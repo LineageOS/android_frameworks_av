@@ -23,6 +23,7 @@
 #include <unordered_map>
 
 // IMediaMetricsService must include Vector, String16, Errors
+#include <android-base/thread_annotations.h>
 #include <media/IMediaMetricsService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/String8.h>
@@ -81,12 +82,11 @@ private:
     bool isRateLimited(mediametrics::Item *) const;
     void saveItem(const std::shared_ptr<const mediametrics::Item>& item);
 
-    // The following methods are GUARDED_BY(mLock)
-    bool expirations_l(const std::shared_ptr<const mediametrics::Item>& item);
+    bool expirations(const std::shared_ptr<const mediametrics::Item>& item) REQUIRES(mLock);
 
     // support for generating output
-    void dumpQueue_l(String8 &result, int64_t sinceNs, const char* prefix);
-    void dumpHeaders_l(String8 &result, int64_t sinceNs, const char* prefix);
+    void dumpQueue(String8 &result, int64_t sinceNs, const char* prefix) REQUIRES(mLock);
+    void dumpHeaders(String8 &result, int64_t sinceNs, const char* prefix) REQUIRES(mLock);
 
     // The following variables accessed without mLock
 
@@ -102,22 +102,22 @@ private:
 
     mediautils::UidInfo mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
 
-    mediametrics::AudioAnalytics mAudioAnalytics;
+    mediametrics::AudioAnalytics mAudioAnalytics; // mAudioAnalytics is locked internally.
 
     std::mutex mLock;
     // statistics about our analytics
-    int64_t mItemsFinalized = 0;        // GUARDED_BY(mLock)
-    int64_t mItemsDiscarded = 0;        // GUARDED_BY(mLock)
-    int64_t mItemsDiscardedExpire = 0;  // GUARDED_BY(mLock)
-    int64_t mItemsDiscardedCount = 0;   // GUARDED_BY(mLock)
+    int64_t mItemsFinalized GUARDED_BY(mLock) = 0;
+    int64_t mItemsDiscarded GUARDED_BY(mLock) = 0;
+    int64_t mItemsDiscardedExpire GUARDED_BY(mLock) = 0;
+    int64_t mItemsDiscardedCount GUARDED_BY(mLock) = 0;
 
     // If we have a worker thread to garbage collect
-    std::future<void> mExpireFuture;    // GUARDED_BY(mLock)
+    std::future<void> mExpireFuture GUARDED_BY(mLock);
 
     // Our item queue, generally (oldest at front)
     // TODO: Make separate class, use segmented queue, write lock only end.
     // Note: Another analytics module might have ownership of an item longer than the log.
-    std::deque<std::shared_ptr<const mediametrics::Item>> mItems; // GUARDED_BY(mLock)
+    std::deque<std::shared_ptr<const mediametrics::Item>> mItems GUARDED_BY(mLock);
 };
 
 } // namespace android
