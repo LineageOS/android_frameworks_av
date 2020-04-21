@@ -282,8 +282,8 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         } else {
             result.appendFormat("Dump of the %s process:\n", kServiceName);
             const char *prefixptr = prefix.size() > 0 ? prefix.c_str() : nullptr;
-            dumpHeaders_l(result, sinceNs, prefixptr);
-            dumpQueue_l(result, sinceNs, prefixptr);
+            dumpHeaders(result, sinceNs, prefixptr);
+            dumpQueue(result, sinceNs, prefixptr);
 
             // TODO: maybe consider a better way of dumping audio analytics info.
             const int32_t linesToDump = all ? INT32_MAX : 1000;
@@ -312,7 +312,7 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
 }
 
 // dump headers
-void MediaMetricsService::dumpHeaders_l(String8 &result, int64_t sinceNs, const char* prefix)
+void MediaMetricsService::dumpHeaders(String8 &result, int64_t sinceNs, const char* prefix)
 {
     if (mediametrics::Item::isEnabled()) {
         result.append("Metrics gathering: enabled\n");
@@ -337,7 +337,7 @@ void MediaMetricsService::dumpHeaders_l(String8 &result, int64_t sinceNs, const 
 }
 
 // TODO: should prefix be a set<string>?
-void MediaMetricsService::dumpQueue_l(String8 &result, int64_t sinceNs, const char* prefix)
+void MediaMetricsService::dumpQueue(String8 &result, int64_t sinceNs, const char* prefix)
 {
     if (mItems.empty()) {
         result.append("empty\n");
@@ -364,7 +364,7 @@ void MediaMetricsService::dumpQueue_l(String8 &result, int64_t sinceNs, const ch
 
 // if item != NULL, it's the item we just inserted
 // true == more items eligible to be recovered
-bool MediaMetricsService::expirations_l(const std::shared_ptr<const mediametrics::Item>& item)
+bool MediaMetricsService::expirations(const std::shared_ptr<const mediametrics::Item>& item)
 {
     bool more = false;
 
@@ -419,7 +419,7 @@ void MediaMetricsService::processExpirations()
     do {
         sleep(1);
         std::lock_guard _l(mLock);
-        more = expirations_l(nullptr);
+        more = expirations(nullptr);
     } while (more);
 }
 
@@ -429,7 +429,7 @@ void MediaMetricsService::saveItem(const std::shared_ptr<const mediametrics::Ite
     // we assume the items are roughly in time order.
     mItems.emplace_back(item);
     ++mItemsFinalized;
-    if (expirations_l(item)
+    if (expirations(item)
             && (!mExpireFuture.valid()
                || mExpireFuture.wait_for(std::chrono::seconds(0)) == std::future_status::ready)) {
         mExpireFuture = std::async(std::launch::async, [this] { processExpirations(); });
