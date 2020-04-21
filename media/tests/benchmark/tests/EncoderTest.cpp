@@ -23,6 +23,10 @@
 #include "Decoder.h"
 #include "Encoder.h"
 
+constexpr int32_t kEncodeDefaultVideoBitRate = 8000000 /* 8 Mbps */;
+constexpr int32_t kEncodeMinVideoBitRate = 600000 /* 600 Kbps */;
+constexpr int32_t kEncodeDefaultAudioBitRate = 128000 /* 128 Kbps */;
+
 static BenchmarkTestEnvironment *gEnv = nullptr;
 
 class EncoderTest : public ::testing::TestWithParam<tuple<string, string, bool>> {};
@@ -86,6 +90,7 @@ TEST_P(EncoderTest, Encode) {
         decoder->setupDecoder();
         status = decoder->decode(inputBuffer, frameInfo, decName, false /*asyncMode */, outFp);
         ASSERT_EQ(status, AMEDIA_OK) << "Decode returned error : " << status;
+        AMediaFormat *decoderFormat = decoder->getFormat();
 
         ifstream eleStream;
         eleStream.open(outputFileName.c_str(), ifstream::binary | ifstream::ate);
@@ -108,11 +113,13 @@ TEST_P(EncoderTest, Encode) {
             if (encParams.bitrate <= 0 || encParams.frameRate <= 0) {
                 encParams.frameRate = 25;
                 if (!strcmp(mime, "video/3gpp") || !strcmp(mime, "video/mp4v-es")) {
-                    encParams.bitrate = 600000 /* 600 Kbps */;
+                    encParams.bitrate = kEncodeMinVideoBitRate;
                 } else {
-                    encParams.bitrate = 8000000 /* 8 Mbps */;
+                    encParams.bitrate = kEncodeDefaultVideoBitRate;
                 }
             }
+            AMediaFormat_getInt32(decoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT,
+                                  &encParams.colorFormat);
             AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_PROFILE, &encParams.profile);
             AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_LEVEL, &encParams.level);
         } else {
@@ -120,8 +127,7 @@ TEST_P(EncoderTest, Encode) {
                                               &encParams.sampleRate));
             ASSERT_TRUE(AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_CHANNEL_COUNT,
                                               &encParams.numChannels));
-            encParams.bitrate =
-                    encParams.sampleRate * encParams.numChannels * 16 /* bitsPerSample */;
+            encParams.bitrate = kEncodeDefaultAudioBitRate;
         }
 
         encoder->setupEncoder();
@@ -141,6 +147,10 @@ TEST_P(EncoderTest, Encode) {
         if (format) {
             AMediaFormat_delete(format);
             format = nullptr;
+        }
+        if (decoderFormat) {
+            AMediaFormat_delete(decoderFormat);
+            decoderFormat = nullptr;
         }
         encoder->resetEncoder();
         decoder->deInitCodec();
