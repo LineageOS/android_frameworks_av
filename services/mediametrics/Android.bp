@@ -27,6 +27,7 @@ cc_binary {
         "-Wall",
         "-Werror",
         "-Wextra",
+        "-Wthread-safety",
     ],
 }
 
