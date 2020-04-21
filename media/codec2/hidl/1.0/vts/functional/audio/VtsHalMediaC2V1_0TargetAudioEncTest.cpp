@@ -240,6 +240,41 @@ bool setupConfigParam(const std::shared_ptr<android::Codec2Client::Component>& c
     return false;
 }
 
+// Get config params for a component
+bool getConfigParams(Codec2AudioEncHidlTest::standardComp compName, int32_t* nChannels,
+                     int32_t* nSampleRate, int32_t* samplesPerFrame) {
+    switch (compName) {
+        case Codec2AudioEncHidlTest::aac:
+            *nChannels = 2;
+            *nSampleRate = 48000;
+            *samplesPerFrame = 1024;
+            break;
+        case Codec2AudioEncHidlTest::flac:
+            *nChannels = 2;
+            *nSampleRate = 48000;
+            *samplesPerFrame = 1152;
+            break;
+        case Codec2AudioEncHidlTest::opus:
+            *nChannels = 2;
+            *nSampleRate = 48000;
+            *samplesPerFrame = 960;
+            break;
+        case Codec2AudioEncHidlTest::amrnb:
+            *nChannels = 1;
+            *nSampleRate = 8000;
+            *samplesPerFrame = 160;
+            break;
+        case Codec2AudioEncHidlTest::amrwb:
+            *nChannels = 1;
+            *nSampleRate = 16000;
+            *samplesPerFrame = 160;
+            break;
+        default:
+            return false;
+    }
+    return true;
+}
+
 // LookUpTable of clips and metadata for component testing
 void GetURLForComponent(Codec2AudioEncHidlTest::standardComp comp, char* mURL) {
     struct CompToURL {
@@ -371,36 +406,18 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
     // Ratio w.r.t to mInputMaxBufSize
     int32_t inputMaxBufRatio = std::stoi(std::get<3>(GetParam()));
-    ;
 
-    // Setting default sampleRate
-    int32_t nChannels = 2;
-    int32_t nSampleRate = 44100;
-    switch (mCompName) {
-        case aac:
-            nChannels = 2;
-            nSampleRate = 48000;
-            break;
-        case flac:
-            nChannels = 2;
-            nSampleRate = 48000;
-            break;
-        case opus:
-            nChannels = 2;
-            nSampleRate = 48000;
-            break;
-        case amrnb:
-            nChannels = 1;
-            nSampleRate = 8000;
-            break;
-        case amrwb:
-            nChannels = 1;
-            nSampleRate = 16000;
-            break;
-        default:
-            ASSERT_TRUE(false);
+    int32_t nChannels;
+    int32_t nSampleRate;
+    int32_t samplesPerFrame;
+
+    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
     }
-    int32_t samplesPerFrame = ((mInputMaxBufSize / inputMaxBufRatio) / (nChannels * 2));
+
+    samplesPerFrame = ((mInputMaxBufSize / inputMaxBufRatio) / (nChannels * 2));
     ALOGV("signalEOS %d mInputMaxBufSize %d samplesPerFrame %d", signalEOS, mInputMaxBufSize,
           samplesPerFrame);
 
@@ -496,39 +513,15 @@ TEST_P(Codec2AudioEncHidlTest, FlushTest) {
     strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL);
 
-    // Setting default configuration
     mFlushedIndices.clear();
-    int32_t nChannels = 2;
-    int32_t nSampleRate = 44100;
-    int32_t samplesPerFrame = 1024;
-    switch (mCompName) {
-        case aac:
-            nChannels = 2;
-            nSampleRate = 48000;
-            samplesPerFrame = 1024;
-            break;
-        case flac:
-            nChannels = 2;
-            nSampleRate = 48000;
-            samplesPerFrame = 1152;
-            break;
-        case opus:
-            nChannels = 2;
-            nSampleRate = 48000;
-            samplesPerFrame = 960;
-            break;
-        case amrnb:
-            nChannels = 1;
-            nSampleRate = 8000;
-            samplesPerFrame = 160;
-            break;
-        case amrwb:
-            nChannels = 1;
-            nSampleRate = 16000;
-            samplesPerFrame = 160;
-            break;
-        default:
-            ASSERT_TRUE(false);
+    int32_t nChannels;
+    int32_t nSampleRate;
+    int32_t samplesPerFrame;
+
+    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
     }
 
     if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
