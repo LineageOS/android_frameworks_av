@@ -711,6 +711,10 @@ private:
 
     bool                    mInOverrun;         // whether recorder is currently in overrun state
 
+    ExtendedTimestamp       mPreviousTimestamp{}; // used to detect retrograde motion
+    bool                    mTimestampRetrogradePositionReported = false; // reduce log spam
+    bool                    mTimestampRetrogradeTimeReported = false;     // reduce log spam
+
 private:
     class DeathNotifier : public IBinder::DeathRecipient {
     public:
