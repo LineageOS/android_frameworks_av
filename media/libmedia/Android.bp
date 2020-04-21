@@ -33,6 +33,7 @@ filegroup {
 
 aidl_interface {
     name: "resourcemanager_aidl_interface",
+    unstable: true,
     local_include_dir: "aidl",
     srcs: [
         "aidl/android/media/IResourceManagerClient.aidl",

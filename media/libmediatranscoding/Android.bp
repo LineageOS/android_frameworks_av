@@ -17,6 +17,7 @@
 // AIDL interfaces of MediaTranscoding.
 aidl_interface {
     name: "mediatranscoding_aidl_interface",
+    unstable: true,
     local_include_dir: "aidl",
     srcs: [
         "aidl/android/media/IMediaTranscodingService.aidl",
