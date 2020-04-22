@@ -75,12 +75,33 @@ void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
     EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStop(aaudioStream));
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_release(aaudioStream));
-    aaudio_stream_state_t state = AAudioStream_getState(aaudioStream);
-    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, state);
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
 
     // We should be able to call this again without crashing.
     EXPECT_EQ(AAUDIO_OK, AAudioStream_release(aaudioStream));
-    state = AAudioStream_getState(aaudioStream);
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
+
+    // We expect these not to crash.
+    AAudioStream_setBufferSizeInFrames(aaudioStream, 0);
+    AAudioStream_setBufferSizeInFrames(aaudioStream, 99999999);
+
+    // We should NOT be able to start or change a stream after it has been released.
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestStart(aaudioStream));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestPause(aaudioStream));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
+    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestStop(aaudioStream));
+    EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
+
+    // Does this crash?
+    EXPECT_LT(0, AAudioStream_getFramesRead(aaudioStream));
+    EXPECT_LT(0, AAudioStream_getFramesWritten(aaudioStream));
+
+    // Verify Closing State. Does this crash?
+    aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                         AAUDIO_STREAM_STATE_UNKNOWN, &state,
+                                                         500 * NANOS_PER_MILLISECOND));
     EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, state);
 
     EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
