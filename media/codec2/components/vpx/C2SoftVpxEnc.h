@@ -180,7 +180,7 @@ struct C2SoftVpxEnc : public SimpleC2Component {
      size_t mTemporalLayers;
 
      // Temporal layer bitrare ratio in percentage
-     uint32_t mTemporalLayerBitrateRatio[MAXTEMPORALLAYERS];
+     float_t mTemporalLayerBitrateRatio[MAXTEMPORALLAYERS];
 
      // Temporal pattern type
      TemporalPatternType mTemporalPatternType;
@@ -218,6 +218,7 @@ struct C2SoftVpxEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamBitrateModeTuning::output> mBitrateMode;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+    std::shared_ptr<C2StreamTemporalLayeringTuning::output> mLayering;
 
      C2_DO_NOT_COPY(C2SoftVpxEnc);
 };
