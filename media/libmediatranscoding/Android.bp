@@ -56,9 +56,13 @@ cc_library_shared {
     ],
 
     cflags: [
-        "-Werror",
-        "-Wno-error=deprecated-declarations",
         "-Wall",
+        "-Werror",
+        "-Wformat",
+        "-Wno-error=deprecated-declarations",
+        "-Wthread-safety",
+        "-Wunused",
+        "-Wunreachable-code",
     ],
 
     sanitize: {
