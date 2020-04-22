@@ -15,17 +15,25 @@
  */
 
 cc_test {
-    name: "XMLParserTest",
-    test_suites: ["device-tests"],
+    name: "HEVCUtilsUnitTest",
     gtest: true,
 
     srcs: [
-        "XMLParserTest.cpp",
+        "HEVCUtilsUnitTest.cpp",
     ],
 
     shared_libs: [
+        "libutils",
         "liblog",
-        "libstagefright_xmlparser",
+    ],
+
+    static_libs: [
+        "libstagefright",
+        "libstagefright_foundation",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright",
     ],
 
     cflags: [
@@ -33,21 +41,11 @@ cc_test {
         "-Wall",
     ],
 
-    data: [":xmlparsertest_test_files",],
-
     sanitize: {
+        cfi: true,
         misc_undefined: [
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
-        cfi: true,
     },
-}
-
-filegroup {
-    name: "xmlparsertest_test_files",
-    srcs: [
-        "testdata/media_codecs_unit_test.xml",
-        "testdata/media_codecs_unit_test_caller.xml",
-    ],
 }

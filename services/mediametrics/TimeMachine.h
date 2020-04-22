@@ -23,6 +23,7 @@
 #include <variant>
 #include <vector>
 
+#include <android-base/thread_annotations.h>
 #include <media/MediaMetricsItem.h>
 #include <utils/Timers.h>
 
@@ -92,7 +93,8 @@ private:
         }
 
         template <typename T>
-        status_t getValue(const std::string &property, T* value, int64_t time = 0) const {
+        status_t getValue(const std::string &property, T* value, int64_t time = 0) const
+                REQUIRES(mPseudoKeyHistoryLock) {
             if (time == 0) time = systemTime(SYSTEM_TIME_REALTIME);
             const auto tsptr = mPropertyMap.find(property);
             if (tsptr == mPropertyMap.end()) return BAD_VALUE;
@@ -108,20 +110,22 @@ private:
         }
 
         template <typename T>
-        status_t getValue(const std::string &property, T defaultValue, int64_t time = 0) const {
+        status_t getValue(const std::string &property, T defaultValue, int64_t time = 0) const
+                REQUIRES(mPseudoKeyHistoryLock){
             T value;
             return getValue(property, &value, time) != NO_ERROR ? defaultValue : value;
         }
 
         void putProp(
-                const std::string &name, const mediametrics::Item::Prop &prop, int64_t time = 0) {
+                const std::string &name, const mediametrics::Item::Prop &prop, int64_t time = 0)
+                REQUIRES(mPseudoKeyHistoryLock) {
             //alternatively: prop.visit([&](auto value) { putValue(name, value, time); });
             putValue(name, prop.get(), time);
         }
 
         template <typename T>
-        void putValue(const std::string &property,
-                T&& e, int64_t time = 0) {
+        void putValue(const std::string &property, T&& e, int64_t time = 0)
+                REQUIRES(mPseudoKeyHistoryLock) {
             if (time == 0) time = systemTime(SYSTEM_TIME_REALTIME);
             mLastModificationTime = time;
             if (mPropertyMap.size() >= kKeyMaxProperties &&
@@ -144,7 +148,8 @@ private:
             }
         }
 
-        std::pair<std::string, int32_t> dump(int32_t lines, int64_t time) const {
+        std::pair<std::string, int32_t> dump(int32_t lines, int64_t time) const
+                REQUIRES(mPseudoKeyHistoryLock) {
             std::stringstream ss;
             int32_t ll = lines;
             for (auto& tsPair : mPropertyMap) {
@@ -158,7 +163,9 @@ private:
             return { ss.str(), lines - ll };
         }
 
-        int64_t getLastModificationTime() const { return mLastModificationTime; }
+        int64_t getLastModificationTime() const REQUIRES(mPseudoKeyHistoryLock) {
+            return mLastModificationTime;
+        }
 
     private:
         static std::string dump(
@@ -267,7 +274,7 @@ public:
             if (it == mHistory.end()) {
                 if (!isTrusted) return PERMISSION_DENIED;
 
-                (void)gc_l(garbage);
+                (void)gc(garbage);
 
                 // no keylock needed here as we are sole owner
                 // until placed on mHistory.
@@ -435,7 +442,8 @@ public:
 private:
 
     // Obtains the lock for a KeyHistory.
-    std::mutex &getLockForKey(const std::string &key) const {
+    std::mutex &getLockForKey(const std::string &key) const
+            RETURN_CAPABILITY(mPseudoKeyHistoryLock) {
         return mKeyLocks[std::hash<std::string>{}(key) % std::size(mKeyLocks)];
     }
 
@@ -459,7 +467,6 @@ private:
         return it->second;
     }
 
-    // GUARDED_BY mLock
     /**
      * Garbage collects if the TimeMachine size exceeds the high water mark.
      *
@@ -471,7 +478,7 @@ private:
      *
      * \return true if garbage collection was done.
      */
-    bool gc_l(std::vector<std::any>& garbage) {
+    bool gc(std::vector<std::any>& garbage) REQUIRES(mLock) {
         // TODO: something better than this for garbage collection.
         if (mHistory.size() < mKeyHighWaterMark) return false;
 
@@ -540,12 +547,17 @@ private:
      */
 
     mutable std::mutex mLock;           // Lock for mHistory
-    History mHistory;                   // GUARDED_BY mLock
+    History mHistory GUARDED_BY(mLock);
 
     // KEY_LOCKS is the number of mutexes for keys.
     // It need not be a power of 2, but faster that way.
     static inline constexpr size_t KEY_LOCKS = 256;
     mutable std::mutex mKeyLocks[KEY_LOCKS];  // Hash-striped lock for KeyHistory based on key.
+
+    // Used for thread-safety analysis, we create a fake mutex object to represent
+    // the hash stripe lock mechanism, which is then tracked by the compiler.
+    class CAPABILITY("mutex") PseudoLock {};
+    static inline PseudoLock mPseudoKeyHistoryLock;
 };
 
 } // namespace android::mediametrics

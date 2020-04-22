@@ -16,6 +16,7 @@
 
 #pragma once
 
+#include <android-base/thread_annotations.h>
 #include <media/MediaMetricsItem.h>
 #include <mutex>
 
@@ -144,7 +145,7 @@ private:
     }
 
     mutable std::mutex mLock;
-    std::map<Trigger, Action> mFilters; // GUARDED_BY mLock
+    std::map<Trigger, Action> mFilters GUARDED_BY(mLock);
 };
 
 } // namespace android::mediametrics

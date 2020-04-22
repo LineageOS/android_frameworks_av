@@ -23,10 +23,11 @@
 #include <queue>
 #include <thread>
 
-#include "media/NdkImage.h"
 #include "BenchmarkCommon.h"
 #include "Stats.h"
 
+// constant not defined in NDK api
+constexpr int32_t COLOR_FormatYUV420Flexible = 0x7F420888;
 
 struct encParameter {
     int32_t bitrate = -1;
@@ -38,9 +39,10 @@ struct encParameter {
     int32_t width = 0;
     int32_t height = 0;
     int32_t frameRate = -1;
-    int32_t profile = 0;
-    int32_t level = 0;
-    int32_t colorFormat = AIMAGE_FORMAT_YUV_420_888;
+    int32_t iFrameInterval = 0;
+    int32_t profile = -1;
+    int32_t level = -1;
+    int32_t colorFormat = COLOR_FormatYUV420Flexible;
 };
 
 class Encoder : public CallBackHandle {
