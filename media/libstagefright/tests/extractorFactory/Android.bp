@@ -15,39 +15,47 @@
  */
 
 cc_test {
-    name: "XMLParserTest",
-    test_suites: ["device-tests"],
+    name: "ExtractorFactoryTest",
     gtest: true,
 
     srcs: [
-        "XMLParserTest.cpp",
+        "ExtractorFactoryTest.cpp",
     ],
 
     shared_libs: [
         "liblog",
-        "libstagefright_xmlparser",
+        "libbase",
+        "libutils",
+        "libmedia",
+        "libbinder",
+        "libcutils",
+        "libdl_android",
+        "libdatasource",
+        "libmediametrics",
     ],
+
+    static_libs: [
+        "libstagefright",
+        "libstagefright_foundation",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/libstagefright",
+    ],
+
+    // TODO: (b/150181583)
+    compile_multilib: "first",
 
     cflags: [
         "-Werror",
         "-Wall",
     ],
 
-    data: [":xmlparsertest_test_files",],
-
     sanitize: {
+        cfi: true,
         misc_undefined: [
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
-        cfi: true,
     },
-}
-
-filegroup {
-    name: "xmlparsertest_test_files",
-    srcs: [
-        "testdata/media_codecs_unit_test.xml",
-        "testdata/media_codecs_unit_test_caller.xml",
-    ],
 }

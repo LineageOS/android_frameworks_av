@@ -1,5 +1,7 @@
+// mappings for frameworks/av/media/libstagefright/foundation
 {
   "presubmit": [
-    { "name": "sf_foundation_test" }
+    { "name": "sf_foundation_test" },
+    { "name": "MetaDataBaseUnitTest"}
   ]
 }
