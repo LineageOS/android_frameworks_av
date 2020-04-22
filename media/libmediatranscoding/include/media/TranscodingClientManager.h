@@ -88,11 +88,6 @@ private:
     TranscodingClientManager(const std::shared_ptr<SchedulerClientInterface>& scheduler);
 
     /**
-     * Checks if a client with clientId is already registered.
-     */
-    bool isClientIdRegistered(ClientIdType clientId) const;
-
-    /**
      * Removes an existing client from the manager.
      *
      * If the client does not exist, this will return non-zero errorcode.
