@@ -42,13 +42,6 @@ typedef uint Bool;
 #define OSCL_EXPORT_REF /* empty */
 #endif
 
-/* flag for post-processing  4/25/00 */
-
-#ifdef DEC_NOPOSTPROC
-#undef PV_POSTPROC_ON   /* enable compilation of post-processing code */
-#else
-#define PV_POSTPROC_ON
-#endif
 
 #define PV_NO_POST_PROC 0
 #define PV_DEBLOCK 1

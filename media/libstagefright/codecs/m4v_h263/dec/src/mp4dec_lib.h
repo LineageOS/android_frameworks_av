@@ -170,37 +170,6 @@ extern "C"
 
     /*--------------------------------------------------------------------------*/
     /* defined in pp_semaphore_chroma_inter.c */
-#ifdef PV_POSTPROC_ON
-    void pp_semaphore_chroma_inter(
-        int xpred,      /* i */
-        int ypred,      /* i */
-        uint8   *pp_dec_u,  /* i/o */
-        uint8   *pstprcTypPrv,  /* i */
-        int dx,     /* i */
-        int dy,     /* i */
-        int mvwidth,    /* i */
-        int height,     /* i */
-        int32   size,       /* i */
-        int mv_loc,     /* i */
-        uint8   msk_deblock /* i */
-    );
-
-    /*--------------------------------------------------------------------------*/
-    /* defined in pp_semaphore_luma.c */
-    uint8 pp_semaphore_luma(
-        int xpred,      /* i */
-        int ypred,      /* i */
-        uint8   *pp_dec_y,  /* i/o */
-        uint8   *pstprcTypPrv,  /* i */
-        int *ll,        /* i */
-        int *mv_loc,    /* i/o */
-        int dx,     /* i */
-        int dy,     /* i */
-        int mvwidth,    /* i */
-        int width,      /* i */
-        int height      /* i */
-    );
-#endif
     /*--------------------------------------------------------------------------*/
     /* defined in get_pred_adv_mb_add.c */
     int GetPredAdvancedMB(
