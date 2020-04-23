@@ -59,8 +59,8 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     // Pointer to the client manager for this client
     TranscodingClientManager* mOwner;
 
-    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid,
-            uid_t uid, const std::string& clientName, const std::string& opPackageName,
+    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
+               const std::string& clientName, const std::string& opPackageName,
                TranscodingClientManager* owner);
 
     Status submitRequest(const TranscodingRequestParcel& /*in_request*/,
@@ -156,15 +156,12 @@ TranscodingClientManager::~TranscodingClientManager() {
     ALOGD("TranscodingClientManager exited");
 }
 
-bool TranscodingClientManager::isClientIdRegistered(ClientIdType clientId) const {
-    return mClientIdToClientMap.find(clientId) != mClientIdToClientMap.end();
-}
-
 void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& args __unused) {
     String8 result;
 
     const size_t SIZE = 256;
     char buffer[SIZE];
+    std::scoped_lock lock{mLock};
 
     snprintf(buffer, SIZE, "    Total num of Clients: %zu\n", mClientIdToClientMap.size());
     result.append(buffer);
@@ -200,7 +197,7 @@ status_t TranscodingClientManager::addClient(
     std::scoped_lock lock{mLock};
 
     // Checks if the client already registers.
-    if (isClientIdRegistered(client->mClientId)) {
+    if (mClientIdToClientMap.find(client->mClientId) != mClientIdToClientMap.end()) {
         return ALREADY_EXISTS;
     }
 

@@ -24,3 +24,6 @@ echo "========================================"
 
 echo "testing MediaSampleReaderNDK"
 adb shell /data/nativetest64/MediaSampleReaderNDKTests/MediaSampleReaderNDKTests
+
+echo "testing MediaSampleQueue"
+adb shell /data/nativetest64/MediaSampleQueueTests/MediaSampleQueueTests
