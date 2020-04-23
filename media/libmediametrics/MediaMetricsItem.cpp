@@ -25,6 +25,7 @@
 #include <set>
 
 #include <binder/Parcel.h>
+#include <cutils/properties.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/SortedVector.h>

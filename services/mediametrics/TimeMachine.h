@@ -138,7 +138,7 @@ private:
             if (timeSequence.empty()           // no elements
                     || property.back() == AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED
                     || timeSequence.rbegin()->second != el) { // value changed
-                timeSequence.emplace(time, std::move(el));
+                timeSequence.emplace_hint(timeSequence.end(), time, std::move(el));
 
                 if (timeSequence.size() > kTimeSequenceMaxElements) {
                     ALOGV("%s: restricting maximum elements (discarding oldest) for %s",
