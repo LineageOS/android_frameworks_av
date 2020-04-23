@@ -81,3 +81,32 @@ cc_fuzz {
 
     dictionary: "mp4_extractor_fuzzer.dict",
 }
+
+cc_fuzz {
+    name: "wav_extractor_fuzzer",
+
+    srcs: [
+        "wav_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/wav",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libfifo",
+        "libwavextractor",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+        "libbinder_ndk",
+        "libbase",
+    ],
+}
