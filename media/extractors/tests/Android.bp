@@ -17,6 +17,7 @@
 cc_test {
     name: "ExtractorUnitTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: ["ExtractorUnitTest.cpp"],
 

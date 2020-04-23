@@ -1,0 +1,12 @@
+{
+    "presubmit": [
+        {
+            "name": "CtsMediaTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.cts.EncodeDecodeTest"
+                }
+            ]
+        }
+    ]
+}
