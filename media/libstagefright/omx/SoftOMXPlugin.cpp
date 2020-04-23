@@ -34,12 +34,7 @@ static const struct {
     const char *mRole;
 
 } kComponents[] = {
-    // two choices for aac decoding.
-    // configurable in media/libstagefright/data/media_codecs_google_audio.xml
-    // default implementation
     { "OMX.google.aac.decoder", "aacdec", "audio_decoder.aac" },
-    // alternate implementation
-    { "OMX.google.xaac.decoder", "xaacdec", "audio_decoder.aac" },
     { "OMX.google.aac.encoder", "aacenc", "audio_encoder.aac" },
     { "OMX.google.amrnb.decoder", "amrdec", "audio_decoder.amrnb" },
     { "OMX.google.amrnb.encoder", "amrnbenc", "audio_encoder.amrnb" },
