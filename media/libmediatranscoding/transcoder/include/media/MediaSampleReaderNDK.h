@@ -20,6 +20,7 @@
 #include <media/MediaSampleReader.h>
 #include <media/NdkMediaExtractor.h>
 
+#include <memory>
 #include <mutex>
 #include <vector>
 

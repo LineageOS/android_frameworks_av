@@ -37,3 +37,10 @@ cc_test {
     defaults: ["testdefaults"],
     srcs: ["MediaSampleReaderNDKTests.cpp"],
 }
+
+// MediaSampleQueue unit test
+cc_test {
+    name: "MediaSampleQueueTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaSampleQueueTests.cpp"],
+}
