@@ -835,10 +835,11 @@ using effect_buffer_t = int16_t;
                 // NOTE: If both mLock and mHardwareLock mutexes must be held,
                 // always take mLock before mHardwareLock
 
-                // These two fields are immutable after onFirstRef(), so no lock needed to access
-                AudioHwDevice*                      mPrimaryHardwareDev; // mAudioHwDevs[0] or NULL
+                // guarded by mHardwareLock
+                AudioHwDevice* mPrimaryHardwareDev;
                 DefaultKeyedVector<audio_module_handle_t, AudioHwDevice*>  mAudioHwDevs;
 
+                // These two fields are immutable after onFirstRef(), so no lock needed to access
                 sp<DevicesFactoryHalInterface> mDevicesFactoryHal;
                 sp<DevicesFactoryHalCallback> mDevicesFactoryHalCallback;
 
@@ -865,6 +866,7 @@ using effect_buffer_t = int16_t;
         AUDIO_HW_GET_PARAMETER,         // get_parameters
         AUDIO_HW_SET_MASTER_MUTE,       // set_master_mute
         AUDIO_HW_GET_MASTER_MUTE,       // get_master_mute
+        AUDIO_HW_GET_MICROPHONES,       // getMicrophones
     };
 
     mutable     hardware_call_state                 mHardwareStatus;    // for dump only
