@@ -19,74 +19,60 @@
 
 #include <android-base/logging.h>
 #include <gtest/gtest.h>
+#include <hidl/GtestPrinter.h>
 #include <stdio.h>
-#include <fstream>
 #include <algorithm>
+#include <fstream>
 
-#include <codec2/hidl/client.h>
 #include <C2AllocatorIon.h>
-#include <C2Config.h>
-#include <C2Debug.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
+#include <C2Config.h>
+#include <C2Debug.h>
+#include <codec2/hidl/client.h>
 
 using android::C2AllocatorIon;
 
-#include <VtsHalHidlTargetTestBase.h>
-#include "media_c2_audio_hidl_test_common.h"
 #include "media_c2_hidl_test_common.h"
 
-class LinearBuffer : public C2Buffer {
-   public:
-    explicit LinearBuffer(const std::shared_ptr<C2LinearBlock>& block)
-        : C2Buffer(
-              {block->share(block->offset(), block->size(), ::C2Fence())}) {}
-};
+static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
+        kEncodeTestParameters;
 
-static ComponentTestEnvironment* gEnv = nullptr;
+// Resource directory
+static std::string sResourceDir = "";
+
+class LinearBuffer : public C2Buffer {
+  public:
+    explicit LinearBuffer(const std::shared_ptr<C2LinearBlock>& block)
+        : C2Buffer({block->share(block->offset(), block->size(), ::C2Fence())}) {}
+};
 
 namespace {
 
-class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
-   private:
-    typedef ::testing::VtsHalHidlTargetTestBase Super;
-
-   public:
-    ::std::string getTestCaseInfo() const override {
-        return ::std::string() +
-                "Component: " + gEnv->getComponent().c_str() + " | " +
-                "Instance: " + gEnv->getInstance().c_str() + " | " +
-                "Res: " + gEnv->getRes().c_str();
-    }
-
+class Codec2AudioEncHidlTestBase : public ::testing::Test {
+  public:
     // google.codec2 Audio test setup
     virtual void SetUp() override {
-        Super::SetUp();
+        getParams();
         mDisableTest = false;
         ALOGV("Codec2AudioEncHidlTest SetUp");
         mClient = android::Codec2Client::CreateFromService(
-            gEnv->getInstance().c_str(),
-            !bool(android::Codec2Client::CreateFromService("default", true)));
+                mInstanceName.c_str(),
+                !bool(android::Codec2Client::CreateFromService("default", true)));
         ASSERT_NE(mClient, nullptr);
-        mListener.reset(new CodecListener(
-            [this](std::list<std::unique_ptr<C2Work>>& workItems) {
-                handleWorkDone(workItems);
-            }));
+        mListener.reset(new CodecListener([this](std::list<std::unique_ptr<C2Work>>& workItems) {
+            handleWorkDone(workItems);
+        }));
         ASSERT_NE(mListener, nullptr);
         for (int i = 0; i < MAX_INPUT_BUFFERS; ++i) {
             mWorkQueue.emplace_back(new C2Work);
         }
-        mClient->createComponent(gEnv->getComponent().c_str(), mListener,
-                                 &mComponent);
+        mClient->createComponent(mComponentName, mListener, &mComponent);
         ASSERT_NE(mComponent, nullptr);
 
-        std::shared_ptr<C2AllocatorStore> store =
-            android::GetCodec2PlatformAllocatorStore();
-        CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR,
-                                       &mLinearAllocator),
-                 C2_OK);
-        mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator,
-                                                          mBlockPoolId++);
+        std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
+        CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &mLinearAllocator), C2_OK);
+        mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
         ASSERT_NE(mLinearPool, nullptr);
 
         mCompName = unknown_comp;
@@ -95,19 +81,13 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
             standardComp CompName;
         };
         const StringToName kStringToName[] = {
-            {"aac", aac},
-            {"flac", flac},
-            {"opus", opus},
-            {"amrnb", amrnb},
-            {"amrwb", amrwb},
+                {"aac", aac}, {"flac", flac}, {"opus", opus}, {"amrnb", amrnb}, {"amrwb", amrwb},
         };
-        const size_t kNumStringToName =
-            sizeof(kStringToName) / sizeof(kStringToName[0]);
+        const size_t kNumStringToName = sizeof(kStringToName) / sizeof(kStringToName[0]);
 
         // Find the component type
-        std::string comp = std::string(gEnv->getComponent());
         for (size_t i = 0; i < kNumStringToName; ++i) {
-            if (strcasestr(comp.c_str(), kStringToName[i].Name)) {
+            if (strcasestr(mComponentName.c_str(), kStringToName[i].Name)) {
                 mCompName = kStringToName[i].CompName;
                 break;
             }
@@ -126,15 +106,17 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
             mComponent->release();
             mComponent = nullptr;
         }
-        Super::TearDown();
     }
+
+    // Get the test parameters from GetParam call.
+    virtual void getParams() {}
+
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
         for (std::unique_ptr<C2Work>& work : workItems) {
             if (!work->worklets.empty()) {
-                workDone(mComponent, work, mFlushedIndices, mQueueLock,
-                         mQueueCondition, mWorkQueue, mEos, mCsd,
-                         mFramesReceived);
+                workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
+                         mEos, mCsd, mFramesReceived);
             }
         }
     }
@@ -147,6 +129,8 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         unknown_comp,
     };
 
+    std::string mInstanceName;
+    std::string mComponentName;
     bool mEos;
     bool mCsd;
     bool mDisableTest;
@@ -167,7 +151,7 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     std::shared_ptr<android::Codec2Client::Listener> mListener;
     std::shared_ptr<android::Codec2Client::Component> mComponent;
 
-   protected:
+  protected:
     static void description(const std::string& description) {
         RecordProperty("description", description);
     }
@@ -176,9 +160,8 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     void getInputMaxBufSize() {
         int32_t bitStreamInfo[1] = {0};
         std::vector<std::unique_ptr<C2Param>> inParams;
-        c2_status_t status = mComponent->query(
-            {}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE}, C2_DONT_BLOCK,
-            &inParams);
+        c2_status_t status = mComponent->query({}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE},
+                                               C2_DONT_BLOCK, &inParams);
         if (status != C2_OK && inParams.size() == 0) {
             ALOGE("Query MaxBufferSizeInfo failed => %d", status);
             ASSERT_TRUE(false);
@@ -191,12 +174,19 @@ class Codec2AudioEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         }
         mInputMaxBufSize = bitStreamInfo[0];
     }
-
 };
 
-void validateComponent(
-    const std::shared_ptr<android::Codec2Client::Component>& component,
-    Codec2AudioEncHidlTest::standardComp compName, bool& disableTest) {
+class Codec2AudioEncHidlTest
+    : public Codec2AudioEncHidlTestBase,
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
+};
+
+void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& component,
+                       Codec2AudioEncHidlTest::standardComp compName, bool& disableTest) {
     // Validate its a C2 Component
     if (component->getName().find("c2") == std::string::npos) {
         ALOGE("Not a c2 component");
@@ -211,14 +201,12 @@ void validateComponent(
         return;
     }
     std::vector<std::unique_ptr<C2Param>> queried;
-    c2_status_t c2err =
-        component->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE},
-                         C2_DONT_BLOCK, &queried);
+    c2_status_t c2err = component->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE},
+                                         C2_DONT_BLOCK, &queried);
     if (c2err != C2_OK && queried.size() == 0) {
         ALOGE("Query media type failed => %d", c2err);
     } else {
-        std::string inputDomain =
-            ((C2StreamMediaTypeSetting::input*)queried[0].get())->m.value;
+        std::string inputDomain = ((C2StreamMediaTypeSetting::input*)queried[0].get())->m.value;
         if (inputDomain.find("audio/") == std::string::npos) {
             ALOGE("Expected Audio Component");
             disableTest = true;
@@ -236,16 +224,14 @@ void validateComponent(
 }
 
 // Set Default config param.
-bool setupConfigParam(
-    const std::shared_ptr<android::Codec2Client::Component>& component,
-    int32_t nChannels, int32_t nSampleRate) {
+bool setupConfigParam(const std::shared_ptr<android::Codec2Client::Component>& component,
+                      int32_t nChannels, int32_t nSampleRate) {
     std::vector<std::unique_ptr<C2SettingResult>> failures;
     C2StreamSampleRateInfo::input sampleRateInfo(0u, nSampleRate);
     C2StreamChannelCountInfo::input channelCountInfo(0u, nChannels);
 
     std::vector<C2Param*> configParam{&sampleRateInfo, &channelCountInfo};
-    c2_status_t status =
-        component->config(configParam, C2_DONT_BLOCK, &failures);
+    c2_status_t status = component->config(configParam, C2_DONT_BLOCK, &failures);
     if (status == C2_OK && failures.size() == 0u) return true;
     return false;
 }
@@ -257,16 +243,11 @@ void GetURLForComponent(Codec2AudioEncHidlTest::standardComp comp, char* mURL) {
         const char* mURL;
     };
     static const CompToURL kCompToURL[] = {
-        {Codec2AudioEncHidlTest::standardComp::aac,
-         "bbb_raw_2ch_48khz_s16le.raw"},
-        {Codec2AudioEncHidlTest::standardComp::amrnb,
-         "bbb_raw_1ch_8khz_s16le.raw"},
-        {Codec2AudioEncHidlTest::standardComp::amrwb,
-         "bbb_raw_1ch_16khz_s16le.raw"},
-        {Codec2AudioEncHidlTest::standardComp::flac,
-         "bbb_raw_2ch_48khz_s16le.raw"},
-        {Codec2AudioEncHidlTest::standardComp::opus,
-         "bbb_raw_2ch_48khz_s16le.raw"},
+            {Codec2AudioEncHidlTest::standardComp::aac, "bbb_raw_2ch_48khz_s16le.raw"},
+            {Codec2AudioEncHidlTest::standardComp::amrnb, "bbb_raw_1ch_8khz_s16le.raw"},
+            {Codec2AudioEncHidlTest::standardComp::amrwb, "bbb_raw_1ch_16khz_s16le.raw"},
+            {Codec2AudioEncHidlTest::standardComp::flac, "bbb_raw_2ch_48khz_s16le.raw"},
+            {Codec2AudioEncHidlTest::standardComp::opus, "bbb_raw_2ch_48khz_s16le.raw"},
     };
 
     for (size_t i = 0; i < sizeof(kCompToURL) / sizeof(kCompToURL[0]); ++i) {
@@ -278,21 +259,18 @@ void GetURLForComponent(Codec2AudioEncHidlTest::standardComp comp, char* mURL) {
 }
 
 void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
-                   std::mutex &queueLock, std::condition_variable& queueCondition,
+                   std::mutex& queueLock, std::condition_variable& queueCondition,
                    std::list<std::unique_ptr<C2Work>>& workQueue,
-                   std::list<uint64_t>& flushedIndices,
-                   std::shared_ptr<C2BlockPool>& linearPool,
-                   std::ifstream& eleStream, uint32_t nFrames,
-                   int32_t samplesPerFrame, int32_t nChannels,
-                   int32_t nSampleRate, bool flushed = false,
+                   std::list<uint64_t>& flushedIndices, std::shared_ptr<C2BlockPool>& linearPool,
+                   std::ifstream& eleStream, uint32_t nFrames, int32_t samplesPerFrame,
+                   int32_t nChannels, int32_t nSampleRate, bool flushed = false,
                    bool signalEOS = true) {
     typedef std::unique_lock<std::mutex> ULock;
 
     uint32_t frameID = 0;
     uint32_t maxRetry = 0;
     int bytesCount = samplesPerFrame * nChannels * 2;
-    int32_t timestampIncr =
-        (int)(((float)samplesPerFrame / nSampleRate) * 1000000);
+    int32_t timestampIncr = (int)(((float)samplesPerFrame / nSampleRate) * 1000000);
     uint64_t timestamp = 0;
     while (1) {
         if (nFrames == 0) break;
@@ -312,8 +290,7 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         if (!work && (maxRetry >= MAX_RETRY)) {
             ASSERT_TRUE(false) << "Wait for generating C2Work exceeded timeout";
         }
-        if (signalEOS && (nFrames == 1))
-            flags |= C2FrameData::FLAG_END_OF_STREAM;
+        if (signalEOS && (nFrames == 1)) flags |= C2FrameData::FLAG_END_OF_STREAM;
         if (flushed) {
             flags |= SYNC_FRAME;
             flushed = false;
@@ -330,10 +307,9 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         eleStream.read(data, bytesCount);
         ASSERT_EQ(eleStream.gcount(), bytesCount);
         std::shared_ptr<C2LinearBlock> block;
-        ASSERT_EQ(C2_OK, linearPool->fetchLinearBlock(
-                             bytesCount, {C2MemoryUsage::CPU_READ,
-                                          C2MemoryUsage::CPU_WRITE},
-                             &block));
+        ASSERT_EQ(C2_OK,
+                  linearPool->fetchLinearBlock(
+                          bytesCount, {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block));
         ASSERT_TRUE(block);
         // Write View
         C2WriteView view = block->map().get();
@@ -365,27 +341,33 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
     }
 }
 
-TEST_F(Codec2AudioEncHidlTest, validateCompName) {
-    if (mDisableTest) return;
+TEST_P(Codec2AudioEncHidlTest, validateCompName) {
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ALOGV("Checks if the given component is a valid audio component");
     validateComponent(mComponent, mCompName, mDisableTest);
     ASSERT_EQ(mDisableTest, false);
 }
 
 class Codec2AudioEncEncodeTest
-    : public Codec2AudioEncHidlTest,
-      public ::testing::WithParamInterface<std::pair<bool, int32_t>> {
+    : public Codec2AudioEncHidlTestBase,
+      public ::testing::WithParamInterface<
+              std::tuple<std::string, std::string, std::string, std::string>> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
 };
 
 TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     ALOGV("EncodeTest");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     char mURL[512];
-    strcpy(mURL, gEnv->getRes().c_str());
+    strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL);
-    bool signalEOS = GetParam().first;
+    bool signalEOS = !std::get<2>(GetParam()).compare("true");
     // Ratio w.r.t to mInputMaxBufSize
-    int32_t inputMaxBufRatio = GetParam().second;
+    int32_t inputMaxBufRatio = std::stoi(std::get<3>(GetParam()));
+    ;
 
     // Setting default sampleRate
     int32_t nChannels = 2;
@@ -414,10 +396,9 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
         default:
             ASSERT_TRUE(false);
     }
-    int32_t samplesPerFrame =
-        ((mInputMaxBufSize / inputMaxBufRatio) / (nChannels * 2));
-    ALOGV("signalEOS %d mInputMaxBufSize %d samplesPerFrame %d", signalEOS,
-          mInputMaxBufSize, samplesPerFrame);
+    int32_t samplesPerFrame = ((mInputMaxBufSize / inputMaxBufRatio) / (nChannels * 2));
+    ALOGV("signalEOS %d mInputMaxBufSize %d samplesPerFrame %d", signalEOS, mInputMaxBufSize,
+          samplesPerFrame);
 
     if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
         std::cout << "[   WARN   ] Test Skipped \n";
@@ -429,26 +410,21 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ALOGV("mURL : %s", mURL);
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mLinearPool, eleStream, numFrames,
-                      samplesPerFrame, nChannels, nSampleRate, false,
-                      signalEOS));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(
+            mComponent, mQueueLock, mQueueCondition, mWorkQueue, mFlushedIndices, mLinearPool,
+            eleStream, numFrames, samplesPerFrame, nChannels, nSampleRate, false, signalEOS));
 
     // If EOS is not sent, sending empty input with EOS flag
     if (!signalEOS) {
-        ASSERT_NO_FATAL_FAILURE(
-            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
-        ASSERT_NO_FATAL_FAILURE(
-            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
-                            C2FrameData::FLAG_END_OF_STREAM, false));
+        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                                                C2FrameData::FLAG_END_OF_STREAM, false));
         numFrames += 1;
     }
 
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
     eleStream.close();
     if (mFramesReceived != numFrames) {
         ALOGE("Input buffer count and Output buffer count mismatch");
@@ -465,18 +441,9 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-// EncodeTest with EOS / No EOS and inputMaxBufRatio
-// inputMaxBufRatio is ratio w.r.t. to mInputMaxBufSize
-INSTANTIATE_TEST_CASE_P(EncodeTest, Codec2AudioEncEncodeTest,
-                        ::testing::Values(std::make_pair(false, 1),
-                                          std::make_pair(false, 2),
-                                          std::make_pair(true, 1),
-                                          std::make_pair(true, 2)));
-
-
-TEST_F(Codec2AudioEncHidlTest, EOSTest) {
+TEST_P(Codec2AudioEncHidlTest, EOSTest) {
     description("Test empty input buffer with EOS flag");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ASSERT_EQ(mComponent->start(), C2_OK);
 
     typedef std::unique_lock<std::mutex> ULock;
@@ -514,13 +481,13 @@ TEST_F(Codec2AudioEncHidlTest, EOSTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-TEST_F(Codec2AudioEncHidlTest, FlushTest) {
+TEST_P(Codec2AudioEncHidlTest, FlushTest) {
     description("Test Request for flush");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     typedef std::unique_lock<std::mutex> ULock;
     char mURL[512];
-    strcpy(mURL, gEnv->getRes().c_str());
+    strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL);
 
     // Setting default configuration
@@ -570,29 +537,24 @@ TEST_F(Codec2AudioEncHidlTest, FlushTest) {
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ALOGV("mURL : %s", mURL);
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mLinearPool, eleStream, numFramesFlushed,
-                      samplesPerFrame, nChannels, nSampleRate));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mLinearPool, eleStream, numFramesFlushed,
+                                          samplesPerFrame, nChannels, nSampleRate));
     std::list<std::unique_ptr<C2Work>> flushedWork;
-    c2_status_t err =
-        mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-            (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
     uint64_t frameIndex;
     {
-        //Update mFlushedIndices based on the index received from flush()
+        // Update mFlushedIndices based on the index received from flush()
         ULock l(mQueueLock);
         for (std::unique_ptr<C2Work>& work : flushedWork) {
             ASSERT_NE(work, nullptr);
             frameIndex = work->input.ordinal.frameIndex.peeku();
             std::list<uint64_t>::iterator frameIndexIt =
-                std::find(mFlushedIndices.begin(), mFlushedIndices.end(),
-                          frameIndex);
-            if (!mFlushedIndices.empty() &&
-                (frameIndexIt != mFlushedIndices.end())) {
+                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
+            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
                 mFlushedIndices.erase(frameIndexIt);
                 work->input.buffers.clear();
                 work->worklets.clear();
@@ -601,29 +563,24 @@ TEST_F(Codec2AudioEncHidlTest, FlushTest) {
         }
     }
     mFlushedIndices.clear();
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mLinearPool, eleStream,
-                      numFrames - numFramesFlushed, samplesPerFrame,
-                      nChannels, nSampleRate, true));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mLinearPool, eleStream,
+                                          numFrames - numFramesFlushed, samplesPerFrame, nChannels,
+                                          nSampleRate, true));
     eleStream.close();
-    err =
-        mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-            (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
     {
-        //Update mFlushedIndices based on the index received from flush()
+        // Update mFlushedIndices based on the index received from flush()
         ULock l(mQueueLock);
         for (std::unique_ptr<C2Work>& work : flushedWork) {
             ASSERT_NE(work, nullptr);
             frameIndex = work->input.ordinal.frameIndex.peeku();
             std::list<uint64_t>::iterator frameIndexIt =
-                std::find(mFlushedIndices.begin(), mFlushedIndices.end(),
-                          frameIndex);
-            if (!mFlushedIndices.empty() &&
-                (frameIndexIt != mFlushedIndices.end())) {
+                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
+            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
                 mFlushedIndices.erase(frameIndexIt);
                 work->input.buffers.clear();
                 work->worklets.clear();
@@ -635,17 +592,39 @@ TEST_F(Codec2AudioEncHidlTest, FlushTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(kTestParameters),
+                         android::hardware::PrintInstanceTupleNameToString<>);
+
+// EncodeTest with EOS / No EOS and inputMaxBufRatio
+// inputMaxBufRatio is ratio w.r.t. to mInputMaxBufSize
+INSTANTIATE_TEST_SUITE_P(EncodeTest, Codec2AudioEncEncodeTest,
+                         testing::ValuesIn(kEncodeTestParameters),
+                         android::hardware::PrintInstanceTupleNameToString<>);
+
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
-    gEnv = new ComponentTestEnvironment();
-    ::testing::AddGlobalTestEnvironment(gEnv);
-    ::testing::InitGoogleTest(&argc, argv);
-    gEnv->init(&argc, argv);
-    int status = gEnv->initFromOptions(argc, argv);
-    if (status == 0) {
-        int status = RUN_ALL_TESTS();
-        LOG(INFO) << "C2 Test result = " << status;
+    kTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_ENCODER);
+    for (auto params : kTestParameters) {
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "1"));
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "2"));
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "1"));
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "2"));
     }
-    return status;
+
+    // Set the resource directory based on command line args.
+    // Test will fail to set up if the argument is not set.
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-P") == 0 && i < argc - 1) {
+            sResourceDir = argv[i + 1];
+            break;
+        }
+    }
+
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }

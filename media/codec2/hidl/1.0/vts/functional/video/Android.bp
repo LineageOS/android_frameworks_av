@@ -16,6 +16,7 @@
 
 cc_test {
     name: "VtsHalMediaC2V1_0TargetVideoDecTest",
+    stem: "vts_media_c2_v1_0_video_dec_test",
     defaults: ["VtsHalMediaC2V1_0Defaults"],
     srcs: ["VtsHalMediaC2V1_0TargetVideoDecTest.cpp"],
     header_libs: [
@@ -26,11 +27,16 @@ cc_test {
         "libgui",
         "libutils",
     ],
+    data: [":media_c2_v1_video_decode_res"],
+    test_config: "VtsHalMediaC2V1_0TargetVideoDecTest.xml",
 }
 
 cc_test {
     name: "VtsHalMediaC2V1_0TargetVideoEncTest",
+    stem: "vts_media_c2_v1_0_video_enc_test",
     defaults: ["VtsHalMediaC2V1_0Defaults"],
     srcs: ["VtsHalMediaC2V1_0TargetVideoEncTest.cpp"],
+    data: [":media_c2_v1_video_encode_res"],
+    test_config: "VtsHalMediaC2V1_0TargetVideoEncTest.xml",
 }
 
