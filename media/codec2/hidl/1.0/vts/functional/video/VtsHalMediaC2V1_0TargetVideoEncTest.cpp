@@ -19,73 +19,62 @@
 
 #include <android-base/logging.h>
 #include <gtest/gtest.h>
+#include <hidl/GtestPrinter.h>
 #include <stdio.h>
 #include <fstream>
 
-#include <codec2/hidl/client.h>
 #include <C2AllocatorIon.h>
-#include <C2Config.h>
-#include <C2Debug.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
+#include <C2Config.h>
+#include <C2Debug.h>
+#include <codec2/hidl/client.h>
 
 using android::C2AllocatorIon;
 
-#include <VtsHalHidlTargetTestBase.h>
-#include "media_c2_video_hidl_test_common.h"
 #include "media_c2_hidl_test_common.h"
+#include "media_c2_video_hidl_test_common.h"
 
 class GraphicBuffer : public C2Buffer {
-public:
-  explicit GraphicBuffer(const std::shared_ptr<C2GraphicBlock> &block)
-      : C2Buffer({block->share(C2Rect(block->width(), block->height()),
-                               ::C2Fence())}) {}
+  public:
+    explicit GraphicBuffer(const std::shared_ptr<C2GraphicBlock>& block)
+        : C2Buffer({block->share(C2Rect(block->width(), block->height()), ::C2Fence())}) {}
 };
 
-static ComponentTestEnvironment* gEnv = nullptr;
+static std::vector<std::tuple<std::string, std::string, std::string>> kEncodeTestParameters;
+static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
+        kEncodeResolutionTestParameters;
+
+// Resource directory
+static std::string sResourceDir = "";
 
 namespace {
 
-class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
-   private:
-    typedef ::testing::VtsHalHidlTargetTestBase Super;
-
-   public:
-    ::std::string getTestCaseInfo() const override {
-        return ::std::string() +
-                "Component: " + gEnv->getComponent().c_str() + " | " +
-                "Instance: " + gEnv->getInstance().c_str() + " | " +
-                "Res: " + gEnv->getRes().c_str();
-    }
-
+class Codec2VideoEncHidlTestBase : public ::testing::Test {
+  public:
     // google.codec2 Video test setup
     virtual void SetUp() override {
-        Super::SetUp();
+        getParams();
         mDisableTest = false;
         ALOGV("Codec2VideoEncHidlTest SetUp");
         mClient = android::Codec2Client::CreateFromService(
-            gEnv->getInstance().c_str(),
-            !bool(android::Codec2Client::CreateFromService("default", true)));
+                mInstanceName.c_str(),
+                !bool(android::Codec2Client::CreateFromService("default", true)));
         ASSERT_NE(mClient, nullptr);
-        mListener.reset(new CodecListener(
-            [this](std::list<std::unique_ptr<C2Work>>& workItems) {
-                handleWorkDone(workItems);
-            }));
+        mListener.reset(new CodecListener([this](std::list<std::unique_ptr<C2Work>>& workItems) {
+            handleWorkDone(workItems);
+        }));
         ASSERT_NE(mListener, nullptr);
         for (int i = 0; i < MAX_INPUT_BUFFERS; ++i) {
             mWorkQueue.emplace_back(new C2Work);
         }
-        mClient->createComponent(gEnv->getComponent().c_str(), mListener,
-                                 &mComponent);
+        mClient->createComponent(mComponentName, mListener, &mComponent);
         ASSERT_NE(mComponent, nullptr);
 
-        std::shared_ptr<C2AllocatorStore> store =
-            android::GetCodec2PlatformAllocatorStore();
-        CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC,
-                                       &mGraphicAllocator),
+        std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
+        CHECK_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_GRAPHIC, &mGraphicAllocator),
                  C2_OK);
-        mGraphicPool = std::make_shared<C2PooledBlockPool>(mGraphicAllocator,
-                                                           mBlockPoolId++);
+        mGraphicPool = std::make_shared<C2PooledBlockPool>(mGraphicAllocator, mBlockPoolId++);
         ASSERT_NE(mGraphicPool, nullptr);
 
         mCompName = unknown_comp;
@@ -95,17 +84,15 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         };
 
         const StringToName kStringToName[] = {
-            {"h263", h263}, {"avc", avc}, {"mpeg4", mpeg4},
-            {"hevc", hevc}, {"vp8", vp8}, {"vp9", vp9},
+                {"h263", h263}, {"avc", avc}, {"mpeg4", mpeg4},
+                {"hevc", hevc}, {"vp8", vp8}, {"vp9", vp9},
         };
 
-        const size_t kNumStringToName =
-            sizeof(kStringToName) / sizeof(kStringToName[0]);
+        const size_t kNumStringToName = sizeof(kStringToName) / sizeof(kStringToName[0]);
 
         // Find the component type
-        std::string comp = std::string(gEnv->getComponent());
         for (size_t i = 0; i < kNumStringToName; ++i) {
-            if (strcasestr(comp.c_str(), kStringToName[i].Name)) {
+            if (strcasestr(mComponentName.c_str(), kStringToName[i].Name)) {
                 mCompName = kStringToName[i].CompName;
                 break;
             }
@@ -126,8 +113,10 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
             mComponent->release();
             mComponent = nullptr;
         }
-        Super::TearDown();
     }
+
+    // Get the test parameters from GetParam call.
+    virtual void getParams() {}
 
     bool setupConfigParam(int32_t nWidth, int32_t nHeight);
 
@@ -139,11 +128,9 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
                 // previous timestamp
                 typedef std::unique_lock<std::mutex> ULock;
                 if (!mTimestampUslist.empty()) {
-                    EXPECT_GE((work->worklets.front()
-                                   ->output.ordinal.timestamp.peeku()),
+                    EXPECT_GE((work->worklets.front()->output.ordinal.timestamp.peeku()),
                               mTimestampUs);
-                    mTimestampUs = work->worklets.front()
-                                       ->output.ordinal.timestamp.peeku();
+                    mTimestampUs = work->worklets.front()->output.ordinal.timestamp.peeku();
                     // Currently this lock is redundant as no mTimestampUslist is only initialized
                     // before queuing any work to component. Once AdaptiveTest is added similar to
                     // the one in video decoders, this is needed.
@@ -151,8 +138,7 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
 
                     if (mTimestampDevTest) {
                         bool tsHit = false;
-                        std::list<uint64_t>::iterator it =
-                            mTimestampUslist.begin();
+                        std::list<uint64_t>::iterator it = mTimestampUslist.begin();
                         while (it != mTimestampUslist.end()) {
                             if (*it == mTimestampUs) {
                                 mTimestampUslist.erase(it);
@@ -163,21 +149,18 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
                         }
                         if (tsHit == false) {
                             if (mTimestampUslist.empty() == false) {
-                                EXPECT_EQ(tsHit, true)
-                                    << "TimeStamp not recognized";
+                                EXPECT_EQ(tsHit, true) << "TimeStamp not recognized";
                             } else {
-                                std::cout
-                                    << "[   INFO   ] Received non-zero "
-                                       "output / TimeStamp not recognized \n";
+                                std::cout << "[   INFO   ] Received non-zero "
+                                             "output / TimeStamp not recognized \n";
                             }
                         }
                     }
                 }
 
                 if (work->result != C2_OK) mFailedWorkReceived++;
-                workDone(mComponent, work, mFlushedIndices, mQueueLock,
-                         mQueueCondition, mWorkQueue, mEos, mCsd,
-                         mFramesReceived);
+                workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
+                         mEos, mCsd, mFramesReceived);
             }
         }
     }
@@ -192,6 +175,8 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
         unknown_comp,
     };
 
+    std::string mInstanceName;
+    std::string mComponentName;
     bool mEos;
     bool mCsd;
     bool mDisableTest;
@@ -217,15 +202,23 @@ class Codec2VideoEncHidlTest : public ::testing::VtsHalHidlTargetTestBase {
     std::shared_ptr<android::Codec2Client::Listener> mListener;
     std::shared_ptr<android::Codec2Client::Component> mComponent;
 
-   protected:
+  protected:
     static void description(const std::string& description) {
         RecordProperty("description", description);
     }
 };
 
-void validateComponent(
-    const std::shared_ptr<android::Codec2Client::Component>& component,
-    Codec2VideoEncHidlTest::standardComp compName, bool& disableTest) {
+class Codec2VideoEncHidlTest
+    : public Codec2VideoEncHidlTestBase,
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
+};
+
+void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& component,
+                       Codec2VideoEncHidlTest::standardComp compName, bool& disableTest) {
     // Validate its a C2 Component
     if (component->getName().find("c2") == std::string::npos) {
         ALOGE("Not a c2 component");
@@ -240,14 +233,12 @@ void validateComponent(
         return;
     }
     std::vector<std::unique_ptr<C2Param>> queried;
-    c2_status_t c2err =
-        component->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE},
-                         C2_DONT_BLOCK, &queried);
+    c2_status_t c2err = component->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE},
+                                         C2_DONT_BLOCK, &queried);
     if (c2err != C2_OK && queried.size() == 0) {
         ALOGE("Query media type failed => %d", c2err);
     } else {
-        std::string inputDomain =
-            ((C2StreamMediaTypeSetting::input*)queried[0].get())->m.value;
+        std::string inputDomain = ((C2StreamMediaTypeSetting::input*)queried[0].get())->m.value;
         if (inputDomain.find("video/") == std::string::npos) {
             ALOGE("Expected Video Component");
             disableTest = true;
@@ -265,12 +256,11 @@ void validateComponent(
 }
 
 // Set Default config param.
-bool Codec2VideoEncHidlTest::setupConfigParam(int32_t nWidth, int32_t nHeight) {
+bool Codec2VideoEncHidlTestBase::setupConfigParam(int32_t nWidth, int32_t nHeight) {
     std::vector<std::unique_ptr<C2SettingResult>> failures;
     C2StreamPictureSizeInfo::input inputSize(0u, nWidth, nHeight);
     std::vector<C2Param*> configParam{&inputSize};
-    c2_status_t status =
-        mComponent->config(configParam, C2_DONT_BLOCK, &failures);
+    c2_status_t status = mComponent->config(configParam, C2_DONT_BLOCK, &failures);
     if (status == C2_OK && failures.size() == 0u) return true;
     return false;
 }
@@ -281,13 +271,11 @@ void GetURLForComponent(char* URL) {
 }
 
 void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
-                   std::mutex &queueLock, std::condition_variable& queueCondition,
+                   std::mutex& queueLock, std::condition_variable& queueCondition,
                    std::list<std::unique_ptr<C2Work>>& workQueue,
-                   std::list<uint64_t>& flushedIndices,
-                   std::shared_ptr<C2BlockPool>& graphicPool,
-                   std::ifstream& eleStream, bool& disableTest,
-                   uint32_t frameID, uint32_t nFrames, uint32_t nWidth,
-                   int32_t nHeight, bool flushed = false, bool signalEOS = true) {
+                   std::list<uint64_t>& flushedIndices, std::shared_ptr<C2BlockPool>& graphicPool,
+                   std::ifstream& eleStream, bool& disableTest, uint32_t frameID, uint32_t nFrames,
+                   uint32_t nWidth, int32_t nHeight, bool flushed = false, bool signalEOS = true) {
     typedef std::unique_lock<std::mutex> ULock;
 
     uint32_t maxRetry = 0;
@@ -313,8 +301,7 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         if (!work && (maxRetry >= MAX_RETRY)) {
             ASSERT_TRUE(false) << "Wait for generating C2Work exceeded timeout";
         }
-        if (signalEOS && (nFrames == 1))
-            flags |= C2FrameData::FLAG_END_OF_STREAM;
+        if (signalEOS && (nFrames == 1)) flags |= C2FrameData::FLAG_END_OF_STREAM;
         if (flushed) {
             flags |= SYNC_FRAME;
             flushed = false;
@@ -335,9 +322,9 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
             ASSERT_EQ(eleStream.gcount(), bytesCount);
         }
         std::shared_ptr<C2GraphicBlock> block;
-        err = graphicPool->fetchGraphicBlock(
-                nWidth, nHeight, HAL_PIXEL_FORMAT_YV12,
-                {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block);
+        err = graphicPool->fetchGraphicBlock(nWidth, nHeight, HAL_PIXEL_FORMAT_YV12,
+                                             {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE},
+                                             &block);
         if (err != C2_OK) {
             fprintf(stderr, "fetchGraphicBlock failed : %d\n", err);
             disableTest = true;
@@ -380,27 +367,32 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
     }
 }
 
-TEST_F(Codec2VideoEncHidlTest, validateCompName) {
-    if (mDisableTest) return;
+TEST_P(Codec2VideoEncHidlTest, validateCompName) {
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ALOGV("Checks if the given component is a valid video component");
     validateComponent(mComponent, mCompName, mDisableTest);
     ASSERT_EQ(mDisableTest, false);
 }
 
-class Codec2VideoEncEncodeTest : public Codec2VideoEncHidlTest,
-                                 public ::testing::WithParamInterface<bool> {
+class Codec2VideoEncEncodeTest
+    : public Codec2VideoEncHidlTestBase,
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
 };
 
 TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     description("Encodes input file");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     char mURL[512];
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
-    bool signalEOS = GetParam();
+    bool signalEOS = !std::get<2>(GetParam()).compare("true");
 
-    strcpy(mURL, gEnv->getRes().c_str());
+    strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mURL);
 
     std::ifstream eleStream;
@@ -425,10 +417,9 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      0, ENC_NUM_FRAMES, nWidth, nHeight, false, signalEOS));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
+                                          ENC_NUM_FRAMES, nWidth, nHeight, false, signalEOS));
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config suceeded
     // In this cases, we skip encoding the input stream
@@ -441,25 +432,21 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     // If EOS is not sent, sending empty input with EOS flag
     inputFrames = ENC_NUM_FRAMES;
     if (!signalEOS) {
-        ASSERT_NO_FATAL_FAILURE(
-            waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
-        ASSERT_NO_FATAL_FAILURE(
-            testInputBuffer(mComponent, mQueueLock, mWorkQueue,
-                            C2FrameData::FLAG_END_OF_STREAM, false));
+        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                                                C2FrameData::FLAG_END_OF_STREAM, false));
         inputFrames += 1;
     }
 
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ALOGD("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
 
     eleStream.close();
     if (mFramesReceived != inputFrames) {
         ALOGE("Input buffer count and Output buffer count mismatch");
-        ALOGE("framesReceived : %d inputFrames : %d", mFramesReceived,
-              inputFrames);
+        ALOGE("framesReceived : %d inputFrames : %d", mFramesReceived, inputFrames);
         ASSERT_TRUE(false);
     }
 
@@ -475,13 +462,9 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-// EncodeTest with EOS / No EOS
-INSTANTIATE_TEST_CASE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
-                        ::testing::Values(true, false));
-
-TEST_F(Codec2VideoEncHidlTest, EOSTest) {
+TEST_P(Codec2VideoEncHidlTest, EOSTest) {
     description("Test empty input buffer with EOS flag");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ASSERT_EQ(mComponent->start(), C2_OK);
 
     typedef std::unique_lock<std::mutex> ULock;
@@ -519,15 +502,15 @@ TEST_F(Codec2VideoEncHidlTest, EOSTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-TEST_F(Codec2VideoEncHidlTest, FlushTest) {
+TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     description("Test Request for flush");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     typedef std::unique_lock<std::mutex> ULock;
     char mURL[512];
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
-    strcpy(mURL, gEnv->getRes().c_str());
+    strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mURL);
 
     if (!setupConfigParam(nWidth, nHeight)) {
@@ -544,10 +527,9 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ALOGV("mURL : %s", mURL);
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      0, numFramesFlushed, nWidth, nHeight));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
+                                          numFramesFlushed, nWidth, nHeight));
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config suceeded
     // In this cases, we skip encoding the input stream
@@ -558,23 +540,20 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
     }
 
     std::list<std::unique_ptr<C2Work>> flushedWork;
-    c2_status_t err =
-        mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-            (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
     uint64_t frameIndex;
     {
-        //Update mFlushedIndices based on the index received from flush()
+        // Update mFlushedIndices based on the index received from flush()
         ULock l(mQueueLock);
         for (std::unique_ptr<C2Work>& work : flushedWork) {
             ASSERT_NE(work, nullptr);
             frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt = std::find(
-                mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() &&
-                (frameIndexIt != mFlushedIndices.end())) {
+            std::list<uint64_t>::iterator frameIndexIt =
+                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
+            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
                 mFlushedIndices.erase(frameIndexIt);
                 work->input.buffers.clear();
                 work->worklets.clear();
@@ -583,11 +562,10 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
         }
     }
     mFlushedIndices.clear();
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      numFramesFlushed, numFrames - numFramesFlushed,
-                      nWidth, nHeight, true));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
+                                          numFramesFlushed, numFrames - numFramesFlushed, nWidth,
+                                          nHeight, true));
     eleStream.close();
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config suceeded
@@ -600,19 +578,17 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
 
     err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-            (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
     {
-        //Update mFlushedIndices based on the index received from flush()
+        // Update mFlushedIndices based on the index received from flush()
         ULock l(mQueueLock);
         for (std::unique_ptr<C2Work>& work : flushedWork) {
             ASSERT_NE(work, nullptr);
             frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt = std::find(
-                mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() &&
-                (frameIndexIt != mFlushedIndices.end())) {
+            std::list<uint64_t>::iterator frameIndexIt =
+                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
+            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
                 mFlushedIndices.erase(frameIndexIt);
                 work->input.buffers.clear();
                 work->worklets.clear();
@@ -624,9 +600,9 @@ TEST_F(Codec2VideoEncHidlTest, FlushTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-TEST_F(Codec2VideoEncHidlTest, InvalidBufferTest) {
+TEST_P(Codec2VideoEncHidlTest, InvalidBufferTest) {
     description("Tests feeding larger/smaller input buffer");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     std::ifstream eleStream;
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH / 2;
@@ -638,28 +614,24 @@ TEST_F(Codec2VideoEncHidlTest, InvalidBufferTest) {
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
 
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      0, 1, nWidth, nHeight, false, false));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
+                                          1, nWidth, nHeight, false, false));
 
     // Feed larger input buffer.
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      1, 1, nWidth*2, nHeight*2, false, false));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 1,
+                                          1, nWidth * 2, nHeight * 2, false, false));
 
     // Feed smaller input buffer.
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      2, 1, nWidth/2, nHeight/2, false, true));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 2,
+                                          1, nWidth / 2, nHeight / 2, false, true));
 
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ALOGD("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
 
     if (mFramesReceived != 3) {
         std::cout << "[   WARN   ] Component didn't receive all buffers back \n";
@@ -674,17 +646,23 @@ TEST_F(Codec2VideoEncHidlTest, InvalidBufferTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-class Codec2VideoEncResolutionTest : public Codec2VideoEncHidlTest,
-        public ::testing::WithParamInterface<std::pair<int32_t, int32_t> > {
+class Codec2VideoEncResolutionTest
+    : public Codec2VideoEncHidlTestBase,
+      public ::testing::WithParamInterface<
+              std::tuple<std::string, std::string, std::string, std::string>> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
 };
 
 TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     description("Tests encoding at different resolutions");
-    if (mDisableTest) return;
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     std::ifstream eleStream;
-    int32_t nWidth = GetParam().first;
-    int32_t nHeight = GetParam().second;
+    int32_t nWidth = std::stoi(std::get<2>(GetParam()));
+    int32_t nHeight = std::stoi(std::get<3>(GetParam()));
     ALOGD("Trying encode for width %d height %d", nWidth, nHeight);
     mEos = false;
 
@@ -694,10 +672,9 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
 
-    ASSERT_NO_FATAL_FAILURE(
-        encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                      mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                      0, MAX_INPUT_BUFFERS, nWidth, nHeight, false, true));
+    ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
+                                          MAX_INPUT_BUFFERS, nWidth, nHeight, false, true));
 
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config suceeded
@@ -709,31 +686,52 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     }
 
     ALOGD("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(
-        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
 
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
     ASSERT_EQ(mComponent->reset(), C2_OK);
 }
 
-INSTANTIATE_TEST_CASE_P(NonStdSizes, Codec2VideoEncResolutionTest, ::testing::Values(
-    std::make_pair(52, 18),
-    std::make_pair(365, 365),
-    std::make_pair(484, 362),
-    std::make_pair(244, 488)));
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoEncHidlTest, testing::ValuesIn(kTestParameters),
+                         android::hardware::PrintInstanceTupleNameToString<>);
+
+INSTANTIATE_TEST_SUITE_P(NonStdSizes, Codec2VideoEncResolutionTest,
+                         ::testing::ValuesIn(kEncodeResolutionTestParameters));
+
+// EncodeTest with EOS / No EOS
+INSTANTIATE_TEST_SUITE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
+                         ::testing::ValuesIn(kEncodeTestParameters));
 
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
-    gEnv = new ComponentTestEnvironment();
-    ::testing::AddGlobalTestEnvironment(gEnv);
-    ::testing::InitGoogleTest(&argc, argv);
-    gEnv->init(&argc, argv);
-    int status = gEnv->initFromOptions(argc, argv);
-    if (status == 0) {
-        int status = RUN_ALL_TESTS();
-        LOG(INFO) << "C2 Test result = " << status;
+    kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
+    for (auto params : kTestParameters) {
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
+
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "52", "18"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "365", "365"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "484", "362"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "244", "488"));
     }
-    return status;
+
+    // Set the resource directory based on command line args.
+    // Test will fail to set up if the argument is not set.
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-P") == 0 && i < argc - 1) {
+            sResourceDir = argv[i + 1];
+            break;
+        }
+    }
+
+    ::testing::InitGoogleTest(&argc, argv);
+    return RUN_ALL_TESTS();
 }
