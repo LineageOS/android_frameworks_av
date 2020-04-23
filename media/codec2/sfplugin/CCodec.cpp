@@ -1951,6 +1951,13 @@ PersistentSurface *CCodec::CreateInputSurface() {
             inputSurface->getHalInterface()));
 }
 
+static void MaybeLogUnrecognizedName(const char *func, const std::string &name) {
+    thread_local std::set<std::string> sLogged{};
+    if (sLogged.insert(name).second) {
+        ALOGW("%s: Unrecognized interface name: %s", func, name.c_str());
+    }
+}
+
 static status_t GetCommonAllocatorIds(
         const std::vector<std::string> &names,
         C2Allocator::type_t type,
@@ -1964,26 +1971,33 @@ static status_t GetCommonAllocatorIds(
     if (names.empty()) {
         return OK;
     }
-    std::shared_ptr<Codec2Client::Interface> intf{
-        Codec2Client::CreateInterfaceByName(names[0].c_str())};
-    std::vector<std::unique_ptr<C2Param>> params;
-    c2_status_t err = intf->query(
-            {}, {C2PortAllocatorsTuning::input::PARAM_TYPE}, C2_MAY_BLOCK, &params);
-    if (err == C2_OK && params.size() == 1u) {
-        C2PortAllocatorsTuning::input *allocators =
-            C2PortAllocatorsTuning::input::From(params[0].get());
-        if (allocators && allocators->flexCount() > 0) {
-            ids->insert(allocators->m.values, allocators->m.values + allocators->flexCount());
+    bool firstIteration = true;
+    for (const std::string &name : names) {
+        std::shared_ptr<Codec2Client::Interface> intf{
+            Codec2Client::CreateInterfaceByName(name.c_str())};
+        if (!intf) {
+            MaybeLogUnrecognizedName(__FUNCTION__, name);
+            continue;
         }
-    }
-    if (ids->empty()) {
-        // The component does not advertise allocators. Use default.
-        ids->insert(defaultAllocatorId);
-    }
-    for (size_t i = 1; i < names.size(); ++i) {
-        intf = Codec2Client::CreateInterfaceByName(names[i].c_str());
-        err = intf->query(
+        std::vector<std::unique_ptr<C2Param>> params;
+        c2_status_t err = intf->query(
                 {}, {C2PortAllocatorsTuning::input::PARAM_TYPE}, C2_MAY_BLOCK, &params);
+        if (firstIteration) {
+            firstIteration = false;
+            if (err == C2_OK && params.size() == 1u) {
+                C2PortAllocatorsTuning::input *allocators =
+                    C2PortAllocatorsTuning::input::From(params[0].get());
+                if (allocators && allocators->flexCount() > 0) {
+                    ids->insert(allocators->m.values,
+                                allocators->m.values + allocators->flexCount());
+                }
+            }
+            if (ids->empty()) {
+                // The component does not advertise allocators. Use default.
+                ids->insert(defaultAllocatorId);
+            }
+            continue;
+        }
         bool filtered = false;
         if (err == C2_OK && params.size() == 1u) {
             C2PortAllocatorsTuning::input *allocators =
@@ -2036,6 +2050,10 @@ static status_t CalculateMinMaxUsage(
     for (const std::string &name : names) {
         std::shared_ptr<Codec2Client::Interface> intf{
             Codec2Client::CreateInterfaceByName(name.c_str())};
+        if (!intf) {
+            MaybeLogUnrecognizedName(__FUNCTION__, name);
+            continue;
+        }
         std::vector<C2FieldSupportedValuesQuery> fields;
         fields.push_back(C2FieldSupportedValuesQuery::Possible(
                 C2ParamField{&sUsage, &sUsage.value}));
