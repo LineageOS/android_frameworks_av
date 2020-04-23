@@ -27,12 +27,8 @@
 #include <variant>
 
 #include <binder/Parcel.h>
-#include <cutils/properties.h>
 #include <utils/Errors.h>
-#include <utils/KeyedVector.h>
-#include <utils/RefBase.h>
-#include <utils/StrongPointer.h>
-#include <utils/Timers.h>
+#include <utils/Timers.h> // nsecs_t
 
 namespace android {
 
