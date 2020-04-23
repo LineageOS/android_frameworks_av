@@ -29,5 +29,4 @@
  * Common video utils
  */
 
-
 #endif  // MEDIA_C2_VIDEO_HIDL_TEST_COMMON_H
