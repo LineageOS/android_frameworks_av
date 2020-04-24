@@ -22,8 +22,12 @@
 #include <iostream>
 #include <mutex>
 
+#include <media/MediaMetricsItem.h>
+#include <media/TypeConverter.h>
+
 #include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
+#include "core/AudioGlobal.h"
 #include "utility/AudioClock.h"
 
 #include "AAudioEndpointManager.h"
@@ -51,6 +55,14 @@ AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
+    // May not be set if open failed.
+    if (mMetricsId.size() > 0) {
+        mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
+                .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+                .record();
+    }
+
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
@@ -79,6 +91,35 @@ std::string AAudioServiceStreamBase::dump() const {
     result << std::setw(9) << getBufferCapacity();
 
     return result.str();
+}
+
+void AAudioServiceStreamBase::logOpen(aaudio_handle_t streamHandle) {
+    // This is the first log sent from the AAudio Service for a stream.
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM)
+            + std::to_string(streamHandle);
+
+    audio_attributes_t attributes = AAudioServiceEndpoint::getAudioAttributesFrom(this);
+
+    // Once this item is logged by the server, the client with the same PID, UID
+    // can also log properties.
+    mediametrics::LogItem(mMetricsId)
+        .setPid(getOwnerProcessId())
+        .setUid(getOwnerUserId())
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN)
+        // the following are immutable
+        .set(AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, (int32_t)getBufferCapacity())
+        .set(AMEDIAMETRICS_PROP_BURSTFRAMES, (int32_t)getFramesPerBurst())
+        .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)getSamplesPerFrame())
+        .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(attributes.content_type).c_str())
+        .set(AMEDIAMETRICS_PROP_DIRECTION,
+                AudioGlobal_convertDirectionToText(getDirection()))
+        .set(AMEDIAMETRICS_PROP_ENCODING, toString(getFormat()).c_str())
+        .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEID, (int32_t)getDeviceId())
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)getSampleRate())
+        .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)getSessionId())
+        .set(AMEDIAMETRICS_PROP_SOURCE, toString(attributes.source).c_str())
+        .set(AMEDIAMETRICS_PROP_USAGE, toString(attributes.usage).c_str())
+        .record();
 }
 
 aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest &request) {
@@ -154,6 +195,10 @@ aaudio_result_t AAudioServiceStreamBase::close() {
     }
 
     setState(AAUDIO_STREAM_STATE_CLOSED);
+
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CLOSE)
+        .record();
     return result;
 }
 
@@ -173,7 +218,16 @@ aaudio_result_t AAudioServiceStreamBase::startDevice() {
  * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
  */
 aaudio_result_t AAudioServiceStreamBase::start() {
+    const int64_t beginNs = AudioClock::getNanoseconds();
     aaudio_result_t result = AAUDIO_OK;
+
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
+            .record(); });
 
     if (isRunning()) {
         return AAUDIO_OK;
@@ -204,10 +258,19 @@ error:
 }
 
 aaudio_result_t AAudioServiceStreamBase::pause() {
+    const int64_t beginNs = AudioClock::getNanoseconds();
     aaudio_result_t result = AAUDIO_OK;
     if (!isRunning()) {
         return result;
     }
+
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE)
+            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
+            .record(); });
 
     // Send it now because the timestamp gets rounded up when stopStream() is called below.
     // Also we don't need the timestamps while we are shutting down.
@@ -222,7 +285,8 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
-        return AAUDIO_ERROR_INVALID_STATE;
+        result =  AAUDIO_ERROR_INVALID_STATE; // for MediaMetric tracking
+        return result;
     }
     result = endpoint->stopStream(this, mClientHandle);
     if (result != AAUDIO_OK) {
@@ -236,10 +300,19 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::stop() {
+    const int64_t beginNs = AudioClock::getNanoseconds();
     aaudio_result_t result = AAUDIO_OK;
     if (!isRunning()) {
         return result;
     }
+
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
+            .record(); });
 
     setState(AAUDIO_STREAM_STATE_STOPPING);
 
@@ -255,7 +328,8 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
-        return AAUDIO_ERROR_INVALID_STATE;
+        result =  AAUDIO_ERROR_INVALID_STATE; // for MediaMetric tracking
+        return result;
     }
     // TODO wait for data to be played out
     result = endpoint->stopStream(this, mClientHandle);
@@ -280,10 +354,19 @@ aaudio_result_t AAudioServiceStreamBase::stopTimestampThread() {
 }
 
 aaudio_result_t AAudioServiceStreamBase::flush() {
+    const int64_t beginNs = AudioClock::getNanoseconds();
     aaudio_result_t result = AAudio_isFlushAllowed(getState());
     if (result != AAUDIO_OK) {
         return result;
     }
+
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH)
+            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
+            .record(); });
 
     // Data will get flushed when the client receives the FLUSHED event.
     sendServiceEvent(AAUDIO_SERVICE_EVENT_FLUSHED);
@@ -321,6 +404,10 @@ void AAudioServiceStreamBase::run() {
 
 void AAudioServiceStreamBase::disconnect() {
     if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED) {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
+            .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+            .record();
         sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
         setState(AAUDIO_STREAM_STATE_DISCONNECTED);
     }
