@@ -22,16 +22,10 @@
 
 #include <android/hardware/media/c2/1.0/IComponentStore.h>
 
-void ComponentTestEnvironment::registerTestServices() {
-    registerTestService<::android::hardware::media::c2::V1_0::
-                        IComponentStore>();
-}
-
 // Test the codecs for NullBuffer, Empty Input Buffer with(out) flags set
-void testInputBuffer(
-    const std::shared_ptr<android::Codec2Client::Component>& component,
-    std::mutex& queueLock, std::list<std::unique_ptr<C2Work>>& workQueue,
-    uint32_t flags, bool isNullBuffer) {
+void testInputBuffer(const std::shared_ptr<android::Codec2Client::Component>& component,
+                     std::mutex& queueLock, std::list<std::unique_ptr<C2Work>>& workQueue,
+                     uint32_t flags, bool isNullBuffer) {
     std::unique_ptr<C2Work> work;
     {
         typedef std::unique_lock<std::mutex> ULock;
@@ -61,10 +55,8 @@ void testInputBuffer(
 }
 
 // Wait for all the inputs to be consumed by the plugin.
-void waitOnInputConsumption(std::mutex& queueLock,
-                            std::condition_variable& queueCondition,
-                            std::list<std::unique_ptr<C2Work>>& workQueue,
-                            size_t bufferCount) {
+void waitOnInputConsumption(std::mutex& queueLock, std::condition_variable& queueCondition,
+                            std::list<std::unique_ptr<C2Work>>& workQueue, size_t bufferCount) {
     typedef std::unique_lock<std::mutex> ULock;
     uint32_t queueSize;
     uint32_t maxRetry = 0;
@@ -85,29 +77,25 @@ void waitOnInputConsumption(std::mutex& queueLock,
 }
 
 // process onWorkDone received by Listener
-void workDone(
-    const std::shared_ptr<android::Codec2Client::Component>& component,
-    std::unique_ptr<C2Work>& work, std::list<uint64_t>& flushedIndices,
-    std::mutex& queueLock, std::condition_variable& queueCondition,
-    std::list<std::unique_ptr<C2Work>>& workQueue, bool& eos, bool& csd,
-    uint32_t& framesReceived) {
+void workDone(const std::shared_ptr<android::Codec2Client::Component>& component,
+              std::unique_ptr<C2Work>& work, std::list<uint64_t>& flushedIndices,
+              std::mutex& queueLock, std::condition_variable& queueCondition,
+              std::list<std::unique_ptr<C2Work>>& workQueue, bool& eos, bool& csd,
+              uint32_t& framesReceived) {
     // handle configuration changes in work done
     if (work->worklets.front()->output.configUpdate.size() != 0) {
         ALOGV("Config Update");
         std::vector<std::unique_ptr<C2Param>> updates =
-            std::move(work->worklets.front()->output.configUpdate);
+                std::move(work->worklets.front()->output.configUpdate);
         std::vector<C2Param*> configParam;
         std::vector<std::unique_ptr<C2SettingResult>> failures;
         for (size_t i = 0; i < updates.size(); ++i) {
             C2Param* param = updates[i].get();
             if (param->index() == C2StreamInitDataInfo::output::PARAM_TYPE) {
                 csd = true;
-            } else if ((param->index() ==
-                        C2StreamSampleRateInfo::output::PARAM_TYPE) ||
-                       (param->index() ==
-                        C2StreamChannelCountInfo::output::PARAM_TYPE) ||
-                       (param->index() ==
-                        C2StreamPictureSizeInfo::output::PARAM_TYPE)) {
+            } else if ((param->index() == C2StreamSampleRateInfo::output::PARAM_TYPE) ||
+                       (param->index() == C2StreamChannelCountInfo::output::PARAM_TYPE) ||
+                       (param->index() == C2StreamPictureSizeInfo::output::PARAM_TYPE)) {
                 configParam.push_back(param);
             }
         }
@@ -116,8 +104,7 @@ void workDone(
     }
     if (work->worklets.front()->output.flags != C2FrameData::FLAG_INCOMPLETE) {
         framesReceived++;
-        eos = (work->worklets.front()->output.flags &
-               C2FrameData::FLAG_END_OF_STREAM) != 0;
+        eos = (work->worklets.front()->output.flags & C2FrameData::FLAG_END_OF_STREAM) != 0;
         auto frameIndexIt = std::find(flushedIndices.begin(), flushedIndices.end(),
                                       work->input.ordinal.frameIndex.peeku());
         ALOGV("WorkDone: frameID received %d",
@@ -142,4 +129,34 @@ int64_t getNowUs() {
     gettimeofday(&tv, NULL);
 
     return (int64_t)tv.tv_usec + tv.tv_sec * 1000000ll;
+}
+
+// Return all test parameters, a list of tuple of <instance, component>
+const std::vector<std::tuple<std::string, std::string>>& getTestParameters() {
+    return getTestParameters(C2Component::DOMAIN_OTHER, C2Component::KIND_OTHER);
+}
+
+// Return all test parameters, a list of tuple of <instance, component> with matching domain and
+// kind.
+const std::vector<std::tuple<std::string, std::string>>& getTestParameters(
+        C2Component::domain_t domain, C2Component::kind_t kind) {
+    static std::vector<std::tuple<std::string, std::string>> parameters;
+
+    auto instances = android::Codec2Client::GetServiceNames();
+    for (std::string instance : instances) {
+        std::shared_ptr<android::Codec2Client> client =
+                android::Codec2Client::CreateFromService(instance.c_str());
+        std::vector<C2Component::Traits> components = client->listComponents();
+        for (C2Component::Traits traits : components) {
+            if (instance.compare(traits.owner)) continue;
+            if (domain != C2Component::DOMAIN_OTHER &&
+                (traits.domain != domain || traits.kind != kind)) {
+                continue;
+            }
+
+            parameters.push_back(std::make_tuple(instance, traits.name));
+        }
+    }
+
+    return parameters;
 }
