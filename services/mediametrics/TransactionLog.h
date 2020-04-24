@@ -94,8 +94,8 @@ public:
         std::lock_guard lock(mLock);
 
         (void)gc(garbage);
-        mLog.emplace(time, item);
-        mItemMap[key].emplace(time, item);
+        mLog.emplace_hint(mLog.end(), time, item);
+        mItemMap[key].emplace_hint(mItemMap[key].end(), time, item);
         return NO_ERROR;  // no errors for now.
     }
 
