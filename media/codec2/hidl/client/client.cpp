@@ -219,6 +219,7 @@ public:
                 if (success) {
                     break;
                 }
+                invalidate();
                 using namespace std::chrono_literals;
                 static constexpr auto kServiceRetryPeriod = 5s;
                 LOG(INFO) << "Failed to retrieve component traits from service "
