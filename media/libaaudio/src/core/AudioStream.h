@@ -95,7 +95,6 @@ public:
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) = 0;
 
-
     /**
      * Update state machine.()
      * @return
@@ -113,6 +112,10 @@ public:
      * Allocate the necessary resources.
      */
     virtual aaudio_result_t open(const AudioStreamBuilder& builder);
+
+    // log to MediaMetrics
+    virtual void logOpen();
+    void logBufferState();
 
     /**
      * Free any hardware or system resources from the open() call.
@@ -572,6 +575,8 @@ protected:
     void setPrivacySensitive(bool privacySensitive) {
         mIsPrivacySensitive = privacySensitive;
     }
+
+    std::string mMetricsId; // set once during open()
 
 private:
 
