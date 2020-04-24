@@ -181,6 +181,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
         return AAudioConvert_androidToAAudioResult(status);
     }
 
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
+            + std::to_string(mAudioTrack->getPortId());
+
     doSetVolume();
 
     // Get the actual values from the AudioTrack.
@@ -248,6 +251,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 aaudio_result_t AudioStreamTrack::release_l() {
     if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioTrack->removeAudioDeviceCallback(mDeviceCallback);
+        logBufferState();
         // TODO Investigate why clear() causes a hang in test_various.cpp
         // if I call close() from a data callback.
         // But the same thing in AudioRecord is OK!
