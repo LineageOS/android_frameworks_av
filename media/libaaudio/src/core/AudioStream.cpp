@@ -20,6 +20,9 @@
 
 #include <atomic>
 #include <stdint.h>
+
+#include <media/MediaMetricsItem.h>
+
 #include <aaudio/AAudio.h>
 
 #include "AudioStreamBuilder.h"
@@ -28,7 +31,6 @@
 #include "AudioGlobal.h"
 
 namespace aaudio {
-
 
 // Sequential number assigned to streams solely for debugging purposes.
 static aaudio_stream_id_t AAudio_getNextStreamId() {
@@ -101,6 +103,24 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     mErrorCallbackUserData = builder.getErrorCallbackUserData();
 
     return AAUDIO_OK;
+}
+
+void AudioStream::logOpen() {
+    LOG_ALWAYS_FATAL_IF(mMetricsId.size() == 0, "mMetricsId is empty!");
+    android::mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+                    AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+            .set(AMEDIAMETRICS_PROP_SHARINGMODE,
+                    AudioGlobal_convertSharingModeToText(getSharingMode()))
+            .record();
+}
+
+void AudioStream::logBufferState() {
+    LOG_ALWAYS_FATAL_IF(mMetricsId.size() == 0, "mMetricsId is empty!");
+    android::mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t) getBufferSize())
+            .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getXRunCount())
+            .record();
 }
 
 aaudio_result_t AudioStream::systemStart() {
@@ -291,6 +311,13 @@ aaudio_result_t AudioStream::safeRelease() {
 
 void AudioStream::setState(aaudio_stream_state_t state) {
     ALOGD("%s(s#%d) from %d to %d", __func__, getId(), mState, state);
+    // Track transition to DISCONNECTED state.
+    if (state == AAUDIO_STREAM_STATE_DISCONNECTED && mState != state) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
+                .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
+                .record();
+    }
     // CLOSED is a final state
     if (mState == AAUDIO_STREAM_STATE_CLOSED) {
         ALOGE("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
