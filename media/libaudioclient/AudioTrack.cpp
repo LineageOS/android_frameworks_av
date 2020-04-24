@@ -301,6 +301,10 @@ AudioTrack::~AudioTrack()
 
     mediametrics::LogItem(mMetricsId)
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
+        .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                mCallerName.empty()
+                ? AMEDIAMETRICS_PROP_VALUE_UNKNOWN
+                : mCallerName.c_str())
         .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
         .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
         .record();
