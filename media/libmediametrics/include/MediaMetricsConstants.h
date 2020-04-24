@@ -90,6 +90,7 @@
 #define AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES "bufferSizeFrames" // int32
 #define AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES "bufferCapacityFrames" // int32
 #define AMEDIAMETRICS_PROP_BURSTFRAMES    "burstFrames"    // int32
+#define AMEDIAMETRICS_PROP_CALLERNAME     "callerName"     // string, eg. "aaudio"
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
@@ -131,6 +132,8 @@
 #define AMEDIAMETRICS_PROP_VOLUME_LEFT    "volume.left"    // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_VOLUME_RIGHT   "volume.right"   // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_WHERE          "where"          // string value
+
+#define AMEDIAMETRICS_PROP_VALUE_UNKNOWN  "unknown"         // string for callerName
 
 // Timing values: millisecond values are suffixed with MS and the type is double
 // nanosecond values are suffixed with NS and the type is int64.
