@@ -277,6 +277,19 @@ public:
      */
             status_t getMetrics(mediametrics::Item * &item);
 
+    /*
+     * Set name of API that is using this object.
+     * For example "aaudio" or "opensles".
+     * This may be logged or reported as part of MediaMetrics.
+     */
+            void setCallerName(const std::string &name) {
+                mCallerName = name;
+            }
+
+            std::string getCallerName() const {
+                return mCallerName;
+            };
+
     /* After it's created the track is not active. Call start() to
      * make it active. If set, the callback will start being called.
      * If event is not AudioSystem::SYNC_EVENT_NONE, the capture start will be delayed until
@@ -776,6 +789,7 @@ private:
     };
     MediaMetrics mMediaMetrics;
     std::string mMetricsId;  // GUARDED_BY(mLock), could change in createRecord_l().
+    std::string mCallerName; // for example "aaudio"
 };
 
 }; // namespace android
