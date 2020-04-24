@@ -71,7 +71,42 @@ const char* AudioGlobal_convertResultToText(aaudio_result_t returnCode) {
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_NO_SERVICE);
         AAUDIO_CASE_ENUM(AAUDIO_ERROR_INVALID_RATE);
     }
-    return "Unrecognized AAudio error.";
+    return "Unrecognized";
+}
+
+const char* AudioGlobal_convertFormatToText(aaudio_format_t format) {
+      switch (format) {
+        AAUDIO_CASE_ENUM(AAUDIO_FORMAT_UNSPECIFIED);
+        AAUDIO_CASE_ENUM(AAUDIO_FORMAT_INVALID);
+        AAUDIO_CASE_ENUM(AAUDIO_FORMAT_PCM_I16);
+        AAUDIO_CASE_ENUM(AAUDIO_FORMAT_PCM_FLOAT);
+    }
+    return "Unrecognized";
+}
+
+const char* AudioGlobal_convertDirectionToText(aaudio_direction_t direction) {
+      switch (direction) {
+        AAUDIO_CASE_ENUM(AAUDIO_DIRECTION_INPUT);
+        AAUDIO_CASE_ENUM(AAUDIO_DIRECTION_OUTPUT);
+    }
+    return "Unrecognized";
+}
+
+const char* AudioGlobal_convertPerformanceModeToText(aaudio_performance_mode_t mode) {
+      switch (mode) {
+        AAUDIO_CASE_ENUM(AAUDIO_PERFORMANCE_MODE_POWER_SAVING);
+        AAUDIO_CASE_ENUM(AAUDIO_PERFORMANCE_MODE_NONE);
+        AAUDIO_CASE_ENUM(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+    }
+    return "Unrecognized";
+}
+
+const char* AudioGlobal_convertSharingModeToText(aaudio_sharing_mode_t mode) {
+      switch (mode) {
+        AAUDIO_CASE_ENUM(AAUDIO_SHARING_MODE_SHARED);
+        AAUDIO_CASE_ENUM(AAUDIO_SHARING_MODE_EXCLUSIVE);
+    }
+    return "Unrecognized";
 }
 
 const char* AudioGlobal_convertStreamStateToText(aaudio_stream_state_t state) {
@@ -91,7 +126,7 @@ const char* AudioGlobal_convertStreamStateToText(aaudio_stream_state_t state) {
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_CLOSED);
         AAUDIO_CASE_ENUM(AAUDIO_STREAM_STATE_DISCONNECTED);
     }
-    return "Unrecognized AAudio state.";
+    return "Unrecognized";
 }
 
 #undef AAUDIO_CASE_ENUM
