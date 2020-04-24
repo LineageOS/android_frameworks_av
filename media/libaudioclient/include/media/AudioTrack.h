@@ -1260,6 +1260,8 @@ private:
     MediaMetrics mMediaMetrics;
     std::string mMetricsId;  // GUARDED_BY(mLock), could change in createTrack_l().
 
+    void logBufferSizeUnderruns();
+
 private:
     class AudioTrackCallback : public media::BnAudioTrackCallback {
     public:

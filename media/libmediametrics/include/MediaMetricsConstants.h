@@ -40,6 +40,9 @@
 // The AudioRecord key appends the "trackId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD AMEDIAMETRICS_KEY_PREFIX_AUDIO "record."
 
+// The AudioStream key appends the "streamId" to the prefix.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM  AMEDIAMETRICS_KEY_PREFIX_AUDIO "stream."
+
 // The AudioThread key appends the "threadId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD AMEDIAMETRICS_KEY_PREFIX_AUDIO "thread."
 
@@ -84,9 +87,13 @@
 #define AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED '#'
 
 #define AMEDIAMETRICS_PROP_AUXEFFECTID    "auxEffectId"    // int32 (AudioTrack)
+#define AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES "bufferSizeFrames" // int32
+#define AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES "bufferCapacityFrames" // int32
+#define AMEDIAMETRICS_PROP_BURSTFRAMES    "burstFrames"    // int32
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
+#define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
 #define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
@@ -99,6 +106,7 @@
 #define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
 #define AMEDIAMETRICS_PROP_ORIGINALFLAGS  "originalFlags"  // int32
 #define AMEDIAMETRICS_PROP_OUTPUTDEVICES  "outputDevices"  // string value
+#define AMEDIAMETRICS_PROP_PERFORMANCEMODE "performanceMode"    // string value, "none", lowLatency"
 #define AMEDIAMETRICS_PROP_PLAYBACK_PITCH "playback.pitch" // double value (AudioTrack)
 #define AMEDIAMETRICS_PROP_PLAYBACK_SPEED "playback.speed" // double value (AudioTrack)
 #define AMEDIAMETRICS_PROP_ROUTEDDEVICEID "routedDeviceId" // int32
@@ -107,6 +115,7 @@
 #define AMEDIAMETRICS_PROP_SELECTEDMICDIRECTION "selectedMicDirection" // int32
 #define AMEDIAMETRICS_PROP_SELECTEDMICFIELDDIRECTION "selectedMicFieldDimension" // double
 #define AMEDIAMETRICS_PROP_SESSIONID      "sessionId"      // int32
+#define AMEDIAMETRICS_PROP_SHARINGMODE    "sharingMode"    // string value, "exclusive", shared"
 #define AMEDIAMETRICS_PROP_SOURCE         "source"         // string (AudioAttributes)
 #define AMEDIAMETRICS_PROP_STARTUPMS      "startupMs"      // double value
 // State is "ACTIVE" or "STOPPED" for AudioRecord
@@ -129,12 +138,15 @@
 // Values are strings accepted for a given property.
 
 // An event is a general description, which often is a function name.
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_CLOSE      "close"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE     "create"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH "createAudioPatch"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR       "ctor"
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT "disconnect"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR       "dtor"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH      "flush"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_INVALIDATE "invalidate" // server track, record
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN       "open"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE      "pause"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS "readParameters" // Thread
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE    "restore"

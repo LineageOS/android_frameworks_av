@@ -14,9 +14,7 @@
  * limitations under the License.
  */
 
-// This file is used in both client and server processes.
-// This is needed to make sense of the logs more easily.
-#define LOG_TAG (mInService ? "AudioStreamInternal_Service" : "AudioStreamInternal_Client")
+#define LOG_TAG "AudioStreamInternal"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -28,6 +26,8 @@
 
 #include <aaudio/AAudio.h>
 #include <cutils/properties.h>
+
+#include <media/MediaMetricsItem.h>
 #include <utils/String16.h>
 #include <utils/Trace.h>
 
@@ -36,11 +36,19 @@
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
+#include "core/AudioGlobal.h"
 #include "core/AudioStreamBuilder.h"
 #include "fifo/FifoBuffer.h"
 #include "utility/AudioClock.h"
 
 #include "AudioStreamInternal.h"
+
+// We do this after the #includes because if a header uses ALOG.
+// it would fail on the reference to mInService.
+#undef LOG_TAG
+// This file is used in both client and server processes.
+// This is needed to make sense of the logs more easily.
+#define LOG_TAG (mInService ? "AudioStreamInternal_Service" : "AudioStreamInternal_Client")
 
 using android::String16;
 using android::Mutex;
@@ -136,6 +144,11 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     if (mServiceStreamHandle < 0) {
         return mServiceStreamHandle;
     }
+
+    // This must match the key generated in oboeservice/AAudioServiceStreamBase.cpp
+    // so the client can have permission to log.
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM)
+            + std::to_string(mServiceStreamHandle);
 
     result = configurationOutput.validate();
     if (result != AAUDIO_OK) {
@@ -274,6 +287,9 @@ aaudio_result_t AudioStreamInternal::release_l() {
         if (isActive() || currentState == AAUDIO_STREAM_STATE_DISCONNECTED) {
             requestStop();
         }
+
+        logBufferState();
+
         setState(AAUDIO_STREAM_STATE_CLOSING);
         aaudio_handle_t serviceStreamHandle = mServiceStreamHandle;
         mServiceStreamHandle = AAUDIO_HANDLE_INVALID;
