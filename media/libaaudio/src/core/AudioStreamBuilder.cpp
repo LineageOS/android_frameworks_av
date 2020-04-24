@@ -193,9 +193,13 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
                         *streamPtr = audioStream;
                     } else {
                         delete audioStream;
+                        audioStream = nullptr;
                     }
                 }
             }
+        }
+        if (audioStream != nullptr) {
+            audioStream->logOpen();
         }
     }
 
