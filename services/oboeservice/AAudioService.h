@@ -115,6 +115,7 @@ private:
     // and share them with this code. Look for "kPriorityFastMixer".
     static constexpr int32_t        kRealTimeAudioPriorityClient = 2;
     static constexpr int32_t        kRealTimeAudioPriorityService = 3;
+
 };
 
 } /* namespace android */
