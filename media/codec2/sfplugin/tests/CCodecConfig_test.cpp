@@ -24,6 +24,8 @@
 #include <codec2/hidl/client.h>
 #include <util/C2InterfaceHelper.h>
 
+#include <media/stagefright/MediaCodecConstants.h>
+
 namespace {
 
 enum ExtendedC2ParamIndexKind : C2Param::type_index_t {
@@ -56,9 +58,15 @@ public:
 
     CCodecConfigTest()
         : mReflector{std::make_shared<C2ReflectorHelper>()} {
+    }
+
+    void init(
+            C2Component::domain_t domain,
+            C2Component::kind_t kind,
+            const char *mediaType) {
         sp<hardware::media::c2::V1_0::utils::CachedConfigurable> cachedConfigurable =
             new hardware::media::c2::V1_0::utils::CachedConfigurable(
-                    std::make_unique<Configurable>(mReflector));
+                    std::make_unique<Configurable>(mReflector, domain, kind, mediaType));
         cachedConfigurable->init(std::make_shared<Cache>());
         mConfigurable = std::make_shared<Codec2Client::Configurable>(cachedConfigurable);
     }
@@ -71,9 +79,13 @@ public:
 
     class Configurable : public hardware::media::c2::V1_0::utils::ConfigurableC2Intf {
     public:
-        explicit Configurable(const std::shared_ptr<C2ReflectorHelper> &reflector)
+        Configurable(
+                const std::shared_ptr<C2ReflectorHelper> &reflector,
+                C2Component::domain_t domain,
+                C2Component::kind_t kind,
+                const char *mediaType)
             : ConfigurableC2Intf("name", 0u),
-              mImpl(reflector) {
+              mImpl(reflector, domain, kind, mediaType) {
         }
 
         c2_status_t query(
@@ -104,9 +116,66 @@ public:
     private:
         class Impl : public C2InterfaceHelper {
         public:
-            explicit Impl(const std::shared_ptr<C2ReflectorHelper> &reflector)
+            Impl(const std::shared_ptr<C2ReflectorHelper> &reflector,
+                    C2Component::domain_t domain,
+                    C2Component::kind_t kind,
+                    const char *mediaType)
                 : C2InterfaceHelper{reflector} {
+
                 setDerivedInstance(this);
+
+                addParameter(
+                        DefineParam(mDomain, C2_PARAMKEY_COMPONENT_DOMAIN)
+                        .withConstValue(new C2ComponentDomainSetting(domain))
+                        .build());
+
+                addParameter(
+                        DefineParam(mKind, C2_PARAMKEY_COMPONENT_KIND)
+                        .withConstValue(new C2ComponentKindSetting(kind))
+                        .build());
+
+                addParameter(
+                        DefineParam(mInputStreamCount, C2_PARAMKEY_INPUT_STREAM_COUNT)
+                        .withConstValue(new C2PortStreamCountTuning::input(1))
+                        .build());
+
+                addParameter(
+                        DefineParam(mOutputStreamCount, C2_PARAMKEY_OUTPUT_STREAM_COUNT)
+                        .withConstValue(new C2PortStreamCountTuning::output(1))
+                        .build());
+
+                const char *rawMediaType = "";
+                switch (domain) {
+                    case C2Component::DOMAIN_IMAGE: [[fallthrough]];
+                    case C2Component::DOMAIN_VIDEO:
+                        rawMediaType = MIMETYPE_VIDEO_RAW;
+                        break;
+                    case C2Component::DOMAIN_AUDIO:
+                        rawMediaType = MIMETYPE_AUDIO_RAW;
+                        break;
+                    default:
+                        break;
+                }
+                bool isEncoder = kind == C2Component::KIND_ENCODER;
+                std::string inputMediaType{isEncoder ? rawMediaType : mediaType};
+                std::string outputMediaType{isEncoder ? mediaType : rawMediaType};
+
+                auto allocSharedString = [](const auto &param, const std::string &str) {
+                    typedef typename std::remove_reference<decltype(param)>::type::element_type T;
+                    std::shared_ptr<T> ret = T::AllocShared(str.length() + 1);
+                    strcpy(ret->m.value, str.c_str());
+                    return ret;
+                };
+
+                addParameter(
+                        DefineParam(mInputMediaType, C2_PARAMKEY_INPUT_MEDIA_TYPE)
+                        .withConstValue(allocSharedString(mInputMediaType, inputMediaType))
+                        .build());
+
+                addParameter(
+                        DefineParam(mOutputMediaType, C2_PARAMKEY_OUTPUT_MEDIA_TYPE)
+                        .withConstValue(allocSharedString(mOutputMediaType, outputMediaType))
+                        .build());
 
                 addParameter(
                         DefineParam(mInt32Input, C2_PARAMKEY_VENDOR_INT32)
@@ -129,12 +198,29 @@ public:
                         .withSetter(Setter<decltype(mStringInput)::element_type>)
                         .build());
 
-                // TODO: SDK params
+                addParameter(
+                        DefineParam(mPixelAspectRatio, C2_PARAMKEY_PIXEL_ASPECT_RATIO)
+                        .withDefault(new C2StreamPixelAspectRatioInfo::output(0u, 1, 1))
+                        .withFields({
+                            C2F(mPixelAspectRatio, width).any(),
+                            C2F(mPixelAspectRatio, height).any(),
+                        })
+                        .withSetter(Setter<C2StreamPixelAspectRatioInfo::output>)
+                        .build());
+
+                // TODO: more SDK params
             }
         private:
+            std::shared_ptr<C2ComponentDomainSetting> mDomain;
+            std::shared_ptr<C2ComponentKindSetting> mKind;
+            std::shared_ptr<C2PortStreamCountTuning::input> mInputStreamCount;
+            std::shared_ptr<C2PortStreamCountTuning::output> mOutputStreamCount;
+            std::shared_ptr<C2PortMediaTypeSetting::input> mInputMediaType;
+            std::shared_ptr<C2PortMediaTypeSetting::output> mOutputMediaType;
             std::shared_ptr<C2PortVendorInt32Info::input> mInt32Input;
             std::shared_ptr<C2StreamVendorInt64Info::output> mInt64Output;
             std::shared_ptr<C2PortVendorStringInfo::input> mStringInput;
+            std::shared_ptr<C2StreamPixelAspectRatioInfo::output> mPixelAspectRatio;
 
             template<typename T>
             static C2R Setter(bool, C2P<T> &) {
@@ -163,6 +249,10 @@ T *FindParam(const std::vector<std::unique_ptr<C2Param>> &vec) {
 }
 
 TEST_F(CCodecConfigTest, SetVendorParam) {
+    // Test at audio domain, as video domain has a few local parameters that
+    // interfere with the testing.
+    init(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER, MIMETYPE_AUDIO_AAC);
+
     ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
 
     sp<AMessage> format{new AMessage};
@@ -172,7 +262,7 @@ TEST_F(CCodecConfigTest, SetVendorParam) {
 
     std::vector<std::unique_ptr<C2Param>> configUpdate;
     ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(
-            mConfigurable, format, D::IS_INPUT | D::IS_OUTPUT, C2_MAY_BLOCK, &configUpdate));
+            mConfigurable, format, D::ALL, C2_MAY_BLOCK, &configUpdate));
 
     ASSERT_EQ(3u, configUpdate.size());
     C2PortVendorInt32Info::input *i32 =
@@ -192,6 +282,10 @@ TEST_F(CCodecConfigTest, SetVendorParam) {
 }
 
 TEST_F(CCodecConfigTest, VendorParamUpdate_Unsubscribed) {
+    // Test at audio domain, as video domain has a few local parameters that
+    // interfere with the testing.
+    init(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER, MIMETYPE_AUDIO_AAC);
+
     ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
 
     std::vector<std::unique_ptr<C2Param>> configUpdate;
@@ -204,7 +298,7 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_Unsubscribed) {
     configUpdate.push_back(std::move(str));
 
     // The vendor parameters are not yet subscribed
-    ASSERT_FALSE(mConfig.updateConfiguration(configUpdate, D::IS_INPUT | D::IS_OUTPUT));
+    ASSERT_FALSE(mConfig.updateConfiguration(configUpdate, D::ALL));
 
     int32_t vendorInt32{0};
     ASSERT_FALSE(mConfig.mInputFormat->findInt32(KEY_VENDOR_INT32, &vendorInt32))
@@ -226,6 +320,10 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_Unsubscribed) {
 }
 
 TEST_F(CCodecConfigTest, VendorParamUpdate_AllSubscribed) {
+    // Test at audio domain, as video domain has a few local parameters that
+    // interfere with the testing.
+    init(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER, MIMETYPE_AUDIO_AAC);
+
     ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
 
     // Force subscribe to all vendor params
@@ -240,7 +338,7 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_AllSubscribed) {
     configUpdate.push_back(C2Param::Copy(i64));
     configUpdate.push_back(std::move(str));
 
-    ASSERT_TRUE(mConfig.updateConfiguration(configUpdate, D::IS_INPUT | D::IS_OUTPUT));
+    ASSERT_TRUE(mConfig.updateConfiguration(configUpdate, D::ALL));
 
     int32_t vendorInt32{0};
     ASSERT_TRUE(mConfig.mInputFormat->findInt32(KEY_VENDOR_INT32, &vendorInt32))
@@ -265,6 +363,10 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_AllSubscribed) {
 }
 
 TEST_F(CCodecConfigTest, VendorParamUpdate_PartiallySubscribed) {
+    // Test at audio domain, as video domain has a few local parameters that
+    // interfere with the testing.
+    init(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER, MIMETYPE_AUDIO_AAC);
+
     ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
 
     // Subscribe to example.int32 only
@@ -273,7 +375,7 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_PartiallySubscribed) {
     format->setInt32(KEY_VENDOR_INT32, 0);
     configUpdate.clear();
     ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(
-            mConfigurable, format, D::IS_INPUT | D::IS_OUTPUT, C2_MAY_BLOCK, &configUpdate));
+            mConfigurable, format, D::ALL, C2_MAY_BLOCK, &configUpdate));
     ASSERT_EQ(OK, mConfig.setParameters(mConfigurable, configUpdate, C2_MAY_BLOCK));
 
     C2PortVendorInt32Info::input i32(kCodec2Int32);
@@ -286,7 +388,7 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_PartiallySubscribed) {
     configUpdate.push_back(std::move(str));
 
     // Only example.i32 should be updated
-    ASSERT_TRUE(mConfig.updateConfiguration(configUpdate, D::IS_INPUT | D::IS_OUTPUT));
+    ASSERT_TRUE(mConfig.updateConfiguration(configUpdate, D::ALL));
 
     int32_t vendorInt32{0};
     ASSERT_TRUE(mConfig.mInputFormat->findInt32(KEY_VENDOR_INT32, &vendorInt32))
@@ -306,6 +408,53 @@ TEST_F(CCodecConfigTest, VendorParamUpdate_PartiallySubscribed) {
             << "mInputFormat = " << mConfig.mInputFormat->debugString().c_str();
     ASSERT_FALSE(mConfig.mOutputFormat->findString(KEY_VENDOR_STRING, &vendorString))
             << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+}
+
+TEST_F(CCodecConfigTest, SetPixelAspectRatio) {
+    init(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER, MIMETYPE_VIDEO_AVC);
+
+    ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
+
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_PIXEL_ASPECT_RATIO_WIDTH, 12);
+    format->setInt32(KEY_PIXEL_ASPECT_RATIO_HEIGHT, 11);
+
+    std::vector<std::unique_ptr<C2Param>> configUpdate;
+    ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(
+            mConfigurable, format, D::ALL, C2_MAY_BLOCK, &configUpdate));
+
+    ASSERT_EQ(1u, configUpdate.size());
+    C2StreamPixelAspectRatioInfo::output *par =
+        FindParam<std::remove_pointer<decltype(par)>::type>(configUpdate);
+    ASSERT_NE(nullptr, par);
+    ASSERT_EQ(12, par->width);
+    ASSERT_EQ(11, par->height);
+}
+
+TEST_F(CCodecConfigTest, PixelAspectRatioUpdate) {
+    init(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER, MIMETYPE_VIDEO_AVC);
+
+    ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
+
+    std::vector<std::unique_ptr<C2Param>> configUpdate;
+    C2StreamPixelAspectRatioInfo::output par(0u, 12, 11);
+    configUpdate.push_back(C2Param::Copy(par));
+
+    ASSERT_TRUE(mConfig.updateConfiguration(configUpdate, D::ALL));
+
+    int32_t parWidth{0};
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_PIXEL_ASPECT_RATIO_WIDTH, &parWidth))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    ASSERT_EQ(12, parWidth);
+    ASSERT_FALSE(mConfig.mInputFormat->findInt32(KEY_PIXEL_ASPECT_RATIO_WIDTH, &parWidth))
+            << "mInputFormat = " << mConfig.mInputFormat->debugString().c_str();
+
+    int32_t parHeight{0};
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_PIXEL_ASPECT_RATIO_HEIGHT, &parHeight))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    ASSERT_EQ(11, parHeight);
+    ASSERT_FALSE(mConfig.mInputFormat->findInt32(KEY_PIXEL_ASPECT_RATIO_HEIGHT, &parHeight))
+            << "mInputFormat = " << mConfig.mInputFormat->debugString().c_str();
 }
 
 } // namespace android
