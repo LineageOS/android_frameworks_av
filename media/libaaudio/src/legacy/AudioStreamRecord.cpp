@@ -179,6 +179,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                 selectedDeviceId
         );
 
+        // Set it here so it can be logged by the destructor if the open failed.
+        mAudioRecord->setCallerName(kCallerName);
+
         // Did we get a valid track?
         status_t status = mAudioRecord->initCheck();
         if (status != OK) {
