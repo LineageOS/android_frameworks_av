@@ -187,7 +187,7 @@ cc_library_static {
     srcs: ["MidiIoWrapper.cpp"],
 
     static_libs: [
-        "libsonivox",
+        "libsonivoxwithoutjet",
     ],
 
     header_libs: [
@@ -314,7 +314,7 @@ cc_library {
         "libutils",
         "libbinder",
         "libbinder_ndk",
-        "libsonivox",
+        //"libsonivox",
         "libandroidicu",
         "libexpat",
         "libcamera_client",
@@ -330,7 +330,7 @@ cc_library {
         "libaudioclient",
         "libbinder",
         "libandroidicu",
-        "libsonivox",
+        //"libsonivox",
         "libmedia_omx",
     ],
 
