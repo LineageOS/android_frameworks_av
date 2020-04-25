@@ -67,7 +67,7 @@ TEST_P(ID3versionTest, VersionTest) {
     ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
     ASSERT_TRUE(tag.version() >= versionNumber)
-            << "Expected version: " << tag.version() << " Found version: " << versionNumber;
+            << "Found version: " << tag.version() << " Expected version: " << versionNumber;
 }
 
 TEST_P(ID3textTagTest, TextTagTest) {
@@ -114,7 +114,7 @@ TEST_P(ID3albumArtTest, AlbumArtTest) {
         if (data) {
             ALOGV("Found album art: size = %zu mime = %s \n", dataSize, mime.string());
         }
-        ASSERT_NE(data, nullptr) << "Expected album art, found none!" << path;
+        ASSERT_NE(data, nullptr) << "Expected album art, found none! " << path;
     } else {
         ASSERT_EQ(data, nullptr) << "Found album art when expected none!";
     }
@@ -150,7 +150,7 @@ TEST_P(ID3multiAlbumArtTest, MultiAlbumArtTest) {
                 hexdump(data, dataSize > 128 ? 128 : dataSize);
 #endif
             }
-            ASSERT_NE(data, nullptr) << "Expected album art, found none!" << path;
+            ASSERT_NE(data, nullptr) << "Expected album art, found none! " << path;
         }
         it.next();
     }
@@ -168,16 +168,18 @@ INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3tagTest,
                                            "bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3",
                                            "bbb_44100hz_2ch_128kbps_mp3_30sec_moreTextFrames.mp3"));
 
+// TODO: need some data that is not V2.3
 INSTANTIATE_TEST_SUITE_P(
         id3TestAll, ID3versionTest,
-        ::testing::Values(make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3", 4),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_moreTextFrames.mp3", 4)));
+        ::testing::Values(
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3", ID3::ID3_V2_3),
+              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_moreTextFrames.mp3", ID3::ID3_V2_3)));
 
 INSTANTIATE_TEST_SUITE_P(
         id3TestAll, ID3textTagTest,
