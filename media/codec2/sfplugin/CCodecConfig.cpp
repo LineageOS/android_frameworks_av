@@ -617,6 +617,11 @@ void CCodecConfig::initializeStandardParams() {
             return C2Value();
         }));
 
+    add(ConfigMapper(KEY_PIXEL_ASPECT_RATIO_WIDTH,  C2_PARAMKEY_PIXEL_ASPECT_RATIO, "width")
+        .limitTo((D::VIDEO | D::IMAGE) & D::RAW));
+    add(ConfigMapper(KEY_PIXEL_ASPECT_RATIO_HEIGHT, C2_PARAMKEY_PIXEL_ASPECT_RATIO, "height")
+        .limitTo((D::VIDEO | D::IMAGE) & D::RAW));
+
     add(ConfigMapper(KEY_CHANNEL_COUNT, C2_PARAMKEY_CHANNEL_COUNT,       "value")
         .limitTo(D::AUDIO)); // read back to both formats
     add(ConfigMapper(KEY_CHANNEL_COUNT, C2_PARAMKEY_CODED_CHANNEL_COUNT, "value")

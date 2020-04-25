@@ -139,8 +139,13 @@ Return<void> DrmPlugin::openSession_1_1(SecurityLevel securityLevel,
     std::vector<uint8_t> sessionId = session->sessionId();
 
     Status status = setSecurityLevel(sessionId, securityLevel);
+    if (status == Status::OK) {
+        mOpenSessionOkCount++;
+    } else {
+        mSessionLibrary->destroySession(session);
+        sessionId.clear();
+    }
     _hidl_cb(status, toHidlVec(sessionId));
-    mOpenSessionOkCount++;
     return Void();
 }
 
@@ -151,12 +156,12 @@ Return<Status> DrmPlugin::closeSession(const hidl_vec<uint8_t>& sessionId) {
 
     sp<Session> session = mSessionLibrary->findSession(toVector(sessionId));
     if (session.get()) {
+        mSessionLibrary->destroySession(session);
         if (session->getMockError() != Status_V1_2::OK) {
             sendSessionLostState(sessionId);
             return Status::ERROR_DRM_INVALID_STATE;
         }
         mCloseSessionOkCount++;
-        mSessionLibrary->destroySession(session);
         return Status::OK;
     }
     mCloseSessionNotOpenedCount++;
@@ -387,6 +392,7 @@ Return<void> DrmPlugin::provideKeyResponse(
         if (isOfflineLicense) {
             if (isRelease) {
                 mFileHandle.DeleteLicense(keySetId);
+                mSessionLibrary->destroySession(session);
             } else {
                 if (!makeKeySetId(&keySetId)) {
                     _hidl_cb(Status::ERROR_DRM_UNKNOWN, hidl_vec<uint8_t>());
