@@ -68,11 +68,14 @@ public:
     // does not include EOL
     virtual std::string dump() const;
 
-    // -------------------------------------------------------------------
     /**
      * Open the device.
      */
     virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request) = 0;
+
+    // We log the CLOSE from the close() method. We needed this separate method to log the OPEN
+    // because we had to wait until we generated the handle.
+    void logOpen(aaudio_handle_t streamHandle);
 
     virtual aaudio_result_t close();
 
@@ -311,6 +314,8 @@ protected:
     // which is thread-safe.
     android::sp<AAudioServiceEndpoint> mServiceEndpoint;
     android::wp<AAudioServiceEndpoint> mServiceEndpointWeak;
+
+    std::string mMetricsId;  // set once during open()
 
 private:
 
