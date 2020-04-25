@@ -10,7 +10,7 @@ cc_library {
 
     static_libs: [
         "libmedia_midiiowrapper",
-        "libsonivox",
+        "libsonivoxwithoutjet",
         "libstagefright_foundation",
         "libwatchdog",
     ],
