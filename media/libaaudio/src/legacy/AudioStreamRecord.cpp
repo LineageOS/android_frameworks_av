@@ -179,6 +179,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                 selectedDeviceId
         );
 
+        // Set it here so it can be logged by the destructor if the open failed.
+        mAudioRecord->setCallerName(kCallerName);
+
         // Did we get a valid track?
         status_t status = mAudioRecord->initCheck();
         if (status != OK) {
@@ -201,6 +204,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             break; // Keep the one we just opened.
         }
     }
+
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD)
+            + std::to_string(mAudioRecord->getPortId());
 
     // Get the actual values from the AudioRecord.
     setSamplesPerFrame(mAudioRecord->channelCount());
@@ -286,6 +292,7 @@ aaudio_result_t AudioStreamRecord::release_l() {
     //  Then call it from here
     if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
+        logBufferState();
         mAudioRecord.clear();
         mFixedBlockWriter.close();
         return AudioStream::release_l();

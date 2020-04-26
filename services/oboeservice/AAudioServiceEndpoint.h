@@ -109,6 +109,8 @@ public:
         return mConnected;
     }
 
+    static audio_attributes_t getAudioAttributesFrom(const AAudioStreamParameters *params);
+
 protected:
 
     /**
@@ -118,8 +120,6 @@ protected:
     bool                     isStreamRegistered(audio_port_handle_t portHandle);
 
     void                     disconnectRegisteredStreams();
-
-    static audio_attributes_t getAudioAttributesFrom(const AAudioStreamParameters *params);
 
     mutable std::mutex       mLockStreams;
     std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;
