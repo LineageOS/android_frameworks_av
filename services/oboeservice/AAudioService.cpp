@@ -144,6 +144,9 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         pid_t pid = request.getProcessId();
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
         configurationOutput.copyFrom(*serviceStream);
+        // Log open in MediaMetrics after we have the handle because we need the handle to
+        // create the metrics ID.
+        serviceStream->logOpen(handle);
         return handle;
     }
 }

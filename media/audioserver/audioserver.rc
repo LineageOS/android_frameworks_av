@@ -14,6 +14,20 @@ on property:vts.native_server.on=1
 on property:vts.native_server.on=0
     start audioserver
 
+on property:init.svc.audioserver=stopped
+    stop vendor.audio-hal
+    stop vendor.audio-hal-4-0-msd
+    # Keep the original service names for backward compatibility
+    stop vendor.audio-hal-2-0
+    stop audio-hal-2-0
+
+on property:init.svc.audioserver=running
+    start vendor.audio-hal
+    start vendor.audio-hal-4-0-msd
+    # Keep the original service names for backward compatibility
+    start vendor.audio-hal-2-0
+    start audio-hal-2-0
+
 on property:sys.audio.restart.hal=1
     restart vendor.audio-hal
     restart vendor.audio-hal-4-0-msd

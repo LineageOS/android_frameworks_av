@@ -26,6 +26,7 @@
 #include <media/AudioTimestamp.h>
 #include <utils/String16.h>
 
+#include "core/AudioGlobal.h"
 #include "core/AudioStream.h"
 #include "legacy/AudioStreamLegacy.h"
 
