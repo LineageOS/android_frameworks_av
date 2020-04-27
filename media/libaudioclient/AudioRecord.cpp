@@ -172,7 +172,7 @@ AudioRecord::~AudioRecord()
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
         .set(AMEDIAMETRICS_PROP_CALLERNAME,
                 mCallerName.empty()
-                ? AMEDIAMETRICS_PROP_VALUE_UNKNOWN
+                ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
                 : mCallerName.c_str())
         .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
         .record();
@@ -400,6 +400,10 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     status_t status = NO_ERROR;
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                    mCallerName.empty()
+                    ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                    : mCallerName.c_str())
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, stateToString(mActive))
