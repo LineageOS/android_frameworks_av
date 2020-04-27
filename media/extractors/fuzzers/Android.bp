@@ -110,3 +110,58 @@ cc_fuzz {
         "libbase",
     ],
 }
+
+cc_fuzz {
+    name: "mp3_extractor_fuzzer",
+
+    srcs: [
+        "mp3_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/mp3",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libfifo",
+        "libmp3extractor",
+        "libstagefright_id3",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+}
+
+cc_fuzz {
+    name: "aac_extractor_fuzzer",
+
+    srcs: [
+        "aac_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/aac",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libaacextractor",
+        "libstagefright_metadatautils",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+}
