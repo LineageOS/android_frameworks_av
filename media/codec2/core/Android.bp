@@ -18,6 +18,10 @@ cc_library_shared {
         "-Werror",
     ],
 
+    header_abi_checker: {
+        check_all_apis: true,
+    },
+
     header_libs: [
         "libcodec2_headers",
         "libhardware_headers",
