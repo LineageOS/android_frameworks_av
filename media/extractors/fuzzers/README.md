@@ -1,9 +1,11 @@
 # Fuzzer for extractors
 
 ## Table of contents
-1. [libextractorfuzzerbase](#ExtractorFuzzerBase)
-2. [libmp4extractor](#mp4ExtractorFuzzer)
-3. [libwavextractor](#wavExtractorFuzzer)
++ [libextractorfuzzerbase](#ExtractorFuzzerBase)
++ [libmp4extractor](#mp4ExtractorFuzzer)
++ [libwavextractor](#wavExtractorFuzzer)
++ [libmp3extractor](#mp3ExtractorFuzzer)
++ [libaacextractor](#aacExtractorFuzzer)
 
 # <a name="ExtractorFuzzerBase"></a> Fuzzer for libextractorfuzzerbase
 All the extractors have a common API - creating a data source, extraction
@@ -77,6 +79,64 @@ To run on device
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/wav_extractor_fuzzer/wav_extractor_fuzzer CORPUS_DIR
+```
+
+# <a name="mp3ExtractorFuzzer"></a> Fuzzer for libmp3extractor
+
+## Plugin Design Considerations
+The fuzzer plugin for MP3 extractor uses the `ExtractorFuzzerBase` class and
+implements only the `createExtractor` to create the MP3 extractor class.
+
+
+## Build
+
+This describes steps to build mp3_extractor_fuzzer binary.
+
+### Android
+
+#### Steps to build
+Build the fuzzer
+```
+  $ mm -j$(nproc) mp3_extractor_fuzzer
+```
+
+#### Steps to run
+Create a directory CORPUS_DIR and copy some mp3 files to that folder
+Push this directory to device.
+
+To run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mp3_extractor_fuzzer/mp3_extractor_fuzzer CORPUS_DIR
+```
+
+# <a name="aacExtractorFuzzer"></a> Fuzzer for libaacextractor
+
+## Plugin Design Considerations
+The fuzzer plugin for AAC extractor uses the `ExtractorFuzzerBase` class and
+implements only the `createExtractor` to create the AAC extractor class.
+
+
+## Build
+
+This describes steps to build aac_extractor_fuzzer binary.
+
+### Android
+
+#### Steps to build
+Build the fuzzer
+```
+  $ mm -j$(nproc) aac_extractor_fuzzer
+```
+
+#### Steps to run
+Create a directory CORPUS_DIR and copy some aac files to that folder
+Push this directory to device.
+
+To run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/aac_extractor_fuzzer/aac_extractor_fuzzer CORPUS_DIR
 ```
 
 ## References:
