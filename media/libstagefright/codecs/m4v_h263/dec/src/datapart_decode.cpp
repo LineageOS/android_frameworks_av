@@ -635,29 +635,9 @@ PV_STATUS GetMBData_DataPart(VideoDecData *video)
     int QP_tmp = QP;
 
     int y_pos = video->mbnum_row;
-#ifdef PV_POSTPROC_ON
-    uint8 *pp_mod[6];
-    int TotalMB = video->nTotalMB;
-    int MB_in_width = video->nMBPerRow;
-#endif
 
 
 
-    /*****
-    *     Decoding of the 6 blocks (depending on transparent pattern)
-    *****/
-#ifdef PV_POSTPROC_ON
-    if (video->postFilterType != PV_NO_POST_PROC)
-    {
-        /** post-processing ***/
-        pp_mod[0] = video->pstprcTypCur + (y_pos << 1) * (MB_in_width << 1) + (x_pos << 1);
-        pp_mod[1] = pp_mod[0] + 1;
-        pp_mod[2] = pp_mod[0] + (MB_in_width << 1);
-        pp_mod[3] = pp_mod[2] + 1;
-        pp_mod[4] = video->pstprcTypCur + (TotalMB << 2) + mbnum;
-        pp_mod[5] = pp_mod[4] + TotalMB;
-    }
-#endif
 
     /*  oscl_memset(mblock->block, 0, sizeof(typeMBStore));    Aug 9,2005 */
 
@@ -698,10 +678,6 @@ PV_STATUS GetMBData_DataPart(VideoDecData *video)
             /*  modified to new semaphore for post-proc */
             // Future work:: can be combined in the dequant function
             // @todo Deblocking Semaphore for INTRA block
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[comp] = (uint8) PostProcSemaphore(dataBlock);
-#endif
         }
         MBlockIDCT(video);
     }
@@ -738,10 +714,6 @@ PV_STATUS GetMBData_DataPart(VideoDecData *video)
             }
 
             /*  @todo Deblocking Semaphore for INTRA block, for inter just test for ringing  */
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[comp] = (uint8)((ncoeffs[comp] > 3) ? 4 : 0);
-#endif
         }
 
         (*DC)[4] = mid_gray;
@@ -760,10 +732,6 @@ PV_STATUS GetMBData_DataPart(VideoDecData *video)
         {
             ncoeffs[4] = 0;
         }
-#ifdef PV_POSTPROC_ON
-        if (video->postFilterType != PV_NO_POST_PROC)
-            *pp_mod[4] = (uint8)((ncoeffs[4] > 3) ? 4 : 0);
-#endif
         (*DC)[5] = mid_gray;
         if (CBP & 1)
         {
@@ -780,10 +748,6 @@ PV_STATUS GetMBData_DataPart(VideoDecData *video)
         {
             ncoeffs[5] = 0;
         }
-#ifdef PV_POSTPROC_ON
-        if (video->postFilterType != PV_NO_POST_PROC)
-            *pp_mod[5] = (uint8)((ncoeffs[5] > 3) ? 4 : 0);
-#endif
 
 
 

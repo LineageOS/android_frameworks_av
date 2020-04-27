@@ -512,60 +512,6 @@ Bool PVAllocVideoData(VideoDecControls *decCtrl, int width, int height, int nLay
     video->memoryUsage += (sizeof(MOT) * 8 * nTotalMB);
 #endif
 
-#ifdef PV_POSTPROC_ON
-    /* Allocating space for post-processing Mode */
-#ifdef DEC_INTERNAL_MEMORY_OPT
-    video->pstprcTypCur = IMEM_pstprcTypCur;
-    video->memoryUsage += (nTotalMB * 6);
-    if (video->pstprcTypCur == NULL)
-    {
-        status = PV_FALSE;
-    }
-    else
-    {
-        oscl_memset(video->pstprcTypCur, 0, 4*nTotalMB + 2*nTotalMB);
-    }
-
-    video->pstprcTypPrv = IMEM_pstprcTypPrv;
-    video->memoryUsage += (nTotalMB * 6);
-    if (video->pstprcTypPrv == NULL)
-    {
-        status = PV_FALSE;
-    }
-    else
-    {
-        oscl_memset(video->pstprcTypPrv, 0, nTotalMB*6);
-    }
-
-#else
-    if (nTotalMB > INT32_MAX / 6) {
-        return PV_FALSE;
-    }
-    video->pstprcTypCur = (uint8 *) oscl_malloc(nTotalMB * 6);
-    video->memoryUsage += (nTotalMB * 6);
-    if (video->pstprcTypCur == NULL)
-    {
-        status = PV_FALSE;
-    }
-    else
-    {
-        oscl_memset(video->pstprcTypCur, 0, 4*nTotalMB + 2*nTotalMB);
-    }
-
-    video->pstprcTypPrv = (uint8 *) oscl_malloc(nTotalMB * 6);
-    video->memoryUsage += (nTotalMB * 6);
-    if (video->pstprcTypPrv == NULL)
-    {
-        status = PV_FALSE;
-    }
-    else
-    {
-        oscl_memset(video->pstprcTypPrv, 0, nTotalMB*6);
-    }
-
-#endif
-
-#endif
 
     /* initialize the decoder library */
     video->prevVop->predictionType = I_VOP;
@@ -631,10 +577,6 @@ OSCL_EXPORT_REF Bool PVCleanUpVideoDecoder(VideoDecControls *decCtrl)
 #ifdef DEC_INTERNAL_MEMORY_OPT
     if (video)
     {
-#ifdef PV_POSTPROC_ON
-        video->pstprcTypCur = NULL;
-        video->pstprcTypPrv = NULL;
-#endif
 
         video->acPredFlag       = NULL;
         video->sliceNo          = NULL;
@@ -699,10 +641,6 @@ OSCL_EXPORT_REF Bool PVCleanUpVideoDecoder(VideoDecControls *decCtrl)
 
     if (video)
     {
-#ifdef PV_POSTPROC_ON
-        if (video->pstprcTypCur) oscl_free(video->pstprcTypCur);
-        if (video->pstprcTypPrv) oscl_free(video->pstprcTypPrv);
-#endif
         if (video->predDC) oscl_free(video->predDC);
         video->predDCAC_row = NULL;
         if (video->predDCAC_col) oscl_free(video->predDCAC_col);
@@ -830,14 +768,10 @@ uint32 PVGetVideoTimeStamp(VideoDecControls *decCtrl)
 OSCL_EXPORT_REF void PVSetPostProcType(VideoDecControls *decCtrl, int mode)
 {
     VideoDecData *video = (VideoDecData *)decCtrl->videoDecoderData;
-#ifdef PV_POSTPROC_ON
-    video->postFilterType = mode;
-#else
     if (mode != 0) {
         ALOGE("Post processing filters are not supported");
     }
     video->postFilterType = 0;
-#endif
 }
 
 
@@ -1628,43 +1562,8 @@ Bool IsIntraFrame(VideoDecControls *decCtrl)
 void PVDecPostProcess(VideoDecControls *decCtrl, uint8 *outputYUV)
 {
     uint8 *outputBuffer;
-#ifdef PV_POSTPROC_ON
-    VideoDecData *video = (VideoDecData *) decCtrl->videoDecoderData;
-    int32 tmpvar;
-    if (outputYUV)
-    {
-        outputBuffer = outputYUV;
-    }
-    else
-    {
-        if (video->postFilterType)
-        {
-            outputBuffer = video->currVop->yChan;
-        }
-        else
-        {
-            outputBuffer = decCtrl->outputFrame;
-        }
-    }
-
-    if (video->postFilterType)
-    {
-        /* Post-processing,  */
-        PostFilter(video, video->postFilterType, outputBuffer);
-    }
-    else
-    {
-        if (outputYUV)
-        {
-            /* Copy decoded frame to the output buffer. */
-            tmpvar = (int32)video->width * video->height;
-            oscl_memcpy(outputBuffer, decCtrl->outputFrame, tmpvar*3 / 2);           /*  3/3/01 */
-        }
-    }
-#else
     outputBuffer = decCtrl->outputFrame;
     outputYUV;
-#endif
     decCtrl->outputFrame = outputBuffer;
     return;
 }
