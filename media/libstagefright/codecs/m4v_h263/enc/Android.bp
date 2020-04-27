@@ -23,10 +23,6 @@ cc_library_static {
 
     cflags: [
         "-DBX_RC",
-        "-DOSCL_IMPORT_REF=",
-        "-DOSCL_UNUSED_ARG(x)=(void)(x)",
-        "-DOSCL_EXPORT_REF=",
-
         "-Werror",
     ],
 
@@ -55,9 +51,6 @@ cc_library_shared {
 
     cflags: [
         "-DBX_RC",
-        "-DOSCL_IMPORT_REF=",
-        "-DOSCL_UNUSED_ARG(x)=(void)(x)",
-        "-DOSCL_EXPORT_REF=",
     ],
 
     static_libs: ["libstagefright_m4vh263enc"],
@@ -81,8 +74,6 @@ cc_test {
     local_include_dirs: ["src"],
 
     cflags: [
-        "-DOSCL_EXPORT_REF=",
-        "-DOSCL_IMPORT_REF=",
         "-DBX_RC",
         "-Wall",
         "-Werror",

@@ -35,13 +35,13 @@ typedef uint Bool;
 #define PV_TRUE  1
 #define PV_FALSE 0
 
-/* flag for post-processing  4/25/00 */
-
-#ifdef DEC_NOPOSTPROC
-#undef PV_POSTPROC_ON   /* enable compilation of post-processing code */
-#else
-#define PV_POSTPROC_ON
+#ifndef OSCL_IMPORT_REF
+#define OSCL_IMPORT_REF /* empty */
 #endif
+#ifndef OSCL_EXPORT_REF
+#define OSCL_EXPORT_REF /* empty */
+#endif
+
 
 #define PV_NO_POST_PROC 0
 #define PV_DEBLOCK 1
