@@ -187,6 +187,8 @@ struct Accessor : public IAccessor {
 
     static void createInvalidator();
 
+    static void createEvictor();
+
 private:
     class Impl;
     std::shared_ptr<Impl> mImpl;
