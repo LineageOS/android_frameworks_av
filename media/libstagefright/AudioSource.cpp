@@ -108,6 +108,9 @@ AudioSource::AudioSource(
                     selectedDeviceId,
                     selectedMicDirection,
                     selectedMicFieldDimension);
+        // Set caller name so it can be logged in destructor.
+        // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA
+        mRecord->setCallerName("media");
         mInitCheck = mRecord->initCheck();
         if (mInitCheck != OK) {
             mRecord.clear();
