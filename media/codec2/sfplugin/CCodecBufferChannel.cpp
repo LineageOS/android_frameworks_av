@@ -44,6 +44,7 @@
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/SkipCutBuffer.h>
 #include <media/MediaCodecBuffer.h>
+#include <mediadrm/ICrypto.h>
 #include <system/window.h>
 
 #include "CCodecBufferChannel.h"
@@ -982,7 +983,7 @@ status_t CCodecBufferChannel::start(
                 // TODO: handle this without going into array mode
                 forceArrayMode = true;
             } else {
-                input->buffers.reset(new GraphicInputBuffers(numInputSlots, mName));
+                input->buffers.reset(new GraphicInputBuffers(mName));
             }
         } else {
             if (hasCryptoOrDescrambler()) {
@@ -1150,7 +1151,7 @@ status_t CCodecBufferChannel::start(
             if (outputSurface || !buffersBoundToCodec) {
                 output->buffers.reset(new GraphicOutputBuffers(mName));
             } else {
-                output->buffers.reset(new RawGraphicOutputBuffers(numOutputSlots, mName));
+                output->buffers.reset(new RawGraphicOutputBuffers(mName));
             }
         } else {
             output->buffers.reset(new LinearOutputBuffers(mName));
