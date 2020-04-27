@@ -43,9 +43,6 @@ cc_library_static {
     export_include_dirs: ["include"],
 
     cflags: [
-        "-DOSCL_EXPORT_REF=",
-        "-DOSCL_IMPORT_REF=",
-
         "-Werror",
         "-DDEC_NOPOSTPROC",
     ],
@@ -77,8 +74,6 @@ cc_library_shared {
     local_include_dirs: ["src"],
 
     cflags: [
-        "-DOSCL_EXPORT_REF=",
-        "-DOSCL_IMPORT_REF=",
     ],
 
     static_libs: ["libstagefright_m4vh263dec"],

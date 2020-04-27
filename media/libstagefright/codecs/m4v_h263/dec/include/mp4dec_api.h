@@ -35,6 +35,13 @@ typedef uint Bool;
 #define PV_TRUE  1
 #define PV_FALSE 0
 
+#ifndef OSCL_IMPORT_REF
+#define OSCL_IMPORT_REF /* empty */
+#endif
+#ifndef OSCL_EXPORT_REF
+#define OSCL_EXPORT_REF /* empty */
+#endif
+
 /* flag for post-processing  4/25/00 */
 
 #ifdef DEC_NOPOSTPROC
