@@ -544,30 +544,12 @@ PV_STATUS GetMBData(VideoDecData *video)
     int16 DC_coeff;
     PV_STATUS status;
 
-#ifdef PV_POSTPROC_ON
-    /* post-processing */
-    uint8 *pp_mod[6];
-    int TotalMB = video->nTotalMB;
-    int MB_in_width = video->nMBPerRow;
-#endif
     int y_pos = video->mbnum_row;
     int x_pos = video->mbnum_col;
     int32 offset = (int32)(y_pos << 4) * width + (x_pos << 4);
 
     /* Decode each 8-by-8 blocks. comp 0 ~ 3 are luminance blocks, 4 ~ 5 */
     /*  are chrominance blocks.   04/03/2000.                          */
-#ifdef PV_POSTPROC_ON
-    if (video->postFilterType != PV_NO_POST_PROC)
-    {
-        /** post-processing ***/
-        pp_mod[0] = video->pstprcTypCur + (y_pos << 1) * (MB_in_width << 1) + (x_pos << 1);
-        pp_mod[1] = pp_mod[0] + 1;
-        pp_mod[2] = pp_mod[0] + (MB_in_width << 1);
-        pp_mod[3] = pp_mod[2] + 1;
-        pp_mod[4] = video->pstprcTypCur + (TotalMB << 2) + mbnum;
-        pp_mod[5] = pp_mod[4] + TotalMB;
-    }
-#endif
 
     /*  oscl_memset(mblock->block, 0, sizeof(typeMBStore));    Aug 9,2005 */
 
@@ -645,10 +627,6 @@ PV_STATUS GetMBData(VideoDecData *video)
             }
             no_coeff[comp] = ncoeffs[comp];
 
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[comp] = (uint8) PostProcSemaphore(dataBlock);
-#endif
         }
         MBlockIDCT(video);
     }
@@ -677,20 +655,6 @@ PV_STATUS GetMBData(VideoDecData *video)
                 BlockIDCT(c_comp + (comp&2)*(width << 2) + 8*(comp&1), mblock->pred_block + (comp&2)*64 + 8*(comp&1), mblock->block[comp], width, ncoeffs[comp],
                           mblock->bitmapcol[comp], mblock->bitmaprow[comp]);
 
-#ifdef PV_POSTPROC_ON
-                /* for inter just test for ringing */
-                if (video->postFilterType != PV_NO_POST_PROC)
-                    *pp_mod[comp] = (uint8)((ncoeffs[comp] > 3) ? 4 : 0);
-#endif
-            }
-            else
-            {
-                /* no IDCT for all zeros blocks  03/28/2002 */
-                /*              BlockIDCT();                */
-#ifdef PV_POSTPROC_ON
-                if (video->postFilterType != PV_NO_POST_PROC)
-                    *pp_mod[comp] = 0;
-#endif
             }
         }
 
@@ -707,20 +671,6 @@ PV_STATUS GetMBData(VideoDecData *video)
             BlockIDCT(video->currVop->uChan + (offset >> 2) + (x_pos << 2), mblock->pred_block + 256, mblock->block[4], width >> 1, ncoeffs[4],
                       mblock->bitmapcol[4], mblock->bitmaprow[4]);
 
-#ifdef PV_POSTPROC_ON
-            /* for inter just test for ringing */
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[4] = (uint8)((ncoeffs[4] > 3) ? 4 : 0);
-#endif
-        }
-        else
-        {
-            /* no IDCT for all zeros blocks  03/28/2002 */
-            /*              BlockIDCT();                */
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[4] = 0;
-#endif
         }
         (*DC)[5] = mid_gray;
         if (CBP & 1)
@@ -731,20 +681,6 @@ PV_STATUS GetMBData(VideoDecData *video)
             BlockIDCT(video->currVop->vChan + (offset >> 2) + (x_pos << 2), mblock->pred_block + 264, mblock->block[5], width >> 1, ncoeffs[5],
                       mblock->bitmapcol[5], mblock->bitmaprow[5]);
 
-#ifdef PV_POSTPROC_ON
-            /* for inter just test for ringing */
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[5] = (uint8)((ncoeffs[5] > 3) ? 4 : 0);
-#endif
-        }
-        else
-        {
-            /* no IDCT for all zeros blocks  03/28/2002 */
-            /*              BlockIDCT();                */
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[5] = 0;
-#endif
         }
         video->QPMB[mbnum] = QP;  /* restore the QP values  ANNEX_T*/
 #else
@@ -759,20 +695,6 @@ PV_STATUS GetMBData(VideoDecData *video)
                 BlockIDCT(c_comp + (comp&2)*(width << 2) + 8*(comp&1), mblock->pred_block + (comp&2)*64 + 8*(comp&1), mblock->block[comp], width, ncoeffs[comp],
                           mblock->bitmapcol[comp], mblock->bitmaprow[comp]);
 
-#ifdef PV_POSTPROC_ON
-                /* for inter just test for ringing */
-                if (video->postFilterType != PV_NO_POST_PROC)
-                    *pp_mod[comp] = (uint8)((ncoeffs[comp] > 3) ? 4 : 0);
-#endif
-            }
-            else
-            {
-                /* no IDCT for all zeros blocks  03/28/2002 */
-                /*              BlockIDCT();                */
-#ifdef PV_POSTPROC_ON
-                if (video->postFilterType != PV_NO_POST_PROC)
-                    *pp_mod[comp] = 0;
-#endif
             }
         }
 
@@ -785,20 +707,11 @@ PV_STATUS GetMBData(VideoDecData *video)
             BlockIDCT(video->currVop->uChan + (offset >> 2) + (x_pos << 2), mblock->pred_block + 256, mblock->block[4], width >> 1, ncoeffs[4],
                       mblock->bitmapcol[4], mblock->bitmaprow[4]);
 
-#ifdef PV_POSTPROC_ON
-            /* for inter just test for ringing */
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[4] = (uint8)((ncoeffs[4] > 3) ? 4 : 0);
-#endif
         }
         else
         {
             /* no IDCT for all zeros blocks  03/28/2002 */
             /*              BlockIDCT();                */
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[4] = 0;
-#endif
         }
         (*DC)[5] = mid_gray;
         if (CBP & 1)
@@ -809,20 +722,11 @@ PV_STATUS GetMBData(VideoDecData *video)
             BlockIDCT(video->currVop->vChan + (offset >> 2) + (x_pos << 2), mblock->pred_block + 264, mblock->block[5], width >> 1, ncoeffs[5],
                       mblock->bitmapcol[5], mblock->bitmaprow[5]);
 
-#ifdef PV_POSTPROC_ON
-            /* for inter just test for ringing */
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[5] = (uint8)((ncoeffs[5] > 3) ? 4 : 0);
-#endif
         }
         else
         {
             /* no IDCT for all zeros blocks  03/28/2002 */
             /*              BlockIDCT();                */
-#ifdef PV_POSTPROC_ON
-            if (video->postFilterType != PV_NO_POST_PROC)
-                *pp_mod[5] = 0;
-#endif
 #endif  // PV_ANNEX_IJKT_SUPPORT
 
 

@@ -154,14 +154,6 @@ void  MBMotionComp(
     int xpred, ypred;
     int xsum;
     int round1;
-#ifdef PV_POSTPROC_ON // 2/14/2001      
-    /* Total number of pixels in the VOL */
-    int32 size = (int32) video->nTotalMB << 8;
-    uint8 *pp_dec_y, *pp_dec_u;
-    int ll[4];
-    int tmp = 0;
-    uint8 msk_deblock = 0;
-#endif
     /*----------------------------------------------------------------------------
     ; Function body here
     ----------------------------------------------------------------------------*/
@@ -404,43 +396,6 @@ void  MBMotionComp(
     /* Call function to set de-blocking and de-ringing */
     /*   semaphores for luminance                      */
 
-#ifdef PV_POSTPROC_ON
-    if (video->postFilterType != PV_NO_POST_PROC)
-    {
-        if (mode&INTER_1VMASK)
-        {
-            pp_dec_y = video->pstprcTypCur + imv;
-            ll[0] = 1;
-            ll[1] = mvwidth - 1;
-            ll[2] = 1;
-            ll[3] = -mvwidth - 1;
-            msk_deblock = pp_semaphore_luma(xpred, ypred, pp_dec_y,
-                                            video->pstprcTypPrv, ll, &tmp, px[0], py[0], mvwidth,
-                                            width, height);
-
-            pp_dec_u = video->pstprcTypCur + (size >> 6) +
-                       ((imv + (xpos >> 3)) >> 2);
-
-            pp_semaphore_chroma_inter(xpred, ypred, pp_dec_u,
-                                      video->pstprcTypPrv, dx, dy, mvwidth, height, size,
-                                      tmp, msk_deblock);
-        }
-        else
-        {
-            /* Post-processing mode (MBM_INTER8) */
-            /* deblocking and deringing) */
-            pp_dec_y = video->pstprcTypCur + imv;
-            *pp_dec_y = 4;
-            *(pp_dec_y + 1) = 4;
-            *(pp_dec_y + mvwidth) = 4;
-            *(pp_dec_y + mvwidth + 1) = 4;
-            pp_dec_u = video->pstprcTypCur + (size >> 6) +
-                       ((imv + (xpos >> 3)) >> 2);
-            *pp_dec_u = 4;
-            pp_dec_u[size>>8] = 4;
-        }
-    }
-#endif
 
 
     /* xpred and ypred calculation for Chrominance is */
@@ -566,13 +521,6 @@ void  SkippedMBMotionComp(
     PIXEL *cv_comp, *cv_prev;
     int width, width_uv;
     int32 offset;
-#ifdef PV_POSTPROC_ON // 2/14/2001      
-    int imv;
-    int32 size = (int32) video->nTotalMB << 8;
-    uint8 *pp_dec_y, *pp_dec_u;
-    uint8 *pp_prev1;
-    int mvwidth = video->nMBPerRow << 1;
-#endif
 
     width = video->width;
     width_uv  = width >> 1;
@@ -609,28 +557,6 @@ void  SkippedMBMotionComp(
     PutSKIPPED_B(cv_comp, cv_prev, width_uv);
 
     /*  10/24/2000 post_processing semaphore generation */
-#ifdef PV_POSTPROC_ON // 2/14/2001
-    if (video->postFilterType != PV_NO_POST_PROC)
-    {
-        imv = (offset >> 6) - (xpos >> 6) + (xpos >> 3);
-        /* Post-processing mode (copy previous MB) */
-        pp_prev1 = video->pstprcTypPrv + imv;
-        pp_dec_y = video->pstprcTypCur + imv;
-        *pp_dec_y = *pp_prev1;
-        *(pp_dec_y + 1) = *(pp_prev1 + 1);
-        *(pp_dec_y + mvwidth) = *(pp_prev1 + mvwidth);
-        *(pp_dec_y + mvwidth + 1) = *(pp_prev1 + mvwidth + 1);
-
-        /* chrominance */
-        /*4*MB_in_width*MB_in_height*/
-        pp_prev1 = video->pstprcTypPrv + (size >> 6) +
-                   ((imv + (xpos >> 3)) >> 2);
-        pp_dec_u = video->pstprcTypCur + (size >> 6) +
-                   ((imv + (xpos >> 3)) >> 2);
-        *pp_dec_u = *pp_prev1;
-        pp_dec_u[size>>8] = pp_prev1[size>>8];
-    }
-#endif
     /*----------------------------------------------------------------------------
     ; Return nothing or data or data pointer
     ----------------------------------------------------------------------------*/
