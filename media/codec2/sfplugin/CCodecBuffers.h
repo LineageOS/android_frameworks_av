@@ -154,6 +154,8 @@ private:
     DISALLOW_EVIL_CONSTRUCTORS(InputBuffers);
 };
 
+class OutputBuffersArray;
+
 class OutputBuffers : public CCodecBuffers {
 public:
     OutputBuffers(const char *componentName, const char *name = "Output")
@@ -162,8 +164,12 @@ public:
 
     /**
      * Register output C2Buffer from the component and obtain corresponding
-     * index and MediaCodecBuffer object. Returns false if registration
-     * fails.
+     * index and MediaCodecBuffer object.
+     *
+     * Returns:
+     *   OK if registration succeeds.
+     *   NO_MEMORY if all buffers are available but not compatible.
+     *   WOULD_BLOCK if there are compatible buffers, but they are all in use.
      */
     virtual status_t registerBuffer(
             const std::shared_ptr<C2Buffer> &buffer,
@@ -198,13 +204,171 @@ public:
      * shall retain the internal state so that it will honor index and
      * buffer from previous calls of registerBuffer().
      */
-    virtual std::unique_ptr<OutputBuffers> toArrayMode(size_t size) = 0;
+    virtual std::unique_ptr<OutputBuffersArray> toArrayMode(size_t size) = 0;
 
     /**
      * Initialize SkipCutBuffer object.
      */
     void initSkipCutBuffer(
             int32_t delay, int32_t padding, int32_t sampleRate, int32_t channelCount);
+
+    /**
+     * Update SkipCutBuffer from format. The @p format must not be null.
+     * @p notify determines whether the format comes with a buffer that should
+     * be reported to the client or not.
+     */
+    void updateSkipCutBuffer(const sp<AMessage> &format, bool notify = true);
+
+    /**
+     * Output Stash
+     * ============
+     *
+     * The output stash is a place to hold output buffers temporarily before
+     * they are registered to output slots. It has 2 main functions:
+     * 1. Allow reordering of output frames as the codec may produce frames in a
+     *    different order.
+     * 2. Act as a "buffer" between the codec and the client because the codec
+     *    may produce more buffers than available slots. This excess of codec's
+     *    output buffers should be registered to slots later, after the client
+     *    has released some slots.
+     *
+     * The stash consists of 2 lists of buffers: mPending and mReorderStash.
+     * mPending is a normal FIFO queue with not size limit, while mReorderStash
+     * is a sorted list with size limit mDepth.
+     *
+     * The normal flow of a non-csd output buffer is as follows:
+     *
+     *           |----------------OutputBuffers---------------|
+     *           |----------Output stash----------|           |
+     *   Codec --|-> mReorderStash --> mPending --|-> slots --|-> client
+     *           |                                |           |
+     *     pushToStash()                    popFromStashAndRegister()
+     *
+     * The buffer that comes from the codec first enters mReorderStash. The
+     * first buffer in mReorderStash gets moved to mPending when mReorderStash
+     * overflows. Buffers in mPending are registered to slots and given to the
+     * client as soon as slots are available.
+     *
+     * Every output buffer that is not a csd buffer should be put on the stash
+     * by calling pushToStash(), then later registered to a slot by calling
+     * popFromStashAndRegister() before notifying the client with
+     * onOutputBufferAvailable().
+     *
+     * Reordering
+     * ==========
+     *
+     * mReorderStash is a sorted list with a specified size limit. The size
+     * limit can be set by calling setReorderDepth().
+     *
+     * Every buffer in mReorderStash has a C2WorkOrdinalStruct, which contains 3
+     * members, all of which are comparable. Which member of C2WorkOrdinalStruct
+     * should be used for reordering can be chosen by calling setReorderKey().
+     */
+
+    /**
+     * Return the reorder depth---the size of mReorderStash.
+     */
+    uint32_t getReorderDepth() const;
+
+    /**
+     * Set the reorder depth.
+     */
+    void setReorderDepth(uint32_t depth);
+
+    /**
+     * Set the type of "key" to use in comparisons.
+     */
+    void setReorderKey(C2Config::ordinal_key_t key);
+
+    /**
+     * Return whether the output stash has any pending buffers.
+     */
+    bool hasPending() const;
+
+    /**
+     * Flush the stash and reset the depth and the key to their default values.
+     */
+    void clearStash();
+
+    /**
+     * Flush the stash.
+     */
+    void flushStash();
+
+    /**
+     * Push a buffer to the reorder stash.
+     *
+     * @param buffer    C2Buffer object from the returned work.
+     * @param notify    Whether the returned work contains a buffer that should
+     *                  be reported to the client. This may be false if the
+     *                  caller wants to process the buffer without notifying the
+     *                  client.
+     * @param timestamp Buffer timestamp to report to the client.
+     * @param flags     Buffer flags to report to the client.
+     * @param format    Buffer format to report to the client.
+     * @param ordinal   Ordinal used in reordering. This determines when the
+     *                  buffer will be popped from the output stash by
+     *                  `popFromStashAndRegister()`.
+     */
+    void pushToStash(
+            const std::shared_ptr<C2Buffer>& buffer,
+            bool notify,
+            int64_t timestamp,
+            int32_t flags,
+            const sp<AMessage>& format,
+            const C2WorkOrdinalStruct& ordinal);
+
+    enum BufferAction : int {
+        SKIP,
+        DISCARD,
+        NOTIFY_CLIENT,
+        REALLOCATE,
+        RETRY,
+    };
+
+    /**
+     * Try to atomically pop the first buffer from the reorder stash and
+     * register it to an output slot. The function returns a value that
+     * indicates a recommended course of action for the caller.
+     *
+     * If the stash is empty, the function will return `SKIP`.
+     *
+     * If the stash is not empty, the function will peek at the first (oldest)
+     * entry in mPending process the buffer in the entry as follows:
+     * - If the buffer should not be sent to the client, the function will
+     *   return `DISCARD`. The stash entry will be removed.
+     * - If the buffer should be sent to the client, the function will attempt
+     *   to register the buffer to a slot. The registration may have 3 outcomes
+     *   corresponding to the following return values:
+     *   - `NOTIFY_CLIENT`: The buffer is successfully registered to a slot. The
+     *     output arguments @p index and @p outBuffer will contain valid values
+     *     that the caller can use to call onOutputBufferAvailable(). The stash
+     *     entry will be removed.
+     *   - `REALLOCATE`: The buffer is not registered because it is not
+     *     compatible with the current slots (which are available). The caller
+     *     should reallocate the OutputBuffers with slots that can fit the
+     *     returned @p c2Buffer. The stash entry will not be removed
+     *   - `RETRY`: All slots are currently occupied by the client. The caller
+     *     should try to call this function again after the client has released
+     *     some slots.
+     *
+     * @return What the caller should do afterwards.
+     *
+     * @param[out] c2Buffer   Underlying C2Buffer associated to the first buffer
+     *                        on the stash. This value is guaranteed to be valid
+     *                        unless the return value is `SKIP`.
+     * @param[out] index      Slot index. This value is valid only if the return
+     *                        value is `NOTIFY_CLIENT`.
+     * @param[out] outBuffer  Registered buffer. This value is valid only if the
+     *                        return valu is `NOTIFY_CLIENT`.
+     */
+    BufferAction popFromStashAndRegister(
+            std::shared_ptr<C2Buffer>* c2Buffer,
+            size_t* index,
+            sp<MediaCodecBuffer>* outBuffer);
+
+protected:
+    sp<SkipCutBuffer> mSkipCutBuffer;
 
     /**
      * Update the SkipCutBuffer object. No-op if it's never initialized.
@@ -216,15 +380,8 @@ public:
      */
     void submit(const sp<MediaCodecBuffer> &buffer);
 
-    /**
-     * Transfer SkipCutBuffer object to the other Buffers object.
-     */
-    void transferSkipCutBuffer(const sp<SkipCutBuffer> &scb);
-
-protected:
-    sp<SkipCutBuffer> mSkipCutBuffer;
-
 private:
+    // SkipCutBuffer
     int32_t mDelay;
     int32_t mPadding;
     int32_t mSampleRate;
@@ -232,7 +389,78 @@ private:
 
     void setSkipCutBuffer(int32_t skip, int32_t cut);
 
+    // Output stash
+
+    // Output format that has not been made available to the client.
+    sp<AMessage> mUnreportedFormat;
+
+    // Struct for an entry in the output stash (mPending and mReorderStash)
+    struct StashEntry {
+        inline StashEntry()
+            : buffer(nullptr),
+              notify(false),
+              timestamp(0),
+              flags(0),
+              format(),
+              ordinal({0, 0, 0}) {}
+        inline StashEntry(
+                const std::shared_ptr<C2Buffer> &b,
+                bool n,
+                int64_t t,
+                int32_t f,
+                const sp<AMessage> &fmt,
+                const C2WorkOrdinalStruct &o)
+            : buffer(b),
+              notify(n),
+              timestamp(t),
+              flags(f),
+              format(fmt),
+              ordinal(o) {}
+        std::shared_ptr<C2Buffer> buffer;
+        bool notify;
+        int64_t timestamp;
+        int32_t flags;
+        sp<AMessage> format;
+        C2WorkOrdinalStruct ordinal;
+    };
+
+    /**
+     * FIFO queue of stash entries.
+     */
+    std::list<StashEntry> mPending;
+    /**
+     * Sorted list of stash entries.
+     */
+    std::list<StashEntry> mReorderStash;
+    /**
+     * Size limit of mReorderStash.
+     */
+    uint32_t mDepth{0};
+    /**
+     * Choice of key to use in ordering of stash entries in mReorderStash.
+     */
+    C2Config::ordinal_key_t mKey{C2Config::ORDINAL};
+
+    /**
+     * Return false if mPending is empty; otherwise, pop the first entry from
+     * mPending and return true.
+     */
+    bool popPending(StashEntry *entry);
+
+    /**
+     * Push an entry as the first entry of mPending.
+     */
+    void deferPending(const StashEntry &entry);
+
+    /**
+     * Comparison of C2WorkOrdinalStruct based on mKey.
+     */
+    bool less(const C2WorkOrdinalStruct &o1,
+              const C2WorkOrdinalStruct &o2) const;
+
     DISALLOW_EVIL_CONSTRUCTORS(OutputBuffers);
+
+    friend OutputBuffersArray;
 };
 
 /**
@@ -772,7 +1000,7 @@ public:
 
     bool isArrayMode() const final { return true; }
 
-    std::unique_ptr<OutputBuffers> toArrayMode(size_t) final {
+    std::unique_ptr<OutputBuffersArray> toArrayMode(size_t) final {
         return nullptr;
     }
 
@@ -811,6 +1039,12 @@ public:
      */
     void grow(size_t newSize);
 
+    /**
+     * Transfer the SkipCutBuffer and the output stash from another
+     * OutputBuffers.
+     */
+    void transferFrom(OutputBuffers* source);
+
 private:
     BuffersArrayImpl mImpl;
     std::function<sp<Codec2Buffer>()> mAlloc;
@@ -839,7 +1073,7 @@ public:
     void flush(
             const std::list<std::unique_ptr<C2Work>> &flushedWork) override;
 
-    std::unique_ptr<OutputBuffers> toArrayMode(size_t size) override;
+    std::unique_ptr<OutputBuffersArray> toArrayMode(size_t size) override;
 
     size_t numClientBuffers() const final;
 

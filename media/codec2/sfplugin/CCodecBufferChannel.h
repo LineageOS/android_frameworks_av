@@ -296,48 +296,6 @@ private:
 
     Mutexed<PipelineWatcher> mPipelineWatcher;
 
-    class ReorderStash {
-    public:
-        struct Entry {
-            inline Entry() : buffer(nullptr), timestamp(0), flags(0), ordinal({0, 0, 0}) {}
-            inline Entry(
-                    const std::shared_ptr<C2Buffer> &b,
-                    int64_t t,
-                    int32_t f,
-                    const C2WorkOrdinalStruct &o)
-                : buffer(b), timestamp(t), flags(f), ordinal(o) {}
-            std::shared_ptr<C2Buffer> buffer;
-            int64_t timestamp;
-            int32_t flags;
-            C2WorkOrdinalStruct ordinal;
-        };
-
-        ReorderStash();
-
-        void clear();
-        void flush();
-        void setDepth(uint32_t depth);
-        void setKey(C2Config::ordinal_key_t key);
-        bool pop(Entry *entry);
-        void emplace(
-                const std::shared_ptr<C2Buffer> &buffer,
-                int64_t timestamp,
-                int32_t flags,
-                const C2WorkOrdinalStruct &ordinal);
-        void defer(const Entry &entry);
-        bool hasPending() const;
-        uint32_t depth() const { return mDepth; }
-
-    private:
-        std::list<Entry> mPending;
-        std::list<Entry> mStash;
-        uint32_t mDepth;
-        C2Config::ordinal_key_t mKey;
-
-        bool less(const C2WorkOrdinalStruct &o1, const C2WorkOrdinalStruct &o2);
-    };
-    Mutexed<ReorderStash> mReorderStash;
-
     std::atomic_bool mInputMetEos;
     std::once_flag mRenderWarningFlag;
 
