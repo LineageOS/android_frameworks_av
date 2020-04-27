@@ -129,6 +129,7 @@ protected:
     }
 
     // This is used for exact matching by MediaMetrics. So do not change it.
+    // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_AAUDIO
     static constexpr char     kCallerName[] = "aaudio";
 
     MonotonicCounter           mFramesWritten;
