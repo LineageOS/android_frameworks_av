@@ -49,8 +49,32 @@ struct configFormat {
     int32_t channelCount;
 };
 
+enum inputId {
+    // audio streams
+    AAC_1,
+    AAC_ADTS_1,
+    AMR_NB_1,
+    AMR_WB_1,
+    FLAC_1,
+    OPUS_1,
+    VORBIS_1,
+    // video streams
+    AV1_1,
+    AVC_1,
+    H263_1,
+    HEVC_1,
+    MPEG4_1,
+    VP8_1,
+    VP9_1,
+    // heif stream
+    HEIC_1,
+    UNUSED_ID,
+    UNKNOWN_ID,
+};
+
 // LookUpTable of clips and metadata for component testing
 static const struct InputData {
+    inputId inpId;
     const char *mime;
     string inputFile;
     string info;
@@ -58,61 +82,67 @@ static const struct InputData {
     int32_t secondParam;
     bool isAudio;
 } kInputData[] = {
-        {MEDIA_MIMETYPE_AUDIO_OPUS, "bbb_opus_stereo_128kbps_48000hz.opus",
-         "bbb_opus_stereo_128kbps_48000hz.info", 48000, 2, true},
-        {MEDIA_MIMETYPE_AUDIO_AAC, "bbb_aac_stereo_128kbps_48000hz.aac",
+        {AAC_1, MEDIA_MIMETYPE_AUDIO_AAC, "bbb_aac_stereo_128kbps_48000hz.aac",
          "bbb_aac_stereo_128kbps_48000hz.info", 48000, 2, true},
-        {MEDIA_MIMETYPE_AUDIO_AAC_ADTS, "Mps_2_c2_fr1_Sc1_Dc2_0x03_raw.adts",
+        {AAC_ADTS_1, MEDIA_MIMETYPE_AUDIO_AAC_ADTS, "Mps_2_c2_fr1_Sc1_Dc2_0x03_raw.adts",
          "Mps_2_c2_fr1_Sc1_Dc2_0x03_raw.info", 48000, 2, true},
-        {MEDIA_MIMETYPE_AUDIO_AMR_NB, "sine_amrnb_1ch_12kbps_8000hz.amrnb",
+        {AMR_NB_1, MEDIA_MIMETYPE_AUDIO_AMR_NB, "sine_amrnb_1ch_12kbps_8000hz.amrnb",
          "sine_amrnb_1ch_12kbps_8000hz.info", 8000, 1, true},
-        {MEDIA_MIMETYPE_AUDIO_AMR_WB, "bbb_amrwb_1ch_14kbps_16000hz.amrwb",
+        {AMR_WB_1, MEDIA_MIMETYPE_AUDIO_AMR_WB, "bbb_amrwb_1ch_14kbps_16000hz.amrwb",
          "bbb_amrwb_1ch_14kbps_16000hz.info", 16000, 1, true},
-        {MEDIA_MIMETYPE_AUDIO_VORBIS, "bbb_vorbis_stereo_128kbps_48000hz.vorbis",
-         "bbb_vorbis_stereo_128kbps_48000hz.info", 48000, 2, true},
-        {MEDIA_MIMETYPE_AUDIO_FLAC, "bbb_flac_stereo_680kbps_48000hz.flac",
+        {FLAC_1, MEDIA_MIMETYPE_AUDIO_FLAC, "bbb_flac_stereo_680kbps_48000hz.flac",
          "bbb_flac_stereo_680kbps_48000hz.info", 48000, 2, true},
-        {MEDIA_MIMETYPE_VIDEO_VP9, "bbb_vp9_176x144_285kbps_60fps.vp9",
-         "bbb_vp9_176x144_285kbps_60fps.info", 176, 144, false},
-        {MEDIA_MIMETYPE_VIDEO_VP8, "bbb_vp8_176x144_240kbps_60fps.vp8",
-         "bbb_vp8_176x144_240kbps_60fps.info", 176, 144, false},
-        {MEDIA_MIMETYPE_VIDEO_AVC, "bbb_avc_176x144_300kbps_60fps.h264",
+        {OPUS_1, MEDIA_MIMETYPE_AUDIO_OPUS, "bbb_opus_stereo_128kbps_48000hz.opus",
+         "bbb_opus_stereo_128kbps_48000hz.info", 48000, 2, true},
+        {VORBIS_1, MEDIA_MIMETYPE_AUDIO_VORBIS, "bbb_vorbis_stereo_128kbps_48000hz.vorbis",
+         "bbb_vorbis_stereo_128kbps_48000hz.info", 48000, 2, true},
+
+        {AV1_1, MEDIA_MIMETYPE_VIDEO_AV1, "bbb_av1_176_144.av1", "bbb_av1_176_144.info", 176, 144,
+         false},
+        {AVC_1, MEDIA_MIMETYPE_VIDEO_AVC, "bbb_avc_176x144_300kbps_60fps.h264",
          "bbb_avc_176x144_300kbps_60fps.info", 176, 144, false},
-        {MEDIA_MIMETYPE_VIDEO_HEVC, "bbb_hevc_176x144_176kbps_60fps.hevc",
-         "bbb_hevc_176x144_176kbps_60fps.info", 176, 144, false},
-        {MEDIA_MIMETYPE_VIDEO_AV1, "bbb_av1_176_144.av1", "bbb_av1_176_144.info", 176, 144, false},
-        {MEDIA_MIMETYPE_VIDEO_H263, "bbb_h263_352x288_300kbps_12fps.h263",
+        {H263_1, MEDIA_MIMETYPE_VIDEO_H263, "bbb_h263_352x288_300kbps_12fps.h263",
          "bbb_h263_352x288_300kbps_12fps.info", 352, 288, false},
-        {MEDIA_MIMETYPE_VIDEO_MPEG4, "bbb_mpeg4_352x288_512kbps_30fps.m4v",
+        {HEVC_1, MEDIA_MIMETYPE_VIDEO_HEVC, "bbb_hevc_176x144_176kbps_60fps.hevc",
+         "bbb_hevc_176x144_176kbps_60fps.info", 176, 144, false},
+        {MPEG4_1, MEDIA_MIMETYPE_VIDEO_MPEG4, "bbb_mpeg4_352x288_512kbps_30fps.m4v",
          "bbb_mpeg4_352x288_512kbps_30fps.info", 352, 288, false},
+        {VP8_1, MEDIA_MIMETYPE_VIDEO_VP8, "bbb_vp8_176x144_240kbps_60fps.vp8",
+         "bbb_vp8_176x144_240kbps_60fps.info", 176, 144, false},
+        {VP9_1, MEDIA_MIMETYPE_VIDEO_VP9, "bbb_vp9_176x144_285kbps_60fps.vp9",
+         "bbb_vp9_176x144_285kbps_60fps.info", 176, 144, false},
+
+        {HEIC_1, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC, "bbb_hevc_176x144_176kbps_60fps.hevc",
+         "bbb_heic_176x144_176kbps_60fps.info", 176, 144, false},
 };
 
 class WriterTest {
   public:
-    WriterTest() : mWriter(nullptr), mFileMeta(nullptr), mCurrentTrack(nullptr) {}
+    WriterTest() : mWriter(nullptr), mFileMeta(nullptr) {}
 
     ~WriterTest() {
         if (mFileMeta) {
             mFileMeta.clear();
             mFileMeta = nullptr;
         }
-        if (mCurrentTrack) {
-            mCurrentTrack->stop();
-            mCurrentTrack.clear();
-            mCurrentTrack = nullptr;
-        }
         if (mWriter) {
             mWriter.clear();
             mWriter = nullptr;
         }
-        mBufferInfo.clear();
-        if (mInputStream.is_open()) mInputStream.close();
         if (gEnv->cleanUp()) remove(OUTPUT_FILE_NAME);
+
+        for (int32_t idx = 0; idx < kMaxTrackCount; idx++) {
+            mBufferInfo[idx].clear();
+            if (mCurrentTrack[idx]) {
+                mCurrentTrack[idx]->stop();
+                mCurrentTrack[idx].clear();
+                mCurrentTrack[idx] = nullptr;
+            }
+            if (mInputStream[idx].is_open()) mInputStream[idx].close();
+        }
     }
 
     void setupWriterType(string writerFormat) {
-        mNumCsds = 0;
-        mInputFrameId = 0;
         mWriterName = unknown_comp;
         mDisableTest = false;
         static const std::map<std::string, standardWriters> mapWriter = {
@@ -128,11 +158,11 @@ class WriterTest {
         }
     }
 
-    void getInputBufferInfo(string inputFileName, string inputInfo);
+    void getInputBufferInfo(string inputFileName, string inputInfo, int32_t idx = 0);
 
     int32_t createWriter(int32_t fd);
 
-    int32_t addWriterSource(bool isAudio, configFormat params);
+    int32_t addWriterSource(bool isAudio, configFormat params, int32_t idx = 0);
 
     enum standardWriters {
         OGG,
@@ -149,38 +179,42 @@ class WriterTest {
     standardWriters mWriterName;
     sp<MediaWriter> mWriter;
     sp<MetaData> mFileMeta;
-    sp<MediaAdapter> mCurrentTrack;
+    sp<MediaAdapter> mCurrentTrack[kMaxTrackCount]{};
 
     bool mDisableTest;
-    int32_t mNumCsds;
-    int32_t mInputFrameId;
-    ifstream mInputStream;
-    vector<BufferInfo> mBufferInfo;
+    int32_t mNumCsds[kMaxTrackCount]{};
+    int32_t mInputFrameId[kMaxTrackCount]{};
+    ifstream mInputStream[kMaxTrackCount]{};
+    vector<BufferInfo> mBufferInfo[kMaxTrackCount];
 };
 
-class WriteFunctionalityTest : public WriterTest,
-                               public ::testing::TestWithParam<pair<string, int32_t>> {
+class WriteFunctionalityTest
+    : public WriterTest,
+      public ::testing::TestWithParam<tuple<string /* writerFormat*/, inputId /* inputId0*/,
+                                            inputId /* inputId1*/, float /* BufferInterval*/>> {
   public:
-    virtual void SetUp() override { setupWriterType(GetParam().first); }
+    virtual void SetUp() override { setupWriterType(get<0>(GetParam())); }
 };
 
-void WriterTest::getInputBufferInfo(string inputFileName, string inputInfo) {
+void WriterTest::getInputBufferInfo(string inputFileName, string inputInfo, int32_t idx) {
     std::ifstream eleInfo;
     eleInfo.open(inputInfo.c_str());
     ASSERT_EQ(eleInfo.is_open(), true);
     int32_t bytesCount = 0;
     uint32_t flags = 0;
     int64_t timestamp = 0;
+    int32_t numCsds = 0;
     while (1) {
         if (!(eleInfo >> bytesCount)) break;
         eleInfo >> flags;
         eleInfo >> timestamp;
-        mBufferInfo.push_back({bytesCount, flags, timestamp});
-        if (flags == CODEC_CONFIG_FLAG) mNumCsds++;
+        mBufferInfo[idx].push_back({bytesCount, flags, timestamp});
+        if (flags == CODEC_CONFIG_FLAG) numCsds++;
     }
     eleInfo.close();
-    mInputStream.open(inputFileName.c_str(), std::ifstream::binary);
-    ASSERT_EQ(mInputStream.is_open(), true);
+    mNumCsds[idx] = numCsds;
+    mInputStream[idx].open(inputFileName.c_str(), std::ifstream::binary);
+    ASSERT_EQ(mInputStream[idx].is_open(), true);
 }
 
 int32_t WriterTest::createWriter(int32_t fd) {
@@ -226,10 +260,10 @@ int32_t WriterTest::createWriter(int32_t fd) {
     return 0;
 }
 
-int32_t WriterTest::addWriterSource(bool isAudio, configFormat params) {
-    if (mInputFrameId) return -1;
+int32_t WriterTest::addWriterSource(bool isAudio, configFormat params, int32_t idx) {
+    if (mInputFrameId[idx]) return -1;
     sp<AMessage> format = new AMessage;
-    if (mInputStream.is_open()) {
+    if (mInputStream[idx].is_open()) {
         format->setString("mime", params.mime);
         if (isAudio) {
             format->setInt32("channel-count", params.channelCount);
@@ -238,25 +272,34 @@ int32_t WriterTest::addWriterSource(bool isAudio, configFormat params) {
             format->setInt32("width", params.width);
             format->setInt32("height", params.height);
         }
-
-        int32_t status =
-                writeHeaderBuffers(mInputStream, mBufferInfo, mInputFrameId, format, mNumCsds);
-        if (status != 0) return -1;
+        if (mNumCsds[idx]) {
+            int32_t status = writeHeaderBuffers(mInputStream[idx], mBufferInfo[idx],
+                                                mInputFrameId[idx], format, mNumCsds[idx]);
+            if (status != 0) return -1;
+        }
     }
+
     sp<MetaData> trackMeta = new MetaData;
     convertMessageToMetaData(format, trackMeta);
-    mCurrentTrack = new MediaAdapter(trackMeta);
-    if (mCurrentTrack == nullptr) {
+    mCurrentTrack[idx] = new MediaAdapter(trackMeta);
+    if (mCurrentTrack[idx] == nullptr) {
         ALOGE("MediaAdapter returned nullptr");
         return -1;
     }
-    status_t result = mWriter->addSource(mCurrentTrack);
+    status_t result = mWriter->addSource(mCurrentTrack[idx]);
     return result;
 }
 
 void getFileDetails(string &inputFilePath, string &info, configFormat &params, bool &isAudio,
-                    int32_t streamIndex = 0) {
-    if (streamIndex >= sizeof(kInputData) / sizeof(kInputData[0])) {
+                    inputId inpId) {
+    int32_t inputDataSize = sizeof(kInputData) / sizeof(kInputData[0]);
+    int32_t streamIndex = 0;
+    for (; streamIndex < inputDataSize; streamIndex++) {
+        if (inpId == kInputData[streamIndex].inpId) {
+            break;
+        }
+    }
+    if (streamIndex == inputDataSize) {
         return;
     }
     inputFilePath += kInputData[streamIndex].inputFile;
@@ -284,14 +327,14 @@ TEST_P(WriteFunctionalityTest, CreateWriterTest) {
 
     // Creating writer within a test scope. Destructor should be called when the test ends
     ASSERT_EQ((status_t)OK, createWriter(fd))
-            << "Failed to create writer for output format:" << GetParam().first;
+            << "Failed to create writer for output format:" << get<0>(GetParam());
 }
 
 TEST_P(WriteFunctionalityTest, WriterTest) {
     if (mDisableTest) return;
     ALOGV("Checks if for a given input, a valid muxed file has been created or not");
 
-    string writerFormat = GetParam().first;
+    string writerFormat = get<0>(GetParam());
     string outputFile = OUTPUT_FILE_NAME;
     int32_t fd =
             open(outputFile.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
@@ -300,25 +343,49 @@ TEST_P(WriteFunctionalityTest, WriterTest) {
     int32_t status = createWriter(fd);
     ASSERT_EQ((status_t)OK, status) << "Failed to create writer for output format:" << writerFormat;
 
-    string inputFile = gEnv->getRes();
-    string inputInfo = gEnv->getRes();
-    configFormat param;
-    bool isAudio;
-    int32_t inputFileIdx = GetParam().second;
-    getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
-    ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+    inputId inpId[] = {get<1>(GetParam()), get<2>(GetParam())};
+    ASSERT_NE(inpId[0], UNUSED_ID) << "Test expects first inputId to be a valid id";
 
-    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
-    status = addWriterSource(isAudio, param);
-    ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
+    int32_t numTracks = 1;
+    if (inpId[1] != UNUSED_ID) {
+        numTracks++;
+    }
+    for (int32_t idx = 0; idx < numTracks; idx++) {
+        string inputFile = gEnv->getRes();
+        string inputInfo = gEnv->getRes();
+        configFormat param;
+        bool isAudio;
+        getFileDetails(inputFile, inputInfo, param, isAudio, inpId[idx]);
+        ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+
+        ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo, idx));
+        status = addWriterSource(isAudio, param, idx);
+        ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
+    }
 
     status = mWriter->start(mFileMeta.get());
     ASSERT_EQ((status_t)OK, status);
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack, 0,
-                                 mBufferInfo.size());
-    ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
-    mCurrentTrack->stop();
+    float interval = get<3>(GetParam());
+    ASSERT_LE(interval, 1.0f) << "Buffer interval invalid. Should be less than or equal to 1.0";
 
+    size_t range = 0;
+    int32_t loopCount = 0;
+    int32_t offset[kMaxTrackCount]{};
+    while (loopCount < ceil(1.0 / interval)) {
+        for (int32_t idx = 0; idx < numTracks; idx++) {
+            range = mBufferInfo[idx].size() * interval;
+            status = sendBuffersToWriter(mInputStream[idx], mBufferInfo[idx], mInputFrameId[idx],
+                                         mCurrentTrack[idx], offset[idx], range);
+            ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
+            offset[idx] += range;
+        }
+        loopCount++;
+    }
+    for (int32_t idx = 0; idx < kMaxTrackCount; idx++) {
+        if (mCurrentTrack[idx]) {
+            mCurrentTrack[idx]->stop();
+        }
+    }
     status = mWriter->stop();
     ASSERT_EQ((status_t)OK, status) << "Failed to stop the writer";
     close(fd);
@@ -328,7 +395,7 @@ TEST_P(WriteFunctionalityTest, PauseWriterTest) {
     if (mDisableTest) return;
     ALOGV("Validates the pause() api of writers");
 
-    string writerFormat = GetParam().first;
+    string writerFormat = get<0>(GetParam());
     string outputFile = OUTPUT_FILE_NAME;
     int32_t fd =
             open(outputFile.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
@@ -341,8 +408,10 @@ TEST_P(WriteFunctionalityTest, PauseWriterTest) {
     string inputInfo = gEnv->getRes();
     configFormat param;
     bool isAudio;
-    int32_t inputFileIdx = GetParam().second;
-    getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
+    inputId inpId = get<1>(GetParam());
+    ASSERT_NE(inpId, UNUSED_ID) << "Test expects first inputId to be a valid id";
+
+    getFileDetails(inputFile, inputInfo, param, isAudio, inpId);
     ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
     ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
@@ -351,8 +420,8 @@ TEST_P(WriteFunctionalityTest, PauseWriterTest) {
 
     status = mWriter->start(mFileMeta.get());
     ASSERT_EQ((status_t)OK, status);
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack, 0,
-                                 mBufferInfo.size() / 4);
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], 0, mBufferInfo[0].size() / 4);
     ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
 
     bool isPaused = false;
@@ -362,19 +431,19 @@ TEST_P(WriteFunctionalityTest, PauseWriterTest) {
         isPaused = true;
     }
     // In the pause state, writers shouldn't write anything. Testing the writers for the same
-    int32_t numFramesPaused = mBufferInfo.size() / 4;
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack,
-                                  mInputFrameId, numFramesPaused, isPaused);
+    int32_t numFramesPaused = mBufferInfo[0].size() / 4;
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], mInputFrameId[0], numFramesPaused, isPaused);
     ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
 
     if (isPaused) {
         status = mWriter->start(mFileMeta.get());
         ASSERT_EQ((status_t)OK, status);
     }
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack,
-                                  mInputFrameId, mBufferInfo.size());
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], mInputFrameId[0], mBufferInfo[0].size());
     ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
-    mCurrentTrack->stop();
+    mCurrentTrack[0]->stop();
 
     status = mWriter->stop();
     ASSERT_EQ((status_t)OK, status) << "Failed to stop the writer";
@@ -392,7 +461,7 @@ TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
             open(outputFile.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
     ASSERT_GE(fd, 0) << "Failed to open output file to dump writer's data";
 
-    string writerFormat = GetParam().first;
+    string writerFormat = get<0>(GetParam());
     int32_t status = createWriter(fd);
     ASSERT_EQ(status, (status_t)OK) << "Failed to create writer for output format:" << writerFormat;
 
@@ -400,8 +469,10 @@ TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
     string inputInfo = gEnv->getRes();
     configFormat param;
     bool isAudio;
-    int32_t inputFileIdx = GetParam().second;
-    getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
+    inputId inpId = get<1>(GetParam());
+    ASSERT_NE(inpId, UNUSED_ID) << "Test expects first inputId to be a valid id";
+
+    getFileDetails(inputFile, inputInfo, param, isAudio, inpId);
     ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
     ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
@@ -418,8 +489,8 @@ TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
         mWriter->start(mFileMeta.get());
     }
 
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack, 0,
-                              mBufferInfo.size() / 4);
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], 0, mBufferInfo[0].size() / 4);
     ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
 
     for (int32_t count = 0; count < kMaxCount; count++) {
@@ -428,20 +499,20 @@ TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
     }
 
     mWriter->pause();
-    int32_t numFramesPaused = mBufferInfo.size() / 4;
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack,
-                              mInputFrameId, numFramesPaused, true);
+    int32_t numFramesPaused = mBufferInfo[0].size() / 4;
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], mInputFrameId[0], numFramesPaused, true);
     ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
 
     for (int32_t count = 0; count < kMaxCount; count++) {
         mWriter->start(mFileMeta.get());
     }
 
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack,
-                              mInputFrameId, mBufferInfo.size());
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], mInputFrameId[0], mBufferInfo[0].size());
     ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
 
-    mCurrentTrack->stop();
+    mCurrentTrack[0]->stop();
 
     // first stop should succeed.
     status = mWriter->stop();
@@ -454,23 +525,20 @@ TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
     close(fd);
 }
 
-class ListenerTest : public WriterTest,
-                     public ::testing::TestWithParam<
-                             tuple<string /* writerFormat*/, int32_t /* inputFileIdx*/,
-                                   float /* FileSizeLimit*/, float /* FileDurationLimit*/>> {
+class ListenerTest
+    : public WriterTest,
+      public ::testing::TestWithParam<tuple<
+              string /* writerFormat*/, inputId /* inputId0*/, inputId /* inputId1*/,
+              float /* FileSizeLimit*/, float /* FileDurationLimit*/, float /* BufferInterval*/>> {
   public:
-    virtual void SetUp() override {
-        tuple<string, int32_t, float, float> params = GetParam();
-        setupWriterType(get<0>(params));
-    }
+    virtual void SetUp() override { setupWriterType(get<0>(GetParam())); }
 };
 
 TEST_P(ListenerTest, SetMaxFileLimitsTest) {
     if (mDisableTest) return;
     ALOGV("Validates writer when max file limits are set");
 
-    tuple<string, int32_t, float, float> params = GetParam();
-    string writerFormat = get<0>(params);
+    string writerFormat = get<0>(GetParam());
     string outputFile = OUTPUT_FILE_NAME;
     int32_t fd =
             open(outputFile.c_str(), O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
@@ -479,30 +547,42 @@ TEST_P(ListenerTest, SetMaxFileLimitsTest) {
     int32_t status = createWriter(fd);
     ASSERT_EQ((status_t)OK, status) << "Failed to create writer for output format:" << writerFormat;
 
-    string inputFile = gEnv->getRes();
-    string inputInfo = gEnv->getRes();
-    configFormat param;
-    bool isAudio;
-    int32_t inputFileIdx = get<1>(params);
-    getFileDetails(inputFile, inputInfo, param, isAudio, inputFileIdx);
-    ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+    inputId inpId[] = {get<1>(GetParam()), get<2>(GetParam())};
+    ASSERT_NE(inpId[0], UNUSED_ID) << "Test expects first inputId to be a valid id";
 
-    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
-    status = addWriterSource(isAudio, param);
-    ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
+    size_t inputFileSize = 0;
+    int64_t lastFrameTimeStampUs = INT_MAX;
+    int32_t numTracks = 1;
+    if (inpId[1] != UNUSED_ID) {
+        numTracks++;
+    }
+    for (int32_t idx = 0; idx < numTracks; idx++) {
+        string inputFile = gEnv->getRes();
+        string inputInfo = gEnv->getRes();
+        configFormat param;
+        bool isAudio;
+        getFileDetails(inputFile, inputInfo, param, isAudio, inpId[idx]);
+        ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
-    // Read file properties
-    struct stat buf;
-    status = stat(inputFile.c_str(), &buf);
-    ASSERT_EQ(0, status);
+        ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo, idx));
+        status = addWriterSource(isAudio, param, idx);
+        ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
 
-    float fileSizeLimit = get<2>(params);
-    float fileDurationLimit = get<3>(params);
+        // Read file properties
+        struct stat buf;
+        status = stat(inputFile.c_str(), &buf);
+        ASSERT_EQ(0, status);
+
+        inputFileSize += buf.st_size;
+        if (lastFrameTimeStampUs > mBufferInfo[idx][mBufferInfo[idx].size() - 1].timeUs) {
+            lastFrameTimeStampUs = mBufferInfo[idx][mBufferInfo[idx].size() - 1].timeUs;
+        }
+    }
+
+    float fileSizeLimit = get<3>(GetParam());
+    float fileDurationLimit = get<4>(GetParam());
     int64_t maxFileSize = 0;
     int64_t maxFileDuration = 0;
-
-    size_t inputFileSize = buf.st_size;
-    int64_t lastFrameTimeStampUs = mBufferInfo[mBufferInfo.size() - 1].timeUs;
     if (fileSizeLimit > 0) {
         maxFileSize = (int64_t)(fileSizeLimit * inputFileSize);
         mWriter->setMaxFileSize(maxFileSize);
@@ -517,14 +597,33 @@ TEST_P(ListenerTest, SetMaxFileLimitsTest) {
 
     mWriter->setListener(listener);
     status = mWriter->start(mFileMeta.get());
-
     ASSERT_EQ((status_t)OK, status);
-    status = sendBuffersToWriter(mInputStream, mBufferInfo, mInputFrameId, mCurrentTrack, 0,
-                                 mBufferInfo.size(), false, listener);
-    ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
+
+    float interval = get<5>(GetParam());
+    ASSERT_LE(interval, 1.0f) << "Buffer interval invalid. Should be less than or equal to 1.0";
+
+    size_t range = 0;
+    int32_t loopCount = 0;
+    int32_t offset[kMaxTrackCount]{};
+    while (loopCount < ceil(1.0 / interval)) {
+        for (int32_t idx = 0; idx < numTracks; idx++) {
+            range = mBufferInfo[idx].size() * interval;
+            status = sendBuffersToWriter(mInputStream[idx], mBufferInfo[idx], mInputFrameId[idx],
+                                         mCurrentTrack[idx], offset[idx], range, false, listener);
+            ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
+            offset[idx] += range;
+        }
+        loopCount++;
+    }
+
     ASSERT_TRUE(mWriter->reachedEOS()) << "EOS not signalled.";
 
-    mCurrentTrack->stop();
+    for (int32_t idx = 0; idx < kMaxTrackCount; idx++) {
+        if (mCurrentTrack[idx]) {
+            mCurrentTrack[idx]->stop();
+        }
+    }
+
     status = mWriter->stop();
     ASSERT_EQ((status_t)OK, status) << "Failed to stop the writer";
     close(fd);
@@ -551,23 +650,57 @@ TEST_P(ListenerTest, SetMaxFileLimitsTest) {
 
 // TODO: (b/150923387)
 // Add WEBM input
-INSTANTIATE_TEST_SUITE_P(
-        ListenerTestAll, ListenerTest,
-        ::testing::Values(make_tuple("ogg", 0, 0.7, 0.3), make_tuple("aac", 1, 0.6, 0.7),
-                          make_tuple("mpeg4", 1, 0.4, 0.3), make_tuple("amrnb", 3, 0.2, 0.6),
-                          make_tuple("amrwb", 4, 0.5, 0.5), make_tuple("mpeg2Ts", 1, 0.2, 1)));
+INSTANTIATE_TEST_SUITE_P(ListenerTestAll, ListenerTest,
+                         ::testing::Values(make_tuple("aac", AAC_1, UNUSED_ID, 0.6, 0.7, 1),
+                                           make_tuple("amrnb", AMR_NB_1, UNUSED_ID, 0.2, 0.6, 1),
+                                           make_tuple("amrwb", AMR_WB_1, UNUSED_ID, 0.5, 0.5, 1),
+                                           make_tuple("mpeg2Ts", AAC_1, UNUSED_ID, 0.2, 1, 1),
+                                           make_tuple("mpeg4", AAC_1, UNUSED_ID, 0.4, 0.3, 0.25),
+                                           make_tuple("ogg", OPUS_1, UNUSED_ID, 0.7, 0.3, 1)));
 
 // TODO: (b/144476164)
 // Add AAC_ADTS, FLAC, AV1 input
-INSTANTIATE_TEST_SUITE_P(WriterTestAll, WriteFunctionalityTest,
-                         ::testing::Values(make_pair("ogg", 0), make_pair("webm", 0),
-                                           make_pair("aac", 1), make_pair("mpeg4", 1),
-                                           make_pair("amrnb", 3), make_pair("amrwb", 4),
-                                           make_pair("webm", 5), make_pair("webm", 7),
-                                           make_pair("webm", 8), make_pair("mpeg4", 9),
-                                           make_pair("mpeg4", 10), make_pair("mpeg4", 12),
-                                           make_pair("mpeg4", 13), make_pair("mpeg2Ts", 1),
-                                           make_pair("mpeg2Ts", 9)));
+INSTANTIATE_TEST_SUITE_P(
+        WriterTestAll, WriteFunctionalityTest,
+        ::testing::Values(
+                make_tuple("aac", AAC_1, UNUSED_ID, 1),
+
+                make_tuple("amrnb", AMR_NB_1, UNUSED_ID, 1),
+                make_tuple("amrwb", AMR_WB_1, UNUSED_ID, 1),
+
+                // TODO(b/144902018): Enable test for mpeg2ts
+                // make_tuple("mpeg2Ts", AAC_1, UNUSED_ID, 1),
+                // make_tuple("mpeg2Ts", AVC_1, UNUSED_ID, 1),
+                // TODO(b/156355857): Add multitrack for mpeg2ts
+                // make_tuple("mpeg2Ts", AAC_1, AVC_1, 0.50),
+                // make_tuple("mpeg2Ts", AVC_1, AAC_1, 0.25),
+
+                make_tuple("mpeg4", AAC_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", AMR_NB_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", AMR_WB_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", AVC_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", H263_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", HEIC_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", HEVC_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", MPEG4_1, UNUSED_ID, 1),
+                make_tuple("mpeg4", AAC_1, AVC_1, 0.25),
+                make_tuple("mpeg4", AVC_1, AAC_1, 0.75),
+                make_tuple("mpeg4", AMR_WB_1, AAC_1, 0.75),
+                make_tuple("mpeg4", HEVC_1, AMR_WB_1, 0.25),
+                make_tuple("mpeg4", H263_1, AMR_NB_1, 0.50),
+                make_tuple("mpeg4", MPEG4_1, AAC_1, 0.75),
+                make_tuple("mpeg4", AMR_NB_1, AMR_WB_1, 0.25),
+                make_tuple("mpeg4", H263_1, AMR_NB_1, 0.50),
+                make_tuple("mpeg4", MPEG4_1, HEVC_1, 0.75),
+
+                make_tuple("ogg", OPUS_1, UNUSED_ID, 1),
+
+                make_tuple("webm", OPUS_1, UNUSED_ID, 1),
+                make_tuple("webm", VORBIS_1, UNUSED_ID, 1),
+                make_tuple("webm", VP8_1, UNUSED_ID, 1),
+                make_tuple("webm", VP9_1, UNUSED_ID, 1),
+                make_tuple("webm", VP8_1, OPUS_1, 0.50),
+                make_tuple("webm", VORBIS_1, VP8_1, 0.25)));
 
 int main(int argc, char **argv) {
     gEnv = new WriterTestEnvironment();
