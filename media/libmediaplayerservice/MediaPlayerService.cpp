@@ -2217,7 +2217,9 @@ status_t MediaPlayerService::AudioOutput::open(
                     targetSpeed,
                     mSelectedDeviceId);
         }
-
+        // Set caller name so it can be logged in destructor.
+        // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA
+        t->setCallerName("media");
         if ((t == 0) || (t->initCheck() != NO_ERROR)) {
             ALOGE("Unable to create audio track");
             delete newcbd;

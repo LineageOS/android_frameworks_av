@@ -303,7 +303,7 @@ AudioTrack::~AudioTrack()
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
         .set(AMEDIAMETRICS_PROP_CALLERNAME,
                 mCallerName.empty()
-                ? AMEDIAMETRICS_PROP_VALUE_UNKNOWN
+                ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
                 : mCallerName.c_str())
         .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
         .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
@@ -645,6 +645,10 @@ status_t AudioTrack::start()
     status_t status = NO_ERROR; // logged: make sure to set this before returning.
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                    mCallerName.empty()
+                    ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                    : mCallerName.c_str())
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
@@ -879,7 +883,7 @@ void AudioTrack::pause()
 {
     const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
-    mediametrics::Defer([&]() {
+    mediametrics::Defer defer([&]() {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
@@ -2433,7 +2437,7 @@ status_t AudioTrack::restoreTrack_l(const char *from)
 {
     status_t result = NO_ERROR;  // logged: make sure to set this before returning.
     const int64_t beginNs = systemTime();
-    mediametrics::Defer([&] {
+    mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE)
             .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(systemTime() - beginNs))
