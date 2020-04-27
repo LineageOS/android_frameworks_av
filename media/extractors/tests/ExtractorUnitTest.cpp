@@ -179,11 +179,11 @@ class ExtractorUnitTest {
 
 class ExtractorFunctionalityTest
     : public ExtractorUnitTest,
-      public ::testing::TestWithParam<
-              tuple<string /* container */, string /* InputFile */, int32_t /* numTracks */>> {
+      public ::testing::TestWithParam<tuple<string /* container */, string /* InputFile */,
+                                            int32_t /* numTracks */, bool /* seekSupported */>> {
   public:
     virtual void SetUp() override {
-        tuple<string, string, int32_t> params = GetParam();
+        tuple<string, string, int32_t, bool> params = GetParam();
         mContainer = get<0>(params);
         mNumTracks = get<2>(params);
         setupExtractor(mContainer);
@@ -567,7 +567,10 @@ TEST_P(ExtractorFunctionalityTest, SeekTest) {
             << "Extractor reported wrong number of track for the given clip";
 
     uint32_t seekFlag = mExtractor->flags();
-    if (!(seekFlag & MediaExtractorPluginHelper::CAN_SEEK)) {
+    bool seekSupported = get<3>(GetParam());
+    bool seekable = seekFlag & MediaExtractorPluginHelper::CAN_SEEK;
+    if (!seekable) {
+        ASSERT_FALSE(seekSupported) << mContainer << "Extractor is expected to support seek ";
         cout << "[   WARN   ] Test Skipped. " << mContainer << " Extractor doesn't support seek\n";
         return;
     }
@@ -732,9 +735,11 @@ TEST_P(ExtractorFunctionalityTest, MonkeySeekTest) {
     ASSERT_EQ(numTracks, mNumTracks)
             << "Extractor reported wrong number of track for the given clip";
 
-    // TODO(b/156854380): add seekability validation
     uint32_t seekFlag = mExtractor->flags();
-    if (!(seekFlag & MediaExtractorPluginHelper::CAN_SEEK)) {
+    bool seekSupported = get<3>(GetParam());
+    bool seekable = seekFlag & MediaExtractorPluginHelper::CAN_SEEK;
+    if (!seekable) {
+        ASSERT_FALSE(seekSupported) << mContainer << "Extractor is expected to support seek ";
         cout << "[   WARN   ] Test Skipped. " << mContainer << " Extractor doesn't support seek\n";
         return;
     }
@@ -1095,38 +1100,39 @@ INSTANTIATE_TEST_SUITE_P(ConfigParamTestAll, ConfigParamTest,
                                            make_pair("mkv", MPEG4_1),
                                            make_pair("mkv", VP9_1)));
 
+// Validate extractors for container format, input file and supports seek flag
 INSTANTIATE_TEST_SUITE_P(
         ExtractorUnitTestAll, ExtractorFunctionalityTest,
         ::testing::Values(
-                make_tuple("aac", "loudsoftaac.aac", 1),
-                make_tuple("amr", "testamr.amr", 1),
-                make_tuple("amr", "amrwb.wav", 1),
-                make_tuple("flac", "sinesweepflac.flac", 1),
-                make_tuple("midi", "midi_a.mid", 1),
-                make_tuple("mkv", "sinesweepvorbis.mkv", 1),
-                make_tuple("mkv", "sinesweepmp3lame.mkv", 1),
-                make_tuple("mkv", "loudsoftaac.mkv", 1),
-                make_tuple("mp3", "sinesweepmp3lame.mp3", 1),
-                make_tuple("mp3", "id3test10.mp3", 1),
-                make_tuple("mpeg2ts", "segment000001.ts", 2),
-                make_tuple("mpeg2ts", "testac3ts.ts", 1),
-                make_tuple("mpeg2ts", "testac4ts.ts", 1),
-                make_tuple("mpeg2ts", "testeac3ts.ts", 1),
-                make_tuple("mpeg4", "sinesweepoggmp4.mp4", 1),
-                make_tuple("mpeg4", "testac3mp4.mp4", 1),
-                make_tuple("mpeg4", "testeac3mp4.mp4", 1),
-                make_tuple("ogg", "john_cage.ogg", 1),
-                make_tuple("ogg", "testopus.opus", 1),
-                make_tuple("ogg", "sinesweepoggalbumart.ogg", 1),
-                make_tuple("wav", "monotestgsm.wav", 1),
+                make_tuple("aac", "loudsoftaac.aac", 1, true),
+                make_tuple("amr", "testamr.amr", 1, true),
+                make_tuple("amr", "amrwb.wav", 1, true),
+                make_tuple("flac", "sinesweepflac.flac", 1, true),
+                make_tuple("midi", "midi_a.mid", 1, true),
+                make_tuple("mkv", "sinesweepvorbis.mkv", 1, true),
+                make_tuple("mkv", "sinesweepmp3lame.mkv", 1, true),
+                make_tuple("mkv", "loudsoftaac.mkv", 1, true),
+                make_tuple("mp3", "sinesweepmp3lame.mp3", 1, true),
+                make_tuple("mp3", "id3test10.mp3", 1, true),
+                make_tuple("mpeg2ts", "segment000001.ts", 2, false),
+                make_tuple("mpeg2ts", "testac3ts.ts", 1, false),
+                make_tuple("mpeg2ts", "testac4ts.ts", 1, false),
+                make_tuple("mpeg2ts", "testeac3ts.ts", 1, false),
+                make_tuple("mpeg4", "sinesweepoggmp4.mp4", 1, true),
+                make_tuple("mpeg4", "testac3mp4.mp4", 1, true),
+                make_tuple("mpeg4", "testeac3mp4.mp4", 1, true),
+                make_tuple("ogg", "john_cage.ogg", 1, true),
+                make_tuple("ogg", "testopus.opus", 1, true),
+                make_tuple("ogg", "sinesweepoggalbumart.ogg", 1, true),
+                make_tuple("wav", "monotestgsm.wav", 1, true),
 
-                make_tuple("mkv", "swirl_144x136_avc.mkv", 1),
-                make_tuple("mkv", "withoutcues.mkv", 2),
-                make_tuple("mkv", "swirl_144x136_vp9.webm", 1),
-                make_tuple("mkv", "swirl_144x136_vp8.webm", 1),
-                make_tuple("mpeg2ps", "swirl_144x136_mpeg2.mpg", 1),
-                make_tuple("mpeg2ps", "programstream.mpeg", 2),
-                make_tuple("mpeg4", "swirl_132x130_mpeg4.mp4", 1)));
+                make_tuple("mkv", "swirl_144x136_avc.mkv", 1, true),
+                make_tuple("mkv", "withoutcues.mkv", 2, true),
+                make_tuple("mkv", "swirl_144x136_vp9.webm", 1, true),
+                make_tuple("mkv", "swirl_144x136_vp8.webm", 1, true),
+                make_tuple("mpeg2ps", "swirl_144x136_mpeg2.mpg", 1, false),
+                make_tuple("mpeg2ps", "programstream.mpeg", 2, false),
+                make_tuple("mpeg4", "swirl_132x130_mpeg4.mp4", 1, true)));
 
 int main(int argc, char **argv) {
     gEnv = new ExtractorUnitTestEnvironment();
