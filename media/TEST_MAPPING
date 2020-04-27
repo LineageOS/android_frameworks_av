@@ -1,10 +1,41 @@
+// for frameworks/av/media
 {
     "presubmit": [
+        // runs whenever we change something in this tree
         {
             "name": "CtsMediaTestCases",
             "options": [
                 {
                     "include-filter": "android.media.cts.EncodeDecodeTest"
+                }
+            ]
+        },
+        {
+            "name": "CtsMediaTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.cts.DecodeEditEncodeTest"
+                }
+            ]
+        }
+    ],
+
+    "staged-platinum-postsubmit": [
+        // runs regularly, independent of changes in this tree.
+        // signals if changes elsewhere break media functionality
+        {
+            "name": "CtsMediaTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.cts.EncodeDecodeTest"
+                }
+            ]
+        },
+        {
+            "name": "CtsMediaTestCases",
+            "options": [
+                {
+                    "include-filter": "android.media.cts.DecodeEditEncodeTest"
                 }
             ]
         }
