@@ -907,7 +907,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         audio_output_flags_t *flags,
         audio_port_handle_t *selectedDeviceId,
         bool *isRequestedDeviceForExclusiveUse,
-        std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs,
+        std::vector<sp<AudioPolicyMix>> *secondaryMixes,
         output_type_t *outputType)
 {
     DeviceVector outputDevices;
@@ -932,29 +932,44 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     // The primary output is the explicit routing (eg. setPreferredDevice) if specified,
     //       otherwise, fallback to the dynamic policies, if none match, query the engine.
     // Secondary outputs are always found by dynamic policies as the engine do not support them
-    sp<SwAudioOutputDescriptor> policyDesc;
-    status = mPolicyMixes.getOutputForAttr(*resultAttr, uid, *flags, policyDesc, secondaryDescs);
+    sp<AudioPolicyMix> primaryMix;
+    status = mPolicyMixes.getOutputForAttr(*resultAttr, uid, *flags, primaryMix, secondaryMixes);
     if (status != OK) {
         return status;
     }
 
     // Explicit routing is higher priority then any dynamic policy primary output
-    bool usePrimaryOutputFromPolicyMixes = requestedDevice == nullptr && policyDesc != nullptr;
+    bool usePrimaryOutputFromPolicyMixes = requestedDevice == nullptr && primaryMix != nullptr;
 
     // FIXME: in case of RENDER policy, the output capabilities should be checked
-    if ((usePrimaryOutputFromPolicyMixes || !secondaryDescs->empty())
+    if ((usePrimaryOutputFromPolicyMixes
+            || (secondaryMixes != nullptr && !secondaryMixes->empty()))
         && !audio_is_linear_pcm(config->format)) {
         ALOGD("%s: rejecting request as dynamic audio policy only support pcm", __func__);
         return BAD_VALUE;
     }
     if (usePrimaryOutputFromPolicyMixes) {
-        *output = policyDesc->mIoHandle;
-        sp<AudioPolicyMix> mix = policyDesc->mPolicyMix.promote();
-        if (mix != nullptr) {
-            sp<DeviceDescriptor> deviceDesc =
-                    mAvailableOutputDevices.getDevice(mix->mDeviceType,
-                                                      mix->mDeviceAddress,
-                                                      AUDIO_FORMAT_DEFAULT);
+        sp<DeviceDescriptor> deviceDesc =
+                mAvailableOutputDevices.getDevice(primaryMix->mDeviceType,
+                                                  primaryMix->mDeviceAddress,
+                                                  AUDIO_FORMAT_DEFAULT);
+        sp<SwAudioOutputDescriptor> policyDesc = primaryMix->getOutput();
+        if (policyDesc == nullptr || (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+            audio_io_handle_t newOutput;
+            status = openDirectOutput(
+                    *stream, session, config,
+                    (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT),
+                    DeviceVector(deviceDesc), &newOutput);
+            if (status != NO_ERROR) {
+                policyDesc = nullptr;
+            } else {
+                policyDesc = mOutputs.valueFor(newOutput);
+                primaryMix->setOutput(policyDesc);
+            }
+        }
+        if (policyDesc != nullptr) {
+            policyDesc->mPolicyMix = primaryMix;
+            *output = policyDesc->mIoHandle;
             *selectedDeviceId = deviceDesc != 0 ? deviceDesc->getId() : AUDIO_PORT_HANDLE_NONE;
 
             ALOGV("getOutputForAttr() returns output %d", *output);
@@ -1050,7 +1065,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     const audio_port_handle_t requestedPortId = *selectedDeviceId;
     audio_attributes_t resultAttr;
     bool isRequestedDeviceForExclusiveUse = false;
-    std::vector<sp<SwAudioOutputDescriptor>> secondaryOutputDescs;
+    std::vector<sp<AudioPolicyMix>> secondaryMixes;
     const sp<DeviceDescriptor> requestedDevice =
       mAvailableOutputDevices.getDeviceFromId(requestedPortId);
 
@@ -1061,14 +1076,20 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
 
     status_t status = getOutputForAttrInt(&resultAttr, output, session, attr, stream, uid,
             config, flags, selectedDeviceId, &isRequestedDeviceForExclusiveUse,
-            &secondaryOutputDescs, outputType);
+            secondaryOutputs != nullptr ? &secondaryMixes : nullptr, outputType);
     if (status != NO_ERROR) {
         return status;
     }
     std::vector<wp<SwAudioOutputDescriptor>> weakSecondaryOutputDescs;
-    for (auto& secondaryDesc : secondaryOutputDescs) {
-        secondaryOutputs->push_back(secondaryDesc->mIoHandle);
-        weakSecondaryOutputDescs.push_back(secondaryDesc);
+    if (secondaryOutputs != nullptr) {
+        for (auto &secondaryMix : secondaryMixes) {
+            sp<SwAudioOutputDescriptor> outputDesc = secondaryMix->getOutput();
+            if (outputDesc != nullptr &&
+                outputDesc->mIoHandle != AUDIO_IO_HANDLE_NONE) {
+                secondaryOutputs->push_back(outputDesc->mIoHandle);
+                weakSecondaryOutputDescs.push_back(outputDesc);
+            }
+        }
     }
 
     audio_config_base_t clientConfig = {.sample_rate = config->sample_rate,
@@ -1093,6 +1114,118 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     return NO_ERROR;
 }
 
+status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
+                                              audio_session_t session,
+                                              const audio_config_t *config,
+                                              audio_output_flags_t flags,
+                                              const DeviceVector &devices,
+                                              audio_io_handle_t *output) {
+
+    *output = AUDIO_IO_HANDLE_NONE;
+
+    // skip direct output selection if the request can obviously be attached to a mixed output
+    // and not explicitly requested
+    if (((flags & AUDIO_OUTPUT_FLAG_DIRECT) == 0) &&
+            audio_is_linear_pcm(config->format) && config->sample_rate <= SAMPLE_RATE_HZ_MAX &&
+            audio_channel_count_from_out_mask(config->channel_mask) <= 2) {
+        return NAME_NOT_FOUND;
+    }
+
+    // Do not allow offloading if one non offloadable effect is enabled or MasterMono is enabled.
+    // This prevents creating an offloaded track and tearing it down immediately after start
+    // when audioflinger detects there is an active non offloadable effect.
+    // FIXME: We should check the audio session here but we do not have it in this context.
+    // This may prevent offloading in rare situations where effects are left active by apps
+    // in the background.
+    sp<IOProfile> profile;
+    if (((flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) ||
+            !(mEffects.isNonOffloadableEffectEnabled() || mMasterMono)) {
+        profile = getProfileForOutput(
+                devices, config->sample_rate, config->format, config->channel_mask,
+                flags, true /* directOnly */);
+    }
+
+    if (profile == nullptr) {
+        return NAME_NOT_FOUND;
+    }
+
+    // exclusive outputs for MMAP and Offload are enforced by different session ids.
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
+        if (!desc->isDuplicated() && (profile == desc->mProfile)) {
+            // reuse direct output if currently open by the same client
+            // and configured with same parameters
+            if ((config->sample_rate == desc->getSamplingRate()) &&
+                (config->format == desc->getFormat()) &&
+                (config->channel_mask == desc->getChannelMask()) &&
+                (session == desc->mDirectClientSession)) {
+                desc->mDirectOpenCount++;
+                ALOGI("%s reusing direct output %d for session %d", __func__,
+                    mOutputs.keyAt(i), session);
+                *output = mOutputs.keyAt(i);
+                return NO_ERROR;
+            }
+        }
+    }
+
+    if (!profile->canOpenNewIo()) {
+        return NAME_NOT_FOUND;
+    }
+
+    sp<SwAudioOutputDescriptor> outputDesc =
+            new SwAudioOutputDescriptor(profile, mpClientInterface);
+
+    String8 address = getFirstDeviceAddress(devices);
+
+    // MSD patch may be using the only output stream that can service this request. Release
+    // MSD patch to prioritize this request over any active output on MSD.
+    AudioPatchCollection msdPatches = getMsdPatches();
+    for (size_t i = 0; i < msdPatches.size(); i++) {
+        const auto& patch = msdPatches[i];
+        for (size_t j = 0; j < patch->mPatch.num_sinks; ++j) {
+            const struct audio_port_config *sink = &patch->mPatch.sinks[j];
+            if (sink->type == AUDIO_PORT_TYPE_DEVICE &&
+                    devices.containsDeviceWithType(sink->ext.device.type) &&
+                    (address.isEmpty() || strncmp(sink->ext.device.address, address.string(),
+                            AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0)) {
+                releaseAudioPatch(patch->getHandle(), mUidCached);
+                break;
+            }
+        }
+    }
+
+    status_t status = outputDesc->open(config, devices, stream, flags, output);
+
+    // only accept an output with the requested parameters
+    if (status != NO_ERROR ||
+        (config->sample_rate != 0 && config->sample_rate != outputDesc->getSamplingRate()) ||
+        (config->format != AUDIO_FORMAT_DEFAULT && config->format != outputDesc->getFormat()) ||
+        (config->channel_mask != 0 && config->channel_mask != outputDesc->getChannelMask())) {
+        ALOGV("%s failed opening direct output: output %d sample rate %d %d,"
+                "format %d %d, channel mask %04x %04x", __func__, *output, config->sample_rate,
+                outputDesc->getSamplingRate(), config->format, outputDesc->getFormat(),
+                config->channel_mask, outputDesc->getChannelMask());
+        if (*output != AUDIO_IO_HANDLE_NONE) {
+            outputDesc->close();
+        }
+        // fall back to mixer output if possible when the direct output could not be open
+        if (audio_is_linear_pcm(config->format) &&
+                config->sample_rate  <= SAMPLE_RATE_HZ_MAX) {
+            return NAME_NOT_FOUND;
+        }
+        *output = AUDIO_IO_HANDLE_NONE;
+        return BAD_VALUE;
+    }
+    outputDesc->mDirectOpenCount = 1;
+    outputDesc->mDirectClientSession = session;
+
+    addOutput(*output, outputDesc);
+    mPreviousOutputs = mOutputs;
+    ALOGV("%s returns new direct output %d", __func__, *output);
+    mpClientInterface->onAudioPortListUpdate();
+    return NO_ERROR;
+}
+
 audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         const DeviceVector &devices,
         audio_session_t session,
@@ -1102,7 +1235,6 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         bool forceMutingHaptic)
 {
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    status_t status;
 
     // Discard haptic channel mask when forcing muting haptic channels.
     audio_channel_mask_t channelMask = forceMutingHaptic
@@ -1137,111 +1269,12 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         ALOGV("Set VoIP and Direct output flags for PCM format");
     }
 
-
-    sp<IOProfile> profile;
-
-    // skip direct output selection if the request can obviously be attached to a mixed output
-    // and not explicitly requested
-    if (((*flags & AUDIO_OUTPUT_FLAG_DIRECT) == 0) &&
-            audio_is_linear_pcm(config->format) && config->sample_rate <= SAMPLE_RATE_HZ_MAX &&
-            audio_channel_count_from_out_mask(channelMask) <= 2) {
-        goto non_direct_output;
-    }
-
-    // Do not allow offloading if one non offloadable effect is enabled or MasterMono is enabled.
-    // This prevents creating an offloaded track and tearing it down immediately after start
-    // when audioflinger detects there is an active non offloadable effect.
-    // FIXME: We should check the audio session here but we do not have it in this context.
-    // This may prevent offloading in rare situations where effects are left active by apps
-    // in the background.
-
-    if (((*flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) == 0) ||
-            !(mEffects.isNonOffloadableEffectEnabled() || mMasterMono)) {
-        profile = getProfileForOutput(devices,
-                                   config->sample_rate,
-                                   config->format,
-                                   channelMask,
-                                   (audio_output_flags_t)*flags,
-                                   true /* directOnly */);
-    }
-
-    if (profile != 0) {
-        // exclusive outputs for MMAP and Offload are enforced by different session ids.
-        for (size_t i = 0; i < mOutputs.size(); i++) {
-            sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-            if (!desc->isDuplicated() && (profile == desc->mProfile)) {
-                // reuse direct output if currently open by the same client
-                // and configured with same parameters
-                if ((config->sample_rate == desc->getSamplingRate()) &&
-                    (config->format == desc->getFormat()) &&
-                    (channelMask == desc->getChannelMask()) &&
-                    (session == desc->mDirectClientSession)) {
-                    desc->mDirectOpenCount++;
-                    ALOGI("%s reusing direct output %d for session %d", __func__, 
-                        mOutputs.keyAt(i), session);
-                    return mOutputs.keyAt(i);
-                }
-            }
-        }
-
-        if (!profile->canOpenNewIo()) {
-            goto non_direct_output;
-        }
-
-        sp<SwAudioOutputDescriptor> outputDesc =
-                new SwAudioOutputDescriptor(profile, mpClientInterface);
-
-        String8 address = getFirstDeviceAddress(devices);
-
-        // MSD patch may be using the only output stream that can service this request. Release
-        // MSD patch to prioritize this request over any active output on MSD.
-        AudioPatchCollection msdPatches = getMsdPatches();
-        for (size_t i = 0; i < msdPatches.size(); i++) {
-            const auto& patch = msdPatches[i];
-            for (size_t j = 0; j < patch->mPatch.num_sinks; ++j) {
-                const struct audio_port_config *sink = &patch->mPatch.sinks[j];
-                if (sink->type == AUDIO_PORT_TYPE_DEVICE &&
-                        devices.containsDeviceWithType(sink->ext.device.type) &&
-                        (address.isEmpty() || strncmp(sink->ext.device.address, address.string(),
-                                AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0)) {
-                    releaseAudioPatch(patch->getHandle(), mUidCached);
-                    break;
-                }
-            }
-        }
-
-        status = outputDesc->open(config, devices, stream, *flags, &output);
-
-        // only accept an output with the requested parameters
-        if (status != NO_ERROR ||
-            (config->sample_rate != 0 && config->sample_rate != outputDesc->getSamplingRate()) ||
-            (config->format != AUDIO_FORMAT_DEFAULT && config->format != outputDesc->getFormat()) ||
-            (channelMask != 0 && channelMask != outputDesc->getChannelMask())) {
-            ALOGV("%s failed opening direct output: output %d sample rate %d %d," 
-                    "format %d %d, channel mask %04x %04x", __func__, output, config->sample_rate,
-                    outputDesc->getSamplingRate(), config->format, outputDesc->getFormat(),
-                    channelMask, outputDesc->getChannelMask());
-            if (output != AUDIO_IO_HANDLE_NONE) {
-                outputDesc->close();
-            }
-            // fall back to mixer output if possible when the direct output could not be open
-            if (audio_is_linear_pcm(config->format) &&
-                    config->sample_rate  <= SAMPLE_RATE_HZ_MAX) {
-                goto non_direct_output;
-            }
-            return AUDIO_IO_HANDLE_NONE;
-        }
-        outputDesc->mDirectOpenCount = 1;
-        outputDesc->mDirectClientSession = session;
-
-        addOutput(output, outputDesc);
-        mPreviousOutputs = mOutputs;
-        ALOGV("%s returns new direct output %d", __func__, output);
-        mpClientInterface->onAudioPortListUpdate();
+    audio_config_t directConfig = *config;
+    directConfig.channel_mask = channelMask;
+    status_t status = openDirectOutput(stream, session, &directConfig, *flags, devices, &output);
+    if (status != NAME_NOT_FOUND) {
         return output;
     }
-
-non_direct_output:
 
     // A request for HW A/V sync cannot fallback to a mixed output because time
     // stamps are embedded in audio data
@@ -2146,7 +2179,7 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(const sp<DeviceDescripto
 
     if (!profile->canOpenNewIo()) {
         for (size_t i = 0; i < mInputs.size(); ) {
-            sp <AudioInputDescriptor> desc = mInputs.valueAt(i);
+            sp<AudioInputDescriptor> desc = mInputs.valueAt(i);
             if (desc->mProfile != profile) {
                 i++;
                 continue;
@@ -2886,8 +2919,8 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             }
             audio_config_t outputConfig = mix.mFormat;
             audio_config_t inputConfig = mix.mFormat;
-            // NOTE: audio flinger mixer does not support mono output: configure remote submix HAL in
-            // stereo and let audio flinger do the channel conversion if needed.
+            // NOTE: audio flinger mixer does not support mono output: configure remote submix HAL
+            // in stereo and let audio flinger do the channel conversion if needed.
             outputConfig.channel_mask = AUDIO_CHANNEL_OUT_STEREO;
             inputConfig.channel_mask = AUDIO_CHANNEL_IN_STEREO;
             rSubmixModule->addOutputProfile(address.c_str(), &outputConfig,
@@ -2917,10 +2950,11 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
             }
 
             bool foundOutput = false;
-            for (size_t j = 0 ; j < mOutputs.size() ; j++) {
+            // First try to find an already opened output supporting the device
+            for (size_t j = 0 ; j < mOutputs.size() && !foundOutput && res == NO_ERROR; j++) {
                 sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(j);
 
-                if (desc->supportedDevices().contains(device)) {
+                if (!desc->isDuplicated() && desc->supportedDevices().contains(device)) {
                     if (mPolicyMixes.registerMix(mix, desc) != NO_ERROR) {
                         ALOGE("Could not register mix RENDER,  dev=0x%X addr=%s", type,
                               address.string());
@@ -2928,10 +2962,26 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
                     } else {
                         foundOutput = true;
                     }
-                    break;
                 }
             }
-
+            // If no output found, try to find a direct output profile supporting the device
+            for (size_t i = 0; i < mHwModules.size() && !foundOutput && res == NO_ERROR; i++) {
+                sp<HwModule> module = mHwModules[i];
+                for (size_t j = 0;
+                        j < module->getOutputProfiles().size() && !foundOutput && res == NO_ERROR;
+                        j++) {
+                    sp<IOProfile> profile = module->getOutputProfiles()[j];
+                    if (profile->isDirectOutput() && profile->supportsDevice(device)) {
+                        if (mPolicyMixes.registerMix(mix, nullptr) != NO_ERROR) {
+                            ALOGE("Could not register mix RENDER,  dev=0x%X addr=%s", type,
+                                  address.string());
+                            res = INVALID_OPERATION;
+                        } else {
+                            foundOutput = true;
+                        }
+                    }
+                }
+            }
             if (res != NO_ERROR) {
                 ALOGE(" Error registering mix %zu for device 0x%X addr %s",
                         i, type, address.string());
@@ -3014,58 +3064,67 @@ void AudioPolicyManager::dumpManualSurroundFormats(String8 *dst) const
     }
 }
 
+// Returns true if all devices types match the predicate and are supported by one HW module
+bool  AudioPolicyManager::areAllDevicesSupported(
+        const Vector<AudioDeviceTypeAddr>& devices,
+        std::function<bool(audio_devices_t)> predicate,
+        const char *context) {
+    for (size_t i = 0; i < devices.size(); i++) {
+        sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
+                devices[i].mType, devices[i].mAddress.c_str(), String8(),
+                AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, false /*matchAddress*/);
+        if (devDesc == nullptr || (predicate != nullptr && !predicate(devices[i].mType))) {
+            ALOGE("%s: device type %#x address %s not supported or not an output device",
+                    context, devices[i].mType, devices[i].mAddress.c_str());
+            return false;
+        }
+    }
+    return true;
+}
+
 status_t AudioPolicyManager::setUidDeviceAffinities(uid_t uid,
         const Vector<AudioDeviceTypeAddr>& devices) {
     ALOGV("%s() uid=%d num devices %zu", __FUNCTION__, uid, devices.size());
-    // uid/device affinity is only for output devices
-    for (size_t i = 0; i < devices.size(); i++) {
-        if (!audio_is_output_device(devices[i].mType)) {
-            ALOGE("setUidDeviceAffinities() device=%08x is NOT an output device",
-                    devices[i].mType);
-            return BAD_VALUE;
-        }
+    if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
+        return BAD_VALUE;
     }
     status_t res =  mPolicyMixes.setUidDeviceAffinities(uid, devices);
-    if (res == NO_ERROR) {
-        // reevaluate outputs for all given devices
-        for (size_t i = 0; i < devices.size(); i++) {
-            sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
-                            devices[i].mType, devices[i].mAddress.c_str(), String8(),
-                            AUDIO_FORMAT_DEFAULT);
-            SortedVector<audio_io_handle_t> outputs;
-            if (checkOutputsForDevice(devDesc, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
-                    outputs) != NO_ERROR) {
-                ALOGE("setUidDeviceAffinities() error in checkOutputsForDevice for device=%08x"
-                        " addr=%s", devices[i].mType, devices[i].mAddress.c_str());
-                return INVALID_OPERATION;
-            }
-        }
+    if (res != NO_ERROR) {
+        ALOGE("%s() Could not set all device affinities for uid = %d", __FUNCTION__, uid);
+        return res;
     }
-    return res;
+
+    checkForDeviceAndOutputChanges();
+    updateCallAndOutputRouting();
+
+    return NO_ERROR;
 }
 
 status_t AudioPolicyManager::removeUidDeviceAffinities(uid_t uid) {
     ALOGV("%s() uid=%d", __FUNCTION__, uid);
     status_t res = mPolicyMixes.removeUidDeviceAffinities(uid);
     if (res != NO_ERROR) {
-        ALOGE("%s() Could not remove all device affinities fo uid = %d",
+        ALOGE("%s() Could not remove all device affinities for uid = %d",
             __FUNCTION__, uid);
         return INVALID_OPERATION;
     }
+
+    checkForDeviceAndOutputChanges();
+    updateCallAndOutputRouting();
 
     return res;
 }
 
 status_t AudioPolicyManager::setPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    const AudioDeviceTypeAddr &device) {
-    ALOGI("%s() strategy=%d device=%08x addr=%s", __FUNCTION__,
+    ALOGV("%s() strategy=%d device=%08x addr=%s", __FUNCTION__,
             strategy, device.mType, device.mAddress.c_str());
-    // strategy preferred device is only for output devices
-    if (!audio_is_output_device(device.mType)) {
-        ALOGE("%s() device=%08x is NOT an output device", __FUNCTION__, device.mType);
+
+    Vector<AudioDeviceTypeAddr> devices;
+    devices.add(device);
+    if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
         return BAD_VALUE;
     }
-
     status_t status = mEngine->setPreferredDeviceForStrategy(strategy, device);
     if (status != NO_ERROR) {
         ALOGW("Engine could not set preferred device %08x %s for strategy %d",
@@ -3124,17 +3183,10 @@ status_t AudioPolicyManager::getPreferredDeviceForStrategy(product_strategy_t st
 
 status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
         const Vector<AudioDeviceTypeAddr>& devices) {
-    ALOGI("%s() userId=%d num devices %zu", __FUNCTION__, userId, devices.size());
-    // userId/device affinity is only for output devices
-    for (size_t i = 0; i < devices.size(); i++) {
-        if (!audio_is_output_device(devices[i].mType)) {
-            ALOGE("%s() device=%08x is NOT an output device",
-                    __FUNCTION__,
-                    devices[i].mType);
-            return BAD_VALUE;
-        }
+    ALOGI("%s() userId=%d num devices %zu", __FUNCTION__, userId, devices.size());\
+    if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
+        return BAD_VALUE;
     }
-
     status_t status =  mPolicyMixes.setUserIdDeviceAffinities(userId, devices);
     if (status != NO_ERROR) {
         ALOGE("%s() could not set device affinity for userId %d",
@@ -3641,12 +3693,11 @@ status_t AudioPolicyManager::createAudioPatchInternal(const struct audio_patch *
                         audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE;
                         audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
                         bool isRequestedDeviceForExclusiveUse = false;
-                        std::vector<sp<SwAudioOutputDescriptor>> secondaryOutputs;
                         output_type_t outputType;
                         getOutputForAttrInt(&resultAttr, &output, AUDIO_SESSION_NONE, &attributes,
                                             &stream, sourceDesc->uid(), &config, &flags,
                                             &selectedDeviceId, &isRequestedDeviceForExclusiveUse,
-                                            &secondaryOutputs, &outputType);
+                                            nullptr, &outputType);
                         if (output == AUDIO_IO_HANDLE_NONE) {
                             ALOGV("%s no output for device %s",
                                   __FUNCTION__, sinkDevice->toString().c_str());
@@ -4551,9 +4602,6 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                 mTtsOutputAvailable = true;
             }
 
-            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
-                continue;
-            }
             const DeviceVector &supportedDevices = outProfile->getSupportedDevices();
             DeviceVector availProfileDevices = supportedDevices.filter(mOutputDevicesAll);
             sp<DeviceDescriptor> supportedDevice = 0;
@@ -4594,12 +4642,16 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                     outProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
                 mPrimaryOutput = outputDesc;
             }
-            addOutput(output, outputDesc);
-            setOutputDevices(outputDesc,
-                             DeviceVector(supportedDevice),
-                             true,
-                             0,
-                             NULL);
+            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
+                outputDesc->close();
+            } else {
+                addOutput(output, outputDesc);
+                setOutputDevices(outputDesc,
+                                 DeviceVector(supportedDevice),
+                                 true,
+                                 0,
+                                 NULL);
+            }
         }
         // open input streams needed to access attached devices to validate
         // mAvailableInputDevices list
@@ -5275,10 +5327,19 @@ void AudioPolicyManager::checkSecondaryOutputs() {
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& outputDescriptor = mOutputs[i];
         for (const sp<TrackClientDescriptor>& client : outputDescriptor->getClientIterable()) {
-            sp<SwAudioOutputDescriptor> desc;
-            std::vector<sp<SwAudioOutputDescriptor>> secondaryDescs;
+            sp<AudioPolicyMix> primaryMix;
+            std::vector<sp<AudioPolicyMix>> secondaryMixes;
             status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->uid(),
-                                                            client->flags(), desc, &secondaryDescs);
+                    client->flags(), primaryMix, &secondaryMixes);
+            std::vector<sp<SwAudioOutputDescriptor>> secondaryDescs;
+            for (auto &secondaryMix : secondaryMixes) {
+                sp<SwAudioOutputDescriptor> outputDesc = secondaryMix->getOutput();
+                if (outputDesc != nullptr &&
+                    outputDesc->mIoHandle != AUDIO_IO_HANDLE_NONE) {
+                    secondaryDescs.push_back(outputDesc);
+                }
+            }
+
             if (status != OK ||
                 !std::equal(client->getSecondaryOutputs().begin(),
                             client->getSecondaryOutputs().end(),
@@ -5482,21 +5543,17 @@ status_t AudioPolicyManager::getDevicesForAttributes(
     }
     // check dynamic policies but only for primary descriptors (secondary not used for audible
     // audio routing, only used for duplication for playback capture)
-    sp<SwAudioOutputDescriptor> policyDesc;
+    sp<AudioPolicyMix> policyMix;
     status_t status = mPolicyMixes.getOutputForAttr(attr, 0 /*uid unknown here*/,
-            AUDIO_OUTPUT_FLAG_NONE, policyDesc, nullptr);
+            AUDIO_OUTPUT_FLAG_NONE, policyMix, nullptr);
     if (status != OK) {
         return status;
     }
-    if (policyDesc != nullptr) {
-        sp<AudioPolicyMix> mix = policyDesc->mPolicyMix.promote();
-        if (mix != nullptr) {
-            AudioDeviceTypeAddr device(mix->mDeviceType, mix->mDeviceAddress.c_str());
-            devices->push_back(device);
-            return NO_ERROR;
-        }
+    if (policyMix != nullptr && policyMix->getOutput() != nullptr) {
+        AudioDeviceTypeAddr device(policyMix->mDeviceType, policyMix->mDeviceAddress.c_str());
+        devices->push_back(device);
+        return NO_ERROR;
     }
-
     DeviceVector curDevices = mEngine->getOutputDevicesForAttributes(attr, nullptr, false);
     for (const auto& device : curDevices) {
         devices->push_back(device->getDeviceTypeAddr());
