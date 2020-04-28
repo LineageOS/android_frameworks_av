@@ -21,7 +21,6 @@
 #include <C2PlatformSupport.h>
 
 #include <media/stagefright/foundation/ADebug.h>
-#include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/SkipCutBuffer.h>
 
@@ -150,27 +149,14 @@ void OutputBuffers::updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount
     setSkipCutBuffer(delay, padding);
 }
 
-void OutputBuffers::updateSkipCutBuffer(
-        const sp<AMessage> &format, bool notify) {
-    AString mediaType;
-    if (format->findString(KEY_MIME, &mediaType)
-            && mediaType == MIMETYPE_AUDIO_RAW) {
-        int32_t channelCount;
-        int32_t sampleRate;
-        if (format->findInt32(KEY_CHANNEL_COUNT, &channelCount)
-                && format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
-            updateSkipCutBuffer(sampleRate, channelCount);
-        }
-    }
-    if (notify) {
-        mUnreportedFormat = nullptr;
-    }
-}
-
 void OutputBuffers::submit(const sp<MediaCodecBuffer> &buffer) {
     if (mSkipCutBuffer != nullptr) {
         mSkipCutBuffer->submit(buffer);
     }
+}
+
+void OutputBuffers::transferSkipCutBuffer(const sp<SkipCutBuffer> &scb) {
+    mSkipCutBuffer = scb;
 }
 
 void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut) {
@@ -181,175 +167,6 @@ void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut) {
         }
     }
     mSkipCutBuffer = new SkipCutBuffer(skip, cut, mChannelCount);
-}
-
-void OutputBuffers::clearStash() {
-    mPending.clear();
-    mReorderStash.clear();
-    mDepth = 0;
-    mKey = C2Config::ORDINAL;
-    mUnreportedFormat = nullptr;
-}
-
-void OutputBuffers::flushStash() {
-    for (StashEntry& e : mPending) {
-        e.notify = false;
-    }
-    for (StashEntry& e : mReorderStash) {
-        e.notify = false;
-    }
-}
-
-uint32_t OutputBuffers::getReorderDepth() const {
-    return mDepth;
-}
-
-void OutputBuffers::setReorderDepth(uint32_t depth) {
-    mPending.splice(mPending.end(), mReorderStash);
-    mDepth = depth;
-}
-
-void OutputBuffers::setReorderKey(C2Config::ordinal_key_t key) {
-    mPending.splice(mPending.end(), mReorderStash);
-    mKey = key;
-}
-
-void OutputBuffers::pushToStash(
-        const std::shared_ptr<C2Buffer>& buffer,
-        bool notify,
-        int64_t timestamp,
-        int32_t flags,
-        const sp<AMessage>& format,
-        const C2WorkOrdinalStruct& ordinal) {
-    bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
-    if (!buffer && eos) {
-        // TRICKY: we may be violating ordering of the stash here. Because we
-        // don't expect any more emplace() calls after this, the ordering should
-        // not matter.
-        mReorderStash.emplace_back(
-                buffer, notify, timestamp, flags, format, ordinal);
-    } else {
-        flags = flags & ~MediaCodec::BUFFER_FLAG_EOS;
-        auto it = mReorderStash.begin();
-        for (; it != mReorderStash.end(); ++it) {
-            if (less(ordinal, it->ordinal)) {
-                break;
-            }
-        }
-        mReorderStash.emplace(it,
-                buffer, notify, timestamp, flags, format, ordinal);
-        if (eos) {
-            mReorderStash.back().flags =
-                mReorderStash.back().flags | MediaCodec::BUFFER_FLAG_EOS;
-        }
-    }
-    while (!mReorderStash.empty() && mReorderStash.size() > mDepth) {
-        mPending.push_back(mReorderStash.front());
-        mReorderStash.pop_front();
-    }
-    ALOGV("[%s] %s: pushToStash -- pending size = %zu", mName, __func__, mPending.size());
-}
-
-OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
-        std::shared_ptr<C2Buffer>* c2Buffer,
-        size_t* index,
-        sp<MediaCodecBuffer>* outBuffer) {
-    if (mPending.empty()) {
-        return SKIP;
-    }
-
-    // Retrieve the first entry.
-    StashEntry &entry = mPending.front();
-
-    *c2Buffer = entry.buffer;
-    sp<AMessage> outputFormat = entry.format;
-
-    // The output format can be processed without a registered slot.
-    if (outputFormat) {
-        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
-                mName, outputFormat->debugString().c_str());
-        updateSkipCutBuffer(outputFormat, entry.notify);
-    }
-
-    if (entry.notify) {
-        if (outputFormat) {
-            setFormat(outputFormat);
-        } else if (mUnreportedFormat) {
-            outputFormat = mUnreportedFormat->dup();
-            setFormat(outputFormat);
-        }
-        mUnreportedFormat = nullptr;
-    } else {
-        if (outputFormat) {
-            mUnreportedFormat = outputFormat;
-        } else if (!mUnreportedFormat) {
-            mUnreportedFormat = mFormat;
-        }
-    }
-
-    // Flushing mReorderStash because no other buffers should come after output
-    // EOS.
-    if (entry.flags & MediaCodec::BUFFER_FLAG_EOS) {
-        // Flush reorder stash
-        setReorderDepth(0);
-    }
-
-    if (!entry.notify) {
-        mPending.pop_front();
-        return DISCARD;
-    }
-
-    // Try to register the buffer.
-    status_t err = registerBuffer(*c2Buffer, index, outBuffer);
-    if (err != OK) {
-        if (err != WOULD_BLOCK) {
-            return REALLOCATE;
-        }
-        return RETRY;
-    }
-
-    // Append information from the front stash entry to outBuffer.
-    (*outBuffer)->meta()->setInt64("timeUs", entry.timestamp);
-    (*outBuffer)->meta()->setInt32("flags", entry.flags);
-    ALOGV("[%s] popFromStashAndRegister: "
-          "out buffer index = %zu [%p] => %p + %zu (%lld)",
-          mName, *index, outBuffer->get(),
-          (*outBuffer)->data(), (*outBuffer)->size(),
-          (long long)entry.timestamp);
-
-    // The front entry of mPending will be removed now that the registration
-    // succeeded.
-    mPending.pop_front();
-    return NOTIFY_CLIENT;
-}
-
-bool OutputBuffers::popPending(StashEntry *entry) {
-    if (mPending.empty()) {
-        return false;
-    }
-    *entry = mPending.front();
-    mPending.pop_front();
-    return true;
-}
-
-void OutputBuffers::deferPending(const OutputBuffers::StashEntry &entry) {
-    mPending.push_front(entry);
-}
-
-bool OutputBuffers::hasPending() const {
-    return !mPending.empty();
-}
-
-bool OutputBuffers::less(
-        const C2WorkOrdinalStruct &o1, const C2WorkOrdinalStruct &o2) const {
-    switch (mKey) {
-        case C2Config::ORDINAL:   return o1.frameIndex < o2.frameIndex;
-        case C2Config::TIMESTAMP: return o1.timestamp < o2.timestamp;
-        case C2Config::CUSTOM:    return o1.customOrdinal < o2.customOrdinal;
-        default:
-            ALOGD("Unrecognized key; default to timestamp");
-            return o1.frameIndex < o2.frameIndex;
-    }
 }
 
 // LocalBufferPool
@@ -1151,16 +968,6 @@ void OutputBuffersArray::grow(size_t newSize) {
     mImpl.grow(newSize, mAlloc);
 }
 
-void OutputBuffersArray::transferFrom(OutputBuffers* source) {
-    mFormat = source->mFormat;
-    mSkipCutBuffer = source->mSkipCutBuffer;
-    mUnreportedFormat = source->mUnreportedFormat;
-    mPending = std::move(source->mPending);
-    mReorderStash = std::move(source->mReorderStash);
-    mDepth = source->mDepth;
-    mKey = source->mKey;
-}
-
 // FlexOutputBuffers
 
 status_t FlexOutputBuffers::registerBuffer(
@@ -1203,12 +1010,13 @@ void FlexOutputBuffers::flush(
     // track of the flushed work.
 }
 
-std::unique_ptr<OutputBuffersArray> FlexOutputBuffers::toArrayMode(size_t size) {
+std::unique_ptr<OutputBuffers> FlexOutputBuffers::toArrayMode(size_t size) {
     std::unique_ptr<OutputBuffersArray> array(new OutputBuffersArray(mComponentName.c_str()));
-    array->transferFrom(this);
+    array->setFormat(mFormat);
+    array->transferSkipCutBuffer(mSkipCutBuffer);
     std::function<sp<Codec2Buffer>()> alloc = getAlloc();
     array->initialize(mImpl, size, alloc);
-    return array;
+    return std::move(array);
 }
 
 size_t FlexOutputBuffers::numClientBuffers() const {
