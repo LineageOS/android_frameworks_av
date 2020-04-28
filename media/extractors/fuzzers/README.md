@@ -11,6 +11,7 @@
 + [libmp3extractor](#mp3ExtractorFuzzer)
 + [libaacextractor](#aacExtractorFuzzer)
 + [libflacextractor](#flacExtractor)
++ [libmidiextractor](#midiExtractorFuzzer)
 
 # <a name="ExtractorFuzzerBase"></a> Fuzzer for libextractorfuzzerbase
 All the extractors have a common API - creating a data source, extraction
@@ -319,6 +320,41 @@ To run on device
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/flac_extractor_fuzzer/flac_extractor_fuzzer CORPUS_DIR
+```
+
+# <a name="midiExtractorFuzzer"></a> Fuzzer for libmidiextractor
+
+## Plugin Design Considerations
+The fuzzer plugin for MIDI extractor uses the `ExtractorFuzzerBase` class and
+implements only the `createExtractor` to create the MIDI extractor class.
+
+##### Maximize code coverage
+Dict file (dictionary file) is created for MIDI to ensure that the required MIDI
+headers are present in every input file that goes to the fuzzer.
+This ensures that larger code gets covered as a range of MIDI headers will be
+present in the input data.
+
+
+## Build
+
+This describes steps to build midi_extractor_fuzzer binary.
+
+### Android
+
+#### Steps to build
+Build the fuzzer
+```
+  $ mm -j$(nproc) midi_extractor_fuzzer
+```
+
+#### Steps to run
+Create a directory CORPUS_DIR and copy some MIDI files to that folder
+Push this directory to device.
+
+To run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/midi_extractor_fuzzer/midi_extractor_fuzzer CORPUS_DIR
 ```
 
 ## References:
