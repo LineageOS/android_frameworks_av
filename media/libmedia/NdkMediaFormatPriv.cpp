@@ -24,8 +24,6 @@
 #include <media/NdkMediaFormatPriv.h>
 #include <media/stagefright/foundation/AMessage.h>
 
-#include <jni.h>
-
 using namespace android;
 
 namespace android {
