@@ -161,3 +161,33 @@ const std::vector<std::tuple<std::string, std::string>>& getTestParameters(
 
     return parameters;
 }
+
+// Populate Info vector and return number of CSDs
+int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameInfo,
+                           bool timestampDevTest, std::list<uint64_t>* timestampUslist) {
+    std::ifstream eleInfo;
+    eleInfo.open(info);
+    if (!eleInfo.is_open()) {
+        ALOGE("Can't open info file");
+        return -1;
+    }
+    int32_t numCsds = 0;
+    int32_t bytesCount = 0;
+    uint32_t flags = 0;
+    uint32_t timestamp = 0;
+    while (1) {
+        if (!(eleInfo >> bytesCount)) break;
+        eleInfo >> flags;
+        eleInfo >> timestamp;
+        bool codecConfig = flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
+        if (codecConfig) numCsds++;
+        bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
+        if (timestampDevTest && !codecConfig && !nonDisplayFrame) {
+            timestampUslist->push_back(timestamp);
+        }
+        frameInfo->push_back({bytesCount, flags, timestamp});
+    }
+    ALOGV("numCsds : %d", numCsds);
+    eleInfo.close();
+    return numCsds;
+}

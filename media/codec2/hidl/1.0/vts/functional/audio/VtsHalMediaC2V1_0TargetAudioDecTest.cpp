@@ -22,7 +22,6 @@
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
 #include <algorithm>
-#include <fstream>
 
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
@@ -34,12 +33,6 @@
 using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
-
-struct FrameInfo {
-    int bytesCount;
-    uint32_t flags;
-    int64_t timestamp;
-};
 
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kDecodeTestParameters;
@@ -121,6 +114,8 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
 
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
+
+    virtual void validateTimestampList(int32_t* bitStreamInfo);
 
     struct outputMetaData {
         uint64_t timestampUs;
@@ -461,6 +456,31 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
     }
 }
 
+void Codec2AudioDecHidlTestBase::validateTimestampList(int32_t* bitStreamInfo) {
+    uint32_t samplesReceived = 0;
+    // Update SampleRate and ChannelCount
+    ASSERT_NO_FATAL_FAILURE(getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
+    int32_t nSampleRate = bitStreamInfo[0];
+    int32_t nChannels = bitStreamInfo[1];
+    std::list<uint64_t>::iterator itIn = mTimestampUslist.begin();
+    auto itOut = oBufferMetaData.begin();
+    EXPECT_EQ(*itIn, itOut->timestampUs);
+    uint64_t expectedTimeStamp = *itIn;
+    while (itOut != oBufferMetaData.end()) {
+        EXPECT_EQ(expectedTimeStamp, itOut->timestampUs);
+        if (expectedTimeStamp != itOut->timestampUs) break;
+        // buffer samples = ((total bytes) / (ac * (bits per sample / 8))
+        samplesReceived += ((itOut->rangeLength) / (nChannels * 2));
+        expectedTimeStamp = samplesReceived * 1000000ll / nSampleRate;
+        itOut++;
+    }
+    itIn = mTimestampUslist.end();
+    --itIn;
+    EXPECT_GT(expectedTimeStamp, *itIn);
+    oBufferMetaData.clear();
+    mTimestampUslist.clear();
+}
+
 TEST_P(Codec2AudioDecHidlTest, validateCompName) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ALOGV("Checks if the given component is a valid audio component");
@@ -497,7 +517,7 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     bool signalEOS = !std::get<3>(GetParam()).compare("true");
     mTimestampDevTest = true;
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
@@ -507,21 +527,9 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
         return;
     }
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        bool codecConfig = ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0;
-        if (mTimestampDevTest && !codecConfig) mTimestampUslist.push_back(timestamp);
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
+
     // Reset total no of frames received
     mFramesReceived = 0;
     mTimestampUs = 0;
@@ -538,6 +546,7 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
     ALOGV("mURL : %s", mURL);
+    std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -562,30 +571,9 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
         ASSERT_TRUE(false);
     }
     ASSERT_EQ(mEos, true);
+
     if (mTimestampDevTest) {
-        uint64_t expTs;
-        uint32_t samplesReceived = 0;
-        // Update SampleRate and ChannelCount
-        ASSERT_NO_FATAL_FAILURE(getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
-        int nSampleRate = bitStreamInfo[0];
-        int nChannels = bitStreamInfo[1];
-        std::list<uint64_t>::iterator itIn = mTimestampUslist.begin();
-        auto itOut = oBufferMetaData.begin();
-        EXPECT_EQ(*itIn, itOut->timestampUs);
-        expTs = *itIn;
-        while (itOut != oBufferMetaData.end()) {
-            EXPECT_EQ(expTs, itOut->timestampUs);
-            if (expTs != itOut->timestampUs) break;
-            // buffer samples = ((total bytes) / (ac * (bits per sample / 8))
-            samplesReceived += ((itOut->rangeLength) / (nChannels * 2));
-            expTs = samplesReceived * 1000000ll / nSampleRate;
-            itOut++;
-        }
-        itIn = mTimestampUslist.end();
-        --itIn;
-        EXPECT_GT(expTs, *itIn);
-        oBufferMetaData.clear();
-        mTimestampUslist.clear();
+        validateTimestampList(bitStreamInfo);
     }
     ASSERT_EQ(mComponent->stop(), C2_OK);
     ASSERT_EQ(mWorkResult, C2_OK);
@@ -597,25 +585,15 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL, info);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
+
     int32_t bitStreamInfo[2] = {0};
     if (mCompName == raw) {
         bitStreamInfo[0] = 8000;
@@ -633,12 +611,14 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
     // request EOS for thumbnail
     // signal EOS flag with last frame
     size_t i = -1;
+    uint32_t flags;
     do {
         i++;
         flags = 0;
         if (Info[i].flags) flags = 1u << (Info[i].flags - 1);
 
     } while (!(flags & SYNC_FRAME));
+    std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -698,26 +678,15 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     typedef std::unique_lock<std::mutex> ULock;
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL, info);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    mFlushedIndices.clear();
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
+
     int32_t bitStreamInfo[2] = {0};
     if (mCompName == raw) {
         bitStreamInfo[0] = 8000;
@@ -731,6 +700,7 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
     ALOGV("mURL : %s", mURL);
+    std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     // Decode 128 frames and flush. here 128 is chosen to ensure there is a key
@@ -767,7 +737,7 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
     mFlushedIndices.clear();
     int index = numFramesFlushed;
     bool keyFrame = false;
-    flags = 0;
+    uint32_t flags = 0;
     while (index < (int)Info.size()) {
         if (Info[index].flags) flags = 1u << (Info[index].flags - 1);
         if ((flags & SYNC_FRAME) == SYNC_FRAME) {

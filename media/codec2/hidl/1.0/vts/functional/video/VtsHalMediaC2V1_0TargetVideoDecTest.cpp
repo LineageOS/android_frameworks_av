@@ -21,7 +21,6 @@
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
-#include <fstream>
 
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
@@ -38,12 +37,6 @@ using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
 #include "media_c2_video_hidl_test_common.h"
-
-struct FrameInfo {
-    int bytesCount;
-    uint32_t flags;
-    int64_t timestamp;
-};
 
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kDecodeTestParameters;
@@ -467,38 +460,27 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
 
     uint32_t streamIndex = std::stoi(std::get<2>(GetParam()));
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
+    mTimestampDevTest = true;
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
+
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
+
     GetURLForComponent(mCompName, mURL, info, streamIndex);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true) << mURL << " - file not found";
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    mTimestampDevTest = true;
     mFlushedIndices.clear();
     mTimestampUslist.clear();
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        bool codecConfig = flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
-        bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
-        if (mTimestampDevTest && !codecConfig && !nonDisplayFrame)
-            mTimestampUslist.push_back(timestamp);
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
 
     ASSERT_EQ(mComponent->start(), C2_OK);
     // Reset total no of frames received
     mFramesReceived = 0;
     mTimestampUs = 0;
     ALOGV("mURL : %s", mURL);
+    std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -645,26 +627,16 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL, info);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
 
+    uint32_t flags = 0;
     for (size_t i = 0; i < MAX_ITERATIONS; i++) {
         ASSERT_EQ(mComponent->start(), C2_OK);
 
@@ -677,6 +649,8 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
             if (Info[j].flags) flags = 1u << (Info[j].flags - 1);
 
         } while (!(flags & SYNC_FRAME));
+
+        std::ifstream eleStream;
         eleStream.open(mURL, std::ifstream::binary);
         ASSERT_EQ(eleStream.is_open(), true);
         ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -738,29 +712,21 @@ TEST_P(Codec2VideoDecHidlTest, FlushTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     typedef std::unique_lock<std::mutex> ULock;
     ASSERT_EQ(mComponent->start(), C2_OK);
+
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL, info);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
     mFlushedIndices.clear();
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
 
     ALOGV("mURL : %s", mURL);
+    std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     // Decode 128 frames and flush. here 128 is chosen to ensure there is a key
@@ -796,7 +762,7 @@ TEST_P(Codec2VideoDecHidlTest, FlushTest) {
     mFlushedIndices.clear();
     int index = numFramesFlushed;
     bool keyFrame = false;
-    flags = 0;
+    uint32_t flags = 0;
     while (index < (int)Info.size()) {
         if (Info[index].flags) flags = 1u << (Info[index].flags - 1);
         if ((flags & SYNC_FRAME) == SYNC_FRAME) {
