@@ -127,6 +127,97 @@ void CCodecBufferChannel::QueueSync::stop() {
     count->value = -1;
 }
 
+// CCodecBufferChannel::ReorderStash
+
+CCodecBufferChannel::ReorderStash::ReorderStash() {
+    clear();
+}
+
+void CCodecBufferChannel::ReorderStash::clear() {
+    mPending.clear();
+    mStash.clear();
+    mDepth = 0;
+    mKey = C2Config::ORDINAL;
+}
+
+void CCodecBufferChannel::ReorderStash::flush() {
+    mPending.clear();
+    mStash.clear();
+}
+
+void CCodecBufferChannel::ReorderStash::setDepth(uint32_t depth) {
+    mPending.splice(mPending.end(), mStash);
+    mDepth = depth;
+}
+
+void CCodecBufferChannel::ReorderStash::setKey(C2Config::ordinal_key_t key) {
+    mPending.splice(mPending.end(), mStash);
+    mKey = key;
+}
+
+bool CCodecBufferChannel::ReorderStash::pop(Entry *entry) {
+    if (mPending.empty()) {
+        return false;
+    }
+    entry->buffer     = mPending.front().buffer;
+    entry->timestamp  = mPending.front().timestamp;
+    entry->flags      = mPending.front().flags;
+    entry->ordinal    = mPending.front().ordinal;
+    mPending.pop_front();
+    return true;
+}
+
+void CCodecBufferChannel::ReorderStash::emplace(
+        const std::shared_ptr<C2Buffer> &buffer,
+        int64_t timestamp,
+        int32_t flags,
+        const C2WorkOrdinalStruct &ordinal) {
+    bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
+    if (!buffer && eos) {
+        // TRICKY: we may be violating ordering of the stash here. Because we
+        // don't expect any more emplace() calls after this, the ordering should
+        // not matter.
+        mStash.emplace_back(buffer, timestamp, flags, ordinal);
+    } else {
+        flags = flags & ~MediaCodec::BUFFER_FLAG_EOS;
+        auto it = mStash.begin();
+        for (; it != mStash.end(); ++it) {
+            if (less(ordinal, it->ordinal)) {
+                break;
+            }
+        }
+        mStash.emplace(it, buffer, timestamp, flags, ordinal);
+        if (eos) {
+            mStash.back().flags = mStash.back().flags | MediaCodec::BUFFER_FLAG_EOS;
+        }
+    }
+    while (!mStash.empty() && mStash.size() > mDepth) {
+        mPending.push_back(mStash.front());
+        mStash.pop_front();
+    }
+}
+
+void CCodecBufferChannel::ReorderStash::defer(
+        const CCodecBufferChannel::ReorderStash::Entry &entry) {
+    mPending.push_front(entry);
+}
+
+bool CCodecBufferChannel::ReorderStash::hasPending() const {
+    return !mPending.empty();
+}
+
+bool CCodecBufferChannel::ReorderStash::less(
+        const C2WorkOrdinalStruct &o1, const C2WorkOrdinalStruct &o2) {
+    switch (mKey) {
+        case C2Config::ORDINAL:   return o1.frameIndex < o2.frameIndex;
+        case C2Config::TIMESTAMP: return o1.timestamp < o2.timestamp;
+        case C2Config::CUSTOM:    return o1.customOrdinal < o2.customOrdinal;
+        default:
+            ALOGD("Unrecognized key; default to timestamp");
+            return o1.frameIndex < o2.frameIndex;
+    }
+}
+
 // Input
 
 CCodecBufferChannel::Input::Input() : extraBuffers("extra") {}
@@ -616,7 +707,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
 
 void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
     if (mInputMetEos ||
-           mOutput.lock()->buffers->hasPending() ||
+           mReorderStash.lock()->hasPending() ||
            mPipelineWatcher.lock()->pipelineFull()) {
         return;
     } else {
@@ -889,6 +980,17 @@ status_t CCodecBufferChannel::start(
         return UNKNOWN_ERROR;
     }
 
+    {
+        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
+        reorder->clear();
+        if (reorderDepth) {
+            reorder->setDepth(reorderDepth.value);
+        }
+        if (reorderKey) {
+            reorder->setKey(reorderKey.value);
+        }
+    }
+
     uint32_t inputDelayValue = inputDelay ? inputDelay.value : 0;
     uint32_t pipelineDelayValue = pipelineDelay ? pipelineDelay.value : 0;
     uint32_t outputDelayValue = outputDelay ? outputDelay.value : 0;
@@ -1157,13 +1259,6 @@ status_t CCodecBufferChannel::start(
         }
         output->buffers->setFormat(outputFormat);
 
-        output->buffers->clearStash();
-        if (reorderDepth) {
-            output->buffers->setReorderDepth(reorderDepth.value);
-        }
-        if (reorderKey) {
-            output->buffers->setReorderKey(reorderKey.value);
-        }
 
         // Try to set output surface to created block pool if given.
         if (outputSurface) {
@@ -1331,8 +1426,8 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
     {
         Mutexed<Output>::Locked output(mOutput);
         output->buffers->flush(flushedWork);
-        output->buffers->flushStash();
     }
+    mReorderStash.lock()->flush();
     mPipelineWatcher.lock()->flush();
 }
 
@@ -1368,34 +1463,45 @@ bool CCodecBufferChannel::handleWork(
         std::unique_ptr<C2Work> work,
         const sp<AMessage> &outputFormat,
         const C2StreamInitDataInfo::output *initData) {
-    // Whether the output buffer should be reported to the client or not.
-    bool notifyClient = false;
+    if (outputFormat != nullptr) {
+        Mutexed<Output>::Locked output(mOutput);
+        ALOGD("[%s] onWorkDone: output format changed to %s",
+                mName, outputFormat->debugString().c_str());
+        output->buffers->setFormat(outputFormat);
 
-    if (work->result == C2_OK){
-        notifyClient = true;
-    } else if (work->result == C2_NOT_FOUND) {
-        ALOGD("[%s] flushed work; ignored.", mName);
-    } else {
-        // C2_OK and C2_NOT_FOUND are the only results that we accept for processing
-        // the config update.
-        ALOGD("[%s] work failed to complete: %d", mName, work->result);
-        mCCodecCallback->onError(work->result, ACTION_CODE_FATAL);
-        return false;
+        AString mediaType;
+        if (outputFormat->findString(KEY_MIME, &mediaType)
+                && mediaType == MIMETYPE_AUDIO_RAW) {
+            int32_t channelCount;
+            int32_t sampleRate;
+            if (outputFormat->findInt32(KEY_CHANNEL_COUNT, &channelCount)
+                    && outputFormat->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+                output->buffers->updateSkipCutBuffer(sampleRate, channelCount);
+            }
+        }
     }
 
-    if ((work->input.ordinal.frameIndex -
-            mFirstValidFrameIndex.load()).peek() < 0) {
+    if ((work->input.ordinal.frameIndex - mFirstValidFrameIndex.load()).peek() < 0) {
         // Discard frames from previous generation.
         ALOGD("[%s] Discard frames from previous generation.", mName);
-        notifyClient = false;
+        return false;
     }
 
     if (mInputSurface == nullptr && (work->worklets.size() != 1u
             || !work->worklets.front()
-            || !(work->worklets.front()->output.flags &
-                 C2FrameData::FLAG_INCOMPLETE))) {
-        mPipelineWatcher.lock()->onWorkDone(
-                work->input.ordinal.frameIndex.peeku());
+            || !(work->worklets.front()->output.flags & C2FrameData::FLAG_INCOMPLETE))) {
+        mPipelineWatcher.lock()->onWorkDone(work->input.ordinal.frameIndex.peeku());
+    }
+
+    if (work->result == C2_NOT_FOUND) {
+        ALOGD("[%s] flushed work; ignored.", mName);
+        return true;
+    }
+
+    if (work->result != C2_OK) {
+        ALOGD("[%s] work failed to complete: %d", mName, work->result);
+        mCCodecCallback->onError(work->result, ACTION_CODE_FATAL);
+        return false;
     }
 
     // NOTE: MediaCodec usage supposedly have only one worklet
@@ -1431,10 +1537,8 @@ bool CCodecBufferChannel::handleWork(
             case C2PortReorderBufferDepthTuning::CORE_INDEX: {
                 C2PortReorderBufferDepthTuning::output reorderDepth;
                 if (reorderDepth.updateFrom(*param)) {
-                    bool secure = mComponent->getName().find(".secure") !=
-                                  std::string::npos;
-                    mOutput.lock()->buffers->setReorderDepth(
-                            reorderDepth.value);
+                    bool secure = mComponent->getName().find(".secure") != std::string::npos;
+                    mReorderStash.lock()->setDepth(reorderDepth.value);
                     ALOGV("[%s] onWorkDone: updated reorder depth to %u",
                           mName, reorderDepth.value);
                     size_t numOutputSlots = mOutput.lock()->numSlots;
@@ -1446,19 +1550,17 @@ bool CCodecBufferChannel::handleWork(
                         output->maxDequeueBuffers += numInputSlots;
                     }
                     if (output->surface) {
-                        output->surface->setMaxDequeuedBufferCount(
-                                output->maxDequeueBuffers);
+                        output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
                     }
                 } else {
-                    ALOGD("[%s] onWorkDone: failed to read reorder depth",
-                          mName);
+                    ALOGD("[%s] onWorkDone: failed to read reorder depth", mName);
                 }
                 break;
             }
             case C2PortReorderKeySetting::CORE_INDEX: {
                 C2PortReorderKeySetting::output reorderKey;
                 if (reorderKey.updateFrom(*param)) {
-                    mOutput.lock()->buffers->setReorderKey(reorderKey.value);
+                    mReorderStash.lock()->setKey(reorderKey.value);
                     ALOGV("[%s] onWorkDone: updated reorder key to %u",
                           mName, reorderKey.value);
                 } else {
@@ -1473,8 +1575,7 @@ bool CCodecBufferChannel::handleWork(
                         ALOGV("[%s] onWorkDone: updating pipeline delay %u",
                               mName, pipelineDelay.value);
                         newPipelineDelay = pipelineDelay.value;
-                        (void)mPipelineWatcher.lock()->pipelineDelay(
-                                pipelineDelay.value);
+                        (void)mPipelineWatcher.lock()->pipelineDelay(pipelineDelay.value);
                     }
                 }
                 if (param->forInput()) {
@@ -1483,8 +1584,7 @@ bool CCodecBufferChannel::handleWork(
                         ALOGV("[%s] onWorkDone: updating input delay %u",
                               mName, inputDelay.value);
                         newInputDelay = inputDelay.value;
-                        (void)mPipelineWatcher.lock()->inputDelay(
-                                inputDelay.value);
+                        (void)mPipelineWatcher.lock()->inputDelay(inputDelay.value);
                     }
                 }
                 if (param->forOutput()) {
@@ -1492,10 +1592,8 @@ bool CCodecBufferChannel::handleWork(
                     if (outputDelay.updateFrom(*param)) {
                         ALOGV("[%s] onWorkDone: updating output delay %u",
                               mName, outputDelay.value);
-                        bool secure = mComponent->getName().find(".secure") !=
-                                      std::string::npos;
-                        (void)mPipelineWatcher.lock()->outputDelay(
-                                outputDelay.value);
+                        bool secure = mComponent->getName().find(".secure") != std::string::npos;
+                        (void)mPipelineWatcher.lock()->outputDelay(outputDelay.value);
 
                         bool outputBuffersChanged = false;
                         size_t numOutputSlots = 0;
@@ -1503,8 +1601,7 @@ bool CCodecBufferChannel::handleWork(
                         {
                             Mutexed<Output>::Locked output(mOutput);
                             output->outputDelay = outputDelay.value;
-                            numOutputSlots = outputDelay.value +
-                                             kSmoothnessFactor;
+                            numOutputSlots = outputDelay.value + kSmoothnessFactor;
                             if (output->numSlots < numOutputSlots) {
                                 output->numSlots = numOutputSlots;
                                 if (output->buffers->isArrayMode()) {
@@ -1523,7 +1620,7 @@ bool CCodecBufferChannel::handleWork(
                             mCCodecCallback->onOutputBuffersChanged();
                         }
 
-                        uint32_t depth = mOutput.lock()->buffers->getReorderDepth();
+                        uint32_t depth = mReorderStash.lock()->depth();
                         Mutexed<OutputSurface>::Locked output(mOutputSurface);
                         output->maxDequeueBuffers = numOutputSlots + depth + kRenderingDepth;
                         if (!secure) {
@@ -1567,6 +1664,9 @@ bool CCodecBufferChannel::handleWork(
         ALOGV("[%s] onWorkDone: output EOS", mName);
     }
 
+    sp<MediaCodecBuffer> outBuffer;
+    size_t index;
+
     // WORKAROUND: adjust output timestamp based on client input timestamp and codec
     // input timestamp. Codec output timestamp (in the timestamp field) shall correspond to
     // the codec input timestamp, but client output timestamp should (reported in timeUs)
@@ -1587,18 +1687,8 @@ bool CCodecBufferChannel::handleWork(
           worklet->output.ordinal.timestamp.peekll(),
           timestamp.peekll());
 
-    // csd cannot be re-ordered and will always arrive first.
     if (initData != nullptr) {
         Mutexed<Output>::Locked output(mOutput);
-        if (outputFormat) {
-            output->buffers->updateSkipCutBuffer(outputFormat);
-            output->buffers->setFormat(outputFormat);
-        }
-        if (!notifyClient) {
-            return false;
-        }
-        size_t index;
-        sp<MediaCodecBuffer> outBuffer;
         if (output->buffers->registerCsd(initData, &index, &outBuffer) == OK) {
             outBuffer->meta()->setInt64("timeUs", timestamp.peek());
             outBuffer->meta()->setInt32("flags", MediaCodec::BUFFER_FLAG_CODECCONFIG);
@@ -1614,10 +1704,10 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
-    if (notifyClient && !buffer && !flags) {
+    if (!buffer && !flags) {
         ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
-        notifyClient = false;
+        return true;
     }
 
     if (buffer) {
@@ -1636,60 +1726,63 @@ bool CCodecBufferChannel::handleWork(
     }
 
     {
-        Mutexed<Output>::Locked output(mOutput);
-        output->buffers->pushToStash(
-                buffer,
-                notifyClient,
-                timestamp.peek(),
-                flags,
-                outputFormat,
-                worklet->output.ordinal);
+        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
+        reorder->emplace(buffer, timestamp.peek(), flags, worklet->output.ordinal);
+        if (flags & MediaCodec::BUFFER_FLAG_EOS) {
+            // Flush reorder stash
+            reorder->setDepth(0);
+        }
     }
     sendOutputBuffers();
     return true;
 }
 
 void CCodecBufferChannel::sendOutputBuffers() {
-    OutputBuffers::BufferAction action;
-    size_t index;
+    ReorderStash::Entry entry;
     sp<MediaCodecBuffer> outBuffer;
-    std::shared_ptr<C2Buffer> c2Buffer;
+    size_t index;
 
     while (true) {
+        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
+        if (!reorder->hasPending()) {
+            break;
+        }
+        if (!reorder->pop(&entry)) {
+            break;
+        }
+
         Mutexed<Output>::Locked output(mOutput);
-        action = output->buffers->popFromStashAndRegister(
-                &c2Buffer, &index, &outBuffer);
-        switch (action) {
-        case OutputBuffers::SKIP:
-            return;
-        case OutputBuffers::DISCARD:
-            break;
-        case OutputBuffers::NOTIFY_CLIENT:
-            output.unlock();
-            mCallback->onOutputBufferAvailable(index, outBuffer);
-            break;
-        case OutputBuffers::REALLOCATE: {
+        status_t err = output->buffers->registerBuffer(entry.buffer, &index, &outBuffer);
+        if (err != OK) {
+            bool outputBuffersChanged = false;
+            if (err != WOULD_BLOCK) {
                 if (!output->buffers->isArrayMode()) {
-                    output->buffers =
-                        output->buffers->toArrayMode(output->numSlots);
+                    output->buffers = output->buffers->toArrayMode(output->numSlots);
                 }
-                static_cast<OutputBuffersArray*>(output->buffers.get())->
-                        realloc(c2Buffer);
-                output.unlock();
+                OutputBuffersArray *array = (OutputBuffersArray *)output->buffers.get();
+                array->realloc(entry.buffer);
+                outputBuffersChanged = true;
+            }
+            ALOGV("[%s] sendOutputBuffers: unable to register output buffer", mName);
+            reorder->defer(entry);
+
+            output.unlock();
+            reorder.unlock();
+
+            if (outputBuffersChanged) {
                 mCCodecCallback->onOutputBuffersChanged();
             }
             return;
-        case OutputBuffers::RETRY:
-            ALOGV("[%s] sendOutputBuffers: unable to register output buffer",
-                  mName);
-            return;
-        default:
-            LOG_ALWAYS_FATAL("[%s] sendOutputBuffers: "
-                    "corrupted BufferAction value (%d) "
-                    "returned from popFromStashAndRegister.",
-                    mName, int(action));
-            return;
         }
+        output.unlock();
+        reorder.unlock();
+
+        outBuffer->meta()->setInt64("timeUs", entry.timestamp);
+        outBuffer->meta()->setInt32("flags", entry.flags);
+        ALOGV("[%s] sendOutputBuffers: out buffer index = %zu [%p] => %p + %zu (%lld)",
+                mName, index, outBuffer.get(), outBuffer->data(), outBuffer->size(),
+                (long long)entry.timestamp);
+        mCallback->onOutputBufferAvailable(index, outBuffer);
     }
 }
 
