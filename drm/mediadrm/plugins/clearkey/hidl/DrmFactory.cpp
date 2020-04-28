@@ -91,6 +91,19 @@ Return<void> DrmFactory::getSupportedCryptoSchemes(
     return Void();
 }
 
+Return<void> DrmFactory::debug(const hidl_handle& fd, const hidl_vec<hidl_string>& /*args*/) {
+    if (fd.getNativeHandle() == nullptr || fd->numFds < 1) {
+        ALOGE("%s: missing fd for writing", __FUNCTION__);
+        return Void();
+    }
+
+    FILE* out = fdopen(dup(fd->data[0]), "w");
+    uint32_t currentSessions = SessionLibrary::get()->numOpenSessions();
+    fprintf(out, "current open sessions: %u\n", currentSessions);
+    fclose(out);
+    return Void();
+}
+
 } // namespace clearkey
 } // namespace V1_3
 } // namespace drm
