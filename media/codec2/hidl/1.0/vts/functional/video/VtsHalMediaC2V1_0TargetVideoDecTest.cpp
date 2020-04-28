@@ -267,7 +267,7 @@ void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& 
 }
 
 // number of elementary streams per component
-#define STREAM_COUNT 2
+#define STREAM_COUNT 3
 // LookUpTable of clips and metadata for component testing
 void GetURLForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, char* info,
                         size_t streamIndex = 1) {
@@ -280,29 +280,31 @@ void GetURLForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, c
 
     static const CompToURL kCompToURL[] = {
             {Codec2VideoDecHidlTest::standardComp::avc,
-             {"bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_640x360_768kbps_30fps.h264"},
-             {"bbb_avc_176x144_300kbps_60fps.info", "bbb_avc_640x360_768kbps_30fps.info"}},
+             {"bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_640x360_768kbps_30fps.h264", ""},
+             {"bbb_avc_176x144_300kbps_60fps.info", "bbb_avc_640x360_768kbps_30fps.info", ""}},
             {Codec2VideoDecHidlTest::standardComp::hevc,
-             {"bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.hevc"},
-             {"bbb_hevc_176x144_176kbps_60fps.info", "bbb_hevc_640x360_1600kbps_30fps.info"}},
+             {"bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.hevc", ""},
+             {"bbb_hevc_176x144_176kbps_60fps.info", "bbb_hevc_640x360_1600kbps_30fps.info", ""}},
             {Codec2VideoDecHidlTest::standardComp::mpeg2,
-             {"bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_352x288_1mbps_60fps.m2v"},
-             {"bbb_mpeg2_176x144_105kbps_25fps.info", "bbb_mpeg2_352x288_1mbps_60fps.info"}},
+             {"bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_352x288_1mbps_60fps.m2v", ""},
+             {"bbb_mpeg2_176x144_105kbps_25fps.info", "bbb_mpeg2_352x288_1mbps_60fps.info", ""}},
             {Codec2VideoDecHidlTest::standardComp::h263,
-             {"", "bbb_h263_352x288_300kbps_12fps.h263"},
-             {"", "bbb_h263_352x288_300kbps_12fps.info"}},
+             {"", "bbb_h263_352x288_300kbps_12fps.h263", ""},
+             {"", "bbb_h263_352x288_300kbps_12fps.info", ""}},
             {Codec2VideoDecHidlTest::standardComp::mpeg4,
-             {"", "bbb_mpeg4_352x288_512kbps_30fps.m4v"},
-             {"", "bbb_mpeg4_352x288_512kbps_30fps.info"}},
+             {"", "bbb_mpeg4_352x288_512kbps_30fps.m4v", ""},
+             {"", "bbb_mpeg4_352x288_512kbps_30fps.info", ""}},
             {Codec2VideoDecHidlTest::standardComp::vp8,
-             {"bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_640x360_2mbps_30fps.vp8"},
-             {"bbb_vp8_176x144_240kbps_60fps.info", "bbb_vp8_640x360_2mbps_30fps.info"}},
+             {"bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", ""},
+             {"bbb_vp8_176x144_240kbps_60fps.info", "bbb_vp8_640x360_2mbps_30fps.info", ""}},
             {Codec2VideoDecHidlTest::standardComp::vp9,
-             {"bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9"},
-             {"bbb_vp9_176x144_285kbps_60fps.info", "bbb_vp9_640x360_1600kbps_30fps.info"}},
+             {"bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9",
+              "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9"},
+             {"bbb_vp9_176x144_285kbps_60fps.info", "bbb_vp9_640x360_1600kbps_30fps.info",
+              "bbb_vp9_704x480_280kbps_24fps_altref_2.info"}},
             {Codec2VideoDecHidlTest::standardComp::av1,
-             {"bbb_av1_640_360.av1", "bbb_av1_176_144.av1"},
-             {"bbb_av1_640_360.info", "bbb_av1_176_144.info"}},
+             {"bbb_av1_640_360.av1", "bbb_av1_176_144.av1", ""},
+             {"bbb_av1_640_360.info", "bbb_av1_176_144.info", ""}},
     };
 
     for (size_t i = 0; i < sizeof(kCompToURL) / sizeof(kCompToURL[0]); ++i) {
@@ -481,7 +483,9 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
         eleInfo >> flags;
         eleInfo >> timestamp;
         bool codecConfig = flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
-        if (mTimestampDevTest && !codecConfig) mTimestampUslist.push_back(timestamp);
+        bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
+        if (mTimestampDevTest && !codecConfig && !nonDisplayFrame)
+            mTimestampUslist.push_back(timestamp);
         Info.push_back({bytesCount, flags, timestamp});
     }
     eleInfo.close();
@@ -545,6 +549,10 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
         strcpy(mURL, sResourceDir.c_str());
         strcpy(info, sResourceDir.c_str());
         GetURLForComponent(mCompName, mURL, info, i % STREAM_COUNT);
+        if (!(strcmp(mURL, sResourceDir.c_str())) || !(strcmp(info, sResourceDir.c_str()))) {
+            ALOGV("Stream not available, skipping this index");
+            continue;
+        }
 
         eleInfo.open(info);
         ASSERT_EQ(eleInfo.is_open(), true) << mURL << " - file not found";
@@ -560,10 +568,12 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
             Info.push_back({bytesCount, flags, timestamp});
             bool codecConfig =
                     flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
+            bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
 
             {
                 ULock l(mQueueLock);
-                if (mTimestampDevTest && !codecConfig) mTimestampUslist.push_back(timestamp);
+                if (mTimestampDevTest && !codecConfig && !nonDisplayFrame)
+                    mTimestampUslist.push_back(timestamp);
             }
             if (timestampMax < timestamp) timestampMax = timestamp;
         }
@@ -903,6 +913,10 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "false"));
         kDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "true"));
+        kDecodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "2", "false"));
+        kDecodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "2", "true"));
     }
 
     // Set the resource directory based on command line args.
