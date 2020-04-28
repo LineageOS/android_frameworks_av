@@ -813,6 +813,42 @@ TEST(mediametrics_tests, audio_analytics_permission) {
   ASSERT_LT(9, audioAnalytics.dump(1000).second /* lines */);
 }
 
+TEST(mediametrics_tests, audio_analytics_permission2) {
+  constexpr int32_t transactionUid = 1010; // arbitrary
+  auto item = std::make_shared<mediametrics::Item>("audio.1");
+  (*item).set("one", (int32_t)1)
+         .set("two", (int32_t)2)
+         .set(AMEDIAMETRICS_PROP_ALLOWUID, transactionUid)
+         .setTimestamp(10);
+
+  // item2 submitted untrusted
+  auto item2 = std::make_shared<mediametrics::Item>("audio.1");
+  (*item2).set("three", (int32_t)3)
+         .setUid(transactionUid)
+         .setTimestamp(11);
+
+  auto item3 = std::make_shared<mediametrics::Item>("audio.2");
+  (*item3).set("four", (int32_t)4)
+          .setTimestamp(12);
+
+  android::mediametrics::AudioAnalytics audioAnalytics;
+
+  // untrusted entities cannot create a new key.
+  ASSERT_EQ(PERMISSION_DENIED, audioAnalytics.submit(item, false /* isTrusted */));
+  ASSERT_EQ(PERMISSION_DENIED, audioAnalytics.submit(item2, false /* isTrusted */));
+
+  // TODO: Verify contents of AudioAnalytics.
+  // Currently there is no getter API in AudioAnalytics besides dump.
+  ASSERT_EQ(9, audioAnalytics.dump(1000).second /* lines */);
+
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
+  // untrusted entities can add to an existing key
+  ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item2, false /* isTrusted */));
+
+  // Check that we have some info in the dump.
+  ASSERT_LT(9, audioAnalytics.dump(1000).second /* lines */);
+}
+
 TEST(mediametrics_tests, audio_analytics_dump) {
   auto item = std::make_shared<mediametrics::Item>("audio.1");
   (*item).set("one", (int32_t)1)

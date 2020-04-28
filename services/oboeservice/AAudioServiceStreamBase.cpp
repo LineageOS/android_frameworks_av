@@ -105,6 +105,7 @@ void AAudioServiceStreamBase::logOpen(aaudio_handle_t streamHandle) {
     mediametrics::LogItem(mMetricsId)
         .setPid(getOwnerProcessId())
         .setUid(getOwnerUserId())
+        .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)getOwnerUserId())
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN)
         // the following are immutable
         .set(AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, (int32_t)getBufferCapacity())
