@@ -837,7 +837,7 @@ private:
                 audio_output_flags_t *flags,
                 audio_port_handle_t *selectedDeviceId,
                 bool *isRequestedDeviceForExclusiveUse,
-                std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs,
+                std::vector<sp<AudioPolicyMix>> *secondaryMixes,
                 output_type_t *outputType);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevices(
@@ -848,6 +848,16 @@ private:
                 audio_output_flags_t *flags,
                 bool forceMutingHaptic = false);
 
+        // Internal method checking if a direct output can be opened matching the requested
+        // attributes, flags, config and devices.
+        // If NAME_NOT_FOUND is returned, an attempt can be made to open a mixed output.
+        status_t openDirectOutput(
+                audio_stream_type_t stream,
+                audio_session_t session,
+                const audio_config_t *config,
+                audio_output_flags_t flags,
+                const DeviceVector &devices,
+                audio_io_handle_t *output);
         /**
          * @brief getInputForDevice selects an input handle for a given input device and
          * requester context
@@ -926,6 +936,12 @@ private:
                 int delayMs,
                 uid_t uid,
                 sp<AudioPatch> *patchDescPtr);
+
+        bool areAllDevicesSupported(
+                const Vector<AudioDeviceTypeAddr>& devices,
+                std::function<bool(audio_devices_t)> predicate,
+                const char* context);
+
 };
 
 };
