@@ -605,6 +605,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mediametrics::LogItem(mMetricsId)
         .setPid(creatorPid)
         .setUid(uid)
+        .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)uid)
         .set(AMEDIAMETRICS_PROP_EVENT,
                 AMEDIAMETRICS_PROP_PREFIX_SERVER AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
         .record();
@@ -2165,6 +2166,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
     mediametrics::LogItem(mMetricsId)
         .setPid(creatorPid)
         .setUid(uid)
+        .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)uid)
         .set(AMEDIAMETRICS_PROP_EVENT, "server." AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
         .record();
 }
