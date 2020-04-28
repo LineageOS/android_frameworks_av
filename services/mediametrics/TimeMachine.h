@@ -75,21 +75,30 @@ private:
     class KeyHistory  {
     public:
         template <typename T>
-        KeyHistory(T key, pid_t pid, uid_t uid, int64_t time)
+        KeyHistory(T key, uid_t allowUid, int64_t time)
             : mKey(key)
-            , mPid(pid)
-            , mUid(uid)
+            , mAllowUid(allowUid)
             , mCreationTime(time)
             , mLastModificationTime(time)
         {
-            putValue(BUNDLE_PID, (int32_t)pid, time);
-            putValue(BUNDLE_UID, (int32_t)uid, time);
+            // allowUid allows an untrusted client with a matching uid to set properties
+            // in this key.
+            // If allowUid == (uid_t)-1, no untrusted client may set properties in the key.
+            if (allowUid != (uid_t)-1) {
+                // Set ALLOWUID property here; does not change after key creation.
+                putValue(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)allowUid, time);
+            }
         }
 
         KeyHistory(const KeyHistory &other) = default;
 
+        // Return NO_ERROR only if the passed in uidCheck is -1 or matches
+        // the internal mAllowUid.
+        // An external submit will always have a valid uidCheck parameter.
+        // An internal get request within mediametrics will have a uidCheck == -1 which
+        // we allow to proceed.
         status_t checkPermission(uid_t uidCheck) const {
-            return uidCheck != (uid_t)-1 && uidCheck != mUid ? PERMISSION_DENIED : NO_ERROR;
+            return uidCheck != (uid_t)-1 && uidCheck != mAllowUid ? PERMISSION_DENIED : NO_ERROR;
         }
 
         template <typename T>
@@ -199,8 +208,7 @@ private:
         }
 
         const std::string mKey;
-        const pid_t mPid __unused;
-        const uid_t mUid;
+        const uid_t mAllowUid;
         const int64_t mCreationTime __unused;
 
         int64_t mLastModificationTime;
@@ -276,10 +284,13 @@ public:
 
                 (void)gc(garbage);
 
+                // We set the allowUid for client access on key creation.
+                int32_t allowUid = -1;
+                (void)item->get(AMEDIAMETRICS_PROP_ALLOWUID, &allowUid);
                 // no keylock needed here as we are sole owner
                 // until placed on mHistory.
                 keyHistory = std::make_shared<KeyHistory>(
-                    key, item->getPid(), item->getUid(), time);
+                    key, allowUid, time);
                 mHistory[key] = keyHistory;
             } else {
                 keyHistory = it->second;
