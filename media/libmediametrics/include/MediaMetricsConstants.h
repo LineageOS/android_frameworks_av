@@ -86,6 +86,7 @@
 // of suppressed in the Time Machine.
 #define AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED '#'
 
+#define AMEDIAMETRICS_PROP_ALLOWUID       "_allowUid"      // int32_t, allow client uid to post
 #define AMEDIAMETRICS_PROP_AUXEFFECTID    "auxEffectId"    // int32 (AudioTrack)
 #define AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES "bufferSizeFrames" // int32
 #define AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES "bufferCapacityFrames" // int32
@@ -133,8 +134,6 @@
 #define AMEDIAMETRICS_PROP_VOLUME_RIGHT   "volume.right"   // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_WHERE          "where"          // string value
 
-#define AMEDIAMETRICS_PROP_VALUE_UNKNOWN  "unknown"         // string for callerName
-
 // Timing values: millisecond values are suffixed with MS and the type is double
 // nanosecond values are suffixed with NS and the type is int64.
 
@@ -158,5 +157,17 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_STOP       "stop"   // AudioTrack, AudioRecord
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN   "underrun" // from Thread
+
+// Possible values for AMEDIAMETRICS_PROP_CALLERNAME
+// Check within the framework for these strings as this header file may not be explicitly
+// included to avoid unnecessary cross-project dependencies.
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_AAUDIO        "aaudio"         // Native AAudio
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_JAVA          "java"           // Java API layer
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA         "media"          // libmedia
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_OPENSLES      "opensles"       // Open SLES
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_RTP           "rtp"            // RTP communication
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_SOUNDPOOL     "soundpool"      // SoundPool
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_TONEGENERATOR "tonegenerator"  // dial tones
+#define AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN       "unknown"        // callerName not set
 
 #endif // ANDROID_MEDIA_MEDIAMETRICSCONSTANTS_H
