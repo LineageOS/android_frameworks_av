@@ -99,7 +99,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
     int32_t jobId = mNextJobId.fetch_add(1);
 
     *_aidl_return =
-            mOwner->mJobScheduler->submit(mClientId, jobId, mClientPid, in_request,
+            mOwner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request,
                                           ITranscodingClientCallback::fromBinder(mClientCallback));
 
     if (*_aidl_return) {

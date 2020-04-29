@@ -31,7 +31,7 @@ using ClientIdType = int64_t;
 // the status of a job.
 class SchedulerClientInterface {
 public:
-    virtual bool submit(ClientIdType clientId, int32_t jobId, pid_t pid,
+    virtual bool submit(ClientIdType clientId, int32_t jobId, uid_t uid,
                         const TranscodingRequestParcel& request,
                         const std::weak_ptr<ITranscodingClientCallback>& clientCallback) = 0;
 

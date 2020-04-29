@@ -120,7 +120,7 @@ struct TestScheduler : public SchedulerClientInterface {
 
     virtual ~TestScheduler() { ALOGI("TestScheduler Destroyed"); }
 
-    bool submit(int64_t clientId, int32_t jobId, pid_t /*pid*/,
+    bool submit(int64_t clientId, int32_t jobId, uid_t /*uid*/,
                 const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override {
         JobKeyType jobKey = std::make_pair(clientId, jobId);
