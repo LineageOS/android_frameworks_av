@@ -72,8 +72,8 @@ public:
      */
     status_t getOutputForAttr(const audio_attributes_t& attributes, uid_t uid,
                               audio_output_flags_t flags,
-                              sp<SwAudioOutputDescriptor> &primaryDesc,
-                              std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs);
+                              sp<AudioPolicyMix> &primaryMix,
+                              std::vector<sp<AudioPolicyMix>> *secondaryMixes);
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
