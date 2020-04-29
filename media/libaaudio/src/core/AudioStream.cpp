@@ -106,21 +106,23 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 }
 
 void AudioStream::logOpen() {
-    LOG_ALWAYS_FATAL_IF(mMetricsId.size() == 0, "mMetricsId is empty!");
-    android::mediametrics::LogItem(mMetricsId)
-            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
-                    AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
-            .set(AMEDIAMETRICS_PROP_SHARINGMODE,
-                    AudioGlobal_convertSharingModeToText(getSharingMode()))
-            .record();
+    if (mMetricsId.size() > 0) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+                     AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+                .set(AMEDIAMETRICS_PROP_SHARINGMODE,
+                     AudioGlobal_convertSharingModeToText(getSharingMode()))
+                .record();
+    }
 }
 
 void AudioStream::logBufferState() {
-    LOG_ALWAYS_FATAL_IF(mMetricsId.size() == 0, "mMetricsId is empty!");
-    android::mediametrics::LogItem(mMetricsId)
-            .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t) getBufferSize())
-            .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getXRunCount())
-            .record();
+    if (mMetricsId.size() > 0) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t) getBufferSize())
+                .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getXRunCount())
+                .record();
+    }
 }
 
 aaudio_result_t AudioStream::systemStart() {
