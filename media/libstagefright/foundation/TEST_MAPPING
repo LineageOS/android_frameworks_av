@@ -1,6 +1,9 @@
 // mappings for frameworks/av/media/libstagefright/foundation
 {
   "presubmit": [
+    // b/148094059: unit tests not allowed to download content
+    //{ "name": "OpusHeaderTest" },
+
     { "name": "sf_foundation_test" },
     { "name": "MetaDataBaseUnitTest"}
   ]

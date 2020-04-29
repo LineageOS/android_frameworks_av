@@ -1,0 +1,7 @@
+// mappings for frameworks/av/media/libstagefright/timedtext
+{
+  "presubmit": [
+    // b/148094059: unit tests not allowed to download content
+    //{ "name": "TimedTextUnitTest" }
+  ]
+}

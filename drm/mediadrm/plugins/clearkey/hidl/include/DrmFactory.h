@@ -30,6 +30,7 @@ namespace clearkey {
 
 using ::android::hardware::drm::V1_1::SecurityLevel;
 using ::android::hardware::hidl_array;
+using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
 
@@ -54,6 +55,8 @@ struct DrmFactory : public IDrmFactory {
 
     Return<void> getSupportedCryptoSchemes(
             getSupportedCryptoSchemes_cb _hidl_cb) override;
+
+    Return<void> debug(const hidl_handle& fd, const hidl_vec<hidl_string>& args);
 
 private:
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN(DrmFactory);
