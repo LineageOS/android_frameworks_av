@@ -16,7 +16,6 @@ cc_library_shared {
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "libbase",
-        "libandroid",
         "libandroid_net",
         "libaudioclient",
         "libbinder",
