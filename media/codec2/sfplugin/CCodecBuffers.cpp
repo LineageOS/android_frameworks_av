@@ -23,6 +23,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/SkipCutBuffer.h>
+#include <mediadrm/ICrypto.h>
 
 #include "CCodecBuffers.h"
 
@@ -121,6 +122,11 @@ sp<Codec2Buffer> InputBuffers::cloneAndReleaseBuffer(const sp<MediaCodecBuffer> 
 
 // OutputBuffers
 
+OutputBuffers::OutputBuffers(const char *componentName, const char *name)
+    : CCodecBuffers(componentName, name) { }
+
+OutputBuffers::~OutputBuffers() = default;
+
 void OutputBuffers::initSkipCutBuffer(
         int32_t delay, int32_t padding, int32_t sampleRate, int32_t channelCount) {
     CHECK(mSkipCutBuffer == nullptr);
@@ -171,8 +177,11 @@ void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut) {
 
 // LocalBufferPool
 
-std::shared_ptr<LocalBufferPool> LocalBufferPool::Create(size_t poolCapacity) {
-    return std::shared_ptr<LocalBufferPool>(new LocalBufferPool(poolCapacity));
+constexpr size_t kInitialPoolCapacity = kMaxLinearBufferSize;
+constexpr size_t kMaxPoolCapacity = kMaxLinearBufferSize * 32;
+
+std::shared_ptr<LocalBufferPool> LocalBufferPool::Create() {
+    return std::shared_ptr<LocalBufferPool>(new LocalBufferPool(kInitialPoolCapacity));
 }
 
 sp<ABuffer> LocalBufferPool::newBuffer(size_t capacity) {
@@ -191,6 +200,11 @@ sp<ABuffer> LocalBufferPool::newBuffer(size_t capacity) {
         while (!mPool.empty()) {
             mUsedSize -= mPool.back().capacity();
             mPool.pop_back();
+        }
+        while (mUsedSize + capacity > mPoolCapacity && mPoolCapacity * 2 <= kMaxPoolCapacity) {
+            ALOGD("Increasing local buffer pool capacity from %zu to %zu",
+                  mPoolCapacity, mPoolCapacity * 2);
+            mPoolCapacity *= 2;
         }
         if (mUsedSize + capacity > mPoolCapacity) {
             ALOGD("mUsedSize = %zu, capacity = %zu, mPoolCapacity = %zu",
@@ -777,11 +791,10 @@ sp<Codec2Buffer> GraphicMetadataInputBuffers::createNewBuffer() {
 // GraphicInputBuffers
 
 GraphicInputBuffers::GraphicInputBuffers(
-        size_t numInputSlots, const char *componentName, const char *name)
+        const char *componentName, const char *name)
     : InputBuffers(componentName, name),
       mImpl(mName),
-      mLocalBufferPool(LocalBufferPool::Create(
-              kMaxLinearBufferSize * numInputSlots)) { }
+      mLocalBufferPool(LocalBufferPool::Create()) { }
 
 bool GraphicInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
     sp<Codec2Buffer> newBuffer = createNewBuffer();
@@ -942,7 +955,7 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
         case C2BufferData::GRAPHIC: {
             // This is only called for RawGraphicOutputBuffers.
             mAlloc = [format = mFormat,
-                      lbp = LocalBufferPool::Create(kMaxLinearBufferSize * mImpl.arraySize())] {
+                      lbp = LocalBufferPool::Create()] {
                 return ConstGraphicBlockBuffer::AllocateEmpty(
                         format,
                         [lbp](size_t capacity) {
@@ -1079,10 +1092,9 @@ std::function<sp<Codec2Buffer>()> GraphicOutputBuffers::getAlloc() {
 // RawGraphicOutputBuffers
 
 RawGraphicOutputBuffers::RawGraphicOutputBuffers(
-        size_t numOutputSlots, const char *componentName, const char *name)
+        const char *componentName, const char *name)
     : FlexOutputBuffers(componentName, name),
-      mLocalBufferPool(LocalBufferPool::Create(
-              kMaxLinearBufferSize * numOutputSlots)) { }
+      mLocalBufferPool(LocalBufferPool::Create()) { }
 
 sp<Codec2Buffer> RawGraphicOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &buffer) {
     if (buffer == nullptr) {
