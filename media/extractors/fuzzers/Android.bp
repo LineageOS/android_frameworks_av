@@ -202,6 +202,88 @@ cc_fuzz {
 }
 
 cc_fuzz {
+    name: "mpeg2ps_extractor_fuzzer",
+
+    srcs: [
+        "mpeg2_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/mpeg2",
+        "frameworks/av/media/libstagefright",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation_without_imemory",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libstagefright_mpeg2support",
+        "libstagefright_mpeg2extractor",
+        "libstagefright_esds",
+        "libmpeg2extractor",
+    ],
+
+    cflags: [
+        "-DMPEG2PS",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
+        "android.hidl.token@1.0-utils",
+        "android.hidl.allocator@1.0",
+        "libcrypto",
+        "libhidlmemory",
+        "libhidlbase",
+    ],
+
+    dictionary: "mpeg2ps_extractor_fuzzer.dict",
+}
+
+cc_fuzz {
+    name: "mpeg2ts_extractor_fuzzer",
+
+    srcs: [
+        "mpeg2_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/mpeg2",
+        "frameworks/av/media/libstagefright",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation_without_imemory",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libstagefright_mpeg2support",
+        "libstagefright_mpeg2extractor",
+        "libstagefright_esds",
+        "libmpeg2extractor",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
+        "android.hidl.token@1.0-utils",
+        "android.hidl.allocator@1.0",
+        "libcrypto",
+        "libhidlmemory",
+        "libhidlbase",
+    ],
+
+    dictionary: "mpeg2ts_extractor_fuzzer.dict",
+}
+
+cc_fuzz {
     name: "mp3_extractor_fuzzer",
 
     srcs: [
