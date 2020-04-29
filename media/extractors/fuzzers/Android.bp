@@ -172,6 +172,36 @@ cc_fuzz {
 }
 
 cc_fuzz {
+    name: "ogg_extractor_fuzzer",
+
+    srcs: [
+        "ogg_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/ogg",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libstagefright_metadatautils",
+        "libvorbisidec",
+        "liboggextractor",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+
+    dictionary: "ogg_extractor_fuzzer.dict",
+}
+
+cc_fuzz {
     name: "mp3_extractor_fuzzer",
 
     srcs: [

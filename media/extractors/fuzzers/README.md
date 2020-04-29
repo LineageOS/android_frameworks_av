@@ -6,6 +6,7 @@
 + [libwavextractor](#wavExtractorFuzzer)
 + [libamrextractor](#amrExtractorFuzzer)
 + [libmkvextractor](#mkvExtractorFuzzer)
++ [liboggextractor](#oggExtractorFuzzer)
 + [libmp3extractor](#mp3ExtractorFuzzer)
 + [libaacextractor](#aacExtractorFuzzer)
 
@@ -149,6 +150,40 @@ To run on device
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/mkv_extractor_fuzzer/mkv_extractor_fuzzer CORPUS_DIR
+```
+
+# <a name="oggExtractorFuzzer"></a> Fuzzer for liboggextractor
+
+## Plugin Design Considerations
+The fuzzer plugin for OGG extractor uses the `ExtractorFuzzerBase` class and
+implements only the `createExtractor` to create the OGG extractor object.
+
+##### Maximize code coverage
+Dict file (dictionary file) is created for OGG to ensure that the required start
+bytes are present in every input file that goes to the fuzzer.
+This ensures that larger code gets covered.
+
+
+## Build
+
+This describes steps to build ogg_extractor_fuzzer binary.
+
+### Android
+
+#### Steps to build
+Build the fuzzer
+```
+  $ mm -j$(nproc) ogg_extractor_fuzzer
+```
+
+#### Steps to run
+Create a directory CORPUS_DIR and copy some ogg files to that folder.
+Push this directory to device.
+
+To run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/ogg_extractor_fuzzer/ogg_extractor_fuzzer CORPUS_DIR
 ```
 
 # <a name="mp3ExtractorFuzzer"></a> Fuzzer for libmp3extractor
