@@ -140,6 +140,38 @@ cc_fuzz {
 }
 
 cc_fuzz {
+    name: "mkv_extractor_fuzzer",
+
+    srcs: [
+        "mkv_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/mkv",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libwebm",
+        "libstagefright_flacdec",
+        "libstagefright_metadatautils",
+        "libmkvextractor",
+        "libFLAC",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+    ],
+
+    dictionary: "mkv_extractor_fuzzer.dict",
+}
+
+cc_fuzz {
     name: "mp3_extractor_fuzzer",
 
     srcs: [

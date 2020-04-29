@@ -5,6 +5,7 @@
 + [libmp4extractor](#mp4ExtractorFuzzer)
 + [libwavextractor](#wavExtractorFuzzer)
 + [libamrextractor](#amrExtractorFuzzer)
++ [libmkvextractor](#mkvExtractorFuzzer)
 + [libmp3extractor](#mp3ExtractorFuzzer)
 + [libaacextractor](#aacExtractorFuzzer)
 
@@ -114,6 +115,40 @@ To run on device
 ```
   $ adb sync data
   $ adb shell /data/fuzz/arm64/amr_extractor_fuzzer/amr_extractor_fuzzer CORPUS_DIR
+```
+
+# <a name="mkvExtractorFuzzer"></a> Fuzzer for libmkvextractor
+
+## Plugin Design Considerations
+The fuzzer plugin for MKV extractor uses the `ExtractorFuzzerBase` class and
+implements only the `createExtractor` to create the MKV extractor class.
+
+##### Maximize code coverage
+Dict file (dictionary file) is created for MKV to ensure that the required element
+ID's are present in every input file that goes to the fuzzer.
+This ensures that larger code gets covered.
+
+
+## Build
+
+This describes steps to build mkv_extractor_fuzzer binary.
+
+### Android
+
+#### Steps to build
+Build the fuzzer
+```
+  $ mm -j$(nproc) mkv_extractor_fuzzer
+```
+
+#### Steps to run
+Create a directory CORPUS_DIR and copy some mkv files to that folder.
+Push this directory to device.
+
+To run on device
+```
+  $ adb sync data
+  $ adb shell /data/fuzz/arm64/mkv_extractor_fuzzer/mkv_extractor_fuzzer CORPUS_DIR
 ```
 
 # <a name="mp3ExtractorFuzzer"></a> Fuzzer for libmp3extractor
