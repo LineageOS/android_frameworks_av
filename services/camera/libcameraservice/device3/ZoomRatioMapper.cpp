@@ -243,10 +243,15 @@ status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, b
             if (weight == 0) {
                 continue;
             }
-            // Top-left is inclusively clamped
-            scaleCoordinates(entry.data.i32 + j, 1, zoomRatio, ClampInclusive);
-            // Bottom-right is exclusively clamped
-            scaleCoordinates(entry.data.i32 + j + 2, 1, zoomRatio, ClampExclusive);
+            // Top left (inclusive)
+            scaleCoordinates(entry.data.i32 + j, 1, zoomRatio, true /*clamp*/);
+            // Bottom right (exclusive): Use adjacent inclusive pixel to
+            // calculate.
+            entry.data.i32[j+2] -= 1;
+            entry.data.i32[j+3] -= 1;
+            scaleCoordinates(entry.data.i32 + j + 2, 1, zoomRatio, true /*clamp*/);
+            entry.data.i32[j+2] += 1;
+            entry.data.i32[j+3] += 1;
         }
     }
 
@@ -258,7 +263,7 @@ status_t ZoomRatioMapper::separateZoomFromCropLocked(CameraMetadata* metadata, b
     if (isResult) {
         for (auto pts : kResultPointsToCorrectNoClamp) {
             entry = metadata->find(pts);
-            scaleCoordinates(entry.data.i32, entry.count / 2, zoomRatio, ClampOff);
+            scaleCoordinates(entry.data.i32, entry.count / 2, zoomRatio, false /*clamp*/);
         }
     }
 
@@ -282,10 +287,15 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
             if (weight == 0) {
                 continue;
             }
-            // Top-left is inclusively clamped
-            scaleCoordinates(entry.data.i32 + j, 1, 1.0 / zoomRatio, ClampInclusive);
-            // Bottom-right is exclusively clamped
-            scaleCoordinates(entry.data.i32 + j + 2, 1, 1.0 / zoomRatio, ClampExclusive);
+            // Top-left (inclusive)
+            scaleCoordinates(entry.data.i32 + j, 1, 1.0 / zoomRatio, true /*clamp*/);
+            // Bottom-right (exclusive): Use adjacent inclusive pixel to
+            // calculate.
+            entry.data.i32[j+2] -= 1;
+            entry.data.i32[j+3] -= 1;
+            scaleCoordinates(entry.data.i32 + j + 2, 1, 1.0 / zoomRatio, true /*clamp*/);
+            entry.data.i32[j+2] += 1;
+            entry.data.i32[j+3] += 1;
         }
     }
     for (auto rect : kRectsToCorrect) {
@@ -295,7 +305,7 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
     if (isResult) {
         for (auto pts : kResultPointsToCorrectNoClamp) {
             entry = metadata->find(pts);
-            scaleCoordinates(entry.data.i32, entry.count / 2, 1.0 / zoomRatio, ClampOff);
+            scaleCoordinates(entry.data.i32, entry.count / 2, 1.0 / zoomRatio, false /*clamp*/);
         }
     }
 
@@ -309,28 +319,31 @@ status_t ZoomRatioMapper::combineZoomAndCropLocked(CameraMetadata* metadata, boo
 }
 
 void ZoomRatioMapper::scaleCoordinates(int32_t* coordPairs, int coordCount,
-        float scaleRatio, ClampMode clamp) {
+        float scaleRatio, bool clamp) {
+    // A pixel's coordinate is represented by the position of its top-left corner.
+    // To avoid the rounding error, we use the coordinate for the center of the
+    // pixel instead:
+    // 1. First shift the coordinate system half pixel both horizontally and
+    // vertically, so that [x, y] is the center of the pixel, not the top-left corner.
+    // 2. Do zoom operation to scale the coordinate relative to the center of
+    // the active array (shifted by 0.5 pixel as well).
+    // 3. Shift the coordinate system back by directly using the pixel center
+    // coordinate.
     for (int i = 0; i < coordCount * 2; i += 2) {
         float x = coordPairs[i];
         float y = coordPairs[i + 1];
-        float xCentered = x - mArrayWidth / 2;
-        float yCentered = y - mArrayHeight / 2;
+        float xCentered = x - (mArrayWidth - 2) / 2;
+        float yCentered = y - (mArrayHeight - 2) / 2;
         float scaledX = xCentered * scaleRatio;
         float scaledY = yCentered * scaleRatio;
-        scaledX += mArrayWidth / 2;
-        scaledY += mArrayHeight / 2;
+        scaledX += (mArrayWidth - 2) / 2;
+        scaledY += (mArrayHeight - 2) / 2;
+        coordPairs[i] = static_cast<int32_t>(std::round(scaledX));
+        coordPairs[i+1] = static_cast<int32_t>(std::round(scaledY));
         // Clamp to within activeArray/preCorrectionActiveArray
-        coordPairs[i] = static_cast<int32_t>(scaledX);
-        coordPairs[i+1] = static_cast<int32_t>(scaledY);
-        if (clamp != ClampOff) {
-            int32_t right, bottom;
-            if (clamp == ClampInclusive) {
-                right = mArrayWidth - 1;
-                bottom = mArrayHeight - 1;
-            } else {
-                right = mArrayWidth;
-                bottom = mArrayHeight;
-            }
+        if (clamp) {
+            int32_t right = mArrayWidth - 1;
+            int32_t bottom = mArrayHeight - 1;
             coordPairs[i] =
                     std::min(right, std::max(0, coordPairs[i]));
             coordPairs[i+1] =
@@ -343,25 +356,25 @@ void ZoomRatioMapper::scaleCoordinates(int32_t* coordPairs, int coordCount,
 void ZoomRatioMapper::scaleRects(int32_t* rects, int rectCount,
         float scaleRatio) {
     for (int i = 0; i < rectCount * 4; i += 4) {
-        // Map from (l, t, width, height) to (l, t, r, b).
-        // [l, t] is inclusive, and [r, b] is exclusive.
+        // Map from (l, t, width, height) to (l, t, l+width-1, t+height-1),
+        // where both top-left and bottom-right are inclusive.
         int32_t coords[4] = {
             rects[i],
             rects[i + 1],
-            rects[i] + rects[i + 2],
-            rects[i + 1] + rects[i + 3]
+            rects[i] + rects[i + 2] - 1,
+            rects[i + 1] + rects[i + 3] - 1
         };
 
         // top-left
-        scaleCoordinates(coords, 1, scaleRatio, ClampInclusive);
+        scaleCoordinates(coords, 1, scaleRatio, true /*clamp*/);
         // bottom-right
-        scaleCoordinates(coords+2, 1, scaleRatio, ClampExclusive);
+        scaleCoordinates(coords+2, 1, scaleRatio, true /*clamp*/);
 
         // Map back to (l, t, width, height)
         rects[i] = coords[0];
         rects[i + 1] = coords[1];
-        rects[i + 2] = coords[2] - coords[0];
-        rects[i + 3] = coords[3] - coords[1];
+        rects[i + 2] = coords[2] - coords[0] + 1;
+        rects[i + 3] = coords[3] - coords[1] + 1;
     }
 }
 
