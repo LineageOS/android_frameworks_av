@@ -31,7 +31,7 @@ using ::aidl::android::media::TranscodingRequestParcel;
 class TranscodingClientManager;
 class TranscodingJobScheduler;
 class TranscoderInterface;
-class ProcessInfoInterface;
+class UidPolicyInterface;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
@@ -40,7 +40,7 @@ public:
 
     MediaTranscodingService();
     MediaTranscodingService(const std::shared_ptr<TranscoderInterface>& transcoder,
-                            const std::shared_ptr<ProcessInfoInterface>& procInfo);
+                            const std::shared_ptr<UidPolicyInterface>& uidPolicy);
     virtual ~MediaTranscodingService();
 
     static void instantiate();
