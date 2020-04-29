@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-// #define LOG_NDEBUG 0
+//#define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingUidPolicy"
 
 #include <binder/ActivityManager.h>
@@ -224,8 +224,9 @@ void TranscodingUidPolicy::onUidStateChanged(uid_t uid, int32_t procState) {
 }
 
 void TranscodingUidPolicy::updateTopUid_l() {
-    // Update top uid state.
     mTopUidState = ActivityManager::PROCESS_STATE_UNKNOWN;
+
+    // Find the lowest uid state (ignoring PROCESS_STATE_UNKNOWN) with some monitored uids.
     for (auto stateIt = mStateUidMap.begin(); stateIt != mStateUidMap.end(); stateIt++) {
         if (stateIt->first != ActivityManager::PROCESS_STATE_UNKNOWN && !stateIt->second.empty()) {
             mTopUidState = stateIt->first;

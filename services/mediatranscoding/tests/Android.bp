@@ -19,6 +19,7 @@ cc_defaults {
         "liblog",
         "libutils",
         "libmediatranscodingservice",
+        "libcutils",
     ],
 
     static_libs: [
@@ -32,4 +33,10 @@ cc_test {
     defaults: ["mediatranscodingservice_test_defaults"],
 
     srcs: ["mediatranscodingservice_tests.cpp"],
+
+    required: [
+        ":TranscodingUidPolicy_TestAppA",
+        ":TranscodingUidPolicy_TestAppB",
+        ":TranscodingUidPolicy_TestAppC",
+    ],
 }

@@ -27,6 +27,8 @@
 #include <utils/Log.h>
 #include <utils/Vector.h>
 
+#include "SimulatedTranscoder.h"
+
 namespace android {
 
 // Convenience methods for constructing binder::Status objects for error returns
@@ -49,26 +51,8 @@ static bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
-// DummyTranscoder is currently used to instantiate MediaTranscodingService on
-// service side for testing, so that we could actually test the IPC calls of
-// MediaTranscodingService to expose some issues that's observable only over IPC.
-class DummyTranscoder : public TranscoderInterface {
-    void start(int64_t clientId, int32_t jobId) override {
-        (void)clientId;
-        (void)jobId;
-    }
-    void pause(int64_t clientId, int32_t jobId) override {
-        (void)clientId;
-        (void)jobId;
-    }
-    void resume(int64_t clientId, int32_t jobId) override {
-        (void)clientId;
-        (void)jobId;
-    }
-};
-
 MediaTranscodingService::MediaTranscodingService()
-      : MediaTranscodingService(std::make_shared<DummyTranscoder>(),
+      : MediaTranscodingService(std::make_shared<SimulatedTranscoder>(),
                                 std::make_shared<TranscodingUidPolicy>()) {}
 
 MediaTranscodingService::MediaTranscodingService(
@@ -77,6 +61,8 @@ MediaTranscodingService::MediaTranscodingService(
       : mJobScheduler(new TranscodingJobScheduler(transcoder, uidPolicy)),
         mClientManager(new TranscodingClientManager(mJobScheduler)) {
     ALOGV("MediaTranscodingService is created");
+
+    transcoder->setCallback(mJobScheduler);
     uidPolicy->setCallback(mJobScheduler);
 }
 

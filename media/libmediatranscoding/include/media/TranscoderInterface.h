@@ -22,12 +22,14 @@
 namespace android {
 
 using ::aidl::android::media::TranscodingErrorCode;
+class TranscoderCallbackInterface;
 
 // Interface for the scheduler to call the transcoder to take actions.
 class TranscoderInterface {
 public:
     // TODO(chz): determine what parameters are needed here.
     // For now, always pass in clientId&jobId.
+    virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) = 0;
     virtual void start(int64_t clientId, int32_t jobId) = 0;
     virtual void pause(int64_t clientId, int32_t jobId) = 0;
     virtual void resume(int64_t clientId, int32_t jobId) = 0;
