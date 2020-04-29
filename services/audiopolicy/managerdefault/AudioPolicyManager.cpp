@@ -3072,7 +3072,7 @@ bool  AudioPolicyManager::areAllDevicesSupported(
     for (size_t i = 0; i < devices.size(); i++) {
         sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
                 devices[i].mType, devices[i].mAddress.c_str(), String8(),
-                AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, false /*matchAddress*/);
+                AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, true /*matchAddress*/);
         if (devDesc == nullptr || (predicate != nullptr && !predicate(devices[i].mType))) {
             ALOGE("%s: device type %#x address %s not supported or not an output device",
                     context, devices[i].mType, devices[i].mAddress.c_str());
@@ -4837,7 +4837,7 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
 
                 if (output != AUDIO_IO_HANDLE_NONE) {
                     addOutput(output, desc);
-                    if (device_distinguishes_on_address(deviceType) && address != "0") {
+                    if (audio_is_remote_submix_device(deviceType) && address != "0") {
                         sp<AudioPolicyMix> policyMix;
                         if (mPolicyMixes.getAudioPolicyMix(deviceType, address, policyMix)
                                 == NO_ERROR) {
