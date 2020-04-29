@@ -18,6 +18,8 @@
 #define LOG_TAG "Codec2Buffer"
 #include <utils/Log.h>
 
+#include <android/hardware/cas/native/1.0/types.h>
+#include <android/hardware/drm/1.0/types.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/HardwareAPI.h>
 #include <media/stagefright/CodecBase.h>
@@ -25,6 +27,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <mediadrm/ICrypto.h>
 #include <nativebase/nativebase.h>
 #include <ui/Fence.h>
 
