@@ -744,6 +744,7 @@ constexpr char KEY_AAC_ENCODED_TARGET_LEVEL[] = "aac-encoded-target-level";
 constexpr char KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT[] = "aac-max-output-channel_count";
 constexpr char KEY_AAC_PROFILE[] = "aac-profile";
 constexpr char KEY_AAC_SBR_MODE[] = "aac-sbr-mode";
+constexpr char KEY_ALLOW_FRAME_DROP[] = "allow-frame-drop";
 constexpr char KEY_AUDIO_SESSION_ID[] = "audio-session-id";
 constexpr char KEY_BIT_RATE[] = "bitrate";
 constexpr char KEY_BITRATE_MODE[] = "bitrate-mode";

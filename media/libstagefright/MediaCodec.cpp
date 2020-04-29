@@ -56,6 +56,7 @@
 #include <media/stagefright/CCodec.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecList.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MediaFilter.h>
@@ -2263,7 +2264,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mSurface != nullptr && !mAllowFrameDroppingBySurface) {
                         // signal frame dropping mode in the input format as this may also be
                         // meaningful and confusing for an encoder in a transcoder scenario
-                        mInputFormat->setInt32("allow-frame-drop", mAllowFrameDroppingBySurface);
+                        mInputFormat->setInt32(KEY_ALLOW_FRAME_DROP, mAllowFrameDroppingBySurface);
                     }
                     ALOGV("[%s] configured as input format: %s, output format: %s",
                             mComponentName.c_str(),
@@ -2720,7 +2721,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             if (obj != NULL) {
-                if (!format->findInt32("allow-frame-drop", &mAllowFrameDroppingBySurface)) {
+                if (!format->findInt32(KEY_ALLOW_FRAME_DROP, &mAllowFrameDroppingBySurface)) {
                     // allow frame dropping by surface by default
                     mAllowFrameDroppingBySurface = true;
                 }
