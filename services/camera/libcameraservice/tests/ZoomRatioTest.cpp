@@ -171,35 +171,35 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
 
     std::array<int32_t, 16> originalCoords = {
             0, 0, // top-left
-            width, 0, // top-right
-            0, height, // bottom-left
-            width, height, // bottom-right
-            width / 2, height / 2, // center
-            width / 4, height / 4, // top-left after 2x
-            width / 3, height * 2 / 3, // bottom-left after 3x zoom
-            width * 7 / 8, height / 2, // middle-right after 1.33x zoom
+            width - 1, 0, // top-right
+            0, height - 1, // bottom-left
+            width - 1, height - 1, // bottom-right
+            (width - 1) / 2, (height - 1) / 2, // center
+            (width - 1) / 4, (height - 1) / 4, // top-left after 2x
+            (width - 1) / 3, (height - 1) * 2 / 3, // bottom-left after 3x zoom
+            (width - 1) * 7 / 8, (height - 1) / 2, // middle-right after 1.33x zoom
     };
 
     // Verify 1.0x zoom doesn't change the coordinates
     auto coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f, ZoomRatioMapper::ClampOff);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f, false /*clamp*/);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_EQ(coords[i], originalCoords[i]);
     }
 
     // Verify 2.0x zoom work as expected (no clamping)
     std::array<float, 16> expected2xCoords = {
-            - width / 2.0f, - height / 2.0f,// top-left
-            width * 3 / 2.0f, - height / 2.0f, // top-right
-            - width / 2.0f, height * 3 / 2.0f, // bottom-left
-            width * 3 / 2.0f, height * 3 / 2.0f, // bottom-right
-            width / 2.0f, height / 2.0f, // center
+            - (width - 1) / 2.0f, - (height - 1) / 2.0f,// top-left
+            (width - 1) * 3 / 2.0f, - (height - 1) / 2.0f, // top-right
+            - (width - 1) / 2.0f, (height - 1) * 3 / 2.0f, // bottom-left
+            (width - 1) * 3 / 2.0f, (height - 1) * 3 / 2.0f, // bottom-right
+            (width - 1) / 2.0f, (height - 1) / 2.0f, // center
             0, 0, // top-left after 2x
-            width / 6.0f, height - height / 6.0f, // bottom-left after 3x zoom
-            width + width / 4.0f, height / 2.0f, // middle-right after 1.33x zoom
+            (width - 1) / 6.0f, (height - 1) * 5.0f / 6.0f, // bottom-left after 3x zoom
+            (width - 1) * 5.0f / 4.0f, (height - 1) / 2.0f, // middle-right after 1.33x zoom
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, ZoomRatioMapper::ClampOff);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, false /*clamp*/);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expected2xCoords[i]), kMaxAllowedPixelError);
     }
@@ -207,16 +207,16 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
     // Verify 2.0x zoom work as expected (with inclusive clamping)
     std::array<float, 16> expected2xCoordsClampedInc = {
             0, 0, // top-left
-            static_cast<float>(width) - 1, 0, // top-right
-            0, static_cast<float>(height) - 1, // bottom-left
-            static_cast<float>(width) - 1, static_cast<float>(height) - 1, // bottom-right
-            width / 2.0f, height / 2.0f, // center
+            width - 1.0f, 0, // top-right
+            0, height - 1.0f, // bottom-left
+            width - 1.0f, height - 1.0f, // bottom-right
+            (width - 1) / 2.0f, (height - 1) / 2.0f, // center
             0, 0, // top-left after 2x
-            width / 6.0f, height - height / 6.0f , // bottom-left after 3x zoom
-            static_cast<float>(width) - 1,  height / 2.0f, // middle-right after 1.33x zoom
+            (width - 1) / 6.0f, (height - 1) * 5.0f / 6.0f , // bottom-left after 3x zoom
+            width - 1.0f,  (height - 1) / 2.0f, // middle-right after 1.33x zoom
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, ZoomRatioMapper::ClampInclusive);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, true /*clamp*/);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expected2xCoordsClampedInc[i]), kMaxAllowedPixelError);
     }
@@ -224,33 +224,33 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
     // Verify 2.0x zoom work as expected (with exclusive clamping)
     std::array<float, 16> expected2xCoordsClampedExc = {
             0, 0, // top-left
-            static_cast<float>(width), 0, // top-right
-            0, static_cast<float>(height), // bottom-left
-            static_cast<float>(width), static_cast<float>(height), // bottom-right
+            width - 1.0f, 0, // top-right
+            0, height - 1.0f, // bottom-left
+            width - 1.0f, height - 1.0f, // bottom-right
             width / 2.0f, height / 2.0f, // center
             0, 0, // top-left after 2x
-            width / 6.0f, height - height / 6.0f , // bottom-left after 3x zoom
-            static_cast<float>(width),  height / 2.0f, // middle-right after 1.33x zoom
+            (width - 1) / 6.0f, (height - 1) * 5.0f / 6.0f , // bottom-left after 3x zoom
+            width - 1.0f,  height / 2.0f, // middle-right after 1.33x zoom
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, ZoomRatioMapper::ClampExclusive);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, true /*clamp*/);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expected2xCoordsClampedExc[i]), kMaxAllowedPixelError);
     }
 
     // Verify 0.33x zoom work as expected
     std::array<float, 16> expectedZoomOutCoords = {
-            width / 3.0f, height / 3.0f, // top-left
-            width * 2 / 3.0f, height / 3.0f, // top-right
-            width / 3.0f, height * 2 / 3.0f, // bottom-left
-            width * 2 / 3.0f, height * 2 / 3.0f, // bottom-right
-            width / 2.0f, height / 2.0f, // center
-            width * 5 / 12.0f, height * 5 / 12.0f, // top-left after 2x
-            width * 4 / 9.0f, height * 5 / 9.0f, // bottom-left after 3x zoom-in
-            width * 5 / 8.0f, height / 2.0f, // middle-right after 1.33x zoom-in
+            (width - 1) / 3.0f, (height - 1) / 3.0f, // top-left
+            (width - 1) * 2 / 3.0f, (height - 1) / 3.0f, // top-right
+            (width - 1) / 3.0f, (height - 1) * 2 / 3.0f, // bottom-left
+            (width - 1) * 2 / 3.0f, (height - 1) * 2 / 3.0f, // bottom-right
+            (width - 1) / 2.0f, (height - 1) / 2.0f, // center
+            (width - 1) * 5 / 12.0f, (height - 1) * 5 / 12.0f, // top-left after 2x
+            (width - 1) * 4 / 9.0f, (height - 1) * 5 / 9.0f, // bottom-left after 3x zoom-in
+            (width - 1) * 5 / 8.0f, (height - 1) / 2.0f, // middle-right after 1.33x zoom-in
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f/3, ZoomRatioMapper::ClampOff);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f/3, false /*clamp*/);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expectedZoomOutCoords[i]), kMaxAllowedPixelError);
     }
@@ -323,7 +323,8 @@ void subCropOverZoomRangeTest(bool usePreCorrectArray) {
     entry = metadata.find(ANDROID_SCALER_CROP_REGION);
     ASSERT_EQ(entry.count, 4U);
     for (int i = 0; i < 4; i++) {
-        EXPECT_EQ(entry.data.i32[i], testDefaultCropSize[index][i]);
+        EXPECT_LE(std::abs(entry.data.i32[i] - testDefaultCropSize[index][i]),
+                kMaxAllowedPixelError);
     }
     entry = metadata.find(ANDROID_CONTROL_ZOOM_RATIO);
     EXPECT_NEAR(entry.data.f[0], 2.0f, kMaxAllowedRatioError);
@@ -335,7 +336,7 @@ void subCropOverZoomRangeTest(bool usePreCorrectArray) {
     entry = metadata.find(ANDROID_SCALER_CROP_REGION);
     ASSERT_EQ(entry.count, 4U);
     for (int i = 0; i < 4; i++) {
-        EXPECT_EQ(entry.data.i32[i], test2xCropRegion[index][i]);
+        EXPECT_LE(std::abs(entry.data.i32[i] - test2xCropRegion[index][i]), kMaxAllowedPixelError);
     }
 
     // Letter boxing crop region, zoomRatio is 1.0
