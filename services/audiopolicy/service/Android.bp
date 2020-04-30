@@ -46,6 +46,7 @@ cc_library_shared {
         "-fvisibility=hidden",
         "-Werror",
         "-Wall",
+        "-Wthread-safety",
     ],
 
     export_shared_lib_headers: [
