@@ -406,6 +406,7 @@ enum {
      * Use this preset for capturing audio meant to be processed in real time
      * and played back for live performance (e.g karaoke).
      * The capture path will minimize latency and coupling with playback path.
+     * Available since API level 29.
      */
     AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE = 10,
 };
