@@ -48,7 +48,7 @@ static bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
-// DummyTranscoder and DummyProcessInfo are currently used to instantiate
+// DummyTranscoder and DummyUidPolicy are currently used to instantiate
 // MediaTranscodingService on service side for testing, so that we could
 // actually test the IPC calls of MediaTranscodingService to expose some
 // issues that's observable only over IPC.
@@ -67,21 +67,21 @@ class DummyTranscoder : public TranscoderInterface {
     }
 };
 
-class DummyProcessInfo : public ProcessInfoInterface {
-    bool isProcessOnTop(int32_t pid) override {
-        (void)pid;
+class DummyUidPolicy : public UidPolicyInterface {
+    bool isUidOnTop(uid_t uid) override {
+        (void)uid;
         return true;
     }
 };
 
 MediaTranscodingService::MediaTranscodingService()
       : MediaTranscodingService(std::make_shared<DummyTranscoder>(),
-                                std::make_shared<DummyProcessInfo>()) {}
+                                std::make_shared<DummyUidPolicy>()) {}
 
 MediaTranscodingService::MediaTranscodingService(
         const std::shared_ptr<TranscoderInterface>& transcoder,
-        const std::shared_ptr<ProcessInfoInterface>& procInfo)
-      : mJobScheduler(new TranscodingJobScheduler(transcoder, procInfo)),
+        const std::shared_ptr<UidPolicyInterface>& uidPolicy)
+      : mJobScheduler(new TranscodingJobScheduler(transcoder, uidPolicy)),
         mClientManager(new TranscodingClientManager(mJobScheduler)) {
     ALOGV("MediaTranscodingService is created");
 }
