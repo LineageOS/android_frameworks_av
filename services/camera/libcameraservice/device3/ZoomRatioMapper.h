@@ -65,14 +65,8 @@ class ZoomRatioMapper : private CoordinateMapper {
     status_t updateCaptureResult(CameraMetadata *request, bool requestedZoomRatioIs1);
 
   public: // Visible for testing. Do not use concurently.
-    enum ClampMode {
-        ClampOff,
-        ClampInclusive,
-        ClampExclusive,
-    };
-
     void scaleCoordinates(int32_t* coordPairs, int coordCount,
-            float scaleRatio, ClampMode clamp);
+            float scaleRatio, bool clamp);
 
     bool isValid() { return mIsValid; }
   private:
