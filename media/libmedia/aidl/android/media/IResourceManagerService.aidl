@@ -94,4 +94,12 @@ interface IResourceManagerService {
      *        remove existing override on originalPid if newPid is -1.
      */
     void overridePid(int originalPid, int newPid);
+
+    /**
+     * Mark a client for pending removal
+     *
+     * @param pid pid from which the client's resources will be removed.
+     * @param clientId clientId within the pid that will be removed.
+     */
+    void markClientForPendingRemoval(int pid, long clientId);
 }
