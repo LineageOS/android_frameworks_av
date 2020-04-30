@@ -330,7 +330,7 @@ class Codec2ComponentInputTests
 TEST_P(Codec2ComponentInputTests, InputBufferTest) {
     description("Tests for different inputs");
 
-    uint32_t flags = std::stol(std::get<2>(GetParam()));
+    uint32_t flags = std::stoul(std::get<2>(GetParam()));
     bool isNullBuffer = !std::get<3>(GetParam()).compare("true");
     if (isNullBuffer)
         ALOGD("Testing for null input buffer with flag : %u", flags);
