@@ -648,6 +648,12 @@ class Camera3Device :
     bool reconfigureCamera(const CameraMetadata& sessionParams);
 
     /**
+     * Return true in case of any output or input abandoned streams,
+     * otherwise return false.
+     */
+    bool checkAbandonedStreamsLocked();
+
+    /**
      * Filter stream session parameters and configure camera HAL.
      */
     status_t filterParamsAndConfigureLocked(const CameraMetadata& sessionParams,
