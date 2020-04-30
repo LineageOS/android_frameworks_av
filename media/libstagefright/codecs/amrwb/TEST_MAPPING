@@ -1,0 +1,8 @@
+// mappings for frameworks/av/media/libstagefright/codecs/amrwb
+{
+  "presubmit": [
+    // TODO(b/148094059): unit tests not allowed to download content
+    // { "name": "AmrwbDecoderTest"}
+
+  ]
+}

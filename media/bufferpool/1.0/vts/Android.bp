@@ -16,6 +16,7 @@
 
 cc_test {
     name: "VtsVndkHidlBufferpoolV1_0TargetSingleTest",
+    test_suites: ["device-tests"],
     defaults: ["VtsHalTargetTestDefaults"],
     srcs: [
         "allocator.cpp",
@@ -34,6 +35,7 @@ cc_test {
 
 cc_test {
     name: "VtsVndkHidlBufferpoolV1_0TargetMultiTest",
+    test_suites: ["device-tests"],
     defaults: ["VtsHalTargetTestDefaults"],
     srcs: [
         "allocator.cpp",

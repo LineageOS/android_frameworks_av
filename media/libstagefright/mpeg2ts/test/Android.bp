@@ -14,12 +14,13 @@
  * limitations under the License.
  */
 
-cc_test{
+cc_test {
     name: "Mpeg2tsUnitTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
-        "Mpeg2tsUnitTest.cpp"
+        "Mpeg2tsUnitTest.cpp",
     ],
 
     shared_libs: [

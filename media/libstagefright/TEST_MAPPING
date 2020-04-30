@@ -1,5 +1,12 @@
 {
   "presubmit": [
+    // TODO(b/148094059): unit tests not allowed to download content
+    // { "name": "HEVCUtilsUnitTest" },
+    //{ "name": "ExtractorFactoryTest" },
+    // writerTest fails about 5 out of 66
+    // in addition to needing the download ability
+    //{ "name": "writerTest" },
+
     {
       "name": "CtsMediaTestCases",
       "options": [

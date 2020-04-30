@@ -1,0 +1,12 @@
+// mappings for frameworks/av/media/codec2/sfplugin
+{
+  "presubmit": [
+    // failing 1 of 11
+    // TODO(b/156167471)
+    // { "name": "ccodec_unit_test" },
+
+    // failing 4 of 17, around max-input-size defaults & overrides
+    // TODO(b/156167471)
+    //{ "name": "mc_sanity_test"}
+  ]
+}

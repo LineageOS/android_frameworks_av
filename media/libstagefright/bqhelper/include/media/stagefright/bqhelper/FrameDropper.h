@@ -30,6 +30,8 @@ struct FrameDropper : public RefBase {
     FrameDropper();
 
     // maxFrameRate required to be positive.
+    // maxFrameRate negative causes shouldDrop() to always return false
+    // maxFrameRate == 0 is illegal
     status_t setMaxFrameRate(float maxFrameRate);
 
     // Returns false if max frame rate has not been set via setMaxFrameRate.

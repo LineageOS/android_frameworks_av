@@ -1,0 +1,20 @@
+// frameworks/av/media/libstagefright/id3
+{
+  "presubmit": [
+    // TODO(b/148094059): unit tests not allowed to download content
+    //{ "name": "ID3Test" },
+
+    // this doesn't seem to run any tests.
+    // but: cts-tradefed run -m CtsMediaTestCases -t android.media.cts.MediaMetadataRetrieverTest
+    // does run he 32 and 64 bit tests, but not the instant tests
+    // but all I know is that with 'atest', it's not running
+    {
+      "name": "CtsMediaTestCases",
+      "options": [
+          {
+            "include-filter": "android.media.cts.MediaMetadataRetrieverTest"
+          }
+      ]
+    }
+  ]
+}
