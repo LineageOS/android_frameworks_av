@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOPOLICYSERVICE_H
 #define ANDROID_AUDIOPOLICYSERVICE_H
 
+#include <android-base/thread_annotations.h>
 #include <cutils/misc.h>
 #include <cutils/config_utils.h>
 #include <cutils/compiler.h>
@@ -330,13 +331,13 @@ private:
                         AudioPolicyService() ANDROID_API;
     virtual             ~AudioPolicyService();
 
-            status_t dumpInternals(int fd);
+            status_t dumpInternals(int fd) REQUIRES(mLock);
 
     // Handles binder shell commands
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
     // Sets whether the given UID records only silence
-    virtual void setAppState_l(audio_port_handle_t portId, app_state_t state);
+    virtual void setAppState_l(audio_port_handle_t portId, app_state_t state) REQUIRES(mLock);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
@@ -361,9 +362,9 @@ private:
     status_t validateUsage(audio_usage_t usage, pid_t pid, uid_t uid);
 
     void updateUidStates();
-    void updateUidStates_l();
+    void updateUidStates_l() REQUIRES(mLock);
 
-    void silenceAllRecordings_l();
+    void silenceAllRecordings_l() REQUIRES(mLock);
 
     static bool isVirtualSource(audio_source_t source);
 
@@ -420,13 +421,13 @@ private:
         wp<AudioPolicyService> mService;
         Mutex mLock;
         ActivityManager mAm;
-        bool mObserverRegistered;
+        bool mObserverRegistered = false;
         std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
-        uid_t mAssistantUid;
+        uid_t mAssistantUid = -1;
         std::vector<uid_t> mA11yUids;
-        uid_t mCurrentImeUid;
-        bool mRttEnabled;
+        uid_t mCurrentImeUid = -1;
+        bool mRttEnabled = false;
     };
 
     // If sensor privacy is enabled then all apps, including those that are active, should be
@@ -447,7 +448,7 @@ private:
 
         private:
             wp<AudioPolicyService> mService;
-            std::atomic_bool mSensorPrivacyEnabled;
+            std::atomic_bool mSensorPrivacyEnabled = false;
     };
 
     // Thread used to send audio config commands to audio flinger
@@ -880,26 +881,27 @@ private:
     // and possibly back in to audio policy service and acquire mEffectsLock.
     sp<AudioCommandThread> mAudioCommandThread;     // audio commands thread
     sp<AudioCommandThread> mOutputCommandThread;    // process stop and release output
-    struct audio_policy_device *mpAudioPolicyDev;
-    struct audio_policy *mpAudioPolicy;
     AudioPolicyInterface *mAudioPolicyManager;
     AudioPolicyClient *mAudioPolicyClient;
     std::vector<audio_usage_t> mSupportedSystemUsages;
 
-    DefaultKeyedVector< int64_t, sp<NotificationClient> >    mNotificationClients;
-    Mutex mNotificationClientsLock;  // protects mNotificationClients
+    Mutex mNotificationClientsLock;
+    DefaultKeyedVector<int64_t, sp<NotificationClient>> mNotificationClients
+        GUARDED_BY(mNotificationClientsLock);
     // Manage all effects configured in audio_effects.conf
     // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
     // those can call back into AudioPolicyService methods and try to acquire the mutex
-    sp<AudioPolicyEffects> mAudioPolicyEffects;
-    audio_mode_t mPhoneState;
-    uid_t mPhoneStateOwnerUid;
+    sp<AudioPolicyEffects> mAudioPolicyEffects GUARDED_BY(mLock);
+    audio_mode_t mPhoneState GUARDED_BY(mLock);
+    uid_t mPhoneStateOwnerUid GUARDED_BY(mLock);
 
-    sp<UidPolicy> mUidPolicy;
-    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;
+    sp<UidPolicy> mUidPolicy GUARDED_BY(mLock);
+    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy GUARDED_BY(mLock);
 
-    DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
-    DefaultKeyedVector< audio_port_handle_t, sp<AudioPlaybackClient> >   mAudioPlaybackClients;
+    DefaultKeyedVector<audio_port_handle_t, sp<AudioRecordClient>> mAudioRecordClients
+        GUARDED_BY(mLock);
+    DefaultKeyedVector<audio_port_handle_t, sp<AudioPlaybackClient>> mAudioPlaybackClients
+        GUARDED_BY(mLock);
 
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 

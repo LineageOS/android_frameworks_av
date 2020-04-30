@@ -44,7 +44,7 @@ LOCAL_STATIC_LIBRARIES := \
 LOCAL_MODULE:= libaudiopolicyservice
 
 LOCAL_CFLAGS += -fvisibility=hidden
-LOCAL_CFLAGS += -Wall -Werror
+LOCAL_CFLAGS += -Wall -Werror -Wthread-safety
 
 include $(BUILD_SHARED_LIBRARY)
 

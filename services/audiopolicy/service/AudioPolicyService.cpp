@@ -58,8 +58,6 @@ static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AU
 
 AudioPolicyService::AudioPolicyService()
     : BnAudioPolicyService(),
-      mpAudioPolicyDev(NULL),
-      mpAudioPolicy(NULL),
       mAudioPolicyManager(NULL),
       mAudioPolicyClient(NULL),
       mPhoneState(AUDIO_MODE_INVALID),
@@ -78,21 +76,19 @@ void AudioPolicyService::onFirstRef()
 
         mAudioPolicyClient = new AudioPolicyClient(this);
         mAudioPolicyManager = createAudioPolicyManager(mAudioPolicyClient);
-
-        mSupportedSystemUsages = std::vector<audio_usage_t> {};
     }
     // load audio processing modules
-    sp<AudioPolicyEffects>audioPolicyEffects = new AudioPolicyEffects();
+    sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects();
+    sp<UidPolicy> uidPolicy = new UidPolicy(this);
+    sp<SensorPrivacyPolicy> sensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     {
         Mutex::Autolock _l(mLock);
         mAudioPolicyEffects = audioPolicyEffects;
+        mUidPolicy = uidPolicy;
+        mSensorPrivacyPolicy = sensorPrivacyPolicy;
     }
-
-    mUidPolicy = new UidPolicy(this);
-    mUidPolicy->registerSelf();
-
-    mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
-    mSensorPrivacyPolicy->registerSelf();
+    uidPolicy->registerSelf();
+    sensorPrivacyPolicy->registerSelf();
 }
 
 AudioPolicyService::~AudioPolicyService()
@@ -107,9 +103,9 @@ AudioPolicyService::~AudioPolicyService()
     mAudioPolicyEffects.clear();
 
     mUidPolicy->unregisterSelf();
-    mUidPolicy.clear();
-
     mSensorPrivacyPolicy->unregisterSelf();
+
+    mUidPolicy.clear();
     mSensorPrivacyPolicy.clear();
 }
 
@@ -172,20 +168,20 @@ void AudioPolicyService::setAudioVolumeGroupCallbacksEnabled(bool enabled)
 // removeNotificationClient() is called when the client process dies.
 void AudioPolicyService::removeNotificationClient(uid_t uid, pid_t pid)
 {
+    bool hasSameUid = false;
     {
         Mutex::Autolock _l(mNotificationClientsLock);
         int64_t token = ((int64_t)uid<<32) | pid;
         mNotificationClients.removeItem(token);
-    }
-    {
-        Mutex::Autolock _l(mLock);
-        bool hasSameUid = false;
         for (size_t i = 0; i < mNotificationClients.size(); i++) {
             if (mNotificationClients.valueAt(i)->uid() == uid) {
                 hasSameUid = true;
                 break;
             }
         }
+    }
+    {
+        Mutex::Autolock _l(mLock);
         if (mAudioPolicyManager && !hasSameUid) {
             // called from binder death notification: no need to clear caller identity
             mAudioPolicyManager->releaseResourcesForUid(uid);
@@ -381,10 +377,14 @@ void AudioPolicyService::binderDied(const wp<IBinder>& who) {
             IPCThreadState::self()->getCallingPid());
 }
 
-static bool dumpTryLock(Mutex& mutex)
+static bool dumpTryLock(Mutex& mutex) ACQUIRE(mutex) NO_THREAD_SAFETY_ANALYSIS
 {
-    status_t err = mutex.timedLock(kDumpLockTimeoutNs);
-    return err == NO_ERROR;
+    return mutex.timedLock(kDumpLockTimeoutNs) == NO_ERROR;
+}
+
+static void dumpReleaseLock(Mutex& mutex, bool locked) RELEASE(mutex) NO_THREAD_SAFETY_ANALYSIS
+{
+    if (locked) mutex.unlock();
 }
 
 status_t AudioPolicyService::dumpInternals(int fd)
@@ -564,7 +564,7 @@ void AudioPolicyService::updateUidStates_l()
         bool isTopOrLatestSensitive = topSensitiveActive == nullptr ?
                                  false : current->uid == topSensitiveActive->uid;
 
-        auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) {
+        auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) REQUIRES(mLock) {
             bool canCaptureCall = recordClient->canCaptureOutput;
             bool canCaptureCommunication = recordClient->canCaptureOutput
                 || recordClient->uid == mPhoneStateOwnerUid
@@ -702,7 +702,7 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
     if (!dumpAllowed()) {
         dumpPermissionDenial(fd);
     } else {
-        bool locked = dumpTryLock(mLock);
+        const bool locked = dumpTryLock(mLock);
         if (!locked) {
             String8 result(kDeadlockedString);
             write(fd, result.string(), result.size());
@@ -719,7 +719,7 @@ status_t AudioPolicyService::dump(int fd, const Vector<String16>& args __unused)
 
         mPackageManager.dump(fd);
 
-        if (locked) mLock.unlock();
+        dumpReleaseLock(mLock, locked);
     }
     return NO_ERROR;
 }
@@ -838,8 +838,16 @@ status_t AudioPolicyService::handleSetUidState(Vector<String16>& args, int err) 
         return BAD_VALUE;
     }
 
-    mUidPolicy->addOverrideUid(uid, active);
-    return NO_ERROR;
+    sp<UidPolicy> uidPolicy;
+    {
+        Mutex::Autolock _l(mLock);
+        uidPolicy = mUidPolicy;
+    }
+    if (uidPolicy) {
+        uidPolicy->addOverrideUid(uid, active);
+        return NO_ERROR;
+    }
+    return NO_INIT;
 }
 
 status_t AudioPolicyService::handleResetUidState(Vector<String16>& args, int err) {
@@ -859,8 +867,16 @@ status_t AudioPolicyService::handleResetUidState(Vector<String16>& args, int err
         return BAD_VALUE;
     }
 
-    mUidPolicy->removeOverrideUid(uid);
-    return NO_ERROR;
+    sp<UidPolicy> uidPolicy;
+    {
+        Mutex::Autolock _l(mLock);
+        uidPolicy = mUidPolicy;
+    }
+    if (uidPolicy) {
+        uidPolicy->removeOverrideUid(uid);
+        return NO_ERROR;
+    }
+    return NO_INIT;
 }
 
 status_t AudioPolicyService::handleGetUidState(Vector<String16>& args, int out, int err) {
@@ -880,11 +896,15 @@ status_t AudioPolicyService::handleGetUidState(Vector<String16>& args, int out, 
         return BAD_VALUE;
     }
 
-    if (mUidPolicy->isUidActive(uid)) {
-        return dprintf(out, "active\n");
-    } else {
-        return dprintf(out, "idle\n");
+    sp<UidPolicy> uidPolicy;
+    {
+        Mutex::Autolock _l(mLock);
+        uidPolicy = mUidPolicy;
     }
+    if (uidPolicy) {
+        return dprintf(out, uidPolicy->isUidActive(uid) ? "active\n" : "idle\n");
+    }
+    return NO_INIT;
 }
 
 status_t AudioPolicyService::printHelp(int out) {
@@ -1401,7 +1421,7 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
     result.append(buffer);
     write(fd, result.string(), result.size());
 
-    bool locked = dumpTryLock(mLock);
+    const bool locked = dumpTryLock(mLock);
     if (!locked) {
         String8 result2(kCmdDeadlockedString);
         write(fd, result2.string(), result2.size());
@@ -1424,7 +1444,7 @@ status_t AudioPolicyService::AudioCommandThread::dump(int fd)
 
     write(fd, result.string(), result.size());
 
-    if (locked) mLock.unlock();
+    dumpReleaseLock(mLock, locked);
 
     return NO_ERROR;
 }
