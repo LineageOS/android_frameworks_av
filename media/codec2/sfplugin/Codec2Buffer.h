@@ -20,15 +20,28 @@
 
 #include <C2Buffer.h>
 
-#include <android/hardware/cas/native/1.0/types.h>
-#include <android/hardware/drm/1.0/types.h>
 #include <binder/IMemory.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/MediaCodecBuffer.h>
-#include <mediadrm/ICrypto.h>
 
 namespace android {
+
+namespace hardware {
+class HidlMemory;
+namespace cas {
+namespace native {
+namespace V1_0 {
+struct SharedBuffer;
+}  // namespace V1_0
+}  // namespace native
+}  // namespace cas
+namespace drm {
+namespace V1_0 {
+struct SharedBuffer;
+}  // namespace V1_0
+}  // namespace drm
+}  // namespace hardware
 
 /**
  * Copies a graphic view into a media image.
