@@ -472,6 +472,56 @@ protected:
         }
     }
 
+    void testMarkClientForPendingRemoval() {
+        bool result;
+
+        {
+            addResource();
+            mService->mSupportsSecureWithNonSecureCodec = true;
+
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+
+            // Remove low priority clients
+            mService->removeClient(kTestPid1, getId(mTestClient1));
+
+            // no lower priority client
+            CHECK_STATUS_FALSE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(false /* c1 */, false /* c2 */, false /* c3 */);
+
+            mService->markClientForPendingRemoval(kTestPid2, getId(mTestClient2));
+
+            // client marked for pending removal from the same process got reclaimed
+            CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+
+            // clean up client 3 which still left
+            mService->removeClient(kTestPid2, getId(mTestClient3));
+        }
+
+        {
+            addResource();
+            mService->mSupportsSecureWithNonSecureCodec = true;
+
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+
+            mService->markClientForPendingRemoval(kTestPid2, getId(mTestClient2));
+
+            // client marked for pending removal from the same process got reclaimed
+            // first, even though there are lower priority process
+            CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+
+            // lower priority client got reclaimed
+            CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+
+            // clean up client 3 which still left
+            mService->removeClient(kTestPid2, getId(mTestClient3));
+        }
+    }
+
     void testRemoveClient() {
         addResource();
 
@@ -898,6 +948,10 @@ TEST_F(ResourceManagerServiceTest, testCpusetBoost) {
 
 TEST_F(ResourceManagerServiceTest, overridePid) {
     testOverridePid();
+}
+
+TEST_F(ResourceManagerServiceTest, markClientForPendingRemoval) {
+    testMarkClientForPendingRemoval();
 }
 
 } // namespace android
