@@ -19,25 +19,24 @@
 
 #include <aidl/android/media/ITranscodingClientCallback.h>
 #include <aidl/android/media/TranscodingRequestParcel.h>
+#include <media/TranscodingDefs.h>
 
 namespace android {
 
 using ::aidl::android::media::ITranscodingClientCallback;
 using ::aidl::android::media::TranscodingRequestParcel;
 
-using ClientIdType = int64_t;
-
 // Interface for a client to call the scheduler to schedule or retrieve
 // the status of a job.
 class SchedulerClientInterface {
 public:
-    virtual bool submit(ClientIdType clientId, int32_t jobId, uid_t uid,
+    virtual bool submit(ClientIdType clientId, JobIdType jobId, uid_t uid,
                         const TranscodingRequestParcel& request,
                         const std::weak_ptr<ITranscodingClientCallback>& clientCallback) = 0;
 
-    virtual bool cancel(ClientIdType clientId, int32_t jobId) = 0;
+    virtual bool cancel(ClientIdType clientId, JobIdType jobId) = 0;
 
-    virtual bool getJob(ClientIdType clientId, int32_t jobId,
+    virtual bool getJob(ClientIdType clientId, JobIdType jobId,
                         TranscodingRequestParcel* request) = 0;
 
 protected:
