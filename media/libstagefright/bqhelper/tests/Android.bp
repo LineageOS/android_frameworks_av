@@ -1,5 +1,6 @@
 cc_test {
     name: "FrameDropper_test",
+    test_suites: ["device-tests"],
 
     srcs: ["FrameDropper_test.cpp"],
 

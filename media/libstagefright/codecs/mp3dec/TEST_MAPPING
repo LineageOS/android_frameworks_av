@@ -1,0 +1,7 @@
+// mappings for frameworks/av/media/libstagefright/codecs/mp3dec
+{
+  "presubmit": [
+    // TODO(b/148094059): unit tests not allowed to download content
+    // { "name": "Mp3DecoderTest"}
+  ]
+}

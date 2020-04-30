@@ -1,5 +1,6 @@
 cc_test {
     name: "ccodec_unit_test",
+    test_suites: ["device-tests"],
 
     srcs: [
         "CCodecBuffers_test.cpp",
@@ -43,6 +44,7 @@ cc_test {
 
 cc_test {
     name: "mc_sanity_test",
+    test_suites: ["device-tests"],
 
     srcs: [
         "MediaCodec_sanity_test.cpp",

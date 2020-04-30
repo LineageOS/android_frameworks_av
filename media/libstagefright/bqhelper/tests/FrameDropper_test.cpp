@@ -110,7 +110,7 @@ protected:
 };
 
 TEST_F(FrameDropperTest, TestInvalidMaxFrameRate) {
-    EXPECT_NE(OK, mFrameDropper->setMaxFrameRate(-1.0));
+    EXPECT_EQ(OK, mFrameDropper->setMaxFrameRate(-1.0));
     EXPECT_NE(OK, mFrameDropper->setMaxFrameRate(0));
 }
 
