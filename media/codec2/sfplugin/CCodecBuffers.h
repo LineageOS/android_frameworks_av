@@ -28,6 +28,8 @@
 
 namespace android {
 
+struct ICrypto;
+class MemoryDealer;
 class SkipCutBuffer;
 
 constexpr size_t kLinearBufferSize = 1048576;
@@ -156,9 +158,8 @@ private:
 
 class OutputBuffers : public CCodecBuffers {
 public:
-    OutputBuffers(const char *componentName, const char *name = "Output")
-        : CCodecBuffers(componentName, name) { }
-    virtual ~OutputBuffers() = default;
+    OutputBuffers(const char *componentName, const char *name = "Output");
+    virtual ~OutputBuffers();
 
     /**
      * Register output C2Buffer from the component and obtain corresponding
@@ -243,11 +244,9 @@ public:
     /**
      * Create a new LocalBufferPool object.
      *
-     * \param poolCapacity  max total size of buffers managed by this pool.
-     *
      * \return  a newly created pool object.
      */
-    static std::shared_ptr<LocalBufferPool> Create(size_t poolCapacity);
+    static std::shared_ptr<LocalBufferPool> Create();
 
     /**
      * Return an ABuffer object whose size is at least |capacity|.
@@ -679,8 +678,7 @@ private:
 
 class GraphicInputBuffers : public InputBuffers {
 public:
-    GraphicInputBuffers(
-            size_t numInputSlots, const char *componentName, const char *name = "2D-BB-Input");
+    GraphicInputBuffers(const char *componentName, const char *name = "2D-BB-Input");
     ~GraphicInputBuffers() override = default;
 
     bool requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) override;
@@ -892,8 +890,7 @@ public:
 
 class RawGraphicOutputBuffers : public FlexOutputBuffers {
 public:
-    RawGraphicOutputBuffers(
-            size_t numOutputSlots, const char *componentName, const char *name = "2D-BB-Output");
+    RawGraphicOutputBuffers(const char *componentName, const char *name = "2D-BB-Output");
     ~RawGraphicOutputBuffers() override = default;
 
     sp<Codec2Buffer> wrap(const std::shared_ptr<C2Buffer> &buffer) override;

@@ -27,7 +27,7 @@
 
 namespace android {
 
-constexpr static pid_t OFFLINE_PID = -1;
+constexpr static uid_t OFFLINE_UID = -1;
 
 //static
 String8 TranscodingJobScheduler::jobToString(const JobKeyType& jobKey) {
@@ -36,12 +36,12 @@ String8 TranscodingJobScheduler::jobToString(const JobKeyType& jobKey) {
 
 TranscodingJobScheduler::TranscodingJobScheduler(
         const std::shared_ptr<TranscoderInterface>& transcoder,
-        const std::shared_ptr<ProcessInfoInterface>& procInfo)
-      : mTranscoder(transcoder), mProcInfo(procInfo), mCurrentJob(nullptr), mResourceLost(false) {
+        const std::shared_ptr<UidPolicyInterface>& uidPolicy)
+      : mTranscoder(transcoder), mUidPolicy(uidPolicy), mCurrentJob(nullptr), mResourceLost(false) {
     // Only push empty offline queue initially. Realtime queues are added when requests come in.
-    mPidSortedList.push_back(OFFLINE_PID);
-    mOfflinePidIterator = mPidSortedList.begin();
-    mJobQueues.emplace(OFFLINE_PID, JobQueueType());
+    mUidSortedList.push_back(OFFLINE_UID);
+    mOfflineUidIterator = mUidSortedList.begin();
+    mJobQueues.emplace(OFFLINE_UID, JobQueueType());
 }
 
 TranscodingJobScheduler::~TranscodingJobScheduler() {}
@@ -50,8 +50,8 @@ TranscodingJobScheduler::Job* TranscodingJobScheduler::getTopJob_l() {
     if (mJobMap.empty()) {
         return nullptr;
     }
-    pid_t topPid = *mPidSortedList.begin();
-    JobKeyType topJobKey = *mJobQueues[topPid].begin();
+    uid_t topUid = *mUidSortedList.begin();
+    JobKeyType topJobKey = *mJobQueues[topUid].begin();
     return &mJobMap[topJobKey];
 }
 
@@ -92,20 +92,20 @@ void TranscodingJobScheduler::removeJob_l(const JobKeyType& jobKey) {
         return;
     }
 
-    // Remove job from pid's queue.
-    const pid_t pid = mJobMap[jobKey].pid;
-    JobQueueType& jobQueue = mJobQueues[pid];
+    // Remove job from uid's queue.
+    const uid_t uid = mJobMap[jobKey].uid;
+    JobQueueType& jobQueue = mJobQueues[uid];
     auto it = std::find(jobQueue.begin(), jobQueue.end(), jobKey);
     if (it == jobQueue.end()) {
-        ALOGE("couldn't find job %s in queue for pid %d", jobToString(jobKey).c_str(), pid);
+        ALOGE("couldn't find job %s in queue for uid %d", jobToString(jobKey).c_str(), uid);
         return;
     }
     jobQueue.erase(it);
 
-    // If this is the last job in a real-time queue, remove this pid's queue.
-    if (pid != OFFLINE_PID && jobQueue.empty()) {
-        mPidSortedList.remove(pid);
-        mJobQueues.erase(pid);
+    // If this is the last job in a real-time queue, remove this uid's queue.
+    if (uid != OFFLINE_UID && jobQueue.empty()) {
+        mUidSortedList.remove(uid);
+        mJobQueues.erase(uid);
     }
 
     // Clear current job.
@@ -117,12 +117,12 @@ void TranscodingJobScheduler::removeJob_l(const JobKeyType& jobKey) {
     mJobMap.erase(jobKey);
 }
 
-bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, pid_t pid,
+bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, uid_t uid,
                                      const TranscodingRequestParcel& request,
                                      const std::weak_ptr<ITranscodingClientCallback>& callback) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
 
-    ALOGV("%s: job %s, pid %d, prioirty %d", __FUNCTION__, jobToString(jobKey).c_str(), pid,
+    ALOGV("%s: job %s, uid %d, prioirty %d", __FUNCTION__, jobToString(jobKey).c_str(), uid,
           (int32_t)request.priority);
 
     std::scoped_lock lock{mLock};
@@ -135,37 +135,37 @@ bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, pid_t
     // TODO(chz): only support offline vs real-time for now. All kUnspecified jobs
     // go to offline queue.
     if (request.priority == TranscodingJobPriority::kUnspecified) {
-        pid = OFFLINE_PID;
+        uid = OFFLINE_UID;
     }
 
     // Add job to job map.
     mJobMap[jobKey].key = jobKey;
-    mJobMap[jobKey].pid = pid;
+    mJobMap[jobKey].uid = uid;
     mJobMap[jobKey].state = Job::NOT_STARTED;
     mJobMap[jobKey].request = request;
     mJobMap[jobKey].callback = callback;
 
     // If it's an offline job, the queue was already added in constructor.
-    // If it's a real-time jobs, check if a queue is already present for the pid,
+    // If it's a real-time jobs, check if a queue is already present for the uid,
     // and add a new queue if needed.
-    if (pid != OFFLINE_PID) {
-        if (mJobQueues.count(pid) == 0) {
-            if (mProcInfo->isProcessOnTop(pid)) {
-                mPidSortedList.push_front(pid);
+    if (uid != OFFLINE_UID) {
+        if (mJobQueues.count(uid) == 0) {
+            if (mUidPolicy->isUidOnTop(uid)) {
+                mUidSortedList.push_front(uid);
             } else {
                 // Shouldn't be submitting real-time requests from non-top app,
                 // put it in front of the offline queue.
-                mPidSortedList.insert(mOfflinePidIterator, pid);
+                mUidSortedList.insert(mOfflineUidIterator, uid);
             }
-        } else if (pid != *mPidSortedList.begin()) {
-            if (mProcInfo->isProcessOnTop(pid)) {
-                mPidSortedList.remove(pid);
-                mPidSortedList.push_front(pid);
+        } else if (uid != *mUidSortedList.begin()) {
+            if (mUidPolicy->isUidOnTop(uid)) {
+                mUidSortedList.remove(uid);
+                mUidSortedList.push_front(uid);
             }
         }
     }
-    // Append this job to the pid's queue.
-    mJobQueues[pid].push_back(jobKey);
+    // Append this job to the uid's queue.
+    mJobQueues[uid].push_back(jobKey);
 
     updateCurrentJob_l();
 
@@ -302,28 +302,28 @@ void TranscodingJobScheduler::onResourceLost() {
     validateState_l();
 }
 
-void TranscodingJobScheduler::onTopProcessChanged(pid_t pid) {
-    ALOGV("%s: pid %d", __FUNCTION__, pid);
+void TranscodingJobScheduler::onTopUidChanged(uid_t uid) {
+    ALOGV("%s: uid %d", __FUNCTION__, uid);
 
     std::scoped_lock lock{mLock};
 
-    if (pid < 0) {
-        ALOGW("bringProcessToTop: ignoring invalid pid %d", pid);
+    if (uid == OFFLINE_UID) {
+        ALOGW("%s: ignoring invalid uid %d", __FUNCTION__, uid);
         return;
     }
-    // If this pid doesn't have any jobs, we don't care about it.
-    if (mJobQueues.count(pid) == 0) {
-        ALOGW("bringProcessToTop: ignoring pid %d without any jobs", pid);
+    // If this uid doesn't have any jobs, we don't care about it.
+    if (mJobQueues.count(uid) == 0) {
+        ALOGW("%s: ignoring uid %d without any jobs", __FUNCTION__, uid);
         return;
     }
-    // If this pid is already top, don't do anything.
-    if (pid == *mPidSortedList.begin()) {
-        ALOGW("pid %d is already top", pid);
+    // If this uid is already top, don't do anything.
+    if (uid == *mUidSortedList.begin()) {
+        ALOGW("%s: uid %d is already top", __FUNCTION__, uid);
         return;
     }
 
-    mPidSortedList.remove(pid);
-    mPidSortedList.push_front(pid);
+    mUidSortedList.remove(uid);
+    mUidSortedList.push_front(uid);
 
     updateCurrentJob_l();
 
@@ -343,26 +343,26 @@ void TranscodingJobScheduler::onResourceAvailable() {
 
 void TranscodingJobScheduler::validateState_l() {
 #ifdef VALIDATE_STATE
-    LOG_ALWAYS_FATAL_IF(mJobQueues.count(OFFLINE_PID) != 1,
+    LOG_ALWAYS_FATAL_IF(mJobQueues.count(OFFLINE_UID) != 1,
                         "mJobQueues offline queue number is not 1");
-    LOG_ALWAYS_FATAL_IF(*mOfflinePidIterator != OFFLINE_PID,
-                        "mOfflinePidIterator not pointing to offline pid");
-    LOG_ALWAYS_FATAL_IF(mPidSortedList.size() != mJobQueues.size(),
-                        "mPidList and mJobQueues size mismatch");
+    LOG_ALWAYS_FATAL_IF(*mOfflineUidIterator != OFFLINE_UID,
+                        "mOfflineUidIterator not pointing to offline uid");
+    LOG_ALWAYS_FATAL_IF(mUidSortedList.size() != mJobQueues.size(),
+                        "mUidList and mJobQueues size mismatch");
 
     int32_t totalJobs = 0;
-    for (auto pidIt = mPidSortedList.begin(); pidIt != mPidSortedList.end(); pidIt++) {
-        LOG_ALWAYS_FATAL_IF(mJobQueues.count(*pidIt) != 1, "mJobQueues count for pid %d is not 1",
-                            *pidIt);
-        for (auto jobIt = mJobQueues[*pidIt].begin(); jobIt != mJobQueues[*pidIt].end(); jobIt++) {
+    for (auto uidIt = mUidSortedList.begin(); uidIt != mUidSortedList.end(); uidIt++) {
+        LOG_ALWAYS_FATAL_IF(mJobQueues.count(*uidIt) != 1, "mJobQueues count for uid %d is not 1",
+                            *uidIt);
+        for (auto jobIt = mJobQueues[*uidIt].begin(); jobIt != mJobQueues[*uidIt].end(); jobIt++) {
             LOG_ALWAYS_FATAL_IF(mJobMap.count(*jobIt) != 1, "mJobs count for job %s is not 1",
                                 jobToString(*jobIt).c_str());
         }
 
-        totalJobs += mJobQueues[*pidIt].size();
+        totalJobs += mJobQueues[*uidIt].size();
     }
     LOG_ALWAYS_FATAL_IF(mJobMap.size() != totalJobs,
-                        "mJobs size doesn't match total jobs counted from pid queues");
+                        "mJobs size doesn't match total jobs counted from uid queues");
 #endif  // VALIDATE_STATE
 }
 
