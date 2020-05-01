@@ -44,3 +44,17 @@ cc_test {
     defaults: ["testdefaults"],
     srcs: ["MediaSampleQueueTests.cpp"],
 }
+
+// MediaTrackTranscoder unit test
+cc_test {
+    name: "MediaTrackTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaTrackTranscoderTests.cpp"],
+}
+
+// VideoTrackTranscoder unit test
+cc_test {
+    name: "VideoTrackTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["VideoTrackTranscoderTests.cpp"],
+}

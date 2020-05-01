@@ -25,6 +25,10 @@
 
 namespace android {
 
+// Check that the extractor sample flags have the expected NDK meaning.
+static_assert(SAMPLE_FLAG_SYNC_SAMPLE == AMEDIAEXTRACTOR_SAMPLE_FLAG_SYNC,
+              "Sample flag mismatch: SYNC_SAMPLE");
+
 // static
 std::shared_ptr<MediaSampleReader> MediaSampleReaderNDK::createFromFd(int fd, size_t offset,
                                                                       size_t size) {
