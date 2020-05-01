@@ -954,7 +954,8 @@ status_t AudioPolicyManager::getOutputForAttrInt(
                                                   primaryMix->mDeviceAddress,
                                                   AUDIO_FORMAT_DEFAULT);
         sp<SwAudioOutputDescriptor> policyDesc = primaryMix->getOutput();
-        if (policyDesc == nullptr || (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT)) {
+        if (deviceDesc != nullptr
+                && (policyDesc == nullptr || (policyDesc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT))) {
             audio_io_handle_t newOutput;
             status = openDirectOutput(
                     *stream, session, config,
