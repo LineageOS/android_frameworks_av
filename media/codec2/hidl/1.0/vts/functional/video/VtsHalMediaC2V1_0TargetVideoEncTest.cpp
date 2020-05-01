@@ -721,6 +721,10 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "484", "362"));
         kEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "244", "488"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "852", "608"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "1400", "442"));
     }
 
     // Set the resource directory based on command line args.
