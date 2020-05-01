@@ -143,6 +143,11 @@ status_t BnCameraClient::onTransact(
             if (data.dataAvail() > 0) {
                 metadata = new camera_frame_metadata_t;
                 metadata->number_of_faces = data.readInt32();
+                if (metadata->number_of_faces <= 0 ||
+                        metadata->number_of_faces > (int32_t)(INT32_MAX / sizeof(camera_face_t))) {
+                    ALOGE("%s: Too large face count: %d", __FUNCTION__, metadata->number_of_faces);
+                    return BAD_VALUE;
+                }
                 metadata->faces = (camera_face_t *) data.readInplace(
                         sizeof(camera_face_t) * metadata->number_of_faces);
             }

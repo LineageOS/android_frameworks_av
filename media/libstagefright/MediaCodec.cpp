@@ -199,6 +199,7 @@ struct MediaCodec::ResourceManagerServiceProxy : public RefBase {
     void addResource(const MediaResourceParcel &resource);
     void removeResource(const MediaResourceParcel &resource);
     void removeClient();
+    void markClientForPendingRemoval();
     bool reclaimResource(const std::vector<MediaResourceParcel> &resources);
 
 private:
@@ -280,6 +281,14 @@ void MediaCodec::ResourceManagerServiceProxy::removeClient() {
     mService->removeClient(mPid, getId(mClient));
 }
 
+void MediaCodec::ResourceManagerServiceProxy::markClientForPendingRemoval() {
+    Mutex::Autolock _l(mLock);
+    if (mService == nullptr) {
+        return;
+    }
+    mService->markClientForPendingRemoval(mPid, getId(mClient));
+}
+
 bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
         const std::vector<MediaResourceParcel> &resources) {
     Mutex::Autolock _l(mLock);
@@ -294,6 +303,33 @@ bool MediaCodec::ResourceManagerServiceProxy::reclaimResource(
 ////////////////////////////////////////////////////////////////////////////////
 
 MediaCodec::BufferInfo::BufferInfo() : mOwnedByClient(false) {}
+
+////////////////////////////////////////////////////////////////////////////////
+
+class MediaCodec::ReleaseSurface {
+public:
+    ReleaseSurface() {
+        BufferQueue::createBufferQueue(&mProducer, &mConsumer);
+        mSurface = new Surface(mProducer, false /* controlledByApp */);
+        struct ConsumerListener : public BnConsumerListener {
+            void onFrameAvailable(const BufferItem&) override {}
+            void onBuffersReleased() override {}
+            void onSidebandStreamChanged() override {}
+        };
+        sp<ConsumerListener> listener{new ConsumerListener};
+        mConsumer->consumerConnect(listener, false);
+        mConsumer->setConsumerName(String8{"MediaCodec.release"});
+    }
+
+    const sp<Surface> &getSurface() {
+        return mSurface;
+    }
+
+private:
+    sp<IGraphicBufferProducer> mProducer;
+    sp<IGraphicBufferConsumer> mConsumer;
+    sp<Surface> mSurface;
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -1432,7 +1468,13 @@ status_t MediaCodec::reclaim(bool force) {
 
 status_t MediaCodec::release() {
     sp<AMessage> msg = new AMessage(kWhatRelease, this);
+    sp<AMessage> response;
+    return PostAndAwaitResponse(msg, &response);
+}
 
+status_t MediaCodec::releaseAsync() {
+    sp<AMessage> msg = new AMessage(kWhatRelease, this);
+    msg->setInt32("async", 1);
     sp<AMessage> response;
     return PostAndAwaitResponse(msg, &response);
 }
@@ -2600,7 +2642,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                     mResourceManagerProxy->removeClient();
 
-                    (new AMessage)->postReply(mReplyID);
+                    if (mReplyID != nullptr) {
+                        (new AMessage)->postReply(mReplyID);
+                    }
                     break;
                 }
 
@@ -2987,6 +3031,26 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
+            int32_t async = 0;
+            if (msg->findInt32("async", &async) && async) {
+                if ((mState ==  CONFIGURED || mState == STARTED || mState == FLUSHED)
+                       && mSurface != NULL) {
+                    if (!mReleaseSurface) {
+                        mReleaseSurface.reset(new ReleaseSurface);
+                    }
+                    status_t err = connectToSurface(mReleaseSurface->getSurface());
+                    ALOGW_IF(err != OK, "error connecting to release surface: err = %d", err);
+                    if (err == OK && !(mFlags & kFlagUsesSoftwareRenderer)) {
+                        err = mCodec->setSurface(mReleaseSurface->getSurface());
+                        ALOGW_IF(err != OK, "error setting release surface: err = %d", err);
+                    }
+                    if (err == OK) {
+                        (void)disconnectFromSurface();
+                        mSurface = mReleaseSurface->getSurface();
+                    }
+                }
+            }
+
             mReplyID = replyID;
             setState(msg->what() == kWhatStop ? STOPPING : RELEASING);
 
@@ -2997,6 +3061,12 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             if (mSoftRenderer != NULL && (mFlags & kFlagPushBlankBuffersOnShutdown)) {
                 pushBlankBuffersToNativeWindow(mSurface.get());
+            }
+
+            if (async) {
+                mResourceManagerProxy->markClientForPendingRemoval();
+                (new AMessage)->postReply(mReplyID);
+                mReplyID = 0;
             }
 
             break;
