@@ -146,6 +146,8 @@ struct MediaCodec : public AHandler {
     // object.
     status_t release();
 
+    status_t releaseAsync();
+
     status_t flush();
 
     status_t queueInputBuffer(
@@ -515,6 +517,9 @@ private:
     int64_t mIndexOfFirstFrameWhenLowLatencyOn;  // index of the first frame queued
                                                  // when low latency is on
     int64_t mInputBufferCounter;  // number of input buffers queued since last reset/flush
+
+    class ReleaseSurface;
+    std::unique_ptr<ReleaseSurface> mReleaseSurface;
 
     sp<BatteryChecker> mBatteryChecker;
 
