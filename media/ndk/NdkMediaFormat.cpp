@@ -26,9 +26,6 @@
 #include <utils/StrongPointer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <android_util_Binder.h>
-
-#include <jni.h>
 
 using namespace android;
 
