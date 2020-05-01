@@ -117,14 +117,17 @@ Return<void> CryptoPlugin::decrypt(
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
     size_t destSize = 0;
+    size_t srcSize = 0;
     bool haveEncryptedSubsamples = false;
     for (size_t i = 0; i < subSamples.size(); i++) {
         const SubSample &subSample = subSamples[i];
-        if (__builtin_add_overflow(destSize, subSample.numBytesOfClearData, &destSize)) {
+        if (__builtin_add_overflow(destSize, subSample.numBytesOfClearData, &destSize) ||
+            __builtin_add_overflow(srcSize, subSample.numBytesOfClearData, &srcSize)) {
             _hidl_cb(Status::BAD_VALUE, 0, "subsample clear size overflow");
             return Void();
         }
-        if (__builtin_add_overflow(destSize, subSample.numBytesOfEncryptedData, &destSize)) {
+        if (__builtin_add_overflow(destSize, subSample.numBytesOfEncryptedData, &destSize) ||
+            __builtin_add_overflow(srcSize, subSample.numBytesOfEncryptedData, &srcSize)) {
             _hidl_cb(Status::BAD_VALUE, 0, "subsample encrypted size overflow");
             return Void();
         }
@@ -133,7 +136,7 @@ Return<void> CryptoPlugin::decrypt(
         }
     }
 
-    if (destSize > destBuffer.size) {
+    if (destSize > destBuffer.size || srcSize > source.size) {
         _hidl_cb(Status::BAD_VALUE, 0, "subsample sum too large");
         return Void();
     }
