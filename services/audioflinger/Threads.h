@@ -37,7 +37,7 @@ public:
     static const char *threadTypeToString(type_t type);
 
     ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-               type_t type, bool systemReady);
+               type_t type, bool systemReady, bool isOut);
     virtual             ~ThreadBase();
 
     virtual status_t    readyToRun();
@@ -330,7 +330,7 @@ public:
                     return mInDeviceTypeAddr;
                 }
 
-    virtual     bool        isOutput() const = 0;
+                bool        isOutput() const { return mIsOut; }
 
     virtual     sp<StreamHalInterface> stream() const = 0;
 
@@ -524,7 +524,8 @@ protected:
                 Condition               mWaitWorkCV;
 
                 const sp<AudioFlinger>  mAudioFlinger;
-                const std::string       mMetricsId;
+                ThreadMetrics           mThreadMetrics;
+                const bool              mIsOut;
 
                 // updated by PlaybackThread::readOutputParameters_l() or
                 // RecordThread::readInputParameters_l()
@@ -911,9 +912,6 @@ public:
 
                 // Return the asynchronous signal wait time.
     virtual     int64_t     computeWaitTimeNs_l() const { return INT64_MAX; }
-
-    virtual     bool        isOutput() const override { return true; }
-
                 // returns true if the track is allowed to be added to the thread.
     virtual     bool        isTrackAllowed_l(
                                     audio_channel_mask_t channelMask __unused,
@@ -1651,7 +1649,6 @@ public:
                             ThreadBase::acquireWakeLock_l();
                             mActiveTracks.updatePowerState(this, true /* force */);
                         }
-    virtual bool        isOutput() const override { return false; }
 
             void        checkBtNrec();
 
@@ -1760,7 +1757,8 @@ class MmapThread : public ThreadBase
 #include "MmapTracks.h"
 
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-               AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady);
+               AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady,
+               bool isOut);
     virtual     ~MmapThread();
 
     virtual     void        configure(const audio_attributes_t *attr,
@@ -1888,8 +1886,6 @@ public:
     virtual     void        checkSilentMode_l();
                 void        processVolume_l() override;
 
-    virtual     bool        isOutput() const override { return true; }
-
                 void        updateMetadata_l() override;
 
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
@@ -1916,7 +1912,6 @@ public:
                 AudioStreamIn* clearInput();
 
                 status_t       exitStandby() override;
-    virtual     bool           isOutput() const override { return false; }
 
                 void           updateMetadata_l() override;
                 void           processVolume_l() override;
