@@ -548,7 +548,7 @@ bool C2SoftAvcDec::setDecodeArgs(ivd_video_decode_ip_t *ps_decode_ip,
     ps_decode_ip->s_out_buffer.u4_min_out_buf_size[1] = chromaSize;
     ps_decode_ip->s_out_buffer.u4_min_out_buf_size[2] = chromaSize;
     if (outBuffer) {
-        if (outBuffer->width() < displayStride || outBuffer->height() < displayHeight) {
+        if (outBuffer->height() < displayHeight) {
             ALOGE("Output buffer too small: provided (%dx%d) required (%ux%u)",
                   outBuffer->width(), outBuffer->height(), displayStride, displayHeight);
             return false;
