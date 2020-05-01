@@ -27,3 +27,9 @@ adb shell /data/nativetest64/MediaSampleReaderNDKTests/MediaSampleReaderNDKTests
 
 echo "testing MediaSampleQueue"
 adb shell /data/nativetest64/MediaSampleQueueTests/MediaSampleQueueTests
+
+echo "testing MediaTrackTranscoder"
+adb shell /data/nativetest64/MediaTrackTranscoderTests/MediaTrackTranscoderTests
+
+echo "testing VideoTrackTranscoder"
+adb shell /data/nativetest64/VideoTrackTranscoderTests/VideoTrackTranscoderTests
