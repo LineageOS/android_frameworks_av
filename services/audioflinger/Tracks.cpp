@@ -106,7 +106,7 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
         mThreadIoHandle(thread ? thread->id() : AUDIO_IO_HANDLE_NONE),
         mPortId(portId),
         mIsInvalid(false),
-        mMetricsId(std::move(metricsId)),
+        mTrackMetrics(std::move(metricsId), isOut),
         mCreatorPid(creatorPid)
 {
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
@@ -602,13 +602,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
 
     // Once this item is logged by the server, the client can add properties.
-    mediametrics::LogItem(mMetricsId)
-        .setPid(creatorPid)
-        .setUid(uid)
-        .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)uid)
-        .set(AMEDIAMETRICS_PROP_EVENT,
-                AMEDIAMETRICS_PROP_PREFIX_SERVER AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
-        .record();
+    mTrackMetrics.logConstructor(creatorPid, uid);
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -1249,6 +1243,7 @@ void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
     if (mFinalVolume != volume) { // Compare to an epsilon if too many meaningless updates
         mFinalVolume = volume;
         setMetadataHasChanged();
+        mTrackMetrics.logVolume(volume);
     }
 }
 
@@ -1534,10 +1529,7 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
                     (long long)mLogStartTimeNs,
                     (long long)local.mPosition[ExtendedTimestamp::LOCATION_SERVER],
                     (long long)mLogStartFrames);
-            mediametrics::LogItem(mMetricsId)
-                .set(AMEDIAMETRICS_PROP_LATENCYMS, latencyMs)
-                .set(AMEDIAMETRICS_PROP_STARTUPMS, startUpMs)
-                .record();
+            mTrackMetrics.logLatencyAndStartup(latencyMs, startUpMs);
         }
     }
 }
@@ -2182,12 +2174,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
 #endif
 
     // Once this item is logged by the server, the client can add properties.
-    mediametrics::LogItem(mMetricsId)
-        .setPid(creatorPid)
-        .setUid(uid)
-        .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)uid)
-        .set(AMEDIAMETRICS_PROP_EVENT, "server." AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
-        .record();
+    mTrackMetrics.logConstructor(creatorPid, uid);
 }
 
 AudioFlinger::RecordThread::RecordTrack::~RecordTrack()
@@ -2744,9 +2731,12 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
                   nullptr /* buffer */, (size_t)0 /* bufferSize */,
                   sessionId, creatorPid, uid, isOut,
                   ALLOC_NONE,
-                  TYPE_DEFAULT, portId),
+                  TYPE_DEFAULT, portId,
+                  std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_MMAP) + std::to_string(portId)),
         mPid(pid), mSilenced(false), mSilencedNotified(false)
 {
+    // Once this item is logged by the server, the client can add properties.
+    mTrackMetrics.logConstructor(creatorPid, uid);
 }
 
 AudioFlinger::MmapThread::MmapTrack::~MmapTrack()
