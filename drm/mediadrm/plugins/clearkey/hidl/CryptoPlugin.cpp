@@ -148,14 +148,17 @@ Return<void> CryptoPlugin::decrypt_1_2(
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
     size_t destSize = 0;
+    size_t srcSize = 0;
     bool haveEncryptedSubsamples = false;
     for (size_t i = 0; i < subSamples.size(); i++) {
         const SubSample &subSample = subSamples[i];
-        if (__builtin_add_overflow(destSize, subSample.numBytesOfClearData, &destSize)) {
+        if (__builtin_add_overflow(destSize, subSample.numBytesOfClearData, &destSize) ||
+            __builtin_add_overflow(srcSize, subSample.numBytesOfClearData, &srcSize)) {
             _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "subsample clear size overflow");
             return Void();
         }
-        if (__builtin_add_overflow(destSize, subSample.numBytesOfEncryptedData, &destSize)) {
+        if (__builtin_add_overflow(destSize, subSample.numBytesOfEncryptedData, &destSize) ||
+            __builtin_add_overflow(srcSize, subSample.numBytesOfEncryptedData, &srcSize)) {
             _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "subsample encrypted size overflow");
             return Void();
         }
@@ -164,7 +167,7 @@ Return<void> CryptoPlugin::decrypt_1_2(
         }
     }
 
-    if (destSize > destBuffer.size) {
+    if (destSize > destBuffer.size || srcSize > source.size) {
         _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "subsample sum too large");
         return Void();
     }
