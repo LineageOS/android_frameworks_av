@@ -3,4 +3,4 @@ service media.transcoding /system/bin/mediatranscoding
     user media
     group media
     ioprio rt 4
-    writepid /dev/cpuset/foreground/tasks /dev/stune/foreground/tasks
+    task_profiles ProcessCapacityHigh HighPerformance
