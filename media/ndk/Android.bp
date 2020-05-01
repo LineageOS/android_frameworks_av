@@ -196,3 +196,41 @@ cc_test {
         "frameworks/av/media/ndk/",
     ],
 }
+
+cc_library_static {
+    name: "libmediandk_format",
+
+    host_supported: true,
+
+    srcs: [
+        "NdkMediaFormat.cpp",
+    ],
+
+    header_libs: [
+        "libstagefright_foundation_headers",
+    ],
+
+    cflags: [
+        "-DEXPORT=__attribute__((visibility(\"default\")))",
+        "-Werror",
+        "-Wall",
+    ],
+
+    export_include_dirs: ["include"],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+
+    apex_available: ["com.android.media"],
+}
