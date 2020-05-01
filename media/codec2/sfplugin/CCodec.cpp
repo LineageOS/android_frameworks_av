@@ -1406,6 +1406,9 @@ void CCodec::stop() {
         // TODO: convert err into status_t
         mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
     }
+    // Assure buffers are not owned when stop() was called without flush().
+    std::list<std::unique_ptr<C2Work>> flushedWork;
+    mChannel->flush(flushedWork);
 
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
