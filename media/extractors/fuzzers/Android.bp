@@ -165,3 +165,35 @@ cc_fuzz {
         "libbinder",
     ],
 }
+
+cc_fuzz {
+    name: "flac_extractor_fuzzer",
+
+    srcs: [
+        "flac_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/flac",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libstagefright_foundation",
+        "libmedia",
+        "libextractorfuzzerbase",
+        "libstagefright_metadatautils",
+        "libFLAC",
+        "libflacextractor",
+    ],
+
+    shared_libs: [
+        "libutils",
+        "libmediandk",
+        "libbinder",
+        "libbinder_ndk",
+        "libbase",
+    ],
+
+    dictionary: "flac_extractor_fuzzer.dict",
+}
