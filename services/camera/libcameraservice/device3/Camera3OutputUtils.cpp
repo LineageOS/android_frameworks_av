@@ -259,13 +259,15 @@ void sendCaptureResult(
     }
 
     // Fix up some result metadata to account for HAL-level distortion correction
-    status_t res =
-            states.distortionMappers[states.cameraId.c_str()].correctCaptureResult(
-                    &captureResult.mMetadata);
-    if (res != OK) {
-        SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
-                frameNumber, strerror(-res), res);
-        return;
+    status_t res = OK;
+    auto iter = states.distortionMappers.find(states.cameraId.c_str());
+    if (iter != states.distortionMappers.end()) {
+        res = iter->second.correctCaptureResult(&captureResult.mMetadata);
+        if (res != OK) {
+            SET_ERR("Unable to correct capture result metadata for frame %d: %s (%d)",
+                    frameNumber, strerror(-res), res);
+            return;
+        }
     }
 
     // Fix up result metadata to account for zoom ratio availabilities between
