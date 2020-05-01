@@ -1705,8 +1705,8 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
-    if (!buffer && !flags) {
-        ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
+    if (!buffer && !flags && outputFormat == nullptr) {
+        ALOGV("[%s] onWorkDone: nothing to report from the work (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
         return true;
     }
