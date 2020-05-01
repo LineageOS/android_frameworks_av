@@ -88,6 +88,7 @@
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
 #include "NBAIO_Tee.h"
+#include "TrackMetrics.h"
 
 #include <android/os/IPowerManager.h>
 
