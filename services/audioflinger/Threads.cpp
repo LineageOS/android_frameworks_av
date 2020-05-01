@@ -220,6 +220,9 @@ static std::string patchSinksToString(const struct audio_patch *patch)
 {
     std::stringstream ss;
     for (size_t i = 0; i < patch->num_sinks; ++i) {
+        if (i > 0) {
+            ss << "|";
+        }
         ss << "(" << toString(patch->sinks[i].ext.device.type)
             << ", " << patch->sinks[i].ext.device.address << ")";
     }
@@ -230,6 +233,9 @@ static std::string patchSourcesToString(const struct audio_patch *patch)
 {
     std::stringstream ss;
     for (size_t i = 0; i < patch->num_sources; ++i) {
+        if (i > 0) {
+            ss << "|";
+        }
         ss << "(" << toString(patch->sources[i].ext.device.type)
             << ", " << patch->sources[i].ext.device.address << ")";
     }
@@ -1686,6 +1692,7 @@ ssize_t AudioFlinger::ThreadBase::ActiveTracks<T>::remove(const sp<T> &track) {
 #ifdef TEE_SINK
     track->dumpTee(-1 /* fd */, "_REMOVE");
 #endif
+    track->logEndInterval(); // log to MediaMetrics
     return index;
 }
 
@@ -2553,6 +2560,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             chain->incActiveTrackCnt();
         }
 
+        track->logBeginInterval(patchSinksToString(&mPatch)); // log to MediaMetrics
         status = NO_ERROR;
     }
 
@@ -4256,10 +4264,16 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
         status = mOutput->stream->setParameters(param.toString());
         *handle = AUDIO_PATCH_HANDLE_NONE;
     }
-    mediametrics::LogItem(mMetricsId)
-        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
-        .set(AMEDIAMETRICS_PROP_OUTPUTDEVICES, patchSinksToString(patch).c_str())
+    const std::string patchSinksAsString = patchSinksToString(patch);
+    mediametrics::LogItem item(mMetricsId);
+    item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
+        .set(AMEDIAMETRICS_PROP_OUTPUTDEVICES, patchSinksAsString.c_str())
         .record();
+    // also dispatch to active AudioTracks for MediaMetrics
+    for (const auto &track : mActiveTracks) {
+        track->logEndInterval();
+        track->logBeginInterval(patchSinksAsString);
+    }
 
     if (configChanged) {
         sendIoConfigEvent_l(AUDIO_OUTPUT_CONFIG_CHANGED);
@@ -4812,19 +4826,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             // because that is when the underrun occurs.
             // We do not distinguish between FastTracks and NormalTracks here.
             if (*mMixerStatus == MIXER_TRACKS_READY && mUnderrunFrames.size() > 0) {
-                mediametrics::LogItem item(mMetricsId);
-
-                item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN);
                 for (const auto &underrun : mUnderrunFrames) {
-                    underrun.first->mAudioTrackServerProxy->tallyUnderrunFrames(
-                            underrun.second);
-
-                    item.set(std::string("[" AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
-                            + std::to_string(underrun.first->portId())
-                            + "]" AMEDIAMETRICS_PROP_UNDERRUN,
-                            (int32_t)underrun.second);
+                    underrun.first->tallyUnderrunFrames(underrun.second);
                 }
-                item.record();
             }
         }
 
@@ -4837,7 +4841,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
     private:
         const mixer_state * const mMixerStatus;
-        const std::string& mMetricsId;
+        const std::string& __unused mMetricsId;
         std::vector<std::pair<sp<Track>, size_t>> mUnderrunFrames;
     } deferredOperations(&mixerStatus, mMetricsId);
     // implicit nested scope for variable capture
@@ -7881,6 +7885,9 @@ status_t AudioFlinger::RecordThread::start(RecordThread::RecordTrack* recordTrac
             sendIoConfigEvent_l(
                 AUDIO_CLIENT_STARTED, recordTrack->creatorPid(), recordTrack->portId());
         }
+
+        recordTrack->logBeginInterval(patchSourcesToString(&mPatch)); // log to MediaMetrics
+
         // Catch up with current buffer indices if thread is already running.
         // This is what makes a new client discard all buffered data.  If the track's mRsmpInFront
         // was initialized to some value closer to the thread's mRsmpInFront, then the track could
@@ -8545,12 +8552,17 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
         mPatch = *patch;
     }
 
-    mediametrics::LogItem(mMetricsId)
-        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
-        .set(AMEDIAMETRICS_PROP_INPUTDEVICES, patchSourcesToString(patch).c_str())
+    const std::string pathSourcesAsString = patchSourcesToString(patch);
+    mediametrics::LogItem item(mMetricsId);
+    item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
+        .set(AMEDIAMETRICS_PROP_INPUTDEVICES, pathSourcesAsString.c_str())
         .set(AMEDIAMETRICS_PROP_SOURCE, toString(mAudioSource).c_str())
         .record();
-
+    // also dispatch to active AudioRecords
+    for (const auto &track : mActiveTracks) {
+        track->logEndInterval();
+        track->logBeginInterval(pathSourcesAsString);
+    }
     return status;
 }
 
@@ -8861,6 +8873,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         chain->incActiveTrackCnt();
     }
 
+    track->logBeginInterval(patchSinksToString(&mPatch)); // log to MediaMetrics
     *handle = portId;
     broadcast_l();
 
@@ -8946,6 +8959,26 @@ void AudioFlinger::MmapThread::readHalParameters_l()
     result = mHalStream->getBufferSize(&mBufferSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving buffer size from HAL: %d", result);
     mFrameCount = mBufferSize / mFrameSize;
+
+    mediametrics::LogItem item(mMetricsId);
+    item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
+        .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
+        .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)mChannelCount)
+        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
+        /*
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(flags).c_str())
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAPTIC AMEDIAMETRICS_PROP_CHANNELMASK,
+                (int32_t)mHapticChannelMask)
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAPTIC AMEDIAMETRICS_PROP_CHANNELCOUNT,
+                (int32_t)mHapticChannelCount)
+        */
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_ENCODING,
+                formatToString(mHALFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_PREFIX_HAL    AMEDIAMETRICS_PROP_FRAMECOUNT,
+                (int32_t)mFrameCount) // sic - added HAL
+        .record();
 }
 
 bool AudioFlinger::MmapThread::threadLoop()
