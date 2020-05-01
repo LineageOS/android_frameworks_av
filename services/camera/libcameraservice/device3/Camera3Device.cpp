@@ -2344,6 +2344,21 @@ void Camera3Device::cancelStreamsConfigurationLocked() {
     }
 }
 
+bool Camera3Device::checkAbandonedStreamsLocked() {
+    if ((mInputStream.get() != nullptr) && (mInputStream->isAbandoned())) {
+        return true;
+    }
+
+    for (size_t i = 0; i < mOutputStreams.size(); i++) {
+        auto stream = mOutputStreams[i];
+        if ((stream.get() != nullptr) && (stream->isAbandoned())) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
 bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams) {
     ATRACE_CALL();
     bool ret = false;
@@ -2352,6 +2367,12 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams) {
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
 
     Mutex::Autolock l(mLock);
+    if (checkAbandonedStreamsLocked()) {
+        ALOGW("%s: Abandoned stream detected, session parameters can't be applied correctly!",
+                __FUNCTION__);
+        return true;
+    }
+
     auto rc = internalPauseAndWaitLocked(maxExpectedDuration);
     if (rc == NO_ERROR) {
         mNeedConfig = true;
