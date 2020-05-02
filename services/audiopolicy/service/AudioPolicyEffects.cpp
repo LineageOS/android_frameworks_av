@@ -928,7 +928,10 @@ status_t AudioPolicyEffects::loadAudioEffectXmlConfig() {
 
     loadProcessingChain(result.parsedConfig->preprocess, mInputSources);
     loadProcessingChain(result.parsedConfig->postprocess, mOutputStreams);
-    loadDeviceProcessingChain(result.parsedConfig->deviceprocess, mDeviceEffects);
+    {
+        Mutex::Autolock _l(mLock);
+        loadDeviceProcessingChain(result.parsedConfig->deviceprocess, mDeviceEffects);
+    }
     // Casting from ssize_t to status_t is probably safe, there should not be more than 2^31 errors
     return result.nbSkippedElement;
 }
