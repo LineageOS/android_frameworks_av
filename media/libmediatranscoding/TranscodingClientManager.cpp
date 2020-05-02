@@ -43,7 +43,8 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
      * object doesn't get created again, otherwise the binder object pointer
      * may not be unique.
      */
-    SpAIBinder mClientCallback;
+    SpAIBinder mClientBinder;
+    std::shared_ptr<ITranscodingClientCallback> mClientCallback;
     /* A unique id assigned to the client by the service. This number is used
      * by the service for indexing. Here we use the binder object's pointer
      * (casted to int64t_t) as the client id.
@@ -78,8 +79,9 @@ TranscodingClientManager::ClientImpl::ClientImpl(
         const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
         const std::string& clientName, const std::string& opPackageName,
         TranscodingClientManager* owner)
-      : mClientCallback((callback != nullptr) ? callback->asBinder() : nullptr),
-        mClientId((int64_t)mClientCallback.get()),
+      : mClientBinder((callback != nullptr) ? callback->asBinder() : nullptr),
+        mClientCallback(callback),
+        mClientId((int64_t)mClientBinder.get()),
         mClientPid(pid),
         mClientUid(uid),
         mClientName(clientName),
@@ -98,9 +100,8 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
 
     int32_t jobId = mNextJobId.fetch_add(1);
 
-    *_aidl_return =
-            mOwner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request,
-                                          ITranscodingClientCallback::fromBinder(mClientCallback));
+    *_aidl_return = mOwner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request,
+                                                  mClientCallback);
 
     if (*_aidl_return) {
         out_job->jobId = jobId;
@@ -205,7 +206,7 @@ status_t TranscodingClientManager::addClient(
           (long long)client->mClientId, client->mClientPid, client->mClientUid,
           client->mClientName.c_str(), client->mClientOpPackageName.c_str());
 
-    AIBinder_linkToDeath(client->mClientCallback.get(), mDeathRecipient.get(),
+    AIBinder_linkToDeath(client->mClientBinder.get(), mDeathRecipient.get(),
                          reinterpret_cast<void*>(client.get()));
 
     // Adds the new client to the map.
@@ -227,7 +228,7 @@ status_t TranscodingClientManager::removeClient(ClientIdType clientId) {
         return INVALID_OPERATION;
     }
 
-    SpAIBinder callback = it->second->mClientCallback;
+    SpAIBinder callback = it->second->mClientBinder;
 
     // Check if the client still live. If alive, unlink the death.
     if (callback.get() != nullptr) {
