@@ -41,7 +41,8 @@ class GraphicBuffer : public C2Buffer {
         : C2Buffer({block->share(C2Rect(block->width(), block->height()), ::C2Fence())}) {}
 };
 
-static std::vector<std::tuple<std::string, std::string, std::string>> kEncodeTestParameters;
+static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
+        kEncodeTestParameters;
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kEncodeResolutionTestParameters;
 
@@ -102,6 +103,7 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         mFramesReceived = 0;
         mFailedWorkReceived = 0;
         mTimestampUs = 0u;
+        mOutputSize = 0u;
         mTimestampDevTest = false;
         if (mCompName == unknown_comp) mDisableTest = true;
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
@@ -159,6 +161,16 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
                 }
 
                 if (work->result != C2_OK) mFailedWorkReceived++;
+                if (!work->worklets.front()->output.buffers.empty()) {
+                    mOutputSize += work->worklets.front()
+                                           ->output.buffers[0]
+                                           ->data()
+                                           .linearBlocks()
+                                           .front()
+                                           .map()
+                                           .get()
+                                           .capacity();
+                }
                 workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
                          mEos, mCsd, mFramesReceived);
             }
@@ -186,6 +198,7 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     uint32_t mFramesReceived;
     uint32_t mFailedWorkReceived;
     uint64_t mTimestampUs;
+    uint64_t mOutputSize;
 
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
@@ -281,7 +294,6 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
     uint32_t maxRetry = 0;
     int bytesCount = nWidth * nHeight * 3 >> 1;
     int32_t timestampIncr = ENCODER_TIMESTAMP_INCREMENT;
-    uint64_t timestamp = 0;
     c2_status_t err = C2_OK;
     while (1) {
         if (nFrames == 0) break;
@@ -308,7 +320,7 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         }
 
         work->input.flags = (C2FrameData::flags_t)flags;
-        work->input.ordinal.timestamp = timestamp;
+        work->input.ordinal.timestamp = frameID * timestampIncr;
         work->input.ordinal.frameIndex = frameID;
         {
             ULock l(queueLock);
@@ -361,7 +373,6 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         ASSERT_EQ(component->queue(&items), C2_OK);
         ALOGV("Frame #%d size = %d queued", frameID, bytesCount);
         nFrames--;
-        timestamp += timestampIncr;
         frameID++;
         maxRetry = 0;
     }
@@ -376,7 +387,8 @@ TEST_P(Codec2VideoEncHidlTest, validateCompName) {
 
 class Codec2VideoEncEncodeTest
     : public Codec2VideoEncHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {
+      public ::testing::WithParamInterface<
+              std::tuple<std::string, std::string, std::string, std::string>> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -391,6 +403,8 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
+    // Send an empty frame to receive CSD data from encoder.
+    bool sendEmptyFirstFrame = !std::get<3>(GetParam()).compare("true");
 
     strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mURL);
@@ -404,24 +418,32 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     mTimestampDevTest = true;
     mFlushedIndices.clear();
     mTimestampUslist.clear();
-    uint32_t inputFrames = ENC_NUM_FRAMES;
+    int32_t inputFrames = ENC_NUM_FRAMES + (sendEmptyFirstFrame ? 1 : 0);
     uint32_t timestamp = 0;
+
     // Add input timestamp to timestampUslist
     while (inputFrames) {
         if (mTimestampDevTest) mTimestampUslist.push_back(timestamp);
         timestamp += ENCODER_TIMESTAMP_INCREMENT;
         inputFrames--;
     }
+
     if (!setupConfigParam(nWidth, nHeight)) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
+
+    if (sendEmptyFirstFrame) {
+        ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue, 0, false));
+        inputFrames += 1;
+    }
     ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
-                                          ENC_NUM_FRAMES, nWidth, nHeight, false, signalEOS));
+                                          mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
+                                          inputFrames, ENC_NUM_FRAMES, nWidth, nHeight, false,
+                                          signalEOS));
     // mDisableTest will be set if buffer was not fetched properly.
-    // This may happen when resolution is not proper but config suceeded
+    // This may happen when resolution is not proper but config succeeded
     // In this cases, we skip encoding the input stream
     if (mDisableTest) {
         std::cout << "[   WARN   ] Test Disabled \n";
@@ -430,7 +452,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     }
 
     // If EOS is not sent, sending empty input with EOS flag
-    inputFrames = ENC_NUM_FRAMES;
+    inputFrames += ENC_NUM_FRAMES;
     if (!signalEOS) {
         ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
         ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
@@ -531,7 +553,7 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
                                           mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
                                           numFramesFlushed, nWidth, nHeight));
     // mDisableTest will be set if buffer was not fetched properly.
-    // This may happen when resolution is not proper but config suceeded
+    // This may happen when resolution is not proper but config succeeded
     // In this cases, we skip encoding the input stream
     if (mDisableTest) {
         std::cout << "[   WARN   ] Test Disabled \n";
@@ -568,7 +590,7 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
                                           nHeight, true));
     eleStream.close();
     // mDisableTest will be set if buffer was not fetched properly.
-    // This may happen when resolution is not proper but config suceeded
+    // This may happen when resolution is not proper but config succeeded
     // In this cases, we skip encoding the input stream
     if (mDisableTest) {
         std::cout << "[   WARN   ] Test Disabled \n";
@@ -677,7 +699,7 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
                                           MAX_INPUT_BUFFERS, nWidth, nHeight, false, true));
 
     // mDisableTest will be set if buffer was not fetched properly.
-    // This may happen when resolution is not proper but config suceeded
+    // This may happen when resolution is not proper but config succeeded
     // In this cases, we skip encoding the input stream
     if (mDisableTest) {
         std::cout << "[   WARN   ] Test Disabled \n";
@@ -703,15 +725,105 @@ INSTANTIATE_TEST_SUITE_P(NonStdSizes, Codec2VideoEncResolutionTest,
 INSTANTIATE_TEST_SUITE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
                          ::testing::ValuesIn(kEncodeTestParameters));
 
+TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
+    description("Encodes input file for different bitrates");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
+
+    char mURL[512];
+
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mURL);
+
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
+    ALOGV("mURL : %s", mURL);
+
+    mFlushedIndices.clear();
+
+    int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
+    int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
+    if (!setupConfigParam(nWidth, nHeight)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+    ASSERT_EQ(mComponent->start(), C2_OK);
+
+    uint64_t prevOutputSize = 0u;
+    uint32_t bitrateValues[] = {100000, 64000, 200000};
+    uint32_t prevBitrate = 0;
+    int32_t inputFrameId = 0;
+
+    for (uint32_t curBitrate : bitrateValues) {
+        // Configuring bitrate
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        C2StreamBitrateInfo::output bitrate(0u, curBitrate);
+        std::vector<C2Param*> configParam{&bitrate};
+        c2_status_t status = mComponent->config(configParam, C2_DONT_BLOCK, &failures);
+        if (status != C2_OK && failures.size() != 0u) {
+            ALOGW("BitRate Config failed, using previous bitrate");
+        }
+
+        ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                              mFlushedIndices, mGraphicPool, eleStream,
+                                              mDisableTest, inputFrameId, ENC_NUM_FRAMES, nWidth,
+                                              nHeight, false, false));
+        // mDisableTest will be set if buffer was not fetched properly.
+        // This may happen when resolution is not proper but config succeeded
+        // In this cases, we skip encoding the input stream
+        if (mDisableTest) {
+            std::cout << "[   WARN   ] Test Disabled \n";
+            ASSERT_EQ(mComponent->stop(), C2_OK);
+            return;
+        }
+        inputFrameId += ENC_NUM_FRAMES;
+        // blocking call to ensures application to Wait till all the inputs are
+        // consumed
+        ALOGD("Waiting for input consumption");
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+        // Change in bitrate may result in different outputSize
+        if (prevBitrate >= curBitrate) {
+            EXPECT_LE(mOutputSize, prevOutputSize);
+        } else {
+            EXPECT_GE(mOutputSize, prevOutputSize);
+        }
+        prevBitrate = curBitrate;
+        prevOutputSize = mOutputSize;
+        // Reset the file pointer and output size
+        mOutputSize = 0;
+        eleStream.seekg(0, eleStream.beg);
+    }
+
+    // Sending empty input with EOS flag
+    ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                                            C2FrameData::FLAG_END_OF_STREAM, false));
+    inputFrameId += 1;
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+    eleStream.close();
+    if (mFramesReceived != inputFrameId) {
+        ALOGE("Input buffer count and Output buffer count mismatch");
+        ALOGE("framesReceived : %d inputFrames : %d", mFramesReceived, inputFrameId);
+        ASSERT_TRUE(false);
+    }
+
+    ASSERT_EQ(mComponent->stop(), C2_OK);
+}
+
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
     for (auto params : kTestParameters) {
         kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "true"));
         kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "false"));
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "true"));
+        kEncodeTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "false"));
 
         kEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "52", "18"));
@@ -721,6 +833,10 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "484", "362"));
         kEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "244", "488"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "852", "608"));
+        kEncodeResolutionTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "1400", "442"));
     }
 
     // Set the resource directory based on command line args.
