@@ -17,29 +17,37 @@
 #ifndef ANDROID_MEDIA_UID_POLICY_INTERFACE_H
 #define ANDROID_MEDIA_UID_POLICY_INTERFACE_H
 
+#include <unordered_set>
+
 namespace android {
+
+class UidPolicyCallbackInterface;
 
 // Interface for the scheduler to query a uid's info.
 class UidPolicyInterface {
 public:
-    // Determines if a uid is currently running as top.
-    // TODO(chz): this should probably be replaced by a query that determines
-    // which uid has the highest priority among a given set of uids.
+    // Instruct the uid policy to start monitoring a uid.
+    virtual void registerMonitorUid(uid_t uid) = 0;
+    // Instruct the uid policy to stop monitoring a uid.
+    virtual void unregisterMonitorUid(uid_t uid) = 0;
+    // Whether a uid is among the set of uids that's currently top priority.
     virtual bool isUidOnTop(uid_t uid) = 0;
+    // Retrieves the set of uids that's currently top priority.
+    virtual std::unordered_set<uid_t> getTopUids() const = 0;
+    // Set the associated callback interface to send the events when uid states change.
+    virtual void setCallback(const std::shared_ptr<UidPolicyCallbackInterface>& cb) = 0;
 
 protected:
     virtual ~UidPolicyInterface() = default;
 };
 
-// Interface for notifying the scheduler of a change in a uid's state or
+// Interface for notifying the scheduler of a change in uid states or
 // transcoding resource availability.
 class UidPolicyCallbackInterface {
 public:
-    // Called when a uid is brought to top.
-    // TODO(chz): this should probably be replace by a callback when the uid
-    // that was previously identified being the highest priority as in
-    // UidPolicyInterface::isUidOnTop() has changed in priority.
-    virtual void onTopUidChanged(uid_t uid) = 0;
+    // Called when the set of uids that's top priority among the uids of interest
+    // has changed. The receiver of this callback should adjust accordingly.
+    virtual void onTopUidsChanged(const std::unordered_set<uid_t>& uids) = 0;
 
     // Called when resources become available for transcoding use. The scheduler
     // may use this as a signal to attempt restart transcoding activity that
