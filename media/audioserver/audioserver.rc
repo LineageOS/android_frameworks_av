@@ -5,7 +5,7 @@ service audioserver /system/bin/audioserver
     group audio camera drmrpc media mediadrm net_bt net_bt_admin net_bw_acct wakelock
     capabilities BLOCK_SUSPEND
     ioprio rt 4
-    writepid /dev/cpuset/foreground/tasks /dev/stune/foreground/tasks
+    task_profiles ProcessCapacityHigh HighPerformance
 
     onrestart setprop sys.audio.restart.hal 1
 
