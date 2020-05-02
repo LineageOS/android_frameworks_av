@@ -31,6 +31,12 @@ aidl_interface {
         "aidl/android/media/TranscodingRequestParcel.aidl",
         "aidl/android/media/TranscodingResultParcel.aidl",
     ],
+    backend:
+    {
+        java: {
+            enabled: true,
+        },
+    },
 }
 
 cc_library_shared {
