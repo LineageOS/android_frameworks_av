@@ -89,6 +89,8 @@ filegroup {
         "res/bbb_av1_176_144.av1",
         "res/bbb_av1_640_360.info",
         "res/bbb_av1_176_144.info",
+        "res/bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
+        "res/bbb_vp9_704x480_280kbps_24fps_altref_2.info",
     ],
 }
 

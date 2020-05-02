@@ -20,12 +20,15 @@ cc_library_shared {
     srcs: [
         "MediaSampleQueue.cpp",
         "MediaSampleReaderNDK.cpp",
+        "MediaTrackTranscoder.cpp",
+        "VideoTrackTranscoder.cpp",
     ],
 
     shared_libs: [
         "libbase",
         "libcutils",
         "libmediandk",
+        "libnativewindow",
         "libutils",
     ],
 

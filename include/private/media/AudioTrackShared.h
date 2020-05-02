@@ -614,6 +614,8 @@ public:
     // and thus which resulted in an underrun.
     virtual uint32_t    getUnderrunFrames() const { return mCblk->u.mStreaming.mUnderrunFrames; }
 
+    virtual uint32_t    getUnderrunCount() const { return mCblk->u.mStreaming.mUnderrunCount; }
+
     // Return the playback speed and pitch read atomically. Not multi-thread safe on server side.
     AudioPlaybackRate getPlaybackRate();
 
