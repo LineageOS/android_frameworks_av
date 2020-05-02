@@ -84,6 +84,8 @@ public:
     virtual ~TestTranscoder() {}
 
     // TranscoderInterface
+    void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& /*cb*/) override {}
+
     void start(int64_t clientId, int32_t jobId) override {
         mEventQueue.push_back(Start(clientId, jobId));
     }
@@ -157,6 +159,7 @@ struct TestClientCallback : public BnTranscodingClientCallback {
     Status onTranscodingFinished(int32_t in_jobId,
                                  const TranscodingResultParcel& in_result) override {
         EXPECT_EQ(in_jobId, in_result.jobId);
+        ALOGD("TestClientCallback: received onTranscodingFinished");
         mOwner->onFinished(mClientId, in_jobId);
         return Status::ok();
     }

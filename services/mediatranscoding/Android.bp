@@ -2,7 +2,10 @@
 cc_library_shared {
     name: "libmediatranscodingservice",
 
-    srcs: ["MediaTranscodingService.cpp"],
+    srcs: [
+        "MediaTranscodingService.cpp",
+        "SimulatedTranscoder.cpp",
+    ],
 
     shared_libs: [
         "libbase",
@@ -10,6 +13,10 @@ cc_library_shared {
         "liblog",
         "libmediatranscoding",
         "libutils",
+    ],
+    
+    export_shared_lib_headers: [
+        "libmediatranscoding",
     ],
 
     static_libs: [
