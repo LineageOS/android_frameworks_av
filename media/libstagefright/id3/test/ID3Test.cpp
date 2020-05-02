@@ -24,6 +24,7 @@
 #include <datasource/FileSource.h>
 
 #include <media/stagefright/foundation/hexdump.h>
+#include <media/MediaExtractorPluginHelper.h>
 #include <ID3.h>
 
 #include "ID3TestEnvironment.h"
@@ -42,7 +43,8 @@ TEST_P(ID3tagTest, TagTest) {
     string path = gEnv->getRes() + GetParam();
     sp<FileSource> file = new FileSource(path.c_str());
     ASSERT_EQ(file->initCheck(), (status_t)OK) << "File initialization failed! \n";
-    ID3 tag(file.get());
+    DataSourceHelper helper(file->wrap());
+    ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
 
     ID3::Iterator it(tag, nullptr);
@@ -61,7 +63,8 @@ TEST_P(ID3versionTest, VersionTest) {
     sp<android::FileSource> file = new FileSource(path.c_str());
     ASSERT_EQ(file->initCheck(), (status_t)OK) << "File initialization failed! \n";
 
-    ID3 tag(file.get());
+    DataSourceHelper helper(file->wrap());
+    ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
     ASSERT_TRUE(tag.version() >= versionNumber)
             << "Found version: " << tag.version() << " Expected version: " << versionNumber;
@@ -73,7 +76,8 @@ TEST_P(ID3textTagTest, TextTagTest) {
     sp<android::FileSource> file = new FileSource(path.c_str());
     ASSERT_EQ(file->initCheck(), (status_t)OK) << "File initialization failed! \n";
 
-    ID3 tag(file.get());
+    DataSourceHelper helper(file->wrap());
+    ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
     int countTextFrames = 0;
     ID3::Iterator it(tag, nullptr);
@@ -99,7 +103,8 @@ TEST_P(ID3albumArtTest, AlbumArtTest) {
     sp<android::FileSource> file = new FileSource(path.c_str());
     ASSERT_EQ(file->initCheck(), (status_t)OK) << "File initialization failed! \n";
 
-    ID3 tag(file.get());
+    DataSourceHelper helper(file->wrap());
+    ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
     size_t dataSize;
     String8 mime;
@@ -124,7 +129,8 @@ TEST_P(ID3multiAlbumArtTest, MultiAlbumArtTest) {
     sp<android::FileSource> file = new FileSource(path.c_str());
     ASSERT_EQ(file->initCheck(), (status_t)OK) << "File initialization failed! \n";
 
-    ID3 tag(file.get());
+    DataSourceHelper helper(file->wrap());
+    ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
     int count = 0;
     ID3::Iterator it(tag, nullptr);
