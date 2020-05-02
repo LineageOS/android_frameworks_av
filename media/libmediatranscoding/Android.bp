@@ -31,6 +31,12 @@ aidl_interface {
         "aidl/android/media/TranscodingRequestParcel.aidl",
         "aidl/android/media/TranscodingResultParcel.aidl",
     ],
+    backend:
+    {
+        java: {
+            enabled: true,
+        },
+    },
 }
 
 cc_library_shared {
@@ -39,6 +45,7 @@ cc_library_shared {
     srcs: [
         "TranscodingClientManager.cpp",
         "TranscodingJobScheduler.cpp",
+        "TranscodingUidPolicy.cpp",
     ],
 
     shared_libs: [
@@ -47,6 +54,7 @@ cc_library_shared {
         "liblog",
         "libutils",
         "libmediatranscoder",
+        "libbinder",
     ],
 
     export_include_dirs: ["include"],
