@@ -26,8 +26,10 @@ constexpr int32_t kSamplesPerFrame = L_FRAME;
 constexpr int32_t kBitsPerSample = 16;
 constexpr int32_t kOutputBufferSize = kSamplesPerFrame * kBitsPerSample / 8;
 const bitstream_format kBitStreamFormats[2] = {MIME_IETF, IF2};
-const int32_t kLocalWmfDecBytesPerFrame[8] = {12, 13, 15, 17, 19, 20, 26, 31};
-const int32_t kLocalIf2DecBytesPerFrame[8] = {13, 14, 16, 18, 19, 21, 26, 31};
+const int32_t kLocalWmfDecBytesPerFrame[16] = {12, 13, 15, 17, 19, 20, 26, 31,
+                                               5,  6,  5,  5,  0,  0,  0,  0};
+const int32_t kLocalIf2DecBytesPerFrame[16] = {13, 14, 16, 18, 19, 21, 26, 31,
+                                               13, 14, 16, 18, 19, 21, 26, 31};
 
 class Codec {
  public:
@@ -52,7 +54,7 @@ void Codec::decodeFrames(const uint8_t *data, size_t size) {
     bitstream_format bitsreamFormat = kBitStreamFormats[bit];
     int32_t frameSize = 0;
     /* Find frame type */
-    Frame_Type_3GPP frameType = static_cast<Frame_Type_3GPP>((mode >> 3) & 0x07);
+    Frame_Type_3GPP frameType = static_cast<Frame_Type_3GPP>((mode >> 3) & 0x0f);
     ++data;
     --size;
     if (bit) {

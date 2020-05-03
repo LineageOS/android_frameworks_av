@@ -171,6 +171,16 @@ public:
 
             void    setTeePatches(TeePatches teePatches);
 
+    void tallyUnderrunFrames(size_t frames) override {
+       if (isOut()) { // we expect this from output tracks only
+           mAudioTrackServerProxy->tallyUnderrunFrames(frames);
+           // Fetch absolute numbers from AudioTrackShared as it counts
+           // contiguous underruns as a one -- we want a consistent number.
+           // TODO: isolate this counting into a class.
+           mTrackMetrics.logUnderruns(mAudioTrackServerProxy->getUnderrunCount(),
+                   mAudioTrackServerProxy->getUnderrunFrames());
+       }
+    }
 protected:
     // for numerous
     friend class PlaybackThread;

@@ -135,7 +135,14 @@ bool contains(std::map<T, std::set<U>> *mapOfSet, T key, U value) {
     return false;
 }
 
-uint32_t Accessor::Impl::sSeqId = time(nullptr);
+#ifdef __ANDROID_VNDK__
+static constexpr uint32_t kSeqIdVndkBit = 1 << 31;
+#else
+static constexpr uint32_t kSeqIdVndkBit = 0;
+#endif
+
+static constexpr uint32_t kSeqIdMax = 0x7fffffff;
+uint32_t Accessor::Impl::sSeqId = time(nullptr) & kSeqIdMax;
 
 Accessor::Impl::Impl(
         const std::shared_ptr<BufferPoolAllocator> &allocator)
@@ -157,7 +164,7 @@ ResultStatus Accessor::Impl::connect(
         std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
         if (newConnection) {
             int32_t pid = getpid();
-            ConnectionId id = (int64_t)pid << 32 | sSeqId;
+            ConnectionId id = (int64_t)pid << 32 | sSeqId | kSeqIdVndkBit;
             status = mBufferPool.mObserver.open(id, statusDescPtr);
             if (status == ResultStatus::OK) {
                 newConnection->initialize(accessor, id);
@@ -167,7 +174,7 @@ ResultStatus Accessor::Impl::connect(
                 mBufferPool.mConnectionIds.insert(id);
                 mBufferPool.mInvalidationChannel.getDesc(invDescPtr);
                 mBufferPool.mInvalidation.onConnect(id, observer);
-                if (sSeqId == UINT32_MAX) {
+                if (sSeqId == kSeqIdMax) {
                    sSeqId = 0;
                 } else {
                     ++sSeqId;

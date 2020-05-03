@@ -97,10 +97,7 @@ public:
 
     virtual void        invalidate() {
                             if (mIsInvalid) return;
-                            mediametrics::LogItem(mMetricsId)
-                                .set(AMEDIAMETRICS_PROP_EVENT,
-                                     AMEDIAMETRICS_PROP_EVENT_VALUE_INVALIDATE)
-                                .record();
+                            mTrackMetrics.logInvalidate();
                             mIsInvalid = true;
                         }
             bool        isInvalid() const { return mIsInvalid; }
@@ -242,6 +239,20 @@ public:
         }
     }
 
+    // Called by the PlaybackThread to indicate that the track is becoming active
+    // and a new interval should start with a given device list.
+    void logBeginInterval(const std::string& devices) {
+        mTrackMetrics.logBeginInterval(devices);
+    }
+
+    // Called by the PlaybackThread to indicate the track is no longer active.
+    void logEndInterval() {
+        mTrackMetrics.logEndInterval();
+    }
+
+    // Called to tally underrun frames in playback.
+    virtual void tallyUnderrunFrames(size_t /* frames */) {}
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
@@ -367,7 +378,7 @@ protected:
     int64_t             mLogStartTimeNs = 0;
     int64_t             mLogStartFrames = 0;
 
-    const std::string   mMetricsId;
+    TrackMetrics        mTrackMetrics;
 
     bool                mServerLatencySupported = false;
     std::atomic<bool>   mServerLatencyFromTrack{}; // latency from track or server timestamp.

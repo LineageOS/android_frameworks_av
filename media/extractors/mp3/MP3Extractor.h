@@ -45,13 +45,13 @@ public:
     virtual const char * name() { return "MP3Extractor"; }
 
 private:
-    status_t mInitCheck;
+    status_t mInitCheck = NO_INIT;
 
-    DataSourceHelper *mDataSource;
-    off64_t mFirstFramePos;
-    AMediaFormat *mMeta;
-    uint32_t mFixedHeader;
-    MP3Seeker *mSeeker;
+    DataSourceHelper *mDataSource = NULL;
+    off64_t mFirstFramePos = -1;
+    AMediaFormat *mMeta = NULL;
+    uint32_t mFixedHeader = 0;
+    MP3Seeker *mSeeker = NULL;
 
     MP3Extractor(const MP3Extractor &);
     MP3Extractor &operator=(const MP3Extractor &);

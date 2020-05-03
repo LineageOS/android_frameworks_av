@@ -676,6 +676,7 @@ bool AudioPolicyService::isVirtualSource(audio_source_t source)
         case AUDIO_SOURCE_VOICE_CALL:
         case AUDIO_SOURCE_REMOTE_SUBMIX:
         case AUDIO_SOURCE_FM_TUNER:
+        case AUDIO_SOURCE_ECHO_REFERENCE:
             return true;
         default:
             break;

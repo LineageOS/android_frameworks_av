@@ -15,6 +15,18 @@ cc_library_headers {
     ],
 }
 
+cc_library_headers {
+    name: "libmedia_datasource_headers",
+    export_include_dirs: ["include"],
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+    apex_available: ["com.android.media"],
+}
+
 filegroup {
     name: "libmedia_omx_aidl",
     srcs: [
