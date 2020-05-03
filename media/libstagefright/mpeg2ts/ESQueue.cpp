@@ -1153,7 +1153,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitAAC() {
     }
 
     const RangeInfo &info = *mRangeInfos.begin();
-    if (mBuffer->size() < info.mLength) {
+    if (info.mLength == 0 || mBuffer->size() < info.mLength) {
         return NULL;
     }
 

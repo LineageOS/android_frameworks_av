@@ -520,6 +520,22 @@ c2_status_t C2AllocationGralloc::map(
             break;
         }
 
+        case static_cast<uint32_t>(PixelFormat4::BLOB): {
+            void *pointer = nullptr;
+            // TODO: fence
+            status_t err = GraphicBufferMapper::get().lock(
+                                const_cast<native_handle_t*>(mBuffer), grallocUsage,
+                                { (int32_t)rect.left, (int32_t)rect.top,
+                                  (int32_t)rect.width, (int32_t)rect.height },
+                                &pointer);
+            if (err) {
+                ALOGE("failed transaction: lock(BLOB)");
+                return C2_CORRUPTED;
+            }
+            *addr = (uint8_t *)pointer;
+            break;
+        }
+
         case static_cast<uint32_t>(PixelFormat4::YCBCR_420_888):
             // fall-through
         case static_cast<uint32_t>(PixelFormat4::YV12):

@@ -88,6 +88,8 @@
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
 #include "NBAIO_Tee.h"
+#include "ThreadMetrics.h"
+#include "TrackMetrics.h"
 
 #include <powermanager/IPowerManager.h>
 

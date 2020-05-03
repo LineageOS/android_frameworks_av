@@ -37,6 +37,11 @@
 // They must be appended with another value to make a key.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO "audio."
 
+// The AudioMmap key appends the "trackId" to the prefix.
+// This is the AudioFlinger equivalent of the AAudio Stream.
+// TODO: unify with AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_MMAP  AMEDIAMETRICS_KEY_PREFIX_AUDIO "mmap."
+
 // The AudioRecord key appends the "trackId" to the prefix.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD AMEDIAMETRICS_KEY_PREFIX_AUDIO "record."
 
@@ -95,6 +100,14 @@
 #define AMEDIAMETRICS_PROP_CHANNELCOUNT   "channelCount"   // int32
 #define AMEDIAMETRICS_PROP_CHANNELMASK    "channelMask"    // int32
 #define AMEDIAMETRICS_PROP_CONTENTTYPE    "contentType"    // string attributes (AudioTrack)
+#define AMEDIAMETRICS_PROP_CUMULATIVETIMENS "cumulativeTimeNs" // int64_t playback/record time
+                                                           // since start
+// DEVICE values are averaged since starting on device
+#define AMEDIAMETRICS_PROP_DEVICELATENCYMS "deviceLatencyMs" // double - avg latency time
+#define AMEDIAMETRICS_PROP_DEVICESTARTUPMS "deviceStartupMs" // double - avg startup time
+#define AMEDIAMETRICS_PROP_DEVICETIMENS   "deviceTimeNs"   // int64_t playback/record time
+#define AMEDIAMETRICS_PROP_DEVICEVOLUME   "deviceVolume"   // double - average device volume
+
 #define AMEDIAMETRICS_PROP_DIRECTION      "direction"      // string AAudio input or output
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
@@ -105,7 +118,9 @@
 
 #define AMEDIAMETRICS_PROP_FRAMECOUNT     "frameCount"     // int32
 #define AMEDIAMETRICS_PROP_INPUTDEVICES   "inputDevices"   // string value
+#define AMEDIAMETRICS_PROP_INTERVALCOUNT  "intervalCount"  // int32
 #define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
+#define AMEDIAMETRICS_PROP_NAME           "name"           // string value
 #define AMEDIAMETRICS_PROP_ORIGINALFLAGS  "originalFlags"  // int32
 #define AMEDIAMETRICS_PROP_OUTPUTDEVICES  "outputDevices"  // string value
 #define AMEDIAMETRICS_PROP_PERFORMANCEMODE "performanceMode"    // string value, "none", lowLatency"
@@ -129,6 +144,7 @@
 #define AMEDIAMETRICS_PROP_TRACKID        "trackId"        // int32 port id of track/record
 #define AMEDIAMETRICS_PROP_TYPE           "type"           // string (thread type)
 #define AMEDIAMETRICS_PROP_UNDERRUN       "underrun"       // int32
+#define AMEDIAMETRICS_PROP_UNDERRUNFRAMES "underrunFrames" // int64_t from Thread
 #define AMEDIAMETRICS_PROP_USAGE          "usage"          // string attributes (ATrack)
 #define AMEDIAMETRICS_PROP_VOLUME_LEFT    "volume.left"    // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_VOLUME_RIGHT   "volume.right"   // double (AudioTrack)
@@ -140,12 +156,14 @@
 // Values are strings accepted for a given property.
 
 // An event is a general description, which often is a function name.
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_BEGINAUDIOINTERVALGROUP "beginAudioIntervalGroup"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CLOSE      "close"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE     "create"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH "createAudioPatch"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR       "ctor"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT "disconnect"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR       "dtor"
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP "endAudioIntervalGroup"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH      "flush"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_INVALIDATE "invalidate" // server track, record
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN       "open"

@@ -39,6 +39,9 @@ namespace {
 
     static constexpr size_t kMinAllocBytesForEviction = 1024*1024*15;
     static constexpr size_t kMinBufferCountForEviction = 25;
+
+    static constexpr nsecs_t kEvictGranularityNs = 1000000000; // 1 sec
+    static constexpr nsecs_t kEvictDurationNs = 5000000000; // 5 secs
 }
 
 // Buffer structure in bufferpool process
@@ -135,11 +138,18 @@ bool contains(std::map<T, std::set<U>> *mapOfSet, T key, U value) {
     return false;
 }
 
-uint32_t Accessor::Impl::sSeqId = time(nullptr);
+#ifdef __ANDROID_VNDK__
+static constexpr uint32_t kSeqIdVndkBit = 1 << 31;
+#else
+static constexpr uint32_t kSeqIdVndkBit = 0;
+#endif
+
+static constexpr uint32_t kSeqIdMax = 0x7fffffff;
+uint32_t Accessor::Impl::sSeqId = time(nullptr) & kSeqIdMax;
 
 Accessor::Impl::Impl(
         const std::shared_ptr<BufferPoolAllocator> &allocator)
-        : mAllocator(allocator) {}
+        : mAllocator(allocator), mScheduleEvictTs(0) {}
 
 Accessor::Impl::~Impl() {
 }
@@ -157,7 +167,7 @@ ResultStatus Accessor::Impl::connect(
         std::lock_guard<std::mutex> lock(mBufferPool.mMutex);
         if (newConnection) {
             int32_t pid = getpid();
-            ConnectionId id = (int64_t)pid << 32 | sSeqId;
+            ConnectionId id = (int64_t)pid << 32 | sSeqId | kSeqIdVndkBit;
             status = mBufferPool.mObserver.open(id, statusDescPtr);
             if (status == ResultStatus::OK) {
                 newConnection->initialize(accessor, id);
@@ -167,7 +177,7 @@ ResultStatus Accessor::Impl::connect(
                 mBufferPool.mConnectionIds.insert(id);
                 mBufferPool.mInvalidationChannel.getDesc(invDescPtr);
                 mBufferPool.mInvalidation.onConnect(id, observer);
-                if (sSeqId == UINT32_MAX) {
+                if (sSeqId == kSeqIdMax) {
                    sSeqId = 0;
                 } else {
                     ++sSeqId;
@@ -177,6 +187,7 @@ ResultStatus Accessor::Impl::connect(
         }
         mBufferPool.processStatusMessages();
         mBufferPool.cleanUp();
+        scheduleEvictIfNeeded();
     }
     return status;
 }
@@ -191,6 +202,7 @@ ResultStatus Accessor::Impl::close(ConnectionId connectionId) {
     // Since close# will be called after all works are finished, it is OK to
     // evict unused buffers.
     mBufferPool.cleanUp(true);
+    scheduleEvictIfNeeded();
     return ResultStatus::OK;
 }
 
@@ -217,6 +229,7 @@ ResultStatus Accessor::Impl::allocate(
         mBufferPool.handleOwnBuffer(connectionId, *bufferId);
     }
     mBufferPool.cleanUp();
+    scheduleEvictIfNeeded();
     return status;
 }
 
@@ -242,6 +255,7 @@ ResultStatus Accessor::Impl::fetch(
         }
     }
     mBufferPool.cleanUp();
+    scheduleEvictIfNeeded();
     return ResultStatus::CRITICAL_ERROR;
 }
 
@@ -881,6 +895,88 @@ std::unique_ptr<Accessor::Impl::AccessorInvalidator> Accessor::Impl::sInvalidato
 void Accessor::Impl::createInvalidator() {
     if (!sInvalidator) {
         sInvalidator = std::make_unique<Accessor::Impl::AccessorInvalidator>();
+    }
+}
+
+void Accessor::Impl::evictorThread(
+        std::map<const std::weak_ptr<Accessor::Impl>, nsecs_t, std::owner_less<>> &accessors,
+        std::mutex &mutex,
+        std::condition_variable &cv) {
+    std::list<const std::weak_ptr<Accessor::Impl>> evictList;
+    while (true) {
+        int expired = 0;
+        int evicted = 0;
+        {
+            nsecs_t now = systemTime();
+            std::unique_lock<std::mutex> lock(mutex);
+            if (accessors.size() == 0) {
+                cv.wait(lock);
+            }
+            auto it = accessors.begin();
+            while (it != accessors.end()) {
+                if (now > (it->second + kEvictDurationNs)) {
+                    ++expired;
+                    evictList.push_back(it->first);
+                    it = accessors.erase(it);
+                } else {
+                    ++it;
+                }
+            }
+        }
+        // evict idle accessors;
+        for (auto it = evictList.begin(); it != evictList.end(); ++it) {
+            const std::shared_ptr<Accessor::Impl> accessor = it->lock();
+            if (accessor) {
+                accessor->cleanUp(true);
+                ++evicted;
+            }
+        }
+        if (expired > 0) {
+            ALOGD("evictor expired: %d, evicted: %d", expired, evicted);
+        }
+        evictList.clear();
+        ::usleep(kEvictGranularityNs / 1000);
+    }
+}
+
+Accessor::Impl::AccessorEvictor::AccessorEvictor() {
+    std::thread evictor(
+            evictorThread,
+            std::ref(mAccessors),
+            std::ref(mMutex),
+            std::ref(mCv));
+    evictor.detach();
+}
+
+void Accessor::Impl::AccessorEvictor::addAccessor(
+        const std::weak_ptr<Accessor::Impl> &impl, nsecs_t ts) {
+    std::lock_guard<std::mutex> lock(mMutex);
+    bool notify = mAccessors.empty();
+    auto it = mAccessors.find(impl);
+    if (it == mAccessors.end()) {
+        mAccessors.emplace(impl, ts);
+    } else {
+        it->second = ts;
+    }
+    if (notify) {
+        mCv.notify_one();
+    }
+}
+
+std::unique_ptr<Accessor::Impl::AccessorEvictor> Accessor::Impl::sEvictor;
+
+void Accessor::Impl::createEvictor() {
+    if (!sEvictor) {
+        sEvictor = std::make_unique<Accessor::Impl::AccessorEvictor>();
+    }
+}
+
+void Accessor::Impl::scheduleEvictIfNeeded() {
+    nsecs_t now = systemTime();
+
+    if (now > (mScheduleEvictTs + kEvictGranularityNs)) {
+        mScheduleEvictTs = now;
+        sEvictor->addAccessor(shared_from_this(), now);
     }
 }
 

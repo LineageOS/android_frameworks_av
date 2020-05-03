@@ -115,7 +115,8 @@ void workDone(const std::shared_ptr<android::Codec2Client::Component>& component
             typedef std::unique_lock<std::mutex> ULock;
             ULock l(queueLock);
             workQueue.push_back(std::move(work));
-            if (!flushedIndices.empty()) {
+            if (!flushedIndices.empty() &&
+                (frameIndexIt != flushedIndices.end())) {
                 flushedIndices.erase(frameIndexIt);
             }
             queueCondition.notify_all();

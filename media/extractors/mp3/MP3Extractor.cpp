@@ -227,17 +227,17 @@ protected:
 
 private:
     static const size_t kMaxFrameSize;
-    AMediaFormat *mMeta;
-    DataSourceHelper *mDataSource;
-    off64_t mFirstFramePos;
-    uint32_t mFixedHeader;
-    off64_t mCurrentPos;
-    int64_t mCurrentTimeUs;
-    bool mStarted;
-    MP3Seeker *mSeeker;
+    AMediaFormat *mMeta = NULL;
+    DataSourceHelper *mDataSource = NULL;
+    off64_t mFirstFramePos = 0;
+    uint32_t mFixedHeader = 0;
+    off64_t mCurrentPos = 0;
+    int64_t mCurrentTimeUs = 0;
+    bool mStarted = false;
+    MP3Seeker *mSeeker = NULL;
 
-    int64_t mBasisTimeUs;
-    int64_t mSamplesRead;
+    int64_t mBasisTimeUs = 0;
+    int64_t mSamplesRead = 0;
 
     MP3Source(const MP3Source &);
     MP3Source &operator=(const MP3Source &);
@@ -251,11 +251,7 @@ struct Mp3Meta {
 
 MP3Extractor::MP3Extractor(
         DataSourceHelper *source, Mp3Meta *meta)
-    : mInitCheck(NO_INIT),
-      mDataSource(source),
-      mFirstFramePos(-1),
-      mFixedHeader(0),
-      mSeeker(NULL) {
+    : mDataSource(source) {
 
     off64_t pos = 0;
     off64_t post_id3_pos;
@@ -442,6 +438,7 @@ media_status_t MP3Extractor::getTrackMetaData(
 //  (8000 samples/sec * 8 bits/byte)) + 1 padding byte/frame = 2881 bytes/frame.
 // Set our max frame size to the nearest power of 2 above this size (aka, 4kB)
 const size_t MP3Source::kMaxFrameSize = (1 << 12); /* 4096 bytes */
+
 MP3Source::MP3Source(
         AMediaFormat *meta, DataSourceHelper *source,
         off64_t first_frame_pos, uint32_t fixed_header,
@@ -450,12 +447,7 @@ MP3Source::MP3Source(
       mDataSource(source),
       mFirstFramePos(first_frame_pos),
       mFixedHeader(fixed_header),
-      mCurrentPos(0),
-      mCurrentTimeUs(0),
-      mStarted(false),
-      mSeeker(seeker),
-      mBasisTimeUs(0),
-      mSamplesRead(0) {
+      mSeeker(seeker) {
 }
 
 MP3Source::~MP3Source() {
