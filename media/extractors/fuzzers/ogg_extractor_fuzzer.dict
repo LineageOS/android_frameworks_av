@@ -1,0 +1,3 @@
+# Start code(bytes 0-3)
+# The below 4 bytes correspond to "OggS" in ASCII
+kw1="\x4F\x67\x67\x53"
