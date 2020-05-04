@@ -949,6 +949,51 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addRotateCropTags() {
     return res;
 }
 
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addPreCorrectionActiveArraySize() {
+    status_t res = OK;
+    auto& c = mCameraCharacteristics;
+
+    auto activeArraySize = c.find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+    auto preCorrectionActiveArraySize = c.find(
+            ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
+    if (activeArraySize.count == 4 && preCorrectionActiveArraySize.count == 0) {
+        std::vector<int32_t> preCorrectionArray(
+                activeArraySize.data.i32, activeArraySize.data.i32+4);
+        res = c.update(ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE,
+                preCorrectionArray.data(), 4);
+        if (res != OK) {
+            ALOGE("%s: Failed to add ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE: %s(%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    } else {
+        return res;
+    }
+
+    auto charTags = c.find(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS);
+    bool hasPreCorrectionActiveArraySize = std::find(charTags.data.i32,
+            charTags.data.i32 + charTags.count,
+            ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE) !=
+            (charTags.data.i32 + charTags.count);
+    if (!hasPreCorrectionActiveArraySize) {
+        std::vector<int32_t> supportedCharTags;
+        supportedCharTags.reserve(charTags.count + 1);
+        supportedCharTags.insert(supportedCharTags.end(), charTags.data.i32,
+                charTags.data.i32 + charTags.count);
+        supportedCharTags.push_back(ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
+
+        res = c.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, supportedCharTags.data(),
+                supportedCharTags.size());
+        if (res != OK) {
+            ALOGE("%s: Failed to update ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS: %s(%d)",
+                    __FUNCTION__, strerror(-res), res);
+            return res;
+        }
+    }
+
+    return res;
+}
+
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::removeAvailableKeys(
         CameraMetadata& c, const std::vector<uint32_t>& keys, uint32_t keyTag) {
     status_t res = OK;
@@ -2254,7 +2299,11 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         ALOGE("%s: Unable to add default SCALER_ROTATE_AND_CROP tags: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
     }
-
+    res = addPreCorrectionActiveArraySize();
+    if (OK != res) {
+        ALOGE("%s: Unable to add PRE_CORRECTION_ACTIVE_ARRAY_SIZE: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
+    }
     res = camera3::ZoomRatioMapper::overrideZoomRatioTags(
             &mCameraCharacteristics, &mSupportNativeZoomRatio);
     if (OK != res) {
