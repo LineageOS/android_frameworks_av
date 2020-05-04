@@ -1669,7 +1669,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
-            uint16_t data_ref_index __unused = U16_AT(&buffer[6]);
+            // we can get data_ref_index value from U16_AT(&buffer[6])
             uint16_t version = U16_AT(&buffer[8]);
             uint32_t num_channels = U16_AT(&buffer[16]);
 
@@ -1861,7 +1861,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                 return ERROR_IO;
             }
 
-            uint16_t data_ref_index __unused = U16_AT(&buffer[6]);
+            // we can get data_ref_index value from U16_AT(&buffer[6])
             uint16_t width = U16_AT(&buffer[6 + 18]);
             uint16_t height = U16_AT(&buffer[6 + 20]);
 
@@ -3252,7 +3252,7 @@ status_t MPEG4Extractor::parseAC3SpecificBox(off64_t offset) {
     }
 
     // skip
-    unsigned bsmod __unused = br.getBits(3);
+    br.skipBits(3); // bsmod
 
     unsigned acmod = br.getBits(3);
     unsigned lfeon = br.getBits(1);
@@ -3563,19 +3563,18 @@ status_t MPEG4Extractor::parseTrackHeader(
         return ERROR_IO;
     }
 
-    uint64_t ctime __unused, mtime __unused, duration __unused;
     int32_t id;
 
     if (version == 1) {
-        ctime = U64_AT(&buffer[4]);
-        mtime = U64_AT(&buffer[12]);
+        // we can get ctime value from U64_AT(&buffer[4])
+        // we can get mtime value from U64_AT(&buffer[12])
         id = U32_AT(&buffer[20]);
-        duration = U64_AT(&buffer[28]);
+        // we can get duration value from U64_AT(&buffer[28])
     } else if (version == 0) {
-        ctime = U32_AT(&buffer[4]);
-        mtime = U32_AT(&buffer[8]);
+        // we can get ctime value from U32_AT(&buffer[4])
+        // we can get mtime value from U32_AT(&buffer[8])
         id = U32_AT(&buffer[12]);
-        duration = U32_AT(&buffer[20]);
+        // we can get duration value from U32_AT(&buffer[20])
     } else {
         return ERROR_UNSUPPORTED;
     }
@@ -4441,18 +4440,17 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
     if (objectType == AOT_SBR || objectType == AOT_PS) {//SBR specific config per 14496-3 tbl 1.13
         if (br.numBitsLeft() < 4) return ERROR_MALFORMED;
         uint32_t extFreqIndex = br.getBits(4);
-        int32_t extSampleRate __unused;
         if (extFreqIndex == 15) {
             if (csd_size < 8) {
                 return ERROR_MALFORMED;
             }
             if (br.numBitsLeft() < 24) return ERROR_MALFORMED;
-            extSampleRate = br.getBits(24);
+            br.skipBits(24); // extSampleRate
         } else {
             if (extFreqIndex == 13 || extFreqIndex == 14) {
                 return ERROR_MALFORMED;
             }
-            extSampleRate = kSamplingRate[extFreqIndex];
+            //extSampleRate = kSamplingRate[extFreqIndex];
         }
         //TODO: save the extension sampling rate value in meta data =>
         //      AMediaFormat_setInt32(mLastTrack->meta, kKeyExtSampleRate, extSampleRate);
@@ -4495,13 +4493,13 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
                 objectType == AOT_ER_AAC_LD || objectType == AOT_ER_AAC_SCAL ||
                 objectType == AOT_ER_BSAC) {
             if (br.numBitsLeft() < 2) return ERROR_MALFORMED;
-            const int32_t frameLengthFlag __unused = br.getBits(1);
+            br.skipBits(1); // frameLengthFlag
 
             const int32_t dependsOnCoreCoder = br.getBits(1);
 
             if (dependsOnCoreCoder ) {
                 if (br.numBitsLeft() < 14) return ERROR_MALFORMED;
-                const int32_t coreCoderDelay __unused = br.getBits(14);
+                br.skipBits(14); // coreCoderDelay
             }
 
             int32_t extensionFlag = -1;
@@ -4533,64 +4531,64 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
                 if (br.numBitsLeft() < 32) {
                     return ERROR_MALFORMED;
                 }
-                const int32_t ElementInstanceTag __unused = br.getBits(4);
-                const int32_t Profile __unused = br.getBits(2);
-                const int32_t SamplingFrequencyIndex __unused = br.getBits(4);
+                br.skipBits(4); // ElementInstanceTag
+                br.skipBits(2); // Profile
+                br.skipBits(4); // SamplingFrequencyIndex
                 const int32_t NumFrontChannelElements = br.getBits(4);
                 const int32_t NumSideChannelElements = br.getBits(4);
                 const int32_t NumBackChannelElements = br.getBits(4);
                 const int32_t NumLfeChannelElements = br.getBits(2);
-                const int32_t NumAssocDataElements __unused = br.getBits(3);
-                const int32_t NumValidCcElements __unused = br.getBits(4);
+                br.skipBits(3); // NumAssocDataElements
+                br.skipBits(4); // NumValidCcElements
 
                 const int32_t MonoMixdownPresent = br.getBits(1);
 
                 if (MonoMixdownPresent != 0) {
                     if (br.numBitsLeft() < 4) return ERROR_MALFORMED;
-                    const int32_t MonoMixdownElementNumber __unused = br.getBits(4);
+                    br.skipBits(4); // MonoMixdownElementNumber
                 }
 
                 if (br.numBitsLeft() < 1) return ERROR_MALFORMED;
                 const int32_t StereoMixdownPresent = br.getBits(1);
                 if (StereoMixdownPresent != 0) {
                     if (br.numBitsLeft() < 4) return ERROR_MALFORMED;
-                    const int32_t StereoMixdownElementNumber __unused = br.getBits(4);
+                    br.skipBits(4); // StereoMixdownElementNumber
                 }
 
                 if (br.numBitsLeft() < 1) return ERROR_MALFORMED;
                 const int32_t MatrixMixdownIndexPresent = br.getBits(1);
                 if (MatrixMixdownIndexPresent != 0) {
                     if (br.numBitsLeft() < 3) return ERROR_MALFORMED;
-                    const int32_t MatrixMixdownIndex __unused = br.getBits(2);
-                    const int32_t PseudoSurroundEnable __unused = br.getBits(1);
+                    br.skipBits(2); // MatrixMixdownIndex
+                    br.skipBits(1); // PseudoSurroundEnable
                 }
 
                 int i;
                 for (i=0; i < NumFrontChannelElements; i++) {
                     if (br.numBitsLeft() < 5) return ERROR_MALFORMED;
                     const int32_t FrontElementIsCpe = br.getBits(1);
-                    const int32_t FrontElementTagSelect __unused = br.getBits(4);
+                    br.skipBits(4); // FrontElementTagSelect
                     channelsNum += FrontElementIsCpe ? 2 : 1;
                 }
 
                 for (i=0; i < NumSideChannelElements; i++) {
                     if (br.numBitsLeft() < 5) return ERROR_MALFORMED;
                     const int32_t SideElementIsCpe = br.getBits(1);
-                    const int32_t SideElementTagSelect __unused = br.getBits(4);
+                    br.skipBits(4); // SideElementTagSelect
                     channelsNum += SideElementIsCpe ? 2 : 1;
                 }
 
                 for (i=0; i < NumBackChannelElements; i++) {
                     if (br.numBitsLeft() < 5) return ERROR_MALFORMED;
                     const int32_t BackElementIsCpe = br.getBits(1);
-                    const int32_t BackElementTagSelect __unused = br.getBits(4);
+                    br.skipBits(4); // BackElementTagSelect
                     channelsNum += BackElementIsCpe ? 2 : 1;
                 }
                 channelsEffectiveNum = channelsNum;
 
                 for (i=0; i < NumLfeChannelElements; i++) {
                     if (br.numBitsLeft() < 4) return ERROR_MALFORMED;
-                    const int32_t LfeElementTagSelect __unused = br.getBits(4);
+                    br.skipBits(4); // LfeElementTagSelect
                     channelsNum += 1;
                 }
                 ALOGV("mpeg4 audio channelsNum = %d", channelsNum);
