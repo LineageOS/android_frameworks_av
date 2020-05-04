@@ -566,6 +566,7 @@ private:
             status_t addDynamicDepthTags();
             status_t deriveHeicTags();
             status_t addRotateCropTags();
+            status_t addPreCorrectionActiveArraySize();
 
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
                     android_pixel_format_t format,
