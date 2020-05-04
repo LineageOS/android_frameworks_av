@@ -339,7 +339,12 @@ void BlockIterator::advance() {
 }
 
 void BlockIterator::advance_l() {
-    for (;;) {
+    for (int i = 0;; i++) {
+        if (i == 1000) {
+            ALOGE("no block found after %d iterations, stopping", i);
+            mCluster = NULL;
+            break;
+        }
         long res = mCluster->GetEntry(mBlockEntryIndex, mBlockEntry);
         ALOGV("GetEntry returned %ld", res);
 
