@@ -27,13 +27,13 @@
 
 #include <utils/Singleton.h>
 
-#include "AAudioEndpointManager.h"
-#include "AAudioServiceEndpoint.h"
 
 #include "core/AudioStreamBuilder.h"
+
+#include "AAudioEndpointManager.h"
+#include "AAudioClientTracker.h"
 #include "AAudioServiceEndpoint.h"
 #include "AAudioServiceStreamShared.h"
-#include "AAudioServiceEndpointShared.h"
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
@@ -87,16 +87,31 @@ bool AAudioServiceEndpoint::isStreamRegistered(audio_port_handle_t portHandle) {
     return false;
 }
 
-void AAudioServiceEndpoint::disconnectRegisteredStreams() {
+std::vector<android::sp<AAudioServiceStreamBase>>
+        AAudioServiceEndpoint::disconnectRegisteredStreams() {
+    std::vector<android::sp<AAudioServiceStreamBase>> streamsDisconnected;
     std::lock_guard<std::mutex> lock(mLockStreams);
     mConnected.store(false);
-    for (const auto& stream : mRegisteredStreams) {
-        ALOGD("disconnectRegisteredStreams() stop and disconnect port %d",
-              stream->getPortHandle());
+    for (const auto &stream : mRegisteredStreams) {
+        ALOGD("%s() - stop and disconnect port %d", __func__, stream->getPortHandle());
         stream->stop();
         stream->disconnect();
     }
-    mRegisteredStreams.clear();
+    mRegisteredStreams.swap(streamsDisconnected);
+    return streamsDisconnected;
+}
+
+void AAudioServiceEndpoint::releaseRegisteredStreams() {
+    // List of streams to be closed after we disconnect everything.
+    std::vector<android::sp<AAudioServiceStreamBase>> streamsToClose
+            = disconnectRegisteredStreams();
+
+    // Close outside the lock to avoid recursive locks.
+    AAudioService *aaudioService = AAudioClientTracker::getInstance().getAAudioService();
+    for (const auto& serviceStream : streamsToClose) {
+        ALOGD("%s() - close stream 0x%08X", __func__, serviceStream->getHandle());
+        aaudioService->closeStream(serviceStream);
+    }
 }
 
 aaudio_result_t AAudioServiceEndpoint::registerStream(sp<AAudioServiceStreamBase>stream) {

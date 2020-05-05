@@ -111,6 +111,21 @@ public:
 
     static audio_attributes_t getAudioAttributesFrom(const AAudioStreamParameters *params);
 
+    // Stop, disconnect and release any streams registered on this endpoint.
+    void releaseRegisteredStreams();
+
+    bool isForSharing() const {
+        return mForSharing;
+    }
+
+    /**
+     *
+     * @param flag true if this endpoint is to be shared between multiple streams
+     */
+    void setForSharing(bool flag) {
+        mForSharing = flag;
+    }
+
 protected:
 
     /**
@@ -119,7 +134,7 @@ protected:
      */
     bool                     isStreamRegistered(audio_port_handle_t portHandle);
 
-    void                     disconnectRegisteredStreams();
+    std::vector<android::sp<AAudioServiceStreamBase>> disconnectRegisteredStreams();
 
     mutable std::mutex       mLockStreams;
     std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;
@@ -132,7 +147,11 @@ protected:
     int32_t                  mOpenCount = 0;
     int32_t                  mRequestedDeviceId = 0;
 
+    // True if this will be shared by one or more other streams.
+    bool                     mForSharing = false;
+
     std::atomic<bool>        mConnected{true};
+
 };
 
 } /* namespace aaudio */
