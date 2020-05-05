@@ -139,7 +139,7 @@ bool contains(std::map<T, std::set<U>> *mapOfSet, T key, U value) {
 }
 
 #ifdef __ANDROID_VNDK__
-static constexpr uint32_t kSeqIdVndkBit = 1 << 31;
+static constexpr uint32_t kSeqIdVndkBit = 1U << 31;
 #else
 static constexpr uint32_t kSeqIdVndkBit = 0;
 #endif
