@@ -220,7 +220,9 @@ hardware::Return<void> CameraHardwareInterface::handleCallbackTimestampBatch(
             msgs.push_back({hidl_msg.timestamp, mem->mBuffers[hidl_msg.bufferIndex]});
         }
     }
-    mDataCbTimestampBatch((int32_t) msgType, msgs, mCbUser);
+    if (mDataCbTimestampBatch != nullptr) {
+        mDataCbTimestampBatch((int32_t) msgType, msgs, mCbUser);
+    }
     return hardware::Void();
 }
 
@@ -761,7 +763,9 @@ void CameraHardwareInterface::sNotifyCb(int32_t msg_type, int32_t ext1,
     ALOGV("%s", __FUNCTION__);
     CameraHardwareInterface *object =
             static_cast<CameraHardwareInterface *>(user);
-    object->mNotifyCb(msg_type, ext1, ext2, object->mCbUser);
+    if (object->mNotifyCb != nullptr) {
+        object->mNotifyCb(msg_type, ext1, ext2, object->mCbUser);
+    }
 }
 
 void CameraHardwareInterface::sDataCb(int32_t msg_type,
@@ -778,7 +782,9 @@ void CameraHardwareInterface::sDataCb(int32_t msg_type,
              index, mem->mNumBufs);
         return;
     }
-    object->mDataCb(msg_type, mem->mBuffers[index], metadata, object->mCbUser);
+    if (object->mDataCb != nullptr){
+        object->mDataCb(msg_type, mem->mBuffers[index], metadata, object->mCbUser);
+    }
 }
 
 void CameraHardwareInterface::sDataCbTimestamp(nsecs_t timestamp, int32_t msg_type,
@@ -797,7 +803,9 @@ void CameraHardwareInterface::sDataCbTimestamp(nsecs_t timestamp, int32_t msg_ty
              index, mem->mNumBufs);
         return;
     }
-    object->mDataCbTimestamp(timestamp, msg_type, mem->mBuffers[index], object->mCbUser);
+    if (object->mDataCbTimestamp != nullptr) {
+        object->mDataCbTimestamp(timestamp, msg_type, mem->mBuffers[index], object->mCbUser);
+    }
 }
 
 camera_memory_t* CameraHardwareInterface::sGetMemory(
