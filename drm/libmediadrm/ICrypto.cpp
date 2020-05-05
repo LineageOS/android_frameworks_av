@@ -264,8 +264,12 @@ status_t BnCrypto::onTransact(
         {
             CHECK_INTERFACE(ICrypto, data, reply);
 
-            uint8_t uuid[16];
-            data.read(uuid, sizeof(uuid));
+            uint8_t uuid[16] = {0};
+            if (data.read(uuid, sizeof(uuid)) != NO_ERROR) {
+                android_errorWriteLog(0x534e4554, "144767096");
+                reply->writeInt32(BAD_VALUE);
+                return OK;
+            }
 
             size_t opaqueSize = data.readInt32();
             void *opaqueData = NULL;
@@ -280,7 +284,11 @@ status_t BnCrypto::onTransact(
                 return NO_MEMORY;
             }
 
-            data.read(opaqueData, opaqueSize);
+            if (data.read(opaqueData, opaqueSize) != NO_ERROR) {
+                android_errorWriteLog(0x534e4554, "144767096");
+                reply->writeInt32(BAD_VALUE);
+                return OK;
+            }
             reply->writeInt32(createPlugin(uuid, opaqueData, opaqueSize));
 
             free(opaqueData);
