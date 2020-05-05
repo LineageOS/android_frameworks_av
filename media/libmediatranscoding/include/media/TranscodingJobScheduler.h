@@ -49,11 +49,12 @@ public:
     // TranscoderCallbackInterface
     void onFinish(ClientIdType clientId, int32_t jobId) override;
     void onError(int64_t clientId, int32_t jobId, TranscodingErrorCode err) override;
+    void onProgressUpdate(int64_t clientId, int32_t jobId, int32_t progress) override;
     void onResourceLost() override;
     // ~TranscoderCallbackInterface
 
     // UidPolicyCallbackInterface
-    void onTopUidChanged(uid_t uid) override;
+    void onTopUidsChanged(const std::unordered_set<uid_t>& uids) override;
     void onResourceAvailable() override;
     // ~UidPolicyCallbackInterface
 
@@ -103,6 +104,7 @@ private:
     Job* getTopJob_l();
     void updateCurrentJob_l();
     void removeJob_l(const JobKeyType& jobKey);
+    void moveUidsToTop_l(const std::unordered_set<uid_t>& uids, bool preserveTopUid);
 
     // Internal state verifier (debug only)
     void validateState_l();
