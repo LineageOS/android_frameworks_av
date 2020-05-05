@@ -226,3 +226,15 @@ cc_test {
         "libutils",
     ],
 }
+
+cc_test {
+    name: "test_steal_exclusive",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_steal_exclusive.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
