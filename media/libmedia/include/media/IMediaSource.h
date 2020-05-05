@@ -135,6 +135,7 @@ protected:
 
 private:
     uint32_t mBuffersSinceStop; // Buffer tracking variable
+    Mutex mBnLock; // to guard readMultiple against concurrent access to the buffer cache
 
     std::unique_ptr<MediaBufferGroup> mGroup;
 
