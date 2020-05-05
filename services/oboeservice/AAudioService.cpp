@@ -85,6 +85,17 @@ bool AAudioService::isCallerInService() {
 
 aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &request,
                                           aaudio::AAudioStreamConfiguration &configurationOutput) {
+    // A lock in is used to order the opening of endpoints when an
+    // EXCLUSIVE endpoint is stolen. We want the order to be:
+    // 1) Thread A opens exclusive MMAP endpoint
+    // 2) Thread B wants to open an exclusive MMAP endpoint so it steals the one from A
+    //    under this lock.
+    // 3) Thread B opens a shared MMAP endpoint.
+    // 4) Thread A can then get the lock and also open a shared stream.
+    // Without the lock. Thread A might sneak in and reallocate an exclusive stream
+    // before B can open the shared stream.
+    std::unique_lock<std::recursive_mutex> lock(mOpenLock);
+
     aaudio_result_t result = AAUDIO_OK;
     sp<AAudioServiceStreamBase> serviceStream;
     const AAudioStreamConfiguration &configurationInput = request.getConstantConfiguration();
@@ -139,7 +150,6 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         return result;
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
-        ALOGV("openStream(): handle = 0x%08X", handle);
         serviceStream->setHandle(handle);
         pid_t pid = request.getProcessId();
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
@@ -147,6 +157,7 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         // Log open in MediaMetrics after we have the handle because we need the handle to
         // create the metrics ID.
         serviceStream->logOpen(handle);
+        ALOGV("%s(): return handle = 0x%08X", __func__, handle);
         return handle;
     }
 }
@@ -180,7 +191,10 @@ aaudio_result_t AAudioService::closeStream(aaudio_handle_t streamHandle) {
         ALOGE("closeStream(0x%0x), illegal stream handle", streamHandle);
         return AAUDIO_ERROR_INVALID_HANDLE;
     }
+    return closeStream(serviceStream);
+}
 
+aaudio_result_t AAudioService::closeStream(sp<AAudioServiceStreamBase> serviceStream) {
     pid_t pid = serviceStream->getOwnerProcessId();
     AAudioClientTracker::getInstance().unregisterClientStream(pid, serviceStream);
 
