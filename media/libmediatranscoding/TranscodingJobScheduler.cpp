@@ -27,6 +27,8 @@
 
 namespace android {
 
+static_assert((JobIdType)-1 < 0, "JobIdType should be signed");
+
 constexpr static uid_t OFFLINE_UID = -1;
 
 //static
@@ -236,19 +238,33 @@ bool TranscodingJobScheduler::cancel(ClientIdType clientId, JobIdType jobId) {
 
     ALOGV("%s: job %s", __FUNCTION__, jobToString(jobKey).c_str());
 
+    std::list<JobKeyType> jobsToRemove;
+
     std::scoped_lock lock{mLock};
 
-    if (mJobMap.count(jobKey) == 0) {
-        ALOGE("job %s doesn't exist", jobToString(jobKey).c_str());
-        return false;
-    }
-    // If the job is running, pause it first.
-    if (mJobMap[jobKey].state == Job::RUNNING) {
-        mTranscoder->pause(clientId, jobId);
+    if (jobId < 0) {
+        for (auto it = mJobMap.begin(); it != mJobMap.end(); ++it) {
+            if (it->first.first == clientId && it->second.uid != OFFLINE_UID) {
+                jobsToRemove.push_back(it->first);
+            }
+        }
+    } else {
+        if (mJobMap.count(jobKey) == 0) {
+            ALOGE("job %s doesn't exist", jobToString(jobKey).c_str());
+            return false;
+        }
+        jobsToRemove.push_back(jobKey);
     }
 
-    // Remove the job.
-    removeJob_l(jobKey);
+    for (auto it = jobsToRemove.begin(); it != jobsToRemove.end(); ++it) {
+        // If the job is running, pause it first.
+        if (mJobMap[*it].state == Job::RUNNING) {
+            mTranscoder->pause(clientId, jobId);
+        }
+
+        // Remove the job.
+        removeJob_l(*it);
+    }
 
     // Start next job.
     updateCurrentJob_l();

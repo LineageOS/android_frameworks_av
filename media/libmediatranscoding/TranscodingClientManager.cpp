@@ -18,15 +18,18 @@
 #define LOG_TAG "TranscodingClientManager"
 
 #include <aidl/android/media/BnTranscodingClient.h>
+#include <aidl/android/media/IMediaTranscodingService.h>
 #include <android/binder_ibinder.h>
 #include <inttypes.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingRequest.h>
 #include <utils/Log.h>
-
 namespace android {
 
+static_assert(sizeof(ClientIdType) == sizeof(void*), "ClientIdType should be pointer-sized");
+
 using ::aidl::android::media::BnTranscodingClient;
+using ::aidl::android::media::IMediaTranscodingService;  // For service error codes
 using ::aidl::android::media::TranscodingJobParcel;
 using ::aidl::android::media::TranscodingRequestParcel;
 using Status = ::ndk::ScopedAStatus;
@@ -62,14 +65,16 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     std::string mClientName;
     std::string mClientOpPackageName;
 
-    // Next jobId to assign
+    // Next jobId to assign.
     std::atomic<int32_t> mNextJobId;
-    // Pointer to the client manager for this client
-    TranscodingClientManager* mOwner;
+    // Whether this client has been unregistered already.
+    std::atomic<bool> mAbandoned;
+    // Weak pointer to the client manager for this client.
+    std::weak_ptr<TranscodingClientManager> mOwner;
 
     ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
                const std::string& clientName, const std::string& opPackageName,
-               TranscodingClientManager* owner);
+               const std::weak_ptr<TranscodingClientManager>& owner);
 
     Status submitRequest(const TranscodingRequestParcel& /*in_request*/,
                          TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) override;
@@ -85,7 +90,7 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
 TranscodingClientManager::ClientImpl::ClientImpl(
         const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
         const std::string& clientName, const std::string& opPackageName,
-        TranscodingClientManager* owner)
+        const std::weak_ptr<TranscodingClientManager>& owner)
       : mClientBinder((callback != nullptr) ? callback->asBinder() : nullptr),
         mClientCallback(callback),
         mClientId(sCookieCounter.fetch_add(1, std::memory_order_relaxed)),
@@ -94,21 +99,28 @@ TranscodingClientManager::ClientImpl::ClientImpl(
         mClientName(clientName),
         mClientOpPackageName(opPackageName),
         mNextJobId(0),
+        mAbandoned(false),
         mOwner(owner) {}
 
 Status TranscodingClientManager::ClientImpl::submitRequest(
         const TranscodingRequestParcel& in_request, TranscodingJobParcel* out_job,
         bool* _aidl_return) {
+    *_aidl_return = false;
+
+    std::shared_ptr<TranscodingClientManager> owner;
+    if (mAbandoned || (owner = mOwner.lock()) == nullptr) {
+        return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
+    }
+
     if (in_request.fileName.empty()) {
         // This is the only error we check for now.
-        *_aidl_return = false;
         return Status::ok();
     }
 
     int32_t jobId = mNextJobId.fetch_add(1);
 
-    *_aidl_return = mOwner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request,
-                                                  mClientCallback);
+    *_aidl_return =
+            owner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request, mClientCallback);
 
     if (*_aidl_return) {
         out_job->jobId = jobId;
@@ -117,18 +129,41 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         *(TranscodingRequest*)&out_job->request = in_request;
         out_job->awaitNumberOfJobs = 0;
     }
+
     return Status::ok();
 }
 
 Status TranscodingClientManager::ClientImpl::cancelJob(int32_t in_jobId, bool* _aidl_return) {
-    *_aidl_return = mOwner->mJobScheduler->cancel(mClientId, in_jobId);
+    *_aidl_return = false;
+
+    std::shared_ptr<TranscodingClientManager> owner;
+    if (mAbandoned || (owner = mOwner.lock()) == nullptr) {
+        return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
+    }
+
+    if (in_jobId < 0) {
+        return Status::ok();
+    }
+
+    *_aidl_return = owner->mJobScheduler->cancel(mClientId, in_jobId);
     return Status::ok();
 }
 
 Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t in_jobId,
                                                           TranscodingJobParcel* out_job,
                                                           bool* _aidl_return) {
-    *_aidl_return = mOwner->mJobScheduler->getJob(mClientId, in_jobId, &out_job->request);
+    *_aidl_return = false;
+
+    std::shared_ptr<TranscodingClientManager> owner;
+    if (mAbandoned || (owner = mOwner.lock()) == nullptr) {
+        return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
+    }
+
+    if (in_jobId < 0) {
+        return Status::ok();
+    }
+
+    *_aidl_return = owner->mJobScheduler->getJob(mClientId, in_jobId, &out_job->request);
 
     if (*_aidl_return) {
         out_job->jobId = in_jobId;
@@ -138,10 +173,17 @@ Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t in_jobId,
 }
 
 Status TranscodingClientManager::ClientImpl::unregister() {
-    // TODO(chz): Decide what to do about this client's jobs.
-    // If app crashed, it could be relaunched later. Do we want to keep the
-    // jobs around for that?
-    mOwner->removeClient(mClientId);
+    bool abandoned = mAbandoned.exchange(true);
+
+    std::shared_ptr<TranscodingClientManager> owner;
+    if (abandoned || (owner = mOwner.lock()) == nullptr) {
+        return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
+    }
+
+    // Use jobId == -1 to cancel all realtime jobs for this client with the scheduler.
+    owner->mJobScheduler->cancel(mClientId, -1);
+    owner->removeClient(mClientId);
+
     return Status::ok();
 }
 
@@ -210,7 +252,7 @@ status_t TranscodingClientManager::addClient(
     // Validate the client.
     if (callback == nullptr || pid < 0 || clientName.empty() || opPackageName.empty()) {
         ALOGE("Invalid client");
-        return BAD_VALUE;
+        return IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT;
     }
 
     SpAIBinder binder = callback->asBinder();
@@ -219,12 +261,12 @@ status_t TranscodingClientManager::addClient(
 
     // Checks if the client already registers.
     if (mRegisteredCallbacks.count((uintptr_t)binder.get()) > 0) {
-        return ALREADY_EXISTS;
+        return IMediaTranscodingService::ERROR_ALREADY_EXISTS;
     }
 
     // Creates the client and uses its process id as client id.
     std::shared_ptr<ClientImpl> client = ::ndk::SharedRefBase::make<ClientImpl>(
-            callback, pid, uid, clientName, opPackageName, this);
+            callback, pid, uid, clientName, opPackageName, shared_from_this());
 
     ALOGD("Adding client id %lld, pid %d, uid %d, name %s, package %s",
           (long long)client->mClientId, client->mClientPid, client->mClientUid,
@@ -255,7 +297,7 @@ status_t TranscodingClientManager::removeClient(ClientIdType clientId) {
     auto it = mClientIdToClientMap.find(clientId);
     if (it == mClientIdToClientMap.end()) {
         ALOGE("Client id %lld does not exist", (long long)clientId);
-        return INVALID_OPERATION;
+        return IMediaTranscodingService::ERROR_INVALID_OPERATION;
     }
 
     SpAIBinder binder = it->second->mClientBinder;

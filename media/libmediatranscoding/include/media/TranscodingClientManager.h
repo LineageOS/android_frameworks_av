@@ -46,7 +46,7 @@ using ::aidl::android::media::ITranscodingClientCallback;
  * TODO(hkuang): Hook up with ResourceManager for resource management.
  * TODO(hkuang): Hook up with MediaMetrics to log all the transactions.
  */
-class TranscodingClientManager {
+class TranscodingClientManager : public std::enable_shared_from_this<TranscodingClientManager> {
 public:
     virtual ~TranscodingClientManager();
 
