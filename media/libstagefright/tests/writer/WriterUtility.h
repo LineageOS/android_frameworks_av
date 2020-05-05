@@ -35,6 +35,11 @@ constexpr uint32_t kMaxTrackCount = 2;
 constexpr uint32_t kMaxCSDStrlen = 16;
 constexpr uint32_t kMaxCount = 20;
 constexpr int32_t kMimeSize = 128;
+constexpr int32_t kDefaultInterleaveDuration = 0;
+// Geodata is set according to ISO-6709 standard.
+constexpr int32_t kDefaultLatitudex10000 = 500000;
+constexpr int32_t kDefaultLongitudex10000 = 1000000;
+constexpr float kDefaultFPS = 30.0f;
 
 struct BufferInfo {
     int32_t size;
