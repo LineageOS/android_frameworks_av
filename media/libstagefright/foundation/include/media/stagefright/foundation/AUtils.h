@@ -63,7 +63,7 @@ inline static const T &max(const T &a, const T &b) {
 
 template<class T>
 void ENSURE_UNSIGNED_TYPE() {
-    T TYPE_MUST_BE_UNSIGNED[(T)-1 < 0 ? -1 : 0] __unused;
+    T TYPE_MUST_BE_UNSIGNED[(T)-1 < 0 ? -1 : 0] __attribute__((unused));
 }
 
 // needle is in range [hayStart, hayStart + haySize)
