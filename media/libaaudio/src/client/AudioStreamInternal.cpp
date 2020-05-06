@@ -354,6 +354,12 @@ aaudio_result_t AudioStreamInternal::requestStart()
     drainTimestampsFromService();
 
     aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandle);
+    if (result == AAUDIO_ERROR_INVALID_HANDLE) {
+        ALOGD("%s() INVALID_HANDLE, stream was probably stolen", __func__);
+        // Stealing was added in R. Coerce result to improve backward compatibility.
+        result = AAUDIO_ERROR_DISCONNECTED;
+        setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+    }
 
     startTime = AudioClock::getNanoseconds();
     mClockModel.start(startTime);
@@ -397,7 +403,12 @@ aaudio_result_t AudioStreamInternal::stopCallback()
     if (isDataCallbackSet()
             && (isActive() || getState() == AAUDIO_STREAM_STATE_DISCONNECTED)) {
         mCallbackEnabled.store(false);
-        return joinThread(NULL); // may temporarily unlock mStreamLock
+        aaudio_result_t result = joinThread(NULL); // may temporarily unlock mStreamLock
+        if (result == AAUDIO_ERROR_INVALID_HANDLE) {
+            ALOGD("%s() INVALID_HANDLE, stream was probably stolen", __func__);
+            result = AAUDIO_OK;
+        }
+        return result;
     } else {
         return AAUDIO_OK;
     }
@@ -427,7 +438,12 @@ aaudio_result_t AudioStreamInternal::requestStop() {
     setState(AAUDIO_STREAM_STATE_STOPPING);
     mAtomicInternalTimestamp.clear();
 
-    return mServiceInterface.stopStream(mServiceStreamHandle);
+    result = mServiceInterface.stopStream(mServiceStreamHandle);
+    if (result == AAUDIO_ERROR_INVALID_HANDLE) {
+        ALOGD("%s() INVALID_HANDLE, stream was probably stolen", __func__);
+        result = AAUDIO_OK;
+    }
+    return result;
 }
 
 aaudio_result_t AudioStreamInternal::registerThread() {
