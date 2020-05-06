@@ -24,7 +24,10 @@ cc_library_headers {
             enabled: false,
         },
     },
-    apex_available: ["com.android.media"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
 }
 
 filegroup {
