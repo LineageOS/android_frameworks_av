@@ -69,6 +69,28 @@ public:
      */
     static bool useUidForPackage(const std::string& package, const std::string& installer);
 
+    /**
+     * Returns a std::pair of packageName and versionCode for a given uid.
+     *
+     * The value is sanitized - i.e. if the result is not approved to send,
+     * we use the uid as a string and a version code of 0.
+     */
+    static std::pair<std::string, int64_t> getSanitizedPackageNameAndVersionCode(uid_t uid);
+
+    /**
+     * Return string tokens from iterator, separated by spaces and reserved chars.
+     */
+    static std::string tokenizer(std::string::const_iterator& it,
+            const std::string::const_iterator& end, const char *reserved);
+
+    /**
+     * Parse the devices string and return a vector of device address pairs.
+     *
+     * A failure to parse returns early with the contents that were able to be parsed.
+     */
+    static std::vector<std::pair<std::string, std::string>>
+    getDeviceAddressPairs(const std::string &devices);
+
 protected:
 
     // Internal call where release is true if ownership of item is transferred
@@ -99,8 +121,6 @@ private:
     const size_t mMaxRecordsExpiredAtOnce;
 
     std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
-
-    mediautils::UidInfo mUidInfo;  // mUidInfo can be accessed without lock (locked internally)
 
     mediametrics::AudioAnalytics mAudioAnalytics; // mAudioAnalytics is locked internally.
 
