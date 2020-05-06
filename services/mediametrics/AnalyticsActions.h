@@ -78,8 +78,8 @@ public:
     template <typename T, typename U, typename A>
     void addAction(T&& url, U&& value, A&& action) {
         std::lock_guard l(mLock);
-        mFilters[ { std::forward<T>(url), std::forward<U>(value) } ]
-                = std::forward<A>(action);
+        mFilters.emplace(Trigger{ std::forward<T>(url), std::forward<U>(value) },
+                std::forward<A>(action));
     }
 
     // TODO: remove an action.
@@ -94,36 +94,15 @@ public:
         std::vector<Action> actions;
         std::lock_guard l(mLock);
 
-        // Essentially the code looks like this:
-        /*
-        for (auto &[trigger, action] : mFilters) {
-            if (isMatch(trigger, item)) {
-                actions.push_back(action);
-            }
-        }
-        */
-
-        // Optimization: there should only be one match for a non-wildcard url.
-        auto it = mFilters.upper_bound( {item->getKey(), std::monostate{} });
-        if (it != mFilters.end()) {
-            const auto &[trigger, action] = *it;
-            if (isMatch(trigger, item)) {
+        for (const auto &[trigger, action] : mFilters) {
+            if (isWildcardMatch(trigger, item) ==
+                    mediametrics::Item::RECURSIVE_WILDCARD_CHECK_MATCH_FOUND) {
                 actions.push_back(action);
             }
         }
 
-        // Optimization: for wildcard URLs we go backwards until there is no
-        // match with the prefix before the wildcard.
-        while (it != mFilters.begin()) {  // this walks backwards, cannot start at begin.
-            const auto &[trigger, action] = *--it;  // look backwards
-            int ret = isWildcardMatch(trigger, item);
-            if (ret == mediametrics::Item::RECURSIVE_WILDCARD_CHECK_MATCH_FOUND) {
-                actions.push_back(action);    // match found.
-            } else if (ret == mediametrics::Item::RECURSIVE_WILDCARD_CHECK_NO_MATCH_NO_WILDCARD) {
-                break;                        // no match before wildcard.
-            }
-            // a wildcard was encountered when matching prefix, so we should check again.
-        }
+        // TODO: Optimize for prefix search and wildcarding.
+
         return actions;
     }
 
@@ -145,7 +124,9 @@ private:
     }
 
     mutable std::mutex mLock;
-    std::map<Trigger, Action> mFilters GUARDED_BY(mLock);
+
+    using FilterType = std::multimap<Trigger, Action>;
+    FilterType mFilters GUARDED_BY(mLock);
 };
 
 } // namespace android::mediametrics
