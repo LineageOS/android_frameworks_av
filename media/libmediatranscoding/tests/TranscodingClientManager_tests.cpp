@@ -83,12 +83,12 @@ struct TestClientCallback : public BnTranscodingClientCallback {
             Finished,
             Failed,
         } type;
-        int32_t jobId;
+        JobIdType jobId;
     };
 
     static constexpr Event NoEvent = {Event::NoEvent, 0};
 #define DECLARE_EVENT(action) \
-    static Event action(int32_t jobId) { return {Event::action, jobId}; }
+    static Event action(JobIdType jobId) { return {Event::action, jobId}; }
 
     DECLARE_EVENT(Finished);
     DECLARE_EVENT(Failed);
@@ -120,7 +120,7 @@ struct TestScheduler : public SchedulerClientInterface {
 
     virtual ~TestScheduler() { ALOGI("TestScheduler Destroyed"); }
 
-    bool submit(int64_t clientId, int32_t jobId, uid_t /*uid*/,
+    bool submit(ClientIdType clientId, JobIdType jobId, uid_t /*uid*/,
                 const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override {
         JobKeyType jobKey = std::make_pair(clientId, jobId);
@@ -141,7 +141,7 @@ struct TestScheduler : public SchedulerClientInterface {
         return true;
     }
 
-    bool cancel(int64_t clientId, int32_t jobId) override {
+    bool cancel(ClientIdType clientId, JobIdType jobId) override {
         JobKeyType jobKey = std::make_pair(clientId, jobId);
 
         if (mJobs.count(jobKey) == 0) {
@@ -151,7 +151,8 @@ struct TestScheduler : public SchedulerClientInterface {
         return true;
     }
 
-    bool getJob(int64_t clientId, int32_t jobId, TranscodingRequestParcel* request) override {
+    bool getJob(ClientIdType clientId, JobIdType jobId,
+                TranscodingRequestParcel* request) override {
         JobKeyType jobKey = std::make_pair(clientId, jobId);
         if (mJobs.count(jobKey) == 0) {
             return false;
@@ -196,7 +197,7 @@ struct TestScheduler : public SchedulerClientInterface {
         std::weak_ptr<ITranscodingClientCallback> callback;
     };
 
-    typedef std::pair<int64_t, int32_t> JobKeyType;
+    typedef std::pair<ClientIdType, JobIdType> JobKeyType;
     std::map<JobKeyType, Job> mJobs;
     JobKeyType mLastJob;
 };

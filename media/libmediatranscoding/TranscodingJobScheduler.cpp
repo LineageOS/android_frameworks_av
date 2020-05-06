@@ -174,7 +174,7 @@ void TranscodingJobScheduler::moveUidsToTop_l(const std::unordered_set<uid_t>& u
     }
 }
 
-bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, uid_t uid,
+bool TranscodingJobScheduler::submit(ClientIdType clientId, JobIdType jobId, uid_t uid,
                                      const TranscodingRequestParcel& request,
                                      const std::weak_ptr<ITranscodingClientCallback>& callback) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
@@ -231,7 +231,7 @@ bool TranscodingJobScheduler::submit(ClientIdType clientId, int32_t jobId, uid_t
     return true;
 }
 
-bool TranscodingJobScheduler::cancel(ClientIdType clientId, int32_t jobId) {
+bool TranscodingJobScheduler::cancel(ClientIdType clientId, JobIdType jobId) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
 
     ALOGV("%s: job %s", __FUNCTION__, jobToString(jobKey).c_str());
@@ -257,7 +257,7 @@ bool TranscodingJobScheduler::cancel(ClientIdType clientId, int32_t jobId) {
     return true;
 }
 
-bool TranscodingJobScheduler::getJob(ClientIdType clientId, int32_t jobId,
+bool TranscodingJobScheduler::getJob(ClientIdType clientId, JobIdType jobId,
                                      TranscodingRequestParcel* request) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
 
@@ -272,7 +272,7 @@ bool TranscodingJobScheduler::getJob(ClientIdType clientId, int32_t jobId,
     return true;
 }
 
-void TranscodingJobScheduler::onFinish(ClientIdType clientId, int32_t jobId) {
+void TranscodingJobScheduler::onFinish(ClientIdType clientId, JobIdType jobId) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
 
     ALOGV("%s: job %s", __FUNCTION__, jobToString(jobKey).c_str());
@@ -308,7 +308,8 @@ void TranscodingJobScheduler::onFinish(ClientIdType clientId, int32_t jobId) {
     validateState_l();
 }
 
-void TranscodingJobScheduler::onError(int64_t clientId, int32_t jobId, TranscodingErrorCode err) {
+void TranscodingJobScheduler::onError(ClientIdType clientId, JobIdType jobId,
+                                      TranscodingErrorCode err) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
 
     ALOGV("%s: job %s, err %d", __FUNCTION__, jobToString(jobKey).c_str(), (int32_t)err);
@@ -344,7 +345,8 @@ void TranscodingJobScheduler::onError(int64_t clientId, int32_t jobId, Transcodi
     validateState_l();
 }
 
-void TranscodingJobScheduler::onProgressUpdate(int64_t clientId, int32_t jobId, int32_t progress) {
+void TranscodingJobScheduler::onProgressUpdate(ClientIdType clientId, JobIdType jobId,
+                                               int32_t progress) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
 
     ALOGV("%s: job %s, progress %d", __FUNCTION__, jobToString(jobKey).c_str(), progress);
