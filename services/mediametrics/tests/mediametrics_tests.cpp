@@ -883,6 +883,48 @@ TEST(mediametrics_tests, audio_analytics_dump) {
   }
 }
 
+TEST(mediametrics_tests, device_parsing) {
+    auto devaddr = android::MediaMetricsService::getDeviceAddressPairs("(DEVICE, )");
+    ASSERT_EQ((size_t)1, devaddr.size());
+    ASSERT_EQ("DEVICE", devaddr[0].first);
+    ASSERT_EQ("", devaddr[0].second);
+
+    devaddr = android::MediaMetricsService::getDeviceAddressPairs(
+            "(DEVICE1, A)|(D, ADDRB)");
+    ASSERT_EQ((size_t)2, devaddr.size());
+    ASSERT_EQ("DEVICE1", devaddr[0].first);
+    ASSERT_EQ("A", devaddr[0].second);
+    ASSERT_EQ("D", devaddr[1].first);
+    ASSERT_EQ("ADDRB", devaddr[1].second);
+
+    devaddr = android::MediaMetricsService::getDeviceAddressPairs(
+            "(A,B)|(C,D)");
+    ASSERT_EQ((size_t)2, devaddr.size());
+    ASSERT_EQ("A", devaddr[0].first);
+    ASSERT_EQ("B", devaddr[0].second);
+    ASSERT_EQ("C", devaddr[1].first);
+    ASSERT_EQ("D", devaddr[1].second);
+
+    devaddr = android::MediaMetricsService::getDeviceAddressPairs(
+            "  ( A1 , B )  | ( C , D2 )  ");
+    ASSERT_EQ((size_t)2, devaddr.size());
+    ASSERT_EQ("A1", devaddr[0].first);
+    ASSERT_EQ("B", devaddr[0].second);
+    ASSERT_EQ("C", devaddr[1].first);
+    ASSERT_EQ("D2", devaddr[1].second);
+}
+
+TEST(mediametrics_tests, timed_action) {
+    android::mediametrics::TimedAction timedAction;
+    std::atomic_int value1 = 0;
+
+    timedAction.postIn(std::chrono::seconds(0), [&value1] { ++value1; });
+    timedAction.postIn(std::chrono::seconds(1000), [&value1] { ++value1; });
+    usleep(100000);
+    ASSERT_EQ(1, value1);
+    ASSERT_EQ((size_t)1, timedAction.size());
+}
+
 #if 0
 // Stress test code for garbage collection, you need to enable AID_SHELL as trusted to run
 // in MediaMetricsService.cpp.
