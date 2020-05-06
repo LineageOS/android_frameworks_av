@@ -51,7 +51,7 @@ TEST_P(ID3tagTest, TagTest) {
     while (!it.done()) {
         String8 id;
         it.getID(&id);
-        ASSERT_GT(id.length(), 0) << "No ID tag found! \n";
+        ASSERT_GT(id.length(), 0) << "Found an ID3 tag of 0 size";
         ALOGV("Found ID tag: %s\n", String8(id).c_str());
         it.next();
     }
@@ -66,7 +66,7 @@ TEST_P(ID3versionTest, VersionTest) {
     DataSourceHelper helper(file->wrap());
     ID3 tag(&helper);
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
-    ASSERT_TRUE(tag.version() >= versionNumber)
+    ASSERT_EQ(tag.version(), versionNumber)
             << "Found version: " << tag.version() << " Expected version: " << versionNumber;
 }
 
@@ -81,17 +81,34 @@ TEST_P(ID3textTagTest, TextTagTest) {
     ASSERT_TRUE(tag.isValid()) << "No valid ID3 tag found for " << path.c_str() << "\n";
     int countTextFrames = 0;
     ID3::Iterator it(tag, nullptr);
-    while (!it.done()) {
-        String8 id;
-        it.getID(&id);
-        ASSERT_GT(id.length(), 0);
-        if (id[0] == 'T') {
-            String8 text;
-            countTextFrames++;
-            it.getString(&text);
-            ALOGV("Found text frame %s : %s \n", id.string(), text.string());
+    if (tag.version() != ID3::ID3_V1 && tag.version() != ID3::ID3_V1_1) {
+        while (!it.done()) {
+            String8 id;
+            it.getID(&id);
+            ASSERT_GT(id.length(), 0) << "Found an ID3 tag of 0 size";
+            if (id[0] == 'T') {
+                String8 text;
+                countTextFrames++;
+                it.getString(&text);
+                ALOGV("Found text frame %s : %s \n", id.string(), text.string());
+            }
+            it.next();
         }
-        it.next();
+    } else {
+        while (!it.done()) {
+            String8 id;
+            String8 text;
+            it.getID(&id);
+            ASSERT_GT(id.length(), 0) << "Found an ID3 tag of 0 size";
+            it.getString(&text);
+            // if the tag has a value
+            if (strcmp(text.string(), "")) {
+                countTextFrames++;
+                ALOGV("ID: %s\n", id.c_str());
+                ALOGV("Text string: %s\n", text.string());
+            }
+            it.next();
+        }
     }
     ASSERT_EQ(countTextFrames, numTextFrames)
             << "Expected " << numTextFrames << " text frames, found " << countTextFrames;
@@ -137,7 +154,7 @@ TEST_P(ID3multiAlbumArtTest, MultiAlbumArtTest) {
     while (!it.done()) {
         String8 id;
         it.getID(&id);
-        ASSERT_GT(id.length(), 0);
+        ASSERT_GT(id.length(), 0) << "Found an ID3 tag of 0 size";
         // Check if the tag is an "APIC/PIC" tag.
         if (String8(id) == "APIC" || String8(id) == "PIC") {
             count++;
@@ -159,58 +176,67 @@ TEST_P(ID3multiAlbumArtTest, MultiAlbumArtTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3tagTest,
-                         ::testing::Values("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_5mins.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3",
-                                           "bbb_44100hz_2ch_128kbps_mp3_30sec_moreTextFrames.mp3"));
+                         ::testing::Values("bbb_1sec_v23.mp3",
+                                           "bbb_1sec_1_image.mp3",
+                                           "bbb_1sec_2_image.mp3",
+                                           "bbb_2sec_v24.mp3",
+                                           "bbb_2sec_1_image.mp3",
+                                           "bbb_2sec_2_image.mp3",
+                                           "bbb_2sec_largeSize.mp3",
+                                           "bbb_1sec_v23_3tags.mp3",
+                                           "bbb_1sec_v1_5tags.mp3",
+                                           "bbb_2sec_v24_unsynchronizedOneFrame.mp3",
+                                           "bbb_2sec_v24_unsynchronizedAllFrames.mp3"));
 
-// TODO: need some data that is not V2.3
 INSTANTIATE_TEST_SUITE_P(
         id3TestAll, ID3versionTest,
-        ::testing::Values(
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3", ID3::ID3_V2_3),
-              make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_moreTextFrames.mp3", ID3::ID3_V2_3)));
+        ::testing::Values(make_pair("bbb_1sec_v23.mp3", ID3::ID3_V2_3),
+                          make_pair("bbb_1sec_1_image.mp3", ID3::ID3_V2_3),
+                          make_pair("bbb_1sec_2_image.mp3", ID3::ID3_V2_3),
+                          make_pair("bbb_2sec_v24.mp3", ID3::ID3_V2_4),
+                          make_pair("bbb_2sec_1_image.mp3", ID3::ID3_V2_4),
+                          make_pair("bbb_2sec_2_image.mp3", ID3::ID3_V2_4),
+                          make_pair("bbb_2sec_largeSize.mp3", ID3::ID3_V2_4),
+                          make_pair("bbb_1sec_v23_3tags.mp3", ID3::ID3_V2_3),
+                          make_pair("bbb_1sec_v1_5tags.mp3", ID3::ID3_V1_1),
+                          make_pair("bbb_1sec_v1_3tags.mp3", ID3::ID3_V1_1),
+                          make_pair("bbb_2sec_v24_unsynchronizedOneFrame.mp3", ID3::ID3_V2_4),
+                          make_pair("bbb_2sec_v24_unsynchronizedAllFrames.mp3", ID3::ID3_V2_4)));
 
 INSTANTIATE_TEST_SUITE_P(
         id3TestAll, ID3textTagTest,
-        ::testing::Values(make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_moreTextFrames.mp3", 5)));
+        ::testing::Values(
+                make_pair("bbb_1sec_v23.mp3", 1),
+                make_pair("bbb_1sec_1_image.mp3", 1),
+                make_pair("bbb_1sec_2_image.mp3", 1),
+                make_pair("bbb_2sec_v24.mp3", 1),
+                make_pair("bbb_2sec_1_image.mp3", 1),
+                make_pair("bbb_2sec_2_image.mp3", 1),
+                make_pair("bbb_2sec_largeSize.mp3", 1),
+                make_pair("bbb_1sec_v23_3tags.mp3", 3),
+                make_pair("bbb_1sec_v1_5tags.mp3", 5),
+                make_pair("bbb_1sec_v1_3tags.mp3", 3),
+                make_pair("bbb_2sec_v24_unsynchronizedOneFrame.mp3", 3),
+                make_pair("bbb_2sec_v24_unsynchronizedAllFrames.mp3", 3)));
 
-INSTANTIATE_TEST_SUITE_P(
-        id3TestAll, ID3albumArtTest,
-        ::testing::Values(make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", false),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3", true),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3", true),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3", false),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3", true),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3", true),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3", true)));
+INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3albumArtTest,
+                         ::testing::Values(make_pair("bbb_1sec_v23.mp3", false),
+                                           make_pair("bbb_1sec_1_image.mp3", true),
+                                           make_pair("bbb_1sec_2_image.mp3", true),
+                                           make_pair("bbb_2sec_v24.mp3", false),
+                                           make_pair("bbb_2sec_1_image.mp3", true),
+                                           make_pair("bbb_2sec_2_image.mp3", true),
+                                           make_pair("bbb_2sec_largeSize.mp3", true),
+                                           make_pair("bbb_1sec_v1_5tags.mp3", false)));
 
-INSTANTIATE_TEST_SUITE_P(
-        id3TestAll, ID3multiAlbumArtTest,
-        ::testing::Values(make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3", 0),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3", 0),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_1_image.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_1_image.mp3", 1),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_30sec_2_image.mp3", 2),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_2_image.mp3", 2),
-                          make_pair("bbb_44100hz_2ch_128kbps_mp3_5mins_largeSize.mp3", 3)));
+INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3multiAlbumArtTest,
+                         ::testing::Values(make_pair("bbb_1sec_v23.mp3", 0),
+                                           make_pair("bbb_2sec_v24.mp3", 0),
+                                           make_pair("bbb_1sec_1_image.mp3", 1),
+                                           make_pair("bbb_2sec_1_image.mp3", 1),
+                                           make_pair("bbb_1sec_2_image.mp3", 2),
+                                           make_pair("bbb_2sec_2_image.mp3", 2),
+                                           make_pair("bbb_2sec_largeSize.mp3", 3)));
 
 int main(int argc, char **argv) {
     gEnv = new ID3TestEnvironment();
