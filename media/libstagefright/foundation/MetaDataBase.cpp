@@ -17,7 +17,6 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MetaDataBase"
 #include <inttypes.h>
-#include <binder/Parcel.h>
 #include <utils/KeyedVector.h>
 #include <utils/Log.h>
 
@@ -28,6 +27,10 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MetaDataBase.h>
+
+#ifndef __ANDROID_VNDK__
+#include <binder/Parcel.h>
+#endif
 
 namespace android {
 
@@ -449,6 +452,7 @@ void MetaDataBase::dumpToLog() const {
     }
 }
 
+#ifndef __ANDROID_VNDK__
 status_t MetaDataBase::writeToParcel(Parcel &parcel) {
     status_t ret;
     size_t numItems = mInternalData->mItems.size();
@@ -528,6 +532,7 @@ status_t MetaDataBase::updateFromParcel(const Parcel &parcel) {
     ALOGW("no metadata in parcel");
     return UNKNOWN_ERROR;
 }
+#endif
 
 }  // namespace android
 
