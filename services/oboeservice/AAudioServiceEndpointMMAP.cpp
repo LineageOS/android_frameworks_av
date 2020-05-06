@@ -229,7 +229,7 @@ error:
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::close() {
-    if (mMmapStream != 0) {
+    if (mMmapStream != nullptr) {
         // Needs to be explicitly cleared or CTS will fail but it is not clear why.
         mMmapStream.clear();
         // Apparently the above close is asynchronous. An attempt to open a new device
