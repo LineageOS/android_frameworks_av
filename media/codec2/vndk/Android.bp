@@ -56,7 +56,6 @@ cc_library_shared {
         "android.hardware.graphics.mapper@3.0",
         "android.hardware.media.bufferpool@2.0",
         "libbase",
-        "libbinder",
         "libcutils",
         "libdl",
         "libhardware",
