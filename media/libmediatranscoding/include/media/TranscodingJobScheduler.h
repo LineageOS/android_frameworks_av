@@ -39,17 +39,17 @@ public:
     virtual ~TranscodingJobScheduler();
 
     // SchedulerClientInterface
-    bool submit(ClientIdType clientId, int32_t jobId, uid_t uid,
+    bool submit(ClientIdType clientId, JobIdType jobId, uid_t uid,
                 const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override;
-    bool cancel(ClientIdType clientId, int32_t jobId) override;
-    bool getJob(ClientIdType clientId, int32_t jobId, TranscodingRequestParcel* request) override;
+    bool cancel(ClientIdType clientId, JobIdType jobId) override;
+    bool getJob(ClientIdType clientId, JobIdType jobId, TranscodingRequestParcel* request) override;
     // ~SchedulerClientInterface
 
     // TranscoderCallbackInterface
-    void onFinish(ClientIdType clientId, int32_t jobId) override;
-    void onError(int64_t clientId, int32_t jobId, TranscodingErrorCode err) override;
-    void onProgressUpdate(int64_t clientId, int32_t jobId, int32_t progress) override;
+    void onFinish(ClientIdType clientId, JobIdType jobId) override;
+    void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode err) override;
+    void onProgressUpdate(ClientIdType clientId, JobIdType jobId, int32_t progress) override;
     void onResourceLost() override;
     // ~TranscoderCallbackInterface
 
@@ -62,7 +62,7 @@ private:
     friend class MediaTranscodingService;
     friend class TranscodingJobSchedulerTest;
 
-    using JobKeyType = std::pair<ClientIdType, int32_t /*jobId*/>;
+    using JobKeyType = std::pair<ClientIdType, JobIdType>;
     using JobQueueType = std::list<JobKeyType>;
 
     struct Job {

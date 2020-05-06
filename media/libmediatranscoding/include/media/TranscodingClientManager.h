@@ -24,8 +24,10 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
+#include <map>
 #include <mutex>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "SchedulerClientInterface.h"
 
@@ -37,9 +39,8 @@ using ::aidl::android::media::ITranscodingClientCallback;
 /*
  * TranscodingClientManager manages all the transcoding clients across different processes.
  *
- * TranscodingClientManager is a global singleton that could only acquired by
- * MediaTranscodingService. It manages all the clients's registration/unregistration and clients'
- * information. It also bookkeeps all the clients' information. It also monitors to the death of the
+ * TranscodingClientManager manages all the clients's registration/unregistration and clients'
+ * information. It also bookkeeps all the clients' information. It also monitors the death of the
  * clients. Upon client's death, it will remove the client from it.
  *
  * TODO(hkuang): Hook up with ResourceManager for resource management.
@@ -102,10 +103,16 @@ private:
     mutable std::mutex mLock;
     std::unordered_map<ClientIdType, std::shared_ptr<ClientImpl>> mClientIdToClientMap
             GUARDED_BY(mLock);
+    std::unordered_set<uintptr_t> mRegisteredCallbacks GUARDED_BY(mLock);
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
     std::shared_ptr<SchedulerClientInterface> mJobScheduler;
+
+    static std::atomic<ClientIdType> sCookieCounter;
+    static std::mutex sCookie2ClientLock;
+    static std::map<ClientIdType, std::shared_ptr<ClientImpl>> sCookie2Client
+            GUARDED_BY(sCookie2ClientLock);
 };
 
 }  // namespace android

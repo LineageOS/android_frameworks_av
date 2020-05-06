@@ -47,19 +47,19 @@ void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackIn
     mCallback = cb;
 }
 
-void SimulatedTranscoder::start(int64_t clientId, int32_t jobId) {
+void SimulatedTranscoder::start(ClientIdType clientId, JobIdType jobId) {
     queueEvent(Event::Start, clientId, jobId);
 }
 
-void SimulatedTranscoder::pause(int64_t clientId, int32_t jobId) {
+void SimulatedTranscoder::pause(ClientIdType clientId, JobIdType jobId) {
     queueEvent(Event::Pause, clientId, jobId);
 }
 
-void SimulatedTranscoder::resume(int64_t clientId, int32_t jobId) {
+void SimulatedTranscoder::resume(ClientIdType clientId, JobIdType jobId) {
     queueEvent(Event::Resume, clientId, jobId);
 }
 
-void SimulatedTranscoder::queueEvent(Event::Type type, int64_t clientId, int32_t jobId) {
+void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId) {
     ALOGV("%s: job {%lld, %d}: %s", __FUNCTION__, (long long)clientId, jobId, toString(type));
 
     auto lock = std::scoped_lock(mLock);
