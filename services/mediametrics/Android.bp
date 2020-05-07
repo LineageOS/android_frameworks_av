@@ -36,6 +36,7 @@ cc_library_shared {
 
     srcs: [
         "AudioAnalytics.cpp",
+        "AudioPowerUsage.cpp",
         "iface_statsd.cpp",
         "MediaMetricsService.cpp",
         "statsd_audiopolicy.cpp",
@@ -55,6 +56,7 @@ cc_library_shared {
 
     shared_libs: [
         "libbinder",
+        "libcutils",
         "liblog",
         "libmediametrics",
         "libmediautils",
