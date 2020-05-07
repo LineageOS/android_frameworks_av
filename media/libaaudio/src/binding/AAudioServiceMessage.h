@@ -44,6 +44,8 @@ typedef enum aaudio_service_event_e : uint32_t {
 struct AAudioMessageEvent {
     aaudio_service_event_t event;
     union {
+        // Align so that 32 and 64-bit code can exchange messages through shared memory.
+        alignas(8)
         double  dataDouble;
         int64_t dataLong;
     };
@@ -57,8 +59,10 @@ typedef struct AAudioServiceMessage_s {
         EVENT,
     };
 
-    code what;
+    code      what;
     union {
+        // Align so that 32 and 64-bit code can exchange messages through shared memory.
+        alignas(8)
         AAudioMessageTimestamp timestamp; // what == TIMESTAMP
         AAudioMessageEvent event;         // what == EVENT
     };
