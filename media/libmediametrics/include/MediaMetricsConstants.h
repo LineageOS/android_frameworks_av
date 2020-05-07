@@ -92,6 +92,7 @@
 #define AMEDIAMETRICS_PROP_SUFFIX_CHAR_DUPLICATES_ALLOWED '#'
 
 #define AMEDIAMETRICS_PROP_ALLOWUID       "_allowUid"      // int32_t, allow client uid to post
+#define AMEDIAMETRICS_PROP_AUDIOMODE      "audioMode"      // string (audio.flinger)
 #define AMEDIAMETRICS_PROP_AUXEFFECTID    "auxEffectId"    // int32 (AudioTrack)
 #define AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES "bufferSizeFrames" // int32
 #define AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES "bufferCapacityFrames" // int32
@@ -146,6 +147,7 @@
 #define AMEDIAMETRICS_PROP_UNDERRUN       "underrun"       // int32
 #define AMEDIAMETRICS_PROP_UNDERRUNFRAMES "underrunFrames" // int64_t from Thread
 #define AMEDIAMETRICS_PROP_USAGE          "usage"          // string attributes (ATrack)
+#define AMEDIAMETRICS_PROP_VOICEVOLUME    "voiceVolume"    // double (audio.flinger)
 #define AMEDIAMETRICS_PROP_VOLUME_LEFT    "volume.left"    // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_VOLUME_RIGHT   "volume.right"   // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_WHERE          "where"          // string value
@@ -170,7 +172,9 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE      "pause"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS "readParameters" // Thread
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE    "restore"
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETMODE    "setMode" // AudioFlinger
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYBACKPARAM "setPlaybackParam" // AudioTrack
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME "setVoiceVolume" // AudioFlinger
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME  "setVolume"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_STOP       "stop"   // AudioTrack, AudioRecord
