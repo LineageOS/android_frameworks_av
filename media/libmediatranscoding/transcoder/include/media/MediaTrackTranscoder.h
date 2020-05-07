@@ -25,6 +25,7 @@
 
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 namespace android {
@@ -94,7 +95,10 @@ public:
      */
     bool stop();
 
-    /** Sample output queue. */
+    /**
+     * Sample output queue.
+     * TODO(b/155918341) Move to protected.
+     */
     MediaSampleQueue mOutputQueue = {};
 
 protected:

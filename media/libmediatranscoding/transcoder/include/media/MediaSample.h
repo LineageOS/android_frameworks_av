@@ -104,6 +104,8 @@ struct MediaSample {
     /** Media sample information. */
     MediaSampleInfo info;
 
+    MediaSample() = default;
+
 private:
     MediaSample(uint8_t* buffer, size_t dataOffset, uint32_t bufferId,
                 OnSampleReleasedCallback releaseCallback)

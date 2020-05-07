@@ -72,14 +72,12 @@ private:
     // Dequeues an encoded buffer from the encoder and adds it to the output queue.
     void dequeueOutputSample(int32_t bufferIndex, AMediaCodecBufferInfo bufferInfo);
 
-    // MediaSample release callback to return a buffer to the codec.
-    void releaseOutputSample(MediaSample* sample);
-
     AMediaCodec* mDecoder = nullptr;
-    AMediaCodec* mEncoder = nullptr;
+    // Sample release callback holds a reference to the encoder, hence the shared_ptr.
+    std::shared_ptr<AMediaCodec> mEncoder;
     ANativeWindow* mSurface = nullptr;
-    bool mEOSFromSource = false;
-    bool mEOSFromEncoder = false;
+    bool mEosFromSource = false;
+    bool mEosFromEncoder = false;
     bool mStopRequested = false;
     media_status_t mStatus = AMEDIA_OK;
     MediaSampleInfo mSampleInfo;
