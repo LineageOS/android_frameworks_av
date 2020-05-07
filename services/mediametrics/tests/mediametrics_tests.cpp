@@ -803,7 +803,7 @@ TEST(mediametrics_tests, audio_analytics_permission) {
 
   // TODO: Verify contents of AudioAnalytics.
   // Currently there is no getter API in AudioAnalytics besides dump.
-  ASSERT_EQ(9, audioAnalytics.dump(1000).second /* lines */);
+  ASSERT_EQ(10, audioAnalytics.dump(1000).second /* lines */);
 
   ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
   // untrusted entities can add to an existing key
@@ -839,7 +839,7 @@ TEST(mediametrics_tests, audio_analytics_permission2) {
 
   // TODO: Verify contents of AudioAnalytics.
   // Currently there is no getter API in AudioAnalytics besides dump.
-  ASSERT_EQ(9, audioAnalytics.dump(1000).second /* lines */);
+  ASSERT_EQ(10, audioAnalytics.dump(1000).second /* lines */);
 
   ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
   // untrusted entities can add to an existing key
