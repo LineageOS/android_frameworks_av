@@ -2,6 +2,7 @@ cc_library_static {
     name: "libstagefright_amrnbdec",
     vendor_available: true,
     host_supported: true,
+    min_sdk_version: "29",
 
     srcs: [
         "src/a_refl.cpp",
