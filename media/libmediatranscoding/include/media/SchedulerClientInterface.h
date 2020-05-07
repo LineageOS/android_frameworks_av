@@ -30,12 +30,33 @@ using ::aidl::android::media::TranscodingRequestParcel;
 // the status of a job.
 class SchedulerClientInterface {
 public:
+    /**
+     * Submits one request to the scheduler.
+     *
+     * Returns true on success and false on failure. This call will fail is a job identified
+     * by <clientId, jobId> already exists.
+     */
     virtual bool submit(ClientIdType clientId, JobIdType jobId, uid_t uid,
                         const TranscodingRequestParcel& request,
                         const std::weak_ptr<ITranscodingClientCallback>& clientCallback) = 0;
 
+    /**
+     * Cancels a job identified by <clientId, jobId>.
+     *
+     * If jobId is negative (<0), all jobs with a specified priority (that's not
+     * TranscodingJobPriority::kUnspecified) will be cancelled. Otherwise, only the single job
+     * <clientId, jobId> will be cancelled.
+     *
+     * Returns false if a single job is being cancelled but it doesn't exist. Returns
+     * true otherwise.
+     */
     virtual bool cancel(ClientIdType clientId, JobIdType jobId) = 0;
 
+    /**
+     * Retrieves information about a job.
+     *
+     * Returns true and the job if it exists, and false otherwise.
+     */
     virtual bool getJob(ClientIdType clientId, JobIdType jobId,
                         TranscodingRequestParcel* request) = 0;
 
