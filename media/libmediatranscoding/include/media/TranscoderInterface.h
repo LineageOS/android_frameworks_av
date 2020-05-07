@@ -18,6 +18,7 @@
 #define ANDROID_MEDIA_TRANSCODER_INTERFACE_H
 
 #include <aidl/android/media/TranscodingErrorCode.h>
+#include <media/TranscodingDefs.h>
 
 namespace android {
 
@@ -30,9 +31,9 @@ public:
     // TODO(chz): determine what parameters are needed here.
     // For now, always pass in clientId&jobId.
     virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) = 0;
-    virtual void start(int64_t clientId, int32_t jobId) = 0;
-    virtual void pause(int64_t clientId, int32_t jobId) = 0;
-    virtual void resume(int64_t clientId, int32_t jobId) = 0;
+    virtual void start(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void pause(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void resume(ClientIdType clientId, JobIdType jobId) = 0;
 
 protected:
     virtual ~TranscoderInterface() = default;
@@ -43,9 +44,9 @@ protected:
 class TranscoderCallbackInterface {
 public:
     // TODO(chz): determine what parameters are needed here.
-    virtual void onFinish(int64_t clientId, int32_t jobId) = 0;
-    virtual void onError(int64_t clientId, int32_t jobId, TranscodingErrorCode err) = 0;
-    virtual void onProgressUpdate(int64_t clientId, int32_t jobId, int32_t progress) = 0;
+    virtual void onFinish(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode err) = 0;
+    virtual void onProgressUpdate(ClientIdType clientId, JobIdType jobId, int32_t progress) = 0;
 
     // Called when transcoding becomes temporarily inaccessible due to loss of resource.
     // If there is any job currently running, it will be paused. When resource contention

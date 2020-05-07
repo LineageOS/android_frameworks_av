@@ -24,7 +24,10 @@ cc_library_headers {
             enabled: false,
         },
     },
-    apex_available: ["com.android.media"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
 }
 
 filegroup {
@@ -373,4 +376,37 @@ cc_library {
         ],
         cfi: true,
     },
+}
+
+cc_library_static {
+    name: "libmedia_ndkformatpriv",
+
+    host_supported: true,
+
+    srcs: [
+        "NdkMediaFormatPriv.cpp",
+        "NdkMediaErrorPriv.cpp",
+    ],
+
+    header_libs: [
+        "libstagefright_foundation_headers",
+        "libstagefright_headers",
+        "media_ndk_headers",
+    ],
+
+    cflags: [
+        "-DEXPORT=__attribute__((visibility(\"default\")))",
+        "-Werror",
+        "-Wall",
+    ],
+
+    export_include_dirs: ["include"],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+
+    apex_available: ["com.android.media"],
 }
