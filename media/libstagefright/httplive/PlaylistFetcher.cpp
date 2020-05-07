@@ -345,6 +345,7 @@ status_t PlaylistFetcher::decryptBuffer(
         ALOGE("Missing key uri");
         return ERROR_MALFORMED;
     }
+    keyURI = mPlaylist->getFullCipherUri(keyURI);
 
     ssize_t index = mAESKeyForURI.indexOfKey(keyURI);
 
