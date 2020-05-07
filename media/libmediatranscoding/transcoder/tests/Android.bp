@@ -50,6 +50,7 @@ cc_test {
     name: "MediaTrackTranscoderTests",
     defaults: ["testdefaults"],
     srcs: ["MediaTrackTranscoderTests.cpp"],
+    shared_libs: ["libbinder_ndk"],
 }
 
 // VideoTrackTranscoder unit test
@@ -57,4 +58,12 @@ cc_test {
     name: "VideoTrackTranscoderTests",
     defaults: ["testdefaults"],
     srcs: ["VideoTrackTranscoderTests.cpp"],
+}
+
+// PassthroughTrackTranscoder unit test
+cc_test {
+    name: "PassthroughTrackTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["PassthroughTrackTranscoderTests.cpp"],
+    shared_libs: ["libcrypto"],
 }
