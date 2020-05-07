@@ -55,6 +55,8 @@ struct M3UParser : public RefBase {
     bool getTypeURI(size_t index, const char *key, AString *uri) const;
     bool hasType(size_t index, const char *key) const;
 
+    AString getFullCipherUri(const AString &partial);
+
 protected:
     virtual ~M3UParser();
 
@@ -99,7 +101,7 @@ private:
             const AString &line, sp<AMessage> *meta) const;
 
     static status_t parseCipherInfo(
-            const AString &line, sp<AMessage> *meta, const AString &baseURI);
+            const AString &line, sp<AMessage> *meta);
 
     static status_t parseByteRange(
             const AString &line, uint64_t curOffset,
