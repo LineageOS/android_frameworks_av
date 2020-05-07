@@ -131,7 +131,7 @@ void TranscodingUidPolicy::registerMonitorUid(uid_t uid) {
     }
 
     int32_t state = ActivityManager::PROCESS_STATE_UNKNOWN;
-    if (mRegistered && mAm->isUidActiveOrForeground(uid, String16(kTranscodingTag))) {
+    if (mRegistered && mAm->isUidActive(uid, String16(kTranscodingTag))) {
         state = mAm->getUidProcessState(uid, String16(kTranscodingTag));
     }
 

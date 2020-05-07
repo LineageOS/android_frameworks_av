@@ -16,8 +16,10 @@
 
 #pragma once
 
+#include <android-base/thread_annotations.h>
 #include "AnalyticsActions.h"
 #include "AnalyticsState.h"
+#include "TimedAction.h"
 #include "Wrap.h"
 
 namespace android::mediametrics {
@@ -89,6 +91,8 @@ private:
      */
     std::string getThreadFromTrack(const std::string& track) const;
 
+    const bool mDeliverStatistics __unused = true;
+
     // Actions is individually locked
     AnalyticsActions mActions;
 
@@ -97,6 +101,54 @@ private:
 
     SharedPtrWrap<AnalyticsState> mAnalyticsState;
     SharedPtrWrap<AnalyticsState> mPreviousAnalyticsState;
+
+    TimedAction mTimedAction; // locked internally
+
+    // DeviceUse is a nested class which handles audio device usage accounting.
+    // We define this class at the end to ensure prior variables all properly constructed.
+    // TODO: Track / Thread interaction
+    // TODO: Consider statistics aggregation.
+    class DeviceUse {
+    public:
+        explicit DeviceUse(AudioAnalytics &audioAnalytics) : mAudioAnalytics{audioAnalytics} {}
+
+        // Called every time an endAudioIntervalGroup message is received.
+        void endAudioIntervalGroup(
+                const std::shared_ptr<const android::mediametrics::Item> &item,
+                bool isTrack) const;
+    private:
+        AudioAnalytics &mAudioAnalytics;
+    } mDeviceUse{*this};
+
+    // DeviceConnected is a nested class which handles audio device connection
+    // We define this class at the end to ensure prior variables all properly constructed.
+    // TODO: Track / Thread interaction
+    // TODO: Consider statistics aggregation.
+    class DeviceConnection {
+    public:
+        explicit DeviceConnection(AudioAnalytics &audioAnalytics)
+            : mAudioAnalytics{audioAnalytics} {}
+
+        // Called every time an endAudioIntervalGroup message is received.
+        void a2dpConnected(
+                const std::shared_ptr<const android::mediametrics::Item> &item);
+
+        // Called when we have an AudioFlinger createPatch
+        void createPatch(
+                const std::shared_ptr<const android::mediametrics::Item> &item);
+
+        // When the timer expires.
+        void expire();
+
+    private:
+        AudioAnalytics &mAudioAnalytics;
+
+        mutable std::mutex mLock;
+        int64_t mA2dpTimeConnectedNs GUARDED_BY(mLock) = 0;
+        int32_t mA2dpConnectedAttempts GUARDED_BY(mLock) = 0;
+        int32_t mA2dpConnectedSuccesses GUARDED_BY(mLock) = 0;
+        int32_t mA2dpConnectedFailures GUARDED_BY(mLock) = 0;
+    } mDeviceConnection{*this};
 };
 
 } // namespace android::mediametrics

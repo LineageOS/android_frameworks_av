@@ -19,7 +19,7 @@
         <option name="cleanup" value="true" />
         <option name="push" value="ID3Test->/data/local/tmp/ID3Test" />
         <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/id3/test/ID3Test.zip?unzip=true"
+            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/id3/test/ID3Test-1.1.zip?unzip=true"
             value="/data/local/tmp/ID3TestRes/" />
     </target_preparer>
 

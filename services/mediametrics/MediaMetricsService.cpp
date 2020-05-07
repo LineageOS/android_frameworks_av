@@ -78,6 +78,74 @@ bool MediaMetricsService::useUidForPackage(
     }
 }
 
+/* static */
+std::pair<std::string, int64_t>
+MediaMetricsService::getSanitizedPackageNameAndVersionCode(uid_t uid) {
+    // Meyer's singleton, initialized on first access.
+    // mUidInfo is locked internally.
+    static mediautils::UidInfo uidInfo;
+
+    // get info.
+    mediautils::UidInfo::Info info = uidInfo.getInfo(uid);
+    if (useUidForPackage(info.package, info.installer)) {
+        return { std::to_string(uid), /* versionCode */ 0 };
+    } else {
+        return { info.package, info.versionCode };
+    }
+}
+
+/* static */
+std::string MediaMetricsService::tokenizer(std::string::const_iterator& it,
+        const std::string::const_iterator& end, const char *reserved) {
+    // consume leading white space
+    for (; it != end && std::isspace(*it); ++it);
+    if (it == end) return {};
+
+    auto start = it;
+    // parse until we hit a reserved keyword or space
+    if (strchr(reserved, *it)) return {start, ++it};
+    for (;;) {
+        ++it;
+        if (it == end || std::isspace(*it) || strchr(reserved, *it)) return {start, it};
+    }
+}
+
+/* static */
+std::vector<std::pair<std::string, std::string>>
+MediaMetricsService::getDeviceAddressPairs(const std::string& devices) {
+    std::vector<std::pair<std::string, std::string>> result;
+
+    // Currently, the device format is EXACTLY
+    // (device1, addr1)|(device2, addr2)|...
+
+    static constexpr char delim[] = "()|,";
+    for (auto it = devices.begin(); ; ) {
+        auto token = tokenizer(it, devices.end(), delim);
+        if (token != "(") return result;
+
+        auto device = tokenizer(it, devices.end(), delim);
+        if (device.empty() || !std::isalnum(device[0])) return result;
+
+        token = tokenizer(it, devices.end(), delim);
+        if (token != ",") return result;
+
+        // special handling here for empty addresses
+        auto address = tokenizer(it, devices.end(), delim);
+        if (address.empty() || !std::isalnum(device[0])) return result;
+        if (address == ")") {  // no address, just the ")"
+            address.clear();
+        } else {
+            token = tokenizer(it, devices.end(), delim);
+            if (token != ")") return result;
+        }
+
+        result.emplace_back(std::move(device), std::move(address));
+
+        token = tokenizer(it, devices.end(), delim);
+        if (token != "|") return result;  // this includes end of string detection
+    }
+}
+
 MediaMetricsService::MediaMetricsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),
@@ -136,16 +204,10 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
     // Overwrite package name and version if the caller was untrusted or empty
     if (!isTrusted || item->getPkgName().empty()) {
         const uid_t uid = item->getUid();
-        mediautils::UidInfo::Info info = mUidInfo.getInfo(uid);
-        if (useUidForPackage(info.package, info.installer)) {
-            // remove uid information of unknown installed packages.
-            // TODO: perhaps this can be done just before uploading to Westworld.
-            item->setPkgName(std::to_string(uid));
-            item->setPkgVersionCode(0);
-        } else {
-            item->setPkgName(info.package);
-            item->setPkgVersionCode(info.versionCode);
-        }
+        const auto [ pkgName, version ] =
+                MediaMetricsService::getSanitizedPackageNameAndVersionCode(uid);
+        item->setPkgName(pkgName);
+        item->setPkgVersionCode(version);
     }
 
     ALOGV("%s: isTrusted:%d given uid %d; sanitized uid: %d sanitized pkg: %s "
