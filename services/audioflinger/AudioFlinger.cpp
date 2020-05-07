@@ -1176,6 +1176,10 @@ status_t AudioFlinger::setMode(audio_mode_t mode)
             mPlaybackThreads.valueAt(i)->setMode(mode);
     }
 
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETMODE)
+        .set(AMEDIAMETRICS_PROP_AUDIOMODE, toString(mode))
+        .record();
     return ret;
 }
 
@@ -1741,6 +1745,10 @@ status_t AudioFlinger::setVoiceVolume(float value)
     ret = dev->setVoiceVolume(value);
     mHardwareStatus = AUDIO_HW_IDLE;
 
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME)
+        .set(AMEDIAMETRICS_PROP_VOICEVOLUME, (double)value)
+        .record();
     return ret;
 }
 
