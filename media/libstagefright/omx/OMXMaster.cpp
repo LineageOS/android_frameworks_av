@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "OMXMaster"
+#include <android-base/properties.h>
 #include <utils/Log.h>
 
 #include <media/stagefright/omx/OMXMaster.h>
@@ -67,6 +68,10 @@ void OMXMaster::addPlatformPlugin() {
 }
 
 void OMXMaster::addPlugin(const char *libname) {
+    if (::android::base::GetIntProperty("vendor.media.omx", int64_t(1)) == 0) {
+        return;
+    }
+
     void *libHandle = android_load_sphal_library(libname, RTLD_NOW);
 
     if (libHandle == NULL) {
