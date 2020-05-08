@@ -178,6 +178,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                 return INVALID_OPERATION;
             }
 
+            // Populate encapsulation information when a output device is connected.
+            device->setEncapsulationInfoFromHal(mpClientInterface);
+
             // outputs should never be empty here
             ALOG_ASSERT(outputs.size() != 0, "setDeviceConnectionState():"
                     "checkOutputsForDevice() returned no outputs but status OK");
@@ -4635,6 +4638,7 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                 if (!device->isAttached()) {
                     device->attach(hwModule);
                     mAvailableOutputDevices.add(device);
+                    device->setEncapsulationInfoFromHal(mpClientInterface);
                     if (newDevices) newDevices->add(device);
                     setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
                 }
