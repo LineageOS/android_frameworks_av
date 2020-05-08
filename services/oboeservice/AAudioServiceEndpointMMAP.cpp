@@ -23,9 +23,9 @@
 #include <map>
 #include <mutex>
 #include <sstream>
+#include <thread>
 #include <utils/Singleton.h>
 #include <vector>
-
 
 #include "AAudioEndpointManager.h"
 #include "AAudioServiceEndpoint.h"
@@ -35,7 +35,6 @@
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceEndpointPlay.h"
 #include "AAudioServiceEndpointMMAP.h"
-
 
 #define AAUDIO_BUFFER_CAPACITY_MIN    4 * 512
 #define AAUDIO_SAMPLE_RATE_DEFAULT    48000
@@ -47,7 +46,6 @@
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
-
 
 AAudioServiceEndpointMMAP::AAudioServiceEndpointMMAP(AAudioService &audioService)
         : mMmapStream(nullptr)
@@ -318,9 +316,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
     return 0; // TODO
 }
 
-// This is called by AudioFlinger when it wants to destroy a stream.
-void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
-    ALOGD("%s(portHandle = %d) called", __func__, portHandle);
+// This is called by onTearDown() in a separate thread to avoid deadlocks.
+void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHandle) {
     // Are we tearing down the EXCLUSIVE MMAP stream?
     if (isStreamRegistered(portHandle)) {
         ALOGD("%s(%d) tearing down this entire MMAP endpoint", __func__, portHandle);
@@ -332,6 +329,13 @@ void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
         ALOGD("%s(%d) disconnectStreamByPortHandle returned %d", __func__, portHandle, result);
     }
 };
+
+// This is called by AudioFlinger when it wants to destroy a stream.
+void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
+    ALOGD("%s(portHandle = %d) called", __func__, portHandle);
+    std::thread asyncTask(&AAudioServiceEndpointMMAP::handleTearDownAsync, this, portHandle);
+    asyncTask.detach();
+}
 
 void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
                                               android::Vector<float> values) {
@@ -345,12 +349,20 @@ void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
     }
 };
 
-void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t deviceId) {
+void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle) {
+    const int32_t deviceId = static_cast<int32_t>(portHandle);
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
-    if (getDeviceId() != AUDIO_PORT_HANDLE_NONE  && getDeviceId() != deviceId) {
-        disconnectRegisteredStreams();
+    if (getDeviceId() != deviceId) {
+        if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
+            std::thread asyncTask([this, deviceId]() {
+                disconnectRegisteredStreams();
+                setDeviceId(deviceId);
+            });
+            asyncTask.detach();
+        } else {
+            setDeviceId(deviceId);
+        }
     }
-    setDeviceId(deviceId);
 };
 
 /**
