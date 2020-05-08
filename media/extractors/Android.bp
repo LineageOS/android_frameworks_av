@@ -24,6 +24,9 @@ cc_defaults {
         "libmediandk#29",
     ],
 
+    // extractors are supposed to work on Q(29)
+    min_sdk_version: "29",
+
     relative_install_path: "extractors",
 
     compile_multilib: "first",
