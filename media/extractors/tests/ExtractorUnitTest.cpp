@@ -107,9 +107,10 @@ class ExtractorUnitTest {
         mDisableTest = false;
 
         static const std::map<std::string, standardExtractors> mapExtractor = {
-                {"aac", AAC},     {"amr", AMR},         {"mp3", MP3},        {"ogg", OGG},
-                {"wav", WAV},     {"mkv", MKV},         {"flac", FLAC},      {"midi", MIDI},
-                {"mpeg4", MPEG4}, {"mpeg2ts", MPEG2TS}, {"mpeg2ps", MPEG2PS}};
+                {"aac", AAC},     {"amr", AMR},         {"mp3", MP3},         {"ogg", OGG},
+                {"wav", WAV},     {"mkv", MKV},         {"flac", FLAC},       {"midi", MIDI},
+                {"mpeg4", MPEG4}, {"mpeg2ts", MPEG2TS}, {"mpeg2ps", MPEG2PS}, {"mp4", MPEG4},
+                {"webm", MKV},    {"ts", MPEG2TS},      {"mpeg", MPEG2PS}};
         // Find the component type
         if (mapExtractor.find(writerFormat) != mapExtractor.end()) {
             mExtractorName = mapExtractor.at(writerFormat);
@@ -733,6 +734,174 @@ TEST_P(ConfigParamTest, ConfigParamValidation) {
     delete track;
     AMediaFormat_delete(trackFormat);
 }
+
+class ExtractorComparison
+    : public ExtractorUnitTest,
+      public ::testing::TestWithParam<pair<string /* InputFile0 */, string /* InputFile1 */>> {
+  public:
+    ~ExtractorComparison() {
+        for (int8_t *extractorOp : mExtractorOutput) {
+            if (extractorOp != nullptr) {
+                free(extractorOp);
+            }
+        }
+    }
+
+    virtual void SetUp() override {
+        string input0 = GetParam().first;
+        string input1 = GetParam().second;
+
+        // Allocate memory to hold extracted data for both extractors
+        struct stat buf;
+        int32_t status = stat((gEnv->getRes() + input0).c_str(), &buf);
+        ASSERT_EQ(status, 0) << "Unable to get file properties";
+
+        // allocating the buffer size as 2x since some
+        // extractors like flac, midi and wav decodes the file.
+        mExtractorOutput[0] = (int8_t *)calloc(1, buf.st_size * 2);
+        ASSERT_NE(mExtractorOutput[0], nullptr)
+                << "Unable to allocate memory for writing extractor's output";
+        mExtractorOuputSize[0] = buf.st_size * 2;
+
+        status = stat((gEnv->getRes() + input1).c_str(), &buf);
+        ASSERT_EQ(status, 0) << "Unable to get file properties";
+
+        // allocate buffer for extractor output, 2x input file size.
+        mExtractorOutput[1] = (int8_t *)calloc(1, buf.st_size * 2);
+        ASSERT_NE(mExtractorOutput[1], nullptr)
+                << "Unable to allocate memory for writing extractor's output";
+        mExtractorOuputSize[1] = buf.st_size * 2;
+    }
+
+    int8_t *mExtractorOutput[2]{};
+    size_t mExtractorOuputSize[2]{};
+};
+
+// Compare output of two extractors for identical content
+TEST_P(ExtractorComparison, ExtractorComparisonTest) {
+    vector<string> inputFileNames = {GetParam().first, GetParam().second};
+    size_t extractedOutputSize[2]{};
+    AMediaFormat *extractorFormat[2]{};
+    int32_t status = OK;
+
+    for (int32_t idx = 0; idx < inputFileNames.size(); idx++) {
+        string containerFormat = inputFileNames[idx].substr(inputFileNames[idx].find(".") + 1);
+        setupExtractor(containerFormat);
+        if (mDisableTest) {
+            ALOGV("Unknown extractor %s. Skipping the test", containerFormat.c_str());
+            return;
+        }
+
+        ALOGV("Validates %s Extractor for %s", containerFormat.c_str(),
+              inputFileNames[idx].c_str());
+        string inputFileName = gEnv->getRes() + inputFileNames[idx];
+
+        status = setDataSource(inputFileName);
+        ASSERT_EQ(status, 0) << "SetDataSource failed for" << containerFormat << "extractor";
+
+        status = createExtractor();
+        ASSERT_EQ(status, 0) << "Extractor creation failed for " << containerFormat << " extractor";
+
+        int32_t numTracks = mExtractor->countTracks();
+        ASSERT_EQ(numTracks, 1) << "This test expects inputs with one track only";
+
+        int32_t trackIdx = 0;
+        MediaTrackHelper *track = mExtractor->getTrack(trackIdx);
+        ASSERT_NE(track, nullptr) << "Failed to get track for index " << trackIdx;
+
+        extractorFormat[idx] = AMediaFormat_new();
+        ASSERT_NE(extractorFormat[idx], nullptr) << "AMediaFormat_new returned null AMediaformat";
+
+        status = track->getFormat(extractorFormat[idx]);
+        ASSERT_EQ(OK, (media_status_t)status) << "Failed to get track meta data";
+
+        CMediaTrack *cTrack = wrap(track);
+        ASSERT_NE(cTrack, nullptr) << "Failed to get track wrapper for index " << trackIdx;
+
+        MediaBufferGroup *bufferGroup = new MediaBufferGroup();
+        status = cTrack->start(track, bufferGroup->wrap());
+        ASSERT_EQ(OK, (media_status_t)status) << "Failed to start the track";
+
+        int32_t offset = 0;
+        while (status != AMEDIA_ERROR_END_OF_STREAM) {
+            MediaBufferHelper *buffer = nullptr;
+            status = track->read(&buffer);
+            ALOGV("track->read Status = %d buffer %p", status, buffer);
+            if (buffer) {
+                ASSERT_LE(offset + buffer->range_length(), mExtractorOuputSize[idx])
+                        << "Memory overflow. Extracted output size more than expected";
+
+                memcpy(mExtractorOutput[idx] + offset, buffer->data(), buffer->range_length());
+                extractedOutputSize[idx] += buffer->range_length();
+                offset += buffer->range_length();
+                buffer->release();
+            }
+        }
+        status = cTrack->stop(track);
+        ASSERT_EQ(OK, status) << "Failed to stop the track";
+
+        fclose(mInputFp);
+        delete bufferGroup;
+        delete track;
+        mDataSource.clear();
+        delete mExtractor;
+        mInputFp = nullptr;
+        mExtractor = nullptr;
+    }
+
+    // Compare the meta data from both the extractors
+    const char *mime[2];
+    AMediaFormat_getString(extractorFormat[0], AMEDIAFORMAT_KEY_MIME, &mime[0]);
+    AMediaFormat_getString(extractorFormat[1], AMEDIAFORMAT_KEY_MIME, &mime[1]);
+    ASSERT_STREQ(mime[0], mime[1]) << "Mismatch between extractor's format";
+
+    if (!strncmp(mime[0], "audio/", 6)) {
+        int32_t channelCount0, channelCount1;
+        int32_t sampleRate0, sampleRate1;
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[0], AMEDIAFORMAT_KEY_CHANNEL_COUNT,
+                                          &channelCount0));
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[0], AMEDIAFORMAT_KEY_SAMPLE_RATE,
+                                          &sampleRate0));
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[1], AMEDIAFORMAT_KEY_CHANNEL_COUNT,
+                                          &channelCount1));
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[1], AMEDIAFORMAT_KEY_SAMPLE_RATE,
+                                          &sampleRate1));
+        ASSERT_EQ(channelCount0, channelCount1) << "Mismatch between extractor's channelCount";
+        ASSERT_EQ(sampleRate0, sampleRate1) << "Mismatch between extractor's sampleRate";
+    } else if (!strncmp(mime[0], "video/", 6)) {
+        int32_t width0, height0;
+        int32_t width1, height1;
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[0], AMEDIAFORMAT_KEY_WIDTH, &width0));
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[0], AMEDIAFORMAT_KEY_HEIGHT, &height0));
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[1], AMEDIAFORMAT_KEY_WIDTH, &width1));
+        ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat[1], AMEDIAFORMAT_KEY_HEIGHT, &height1));
+        ASSERT_EQ(width0, width1) << "Mismatch between extractor's width";
+        ASSERT_EQ(height0, height1) << "Mismatch between extractor's height";
+    } else {
+        ASSERT_TRUE(false) << "Invalid mime type " << mime[0];
+    }
+
+    for (AMediaFormat *exFormat : extractorFormat) {
+        AMediaFormat_delete(exFormat);
+    }
+
+    // Compare the extracted outputs of both extractor
+    ASSERT_EQ(extractedOutputSize[0], extractedOutputSize[1])
+            << "Extractor's output size doesn't match between " << inputFileNames[0] << "and "
+            << inputFileNames[1] << " extractors";
+    status = memcmp(mExtractorOutput[0], mExtractorOutput[1], extractedOutputSize[0]);
+    ASSERT_EQ(status, 0) << "Extracted content mismatch between " << inputFileNames[0] << "and "
+                         << inputFileNames[1] << " extractors";
+}
+
+INSTANTIATE_TEST_SUITE_P(ExtractorComparisonAll, ExtractorComparison,
+                         ::testing::Values(make_pair("swirl_144x136_vp9.mp4",
+                                                     "swirl_144x136_vp9.webm"),
+                                           make_pair("video_480x360_mp4_vp9_333kbps_25fps.mp4",
+                                                     "video_480x360_webm_vp9_333kbps_25fps.webm"),
+                                           make_pair("video_1280x720_av1_hdr_static_3mbps.mp4",
+                                                     "video_1280x720_av1_hdr_static_3mbps.webm"),
+                                           make_pair("loudsoftaac.aac", "loudsoftaac.mkv")));
 
 INSTANTIATE_TEST_SUITE_P(ConfigParamTestAll, ConfigParamTest,
                          ::testing::Values(make_pair("aac", 0),

@@ -100,9 +100,8 @@ Status MediaTranscodingService::registerClient(
         const std::string& in_clientName, const std::string& in_opPackageName, int32_t in_clientUid,
         int32_t in_clientPid, std::shared_ptr<ITranscodingClient>* _aidl_return) {
     if (in_callback == nullptr) {
-        ALOGE("Client callback can not be null");
         *_aidl_return = nullptr;
-        return Status::fromServiceSpecificError(ERROR_ILLEGAL_ARGUMENT);
+        return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT, "Client callback cannot be null!");
     }
 
     int32_t callingPid = AIBinder_getCallingPid();
