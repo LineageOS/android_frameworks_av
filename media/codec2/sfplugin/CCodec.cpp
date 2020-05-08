@@ -1379,7 +1379,7 @@ void CCodec::initiateStop() {
         state->set(STOPPING);
     }
 
-    mChannel->stop();
+    mChannel->reset();
     (new AMessage(kWhatStop, this))->post();
 }
 
@@ -1406,9 +1406,6 @@ void CCodec::stop() {
         // TODO: convert err into status_t
         mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
     }
-    // Assure buffers are not owned when stop() was called without flush().
-    std::list<std::unique_ptr<C2Work>> flushedWork;
-    mChannel->flush(flushedWork);
 
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -1468,7 +1465,7 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
         }
     }
 
-    mChannel->stop();
+    mChannel->reset();
     // thiz holds strong ref to this while the thread is running.
     sp<CCodec> thiz(this);
     std::thread([thiz, sendCallback] { thiz->release(sendCallback); }).detach();
@@ -1495,6 +1492,7 @@ void CCodec::release(bool sendCallback) {
         state->set(RELEASED);
         state->comp.reset();
     }
+    (new AMessage(kWhatRelease, this))->post();
     if (sendCallback) {
         mCallback->onReleaseCompleted();
     }
@@ -1757,6 +1755,12 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             // C2Component::flush_sm() should return within 5ms.
             setDeadline(now, 1500ms, "flush");
             flush();
+            break;
+        }
+        case kWhatRelease: {
+            mChannel->release();
+            mClient.reset();
+            mClientListener.reset();
             break;
         }
         case kWhatCreateInputSurface: {
