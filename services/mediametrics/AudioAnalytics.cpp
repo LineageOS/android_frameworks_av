@@ -132,6 +132,49 @@ AudioAnalytics::AudioAnalytics()
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
                 mDeviceConnection.createPatch(item);
             }));
+
+    // Handle power usage
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mAudioPowerUsage.checkTrackRecord(item, true /* isTrack */);
+            }));
+
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mAudioPowerUsage.checkTrackRecord(item, false /* isTrack */);
+            }));
+
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_SETMODE),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                // ALOGD("(key=%s) Audioflinger setMode", item->getKey().c_str());
+                mAudioPowerUsage.checkMode(item);
+            }));
+
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_AUDIO_FLINGER "." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                // ALOGD("(key=%s) Audioflinger setVoiceVolume", item->getKey().c_str());
+                mAudioPowerUsage.checkVoiceVolume(item);
+            }));
+
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string("createAudioPatch"),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mAudioPowerUsage.checkCreatePatch(item);
+            }));
 }
 
 AudioAnalytics::~AudioAnalytics()
@@ -170,6 +213,12 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
     }
     if (ll > 0) {
         auto [s, l] = mPreviousAnalyticsState->dump(ll, sinceNs, prefix);
+        ss << s;
+        ll -= l;
+    }
+
+    if (ll > 0 && prefix == nullptr) {
+        auto [s, l] = mAudioPowerUsage.dump(ll);
         ss << s;
         ll -= l;
     }
