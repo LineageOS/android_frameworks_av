@@ -41,7 +41,7 @@ class GraphicBuffer : public C2Buffer {
         : C2Buffer({block->share(C2Rect(block->width(), block->height()), ::C2Fence())}) {}
 };
 
-static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
+static std::vector<std::tuple<std::string, std::string, std::string, std::string, std::string>>
         kEncodeTestParameters;
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kEncodeResolutionTestParameters;
@@ -100,6 +100,7 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         }
         mEos = false;
         mCsd = false;
+        mConfigBPictures = false;
         mFramesReceived = 0;
         mFailedWorkReceived = 0;
         mTimestampUs = 0u;
@@ -120,7 +121,7 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
 
-    bool setupConfigParam(int32_t nWidth, int32_t nHeight);
+    bool setupConfigParam(int32_t nWidth, int32_t nHeight, int32_t nBFrame = 0);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -130,8 +131,10 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
                 // previous timestamp
                 typedef std::unique_lock<std::mutex> ULock;
                 if (!mTimestampUslist.empty()) {
-                    EXPECT_GE((work->worklets.front()->output.ordinal.timestamp.peeku()),
-                              mTimestampUs);
+                    if (!mConfigBPictures) {
+                        EXPECT_GE((work->worklets.front()->output.ordinal.timestamp.peeku()),
+                                  mTimestampUs);
+                    }
                     mTimestampUs = work->worklets.front()->output.ordinal.timestamp.peeku();
                     // Currently this lock is redundant as no mTimestampUslist is only initialized
                     // before queuing any work to component. Once AdaptiveTest is added similar to
@@ -192,7 +195,7 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     bool mEos;
     bool mCsd;
     bool mDisableTest;
-    bool mConfig;
+    bool mConfigBPictures;
     bool mTimestampDevTest;
     standardComp mCompName;
     uint32_t mFramesReceived;
@@ -269,13 +272,27 @@ void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& 
 }
 
 // Set Default config param.
-bool Codec2VideoEncHidlTestBase::setupConfigParam(int32_t nWidth, int32_t nHeight) {
+bool Codec2VideoEncHidlTestBase::setupConfigParam(int32_t nWidth, int32_t nHeight,
+                                                  int32_t nBFrame) {
+    c2_status_t status = C2_OK;
+    std::vector<std::unique_ptr<C2Param>> configParam;
     std::vector<std::unique_ptr<C2SettingResult>> failures;
-    C2StreamPictureSizeInfo::input inputSize(0u, nWidth, nHeight);
-    std::vector<C2Param*> configParam{&inputSize};
-    c2_status_t status = mComponent->config(configParam, C2_DONT_BLOCK, &failures);
-    if (status == C2_OK && failures.size() == 0u) return true;
-    return false;
+
+    configParam.push_back(std::make_unique<C2StreamPictureSizeInfo::input>(0u, nWidth, nHeight));
+
+    if (nBFrame > 0) {
+        std::unique_ptr<C2StreamGopTuning::output> gop =
+                C2StreamGopTuning::output::AllocUnique(2 /* flexCount */, 0u /* stream */);
+        gop->m.values[0] = {P_FRAME, UINT32_MAX};
+        gop->m.values[1] = {C2Config::picture_type_t(P_FRAME | B_FRAME), uint32_t(nBFrame)};
+        configParam.push_back(std::move(gop));
+    }
+
+    for (const std::unique_ptr<C2Param>& param : configParam) {
+        status = mComponent->config({param.get()}, C2_DONT_BLOCK, &failures);
+        if (status != C2_OK || failures.size() != 0u) return false;
+    }
+    return true;
 }
 
 // LookUpTable of clips for component testing
@@ -388,7 +405,7 @@ TEST_P(Codec2VideoEncHidlTest, validateCompName) {
 class Codec2VideoEncEncodeTest
     : public Codec2VideoEncHidlTestBase,
       public ::testing::WithParamInterface<
-              std::tuple<std::string, std::string, std::string, std::string>> {
+              std::tuple<std::string, std::string, std::string, std::string, std::string>> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -405,6 +422,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
     // Send an empty frame to receive CSD data from encoder.
     bool sendEmptyFirstFrame = !std::get<3>(GetParam()).compare("true");
+    mConfigBPictures = !std::get<4>(GetParam()).compare("true");
 
     strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mURL);
@@ -428,10 +446,30 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         inputFrames--;
     }
 
-    if (!setupConfigParam(nWidth, nHeight)) {
+    if (!setupConfigParam(nWidth, nHeight, mConfigBPictures ? 1 : 0)) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
+    std::vector<std::unique_ptr<C2Param>> inParams;
+    c2_status_t c2_status = mComponent->query({}, {C2StreamGopTuning::output::PARAM_TYPE},
+                                              C2_DONT_BLOCK, &inParams);
+
+    if (c2_status != C2_OK || inParams.size() == 0) {
+        std::cout << "[   WARN   ] Bframe not supported for " << mComponentName
+                  << " resetting num BFrames to 0\n";
+        mConfigBPictures = false;
+    } else {
+        size_t offset = sizeof(C2Param);
+        C2Param* param = inParams[0].get();
+        int32_t numBFrames = *(int32_t*)((uint8_t*)param + offset);
+
+        if (!numBFrames) {
+            std::cout << "[   WARN   ] Bframe not supported for " << mComponentName
+                      << " resetting num BFrames to 0\n";
+            mConfigBPictures = false;
+        }
+    }
+
     ASSERT_EQ(mComponent->start(), C2_OK);
 
     if (sendEmptyFirstFrame) {
@@ -816,14 +854,14 @@ TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
 int main(int argc, char** argv) {
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
     for (auto params : kTestParameters) {
-        kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "true"));
-        kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "false"));
-        kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "true"));
-        kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "false"));
+        constexpr char const* kBoolString[] = { "false", "true" };
+        for (size_t i = 0; i < 1 << 3; ++i) {
+            kEncodeTestParameters.push_back(std::make_tuple(
+                    std::get<0>(params), std::get<1>(params),
+                    kBoolString[i & 1],
+                    kBoolString[(i >> 1) & 1],
+                    kBoolString[(i >> 2) & 1]));
+        }
 
         kEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "52", "18"));
