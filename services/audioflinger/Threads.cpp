@@ -2088,6 +2088,12 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         outputFlags = (audio_output_flags_t)(outputFlags | AUDIO_OUTPUT_FLAG_FAST);
     }
 
+    // Set DIRECT flag if current thread is DirectOutputThread. This can happen when the playback is
+    // rerouted to direct output thread by dynamic audio policy.
+    if (mType == DIRECT) {
+        *flags = (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT);
+    }
+
     // Check if requested flags are compatible with output stream flags
     if ((*flags & outputFlags) != *flags) {
         ALOGW("createTrack_l(): mismatch between requested flags (%08x) and output flags (%08x)",
