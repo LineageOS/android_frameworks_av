@@ -20,10 +20,12 @@
 #define LOG_TAG "MediaTrackTranscoderTests"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <media/MediaSampleReaderNDK.h>
 #include <media/MediaTrackTranscoder.h>
+#include <media/PassthroughTrackTranscoder.h>
 #include <media/VideoTrackTranscoder.h>
 
 #include "TrackTranscoderTestUtils.h"
@@ -33,6 +35,7 @@ namespace android {
 /** TrackTranscoder types to test. */
 enum TrackTranscoderType {
     VIDEO,
+    PASSTHROUGH,
 };
 
 class MediaTrackTranscoderTests : public ::testing::TestWithParam<TrackTranscoderType> {
@@ -42,12 +45,18 @@ public:
     void SetUp() override {
         LOG(DEBUG) << "MediaTrackTranscoderTests set up";
 
+        // Need to start a thread pool to prevent AMediaExtractor binder calls from starving
+        // (b/155663561).
+        ABinderProcess_startThreadPool();
+
         mCallback = std::make_shared<TestCallback>();
 
         switch (GetParam()) {
         case VIDEO:
             mTranscoder = std::make_shared<VideoTrackTranscoder>(mCallback);
-            ASSERT_NE(mTranscoder, nullptr);
+            break;
+        case PASSTHROUGH:
+            mTranscoder = std::make_shared<PassthroughTrackTranscoder>(mCallback);
             break;
         }
         ASSERT_NE(mTranscoder, nullptr);
@@ -88,6 +97,14 @@ public:
                 mDestinationFormat =
                         TrackTranscoderTestUtils::getDefaultVideoDestinationFormat(trackFormat);
                 ASSERT_NE(mDestinationFormat, nullptr);
+                break;
+            } else if (GetParam() == PASSTHROUGH && strncmp(mime, "audio/", 6) == 0) {
+                // TODO(lnilsson): Test metadata track passthrough after hkuang@ provides sample.
+                mTrackIndex = trackIndex;
+
+                mSourceFormat = std::shared_ptr<AMediaFormat>(
+                        trackFormat, std::bind(AMediaFormat_delete, std::placeholders::_1));
+                ASSERT_NE(mSourceFormat, nullptr);
                 break;
             }
 
@@ -215,7 +232,6 @@ TEST_P(MediaTrackTranscoderTests, RestartAfterFinish) {
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
     EXPECT_TRUE(mTranscoder->stop());
     EXPECT_FALSE(mTranscoder->start());
-
     joinDrainThread();
     EXPECT_FALSE(mQueueWasAborted);
     EXPECT_TRUE(mGotEndOfStream);
@@ -236,11 +252,46 @@ TEST_P(MediaTrackTranscoderTests, AbortOutputQueue) {
     EXPECT_FALSE(mGotEndOfStream);
 }
 
+TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderRelease) {
+    LOG(DEBUG) << "Testing HoldSampleAfterTranscoderRelease";
+    EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
+              AMEDIA_OK);
+    ASSERT_TRUE(mTranscoder->start());
+
+    std::shared_ptr<MediaSample> sample;
+    EXPECT_FALSE(mTranscoder->mOutputQueue.dequeue(&sample));
+
+    drainOutputSampleQueue();
+    EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
+    EXPECT_TRUE(mTranscoder->stop());
+    joinDrainThread();
+    EXPECT_FALSE(mQueueWasAborted);
+    EXPECT_TRUE(mGotEndOfStream);
+
+    mTranscoder.reset();
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    sample.reset();
+}
+
+TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderStop) {
+    LOG(DEBUG) << "Testing HoldSampleAfterTranscoderStop";
+    EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
+              AMEDIA_OK);
+    ASSERT_TRUE(mTranscoder->start());
+
+    std::shared_ptr<MediaSample> sample;
+    EXPECT_FALSE(mTranscoder->mOutputQueue.dequeue(&sample));
+    EXPECT_TRUE(mTranscoder->stop());
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+    sample.reset();
+}
+
 TEST_P(MediaTrackTranscoderTests, NullSampleReader) {
     LOG(DEBUG) << "Testing NullSampleReader";
     std::shared_ptr<MediaSampleReader> nullSampleReader;
     EXPECT_NE(mTranscoder->configure(nullSampleReader, mTrackIndex, mDestinationFormat), AMEDIA_OK);
-    EXPECT_FALSE(mTranscoder->start());
+    ASSERT_FALSE(mTranscoder->start());
 }
 
 TEST_P(MediaTrackTranscoderTests, InvalidTrackIndex) {
@@ -256,7 +307,7 @@ TEST_P(MediaTrackTranscoderTests, InvalidTrackIndex) {
 using namespace android;
 
 INSTANTIATE_TEST_SUITE_P(MediaTrackTranscoderTestsAll, MediaTrackTranscoderTests,
-                         ::testing::Values(VIDEO));
+                         ::testing::Values(VIDEO, PASSTHROUGH));
 
 int main(int argc, char** argv) {
     ::testing::InitGoogleTest(&argc, argv);

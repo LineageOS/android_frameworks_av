@@ -32,6 +32,13 @@ using ::aidl::android::media::TranscodingRequestParcel;
 using Status = ::ndk::ScopedAStatus;
 using ::ndk::SpAIBinder;
 
+//static
+std::atomic<ClientIdType> TranscodingClientManager::sCookieCounter = 0;
+//static
+std::mutex TranscodingClientManager::sCookie2ClientLock;
+//static
+std::map<ClientIdType, std::shared_ptr<TranscodingClientManager::ClientImpl>>
+        TranscodingClientManager::sCookie2Client;
 ///////////////////////////////////////////////////////////////////////////////
 
 /**
@@ -56,7 +63,7 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     std::string mClientOpPackageName;
 
     // Next jobId to assign
-    std::atomic<std::int32_t> mNextJobId;
+    std::atomic<int32_t> mNextJobId;
     // Pointer to the client manager for this client
     TranscodingClientManager* mOwner;
 
@@ -81,7 +88,7 @@ TranscodingClientManager::ClientImpl::ClientImpl(
         TranscodingClientManager* owner)
       : mClientBinder((callback != nullptr) ? callback->asBinder() : nullptr),
         mClientCallback(callback),
-        mClientId((int64_t)mClientBinder.get()),
+        mClientId(sCookieCounter.fetch_add(1, std::memory_order_relaxed)),
         mClientPid(pid),
         mClientUid(uid),
         mClientName(clientName),
@@ -142,9 +149,24 @@ Status TranscodingClientManager::ClientImpl::unregister() {
 
 // static
 void TranscodingClientManager::BinderDiedCallback(void* cookie) {
-    ClientImpl* client = static_cast<ClientImpl*>(cookie);
-    ALOGD("Client %lld is dead", (long long)client->mClientId);
-    client->unregister();
+    ClientIdType clientId = reinterpret_cast<ClientIdType>(cookie);
+
+    ALOGD("Client %lld is dead", (long long)clientId);
+
+    std::shared_ptr<ClientImpl> client;
+
+    {
+        std::scoped_lock lock{sCookie2ClientLock};
+
+        auto it = sCookie2Client.find(clientId);
+        if (it != sCookie2Client.end()) {
+            client = it->second;
+        }
+    }
+
+    if (client != nullptr) {
+        client->unregister();
+    }
 }
 
 TranscodingClientManager::TranscodingClientManager(
@@ -191,25 +213,33 @@ status_t TranscodingClientManager::addClient(
         return BAD_VALUE;
     }
 
-    // Creates the client and uses its process id as client id.
-    std::shared_ptr<ClientImpl> client = ::ndk::SharedRefBase::make<ClientImpl>(
-            callback, pid, uid, clientName, opPackageName, this);
+    SpAIBinder binder = callback->asBinder();
 
     std::scoped_lock lock{mLock};
 
     // Checks if the client already registers.
-    if (mClientIdToClientMap.find(client->mClientId) != mClientIdToClientMap.end()) {
+    if (mRegisteredCallbacks.count((uintptr_t)binder.get()) > 0) {
         return ALREADY_EXISTS;
     }
+
+    // Creates the client and uses its process id as client id.
+    std::shared_ptr<ClientImpl> client = ::ndk::SharedRefBase::make<ClientImpl>(
+            callback, pid, uid, clientName, opPackageName, this);
 
     ALOGD("Adding client id %lld, pid %d, uid %d, name %s, package %s",
           (long long)client->mClientId, client->mClientPid, client->mClientUid,
           client->mClientName.c_str(), client->mClientOpPackageName.c_str());
 
-    AIBinder_linkToDeath(client->mClientBinder.get(), mDeathRecipient.get(),
-                         reinterpret_cast<void*>(client.get()));
+    {
+        std::scoped_lock lock{sCookie2ClientLock};
+        sCookie2Client.emplace(std::make_pair(client->mClientId, client));
+    }
+
+    AIBinder_linkToDeath(binder.get(), mDeathRecipient.get(),
+                         reinterpret_cast<void*>(client->mClientId));
 
     // Adds the new client to the map.
+    mRegisteredCallbacks.insert((uintptr_t)binder.get());
     mClientIdToClientMap[client->mClientId] = client;
 
     *outClient = client;
@@ -228,16 +258,22 @@ status_t TranscodingClientManager::removeClient(ClientIdType clientId) {
         return INVALID_OPERATION;
     }
 
-    SpAIBinder callback = it->second->mClientBinder;
+    SpAIBinder binder = it->second->mClientBinder;
 
     // Check if the client still live. If alive, unlink the death.
-    if (callback.get() != nullptr) {
-        AIBinder_unlinkToDeath(callback.get(), mDeathRecipient.get(),
-                               reinterpret_cast<void*>(it->second.get()));
+    if (binder.get() != nullptr) {
+        AIBinder_unlinkToDeath(binder.get(), mDeathRecipient.get(),
+                               reinterpret_cast<void*>(it->second->mClientId));
+    }
+
+    {
+        std::scoped_lock lock{sCookie2ClientLock};
+        sCookie2Client.erase(it->second->mClientId);
     }
 
     // Erase the entry.
     mClientIdToClientMap.erase(it);
+    mRegisteredCallbacks.erase((uintptr_t)binder.get());
 
     return OK;
 }

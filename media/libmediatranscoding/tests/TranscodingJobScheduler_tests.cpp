@@ -40,8 +40,8 @@ using aidl::android::media::BnTranscodingClientCallback;
 using aidl::android::media::IMediaTranscodingService;
 using aidl::android::media::ITranscodingClient;
 
-constexpr int64_t kClientId = 1000;
-constexpr int32_t kClientJobId = 0;
+constexpr ClientIdType kClientId = 1000;
+constexpr JobIdType kClientJobId = 0;
 constexpr uid_t kClientUid = 5000;
 constexpr uid_t kInvalidUid = (uid_t)-1;
 
@@ -86,21 +86,21 @@ public:
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& /*cb*/) override {}
 
-    void start(int64_t clientId, int32_t jobId) override {
+    void start(ClientIdType clientId, JobIdType jobId) override {
         mEventQueue.push_back(Start(clientId, jobId));
     }
-    void pause(int64_t clientId, int32_t jobId) override {
+    void pause(ClientIdType clientId, JobIdType jobId) override {
         mEventQueue.push_back(Pause(clientId, jobId));
     }
-    void resume(int64_t clientId, int32_t jobId) override {
+    void resume(ClientIdType clientId, JobIdType jobId) override {
         mEventQueue.push_back(Resume(clientId, jobId));
     }
 
-    void onFinished(int64_t clientId, int32_t jobId) {
+    void onFinished(ClientIdType clientId, JobIdType jobId) {
         mEventQueue.push_back(Finished(clientId, jobId));
     }
 
-    void onFailed(int64_t clientId, int32_t jobId, TranscodingErrorCode err) {
+    void onFailed(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode err) {
         mLastError = err;
         mEventQueue.push_back(Failed(clientId, jobId));
     }
@@ -113,15 +113,15 @@ public:
 
     struct Event {
         enum { NoEvent, Start, Pause, Resume, Finished, Failed } type;
-        int64_t clientId;
-        int32_t jobId;
+        ClientIdType clientId;
+        JobIdType jobId;
     };
 
     static constexpr Event NoEvent = {Event::NoEvent, 0, 0};
 
-#define DECLARE_EVENT(action)                              \
-    static Event action(int64_t clientId, int32_t jobId) { \
-        return {Event::action, clientId, jobId};           \
+#define DECLARE_EVENT(action)                                     \
+    static Event action(ClientIdType clientId, JobIdType jobId) { \
+        return {Event::action, clientId, jobId};                  \
     }
 
     DECLARE_EVENT(Start);

@@ -38,8 +38,8 @@ class SimulatedTranscoder : public TranscoderInterface {
 public:
     struct Event {
         enum Type { NoEvent, Start, Pause, Resume, Finished, Failed } type;
-        int64_t clientId;
-        int32_t jobId;
+        ClientIdType clientId;
+        JobIdType jobId;
     };
 
     static constexpr int64_t kJobDurationUs = 1000000;
@@ -48,9 +48,9 @@ public:
 
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) override;
-    void start(int64_t clientId, int32_t jobId) override;
-    void pause(int64_t clientId, int32_t jobId) override;
-    void resume(int64_t clientId, int32_t jobId) override;
+    void start(ClientIdType clientId, JobIdType jobId) override;
+    void pause(ClientIdType clientId, JobIdType jobId) override;
+    void resume(ClientIdType clientId, JobIdType jobId) override;
     // ~TranscoderInterface
 
 private:
@@ -60,7 +60,7 @@ private:
     std::list<Event> mQueue GUARDED_BY(mLock);
 
     static const char* toString(Event::Type type);
-    void queueEvent(Event::Type type, int64_t clientId, int32_t jobId);
+    void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId);
     void threadLoop();
 };
 
