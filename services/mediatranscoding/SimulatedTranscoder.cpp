@@ -47,7 +47,8 @@ void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackIn
     mCallback = cb;
 }
 
-void SimulatedTranscoder::start(ClientIdType clientId, JobIdType jobId) {
+void SimulatedTranscoder::start(ClientIdType clientId, JobIdType jobId,
+                                const TranscodingRequestParcel& /*request*/) {
     queueEvent(Event::Start, clientId, jobId);
 }
 
@@ -57,6 +58,10 @@ void SimulatedTranscoder::pause(ClientIdType clientId, JobIdType jobId) {
 
 void SimulatedTranscoder::resume(ClientIdType clientId, JobIdType jobId) {
     queueEvent(Event::Resume, clientId, jobId);
+}
+
+void SimulatedTranscoder::stop(ClientIdType clientId, JobIdType jobId) {
+    queueEvent(Event::Stop, clientId, jobId);
 }
 
 void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId) {
@@ -120,12 +125,12 @@ void SimulatedTranscoder::threadLoop() {
                 if (event.type == Event::Start) {
                     remainingUs = std::chrono::microseconds(kJobDurationUs);
                 }
-            } else if (running && event.type == Event::Pause) {
+            } else if (running && (event.type == Event::Pause || event.type == Event::Stop)) {
                 running = false;
                 remainingUs -= (std::chrono::system_clock::now() - lastRunningTime);
             } else {
                 ALOGW("%s: discarding bad event: job {%lld, %d}: %s", __FUNCTION__,
-                        (long long)event.clientId, event.jobId, toString(event.type));
+                      (long long)event.clientId, event.jobId, toString(event.type));
                 continue;
             }
 
