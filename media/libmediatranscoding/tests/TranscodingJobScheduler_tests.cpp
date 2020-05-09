@@ -39,6 +39,7 @@ using Status = ::ndk::ScopedAStatus;
 using aidl::android::media::BnTranscodingClientCallback;
 using aidl::android::media::IMediaTranscodingService;
 using aidl::android::media::ITranscodingClient;
+using aidl::android::media::TranscodingRequestParcel;
 
 constexpr ClientIdType kClientId = 1000;
 constexpr JobIdType kClientJobId = 0;
@@ -86,7 +87,8 @@ public:
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& /*cb*/) override {}
 
-    void start(ClientIdType clientId, JobIdType jobId) override {
+    void start(ClientIdType clientId, JobIdType jobId,
+               const TranscodingRequestParcel& /*request*/) override {
         mEventQueue.push_back(Start(clientId, jobId));
     }
     void pause(ClientIdType clientId, JobIdType jobId) override {
@@ -94,6 +96,9 @@ public:
     }
     void resume(ClientIdType clientId, JobIdType jobId) override {
         mEventQueue.push_back(Resume(clientId, jobId));
+    }
+    void stop(ClientIdType clientId, JobIdType jobId) override {
+        mEventQueue.push_back(Stop(clientId, jobId));
     }
 
     void onFinished(ClientIdType clientId, JobIdType jobId) {
@@ -112,7 +117,7 @@ public:
     }
 
     struct Event {
-        enum { NoEvent, Start, Pause, Resume, Finished, Failed } type;
+        enum { NoEvent, Start, Pause, Resume, Stop, Finished, Failed } type;
         ClientIdType clientId;
         JobIdType jobId;
     };
@@ -127,6 +132,7 @@ public:
     DECLARE_EVENT(Start);
     DECLARE_EVENT(Pause);
     DECLARE_EVENT(Resume);
+    DECLARE_EVENT(Stop);
     DECLARE_EVENT(Finished);
     DECLARE_EVENT(Failed);
 
@@ -296,11 +302,20 @@ TEST_F(TranscodingJobSchedulerTest, TestCancelJob) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 
     // Cancel running real-time job JOB(0).
-    // - Should be paused first then cancelled.
+    // - Should be stopped first then cancelled.
     // - Should also start offline job JOB(2) because real-time queue is empty.
     EXPECT_TRUE(mScheduler->cancel(CLIENT(0), JOB(0)));
-    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), JOB(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), JOB(0)));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), JOB(3)));
+
+    // Submit real-time job JOB(4), offline JOB(3) should pause and JOB(4) should start.
+    mScheduler->submit(CLIENT(0), JOB(4), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), JOB(3)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), JOB(4)));
+
+    // Cancel paused JOB(3). JOB(3) should be stopped.
+    EXPECT_TRUE(mScheduler->cancel(CLIENT(0), JOB(3)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), JOB(3)));
 }
 
 TEST_F(TranscodingJobSchedulerTest, TestFinishJob) {
