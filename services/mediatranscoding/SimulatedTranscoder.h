@@ -37,7 +37,7 @@ namespace android {
 class SimulatedTranscoder : public TranscoderInterface {
 public:
     struct Event {
-        enum Type { NoEvent, Start, Pause, Resume, Finished, Failed } type;
+        enum Type { NoEvent, Start, Pause, Resume, Stop, Finished, Failed } type;
         ClientIdType clientId;
         JobIdType jobId;
     };
@@ -48,9 +48,11 @@ public:
 
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) override;
-    void start(ClientIdType clientId, JobIdType jobId) override;
+    void start(ClientIdType clientId, JobIdType jobId,
+               const TranscodingRequestParcel& request) override;
     void pause(ClientIdType clientId, JobIdType jobId) override;
     void resume(ClientIdType clientId, JobIdType jobId) override;
+    void stop(ClientIdType clientId, JobIdType jobId) override;
     // ~TranscoderInterface
 
 private:
