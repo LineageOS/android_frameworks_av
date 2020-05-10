@@ -131,6 +131,9 @@ TEST(AudioFoundationParcelableTest, ParcelingDeviceDescriptorBase) {
     desc->setAudioProfiles(getAudioProfileVectorForTest());
     desc->applyAudioPortConfig(&TEST_AUDIO_PORT_CONFIG);
     desc->setAddress("DeviceDescriptorBaseTestAddress");
+    ASSERT_EQ(desc->setEncapsulationModes(1 << AUDIO_ENCAPSULATION_MODE_HANDLE), NO_ERROR);
+    ASSERT_EQ(desc->setEncapsulationMetadataTypes(
+            AUDIO_ENCAPSULATION_METADATA_TYPE_ALL_POSITION_BITS), NO_ERROR);
 
     ASSERT_EQ(data.writeParcelable(*desc), NO_ERROR);
     data.setDataPosition(0);
