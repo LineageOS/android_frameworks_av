@@ -92,6 +92,18 @@ public:
     static const char * const keyReconfigA2dp;
     static const char * const keyReconfigA2dpSupported;
 
+    // For querying device supported encapsulation capabilities. All returned values are integer,
+    // which are bit fields composed from using encapsulation capability values as position bits.
+    // Encapsulation capability values are defined in audio_encapsulation_mode_t and
+    // audio_encapsulation_metadata_type_t. For instance, if the supported encapsulation mode is
+    // AUDIO_ENCAPSULATION_MODE_ELEMENTARY_STREAM, the returned value is
+    // "supEncapsulationModes=1 << AUDIO_ENCAPSULATION_MODE_HANDLE".
+    // When querying device supported encapsulation capabilities, the key should use with device
+    // type and address so that it is able to identify the device. The device will be a key. The
+    // device type will be the value of key AUDIO_PARAMETER_STREAM_ROUTING.
+    // static const char * const keyDeviceSupportedEncapsulationModes;
+    // static const char * const keyDeviceSupportedEncapsulationMetadataTypes;
+
     String8 toString() const { return toStringImpl(true); }
     String8 keysToString() const { return toStringImpl(false); }
 
