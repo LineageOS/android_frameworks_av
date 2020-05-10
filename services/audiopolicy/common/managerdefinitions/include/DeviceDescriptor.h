@@ -28,6 +28,8 @@
 
 namespace android {
 
+class AudioPolicyClientInterface;
+
 class DeviceDescriptor : public DeviceDescriptorBase,
                          public PolicyAudioPort, public PolicyAudioPortConfig
 {
@@ -86,6 +88,8 @@ public:
 
     void importAudioPortAndPickAudioProfile(const sp<PolicyAudioPort>& policyPort,
                                             bool force = false);
+
+    void setEncapsulationInfoFromHal(AudioPolicyClientInterface *clientInterface);
 
     void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
 

@@ -17,9 +17,12 @@
 #define LOG_TAG "APM::Devices"
 //#define LOG_NDEBUG 0
 
-#include <audio_utils/string.h>
-#include <media/TypeConverter.h>
 #include <set>
+
+#include <AudioPolicyInterface.h>
+#include <audio_utils/string.h>
+#include <media/AudioParameter.h>
+#include <media/TypeConverter.h>
 #include "DeviceDescriptor.h"
 #include "TypeConverter.h"
 #include "HwModule.h"
@@ -163,6 +166,29 @@ void DeviceDescriptor::importAudioPortAndPickAudioProfile(
     }
     AudioPort::importAudioPort(policyPort->asAudioPort());
     policyPort->pickAudioProfile(mSamplingRate, mChannelMask, mFormat);
+}
+
+void DeviceDescriptor::setEncapsulationInfoFromHal(
+        AudioPolicyClientInterface *clientInterface) {
+    AudioParameter param(String8(mDeviceTypeAddr.getAddress()));
+    param.addInt(String8(AudioParameter::keyRouting), mDeviceTypeAddr.mType);
+    param.addKey(String8(AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES));
+    param.addKey(String8(AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_METADATA_TYPES));
+    String8 reply = clientInterface->getParameters(AUDIO_IO_HANDLE_NONE, param.toString());
+    AudioParameter repliedParameters(reply);
+    int value;
+    if (repliedParameters.getInt(
+            String8(AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES), value) == NO_ERROR) {
+        if (setEncapsulationModes(value) != NO_ERROR) {
+            ALOGE("Failed to set encapsulation mode(%d)", value);
+        }
+    }
+    if (repliedParameters.getInt(
+            String8(AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_METADATA_TYPES), value) == NO_ERROR) {
+        if (setEncapsulationMetadataTypes(value) != NO_ERROR) {
+            ALOGE("Failed to set encapsulation metadata types(%d)", value);
+        }
+    }
 }
 
 void DeviceDescriptor::dump(String8 *dst, int spaces, int index, bool verbose) const
