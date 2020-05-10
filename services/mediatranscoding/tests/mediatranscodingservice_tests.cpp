@@ -611,6 +611,31 @@ TEST_F(MediaTranscodingServiceTest, TestSubmitCancelWithOfflineJobs) {
     unregisterMultipleClients();
 }
 
+TEST_F(MediaTranscodingServiceTest, TestClientUseAfterUnregister) {
+    std::shared_ptr<ITranscodingClient> client;
+
+    // Register a client, then unregister.
+    Status status = mService->registerClient(mClientCallback1, kClientName, kClientOpPackageName,
+                                             kClientUseCallingUid, kClientUseCallingPid, &client);
+    EXPECT_TRUE(status.isOk());
+
+    status = client->unregister();
+    EXPECT_TRUE(status.isOk());
+
+    // Test various operations on the client, should fail with ERROR_DISCONNECTED.
+    TranscodingJobParcel job;
+    bool result;
+    status = client->getJobWithId(0, &job, &result);
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    status = client->cancelJob(0, &result);
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    TranscodingRequestParcel request;
+    status = client->submitRequest(request, &job, &result);
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+}
+
 TEST_F(MediaTranscodingServiceTest, TestTranscodingUidPolicy) {
     ALOGD("TestTranscodingUidPolicy starting...");
 

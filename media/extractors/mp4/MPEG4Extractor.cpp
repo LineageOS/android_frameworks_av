@@ -369,6 +369,8 @@ static const char *FourCC2MIME(uint32_t fourcc) {
             return MEDIA_MIMETYPE_AUDIO_FLAC;
         case FOURCC("av01"):
             return MEDIA_MIMETYPE_VIDEO_AV1;
+        case FOURCC("vp09"):
+            return MEDIA_MIMETYPE_VIDEO_VP9;
         case FOURCC(".mp3"):
         case 0x6D730055: // "ms U" mp3 audio
             return MEDIA_MIMETYPE_AUDIO_MPEG;
@@ -1969,6 +1971,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("dvh1"):
         case FOURCC("dav1"):
         case FOURCC("av01"):
+        case FOURCC("vp09"):
         {
             uint8_t buffer[78];
             if (chunk_data_size < (ssize_t)sizeof(buffer)) {
@@ -2431,6 +2434,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             *offset += chunk_size;
             break;
         }
+
+        case FOURCC("vpcC"):
         case FOURCC("av1C"):
         {
             auto buffer = heapbuffer<uint8_t>(chunk_data_size);
@@ -4332,6 +4337,18 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
         if (size < 5 || ptr[0] != 0x81) {  // configurationVersion == 1
             return NULL;
         }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_VP9)) {
+        void *data;
+        size_t size;
+        if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_0, &data, &size)) {
+            return NULL;
+        }
+
+        const uint8_t *ptr = (const uint8_t *)data;
+
+        if (size < 5 || ptr[0] != 0x01) {  // configurationVersion == 1
+            return NULL;
+        }
     }
 
     ALOGV("track->elst_shift_start_ticks :%" PRIu64, track->elst_shift_start_ticks);
@@ -4383,6 +4400,10 @@ status_t MPEG4Extractor::verifyTrack(Track *track) {
             return ERROR_MALFORMED;
         }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)) {
+        if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_0, &data, &size)) {
+            return ERROR_MALFORMED;
+        }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_VP9)) {
         if (!AMediaFormat_getBuffer(track->meta, AMEDIAFORMAT_KEY_CSD_0, &data, &size)) {
             return ERROR_MALFORMED;
         }
@@ -6680,6 +6701,7 @@ static bool isCompatibleBrand(uint32_t fourcc) {
         FOURCC("hvc1"),
         FOURCC("hev1"),
         FOURCC("av01"),
+        FOURCC("vp09"),
         FOURCC("3gp4"),
         FOURCC("mp41"),
         FOURCC("mp42"),

@@ -39,6 +39,7 @@ using ::aidl::android::media::BnTranscodingClientCallback;
 using ::aidl::android::media::IMediaTranscodingService;
 using ::aidl::android::media::TranscodingErrorCode;
 using ::aidl::android::media::TranscodingJobParcel;
+using ::aidl::android::media::TranscodingJobPriority;
 using ::aidl::android::media::TranscodingRequestParcel;
 using ::aidl::android::media::TranscodingResultParcel;
 
@@ -50,6 +51,8 @@ constexpr pid_t kClientPid = 2;
 constexpr uid_t kClientUid = 3;
 constexpr const char* kClientName = "TestClientName";
 constexpr const char* kClientPackage = "TestClientPackage";
+
+#define JOB(n) (n)
 
 struct TestClientCallback : public BnTranscodingClientCallback {
     TestClientCallback() { ALOGI("TestClientCallback Created"); }
@@ -261,7 +264,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientCallback) {
     std::shared_ptr<ITranscodingClient> client;
     status_t err = mClientManager->addClient(nullptr, kClientPid, kClientUid, kClientName,
                                              kClientPackage, &client);
-    EXPECT_EQ(err, BAD_VALUE);
+    EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPid) {
@@ -269,7 +272,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPid) {
     std::shared_ptr<ITranscodingClient> client;
     status_t err = mClientManager->addClient(mClientCallback1, kInvalidClientPid, kClientUid,
                                              kClientName, kClientPackage, &client);
-    EXPECT_EQ(err, BAD_VALUE);
+    EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientName) {
@@ -277,7 +280,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientName) {
     std::shared_ptr<ITranscodingClient> client;
     status_t err = mClientManager->addClient(mClientCallback1, kClientPid, kClientUid,
                                              kInvalidClientName, kClientPackage, &client);
-    EXPECT_EQ(err, BAD_VALUE);
+    EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPackageName) {
@@ -285,7 +288,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPackageName) {
     std::shared_ptr<ITranscodingClient> client;
     status_t err = mClientManager->addClient(mClientCallback1, kClientPid, kClientUid, kClientName,
                                              kInvalidClientPackage, &client);
-    EXPECT_EQ(err, BAD_VALUE);
+    EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingValidClient) {
@@ -314,7 +317,7 @@ TEST_F(TranscodingClientManagerTest, TestAddingDupliacteClient) {
     std::shared_ptr<ITranscodingClient> dupClient;
     err = mClientManager->addClient(mClientCallback1, kClientPid, kClientUid, "dupClient",
                                     "dupPackage", &dupClient);
-    EXPECT_EQ(err, ALREADY_EXISTS);
+    EXPECT_EQ(err, IMediaTranscodingService::ERROR_ALREADY_EXISTS);
     EXPECT_EQ(dupClient.get(), nullptr);
     EXPECT_EQ(mClientManager->getNumOfClients(), 1);
 
@@ -348,17 +351,17 @@ TEST_F(TranscodingClientManagerTest, TestSubmitCancelGetJobs) {
     bool result;
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 0);
+    EXPECT_EQ(job.jobId, JOB(0));
 
     request.fileName = "test_file_1";
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 1);
+    EXPECT_EQ(job.jobId, JOB(1));
 
     request.fileName = "test_file_2";
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 2);
+    EXPECT_EQ(job.jobId, JOB(2));
 
     // Test submit bad request (no valid fileName) fails.
     TranscodingRequestParcel badRequest;
@@ -367,45 +370,45 @@ TEST_F(TranscodingClientManagerTest, TestSubmitCancelGetJobs) {
     EXPECT_FALSE(result);
 
     // Test get jobs by id.
-    EXPECT_TRUE(mClient1->getJobWithId(2, &job, &result).isOk());
-    EXPECT_EQ(job.jobId, 2);
+    EXPECT_TRUE(mClient1->getJobWithId(JOB(2), &job, &result).isOk());
+    EXPECT_EQ(job.jobId, JOB(2));
     EXPECT_EQ(job.request.fileName, "test_file_2");
     EXPECT_TRUE(result);
 
     // Test get jobs by invalid id fails.
-    EXPECT_TRUE(mClient1->getJobWithId(100, &job, &result).isOk());
+    EXPECT_TRUE(mClient1->getJobWithId(JOB(100), &job, &result).isOk());
     EXPECT_FALSE(result);
 
     // Test cancel non-existent job fail.
-    EXPECT_TRUE(mClient2->cancelJob(100, &result).isOk());
+    EXPECT_TRUE(mClient2->cancelJob(JOB(100), &result).isOk());
     EXPECT_FALSE(result);
 
     // Test cancel valid jobId in arbitrary order.
-    EXPECT_TRUE(mClient1->cancelJob(2, &result).isOk());
+    EXPECT_TRUE(mClient1->cancelJob(JOB(2), &result).isOk());
     EXPECT_TRUE(result);
 
-    EXPECT_TRUE(mClient1->cancelJob(0, &result).isOk());
+    EXPECT_TRUE(mClient1->cancelJob(JOB(0), &result).isOk());
     EXPECT_TRUE(result);
 
-    EXPECT_TRUE(mClient1->cancelJob(1, &result).isOk());
+    EXPECT_TRUE(mClient1->cancelJob(JOB(1), &result).isOk());
     EXPECT_TRUE(result);
 
     // Test cancel job again fails.
-    EXPECT_TRUE(mClient1->cancelJob(1, &result).isOk());
+    EXPECT_TRUE(mClient1->cancelJob(JOB(1), &result).isOk());
     EXPECT_FALSE(result);
 
     // Test get job after cancel fails.
-    EXPECT_TRUE(mClient1->getJobWithId(2, &job, &result).isOk());
+    EXPECT_TRUE(mClient1->getJobWithId(JOB(2), &job, &result).isOk());
     EXPECT_FALSE(result);
 
     // Test jobId independence for each client.
     EXPECT_TRUE(mClient2->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 0);
+    EXPECT_EQ(job.jobId, JOB(0));
 
     EXPECT_TRUE(mClient2->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 1);
+    EXPECT_EQ(job.jobId, JOB(1));
 
     unregisterMultipleClients();
 }
@@ -419,30 +422,93 @@ TEST_F(TranscodingClientManagerTest, TestClientCallback) {
     bool result;
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 0);
+    EXPECT_EQ(job.jobId, JOB(0));
 
     mScheduler->finishLastJob();
     EXPECT_EQ(mClientCallback1->popEvent(), TestClientCallback::Finished(job.jobId));
 
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 1);
+    EXPECT_EQ(job.jobId, JOB(1));
 
     mScheduler->abortLastJob();
     EXPECT_EQ(mClientCallback1->popEvent(), TestClientCallback::Failed(job.jobId));
 
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 2);
+    EXPECT_EQ(job.jobId, JOB(2));
 
     EXPECT_TRUE(mClient2->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_EQ(job.jobId, 0);
+    EXPECT_EQ(job.jobId, JOB(0));
 
     mScheduler->finishLastJob();
     EXPECT_EQ(mClientCallback2->popEvent(), TestClientCallback::Finished(job.jobId));
 
     unregisterMultipleClients();
+}
+
+TEST_F(TranscodingClientManagerTest, TestUseAfterUnregister) {
+    // Add a client.
+    std::shared_ptr<ITranscodingClient> client;
+    status_t err = mClientManager->addClient(mClientCallback1, kClientPid, kClientUid, kClientName,
+                                             kClientPackage, &client);
+    EXPECT_EQ(err, OK);
+    EXPECT_NE(client.get(), nullptr);
+
+    // Submit 2 requests, 1 offline and 1 realtime.
+    TranscodingRequestParcel request;
+    TranscodingJobParcel job;
+    bool result;
+
+    request.fileName = "test_file_0";
+    request.priority = TranscodingJobPriority::kUnspecified;
+    EXPECT_TRUE(client->submitRequest(request, &job, &result).isOk() && result);
+    EXPECT_EQ(job.jobId, JOB(0));
+
+    request.fileName = "test_file_1";
+    request.priority = TranscodingJobPriority::kNormal;
+    EXPECT_TRUE(client->submitRequest(request, &job, &result).isOk() && result);
+    EXPECT_EQ(job.jobId, JOB(1));
+
+    // Unregister client, should succeed.
+    Status status = client->unregister();
+    EXPECT_TRUE(status.isOk());
+
+    // Test submit new request after unregister, should fail with ERROR_DISCONNECTED.
+    request.fileName = "test_file_2";
+    request.priority = TranscodingJobPriority::kNormal;
+    status = client->submitRequest(request, &job, &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    // Test cancel jobs after unregister, should fail with ERROR_DISCONNECTED
+    // regardless of realtime or offline job, or whether the jobId is valid.
+    status = client->cancelJob(JOB(0), &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    status = client->cancelJob(JOB(1), &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    status = client->cancelJob(JOB(2), &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    // Test get jobs, should fail with ERROR_DISCONNECTED regardless of realtime
+    // or offline job, or whether the jobId is valid.
+    status = client->getJobWithId(JOB(0), &job, &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    status = client->getJobWithId(JOB(1), &job, &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+
+    status = client->getJobWithId(JOB(2), &job, &result);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
 }
 
 }  // namespace android
