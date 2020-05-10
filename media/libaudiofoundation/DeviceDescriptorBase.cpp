@@ -80,7 +80,26 @@ void DeviceDescriptorBase::toAudioPort(struct audio_port *port) const
     toAudioPortConfig(&port->active_config);
     port->id = mId;
     port->ext.device.type = mDeviceTypeAddr.mType;
+    port->ext.device.encapsulation_modes = mEncapsulationModes;
+    port->ext.device.encapsulation_metadata_types = mEncapsulationMetadataTypes;
     (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mDeviceTypeAddr.getAddress());
+}
+
+status_t DeviceDescriptorBase::setEncapsulationModes(uint32_t encapsulationModes) {
+    if ((encapsulationModes & ~AUDIO_ENCAPSULATION_MODE_ALL_POSITION_BITS) != 0) {
+        return BAD_VALUE;
+    }
+    mEncapsulationModes = encapsulationModes & ~(1 << AUDIO_ENCAPSULATION_MODE_NONE);
+    return NO_ERROR;
+}
+
+status_t DeviceDescriptorBase::setEncapsulationMetadataTypes(uint32_t encapsulationMetadataTypes) {
+    if ((encapsulationMetadataTypes & ~AUDIO_ENCAPSULATION_METADATA_TYPE_ALL_POSITION_BITS) != 0) {
+        return BAD_VALUE;
+    }
+    mEncapsulationMetadataTypes =
+            encapsulationMetadataTypes & ~(1 << AUDIO_ENCAPSULATION_METADATA_TYPE_NONE);
+    return NO_ERROR;
 }
 
 void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
@@ -97,6 +116,12 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
 
     dst->append(base::StringPrintf("%*s- type: %-48s\n",
             spaces, "", ::android::toString(mDeviceTypeAddr.mType).c_str()));
+
+    dst->append(base::StringPrintf(
+            "%*s- supported encapsulation modes: %u", spaces, "", mEncapsulationModes));
+    dst->append(base::StringPrintf(
+            "%*s- supported encapsulation metadata types: %u",
+            spaces, "", mEncapsulationMetadataTypes));
 
     if (mDeviceTypeAddr.mAddress.size() != 0) {
         dst->append(base::StringPrintf(
@@ -135,6 +160,8 @@ status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
     if ((status = AudioPort::writeToParcel(parcel)) != NO_ERROR) return status;
     if ((status = AudioPortConfig::writeToParcel(parcel)) != NO_ERROR) return status;
     if ((status = parcel->writeParcelable(mDeviceTypeAddr)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mEncapsulationModes)) != NO_ERROR) return status;
+    if ((status = parcel->writeUint32(mEncapsulationMetadataTypes)) != NO_ERROR) return status;
     return status;
 }
 
@@ -144,6 +171,8 @@ status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel)
     if ((status = AudioPort::readFromParcel(parcel)) != NO_ERROR) return status;
     if ((status = AudioPortConfig::readFromParcel(parcel)) != NO_ERROR) return status;
     if ((status = parcel->readParcelable(&mDeviceTypeAddr)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mEncapsulationModes)) != NO_ERROR) return status;
+    if ((status = parcel->readUint32(&mEncapsulationMetadataTypes)) != NO_ERROR) return status;
     return status;
 }
 
