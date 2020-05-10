@@ -144,7 +144,8 @@ void AudioFlinger::DeviceEffectManager::dump(int fd) {
         write(fd, result.string(), result.size());
     }
 
-    write(fd, "\nDevice Effects:\n", sizeof("\nDevice Effects:\n"));
+    String8 heading("\nDevice Effects:\n");
+    write(fd, heading.string(), heading.size());
     for (const auto& iter : mDeviceEffects) {
         String8 outStr;
         outStr.appendFormat("%*sEffect for device %s address %s:\n", 2, "",
