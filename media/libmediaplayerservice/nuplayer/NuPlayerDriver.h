@@ -142,6 +142,7 @@ private:
     uint32_t mPlayerFlags;
 
     mediametrics::Item *mMetricsItem;
+    mutable Mutex mMetricsLock;
     uid_t mClientUid;
 
     bool mAtEOS;
