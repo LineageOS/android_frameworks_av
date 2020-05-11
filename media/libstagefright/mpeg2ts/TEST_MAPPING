@@ -1,7 +1,7 @@
-// frameworks/av/media/extractors
+// frameworks/av/media/libstagefright/mpeg2ts
 {
   "presubmit": [
     // TODO(b/148094059): unit tests not allowed to download content
-    //{ "name": "ExtractorUnitTest" }
+    //{ "name": "Mpeg2tsUnitTest" }
   ]
 }

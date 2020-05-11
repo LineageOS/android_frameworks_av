@@ -17,6 +17,7 @@
 cc_test {
     name: "Mp3DecoderTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "mp3reader.cpp",
