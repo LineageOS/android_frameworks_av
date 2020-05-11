@@ -65,6 +65,7 @@ void Codec::deInitDecoder() {
 }
 
 void Codec::decodeFrames(const uint8_t *data, size_t size) {
+  RX_State_wb rx_state{};
   while (size > 0) {
     uint8_t modeByte = *data;
     bool quality = modeByte & 0x01;
@@ -81,7 +82,6 @@ void Codec::decodeFrames(const uint8_t *data, size_t size) {
     memcpy(inputBuf, data, minSize);
     int16 frameMode = mode;
     int16 frameType;
-    RX_State_wb rx_state;
     mime_unsorting(inputBuf, inputSampleBuf, &frameType, &frameMode, quality, &rx_state);
 
     int16_t numSamplesOutput;
