@@ -138,6 +138,16 @@ public:
      */
     void stop();
 
+    /**
+     * Stop queueing buffers to the component and release all buffers.
+     */
+    void reset();
+
+    /**
+     * Release all resources.
+     */
+    void release();
+
     void flush(const std::list<std::unique_ptr<C2Work>> &flushedWork);
 
     /**
