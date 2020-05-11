@@ -1,0 +1,11 @@
+// mappings for frameworks/av/media/libstagefright/codecs/amrnb
+{
+  "presubmit": [
+    // TODO(b/148094059): unit tests not allowed to download content
+    // { "name": "AmrnbDecoderTest"},
+
+    // TODO(b/148094059): unit tests not allowed to download content
+    // { "name": "AmrnbEncoderTest"}
+
+  ]
+}
