@@ -577,7 +577,8 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
         case AUDIO_INPUT_CONFIG_CHANGED: {
             sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->mIoHandle);
             if (oldDesc == 0) {
-                ALOGW("ioConfigChanged() modifying unknown output! %d", ioDesc->mIoHandle);
+                ALOGW("ioConfigChanged() modifying unknown %s! %d",
+                    event == AUDIO_OUTPUT_CONFIG_CHANGED ? "output" : "input", ioDesc->mIoHandle);
                 break;
             }
 
