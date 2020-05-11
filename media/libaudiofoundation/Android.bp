@@ -10,6 +10,12 @@ cc_library_headers {
         "libaudio_system_headers",
         "libmedia_helper_headers",
     ],
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library {
