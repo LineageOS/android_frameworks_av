@@ -76,7 +76,7 @@ void TranscodingJobScheduler::updateCurrentJob_l() {
         // the topJob now.
         if (!mResourceLost) {
             if (topJob->state == Job::NOT_STARTED) {
-                mTranscoder->start(topJob->key.first, topJob->key.second);
+                mTranscoder->start(topJob->key.first, topJob->key.second, curJob->request);
             } else if (topJob->state == Job::PAUSED) {
                 mTranscoder->resume(topJob->key.first, topJob->key.second);
             }
@@ -257,9 +257,12 @@ bool TranscodingJobScheduler::cancel(ClientIdType clientId, JobIdType jobId) {
     }
 
     for (auto it = jobsToRemove.begin(); it != jobsToRemove.end(); ++it) {
-        // If the job is running, pause it first.
-        if (mJobMap[*it].state == Job::RUNNING) {
-            mTranscoder->pause(clientId, jobId);
+        // If the job has ever been started, stop it now.
+        // Note that stop() is needed even if the job is currently paused. This instructs
+        // the transcoder to discard any states for the job, otherwise the states may
+        // never be discarded.
+        if (mJobMap[*it].state != Job::NOT_STARTED) {
+            mTranscoder->stop(it->first, it->second);
         }
 
         // Remove the job.

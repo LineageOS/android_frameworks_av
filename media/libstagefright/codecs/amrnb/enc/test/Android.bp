@@ -17,6 +17,7 @@
 cc_test {
     name: "AmrnbEncoderTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "AmrnbEncoderTest.cpp",

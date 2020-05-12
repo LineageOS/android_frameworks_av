@@ -1,0 +1,7 @@
+// mappings for frameworks/av/media/bufferpool/2.0
+{
+  "presubmit": [
+    { "name": "VtsVndkHidlBufferpoolV2_0TargetSingleTest"},
+    { "name": "VtsVndkHidlBufferpoolV2_0TargetMultiTest"}
+  ]
+}
