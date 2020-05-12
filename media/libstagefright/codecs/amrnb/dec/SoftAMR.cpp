@@ -20,9 +20,6 @@
 
 #include "SoftAMR.h"
 
-#include "gsmamr_dec.h"
-#include "pvamrwbdecoder.h"
-
 #include <media/stagefright/foundation/ADebug.h>
 
 namespace android {
@@ -470,11 +467,10 @@ void SoftAMR::onQueueFilled(OMX_U32 /* portIndex */) {
                 memset(outPtr, 0, kNumSamplesPerFrameWB * sizeof(int16_t));
             } else if (mode < 9) {
                 int16 frameType;
-                RX_State_wb rx_state;
                 mime_unsorting(
                         const_cast<uint8_t *>(&inputPtr[1]),
                         mInputSampleBuffer,
-                        &frameType, &mode, 1, &rx_state);
+                        &frameType, &mode, 1, &mRxState);
 
                 int16_t numSamplesOutput;
                 pvDecoder_AmrWb(
