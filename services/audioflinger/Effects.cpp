@@ -2812,7 +2812,7 @@ bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrMmap() const {
     if (t == nullptr) {
         return false;
     }
-    return t->type() == ThreadBase::OFFLOAD || t->type() == ThreadBase::MMAP;
+    return t->isOffloadOrMmap();
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
