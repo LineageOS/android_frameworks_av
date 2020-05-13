@@ -52,26 +52,24 @@ public:
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
+    aaudio_result_t startClient(const android::AudioClient& client,
+                                audio_port_handle_t *clientHandle) override;
+
+    aaudio_result_t stopClient(audio_port_handle_t clientHandle) override;
+
+    const char *getTypeText() const override { return "MMAP"; }
+
+protected:
+
     /**
      * Stop the flow of data so that start() can resume without loss of data.
      *
      * This is not guaranteed to be synchronous but it currently is.
      * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
     */
-    aaudio_result_t pause() override;
+    aaudio_result_t pause_l() override;
 
-    aaudio_result_t stop() override;
-
-    aaudio_result_t startClient(const android::AudioClient& client,
-                                audio_port_handle_t *clientHandle) override;
-
-    aaudio_result_t stopClient(audio_port_handle_t clientHandle) override;
-
-    aaudio_result_t close() override;
-
-    const char *getTypeText() const override { return "MMAP"; }
-
-protected:
+    aaudio_result_t stop_l() override;
 
     aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) override;
 

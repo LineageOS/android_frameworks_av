@@ -49,16 +49,6 @@ AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(android::AAudioService &aAudioS
         , mInService(inService) {
 }
 
-aaudio_result_t AAudioServiceStreamMMAP::close() {
-    if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
-        return AAUDIO_OK;
-    }
-
-    stop();
-
-    return AAudioServiceStreamBase::close();
-}
-
 // Open stream on HAL and pass information about the shared memory buffer back to the client.
 aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest &request) {
 
@@ -102,11 +92,11 @@ aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
 }
 
 // Stop the flow of data such that start() can resume with loss of data.
-aaudio_result_t AAudioServiceStreamMMAP::pause() {
+aaudio_result_t AAudioServiceStreamMMAP::pause_l() {
     if (!isRunning()) {
         return AAUDIO_OK;
     }
-    aaudio_result_t result = AAudioServiceStreamBase::pause();
+    aaudio_result_t result = AAudioServiceStreamBase::pause_l();
     // TODO put before base::pause()?
     if (!mInService) {
         (void) stopClient(mClientHandle);
@@ -114,11 +104,11 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     return result;
 }
 
-aaudio_result_t AAudioServiceStreamMMAP::stop() {
+aaudio_result_t AAudioServiceStreamMMAP::stop_l() {
     if (!isRunning()) {
         return AAUDIO_OK;
     }
-    aaudio_result_t result = AAudioServiceStreamBase::stop();
+    aaudio_result_t result = AAudioServiceStreamBase::stop_l();
     // TODO put before base::stop()?
     if (!mInService) {
         (void) stopClient(mClientHandle);

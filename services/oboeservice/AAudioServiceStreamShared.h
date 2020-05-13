@@ -52,7 +52,7 @@ public:
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
-    aaudio_result_t close() override;
+    aaudio_result_t close_l() override;
 
     /**
      * This must be locked when calling getAudioDataFifoBuffer_l() and while
