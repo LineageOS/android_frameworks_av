@@ -231,6 +231,9 @@ class Camera3Device :
     status_t setRotateAndCropAutoBehavior(
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
+    // Get the status trackeer for the camera device
+    wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
+
     /**
      * Helper functions to map between framework and HIDL values
      */
