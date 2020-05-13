@@ -41,7 +41,7 @@ class DepthCompositeStream : public CompositeStream, public Thread,
         public CpuConsumer::FrameAvailableListener {
 
 public:
-    DepthCompositeStream(wp<CameraDeviceBase> device,
+    DepthCompositeStream(sp<CameraDeviceBase> device,
             wp<hardware::camera2::ICameraDeviceCallbacks> cb);
     ~DepthCompositeStream() override;
 
@@ -80,8 +80,9 @@ private:
         bool                      error;
         bool                      errorNotified;
         int64_t                   frameNumber;
+        int32_t                   requestId;
 
-        InputFrame() : error(false), errorNotified(false), frameNumber(-1) { }
+        InputFrame() : error(false), errorNotified(false), frameNumber(-1), requestId(-1) { }
     };
 
     // Helper methods
