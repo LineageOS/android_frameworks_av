@@ -29,6 +29,7 @@ class Camera3StreamBufferListener : public virtual RefBase {
 public:
 
     struct BufferInfo {
+        int mStreamId;
         bool mOutput; // if false then input buffer
         Rect mCrop;
         uint32_t mTransform;
