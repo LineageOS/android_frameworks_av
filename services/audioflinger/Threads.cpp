@@ -484,8 +484,10 @@ const char *AudioFlinger::ThreadBase::threadTypeToString(AudioFlinger::ThreadBas
         return "RECORD";
     case OFFLOAD:
         return "OFFLOAD";
-    case MMAP:
-        return "MMAP";
+    case MMAP_PLAYBACK:
+        return "MMAP_PLAYBACK";
+    case MMAP_CAPTURE:
+        return "MMAP_CAPTURE";
     default:
         return "unknown";
     }
@@ -967,8 +969,10 @@ String16 AudioFlinger::ThreadBase::getWakeLockTag()
         return String16("AudioIn");
     case OFFLOAD:
         return String16("AudioOffload");
-    case MMAP:
-        return String16("Mmap");
+    case MMAP_PLAYBACK:
+        return String16("MmapPlayback");
+    case MMAP_CAPTURE:
+        return String16("MmapCapture");
     default:
         ALOG_ASSERT(false);
         return String16("AudioUnknown");
@@ -1477,7 +1481,7 @@ void AudioFlinger::ThreadBase::disconnectEffectHandle(EffectHandle *handle,
 }
 
 void AudioFlinger::ThreadBase::onEffectEnable(const sp<EffectModule>& effect) {
-    if (mType == OFFLOAD || mType == MMAP) {
+    if (isOffloadOrMmap()) {
         Mutex::Autolock _l(mLock);
         broadcast_l();
     }
@@ -1493,7 +1497,7 @@ void AudioFlinger::ThreadBase::onEffectEnable(const sp<EffectModule>& effect) {
 }
 
 void AudioFlinger::ThreadBase::onEffectDisable() {
-    if (mType == OFFLOAD || mType == MMAP) {
+    if (isOffloadOrMmap()) {
         Mutex::Autolock _l(mLock);
         broadcast_l();
     }
@@ -4266,7 +4270,7 @@ status_t AudioFlinger::PlaybackThread::createAudioPatch_l(const struct audio_pat
     const std::string patchSinksAsString = patchSinksToString(patch);
 
     mThreadMetrics.logEndInterval();
-    mThreadMetrics.logCreatePatch(patchSinksAsString);
+    mThreadMetrics.logCreatePatch(/* inDevices */ {}, patchSinksAsString);
     mThreadMetrics.logBeginInterval();
     // also dispatch to active AudioTracks for MediaMetrics
     for (const auto &track : mActiveTracks) {
@@ -4815,19 +4819,24 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
     // DeferredOperations handles statistics after setting mixerStatus.
     class DeferredOperations {
     public:
-        explicit DeferredOperations(mixer_state *mixerStatus)
-            : mMixerStatus(mixerStatus) {}
+        DeferredOperations(mixer_state *mixerStatus, ThreadMetrics *threadMetrics)
+            : mMixerStatus(mixerStatus)
+            , mThreadMetrics(threadMetrics) {}
 
         // when leaving scope, tally frames properly.
         ~DeferredOperations() {
             // Tally underrun frames only if we are actually mixing (MIXER_TRACKS_READY)
             // because that is when the underrun occurs.
             // We do not distinguish between FastTracks and NormalTracks here.
+            size_t maxUnderrunFrames = 0;
             if (*mMixerStatus == MIXER_TRACKS_READY && mUnderrunFrames.size() > 0) {
                 for (const auto &underrun : mUnderrunFrames) {
                     underrun.first->tallyUnderrunFrames(underrun.second);
+                    maxUnderrunFrames = max(underrun.second, maxUnderrunFrames);
                 }
             }
+            // send the max underrun frames for this mixer period
+            mThreadMetrics->logUnderrunFrames(maxUnderrunFrames);
         }
 
         // tallyUnderrunFrames() is called to update the track counters
@@ -4839,8 +4848,9 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
 
     private:
         const mixer_state * const mMixerStatus;
+        ThreadMetrics * const mThreadMetrics;
         std::vector<std::pair<sp<Track>, size_t>> mUnderrunFrames;
-    } deferredOperations(&mixerStatus);
+    } deferredOperations(&mixerStatus, &mThreadMetrics);
     // implicit nested scope for variable capture
 
     bool noFastHapticTrack = true;
@@ -8434,6 +8444,17 @@ void AudioFlinger::RecordThread::readInputParameters_l()
 
     // AudioRecord mSampleRate and mChannelCount are constant due to AudioRecord API constraints.
     // But if thread's mSampleRate or mChannelCount changes, how will that affect active tracks?
+
+    audio_input_flags_t flags = mInput->flags;
+    mediametrics::LogItem item(mThreadMetrics.getMetricsId());
+    item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS)
+        .set(AMEDIAMETRICS_PROP_ENCODING, formatToString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(flags).c_str())
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
+        .set(AMEDIAMETRICS_PROP_CHANNELCOUNT, (int32_t)mChannelCount)
+        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
+        .record();
 }
 
 uint32_t AudioFlinger::RecordThread::getInputFramesLost()
@@ -8564,7 +8585,7 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
 
     const std::string pathSourcesAsString = patchSourcesToString(patch);
     mThreadMetrics.logEndInterval();
-    mThreadMetrics.logCreatePatch(pathSourcesAsString);
+    mThreadMetrics.logCreatePatch(pathSourcesAsString, /* outDevices */ {});
     mThreadMetrics.logBeginInterval();
     // also dispatch to active AudioRecords
     for (const auto &track : mActiveTracks) {
@@ -8678,7 +8699,7 @@ status_t AudioFlinger::MmapThreadHandle::standby()
 AudioFlinger::MmapThread::MmapThread(
         const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
         AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady, bool isOut)
-    : ThreadBase(audioFlinger, id, MMAP, systemReady, isOut),
+    : ThreadBase(audioFlinger, id, (isOut ? MMAP_PLAYBACK : MMAP_CAPTURE), systemReady, isOut),
       mSessionId(AUDIO_SESSION_NONE),
       mPortId(AUDIO_PORT_HANDLE_NONE),
       mHalStream(stream), mHalDevice(hwDev->hwDevice()), mAudioHwDev(hwDev),
