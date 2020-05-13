@@ -17,9 +17,7 @@
 // #define LOG_NDEBUG 0
 
 #define LOG_TAG "Camera2-Metadata"
-#define ATRACE_TAG ATRACE_TAG_CAMERA
 #include <utils/Log.h>
-#include <utils/Trace.h>
 #include <utils/Errors.h>
 
 #include <binder/Parcel.h>
@@ -40,13 +38,11 @@ CameraMetadata::CameraMetadata() :
 CameraMetadata::CameraMetadata(size_t entryCapacity, size_t dataCapacity) :
         mLocked(false)
 {
-    ATRACE_CALL();
     mBuffer = allocate_camera_metadata(entryCapacity, dataCapacity);
 }
 
 CameraMetadata::CameraMetadata(const CameraMetadata &other) :
         mLocked(false) {
-    ATRACE_CALL();
     mBuffer = clone_camera_metadata(other.mBuffer);
 }
 
@@ -117,7 +113,6 @@ camera_metadata_t* CameraMetadata::release() {
 }
 
 void CameraMetadata::clear() {
-    ATRACE_CALL();
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);
         return;
@@ -129,7 +124,6 @@ void CameraMetadata::clear() {
 }
 
 void CameraMetadata::acquire(camera_metadata_t *buffer) {
-    ATRACE_CALL();
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);
         return;
@@ -143,7 +137,6 @@ void CameraMetadata::acquire(camera_metadata_t *buffer) {
 }
 
 void CameraMetadata::acquire(CameraMetadata &other) {
-    ATRACE_CALL();
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);
         return;
@@ -152,12 +145,10 @@ void CameraMetadata::acquire(CameraMetadata &other) {
 }
 
 status_t CameraMetadata::append(const CameraMetadata &other) {
-    ATRACE_CALL();
     return append(other.mBuffer);
 }
 
 status_t CameraMetadata::append(const camera_metadata_t* other) {
-    ATRACE_CALL();
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);
         return INVALID_OPERATION;
@@ -179,7 +170,6 @@ bool CameraMetadata::isEmpty() const {
 }
 
 status_t CameraMetadata::sort() {
-    ATRACE_CALL();
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);
         return INVALID_OPERATION;
@@ -310,7 +300,6 @@ status_t CameraMetadata::update(const camera_metadata_ro_entry &entry) {
 
 status_t CameraMetadata::updateImpl(uint32_t tag, const void *data,
         size_t data_count) {
-    ATRACE_CALL();
     status_t res;
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);
@@ -368,13 +357,11 @@ status_t CameraMetadata::updateImpl(uint32_t tag, const void *data,
 }
 
 bool CameraMetadata::exists(uint32_t tag) const {
-    ATRACE_CALL();
     camera_metadata_ro_entry entry;
     return find_camera_metadata_ro_entry(mBuffer, tag, &entry) == 0;
 }
 
 camera_metadata_entry_t CameraMetadata::find(uint32_t tag) {
-    ATRACE_CALL();
     status_t res;
     camera_metadata_entry entry;
     if (mLocked) {
@@ -391,7 +378,6 @@ camera_metadata_entry_t CameraMetadata::find(uint32_t tag) {
 }
 
 camera_metadata_ro_entry_t CameraMetadata::find(uint32_t tag) const {
-    ATRACE_CALL();
     status_t res;
     camera_metadata_ro_entry entry;
     res = find_camera_metadata_ro_entry(mBuffer, tag, &entry);
@@ -403,7 +389,6 @@ camera_metadata_ro_entry_t CameraMetadata::find(uint32_t tag) const {
 }
 
 status_t CameraMetadata::erase(uint32_t tag) {
-    ATRACE_CALL();
     camera_metadata_entry_t entry;
     status_t res;
     if (mLocked) {
@@ -434,7 +419,6 @@ status_t CameraMetadata::erase(uint32_t tag) {
 
 status_t CameraMetadata::removePermissionEntries(metadata_vendor_id_t vendorId,
         std::vector<int32_t> *tagsRemoved) {
-    ATRACE_CALL();
     uint32_t tagCount = 0;
     std::vector<uint32_t> tagsToRemove;
 
@@ -511,7 +495,6 @@ void CameraMetadata::dump(int fd, int verbosity, int indentation) const {
 }
 
 status_t CameraMetadata::resizeIfNeeded(size_t extraEntries, size_t extraData) {
-    ATRACE_CALL();
     if (mBuffer == NULL) {
         mBuffer = allocate_camera_metadata(extraEntries * 2, extraData * 2);
         if (mBuffer == NULL) {
@@ -551,7 +534,7 @@ status_t CameraMetadata::resizeIfNeeded(size_t extraEntries, size_t extraData) {
 
 status_t CameraMetadata::readFromParcel(const Parcel& data,
                                         camera_metadata_t** out) {
-    ATRACE_CALL();
+
     status_t err = OK;
 
     camera_metadata_t* metadata = NULL;
@@ -642,7 +625,6 @@ status_t CameraMetadata::readFromParcel(const Parcel& data,
 
 status_t CameraMetadata::writeToParcel(Parcel& data,
                                        const camera_metadata_t* metadata) {
-    ATRACE_CALL();
     status_t res = OK;
 
     /**
@@ -737,7 +719,7 @@ status_t CameraMetadata::writeToParcel(Parcel& data,
 }
 
 status_t CameraMetadata::readFromParcel(const Parcel *parcel) {
-    ATRACE_CALL();
+
     ALOGV("%s: parcel = %p", __FUNCTION__, parcel);
 
     status_t res = OK;
@@ -769,7 +751,7 @@ status_t CameraMetadata::readFromParcel(const Parcel *parcel) {
 }
 
 status_t CameraMetadata::writeToParcel(Parcel *parcel) const {
-    ATRACE_CALL();
+
     ALOGV("%s: parcel = %p", __FUNCTION__, parcel);
 
     if (parcel == NULL) {
@@ -798,7 +780,7 @@ void CameraMetadata::swap(CameraMetadata& other) {
 
 status_t CameraMetadata::getTagFromName(const char *name,
         const VendorTagDescriptor* vTags, uint32_t *tag) {
-    ATRACE_CALL();
+
     if (name == nullptr || tag == nullptr) return BAD_VALUE;
 
     size_t nameLength = strlen(name);
