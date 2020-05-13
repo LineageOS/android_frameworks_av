@@ -33,6 +33,7 @@
 #include "camera/CaptureResult.h"
 #include "gui/IGraphicBufferProducer.h"
 #include "device3/Camera3StreamInterface.h"
+#include "device3/StatusTracker.h"
 #include "binder/Status.h"
 #include "FrameProducer.h"
 
@@ -362,6 +363,10 @@ class CameraDeviceBase : public virtual FrameProducer {
     virtual status_t setRotateAndCropAutoBehavior(
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) = 0;
 
+    /**
+     * Get the status tracker of the camera device
+     */
+    virtual wp<camera3::StatusTracker> getStatusTracker() = 0;
 };
 
 }; // namespace android
