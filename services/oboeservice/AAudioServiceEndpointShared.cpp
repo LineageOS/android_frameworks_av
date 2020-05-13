@@ -166,13 +166,11 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
 
 aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBase> sharedStream,
                                                         audio_port_handle_t clientHandle) {
-    // Don't lock here because the disconnectRegisteredStreams also uses the lock.
-
     // Ignore result.
     (void) getStreamInternal()->stopClient(clientHandle);
 
     if (--mRunningStreamCount == 0) { // atomic
-        stopSharingThread();
+        stopSharingThread(); // the sharing thread locks mLockStreams
         getStreamInternal()->requestStop();
     }
     return AAUDIO_OK;
