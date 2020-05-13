@@ -30,7 +30,8 @@ public:
         DUPLICATING,        // Thread class is DuplicatingThread
         RECORD,             // Thread class is RecordThread
         OFFLOAD,            // Thread class is OffloadThread
-        MMAP                // control thread for MMAP stream
+        MMAP_PLAYBACK,      // Thread class for MMAP playback stream
+        MMAP_CAPTURE,       // Thread class for MMAP capture stream
         // If you add any values here, also update ThreadBase::threadTypeToString()
     };
 
@@ -331,6 +332,17 @@ public:
                 }
 
                 bool        isOutput() const { return mIsOut; }
+
+                bool        isOffloadOrMmap() const {
+                    switch (mType) {
+                    case OFFLOAD:
+                    case MMAP_PLAYBACK:
+                    case MMAP_CAPTURE:
+                        return true;
+                    default:
+                        return false;
+                    }
+                }
 
     virtual     sp<StreamHalInterface> stream() const = 0;
 

@@ -49,47 +49,13 @@ AudioAnalytics::AudioAnalytics()
                 // Perhaps report this.
             }));
 
-    // Check underruns
+    // Handle device use record statistics
     mActions.addAction(
-        AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD "*." AMEDIAMETRICS_PROP_EVENT,
-        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_UNDERRUN),
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP),
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
-                std::string threadId = item->getKey().substr(
-                        sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD) - 1);
-                std::string outputDevices;
-                mAnalyticsState->timeMachine().get(
-                        item->getKey(), AMEDIAMETRICS_PROP_OUTPUTDEVICES, &outputDevices);
-                ALOGD("(key=%s) Thread underrun event detected on io handle:%s device:%s",
-                        item->getKey().c_str(), threadId.c_str(), outputDevices.c_str());
-                if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
-                    // report this for Bluetooth
-                }
-            }));
-
-    // Check latencies, playback and startup
-    mActions.addAction(
-        AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "*." AMEDIAMETRICS_PROP_LATENCYMS,
-        std::monostate{},  // accept any value
-        std::make_shared<AnalyticsActions::Function>(
-            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
-                double latencyMs{};
-                double startupMs{};
-                if (!item->get(AMEDIAMETRICS_PROP_LATENCYMS, &latencyMs)
-                        || !item->get(AMEDIAMETRICS_PROP_STARTUPMS, &startupMs)) return;
-
-                std::string trackId = item->getKey().substr(
-                        sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) - 1);
-                std::string thread = getThreadFromTrack(item->getKey());
-                std::string outputDevices;
-                mAnalyticsState->timeMachine().get(
-                        thread, AMEDIAMETRICS_PROP_OUTPUTDEVICES, &outputDevices);
-                ALOGD("(key=%s) Track latencyMs:%lf startupMs:%lf detected on port:%s device:%s",
-                        item->getKey().c_str(), latencyMs, startupMs,
-                        trackId.c_str(), outputDevices.c_str());
-                if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
-                    // report this for Bluetooth
-                }
+                mDeviceUse.endAudioIntervalGroup(item, DeviceUse::RECORD);
             }));
 
     // Handle device use thread statistics
@@ -98,7 +64,7 @@ AudioAnalytics::AudioAnalytics()
         std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP),
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
-                mDeviceUse.endAudioIntervalGroup(item, false /* isTrack */);
+                mDeviceUse.endAudioIntervalGroup(item, DeviceUse::THREAD);
             }));
 
     // Handle device use track statistics
@@ -107,10 +73,11 @@ AudioAnalytics::AudioAnalytics()
         std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP),
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
-                mDeviceUse.endAudioIntervalGroup(item, true /* isTrack */);
+                mDeviceUse.endAudioIntervalGroup(item, DeviceUse::TRACK);
             }));
 
-    // Handle device routing statistics
+
+    // Handle device connection statistics
 
     // We track connections (not disconnections) for the time to connect.
     // TODO: consider BT requests in their A2dp service
@@ -119,7 +86,7 @@ AudioAnalytics::AudioAnalytics()
     // AudioDeviceBroker.postA2dpActiveDeviceChange
     mActions.addAction(
         "audio.device.a2dp.state",
-        std::string("connected"),
+        "connected",
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
                 mDeviceConnection.a2dpConnected(item);
@@ -131,6 +98,17 @@ AudioAnalytics::AudioAnalytics()
         std::make_shared<AnalyticsActions::Function>(
             [this](const std::shared_ptr<const android::mediametrics::Item> &item){
                 mDeviceConnection.createPatch(item);
+            }));
+
+    // Called from BT service
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_DEVICE
+        "postBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent"
+        "." AMEDIAMETRICS_PROP_STATE,
+        "connected",
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item){
+                mDeviceConnection.postBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(item);
             }));
 
     // Handle power usage
@@ -248,11 +226,12 @@ std::string AudioAnalytics::getThreadFromTrack(const std::string& track) const
 
 // DeviceUse helper class.
 void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
-       const std::shared_ptr<const android::mediametrics::Item> &item, bool isTrack) const {
+       const std::shared_ptr<const android::mediametrics::Item> &item, ItemType itemType) const {
     const std::string& key = item->getKey();
     const std::string id = key.substr(
-            (isTrack ? sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
-            : sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD))
+            (itemType == THREAD ? sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_THREAD)
+            : itemType == TRACK ? sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
+            : sizeof(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD))
              - 1);
     // deliver statistics
     int64_t deviceTimeNs = 0;
@@ -264,6 +243,9 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
     int32_t frameCount = 0;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
             key, AMEDIAMETRICS_PROP_FRAMECOUNT, &frameCount);
+    std::string inputDevices;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_INPUTDEVICES, &inputDevices);
     int32_t intervalCount = 0;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
             key, AMEDIAMETRICS_PROP_INTERVALCOUNT, &intervalCount);
@@ -273,29 +255,128 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
     int32_t sampleRate = 0;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
             key, AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate);
-    int32_t underrun = 0;
+    std::string flags;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
-            key, AMEDIAMETRICS_PROP_UNDERRUN, &underrun);
+            key, AMEDIAMETRICS_PROP_FLAGS, &flags);
+    // We may have several devices.
+    // Strings allow us to mix input and output devices together.
+    // TODO: review if we want to separate them.
+    std::stringstream ss;
+    for (const auto& devicePairs : { outputDevices, inputDevices }) {
+        const auto devaddrvec = MediaMetricsService::getDeviceAddressPairs(devicePairs);
+        for (const auto& [device, addr] : devaddrvec) {
+            if (ss.tellp() > 0) ss << "|";  // delimit devices with '|'.
+            ss << device;
+        }
+    }
+    std::string devices = ss.str();
 
     // Get connected device name if from bluetooth.
     bool isBluetooth = false;
-    std::string name;
+    std::string deviceNames; // we only have one device name at this time.
     if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
         isBluetooth = true;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
-            "audio.device.bt_a2dp", AMEDIAMETRICS_PROP_NAME, &name);
+            "audio.device.bt_a2dp", AMEDIAMETRICS_PROP_NAME, &deviceNames);
+        // We don't check if deviceName is sanitized.
+        // TODO: remove reserved chars such as '|' and replace with a char like '_'.
     }
 
-    // We may have several devices.  We only list the first device.
-    // TODO: consider whether we should list all the devices separated by |
-    std::string firstDevice = "unknown";
-    auto devaddrvec = MediaMetricsService::getDeviceAddressPairs(outputDevices);
-    if (devaddrvec.size() != 0) {
-        firstDevice = devaddrvec[0].first;
-        // DO NOT show the address.
-    }
+    switch (itemType) {
+    case RECORD: {
+        std::string callerName;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_CALLERNAME, &callerName);
 
-    if (isTrack) {
+        std::string packageName;
+        int64_t versionCode = 0;
+        int32_t uid = -1;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_ALLOWUID, &uid);
+        if (uid != -1) {
+            std::tie(packageName, versionCode) =
+                    MediaMetricsService::getSanitizedPackageNameAndVersionCode(uid);
+        }
+
+        int32_t selectedDeviceId = 0;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_SELECTEDDEVICEID, &selectedDeviceId);
+        std::string source;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_SOURCE, &source);
+
+        ALOGD("(key=%s) id:%s endAudioIntervalGroup devices:%s deviceNames:%s "
+                 "deviceTimeNs:%lld encoding:%s frameCount:%d intervalCount:%d "
+                 "sampleRate:%d "
+                 "packageName:%s "
+                 "selectedDeviceId:%d "
+                 "callerName:%s source:%s",
+                key.c_str(), id.c_str(), devices.c_str(), deviceNames.c_str(),
+                (long long)deviceTimeNs, encoding.c_str(), frameCount, intervalCount,
+                sampleRate,
+                packageName.c_str(), selectedDeviceId,
+                callerName.c_str(), source.c_str());
+
+#ifdef STATSD
+        if (mAudioAnalytics.mDeliverStatistics) {
+            (void)android::util::stats_write(
+                    android::util::MEDIAMETRICS_AUDIORECORDDEVICEUSAGE_REPORTED
+                    /* timestamp, */
+                    /* mediaApexVersion, */
+                    , devices.c_str()
+                    , deviceNames.c_str()
+                    , deviceTimeNs
+                    , encoding.c_str()
+                    , frameCount
+                    , intervalCount
+                    , sampleRate
+                    , flags.c_str()
+
+                    , packageName.c_str()
+                    , selectedDeviceId
+                    , callerName.c_str()
+                    , source.c_str()
+                    );
+        }
+#endif
+    } break;
+    case THREAD: {
+        std::string type;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_TYPE, &type);
+        int32_t underrun = 0; // zero for record types
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_UNDERRUN, &underrun);
+        ALOGD("(key=%s) id:%s endAudioIntervalGroup devices:%s deviceNames:%s "
+                 "deviceTimeNs:%lld encoding:%s frameCount:%d intervalCount:%d "
+                 "sampleRate:%d underrun:%d "
+                 "flags:%s type:%s",
+                key.c_str(), id.c_str(), devices.c_str(), deviceNames.c_str(),
+                (long long)deviceTimeNs, encoding.c_str(), frameCount, intervalCount,
+                sampleRate, underrun,
+                flags.c_str(), type.c_str());
+#ifdef STATSD
+        if (mAudioAnalytics.mDeliverStatistics) {
+            (void)android::util::stats_write(
+                android::util::MEDIAMETRICS_AUDIOTHREADDEVICEUSAGE_REPORTED
+                /* timestamp, */
+                /* mediaApexVersion, */
+                , devices.c_str()
+                , deviceNames.c_str()
+                , deviceTimeNs
+                , encoding.c_str()
+                , frameCount
+                , intervalCount
+                , sampleRate
+                , flags.c_str()
+
+                , underrun
+                , type.c_str()
+            );
+        }
+#endif
+    } break;
+    case TRACK: {
         std::string callerName;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_CALLERNAME, &callerName);
@@ -329,38 +410,44 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         int32_t selectedDeviceId = 0;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_SELECTEDDEVICEID, &selectedDeviceId);
-
+        std::string streamType;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_STREAMTYPE, &streamType);
+        int32_t underrun = 0;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_UNDERRUN, &underrun);
         std::string usage;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_USAGE, &usage);
 
-        ALOGD("(key=%s) id:%s endAudioIntervalGroup device:%s name:%s "
+        ALOGD("(key=%s) id:%s endAudioIntervalGroup devices:%s deviceNames:%s "
                  "deviceTimeNs:%lld encoding:%s frameCount:%d intervalCount:%d "
                  "sampleRate:%d underrun:%d "
                  "callerName:%s contentType:%s "
-                 "deviceLatencyMs:%lf deviceStartupMs:%lf deviceVolume:%lf"
+                 "deviceLatencyMs:%lf deviceStartupMs:%lf deviceVolume:%lf "
                  "packageName:%s playbackPitch:%lf playbackSpeed:%lf "
-                 "selectedDevceId:%d usage:%s",
-                key.c_str(), id.c_str(), firstDevice.c_str(), name.c_str(),
+                 "selectedDeviceId:%d streamType:%s usage:%s",
+                key.c_str(), id.c_str(), devices.c_str(), deviceNames.c_str(),
                 (long long)deviceTimeNs, encoding.c_str(), frameCount, intervalCount,
                 sampleRate, underrun,
                 callerName.c_str(), contentType.c_str(),
                 deviceLatencyMs, deviceStartupMs, deviceVolume,
                 packageName.c_str(), playbackPitch, playbackSpeed,
-                selectedDeviceId, usage.c_str());
+                selectedDeviceId, streamType.c_str(), usage.c_str());
 #ifdef STATSD
         if (mAudioAnalytics.mDeliverStatistics) {
             (void)android::util::stats_write(
                     android::util::MEDIAMETRICS_AUDIOTRACKDEVICEUSAGE_REPORTED
                     /* timestamp, */
                     /* mediaApexVersion, */
-                    , firstDevice.c_str()
-                    , name.c_str()
+                    , devices.c_str()
+                    , deviceNames.c_str()
                     , deviceTimeNs
                     , encoding.c_str()
                     , frameCount
                     , intervalCount
                     , sampleRate
+                    , flags.c_str()
                     , underrun
 
                     , packageName.c_str()
@@ -368,43 +455,14 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , (float)deviceStartupMs
                     , (float)deviceVolume
                     , selectedDeviceId
+                    , streamType.c_str()
                     , usage.c_str()
                     , contentType.c_str()
                     , callerName.c_str()
                     );
         }
 #endif
-    } else {
-
-        std::string flags;
-        mAudioAnalytics.mAnalyticsState->timeMachine().get(
-                key, AMEDIAMETRICS_PROP_FLAGS, &flags);
-
-        ALOGD("(key=%s) id:%s endAudioIntervalGroup device:%s name:%s "
-                 "deviceTimeNs:%lld encoding:%s frameCount:%d intervalCount:%d "
-                 "sampleRate:%d underrun:%d "
-                 "flags:%s",
-                key.c_str(), id.c_str(), firstDevice.c_str(), name.c_str(),
-                (long long)deviceTimeNs, encoding.c_str(), frameCount, intervalCount,
-                sampleRate, underrun,
-                flags.c_str());
-#ifdef STATSD
-        if (mAudioAnalytics.mDeliverStatistics) {
-            (void)android::util::stats_write(
-                android::util::MEDIAMETRICS_AUDIOTHREADDEVICEUSAGE_REPORTED
-                /* timestamp, */
-                /* mediaApexVersion, */
-                , firstDevice.c_str()
-                , name.c_str()
-                , deviceTimeNs
-                , encoding.c_str()
-                , frameCount
-                , intervalCount
-                , sampleRate
-                , underrun
-            );
-        }
-#endif
+        } break;
     }
 
     // Report this as needed.
@@ -417,49 +475,123 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
 void AudioAnalytics::DeviceConnection::a2dpConnected(
        const std::shared_ptr<const android::mediametrics::Item> &item) {
     const std::string& key = item->getKey();
-
-    const int64_t connectedAtNs = item->getTimestamp();
+    const int64_t atNs = item->getTimestamp();
     {
         std::lock_guard l(mLock);
-        mA2dpTimeConnectedNs = connectedAtNs;
-         ++mA2dpConnectedAttempts;
+        mA2dpConnectionServiceNs = atNs;
+        ++mA2dpConnectionServices;
+
+        if (mA2dpConnectionRequestNs == 0) {
+            mAudioAnalytics.mTimedAction.postIn(std::chrono::seconds(5), [this](){ expire(); });
+        }
+        // This sets the time we were connected.  Now we look for the delta in the future.
     }
     std::string name;
     item->get(AMEDIAMETRICS_PROP_NAME, &name);
-    ALOGD("(key=%s) a2dp connected device:%s "
-             "connectedAtNs:%lld",
-            key.c_str(), name.c_str(),
-            (long long)connectedAtNs);
-    // Note - we need to be able to cancel a timed event
-    mAudioAnalytics.mTimedAction.postIn(std::chrono::seconds(5), [this](){ expire(); });
-    // This sets the time we were connected.  Now we look for the delta in the future.
+    ALOGD("(key=%s) a2dp connected device:%s atNs:%lld",
+            key.c_str(), name.c_str(), (long long)atNs);
+
 }
 
 void AudioAnalytics::DeviceConnection::createPatch(
        const std::shared_ptr<const android::mediametrics::Item> &item) {
     std::lock_guard l(mLock);
-    if (mA2dpTimeConnectedNs == 0) return; // ignore
+    if (mA2dpConnectionServiceNs == 0) return; // patch unrelated to us.
     const std::string& key = item->getKey();
     std::string outputDevices;
     item->get(AMEDIAMETRICS_PROP_OUTPUTDEVICES, &outputDevices);
-    if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
+    if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH_A2DP") != std::string::npos) {
         // TODO compare address
-        const int64_t timeDiff = item->getTimestamp() - mA2dpTimeConnectedNs;
+        int64_t timeDiff = item->getTimestamp();
+        if (mA2dpConnectionRequestNs == 0) {
+            ALOGD("%s: A2DP create patch didn't see a connection request", __func__);
+            timeDiff -= mA2dpConnectionServiceNs;
+        } else {
+            timeDiff -= mA2dpConnectionRequestNs;
+        }
         ALOGD("(key=%s) A2DP device connection time: %lld", key.c_str(), (long long)timeDiff);
-        mA2dpTimeConnectedNs = 0; // reset counter.
-        ++mA2dpConnectedSuccesses;
+        mA2dpConnectionRequestNs = 0;
+        mA2dpConnectionServiceNs = 0;
+        ++mA2dpConnectionSuccesses;
+
+#ifdef STATSD
+        if (mAudioAnalytics.mDeliverStatistics) {
+            (void)android::util::stats_write(
+                    android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED
+                    /* timestamp, */
+                    /* mediaApexVersion, */
+                    , "AUDIO_DEVICE_OUT_BLUETOOTH_A2DP"
+                    , android::util::MEDIAMETRICS_AUDIO_DEVICE_CONNECTION_REPORTED__RESULT__SUCCESS
+                    , /* connection_time_ms */ timeDiff * 1e-6 /* NS to MS */
+                    , /* connection_count */ 1
+                    );
+        }
+#endif
     }
+}
+
+// Called through AudioManager when the BT service wants to enable
+void AudioAnalytics::DeviceConnection::postBluetoothA2dpDeviceConnectionStateSuppressNoisyIntent(
+        const std::shared_ptr<const android::mediametrics::Item> &item) {
+    const int64_t atNs = item->getTimestamp();
+    const std::string& key = item->getKey();
+    std::string state;
+    item->get(AMEDIAMETRICS_PROP_STATE, &state);
+    if (state != "connected") return;
+    {
+        std::lock_guard l(mLock);
+        mA2dpConnectionRequestNs = atNs;
+        ++mA2dpConnectionRequests;
+    }
+    ALOGD("(key=%s) a2dp connection request atNs:%lld",
+            key.c_str(), (long long)atNs);
+    // TODO: attempt to cancel a timed event, rather than let it expire.
+    mAudioAnalytics.mTimedAction.postIn(std::chrono::seconds(5), [this](){ expire(); });
 }
 
 void AudioAnalytics::DeviceConnection::expire() {
     std::lock_guard l(mLock);
-    if (mA2dpTimeConnectedNs == 0) return; // ignore
+    if (mA2dpConnectionRequestNs == 0) return; // ignore (this was an internal connection).
+    if (mA2dpConnectionServiceNs == 0) {
+        ALOGD("A2DP device connection service cancels");
+        ++mA2dpConnectionJavaServiceCancels;  // service did not connect to A2DP
 
-    // An expiration may occur because there is no audio playing.
+#ifdef STATSD
+        if (mAudioAnalytics.mDeliverStatistics) {
+            (void)android::util::stats_write(
+                    android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED
+                    /* timestamp, */
+                    /* mediaApexVersion, */
+                    , "AUDIO_DEVICE_OUT_BLUETOOTH_A2DP"
+                    , android::util::MEDIAMETRICS_AUDIO_DEVICE_CONNECTION_REPORTED__RESULT__JAVA_SERVICE_CANCEL
+                    , /* connection_time_ms */ 0.f
+                    , /* connection_count */ 1
+                    );
+        }
+#endif
+        return;
+    }
+
+    // AudioFlinger didn't play - an expiration may occur because there is no audio playing.
+    // Should we check elsewhere?
     // TODO: disambiguate this case.
-    ALOGD("A2DP device connection expired");
-    ++mA2dpConnectedFailures; // this is not a true failure.
-    mA2dpTimeConnectedNs = 0;
+    ALOGD("A2DP device connection expired, state unknown");
+    mA2dpConnectionRequestNs = 0;
+    mA2dpConnectionServiceNs = 0;
+    ++mA2dpConnectionUnknowns;  // connection result unknown
+#ifdef STATSD
+    if (mAudioAnalytics.mDeliverStatistics) {
+        (void)android::util::stats_write(
+                android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED
+                /* timestamp, */
+                /* mediaApexVersion, */
+                , "AUDIO_DEVICE_OUT_BLUETOOTH_A2DP"
+                , android::util::MEDIAMETRICS_AUDIO_DEVICE_CONNECTION_REPORTED__RESULT__UNKNOWN
+                , /* connection_time_ms */ 0.f
+                , /* connection_count */ 1
+                );
+    }
+#endif
 }
 
 } // namespace android

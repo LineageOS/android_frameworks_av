@@ -67,16 +67,21 @@ public:
         mIntervalStartTimeNs = systemTime();
     }
 
-    void logConstructor(pid_t creatorPid, uid_t creatorUid) const {
+    void logConstructor(pid_t creatorPid, uid_t creatorUid,
+            audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT) const {
         // Once this item is logged by the server, the client can add properties.
         // no lock required, all local or const variables.
-        mediametrics::LogItem(mMetricsId)
-            .setPid(creatorPid)
+        mediametrics::LogItem item(mMetricsId);
+        item.setPid(creatorPid)
             .setUid(creatorUid)
             .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)creatorUid)
             .set(AMEDIAMETRICS_PROP_EVENT,
-                    AMEDIAMETRICS_PROP_PREFIX_SERVER AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
-            .record();
+                    AMEDIAMETRICS_PROP_PREFIX_SERVER AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR);
+        // log streamType from the service, since client doesn't know chosen streamType.
+        if (streamType != AUDIO_STREAM_DEFAULT) {
+            item.set(AMEDIAMETRICS_PROP_STREAMTYPE, toString(streamType).c_str());
+        }
+        item.record();
     }
 
     // Called when we are removed from the Thread.

@@ -37,6 +37,9 @@
 // They must be appended with another value to make a key.
 #define AMEDIAMETRICS_KEY_PREFIX_AUDIO "audio."
 
+// Device related key prefix.
+#define AMEDIAMETRICS_KEY_PREFIX_AUDIO_DEVICE  AMEDIAMETRICS_KEY_PREFIX_AUDIO "device."
+
 // The AudioMmap key appends the "trackId" to the prefix.
 // This is the AudioFlinger equivalent of the AAudio Stream.
 // TODO: unify with AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM
@@ -113,6 +116,7 @@
 #define AMEDIAMETRICS_PROP_DURATIONNS     "durationNs"     // int64 duration time span
 #define AMEDIAMETRICS_PROP_ENCODING       "encoding"       // string value of format
 #define AMEDIAMETRICS_PROP_EVENT          "event#"         // string value (often func name)
+#define AMEDIAMETRICS_PROP_EXECUTIONTIMENS "executionTimeNs"  // time to execute the event
 
 // TODO: fix inconsistency in flags: AudioRecord / AudioTrack int32,  AudioThread string
 #define AMEDIAMETRICS_PROP_FLAGS          "flags"
