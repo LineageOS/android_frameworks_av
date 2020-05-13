@@ -225,7 +225,7 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
-            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .record(); });
@@ -268,7 +268,7 @@ aaudio_result_t AAudioServiceStreamBase::pause() {
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE)
-            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .record(); });
@@ -310,7 +310,7 @@ aaudio_result_t AAudioServiceStreamBase::stop() {
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
-            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .record(); });
@@ -364,7 +364,7 @@ aaudio_result_t AAudioServiceStreamBase::flush() {
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH)
-            .set(AMEDIAMETRICS_PROP_DURATIONNS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(AudioClock::getNanoseconds() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
             .record(); });
