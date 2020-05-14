@@ -956,6 +956,7 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 C2AndroidMemoryUsage androidUsage(C2MemoryUsage(usage.value));
                 config->mISConfig->mUsage = androidUsage.asGrallocUsage();
             }
+            config->mInputFormat->setInt64("android._C2MemoryUsage", usage.value);
         }
 
         // NOTE: we don't blindly use client specified input size if specified as clients
