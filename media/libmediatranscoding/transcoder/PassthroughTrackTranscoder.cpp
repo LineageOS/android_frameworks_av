@@ -134,7 +134,7 @@ media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
         }
 
         sample->info = info;
-        if (mOutputQueue.enqueue(sample)) {
+        if (mOutputQueue->enqueue(sample)) {
             LOG(ERROR) << "Output queue aborted";
             return AMEDIA_ERROR_IO;
         }
@@ -153,4 +153,7 @@ void PassthroughTrackTranscoder::abortTranscodeLoop() {
     mBufferPool->abort();
 }
 
+std::shared_ptr<AMediaFormat> PassthroughTrackTranscoder::getOutputFormat() const {
+    return mSourceFormat;
+}
 }  // namespace android

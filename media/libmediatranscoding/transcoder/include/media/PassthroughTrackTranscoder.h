@@ -90,6 +90,7 @@ private:
     void abortTranscodeLoop() override;
     media_status_t configureDestinationFormat(
             const std::shared_ptr<AMediaFormat>& destinationFormat) override;
+    std::shared_ptr<AMediaFormat> getOutputFormat() const override;
     // ~MediaTrackTranscoder
 
     std::shared_ptr<BufferPool> mBufferPool;

@@ -74,3 +74,10 @@ cc_test {
     defaults: ["testdefaults"],
     srcs: ["MediaSampleWriterTests.cpp"],
 }
+
+// MediaTranscoder unit test
+cc_test {
+    name: "MediaTranscoderTests",
+    defaults: ["testdefaults"],
+    srcs: ["MediaTranscoderTests.cpp"],
+}
