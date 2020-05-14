@@ -29,7 +29,7 @@
 namespace android {
 namespace camera3 {
 
-DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
+DepthCompositeStream::DepthCompositeStream(sp<CameraDeviceBase> device,
         wp<hardware::camera2::ICameraDeviceCallbacks> cb) :
         CompositeStream(device, cb),
         mBlobStreamId(-1),
@@ -43,9 +43,8 @@ DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
         mProducerListener(new ProducerListener()),
         mMaxJpegSize(-1),
         mIsLogicalCamera(false) {
-    sp<CameraDeviceBase> cameraDevice = device.promote();
-    if (cameraDevice.get() != nullptr) {
-        CameraMetadata staticInfo = cameraDevice->info();
+    if (device != nullptr) {
+        CameraMetadata staticInfo = device->info();
         auto entry = staticInfo.find(ANDROID_JPEG_MAX_SIZE);
         if (entry.count > 0) {
             mMaxJpegSize = entry.data.i32[0];
@@ -385,7 +384,8 @@ void DepthCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*
     }
 
     if ((inputFrame->error || mErrorState) && !inputFrame->errorNotified) {
-        notifyError(inputFrame->frameNumber);
+        //TODO: Figure out correct requestId
+        notifyError(inputFrame->frameNumber, -1 /*requestId*/);
         inputFrame->errorNotified = true;
     }
 }
