@@ -814,6 +814,8 @@ void Camera3Stream::fireBufferListenersLocked(
     info.mError = (buffer.status == CAMERA3_BUFFER_STATUS_ERROR);
     info.mFrameNumber = frameNumber;
     info.mTimestamp = timestamp;
+    info.mStreamId = getId();
+
     // TODO: rest of fields
 
     for (it = mBufferListenerList.begin(), end = mBufferListenerList.end();
