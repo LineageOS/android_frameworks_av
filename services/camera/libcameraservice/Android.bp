@@ -108,6 +108,7 @@ cc_library_shared {
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.5",
         "vendor.lineage.camera.motor@1.0",
+        "vendor.samsung.hardware.camera.provider@3.0",
     ],
 
     export_shared_lib_headers: [

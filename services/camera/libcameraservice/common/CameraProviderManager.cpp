@@ -21,6 +21,7 @@
 #include "CameraProviderManager.h"
 
 #include <android/hardware/camera/device/3.5/ICameraDevice.h>
+#include <vendor/samsung/hardware/camera/provider/3.0/ISehCameraProvider.h>
 
 #include <algorithm>
 #include <chrono>
@@ -1225,6 +1226,9 @@ status_t CameraProviderManager::ProviderInfo::initialize(
         mMinorVersion = 4;
     }
 
+    auto samsungCast = vendor::samsung::hardware::camera::provider::V3_0::ISehCameraProvider::castFrom(interface);
+    auto samsungProvider = samsungCast.isOk() ? static_cast<sp<vendor::samsung::hardware::camera::provider::V3_0::ISehCameraProvider>>(samsungCast) : nullptr;
+
     // cameraDeviceStatusChange callbacks may be called (and causing new devices added)
     // before setCallback returns
     hardware::Return<Status> status = interface->setCallback(this);
@@ -1269,7 +1273,7 @@ status_t CameraProviderManager::ProviderInfo::initialize(
 
     // Get initial list of camera devices, if any
     std::vector<std::string> devices;
-    hardware::Return<void> ret = interface->getCameraIdList([&status, this, &devices](
+    auto cb = [&status, this, &devices](
             Status idStatus,
             const hardware::hidl_vec<hardware::hidl_string>& cameraDeviceNames) {
         status = idStatus;
@@ -1286,7 +1290,12 @@ status_t CameraProviderManager::ProviderInfo::initialize(
                     mProviderPublicCameraIds.push_back(id);
                 }
             }
-        } });
+        } };
+    hardware::Return<void> ret;
+    if(samsungProvider != nullptr)
+        ret = samsungProvider->sehGetCameraIdList(cb);
+    else
+        ret = interface->getCameraIdList(cb);
     if (!ret.isOk()) {
         ALOGE("%s: Transaction error in getting camera ID list from provider '%s': %s",
                 __FUNCTION__, mProviderName.c_str(), linked.description().c_str());
