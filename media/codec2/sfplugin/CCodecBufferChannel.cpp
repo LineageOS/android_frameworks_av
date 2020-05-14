@@ -851,26 +851,29 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     if (hdrStaticInfo || hdr10PlusInfo) {
         HdrMetadata hdr;
         if (hdrStaticInfo) {
-            struct android_smpte2086_metadata smpte2086_meta = {
-                .displayPrimaryRed = {
-                    hdrStaticInfo->mastering.red.x, hdrStaticInfo->mastering.red.y
-                },
-                .displayPrimaryGreen = {
-                    hdrStaticInfo->mastering.green.x, hdrStaticInfo->mastering.green.y
-                },
-                .displayPrimaryBlue = {
-                    hdrStaticInfo->mastering.blue.x, hdrStaticInfo->mastering.blue.y
-                },
-                .whitePoint = {
-                    hdrStaticInfo->mastering.white.x, hdrStaticInfo->mastering.white.y
-                },
-                .maxLuminance = hdrStaticInfo->mastering.maxLuminance,
-                .minLuminance = hdrStaticInfo->mastering.minLuminance,
-            };
-
-            hdr.validTypes = HdrMetadata::SMPTE2086;
-            hdr.smpte2086 = smpte2086_meta;
-
+            // If mastering max and min luminance fields are 0, do not use them.
+            // It indicates the value may not be present in the stream.
+            if (hdrStaticInfo->mastering.maxLuminance > 0.0f &&
+                hdrStaticInfo->mastering.minLuminance > 0.0f) {
+                struct android_smpte2086_metadata smpte2086_meta = {
+                    .displayPrimaryRed = {
+                        hdrStaticInfo->mastering.red.x, hdrStaticInfo->mastering.red.y
+                    },
+                    .displayPrimaryGreen = {
+                        hdrStaticInfo->mastering.green.x, hdrStaticInfo->mastering.green.y
+                    },
+                    .displayPrimaryBlue = {
+                        hdrStaticInfo->mastering.blue.x, hdrStaticInfo->mastering.blue.y
+                    },
+                    .whitePoint = {
+                        hdrStaticInfo->mastering.white.x, hdrStaticInfo->mastering.white.y
+                    },
+                    .maxLuminance = hdrStaticInfo->mastering.maxLuminance,
+                    .minLuminance = hdrStaticInfo->mastering.minLuminance,
+                };
+                hdr.validTypes = HdrMetadata::SMPTE2086;
+                hdr.smpte2086 = smpte2086_meta;
+            }
             // If the content light level fields are 0, do not use them, it
             // indicates the value may not be present in the stream.
             if (hdrStaticInfo->maxCll > 0.0f && hdrStaticInfo->maxFall > 0.0f) {
