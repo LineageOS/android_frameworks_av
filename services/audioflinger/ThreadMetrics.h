@@ -58,9 +58,11 @@ public:
     // 2) We come out of standby
     void logBeginInterval() {
         std::lock_guard l(mLock);
-        if (mDevices != mCreatePatchDevices) {
+        // The devices we look for change depend on whether the Thread is input or output.
+        const std::string& patchDevices = mIsOut ? mCreatePatchOutDevices : mCreatePatchInDevices;
+        if (mDevices != patchDevices) {
             deliverCumulativeMetrics(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAUDIOINTERVALGROUP);
-            mDevices = mCreatePatchDevices; // set after endAudioIntervalGroup
+            mDevices = patchDevices; // set after endAudioIntervalGroup
             resetIntervalGroupMetrics();
             deliverDeviceMetrics(
                     AMEDIAMETRICS_PROP_EVENT_VALUE_BEGINAUDIOINTERVALGROUP, mDevices.c_str());
@@ -80,12 +82,14 @@ public:
             .record();
     }
 
-    void logCreatePatch(const std::string& devices) {
+    void logCreatePatch(const std::string& inDevices, const std::string& outDevices) {
         std::lock_guard l(mLock);
-        mCreatePatchDevices = devices;
+        mCreatePatchInDevices = inDevices;
+        mCreatePatchOutDevices = outDevices;
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATEAUDIOPATCH)
-            .set(AMEDIAMETRICS_PROP_OUTPUTDEVICES, devices)
+            .set(AMEDIAMETRICS_PROP_INPUTDEVICES, inDevices)
+            .set(AMEDIAMETRICS_PROP_OUTPUTDEVICES, outDevices)
             .record();
     }
 
@@ -115,11 +119,13 @@ public:
         mDeviceLatencyMs.add(latencyMs);
     }
 
-    // TODO: further implement this.
-    void logUnderrunFrames(size_t count, size_t frames) {
+    void logUnderrunFrames(size_t frames) {
         std::lock_guard l(mLock);
-        mUnderrunCount = count;
-        mUnderrunFrames = frames;
+        if (mLastUnderrun == false && frames > 0) {
+            ++mUnderrunCount; // count non-continguous underrun sequences.
+        }
+        mLastUnderrun = (frames > 0);
+        mUnderrunFrames += frames;
     }
 
     const std::string& getMetricsId() const {
@@ -164,6 +170,7 @@ private:
 
         mDeviceLatencyMs.reset();
 
+        mLastUnderrun = false;
         mUnderrunCount = 0;
         mUnderrunFrames = 0;
     }
@@ -174,8 +181,9 @@ private:
     mutable           std::mutex mLock;
 
     // Devices in the interval group.
-    std::string       mDevices GUARDED_BY(mLock);
-    std::string       mCreatePatchDevices GUARDED_BY(mLock);
+    std::string       mDevices GUARDED_BY(mLock); // last input or output devices based on mIsOut.
+    std::string       mCreatePatchInDevices GUARDED_BY(mLock);
+    std::string       mCreatePatchOutDevices GUARDED_BY(mLock);
 
     // Number of intervals and playing time
     int32_t           mIntervalCount GUARDED_BY(mLock) = 0;
@@ -187,8 +195,9 @@ private:
     audio_utils::Statistics<double> mDeviceLatencyMs GUARDED_BY(mLock);
 
     // underrun count and frames
-    int64_t           mUnderrunCount GUARDED_BY(mLock) = 0;
-    int64_t           mUnderrunFrames GUARDED_BY(mLock) = 0;
+    bool              mLastUnderrun GUARDED_BY(mLock) = false; // checks consecutive underruns
+    int64_t           mUnderrunCount GUARDED_BY(mLock) = 0;    // number of consecutive underruns
+    int64_t           mUnderrunFrames GUARDED_BY(mLock) = 0;   // total estimated frames underrun
 };
 
 } // namespace android
