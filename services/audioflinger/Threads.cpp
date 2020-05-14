@@ -6725,7 +6725,7 @@ AudioFlinger::RecordThread::RecordThread(const sp<AudioFlinger>& audioFlinger,
     snprintf(mThreadName, kThreadNameLength, "AudioIn_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
 
-    if (mInput != nullptr && mInput->audioHwDev != nullptr) {
+    if (mInput->audioHwDev != nullptr) {
         mIsMsdDevice = strcmp(
                 mInput->audioHwDev->moduleName(), AUDIO_HARDWARE_MODULE_ID_MSD) == 0;
     }
