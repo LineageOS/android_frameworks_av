@@ -138,10 +138,23 @@ class ExtractorUnitTest {
         mDisableTest = false;
 
         static const std::map<std::string, standardExtractors> mapExtractor = {
-                {"aac", AAC},     {"amr", AMR},         {"mp3", MP3},         {"ogg", OGG},
-                {"wav", WAV},     {"mkv", MKV},         {"flac", FLAC},       {"midi", MIDI},
-                {"mpeg4", MPEG4}, {"mpeg2ts", MPEG2TS}, {"mpeg2ps", MPEG2PS}, {"mp4", MPEG4},
-                {"webm", MKV},    {"ts", MPEG2TS},      {"mpeg", MPEG2PS}};
+                {"aac", AAC},
+                {"amr", AMR},
+                {"flac", FLAC},
+                {"mid", MIDI},
+                {"midi", MIDI},
+                {"mkv", MKV},
+                {"mp3", MP3},
+                {"mp4", MPEG4},
+                {"mpeg2ps", MPEG2PS},
+                {"mpeg2ts", MPEG2TS},
+                {"mpeg4", MPEG4},
+                {"mpg", MPEG2PS},
+                {"ogg", OGG},
+                {"opus", OGG},
+                {"ts", MPEG2TS},
+                {"wav", WAV},
+                {"webm", MKV}};
         // Find the component type
         if (mapExtractor.find(writerFormat) != mapExtractor.end()) {
             mExtractorName = mapExtractor.at(writerFormat);
@@ -940,35 +953,54 @@ class ExtractorComparison
         }
     }
 
-    virtual void SetUp() override {
-        string input0 = GetParam().first;
-        string input1 = GetParam().second;
-
-        // Allocate memory to hold extracted data for both extractors
-        struct stat buf;
-        int32_t status = stat((gEnv->getRes() + input0).c_str(), &buf);
-        ASSERT_EQ(status, 0) << "Unable to get file properties";
-
-        // allocating the buffer size as 2x since some
-        // extractors like flac, midi and wav decodes the file.
-        mExtractorOutput[0] = (int8_t *)calloc(1, buf.st_size * 2);
-        ASSERT_NE(mExtractorOutput[0], nullptr)
-                << "Unable to allocate memory for writing extractor's output";
-        mExtractorOuputSize[0] = buf.st_size * 2;
-
-        status = stat((gEnv->getRes() + input1).c_str(), &buf);
-        ASSERT_EQ(status, 0) << "Unable to get file properties";
-
-        // allocate buffer for extractor output, 2x input file size.
-        mExtractorOutput[1] = (int8_t *)calloc(1, buf.st_size * 2);
-        ASSERT_NE(mExtractorOutput[1], nullptr)
-                << "Unable to allocate memory for writing extractor's output";
-        mExtractorOuputSize[1] = buf.st_size * 2;
-    }
-
     int8_t *mExtractorOutput[2]{};
     size_t mExtractorOuputSize[2]{};
 };
+
+size_t allocateOutputBuffers(string inputFileName, AMediaFormat *extractorFormat) {
+    size_t bufferSize = 0u;
+    // allocating the buffer size as sampleRate * channelCount * clipDuration since
+    // some extractors like flac, midi and wav decodes the file. These extractors
+    // advertise the mime type as raw.
+    const char *mime;
+    AMediaFormat_getString(extractorFormat, AMEDIAFORMAT_KEY_MIME, &mime);
+    if (!strcmp(mime, MEDIA_MIMETYPE_AUDIO_RAW)) {
+        int64_t clipDurationUs = -1;
+        int32_t channelCount = -1;
+        int32_t sampleRate = -1;
+        int32_t bitsPerSampple = -1;
+        if (!AMediaFormat_getInt32(extractorFormat, AMEDIAFORMAT_KEY_CHANNEL_COUNT,
+                                   &channelCount) || channelCount <= 0) {
+            ALOGE("Invalid channelCount for input file : %s", inputFileName.c_str());
+            return 0;
+        }
+        if (!AMediaFormat_getInt32(extractorFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, &sampleRate) ||
+            sampleRate <= 0) {
+            ALOGE("Invalid sampleRate for input file : %s", inputFileName.c_str());
+            return 0;
+        }
+        if (!AMediaFormat_getInt64(extractorFormat, AMEDIAFORMAT_KEY_DURATION, &clipDurationUs) ||
+            clipDurationUs <= 0) {
+            ALOGE("Invalid clip duration for input file : %s", inputFileName.c_str());
+            return 0;
+        }
+        if (!AMediaFormat_getInt32(extractorFormat, AMEDIAFORMAT_KEY_PCM_ENCODING,
+                                   &bitsPerSampple) || bitsPerSampple <= 0) {
+            ALOGE("Invalid bits per sample for input file : %s", inputFileName.c_str());
+            return 0;
+        }
+        bufferSize = bitsPerSampple * channelCount * sampleRate * (clipDurationUs / 1000000 + 1);
+    } else {
+        struct stat buf;
+        int32_t status = stat(inputFileName.c_str(), &buf);
+        if (status != 0) {
+            ALOGE("Unable to get file properties for: %s", inputFileName.c_str());
+            return 0;
+        }
+        bufferSize = buf.st_size;
+    }
+    return bufferSize;
+}
 
 // Compare output of two extractors for identical content
 TEST_P(ExtractorComparison, ExtractorComparisonTest) {
@@ -1010,6 +1042,13 @@ TEST_P(ExtractorComparison, ExtractorComparisonTest) {
 
         CMediaTrack *cTrack = wrap(track);
         ASSERT_NE(cTrack, nullptr) << "Failed to get track wrapper for index " << trackIdx;
+
+        mExtractorOuputSize[idx] = allocateOutputBuffers(inputFileName, extractorFormat[idx]);
+        ASSERT_GT(mExtractorOuputSize[idx], 0u) << " Invalid size for output buffers";
+
+        mExtractorOutput[idx] = (int8_t *)calloc(1, mExtractorOuputSize[idx]);
+        ASSERT_NE(mExtractorOutput[idx], nullptr)
+                << "Unable to allocate memory for writing extractor's output";
 
         MediaBufferGroup *bufferGroup = new MediaBufferGroup();
         status = cTrack->start(track, bufferGroup->wrap());
@@ -1087,14 +1126,44 @@ TEST_P(ExtractorComparison, ExtractorComparisonTest) {
                          << inputFileNames[1] << " extractors";
 }
 
-INSTANTIATE_TEST_SUITE_P(ExtractorComparisonAll, ExtractorComparison,
-                         ::testing::Values(make_pair("swirl_144x136_vp9.mp4",
-                                                     "swirl_144x136_vp9.webm"),
-                                           make_pair("video_480x360_mp4_vp9_333kbps_25fps.mp4",
-                                                     "video_480x360_webm_vp9_333kbps_25fps.webm"),
-                                           make_pair("video_1280x720_av1_hdr_static_3mbps.mp4",
-                                                     "video_1280x720_av1_hdr_static_3mbps.webm"),
-                                           make_pair("loudsoftaac.aac", "loudsoftaac.mkv")));
+INSTANTIATE_TEST_SUITE_P(
+        ExtractorComparisonAll, ExtractorComparison,
+        ::testing::Values(make_pair("swirl_144x136_vp9.mp4", "swirl_144x136_vp9.webm"),
+                          make_pair("video_480x360_mp4_vp9_333kbps_25fps.mp4",
+                                    "video_480x360_webm_vp9_333kbps_25fps.webm"),
+                          make_pair("video_1280x720_av1_hdr_static_3mbps.mp4",
+                                    "video_1280x720_av1_hdr_static_3mbps.webm"),
+                          make_pair("swirl_132x130_mpeg4.3gp", "swirl_132x130_mpeg4.mkv"),
+                          make_pair("swirl_144x136_avc.mkv", "swirl_144x136_avc.mp4"),
+                          make_pair("swirl_132x130_mpeg4.mp4", "swirl_132x130_mpeg4.mkv"),
+                          make_pair("crowd_508x240_25fps_hevc.mp4","crowd_508x240_25fps_hevc.mkv"),
+                          make_pair("bbb_cif_768kbps_30fps_mpeg2.mp4",
+                                    "bbb_cif_768kbps_30fps_mpeg2.ts"),
+
+                          make_pair("loudsoftaac.aac", "loudsoftaac.mkv"),
+                          make_pair("sinesweepflacmkv.mkv", "sinesweepflacmp4.mp4"),
+                          make_pair("sinesweepmp3lame.mp3", "sinesweepmp3lame.mkv"),
+                          make_pair("sinesweepoggmp4.mp4", "sinesweepogg.ogg"),
+                          make_pair("sinesweepvorbis.mp4", "sinesweepvorbis.ogg"),
+                          make_pair("sinesweepvorbis.mkv", "sinesweepvorbis.ogg"),
+                          make_pair("testopus.mkv", "testopus.mp4"),
+                          make_pair("testopus.mp4", "testopus.opus"),
+
+                          make_pair("loudsoftaac.aac", "loudsoftaac.aac"),
+                          make_pair("testamr.amr", "testamr.amr"),
+                          make_pair("sinesweepflac.flac", "sinesweepflac.flac"),
+                          make_pair("midi_a.mid", "midi_a.mid"),
+                          make_pair("sinesweepvorbis.mkv", "sinesweepvorbis.mkv"),
+                          make_pair("sinesweepmp3lame.mp3", "sinesweepmp3lame.mp3"),
+                          make_pair("sinesweepoggmp4.mp4", "sinesweepoggmp4.mp4"),
+                          make_pair("testopus.opus", "testopus.opus"),
+                          make_pair("john_cage.ogg", "john_cage.ogg"),
+                          make_pair("monotestgsm.wav", "monotestgsm.wav"),
+
+                          make_pair("swirl_144x136_mpeg2.mpg", "swirl_144x136_mpeg2.mpg"),
+                          make_pair("swirl_132x130_mpeg4.mp4", "swirl_132x130_mpeg4.mp4"),
+                          make_pair("swirl_144x136_vp9.webm", "swirl_144x136_vp9.webm"),
+                          make_pair("swirl_144x136_vp8.webm", "swirl_144x136_vp8.webm")));
 
 INSTANTIATE_TEST_SUITE_P(ConfigParamTestAll, ConfigParamTest,
                          ::testing::Values(make_pair("aac", AAC_1),
