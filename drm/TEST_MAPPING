@@ -1,9 +1,4 @@
 {
-  "imports": [
-    {
-      "path": "system/apex/tests"
-    }
-  ],
   "presubmit": [
     // The following tests validate codec and drm path.
     {
