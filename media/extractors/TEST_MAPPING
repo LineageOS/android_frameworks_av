@@ -1,7 +1,20 @@
-// frameworks/av/media/extractors
 {
   "presubmit": [
     // TODO(b/148094059): unit tests not allowed to download content
-    //{ "name": "ExtractorUnitTest" }
+    // { "name": "ExtractorUnitTest" },
+
+    // TODO(b/153661591) enable test once the bug is fixed
+    // This tests the extractor path
+    // {
+    //    "name": "GtsYouTubeTestCases",
+    //    "options" : [
+    //      {
+    //        "include-annotation": "android.platform.test.annotations.Presubmit"
+    //      },
+    //      {
+    //        "include-filter": "com.google.android.youtube.gts.SimultaneousClearAndProtectedDecodeTest#testSimultaneousClearAndProtectedDecode"
+    //      }
+    //    ]
+    //  }
   ]
 }

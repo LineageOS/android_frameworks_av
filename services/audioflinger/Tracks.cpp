@@ -602,7 +602,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
 
     // Once this item is logged by the server, the client can add properties.
-    mTrackMetrics.logConstructor(creatorPid, uid);
+    mTrackMetrics.logConstructor(creatorPid, uid, streamType);
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
