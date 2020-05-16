@@ -36,3 +36,6 @@ adb shell /data/nativetest64/VideoTrackTranscoderTests/VideoTrackTranscoderTests
 
 echo "testing PassthroughTrackTranscoder"
 adb shell /data/nativetest64/PassthroughTrackTranscoderTests/PassthroughTrackTranscoderTests
+
+echo "testing MediaSampleWriter"
+adb shell /data/nativetest64/MediaSampleWriterTests/MediaSampleWriterTests
