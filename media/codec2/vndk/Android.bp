@@ -64,11 +64,22 @@ cc_library_shared {
         "libfmq",
         "liblog",
         "libnativewindow",
-        "libstagefright_foundation",
+        "libstagefright_foundation_without_imemory",
         "libstagefright_bufferpool@2.0.1",
         "libui",
         "libutils",
     ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libstagefright_foundation_without_imemory",
+            ],
+            shared_libs: [
+                "libstagefright_foundation",
+            ],
+        },
+    },
 
     cflags: [
         "-Werror",

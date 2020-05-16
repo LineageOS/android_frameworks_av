@@ -23,9 +23,20 @@ cc_library_shared {
         "libcodec2_vndk",
         "libcutils",
         "liblog",
-        "libstagefright_foundation",
+        "libstagefright_foundation_without_imemory",
         "libutils",
     ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libstagefright_foundation_without_imemory",
+            ],
+            shared_libs: [
+                "libstagefright_foundation",
+            ],
+        },
+    },
 
     static_libs: [
         "libyuv_static",

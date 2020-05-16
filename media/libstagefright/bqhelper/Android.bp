@@ -25,7 +25,7 @@ cc_defaults {
         "libhidlbase",
         "libhidlmemory",
         "liblog",
-        "libstagefright_foundation",
+        "libstagefright_foundation_without_imemory",
         "libui",
         "libutils",
 
@@ -35,7 +35,6 @@ cc_defaults {
 
     export_shared_lib_headers: [
         "libhidlmemory",
-        "libstagefright_foundation",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hardware.graphics.bufferqueue@2.0",
     ],
@@ -68,11 +67,13 @@ cc_library_shared {
         vendor: {
             exclude_shared_libs: [
                 "libgui",
+                "libstagefright_foundation_without_imemory",
             ],
             static_libs: [
                 "libgui_bufferqueue_static",
             ],
             shared_libs: [
+                "libstagefright_foundation",
                 "android.hidl.token@1.0-utils",
                 "libEGL",
                 "libnativewindow",
