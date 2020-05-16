@@ -22,8 +22,19 @@ cc_library_shared {
         "libcutils", // for properties
         "liblog",    // for ALOG
         "libsfplugin_ccodec_utils", // for ImageCopy
-        "libstagefright_foundation", // for Mutexed
+        "libstagefright_foundation_without_imemory", // for Mutexed
     ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libstagefright_foundation_without_imemory",
+            ],
+            shared_libs: [
+                "libstagefright_foundation",
+            ],
+        },
+    },
 
     sanitize: {
         misc_undefined: [
@@ -57,8 +68,19 @@ cc_defaults {
         "libcutils", // for properties
         "liblog", // for ALOG
         "libsfplugin_ccodec_utils", // for ImageCopy
-        "libstagefright_foundation", // for ColorUtils and MIME
+        "libstagefright_foundation_without_imemory", // for ColorUtils and MIME
     ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libstagefright_foundation_without_imemory",
+            ],
+            shared_libs: [
+                "libstagefright_foundation",
+            ],
+        },
+    },
 
     cflags: [
         "-Wall",

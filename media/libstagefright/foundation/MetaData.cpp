@@ -28,7 +28,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MetaData.h>
 
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
 #include <binder/Parcel.h>
 #endif
 
@@ -48,7 +48,7 @@ MetaData::MetaData(const MetaDataBase &from)
 MetaData::~MetaData() {
 }
 
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
 /* static */
 sp<MetaData> MetaData::createFromParcel(const Parcel &parcel) {
 
