@@ -48,7 +48,7 @@
         }
     ],
 
-    "staged-platinum-postsubmit": [
+    "platinum-postsubmit": [
         // runs regularly, independent of changes in this tree.
         // signals if changes elsewhere break media functionality
         {
