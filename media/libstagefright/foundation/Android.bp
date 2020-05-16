@@ -8,6 +8,9 @@ cc_library_headers {
 cc_defaults {
     name: "libstagefright_foundation_defaults",
     vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
     double_loadable: true,
     include_dirs: [
         "frameworks/av/include",
@@ -39,6 +42,7 @@ cc_defaults {
     ],
 
     shared_libs: [
+        "libbinder",
         "libutils",
         "libcutils",
         "liblog",
@@ -97,21 +101,12 @@ cc_defaults {
 cc_library {
     name: "libstagefright_foundation",
     defaults: ["libstagefright_foundation_defaults"],
-    vndk: {
-        enabled: true,
-    },
-    shared_libs: [ "libbinder" ]
 }
 
-cc_library {
+cc_library_static {
     name: "libstagefright_foundation_without_imemory",
     defaults: ["libstagefright_foundation_defaults"],
-    apex_available: [
-        "//apex_available:platform",
-        "com.android.media.swcodec",
-        "test_com.android.media.swcodec",
-    ],
-    vendor_available: false,
+
     cflags: [
         "-Wno-multichar",
         "-Werror",
