@@ -28,7 +28,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MetaDataBase.h>
 
-#ifndef NO_IMEMORY
+#ifndef __ANDROID_VNDK__
 #include <binder/Parcel.h>
 #endif
 
@@ -452,7 +452,7 @@ void MetaDataBase::dumpToLog() const {
     }
 }
 
-#ifndef NO_IMEMORY
+#ifndef __ANDROID_VNDK__
 status_t MetaDataBase::writeToParcel(Parcel &parcel) {
     status_t ret;
     size_t numItems = mInternalData->mItems.size();
