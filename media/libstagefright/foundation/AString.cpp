@@ -27,7 +27,7 @@
 #include "ADebug.h"
 #include "AString.h"
 
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
 #include <binder/Parcel.h>
 #endif
 
@@ -365,7 +365,7 @@ bool AString::endsWithIgnoreCase(const char *suffix) const {
     return !strcasecmp(mData + mSize - suffixLen, suffix);
 }
 
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
 // static
 AString AString::FromParcel(const Parcel &parcel) {
     size_t size = static_cast<size_t>(parcel.readInt32());

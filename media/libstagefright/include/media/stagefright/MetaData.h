@@ -41,7 +41,7 @@ private:
     friend class BnMediaSource;
     friend class BpMediaSource;
     friend class BpMediaExtractor;
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
     static sp<MetaData> createFromParcel(const Parcel &parcel);
 #endif
 };
