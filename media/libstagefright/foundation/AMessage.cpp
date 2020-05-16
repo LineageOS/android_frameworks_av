@@ -33,7 +33,7 @@
 
 #include <media/stagefright/foundation/hexdump.h>
 
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
 #include <binder/Parcel.h>
 #endif
 
@@ -646,7 +646,7 @@ AString AMessage::debugString(int32_t indent) const {
     return s;
 }
 
-#ifndef __ANDROID_VNDK__
+#ifndef NO_IMEMORY
 // static
 sp<AMessage> AMessage::FromParcel(const Parcel &parcel, size_t maxNestingLevel) {
     int32_t what = parcel.readInt32();
@@ -813,7 +813,7 @@ void AMessage::writeToParcel(Parcel *parcel) const {
         }
     }
 }
-#endif  // __ANDROID_VNDK__
+#endif  // NO_IMEMORY
 
 sp<AMessage> AMessage::changesFrom(const sp<const AMessage> &other, bool deep) const {
     if (other == NULL) {
