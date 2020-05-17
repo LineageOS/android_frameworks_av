@@ -18,6 +18,7 @@ package android.media;
 
 import android.media.TranscodingJobPriority;
 import android.media.TranscodingType;
+import android.media.TranscodingVideoTrackFormat;
 
 /**
  * TranscodingRequest contains the desired configuration for the transcoding.
@@ -35,6 +36,14 @@ parcelable TranscodingRequestParcel {
      * Type of the transcoding.
      */
     TranscodingType transcodingType;
+
+    /**
+     * Requested video track format for the transcoding.
+     * Note that the transcoding service will try to fulfill the requested format as much as
+     * possbile, while subject to hardware and software limitation. The final video track format
+     * will be available in the TranscodingJobParcel when the job is finished.
+     */
+    @nullable TranscodingVideoTrackFormat requestedVideoTrackFormat;
 
     /**
      * Input source file descriptor.
