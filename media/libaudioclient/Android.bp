@@ -1,6 +1,8 @@
 cc_library_headers {
     name: "libaudioclient_headers",
     vendor_available: true,
+    min_sdk_version: "29",
+
     header_libs: [
         "libaudiofoundation_headers",
     ],

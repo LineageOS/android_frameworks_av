@@ -63,6 +63,8 @@ cc_library_shared {
     vndk: {
         enabled: true,
     },
+    min_sdk_version: "29",
+
     shared_libs: [ "libgui" ],
     target: {
         vendor: {
