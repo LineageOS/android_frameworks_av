@@ -30,6 +30,7 @@ cc_library {
     name: "libstagefright_bufferpool@2.0.1",
     defaults: ["libstagefright_bufferpool@2.0-default"],
     vendor_available: true,
+    min_sdk_version: "29",
     // TODO: b/147147992
     double_loadable: true,
     cflags: [
