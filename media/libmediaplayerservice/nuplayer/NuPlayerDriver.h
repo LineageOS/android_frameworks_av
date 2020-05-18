@@ -133,6 +133,7 @@ private:
 
     MediaAnalyticsItem *mAnalyticsItem;
     uid_t mClientUid;
+    mutable Mutex mMetricsLock;
 
     bool mAtEOS;
     bool mLooping;
