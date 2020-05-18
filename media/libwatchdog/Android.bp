@@ -31,4 +31,5 @@ cc_library {
         },
     },
     apex_available: ["com.android.media"],
+    min_sdk_version: "29",
 }
