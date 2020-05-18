@@ -30,6 +30,12 @@ cc_fuzz {
     cflags: [
         "-DALAW",
     ],
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -41,4 +47,10 @@ cc_fuzz {
     static_libs: [
         "codecs_g711dec",
     ],
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
