@@ -15,6 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
+#include "hidl/HidlSupport.h"
 #define LOG_TAG "MediaCodec"
 #include <utils/Log.h>
 
@@ -37,6 +38,7 @@
 #include <cutils/properties.h>
 #include <gui/BufferQueue.h>
 #include <gui/Surface.h>
+#include <hidlmemory/FrameworkUtils.h>
 #include <mediadrm/ICrypto.h>
 #include <media/IOMX.h>
 #include <media/MediaCodecBuffer.h>
@@ -3431,19 +3433,42 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     sp<ABuffer> csd = *mCSD.begin();
     mCSD.erase(mCSD.begin());
     std::shared_ptr<C2Buffer> c2Buffer;
+    sp<hardware::HidlMemory> memory;
+    size_t offset = 0;
 
     if ((mFlags & kFlagUseBlockModel) && mOwnerName.startsWith("codec2::")) {
-        std::shared_ptr<C2LinearBlock> block =
-            FetchLinearBlock(csd->size(), {std::string{mComponentName.c_str()}});
-        C2WriteView view{block->map().get()};
-        if (view.error() != C2_OK) {
-            return -EINVAL;
+        if (mCrypto) {
+            constexpr size_t kInitialDealerCapacity = 1048576;  // 1MB
+            thread_local sp<MemoryDealer> sDealer = new MemoryDealer(
+                    kInitialDealerCapacity, "CSD(1MB)");
+            sp<IMemory> mem = sDealer->allocate(csd->size());
+            if (mem == nullptr) {
+                size_t newDealerCapacity = sDealer->getMemoryHeap()->getSize() * 2;
+                while (csd->size() * 2 > newDealerCapacity) {
+                    newDealerCapacity *= 2;
+                }
+                sDealer = new MemoryDealer(
+                        newDealerCapacity,
+                        AStringPrintf("CSD(%dMB)", newDealerCapacity / 1048576).c_str());
+                mem = sDealer->allocate(csd->size());
+            }
+            memcpy(mem->unsecurePointer(), csd->data(), csd->size());
+            ssize_t heapOffset;
+            memory = hardware::fromHeap(mem->getMemory(&heapOffset, nullptr));
+            offset += heapOffset;
+        } else {
+            std::shared_ptr<C2LinearBlock> block =
+                FetchLinearBlock(csd->size(), {std::string{mComponentName.c_str()}});
+            C2WriteView view{block->map().get()};
+            if (view.error() != C2_OK) {
+                return -EINVAL;
+            }
+            if (csd->size() > view.capacity()) {
+                return -EINVAL;
+            }
+            memcpy(view.base(), csd->data(), csd->size());
+            c2Buffer = C2Buffer::CreateLinearBuffer(block->share(0, csd->size(), C2Fence{}));
         }
-        if (csd->size() > view.capacity()) {
-            return -EINVAL;
-        }
-        memcpy(view.base(), csd->data(), csd->size());
-        c2Buffer = C2Buffer::CreateLinearBuffer(block->share(0, csd->size(), C2Fence{}));
     } else {
         const BufferInfo &info = mPortBuffers[kPortIndexInput][bufferIndex];
         const sp<MediaCodecBuffer> &codecInputData = info.mData;
@@ -3472,6 +3497,11 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
         sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
             new WrapperObject<std::shared_ptr<C2Buffer>>{c2Buffer}};
         msg->setObject("c2buffer", obj);
+        msg->setMessage("tunings", new AMessage);
+    } else if (memory) {
+        sp<WrapperObject<sp<hardware::HidlMemory>>> obj{
+            new WrapperObject<sp<hardware::HidlMemory>>{memory}};
+        msg->setObject("memory", obj);
         msg->setMessage("tunings", new AMessage);
     }
 
@@ -3590,6 +3620,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     } else if (msg->findObject("memory", &obj)) {
         CHECK(obj);
         memory = static_cast<WrapperObject<sp<hardware::HidlMemory>> *>(obj.get())->value;
+        CHECK(msg->findSize("offset", &offset));
     } else {
         CHECK(msg->findSize("offset", &offset));
     }
@@ -3688,7 +3719,7 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
 
     status_t err = OK;
-    if (hasCryptoOrDescrambler()) {
+    if (hasCryptoOrDescrambler() && !c2Buffer && !memory) {
         AString *errorDetailMsg;
         CHECK(msg->findPointer("errorDetailMsg", (void **)&errorDetailMsg));
 
