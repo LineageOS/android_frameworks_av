@@ -141,13 +141,11 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
     double volume;
     if (!item->getDouble(AUDIO_POWER_USAGE_PROP_VOLUME, &volume)) return;
 
-#ifdef STATSD
     (void)android::util::stats_write(android::util::AUDIO_POWER_USAGE_DATA_REPORTED,
                                          device,
                                          (int32_t)(duration_ns / NANOS_PER_SECOND),
                                          (float)volume,
                                          type);
-#endif
 }
 
 bool AudioPowerUsage::saveAsItem_l(
