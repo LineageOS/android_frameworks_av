@@ -323,7 +323,7 @@ private:
     struct Rect;
     struct MetaDataInternal;
     MetaDataInternal *mInternalData;
-#ifndef NO_IMEMORY
+#ifndef __ANDROID_VNDK__
     status_t writeToParcel(Parcel &parcel);
     status_t updateFromParcel(const Parcel &parcel);
 #endif
