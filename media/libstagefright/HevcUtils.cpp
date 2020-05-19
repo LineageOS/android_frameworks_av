@@ -83,6 +83,7 @@ status_t HevcParameterSets::addNalUnit(const uint8_t* data, size_t size) {
     }
 
     if (err != OK) {
+        ALOGE("error parsing VPS or SPS or PPS");
         return err;
     }
 
