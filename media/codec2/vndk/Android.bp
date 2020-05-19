@@ -7,6 +7,8 @@ cc_library_headers {
 
     // TODO: Remove this when this module is moved back to frameworks/av.
     vendor_available: true,
+
+    min_sdk_version: "29",
 }
 
 // !!!DO NOT DEPEND ON THIS SHARED LIBRARY DIRECTLY!!!
@@ -14,6 +16,7 @@ cc_library_headers {
 cc_library_shared {
     name: "libcodec2_vndk",
     vendor_available: true,
+    min_sdk_version: "29",
     // TODO: b/147147883
     double_loadable: true,
 
@@ -87,6 +90,8 @@ cc_defaults {
         "libcodec2_vndk",
         "libutils",
     ],
+
+    min_sdk_version: "29",
 }
 
 // public dependency for implementing Codec 2 framework utilities

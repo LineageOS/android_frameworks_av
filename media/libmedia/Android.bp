@@ -1,6 +1,8 @@
 cc_library_headers {
     name: "libmedia_headers",
     vendor_available: true,
+    min_sdk_version: "29",
+
     export_include_dirs: ["include"],
     header_libs: [
         "libbase_headers",
@@ -183,6 +185,8 @@ cc_library_shared {
 
 cc_library_static {
     name: "libmedia_midiiowrapper",
+
+    min_sdk_version: "29",
 
     srcs: ["MidiIoWrapper.cpp"],
 
