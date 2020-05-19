@@ -29,4 +29,11 @@ cc_fuzz {
     srcs: [
         "mp3_dec_fuzzer.cpp",
     ],
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
