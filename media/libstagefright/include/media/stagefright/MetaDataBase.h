@@ -239,6 +239,12 @@ enum {
 
     kKeyHapticChannelCount = 'hapC',
 
+    /* MediaRecorder.h, error notifications can represent track ids with 4 bits only.
+     * | track id | reserved |     error or info type     |
+     * 31         28         16                           0
+     */
+    kKey4BitTrackIds = '4bid',
+
     // Treat empty track as malformed for MediaRecorder.
     kKeyEmptyTrackMalFormed = 'nemt', // bool (int32_t)
 };
