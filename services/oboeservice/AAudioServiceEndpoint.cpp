@@ -90,14 +90,16 @@ bool AAudioServiceEndpoint::isStreamRegistered(audio_port_handle_t portHandle) {
 std::vector<android::sp<AAudioServiceStreamBase>>
         AAudioServiceEndpoint::disconnectRegisteredStreams() {
     std::vector<android::sp<AAudioServiceStreamBase>> streamsDisconnected;
-    std::lock_guard<std::mutex> lock(mLockStreams);
+    {
+        std::lock_guard<std::mutex> lock(mLockStreams);
+        mRegisteredStreams.swap(streamsDisconnected);
+    }
     mConnected.store(false);
-    for (const auto &stream : mRegisteredStreams) {
+    for (const auto &stream : streamsDisconnected) {
         ALOGD("%s() - stop and disconnect port %d", __func__, stream->getPortHandle());
         stream->stop();
         stream->disconnect();
     }
-    mRegisteredStreams.swap(streamsDisconnected);
     return streamsDisconnected;
 }
 
