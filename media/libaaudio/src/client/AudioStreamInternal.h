@@ -123,7 +123,9 @@ protected:
 
     aaudio_result_t stopCallback();
 
-    virtual void advanceClientToMatchServerPosition() = 0;
+    virtual void prepareBuffersForStart() {}
+
+    virtual void advanceClientToMatchServerPosition(int32_t serverMargin = 0) = 0;
 
     virtual void onFlushFromServer() {}
 
