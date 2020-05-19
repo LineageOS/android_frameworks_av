@@ -773,7 +773,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN);
         if (!useCaseAllowed) {
-            ALOGW("%s(%d): AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
+            ALOGD("%s(%d): AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
                   __func__, mPortId,
                   convertTransferToText(mTransfer));
             mFlags = (audio_input_flags_t) (mFlags & ~(AUDIO_INPUT_FLAG_FAST |
