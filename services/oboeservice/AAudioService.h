@@ -114,11 +114,6 @@ private:
     sp<aaudio::AAudioServiceStreamBase> convertHandleToServiceStream(
             aaudio::aaudio_handle_t streamHandle);
 
-    bool releaseStream(const sp<aaudio::AAudioServiceStreamBase> &serviceStream);
-
-    aaudio_result_t checkForPendingClose(const sp<aaudio::AAudioServiceStreamBase> &serviceStream,
-                                         aaudio_result_t defaultResult);
-
     android::AudioClient            mAudioClient;
 
     aaudio::AAudioStreamTracker     mStreamTracker;
