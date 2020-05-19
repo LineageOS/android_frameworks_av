@@ -1006,7 +1006,8 @@ private:
             hardware::camera::common::V1_0::TorchModeStatus status);
 
     // notify physical camera status when the physical camera is public.
-    void notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId);
+    void notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId,
+            SystemCameraKind deviceKind);
 
     // IBinder::DeathRecipient implementation
     virtual void        binderDied(const wp<IBinder> &who);
