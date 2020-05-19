@@ -467,10 +467,21 @@ void CameraService::onDeviceStatusChanged(const String8& id,
             logDeviceRemoved(idCombo,
                     String8::format("Device status changed to %d", newStatus));
         }
-
+        // Avoid calling getSystemCameraKind() with mStatusListenerLock held (b/141756275)
+        SystemCameraKind deviceKind = SystemCameraKind::PUBLIC;
+        if (getSystemCameraKind(id, &deviceKind) != OK) {
+            ALOGE("%s: Invalid camera id %s, skipping", __FUNCTION__, id.string());
+            return;
+        }
         String16 id16(id), physicalId16(physicalId);
         Mutex::Autolock lock(mStatusListenerLock);
         for (auto& listener : mListenerList) {
+            if (shouldSkipStatusUpdates(deviceKind, listener->isVendorListener(),
+                    listener->getListenerPid(), listener->getListenerUid())) {
+                ALOGV("Skipping discovery callback for system-only camera device %s",
+                        id.c_str());
+                continue;
+            }
             listener->getListener()->onPhysicalCameraStatusChanged(mapToInterface(newStatus),
                     id16, physicalId16);
         }
@@ -3757,13 +3768,13 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
 
             Mutex::Autolock lock(mStatusListenerLock);
 
-            notifyPhysicalCameraStatusLocked(mapToInterface(status), cameraId);
+            notifyPhysicalCameraStatusLocked(mapToInterface(status), cameraId, deviceKind);
 
             for (auto& listener : mListenerList) {
                 bool isVendorListener = listener->isVendorListener();
                 if (shouldSkipStatusUpdates(deviceKind, isVendorListener,
                         listener->getListenerPid(), listener->getListenerUid()) ||
-                    (isVendorListener && !supportsHAL3)) {
+                        (isVendorListener && !supportsHAL3)) {
                     ALOGV("Skipping discovery callback for system-only camera/HAL1 device %s",
                             cameraId.c_str());
                     continue;
@@ -3875,7 +3886,8 @@ status_t CameraService::setTorchStatusLocked(const String8& cameraId,
     return OK;
 }
 
-void CameraService::notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId) {
+void CameraService::notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId,
+        SystemCameraKind deviceKind) {
     Mutex::Autolock lock(mCameraStatesLock);
     for (const auto& state : mCameraStates) {
         std::vector<std::string> physicalCameraIds;
@@ -3891,6 +3903,12 @@ void CameraService::notifyPhysicalCameraStatusLocked(int32_t status, const Strin
 
         String16 id16(state.first), physicalId16(cameraId);
         for (auto& listener : mListenerList) {
+            if (shouldSkipStatusUpdates(deviceKind, listener->isVendorListener(),
+                    listener->getListenerPid(), listener->getListenerUid())) {
+                ALOGV("Skipping discovery callback for system-only camera device %s",
+                        cameraId.c_str());
+                continue;
+            }
             listener->getListener()->onPhysicalCameraStatusChanged(status,
                     id16, physicalId16);
         }
