@@ -171,7 +171,10 @@ status_t MediaMuxer::stop() {
         if (err != OK || mError != OK) {
             ALOGE("stop err: %d, mError:%d", err, mError);
         }
-        // Prioritize mError over err.
+        /* Prioritize mError over err as writer would have got stopped on any
+         * internal error and notified muxer already.  Clients might issue
+         * stop again later, and mWriter->stop() would return success.
+         */
         if (mError != OK) {
             err = mError;
         }
