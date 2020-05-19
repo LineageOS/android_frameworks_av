@@ -92,11 +92,11 @@ aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
 }
 
 // Stop the flow of data such that start() can resume with loss of data.
-aaudio_result_t AAudioServiceStreamMMAP::pause() {
+aaudio_result_t AAudioServiceStreamMMAP::pause_l() {
     if (!isRunning()) {
         return AAUDIO_OK;
     }
-    aaudio_result_t result = AAudioServiceStreamBase::pause();
+    aaudio_result_t result = AAudioServiceStreamBase::pause_l();
     // TODO put before base::pause()?
     if (!mInService) {
         (void) stopClient(mClientHandle);
@@ -104,11 +104,11 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     return result;
 }
 
-aaudio_result_t AAudioServiceStreamMMAP::stop() {
+aaudio_result_t AAudioServiceStreamMMAP::stop_l() {
     if (!isRunning()) {
         return AAUDIO_OK;
     }
-    aaudio_result_t result = AAudioServiceStreamBase::stop();
+    aaudio_result_t result = AAudioServiceStreamBase::stop_l();
     // TODO put before base::stop()?
     if (!mInService) {
         (void) stopClient(mClientHandle);
