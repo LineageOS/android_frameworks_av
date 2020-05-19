@@ -85,9 +85,9 @@ private:
     friend struct AHandlerReflector<MPEG4Writer>;
 
     enum {
-        kWhatSwitch                          = 'swch',
-        kWhatHandleIOError                   = 'ioer',
-        kWhatHandleFallocateError            = 'faer'
+        kWhatSwitch                  = 'swch',
+        kWhatIOError                 = 'ioer',
+        kWhatFallocateError          = 'faer'
     };
 
     int  mFd;
@@ -287,7 +287,8 @@ private:
     bool exceedsFileDurationLimit();
     bool approachingFileSizeLimit();
     bool isFileStreamable() const;
-    void trackProgressStatus(size_t trackId, int64_t timeUs, status_t err = OK);
+    void trackProgressStatus(uint32_t trackId, int64_t timeUs, status_t err = OK);
+    status_t validateAllTracksId(bool akKey4BitTrackIds);
     void writeCompositionMatrix(int32_t degrees);
     void writeMvhdBox(int64_t durationUs);
     void writeMoovBox(int64_t durationUs);
@@ -310,7 +311,7 @@ private:
      */
     bool preAllocate(uint64_t wantSize);
     /*
-     * Truncate file as per the size used for meta data and actual data in a session.
+     * Truncate file as per the size used for metadata and actual data in a session.
      */
     bool truncatePreAllocation();
 
@@ -327,7 +328,7 @@ private:
     void writeFileLevelMetaBox();
 
     void sendSessionSummary();
-    void release();
+    status_t release();
     status_t switchFd();
     status_t reset(bool stopSource = true);
 
