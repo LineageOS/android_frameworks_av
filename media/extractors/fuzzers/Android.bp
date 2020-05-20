@@ -80,6 +80,13 @@ cc_fuzz {
     ],
 
     dictionary: "mp4_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -109,6 +116,13 @@ cc_fuzz {
         "libbinder_ndk",
         "libbase",
     ],
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -137,6 +151,13 @@ cc_fuzz {
     ],
 
     dictionary: "amr_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -169,6 +190,13 @@ cc_fuzz {
     ],
 
     dictionary: "mkv_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -199,6 +227,13 @@ cc_fuzz {
     ],
 
     dictionary: "ogg_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -242,6 +277,13 @@ cc_fuzz {
     ],
 
     dictionary: "mpeg2ps_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -281,6 +323,13 @@ cc_fuzz {
     ],
 
     dictionary: "mpeg2ts_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -309,6 +358,13 @@ cc_fuzz {
         "libmediandk",
         "libbinder",
     ],
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -336,6 +392,13 @@ cc_fuzz {
         "libmediandk",
         "libbinder",
     ],
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -368,4 +431,11 @@ cc_fuzz {
     ],
 
     dictionary: "flac_extractor_fuzzer.dict",
+
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }

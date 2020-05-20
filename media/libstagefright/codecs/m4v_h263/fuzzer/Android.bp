@@ -37,6 +37,12 @@ cc_fuzz {
             enabled: false,
         },
     },
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
 }
 
 cc_fuzz {
@@ -56,5 +62,11 @@ cc_fuzz {
         darwin: {
             enabled: false,
         },
+    },
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
     },
 }
