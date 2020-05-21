@@ -21,7 +21,6 @@
 #include <gtest/gtest.h>
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
-#include <fstream>
 
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
@@ -38,12 +37,6 @@ using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
 #include "media_c2_video_hidl_test_common.h"
-
-struct FrameInfo {
-    int bytesCount;
-    uint32_t flags;
-    int64_t timestamp;
-};
 
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kDecodeTestParameters;
@@ -111,6 +104,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         mEos = false;
         mFramesReceived = 0;
         mTimestampUs = 0u;
+        mWorkResult = C2_OK;
         mTimestampDevTest = false;
         if (mCompName == unknown_comp) mDisableTest = true;
 
@@ -141,6 +135,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                 // For decoder components current timestamp always exceeds
                 // previous timestamp
                 typedef std::unique_lock<std::mutex> ULock;
+                mWorkResult |= work->result;
                 bool codecConfig = ((work->worklets.front()->output.flags &
                                      C2FrameData::FLAG_CODEC_CONFIG) != 0);
                 if (!codecConfig && !work->worklets.front()->output.buffers.empty()) {
@@ -170,7 +165,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                         }
                     }
                 }
-                bool mCsd;
+                bool mCsd = false;
                 workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
                          mEos, mCsd, mFramesReceived);
                 (void)mCsd;
@@ -200,6 +195,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
     standardComp mCompName;
+
+    int32_t mWorkResult;
     uint32_t mFramesReceived;
     C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2BlockPool> mLinearPool;
@@ -463,38 +460,27 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
 
     uint32_t streamIndex = std::stoi(std::get<2>(GetParam()));
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
+    mTimestampDevTest = true;
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
+
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
+
     GetURLForComponent(mCompName, mURL, info, streamIndex);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true) << mURL << " - file not found";
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    mTimestampDevTest = true;
     mFlushedIndices.clear();
     mTimestampUslist.clear();
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        bool codecConfig = flags ? ((1 << (flags - 1)) & C2FrameData::FLAG_CODEC_CONFIG) != 0 : 0;
-        bool nonDisplayFrame = ((flags & FLAG_NON_DISPLAY_FRAME) != 0);
-        if (mTimestampDevTest && !codecConfig && !nonDisplayFrame)
-            mTimestampUslist.push_back(timestamp);
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
 
     ASSERT_EQ(mComponent->start(), C2_OK);
     // Reset total no of frames received
     mFramesReceived = 0;
     mTimestampUs = 0;
     ALOGV("mURL : %s", mURL);
+    std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -504,7 +490,7 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     // If EOS is not sent, sending empty input with EOS flag
     size_t infoSize = Info.size();
     if (!signalEOS) {
-        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1);
         ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
                                                 C2FrameData::FLAG_END_OF_STREAM, false));
         infoSize += 1;
@@ -513,7 +499,7 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     // consumed
     if (!mEos) {
         ALOGV("Waiting for input consumption");
-        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
     }
 
     eleStream.close();
@@ -525,6 +511,7 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 // Adaptive Test
@@ -622,7 +609,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ALOGV("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
     if (mFramesReceived != ((Info.size()) + 1)) {
         ALOGE("Input buffer count and Output buffer count mismatch");
@@ -631,6 +618,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     }
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 // thumbnail test
@@ -639,26 +627,16 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL, info);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
 
+    uint32_t flags = 0;
     for (size_t i = 0; i < MAX_ITERATIONS; i++) {
         ASSERT_EQ(mComponent->start(), C2_OK);
 
@@ -671,18 +649,21 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
             if (Info[j].flags) flags = 1u << (Info[j].flags - 1);
 
         } while (!(flags & SYNC_FRAME));
+
+        std::ifstream eleStream;
         eleStream.open(mURL, std::ifstream::binary);
         ASSERT_EQ(eleStream.is_open(), true);
         ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                               mFlushedIndices, mLinearPool, eleStream, &Info, 0,
                                               j + 1));
-        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
         eleStream.close();
         EXPECT_GE(mFramesReceived, 1U);
         ASSERT_EQ(mEos, true);
         ASSERT_EQ(mComponent->stop(), C2_OK);
     }
     ASSERT_EQ(mComponent->release(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2VideoDecHidlTest, EOSTest) {
@@ -723,72 +704,59 @@ TEST_P(Codec2VideoDecHidlTest, EOSTest) {
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mWorkQueue.size(), (size_t)MAX_INPUT_BUFFERS);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mWorkResult, C2_OK);
 }
 
 TEST_P(Codec2VideoDecHidlTest, FlushTest) {
     description("Tests Flush calls");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
-    typedef std::unique_lock<std::mutex> ULock;
+
     ASSERT_EQ(mComponent->start(), C2_OK);
+
     char mURL[512], info[512];
-    std::ifstream eleStream, eleInfo;
+    android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
     GetURLForComponent(mCompName, mURL, info);
 
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true);
-    android::Vector<FrameInfo> Info;
-    int bytesCount = 0;
-    uint32_t flags = 0;
-    uint32_t timestamp = 0;
     mFlushedIndices.clear();
-    while (1) {
-        if (!(eleInfo >> bytesCount)) break;
-        eleInfo >> flags;
-        eleInfo >> timestamp;
-        Info.push_back({bytesCount, flags, timestamp});
-    }
-    eleInfo.close();
+
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
 
     ALOGV("mURL : %s", mURL);
-    eleStream.open(mURL, std::ifstream::binary);
-    ASSERT_EQ(eleStream.is_open(), true);
-    // Decode 128 frames and flush. here 128 is chosen to ensure there is a key
-    // frame after this so that the below section can be covered for all
-    // components
-    uint32_t numFramesFlushed = 128;
-    ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
-                                          mFlushedIndices, mLinearPool, eleStream, &Info, 0,
-                                          numFramesFlushed, false));
+
     // flush
     std::list<std::unique_ptr<C2Work>> flushedWork;
     c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
 
-    {
-        // Update mFlushedIndices based on the index received from flush()
-        ULock l(mQueueLock);
-        for (std::unique_ptr<C2Work>& work : flushedWork) {
-            ASSERT_NE(work, nullptr);
-            auto frameIndexIt = std::find(mFlushedIndices.begin(), mFlushedIndices.end(),
-                                          work->input.ordinal.frameIndex.peeku());
-            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
-                mFlushedIndices.erase(frameIndexIt);
-                work->input.buffers.clear();
-                work->worklets.clear();
-                mWorkQueue.push_back(std::move(work));
-            }
-        }
-    }
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true);
+    // Decode 30 frames and flush. here 30 is chosen to ensure there is a key
+    // frame after this so that the below section can be covered for all
+    // components
+    uint32_t numFramesFlushed = FLUSH_INTERVAL;
+    ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mLinearPool, eleStream, &Info, 0,
+                                          numFramesFlushed, false));
+    // flush
+    err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    ASSERT_EQ(err, C2_OK);
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                           (size_t)MAX_INPUT_BUFFERS - flushedWork.size());
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
     // Seek to next key frame and start decoding till the end
-    mFlushedIndices.clear();
     int index = numFramesFlushed;
     bool keyFrame = false;
-    flags = 0;
+    uint32_t flags = 0;
     while (index < (int)Info.size()) {
         if (Info[index].flags) flags = 1u << (Info[index].flags - 1);
         if ((flags & SYNC_FRAME) == SYNC_FRAME) {
@@ -807,25 +775,13 @@ TEST_P(Codec2VideoDecHidlTest, FlushTest) {
     eleStream.close();
     err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
-    {
-        // Update mFlushedIndices based on the index received from flush()
-        ULock l(mQueueLock);
-        for (std::unique_ptr<C2Work>& work : flushedWork) {
-            ASSERT_NE(work, nullptr);
-            uint64_t frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt =
-                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
-                mFlushedIndices.erase(frameIndexIt);
-                work->input.buffers.clear();
-                work->worklets.clear();
-                mWorkQueue.push_back(std::move(work));
-            }
-        }
-    }
-    ASSERT_EQ(mFlushedIndices.empty(), true);
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                           (size_t)MAX_INPUT_BUFFERS - flushedWork.size());
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+    // TODO: (b/154671521)
+    // Add assert for mWorkResult
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
@@ -880,7 +836,7 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
     // consumed
     if (!mEos) {
         ALOGV("Waiting for input consumption");
-        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
     }
 
     eleStream.close();
