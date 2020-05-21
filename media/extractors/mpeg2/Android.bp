@@ -1,4 +1,7 @@
 cc_library {
+    name: "libmpeg2extractor",
+
+    defaults: ["extractor-defaults"],
 
     srcs: [
         "ExtractorBundle.cpp",
@@ -6,21 +9,10 @@ cc_library {
         "MPEG2TSExtractor.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright",
-        "frameworks/av/media/libstagefright/include",
-    ],
-
     shared_libs: [
-        "android.hardware.cas@1.0",
-        "android.hardware.cas.native@1.0",
-        "android.hidl.token@1.0-utils",
-        "android.hidl.allocator@1.0",
+        "libcgrouprc#29",
+        "libvndksupport#29",
         "libcrypto",
-        "libhidlmemory",
-        "libhidlbase",
-        "liblog",
-        "libmediandk",
     ],
 
     header_libs: [
@@ -31,31 +23,27 @@ cc_library {
     ],
 
     static_libs: [
+        "android.hardware.cas@1.0",
+        "android.hardware.cas.native@1.0",
+        "android.hidl.allocator@1.0",
+        "android.hidl.memory@1.0",
+        "android.hidl.token@1.0",
+        "android.hidl.token@1.0-utils",
+        "libbase",
+        "libcutils",
+        "libhidlbase",
+        "libhidlmemory",
+        "libjsoncpp",
+        "libprocessgroup",
+        "libstagefright_esds",
         "libstagefright_foundation_without_imemory",
+        "libstagefright_mpeg2extractor",
         "libstagefright_mpeg2support",
         "libutils",
-        "libstagefright_mpeg2extractor",
-        "libstagefright_esds",
     ],
 
-    name: "libmpeg2extractor",
-    relative_install_path: "extractors",
-
-    compile_multilib: "first",
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-        "-fvisibility=hidden",
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
     ],
-    version_script: "exports.lds",
-
-    sanitize: {
-        cfi: true,
-        misc_undefined: [
-            "unsigned-integer-overflow",
-            "signed-integer-overflow",
-        ],
-    },
-
 }
