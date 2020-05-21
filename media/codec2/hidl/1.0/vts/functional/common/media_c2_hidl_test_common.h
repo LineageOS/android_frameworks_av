@@ -25,10 +25,13 @@
 #include <gtest/gtest.h>
 #include <hidl/HidlSupport.h>
 #include <chrono>
+#include <fstream>
 
+#define FLAG_NON_DISPLAY_FRAME (1 << 4)
 #define MAX_RETRY 20
 #define TIME_OUT 400ms
 #define MAX_INPUT_BUFFERS 8
+#define FLUSH_INTERVAL 30
 
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
@@ -38,6 +41,12 @@ using ::android::hardware::Void;
 using namespace ::std::chrono;
 
 static std::vector<std::tuple<std::string, std::string>> kTestParameters;
+
+struct FrameInfo {
+    int bytesCount;
+    uint32_t flags;
+    int64_t timestamp;
+};
 
 /*
  * Handle Callback functions onWorkDone(), onTripped(),
@@ -123,4 +132,10 @@ void workDone(const std::shared_ptr<android::Codec2Client::Component>& component
 
 int64_t getNowUs();
 
+int32_t populateInfoVector(std::string info, android::Vector<FrameInfo>* frameInfo,
+                           bool timestampDevTest, std::list<uint64_t>* timestampUslist);
+
+void verifyFlushOutput(std::list<std::unique_ptr<C2Work>>& flushedWork,
+                       std::list<std::unique_ptr<C2Work>>& workQueue,
+                       std::list<uint64_t>& flushedIndices, std::mutex& queueLock);
 #endif  // MEDIA_C2_HIDL_TEST_COMMON_H
