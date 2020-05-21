@@ -1,5 +1,6 @@
 cc_defaults {
     name: "libmp4extractor_defaults",
+    defaults: ["extractor-defaults_no-sanitizer"],
 
     srcs: [
         "AC4Parser.cpp",
@@ -9,34 +10,15 @@ cc_defaults {
         "SampleTable.cpp",
     ],
 
-    include_dirs: [
-        "frameworks/av/media/libstagefright/",
-    ],
-
-    shared_libs: [
-        "liblog",
-        "libmediandk"
-    ],
-
     static_libs: [
         "libstagefright_esds",
         "libstagefright_foundation",
         "libstagefright_id3",
         "libutils",
     ],
-
-    cflags: [
-        "-Werror",
-        "-Wall",
-        "-fvisibility=hidden",
-    ],
-    version_script: "exports.lds",
-    relative_install_path: "extractors",
-    compile_multilib: "first",
 }
 
 cc_library {
-
 
     name: "libmp4extractor",
     defaults: ["libmp4extractor_defaults"],
