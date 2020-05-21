@@ -1506,25 +1506,21 @@ void MPEG4Writer::addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer) {
 void MPEG4Writer::addLengthPrefixedSample_l(MediaBuffer *buffer) {
     size_t length = buffer->range_length();
     if (mUse4ByteNalLength) {
-        uint8_t x = length >> 24;
-        writeOrPostError(mFd, &x, 1);
-        x = (length >> 16) & 0xff;
-        writeOrPostError(mFd, &x, 1);
-        x = (length >> 8) & 0xff;
-        writeOrPostError(mFd, &x, 1);
-        x = length & 0xff;
-        writeOrPostError(mFd, &x, 1);
-
+        uint8_t x[4];
+        x[0] = length >> 24;
+        x[1] = (length >> 16) & 0xff;
+        x[2] = (length >> 8) & 0xff;
+        x[3] = length & 0xff;
+        writeOrPostError(mFd, &x, 4);
         writeOrPostError(mFd, (const uint8_t*)buffer->data() + buffer->range_offset(), length);
-
         mOffset += length + 4;
     } else {
         CHECK_LT(length, 65536u);
 
-        uint8_t x = length >> 8;
-        writeOrPostError(mFd, &x, 1);
-        x = length & 0xff;
-        writeOrPostError(mFd, &x, 1);
+        uint8_t x[2];
+        x[0] = length >> 8;
+        x[1] = length & 0xff;
+        writeOrPostError(mFd, &x, 2);
         writeOrPostError(mFd, (const uint8_t*)buffer->data() + buffer->range_offset(), length);
         mOffset += length + 2;
     }
