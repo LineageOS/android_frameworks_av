@@ -2,6 +2,12 @@ cc_library_headers {
     name: "libstagefright_headers",
     export_include_dirs: ["include"],
     vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
     host_supported: true,
     target: {
         darwin: {
@@ -12,6 +18,11 @@ cc_library_headers {
 
 cc_library_static {
     name: "libstagefright_esds",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
 
     srcs: ["ESDS.cpp"],
 
@@ -33,6 +44,11 @@ cc_library_static {
 
 cc_library_static {
     name: "libstagefright_metadatautils",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
 
     srcs: ["MetaDataUtils.cpp"],
 
@@ -91,6 +107,11 @@ cc_library_shared {
 
 cc_library_static {
     name: "libstagefright_mpeg2extractor",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+    ],
+    min_sdk_version: "29",
 
     srcs: [
         "Utils.cpp",
