@@ -18,6 +18,7 @@
 
 #include <any>
 #include <map>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <variant>
@@ -81,6 +82,8 @@ private:
             , mCreationTime(time)
             , mLastModificationTime(time)
         {
+            (void)mCreationTime; // suppress unused warning.
+
             // allowUid allows an untrusted client with a matching uid to set properties
             // in this key.
             // If allowUid == (uid_t)-1, no untrusted client may set properties in the key.
@@ -209,7 +212,7 @@ private:
 
         const std::string mKey;
         const uid_t mAllowUid;
-        const int64_t mCreationTime __unused;
+        const int64_t mCreationTime;
 
         int64_t mLastModificationTime;
         std::map<std::string /* property */, PropertyHistory> mPropertyMap;
@@ -442,7 +445,7 @@ public:
                 ++it) {
             if (ll <= 0) break;
             if (prefix != nullptr && !startsWith(it->first, prefix)) break;
-            std::lock_guard lock(getLockForKey(it->first));
+            std::lock_guard lock2(getLockForKey(it->first));
             auto [s, l] = it->second->dump(ll, sinceNs);
             ss << s;
             ll -= l;

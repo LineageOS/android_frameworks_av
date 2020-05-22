@@ -32,7 +32,8 @@
 
 namespace android {
 
-using namespace mediametrics;
+using mediametrics::Item;
+using mediametrics::startsWith;
 
 // individual records kept in memory: age or count
 // age: <= 28 hours (1 1/6 days)
@@ -63,7 +64,7 @@ nsecs_t MediaMetricsService::roundTime(nsecs_t timeNs)
 bool MediaMetricsService::useUidForPackage(
         const std::string& package, const std::string& installer)
 {
-    if (strchr(package.c_str(), '.') == NULL) {
+    if (strchr(package.c_str(), '.') == nullptr) {
         return false;  // not of form 'com.whatever...'; assume internal and ok
     } else if (strncmp(package.c_str(), "android.", 8) == 0) {
         return false;  // android.* packages are assumed fine
@@ -203,9 +204,9 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
 
     // Overwrite package name and version if the caller was untrusted or empty
     if (!isTrusted || item->getPkgName().empty()) {
-        const uid_t uid = item->getUid();
+        const uid_t uidItem = item->getUid();
         const auto [ pkgName, version ] =
-                MediaMetricsService::getSanitizedPackageNameAndVersionCode(uid);
+                MediaMetricsService::getSanitizedPackageNameAndVersionCode(uidItem);
         item->setPkgName(pkgName);
         item->setPkgVersionCode(version);
     }
@@ -320,7 +321,7 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
                 String8 value(args[i]);
                 char *endp;
                 const char *p = value.string();
-                long long sec = strtoll(p, &endp, 10);
+                const auto sec = (int64_t)strtoll(p, &endp, 10);
                 if (endp == p || *endp != '\0' || sec == 0) {
                     sinceNs = 0;
                 } else if (sec < 0) {

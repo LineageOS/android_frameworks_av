@@ -25,9 +25,9 @@
 #include <binder/ProcessState.h>
 #include <mediautils/LimitProcessMemory.h>
 
-int main(int argc __unused, char **argv __unused)
+int main(int argc __unused, char **argv)
 {
-    using namespace android;
+    using namespace android; // NOLINT (clang-tidy)
 
     limitProcessMemory(
         "media.metrics.maxmem", /* property that defines limit */
@@ -39,7 +39,8 @@ int main(int argc __unused, char **argv __unused)
     // to match the service name
     // we're replacing "/system/bin/mediametrics" with "media.metrics"
     // we add a ".", but discard the path components: we finish with a shorter string
-    strcpy(argv[0], MediaMetricsService::kServiceName);
+    const size_t origSize = strlen(argv[0]) + 1; // include null termination.
+    strlcpy(argv[0], MediaMetricsService::kServiceName, origSize);
 
     defaultServiceManager()->addService(
             String16(MediaMetricsService::kServiceName), new MediaMetricsService());

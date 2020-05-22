@@ -43,22 +43,22 @@ namespace android {
 // mediadrm
 bool statsd_mediadrm(const mediametrics::Item *item)
 {
-    if (item == NULL) return false;
+    if (item == nullptr) return false;
 
     const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
 
-    char *vendor = NULL;
+    char *vendor = nullptr;
     (void) item->getCString("vendor", &vendor);
-    char *description = NULL;
+    char *description = nullptr;
     (void) item->getCString("description", &description);
-    char *serialized_metrics = NULL;
+    char *serialized_metrics = nullptr;
     (void) item->getCString("serialized_metrics", &serialized_metrics);
 
     if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics ? serialized_metrics : NULL,
+        android::util::BytesField bf_serialized(serialized_metrics ? serialized_metrics : nullptr,
                                                 serialized_metrics ? strlen(serialized_metrics)
                                                                    : 0);
         android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
@@ -80,18 +80,18 @@ bool statsd_mediadrm(const mediametrics::Item *item)
 // widevineCDM
 bool statsd_widevineCDM(const mediametrics::Item *item)
 {
-    if (item == NULL) return false;
+    if (item == nullptr) return false;
 
     const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
     std::string pkgName = item->getPkgName();
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
 
-    char *serialized_metrics = NULL;
+    char *serialized_metrics = nullptr;
     (void) item->getCString("serialized_metrics", &serialized_metrics);
 
     if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics ? serialized_metrics : NULL,
+        android::util::BytesField bf_serialized(serialized_metrics ? serialized_metrics : nullptr,
                                                 serialized_metrics ? strlen(serialized_metrics)
                                                                    : 0);
         android::util::stats_write(android::util::MEDIAMETRICS_DRM_WIDEVINE_REPORTED,
@@ -111,7 +111,7 @@ bool statsd_widevineCDM(const mediametrics::Item *item)
 bool statsd_drmmanager(const mediametrics::Item *item)
 {
     using namespace std::string_literals;
-    if (item == NULL) return false;
+    if (item == nullptr) return false;
 
     if (!enabled_statsd) {
         ALOGV("NOT sending: drmmanager data");
@@ -123,13 +123,13 @@ bool statsd_drmmanager(const mediametrics::Item *item)
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
 
-    char *plugin_id = NULL;
+    char *plugin_id = nullptr;
     (void) item->getCString("plugin_id", &plugin_id);
-    char *description = NULL;
+    char *description = nullptr;
     (void) item->getCString("description", &description);
     int32_t method_id = -1;
     (void) item->getInt32("method_id", &method_id);
-    char *mime_types = NULL;
+    char *mime_types = nullptr;
     (void) item->getCString("mime_types", &mime_types);
 
     // Corresponds to the 13 APIs tracked in the MediametricsDrmManagerReported statsd proto

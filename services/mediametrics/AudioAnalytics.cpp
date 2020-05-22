@@ -594,4 +594,4 @@ void AudioAnalytics::DeviceConnection::expire() {
 #endif
 }
 
-} // namespace android
+} // namespace android::mediametrics
