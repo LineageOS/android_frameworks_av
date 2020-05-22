@@ -20,6 +20,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <algorithm>
+#include <map>
 #include <memory>
 #include <stdint.h>
 #include <stdlib.h>
@@ -204,6 +205,7 @@ private:
         Vector<size_t> encryptedsizes;
     };
     Vector<Sample> mCurrentSamples;
+    std::map<off64_t, uint32_t> mDrmOffsets;
 
     MPEG4Source(const MPEG4Source &);
     MPEG4Source &operator=(const MPEG4Source &);
@@ -5153,6 +5155,9 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
                     if (chunk_type == FOURCC("moof")) {
                         mNextMoofOffset = *offset;
                         break;
+                    } else if (chunk_type == FOURCC("mdat")) {
+                        parseChunk(offset);
+                        continue;
                     } else if (chunk_size == 0) {
                         break;
                     }
@@ -5214,6 +5219,22 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
             // parse DRM info if present
             ALOGV("MPEG4Source::parseChunk mdat");
             // if saiz/saoi was previously observed, do something with the sampleinfos
+            status_t err = OK;
+            auto kv = mDrmOffsets.lower_bound(*offset);
+            if (kv != mDrmOffsets.end()) {
+                auto drmoffset = kv->first;
+                auto flags = kv->second;
+                mDrmOffsets.erase(kv);
+                ALOGV("mdat chunk_size %" PRIu64 " drmoffset %" PRId64 " offset %" PRId64,
+                        chunk_size, drmoffset, *offset);
+                if (chunk_size >= drmoffset - *offset) {
+                    err = parseClearEncryptedSizes(drmoffset, false, flags,
+                        chunk_size - (drmoffset - *offset));
+                }
+            }
+            if (err != OK) {
+                return err;
+            }
             *offset += chunk_size;
             break;
         }
@@ -5395,8 +5416,10 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
     off64_t drmoffset = mCurrentSampleInfoOffsets[0]; // from moof
 
     drmoffset += mCurrentMoofOffset;
+    mDrmOffsets[drmoffset] = flags;
+    ALOGV("saio drmoffset %" PRId64 " flags %u", drmoffset, flags);
 
-    return parseClearEncryptedSizes(drmoffset, false, 0, mCurrentMoofSize);
+    return OK;
 }
 
 status_t MPEG4Source::parseClearEncryptedSizes(
