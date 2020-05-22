@@ -34,8 +34,6 @@ NuPlayer::NuPlayerStreamListener::NuPlayerStreamListener(
       mTargetHandler(targetHandler),
       mEOS(false),
       mSendDataNotification(true) {
-    mSource->setListener(this);
-
     mMemoryDealer = new MemoryDealer(kNumBuffers * kBufferSize);
     for (size_t i = 0; i < kNumBuffers; ++i) {
         sp<IMemory> mem = mMemoryDealer->allocate(kBufferSize);

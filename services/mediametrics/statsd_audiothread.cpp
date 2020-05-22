@@ -39,7 +39,7 @@ namespace android {
 
 bool statsd_audiothread(const mediametrics::Item *item)
 {
-    if (item == NULL) return false;
+    if (item == nullptr) return false;
 
     // these go into the statsd wrapper
     const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
@@ -204,4 +204,4 @@ bool statsd_audiothread(const mediametrics::Item *item)
     return true;
 }
 
-};
+} // namespace android
