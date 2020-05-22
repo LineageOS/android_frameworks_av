@@ -492,7 +492,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     // If EOS is not sent, sending empty input with EOS flag
     inputFrames += ENC_NUM_FRAMES;
     if (!signalEOS) {
-        ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue, 1);
         ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
                                                 C2FrameData::FLAG_END_OF_STREAM, false));
         inputFrames += 1;
@@ -501,7 +501,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ALOGD("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
     eleStream.close();
     if (mFramesReceived != inputFrames) {
@@ -520,6 +520,9 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+
+    // TODO: (b/155534991)
+    // Add assert for mFailedWorkReceived
 }
 
 TEST_P(Codec2VideoEncHidlTest, EOSTest) {
@@ -560,13 +563,13 @@ TEST_P(Codec2VideoEncHidlTest, EOSTest) {
     }
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
+    ASSERT_EQ(mFailedWorkReceived, 0);
 }
 
 TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     description("Test Request for flush");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    typedef std::unique_lock<std::mutex> ULock;
     char mURL[512];
     int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
     int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
@@ -587,9 +590,17 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ALOGV("mURL : %s", mURL);
+    // flush
+    std::list<std::unique_ptr<C2Work>> flushedWork;
+    c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    ASSERT_EQ(err, C2_OK);
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+
     ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
-                                          numFramesFlushed, nWidth, nHeight));
+                                          numFramesFlushed, nWidth, nHeight, false, false));
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config succeeded
     // In this cases, we skip encoding the input stream
@@ -599,29 +610,14 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
         return;
     }
 
-    std::list<std::unique_ptr<C2Work>> flushedWork;
-    c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+    // flush
+    err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
-    uint64_t frameIndex;
-    {
-        // Update mFlushedIndices based on the index received from flush()
-        ULock l(mQueueLock);
-        for (std::unique_ptr<C2Work>& work : flushedWork) {
-            ASSERT_NE(work, nullptr);
-            frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt =
-                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
-                mFlushedIndices.erase(frameIndexIt);
-                work->input.buffers.clear();
-                work->worklets.clear();
-                mWorkQueue.push_back(std::move(work));
-            }
-        }
-    }
-    mFlushedIndices.clear();
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                           (size_t)MAX_INPUT_BUFFERS - flushedWork.size());
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
     ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
                                           numFramesFlushed, numFrames - numFramesFlushed, nWidth,
@@ -638,25 +634,13 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
 
     err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
     ASSERT_EQ(err, C2_OK);
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
-                                                   (size_t)MAX_INPUT_BUFFERS - flushedWork.size()));
-    {
-        // Update mFlushedIndices based on the index received from flush()
-        ULock l(mQueueLock);
-        for (std::unique_ptr<C2Work>& work : flushedWork) {
-            ASSERT_NE(work, nullptr);
-            frameIndex = work->input.ordinal.frameIndex.peeku();
-            std::list<uint64_t>::iterator frameIndexIt =
-                    std::find(mFlushedIndices.begin(), mFlushedIndices.end(), frameIndex);
-            if (!mFlushedIndices.empty() && (frameIndexIt != mFlushedIndices.end())) {
-                mFlushedIndices.erase(frameIndexIt);
-                work->input.buffers.clear();
-                work->worklets.clear();
-                mWorkQueue.push_back(std::move(work));
-            }
-        }
-    }
-    ASSERT_EQ(mFlushedIndices.empty(), true);
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                           (size_t)MAX_INPUT_BUFFERS - flushedWork.size());
+    ASSERT_NO_FATAL_FAILURE(
+            verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+    // TODO: (b/154671521)
+    // Add assert for mFailedWorkReceived
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
@@ -691,7 +675,7 @@ TEST_P(Codec2VideoEncHidlTest, InvalidBufferTest) {
     // blocking call to ensures application to Wait till all the inputs are
     // consumed
     ALOGD("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
     if (mFramesReceived != 3) {
         std::cout << "[   WARN   ] Component didn't receive all buffers back \n";
@@ -746,7 +730,7 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     }
 
     ALOGD("Waiting for input consumption");
-    ASSERT_NO_FATAL_FAILURE(waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue));
+    waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
