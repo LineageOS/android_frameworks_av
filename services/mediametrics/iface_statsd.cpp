@@ -71,7 +71,7 @@ static constexpr struct statsd_hooks statsd_handlers[] =
 
 // give me a record, i'll look at the type and upload appropriately
 bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item) {
-    if (item == NULL) return false;
+    if (item == nullptr) return false;
 
     // get the key
     std::string key = item->getKey();
