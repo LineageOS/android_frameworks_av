@@ -3036,20 +3036,21 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             int32_t async = 0;
             if (msg->findInt32("async", &async) && async) {
-                if ((mState ==  CONFIGURED || mState == STARTED || mState == FLUSHED)
-                       && mSurface != NULL) {
+                if (mSurface != NULL) {
                     if (!mReleaseSurface) {
                         mReleaseSurface.reset(new ReleaseSurface);
                     }
-                    status_t err = connectToSurface(mReleaseSurface->getSurface());
-                    ALOGW_IF(err != OK, "error connecting to release surface: err = %d", err);
-                    if (err == OK && !(mFlags & kFlagUsesSoftwareRenderer)) {
-                        err = mCodec->setSurface(mReleaseSurface->getSurface());
-                        ALOGW_IF(err != OK, "error setting release surface: err = %d", err);
-                    }
-                    if (err == OK) {
-                        (void)disconnectFromSurface();
-                        mSurface = mReleaseSurface->getSurface();
+                    if (mSurface != mReleaseSurface->getSurface()) {
+                        status_t err = connectToSurface(mReleaseSurface->getSurface());
+                        ALOGW_IF(err != OK, "error connecting to release surface: err = %d", err);
+                        if (err == OK && !(mFlags & kFlagUsesSoftwareRenderer)) {
+                            err = mCodec->setSurface(mReleaseSurface->getSurface());
+                            ALOGW_IF(err != OK, "error setting release surface: err = %d", err);
+                        }
+                        if (err == OK) {
+                            (void)disconnectFromSurface();
+                            mSurface = mReleaseSurface->getSurface();
+                        }
                     }
                 }
             }
