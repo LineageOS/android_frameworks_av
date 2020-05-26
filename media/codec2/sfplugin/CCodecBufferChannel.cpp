@@ -1402,6 +1402,7 @@ void CCodecBufferChannel::stop() {
     if (mInputSurface != nullptr) {
         mInputSurface.reset();
     }
+    mPipelineWatcher.lock()->flush();
 }
 
 void CCodecBufferChannel::reset() {
@@ -1409,6 +1410,7 @@ void CCodecBufferChannel::reset() {
     {
         Mutexed<Input>::Locked input(mInput);
         input->buffers.reset(new DummyInputBuffers(""));
+        input->extraBuffers.flush();
     }
     {
         Mutexed<Output>::Locked output(mOutput);
@@ -1425,6 +1427,8 @@ void CCodecBufferChannel::release() {
         blockPools->inputPool.reset();
         blockPools->outputPoolIntf.reset();
     }
+    setCrypto(nullptr);
+    setDescrambler(nullptr);
 }
 
 
