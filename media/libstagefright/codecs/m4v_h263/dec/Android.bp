@@ -1,6 +1,11 @@
 cc_library_static {
     name: "libstagefright_m4vh263dec",
     vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
     shared_libs: ["liblog"],
 
     srcs: [
