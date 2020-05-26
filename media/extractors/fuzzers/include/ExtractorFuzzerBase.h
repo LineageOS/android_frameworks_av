@@ -24,10 +24,13 @@
 #include <media/DataSource.h>
 #include <media/MediaExtractorPluginHelper.h>
 #include <media/stagefright/MediaBufferGroup.h>
+#include <vector>
 
 extern "C" {
 android::ExtractorDef GETEXTRACTORDEF();
 }
+
+constexpr int32_t kFuzzerMaxSeekPointsCount = 5;
 
 namespace android {
 
@@ -55,15 +58,17 @@ class ExtractorFuzzerBase {
     */
   bool setDataSource(const uint8_t* data, size_t size);
 
-  bool getExtractorDef();
+  void getExtractorDef();
 
-  bool extractTracks();
+  void extractTracks();
 
-  bool getMetadata();
+  void getMetadata();
 
-  bool getTracksMetadata();
+  void getTracksMetadata();
 
   void setDataSourceFlags(uint32_t flags);
+
+  void seekAndExtractTracks();
 
  protected:
   class BufferSource : public DataSource {
@@ -123,6 +128,8 @@ class ExtractorFuzzerBase {
   MediaExtractorPluginHelper* mExtractor = nullptr;
 
   virtual void extractTrack(MediaTrackHelper* track, MediaBufferGroup* bufferGroup);
+  virtual void seekAndExtractTrack(MediaTrackHelper* track, MediaBufferGroup* bufferGroup,
+                                   int64_t trackDuration);
 };
 
 }  // namespace android
