@@ -40,6 +40,12 @@ cc_library_static {
         "libstagefright_foundation",
         "libutils"
     ],
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library_static {
