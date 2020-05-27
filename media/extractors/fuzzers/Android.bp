@@ -36,13 +36,13 @@ cc_library {
     static_libs: [
         "liblog",
         "libstagefright_foundation",
-        "libmedia",
+        "libmediandk_format",
+        "libmedia_ndkformatpriv",
     ],
 
     shared_libs: [
         "libutils",
         "libbinder",
-        "libmediandk",
     ],
 
     /* GETEXTRACTORDEF is not defined as extractor library is not linked in the
@@ -50,6 +50,14 @@ cc_library {
      * generated.
      */
     allow_undefined_symbols: true,
+
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_fuzz {
