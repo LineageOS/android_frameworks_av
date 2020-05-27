@@ -133,7 +133,7 @@ struct TestScheduler : public SchedulerClientInterface {
 
         // This is the secret name we'll check, to test error propagation from
         // the scheduler back to client.
-        if (request.fileName == "bad_file") {
+        if (request.sourceFilePath == "bad_source_file") {
             return false;
         }
 
@@ -346,33 +346,37 @@ TEST_F(TranscodingClientManagerTest, TestSubmitCancelGetJobs) {
 
     // Test jobId assignment.
     TranscodingRequestParcel request;
-    request.fileName = "test_file_0";
+    request.sourceFilePath = "test_source_file_0";
+    request.destinationFilePath = "test_desintaion_file_0";
     TranscodingJobParcel job;
     bool result;
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
     EXPECT_EQ(job.jobId, JOB(0));
 
-    request.fileName = "test_file_1";
+    request.sourceFilePath = "test_source_file_1";
+    request.destinationFilePath = "test_desintaion_file_1";
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
     EXPECT_EQ(job.jobId, JOB(1));
 
-    request.fileName = "test_file_2";
+    request.sourceFilePath = "test_source_file_2";
+    request.destinationFilePath = "test_desintaion_file_2";
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
     EXPECT_TRUE(result);
     EXPECT_EQ(job.jobId, JOB(2));
 
-    // Test submit bad request (no valid fileName) fails.
+    // Test submit bad request (no valid sourceFilePath) fails.
     TranscodingRequestParcel badRequest;
-    badRequest.fileName = "bad_file";
+    badRequest.sourceFilePath = "bad_source_file";
+    badRequest.destinationFilePath = "bad_destination_file";
     EXPECT_TRUE(mClient1->submitRequest(badRequest, &job, &result).isOk());
     EXPECT_FALSE(result);
 
     // Test get jobs by id.
     EXPECT_TRUE(mClient1->getJobWithId(JOB(2), &job, &result).isOk());
     EXPECT_EQ(job.jobId, JOB(2));
-    EXPECT_EQ(job.request.fileName, "test_file_2");
+    EXPECT_EQ(job.request.sourceFilePath, "test_source_file_2");
     EXPECT_TRUE(result);
 
     // Test get jobs by invalid id fails.
@@ -417,7 +421,8 @@ TEST_F(TranscodingClientManagerTest, TestClientCallback) {
     addMultipleClients();
 
     TranscodingRequestParcel request;
-    request.fileName = "test_file_name";
+    request.sourceFilePath = "test_source_file_name";
+    request.destinationFilePath = "test_destination_file_name";
     TranscodingJobParcel job;
     bool result;
     EXPECT_TRUE(mClient1->submitRequest(request, &job, &result).isOk());
@@ -461,12 +466,14 @@ TEST_F(TranscodingClientManagerTest, TestUseAfterUnregister) {
     TranscodingJobParcel job;
     bool result;
 
-    request.fileName = "test_file_0";
+    request.sourceFilePath = "test_source_file_0";
+    request.destinationFilePath = "test_destination_file_0";
     request.priority = TranscodingJobPriority::kUnspecified;
     EXPECT_TRUE(client->submitRequest(request, &job, &result).isOk() && result);
     EXPECT_EQ(job.jobId, JOB(0));
 
-    request.fileName = "test_file_1";
+    request.sourceFilePath = "test_source_file_1";
+    request.destinationFilePath = "test_destination_file_1";
     request.priority = TranscodingJobPriority::kNormal;
     EXPECT_TRUE(client->submitRequest(request, &job, &result).isOk() && result);
     EXPECT_EQ(job.jobId, JOB(1));
@@ -476,7 +483,8 @@ TEST_F(TranscodingClientManagerTest, TestUseAfterUnregister) {
     EXPECT_TRUE(status.isOk());
 
     // Test submit new request after unregister, should fail with ERROR_DISCONNECTED.
-    request.fileName = "test_file_2";
+    request.sourceFilePath = "test_source_file_2";
+    request.destinationFilePath = "test_destination_file_2";
     request.priority = TranscodingJobPriority::kNormal;
     status = client->submitRequest(request, &job, &result);
     EXPECT_FALSE(status.isOk());
