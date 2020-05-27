@@ -22,6 +22,8 @@
 #include <hidl/GtestPrinter.h>
 #include <stdio.h>
 
+#include <openssl/md5.h>
+
 #include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
@@ -106,6 +108,9 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         mTimestampUs = 0u;
         mWorkResult = C2_OK;
         mTimestampDevTest = false;
+        mMd5Offset = 0;
+        mMd5Enable = false;
+        mRefMd5 = nullptr;
         if (mCompName == unknown_comp) mDisableTest = true;
 
         C2SecureModeTuning secureModeTuning{};
@@ -127,6 +132,77 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
 
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
+
+    /* Calculate the CKSUM for the data in inbuf */
+    void calc_md5_cksum(uint8_t* pu1_inbuf, uint32_t u4_stride, uint32_t u4_width,
+                        uint32_t u4_height, uint8_t* pu1_cksum_p) {
+        int32_t row;
+        MD5_CTX s_md5_context;
+        MD5_Init(&s_md5_context);
+        for (row = 0; row < u4_height; row++) {
+            MD5_Update(&s_md5_context, pu1_inbuf, u4_width);
+            pu1_inbuf += u4_stride;
+        }
+        MD5_Final(pu1_cksum_p, &s_md5_context);
+    }
+
+    void compareMd5Chksm(std::unique_ptr<C2Work>& work) {
+        uint8_t chksum[48];
+        uint8_t* au1_y_chksum = chksum;
+        uint8_t* au1_u_chksum = chksum + 16;
+        uint8_t* au1_v_chksum = chksum + 32;
+        const C2GraphicView output = work->worklets.front()
+                                             ->output.buffers[0]
+                                             ->data()
+                                             .graphicBlocks()
+                                             .front()
+                                             .map()
+                                             .get();
+        uint8_t* yPlane = const_cast<uint8_t*>(output.data()[C2PlanarLayout::PLANE_Y]);
+        uint8_t* uPlane = const_cast<uint8_t*>(output.data()[C2PlanarLayout::PLANE_U]);
+        uint8_t* vPlane = const_cast<uint8_t*>(output.data()[C2PlanarLayout::PLANE_V]);
+        C2PlanarLayout layout = output.layout();
+
+        size_t yStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
+        size_t uvStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
+        size_t colInc = layout.planes[C2PlanarLayout::PLANE_U].colInc;
+        size_t bitDepth = layout.planes[C2PlanarLayout::PLANE_Y].bitDepth;
+        uint32_t layoutType = layout.type;
+        size_t cropWidth = output.crop().width;
+        size_t cropHeight = output.crop().height;
+
+        if (bitDepth == 8 && layoutType == C2PlanarLayout::TYPE_YUV && colInc == 1) {
+            calc_md5_cksum(yPlane, yStride, cropWidth, cropHeight, au1_y_chksum);
+            calc_md5_cksum(uPlane, uvStride, cropWidth / 2, cropHeight / 2, au1_u_chksum);
+            calc_md5_cksum(vPlane, uvStride, cropWidth / 2, cropHeight / 2, au1_v_chksum);
+        } else if (bitDepth == 8 && layoutType == C2PlanarLayout::TYPE_YUV && colInc == 2) {
+            uint8_t* cbPlane = (uint8_t*)malloc(cropWidth * cropHeight / 4);
+            uint8_t* crPlane = (uint8_t*)malloc(cropWidth * cropHeight / 4);
+            ASSERT_NE(cbPlane, nullptr);
+            ASSERT_NE(crPlane, nullptr);
+            size_t count = 0;
+            for (size_t k = 0; k < (cropHeight / 2); k++) {
+                for (size_t l = 0; l < (cropWidth); l = l + 2) {
+                    cbPlane[count] = uPlane[k * uvStride + l];
+                    crPlane[count] = vPlane[k * uvStride + l];
+                    count++;
+                }
+            }
+            calc_md5_cksum(yPlane, yStride, cropWidth, cropHeight, au1_y_chksum);
+            calc_md5_cksum(cbPlane, cropWidth / 2, cropWidth / 2, cropHeight / 2, au1_u_chksum);
+            calc_md5_cksum(crPlane, cropWidth / 2, cropWidth / 2, cropHeight / 2, au1_v_chksum);
+            free(cbPlane);
+            free(crPlane);
+        } else {
+            mMd5Enable = false;
+            ALOGV("Disabling MD5 chksm flag");
+            return;
+        }
+        if (memcmp(mRefMd5 + mMd5Offset, chksum, 48)) ASSERT_TRUE(false);
+        mMd5Offset += 48;
+        return;
+    }
+    bool configPixelFormat(uint32_t format);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -164,6 +240,9 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                             }
                         }
                     }
+                    if (mMd5Enable) {
+                        compareMd5Chksm(work);
+                    }
                 }
                 bool mCsd = false;
                 workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
@@ -190,8 +269,11 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
 
     bool mEos;
     bool mDisableTest;
+    bool mMd5Enable;
     bool mTimestampDevTest;
     uint64_t mTimestampUs;
+    uint64_t mMd5Offset;
+    char* mRefMd5;
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
     standardComp mCompName;
@@ -265,52 +347,71 @@ void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& 
 
 // number of elementary streams per component
 #define STREAM_COUNT 3
-// LookUpTable of clips and metadata for component testing
-void GetURLForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, char* info,
-                        size_t streamIndex = 1) {
+// LookUpTable of clips, metadata and chksum for component testing
+void GetURLChksmForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, char* info,
+                             char* chksum, size_t streamIndex = 1) {
     struct CompToURL {
         Codec2VideoDecHidlTest::standardComp comp;
         const char mURL[STREAM_COUNT][512];
         const char info[STREAM_COUNT][512];
+        const char chksum[STREAM_COUNT][512];
     };
     ASSERT_TRUE(streamIndex < STREAM_COUNT);
 
     static const CompToURL kCompToURL[] = {
             {Codec2VideoDecHidlTest::standardComp::avc,
              {"bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_640x360_768kbps_30fps.h264", ""},
-             {"bbb_avc_176x144_300kbps_60fps.info", "bbb_avc_640x360_768kbps_30fps.info", ""}},
+             {"bbb_avc_176x144_300kbps_60fps.info", "bbb_avc_640x360_768kbps_30fps.info", ""},
+             {"bbb_avc_176x144_300kbps_60fps_chksum.md5",
+              "bbb_avc_640x360_768kbps_30fps_chksum.md5", ""}},
             {Codec2VideoDecHidlTest::standardComp::hevc,
              {"bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.hevc", ""},
-             {"bbb_hevc_176x144_176kbps_60fps.info", "bbb_hevc_640x360_1600kbps_30fps.info", ""}},
+             {"bbb_hevc_176x144_176kbps_60fps.info", "bbb_hevc_640x360_1600kbps_30fps.info", ""},
+             {"bbb_hevc_176x144_176kbps_60fps_chksum.md5",
+              "bbb_hevc_640x360_1600kbps_30fps_chksum.md5", ""}},
             {Codec2VideoDecHidlTest::standardComp::mpeg2,
              {"bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_352x288_1mbps_60fps.m2v", ""},
-             {"bbb_mpeg2_176x144_105kbps_25fps.info", "bbb_mpeg2_352x288_1mbps_60fps.info", ""}},
+             {"bbb_mpeg2_176x144_105kbps_25fps.info", "bbb_mpeg2_352x288_1mbps_60fps.info", ""},
+             {"", "", ""}},
             {Codec2VideoDecHidlTest::standardComp::h263,
              {"", "bbb_h263_352x288_300kbps_12fps.h263", ""},
-             {"", "bbb_h263_352x288_300kbps_12fps.info", ""}},
+             {"", "bbb_h263_352x288_300kbps_12fps.info", ""},
+             {"", "", ""}},
             {Codec2VideoDecHidlTest::standardComp::mpeg4,
              {"", "bbb_mpeg4_352x288_512kbps_30fps.m4v", ""},
-             {"", "bbb_mpeg4_352x288_512kbps_30fps.info", ""}},
+             {"", "bbb_mpeg4_352x288_512kbps_30fps.info", ""},
+             {"", "", ""}},
             {Codec2VideoDecHidlTest::standardComp::vp8,
              {"bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", ""},
-             {"bbb_vp8_176x144_240kbps_60fps.info", "bbb_vp8_640x360_2mbps_30fps.info", ""}},
+             {"bbb_vp8_176x144_240kbps_60fps.info", "bbb_vp8_640x360_2mbps_30fps.info", ""},
+             {"", "bbb_vp8_640x360_2mbps_30fps_chksm.md5", ""}},
             {Codec2VideoDecHidlTest::standardComp::vp9,
              {"bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9",
               "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9"},
              {"bbb_vp9_176x144_285kbps_60fps.info", "bbb_vp9_640x360_1600kbps_30fps.info",
-              "bbb_vp9_704x480_280kbps_24fps_altref_2.info"}},
+              "bbb_vp9_704x480_280kbps_24fps_altref_2.info"},
+             {"", "bbb_vp9_640x360_1600kbps_30fps_chksm.md5", ""}},
             {Codec2VideoDecHidlTest::standardComp::av1,
              {"bbb_av1_640_360.av1", "bbb_av1_176_144.av1", ""},
-             {"bbb_av1_640_360.info", "bbb_av1_176_144.info", ""}},
+             {"bbb_av1_640_360.info", "bbb_av1_176_144.info", ""},
+             {"bbb_av1_640_360_chksum.md5", "bbb_av1_176_144_chksm.md5", ""}},
     };
 
     for (size_t i = 0; i < sizeof(kCompToURL) / sizeof(kCompToURL[0]); ++i) {
         if (kCompToURL[i].comp == comp) {
             strcat(mURL, kCompToURL[i].mURL[streamIndex]);
             strcat(info, kCompToURL[i].info[streamIndex]);
+            strcat(chksum, kCompToURL[i].chksum[streamIndex]);
             return;
         }
     }
+}
+
+void GetURLForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, char* info,
+                        size_t streamIndex = 1) {
+    char chksum[512];
+    strcpy(chksum, sResourceDir.c_str());
+    GetURLChksmForComponent(comp, mURL, info, chksum, streamIndex);
 }
 
 void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
@@ -443,6 +544,19 @@ TEST_P(Codec2VideoDecHidlTest, configureTunnel) {
     ASSERT_EQ(producer->setSidebandStream(nativeHandle), NO_ERROR);
 }
 
+// Config output pixel format
+bool Codec2VideoDecHidlTestBase::configPixelFormat(uint32_t format) {
+    std::vector<std::unique_ptr<C2SettingResult>> failures;
+    C2StreamPixelFormatInfo::output pixelformat(0u, format);
+
+    std::vector<C2Param*> configParam{&pixelformat};
+    c2_status_t status = mComponent->config(configParam, C2_DONT_BLOCK, &failures);
+    if (status == C2_OK && failures.size() == 0u) {
+        return true;
+    }
+    return false;
+}
+
 class Codec2VideoDecDecodeTest
     : public Codec2VideoDecHidlTestBase,
       public ::testing::WithParamInterface<
@@ -461,13 +575,27 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     uint32_t streamIndex = std::stoi(std::get<2>(GetParam()));
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
     mTimestampDevTest = true;
-    char mURL[512], info[512];
+
+    char mURL[512], info[512], chksum[512];
     android::Vector<FrameInfo> Info;
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
+    strcpy(chksum, sResourceDir.c_str());
 
-    GetURLForComponent(mCompName, mURL, info, streamIndex);
+    GetURLChksmForComponent(mCompName, mURL, info, chksum, streamIndex);
+    if (!(strcmp(mURL, sResourceDir.c_str())) || !(strcmp(info, sResourceDir.c_str()))) {
+        ALOGV("Skipping Test, Stream not available");
+        return;
+    }
+    mMd5Enable = true;
+    if (!strcmp(chksum, sResourceDir.c_str())) mMd5Enable = false;
+
+    uint32_t format = HAL_PIXEL_FORMAT_YCBCR_420_888;
+    if (!configPixelFormat(format)) {
+        std::cout << "[   WARN   ] Test Skipped PixelFormat not configured\n";
+        return;
+    }
 
     mFlushedIndices.clear();
     mTimestampUslist.clear();
@@ -483,6 +611,24 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
+
+    size_t refChksmSize = 0;
+    std::ifstream refChksum;
+    if (mMd5Enable) {
+        ALOGV("chksum file name: %s", chksum);
+        refChksum.open(chksum, std::ifstream::binary | std::ifstream::ate);
+        ASSERT_EQ(refChksum.is_open(), true);
+        refChksmSize = refChksum.tellg();
+        refChksum.seekg(0, std::ifstream::beg);
+
+        ALOGV("chksum Size %zu ", refChksmSize);
+        mRefMd5 = (char*)malloc(refChksmSize);
+        ASSERT_NE(mRefMd5, nullptr);
+        refChksum.read(mRefMd5, refChksmSize);
+        ASSERT_EQ(refChksum.gcount(), refChksmSize);
+        refChksum.close();
+    }
+
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mLinearPool, eleStream, &Info, 0,
                                           (int)Info.size(), signalEOS));
@@ -506,6 +652,14 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     if (mFramesReceived != infoSize) {
         ALOGE("Input buffer count and Output buffer count mismatch");
         ALOGV("framesReceived : %d inputFrames : %zu", mFramesReceived, infoSize);
+        ASSERT_TRUE(false);
+    }
+
+    if (mRefMd5 != nullptr) free(mRefMd5);
+    if (mMd5Enable && refChksmSize != mMd5Offset) {
+        ALOGE("refChksum size and generated chksum size mismatch refChksum size %zu generated "
+              "chksum size %" PRId64 "",
+              refChksmSize, mMd5Offset);
         ASSERT_TRUE(false);
     }
 
