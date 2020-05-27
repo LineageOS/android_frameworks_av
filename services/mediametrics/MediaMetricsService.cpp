@@ -95,58 +95,6 @@ MediaMetricsService::getSanitizedPackageNameAndVersionCode(uid_t uid) {
     }
 }
 
-/* static */
-std::string MediaMetricsService::tokenizer(std::string::const_iterator& it,
-        const std::string::const_iterator& end, const char *reserved) {
-    // consume leading white space
-    for (; it != end && std::isspace(*it); ++it);
-    if (it == end) return {};
-
-    auto start = it;
-    // parse until we hit a reserved keyword or space
-    if (strchr(reserved, *it)) return {start, ++it};
-    for (;;) {
-        ++it;
-        if (it == end || std::isspace(*it) || strchr(reserved, *it)) return {start, it};
-    }
-}
-
-/* static */
-std::vector<std::pair<std::string, std::string>>
-MediaMetricsService::getDeviceAddressPairs(const std::string& devices) {
-    std::vector<std::pair<std::string, std::string>> result;
-
-    // Currently, the device format is EXACTLY
-    // (device1, addr1)|(device2, addr2)|...
-
-    static constexpr char delim[] = "()|,";
-    for (auto it = devices.begin(); ; ) {
-        auto token = tokenizer(it, devices.end(), delim);
-        if (token != "(") return result;
-
-        auto device = tokenizer(it, devices.end(), delim);
-        if (device.empty() || !std::isalnum(device[0])) return result;
-
-        token = tokenizer(it, devices.end(), delim);
-        if (token != ",") return result;
-
-        // special handling here for empty addresses
-        auto address = tokenizer(it, devices.end(), delim);
-        if (address.empty() || !std::isalnum(device[0])) return result;
-        if (address == ")") {  // no address, just the ")"
-            address.clear();
-        } else {
-            token = tokenizer(it, devices.end(), delim);
-            if (token != ")") return result;
-        }
-
-        result.emplace_back(std::move(device), std::move(address));
-
-        token = tokenizer(it, devices.end(), delim);
-        if (token != "|") return result;  // this includes end of string detection
-    }
-}
-
 MediaMetricsService::MediaMetricsService()
         : mMaxRecords(kMaxRecords),
           mMaxRecordAgeNs(kMaxRecordAgeNs),

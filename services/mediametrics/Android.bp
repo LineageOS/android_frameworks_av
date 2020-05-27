@@ -119,6 +119,7 @@ cc_library_shared {
     srcs: [
         "AudioAnalytics.cpp",
         "AudioPowerUsage.cpp",
+        "AudioTypes.cpp",
         "iface_statsd.cpp",
         "MediaMetricsService.cpp",
         "statsd_audiopolicy.cpp",
@@ -130,6 +131,7 @@ cc_library_shared {
         "statsd_extractor.cpp",
         "statsd_nuplayer.cpp",
         "statsd_recorder.cpp",
+        "StringUtils.cpp"
     ],
 
     proto: {
@@ -137,9 +139,11 @@ cc_library_shared {
     },
 
     shared_libs: [
+        "libbase", // android logging
         "libbinder",
         "libcutils",
         "liblog",
+        "libmedia_helper",
         "libmediametrics",
         "libmediautils",
         "libmemunreachable",
