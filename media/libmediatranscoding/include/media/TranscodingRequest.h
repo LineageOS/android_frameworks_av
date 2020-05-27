@@ -40,6 +40,8 @@ private:
         transcodingType = parcel.transcodingType;
         priority = parcel.priority;
         requestUpdate = parcel.requestUpdate;
+        isForTesting = parcel.isForTesting;
+        testConfig = parcel.testConfig;
     }
 };
 
