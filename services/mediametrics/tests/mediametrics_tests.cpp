@@ -18,6 +18,7 @@
 #include <utils/Log.h>
 
 #include "MediaMetricsService.h"
+#include "StringUtils.h"
 
 #include <stdio.h>
 
@@ -884,12 +885,12 @@ TEST(mediametrics_tests, audio_analytics_dump) {
 }
 
 TEST(mediametrics_tests, device_parsing) {
-    auto devaddr = android::MediaMetricsService::getDeviceAddressPairs("(DEVICE, )");
+    auto devaddr = android::mediametrics::stringutils::getDeviceAddressPairs("(DEVICE, )");
     ASSERT_EQ((size_t)1, devaddr.size());
     ASSERT_EQ("DEVICE", devaddr[0].first);
     ASSERT_EQ("", devaddr[0].second);
 
-    devaddr = android::MediaMetricsService::getDeviceAddressPairs(
+    devaddr = android::mediametrics::stringutils::getDeviceAddressPairs(
             "(DEVICE1, A)|(D, ADDRB)");
     ASSERT_EQ((size_t)2, devaddr.size());
     ASSERT_EQ("DEVICE1", devaddr[0].first);
@@ -897,7 +898,7 @@ TEST(mediametrics_tests, device_parsing) {
     ASSERT_EQ("D", devaddr[1].first);
     ASSERT_EQ("ADDRB", devaddr[1].second);
 
-    devaddr = android::MediaMetricsService::getDeviceAddressPairs(
+    devaddr = android::mediametrics::stringutils::getDeviceAddressPairs(
             "(A,B)|(C,D)");
     ASSERT_EQ((size_t)2, devaddr.size());
     ASSERT_EQ("A", devaddr[0].first);
@@ -905,7 +906,7 @@ TEST(mediametrics_tests, device_parsing) {
     ASSERT_EQ("C", devaddr[1].first);
     ASSERT_EQ("D", devaddr[1].second);
 
-    devaddr = android::MediaMetricsService::getDeviceAddressPairs(
+    devaddr = android::mediametrics::stringutils::getDeviceAddressPairs(
             "  ( A1 , B )  | ( C , D2 )  ");
     ASSERT_EQ((size_t)2, devaddr.size());
     ASSERT_EQ("A1", devaddr[0].first);
