@@ -166,7 +166,7 @@ void ALooperRoster::dump(int fd, const Vector<String16>& args) {
         }
         s.append("\n");
     }
-    write(fd, s.string(), s.size());
+    (void)write(fd, s.string(), s.size());
 }
 
 }  // namespace android
