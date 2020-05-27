@@ -28,9 +28,14 @@ import android.media.TranscodingVideoTrackFormat;
 //TODO(hkuang): Implement the parcelable.
 parcelable TranscodingRequestParcel {
     /**
-     * Name of file to be transcoded.
+     * The absolute file path of the source file.
      */
-    @utf8InCpp String fileName;
+    @utf8InCpp String sourceFilePath;
+
+    /**
+     * The absolute file path of the destination file.
+     */
+    @utf8InCpp String destinationFilePath;
 
     /**
      * Type of the transcoding.
@@ -44,16 +49,6 @@ parcelable TranscodingRequestParcel {
      * will be available in the TranscodingJobParcel when the job is finished.
      */
     @nullable TranscodingVideoTrackFormat requestedVideoTrackFormat;
-
-    /**
-     * Input source file descriptor.
-     */
-    @nullable ParcelFileDescriptor inFd;
-
-    /**
-     * Output transcoded file descriptor.
-     */
-    @nullable ParcelFileDescriptor outFd;
 
     /**
      * Priority of this transcoding. Service will schedule the transcoding based on the priority.
