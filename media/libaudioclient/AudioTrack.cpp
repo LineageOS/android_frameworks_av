@@ -639,9 +639,17 @@ exit:
 
 status_t AudioTrack::start()
 {
-    const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
 
+    if (mState == STATE_ACTIVE) {
+        return INVALID_OPERATION;
+    }
+
+    ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
+
+    // Defer logging here due to OpenSL ES repeated start calls.
+    // TODO(b/154868033) after fix, restore this logging back to the beginning of start().
+    const int64_t beginNs = systemTime();
     status_t status = NO_ERROR; // logged: make sure to set this before returning.
     mediametrics::Defer defer([&] {
         mediametrics::LogItem(mMetricsId)
@@ -655,12 +663,6 @@ status_t AudioTrack::start()
             .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
             .record(); });
 
-    ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
-
-    if (mState == STATE_ACTIVE) {
-        status = INVALID_OPERATION;
-        return status;
-    }
 
     mInUnderrun = true;
 
