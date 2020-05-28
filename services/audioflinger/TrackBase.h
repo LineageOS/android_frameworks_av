@@ -373,10 +373,15 @@ protected:
     bool                mIsInvalid; // non-resettable latch, set by invalidate()
 
     // It typically takes 5 threadloop mix iterations for latency to stabilize.
-    static inline constexpr int32_t LOG_START_COUNTDOWN = 8;
-    int32_t             mLogStartCountdown = 0;
-    int64_t             mLogStartTimeNs = 0;
-    int64_t             mLogStartFrames = 0;
+    // However, this can be 12+ iterations for BT.
+    // To be sure, we wait for latency to dip (it usually increases at the start)
+    // to assess stability and then log to MediaMetrics.
+    // Rapid start / pause calls may cause inaccurate numbers.
+    static inline constexpr int32_t LOG_START_COUNTDOWN = 12;
+    int32_t             mLogStartCountdown = 0; // Mixer period countdown
+    int64_t             mLogStartTimeNs = 0;    // Monotonic time at start()
+    int64_t             mLogStartFrames = 0;    // Timestamp frames at start()
+    double              mLogLatencyMs = 0.;     // Track the last log latency
 
     TrackMetrics        mTrackMetrics;
 
