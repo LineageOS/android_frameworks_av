@@ -13,7 +13,7 @@
 // limitations under the License.
 
 cc_defaults {
-    name: "extractor-defaults_no-sanitizer",
+    name: "extractor-defaults",
 
     include_dirs: [
         "frameworks/av/media/libstagefright/include",
@@ -23,6 +23,9 @@ cc_defaults {
         "liblog",
         "libmediandk#29",
     ],
+
+    // extractors are supposed to work on Q(29)
+    min_sdk_version: "29",
 
     relative_install_path: "extractors",
 
@@ -35,12 +38,6 @@ cc_defaults {
     ],
 
     version_script: "exports.lds",
-}
-
-cc_defaults {
-    name: "extractor-defaults",
-
-    defaults: ["extractor-defaults_no-sanitizer"],
 
     sanitize: {
         cfi: true,
