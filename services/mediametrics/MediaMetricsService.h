@@ -77,20 +77,6 @@ public:
      */
     static std::pair<std::string, int64_t> getSanitizedPackageNameAndVersionCode(uid_t uid);
 
-    /**
-     * Return string tokens from iterator, separated by spaces and reserved chars.
-     */
-    static std::string tokenizer(std::string::const_iterator& it,
-            const std::string::const_iterator& end, const char *reserved);
-
-    /**
-     * Parse the devices string and return a vector of device address pairs.
-     *
-     * A failure to parse returns early with the contents that were able to be parsed.
-     */
-    static std::vector<std::pair<std::string, std::string>>
-    getDeviceAddressPairs(const std::string &devices);
-
 protected:
 
     // Internal call where release is true if ownership of item is transferred
