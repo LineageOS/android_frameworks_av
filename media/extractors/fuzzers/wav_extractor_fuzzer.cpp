@@ -46,17 +46,9 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
   wavExtractor* extractor = new wavExtractor();
-  if (!extractor) {
-    return 0;
+  if (extractor) {
+    extractor->processData(data, size);
+    delete extractor;
   }
-  if (extractor->setDataSource(data, size)) {
-    if (extractor->createExtractor()) {
-      extractor->getExtractorDef();
-      extractor->getMetadata();
-      extractor->extractTracks();
-      extractor->getTracksMetadata();
-    }
-  }
-  delete extractor;
   return 0;
 }
