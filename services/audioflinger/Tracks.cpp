@@ -978,7 +978,8 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             mLogStartCountdown = LOG_START_COUNTDOWN;
             mLogStartTimeNs = systemTime();
             mLogStartFrames = mAudioTrackServerProxy->getTimestamp()
-                    .mPosition[ExtendedTimestamp::LOCATION_SERVER];
+                    .mPosition[ExtendedTimestamp::LOCATION_KERNEL];
+            mLogLatencyMs = 0.;
         }
 
         if (status == NO_ERROR || status == ALREADY_EXISTS) {
@@ -1514,23 +1515,31 @@ void AudioFlinger::PlaybackThread::Track::updateTrackFrameInfo(
     mServerLatencyFromTrack.store(useTrackTimestamp);
     mServerLatencyMs.store(latencyMs);
 
-    if (mLogStartCountdown > 0) {
-        if (--mLogStartCountdown == 0) {
+    if (mLogStartCountdown > 0
+            && local.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] > 0
+            && local.mPosition[ExtendedTimestamp::LOCATION_KERNEL] > 0)
+    {
+        if (mLogStartCountdown > 1) {
+            --mLogStartCountdown;
+        } else if (latencyMs < mLogLatencyMs) { // wait for latency to stabilize (dip)
+            mLogStartCountdown = 0;
             // startup is the difference in times for the current timestamp and our start
             double startUpMs =
-                    (local.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] - mLogStartTimeNs) * 1e-6;
+                    (local.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL] - mLogStartTimeNs) * 1e-6;
             // adjust for frames played.
-            startUpMs -= (local.mPosition[ExtendedTimestamp::LOCATION_SERVER] - mLogStartFrames)
-                      * 1e3 / mSampleRate;
-            ALOGV("%s: logging localTime:%lld, startTime:%lld"
-                  "  localPosition:%lld, startPosition:%lld",
-                    __func__,
-                    (long long)local.mTimeNs[ExtendedTimestamp::LOCATION_SERVER],
+            startUpMs -= (local.mPosition[ExtendedTimestamp::LOCATION_KERNEL] - mLogStartFrames)
+                    * 1e3 / mSampleRate;
+            ALOGV("%s: latencyMs:%lf startUpMs:%lf"
+                    " localTime:%lld startTime:%lld"
+                    " localPosition:%lld startPosition:%lld",
+                    __func__, latencyMs, startUpMs,
+                    (long long)local.mTimeNs[ExtendedTimestamp::LOCATION_KERNEL],
                     (long long)mLogStartTimeNs,
-                    (long long)local.mPosition[ExtendedTimestamp::LOCATION_SERVER],
+                    (long long)local.mPosition[ExtendedTimestamp::LOCATION_KERNEL],
                     (long long)mLogStartFrames);
             mTrackMetrics.logLatencyAndStartup(latencyMs, startUpMs);
         }
+        mLogLatencyMs = latencyMs;
     }
 }
 
