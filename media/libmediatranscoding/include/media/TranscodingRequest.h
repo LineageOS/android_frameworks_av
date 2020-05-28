@@ -35,11 +35,9 @@ public:
 
 private:
     void setTo(const TranscodingRequestParcel& parcel) {
-        fileName = parcel.fileName;
+        sourceFilePath = parcel.sourceFilePath;
+        destinationFilePath = parcel.destinationFilePath;
         transcodingType = parcel.transcodingType;
-        // TODO: determine if the fds need dup
-        inFd.set(dup(parcel.inFd.get()));
-        outFd.set(dup(parcel.outFd.get()));
         priority = parcel.priority;
         requestUpdate = parcel.requestUpdate;
     }

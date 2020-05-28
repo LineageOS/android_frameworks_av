@@ -112,7 +112,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
     }
 
-    if (in_request.fileName.empty()) {
+    if (in_request.sourceFilePath.empty() || in_request.destinationFilePath.empty()) {
         // This is the only error we check for now.
         return Status::ok();
     }

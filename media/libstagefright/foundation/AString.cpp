@@ -387,9 +387,13 @@ AString AStringPrintf(const char *format, ...) {
     va_start(ap, format);
 
     char *buffer;
-    vasprintf(&buffer, format, ap);
+    int bufferSize = vasprintf(&buffer, format, ap);
 
     va_end(ap);
+
+    if(bufferSize < 0) {
+        return AString();
+    }
 
     AString result(buffer);
 
