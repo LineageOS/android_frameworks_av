@@ -20,6 +20,7 @@
 
 #include "AudioAnalytics.h"
 #include "MediaMetricsService.h"
+#include "StringUtils.h"
 #include <map>
 #include <sstream>
 #include <string>
@@ -117,7 +118,7 @@ bool AudioPowerUsage::deviceFromString(const std::string& device_string, int32_t
 
 int32_t AudioPowerUsage::deviceFromStringPairs(const std::string& device_strings) {
     int32_t deviceMask = 0;
-    const auto devaddrvec = MediaMetricsService::getDeviceAddressPairs(device_strings);
+    const auto devaddrvec = stringutils::getDeviceAddressPairs(device_strings);
     for (const auto &[device, addr] : devaddrvec) {
         int32_t combo_device = 0;
         deviceFromString(device, combo_device);

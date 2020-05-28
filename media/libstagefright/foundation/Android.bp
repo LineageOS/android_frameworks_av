@@ -12,6 +12,7 @@ cc_defaults {
     vndk: {
         enabled: true,
     },
+    host_supported: true,
     double_loadable: true,
     include_dirs: [
         "frameworks/av/include",
@@ -84,6 +85,9 @@ cc_defaults {
             cflags: [
                 "-DNO_IMEMORY",
             ],
+        },
+        darwin: {
+            enabled: false,
         },
     },
 

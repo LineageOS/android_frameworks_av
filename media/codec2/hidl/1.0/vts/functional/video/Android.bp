@@ -26,6 +26,7 @@ cc_test {
         "libbinder",
         "libgui",
         "libutils",
+        "libcrypto",
     ],
     data: [":media_c2_v1_video_decode_res"],
     test_config: "VtsHalMediaC2V1_0TargetVideoDecTest.xml",

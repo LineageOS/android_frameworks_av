@@ -109,7 +109,7 @@ private:
      */
     std::string getThreadFromTrack(const std::string& track) const;
 
-    const bool mDeliverStatistics __unused = true;
+    const bool mDeliverStatistics;
 
     // Actions is individually locked
     AnalyticsActions mActions;
