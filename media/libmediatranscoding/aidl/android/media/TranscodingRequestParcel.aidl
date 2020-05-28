@@ -17,6 +17,7 @@
 package android.media;
 
 import android.media.TranscodingJobPriority;
+import android.media.TranscodingTestConfig;
 import android.media.TranscodingType;
 import android.media.TranscodingVideoTrackFormat;
 
@@ -59,4 +60,15 @@ parcelable TranscodingRequestParcel {
      * Whether to receive update on progress and change of awaitNumJobs.
      */
     boolean requestUpdate;
+
+    /**
+     * Whether this request is for testing.
+     */
+    boolean isForTesting = false;
+
+    /**
+     * Test configuration. This is only valid when isForTesting is set to true.
+     */
+
+    TranscodingTestConfig testConfig;
 }
