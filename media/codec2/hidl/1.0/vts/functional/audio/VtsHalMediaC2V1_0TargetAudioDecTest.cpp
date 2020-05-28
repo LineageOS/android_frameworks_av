@@ -37,6 +37,8 @@ using android::C2AllocatorIon;
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kDecodeTestParameters;
 
+static std::vector<std::tuple<std::string, std::string, std::string>> kCsdFlushTestParameters;
+
 // Resource directory
 static std::string sResourceDir = "";
 
@@ -831,12 +833,119 @@ TEST_P(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
+class Codec2AudioDecCsdInputTests
+    : public Codec2AudioDecHidlTestBase,
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {
+    void getParams() {
+        mInstanceName = std::get<0>(GetParam());
+        mComponentName = std::get<1>(GetParam());
+    }
+};
+
+// Test the codecs for the following
+// start - csd - data… - (with/without)flush - data… - flush - data…
+TEST_P(Codec2AudioDecCsdInputTests, CSDFlushTest) {
+    description("Tests codecs for flush at different states");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
+
+    char mURL[512], info[512];
+    android::Vector<FrameInfo> Info;
+
+    strcpy(mURL, sResourceDir.c_str());
+    strcpy(info, sResourceDir.c_str());
+    GetURLForComponent(mCompName, mURL, info);
+    if (!strcmp(mURL, sResourceDir.c_str())) {
+        ALOGV("EMPTY INPUT sResourceDir.c_str() %s mURL  %s ", sResourceDir.c_str(), mURL);
+        return;
+    }
+    ALOGV("mURL : %s", mURL);
+
+    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file";
+
+    int32_t bitStreamInfo[2] = {0};
+    if (mCompName == raw) {
+        bitStreamInfo[0] = 8000;
+        bitStreamInfo[1] = 1;
+    } else {
+        ASSERT_NO_FATAL_FAILURE(getInputChannelInfo(mComponent, mCompName, bitStreamInfo));
+    }
+    if (!setupConfigParam(mComponent, bitStreamInfo)) {
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+
+    ASSERT_EQ(mComponent->start(), C2_OK);
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true);
+
+    bool signalEOS = false;
+    bool flushCsd = !std::get<2>(GetParam()).compare("true");
+    ALOGV("sending %d csd data ", numCsds);
+    int framesToDecode = numCsds;
+    ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                          mFlushedIndices, mLinearPool, eleStream, &Info, 0,
+                                          framesToDecode, false));
+
+    c2_status_t err = C2_OK;
+    std::list<std::unique_ptr<C2Work>> flushedWork;
+    if (numCsds && flushCsd) {
+        // We wait for all the CSD buffers to get consumed.
+        // Once we have received all CSD work back, we call flush
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+        err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+        ASSERT_EQ(err, C2_OK);
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                               MAX_INPUT_BUFFERS - flushedWork.size());
+        ASSERT_NO_FATAL_FAILURE(
+                verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+        ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+        oBufferMetaData.clear();
+    }
+
+    int offset = framesToDecode;
+    while (1) {
+        framesToDecode = c2_min(FLUSH_INTERVAL, (int)Info.size() - offset);
+        if (framesToDecode < FLUSH_INTERVAL) signalEOS = true;
+        ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                              mFlushedIndices, mLinearPool, eleStream, &Info,
+                                              offset, framesToDecode, signalEOS));
+        offset += framesToDecode;
+        err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
+        ASSERT_EQ(err, C2_OK);
+        // blocking call to ensures application to Wait till remaining
+        // 'non-flushed' inputs are consumed
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue,
+                               MAX_INPUT_BUFFERS - flushedWork.size());
+        ASSERT_NO_FATAL_FAILURE(
+                verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
+        ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+        if (signalEOS || offset >= (int)Info.size()) {
+            break;
+        }
+    }
+    if (!signalEOS) {
+        ASSERT_NO_FATAL_FAILURE(testInputBuffer(mComponent, mQueueLock, mWorkQueue,
+                                                C2FrameData::FLAG_END_OF_STREAM, false));
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+    }
+    eleStream.close();
+    ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
+    ASSERT_EQ(mComponent->stop(), C2_OK);
+}
+
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioDecHidlTest, testing::ValuesIn(kTestParameters),
                          android::hardware::PrintInstanceTupleNameToString<>);
 
 // DecodeTest with StreamIndex and EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(StreamIndexAndEOS, Codec2AudioDecDecodeTest,
                          testing::ValuesIn(kDecodeTestParameters),
+                         android::hardware::PrintInstanceTupleNameToString<>);
+
+INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2AudioDecCsdInputTests,
+                         testing::ValuesIn(kCsdFlushTestParameters),
                          android::hardware::PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
@@ -852,6 +961,11 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "false"));
         kDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "true"));
+
+        kCsdFlushTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
+        kCsdFlushTestParameters.push_back(
+                std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
     }
 
     // Set the resource directory based on command line args.
