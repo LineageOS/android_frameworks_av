@@ -45,4 +45,6 @@ cc_library_static {
     whole_static_libs: [
         "libstagefright_metadatautils",
     ],
+
+    min_sdk_version: "29",
 }
