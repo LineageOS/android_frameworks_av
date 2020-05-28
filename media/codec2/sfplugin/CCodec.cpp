@@ -1955,11 +1955,98 @@ PersistentSurface *CCodec::CreateInputSurface() {
             inputSurface->getHalInterface()));
 }
 
-static void MaybeLogUnrecognizedName(const char *func, const std::string &name) {
-    thread_local std::set<std::string> sLogged{};
-    if (sLogged.insert(name).second) {
-        ALOGW("%s: Unrecognized interface name: %s", func, name.c_str());
+class IntfCache {
+public:
+    IntfCache() = default;
+
+    status_t init(const std::string &name) {
+        std::shared_ptr<Codec2Client::Interface> intf{
+            Codec2Client::CreateInterfaceByName(name.c_str())};
+        if (!intf) {
+            ALOGW("IntfCache [%s]: Unrecognized interface name", name.c_str());
+            mInitStatus = NO_INIT;
+            return NO_INIT;
+        }
+        const static C2StreamUsageTuning::input sUsage{0u /* stream id */};
+        mFields.push_back(C2FieldSupportedValuesQuery::Possible(
+                C2ParamField{&sUsage, &sUsage.value}));
+        c2_status_t err = intf->querySupportedValues(mFields, C2_MAY_BLOCK);
+        if (err != C2_OK) {
+            ALOGW("IntfCache [%s]: failed to query usage supported value (err=%d)",
+                    name.c_str(), err);
+            mFields[0].status = err;
+        }
+        std::vector<std::unique_ptr<C2Param>> params;
+        err = intf->query(
+                {&mApiFeatures},
+                {C2PortAllocatorsTuning::input::PARAM_TYPE},
+                C2_MAY_BLOCK,
+                &params);
+        if (err != C2_OK && err != C2_BAD_INDEX) {
+            ALOGW("IntfCache [%s]: failed to query api features (err=%d)",
+                    name.c_str(), err);
+        }
+        while (!params.empty()) {
+            C2Param *param = params.back().release();
+            params.pop_back();
+            if (!param) {
+                continue;
+            }
+            if (param->type() == C2PortAllocatorsTuning::input::PARAM_TYPE) {
+                mInputAllocators.reset(
+                        C2PortAllocatorsTuning::input::From(params[0].get()));
+            }
+        }
+        mInitStatus = OK;
+        return OK;
     }
+
+    status_t initCheck() const { return mInitStatus; }
+
+    const C2FieldSupportedValuesQuery &getUsageSupportedValues() const {
+        CHECK_EQ(1u, mFields.size());
+        return mFields[0];
+    }
+
+    const C2ApiFeaturesSetting &getApiFeatures() const {
+        return mApiFeatures;
+    }
+
+    const C2PortAllocatorsTuning::input &getInputAllocators() const {
+        static std::unique_ptr<C2PortAllocatorsTuning::input> sInvalidated = []{
+            std::unique_ptr<C2PortAllocatorsTuning::input> param =
+                C2PortAllocatorsTuning::input::AllocUnique(0);
+            param->invalidate();
+            return param;
+        }();
+        return mInputAllocators ? *mInputAllocators : *sInvalidated;
+    }
+
+private:
+    status_t mInitStatus{NO_INIT};
+
+    std::vector<C2FieldSupportedValuesQuery> mFields;
+    C2ApiFeaturesSetting mApiFeatures;
+    std::unique_ptr<C2PortAllocatorsTuning::input> mInputAllocators;
+};
+
+static const IntfCache &GetIntfCache(const std::string &name) {
+    static IntfCache sNullIntfCache;
+    static std::mutex sMutex;
+    static std::map<std::string, IntfCache> sCache;
+    std::unique_lock<std::mutex> lock{sMutex};
+    auto it = sCache.find(name);
+    if (it == sCache.end()) {
+        lock.unlock();
+        IntfCache intfCache;
+        status_t err = intfCache.init(name);
+        if (err != OK) {
+            return sNullIntfCache;
+        }
+        lock.lock();
+        it = sCache.insert({name, std::move(intfCache)}).first;
+    }
+    return it->second;
 }
 
 static status_t GetCommonAllocatorIds(
@@ -1977,24 +2064,16 @@ static status_t GetCommonAllocatorIds(
     }
     bool firstIteration = true;
     for (const std::string &name : names) {
-        std::shared_ptr<Codec2Client::Interface> intf{
-            Codec2Client::CreateInterfaceByName(name.c_str())};
-        if (!intf) {
-            MaybeLogUnrecognizedName(__FUNCTION__, name);
+        const IntfCache &intfCache = GetIntfCache(name);
+        if (intfCache.initCheck() != OK) {
             continue;
         }
-        std::vector<std::unique_ptr<C2Param>> params;
-        c2_status_t err = intf->query(
-                {}, {C2PortAllocatorsTuning::input::PARAM_TYPE}, C2_MAY_BLOCK, &params);
+        const C2PortAllocatorsTuning::input &allocators = intfCache.getInputAllocators();
         if (firstIteration) {
             firstIteration = false;
-            if (err == C2_OK && params.size() == 1u) {
-                C2PortAllocatorsTuning::input *allocators =
-                    C2PortAllocatorsTuning::input::From(params[0].get());
-                if (allocators && allocators->flexCount() > 0) {
-                    ids->insert(allocators->m.values,
-                                allocators->m.values + allocators->flexCount());
-                }
+            if (allocators && allocators.flexCount() > 0) {
+                ids->insert(allocators.m.values,
+                            allocators.m.values + allocators.flexCount());
             }
             if (ids->empty()) {
                 // The component does not advertise allocators. Use default.
@@ -2003,24 +2082,20 @@ static status_t GetCommonAllocatorIds(
             continue;
         }
         bool filtered = false;
-        if (err == C2_OK && params.size() == 1u) {
-            C2PortAllocatorsTuning::input *allocators =
-                C2PortAllocatorsTuning::input::From(params[0].get());
-            if (allocators && allocators->flexCount() > 0) {
-                filtered = true;
-                for (auto it = ids->begin(); it != ids->end(); ) {
-                    bool found = false;
-                    for (size_t j = 0; j < allocators->flexCount(); ++j) {
-                        if (allocators->m.values[j] == *it) {
-                            found = true;
-                            break;
-                        }
+        if (allocators && allocators.flexCount() > 0) {
+            filtered = true;
+            for (auto it = ids->begin(); it != ids->end(); ) {
+                bool found = false;
+                for (size_t j = 0; j < allocators.flexCount(); ++j) {
+                    if (allocators.m.values[j] == *it) {
+                        found = true;
+                        break;
                     }
-                    if (found) {
-                        ++it;
-                    } else {
-                        it = ids->erase(it);
-                    }
+                }
+                if (found) {
+                    ++it;
+                } else {
+                    it = ids->erase(it);
                 }
             }
         }
@@ -2052,23 +2127,16 @@ static status_t CalculateMinMaxUsage(
     *minUsage = 0;
     *maxUsage = ~0ull;
     for (const std::string &name : names) {
-        std::shared_ptr<Codec2Client::Interface> intf{
-            Codec2Client::CreateInterfaceByName(name.c_str())};
-        if (!intf) {
-            MaybeLogUnrecognizedName(__FUNCTION__, name);
+        const IntfCache &intfCache = GetIntfCache(name);
+        if (intfCache.initCheck() != OK) {
             continue;
         }
-        std::vector<C2FieldSupportedValuesQuery> fields;
-        fields.push_back(C2FieldSupportedValuesQuery::Possible(
-                C2ParamField{&sUsage, &sUsage.value}));
-        c2_status_t err = intf->querySupportedValues(fields, C2_MAY_BLOCK);
-        if (err != C2_OK) {
+        const C2FieldSupportedValuesQuery &usageSupportedValues =
+            intfCache.getUsageSupportedValues();
+        if (usageSupportedValues.status != C2_OK) {
             continue;
         }
-        if (fields[0].status != C2_OK) {
-            continue;
-        }
-        const C2FieldSupportedValues &supported = fields[0].values;
+        const C2FieldSupportedValues &supported = usageSupportedValues.values;
         if (supported.type != C2FieldSupportedValues::FLAGS) {
             continue;
         }
@@ -2089,6 +2157,17 @@ static status_t CalculateMinMaxUsage(
 // static
 status_t CCodec::CanFetchLinearBlock(
         const std::vector<std::string> &names, const C2MemoryUsage &usage, bool *isCompatible) {
+    for (const std::string &name : names) {
+        const IntfCache &intfCache = GetIntfCache(name);
+        if (intfCache.initCheck() != OK) {
+            continue;
+        }
+        const C2ApiFeaturesSetting &features = intfCache.getApiFeatures();
+        if (features && !(features.value & API_SAME_INPUT_BUFFER)) {
+            *isCompatible = false;
+            return OK;
+        }
+    }
     uint64_t minUsage = usage.expected;
     uint64_t maxUsage = ~0ull;
     std::set<C2Allocator::id_t> allocators;
