@@ -214,6 +214,80 @@ static inline const char *portString(OMX_U32 portIndex) {
     }
 }
 
+template <typename T>
+inline static T *asSetting(void *setting /* nonnull */, size_t size) {
+    // no need to check internally stored size as that is outside of sanitizing
+    // the underlying buffer's size is the one passed into this method.
+    if (size < sizeof(T)) {
+        return nullptr;
+    }
+
+    return (T *)setting;
+}
+
+inline static void sanitize(OMX_CONFIG_CONTAINERNODEIDTYPE *s) {
+    s->cNodeName = 0;
+}
+
+inline static void sanitize(OMX_CONFIG_METADATAITEMTYPE *s) {
+    s->sLanguageCountry = 0;
+}
+
+inline static void sanitize(OMX_PARAM_PORTDEFINITIONTYPE *s) {
+    switch (s->eDomain) {
+    case OMX_PortDomainAudio:
+        s->format.audio.cMIMEType = 0;
+        break;
+    case OMX_PortDomainVideo:
+        s->format.video.cMIMEType = 0;
+        break;
+    case OMX_PortDomainImage:
+        s->format.image.cMIMEType = 0;
+        break;
+    default:
+        break;
+    }
+}
+
+template <typename T>
+static bool sanitizeAs(void *setting, size_t size) {
+    T *s = asSetting<T>(setting, size);
+    if (s) {
+        sanitize(s);
+        return true;
+    }
+    return false;
+}
+
+static void sanitizeSetting(OMX_INDEXTYPE index, void *setting, size_t size) {
+    if (size < 8 || setting == nullptr) {
+        return;
+    }
+
+    bool ok = true;
+
+    // there are 3 standard OMX settings that contain pointer members
+    switch ((OMX_U32)index) {
+    case OMX_IndexConfigCounterNodeID:
+        ok = sanitizeAs<OMX_CONFIG_CONTAINERNODEIDTYPE>(setting, size);
+        break;
+    case OMX_IndexConfigMetadataItem:
+        ok = sanitizeAs<OMX_CONFIG_METADATAITEMTYPE>(setting, size);
+        break;
+    case OMX_IndexParamPortDefinition:
+        ok = sanitizeAs<OMX_PARAM_PORTDEFINITIONTYPE>(setting, size);
+        break;
+    }
+
+    if (!ok) {
+        // cannot effectively sanitize - we should not be here as IOMX.cpp
+        // should guard against size being too small. Nonetheless, log and
+        // clear result.
+        android_errorWriteLog(0x534e4554, "120781925");
+        memset(setting, 0, size);
+    }
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 // This provides the underlying Thread used by CallbackDispatcher.
@@ -608,7 +682,7 @@ bool OMXNodeInstance::isProhibitedIndex_l(OMX_INDEXTYPE index) {
 }
 
 status_t OMXNodeInstance::getParameter(
-        OMX_INDEXTYPE index, void *params, size_t /* size */) {
+        OMX_INDEXTYPE index, void *params, size_t size) {
     Mutex::Autolock autoLock(mLock);
     if (mHandle == NULL) {
         return DEAD_OBJECT;
@@ -625,6 +699,7 @@ status_t OMXNodeInstance::getParameter(
     if (err != OMX_ErrorNoMore) {
         CLOG_IF_ERROR(getParameter, err, "%s(%#x)", asString(extIndex), index);
     }
+    sanitizeSetting(index, params, size);
     return StatusFromOMXError(err);
 }
 
@@ -650,11 +725,12 @@ status_t OMXNodeInstance::setParameter(
     OMX_ERRORTYPE err = OMX_SetParameter(
             mHandle, index, const_cast<void *>(params));
     CLOG_IF_ERROR(setParameter, err, "%s(%#x)", asString(extIndex), index);
+    sanitizeSetting(index, const_cast<void *>(params), size);
     return StatusFromOMXError(err);
 }
 
 status_t OMXNodeInstance::getConfig(
-        OMX_INDEXTYPE index, void *params, size_t /* size */) {
+        OMX_INDEXTYPE index, void *params, size_t size) {
     Mutex::Autolock autoLock(mLock);
     if (mHandle == NULL) {
         return DEAD_OBJECT;
@@ -671,6 +747,8 @@ status_t OMXNodeInstance::getConfig(
     if (err != OMX_ErrorNoMore) {
         CLOG_IF_ERROR(getConfig, err, "%s(%#x)", asString(extIndex), index);
     }
+
+    sanitizeSetting(index, params, size);
     return StatusFromOMXError(err);
 }
 
@@ -692,6 +770,7 @@ status_t OMXNodeInstance::setConfig(
     OMX_ERRORTYPE err = OMX_SetConfig(
             mHandle, index, const_cast<void *>(params));
     CLOG_IF_ERROR(setConfig, err, "%s(%#x)", asString(extIndex), index);
+    sanitizeSetting(index, const_cast<void *>(params), size);
     return StatusFromOMXError(err);
 }
 
