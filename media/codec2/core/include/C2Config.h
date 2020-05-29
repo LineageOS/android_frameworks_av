@@ -278,16 +278,19 @@ typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Config::api_level_t>, kPa
         C2ApiLevelSetting;
 constexpr char C2_PARAMKEY_API_LEVEL[] = "api.level";
 
-enum C2Config::api_feature_t : uint64_t {
+C2ENUM(C2Config::api_feature_t, uint64_t,
     API_REFLECTION       = (1U << 0),  ///< ability to list supported parameters
     API_VALUES           = (1U << 1),  ///< ability to list supported values for each parameter
     API_CURRENT_VALUES   = (1U << 2),  ///< ability to list currently supported values for each parameter
     API_DEPENDENCY       = (1U << 3),  ///< have a defined parameter dependency
 
+    API_SAME_INPUT_BUFFER = (1U << 16),   ///< supporting multiple input buffers
+                                          ///< backed by the same allocation
+
     API_STREAMS          = (1ULL << 32),  ///< supporting variable number of streams
 
-    API_TUNNELING        = (1ULL << 48),  ///< tunneling API
-};
+    API_TUNNELING        = (1ULL << 48)   ///< tunneling API
+)
 
 // read-only
 typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Config::api_feature_t>, kParamIndexApiFeatures>
