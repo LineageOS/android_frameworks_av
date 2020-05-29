@@ -117,8 +117,6 @@ public:
     status_t writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
                              int64_t timeUs, uint32_t flags) ;
 
-    void notify(int msg, int ext1, int ext2);
-
 private:
     const OutputFormat mFormat;
     sp<MediaWriter> mWriter;
@@ -130,11 +128,9 @@ private:
         UNINITIALIZED,
         INITIALIZED,
         STARTED,
-        STOPPED,
-        ERROR
+        STOPPED
     };
     State mState;
-    status_t mError;
 
     DISALLOW_EVIL_CONSTRUCTORS(MediaMuxer);
 };
