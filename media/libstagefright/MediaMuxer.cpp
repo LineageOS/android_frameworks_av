@@ -48,8 +48,7 @@ static bool isMp4Format(MediaMuxer::OutputFormat format) {
 
 MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     : mFormat(format),
-      mState(UNINITIALIZED),
-      mError(OK) {
+      mState(UNINITIALIZED) {
     if (isMp4Format(format)) {
         mWriter = new MPEG4Writer(fd);
     } else if (format == OUTPUT_FORMAT_WEBM) {
@@ -59,7 +58,6 @@ MediaMuxer::MediaMuxer(int fd, OutputFormat format)
     }
 
     if (mWriter != NULL) {
-        mWriter->setMuxerListener(this);
         mFileMeta = new MetaData;
         if (format == OUTPUT_FORMAT_HEIF) {
             // Note that the key uses recorder file types.
@@ -157,26 +155,16 @@ status_t MediaMuxer::start() {
 
 status_t MediaMuxer::stop() {
     Mutex::Autolock autoLock(mMuxerLock);
-    if (mState == STARTED || mState == ERROR) {
+    if (mState == STARTED) {
         mState = STOPPED;
         for (size_t i = 0; i < mTrackList.size(); i++) {
             if (mTrackList[i]->stop() != OK) {
                 return INVALID_OPERATION;
             }
         }
-        // Unlock this mutex to allow notify to be called during stop process.
-        mMuxerLock.unlock();
         status_t err = mWriter->stop();
-        mMuxerLock.lock();
-        if (err != OK || mError != OK) {
-            ALOGE("stop err: %d, mError:%d", err, mError);
-        }
-        /* Prioritize mError over err as writer would have got stopped on any
-         * internal error and notified muxer already.  Clients might issue
-         * stop again later, and mWriter->stop() would return success.
-         */
-        if (mError != OK) {
-            err = mError;
+        if (err != OK) {
+            ALOGE("stop() err: %d", err);
         }
         return err;
     } else {
@@ -230,31 +218,6 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];
     // This pushBuffer will wait until the mediaBuffer is consumed.
     return currentTrack->pushBuffer(mediaBuffer);
-}
-
-void MediaMuxer::notify(int msg, int ext1, int ext2) {
-    switch (msg) {
-        case MEDIA_RECORDER_EVENT_ERROR:
-        case MEDIA_RECORDER_TRACK_EVENT_ERROR: {
-            Mutex::Autolock autoLock(mMuxerLock);
-            mState = ERROR;
-            mError = ext2;
-            ALOGW("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);
-            break;
-        }
-        case MEDIA_RECORDER_EVENT_INFO: {
-            if (ext1 == MEDIA_RECORDER_INFO_UNKNOWN) {
-                Mutex::Autolock autoLock(mMuxerLock);
-                mState = ERROR;
-                mError = ext2;
-                ALOGW("message received msg=%d, ext1=%d, ext2=%d", msg, ext1, ext2);
-            }
-            break;
-        }
-        default:
-            // Ignore INFO and other notifications for now.
-            break;
-    }
 }
 
 }  // namespace android
