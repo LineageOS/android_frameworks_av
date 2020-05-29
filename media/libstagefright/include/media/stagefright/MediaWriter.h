@@ -21,7 +21,7 @@
 #include <utils/RefBase.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/IMediaRecorderClient.h>
-#include <media/stagefright/MediaMuxer.h>
+#include <media/mediarecorder.h>
 
 namespace android {
 
@@ -46,7 +46,6 @@ struct MediaWriter : public RefBase {
     virtual void setListener(const sp<IMediaRecorderClient>& listener) {
         mListener = listener;
     }
-    virtual void setMuxerListener(const wp<MediaMuxer>& muxer) { mMuxer = muxer; }
 
     virtual status_t dump(int /*fd*/, const Vector<String16>& /*args*/) {
         return OK;
@@ -61,16 +60,19 @@ protected:
     int64_t mMaxFileSizeLimitBytes;
     int64_t mMaxFileDurationLimitUs;
     sp<IMediaRecorderClient> mListener;
-    wp<MediaMuxer> mMuxer;
 
     void notify(int msg, int ext1, int ext2) {
-        ALOG(LOG_VERBOSE, "MediaWriter", "notify msg:%d, ext1:%d, ext2:%d", msg, ext1, ext2);
+        if (msg == MEDIA_RECORDER_TRACK_EVENT_INFO || msg == MEDIA_RECORDER_TRACK_EVENT_ERROR) {
+            uint32_t trackId = (ext1 >> 28) & 0xf;
+            int type = ext1 & 0xfffffff;
+            ALOG(LOG_VERBOSE, "MediaWriter", "Track event err/info msg:%d, trackId:%u, type:%d,"
+                                             "val:%d", msg, trackId, type, ext2);
+        } else {
+            ALOG(LOG_VERBOSE, "MediaWriter", "Recorder event msg:%d, ext1:%d, ext2:%d",
+                                              msg, ext1, ext2);
+        }
         if (mListener != nullptr) {
             mListener->notify(msg, ext1, ext2);
-        }
-        sp<MediaMuxer> muxer = mMuxer.promote();
-        if (muxer != nullptr) {
-            muxer->notify(msg, ext1, ext2);
         }
     }
 private:
