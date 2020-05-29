@@ -187,3 +187,15 @@ void ExtractorFuzzerBase::seekAndExtractTrack(MediaTrackHelper* track,
   cTrack->stop(track);
   free(cTrack);
 }
+
+void ExtractorFuzzerBase::processData(const uint8_t* data, size_t size) {
+  if (setDataSource(data, size)) {
+    if (createExtractor()) {
+      getExtractorDef();
+      getMetadata();
+      extractTracks();
+      getTracksMetadata();
+      seekAndExtractTracks();
+    }
+  }
+}

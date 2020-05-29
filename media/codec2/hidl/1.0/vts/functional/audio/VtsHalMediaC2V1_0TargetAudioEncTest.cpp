@@ -96,6 +96,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
         mCsd = false;
         mFramesReceived = 0;
         mWorkResult = C2_OK;
+        mOutputSize = 0u;
         if (mCompName == unknown_comp) mDisableTest = true;
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
         getInputMaxBufSize();
@@ -117,6 +118,16 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
         for (std::unique_ptr<C2Work>& work : workItems) {
             if (!work->worklets.empty()) {
                 mWorkResult |= work->result;
+                if (!work->worklets.front()->output.buffers.empty()) {
+                    mOutputSize += work->worklets.front()
+                                           ->output.buffers[0]
+                                           ->data()
+                                           .linearBlocks()
+                                           .front()
+                                           .map()
+                                           .get()
+                                           .capacity();
+                }
                 workDone(mComponent, work, mFlushedIndices, mQueueLock, mQueueCondition, mWorkQueue,
                          mEos, mCsd, mFramesReceived);
             }
@@ -141,6 +152,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     int32_t mWorkResult;
     uint32_t mFramesReceived;
     int32_t mInputMaxBufSize;
+    uint64_t mOutputSize;
     std::list<uint64_t> mFlushedIndices;
 
     C2BlockPool::local_id_t mBlockPoolId;
@@ -567,6 +579,210 @@ TEST_P(Codec2AudioEncHidlTest, FlushTest) {
     // TODO: (b/154671521)
     // Add assert for mWorkResult
     ASSERT_EQ(mComponent->stop(), C2_OK);
+}
+
+TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
+    description("Encodes input file for different channel count");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
+
+    char mURL[512];
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mCompName, mURL);
+
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
+    ALOGV("mURL : %s", mURL);
+
+    int32_t nSampleRate;
+    int32_t samplesPerFrame;
+    int32_t nChannels;
+    int32_t numFrames = 16;
+    int32_t maxChannelCount = 8;
+
+    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+
+    uint64_t prevOutputSize = 0u;
+    uint32_t prevChannelCount = 0u;
+
+    // Looping through the maximum number of channel count supported by encoder
+    for (nChannels = 1; nChannels < maxChannelCount; nChannels++) {
+        ALOGV("Configuring %u encoder for channel count = %d", mCompName, nChannels);
+        if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
+            std::cout << "[   WARN   ] Test Skipped \n";
+            return;
+        }
+
+        std::vector<std::unique_ptr<C2Param>> inParams;
+        c2_status_t c2_status = mComponent->query({}, {C2StreamChannelCountInfo::input::PARAM_TYPE},
+                                                  C2_DONT_BLOCK, &inParams);
+        ASSERT_TRUE(!c2_status && inParams.size())
+                << "Query configured channelCount failed => %d" << c2_status;
+
+        size_t offset = sizeof(C2Param);
+        C2Param* param = inParams[0].get();
+        int32_t channelCount = *(int32_t*)((uint8_t*)param + offset);
+        if (channelCount != nChannels) {
+            std::cout << "[   WARN   ] Test Skipped for ChannelCount " << nChannels << "\n";
+            continue;
+        }
+
+        // To check if the input stream is sufficient to encode for the higher channel count
+        int32_t bytesCount = (samplesPerFrame * nChannels * 2) * numFrames;
+        if (eleStream.gcount() < bytesCount) {
+            std::cout << "[   WARN   ] Test Skipped for ChannelCount " << nChannels
+                      << " because of insufficient input data\n";
+            continue;
+        }
+
+        ASSERT_EQ(mComponent->start(), C2_OK);
+
+        ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                              mFlushedIndices, mLinearPool, eleStream, numFrames,
+                                              samplesPerFrame, nChannels, nSampleRate));
+
+        // mDisableTest will be set if buffer was not fetched properly.
+        // This may happen when config params is not proper but config succeeded
+        // In this cases, we skip encoding the input stream
+        if (mDisableTest) {
+            std::cout << "[   WARN   ] Test Disabled for ChannelCount " << nChannels << "\n";
+            ASSERT_EQ(mComponent->stop(), C2_OK);
+            return;
+        }
+
+        // blocking call to ensures application to Wait till all the inputs are consumed
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+        // Validate output size based on chosen ChannelCount
+        EXPECT_GE(mOutputSize, prevOutputSize);
+
+        prevChannelCount = nChannels;
+        prevOutputSize = mOutputSize;
+
+        if (mFramesReceived != numFrames) {
+            ALOGE("Input buffer count and Output buffer count mismatch");
+            ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
+            ASSERT_TRUE(false);
+        }
+        if ((mCompName == flac || mCompName == opus || mCompName == aac)) {
+            ASSERT_TRUE(mCsd) << "CSD buffer missing";
+        }
+        ASSERT_TRUE(mEos);
+        ASSERT_EQ(mComponent->stop(), C2_OK);
+        mFramesReceived = 0;
+        mOutputSize = 0;
+        mEos = false;
+        mCsd = false;
+        eleStream.seekg(0, eleStream.beg);
+    }
+}
+
+TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
+    description("Encodes input file for different SampleRate");
+    if (mDisableTest) GTEST_SKIP() << "Test is disabled";
+
+    char mURL[512];
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mCompName, mURL);
+
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
+    ALOGV("mURL : %s", mURL);
+
+    int32_t nSampleRate;
+    int32_t samplesPerFrame;
+    int32_t nChannels;
+    int32_t numFrames = 16;
+
+    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+        std::cout << "[   WARN   ] Test Skipped \n";
+        return;
+    }
+
+    int32_t sampleRateValues[] = {1000, 8000, 16000, 24000, 48000, 96000, 192000};
+
+    uint64_t prevOutputSize = 0u;
+    uint32_t prevSampleRate = 0u;
+
+    for (int32_t nSampleRate : sampleRateValues) {
+        ALOGV("Configuring %u encoder for SampleRate = %d", mCompName, nSampleRate);
+        if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
+            std::cout << "[   WARN   ] Test Skipped \n";
+            return;
+        }
+
+        std::vector<std::unique_ptr<C2Param>> inParams;
+        c2_status_t c2_status = mComponent->query({}, {C2StreamSampleRateInfo::input::PARAM_TYPE},
+                                                  C2_DONT_BLOCK, &inParams);
+
+        ASSERT_TRUE(!c2_status && inParams.size())
+                << "Query configured SampleRate failed => %d" << c2_status;
+        size_t offset = sizeof(C2Param);
+        C2Param* param = inParams[0].get();
+        int32_t configuredSampleRate = *(int32_t*)((uint8_t*)param + offset);
+
+        if (configuredSampleRate != nSampleRate) {
+            std::cout << "[   WARN   ] Test Skipped for SampleRate " << nSampleRate << "\n";
+            continue;
+        }
+
+        // To check if the input stream is sufficient to encode for the higher SampleRate
+        int32_t bytesCount = (samplesPerFrame * nChannels * 2) * numFrames;
+        if (eleStream.gcount() < bytesCount) {
+            std::cout << "[   WARN   ] Test Skipped for SampleRate " << nSampleRate
+                      << " because of insufficient input data\n";
+            continue;
+        }
+
+        ASSERT_EQ(mComponent->start(), C2_OK);
+
+        ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
+                                              mFlushedIndices, mLinearPool, eleStream, numFrames,
+                                              samplesPerFrame, nChannels, nSampleRate));
+
+        // mDisableTest will be set if buffer was not fetched properly.
+        // This may happen when config params is not proper but config succeeded
+        // In this case, we skip encoding the input stream
+        if (mDisableTest) {
+            std::cout << "[   WARN   ] Test Disabled for SampleRate" << nSampleRate << "\n";
+            ASSERT_EQ(mComponent->stop(), C2_OK);
+            return;
+        }
+
+        // blocking call to ensures application to Wait till all the inputs are consumed
+        waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
+
+        // Validate output size based on chosen samplerate
+        if (prevSampleRate >= nSampleRate) {
+            EXPECT_LE(mOutputSize, prevOutputSize);
+        } else {
+            EXPECT_GT(mOutputSize, prevOutputSize);
+        }
+        prevSampleRate = nSampleRate;
+        prevOutputSize = mOutputSize;
+
+        if (mFramesReceived != numFrames) {
+            ALOGE("Input buffer count and Output buffer count mismatch");
+            ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
+            ASSERT_TRUE(false);
+        }
+        if ((mCompName == flac || mCompName == opus || mCompName == aac)) {
+            ASSERT_TRUE(mCsd) << "CSD buffer missing";
+        }
+        ASSERT_TRUE(mEos);
+        ASSERT_EQ(mComponent->stop(), C2_OK);
+        mFramesReceived = 0;
+        mOutputSize = 0;
+        mEos = false;
+        mCsd = false;
+        eleStream.seekg(0, eleStream.beg);
+    }
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(kTestParameters),

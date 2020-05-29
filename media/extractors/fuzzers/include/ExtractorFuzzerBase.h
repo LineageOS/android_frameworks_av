@@ -70,6 +70,8 @@ class ExtractorFuzzerBase {
 
   void seekAndExtractTracks();
 
+  void processData(const uint8_t* data, size_t size);
+
  protected:
   class BufferSource : public DataSource {
    public:
