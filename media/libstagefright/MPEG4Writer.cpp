@@ -2401,8 +2401,8 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
             int32_t err;
             CHECK(msg->findInt32("errno", &err));
             // Stop tracks' threads and main writer thread.
-            notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
             stop();
+            notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
             break;
         }
         // fallocate() failed, hence notify app about it and stop().
@@ -2410,9 +2410,10 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
             ALOGE("kWhatFallocateError");
             int32_t err;
             CHECK(msg->findInt32("errno", &err));
+            // Stop tracks' threads and main writer thread.
+            stop();
             //TODO: introduce a suitable MEDIA_RECORDER_ERROR_* instead MEDIA_RECORDER_ERROR_UNKNOWN?
             notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
-            stop();
             break;
         }
         default:
