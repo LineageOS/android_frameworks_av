@@ -139,8 +139,10 @@ cc_library_static {
 
     header_libs: [
         "libaudioclient_headers",
-        "libmedia_headers",
+        "libbase_headers",
+        "libmedia_datasource_headers",
         "media_ndk_headers",
+        "media_plugin_headers",
     ],
 
     cflags: [
