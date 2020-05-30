@@ -57,6 +57,7 @@
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/CCodec.h>
 #include <media/stagefright/MediaCodec.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -95,9 +96,12 @@ static const char *kCodecRotation = "android.media.mediacodec.rotation-degrees";
 static const char *kCodecCrypto = "android.media.mediacodec.crypto";   /* 0,1 */
 static const char *kCodecProfile = "android.media.mediacodec.profile";  /* 0..n */
 static const char *kCodecLevel = "android.media.mediacodec.level";  /* 0..n */
+static const char *kCodecBitrateMode = "android.media.mediacodec.bitrate_mode";  /* CQ/VBR/CBR */
+static const char *kCodecBitrate = "android.media.mediacodec.bitrate";  /* 0..n */
 static const char *kCodecMaxWidth = "android.media.mediacodec.maxwidth";  /* 0..n */
 static const char *kCodecMaxHeight = "android.media.mediacodec.maxheight";  /* 0..n */
 static const char *kCodecError = "android.media.mediacodec.errcode";
+static const char *kCodecLifetimeMs = "android.media.mediacodec.lifetimeMs";   /* 0..n ms*/
 static const char *kCodecErrorState = "android.media.mediacodec.errstate";
 static const char *kCodecLatencyMax = "android.media.mediacodec.latency.max";   /* in us */
 static const char *kCodecLatencyMin = "android.media.mediacodec.latency.min";   /* in us */
@@ -619,7 +623,6 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mFlags(0),
       mStickyError(OK),
       mSoftRenderer(NULL),
-      mMetricsHandle(0),
       mIsVideo(false),
       mVideoWidth(0),
       mVideoHeight(0),
@@ -679,6 +682,8 @@ void MediaCodec::initMediametrics() {
         mIndexOfFirstFrameWhenLowLatencyOn = -1;
         mInputBufferCounter = 0;
     }
+
+    mLifetimeStartNs = systemTime(SYSTEM_TIME_MONOTONIC);
 }
 
 void MediaCodec::updateMediametrics() {
@@ -686,7 +691,6 @@ void MediaCodec::updateMediametrics() {
     if (mMetricsHandle == 0) {
         return;
     }
-
 
     if (mLatencyHist.getCount() != 0 ) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyMax, mLatencyHist.getMax());
@@ -702,6 +706,11 @@ void MediaCodec::updateMediametrics() {
     }
     if (mLatencyUnknown > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
+    }
+    if (mLifetimeStartNs > 0) {
+        nsecs_t lifetime = systemTime(SYSTEM_TIME_MONOTONIC) - mLifetimeStartNs;
+        lifetime = lifetime / (1000 * 1000);    // emitted in ms, truncated not rounded
+        mediametrics_setInt64(mMetricsHandle, kCodecLifetimeMs, lifetime);
     }
 
     {
@@ -739,7 +748,6 @@ void MediaCodec::updateEphemeralMediametrics(mediametrics_handle_t item) {
             }
         }
     }
-
 
     // spit the data (if any) into the supplied analytics record
     if (recentHist.getCount()!= 0 ) {
@@ -2309,6 +2317,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         // meaningful and confusing for an encoder in a transcoder scenario
                         mInputFormat->setInt32("allow-frame-drop", mAllowFrameDroppingBySurface);
                     }
+                    sp<AMessage> interestingFormat =
+                            (mFlags & kFlagIsEncoder) ? mOutputFormat : mInputFormat;
                     ALOGV("[%s] configured as input format: %s, output format: %s",
                             mComponentName.c_str(),
                             mInputFormat->debugString(4).c_str(),
@@ -2322,6 +2332,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     (new AMessage)->postReply(mReplyID);
 
                     // augment our media metrics info, now that we know more things
+                    // such as what the codec extracted from any CSD passed in.
                     if (mMetricsHandle != 0) {
                         sp<AMessage> format;
                         if (mConfigureMsg != NULL &&
@@ -2333,6 +2344,30 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                                             mime.c_str());
                                 }
                             }
+                        // perhaps video only?
+                        int32_t profile = 0;
+                        if (interestingFormat->findInt32("profile", &profile)) {
+                            mediametrics_setInt32(mMetricsHandle, kCodecProfile, profile);
+                        }
+                        int32_t level = 0;
+                        if (interestingFormat->findInt32("level", &level)) {
+                            mediametrics_setInt32(mMetricsHandle, kCodecLevel, level);
+                        }
+                        // bitrate and bitrate mode, encoder only
+                        if (mFlags & kFlagIsEncoder) {
+                            // encoder specific values
+                            int32_t bitrate_mode = -1;
+                            if (mOutputFormat->findInt32(KEY_BITRATE_MODE, &bitrate_mode)) {
+                                    mediametrics_setCString(mMetricsHandle, kCodecBitrateMode,
+                                          asString_BitrateMode(bitrate_mode));
+                            }
+                            int32_t bitrate = -1;
+                            if (mOutputFormat->findInt32(KEY_BIT_RATE, &bitrate)) {
+                                    mediametrics_setInt32(mMetricsHandle, kCodecBitrate, bitrate);
+                            }
+                        } else {
+                            // decoder specific values
+                        }
                     }
                     break;
                 }
