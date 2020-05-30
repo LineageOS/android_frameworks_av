@@ -510,11 +510,11 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         ASSERT_TRUE(false);
     }
 
-    if (!mCsd && (mCompName != vp8 && mCompName != vp9 && mCompName != h263)) {
+    if (!mCsd && (mCompName != vp8 && mCompName != vp9)) {
         ASSERT_TRUE(false) << "CSD Buffer not received";
     }
 
-    if (mCsd && (mCompName == vp8 || mCompName == vp9 || mCompName == h263)) {
+    if (mCsd && (mCompName == vp8 || mCompName == vp9)) {
         ASSERT_TRUE(false) << "CSD Buffer not expected";
     }
 
