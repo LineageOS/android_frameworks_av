@@ -1686,6 +1686,9 @@ bool CCodecBufferChannel::handleWork(
 
     {
         Mutexed<Output>::Locked output(mOutput);
+        if (!output->buffers) {
+            return false;
+        }
         output->buffers->pushToStash(
                 buffer,
                 notifyClient,
