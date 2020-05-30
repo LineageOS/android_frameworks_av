@@ -371,7 +371,8 @@ private:
     sp<Surface> mSurface;
     SoftwareRenderer *mSoftRenderer;
 
-    mediametrics_handle_t mMetricsHandle;
+    mediametrics_handle_t mMetricsHandle = 0;
+    nsecs_t mLifetimeStartNs = 0;
     void initMediametrics();
     void updateMediametrics();
     void flushMediametrics();
