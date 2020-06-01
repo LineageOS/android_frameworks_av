@@ -84,6 +84,7 @@ private:
     AString mUser, mPass;
     AuthType mAuthType;
     AString mNonce;
+    AString mRealm;
     int mSocket;
     int32_t mConnectionID;
     int32_t mNextCSeq;
