@@ -172,29 +172,26 @@ static unsigned parseAC3SyncFrame(
         return 0;
     }
 
-    unsigned bsmod __unused = bits.getBits(3);
+    bits.skipBits(3); // bsmod
     unsigned acmod = bits.getBits(3);
-    unsigned cmixlev __unused = 0;
-    unsigned surmixlev __unused = 0;
-    unsigned dsurmod __unused = 0;
 
     if ((acmod & 1) > 0 && acmod != 1) {
         if (bits.numBitsLeft() < 2) {
             return 0;
         }
-        cmixlev = bits.getBits(2);
+        bits.skipBits(2); //cmixlev
     }
     if ((acmod & 4) > 0) {
         if (bits.numBitsLeft() < 2) {
             return 0;
         }
-        surmixlev = bits.getBits(2);
+        bits.skipBits(2); //surmixlev
     }
     if (acmod == 2) {
         if (bits.numBitsLeft() < 2) {
             return 0;
         }
-        dsurmod = bits.getBits(2);
+        bits.skipBits(2); //dsurmod
     }
 
     if (bits.numBitsLeft() < 1) {
@@ -269,7 +266,7 @@ static unsigned parseEAC3SyncFrame(
         samplingRate = samplingRateTable2[fscod2];
     } else {
         samplingRate = samplingRateTable[fscod];
-        unsigned numblkscod __unused = bits.getBits(2);
+        bits.skipBits(2); // numblkscod
     }
 
     unsigned acmod = bits.getBits(3);
@@ -1087,7 +1084,7 @@ sp<ABuffer> ElementaryStreamQueue::dequeueAccessUnitPCMAudio() {
     }
     unsigned numAUs = bits.getBits(8);
     bits.skipBits(8);
-    unsigned quantization_word_length __unused = bits.getBits(2);
+    bits.skipBits(2); // quantization_word_length
     unsigned audio_sampling_frequency = bits.getBits(3);
     unsigned num_channels = bits.getBits(3);
 
