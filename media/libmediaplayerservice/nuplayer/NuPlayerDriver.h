@@ -132,6 +132,7 @@ private:
     uint32_t mPlayerFlags;
 
     MediaAnalyticsItem *mAnalyticsItem;
+    mutable Mutex mMetricsLock;
 
     bool mAtEOS;
     bool mLooping;
