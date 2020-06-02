@@ -154,7 +154,7 @@ void FastCapture::onStateChange()
         mReadBufferState = -1;
         dumpState->mFrameCount = frameCount;
     }
-
+    dumpState->mSilenced = current->mSilenceCapture;
 }
 
 void FastCapture::onWork()
@@ -208,6 +208,9 @@ void FastCapture::onWork()
             mReadBufferState = frameCount;
         }
         if (mReadBufferState > 0) {
+            if (current->mSilenceCapture) {
+                memset(mReadBuffer, 0, mReadBufferState * Format_frameSize(mFormat));
+            }
             ssize_t framesWritten = mPipeSink->write(mReadBuffer, mReadBufferState);
             audio_track_cblk_t* cblk = current->mCblk;
             if (fastPatchRecordBufferProvider != 0) {
