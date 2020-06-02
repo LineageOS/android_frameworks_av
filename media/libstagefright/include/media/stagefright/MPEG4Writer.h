@@ -87,7 +87,8 @@ private:
     enum {
         kWhatSwitch                  = 'swch',
         kWhatIOError                 = 'ioer',
-        kWhatFallocateError          = 'faer'
+        kWhatFallocateError          = 'faer',
+        kWhatNoIOErrorSoFar          = 'noie'
     };
 
     int  mFd;
@@ -231,7 +232,7 @@ private:
     status_t stopWriterThread();
     static void *ThreadWrapper(void *me);
     void threadFunc();
-    void setupAndStartLooper();
+    status_t setupAndStartLooper();
     void stopAndReleaseLooper();
 
     // Buffer a single chunk to be written out later.
