@@ -1500,7 +1500,7 @@ void AudioMixerBase::TrackBase::track__Resample(TO* out, size_t outFrameCount, T
     ALOGVV("track__Resample\n");
     mResampler->setSampleRate(sampleRate);
     const bool ramp = needsRamp();
-    if (MIXTYPE == MIXTYPE_MONOEXPAND || MIXTYPE == MIXTYPE_STEREOEXPAND
+    if (MIXTYPE == MIXTYPE_MONOEXPAND || MIXTYPE == MIXTYPE_STEREOEXPAND // custom volume handling
             || ramp || aux != NULL) {
         // if ramp:        resample with unity gain to temp buffer and scale/mix in 2nd step.
         // if aux != NULL: resample with unity gain to temp buffer then apply send level.
