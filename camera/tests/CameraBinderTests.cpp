@@ -95,6 +95,17 @@ public:
         return binder::Status::ok();
     }
 
+    virtual binder::Status onCameraOpened(const String16& /*cameraId*/,
+            const String16& /*clientPackageName*/) {
+        // No op
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onCameraClosed(const String16& /*cameraId*/) {
+        // No op
+        return binder::Status::ok();
+    }
+
     bool waitForNumCameras(size_t num) const {
         Mutex::Autolock l(mLock);
 

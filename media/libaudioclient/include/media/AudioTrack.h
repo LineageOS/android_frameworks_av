@@ -107,6 +107,11 @@ public:
             int16_t*    i16;      // signed 16-bit
             int8_t*     i8;       // unsigned 8-bit, offset by 0x80
         };                        // input to obtainBuffer(): unused, output: pointer to buffer
+
+        uint32_t    sequence;       // IAudioTrack instance sequence number, as of obtainBuffer().
+                                    // It is set by obtainBuffer() and confirmed by releaseBuffer().
+                                    // Not "user-serviceable".
+                                    // TODO Consider sp<IMemory> instead, or in addition to this.
     };
 
     /* As a convenience, if a callback is supplied, a handler thread
@@ -692,14 +697,17 @@ public:
      *  frameCount  number of [empty slots for] frames requested
      *  size        ignored
      *  raw         ignored
+     *  sequence    ignored
      * After error return:
      *  frameCount  0
      *  size        0
      *  raw         undefined
+     *  sequence    undefined
      * After successful return:
      *  frameCount  actual number of [empty slots for] frames available, <= number requested
      *  size        actual number of bytes available
      *  raw         pointer to the buffer
+     *  sequence    IAudioTrack instance sequence number, as of obtainBuffer()
      */
             status_t    obtainBuffer(Buffer* audioBuffer, int32_t waitCount,
                                 size_t *nonContig = NULL);

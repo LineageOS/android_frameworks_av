@@ -34,6 +34,9 @@ sched_setscheduler: 1
 getrlimit: 1
 nanosleep: 1
 getrandom: 1
+timer_create: 1
+timer_settime: 1
+timer_delete: 1
 
 # for dynamically loading extractors
 getdents64: 1
@@ -51,3 +54,4 @@ getpid: 1
 gettid: 1
 
 @include /system/etc/seccomp_policy/crash_dump.x86_64.policy
+@include /system/etc/seccomp_policy/code_coverage.x86_64.policy

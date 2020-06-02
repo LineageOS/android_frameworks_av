@@ -1071,6 +1071,7 @@ status_t BnDrm::onTransact(
             Vector<uint8_t> keySetId;
             readVector(data, keySetId);
             DrmPlugin::OfflineLicenseState state;
+            state = DrmPlugin::OfflineLicenseState::kOfflineLicenseStateUnknown;
             status_t result = getOfflineLicenseState(keySetId, &state);
             reply->writeInt32(static_cast<DrmPlugin::OfflineLicenseState>(state));
             reply->writeInt32(result);

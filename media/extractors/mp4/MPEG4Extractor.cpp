@@ -1060,6 +1060,8 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     // drop it now to reduce our footprint
                     free(mLastTrack->mTx3gBuffer);
                     mLastTrack->mTx3gBuffer = NULL;
+                    mLastTrack->mTx3gFilled = 0;
+                    mLastTrack->mTx3gSize = 0;
                 }
 
             } else if (chunk_type == FOURCC("moov")) {
@@ -2621,6 +2623,10 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             // if those apps are compensating for it, we'd break them with such a change
             //
 
+            if (mLastTrack->mTx3gBuffer == NULL) {
+                mLastTrack->mTx3gSize = 0;
+                mLastTrack->mTx3gFilled = 0;
+            }
             if (mLastTrack->mTx3gSize - mLastTrack->mTx3gFilled < chunk_size) {
                 size_t growth = kTx3gGrowth;
                 if (growth < chunk_size) {
@@ -4993,8 +4999,11 @@ status_t MPEG4Source::parseChunk(off64_t *offset) {
 }
 
 status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
-        off64_t offset, off64_t /* size */) {
+        off64_t offset, off64_t size) {
     ALOGV("parseSampleAuxiliaryInformationSizes");
+    if (size < 9) {
+        return -EINVAL;
+    }
     // 14496-12 8.7.12
     uint8_t version;
     if (mDataSource->readAt(
@@ -5007,25 +5016,32 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
         return ERROR_UNSUPPORTED;
     }
     offset++;
+    size--;
 
     uint32_t flags;
     if (!mDataSource->getUInt24(offset, &flags)) {
         return ERROR_IO;
     }
     offset += 3;
+    size -= 3;
 
     if (flags & 1) {
+        if (size < 13) {
+            return -EINVAL;
+        }
         uint32_t tmp;
         if (!mDataSource->getUInt32(offset, &tmp)) {
             return ERROR_MALFORMED;
         }
         mCurrentAuxInfoType = tmp;
         offset += 4;
+        size -= 4;
         if (!mDataSource->getUInt32(offset, &tmp)) {
             return ERROR_MALFORMED;
         }
         mCurrentAuxInfoTypeParameter = tmp;
         offset += 4;
+        size -= 4;
     }
 
     uint8_t defsize;
@@ -5034,6 +5050,7 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
     }
     mCurrentDefaultSampleInfoSize = defsize;
     offset++;
+    size--;
 
     uint32_t smplcnt;
     if (!mDataSource->getUInt32(offset, &smplcnt)) {
@@ -5041,10 +5058,15 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
     }
     mCurrentSampleInfoCount = smplcnt;
     offset += 4;
-
+    size -= 4;
     if (mCurrentDefaultSampleInfoSize != 0) {
         ALOGV("@@@@ using default sample info size of %d", mCurrentDefaultSampleInfoSize);
         return OK;
+    }
+    if(smplcnt > size) {
+        ALOGW("b/124525515 - smplcnt(%u) > size(%ld)", (unsigned int)smplcnt, (unsigned long)size);
+        android_errorWriteLog(0x534e4554, "124525515");
+        return -EINVAL;
     }
     if (smplcnt > mCurrentSampleInfoAllocSize) {
         uint8_t * newPtr =  (uint8_t*) realloc(mCurrentSampleInfoSizes, smplcnt);
@@ -5061,26 +5083,32 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationSizes(
 }
 
 status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
-        off64_t offset, off64_t /* size */) {
+        off64_t offset, off64_t size) {
     ALOGV("parseSampleAuxiliaryInformationOffsets");
+    if (size < 8) {
+        return -EINVAL;
+    }
     // 14496-12 8.7.13
     uint8_t version;
     if (mDataSource->readAt(offset, &version, sizeof(version)) != 1) {
         return ERROR_IO;
     }
     offset++;
+    size--;
 
     uint32_t flags;
     if (!mDataSource->getUInt24(offset, &flags)) {
         return ERROR_IO;
     }
     offset += 3;
+    size -= 3;
 
     uint32_t entrycount;
     if (!mDataSource->getUInt32(offset, &entrycount)) {
         return ERROR_IO;
     }
     offset += 4;
+    size -= 4;
     if (entrycount == 0) {
         return OK;
     }
@@ -5106,19 +5134,31 @@ status_t MPEG4Source::parseSampleAuxiliaryInformationOffsets(
 
     for (size_t i = 0; i < entrycount; i++) {
         if (version == 0) {
+            if (size < 4) {
+                ALOGW("b/124526959");
+                android_errorWriteLog(0x534e4554, "124526959");
+                return -EINVAL;
+            }
             uint32_t tmp;
             if (!mDataSource->getUInt32(offset, &tmp)) {
                 return ERROR_IO;
             }
             mCurrentSampleInfoOffsets[i] = tmp;
             offset += 4;
+            size -= 4;
         } else {
+            if (size < 8) {
+                ALOGW("b/124526959");
+                android_errorWriteLog(0x534e4554, "124526959");
+                return -EINVAL;
+            }
             uint64_t tmp;
             if (!mDataSource->getUInt64(offset, &tmp)) {
                 return ERROR_IO;
             }
             mCurrentSampleInfoOffsets[i] = tmp;
             offset += 8;
+            size -= 8;
         }
     }
 
@@ -5440,16 +5480,12 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
 
         // apply some sanity (vs strict legality) checks
         //
-        // clamp the count of entries in the trun box, to avoid spending forever parsing
-        // this box. Clamping (vs error) lets us play *something*.
-        // 1 million is about 400 msecs on a Pixel3, should be no more than a couple seconds
-        // on the slowest devices.
-        static constexpr uint32_t kMaxTrunSampleCount = 1000000;
+        static constexpr uint32_t kMaxTrunSampleCount = 10000;
         if (sampleCount > kMaxTrunSampleCount) {
-            ALOGW("b/123389881 clamp sampleCount(%u) @ kMaxTrunSampleCount(%u)",
+            ALOGW("b/123389881 sampleCount(%u) > kMaxTrunSampleCount(%u)",
                   sampleCount, kMaxTrunSampleCount);
             android_errorWriteLog(0x534e4554, "124389881 count");
-
+            return -EINVAL;
         }
     }
 
@@ -5493,7 +5529,12 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
         tmp.duration = sampleDuration;
         tmp.compositionOffset = sampleCtsOffset;
         memset(tmp.iv, 0, sizeof(tmp.iv));
-        mCurrentSamples.add(tmp);
+        if (mCurrentSamples.add(tmp) < 0) {
+            ALOGW("b/123389881 failed saving sample(n=%zu)", mCurrentSamples.size());
+            android_errorWriteLog(0x534e4554, "124389881 allocation");
+            mCurrentSamples.clear();
+            return NO_MEMORY;
+        }
 
         dataOffset += sampleSize;
     }

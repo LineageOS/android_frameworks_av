@@ -14,7 +14,9 @@ cc_library_shared {
     static_libs: [
         "libmedia_midiiowrapper",
         "libsonivox",
-        "libstagefright_foundation"
+        "libstagefright_foundation",
+        "libwatchdog",
+        "libbase",
     ],
     name: "libmidiextractor",
     relative_install_path: "extractors",
@@ -35,5 +37,4 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
     },
-
 }
