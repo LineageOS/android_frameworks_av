@@ -40,6 +40,32 @@
 #define HW_MODULE_PREFIX "primary"
 namespace android {
 
+namespace {
+
+// Given an IMemory, returns a copy of its content along with its size.
+// Returns nullptr on failure or if input is nullptr.
+std::pair<std::unique_ptr<uint8_t[]>,
+          size_t> CopyToArray(const sp<IMemory>& mem) {
+    if (mem == nullptr) {
+        return std::make_pair(nullptr, 0);
+    }
+
+    const size_t size = mem->size();
+    if (size == 0) {
+        return std::make_pair(nullptr, 0);
+    }
+
+    std::unique_ptr<uint8_t[]> ar = std::make_unique<uint8_t[]>(size);
+    if (ar == nullptr) {
+        return std::make_pair(nullptr, 0);
+    }
+
+    memcpy(ar.get(), mem->pointer(), size);
+    return std::make_pair(std::move(ar), size);
+}
+
+}
+
 SoundTriggerHwService::SoundTriggerHwService()
     : BnSoundTriggerHwService(),
       mNextUniqueId(1),
@@ -557,8 +583,13 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
         return NO_INIT;
     }
 
-    struct sound_trigger_sound_model *sound_model =
-            (struct sound_trigger_sound_model *)modelMemory->pointer();
+    auto immutableMemory = CopyToArray(modelMemory);
+    if (immutableMemory.first == nullptr) {
+        return NO_MEMORY;
+    }
+
+    struct sound_trigger_sound_model* sound_model =
+        (struct sound_trigger_sound_model*) immutableMemory.first.get();
 
     size_t structSize;
     if (sound_model->type == SOUND_MODEL_TYPE_KEYPHRASE) {
@@ -568,9 +599,10 @@ status_t SoundTriggerHwService::Module::loadSoundModel(const sp<IMemory>& modelM
     }
 
     if (sound_model->data_offset < structSize ||
-           sound_model->data_size > (UINT_MAX - sound_model->data_offset) ||
-           modelMemory->size() < sound_model->data_offset ||
-           sound_model->data_size > (modelMemory->size() - sound_model->data_offset)) {
+        sound_model->data_size > (UINT_MAX - sound_model->data_offset) ||
+        immutableMemory.second < sound_model->data_offset ||
+            sound_model->data_size >
+            (immutableMemory.second - sound_model->data_offset)) {
         android_errorWriteLog(0x534e4554, "30148546");
         ALOGE("loadSoundModel() data_size is too big");
         return BAD_VALUE;
@@ -651,13 +683,19 @@ status_t SoundTriggerHwService::Module::startRecognition(sound_model_handle_t ha
         return NO_INIT;
     }
 
-    struct sound_trigger_recognition_config *config =
-            (struct sound_trigger_recognition_config *)dataMemory->pointer();
+    auto immutableMemory = CopyToArray(dataMemory);
+    if (immutableMemory.first == nullptr) {
+        return NO_MEMORY;
+    }
+
+    struct sound_trigger_recognition_config* config =
+        (struct sound_trigger_recognition_config*) immutableMemory.first.get();
 
     if (config->data_offset < sizeof(struct sound_trigger_recognition_config) ||
-            config->data_size > (UINT_MAX - config->data_offset) ||
-            dataMemory->size() < config->data_offset ||
-            config->data_size > (dataMemory->size() - config->data_offset)) {
+        config->data_size > (UINT_MAX - config->data_offset) ||
+        immutableMemory.second < config->data_offset ||
+            config->data_size >
+            (immutableMemory.second - config->data_offset)) {
         ALOGE("startRecognition() data_size is too big");
         return BAD_VALUE;
     }

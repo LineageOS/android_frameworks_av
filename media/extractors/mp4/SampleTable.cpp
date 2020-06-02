@@ -391,19 +391,10 @@ status_t SampleTable::setTimeToSampleParams(
     }
 
     mTimeToSampleCount = U32_AT(&header[4]);
-    if (mTimeToSampleCount > UINT32_MAX / (2 * sizeof(uint32_t))) {
-        // Choose this bound because
-        // 1) 2 * sizeof(uint32_t) is the amount of memory needed for one
-        //    time-to-sample entry in the time-to-sample table.
-        // 2) mTimeToSampleCount is the number of entries of the time-to-sample
-        //    table.
-        // 3) We hope that the table size does not exceed UINT32_MAX.
+    if (mTimeToSampleCount > (data_size - 8) / (2 * sizeof(uint32_t))) {
         ALOGE("Time-to-sample table size too large.");
         return ERROR_OUT_OF_RANGE;
     }
-
-    // Note: At this point, we know that mTimeToSampleCount * 2 will not
-    // overflow because of the above condition.
 
     uint64_t allocSize = (uint64_t)mTimeToSampleCount * 2 * sizeof(uint32_t);
     mTotalSize += allocSize;
@@ -540,6 +531,12 @@ status_t SampleTable::setSyncSampleParams(off64_t data_offset, size_t data_size)
     }
 
     uint64_t allocSize = (uint64_t)numSyncSamples * sizeof(uint32_t);
+    if (allocSize > data_size - 8) {
+        ALOGW("b/124771364 - allocSize(%lu) > size(%lu)",
+                (unsigned long)allocSize, (unsigned long)(data_size - 8));
+        android_errorWriteLog(0x534e4554, "124771364");
+        return ERROR_MALFORMED;
+    }
     if (allocSize > kMaxTotalSize) {
         ALOGE("Sync sample table size too large.");
         return ERROR_OUT_OF_RANGE;

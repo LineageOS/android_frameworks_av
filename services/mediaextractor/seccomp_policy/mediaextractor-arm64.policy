@@ -30,6 +30,9 @@ rt_sigreturn: 1
 getrlimit: 1
 nanosleep: 1
 getrandom: 1
+timer_create: 1
+timer_settime: 1
+timer_delete: 1
 
 # for FileSource
 readlinkat: 1
@@ -44,3 +47,4 @@ mremap: 1
 sched_yield: 1
 
 @include /system/etc/seccomp_policy/crash_dump.arm64.policy
+@include /system/etc/seccomp_policy/code_coverage.arm64.policy
