@@ -79,6 +79,7 @@ void NuPlayer::StreamingSource::prepareAsync() {
 
 void NuPlayer::StreamingSource::start() {
     mStreamListener = new NuPlayerStreamListener(mSource, NULL);
+    mSource->setListener(mStreamListener);
 
     uint32_t sourceFlags = mSource->flags();
 
