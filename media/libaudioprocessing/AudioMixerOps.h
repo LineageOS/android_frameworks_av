@@ -236,7 +236,8 @@ void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
             || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
             || MIXTYPE == MIXTYPE_STEREOEXPAND);
     auto proc = [](auto& a, const auto& b) {
-        if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL) {
+        if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
+                || MIXTYPE == MIXTYPE_STEREOEXPAND) {
             a += b;
         } else {
             a = b;
