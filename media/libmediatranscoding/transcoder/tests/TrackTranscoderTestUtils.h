@@ -56,13 +56,13 @@ public:
     ~TestCallback() = default;
 
     // MediaTrackTranscoderCallback
-    void onTrackFinished(MediaTrackTranscoder* transcoder __unused) {
+    void onTrackFinished(const MediaTrackTranscoder* transcoder __unused) {
         std::unique_lock<std::mutex> lock(mMutex);
         mTranscodingFinished = true;
         mCv.notify_all();
     }
 
-    void onTrackError(MediaTrackTranscoder* transcoder __unused, media_status_t status) {
+    void onTrackError(const MediaTrackTranscoder* transcoder __unused, media_status_t status) {
         std::unique_lock<std::mutex> lock(mMutex);
         mTranscodingFinished = true;
         mStatus = status;
