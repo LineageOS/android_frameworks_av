@@ -166,7 +166,8 @@ TEST_F(PassthroughTrackTranscoderTests, SampleEquality) {
     // Pull transcoder's output samples and compare against input checksums.
     uint64_t sampleCount = 0;
     std::shared_ptr<MediaSample> sample;
-    while (!transcoder.mOutputQueue.dequeue(&sample)) {
+    std::shared_ptr<MediaSampleQueue> outputQueue = transcoder.getOutputQueue();
+    while (!outputQueue->dequeue(&sample)) {
         ASSERT_NE(sample, nullptr);
 
         if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {

@@ -22,6 +22,7 @@ cc_library_shared {
         "MediaSampleReaderNDK.cpp",
         "MediaSampleWriter.cpp",
         "MediaTrackTranscoder.cpp",
+        "MediaTranscoder.cpp",
         "PassthroughTrackTranscoder.cpp",
         "VideoTrackTranscoder.cpp",
     ],

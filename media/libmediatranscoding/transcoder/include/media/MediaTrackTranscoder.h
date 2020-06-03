@@ -40,14 +40,14 @@ public:
      * successfully.
      * @param transcoder The MediaTrackTranscoder that finished the transcoding.
      */
-    virtual void onTrackFinished(MediaTrackTranscoder* transcoder);
+    virtual void onTrackFinished(const MediaTrackTranscoder* transcoder);
 
     /**
      * Called when the MediaTrackTranscoder instance encountered an error it could not recover from.
      * @param transcoder The MediaTrackTranscoder that encountered the error.
      * @param status The non-zero error code describing the encountered error.
      */
-    virtual void onTrackError(MediaTrackTranscoder* transcoder, media_status_t status);
+    virtual void onTrackError(const MediaTrackTranscoder* transcoder, media_status_t status);
 
 protected:
     virtual ~MediaTrackTranscoderCallback() = default;
@@ -96,15 +96,24 @@ public:
     bool stop();
 
     /**
-     * Sample output queue.
-     * TODO(b/155918341) Move to protected.
+     * Retrieves the track transcoder's output sample queue.
+     * @return The output sample queue.
      */
-    MediaSampleQueue mOutputQueue = {};
+    std::shared_ptr<MediaSampleQueue> getOutputQueue() const;
+
+    /**
+      * Retrieves the track transcoder's final output format. The output is available after the
+      * track transcoder has been successfully configured.
+      * @return The track output format.
+      */
+    virtual std::shared_ptr<AMediaFormat> getOutputFormat() const = 0;
+
+    virtual ~MediaTrackTranscoder() = default;
 
 protected:
     MediaTrackTranscoder(const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback)
-          : mTranscoderCallback(transcoderCallback){};
-    virtual ~MediaTrackTranscoder() = default;
+          : mOutputQueue(std::make_shared<MediaSampleQueue>()),
+            mTranscoderCallback(transcoderCallback){};
 
     // configureDestinationFormat needs to be implemented by subclasses, and gets called on an
     // external thread before start.
@@ -119,6 +128,7 @@ protected:
     // be aborted as soon as possible. It should be safe to call abortTranscodeLoop multiple times.
     virtual void abortTranscodeLoop() = 0;
 
+    std::shared_ptr<MediaSampleQueue> mOutputQueue;
     std::shared_ptr<MediaSampleReader> mMediaSampleReader;
     int mTrackIndex;
     std::shared_ptr<AMediaFormat> mSourceFormat;
