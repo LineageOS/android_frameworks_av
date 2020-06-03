@@ -117,7 +117,8 @@ aaudio_handle_t AAudioService::openStream(const aaudio::AAudioStreamRequest &req
         return AAUDIO_ERROR_ILLEGAL_ARGUMENT;
     }
 
-    if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+    if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE
+        && AAudioClientTracker::getInstance().isExclusiveEnabled(request.getProcessId())) {
         // only trust audioserver for in service indication
         bool inService = false;
         if (isCallerInService()) {
