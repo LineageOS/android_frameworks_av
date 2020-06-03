@@ -25,6 +25,7 @@
 #include <sstream>
 #include <utility/AAudioUtilities.h>
 
+#include "AAudioClientTracker.h"
 #include "AAudioEndpointManager.h"
 #include "AAudioServiceEndpointShared.h"
 #include "AAudioServiceEndpointMMAP.h"
@@ -174,7 +175,15 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
                 && !request.isSharingModeMatchRequired()) { // app did not request a shared stream
             ALOGD("%s() endpoint in EXCLUSIVE use. Steal it!", __func__);
             mExclusiveStolenCount++;
-            endpointToSteal = endpoint;
+            // Prevent this process from getting another EXCLUSIVE stream.
+            // This will prevent two clients from colliding after a DISCONNECTION
+            // when they both try to open an exclusive stream at the same time.
+            // That can result in a stream getting disconnected between the OPEN
+            // and START calls. This will help preserve app compatibility.
+            // An app can avoid having this happen by closing their streams when
+            // the app is paused.
+            AAudioClientTracker::getInstance().setExclusiveEnabled(request.getProcessId(), false);
+            endpointToSteal = endpoint; // return it to caller
         }
         return nullptr;
     } else {
