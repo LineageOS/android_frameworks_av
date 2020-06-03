@@ -237,12 +237,12 @@ IMPLEMENT_META_INTERFACE(AAudioService, "IAAudioService");
 
 status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
                                         Parcel* reply, uint32_t flags) {
-    aaudio_handle_t streamHandle;
+    aaudio_handle_t streamHandle = 0;
     aaudio::AAudioStreamRequest request;
     aaudio::AAudioStreamConfiguration configuration;
-    pid_t tid;
-    int64_t nanoseconds;
-    aaudio_result_t result;
+    pid_t tid = 0;
+    int64_t nanoseconds = 0;
+    aaudio_result_t result = AAUDIO_OK;
     status_t status = NO_ERROR;
     ALOGV("BnAAudioService::onTransact(%i) %i", code, flags);
 
@@ -285,7 +285,11 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case CLOSE_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(CLOSE_STREAM) streamHandle failed!", __func__);
+                return status;
+            }
             result = closeStream(streamHandle);
             //ALOGD("BnAAudioService::onTransact CLOSE_STREAM 0x%08X, result = %d",
             //      streamHandle, result);
@@ -297,6 +301,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
             CHECK_INTERFACE(IAAudioService, data, reply);
             status = data.readInt32(&streamHandle);
             if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(GET_STREAM_DESCRIPTION) streamHandle failed!", __func__);
                 return status;
             }
             aaudio::AudioEndpointParcelable parcelable;
@@ -313,7 +318,11 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case START_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(START_STREAM) streamHandle failed!", __func__);
+                return status;
+            }
             result = startStream(streamHandle);
             ALOGV("BnAAudioService::onTransact START_STREAM 0x%08X, result = %d",
                     streamHandle, result);
@@ -323,7 +332,11 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case PAUSE_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(PAUSE_STREAM) streamHandle failed!", __func__);
+                return status;
+            }
             result = pauseStream(streamHandle);
             ALOGV("BnAAudioService::onTransact PAUSE_STREAM 0x%08X, result = %d",
                   streamHandle, result);
@@ -333,7 +346,11 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case STOP_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(STOP_STREAM) streamHandle failed!", __func__);
+                return status;
+            }
             result = stopStream(streamHandle);
             ALOGV("BnAAudioService::onTransact STOP_STREAM 0x%08X, result = %d",
                   streamHandle, result);
@@ -343,7 +360,11 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case FLUSH_STREAM: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(FLUSH_STREAM) streamHandle failed!", __func__);
+                return status;
+            }
             result = flushStream(streamHandle);
             ALOGV("BnAAudioService::onTransact FLUSH_STREAM 0x%08X, result = %d",
                     streamHandle, result);
@@ -353,20 +374,40 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
 
         case REGISTER_AUDIO_THREAD: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
-            data.readInt32(&tid);
-            data.readInt64(&nanoseconds);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(REGISTER_AUDIO_THREAD) streamHandle failed!", __func__);
+                return status;
+            }
+            status = data.readInt32(&tid);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(REGISTER_AUDIO_THREAD) tid failed!", __func__);
+                return status;
+            }
+            status = data.readInt64(&nanoseconds);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(REGISTER_AUDIO_THREAD) nanoseconds failed!", __func__);
+                return status;
+            }
             result = registerAudioThread(streamHandle, tid, nanoseconds);
-            ALOGV("BnAAudioService::onTransact REGISTER_AUDIO_THREAD 0x%08X, result = %d",
-                    streamHandle, result);
+            ALOGV("BnAAudioService::%s(REGISTER_AUDIO_THREAD) 0x%08X, result = %d",
+                    __func__, streamHandle, result);
             reply->writeInt32(result);
             return NO_ERROR;
         } break;
 
         case UNREGISTER_AUDIO_THREAD: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            data.readInt32(&streamHandle);
-            data.readInt32(&tid);
+            status = data.readInt32(&streamHandle);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(UNREGISTER_AUDIO_THREAD) streamHandle failed!", __func__);
+                return status;
+            }
+            status = data.readInt32(&tid);
+            if (status != NO_ERROR) {
+                ALOGE("BnAAudioService::%s(UNREGISTER_AUDIO_THREAD) tid failed!", __func__);
+                return status;
+            }
             result = unregisterAudioThread(streamHandle, tid);
             ALOGV("BnAAudioService::onTransact UNREGISTER_AUDIO_THREAD 0x%08X, result = %d",
                     streamHandle, result);

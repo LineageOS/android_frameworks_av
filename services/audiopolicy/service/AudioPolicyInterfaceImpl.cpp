@@ -989,11 +989,6 @@ status_t AudioPolicyService::setAllowedCapturePolicy(uid_t uid, audio_flags_mask
         ALOGV("%s() mAudioPolicyManager == NULL", __func__);
         return NO_INIT;
     }
-    uint_t callingUid = IPCThreadState::self()->getCallingUid();
-    if (uid != callingUid) {
-        ALOGD("%s() uid invalid %d != %d", __func__, uid, callingUid);
-        return PERMISSION_DENIED;
-    }
     return mAudioPolicyManager->setAllowedCapturePolicy(uid, capturePolicy);
 }
 
