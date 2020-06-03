@@ -787,8 +787,9 @@ void AudioTrack::stop()
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
             .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
             .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t)mProxy->getBufferSizeInFrames())
+            .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getUnderrunCount_l())
             .record();
-        logBufferSizeUnderruns();
     });
 
     ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
@@ -1141,16 +1142,6 @@ status_t AudioTrack::getBufferDurationInUs(int64_t *duration)
     return NO_ERROR;
 }
 
-void AudioTrack::logBufferSizeUnderruns() {
-    LOG_ALWAYS_FATAL_IF(mMetricsId.size() == 0, "mMetricsId is empty!");
-    ALOGD("%s(), mMetricsId = %s", __func__, mMetricsId.c_str());
-    // FIXME THis hangs! Why?
-//    android::mediametrics::LogItem(mMetricsId)
-//            .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t) getBufferSizeInFrames())
-//            .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getUnderrunCount())
-//            .record();
-}
-
 ssize_t AudioTrack::setBufferSizeInFrames(size_t bufferSizeInFrames)
 {
     AutoMutex lock(mLock);
@@ -1165,7 +1156,11 @@ ssize_t AudioTrack::setBufferSizeInFrames(size_t bufferSizeInFrames)
     ssize_t originalBufferSize = mProxy->getBufferSizeInFrames();
     ssize_t finalBufferSize  = mProxy->setBufferSizeInFrames((uint32_t) bufferSizeInFrames);
     if (originalBufferSize != finalBufferSize) {
-        logBufferSizeUnderruns();
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETBUFFERSIZE)
+                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t)mProxy->getBufferSizeInFrames())
+                .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t)getUnderrunCount_l())
+                .record();
     }
     return finalBufferSize;
 }

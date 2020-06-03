@@ -292,7 +292,7 @@ aaudio_result_t AudioStreamRecord::release_l() {
     //  Then call it from here
     if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
-        logBufferState();
+        logReleaseBufferState();
         mAudioRecord.clear();
         mFixedBlockWriter.close();
         return AudioStream::release_l();
