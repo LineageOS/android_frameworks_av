@@ -175,10 +175,12 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN       "open"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE      "pause"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_READPARAMETERS "readParameters" // Thread
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_RELEASE    "release"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE    "restore"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETMODE    "setMode" // AudioFlinger
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETBUFFERSIZE    "setBufferSize" // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYBACKPARAM "setPlaybackParam" // AudioTrack
-#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME "setVoiceVolume" // AudioFlinger
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME   "setVoiceVolume" // AudioFlinger
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME  "setVolume"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_STOP       "stop"   // AudioTrack, AudioRecord
