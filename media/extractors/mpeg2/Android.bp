@@ -12,7 +12,6 @@ cc_library {
     shared_libs: [
         "libcgrouprc#29",
         "libvndksupport#29",
-        "libcrypto",
     ],
 
     header_libs: [
