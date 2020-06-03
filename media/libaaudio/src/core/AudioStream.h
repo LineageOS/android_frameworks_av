@@ -115,7 +115,7 @@ public:
 
     // log to MediaMetrics
     virtual void logOpen();
-    void logBufferState();
+    void logReleaseBufferState();
 
     /**
      * Free any hardware or system resources from the open() call.
