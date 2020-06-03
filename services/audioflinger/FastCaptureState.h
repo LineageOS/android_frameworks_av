@@ -41,6 +41,8 @@ struct FastCaptureState : FastThreadState {
     audio_format_t  mFastPatchRecordFormat = AUDIO_FORMAT_INVALID;
     AudioBufferProvider* mFastPatchRecordBufferProvider = nullptr;   // a reference to a patch
                                                                      // record in fast mode
+    bool            mSilenceCapture = false;    // request to silence capture for fast track.
+                                                // note: this also silences the normal mixer pipe
 
     // Extends FastThreadState::Command
     static const Command

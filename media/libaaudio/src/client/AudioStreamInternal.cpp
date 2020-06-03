@@ -288,7 +288,7 @@ aaudio_result_t AudioStreamInternal::release_l() {
             requestStop();
         }
 
-        logBufferState();
+        logReleaseBufferState();
 
         setState(AAUDIO_STREAM_STATE_CLOSING);
         aaudio_handle_t serviceStreamHandle = mServiceStreamHandle;
@@ -781,6 +781,14 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
         mAudioEndpoint->setBufferSizeInFrames(maximumSize, &actualFrames);
         // actualFrames should be <= actual maximum size of endpoint
         adjustedFrames = std::min(actualFrames, adjustedFrames);
+    }
+
+    if (adjustedFrames != mBufferSizeInFrames) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETBUFFERSIZE)
+                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, adjustedFrames)
+                .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getXRunCount())
+                .record();
     }
 
     mBufferSizeInFrames = adjustedFrames;
