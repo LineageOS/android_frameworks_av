@@ -1159,7 +1159,7 @@ status_t NuPlayer::GenericSource::doSeek(int64_t seekTimeUs, MediaPlayerSeekMode
         readBuffer(MEDIA_TRACK_TYPE_VIDEO, seekTimeUs, mode, &actualTimeUs);
 
         if (mode != MediaPlayerSeekMode::SEEK_CLOSEST) {
-            seekTimeUs = actualTimeUs;
+            seekTimeUs = std::max<int64_t>(0, actualTimeUs);
         }
         mVideoLastDequeueTimeUs = actualTimeUs;
     }
