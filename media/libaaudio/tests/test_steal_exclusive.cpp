@@ -47,16 +47,23 @@
  */
 
 #include <atomic>
+#include <mutex>
 #include <stdio.h>
 #include <thread>
 #include <unistd.h>
 
+#include <android/log.h>
+
 #include <aaudio/AAudio.h>
+#include <aaudio/AAudioTesting.h>
 
 #define DEFAULT_TIMEOUT_NANOS  ((int64_t)1000000000)
 #define SOLO_DURATION_MSEC    2000
 #define DUET_DURATION_MSEC    8000
 #define SLEEP_DURATION_MSEC    500
+
+#define MODULE_NAME  "stealAudio"
+#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, MODULE_NAME, __VA_ARGS__)
 
 static const char * s_sharingModeToText(aaudio_sharing_mode_t mode) {
     return (mode == AAUDIO_SHARING_MODE_EXCLUSIVE) ? "EXCLUSIVE"
@@ -64,120 +71,244 @@ static const char * s_sharingModeToText(aaudio_sharing_mode_t mode) {
             : AAudio_convertResultToText(mode));
 }
 
+static const char * s_performanceModeToText(aaudio_performance_mode_t mode) {
+    return (mode == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY) ? "LOWLAT"
+        : ((mode == AAUDIO_PERFORMANCE_MODE_NONE)  ? "NONE"
+            : AAudio_convertResultToText(mode));
+}
+
+static aaudio_data_callback_result_t s_myDataCallbackProc(
+        AAudioStream * /* stream */,
+        void *userData,
+        void *audioData,
+        int32_t numFrames);
+
 static void s_myErrorCallbackProc(
         AAudioStream *stream,
         void *userData,
         aaudio_result_t error);
 
-struct AudioEngine {
-    AAudioStream        *stream = nullptr;
-    std::thread         *thread = nullptr;
-    aaudio_direction_t   direction = AAUDIO_DIRECTION_OUTPUT;
+class AudioEngine {
+public:
+
+    AudioEngine(const char *name) {
+        mName = name;
+    }
 
     // These counters are read and written by the callback and the main thread.
-    std::atomic<int32_t> framesRead{};
     std::atomic<int32_t> framesCalled{};
     std::atomic<int32_t> callbackCount{};
+    std::atomic<aaudio_sharing_mode_t> sharingMode{};
+    std::atomic<aaudio_performance_mode_t> performanceMode{};
+    std::atomic<bool> isMMap{false};
 
+    void setMaxRetries(int maxRetries) {
+        mMaxRetries = maxRetries;
+    }
+
+    void setOpenDelayMillis(int openDelayMillis) {
+        mOpenDelayMillis = openDelayMillis;
+    }
+
+    void restartStream() {
+        int retriesLeft = mMaxRetries;
+        aaudio_result_t result;
+        do {
+            closeAudioStream();
+            if (mOpenDelayMillis) usleep(mOpenDelayMillis * 1000);
+            openAudioStream(mDirection);
+            // It is possible for the stream to be disconnected, or stolen between the time
+            // it is opened and when it is started. If that happens then try again.
+            // If it was stolen then it should succeed the second time because there will already be
+            // a SHARED stream, which will not get stolen.
+            result = AAudioStream_requestStart(mStream);
+            printf("%s: AAudioStream_requestStart() returns %s\n",
+                    mName.c_str(),
+                    AAudio_convertResultToText(result));
+        } while (retriesLeft-- > 0 && result != AAUDIO_OK);
+    }
+
+    aaudio_data_callback_result_t onAudioReady(
+            void * /*audioData */,
+            int32_t numFrames) {
+        callbackCount++;
+        framesCalled += numFrames;
+        return AAUDIO_CALLBACK_RESULT_CONTINUE;
+    }
+
+    aaudio_result_t openAudioStream(aaudio_direction_t direction) {
+        std::lock_guard<std::mutex> lock(mLock);
+
+        AAudioStreamBuilder *builder = nullptr;
+        mDirection = direction;
+
+        // Use an AAudioStreamBuilder to contain requested parameters.
+        aaudio_result_t result = AAudio_createStreamBuilder(&builder);
+        if (result != AAUDIO_OK) {
+            printf("AAudio_createStreamBuilder returned %s",
+                   AAudio_convertResultToText(result));
+            return result;
+        }
+
+        // Request stream properties.
+        AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
+        AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+        AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
+        AAudioStreamBuilder_setDirection(builder, direction);
+        AAudioStreamBuilder_setDataCallback(builder, s_myDataCallbackProc, this);
+        AAudioStreamBuilder_setErrorCallback(builder, s_myErrorCallbackProc, this);
+
+        // Create an AAudioStream using the Builder.
+        result = AAudioStreamBuilder_openStream(builder, &mStream);
+        AAudioStreamBuilder_delete(builder);
+        builder = nullptr;
+        if (result != AAUDIO_OK) {
+            printf("AAudioStreamBuilder_openStream returned %s",
+                   AAudio_convertResultToText(result));
+        }
+
+        // See what kind of stream we actually opened.
+        int32_t deviceId = AAudioStream_getDeviceId(mStream);
+        sharingMode = AAudioStream_getSharingMode(mStream);
+        performanceMode = AAudioStream_getPerformanceMode(mStream);
+        isMMap = AAudioStream_isMMapUsed(mStream);
+        printf("%s: opened: deviceId = %3d, sharingMode = %s, perf = %s, %s --------\n",
+               mName.c_str(),
+               deviceId,
+               s_sharingModeToText(sharingMode),
+               s_performanceModeToText(performanceMode),
+               (isMMap ? "MMAP" : "Legacy")
+               );
+
+        return result;
+    }
+
+    aaudio_result_t closeAudioStream() {
+        std::lock_guard<std::mutex> lock(mLock);
+        aaudio_result_t result = AAUDIO_OK;
+        if (mStream != nullptr) {
+            result = AAudioStream_close(mStream);
+            if (result != AAUDIO_OK) {
+                printf("AAudioStream_close returned %s\n",
+                       AAudio_convertResultToText(result));
+            }
+            mStream = nullptr;
+        }
+        return result;
+    }
+
+    /**
+     * @return 0 is OK, -1 for error
+     */
+    int checkEnginePositions() {
+        std::lock_guard<std::mutex> lock(mLock);
+        if (mStream == nullptr) return 0;
+
+        const int64_t framesRead = AAudioStream_getFramesRead(mStream);
+        const int64_t framesWritten = AAudioStream_getFramesWritten(mStream);
+        const int32_t delta = (int32_t)(framesWritten - framesRead);
+        printf("%s: playing framesRead = %7d, framesWritten = %7d"
+               ", delta = %4d, framesCalled = %6d, callbackCount = %4d\n",
+               mName.c_str(),
+               (int32_t) framesRead,
+               (int32_t) framesWritten,
+               delta,
+               framesCalled.load(),
+               callbackCount.load()
+        );
+        if (delta > AAudioStream_getBufferCapacityInFrames(mStream)) {
+            printf("ERROR - delta > capacity\n");
+            return -1;
+        }
+        return 0;
+    }
+
+    aaudio_result_t start() {
+        std::lock_guard<std::mutex> lock(mLock);
+        reset();
+        if (mStream == nullptr) return 0;
+        return AAudioStream_requestStart(mStream);
+    }
+
+    aaudio_result_t stop() {
+        std::lock_guard<std::mutex> lock(mLock);
+        if (mStream == nullptr) return 0;
+        return AAudioStream_requestStop(mStream);
+    }
+
+    bool hasAdvanced() {
+        std::lock_guard<std::mutex> lock(mLock);
+        if (mStream == nullptr) return 0;
+        if (mDirection == AAUDIO_DIRECTION_OUTPUT) {
+            return AAudioStream_getFramesRead(mStream) > 0;
+        } else {
+            return AAudioStream_getFramesWritten(mStream) > 0;
+        }
+    }
+
+    aaudio_result_t verify() {
+        int errorCount = 0;
+        if (hasAdvanced()) {
+            printf("%s: stream is running => PASS\n", mName.c_str());
+        } else {
+            errorCount++;
+            printf("%s: stream should be running => FAIL!!\n", mName.c_str());
+        }
+
+        if (isMMap) {
+            printf("%s: data path is MMAP => PASS\n", mName.c_str());
+        } else {
+            errorCount++;
+            printf("%s: data path is Legacy! => FAIL\n", mName.c_str());
+        }
+
+        // Check for PASS/FAIL
+        if (sharingMode == AAUDIO_SHARING_MODE_SHARED) {
+            printf("%s: mode is SHARED => PASS\n", mName.c_str());
+        } else {
+            errorCount++;
+            printf("%s: modes is EXCLUSIVE => FAIL!!\n", mName.c_str());
+        }
+        return errorCount ? AAUDIO_ERROR_INVALID_FORMAT : AAUDIO_OK;
+    }
+
+private:
     void reset() {
-        framesRead.store(0);
         framesCalled.store(0);
         callbackCount.store(0);
     }
+
+    AAudioStream       *mStream = nullptr;
+    aaudio_direction_t  mDirection = AAUDIO_DIRECTION_OUTPUT;
+    std::mutex          mLock;
+    std::string         mName;
+    int                 mMaxRetries = 1;
+    int                 mOpenDelayMillis = 0;
 };
 
 // Callback function that fills the audio output buffer.
 static aaudio_data_callback_result_t s_myDataCallbackProc(
-        AAudioStream *stream,
+        AAudioStream * /* stream */,
         void *userData,
         void *audioData,
         int32_t numFrames
 ) {
-    (void) audioData;
-    (void) numFrames;
-    AudioEngine *engine = (struct AudioEngine *)userData;
-    engine->callbackCount++;
-
-    engine->framesRead = (int32_t)AAudioStream_getFramesRead(stream);
-    engine->framesCalled += numFrames;
-    return AAUDIO_CALLBACK_RESULT_CONTINUE;
-}
-
-static aaudio_result_t s_OpenAudioStream(struct AudioEngine *engine,
-                                         aaudio_direction_t direction) {
-    AAudioStreamBuilder *builder = nullptr;
-    engine->direction = direction;
-
-    // Use an AAudioStreamBuilder to contain requested parameters.
-    aaudio_result_t result = AAudio_createStreamBuilder(&builder);
-    if (result != AAUDIO_OK) {
-        printf("AAudio_createStreamBuilder returned %s",
-               AAudio_convertResultToText(result));
-        return result;
-    }
-
-    // Request stream properties.
-    AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
-    AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-    AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
-    AAudioStreamBuilder_setDirection(builder, direction);
-    AAudioStreamBuilder_setDataCallback(builder, s_myDataCallbackProc, engine);
-    AAudioStreamBuilder_setErrorCallback(builder, s_myErrorCallbackProc, engine);
-
-    // Create an AAudioStream using the Builder.
-    result = AAudioStreamBuilder_openStream(builder, &engine->stream);
-    AAudioStreamBuilder_delete(builder);
-    builder = nullptr;
-    if (result != AAUDIO_OK) {
-        printf("AAudioStreamBuilder_openStream returned %s",
-               AAudio_convertResultToText(result));
-    }
-
-    // See see what kind of stream we actually opened.
-    int32_t deviceId = AAudioStream_getDeviceId(engine->stream);
-    aaudio_sharing_mode_t actualSharingMode = AAudioStream_getSharingMode(engine->stream);
-    printf("-------- opened: deviceId = %3d, actualSharingMode = %s\n",
-           deviceId,
-           s_sharingModeToText(actualSharingMode));
-
-    return result;
-}
-
-static aaudio_result_t s_CloseAudioStream(struct AudioEngine *engine) {
-    aaudio_result_t result = AAUDIO_OK;
-    if (engine->stream != nullptr) {
-        result = AAudioStream_close(engine->stream);
-        if (result != AAUDIO_OK) {
-            printf("AAudioStream_close returned %s\n",
-                   AAudio_convertResultToText(result));
-        }
-        engine->stream = nullptr;
-    }
-    return result;
+    AudioEngine *engine = (AudioEngine *)userData;
+    return engine->onAudioReady(audioData, numFrames);
 }
 
 static void s_myRestartStreamProc(void *userData) {
+    LOGI("%s() called", __func__);
     printf("%s() - restart in separate thread\n", __func__);
     AudioEngine *engine = (AudioEngine *) userData;
-    int retriesLeft = 1;
-    aaudio_result_t result;
-    do {
-        s_CloseAudioStream(engine);
-        s_OpenAudioStream(engine, engine->direction);
-        // It is possible for the stream to be disconnected, or stolen between the time
-        // it is opened and when it is started. If that happens then try again.
-        // If it was stolen then it should succeed the second time because there will already be
-        // a SHARED stream, which will not get stolen.
-        result = AAudioStream_requestStart(engine->stream);
-        printf("%s() - AAudioStream_requestStart() returns %s\n", __func__,
-                AAudio_convertResultToText(result));
-    } while (retriesLeft-- > 0 && result != AAUDIO_OK);
+    engine->restartStream();
 }
 
 static void s_myErrorCallbackProc(
         AAudioStream * /* stream */,
         void *userData,
         aaudio_result_t error) {
+    LOGI("%s() called", __func__);
     printf("%s() - error = %s\n", __func__, AAudio_convertResultToText(error));
     // Handle error on a separate thread.
     std::thread t(s_myRestartStreamProc, userData);
@@ -185,42 +316,20 @@ static void s_myErrorCallbackProc(
 }
 
 static void s_usage() {
-    printf("test_steal_exclusive [-i]\n");
+    printf("test_steal_exclusive [-i] [-r{maxRetries}] [-d{delay}]\n");
     printf("     -i direction INPUT, otherwise OUTPUT\n");
+    printf("     -d delay open by milliseconds, default = 0\n");
+    printf("     -r max retries in the error callback, default = 1\n");
 }
 
-/**
- * @return 0 is OK, -1 for error
- */
-static int s_checkEnginePositions(AudioEngine *engine) {
-    if (engine->stream == nullptr) return 0; // race condition with onError procs!
-
-    const int64_t framesRead = AAudioStream_getFramesRead(engine->stream);
-    const int64_t framesWritten = AAudioStream_getFramesWritten(engine->stream);
-    const int32_t delta = (int32_t)(framesWritten - framesRead);
-    printf("playing framesRead = %7d, framesWritten = %7d"
-           ", delta = %4d, framesCalled = %6d, callbackCount = %4d\n",
-           (int32_t) framesRead,
-           (int32_t) framesWritten,
-           delta,
-           engine->framesCalled.load(),
-           engine->callbackCount.load()
-    );
-    if (delta > AAudioStream_getBufferCapacityInFrames(engine->stream)) {
-        printf("ERROR - delta > capacity\n");
-        return -1;
-    }
-    return 0;
-}
-
-int main(int argc, char **argv) {
-    (void) argc;
-    (void) argv;
-    struct AudioEngine victim;
-    struct AudioEngine thief;
+int main(int argc, char ** argv) {
+    AudioEngine victim("victim");
+    AudioEngine thief("thief");
     aaudio_direction_t direction = AAUDIO_DIRECTION_OUTPUT;
     aaudio_result_t result = AAUDIO_OK;
     int errorCount = 0;
+    int maxRetries = 1;
+    int openDelayMillis = 0;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -234,8 +343,14 @@ int main(int argc, char **argv) {
         if (arg[0] == '-') {
             char option = arg[1];
             switch (option) {
+                case 'd':
+                    openDelayMillis = atoi(&arg[2]);
+                    break;
                 case 'i':
                     direction = AAUDIO_DIRECTION_INPUT;
+                    break;
+                case 'r':
+                    maxRetries = atoi(&arg[2]);
                     break;
                 default:
                     s_usage();
@@ -249,16 +364,34 @@ int main(int argc, char **argv) {
         }
     }
 
-    result = s_OpenAudioStream(&victim, direction);
+    victim.setOpenDelayMillis(openDelayMillis);
+    thief.setOpenDelayMillis(openDelayMillis);
+    victim.setMaxRetries(maxRetries);
+    thief.setMaxRetries(maxRetries);
+
+    result = victim.openAudioStream(direction);
     if (result != AAUDIO_OK) {
         printf("s_OpenAudioStream victim returned %s\n",
                AAudio_convertResultToText(result));
         errorCount++;
     }
-    victim.reset();
+
+    if (victim.sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
+        printf("Victim modes is EXCLUSIVE => OK\n");
+    } else {
+        printf("Victim modes should be EXCLUSIVE => test not valid!\n");
+        goto onerror;
+    }
+
+    if (victim.isMMap) {
+        printf("Victim data path is MMAP => OK\n");
+    } else {
+        printf("Victim data path is Legacy! => test not valid\n");
+        goto onerror;
+    }
 
     // Start stream.
-    result = AAudioStream_requestStart(victim.stream);
+    result = victim.start();
     printf("AAudioStream_requestStart(VICTIM) returned %d >>>>>>>>>>>>>>>>>>>>>>\n", result);
     if (result != AAUDIO_OK) {
         errorCount++;
@@ -267,77 +400,69 @@ int main(int argc, char **argv) {
     if (result == AAUDIO_OK) {
         const int watchLoops = SOLO_DURATION_MSEC / SLEEP_DURATION_MSEC;
         for (int i = watchLoops; i > 0; i--) {
-            errorCount += s_checkEnginePositions(&victim) ? 1 : 0;
+            errorCount += victim.checkEnginePositions() ? 1 : 0;
             usleep(SLEEP_DURATION_MSEC * 1000);
         }
     }
 
-    printf("Try to start the THIEF stream that may steal the VICTIM MMAP resource -----\n");
-    result = s_OpenAudioStream(&thief, direction);
+    printf("Trying to start the THIEF stream, which may steal the VICTIM MMAP resource -----\n");
+    result = thief.openAudioStream(direction);
     if (result != AAUDIO_OK) {
         printf("s_OpenAudioStream victim returned %s\n",
                AAudio_convertResultToText(result));
         errorCount++;
     }
-    thief.reset();
 
     // Start stream.
-    result = AAudioStream_requestStart(thief.stream);
+    result = thief.start();
     printf("AAudioStream_requestStart(THIEF) returned %d >>>>>>>>>>>>>>>>>>>>>>\n", result);
     if (result != AAUDIO_OK) {
         errorCount++;
     }
-    printf("You might enjoy plugging in a headset now to see what happens...\n");
+
+    // Give stream time to advance.
+    usleep(SLEEP_DURATION_MSEC * 1000);
+
+    if (victim.verify()) {
+        errorCount++;
+        goto onerror;
+    }
+    if (thief.verify()) {
+        errorCount++;
+        goto onerror;
+    }
+
+    LOGI("Both streams running. Ask user to plug in headset. ====");
+    printf("\n====\nPlease PLUG IN A HEADSET now!\n====\n\n");
 
     if (result == AAUDIO_OK) {
         const int watchLoops = DUET_DURATION_MSEC / SLEEP_DURATION_MSEC;
         for (int i = watchLoops; i > 0; i--) {
-            printf("victim: ");
-            errorCount += s_checkEnginePositions(&victim) ? 1 : 0;
-            printf(" thief: ");
-            errorCount += s_checkEnginePositions(&thief) ? 1 : 0;
+            errorCount += victim.checkEnginePositions() ? 1 : 0;
+            errorCount += thief.checkEnginePositions() ? 1 : 0;
             usleep(SLEEP_DURATION_MSEC * 1000);
         }
     }
 
-    // Check for PASS/FAIL
-    aaudio_sharing_mode_t victimSharingMode = AAudioStream_getSharingMode(victim.stream);
-    aaudio_sharing_mode_t thiefSharingMode = AAudioStream_getSharingMode(thief.stream);
-    printf("victimSharingMode = %s, thiefSharingMode = %s, - ",
-           s_sharingModeToText(victimSharingMode),
-           s_sharingModeToText(thiefSharingMode));
-    if ((victimSharingMode == AAUDIO_SHARING_MODE_SHARED)
-            && (thiefSharingMode == AAUDIO_SHARING_MODE_SHARED)) {
-        printf("Both modes are SHARED => PASS\n");
-    } else {
-        errorCount++;
-        printf("Both modes should be SHARED => FAIL!!\n");
-    }
+    errorCount += victim.verify() ? 1 : 0;
+    errorCount += thief.verify() ? 1 : 0;
 
-    const int64_t victimFramesRead = AAudioStream_getFramesRead(victim.stream);
-    const int64_t thiefFramesRead = AAudioStream_getFramesRead(thief.stream);
-    printf("victimFramesRead = %d, thiefFramesRead = %d, - ",
-           (int)victimFramesRead, (int)thiefFramesRead);
-    if (victimFramesRead > 0 && thiefFramesRead > 0) {
-        printf("Both streams are running => PASS\n");
-    } else {
-        errorCount++;
-        printf("Both streams should be running => FAIL!!\n");
-    }
-
-    result = AAudioStream_requestStop(victim.stream);
+    result = victim.stop();
     printf("AAudioStream_requestStop() returned %d <<<<<<<<<<<<<<<<<<<<<\n", result);
     if (result != AAUDIO_OK) {
+        printf("stop result = %d = %s\n", result, AAudio_convertResultToText(result));
         errorCount++;
     }
-    result = AAudioStream_requestStop(thief.stream);
+    result = thief.stop();
     printf("AAudioStream_requestStop() returned %d <<<<<<<<<<<<<<<<<<<<<\n", result);
     if (result != AAUDIO_OK) {
+        printf("stop result = %d = %s\n", result, AAudio_convertResultToText(result));
         errorCount++;
     }
 
-    s_CloseAudioStream(&victim);
-    s_CloseAudioStream(&thief);
+onerror:
+    victim.closeAudioStream();
+    thief.closeAudioStream();
 
     printf("aaudio result = %d = %s\n", result, AAudio_convertResultToText(result));
     printf("test %s\n", errorCount ? "FAILED" : "PASSED");
