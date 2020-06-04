@@ -51,8 +51,8 @@ public:
 
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) override;
-    void start(ClientIdType clientId, JobIdType jobId,
-               const TranscodingRequestParcel& request) override;
+    void start(ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
+               const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void pause(ClientIdType clientId, JobIdType jobId) override;
     void resume(ClientIdType clientId, JobIdType jobId) override;
     void stop(ClientIdType clientId, JobIdType jobId) override;

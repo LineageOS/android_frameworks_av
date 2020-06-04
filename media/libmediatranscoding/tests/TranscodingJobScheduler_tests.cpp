@@ -87,8 +87,8 @@ public:
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& /*cb*/) override {}
 
-    void start(ClientIdType clientId, JobIdType jobId,
-               const TranscodingRequestParcel& /*request*/) override {
+    void start(ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& /*request*/,
+               const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) override {
         mEventQueue.push_back(Start(clientId, jobId));
     }
     void pause(ClientIdType clientId, JobIdType jobId) override {
@@ -433,9 +433,9 @@ TEST_F(TranscodingJobSchedulerTest, TestFailJob) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), JOB(0)));
 
     // Fail running offline job, and test error code propagation.
-    mScheduler->onError(CLIENT(0), JOB(0), TranscodingErrorCode::kInvalidBitstream);
+    mScheduler->onError(CLIENT(0), JOB(0), TranscodingErrorCode::kInvalidOperation);
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Failed(CLIENT(0), JOB(0)));
-    EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kInvalidBitstream);
+    EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kInvalidOperation);
 
     // Duplicate fail for last job, should be ignored.
     mScheduler->onError(CLIENT(0), JOB(0), TranscodingErrorCode::kUnknown);
