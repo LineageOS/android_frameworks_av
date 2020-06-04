@@ -30,6 +30,11 @@ static_assert(SAMPLE_FLAG_END_OF_STREAM == AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM
 static_assert(SAMPLE_FLAG_PARTIAL_FRAME == AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME,
               "Sample flag mismatch: PARTIAL_FRAME");
 
+// Color format defined by surface. (See MediaCodecInfo.CodecCapabilities#COLOR_FormatSurface.)
+static constexpr int32_t kColorFormatSurface = 0x7f000789;
+// Default key frame interval in seconds.
+static constexpr float kDefaultKeyFrameIntervalSeconds = 1.0f;
+
 template <typename T>
 void VideoTrackTranscoder::BlockingQueue<T>::push(T const& value, bool front) {
     {
@@ -113,11 +118,24 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     media_status_t status = AMEDIA_OK;
 
     if (destinationFormat == nullptr) {
-        LOG(ERROR) << "Destination format is null";
+        LOG(ERROR) << "Destination format is null, use passthrough transcoder";
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    mDestinationFormat = destinationFormat;
+    AMediaFormat* encoderFormat = AMediaFormat_new();
+    if (!encoderFormat || AMediaFormat_copy(encoderFormat, destinationFormat.get()) != AMEDIA_OK) {
+        LOG(ERROR) << "Unable to copy destination format";
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    float tmp;
+    if (!AMediaFormat_getFloat(encoderFormat, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, &tmp)) {
+        AMediaFormat_setFloat(encoderFormat, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
+                              kDefaultKeyFrameIntervalSeconds);
+    }
+    AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT, kColorFormatSurface);
+
+    mDestinationFormat = std::shared_ptr<AMediaFormat>(encoderFormat, &AMediaFormat_delete);
 
     // Create and configure the encoder.
     const char* destinationMime = nullptr;
@@ -276,7 +294,7 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
         sample->info.flags = bufferInfo.flags;
         sample->info.presentationTimeUs = bufferInfo.presentationTimeUs;
 
-        const bool aborted = mOutputQueue.enqueue(sample);
+        const bool aborted = mOutputQueue->enqueue(sample);
         if (aborted) {
             LOG(ERROR) << "Output sample queue was aborted. Stopping transcode.";
             mStatus = AMEDIA_ERROR_IO;  // TODO: Define custom error codes?
@@ -321,13 +339,18 @@ media_status_t VideoTrackTranscoder::runTranscodeLoop() {
     }
 
     AMediaCodec_stop(mDecoder);
-    AMediaCodec_stop(mEncoder.get());
+    // TODO: Stop invalidates all buffers. Stop encoder when last buffer is released.
+    //    AMediaCodec_stop(mEncoder.get());
     return mStatus;
 }
 
 void VideoTrackTranscoder::abortTranscodeLoop() {
     // Push abort message to the front of the codec event queue.
     mCodecMessageQueue.push([this] { mStopRequested = true; }, true /* front */);
+}
+
+std::shared_ptr<AMediaFormat> VideoTrackTranscoder::getOutputFormat() const {
+    return mDestinationFormat;
 }
 
 }  // namespace android

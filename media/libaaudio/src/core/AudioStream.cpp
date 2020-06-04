@@ -116,9 +116,10 @@ void AudioStream::logOpen() {
     }
 }
 
-void AudioStream::logBufferState() {
+void AudioStream::logReleaseBufferState() {
     if (mMetricsId.size() > 0) {
         android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_RELEASE)
                 .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t) getBufferSize())
                 .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getXRunCount())
                 .record();

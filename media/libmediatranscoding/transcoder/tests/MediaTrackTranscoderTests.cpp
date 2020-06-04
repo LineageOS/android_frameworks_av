@@ -60,6 +60,7 @@ public:
             break;
         }
         ASSERT_NE(mTranscoder, nullptr);
+        mTranscoderOutputQueue = mTranscoder->getOutputQueue();
 
         initSampleReader();
     }
@@ -120,7 +121,7 @@ public:
             std::shared_ptr<MediaSample> sample;
             bool aborted = false;
             do {
-                aborted = mTranscoder->mOutputQueue.dequeue(&sample);
+                aborted = mTranscoderOutputQueue->dequeue(&sample);
             } while (!aborted && !(sample->info.flags & SAMPLE_FLAG_END_OF_STREAM));
             mQueueWasAborted = aborted;
             mGotEndOfStream =
@@ -142,6 +143,7 @@ public:
 
 protected:
     std::shared_ptr<MediaTrackTranscoder> mTranscoder;
+    std::shared_ptr<MediaSampleQueue> mTranscoderOutputQueue;
     std::shared_ptr<TestCallback> mCallback;
 
     std::shared_ptr<MediaSampleReader> mMediaSampleReader;
@@ -242,7 +244,7 @@ TEST_P(MediaTrackTranscoderTests, AbortOutputQueue) {
     EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
               AMEDIA_OK);
     ASSERT_TRUE(mTranscoder->start());
-    mTranscoder->mOutputQueue.abort();
+    mTranscoderOutputQueue->abort();
     drainOutputSampleQueue();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_ERROR_IO);
     EXPECT_TRUE(mTranscoder->stop());
@@ -259,7 +261,7 @@ TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderRelease) {
     ASSERT_TRUE(mTranscoder->start());
 
     std::shared_ptr<MediaSample> sample;
-    EXPECT_FALSE(mTranscoder->mOutputQueue.dequeue(&sample));
+    EXPECT_FALSE(mTranscoderOutputQueue->dequeue(&sample));
 
     drainOutputSampleQueue();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
@@ -269,6 +271,7 @@ TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderRelease) {
     EXPECT_TRUE(mGotEndOfStream);
 
     mTranscoder.reset();
+    mTranscoderOutputQueue.reset();
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     sample.reset();
 }
@@ -280,7 +283,7 @@ TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderStop) {
     ASSERT_TRUE(mTranscoder->start());
 
     std::shared_ptr<MediaSample> sample;
-    EXPECT_FALSE(mTranscoder->mOutputQueue.dequeue(&sample));
+    EXPECT_FALSE(mTranscoderOutputQueue->dequeue(&sample));
     EXPECT_TRUE(mTranscoder->stop());
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
