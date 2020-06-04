@@ -19,6 +19,7 @@ package android.media;
 import android.media.TranscodingErrorCode;
 import android.media.TranscodingJobParcel;
 import android.media.TranscodingResultParcel;
+import android.os.ParcelFileDescriptor;
 
 /**
  * ITranscodingClientCallback
@@ -28,6 +29,15 @@ import android.media.TranscodingResultParcel;
  * {@hide}
  */
 interface ITranscodingClientCallback {
+    /**
+    * Called to open a raw file descriptor to access data under a URI
+    *
+    * @param fileUri The path of the filename.
+    * @param mode The file mode to use. Must be one of ("r, "w", "rw")
+    * @return ParcelFileDescriptor if open the file successfully, null otherwise.
+    */
+    ParcelFileDescriptor openFileDescriptor(in @utf8InCpp String fileUri,
+                                            in @utf8InCpp String mode);
 
     /**
     * Called when the transcoding associated with the jobId finished.

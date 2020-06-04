@@ -162,6 +162,11 @@ struct TestClientCallback : public BnTranscodingClientCallback {
         ALOGD("TestClient Created");
     }
 
+    Status openFileDescriptor(const std::string& /*in_fileUri*/, const std::string& /*in_mode*/,
+                              ::ndk::ScopedFileDescriptor* /*_aidl_return*/) override {
+        return Status::ok();
+    }
+
     Status onTranscodingFinished(int32_t in_jobId,
                                  const TranscodingResultParcel& in_result) override {
         EXPECT_EQ(in_jobId, in_result.jobId);
