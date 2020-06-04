@@ -101,4 +101,8 @@ bool MediaTrackTranscoder::stop() {
     return false;
 }
 
+std::shared_ptr<MediaSampleQueue> MediaTrackTranscoder::getOutputQueue() const {
+    return mOutputQueue;
+}
+
 }  // namespace android

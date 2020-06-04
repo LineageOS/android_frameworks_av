@@ -100,10 +100,11 @@ TEST_F(VideoTrackTranscoderTests, SampleSanity) {
     EXPECT_EQ(transcoder.configure(mMediaSampleReader, mTrackIndex, mDestinationFormat), AMEDIA_OK);
     ASSERT_TRUE(transcoder.start());
 
-    std::thread sampleConsumerThread{[&transcoder] {
+    std::shared_ptr<MediaSampleQueue> outputQueue = transcoder.getOutputQueue();
+    std::thread sampleConsumerThread{[&outputQueue] {
         uint64_t sampleCount = 0;
         std::shared_ptr<MediaSample> sample;
-        while (!transcoder.mOutputQueue.dequeue(&sample)) {
+        while (!outputQueue->dequeue(&sample)) {
             ASSERT_NE(sample, nullptr);
             const uint32_t flags = sample->info.flags;
 

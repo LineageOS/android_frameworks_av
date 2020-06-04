@@ -114,12 +114,12 @@ typedef void (*AMediaCodecOnAsyncError)(
         int32_t actionCode,
         const char *detail);
 
-struct AMediaCodecOnAsyncNotifyCallback {
+typedef struct AMediaCodecOnAsyncNotifyCallback {
       AMediaCodecOnAsyncInputAvailable  onAsyncInputAvailable;
       AMediaCodecOnAsyncOutputAvailable onAsyncOutputAvailable;
       AMediaCodecOnAsyncFormatChanged   onAsyncFormatChanged;
       AMediaCodecOnAsyncError           onAsyncError;
-};
+} AMediaCodecOnAsyncNotifyCallback;
 
 #if __ANDROID_API__ >= 21
 
