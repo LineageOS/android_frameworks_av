@@ -273,6 +273,7 @@ cc_library {
         "libutils",
         "libmedia_helper",
         "libsfplugin_ccodec",
+        "libsfplugin_ccodec_utils",
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx_utils",
