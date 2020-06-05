@@ -1240,9 +1240,9 @@ int PreProcessingFx_Process(effect_handle_t     self,
             memcpy(outBuffer->s16,
                   session->outBuf,
                   fr * session->outChannelCount * sizeof(int16_t));
-            memcpy(session->outBuf,
-                  session->outBuf + fr * session->outChannelCount,
-                  (session->framesOut - fr) * session->outChannelCount * sizeof(int16_t));
+            memmove(session->outBuf,
+                    session->outBuf + fr * session->outChannelCount,
+                    (session->framesOut - fr) * session->outChannelCount * sizeof(int16_t));
             session->framesOut -= fr;
             framesWr += fr;
         }
@@ -1303,9 +1303,9 @@ int PreProcessingFx_Process(effect_handle_t     self,
                                                         session->procFrame->data_,
                                                         &frOut);
             }
-            memcpy(session->inBuf,
-                   session->inBuf + frIn * session->inChannelCount,
-                   (session->framesIn - frIn) * session->inChannelCount * sizeof(int16_t));
+            memmove(session->inBuf,
+                    session->inBuf + frIn * session->inChannelCount,
+                    (session->framesIn - frIn) * session->inChannelCount * sizeof(int16_t));
             session->framesIn -= frIn;
         } else {
             size_t fr = session->frameCount - session->framesIn;
@@ -1381,9 +1381,9 @@ int PreProcessingFx_Process(effect_handle_t     self,
         memcpy(outBuffer->s16 + framesWr * session->outChannelCount,
               session->outBuf,
               fr * session->outChannelCount * sizeof(int16_t));
-        memcpy(session->outBuf,
-              session->outBuf + fr * session->outChannelCount,
-              (session->framesOut - fr) * session->outChannelCount * sizeof(int16_t));
+        memmove(session->outBuf,
+                session->outBuf + fr * session->outChannelCount,
+                (session->framesOut - fr) * session->outChannelCount * sizeof(int16_t));
         session->framesOut -= fr;
         outBuffer->frameCount += fr;
 
@@ -1837,9 +1837,9 @@ int PreProcessingFx_ProcessReverse(effect_handle_t     self,
                                                         session->revFrame->data_,
                                                         &frOut);
             }
-            memcpy(session->revBuf,
-                   session->revBuf + frIn * session->inChannelCount,
-                   (session->framesRev - frIn) * session->inChannelCount * sizeof(int16_t));
+            memmove(session->revBuf,
+                    session->revBuf + frIn * session->inChannelCount,
+                    (session->framesRev - frIn) * session->inChannelCount * sizeof(int16_t));
             session->framesRev -= frIn;
         } else {
             size_t fr = session->frameCount - session->framesRev;
