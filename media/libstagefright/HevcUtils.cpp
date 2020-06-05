@@ -30,6 +30,8 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 
+#define UNUSED_PARAM __attribute__((unused))
+
 namespace android {
 
 static const uint8_t kHevcNalUnitTypes[8] = {
@@ -379,7 +381,7 @@ status_t HevcParameterSets::parseSps(const uint8_t* data, size_t size) {
 }
 
 status_t HevcParameterSets::parsePps(
-        const uint8_t* data __unused, size_t size __unused) {
+        const uint8_t* data UNUSED_PARAM, size_t size UNUSED_PARAM) {
     return OK;
 }
 
