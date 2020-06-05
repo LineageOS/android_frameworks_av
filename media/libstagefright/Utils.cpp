@@ -1135,7 +1135,7 @@ status_t convertMetaDataToMessage(
         // assertion, let's be lenient for now...
         // CHECK((ptr[4] >> 2) == 0x3f);  // reserved
 
-        size_t lengthSize __unused = 1 + (ptr[4] & 3);
+        // we can get lengthSize value from 1 + (ptr[4] & 3)
 
         // commented out check below as H264_QVGA_500_NO_AUDIO.3gp
         // violates it...
