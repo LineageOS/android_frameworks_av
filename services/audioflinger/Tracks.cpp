@@ -602,7 +602,8 @@ AudioFlinger::PlaybackThread::Track::Track(
     }
 
     // Once this item is logged by the server, the client can add properties.
-    mTrackMetrics.logConstructor(creatorPid, uid, streamType);
+    const char * const traits = sharedBuffer == 0 ? "" : "static";
+    mTrackMetrics.logConstructor(creatorPid, uid, traits, streamType);
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()

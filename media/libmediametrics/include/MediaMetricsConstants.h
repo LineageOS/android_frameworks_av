@@ -147,6 +147,7 @@
 #define AMEDIAMETRICS_PROP_THREADID       "threadId"       // int32 value io handle
 #define AMEDIAMETRICS_PROP_THROTTLEMS     "throttleMs"     // double
 #define AMEDIAMETRICS_PROP_TRACKID        "trackId"        // int32 port id of track/record
+#define AMEDIAMETRICS_PROP_TRAITS         "traits"         // string
 #define AMEDIAMETRICS_PROP_TYPE           "type"           // string (thread type)
 #define AMEDIAMETRICS_PROP_UNDERRUN       "underrun"       // int32
 #define AMEDIAMETRICS_PROP_UNDERRUNFRAMES "underrunFrames" // int64_t from Thread
