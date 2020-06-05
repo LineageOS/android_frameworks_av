@@ -515,6 +515,9 @@ private:
     class ReleaseSurface;
     std::unique_ptr<ReleaseSurface> mReleaseSurface;
 
+    std::list<sp<AMessage>> mLeftover;
+    status_t handleLeftover(size_t index);
+
     sp<BatteryChecker> mBatteryChecker;
 
     void statsBufferSent(int64_t presentationUs);
