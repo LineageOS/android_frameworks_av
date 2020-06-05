@@ -45,8 +45,18 @@ NuPlayer::RTPSource::RTPSource(
       mRTPConn(new ARTPConnection(ARTPConnection::kViLTEConnection)),
       mEOSTimeoutAudio(0),
       mEOSTimeoutVideo(0),
-      mLastCVOUpdated(-1) {
-      ALOGD("RTPSource initialized with rtpParams=%s", rtpParams.string());
+      mFirstAccessUnit(true),
+      mAllTracksHaveTime(false),
+      mNTPAnchorUs(-1),
+      mMediaAnchorUs(-1),
+      mLastMediaTimeUs(-1),
+      mNumAccessUnitsReceived(0),
+      mLastCVOUpdated(-1),
+      mReceivedFirstRTCPPacket(false),
+      mReceivedFirstRTPPacket(false),
+      mPausing(false),
+      mPauseGeneration(0) {
+    ALOGD("RTPSource initialized with rtpParams=%s", rtpParams.string());
 }
 
 NuPlayer::RTPSource::~RTPSource() {
