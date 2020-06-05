@@ -71,10 +71,15 @@ cc_fuzz {
         "frameworks/av/media/extractors/mp4",
     ],
 
+    header_libs: [
+        "libaudioclient_headers",
+    ],
+
     static_libs: [
         "liblog",
         "libstagefright_foundation",
-        "libmedia",
+        "libmediandk_format",
+        "libmedia_ndkformatpriv",
         "libextractorfuzzerbase",
         "libstagefright_id3",
         "libstagefright_esds",
@@ -83,7 +88,6 @@ cc_fuzz {
 
     shared_libs: [
         "libutils",
-        "libmediandk",
         "libbinder",
     ],
 
@@ -95,6 +99,8 @@ cc_fuzz {
         ],
         componentid: 155276,
     },
+
+    host_supported: true,
 }
 
 cc_fuzz {
