@@ -4,6 +4,7 @@ cc_library_shared {
     vndk: {
         enabled: true,
     },
+    min_sdk_version: "29",
     double_loadable: true,
     srcs: [
         "FrameDropper.cpp",
@@ -41,7 +42,7 @@ cc_library_shared {
         "libnativewindow",
         "libvndksupport",
     ],
-    
+
     static_libs: [
         "libgui_bufferqueue_static"
     ],

@@ -1,6 +1,7 @@
 cc_library_shared {
     name: "libmedia_codecserviceregistrant",
     vendor_available: true,
+    min_sdk_version: "29",
     srcs: [
         "CodecServiceRegistrant.cpp",
     ],
