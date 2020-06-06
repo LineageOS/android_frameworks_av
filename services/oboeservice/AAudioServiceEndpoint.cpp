@@ -95,9 +95,16 @@ std::vector<android::sp<AAudioServiceStreamBase>>
         mRegisteredStreams.swap(streamsDisconnected);
     }
     mConnected.store(false);
+    // We need to stop all the streams before we disconnect them.
+    // Otherwise there is a race condition where the first disconnected app
+    // tries to reopen a stream as MMAP but is blocked by the second stream,
+    // which hasn't stopped yet. Then the first app ends up with a Legacy stream.
     for (const auto &stream : streamsDisconnected) {
-        ALOGD("%s() - stop and disconnect port %d", __func__, stream->getPortHandle());
+        ALOGD("%s() - stop(), port = %d", __func__, stream->getPortHandle());
         stream->stop();
+    }
+    for (const auto &stream : streamsDisconnected) {
+        ALOGD("%s() - disconnect(), port = %d", __func__, stream->getPortHandle());
         stream->disconnect();
     }
     return streamsDisconnected;
