@@ -945,9 +945,29 @@ status_t MPEG4Writer::start(MetaData *param) {
     mInMemoryCache = NULL;
     mInMemoryCacheOffset = 0;
 
+    status_t err = OK;
+    int32_t is4bitTrackId = false;
+    if (param && param->findInt32(kKey4BitTrackIds, &is4bitTrackId) && is4bitTrackId) {
+        err = validateAllTracksId(true);
+    } else {
+        err = validateAllTracksId(false);
+    }
+    if (err != OK) {
+        return err;
+    }
 
     ALOGV("muxer starting: mHasMoovBox %d, mHasFileLevelMeta %d",
             mHasMoovBox, mHasFileLevelMeta);
+
+    err = startWriterThread();
+    if (err != OK) {
+        return err;
+    }
+
+    err = setupAndStartLooper();
+    if (err != OK) {
+        return err;
+    }
 
     writeFtypBox(param);
 
@@ -980,22 +1000,22 @@ status_t MPEG4Writer::start(MetaData *param) {
     seekOrPostError(mFd, mMdatOffset, SEEK_SET);
     write("\x00\x00\x00\x01mdat????????", 16);
 
-    status_t err = startWriterThread();
-    if (err != OK) {
-        return err;
-    }
-
-    setupAndStartLooper();
-
-    int32_t is4bitTrackId = false;
-    if (param && param->findInt32(kKey4BitTrackIds, &is4bitTrackId) && is4bitTrackId) {
-        err = validateAllTracksId(true);
-    }
-    else {
-        err = validateAllTracksId(false);
-    }
-    if (err != OK) {
-        return err;
+    /* Confirm whether the writing of the initial file atoms, ftyp and free,
+     * are written to the file properly by posting kWhatNoIOErrorSoFar to the
+     * MP4WtrCtrlHlpLooper that's handling write and seek errors also. If there
+     * was kWhatIOError, the following two scenarios should be handled.
+     * 1) If kWhatIOError was delivered and processed, MP4WtrCtrlHlpLooper
+     * would have stopped all threads gracefully already and posting
+     * kWhatNoIOErrorSoFar would fail.
+     * 2) If kWhatIOError wasn't delivered or getting processed,
+     * kWhatNoIOErrorSoFar should get posted successfully.  Wait for
+     * response from MP4WtrCtrlHlpLooper.
+     */
+    sp<AMessage> msg = new AMessage(kWhatNoIOErrorSoFar, mReflector);
+    sp<AMessage> response;
+    err = msg->postAndAwaitResponse(&response);
+    if (err != OK || !response->findInt32("err", &err) || err != OK) {
+        return ERROR_IO;
     }
 
     err = startTracks(param);
@@ -1025,13 +1045,16 @@ status_t MPEG4Writer::stopWriterThread() {
     }
 
     void *dummy;
-    status_t err = pthread_join(mThread, &dummy);
-    WARN_UNLESS(err == 0, "stopWriterThread pthread_join err: %d", err);
-
-    err = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
+    status_t err = OK;
+    int retVal = pthread_join(mThread, &dummy);
+    if (retVal == 0) {
+        err = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
+        ALOGD("WriterThread stopped. Status:%d", err);
+    } else {
+        ALOGE("stopWriterThread pthread_join status:%d", retVal);
+        err = UNKNOWN_ERROR;
+    }
     mWriterThreadStarted = false;
-    WARN_UNLESS(err == 0, "stopWriterThread pthread_join retVal: %d", err);
-    ALOGD("Writer thread stopped");
     return err;
 }
 
@@ -1089,23 +1112,26 @@ void MPEG4Writer::writeCompositionMatrix(int degrees) {
 
 status_t MPEG4Writer::release() {
     ALOGD("release()");
-    if (mPreAllocationEnabled) {
-        truncatePreAllocation();
+    status_t err = OK;
+    if (!truncatePreAllocation()) {
+        if (err == OK) { err = ERROR_IO; }
     }
-    int err = OK;
-    int retVal = fsync(mFd);
-    WARN_UNLESS(retVal == 0, "fsync err:%s(%d)", std::strerror(errno), errno);
-    err |= retVal;
-    retVal = close(mFd);
-    WARN_UNLESS(retVal == 0, "close err:%s(%d)", std::strerror(errno), errno);
-    err |= retVal;
+    if (fsync(mFd) != 0) {
+        ALOGW("(ignored)fsync err:%s(%d)", std::strerror(errno), errno);
+        // Don't bubble up fsync error, b/157291505.
+        // if (err == OK) { err = ERROR_IO; }
+    }
+    if (close(mFd) != 0) {
+        ALOGE("close err:%s(%d)", std::strerror(errno), errno);
+        if (err == OK) { err = ERROR_IO; }
+    }
     mFd = -1;
     if (mNextFd != -1) {
-        retVal = close(mNextFd);
+        if (close(mNextFd) != 0) {
+            ALOGE("close(mNextFd) error:%s(%d)", std::strerror(errno), errno);
+        }
+        if (err == OK) { err = ERROR_IO; }
         mNextFd = -1;
-        WARN_UNLESS(retVal == 0, "close mNextFd error:%s(%d)",
-                    std::strerror(errno), errno);
-        err |= retVal;
     }
     stopAndReleaseLooper();
     mInitCheck = NO_INIT;
@@ -1165,7 +1191,7 @@ status_t MPEG4Writer::reset(bool stopSource) {
     for (List<Track *>::iterator it = mTracks.begin();
         it != mTracks.end(); ++it) {
         status_t trackErr = (*it)->stop(stopSource);
-        WARN_UNLESS(trackErr == 0, "%s track stopped with an error",
+        WARN_UNLESS(trackErr == OK, "%s track stopped with an error",
                     (*it)->getTrackType());
         if (err == OK && trackErr != OK) {
             err = trackErr;
@@ -1254,7 +1280,11 @@ status_t MPEG4Writer::reset(bool stopSource) {
 
     CHECK(mBoxes.empty());
 
-    err = release();
+    status_t errRelease = release();
+    // Prioritize the error that occurred before release().
+    if (err == OK) {
+        err = errRelease;
+    }
     return err;
 }
 
@@ -1577,9 +1607,8 @@ void MPEG4Writer::writeOrPostError(int fd, const void* buf, size_t count) {
 
     // Can't guarantee that file is usable or write would succeed anymore, hence signal to stop.
     sp<AMessage> msg = new AMessage(kWhatIOError, mReflector);
-    msg->setInt32("errno", errno);
-    status_t err = msg->post();
-    ALOGE("writeOrPostError post:%d", err);
+    msg->setInt32("err", ERROR_IO);
+    WARN_UNLESS(msg->post() == OK, "writeOrPostError:error posting ERROR_IO");
 }
 
 void MPEG4Writer::seekOrPostError(int fd, off64_t offset, int whence) {
@@ -1597,9 +1626,8 @@ void MPEG4Writer::seekOrPostError(int fd, off64_t offset, int whence) {
 
     // Can't guarantee that file is usable or seek would succeed anymore, hence signal to stop.
     sp<AMessage> msg = new AMessage(kWhatIOError, mReflector);
-    msg->setInt32("errno", errno);
-    status_t err = msg->post();
-    ALOGE("seekOrPostError post:%d", err);
+    msg->setInt32("err", ERROR_IO);
+    WARN_UNLESS(msg->post() == OK, "seekOrPostError:error posting ERROR_IO");
 }
 
 void MPEG4Writer::beginBox(uint32_t id) {
@@ -1838,7 +1866,7 @@ bool MPEG4Writer::preAllocate(uint64_t wantSize) {
     if (res == -1) {
         ALOGE("fallocate err:%s, %d, fd:%d", strerror(errno), errno, mFd);
         sp<AMessage> msg = new AMessage(kWhatFallocateError, mReflector);
-        msg->setInt32("errno", errno);
+        msg->setInt32("err", ERROR_IO);
         status_t err = msg->post();
         mFallocateErr = true;
         ALOGD("preAllocation post:%d", err);
@@ -1850,6 +1878,9 @@ bool MPEG4Writer::preAllocate(uint64_t wantSize) {
 }
 
 bool MPEG4Writer::truncatePreAllocation() {
+    if (!mPreAllocationEnabled)
+        return true;
+
     bool status = true;
     off64_t endOffset = std::max(mMdatEndOffset, mOffset);
     /* if mPreAllocateFileEndOffset >= endOffset, then preallocation logic works good. (diff >= 0).
@@ -1861,6 +1892,10 @@ bool MPEG4Writer::truncatePreAllocation() {
     if(ftruncate(mFd, endOffset) == -1) {
         ALOGE("ftruncate err:%s, %d, fd:%d", strerror(errno), errno, mFd);
         status = false;
+        /* No need to post and handle(stop & notify client) error like it's done in preAllocate(),
+         * because ftruncate() is called during release() only and the error here would be
+         * reported from there as this function is returning false on any error in ftruncate().
+         */
     }
     return status;
 }
@@ -2153,14 +2188,17 @@ void MPEG4Writer::Track::addOneElstTableEntry(
     mElstTableEntries->add(htonl((((uint32_t)mediaRate) << 16) | (uint32_t)mediaRateFraction));
 }
 
-void MPEG4Writer::setupAndStartLooper() {
+status_t MPEG4Writer::setupAndStartLooper() {
+    status_t err = OK;
     if (mLooper == nullptr) {
         mLooper = new ALooper;
         mLooper->setName("MP4WtrCtrlHlpLooper");
-        mLooper->start();
+        err = mLooper->start();
         mReflector = new AHandlerReflector<MPEG4Writer>(this);
         mLooper->registerHandler(mReflector);
     }
+    ALOGD("MP4WtrCtrlHlpLooper Started");
+    return err;
 }
 
 void MPEG4Writer::stopAndReleaseLooper() {
@@ -2399,21 +2437,33 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
         case kWhatIOError: {
             ALOGE("kWhatIOError");
             int32_t err;
-            CHECK(msg->findInt32("errno", &err));
+            CHECK(msg->findInt32("err", &err));
             // Stop tracks' threads and main writer thread.
             stop();
             notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
             break;
         }
-        // fallocate() failed, hence notify app about it and stop().
+        // fallocate() failed, hence stop() and notify app.
         case kWhatFallocateError: {
             ALOGE("kWhatFallocateError");
             int32_t err;
-            CHECK(msg->findInt32("errno", &err));
+            CHECK(msg->findInt32("err", &err));
             // Stop tracks' threads and main writer thread.
             stop();
             //TODO: introduce a suitable MEDIA_RECORDER_ERROR_* instead MEDIA_RECORDER_ERROR_UNKNOWN?
             notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
+            break;
+        }
+        /* Response to kWhatNoIOErrorSoFar would be OK always as of now.
+         * Responding with other options could be added later if required.
+         */
+        case kWhatNoIOErrorSoFar: {
+            ALOGD("kWhatNoIOErrorSoFar");
+            sp<AMessage> response = new AMessage;
+            response->setInt32("err", OK);
+            sp<AReplyToken> replyID;
+            CHECK(msg->senderAwaitsResponse(&replyID));
+            response->postReply(replyID);
             break;
         }
         default:
@@ -2778,11 +2828,16 @@ status_t MPEG4Writer::Track::stop(bool stopSource) {
     mDone = true;
 
     void *dummy;
-    status_t err = pthread_join(mThread, &dummy);
-    WARN_UNLESS(err == 0, "track::stop: pthread_join status:%d", err);
-    status_t threadRetVal = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
-    WARN_UNLESS(threadRetVal == 0, "%s track stopped. Status :%d. %s source",
-                getTrackType(), err, stopSource ? "Stop" : "Not Stop");
+    status_t err = OK;
+    int retVal = pthread_join(mThread, &dummy);
+    if (retVal == 0) {
+        err = static_cast<status_t>(reinterpret_cast<uintptr_t>(dummy));
+        ALOGD("%s track stopped. Status:%d. %s source",
+            getTrackType(), err, stopSource ? "Stop" : "Not Stop");
+    } else {
+        ALOGE("track::stop: pthread_join retVal:%d", retVal);
+        err = UNKNOWN_ERROR;
+    }
     mStarted = false;
     return err;
 }
