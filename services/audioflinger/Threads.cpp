@@ -7366,8 +7366,10 @@ reacquire_wakelock:
 
         // Update server timestamp with server stats
         // systemTime() is optional if the hardware supports timestamps.
-        mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] += framesRead;
-        mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = lastIoEndNs;
+        if (framesRead >= 0) {
+            mTimestamp.mPosition[ExtendedTimestamp::LOCATION_SERVER] += framesRead;
+            mTimestamp.mTimeNs[ExtendedTimestamp::LOCATION_SERVER] = lastIoEndNs;
+        }
 
         // Update server timestamp with kernel stats
         if (mPipeSource.get() == nullptr /* don't obtain for FastCapture, could block */) {
