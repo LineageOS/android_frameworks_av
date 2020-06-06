@@ -116,7 +116,7 @@ public:
         do {
             closeAudioStream();
             if (mOpenDelayMillis) usleep(mOpenDelayMillis * 1000);
-            openAudioStream(mDirection);
+            openAudioStream(mDirection, mRequestedSharingMode);
             // It is possible for the stream to be disconnected, or stolen between the time
             // it is opened and when it is started. If that happens then try again.
             // If it was stolen then it should succeed the second time because there will already be
@@ -136,11 +136,13 @@ public:
         return AAUDIO_CALLBACK_RESULT_CONTINUE;
     }
 
-    aaudio_result_t openAudioStream(aaudio_direction_t direction) {
+    aaudio_result_t openAudioStream(aaudio_direction_t direction,
+            aaudio_sharing_mode_t requestedSharingMode) {
         std::lock_guard<std::mutex> lock(mLock);
 
         AAudioStreamBuilder *builder = nullptr;
         mDirection = direction;
+        mRequestedSharingMode = requestedSharingMode;
 
         // Use an AAudioStreamBuilder to contain requested parameters.
         aaudio_result_t result = AAudio_createStreamBuilder(&builder);
@@ -153,7 +155,7 @@ public:
         // Request stream properties.
         AAudioStreamBuilder_setFormat(builder, AAUDIO_FORMAT_PCM_FLOAT);
         AAudioStreamBuilder_setPerformanceMode(builder, AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
-        AAudioStreamBuilder_setSharingMode(builder, AAUDIO_SHARING_MODE_EXCLUSIVE);
+        AAudioStreamBuilder_setSharingMode(builder, mRequestedSharingMode);
         AAudioStreamBuilder_setDirection(builder, direction);
         AAudioStreamBuilder_setDataCallback(builder, s_myDataCallbackProc, this);
         AAudioStreamBuilder_setErrorCallback(builder, s_myErrorCallbackProc, this);
@@ -280,6 +282,7 @@ private:
 
     AAudioStream       *mStream = nullptr;
     aaudio_direction_t  mDirection = AAUDIO_DIRECTION_OUTPUT;
+    aaudio_sharing_mode_t mRequestedSharingMode = AAUDIO_UNSPECIFIED;
     std::mutex          mLock;
     std::string         mName;
     int                 mMaxRetries = 1;
@@ -316,10 +319,11 @@ static void s_myErrorCallbackProc(
 }
 
 static void s_usage() {
-    printf("test_steal_exclusive [-i] [-r{maxRetries}] [-d{delay}]\n");
+    printf("test_steal_exclusive [-i] [-r{maxRetries}] [-d{delay}] -s\n");
     printf("     -i direction INPUT, otherwise OUTPUT\n");
     printf("     -d delay open by milliseconds, default = 0\n");
     printf("     -r max retries in the error callback, default = 1\n");
+    printf("     -s try to open in SHARED mode\n");
 }
 
 int main(int argc, char ** argv) {
@@ -330,12 +334,13 @@ int main(int argc, char ** argv) {
     int errorCount = 0;
     int maxRetries = 1;
     int openDelayMillis = 0;
+    aaudio_sharing_mode_t requestedSharingMode = AAUDIO_SHARING_MODE_EXCLUSIVE;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
     setvbuf(stdout, nullptr, _IONBF, (size_t) 0);
 
-    printf("Test Stealing an EXCLUSIVE stream V1.0\n");
+    printf("Test interaction between streams V1.1\n");
     printf("\n");
 
     for (int i = 1; i < argc; i++) {
@@ -351,6 +356,9 @@ int main(int argc, char ** argv) {
                     break;
                 case 'r':
                     maxRetries = atoi(&arg[2]);
+                    break;
+                case 's':
+                    requestedSharingMode = AAUDIO_SHARING_MODE_SHARED;
                     break;
                 default:
                     s_usage();
@@ -369,17 +377,18 @@ int main(int argc, char ** argv) {
     victim.setMaxRetries(maxRetries);
     thief.setMaxRetries(maxRetries);
 
-    result = victim.openAudioStream(direction);
+    result = victim.openAudioStream(direction, requestedSharingMode);
     if (result != AAUDIO_OK) {
         printf("s_OpenAudioStream victim returned %s\n",
                AAudio_convertResultToText(result));
         errorCount++;
     }
 
-    if (victim.sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE) {
-        printf("Victim modes is EXCLUSIVE => OK\n");
+    if (victim.sharingMode == requestedSharingMode) {
+        printf("Victim modes is %s => OK\n", s_sharingModeToText(requestedSharingMode));
     } else {
-        printf("Victim modes should be EXCLUSIVE => test not valid!\n");
+        printf("Victim modes should be %s => test not valid!\n",
+                s_sharingModeToText(requestedSharingMode));
         goto onerror;
     }
 
@@ -406,7 +415,7 @@ int main(int argc, char ** argv) {
     }
 
     printf("Trying to start the THIEF stream, which may steal the VICTIM MMAP resource -----\n");
-    result = thief.openAudioStream(direction);
+    result = thief.openAudioStream(direction, requestedSharingMode);
     if (result != AAUDIO_OK) {
         printf("s_OpenAudioStream victim returned %s\n",
                AAudio_convertResultToText(result));
