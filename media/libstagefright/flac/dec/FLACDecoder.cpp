@@ -433,7 +433,7 @@ status_t FLACDecoder::addDataToBuffer(const uint8_t *inBuffer, size_t inBufferLe
             if (mBuffer == nullptr) {
                 mBufferDataSize = 0;
                 mBufferLen = 0;
-                ALOGE("decodeOneFrame: failed to allocate memory for input buffer");
+                ALOGE("addDataToBuffer: failed to allocate memory for input buffer");
                 return NO_MEMORY;
             }
             mBufferLen = mBufferDataSize + inBufferLen;
