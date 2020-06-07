@@ -2496,6 +2496,18 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         }
                         break;
                     }
+                    if (!mLeftover.empty()) {
+                        ssize_t index = dequeuePortBuffer(kPortIndexInput);
+                        CHECK_GE(index, 0);
+
+                        status_t err = handleLeftover(index);
+                        if (err != OK) {
+                            setStickyError(err);
+                            postActivityNotificationIfPossible();
+                            cancelPendingDequeueOperations();
+                        }
+                        break;
+                    }
 
                     if (mFlags & kFlagIsAsync) {
                         if (!mHaveInputSurface) {
@@ -3185,7 +3197,15 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            status_t err = onQueueInputBuffer(msg);
+            status_t err = UNKNOWN_ERROR;
+            if (!mLeftover.empty()) {
+                mLeftover.push_back(msg);
+                size_t index;
+                msg->findSize("index", &index);
+                err = handleLeftover(index);
+            } else {
+                err = onQueueInputBuffer(msg);
+            }
 
             PostReplyWithError(replyID, err);
             break;
@@ -3472,8 +3492,8 @@ status_t MediaCodec::queueCSDInputBuffer(size_t bufferIndex) {
     sp<hardware::HidlMemory> memory;
     size_t offset = 0;
 
-    if ((mFlags & kFlagUseBlockModel) && mOwnerName.startsWith("codec2::")) {
-        if (mCrypto) {
+    if (mFlags & kFlagUseBlockModel) {
+        if (hasCryptoOrDescrambler()) {
             constexpr size_t kInitialDealerCapacity = 1048576;  // 1MB
             thread_local sp<MemoryDealer> sDealer = new MemoryDealer(
                     kInitialDealerCapacity, "CSD(1MB)");
@@ -3598,6 +3618,9 @@ void MediaCodec::returnBuffersToCodecOnPort(int32_t portIndex, bool isReclaim) {
     CHECK(portIndex == kPortIndexInput || portIndex == kPortIndexOutput);
     Mutex::Autolock al(mBufferLock);
 
+    if (portIndex == kPortIndexInput) {
+        mLeftover.clear();
+    }
     for (size_t i = 0; i < mPortBuffers[portIndex].size(); ++i) {
         BufferInfo *info = &mPortBuffers[portIndex][i];
 
@@ -3728,7 +3751,26 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
             err = mBufferChannel->attachEncryptedBuffer(
                     memory, (mFlags & kFlagIsSecure), key, iv, mode, pattern,
                     offset, subSamples, numSubSamples, buffer);
+        } else {
+            err = UNKNOWN_ERROR;
         }
+
+        if (err == OK && !buffer->asC2Buffer()
+                && c2Buffer && c2Buffer->data().type() == C2BufferData::LINEAR) {
+            C2ConstLinearBlock block{c2Buffer->data().linearBlocks().front()};
+            if (block.size() > buffer->size()) {
+                C2ConstLinearBlock leftover = block.subBlock(
+                        block.offset() + buffer->size(), block.size() - buffer->size());
+                sp<WrapperObject<std::shared_ptr<C2Buffer>>> obj{
+                    new WrapperObject<std::shared_ptr<C2Buffer>>{
+                        C2Buffer::CreateLinearBuffer(leftover)}};
+                msg->setObject("c2buffer", obj);
+                mLeftover.push_front(msg);
+                // Not sending EOS if we have leftovers
+                flags &= ~BUFFER_FLAG_EOS;
+            }
+        }
+
         offset = buffer->offset();
         size = buffer->size();
         if (err != OK) {
@@ -3791,6 +3833,16 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
 
     return err;
+}
+
+status_t MediaCodec::handleLeftover(size_t index) {
+    if (mLeftover.empty()) {
+        return OK;
+    }
+    sp<AMessage> msg = mLeftover.front();
+    mLeftover.pop_front();
+    msg->setSize("index", index);
+    return onQueueInputBuffer(msg);
 }
 
 //static

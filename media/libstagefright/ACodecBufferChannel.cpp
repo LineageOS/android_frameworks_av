@@ -22,11 +22,14 @@
 
 #include <C2Buffer.h>
 
+#include <Codec2BufferUtils.h>
+
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/drm/1.0/types.h>
 #include <binder/MemoryDealer.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/openmax/OMX_Core.h>
+#include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/MediaCodec.h>
@@ -91,14 +94,26 @@ ACodecBufferChannel::ACodecBufferChannel(
 }
 
 status_t ACodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
-    if (mDealer != nullptr) {
-        return -ENOSYS;
-    }
     std::shared_ptr<const std::vector<const BufferInfo>> array(
             std::atomic_load(&mInputBuffers));
     BufferInfoIterator it = findClientBuffer(array, buffer);
     if (it == array->end()) {
         return -ENOENT;
+    }
+    if (it->mClientBuffer != it->mCodecBuffer) {
+        // Copy metadata from client to codec buffer.
+        it->mCodecBuffer->meta()->clear();
+        int64_t timeUs;
+        CHECK(it->mClientBuffer->meta()->findInt64("timeUs", &timeUs));
+        it->mCodecBuffer->meta()->setInt64("timeUs", timeUs);
+        int32_t eos;
+        if (it->mClientBuffer->meta()->findInt32("eos", &eos)) {
+            it->mCodecBuffer->meta()->setInt32("eos", eos);
+        }
+        int32_t csd;
+        if (it->mClientBuffer->meta()->findInt32("csd", &csd)) {
+            it->mCodecBuffer->meta()->setInt32("csd", csd);
+        }
     }
     ALOGV("queueInputBuffer #%d", it->mBufferId);
     sp<AMessage> msg = mInputBufferFilled->dup();
@@ -267,16 +282,30 @@ status_t ACodecBufferChannel::attachBuffer(
             }
             C2ConstLinearBlock block{c2Buffer->data().linearBlocks().front()};
             C2ReadView view{block.map().get()};
-            if (view.capacity() > buffer->capacity()) {
-                return -ENOSYS;
-            }
-            memcpy(buffer->base(), view.data(), view.capacity());
-            buffer->setRange(0, view.capacity());
+            size_t copyLength = std::min(size_t(view.capacity()), buffer->capacity());
+            ALOGV_IF(view.capacity() > buffer->capacity(),
+                    "view.capacity() = %zu, buffer->capacity() = %zu",
+                    view.capacity(), buffer->capacity());
+            memcpy(buffer->base(), view.data(), copyLength);
+            buffer->setRange(0, copyLength);
             break;
         }
         case C2BufferData::GRAPHIC: {
-            // TODO
-            return -ENOSYS;
+            sp<ABuffer> imageData;
+            if (!buffer->format()->findBuffer("image-data", &imageData)) {
+                return -ENOSYS;
+            }
+            if (c2Buffer->data().graphicBlocks().size() != 1u) {
+                return -ENOSYS;
+            }
+            C2ConstGraphicBlock block{c2Buffer->data().graphicBlocks().front()};
+            const C2GraphicView view{block.map().get()};
+            status_t err = ImageCopy(
+                    buffer->base(), (const MediaImage2 *)(imageData->base()), view);
+            if (err != OK) {
+                return err;
+            }
+            break;
         }
         case C2BufferData::LINEAR_CHUNKS:  [[fallthrough]];
         case C2BufferData::GRAPHIC_CHUNKS: [[fallthrough]];
