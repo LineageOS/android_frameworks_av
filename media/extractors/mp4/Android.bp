@@ -16,4 +16,12 @@ cc_library {
         "libstagefright_id3",
         "libutils",
     ],
+
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }

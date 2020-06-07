@@ -67,7 +67,7 @@ struct TWGraphicBufferSource::TWOmxNodeWrapper : public IOmxNodeWrapper {
             int32_t dataSpace, int32_t aspects, int32_t pixelFormat) override {
         Message tMsg;
         tMsg.type = Message::Type::EVENT;
-        tMsg.fence = native_handle_create(0, 0);
+        tMsg.fence.setTo(native_handle_create(0, 0), /* shouldOwn = */ true);
         tMsg.data.eventData.event = uint32_t(OMX_EventDataSpaceChanged);
         tMsg.data.eventData.data1 = dataSpace;
         tMsg.data.eventData.data2 = aspects;
