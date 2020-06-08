@@ -139,7 +139,7 @@ struct MediaCodec : public AHandler {
     // object.
     status_t release();
 
-    status_t releaseAsync();
+    status_t releaseAsync(const sp<AMessage> &notify);
 
     status_t flush();
 
@@ -382,6 +382,7 @@ private:
     sp<AMessage> mInputFormat;
     sp<AMessage> mCallback;
     sp<AMessage> mOnFrameRenderedNotification;
+    sp<AMessage> mAsyncReleaseCompleteNotification;
 
     sp<ResourceManagerServiceProxy> mResourceManagerProxy;
 
