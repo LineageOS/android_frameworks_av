@@ -57,10 +57,11 @@ struct Camera3OfflineStates {
             const TagMonitor& tagMonitor, const metadata_vendor_id_t vendorTagId,
             const bool useHalBufManager, const bool needFixupMonochromeTags,
             const bool usePartialResult, const uint32_t numPartialResults,
-            const uint32_t nextResultFN, const uint32_t nextReprocResultFN,
-            const uint32_t nextZslResultFN,  const uint32_t nextShutterFN,
-            const uint32_t nextReprocShutterFN, const uint32_t nextZslShutterFN,
-            const CameraMetadata& deviceInfo,
+            const int64_t lastCompletedRegularFN, const int64_t lastCompletedReprocessFN,
+            const int64_t lastCompletedZslFN, const uint32_t nextResultFN,
+            const uint32_t nextReprocResultFN, const uint32_t nextZslResultFN,
+            const uint32_t nextShutterFN, const uint32_t nextReprocShutterFN,
+            const uint32_t nextZslShutterFN, const CameraMetadata& deviceInfo,
             const std::unordered_map<std::string, CameraMetadata>& physicalDeviceInfoMap,
             const std::unordered_map<std::string, camera3::DistortionMapper>& distortionMappers,
             const std::unordered_map<std::string, camera3::ZoomRatioMapper>& zoomRatioMappers,
@@ -69,6 +70,9 @@ struct Camera3OfflineStates {
             mTagMonitor(tagMonitor), mVendorTagId(vendorTagId),
             mUseHalBufManager(useHalBufManager), mNeedFixupMonochromeTags(needFixupMonochromeTags),
             mUsePartialResult(usePartialResult), mNumPartialResults(numPartialResults),
+            mLastCompletedRegularFrameNumber(lastCompletedRegularFN),
+            mLastCompletedReprocessFrameNumber(lastCompletedReprocessFN),
+            mLastCompletedZslFrameNumber(lastCompletedZslFN),
             mNextResultFrameNumber(nextResultFN),
             mNextReprocessResultFrameNumber(nextReprocResultFN),
             mNextZslStillResultFrameNumber(nextZslResultFN),
@@ -90,6 +94,15 @@ struct Camera3OfflineStates {
     const bool mUsePartialResult;
     const uint32_t mNumPartialResults;
 
+    // The last completed (buffers, result metadata, and error notify) regular
+    // request frame number
+    const int64_t mLastCompletedRegularFrameNumber;
+    // The last completed (buffers, result metadata, and error notify) reprocess
+    // request frame number
+    const int64_t mLastCompletedReprocessFrameNumber;
+    // The last completed (buffers, result metadata, and error notify) zsl
+    // request frame number
+    const int64_t mLastCompletedZslFrameNumber;
     // the minimal frame number of the next non-reprocess result
     const uint32_t mNextResultFrameNumber;
     // the minimal frame number of the next reprocess result
@@ -214,6 +227,12 @@ class Camera3OfflineSession :
     std::mutex mOutputLock;
     std::list<CaptureResult> mResultQueue;
     std::condition_variable mResultSignal;
+    // the last completed frame number of regular requests
+    int64_t mLastCompletedRegularFrameNumber;
+    // the last completed frame number of reprocess requests
+    int64_t mLastCompletedReprocessFrameNumber;
+    // the last completed frame number of ZSL still capture requests
+    int64_t mLastCompletedZslFrameNumber;
     // the minimal frame number of the next non-reprocess result
     uint32_t mNextResultFrameNumber;
     // the minimal frame number of the next reprocess result
