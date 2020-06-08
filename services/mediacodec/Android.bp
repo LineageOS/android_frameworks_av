@@ -15,18 +15,6 @@ cc_binary {
         "libmedia_codecserviceregistrant",
     ],
 
-    target: {
-        android: {
-            product_variables: {
-                malloc_not_svelte: {
-                    // Scudo increases memory footprint, so only enable on
-                    // non-svelte devices.
-                    shared_libs: ["libc_scudo"],
-                },
-            },
-        },
-    },
-
     header_libs: [
         "libmedia_headers",
     ],
