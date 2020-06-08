@@ -45,7 +45,8 @@ namespace camera3 {
      * Helper methods shared between Camera3Device/Camera3OfflineSession for HAL callbacks
      */
     // helper function to return the output buffers to output streams.
-    void returnOutputBuffers(
+    // returns the number of STATUS_ERROR buffers
+    size_t returnOutputBuffers(
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
             const camera3_stream_buffer_t *outputBuffers,
@@ -60,6 +61,9 @@ namespace camera3 {
     struct CaptureOutputStates {
         const String8& cameraId;
         std::mutex& inflightLock;
+        int64_t& lastCompletedRegularFrameNumber;
+        int64_t& lastCompletedZslFrameNumber;
+        int64_t& lastCompletedReprocessFrameNumber;
         InFlightRequestMap& inflightMap; // end of inflightLock scope
         std::mutex& outputLock;
         std::list<CaptureResult>& resultQueue;
