@@ -50,30 +50,26 @@ bool statsd_mediadrm(const mediametrics::Item *item)
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
 
-    char *vendor = nullptr;
-    (void) item->getCString("vendor", &vendor);
-    char *description = nullptr;
-    (void) item->getCString("description", &description);
-    char *serialized_metrics = nullptr;
-    (void) item->getCString("serialized_metrics", &serialized_metrics);
+    std::string vendor;
+    (void) item->getString("vendor", &vendor);
+    std::string description;
+    (void) item->getString("description", &description);
+    std::string serialized_metrics;
+    (void) item->getString("serialized_metrics", &serialized_metrics);
 
     if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics ? serialized_metrics : nullptr,
-                                                serialized_metrics ? strlen(serialized_metrics)
-                                                                   : 0);
+        android::util::BytesField bf_serialized(serialized_metrics.c_str(),
+                                                serialized_metrics.size());
         android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
                                    timestamp, pkgName.c_str(), pkgVersionCode,
                                    mediaApexVersion,
-                                   vendor, description,
+                                   vendor.c_str(),
+                                   description.c_str(),
                                    bf_serialized);
     } else {
-        ALOGV("NOT sending: mediadrm private data (len=%zu)",
-              serialized_metrics ? strlen(serialized_metrics) : 0);
+        ALOGV("NOT sending: mediadrm private data (len=%zu)", serialized_metrics.size());
     }
 
-    free(vendor);
-    free(description);
-    free(serialized_metrics);
     return true;
 }
 
@@ -87,23 +83,20 @@ bool statsd_widevineCDM(const mediametrics::Item *item)
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
 
-    char *serialized_metrics = nullptr;
-    (void) item->getCString("serialized_metrics", &serialized_metrics);
+    std::string serialized_metrics;
+    (void) item->getString("serialized_metrics", &serialized_metrics);
 
     if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics ? serialized_metrics : nullptr,
-                                                serialized_metrics ? strlen(serialized_metrics)
-                                                                   : 0);
+        android::util::BytesField bf_serialized(serialized_metrics.c_str(),
+                                                serialized_metrics.size());
         android::util::stats_write(android::util::MEDIAMETRICS_DRM_WIDEVINE_REPORTED,
                                    timestamp, pkgName.c_str(), pkgVersionCode,
                                    mediaApexVersion,
                                    bf_serialized);
     } else {
-        ALOGV("NOT sending: widevine private data (len=%zu)",
-              serialized_metrics ? strlen(serialized_metrics) : 0);
+        ALOGV("NOT sending: widevine private data (len=%zu)", serialized_metrics.size());
     }
 
-    free(serialized_metrics);
     return true;
 }
 
@@ -123,14 +116,14 @@ bool statsd_drmmanager(const mediametrics::Item *item)
     int64_t pkgVersionCode = item->getPkgVersionCode();
     int64_t mediaApexVersion = 0;
 
-    char *plugin_id = nullptr;
-    (void) item->getCString("plugin_id", &plugin_id);
-    char *description = nullptr;
-    (void) item->getCString("description", &description);
+    std::string plugin_id;
+    (void) item->getString("plugin_id", &plugin_id);
+    std::string description;
+    (void) item->getString("description", &description);
     int32_t method_id = -1;
     (void) item->getInt32("method_id", &method_id);
-    char *mime_types = nullptr;
-    (void) item->getCString("mime_types", &mime_types);
+    std::string mime_types;
+    (void) item->getString("mime_types", &mime_types);
 
     // Corresponds to the 13 APIs tracked in the MediametricsDrmManagerReported statsd proto
     // Please see also DrmManager::kMethodIdMap
@@ -141,16 +134,15 @@ bool statsd_drmmanager(const mediametrics::Item *item)
 
     android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
                                timestamp, pkgName.c_str(), pkgVersionCode, mediaApexVersion,
-                               plugin_id, description, method_id, mime_types,
+                               plugin_id.c_str(), description.c_str(),
+                               method_id, mime_types.c_str(),
                                methodCounts[0], methodCounts[1], methodCounts[2],
                                methodCounts[3], methodCounts[4], methodCounts[5],
                                methodCounts[6], methodCounts[7], methodCounts[8],
                                methodCounts[9], methodCounts[10], methodCounts[11],
                                methodCounts[12]);
 
-    free(plugin_id);
-    free(description);
-    free(mime_types);
     return true;
 }
+
 } // namespace android
