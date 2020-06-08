@@ -64,6 +64,12 @@ struct TestClientCallback : public BnTranscodingClientCallback {
         return Status::ok();
     }
 
+    Status onTranscodingStarted(int32_t /*in_jobId*/) override { return Status::ok(); }
+
+    Status onTranscodingPaused(int32_t /*in_jobId*/) override { return Status::ok(); }
+
+    Status onTranscodingResumed(int32_t /*in_jobId*/) override { return Status::ok(); }
+
     Status onTranscodingFinished(int32_t in_jobId,
                                  const TranscodingResultParcel& in_result) override {
         EXPECT_EQ(in_jobId, in_result.jobId);
