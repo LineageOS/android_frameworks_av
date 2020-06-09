@@ -18,6 +18,8 @@
 #define LOG_TAG "CCodecBufferChannel"
 #include <utils/Log.h>
 
+#include <algorithm>
+#include <list>
 #include <numeric>
 
 #include <C2AllocatorGralloc.h>
@@ -1242,62 +1244,98 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
         return UNKNOWN_ERROR;
     }
     size_t numInputSlots = mInput.lock()->numSlots;
-    std::vector<sp<MediaCodecBuffer>> toBeQueued;
-    for (size_t i = 0; i < numInputSlots; ++i) {
+
+    struct ClientInputBuffer {
         size_t index;
         sp<MediaCodecBuffer> buffer;
-        {
-            Mutexed<Input>::Locked input(mInput);
-            if (!input->buffers->requestNewBuffer(&index, &buffer)) {
-                if (i == 0) {
-                    ALOGW("[%s] start: cannot allocate memory at all", mName);
-                    return NO_MEMORY;
-                } else {
-                    ALOGV("[%s] start: cannot allocate memory, only %zu buffers allocated",
-                            mName, i);
-                }
+        size_t capacity;
+    };
+    std::list<ClientInputBuffer> clientInputBuffers;
+
+    {
+        Mutexed<Input>::Locked input(mInput);
+        while (clientInputBuffers.size() < numInputSlots) {
+            ClientInputBuffer clientInputBuffer;
+            if (!input->buffers->requestNewBuffer(&clientInputBuffer.index,
+                                                  &clientInputBuffer.buffer)) {
                 break;
             }
+            clientInputBuffer.capacity = clientInputBuffer.buffer->capacity();
+            clientInputBuffers.emplace_back(std::move(clientInputBuffer));
         }
-        if (buffer) {
-            Mutexed<std::list<sp<ABuffer>>>::Locked configs(mFlushedConfigs);
-            ALOGV("[%s] input buffer %zu available", mName, index);
-            bool post = true;
-            if (!configs->empty()) {
+    }
+    if (clientInputBuffers.empty()) {
+        ALOGW("[%s] start: cannot allocate memory at all", mName);
+        return NO_MEMORY;
+    } else if (clientInputBuffers.size() < numInputSlots) {
+        ALOGD("[%s] start: cannot allocate memory for all slots, "
+              "only %zu buffers allocated",
+              mName, clientInputBuffers.size());
+    } else {
+        ALOGV("[%s] %zu initial input buffers available",
+              mName, clientInputBuffers.size());
+    }
+    // Sort input buffers by their capacities in increasing order.
+    clientInputBuffers.sort(
+            [](const ClientInputBuffer& a, const ClientInputBuffer& b) {
+                return a.capacity < b.capacity;
+            });
+
+    {
+        Mutexed<std::list<sp<ABuffer>>>::Locked configs(mFlushedConfigs);
+        if (!configs->empty()) {
+            while (!configs->empty()) {
                 sp<ABuffer> config = configs->front();
                 configs->pop_front();
-                if (buffer->capacity() >= config->size()) {
-                    memcpy(buffer->base(), config->data(), config->size());
-                    buffer->setRange(0, config->size());
-                    buffer->meta()->clear();
-                    buffer->meta()->setInt64("timeUs", 0);
-                    buffer->meta()->setInt32("csd", 1);
-                    post = false;
-                } else {
-                    ALOGD("[%s] buffer capacity too small for the config (%zu < %zu)",
-                            mName, buffer->capacity(), config->size());
+                // Find the smallest input buffer that can fit the config.
+                auto i = std::find_if(
+                        clientInputBuffers.begin(),
+                        clientInputBuffers.end(),
+                        [cfgSize = config->size()](const ClientInputBuffer& b) {
+                            return b.capacity >= cfgSize;
+                        });
+                if (i == clientInputBuffers.end()) {
+                    ALOGW("[%s] no input buffer large enough for the config "
+                          "(%zu bytes)",
+                          mName, config->size());
+                    return NO_MEMORY;
                 }
-            } else if (oStreamFormat.value == C2BufferData::LINEAR && i == 0
-                        && (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
-                // WORKAROUND: Some apps expect CSD available without queueing
-                //             any input. Queue an empty buffer to get the CSD.
-                buffer->setRange(0, 0);
+                sp<MediaCodecBuffer> buffer = i->buffer;
+                memcpy(buffer->base(), config->data(), config->size());
+                buffer->setRange(0, config->size());
                 buffer->meta()->clear();
                 buffer->meta()->setInt64("timeUs", 0);
-                post = false;
+                buffer->meta()->setInt32("csd", 1);
+                if (queueInputBufferInternal(buffer) != OK) {
+                    ALOGW("[%s] Error while queueing a flushed config",
+                          mName);
+                    return UNKNOWN_ERROR;
+                }
+                clientInputBuffers.erase(i);
             }
-            if (post) {
-                mCallback->onInputBufferAvailable(index, buffer);
-            } else {
-                toBeQueued.emplace_back(buffer);
+        } else if (oStreamFormat.value == C2BufferData::LINEAR &&
+                   (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
+            sp<MediaCodecBuffer> buffer = clientInputBuffers.front().buffer;
+            // WORKAROUND: Some apps expect CSD available without queueing
+            //             any input. Queue an empty buffer to get the CSD.
+            buffer->setRange(0, 0);
+            buffer->meta()->clear();
+            buffer->meta()->setInt64("timeUs", 0);
+            if (queueInputBufferInternal(buffer) != OK) {
+                ALOGW("[%s] Error while queueing an empty buffer to get CSD",
+                      mName);
+                return UNKNOWN_ERROR;
             }
+            clientInputBuffers.pop_front();
         }
     }
-    for (const sp<MediaCodecBuffer> &buffer : toBeQueued) {
-        if (queueInputBufferInternal(buffer) != OK) {
-            ALOGV("[%s] Error while queueing initial buffers", mName);
-        }
+
+    for (const ClientInputBuffer& clientInputBuffer: clientInputBuffers) {
+        mCallback->onInputBufferAvailable(
+                clientInputBuffer.index,
+                clientInputBuffer.buffer);
     }
+
     return OK;
 }
 
