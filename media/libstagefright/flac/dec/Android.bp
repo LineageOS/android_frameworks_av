@@ -2,6 +2,7 @@ cc_library {
     name: "libstagefright_flacdec",
     vendor_available: true,
     min_sdk_version: "29",
+    host_supported: true,
 
     srcs: [
         "FLACDecoder.cpp",
@@ -36,4 +37,10 @@ cc_library {
         "libstagefright_foundation_headers",
         "libstagefright_headers",
     ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
