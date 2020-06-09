@@ -34,6 +34,9 @@ sched_setscheduler: 1
 getrlimit: 1
 nanosleep: 1
 getrandom: 1
+timer_create: 1
+timer_settime: 1
+timer_delete: 1
 
 # for dynamically loading extractors
 getdents64: 1

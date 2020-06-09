@@ -33,6 +33,7 @@ cc_test {
         "libmp4extractor",
         "libaudioutils",
         "libdatasource",
+        "libwatchdog",
 
         "libstagefright",
         "libstagefright_id3",
@@ -65,6 +66,7 @@ cc_test {
         "libcrypto",
         "libhidlmemory",
         "libhidlbase",
+        "libbase",
     ],
 
     include_dirs: [
