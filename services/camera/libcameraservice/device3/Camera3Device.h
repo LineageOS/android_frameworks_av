@@ -1010,6 +1010,9 @@ class Camera3Device :
     std::mutex                    mInFlightLock;
     camera3::InFlightRequestMap   mInFlightMap;
     nsecs_t                       mExpectedInflightDuration = 0;
+    int64_t                       mLastCompletedRegularFrameNumber = -1;
+    int64_t                       mLastCompletedReprocessFrameNumber = -1;
+    int64_t                       mLastCompletedZslFrameNumber = -1;
     // End of mInFlightLock protection scope
 
     int mInFlightStatusId; // const after initialize

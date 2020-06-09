@@ -20,7 +20,8 @@
     android:versionName="1.0" >
 
     <application android:label="TestAppB">
-        <activity android:name="com.android.tests.transcoding.MainActivity">
+        <activity android:name="com.android.tests.transcoding.MainActivity"
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.DEFAULT"/>
