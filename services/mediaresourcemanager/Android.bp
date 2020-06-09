@@ -1,6 +1,4 @@
-
-
-cc_library_shared {
+cc_library {
     name: "libresourcemanagerservice",
 
     srcs: [
@@ -24,5 +22,4 @@ cc_library_shared {
     ],
 
     export_include_dirs: ["."],
-
 }
