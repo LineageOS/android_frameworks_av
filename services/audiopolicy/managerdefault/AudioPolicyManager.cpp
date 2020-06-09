@@ -1102,14 +1102,15 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     };
     *portId = PolicyAudioPort::getNextUniqueId();
 
+    sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
     sp<TrackClientDescriptor> clientDesc =
         new TrackClientDescriptor(*portId, uid, session, resultAttr, clientConfig,
                                   sanitizedRequestedPortId, *stream,
                                   mEngine->getProductStrategyForAttributes(resultAttr),
                                   toVolumeSource(resultAttr),
                                   *flags, isRequestedDeviceForExclusiveUse,
-                                  std::move(weakSecondaryOutputDescs));
-    sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueFor(*output);
+                                  std::move(weakSecondaryOutputDescs),
+                                  outputDesc->mPolicyMix);
     outputDesc->addClient(clientDesc);
 
     ALOGV("%s() returns output %d requestedPortId %d selectedDeviceId %d for port ID %d", __func__,
@@ -2877,7 +2878,7 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
 {
     ALOGV("registerPolicyMixes() %zu mix(es)", mixes.size());
     status_t res = NO_ERROR;
-
+    bool checkOutputs = false;
     sp<HwModule> rSubmixModule;
     // examine each mix's route type
     for (size_t i = 0; i < mixes.size(); i++) {
@@ -2996,11 +2997,16 @@ status_t AudioPolicyManager::registerPolicyMixes(const Vector<AudioMix>& mixes)
                         i, type, address.string());
                 res = INVALID_OPERATION;
                 break;
+            } else {
+                checkOutputs = true;
             }
         }
     }
     if (res != NO_ERROR) {
         unregisterPolicyMixes(mixes);
+    } else if (checkOutputs) {
+        checkForDeviceAndOutputChanges();
+        updateCallAndOutputRouting();
     }
     return res;
 }
@@ -3009,6 +3015,7 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
 {
     ALOGV("unregisterPolicyMixes() num mixes %zu", mixes.size());
     status_t res = NO_ERROR;
+    bool checkOutputs = false;
     sp<HwModule> rSubmixModule;
     // examine each mix's route type
     for (const auto& mix : mixes) {
@@ -3049,8 +3056,14 @@ status_t AudioPolicyManager::unregisterPolicyMixes(Vector<AudioMix> mixes)
             if (mPolicyMixes.unregisterMix(mix) != NO_ERROR) {
                 res = INVALID_OPERATION;
                 continue;
+            } else {
+                checkOutputs = true;
             }
         }
+    }
+    if (res == NO_ERROR && checkOutputs) {
+        checkForDeviceAndOutputChanges();
+        updateCallAndOutputRouting();
     }
     return res;
 }
@@ -5226,32 +5239,38 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
     SortedVector<audio_io_handle_t> srcOutputs = getOutputsForDevices(oldDevices, mPreviousOutputs);
     SortedVector<audio_io_handle_t> dstOutputs = getOutputsForDevices(newDevices, mOutputs);
 
-    // also take into account external policy-related changes: add all outputs which are
-    // associated with policies in the "before" and "after" output vectors
-    ALOGVV("%s(): policy related outputs", __func__);
-    bool hasDynamicPolicy = false;
-    for (size_t i = 0 ; i < mPreviousOutputs.size() ; i++) {
-        const sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueAt(i);
-        if (desc != 0 && desc->mPolicyMix != NULL) {
-            srcOutputs.add(desc->mIoHandle);
-            hasDynamicPolicy = true;
-            ALOGVV(" previous outputs: adding %d", desc->mIoHandle);
+    uint32_t maxLatency = 0;
+    bool invalidate = false;
+    // take into account dynamic audio policies related changes: if a client is now associated
+    // to a different policy mix than at creation time, invalidate corresponding stream
+    for (size_t i = 0; i < mPreviousOutputs.size() && !invalidate; i++) {
+        const sp<SwAudioOutputDescriptor>& desc = mPreviousOutputs.valueAt(i);
+        if (desc->isDuplicated()) {
+            continue;
         }
-    }
-    for (size_t i = 0 ; i < mOutputs.size() ; i++) {
-        const sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
-        if (desc != 0 && desc->mPolicyMix != NULL) {
-            dstOutputs.add(desc->mIoHandle);
-            hasDynamicPolicy = true;
-            ALOGVV(" new outputs: adding %d", desc->mIoHandle);
+        for (const sp<TrackClientDescriptor>& client : desc->getClientIterable()) {
+            if (mEngine->getProductStrategyForAttributes(client->attributes()) != psId) {
+                continue;
+            }
+            sp<AudioPolicyMix> primaryMix;
+            status_t status = mPolicyMixes.getOutputForAttr(client->attributes(), client->uid(),
+                    client->flags(), primaryMix, nullptr);
+            if (status != OK) {
+                continue;
+            }
+            if (client->getPrimaryMix() != primaryMix) {
+                invalidate = true;
+                if (desc->isStrategyActive(psId)) {
+                    maxLatency = desc->latency();
+                }
+                break;
+            }
         }
     }
 
-    if (srcOutputs != dstOutputs) {
+    if (srcOutputs != dstOutputs || invalidate) {
         // get maximum latency of all source outputs to determine the minimum mute time guaranteeing
         // audio from invalidated tracks will be rendered when unmuting
-        uint32_t maxLatency = 0;
-        bool invalidate = hasDynamicPolicy;
         for (audio_io_handle_t srcOut : srcOutputs) {
             sp<SwAudioOutputDescriptor> desc = mPreviousOutputs.valueFor(srcOut);
             if (desc == nullptr) continue;
