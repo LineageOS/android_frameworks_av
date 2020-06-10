@@ -1336,97 +1336,56 @@ CameraDevice::checkRepeatingSequenceCompleteLocked(
 void
 CameraDevice::checkAndFireSequenceCompleteLocked() {
     int64_t completedFrameNumber = mFrameNumberTracker.getCompletedFrameNumber();
+    //std::map<int, int64_t> mSequenceLastFrameNumberMap;
     auto it = mSequenceLastFrameNumberMap.begin();
     while (it != mSequenceLastFrameNumberMap.end()) {
         int sequenceId = it->first;
-        int64_t lastFrameNumber = it->second.lastFrameNumber;
-        bool hasCallback = true;
+        int64_t lastFrameNumber = it->second;
+        bool seqCompleted = false;
+        bool hasCallback  = true;
 
         if (mRemote == nullptr) {
             ALOGW("Camera %s closed while checking sequence complete", getId());
             return;
         }
-        ALOGV("%s: seq %d's last frame number %" PRId64 ", completed %" PRId64,
-                __FUNCTION__, sequenceId, lastFrameNumber, completedFrameNumber);
-        if (!it->second.isSequenceCompleted) {
-            // Check if there is callback for this sequence
-            // This should not happen because we always register callback (with nullptr inside)
-            if (mSequenceCallbackMap.count(sequenceId) == 0) {
-                ALOGW("No callback found for sequenceId %d", sequenceId);
-                hasCallback = false;
-            }
 
-            if (lastFrameNumber <= completedFrameNumber) {
-                ALOGV("Mark sequenceId %d as sequence completed", sequenceId);
-                it->second.isSequenceCompleted = true;
-            }
-
-            if (it->second.isSequenceCompleted && hasCallback) {
-                auto cbIt = mSequenceCallbackMap.find(sequenceId);
-                CallbackHolder cbh = cbIt->second;
-
-                // send seq complete callback
-                sp<AMessage> msg = new AMessage(kWhatCaptureSeqEnd, mHandler);
-                msg->setPointer(kContextKey, cbh.mContext);
-                msg->setObject(kSessionSpKey, cbh.mSession);
-                msg->setPointer(kCallbackFpKey, (void*) cbh.mOnCaptureSequenceCompleted);
-                msg->setInt32(kSequenceIdKey, sequenceId);
-                msg->setInt64(kFrameNumberKey, lastFrameNumber);
-
-                // Clear the session sp before we send out the message
-                // This will guarantee the rare case where the message is processed
-                // before cbh goes out of scope and causing we call the session
-                // destructor while holding device lock
-                cbh.mSession.clear();
-                postSessionMsgAndCleanup(msg);
-            }
+        // Check if there is callback for this sequence
+        // This should not happen because we always register callback (with nullptr inside)
+        if (mSequenceCallbackMap.count(sequenceId) == 0) {
+            ALOGW("No callback found for sequenceId %d", sequenceId);
+            hasCallback = false;
         }
 
-        if (it->second.isSequenceCompleted && it->second.isInflightCompleted) {
-            if (mSequenceCallbackMap.find(sequenceId) != mSequenceCallbackMap.end()) {
-                mSequenceCallbackMap.erase(sequenceId);
-            }
+        if (lastFrameNumber <= completedFrameNumber) {
+            ALOGV("seq %d reached last frame %" PRId64 ", completed %" PRId64,
+                    sequenceId, lastFrameNumber, completedFrameNumber);
+            seqCompleted = true;
+        }
+
+        if (seqCompleted && hasCallback) {
+            // remove callback holder from callback map
+            auto cbIt = mSequenceCallbackMap.find(sequenceId);
+            CallbackHolder cbh = cbIt->second;
+            mSequenceCallbackMap.erase(cbIt);
+            // send seq complete callback
+            sp<AMessage> msg = new AMessage(kWhatCaptureSeqEnd, mHandler);
+            msg->setPointer(kContextKey, cbh.mContext);
+            msg->setObject(kSessionSpKey, cbh.mSession);
+            msg->setPointer(kCallbackFpKey, (void*) cbh.mOnCaptureSequenceCompleted);
+            msg->setInt32(kSequenceIdKey, sequenceId);
+            msg->setInt64(kFrameNumberKey, lastFrameNumber);
+
+            // Clear the session sp before we send out the message
+            // This will guarantee the rare case where the message is processed
+            // before cbh goes out of scope and causing we call the session
+            // destructor while holding device lock
+            cbh.mSession.clear();
+            postSessionMsgAndCleanup(msg);
+        }
+
+        // No need to track sequence complete if there is no callback registered
+        if (seqCompleted || !hasCallback) {
             it = mSequenceLastFrameNumberMap.erase(it);
-            ALOGV("%s: Remove holder for sequenceId %d", __FUNCTION__, sequenceId);
-        } else {
-            ++it;
-        }
-    }
-}
-
-void
-CameraDevice::removeCompletedCallbackHolderLocked(int64_t lastCompletedRegularFrameNumber) {
-    auto it = mSequenceLastFrameNumberMap.begin();
-    while (it != mSequenceLastFrameNumberMap.end()) {
-        int sequenceId = it->first;
-        int64_t lastFrameNumber = it->second.lastFrameNumber;
-
-        if (mRemote == nullptr) {
-            ALOGW("Camera %s closed while checking sequence complete", getId());
-            return;
-        }
-
-        ALOGV("%s: seq %d's last frame number %" PRId64
-                ", completed inflight frame number %" PRId64,
-                __FUNCTION__, sequenceId, lastFrameNumber,
-                lastCompletedRegularFrameNumber);
-        if (lastFrameNumber <= lastCompletedRegularFrameNumber) {
-            if (it->second.isSequenceCompleted) {
-                // Check if there is callback for this sequence
-                // This should not happen because we always register callback (with nullptr inside)
-                if (mSequenceCallbackMap.count(sequenceId) == 0) {
-                    ALOGW("No callback found for sequenceId %d", sequenceId);
-                } else {
-                    mSequenceCallbackMap.erase(sequenceId);
-                }
-
-                it = mSequenceLastFrameNumberMap.erase(it);
-                ALOGV("%s: Remove holder for sequenceId %d", __FUNCTION__, sequenceId);
-            } else {
-                ALOGV("Mark sequenceId %d as inflight completed", sequenceId);
-                it->second.isInflightCompleted = true;
-                ++it;
-            }
         } else {
             ++it;
         }
@@ -1521,9 +1480,6 @@ CameraDevice::ServiceCallback::onDeviceIdle() {
         return ret;
     }
 
-    dev->removeCompletedCallbackHolderLocked(
-             std::numeric_limits<int64_t>::max()/*lastCompletedRegularFrameNumber*/);
-
     if (dev->mIdle) {
         // Already in idle state. Possibly other thread did waitUntilIdle
         return ret;
@@ -1565,9 +1521,6 @@ CameraDevice::ServiceCallback::onCaptureStarted(
     if (dev->isClosed() || dev->mRemote == nullptr) {
         return ret;
     }
-
-    dev->removeCompletedCallbackHolderLocked(
-            resultExtras.lastCompletedRegularFrameNumber);
 
     int sequenceId = resultExtras.requestId;
     int32_t burstId = resultExtras.burstId;
