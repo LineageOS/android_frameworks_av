@@ -1770,7 +1770,7 @@ void CCodecBufferChannel::sendOutputBuffers() {
                     realloc(c2Buffer);
             output.unlock();
             mCCodecCallback->onOutputBuffersChanged();
-            return;
+            break;
         case OutputBuffers::RETRY:
             ALOGV("[%s] sendOutputBuffers: unable to register output buffer",
                   mName);
