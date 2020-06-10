@@ -43,19 +43,6 @@ struct InFlightRequest {
     // Decremented by calls to process_capture_result with valid output
     // and input buffers
     int     numBuffersLeft;
-    // Total number of output buffers for this request
-    int     numOutputBuffers;
-
-    // The inflight request is considered complete if all buffers are returned
-    // and numErrorBuffersReturned == numErrorBuffersNotified.
-
-    // The number of buffers returned with STATUS_ERROR;
-    int numErrorBuffersReturned;
-    // The number of buffers that are notified as error:
-    //   +1 for each notifyError(ERROR_BUFFER), and
-    //   +numOutputBuffers for notifyError(ERROR_REQUEST)
-    int numErrorBuffersNotified;
-
     CaptureResultExtras resultExtras;
     // If this request has any input buffer
     bool hasInputBuffer;
@@ -123,9 +110,6 @@ struct InFlightRequest {
             requestStatus(OK),
             haveResultMetadata(false),
             numBuffersLeft(0),
-            numOutputBuffers(0),
-            numErrorBuffersReturned(0),
-            numErrorBuffersNotified(0),
             hasInputBuffer(false),
             hasCallback(true),
             maxExpectedDuration(kDefaultExpectedDuration),
@@ -145,9 +129,6 @@ struct InFlightRequest {
             requestStatus(OK),
             haveResultMetadata(false),
             numBuffersLeft(numBuffers),
-            numOutputBuffers(hasInput ? numBuffers-1 : numBuffers),
-            numErrorBuffersReturned(0),
-            numErrorBuffersNotified(0),
             resultExtras(extras),
             hasInputBuffer(hasInput),
             hasCallback(hasAppCallback),
