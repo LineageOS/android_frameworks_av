@@ -267,15 +267,8 @@ class CameraDevice final : public RefBase {
     static const int REQUEST_ID_NONE = -1;
     int mRepeatingSequenceId = REQUEST_ID_NONE;
 
-    // sequence id -> last frame number holder map
-    struct RequestLastFrameNumberHolder {
-        int64_t lastFrameNumber;
-        bool isSequenceCompleted = false;
-        bool isInflightCompleted = false;
-        RequestLastFrameNumberHolder(int64_t lastFN) :
-                lastFrameNumber(lastFN) {}
-    };
-    std::map<int, RequestLastFrameNumberHolder> mSequenceLastFrameNumberMap;
+    // sequence id -> last frame number map
+    std::map<int, int64_t> mSequenceLastFrameNumberMap;
 
     struct CallbackHolder {
         CallbackHolder(sp<ACameraCaptureSession>          session,
@@ -345,7 +338,6 @@ class CameraDevice final : public RefBase {
 
     void checkRepeatingSequenceCompleteLocked(const int sequenceId, const int64_t lastFrameNumber);
     void checkAndFireSequenceCompleteLocked();
-    void removeCompletedCallbackHolderLocked(int64_t lastCompletedRegularFrameNumber);
 
     // Misc variables
     int32_t mShadingMapSize[2];   // const after constructor
