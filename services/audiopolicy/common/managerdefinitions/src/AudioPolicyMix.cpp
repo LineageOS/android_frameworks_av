@@ -28,7 +28,7 @@ namespace android {
 
 void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
 {
-    dst->appendFormat("%*sAudio Policy Mix %d:\n", spaces, "", index + 1);
+    dst->appendFormat("%*sAudio Policy Mix %d (%p):\n", spaces, "", index + 1, this);
     std::string mixTypeLiteral;
     if (!MixTypeConverter::toString(mMixType, mixTypeLiteral)) {
         ALOGE("%s: failed to convert mix type %d", __FUNCTION__, mMixType);
@@ -43,6 +43,9 @@ void AudioPolicyMix::dump(String8 *dst, int spaces, int index) const
     dst->appendFormat("%*s- device type: %s\n", spaces, "", toString(mDeviceType).c_str());
 
     dst->appendFormat("%*s- device address: %s\n", spaces, "", mDeviceAddress.string());
+
+    dst->appendFormat("%*s- output: %d\n", spaces, "",
+            mOutput == nullptr ? 0 : mOutput->mIoHandle);
 
     int indexCriterion = 0;
     for (const auto &criterion : mCriteria) {
