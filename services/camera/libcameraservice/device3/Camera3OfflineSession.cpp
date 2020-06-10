@@ -61,9 +61,6 @@ Camera3OfflineSession::Camera3OfflineSession(const String8 &id,
         mNeedFixupMonochromeTags(offlineStates.mNeedFixupMonochromeTags),
         mUsePartialResult(offlineStates.mUsePartialResult),
         mNumPartialResults(offlineStates.mNumPartialResults),
-        mLastCompletedRegularFrameNumber(offlineStates.mLastCompletedRegularFrameNumber),
-        mLastCompletedReprocessFrameNumber(offlineStates.mLastCompletedReprocessFrameNumber),
-        mLastCompletedZslFrameNumber(offlineStates.mLastCompletedZslFrameNumber),
         mNextResultFrameNumber(offlineStates.mNextResultFrameNumber),
         mNextReprocessResultFrameNumber(offlineStates.mNextReprocessResultFrameNumber),
         mNextZslStillResultFrameNumber(offlineStates.mNextZslStillResultFrameNumber),
@@ -250,9 +247,8 @@ hardware::Return<void> Camera3OfflineSession::processCaptureResult_3_4(
 
     CaptureOutputStates states {
         mId,
-        mOfflineReqsLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
+        mOfflineReqsLock, mOfflineReqs,
+        mOutputLock, mResultQueue, mResultSignal,
         mNextShutterFrameNumber,
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
@@ -289,9 +285,8 @@ hardware::Return<void> Camera3OfflineSession::processCaptureResult(
 
     CaptureOutputStates states {
         mId,
-        mOfflineReqsLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
+        mOfflineReqsLock, mOfflineReqs,
+        mOutputLock, mResultQueue, mResultSignal,
         mNextShutterFrameNumber,
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
@@ -323,9 +318,8 @@ hardware::Return<void> Camera3OfflineSession::notify(
 
     CaptureOutputStates states {
         mId,
-        mOfflineReqsLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mOfflineReqs, mOutputLock, mResultQueue, mResultSignal,
+        mOfflineReqsLock, mOfflineReqs,
+        mOutputLock, mResultQueue, mResultSignal,
         mNextShutterFrameNumber,
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
