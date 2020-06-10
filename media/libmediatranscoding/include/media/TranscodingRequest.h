@@ -39,7 +39,8 @@ private:
         destinationFilePath = parcel.destinationFilePath;
         transcodingType = parcel.transcodingType;
         priority = parcel.priority;
-        requestUpdate = parcel.requestUpdate;
+        requestProgressUpdate = parcel.requestProgressUpdate;
+        requestJobEventUpdate = parcel.requestJobEventUpdate;
         isForTesting = parcel.isForTesting;
         testConfig = parcel.testConfig;
     }

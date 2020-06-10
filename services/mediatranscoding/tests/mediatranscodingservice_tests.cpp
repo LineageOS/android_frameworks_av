@@ -216,6 +216,12 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
         return Status::ok();
     }
 
+    Status onTranscodingStarted(int32_t /*in_jobId*/) override { return Status::ok(); }
+
+    Status onTranscodingPaused(int32_t /*in_jobId*/) override { return Status::ok(); }
+
+    Status onTranscodingResumed(int32_t /*in_jobId*/) override { return Status::ok(); }
+
     Status onTranscodingFinished(
             int32_t in_jobId,
             const ::aidl::android::media::TranscodingResultParcel& /* in_result */) override {
