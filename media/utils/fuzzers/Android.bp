@@ -1,0 +1,51 @@
+cc_defaults {
+    name: "libmediautils_fuzzer_defaults",
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-Wno-c++2a-extensions",
+    ],
+
+    header_libs: [
+        "bionic_libc_platform_headers",
+        "libmedia_headers",
+    ],
+
+    include_dirs: [
+        // For DEBUGGER_SIGNAL
+        "system/core/debuggerd/include",
+    ],
+}
+
+cc_fuzz {
+    name: "libmediautils_fuzzer_battery_notifier",
+    defaults: ["libmediautils_fuzzer_defaults"],
+    srcs: ["BatteryNotifierFuzz.cpp"],
+}
+
+cc_fuzz {
+    name: "libmediautils_fuzzer_scheduling_policy_service",
+    defaults: ["libmediautils_fuzzer_defaults"],
+    srcs: ["SchedulingPolicyServiceFuzz.cpp"],
+}
+
+cc_fuzz {
+    name: "libmediautils_fuzzer_service_utilities",
+    defaults: ["libmediautils_fuzzer_defaults"],
+    srcs: ["ServiceUtilitiesFuzz.cpp"],
+}
+
+cc_fuzz {
+    name: "libmediautils_fuzzer_time_check",
+    defaults: ["libmediautils_fuzzer_defaults"],
+    srcs: ["TimeCheckFuzz.cpp"],
+}
