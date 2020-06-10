@@ -30,28 +30,7 @@
 
 namespace android {
 
-class MediaTrackTranscoder;
-
-/** Callback interface for MediaTrackTranscoder. */
-class MediaTrackTranscoderCallback {
-public:
-    /**
-     * Called when the MediaTrackTranscoder instance have finished transcoding all media samples
-     * successfully.
-     * @param transcoder The MediaTrackTranscoder that finished the transcoding.
-     */
-    virtual void onTrackFinished(const MediaTrackTranscoder* transcoder);
-
-    /**
-     * Called when the MediaTrackTranscoder instance encountered an error it could not recover from.
-     * @param transcoder The MediaTrackTranscoder that encountered the error.
-     * @param status The non-zero error code describing the encountered error.
-     */
-    virtual void onTrackError(const MediaTrackTranscoder* transcoder, media_status_t status);
-
-protected:
-    virtual ~MediaTrackTranscoderCallback() = default;
-};
+class MediaTrackTranscoderCallback;
 
 /**
  * Base class for all track transcoders. MediaTrackTranscoder operates asynchronously on an internal

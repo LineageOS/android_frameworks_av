@@ -15,6 +15,7 @@
  */
 
 #include <media/MediaTrackTranscoder.h>
+#include <media/MediaTrackTranscoderCallback.h>
 
 #include <condition_variable>
 #include <memory>
