@@ -756,10 +756,9 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
         for (size_t i = 0; i < mInFlightMap.size(); i++) {
             InFlightRequest r = mInFlightMap.valueAt(i);
             lines.appendFormat("      Frame %d |  Timestamp: %" PRId64 ", metadata"
-                    " arrived: %s, buffers left: %d, buffers returned with STATUS_ERROR: %d, "
-                    " buffers notified with error: %d\n", mInFlightMap.keyAt(i),
+                    " arrived: %s, buffers left: %d\n", mInFlightMap.keyAt(i),
                     r.shutterTimestamp, r.haveResultMetadata ? "true" : "false",
-                    r.numBuffersLeft, r.numErrorBuffersReturned, r.numErrorBuffersNotified);
+                    r.numBuffersLeft);
         }
     }
     write(fd, lines.string(), lines.size());
@@ -1044,9 +1043,8 @@ hardware::Return<void> Camera3Device::processCaptureResult_3_4(
     }
     CaptureOutputStates states {
         mId,
-        mInFlightLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mInFlightMap, mOutputLock,  mResultQueue, mResultSignal,
+        mInFlightLock, mInFlightMap,
+        mOutputLock,  mResultQueue, mResultSignal,
         mNextShutterFrameNumber,
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
@@ -1102,9 +1100,8 @@ hardware::Return<void> Camera3Device::processCaptureResult(
 
     CaptureOutputStates states {
         mId,
-        mInFlightLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mInFlightMap, mOutputLock,  mResultQueue, mResultSignal,
+        mInFlightLock, mInFlightMap,
+        mOutputLock,  mResultQueue, mResultSignal,
         mNextShutterFrameNumber,
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
@@ -1142,9 +1139,8 @@ hardware::Return<void> Camera3Device::notify(
 
     CaptureOutputStates states {
         mId,
-        mInFlightLock, mLastCompletedRegularFrameNumber,
-        mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-        mInFlightMap, mOutputLock,  mResultQueue, mResultSignal,
+        mInFlightLock, mInFlightMap,
+        mOutputLock,  mResultQueue, mResultSignal,
         mNextShutterFrameNumber,
         mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
         mNextResultFrameNumber,
@@ -5905,13 +5901,11 @@ status_t Camera3Device::switchToOffline(
     //       though technically no other thread should be talking to Camera3Device at this point
     Camera3OfflineStates offlineStates(
             mTagMonitor, mVendorTagId, mUseHalBufManager, mNeedFixupMonochromeTags,
-            mUsePartialResult, mNumPartialResults, mLastCompletedRegularFrameNumber,
-            mLastCompletedReprocessFrameNumber, mLastCompletedZslFrameNumber,
-            mNextResultFrameNumber, mNextReprocessResultFrameNumber,
-            mNextZslStillResultFrameNumber, mNextShutterFrameNumber,
-            mNextReprocessShutterFrameNumber, mNextZslStillShutterFrameNumber,
-            mDeviceInfo, mPhysicalDeviceInfoMap, mDistortionMappers,
-            mZoomRatioMappers, mRotateAndCropMappers);
+            mUsePartialResult, mNumPartialResults, mNextResultFrameNumber,
+            mNextReprocessResultFrameNumber, mNextZslStillResultFrameNumber,
+            mNextShutterFrameNumber, mNextReprocessShutterFrameNumber,
+            mNextZslStillShutterFrameNumber, mDeviceInfo, mPhysicalDeviceInfoMap,
+            mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers);
 
     *session = new Camera3OfflineSession(mId, inputStream, offlineStreamSet,
             std::move(bufferRecords), offlineReqs, offlineStates, offlineSession);
