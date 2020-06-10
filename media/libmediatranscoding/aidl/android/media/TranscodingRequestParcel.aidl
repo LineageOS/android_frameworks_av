@@ -58,8 +58,15 @@ parcelable TranscodingRequestParcel {
 
     /**
      * Whether to receive update on progress and change of awaitNumJobs.
+     * Default to false.
      */
-    boolean requestUpdate;
+    boolean requestProgressUpdate = false;
+
+    /**
+     * Whether to receive update on job's start/stop/pause/resume.
+     * Default to false.
+     */
+    boolean requestJobEventUpdate = false;
 
     /**
      * Whether this request is for testing.
@@ -69,6 +76,5 @@ parcelable TranscodingRequestParcel {
     /**
      * Test configuration. This is only valid when isForTesting is set to true.
      */
-
     TranscodingTestConfig testConfig;
 }

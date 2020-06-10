@@ -41,6 +41,30 @@ interface ITranscodingClientCallback {
 
     /**
     * Called when the transcoding associated with the jobId finished.
+    * This will only be called if client request to get all the status of the job.
+    *
+    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    */
+    oneway void onTranscodingStarted(in int jobId);
+
+    /**
+    * Called when the transcoding associated with the jobId is paused.
+    * This will only be called if client request to get all the status of the job.
+    *
+    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    */
+    oneway void onTranscodingPaused(in int jobId);
+
+    /**
+    * Called when the transcoding associated with the jobId is resumed.
+    * This will only be called if client request to get all the status of the job.
+    *
+    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    */
+    oneway void onTranscodingResumed(in int jobId);
+
+    /**
+    * Called when the transcoding associated with the jobId finished.
     *
     * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
     * @param result contains the transcoded file stats and other transcoding metrics if requested.
