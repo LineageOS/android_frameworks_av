@@ -1377,7 +1377,12 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
             Mutex::Autolock l(mLogLock);
             mEventLog.add(msg);
 
-            return -EBUSY;
+            auto current = mActiveClientManager.get(cameraId);
+            if (current != nullptr) {
+                return -EBUSY; // CAMERA_IN_USE
+            } else {
+                return -EUSERS; // MAX_CAMERAS_IN_USE
+            }
         }
 
         for (auto& i : evicted) {
@@ -1668,6 +1673,10 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
                 case -EBUSY:
                     return STATUS_ERROR_FMT(ERROR_CAMERA_IN_USE,
                             "Higher-priority client using camera, ID \"%s\" currently unavailable",
+                            cameraId.string());
+                case -EUSERS:
+                    return STATUS_ERROR_FMT(ERROR_MAX_CAMERAS_IN_USE,
+                            "Too many cameras already open, cannot open camera \"%s\"",
                             cameraId.string());
                 default:
                     return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
