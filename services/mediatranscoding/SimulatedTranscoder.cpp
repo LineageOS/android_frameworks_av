@@ -48,7 +48,12 @@ void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackIn
 }
 
 void SimulatedTranscoder::start(ClientIdType clientId, JobIdType jobId,
-                                const TranscodingRequestParcel& /*request*/) {
+                                const TranscodingRequestParcel& request) {
+    if (request.testConfig.processingTotalTimeMs > 0) {
+        mJobProcessingTimeMs = request.testConfig.processingTotalTimeMs;
+    }
+    ALOGV("%s: job {%d}: processingTime: %lld", __FUNCTION__, jobId,
+          (long long)mJobProcessingTimeMs);
     queueEvent(Event::Start, clientId, jobId);
 }
 
@@ -123,7 +128,7 @@ void SimulatedTranscoder::threadLoop() {
                 lastRunningTime = std::chrono::system_clock::now();
                 lastRunningEvent = event;
                 if (event.type == Event::Start) {
-                    remainingUs = std::chrono::microseconds(kJobDurationUs);
+                    remainingUs = std::chrono::milliseconds(mJobProcessingTimeMs);
                 }
             } else if (running && (event.type == Event::Pause || event.type == Event::Stop)) {
                 running = false;

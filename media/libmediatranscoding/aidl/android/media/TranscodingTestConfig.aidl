@@ -23,15 +23,21 @@
   */
 parcelable TranscodingTestConfig {
     /**
+     * Whether to use SimulatedTranscoder for testing. Note that SimulatedTranscoder does not send
+     * transcoding jobs to real MediaTranscoder.
+     */
+    boolean useSimulatedTranscoder = false;
+
+    /**
      * Passthrough mode used for testing. The transcoding service will assume the destination
      * path already contains the transcoding of the source file and return it to client directly.
      */
     boolean passThroughMode = false;
 
     /**
-     * Delay of processing the job in milliseconds. Used only for testing. This comebines with
-     * passThroughMode are used to simulate the transcoding latency in transcoding without involvign
-     * MediaTranscoder.
+     * Time of processing the job in milliseconds. Service will return the job result at least after
+     * processingTotalTimeMs from the time it starts to process the job. Note that if service uses
+     * real MediaTranscoder to do transcoding, the time spent on transcoding may be more than that.
      */
-    int processingDelayMs = 0;
+    int processingTotalTimeMs = 0;
 }
