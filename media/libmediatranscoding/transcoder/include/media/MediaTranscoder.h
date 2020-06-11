@@ -19,9 +19,7 @@
 
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-#include <media/MediaSampleReader.h>
-#include <media/MediaSampleWriter.h>
-#include <media/MediaTrackTranscoder.h>
+#include <media/MediaTrackTranscoderCallback.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
 
@@ -30,6 +28,9 @@
 #include <unordered_set>
 
 namespace android {
+
+class MediaSampleReader;
+class MediaSampleWriter;
 
 class MediaTranscoder : public std::enable_shared_from_this<MediaTranscoder>,
                         public MediaTrackTranscoderCallback {
@@ -68,8 +69,8 @@ public:
             const std::shared_ptr<CallbackInterface>& callbacks,
             const std::shared_ptr<Parcel>& pausedState = nullptr);
 
-    /** Configures source from path. */
-    media_status_t configureSource(const char* path);
+    /** Configures source from path fd. */
+    media_status_t configureSource(int fd);
 
     /** Gets the media formats of all tracks in the file. */
     std::vector<std::shared_ptr<AMediaFormat>> getTrackFormats() const;
@@ -83,8 +84,8 @@ public:
      */
     media_status_t configureTrackFormat(size_t trackIndex, AMediaFormat* trackFormat);
 
-    /** Configures destination from path. */
-    media_status_t configureDestination(const char* path);
+    /** Configures destination from fd. */
+    media_status_t configureDestination(int fd);
 
     /** Starts transcoding. No configurations can be made once the transcoder has started. */
     media_status_t start();
@@ -105,19 +106,14 @@ public:
     /** Resumes a paused transcoding. */
     media_status_t resume();
 
-    /** Cancels the transcoding. Once canceled the transcoding can not be restarted. returns error
-     * if file could not be deleted. */
-    media_status_t cancel(bool deleteDestinationFile = true);
+    /** Cancels the transcoding. Once canceled the transcoding can not be restarted. Client
+     * will be responsible for cleaning up the abandoned file. */
+    media_status_t cancel();
 
     virtual ~MediaTranscoder() = default;
 
 private:
-    MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks)
-          : mCallbacks(callbacks),
-            mSampleReader(nullptr),
-            mSampleWriter(nullptr),
-            mSourceTrackFormats(),
-            mTrackTranscoders() {}
+    MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks);
 
     // MediaTrackTranscoderCallback
     virtual void onTrackFinished(const MediaTrackTranscoder* transcoder) override;
@@ -133,7 +129,6 @@ private:
     std::vector<std::shared_ptr<AMediaFormat>> mSourceTrackFormats;
     std::vector<std::unique_ptr<MediaTrackTranscoder>> mTrackTranscoders;
 
-    std::string mDestinationPath;
     std::atomic_bool mCallbackSent = false;
     std::atomic_bool mCancelled = false;
 };
