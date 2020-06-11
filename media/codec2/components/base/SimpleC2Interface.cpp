@@ -39,6 +39,16 @@ SimpleInterface<void>::BaseParams::BaseParams(
     setDerivedInstance(this);
 
     addParameter(
+            DefineParam(mApiFeatures, C2_PARAMKEY_API_FEATURES)
+            .withConstValue(new C2ApiFeaturesSetting(C2Config::api_feature_t(
+                    API_REFLECTION |
+                    API_VALUES |
+                    API_CURRENT_VALUES |
+                    API_DEPENDENCY |
+                    API_SAME_INPUT_BUFFER)))
+            .build());
+
+    addParameter(
             DefineParam(mName, C2_PARAMKEY_COMPONENT_NAME)
             .withConstValue(AllocSharedString<C2ComponentNameSetting>(name.c_str()))
             .build());
@@ -305,7 +315,6 @@ void SimpleInterface<void>::BaseParams::noTimeStretch() {
     Clients need to handle the following base params due to custom dependency.
 
     std::shared_ptr<C2ApiLevelSetting> mApiLevel;
-    std::shared_ptr<C2ApiFeaturesSetting> mApiFeatures;
     std::shared_ptr<C2ComponentAttributesSetting> mAttrib;
 
     std::shared_ptr<C2PortSuggestedBufferCountTuning::input> mSuggestedInputBufferCount;
