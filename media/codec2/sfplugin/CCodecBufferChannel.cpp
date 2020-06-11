@@ -916,6 +916,12 @@ status_t CCodecBufferChannel::start(
 
     if (inputFormat != nullptr) {
         bool graphic = (iStreamFormat.value == C2BufferData::GRAPHIC);
+        C2Config::api_feature_t apiFeatures = C2Config::api_feature_t(
+                API_REFLECTION |
+                API_VALUES |
+                API_CURRENT_VALUES |
+                API_DEPENDENCY |
+                API_SAME_INPUT_BUFFER);
         std::shared_ptr<C2BlockPool> pool;
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
@@ -927,14 +933,15 @@ status_t CCodecBufferChannel::start(
             // query C2PortAllocatorsTuning::input from component. If an allocator ID is obtained
             // from component, create the input block pool with given ID. Otherwise, use default IDs.
             std::vector<std::unique_ptr<C2Param>> params;
-            err = mComponent->query({ },
+            C2ApiFeaturesSetting featuresSetting{apiFeatures};
+            err = mComponent->query({ &featuresSetting },
                                     { C2PortAllocatorsTuning::input::PARAM_TYPE },
                                     C2_DONT_BLOCK,
                                     &params);
             if ((err != C2_OK && err != C2_BAD_INDEX) || params.size() != 1) {
                 ALOGD("[%s] Query input allocators returned %zu params => %s (%u)",
                         mName, params.size(), asString(err), err);
-            } else if (err == C2_OK && params.size() == 1) {
+            } else if (params.size() == 1) {
                 C2PortAllocatorsTuning::input *inputAllocators =
                     C2PortAllocatorsTuning::input::From(params[0].get());
                 if (inputAllocators && inputAllocators->flexCount() > 0) {
@@ -948,6 +955,9 @@ status_t CCodecBufferChannel::start(
                                 mName, inputAllocators->m.values[0]);
                     }
                 }
+            }
+            if (featuresSetting) {
+                apiFeatures = featuresSetting.value;
             }
 
             // TODO: use C2Component wrapper to associate this pool with ourselves
@@ -982,7 +992,10 @@ status_t CCodecBufferChannel::start(
         input->numSlots = numInputSlots;
         input->extraBuffers.flush();
         input->numExtraSlots = 0u;
-        if (!buffersBoundToCodec) {
+        bool conforming = (apiFeatures & API_SAME_INPUT_BUFFER);
+        // For encrypted content, framework decrypts source buffer (ashmem) into
+        // C2Buffers. Thus non-conforming codecs can process these.
+        if (!buffersBoundToCodec && (hasCryptoOrDescrambler() || conforming)) {
             input->buffers.reset(new SlotInputBuffers(mName));
         } else if (graphic) {
             if (mInputSurface) {
