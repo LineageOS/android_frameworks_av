@@ -460,8 +460,8 @@ void C2SoftVpxEnc::process(
 
     const C2ConstGraphicBlock inBuffer =
         inputBuffer->data().graphicBlocks().front();
-    if (inBuffer.width() != mSize->width ||
-        inBuffer.height() != mSize->height) {
+    if (inBuffer.width() < mSize->width ||
+        inBuffer.height() < mSize->height) {
         ALOGE("unexpected Input buffer attributes %d(%d) x %d(%d)",
               inBuffer.width(), mSize->width, inBuffer.height(),
               mSize->height);
@@ -472,8 +472,8 @@ void C2SoftVpxEnc::process(
     bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
     vpx_image_t raw_frame;
     const C2PlanarLayout &layout = rView->layout();
-    uint32_t width = rView->width();
-    uint32_t height = rView->height();
+    uint32_t width = mSize->width;
+    uint32_t height = mSize->height;
     if (width > 0x8000 || height > 0x8000) {
         ALOGE("Image too big: %u x %u", width, height);
         work->result = C2_BAD_VALUE;
