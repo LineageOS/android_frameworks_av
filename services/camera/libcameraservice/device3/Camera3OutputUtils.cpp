@@ -395,7 +395,7 @@ void removeInFlightMapEntryLocked(CaptureOutputStates& states, int idx) {
 
 void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
     InFlightRequestMap& inflightMap = states.inflightMap;
-    InFlightRequest &request = inflightMap.editValueAt(idx);
+    const InFlightRequest &request = inflightMap.valueAt(idx);
     const uint32_t frameNumber = inflightMap.keyAt(idx);
 
     nsecs_t sensorTimestamp = request.sensorTimestamp;
@@ -405,8 +405,8 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
     // In the case of a successful request:
     //      all input and output buffers, all result metadata, shutter callback
     //      arrived.
-    // In the case of an unsuccessful request:
-    //      all input and output buffers, as well as error notifications, arrived.
+    // In the case of a unsuccessful request:
+    //      all input and output buffers arrived.
     if (request.numBuffersLeft == 0 &&
             (request.skipResultMetadata ||
             (request.haveResultMetadata && shutterTimestamp != 0))) {
@@ -430,26 +430,14 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
         assert(request.requestStatus != OK ||
                request.pendingOutputBuffers.size() == 0);
 
-        size_t bufferErrorCnt = returnOutputBuffers(
+        returnOutputBuffers(
             states.useHalBufManager, states.listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(), 0, /*timestampIncreasing*/true,
             request.outputSurfaces, request.resultExtras);
 
-        request.numErrorBuffersReturned += bufferErrorCnt;
-        if (request.numErrorBuffersReturned == request.numErrorBuffersNotified) {
-            removeInFlightMapEntryLocked(states, idx);
-            ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
-
-            // Note down the just completed frame number
-            if (request.hasInputBuffer) {
-                states.lastCompletedReprocessFrameNumber = frameNumber;
-            } else if (request.zslCapture) {
-                states.lastCompletedZslFrameNumber = frameNumber;
-            } else {
-                states.lastCompletedRegularFrameNumber = frameNumber;
-            }
-        }
+        removeInFlightMapEntryLocked(states, idx);
+        ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
     }
 
     states.inflightIntf.checkInflightMapLengthLocked();
@@ -499,10 +487,10 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
         InFlightRequest &request = states.inflightMap.editValueAt(idx);
         ALOGVV("%s: got InFlightRequest requestId = %" PRId32
                 ", frameNumber = %" PRId64 ", burstId = %" PRId32
-                ", partialResultCount = %d, hasCallback = %d, num_output_buffers %d",
+                ", partialResultCount = %d, hasCallback = %d",
                 __FUNCTION__, request.resultExtras.requestId,
                 request.resultExtras.frameNumber, request.resultExtras.burstId,
-                result->partial_result, request.hasCallback, result->num_output_buffers);
+                result->partial_result, request.hasCallback);
         // Always update the partial count to the latest one if it's not 0
         // (buffers only). When framework aggregates adjacent partial results
         // into one, the latest partial count will be used.
@@ -601,11 +589,10 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
                 result->num_output_buffers);
         } else {
             bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
-            auto numErrorBuffers = returnOutputBuffers(states.useHalBufManager, states.listener,
+            returnOutputBuffers(states.useHalBufManager, states.listener,
                 result->output_buffers, result->num_output_buffers,
                 shutterTimestamp, timestampIncreasing,
                 request.outputSurfaces, request.resultExtras);
-            request.numErrorBuffersReturned += numErrorBuffers;
         }
 
         if (result->result != NULL && !isPartialResult) {
@@ -643,7 +630,6 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
                       "  its stream:%s (%d)",  __FUNCTION__,
                       frameNumber, strerror(-res), res);
             }
-
         } else {
             ALOGW("%s: Input buffer should be NULL if there is no input"
                     " buffer sent in the request, skipping input buffer return.",
@@ -799,7 +785,7 @@ void processOneCaptureResultLocked(
     processCaptureResult(states, &r);
 }
 
-size_t returnOutputBuffers(
+void returnOutputBuffers(
         bool useHalBufManager,
         sp<NotificationListener> listener,
         const camera3_stream_buffer_t *outputBuffers, size_t numBuffers,
@@ -807,7 +793,6 @@ size_t returnOutputBuffers(
         const SurfaceMap& outputSurfaces,
         const CaptureResultExtras &inResultExtras) {
 
-    size_t numErrorBuffers = 0;
     for (size_t i = 0; i < numBuffers; i++)
     {
         if (outputBuffers[i].buffer == nullptr) {
@@ -816,10 +801,6 @@ size_t returnOutputBuffers(
                 // has not got a output buffer handle filled yet. This is though illegal if HAL
                 // buffer management API is not being used.
                 ALOGE("%s: cannot return a null buffer!", __FUNCTION__);
-            } else {
-                if (outputBuffers[i].status == CAMERA3_BUFFER_STATUS_ERROR) {
-                    numErrorBuffers++;
-                }
             }
             continue;
         }
@@ -863,13 +844,8 @@ size_t returnOutputBuffers(
                         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER,
                         extras);
             }
-        } else {
-            if (outputBuffers[i].status == CAMERA3_BUFFER_STATUS_ERROR) {
-               numErrorBuffers++;
-            }
         }
     }
-    return numErrorBuffers;
 }
 
 void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg) {
@@ -923,12 +899,6 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
                     msg.frame_number, r.resultExtras.requestId, msg.timestamp);
                 // Call listener, if any
                 if (states.listener != nullptr) {
-                    r.resultExtras.lastCompletedRegularFrameNumber =
-                            states.lastCompletedRegularFrameNumber;
-                    r.resultExtras.lastCompletedReprocessFrameNumber =
-                            states.lastCompletedReprocessFrameNumber;
-                    r.resultExtras.lastCompletedZslFrameNumber =
-                            states.lastCompletedZslFrameNumber;
                     states.listener->notifyShutter(r.resultExtras, msg.timestamp);
                 }
                 // send pending result and buffers
@@ -939,12 +909,11 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
                     r.rotateAndCropAuto, r.cameraIdsWithZoom, r.physicalMetadatas);
             }
             bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
-            size_t bufferErrorCnt = returnOutputBuffers(
+            returnOutputBuffers(
                     states.useHalBufManager, states.listener,
                     r.pendingOutputBuffers.array(),
                     r.pendingOutputBuffers.size(), r.shutterTimestamp, timestampIncreasing,
                     r.outputSurfaces, r.resultExtras);
-            r.numErrorBuffersReturned += bufferErrorCnt;
             r.pendingOutputBuffers.clear();
 
             removeInFlightRequestIfReadyLocked(states, idx);
@@ -1007,7 +976,7 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
                     InFlightRequest &r = states.inflightMap.editValueAt(idx);
                     r.requestStatus = msg.error_code;
                     resultExtras = r.resultExtras;
-                    bool physicalDeviceResultError = false;
+                    bool logicalDeviceResultError = false;
                     if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
                             errorCode) {
                         if (physicalCameraId.size() > 0) {
@@ -1021,39 +990,23 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
                             }
                             r.physicalCameraIds.erase(iter);
                             resultExtras.errorPhysicalCameraId = physicalCameraId;
-                            physicalDeviceResultError = true;
+                        } else {
+                            logicalDeviceResultError = true;
                         }
                     }
 
-                    if (!physicalDeviceResultError) {
-                        if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT
-                                == errorCode) {
-                            r.skipResultMetadata = true;
-                        } else if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER
-                                == errorCode) {
-                            r.numErrorBuffersNotified ++;
-                        } else {
-                            // errorCode is ERROR_CAMERA_REQUEST
-                            if (!r.skipResultMetadata) {
-                                // In case HAL calls multiples ERROR_REQUEST
-                                // callback, only count the pending buffer
-                                // notify error counter once. And also handle
-                                // the case where ERROR_BUFFERs are sent before
-                                // ERROR_REQUEST, even though it's not allowed
-                                // by the HAL API.
-                                if (r.numErrorBuffersNotified != 0) {
-                                    ALOGW("Camera %s: %s: HAL should not notify ERROR_REQUEST"
-                                            " and ERROR_BUFFER for the same request",
-                                            states.cameraId.string(), __FUNCTION__);
-                                }
-                                r.numErrorBuffersNotified =
-                                        r.numOutputBuffers - r.numErrorBuffersNotified;
-                                r.skipResultMetadata = true;
-                            }
-                        }
-
-                        // Check whether the buffers returned. If they returned,
-                        // remove inflight request.
+                    if (logicalDeviceResultError
+                            ||  hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST ==
+                            errorCode) {
+                        r.skipResultMetadata = true;
+                    }
+                    if (logicalDeviceResultError) {
+                        // In case of missing result check whether the buffers
+                        // returned. If they returned, then remove inflight
+                        // request.
+                        // TODO: should we call this for ERROR_CAMERA_REQUEST as well?
+                        //       otherwise we are depending on HAL to send the buffers back after
+                        //       calling notifyError. Not sure if that's in the spec.
                         removeInFlightRequestIfReadyLocked(states, idx);
                     }
                 } else {
@@ -1379,23 +1332,14 @@ void flushInflightRequests(FlushInflightReqStates& states) {
     { // First return buffers cached in mInFlightMap
         std::lock_guard<std::mutex> l(states.inflightLock);
         for (size_t idx = 0; idx < states.inflightMap.size(); idx++) {
-            InFlightRequest &request = states.inflightMap.editValueAt(idx);
-            size_t bufferErrorCnt = returnOutputBuffers(
+            const InFlightRequest &request = states.inflightMap.valueAt(idx);
+            returnOutputBuffers(
                 states.useHalBufManager, states.listener,
                 request.pendingOutputBuffers.array(),
                 request.pendingOutputBuffers.size(), 0,
                 /*timestampIncreasing*/true, request.outputSurfaces,
                 request.resultExtras);
-            request.numErrorBuffersReturned += bufferErrorCnt;
-            ALOGW("%s: Frame %d |  Timestamp: %" PRId64 ", metadata"
-                    " arrived: %s, buffers left: %d, buffers returned with STATUS_ERROR: %d, "
-                    " buffers notified with error: %d\n", __FUNCTION__,
-                    states.inflightMap.keyAt(idx), request.shutterTimestamp,
-                    request.haveResultMetadata ? "true" : "false",
-                    request.numBuffersLeft, request.numErrorBuffersReturned,
-                    request.numErrorBuffersNotified);
         }
-
         states.inflightMap.clear();
         states.inflightIntf.onInflightMapFlushedLocked();
     }
