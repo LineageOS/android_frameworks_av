@@ -42,17 +42,17 @@ private:
     const Time mRecordLimit;
     Time mClock;
     Time mLastTimeOfPrint;
+    Bytes mAccuBytes;
+
 public:
     TrafficRecorder(size_t size, Time accuTimeLimit);
     virtual ~TrafficRecorder();
 
     void init();
-
     void updateClock(Time now);
-
+    Bytes readBytesForTotal();
     Bytes readBytesForLastPeriod(Time period);
     void writeBytes(Bytes bytes);
-
     void printAccuBitsForLastPeriod(Time period, Time unit);
 };
 
@@ -94,14 +94,20 @@ void TrafficRecorder<Time, Bytes>::init() {
         mTimeArray[i] = 0;
         mBytesArray[i] = 0;
     }
+    mClock = 0;
     mLastReadIdx = 0;
     mLastTimeOfPrint = 0;
-    mClock = 0;
+    mAccuBytes = 0;
 }
 
 template <class Time, class Bytes>
 void TrafficRecorder<Time, Bytes>::updateClock(Time now) {
     mClock = now;
+}
+
+template <class Time, class Bytes>
+Bytes TrafficRecorder<Time, Bytes>::readBytesForTotal() {
+    return mAccuBytes;
 }
 
 template <class Time, class Bytes>
@@ -145,6 +151,7 @@ void TrafficRecorder<Time, Bytes>::writeBytes(Bytes bytes) {
     }
 
     mHeadIdx = writeIdx;
+    mAccuBytes += bytes;
 }
 
 template <class Time, class Bytes>

@@ -46,10 +46,12 @@
 #define H265_NALU_SPS 0x21
 #define H265_NALU_PPS 0x22
 
-#define LINK_HEADER_SIZE 14
-#define IP_HEADER_SIZE 20
+#define IPV4_HEADER_SIZE 20
+#define IPV6_HEADER_SIZE 40
 #define UDP_HEADER_SIZE 8
-#define TCPIP_HEADER_SIZE (LINK_HEADER_SIZE + IP_HEADER_SIZE + UDP_HEADER_SIZE)
+#define TCPIPV4_HEADER_SIZE (IPV4_HEADER_SIZE + UDP_HEADER_SIZE)
+#define TCPIPV6_HEADER_SIZE (IPV6_HEADER_SIZE + UDP_HEADER_SIZE)
+#define TCPIP_HEADER_SIZE TCPIPV4_HEADER_SIZE
 #define RTP_HEADER_SIZE 12
 #define RTP_HEADER_EXT_SIZE 8
 #define RTP_FU_HEADER_SIZE 2
@@ -74,7 +76,7 @@ ARTPWriter::ARTPWriter(int fd)
       mFd(dup(fd)),
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)),
-      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(
+      mTrafficRec(new TrafficRecorder<uint32_t /* Time */, Bytes>(
               kTrafficRecorderMaxEntries, kTrafficRecorderMaxTimeSpanMs)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
@@ -126,7 +128,7 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
       mFd(dup(fd)),
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)),
-      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(
+      mTrafficRec(new TrafficRecorder<uint32_t /* Time */, Bytes>(
               kTrafficRecorderMaxEntries, kTrafficRecorderMaxTimeSpanMs)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
@@ -614,7 +616,8 @@ void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
         ALOGW("packets can not be sent. ret=%d, buf=%d", (int)n, (int)buffer->size());
     } else {
         // Record current traffic & Print bits while last 1sec (1000ms)
-        mTrafficRec->writeBytes(buffer->size());
+        mTrafficRec->writeBytes(buffer->size() +
+                (mIsIPv6 ? TCPIPV6_HEADER_SIZE : TCPIPV4_HEADER_SIZE));
         mTrafficRec->printAccuBitsForLastPeriod(1000, 1000);
     }
 
@@ -1374,6 +1377,10 @@ void ARTPWriter::updateSocketNetwork(int64_t socketNetwork) {
 
 uint32_t ARTPWriter::getSequenceNum() {
     return mSeqNo;
+}
+
+uint64_t ARTPWriter::getAccumulativeBytes() {
+    return mTrafficRec->readBytesForTotal();
 }
 
 static size_t getFrameSize(bool isWide, unsigned FT) {
