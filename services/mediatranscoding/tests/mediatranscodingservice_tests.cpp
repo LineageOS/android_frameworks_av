@@ -67,7 +67,7 @@ constexpr uid_t kClientUid = 5000;
 constexpr int32_t kClientId = 0;
 #define CLIENT(n) (kClientId + (n))
 
-constexpr int64_t kPaddingUs = 200000;
+constexpr int64_t kPaddingUs = 10000000;
 constexpr int64_t kJobWithPaddingUs = SimulatedTranscoder::kJobDurationUs + kPaddingUs;
 
 constexpr const char* kClientName = "TestClient";
@@ -215,6 +215,12 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
                               ::ndk::ScopedFileDescriptor* /*_aidl_return*/) override {
         return Status::ok();
     }
+
+    Status onTranscodingStarted(int32_t /*in_jobId*/) override { return Status::ok(); }
+
+    Status onTranscodingPaused(int32_t /*in_jobId*/) override { return Status::ok(); }
+
+    Status onTranscodingResumed(int32_t /*in_jobId*/) override { return Status::ok(); }
 
     Status onTranscodingFinished(
             int32_t in_jobId,
