@@ -29,6 +29,8 @@ namespace android {
  * SimulatedTranscoder is currently used to instantiate MediaTranscodingService
  * on service side for testing, so that we could actually test the IPC calls of
  * MediaTranscodingService to expose issues that's observable only over IPC.
+ * SimulatedTranscoder is used when useSimulatedTranscoder in TranscodingTestConfig
+ * is set to true.
  *
  * SimulatedTranscoder simulates job execution by reporting finish after kJobDurationUs.
  * Job lifecycle events are reported via progress updates with special progress
@@ -60,6 +62,9 @@ private:
     std::mutex mLock;
     std::condition_variable mCondition;
     std::list<Event> mQueue GUARDED_BY(mLock);
+
+    // Minimum time spent on transcode the video. This is used just for testing.
+    int64_t mJobProcessingTimeMs = kJobDurationUs / 1000;
 
     static const char* toString(Event::Type type);
     void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId);
