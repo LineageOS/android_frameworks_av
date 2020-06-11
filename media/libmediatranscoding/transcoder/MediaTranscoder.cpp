@@ -20,6 +20,7 @@
 #include <android-base/logging.h>
 #include <fcntl.h>
 #include <media/MediaSampleReaderNDK.h>
+#include <media/MediaSampleWriter.h>
 #include <media/MediaTranscoder.h>
 #include <media/PassthroughTrackTranscoder.h>
 #include <media/VideoTrackTranscoder.h>
@@ -92,11 +93,10 @@ void MediaTranscoder::sendCallback(media_status_t status) {
         }
 
         // Transcoding is done and the callback to the client has been sent, so tear down the
-        // pipeline but do it asynchronously to avoid deadlocks. If an error occurred then
-        // automatically delete the output file.
-        const bool deleteOutputFile = status != AMEDIA_OK;
+        // pipeline but do it asynchronously to avoid deadlocks. If an error occurred, client
+        // should clean up the file.
         std::thread asyncCancelThread{
-                [self = shared_from_this(), deleteOutputFile] { self->cancel(deleteOutputFile); }};
+                [self = shared_from_this()] { self->cancel(); }};
         asyncCancelThread.detach();
     }
 }
@@ -115,6 +115,9 @@ void MediaTranscoder::onSampleWriterFinished(media_status_t status) {
     sendCallback(status);
 }
 
+MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks)
+     : mCallbacks(callbacks) {}
+
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         const std::shared_ptr<CallbackInterface>& callbacks,
         const std::shared_ptr<Parcel>& pausedState) {
@@ -129,15 +132,9 @@ std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
     return std::shared_ptr<MediaTranscoder>(new MediaTranscoder(callbacks));
 }
 
-media_status_t MediaTranscoder::configureSource(const char* path) {
-    if (path == nullptr) {
-        LOG(ERROR) << "Source path cannot be null";
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
-
-    const int fd = open(path, O_RDONLY);
-    if (fd <= 0) {
-        LOG(ERROR) << "Unable to open source path: " << path;
+media_status_t MediaTranscoder::configureSource(int fd) {
+    if (fd < 0) {
+        LOG(ERROR) << "Invalid source fd: " << fd;
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
@@ -145,10 +142,9 @@ media_status_t MediaTranscoder::configureSource(const char* path) {
     lseek(fd, 0, SEEK_SET);
 
     mSampleReader = MediaSampleReaderNDK::createFromFd(fd, 0 /* offset */, fileSize);
-    close(fd);
 
     if (mSampleReader == nullptr) {
-        LOG(ERROR) << "Unable to parse source file: " << path;
+        LOG(ERROR) << "Unable to parse source fd: " << fd;
         return AMEDIA_ERROR_UNSUPPORTED;
     }
 
@@ -239,35 +235,23 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
     return AMEDIA_OK;
 }
 
-media_status_t MediaTranscoder::configureDestination(const char* path) {
-    if (path == nullptr || strlen(path) < 1) {
-        LOG(ERROR) << "Invalid destination path: " << path;
+media_status_t MediaTranscoder::configureDestination(int fd) {
+    if (fd < 0) {
+        LOG(ERROR) << "Invalid destination fd: " << fd;
         return AMEDIA_ERROR_INVALID_PARAMETER;
-    } else if (mSampleWriter != nullptr) {
+    }
+
+    if (mSampleWriter != nullptr) {
         LOG(ERROR) << "Destination is already configured.";
         return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
-    // Write-only, create file if non-existent, don't overwrite existing file.
-    static constexpr int kOpenFlags = O_WRONLY | O_CREAT | O_EXCL;
-    // User R+W permission.
-    static constexpr int kFileMode = S_IRUSR | S_IWUSR;
-
-    const int fd = open(path, kOpenFlags, kFileMode);
-    if (fd < 0) {
-        LOG(ERROR) << "Unable to open destination file \"" << path << "\" for writing: " << fd;
-        return AMEDIA_ERROR_INVALID_PARAMETER;
-    }
-
-    mDestinationPath = std::string(path);
-
     mSampleWriter = std::make_unique<MediaSampleWriter>();
     const bool initOk = mSampleWriter->init(
             fd, std::bind(&MediaTranscoder::onSampleWriterFinished, this, std::placeholders::_1));
-    close(fd);
 
     if (!initOk) {
-        LOG(ERROR) << "Unable to initialize sample writer with destination path " << path;
+        LOG(ERROR) << "Unable to initialize sample writer with destination fd: " << fd;
         mSampleWriter.reset();
         return AMEDIA_ERROR_UNKNOWN;
     }
@@ -305,7 +289,7 @@ media_status_t MediaTranscoder::start() {
         started = transcoder->start();
         if (!started) {
             LOG(ERROR) << "Unable to start track transcoder.";
-            cancel(true);
+            cancel();
             return AMEDIA_ERROR_UNKNOWN;
         }
     }
@@ -323,7 +307,7 @@ media_status_t MediaTranscoder::resume() {
     return AMEDIA_ERROR_UNSUPPORTED;
 }
 
-media_status_t MediaTranscoder::cancel(bool deleteDestinationFile) {
+media_status_t MediaTranscoder::cancel() {
     bool expected = false;
     if (!mCancelled.compare_exchange_strong(expected, true)) {
         // Already cancelled.
@@ -335,15 +319,6 @@ media_status_t MediaTranscoder::cancel(bool deleteDestinationFile) {
         transcoder->stop();
     }
 
-    // TODO(chz): file deletion should be done by upper level from the content URI.
-    if (deleteDestinationFile && !mDestinationPath.empty()) {
-        int error = unlink(mDestinationPath.c_str());
-        if (error) {
-            LOG(ERROR) << "Unable to delete destination file " << mDestinationPath.c_str() << ": "
-                       << error;
-            return AMEDIA_ERROR_IO;
-        }
-    }
     return AMEDIA_OK;
 }
 
