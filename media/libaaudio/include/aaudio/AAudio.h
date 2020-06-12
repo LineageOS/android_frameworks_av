@@ -29,6 +29,8 @@
 #ifndef AAUDIO_AAUDIO_H
 #define AAUDIO_AAUDIO_H
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <time.h>
 
 #ifdef __cplusplus
