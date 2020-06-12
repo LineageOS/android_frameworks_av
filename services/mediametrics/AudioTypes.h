@@ -21,17 +21,19 @@
 
 namespace android::mediametrics::types {
 
-// Helper methods that map mediametrics logged strings to
-// integer codes.
-std::unordered_map<std::string, int64_t>& getAudioDeviceInMap();
-std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap();
-std::unordered_map<std::string, int32_t>& getCallerNameMap();
-std::unordered_map<std::string, int32_t>& getThreadTypeMap();
+// Helper methods that map mediametrics logged strings to integer codes.
+// In R we do not use the integer codes, but rather we can use these maps
+// to validate correct strings.
+const std::unordered_map<std::string, int32_t>& getAudioCallerNameMap();
+const std::unordered_map<std::string, int64_t>& getAudioDeviceInMap();
+const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap();
+const std::unordered_map<std::string, int32_t>& getAudioThreadTypeMap();
+const std::unordered_map<std::string, int32_t>& getAudioTrackTraitsMap();
 
 // Enumeration for the device connection results.
 enum DeviceConnectionResult : int32_t {
-    DEVICE_CONNECTION_RESULT_UNKNOWN = 0,              // Success is unknown.
-    DEVICE_CONNECTION_RESULT_SUCCESS = 1,              // Audio delivered
+    DEVICE_CONNECTION_RESULT_SUCCESS = 0,              // Audio delivered
+    DEVICE_CONNECTION_RESULT_UNKNOWN = 1,              // Success is unknown.
     DEVICE_CONNECTION_RESULT_JAVA_SERVICE_CANCEL = 2,  // Canceled in Java service
     // Do not modify the constants above after R.  Adding new constants is fine.
 };
@@ -48,6 +50,7 @@ enum AudioEnumCategory {
     SOURCE_TYPE,
     STREAM_TYPE,
     THREAD_TYPE,
+    TRACK_TRAITS,
     USAGE,
 };
 
