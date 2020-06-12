@@ -742,8 +742,6 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     void *iMemPointer;
     audio_track_cblk_t* cblk;
     status_t status;
-    std::string flagsAsString;
-    std::string originalFlagsAsString;
 
     if (audioFlinger == 0) {
         ALOGE("%s(%d): Could not get audioflinger", __func__, mPortId);
@@ -922,15 +920,13 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     mDeathNotifier = new DeathNotifier(this);
     IInterface::asBinder(mAudioRecord)->linkToDeath(mDeathNotifier, this);
 
-    InputFlagConverter::toString(mFlags, flagsAsString);
-    InputFlagConverter::toString(mOrigFlags, originalFlagsAsString);
     mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD) + std::to_string(mPortId);
     mediametrics::LogItem(mMetricsId)
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
         .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
         // the following are immutable (at least until restore)
-        .set(AMEDIAMETRICS_PROP_FLAGS, flagsAsString.c_str())
-        .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, originalFlagsAsString.c_str())
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(mFlags).c_str())
+        .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
         .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
         .set(AMEDIAMETRICS_PROP_TRACKID, mPortId)
         .set(AMEDIAMETRICS_PROP_SOURCE, toString(mAttributes.source).c_str())
