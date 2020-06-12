@@ -68,6 +68,10 @@ private:
 
 static const char* SOURCE_PATH =
         "/data/local/tmp/TranscoderTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
+// Write-only, create file if non-existent, don't overwrite existing file.
+static constexpr int kOpenFlags = O_WRONLY | O_CREAT | O_EXCL;
+// User R+W permission.
+static constexpr int kFileMode = S_IRUSR | S_IWUSR;
 
 class MediaTranscoderTests : public ::testing::Test {
 public:
@@ -92,7 +96,8 @@ public:
         auto transcoder = MediaTranscoder::create(mCallbacks, nullptr);
         EXPECT_NE(transcoder, nullptr);
 
-        EXPECT_EQ(transcoder->configureSource(SOURCE_PATH), AMEDIA_OK);
+        const int srcFd = open(SOURCE_PATH, O_RDONLY);
+        EXPECT_EQ(transcoder->configureSource(srcFd), AMEDIA_OK);
 
         std::vector<std::shared_ptr<AMediaFormat>> trackFormats = transcoder->getTrackFormats();
         EXPECT_GT(trackFormats.size(), 0);
@@ -105,13 +110,16 @@ public:
             }
         }
         deleteFile(destPath);
-        EXPECT_EQ(transcoder->configureDestination(destPath), AMEDIA_OK);
+        const int dstFd = open(destPath, kOpenFlags, kFileMode);
+        EXPECT_EQ(transcoder->configureDestination(dstFd), AMEDIA_OK);
 
         media_status_t startStatus = transcoder->start();
         EXPECT_EQ(startStatus, AMEDIA_OK);
         if (startStatus == AMEDIA_OK) {
             mCallbacks->waitForTranscodingFinished();
         }
+        close(srcFd);
+        close(dstFd);
 
         return mCallbacks->mStatus;
     }

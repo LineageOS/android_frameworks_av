@@ -19,6 +19,7 @@
 
 #include <android-base/logging.h>
 #include <media/MediaTrackTranscoder.h>
+#include <media/MediaTrackTranscoderCallback.h>
 
 namespace android {
 
