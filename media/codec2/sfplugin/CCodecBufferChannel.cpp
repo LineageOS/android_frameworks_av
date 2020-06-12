@@ -618,13 +618,14 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
-    if (mInputMetEos ||
-           mOutput.lock()->buffers->hasPending() ||
-           mPipelineWatcher.lock()->pipelineFull()) {
+    if (mInputMetEos || mPipelineWatcher.lock()->pipelineFull()) {
         return;
-    } else {
+    }
+    {
         Mutexed<Output>::Locked output(mOutput);
-        if (!output->buffers || output->buffers->numClientBuffers() >= output->numSlots) {
+        if (!output->buffers ||
+                output->buffers->hasPending() ||
+                output->buffers->numClientBuffers() >= output->numSlots) {
             return;
         }
     }
