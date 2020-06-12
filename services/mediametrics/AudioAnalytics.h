@@ -17,6 +17,7 @@
 #pragma once
 
 #include <android-base/thread_annotations.h>
+#include <audio_utils/SimpleLog.h>
 #include "AnalyticsActions.h"
 #include "AnalyticsState.h"
 #include "AudioPowerUsage.h"
@@ -122,6 +123,8 @@ private:
 
     TimedAction mTimedAction; // locked internally
 
+    SimpleLog mStatsdLog{16 /* log lines */}; // locked internally
+
     // DeviceUse is a nested class which handles audio device usage accounting.
     // We define this class at the end to ensure prior variables all properly constructed.
     // TODO: Track / Thread interaction
@@ -173,6 +176,7 @@ private:
         AudioAnalytics &mAudioAnalytics;
 
         mutable std::mutex mLock;
+        std::string mA2dpDeviceName;
         int64_t mA2dpConnectionRequestNs GUARDED_BY(mLock) = 0;  // Time for BT service request.
         int64_t mA2dpConnectionServiceNs GUARDED_BY(mLock) = 0;  // Time audio service agrees.
 
