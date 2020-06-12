@@ -34,7 +34,7 @@
 namespace android::mediametrics {
 
 // Enable for testing of delivery to statsd. Caution if this is enabled, all protos MUST exist.
-//#define STATSD_ENABLE
+#define STATSD_ENABLE
 
 #ifdef STATSD_ENABLE
 #define CONDITION(INT_VALUE) (INT_VALUE)  // allow value
