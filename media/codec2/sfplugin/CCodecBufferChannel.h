@@ -293,6 +293,7 @@ private:
         sp<Surface> surface;
         uint32_t generation;
         int maxDequeueBuffers;
+        std::map<uint64_t, int> rotation;
     };
     Mutexed<OutputSurface> mOutputSurface;
 
