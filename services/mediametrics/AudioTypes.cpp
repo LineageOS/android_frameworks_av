@@ -20,7 +20,30 @@
 
 namespace android::mediametrics::types {
 
-std::unordered_map<std::string, int64_t>& getAudioDeviceInMap() {
+const std::unordered_map<std::string, int32_t>& getAudioCallerNameMap() {
+    // DO NOT MODIFY VALUES (OK to add new ones).
+    // This may be found in frameworks/av/media/libmediametrics/include/MediaMetricsConstants.h
+    static std::unordered_map<std::string, int32_t> map{
+        {"unknown",       0},           // callerName not set
+        {"aaudio",        1},           // Native AAudio
+        {"java",          2},           // Java API layer
+        {"media",         3},           // libmedia (mediaplayer)
+        {"opensles",      4},           // Open SLES
+        {"rtp",           5},           // RTP communication
+        {"soundpool",     6},           // SoundPool
+        {"tonegenerator", 7},           // dial tones
+        // R values above.
+    };
+    return map;
+}
+
+// A map in case we need to return a flag for input devices.
+// This is 64 bits (and hence not the same as audio_device_t) because we need extra
+// bits to represent new devices.
+// NOT USED FOR R.  We do not use int64 flags.
+// This can be out of date for now, as it is unused even for string validation
+// (instead TypeConverter<InputDeviceTraits> is used).
+const std::unordered_map<std::string, int64_t>& getAudioDeviceInMap() {
     // DO NOT MODIFY VALUES (OK to add new ones).  This does NOT match audio_device_t.
     static std::unordered_map<std::string, int64_t> map{
         {"AUDIO_DEVICE_IN_COMMUNICATION",          1LL << 0},
@@ -57,7 +80,13 @@ std::unordered_map<std::string, int64_t>& getAudioDeviceInMap() {
     return map;
 }
 
-std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
+// A map in case we need to return a flag for output devices.
+// This is 64 bits (and hence not the same as audio_device_t) because we need extra
+// bits to represent new devices.
+// NOT USED FOR R.  We do not use int64 flags.
+// This can be out of date for now, as it is unused even for string validation
+// (instead TypeConverter<OutputDeviceTraits> is used).
+const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
     // DO NOT MODIFY VALUES (OK to add new ones).  This does NOT match audio_device_t.
     static std::unordered_map<std::string, int64_t> map{
         {"AUDIO_DEVICE_OUT_EARPIECE",                  1LL << 0},
@@ -96,24 +125,7 @@ std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
     return map;
 }
 
-std::unordered_map<std::string, int32_t>& getCallerNameMap() {
-    // DO NOT MODIFY VALUES (OK to add new ones).
-    // This may be found in frameworks/av/media/libmediametrics/include/MediaMetricsConstants.h
-    static std::unordered_map<std::string, int32_t> map{
-        {"aaudio",        0},           // Native AAudio
-        {"java",          1},           // Java API layer
-        {"media",         2},           // libmedia (mediaplayer)
-        {"opensles",      3},           // Open SLES
-        {"rtp",           4},           // RTP communication
-        {"soundpool",     5},           // SoundPool
-        {"tonegenerator", 6},           // dial tones
-        {"unknown",       7},           // callerName not set
-        // R values above.
-    };
-    return map;
-}
-
-std::unordered_map<std::string, int32_t>& getThreadTypeMap() {
+const std::unordered_map<std::string, int32_t>& getAudioThreadTypeMap() {
     // DO NOT MODIFY VALUES (OK to add new ones).
     // This may be found in frameworks/av/services/audioflinger/Threads.h
     static std::unordered_map<std::string, int32_t> map{
@@ -125,6 +137,15 @@ std::unordered_map<std::string, int32_t>& getThreadTypeMap() {
         {"OFFLOAD",       4},          // Thread class is OffloadThread
         {"MMAP_PLAYBACK", 5},          // Thread class for MMAP playback stream
         {"MMAP_CAPTURE",  6},          // Thread class for MMAP capture stream
+        // R values above.
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getAudioTrackTraitsMap() {
+    // DO NOT MODIFY VALUES (OK to add new ones).
+    static std::unordered_map<std::string, int32_t> map{
+        {"static",        (1 << 0)},  // A static track
         // R values above.
     };
     return map;
@@ -163,6 +184,37 @@ std::string stringFromFlags(const std::string &flags, size_t len)
     return sFlags;
 }
 
+template <typename M>
+std::string validateStringFromMap(const std::string &str, const M& map)
+{
+    if (str.empty()) return {};
+
+    const auto result = stringutils::split(str, "|");
+    std::stringstream ss;
+    for (const auto &s : result) {
+        if (map.count(s) > 0) {
+            if (ss.tellp() > 0) ss << "|";
+            ss << s;
+        }
+    }
+    return ss.str();
+}
+
+template <typename M>
+typename M::mapped_type flagsFromMap(const std::string &str, const M& map)
+{
+    if (str.empty()) return {};
+
+    const auto result = stringutils::split(str, "|");
+    typename M::mapped_type value{};
+    for (const auto &s : result) {
+        auto it = map.find(s);
+        if (it == map.end()) continue;
+        value |= it->second;
+    }
+    return value;
+}
+
 template <>
 int32_t lookup<CONTENT_TYPE>(const std::string &contentType)
 {
@@ -178,7 +230,7 @@ std::string lookup<CONTENT_TYPE>(const std::string &contentType)
 {
     AudioContentTraits::Type value;
     if (!TypeConverter<AudioContentTraits>::fromString(contentType, value)) {
-        return "UNKNOWN";
+        return "";
     }
     return contentType.c_str() + sizeof("AUDIO_CONTENT_TYPE");
 }
@@ -198,7 +250,7 @@ std::string lookup<ENCODING>(const std::string &encoding)
 {
     FormatTraits::Type value;
     if (!TypeConverter<FormatTraits>::fromString(encoding, value)) {
-        return "INVALID";
+        return "";
     }
     return encoding.c_str() + sizeof("AUDIO_FORMAT");
 }
@@ -242,7 +294,7 @@ std::string lookup<SOURCE_TYPE>(const std::string &sourceType)
 {
     SourceTraits::Type value;
     if (!TypeConverter<SourceTraits>::fromString(sourceType, value)) {
-        return "DEFAULT";
+        return "";
     }
     return sourceType.c_str() + sizeof("AUDIO_SOURCE");
 }
@@ -262,7 +314,7 @@ std::string lookup<STREAM_TYPE>(const std::string &streamType)
 {
     StreamTraits::Type value;
     if (!TypeConverter<StreamTraits>::fromString(streamType, value)) {
-        return "DEFAULT";
+        return "";
     }
     return streamType.c_str() + sizeof("AUDIO_STREAM");
 }
@@ -282,7 +334,7 @@ std::string lookup<USAGE>(const std::string &usage)
 {
     UsageTraits::Type value;
     if (!TypeConverter<UsageTraits>::fromString(usage, value)) {
-        return "UNKNOWN";
+        return "";
     }
     return usage.c_str() + sizeof("AUDIO_USAGE");
 }
@@ -290,54 +342,40 @@ std::string lookup<USAGE>(const std::string &usage)
 template <>
 int64_t lookup<INPUT_DEVICE>(const std::string &inputDevice)
 {
-    auto& map = getAudioDeviceInMap();
-    auto it = map.find(inputDevice);
-    if (it == map.end()) {
-        return 0;
-    }
-    return it->second;
+    // NOT USED FOR R.
+    // Returns a set of bits, each one representing a device in inputDevice.
+    // This is a 64 bit integer, not the same as audio_device_t.
+    return flagsFromMap(inputDevice, getAudioDeviceInMap());
 }
 
 template <>
 std::string lookup<INPUT_DEVICE>(const std::string &inputDevice)
 {
-    auto& map = getAudioDeviceInMap();
-    auto it = map.find(inputDevice);
-    if (it == map.end()) {
-        return "NONE";
-    }
-    return inputDevice.c_str() + sizeof("AUDIO_DEVICE_IN");
+    return stringFromFlags<InputDeviceTraits>(inputDevice, sizeof("AUDIO_DEVICE_IN"));
 }
 
 template <>
 int64_t lookup<OUTPUT_DEVICE>(const std::string &outputDevice)
 {
-    auto& map = getAudioDeviceOutMap();
-    auto it = map.find(outputDevice);
-    if (it == map.end()) {
-        return 0; // nothing
-    }
-    return it->second;
+    // NOT USED FOR R.
+    // Returns a set of bits, each one representing a device in outputDevice.
+    // This is a 64 bit integer, not the same as audio_device_t.
+    return flagsFromMap(outputDevice, getAudioDeviceOutMap());
 }
 
 template <>
 std::string lookup<OUTPUT_DEVICE>(const std::string &outputDevice)
 {
-    auto& map = getAudioDeviceOutMap();
-    auto it = map.find(outputDevice);
-    if (it == map.end()) {
-        return "NONE";
-    }
-    return outputDevice.c_str() + sizeof("AUDIO_DEVICE_OUT");
+    return stringFromFlags<OutputDeviceTraits>(outputDevice, sizeof("AUDIO_DEVICE_OUT"));
 }
 
 template <>
 int32_t lookup<CALLER_NAME>(const std::string &callerName)
 {
-    auto& map = getCallerNameMap();
+    auto& map = getAudioCallerNameMap();
     auto it = map.find(callerName);
     if (it == map.end()) {
-        return 7;      // return unknown
+        return 0;      // return unknown
     }
     return it->second;
 }
@@ -345,10 +383,10 @@ int32_t lookup<CALLER_NAME>(const std::string &callerName)
 template <>
 std::string lookup<CALLER_NAME>(const std::string &callerName)
 {
-    auto& map = getCallerNameMap();
+    auto& map = getAudioCallerNameMap();
     auto it = map.find(callerName);
     if (it == map.end()) {
-        return "unknown";
+        return "";
     }
     return callerName;
 }
@@ -356,7 +394,7 @@ std::string lookup<CALLER_NAME>(const std::string &callerName)
 template <>
 int32_t lookup<THREAD_TYPE>(const std::string &threadType)
 {
-    auto& map = getThreadTypeMap();
+    auto& map = getAudioThreadTypeMap();
     auto it = map.find(threadType);
     if (it == map.end()) {
         return -1; // note this as an illegal thread value as we don't have unknown here.
@@ -367,10 +405,10 @@ int32_t lookup<THREAD_TYPE>(const std::string &threadType)
 template <>
 std::string lookup<THREAD_TYPE>(const std::string &threadType)
 {
-    auto& map = getThreadTypeMap();
+    auto& map = getAudioThreadTypeMap();
     auto it = map.find(threadType);
     if (it == map.end()) {
-        return "UNKNOWN";
+        return "";
     }
     return threadType;
 }
@@ -378,6 +416,18 @@ std::string lookup<THREAD_TYPE>(const std::string &threadType)
 bool isInputThreadType(const std::string &threadType)
 {
     return threadType == "RECORD" || threadType == "MMAP_CAPTURE";
+}
+
+template <>
+std::string lookup<TRACK_TRAITS>(const std::string &traits)
+{
+    return validateStringFromMap(traits, getAudioTrackTraitsMap());
+}
+
+template <>
+int32_t lookup<TRACK_TRAITS>(const std::string &traits)
+{
+    return flagsFromMap(traits, getAudioTrackTraitsMap());
 }
 
 } // namespace android::mediametrics::types
