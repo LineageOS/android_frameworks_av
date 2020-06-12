@@ -54,27 +54,43 @@ void SimulatedTranscoder::start(ClientIdType clientId, JobIdType jobId,
     }
     ALOGV("%s: job {%d}: processingTime: %lld", __FUNCTION__, jobId,
           (long long)mJobProcessingTimeMs);
-    queueEvent(Event::Start, clientId, jobId);
+    queueEvent(Event::Start, clientId, jobId, [=] {
+        auto callback = mCallback.lock();
+        if (callback != nullptr) {
+            callback->onStarted(clientId, jobId);
+        }
+    });
 }
 
 void SimulatedTranscoder::pause(ClientIdType clientId, JobIdType jobId) {
-    queueEvent(Event::Pause, clientId, jobId);
+    queueEvent(Event::Pause, clientId, jobId, [=] {
+        auto callback = mCallback.lock();
+        if (callback != nullptr) {
+            callback->onPaused(clientId, jobId);
+        }
+    });
 }
 
 void SimulatedTranscoder::resume(ClientIdType clientId, JobIdType jobId) {
-    queueEvent(Event::Resume, clientId, jobId);
+    queueEvent(Event::Resume, clientId, jobId, [=] {
+        auto callback = mCallback.lock();
+        if (callback != nullptr) {
+            callback->onResumed(clientId, jobId);
+        }
+    });
 }
 
 void SimulatedTranscoder::stop(ClientIdType clientId, JobIdType jobId) {
-    queueEvent(Event::Stop, clientId, jobId);
+    queueEvent(Event::Stop, clientId, jobId, nullptr);
 }
 
-void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId) {
+void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
+                                     std::function<void()> runnable) {
     ALOGV("%s: job {%lld, %d}: %s", __FUNCTION__, (long long)clientId, jobId, toString(type));
 
     auto lock = std::scoped_lock(mLock);
 
-    mQueue.push_back({type, clientId, jobId});
+    mQueue.push_back({type, clientId, jobId, runnable});
     mCondition.notify_one();
 }
 
@@ -139,10 +155,9 @@ void SimulatedTranscoder::threadLoop() {
                 continue;
             }
 
-            auto callback = mCallback.lock();
-            if (callback != nullptr) {
+            if (event.runnable != nullptr) {
                 lock.unlock();
-                callback->onProgressUpdate(event.clientId, event.jobId, event.type);
+                event.runnable();
                 lock.lock();
             }
         }
