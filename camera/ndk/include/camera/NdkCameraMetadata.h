@@ -36,6 +36,7 @@
 #ifndef _NDK_CAMERA_METADATA_H
 #define _NDK_CAMERA_METADATA_H
 
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/cdefs.h>
 
