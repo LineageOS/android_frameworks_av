@@ -36,6 +36,7 @@
 #ifndef _NDK_MEDIA_FORMAT_H
 #define _NDK_MEDIA_FORMAT_H
 
+#include <stdbool.h>
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
