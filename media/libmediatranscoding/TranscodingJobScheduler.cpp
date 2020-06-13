@@ -291,15 +291,16 @@ bool TranscodingJobScheduler::getJob(ClientIdType clientId, JobIdType jobId,
     return true;
 }
 
-void TranscodingJobScheduler::onFinish(ClientIdType clientId, JobIdType jobId) {
+void TranscodingJobScheduler::notifyClient(ClientIdType clientId, JobIdType jobId,
+                                           const char* reason,
+                                           std::function<void(const JobKeyType&)> func) {
     JobKeyType jobKey = std::make_pair(clientId, jobId);
-
-    ALOGV("%s: job %s", __FUNCTION__, jobToString(jobKey).c_str());
 
     std::scoped_lock lock{mLock};
 
     if (mJobMap.count(jobKey) == 0) {
-        ALOGW("ignoring finish for non-existent job");
+        ALOGW("%s: ignoring %s for job %s that doesn't exist", __FUNCTION__, reason,
+              jobToString(jobKey).c_str());
         return;
     }
 
@@ -307,90 +308,89 @@ void TranscodingJobScheduler::onFinish(ClientIdType clientId, JobIdType jobId) {
     // to client if the job is paused. Transcoder could have posted finish when
     // we're pausing it, and the finish arrived after we changed current job.
     if (mJobMap[jobKey].state == Job::NOT_STARTED) {
-        ALOGW("ignoring finish for job that was never started");
+        ALOGW("%s: ignoring %s for job %s that was never started", __FUNCTION__, reason,
+              jobToString(jobKey).c_str());
         return;
     }
 
-    {
-        auto clientCallback = mJobMap[jobKey].callback.lock();
-        if (clientCallback != nullptr) {
-            clientCallback->onTranscodingFinished(jobId, TranscodingResultParcel({jobId, 0}));
+    ALOGV("%s: job %s %s", __FUNCTION__, jobToString(jobKey).c_str(), reason);
+    func(jobKey);
+}
+
+void TranscodingJobScheduler::onStarted(ClientIdType clientId, JobIdType jobId) {
+    notifyClient(clientId, jobId, "started", [=](const JobKeyType& jobKey) {
+        auto callback = mJobMap[jobKey].callback.lock();
+        if (callback != nullptr) {
+            callback->onTranscodingStarted(jobId);
         }
-    }
+    });
+}
 
-    // Remove the job.
-    removeJob_l(jobKey);
+void TranscodingJobScheduler::onPaused(ClientIdType clientId, JobIdType jobId) {
+    notifyClient(clientId, jobId, "paused", [=](const JobKeyType& jobKey) {
+        auto callback = mJobMap[jobKey].callback.lock();
+        if (callback != nullptr) {
+            callback->onTranscodingPaused(jobId);
+        }
+    });
+}
 
-    // Start next job.
-    updateCurrentJob_l();
+void TranscodingJobScheduler::onResumed(ClientIdType clientId, JobIdType jobId) {
+    notifyClient(clientId, jobId, "resumed", [=](const JobKeyType& jobKey) {
+        auto callback = mJobMap[jobKey].callback.lock();
+        if (callback != nullptr) {
+            callback->onTranscodingResumed(jobId);
+        }
+    });
+}
 
-    validateState_l();
+void TranscodingJobScheduler::onFinish(ClientIdType clientId, JobIdType jobId) {
+    notifyClient(clientId, jobId, "finish", [=](const JobKeyType& jobKey) {
+        {
+            auto clientCallback = mJobMap[jobKey].callback.lock();
+            if (clientCallback != nullptr) {
+                clientCallback->onTranscodingFinished(jobId, TranscodingResultParcel({jobId, -1 /*actualBitrateBps*/}));
+            }
+        }
+
+        // Remove the job.
+        removeJob_l(jobKey);
+
+        // Start next job.
+        updateCurrentJob_l();
+
+        validateState_l();
+    });
 }
 
 void TranscodingJobScheduler::onError(ClientIdType clientId, JobIdType jobId,
                                       TranscodingErrorCode err) {
-    JobKeyType jobKey = std::make_pair(clientId, jobId);
-
-    ALOGV("%s: job %s, err %d", __FUNCTION__, jobToString(jobKey).c_str(), (int32_t)err);
-
-    std::scoped_lock lock{mLock};
-
-    if (mJobMap.count(jobKey) == 0) {
-        ALOGW("ignoring error for non-existent job");
-        return;
-    }
-
-    // Only ignore if job was never started. In particular, propagate the status
-    // to client if the job is paused. Transcoder could have posted finish when
-    // we're pausing it, and the finish arrived after we changed current job.
-    if (mJobMap[jobKey].state == Job::NOT_STARTED) {
-        ALOGW("ignoring error for job that was never started");
-        return;
-    }
-
-    {
-        auto clientCallback = mJobMap[jobKey].callback.lock();
-        if (clientCallback != nullptr) {
-            clientCallback->onTranscodingFailed(jobId, err);
+    notifyClient(clientId, jobId, "error", [=](const JobKeyType& jobKey) {
+        {
+            auto clientCallback = mJobMap[jobKey].callback.lock();
+            if (clientCallback != nullptr) {
+                clientCallback->onTranscodingFailed(jobId, err);
+            }
         }
-    }
 
-    // Remove the job.
-    removeJob_l(jobKey);
+        // Remove the job.
+        removeJob_l(jobKey);
 
-    // Start next job.
-    updateCurrentJob_l();
+        // Start next job.
+        updateCurrentJob_l();
 
-    validateState_l();
+        validateState_l();
+    });
 }
 
 void TranscodingJobScheduler::onProgressUpdate(ClientIdType clientId, JobIdType jobId,
                                                int32_t progress) {
-    JobKeyType jobKey = std::make_pair(clientId, jobId);
-
-    ALOGV("%s: job %s, progress %d", __FUNCTION__, jobToString(jobKey).c_str(), progress);
-
-    std::scoped_lock lock{mLock};
-
-    if (mJobMap.count(jobKey) == 0) {
-        ALOGW("ignoring progress for non-existent job");
-        return;
-    }
-
-    // Only ignore if job was never started. In particular, propagate the status
-    // to client if the job is paused. Transcoder could have posted finish when
-    // we're pausing it, and the finish arrived after we changed current job.
-    if (mJobMap[jobKey].state == Job::NOT_STARTED) {
-        ALOGW("ignoring progress for job that was never started");
-        return;
-    }
-
-    {
-        auto clientCallback = mJobMap[jobKey].callback.lock();
-        if (clientCallback != nullptr) {
-            clientCallback->onProgressUpdate(jobId, progress);
+    notifyClient(clientId, jobId, "progress", [=](const JobKeyType& jobKey) {
+        auto callback = mJobMap[jobKey].callback.lock();
+        if (callback != nullptr) {
+            callback->onProgressUpdate(jobId, progress);
         }
-    }
+    });
 }
 
 void TranscodingJobScheduler::onResourceLost() {

@@ -14,7 +14,7 @@ cc_library_shared {
         "libmediatranscoding",
         "libutils",
     ],
-    
+
     export_shared_lib_headers: [
         "libmediatranscoding",
     ],

@@ -47,6 +47,9 @@ public:
     // ~SchedulerClientInterface
 
     // TranscoderCallbackInterface
+    void onStarted(ClientIdType clientId, JobIdType jobId) override;
+    void onPaused(ClientIdType clientId, JobIdType jobId) override;
+    void onResumed(ClientIdType clientId, JobIdType jobId) override;
     void onFinish(ClientIdType clientId, JobIdType jobId) override;
     void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode err) override;
     void onProgressUpdate(ClientIdType clientId, JobIdType jobId, int32_t progress) override;
@@ -105,7 +108,8 @@ private:
     void updateCurrentJob_l();
     void removeJob_l(const JobKeyType& jobKey);
     void moveUidsToTop_l(const std::unordered_set<uid_t>& uids, bool preserveTopUid);
-
+    void notifyClient(ClientIdType clientId, JobIdType jobId, const char* reason,
+                      std::function<void(const JobKeyType&)> func);
     // Internal state verifier (debug only)
     void validateState_l();
 

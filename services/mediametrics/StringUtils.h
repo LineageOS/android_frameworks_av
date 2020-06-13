@@ -22,6 +22,30 @@
 namespace android::mediametrics::stringutils {
 
 /**
+ * fieldPrint is a helper method that logs to a stringstream a sequence of
+ * field names (in a fixed size array) together with a variable number of arg parameters.
+ *
+ * stringstream << field[0] << ":" << arg0 << " ";
+ * stringstream << field[1] << ":" << arg1 << " ";
+ * ...
+ * stringstream << field[N-1] << ":" << arg{N-1} << " ";
+ *
+ * The number of fields must exactly match the (variable) arguments.
+ *
+ * Example:
+ *
+ * const char * const fields[] = { "integer" };
+ * std::stringstream ss;
+ * fieldPrint(ss, fields, int(10));
+ */
+template <size_t N, typename... Targs>
+void fieldPrint(std::stringstream& ss, const char * const (& fields)[N], Targs... args) {
+    static_assert(N == sizeof...(args));          // guarantee #fields == #args
+    auto fptr = fields;                           // get a pointer to the base of fields array
+    ((ss << *fptr++ << ":" << args << " "), ...); // (fold expression), send to stringstream.
+}
+
+/**
  * Return string tokens from iterator, separated by spaces and reserved chars.
  */
 std::string tokenizer(std::string::const_iterator& it,

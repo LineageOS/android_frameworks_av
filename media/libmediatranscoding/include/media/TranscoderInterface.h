@@ -48,6 +48,9 @@ protected:
 class TranscoderCallbackInterface {
 public:
     // TODO(chz): determine what parameters are needed here.
+    virtual void onStarted(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void onPaused(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void onResumed(ClientIdType clientId, JobIdType jobId) = 0;
     virtual void onFinish(ClientIdType clientId, JobIdType jobId) = 0;
     virtual void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode err) = 0;
     virtual void onProgressUpdate(ClientIdType clientId, JobIdType jobId, int32_t progress) = 0;
