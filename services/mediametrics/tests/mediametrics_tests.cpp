@@ -18,12 +18,16 @@
 #include <utils/Log.h>
 
 #include "MediaMetricsService.h"
-#include "StringUtils.h"
 
 #include <stdio.h>
+#include <unordered_set>
 
 #include <gtest/gtest.h>
 #include <media/MediaMetricsItem.h>
+#include <system/audio.h>
+
+#include "AudioTypes.h"
+#include "StringUtils.h"
 
 using namespace android;
 
@@ -34,6 +38,15 @@ static size_t countNewlines(const char *s) {
         ++count;
     }
     return count;
+}
+
+template <typename M>
+ssize_t countDuplicates(const M& map) {
+    std::unordered_set<typename M::mapped_type> s;
+    for (const auto &m : map) {
+        s.emplace(m.second);
+    }
+    return map.size() - s.size();
 }
 
 TEST(mediametrics_tests, startsWith) {
@@ -804,7 +817,7 @@ TEST(mediametrics_tests, audio_analytics_permission) {
 
   // TODO: Verify contents of AudioAnalytics.
   // Currently there is no getter API in AudioAnalytics besides dump.
-  ASSERT_EQ(10, audioAnalytics.dump(1000).second /* lines */);
+  ASSERT_EQ(11, audioAnalytics.dump(1000).second /* lines */);
 
   ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
   // untrusted entities can add to an existing key
@@ -840,7 +853,7 @@ TEST(mediametrics_tests, audio_analytics_permission2) {
 
   // TODO: Verify contents of AudioAnalytics.
   // Currently there is no getter API in AudioAnalytics besides dump.
-  ASSERT_EQ(10, audioAnalytics.dump(1000).second /* lines */);
+  ASSERT_EQ(11, audioAnalytics.dump(1000).second /* lines */);
 
   ASSERT_EQ(NO_ERROR, audioAnalytics.submit(item, true /* isTrusted */));
   // untrusted entities can add to an existing key
@@ -924,6 +937,132 @@ TEST(mediametrics_tests, timed_action) {
     usleep(100000);
     ASSERT_EQ(1, value1);
     ASSERT_EQ((size_t)1, timedAction.size());
+}
+
+// Ensure we don't introduce unexpected duplicates into our maps.
+TEST(mediametrics_tests, audio_types_tables) {
+    using namespace android::mediametrics::types;
+
+    ASSERT_EQ(0, countDuplicates(getAudioCallerNameMap()));
+    ASSERT_EQ(2, countDuplicates(getAudioDeviceInMap()));  // has dups
+    ASSERT_EQ(1, countDuplicates(getAudioDeviceOutMap())); // has dups
+    ASSERT_EQ(0, countDuplicates(getAudioThreadTypeMap()));
+    ASSERT_EQ(0, countDuplicates(getAudioTrackTraitsMap()));
+}
+
+// Check our string validation (before logging to statsd).
+// This variant checks the logged, possibly shortened string.
+TEST(mediametrics_tests, audio_types_string) {
+    using namespace android::mediametrics::types;
+
+    ASSERT_EQ("java", (lookup<CALLER_NAME, std::string>)("java"));
+    ASSERT_EQ("", (lookup<CALLER_NAME, std::string>)("random"));
+
+    ASSERT_EQ("SPEECH", (lookup<CONTENT_TYPE, std::string>)("AUDIO_CONTENT_TYPE_SPEECH"));
+    ASSERT_EQ("", (lookup<CONTENT_TYPE, std::string>)("random"));
+
+    ASSERT_EQ("FLAC", (lookup<ENCODING, std::string>)("AUDIO_FORMAT_FLAC"));
+    ASSERT_EQ("", (lookup<ENCODING, std::string>)("random"));
+
+    ASSERT_EQ("USB_DEVICE", (lookup<INPUT_DEVICE, std::string>)("AUDIO_DEVICE_IN_USB_DEVICE"));
+    ASSERT_EQ("BUILTIN_MIC|WIRED_HEADSET", (lookup<INPUT_DEVICE, std::string>)(
+            "AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_WIRED_HEADSET"));
+    ASSERT_EQ("", (lookup<INPUT_DEVICE, std::string>)("random"));
+
+    ASSERT_EQ("RAW", (lookup<INPUT_FLAG, std::string>)("AUDIO_INPUT_FLAG_RAW"));
+    ASSERT_EQ("HW_AV_SYNC|VOIP_TX", (lookup<INPUT_FLAG, std::string>)(
+            "AUDIO_INPUT_FLAG_HW_AV_SYNC|AUDIO_INPUT_FLAG_VOIP_TX"));
+    ASSERT_EQ("", (lookup<INPUT_FLAG, std::string>)("random"));
+
+    ASSERT_EQ("BLUETOOTH_SCO_CARKIT",
+            (lookup<OUTPUT_DEVICE, std::string>)("AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT"));
+    ASSERT_EQ("SPEAKER|HDMI", (lookup<OUTPUT_DEVICE, std::string>)(
+            "AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_HDMI"));
+    ASSERT_EQ("", (lookup<OUTPUT_DEVICE, std::string>)("random"));
+
+    ASSERT_EQ("PRIMARY", (lookup<OUTPUT_FLAG, std::string>)("AUDIO_OUTPUT_FLAG_PRIMARY"));
+    ASSERT_EQ("DEEP_BUFFER|NON_BLOCKING", (lookup<OUTPUT_FLAG, std::string>)(
+            "AUDIO_OUTPUT_FLAG_DEEP_BUFFER|AUDIO_OUTPUT_FLAG_NON_BLOCKING"));
+    ASSERT_EQ("", (lookup<OUTPUT_FLAG, std::string>)("random"));
+
+    ASSERT_EQ("MIC", (lookup<SOURCE_TYPE, std::string>)("AUDIO_SOURCE_MIC"));
+    ASSERT_EQ("", (lookup<SOURCE_TYPE, std::string>)("random"));
+
+    ASSERT_EQ("TTS", (lookup<STREAM_TYPE, std::string>)("AUDIO_STREAM_TTS"));
+    ASSERT_EQ("", (lookup<STREAM_TYPE, std::string>)("random"));
+
+    ASSERT_EQ("DIRECT", (lookup<THREAD_TYPE, std::string>)("DIRECT"));
+    ASSERT_EQ("", (lookup<THREAD_TYPE, std::string>)("random"));
+
+    ASSERT_EQ("static", (lookup<TRACK_TRAITS, std::string>)("static"));
+    ASSERT_EQ("", (lookup<TRACK_TRAITS, std::string>)("random"));
+
+    ASSERT_EQ("VOICE_COMMUNICATION",
+            (lookup<USAGE, std::string>)("AUDIO_USAGE_VOICE_COMMUNICATION"));
+    ASSERT_EQ("", (lookup<USAGE, std::string>)("random"));
+}
+
+// Check our string validation (before logging to statsd).
+// This variant checks integral value logging.
+TEST(mediametrics_tests, audio_types_integer) {
+    using namespace android::mediametrics::types;
+
+    ASSERT_EQ(2, (lookup<CALLER_NAME, int32_t>)("java"));
+    ASSERT_EQ(0, (lookup<CALLER_NAME, int32_t>)("random")); // 0 == unknown
+
+    ASSERT_EQ((int32_t)AUDIO_CONTENT_TYPE_SPEECH,
+            (lookup<CONTENT_TYPE, int32_t>)("AUDIO_CONTENT_TYPE_SPEECH"));
+    ASSERT_EQ((int32_t)AUDIO_CONTENT_TYPE_UNKNOWN, (lookup<CONTENT_TYPE, int32_t>)("random"));
+
+    ASSERT_EQ((int32_t)AUDIO_FORMAT_FLAC, (lookup<ENCODING, int32_t>)("AUDIO_FORMAT_FLAC"));
+    ASSERT_EQ((int32_t)AUDIO_FORMAT_INVALID, (lookup<ENCODING, int32_t>)("random"));
+
+    ASSERT_EQ(getAudioDeviceInMap().at("AUDIO_DEVICE_IN_USB_DEVICE"),
+            (lookup<INPUT_DEVICE, int64_t>)("AUDIO_DEVICE_IN_USB_DEVICE"));
+    ASSERT_EQ(getAudioDeviceInMap().at("AUDIO_DEVICE_IN_BUILTIN_MIC")
+            | getAudioDeviceInMap().at("AUDIO_DEVICE_IN_WIRED_HEADSET"),
+            (lookup<INPUT_DEVICE, int64_t>)(
+            "AUDIO_DEVICE_IN_BUILTIN_MIC|AUDIO_DEVICE_IN_WIRED_HEADSET"));
+    ASSERT_EQ(0, (lookup<INPUT_DEVICE, int64_t>)("random"));
+
+    ASSERT_EQ((int32_t)AUDIO_INPUT_FLAG_RAW,
+            (lookup<INPUT_FLAG, int32_t>)("AUDIO_INPUT_FLAG_RAW"));
+    ASSERT_EQ((int32_t)AUDIO_INPUT_FLAG_HW_AV_SYNC
+            | (int32_t)AUDIO_INPUT_FLAG_VOIP_TX,
+            (lookup<INPUT_FLAG, int32_t>)(
+            "AUDIO_INPUT_FLAG_HW_AV_SYNC|AUDIO_INPUT_FLAG_VOIP_TX"));
+    ASSERT_EQ(0, (lookup<INPUT_FLAG, int32_t>)("random"));
+
+    ASSERT_EQ(getAudioDeviceOutMap().at("AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT"),
+            (lookup<OUTPUT_DEVICE, int64_t>)("AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT"));
+    ASSERT_EQ(getAudioDeviceOutMap().at("AUDIO_DEVICE_OUT_SPEAKER")
+            | getAudioDeviceOutMap().at("AUDIO_DEVICE_OUT_HDMI"),
+            (lookup<OUTPUT_DEVICE, int64_t>)(
+            "AUDIO_DEVICE_OUT_SPEAKER|AUDIO_DEVICE_OUT_HDMI"));
+    ASSERT_EQ(0, (lookup<OUTPUT_DEVICE, int64_t>)("random"));
+
+    ASSERT_EQ((int32_t)AUDIO_OUTPUT_FLAG_PRIMARY,
+            (lookup<OUTPUT_FLAG, int32_t>)("AUDIO_OUTPUT_FLAG_PRIMARY"));
+    ASSERT_EQ((int32_t)AUDIO_OUTPUT_FLAG_DEEP_BUFFER | (int32_t)AUDIO_OUTPUT_FLAG_NON_BLOCKING,
+            (lookup<OUTPUT_FLAG, int32_t>)(
+            "AUDIO_OUTPUT_FLAG_DEEP_BUFFER|AUDIO_OUTPUT_FLAG_NON_BLOCKING"));
+    ASSERT_EQ(0, (lookup<OUTPUT_FLAG, int32_t>)("random"));
+
+    ASSERT_EQ((int32_t)AUDIO_SOURCE_MIC, (lookup<SOURCE_TYPE, int32_t>)("AUDIO_SOURCE_MIC"));
+    ASSERT_EQ((int32_t)AUDIO_SOURCE_DEFAULT, (lookup<SOURCE_TYPE, int32_t>)("random"));
+
+    ASSERT_EQ((int32_t)AUDIO_STREAM_TTS, (lookup<STREAM_TYPE, int32_t>)("AUDIO_STREAM_TTS"));
+    ASSERT_EQ((int32_t)AUDIO_STREAM_DEFAULT, (lookup<STREAM_TYPE, int32_t>)("random"));
+
+    ASSERT_EQ(1, (lookup<THREAD_TYPE, int32_t>)("DIRECT"));
+    ASSERT_EQ(-1, (lookup<THREAD_TYPE, int32_t>)("random"));
+
+    ASSERT_EQ(getAudioTrackTraitsMap().at("static"), (lookup<TRACK_TRAITS, int32_t>)("static"));
+    ASSERT_EQ(0, (lookup<TRACK_TRAITS, int32_t>)("random"));
+
+    ASSERT_EQ((int32_t)AUDIO_USAGE_VOICE_COMMUNICATION,
+            (lookup<USAGE, int32_t>)("AUDIO_USAGE_VOICE_COMMUNICATION"));
+    ASSERT_EQ((int32_t)AUDIO_USAGE_UNKNOWN, (lookup<USAGE, int32_t>)("random"));
 }
 
 #if 0
