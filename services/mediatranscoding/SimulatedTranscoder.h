@@ -42,6 +42,7 @@ public:
         enum Type { NoEvent, Start, Pause, Resume, Stop, Finished, Failed } type;
         ClientIdType clientId;
         JobIdType jobId;
+        std::function<void()> runnable;
     };
 
     static constexpr int64_t kJobDurationUs = 1000000;
@@ -67,7 +68,8 @@ private:
     int64_t mJobProcessingTimeMs = kJobDurationUs / 1000;
 
     static const char* toString(Event::Type type);
-    void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId);
+    void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
+                    std::function<void()> runnable);
     void threadLoop();
 };
 

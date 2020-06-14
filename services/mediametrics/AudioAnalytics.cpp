@@ -31,30 +31,131 @@
 
 #define PROP_AUDIO_ANALYTICS_CLOUD_ENABLED "persist.audio.analytics.cloud.enabled"
 
-// Enable for testing of delivery to statsd
-//#define STATSD
+namespace android::mediametrics {
 
-// Transmit to statsd in integer or strings
-//#define USE_INT
+// Enable for testing of delivery to statsd. Caution if this is enabled, all protos MUST exist.
+#define STATSD_ENABLE
 
-#ifdef USE_INT
-using short_enum_type_t = int32_t;
-using long_enum_type_t = int64_t;
-#define ENUM_EXTRACT(x) (x)
+#ifdef STATSD_ENABLE
+#define CONDITION(INT_VALUE) (INT_VALUE)  // allow value
 #else
-using short_enum_type_t = std::string;
-using long_enum_type_t = std::string;
-#define ENUM_EXTRACT(x) (x).c_str()
+#define CONDITION(INT_VALUE) (int(0))     // mask value since the proto may not be defined yet.
 #endif
 
-using android::base::DEBUG;
+// Maximum length of a device name.
+static constexpr size_t STATSD_DEVICE_NAME_MAX_LENGTH = 32;
 
-namespace android::mediametrics {
+// Transmit Enums to statsd in integer or strings  (this must match the atoms.proto)
+static constexpr bool STATSD_USE_INT_FOR_ENUM = false;
+
+// derive types based on integer or strings.
+using short_enum_type_t = std::conditional_t<STATSD_USE_INT_FOR_ENUM, int32_t, std::string>;
+using long_enum_type_t = std::conditional_t<STATSD_USE_INT_FOR_ENUM, int64_t, std::string>;
+
+// Convert std::string to char *
+template <typename T>
+auto ENUM_EXTRACT(const T& x) {
+    if constexpr (std::is_same_v<std::decay_t<T>, std::string>) {
+        return x.c_str();
+    } else {
+        return x;
+    }
+}
+
+static constexpr const auto LOG_LEVEL = android::base::VERBOSE;
+
+/*
+ * For logging purposes, we list all of the MediaMetrics atom fields,
+ * which can then be associated with consecutive arguments to the statsd write.
+ */
+
+static constexpr const char * const AudioRecordDeviceUsageFields[] = {
+    "mediametrics_audiorecorddeviceusage_reported", // proto number
+    "devices",
+    "device_names",
+    "device_time_nanos",
+    "encoding",
+    "frame_count",
+    "interval_count",
+    "sample_rate",
+    "flags",
+    "package_name",
+    "selected_device_id",
+    "caller",
+    "source",
+};
+
+static constexpr const char * const AudioThreadDeviceUsageFields[] = {
+    "mediametrics_audiothreaddeviceusage_reported",
+    "devices",
+    "device_names",
+    "device_time_nanos",
+    "encoding",
+    "frame_count",
+    "interval_count",
+    "sample_rate",
+    "flags",
+    "xruns",
+    "type",
+};
+
+static constexpr const char * const AudioTrackDeviceUsageFields[] = {
+    "mediametrics_audiotrackdeviceusage_reported",
+    "devices",
+    "device_names",
+    "device_time_nanos",
+    "encoding",
+    "frame_count",
+    "interval_count",
+    "sample_rate",
+    "flags",
+    "xruns",
+    "package_name",
+    "device_latency_millis",
+    "device_startup_millis",
+    "device_volume",
+    "selected_device_id",
+    "stream_type",
+    "usage",
+    "content_type",
+    "caller",
+    "traits",
+};
+
+static constexpr const char * const AudioDeviceConnectionFields[] = {
+    "mediametrics_audiodeviceconnection_reported",
+    "input_devices",
+    "output_devices",
+    "device_names",
+    "result",
+    "time_to_connect_millis",
+    "connection_count",
+};
+
+/**
+ * sendToStatsd is a helper method that sends the arguments to statsd
+ * and returns a pair { result, summary_string }.
+ */
+template <size_t N, typename ...Types>
+std::pair<int, std::string> sendToStatsd(const char * const (& fields)[N], Types ... args)
+{
+    int result = 0;
+    std::stringstream ss;
+
+#ifdef STATSD_ENABLE
+    result = android::util::stats_write(args...);
+    ss << "result:" << result;
+#endif
+    ss << " { ";
+    stringutils::fieldPrint(ss, fields, args...);
+    ss << "}";
+    return { result, ss.str() };
+}
 
 AudioAnalytics::AudioAnalytics()
     : mDeliverStatistics(property_get_bool(PROP_AUDIO_ANALYTICS_CLOUD_ENABLED, true))
 {
-    SetMinimumLogSeverity(DEBUG); // for LOG().
+    SetMinimumLogSeverity(android::base::DEBUG); // for LOG().
     ALOGD("%s", __func__);
 
     // Add action to save AnalyticsState if audioserver is restarted.
@@ -220,11 +321,26 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
         ll -= l;
     }
 
+    if (ll > 0) {
+        // Print the statsd atoms we sent out.
+        const std::string statsd = mStatsdLog.dumpToString("  " /* prefix */, ll - 1);
+        const size_t n = std::count(statsd.begin(), statsd.end(), '\n') + 1; // we control this.
+        if ((size_t)ll >= n) {
+            if (n == 1) {
+                ss << "Statsd atoms: empty or truncated\n";
+            } else {
+                ss << "Statsd atoms:\n" << statsd;
+            }
+            ll -= n;
+        }
+    }
+
     if (ll > 0 && prefix == nullptr) {
         auto [s, l] = mAudioPowerUsage.dump(ll);
         ss << s;
         ll -= l;
     }
+
     return { ss.str(), lines - ll };
 }
 
@@ -312,20 +428,25 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
 
     // Get connected device name if from bluetooth.
     bool isBluetooth = false;
-    std::string deviceNames; // we only have one device name at this time.
+
+    std::string inputDeviceNames;  // not filled currently.
+    std::string outputDeviceNames;
     if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
         isBluetooth = true;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
-            "audio.device.bt_a2dp", AMEDIAMETRICS_PROP_NAME, &deviceNames);
+            "audio.device.bt_a2dp", AMEDIAMETRICS_PROP_NAME, &outputDeviceNames);
         // Remove | if present
-        stringutils::replace(deviceNames, "|", '?');
+        stringutils::replace(outputDeviceNames, "|", '?');
+        if (outputDeviceNames.size() > STATSD_DEVICE_NAME_MAX_LENGTH) {
+            outputDeviceNames.resize(STATSD_DEVICE_NAME_MAX_LENGTH); // truncate
+        }
     }
 
     switch (itemType) {
     case RECORD: {
         std::string callerName;
-        mAudioAnalytics.mAnalyticsState->timeMachine().get(
-                key, AMEDIAMETRICS_PROP_CALLERNAME, &callerName);
+        const bool clientCalled = mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_CALLERNAME, &callerName) == OK;
 
         std::string packageName;
         int64_t versionCode = 0;
@@ -350,10 +471,10 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         const auto flagsForStats = types::lookup<types::INPUT_FLAG, short_enum_type_t>(flags);
         const auto sourceForStats = types::lookup<types::SOURCE_TYPE, short_enum_type_t>(source);
 
-        LOG(DEBUG) << "key:" << key
+        LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
               << " inputDevices:" << inputDevices << "(" << inputDeviceBits
-              << ") deviceNames:" << deviceNames
+              << ") inputDeviceNames:" << inputDeviceNames
               << " deviceTimeNs:" << deviceTimeNs
               << " encoding:" << encoding << "(" << encodingForStats
               << ") frameCount:" << frameCount
@@ -364,12 +485,12 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << " selectedDeviceId:" << selectedDeviceId
               << " callerName:" << callerName << "(" << callerNameForStats
               << ") source:" << source << "(" << sourceForStats << ")";
-#ifdef STATSD
-        if (mAudioAnalytics.mDeliverStatistics) {
-            (void)android::util::stats_write(
-                    android::util::MEDIAMETRICS_AUDIORECORDDEVICEUSAGE_REPORTED
+        if (clientCalled  // only log if client app called AudioRecord.
+                && mAudioAnalytics.mDeliverStatistics) {
+            const auto [ result, str ] = sendToStatsd(AudioRecordDeviceUsageFields,
+                    CONDITION(android::util::MEDIAMETRICS_AUDIORECORDDEVICEUSAGE_REPORTED)
                     , ENUM_EXTRACT(inputDeviceBits)
-                    , deviceNames.c_str()
+                    , inputDeviceNames.c_str()
                     , deviceTimeNs
                     , ENUM_EXTRACT(encodingForStats)
                     , frameCount
@@ -382,8 +503,9 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , ENUM_EXTRACT(callerNameForStats)
                     , ENUM_EXTRACT(sourceForStats)
                     );
+            ALOGV("%s: statsd %s", __func__, str.c_str());
+            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
         }
-#endif
     } break;
     case THREAD: {
         std::string type;
@@ -400,11 +522,12 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                         : types::lookup<types::OUTPUT_FLAG, short_enum_type_t>(flags));
         const auto typeForStats = types::lookup<types::THREAD_TYPE, short_enum_type_t>(type);
 
-        LOG(DEBUG) << "key:" << key
+        LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
               << " inputDevices:" << inputDevices << "(" << inputDeviceBits
               << ") outputDevices:" << outputDevices << "(" << outputDeviceBits
-              << ") deviceNames:" << deviceNames
+              << ") inputDeviceNames:" << inputDeviceNames
+              << " outputDeviceNames:" << outputDeviceNames
               << " deviceTimeNs:" << deviceTimeNs
               << " encoding:" << encoding << "(" << encodingForStats
               << ") frameCount:" << frameCount
@@ -414,13 +537,11 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << " flags:" << flags << "(" << flagsForStats
               << ") type:" << type << "(" << typeForStats
               << ")";
-#ifdef STATSD
         if (mAudioAnalytics.mDeliverStatistics) {
-            (void)android::util::stats_write(
-                android::util::MEDIAMETRICS_AUDIOTHREADDEVICEUSAGE_REPORTED
-                , ENUM_EXTRACT(inputDeviceBits)
-                , ENUM_EXTRACT(outputDeviceBits)
-                , deviceNames.c_str()
+            const auto [ result, str ] = sendToStatsd(AudioThreadDeviceUsageFields,
+                CONDITION(android::util::MEDIAMETRICS_AUDIOTHREADDEVICEUSAGE_REPORTED)
+                , isInput ? ENUM_EXTRACT(inputDeviceBits) : ENUM_EXTRACT(outputDeviceBits)
+                , isInput ? inputDeviceNames.c_str() : outputDeviceNames.c_str()
                 , deviceTimeNs
                 , ENUM_EXTRACT(encodingForStats)
                 , frameCount
@@ -430,13 +551,15 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                 , underrun
                 , ENUM_EXTRACT(typeForStats)
             );
+            ALOGV("%s: statsd %s", __func__, str.c_str());
+            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
         }
-#endif
     } break;
     case TRACK: {
         std::string callerName;
-        mAudioAnalytics.mAnalyticsState->timeMachine().get(
-                key, AMEDIAMETRICS_PROP_CALLERNAME, &callerName);
+        const bool clientCalled = mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_CALLERNAME, &callerName) == OK;
+
         std::string contentType;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_CONTENTTYPE, &contentType);
@@ -470,6 +593,9 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         std::string streamType;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_STREAMTYPE, &streamType);
+        std::string traits;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_TRAITS, &traits);
         int32_t underrun = 0;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_UNDERRUN, &underrun);
@@ -485,12 +611,14 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         const auto flagsForStats = types::lookup<types::OUTPUT_FLAG, short_enum_type_t>(flags);
         const auto streamTypeForStats =
                 types::lookup<types::STREAM_TYPE, short_enum_type_t>(streamType);
+        const auto traitsForStats =
+                 types::lookup<types::TRACK_TRAITS, short_enum_type_t>(traits);
         const auto usageForStats = types::lookup<types::USAGE, short_enum_type_t>(usage);
 
-        LOG(DEBUG) << "key:" << key
+        LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
               << " outputDevices:" << outputDevices << "(" << outputDeviceBits
-              << ") deviceNames:" << deviceNames
+              << ") outputDeviceNames:" << outputDeviceNames
               << " deviceTimeNs:" << deviceTimeNs
               << " encoding:" << encoding << "(" << encodingForStats
               << ") frameCount:" << frameCount
@@ -508,14 +636,15 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << " playbackSpeed:" << playbackSpeed
               << " selectedDeviceId:" << selectedDeviceId
               << " streamType:" << streamType << "(" << streamTypeForStats
+              << ") traits:" << traits << "(" << traitsForStats
               << ") usage:" << usage << "(" << usageForStats
               << ")";
-#ifdef STATSD
-        if (mAudioAnalytics.mDeliverStatistics) {
-            (void)android::util::stats_write(
-                    android::util::MEDIAMETRICS_AUDIOTRACKDEVICEUSAGE_REPORTED
+        if (clientCalled // only log if client app called AudioTracks
+                && mAudioAnalytics.mDeliverStatistics) {
+            const auto [ result, str ] = sendToStatsd(AudioTrackDeviceUsageFields,
+                    CONDITION(android::util::MEDIAMETRICS_AUDIOTRACKDEVICEUSAGE_REPORTED)
                     , ENUM_EXTRACT(outputDeviceBits)
-                    , deviceNames.c_str()
+                    , outputDeviceNames.c_str()
                     , deviceTimeNs
                     , ENUM_EXTRACT(encodingForStats)
                     , frameCount
@@ -523,7 +652,6 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , sampleRate
                     , ENUM_EXTRACT(flagsForStats)
                     , underrun
-
                     , packageName.c_str()
                     , (float)deviceLatencyMs
                     , (float)deviceStartupMs
@@ -533,9 +661,11 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , ENUM_EXTRACT(usageForStats)
                     , ENUM_EXTRACT(contentTypeForStats)
                     , ENUM_EXTRACT(callerNameForStats)
+                    , ENUM_EXTRACT(traitsForStats)
                     );
+            ALOGV("%s: statsd %s", __func__, str.c_str());
+            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
         }
-#endif
         } break;
     }
 
@@ -592,23 +722,26 @@ void AudioAnalytics::DeviceConnection::createPatch(
         const auto outputDeviceBits = types::lookup<types::OUTPUT_DEVICE, long_enum_type_t>(
                 "AUDIO_DEVICE_OUT_BLUETOOTH_A2DP");
 
-        LOG(DEBUG) << "key:" << key
+        LOG(LOG_LEVEL) << "key:" << key
                 << " A2DP SUCCESS"
                 << " outputDevices:" << outputDeviceBits
+                << " deviceName:" << mA2dpDeviceName
                 << " connectionTimeMs:" <<  connectionTimeMs;
-#ifdef STATSD
         if (mAudioAnalytics.mDeliverStatistics) {
             const long_enum_type_t inputDeviceBits{};
-            (void)android::util::stats_write(
-                    android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED
+
+            const auto [ result, str ] = sendToStatsd(AudioDeviceConnectionFields,
+                    CONDITION(android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED)
                     , ENUM_EXTRACT(inputDeviceBits)
                     , ENUM_EXTRACT(outputDeviceBits)
+                    , mA2dpDeviceName.c_str()
                     , types::DEVICE_CONNECTION_RESULT_SUCCESS
                     , connectionTimeMs
                     , /* connection_count */ 1
                     );
+            ALOGV("%s: statsd %s", __func__, str.c_str());
+            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
         }
-#endif
     }
 }
 
@@ -620,13 +753,17 @@ void AudioAnalytics::DeviceConnection::postBluetoothA2dpDeviceConnectionStateSup
     std::string state;
     item->get(AMEDIAMETRICS_PROP_STATE, &state);
     if (state != "connected") return;
+
+    std::string name;
+    item->get(AMEDIAMETRICS_PROP_NAME, &name);
     {
         std::lock_guard l(mLock);
         mA2dpConnectionRequestNs = atNs;
         ++mA2dpConnectionRequests;
+        mA2dpDeviceName = name;
     }
-    ALOGD("(key=%s) a2dp connection request atNs:%lld",
-            key.c_str(), (long long)atNs);
+    ALOGD("(key=%s) a2dp connection name:%s request atNs:%lld",
+            key.c_str(), name.c_str(), (long long)atNs);
     // TODO: attempt to cancel a timed event, rather than let it expire.
     mAudioAnalytics.mTimedAction.postIn(std::chrono::seconds(5), [this](){ expire(); });
 }
@@ -635,29 +772,29 @@ void AudioAnalytics::DeviceConnection::expire() {
     std::lock_guard l(mLock);
     if (mA2dpConnectionRequestNs == 0) return; // ignore (this was an internal connection).
 
-#ifdef STATSD
     const long_enum_type_t inputDeviceBits{};
-#endif
     const auto outputDeviceBits = types::lookup<types::OUTPUT_DEVICE, long_enum_type_t>(
             "AUDIO_DEVICE_OUT_BLUETOOTH_A2DP");
 
     if (mA2dpConnectionServiceNs == 0) {
         ++mA2dpConnectionJavaServiceCancels;  // service did not connect to A2DP
 
-        LOG(DEBUG) << "A2DP CANCEL"
-                << " outputDevices:" << outputDeviceBits;
-#ifdef STATSD
+        LOG(LOG_LEVEL) << "A2DP CANCEL"
+                << " outputDevices:" << outputDeviceBits
+                << " deviceName:" << mA2dpDeviceName;
         if (mAudioAnalytics.mDeliverStatistics) {
-            (void)android::util::stats_write(
-                    android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED
+            const auto [ result, str ] = sendToStatsd(AudioDeviceConnectionFields,
+                    CONDITION(android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED)
                     , ENUM_EXTRACT(inputDeviceBits)
                     , ENUM_EXTRACT(outputDeviceBits)
+                    , mA2dpDeviceName.c_str()
                     , types::DEVICE_CONNECTION_RESULT_JAVA_SERVICE_CANCEL
                     , /* connection_time_ms */ 0.f
                     , /* connection_count */ 1
                     );
+            ALOGV("%s: statsd %s", __func__, str.c_str());
+            mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
         }
-#endif
         return;
     }
 
@@ -668,20 +805,22 @@ void AudioAnalytics::DeviceConnection::expire() {
     mA2dpConnectionServiceNs = 0;
     ++mA2dpConnectionUnknowns;  // connection result unknown
 
-    LOG(DEBUG) << "A2DP UNKNOWN"
-            << " outputDevices:" << outputDeviceBits;
-#ifdef STATSD
+    LOG(LOG_LEVEL) << "A2DP UNKNOWN"
+            << " outputDevices:" << outputDeviceBits
+            << " deviceName:" << mA2dpDeviceName;
     if (mAudioAnalytics.mDeliverStatistics) {
-        (void)android::util::stats_write(
-                android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED
+        const auto [ result, str ] = sendToStatsd(AudioDeviceConnectionFields,
+                CONDITION(android::util::MEDIAMETRICS_AUDIODEVICECONNECTION_REPORTED)
                 , ENUM_EXTRACT(inputDeviceBits)
                 , ENUM_EXTRACT(outputDeviceBits)
+                , mA2dpDeviceName.c_str()
                 , types::DEVICE_CONNECTION_RESULT_UNKNOWN
                 , /* connection_time_ms */ 0.f
                 , /* connection_count */ 1
                 );
+        ALOGV("%s: statsd %s", __func__, str.c_str());
+        mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
     }
-#endif
 }
 
 } // namespace android::mediametrics

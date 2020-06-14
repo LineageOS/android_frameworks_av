@@ -216,11 +216,20 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
         return Status::ok();
     }
 
-    Status onTranscodingStarted(int32_t /*in_jobId*/) override { return Status::ok(); }
+    Status onTranscodingStarted(int32_t in_jobId) override {
+        append(Start(mClientId, in_jobId));
+        return Status::ok();
+    }
 
-    Status onTranscodingPaused(int32_t /*in_jobId*/) override { return Status::ok(); }
+    Status onTranscodingPaused(int32_t in_jobId) override {
+        append(Pause(mClientId, in_jobId));
+        return Status::ok();
+    }
 
-    Status onTranscodingResumed(int32_t /*in_jobId*/) override { return Status::ok(); }
+    Status onTranscodingResumed(int32_t in_jobId) override {
+        append(Resume(mClientId, in_jobId));
+        return Status::ok();
+    }
 
     Status onTranscodingFinished(
             int32_t in_jobId,
@@ -241,23 +250,7 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
         return Status::ok();
     }
 
-    Status onProgressUpdate(int32_t in_jobId, int32_t in_progress) override {
-        // The progress numbers from the SimulatedTranscoder represents the
-        // event's type in the transcoder.
-        switch (in_progress) {
-        case SimulatedTranscoder::Event::Start:
-            append(EventTracker::Start(mClientId, in_jobId));
-            break;
-        case SimulatedTranscoder::Event::Pause:
-            append(EventTracker::Pause(mClientId, in_jobId));
-            break;
-        case SimulatedTranscoder::Event::Resume:
-            append(EventTracker::Resume(mClientId, in_jobId));
-            break;
-        default:
-            ALOGE("unrecognized progress number %d, ignored by test", in_progress);
-            break;
-        }
+    Status onProgressUpdate(int32_t /*in_jobId*/, int32_t /*in_progress*/) override {
         return Status::ok();
     }
 
@@ -393,8 +386,9 @@ public:
         }
 
         return status.isOk() && (result == shouldSucceed) &&
-               (!shouldSucceed || (job.jobId == jobId && 
-                job.request.sourceFilePath == sourceFilePath && job.request.destinationFilePath == destinationFilePath));
+               (!shouldSucceed ||
+                (job.jobId == jobId && job.request.sourceFilePath == sourceFilePath &&
+                 job.request.destinationFilePath == destinationFilePath));
     }
 
     std::shared_ptr<IMediaTranscodingService> mService;
@@ -592,8 +586,10 @@ TEST_F(MediaTranscodingServiceTest, TestSubmitCancelWithOfflineJobs) {
     registerMultipleClients();
 
     // Submit some offline jobs first.
-    EXPECT_TRUE(submit(mClient1, 0, "test_source_file_0", "test_destination_file_0", TranscodingJobPriority::kUnspecified));
-    EXPECT_TRUE(submit(mClient1, 1, "test_source_file_1", "test_destination_file_1", TranscodingJobPriority::kUnspecified));
+    EXPECT_TRUE(submit(mClient1, 0, "test_source_file_0", "test_destination_file_0",
+                       TranscodingJobPriority::kUnspecified));
+    EXPECT_TRUE(submit(mClient1, 1, "test_source_file_1", "test_destination_file_1",
+                       TranscodingJobPriority::kUnspecified));
 
     // Job 0 should start immediately.
     EXPECT_EQ(mClientCallback1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));

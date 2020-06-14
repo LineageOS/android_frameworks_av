@@ -1713,16 +1713,12 @@ status_t AudioTrack::createTrack_l()
     // is the first log of the AudioTrack and must be present before
     // any AudioTrack client logs will be accepted.
 
-    std::string flagsAsString;
-    OutputFlagConverter::toString(mFlags, flagsAsString);
-    std::string originalFlagsAsString;
-    OutputFlagConverter::toString(mOrigFlags, originalFlagsAsString);
     mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + std::to_string(mPortId);
     mediametrics::LogItem(mMetricsId)
         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
         // the following are immutable
-        .set(AMEDIAMETRICS_PROP_FLAGS, flagsAsString.c_str())
-        .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, originalFlagsAsString.c_str())
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(mFlags).c_str())
+        .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
         .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
         .set(AMEDIAMETRICS_PROP_TRACKID, mPortId) // dup from key
         .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(mAttributes.content_type).c_str())
