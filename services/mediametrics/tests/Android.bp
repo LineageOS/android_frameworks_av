@@ -21,6 +21,10 @@ cc_test {
         "libutils",
     ],
 
+    header_libs: [
+        "libaudioutils_headers",
+    ],
+
     srcs: [
         "mediametrics_tests.cpp",
     ],
