@@ -33,10 +33,8 @@ filegroup {
     path: "aidl",
 }
 
-aidl_interface {
-    name: "resourcemanager_aidl_interface",
-    unstable: true,
-    local_include_dir: "aidl",
+filegroup {
+    name: "resourcemanager_aidl",
     srcs: [
         "aidl/android/media/IResourceManagerClient.aidl",
         "aidl/android/media/IResourceManagerService.aidl",
@@ -44,6 +42,16 @@ aidl_interface {
         "aidl/android/media/MediaResourceSubType.aidl",
         "aidl/android/media/MediaResourceParcel.aidl",
         "aidl/android/media/MediaResourcePolicyParcel.aidl",
+    ],
+    path: "aidl",
+}
+
+aidl_interface {
+    name: "resourcemanager_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":resourcemanager_aidl",
     ],
 }
 
