@@ -19,7 +19,7 @@
         <option name="cleanup" value="true" />
         <option name="push" value="ExtractorUnitTest->/data/local/tmp/ExtractorUnitTest" />
         <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/extractors/tests/extractor.zip?unzip=true"
+            key="https://storage.googleapis.com/android_media/frameworks/av/media/extractors/tests/extractor-1.1.zip?unzip=true"
             value="/data/local/tmp/ExtractorUnitTestRes/" />
     </target_preparer>
 

@@ -1100,7 +1100,7 @@ INSTANTIATE_TEST_SUITE_P(ConfigParamTestAll, ConfigParamTest,
                                            make_pair("mkv", MPEG4_1),
                                            make_pair("mkv", VP9_1)));
 
-// Validate extractors for container format, input file and supports seek flag
+// Validate extractors for container format, input file, no. of tracks and supports seek flag
 INSTANTIATE_TEST_SUITE_P(
         ExtractorUnitTestAll, ExtractorFunctionalityTest,
         ::testing::Values(
@@ -1118,7 +1118,14 @@ INSTANTIATE_TEST_SUITE_P(
                 make_tuple("mpeg2ts", "testac3ts.ts", 1, false),
                 make_tuple("mpeg2ts", "testac4ts.ts", 1, false),
                 make_tuple("mpeg2ts", "testeac3ts.ts", 1, false),
+                make_tuple("mpeg4", "audio_aac_mono_70kbs_44100hz.mp4", 2, true),
+                make_tuple("mpeg4", "multi0_ac4.mp4", 1, true),
+                make_tuple("mpeg4", "noise_6ch_44khz_aot5_dr_sbr_sig2_mp4.m4a", 1, true),
+                make_tuple("mpeg4", "sinesweepalac.mov", 1, true),
+                make_tuple("mpeg4", "sinesweepflacmp4.mp4", 1, true),
+                make_tuple("mpeg4", "sinesweepm4a.m4a", 1, true),
                 make_tuple("mpeg4", "sinesweepoggmp4.mp4", 1, true),
+                make_tuple("mpeg4", "sinesweepopusmp4.mp4", 1, true),
                 make_tuple("mpeg4", "testac3mp4.mp4", 1, true),
                 make_tuple("mpeg4", "testeac3mp4.mp4", 1, true),
                 make_tuple("ogg", "john_cage.ogg", 1, true),
@@ -1132,7 +1139,26 @@ INSTANTIATE_TEST_SUITE_P(
                 make_tuple("mkv", "swirl_144x136_vp8.webm", 1, true),
                 make_tuple("mpeg2ps", "swirl_144x136_mpeg2.mpg", 1, false),
                 make_tuple("mpeg2ps", "programstream.mpeg", 2, false),
-                make_tuple("mpeg4", "swirl_132x130_mpeg4.mp4", 1, true)));
+                make_tuple("mpeg4", "color_176x144_bt601_525_lr_sdr_h264.mp4", 1, true),
+                make_tuple("mpeg4", "psshtest.mp4", 1, true),
+                make_tuple("mpeg4", "swirl_132x130_mpeg4.mp4", 1, true),
+                make_tuple("mpeg4", "testvideo.3gp", 4, true),
+                make_tuple("mpeg4", "testvideo_with_2_timedtext_tracks.3gp", 4, true),
+                make_tuple("mpeg4",
+                           "video_176x144_3gp_h263_300kbps_25fps_aac_stereo_128kbps_11025hz_"
+                           "metadata_gyro_compliant.3gp",
+                           3, true),
+                make_tuple(
+                        "mpeg4",
+                        "video_1920x1080_mp4_mpeg2_12000kbps_30fps_aac_stereo_128kbps_48000hz.mp4",
+                        2, true),
+                make_tuple("mpeg4",
+                           "video_480x360_mp4_hevc_650kbps_30fps_aac_stereo_128kbps_48000hz.mp4", 2,
+                           true),
+                make_tuple(
+                        "mpeg4",
+                        "video_480x360_mp4_h264_1350kbps_30fps_aac_stereo_128kbps_44100hz_dash.mp4",
+                        2, true)));
 
 int main(int argc, char **argv) {
     gEnv = new ExtractorUnitTestEnvironment();
