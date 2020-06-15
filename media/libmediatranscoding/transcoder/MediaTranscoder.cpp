@@ -95,8 +95,7 @@ void MediaTranscoder::sendCallback(media_status_t status) {
         // Transcoding is done and the callback to the client has been sent, so tear down the
         // pipeline but do it asynchronously to avoid deadlocks. If an error occurred, client
         // should clean up the file.
-        std::thread asyncCancelThread{
-                [self = shared_from_this()] { self->cancel(); }};
+        std::thread asyncCancelThread{[self = shared_from_this()] { self->cancel(); }};
         asyncCancelThread.detach();
     }
 }
@@ -116,7 +115,7 @@ void MediaTranscoder::onSampleWriterFinished(media_status_t status) {
 }
 
 MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks)
-     : mCallbacks(callbacks) {}
+      : mCallbacks(callbacks) {}
 
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         const std::shared_ptr<CallbackInterface>& callbacks,

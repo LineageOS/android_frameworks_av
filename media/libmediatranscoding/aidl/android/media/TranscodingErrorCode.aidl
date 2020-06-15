@@ -23,11 +23,12 @@ package android.media;
  */
 @Backing(type = "int")
 enum TranscodingErrorCode {
-    kUnknown = 0,
-    kUnsupported = 1,
-    kDecoderError = 2,
-    kEncoderError = 3,
-    kExtractorError = 4,
-    kMuxerError = 5,
-    kInvalidBitstream = 6
+    kNoError = 0,
+    kUnknown = 1,
+    kMalformed = 2,
+    kUnsupported = 3,
+    kInvalidParameter = 4,
+    kInvalidOperation = 5,
+    kErrorIO = 6,
+    kInsufficientResources = 7,
 }
