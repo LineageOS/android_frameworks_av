@@ -19,7 +19,7 @@ cc_library {
         "libaudioclient_headers",
         "libbase_headers",
         "libstagefright_headers",
-        "libmedia_headers",
+        "libmedia_datasource_headers",
     ],
 
     static_libs: [
