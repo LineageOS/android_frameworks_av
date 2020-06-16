@@ -13,6 +13,9 @@ fi
 
 mm
 
+# Push the files onto the device.
+. $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/push_assets.sh
+
 echo "[==========] installing test apps"
 adb root
 adb install -t -r -g -d $ANDROID_TARGET_OUT_TESTCASES/TranscodingUidPolicy_TestAppA/arm64/TranscodingUidPolicy_TestAppA.apk
