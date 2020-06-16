@@ -38,6 +38,7 @@ private:
         sourceFilePath = parcel.sourceFilePath;
         destinationFilePath = parcel.destinationFilePath;
         transcodingType = parcel.transcodingType;
+        requestedVideoTrackFormat = parcel.requestedVideoTrackFormat;
         priority = parcel.priority;
         requestProgressUpdate = parcel.requestProgressUpdate;
         requestJobEventUpdate = parcel.requestJobEventUpdate;

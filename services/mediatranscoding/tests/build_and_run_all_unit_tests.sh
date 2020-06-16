@@ -21,7 +21,19 @@ adb install -t -r -g -d $ANDROID_TARGET_OUT_TESTCASES/TranscodingUidPolicy_TestA
 
 echo "[==========] waiting for device and sync"
 adb wait-for-device remount && adb sync
-adb shell kill -9 `pid media.transcoding`
 
-#adb shell /data/nativetest64/mediatranscodingservice_tests/mediatranscodingservice_tests
-adb shell /data/nativetest/mediatranscodingservice_tests/mediatranscodingservice_tests
+echo "[==========] running simulated tests"
+adb shell setprop debug.transcoding.simulated_transcoder true
+adb shell kill -9 `pid media.transcoding`
+#adb shell /data/nativetest64/mediatranscodingservice_simulated_tests/mediatranscodingservice_simulated_tests
+adb shell /data/nativetest/mediatranscodingservice_simulated_tests/mediatranscodingservice_simulated_tests
+
+echo "[==========] running real tests"
+adb shell setprop debug.transcoding.simulated_transcoder false
+adb shell kill -9 `pid media.transcoding`
+#adb shell /data/nativetest64/mediatranscodingservice_real_tests/mediatranscodingservice_real_tests
+adb shell /data/nativetest/mediatranscodingservice_real_tests/mediatranscodingservice_real_tests
+
+echo "[==========] removing debug properties"
+adb shell setprop debug.transcoding.simulated_transcoder \"\"
+adb shell kill -9 `pid media.transcoding`

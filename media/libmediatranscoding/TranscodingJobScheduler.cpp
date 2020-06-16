@@ -76,7 +76,8 @@ void TranscodingJobScheduler::updateCurrentJob_l() {
         // the topJob now.
         if (!mResourceLost) {
             if (topJob->state == Job::NOT_STARTED) {
-                mTranscoder->start(topJob->key.first, topJob->key.second, topJob->request);
+                mTranscoder->start(topJob->key.first, topJob->key.second, topJob->request,
+                                   topJob->callback.lock());
             } else if (topJob->state == Job::PAUSED) {
                 mTranscoder->resume(topJob->key.first, topJob->key.second);
             }
@@ -349,7 +350,8 @@ void TranscodingJobScheduler::onFinish(ClientIdType clientId, JobIdType jobId) {
         {
             auto clientCallback = mJobMap[jobKey].callback.lock();
             if (clientCallback != nullptr) {
-                clientCallback->onTranscodingFinished(jobId, TranscodingResultParcel({jobId, -1 /*actualBitrateBps*/}));
+                clientCallback->onTranscodingFinished(
+                        jobId, TranscodingResultParcel({jobId, -1 /*actualBitrateBps*/}));
             }
         }
 
