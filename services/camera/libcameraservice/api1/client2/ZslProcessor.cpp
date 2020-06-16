@@ -172,7 +172,7 @@ ZslProcessor::ZslProcessor(
     mBufferQueueDepth = mFrameListDepth + 1;
 
     mZslQueue.insertAt(0, mBufferQueueDepth);
-    mFrameList.insertAt(0, mFrameListDepth);
+    mFrameList.resize(mFrameListDepth);
     sp<CaptureSequencer> captureSequencer = mSequencer.promote();
     if (captureSequencer != 0) captureSequencer->setZslProcessor(this);
 }
@@ -208,7 +208,7 @@ void ZslProcessor::onResultAvailable(const CaptureResult &result) {
     // Corresponding buffer has been cleared. No need to push into mFrameList
     if (timestamp <= mLatestClearedBufferTimestamp) return;
 
-    mFrameList.editItemAt(mFrameListHead) = result.mMetadata;
+    mFrameList[mFrameListHead] = result.mMetadata;
     mFrameListHead = (mFrameListHead + 1) % mFrameListDepth;
 }
 
@@ -671,7 +671,7 @@ status_t ZslProcessor::clearZslQueueLocked() {
 void ZslProcessor::clearZslResultQueueLocked() {
     mFrameList.clear();
     mFrameListHead = 0;
-    mFrameList.insertAt(0, mFrameListDepth);
+    mFrameList.resize(mFrameListDepth);
 }
 
 void ZslProcessor::dump(int fd, const Vector<String16>& /*args*/) const {
