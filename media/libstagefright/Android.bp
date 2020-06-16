@@ -159,6 +159,18 @@ cc_library_static {
             "signed-integer-overflow",
         ],
     },
+
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+        linux: {
+            cflags: [
+                "-DDISABLE_AUDIO_SYSTEM_OFFLOAD",
+            ],
+        }
+    },
 }
 
 cc_library {
