@@ -20,6 +20,8 @@
 
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
+#include <cutils/properties.h>
+#include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingJobScheduler.h>
 #include <media/TranscodingUidPolicy.h>
@@ -51,19 +53,14 @@ static bool isTrustedCallingUid(uid_t uid) {
     }
 }
 
-MediaTranscodingService::MediaTranscodingService()
-      : MediaTranscodingService(std::make_shared<SimulatedTranscoder>(),
-                                std::make_shared<TranscodingUidPolicy>()) {}
-
 MediaTranscodingService::MediaTranscodingService(
-        const std::shared_ptr<TranscoderInterface>& transcoder,
-        const std::shared_ptr<UidPolicyInterface>& uidPolicy)
-      : mJobScheduler(new TranscodingJobScheduler(transcoder, uidPolicy)),
+        const std::shared_ptr<TranscoderInterface>& transcoder)
+      : mUidPolicy(new TranscodingUidPolicy()),
+        mJobScheduler(new TranscodingJobScheduler(transcoder, mUidPolicy)),
         mClientManager(new TranscodingClientManager(mJobScheduler)) {
     ALOGV("MediaTranscodingService is created");
-
     transcoder->setCallback(mJobScheduler);
-    uidPolicy->setCallback(mJobScheduler);
+    mUidPolicy->setCallback(mJobScheduler);
 }
 
 MediaTranscodingService::~MediaTranscodingService() {
@@ -86,8 +83,15 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
 //static
 void MediaTranscodingService::instantiate() {
+    std::shared_ptr<TranscoderInterface> transcoder;
+    if (property_get_bool("debug.transcoding.simulated_transcoder", true)) {
+        transcoder = std::make_shared<SimulatedTranscoder>();
+    } else {
+        transcoder = std::make_shared<TranscoderWrapper>();
+    }
+
     std::shared_ptr<MediaTranscodingService> service =
-            ::ndk::SharedRefBase::make<MediaTranscodingService>();
+            ::ndk::SharedRefBase::make<MediaTranscodingService>(transcoder);
     binder_status_t status =
             AServiceManager_addService(service->asBinder().get(), getServiceName());
     if (status != STATUS_OK) {

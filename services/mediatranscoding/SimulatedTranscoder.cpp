@@ -47,8 +47,9 @@ void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackIn
     mCallback = cb;
 }
 
-void SimulatedTranscoder::start(ClientIdType clientId, JobIdType jobId,
-                                const TranscodingRequestParcel& request) {
+void SimulatedTranscoder::start(
+        ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
+        const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     if (request.testConfig.processingTotalTimeMs > 0) {
         mJobProcessingTimeMs = request.testConfig.processingTotalTimeMs;
     }

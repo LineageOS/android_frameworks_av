@@ -48,6 +48,8 @@ cc_library_shared {
         "TranscodingClientManager.cpp",
         "TranscodingJobScheduler.cpp",
         "TranscodingUidPolicy.cpp",
+        "TranscoderWrapper.cpp",
+        "NdkCommon.cpp",
     ],
 
     shared_libs: [
@@ -57,6 +59,7 @@ cc_library_shared {
         "libutils",
         "libmediatranscoder",
         "libbinder",
+        "libmediandk",
     ],
 
     export_include_dirs: ["include"],

@@ -17,12 +17,14 @@
 #ifndef ANDROID_MEDIA_TRANSCODER_INTERFACE_H
 #define ANDROID_MEDIA_TRANSCODER_INTERFACE_H
 
+#include <aidl/android/media/ITranscodingClientCallback.h>
 #include <aidl/android/media/TranscodingErrorCode.h>
 #include <aidl/android/media/TranscodingRequestParcel.h>
 #include <media/TranscodingDefs.h>
 
 namespace android {
 
+using ::aidl::android::media::ITranscodingClientCallback;
 using ::aidl::android::media::TranscodingErrorCode;
 using ::aidl::android::media::TranscodingRequestParcel;
 class TranscoderCallbackInterface;
@@ -34,7 +36,8 @@ public:
     // For now, always pass in clientId&jobId.
     virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) = 0;
     virtual void start(ClientIdType clientId, JobIdType jobId,
-                       const TranscodingRequestParcel& request) = 0;
+                       const TranscodingRequestParcel& request,
+                       const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
     virtual void pause(ClientIdType clientId, JobIdType jobId) = 0;
     virtual void resume(ClientIdType clientId, JobIdType jobId) = 0;
     virtual void stop(ClientIdType clientId, JobIdType jobId) = 0;

@@ -38,9 +38,7 @@ public:
     static constexpr int32_t kInvalidJobId = -1;
     static constexpr int32_t kInvalidClientId = -1;
 
-    MediaTranscodingService();
-    MediaTranscodingService(const std::shared_ptr<TranscoderInterface>& transcoder,
-                            const std::shared_ptr<UidPolicyInterface>& uidPolicy);
+    MediaTranscodingService(const std::shared_ptr<TranscoderInterface>& transcoder);
     virtual ~MediaTranscodingService();
 
     static void instantiate();
@@ -61,6 +59,7 @@ private:
 
     mutable std::mutex mServiceLock;
 
+    std::shared_ptr<UidPolicyInterface> mUidPolicy;
     std::shared_ptr<TranscodingJobScheduler> mJobScheduler;
     std::shared_ptr<TranscodingClientManager> mClientManager;
 };
