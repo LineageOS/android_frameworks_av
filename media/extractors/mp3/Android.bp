@@ -13,4 +13,11 @@ cc_library {
         "libstagefright_foundation",
     ],
 
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
