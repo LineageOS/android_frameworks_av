@@ -5770,15 +5770,6 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     DeviceVector filteredDevices = outputDesc->filterSupportedDevices(devices);
     DeviceVector prevDevices = outputDesc->devices();
 
-    // no need to proceed if new device is not AUDIO_DEVICE_NONE and not supported by current
-    // output profile or if new device is not supported AND previous device(s) is(are) still
-    // available (otherwise reset device must be done on the output)
-    if (!devices.isEmpty() && filteredDevices.isEmpty() &&
-            !mAvailableOutputDevices.filter(prevDevices).empty()) {
-        ALOGV("%s: unsupported device %s for output", __func__, devices.toString().c_str());
-        return 0;
-    }
-
     ALOGV("setOutputDevices() prevDevice %s", prevDevices.toString().c_str());
 
     if (!filteredDevices.isEmpty()) {
@@ -5791,6 +5782,17 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     } else {
         ALOGV("%s: suppressing checkDeviceMuteStrategies", __func__);
         muteWaitMs = 0;
+    }
+
+    // no need to proceed if new device is not AUDIO_DEVICE_NONE and not supported by current
+    // output profile or if new device is not supported AND previous device(s) is(are) still
+    // available (otherwise reset device must be done on the output)
+    if (!devices.isEmpty() && filteredDevices.isEmpty() &&
+            !mAvailableOutputDevices.filter(prevDevices).empty()) {
+        ALOGV("%s: unsupported device %s for output", __func__, devices.toString().c_str());
+        // restore previous device after evaluating strategy mute state
+        outputDesc->setDevices(prevDevices);
+        return muteWaitMs;
     }
 
     // Do not change the routing if:
