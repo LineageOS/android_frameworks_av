@@ -36,7 +36,7 @@
 #include <inttypes.h>
 #include <netinet/in.h>
 
-#ifndef __ANDROID_APEX__
+#ifdef ENABLE_CRYPTO
 #include "HlsSampleDecryptor.h"
 #endif
 
@@ -55,10 +55,10 @@ ElementaryStreamQueue::ElementaryStreamQueue(Mode mode, uint32_t flags)
     // Create the decryptor anyway since we don't know the use-case unless key is provided
     // Won't decrypt if key info not available (e.g., scanner/extractor just parsing ts files)
     mSampleDecryptor = isSampleEncrypted() ?
-#ifdef __ANDROID_APEX__
-        new SampleDecryptor
-#else
+#ifdef ENABLE_CRYPTO
         new HlsSampleDecryptor
+#else
+        new SampleDecryptor
 #endif
         : NULL;
 }
