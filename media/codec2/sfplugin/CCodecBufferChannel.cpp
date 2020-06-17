@@ -732,6 +732,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     std::shared_ptr<const C2StreamHdr10PlusInfo::output> hdr10PlusInfo =
         std::static_pointer_cast<const C2StreamHdr10PlusInfo::output>(
                 c2Buffer->getInfo(C2StreamHdr10PlusInfo::output::PARAM_TYPE));
+    if (hdr10PlusInfo && hdr10PlusInfo->flexCount() == 0) {
+        hdr10PlusInfo.reset();
+    }
 
     {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
@@ -783,7 +786,7 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                     .maxLuminance = hdrStaticInfo->mastering.maxLuminance,
                     .minLuminance = hdrStaticInfo->mastering.minLuminance,
                 };
-                hdr.validTypes = HdrMetadata::SMPTE2086;
+                hdr.validTypes |= HdrMetadata::SMPTE2086;
                 hdr.smpte2086 = smpte2086_meta;
             }
             // If the content light level fields are 0, do not use them, it
