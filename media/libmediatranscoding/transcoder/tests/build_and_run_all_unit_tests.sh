@@ -18,7 +18,9 @@ if [ "$SYNC_FINISHED" != true ]; then
 
   adb root && adb wait-for-device remount && adb sync
 fi
-adb push assets /data/local/tmp/TranscoderTestAssets
+
+# Push the files onto the device.
+. $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/push_assets.sh
 
 echo "========================================"
 
