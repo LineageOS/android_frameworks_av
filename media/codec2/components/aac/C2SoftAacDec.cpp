@@ -862,6 +862,51 @@ void C2SoftAacDec::process(
                     ALOGE("Getting output loudness failed");
                 }
             }
+
+            // update config with values used for decoding:
+            //    Album mode, target reference level, DRC effect type, DRC attenuation and boost
+            //    factor, DRC compression mode, encoder target level and max channel count
+            // with input values as they were not modified by decoder
+
+            C2StreamDrcAttenuationFactorTuning::input currentAttenuationFactor(0u,
+                    (C2FloatValue) (attenuationFactor/127.));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentAttenuationFactor));
+
+            C2StreamDrcBoostFactorTuning::input currentBoostFactor(0u,
+                    (C2FloatValue) (boostFactor/127.));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentBoostFactor));
+
+            C2StreamDrcCompressionModeTuning::input currentCompressMode(0u,
+                    (C2Config::drc_compression_mode_t) compressMode);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentCompressMode));
+
+            C2StreamDrcEncodedTargetLevelTuning::input currentEncodedTargetLevel(0u,
+                    (C2FloatValue) (encTargetLevel*-0.25));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentEncodedTargetLevel));
+
+            C2StreamDrcAlbumModeTuning::input currentAlbumMode(0u,
+                    (C2Config::drc_album_mode_t) albumMode);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentAlbumMode));
+
+            C2StreamDrcTargetReferenceLevelTuning::input currentTargetRefLevel(0u,
+                    (float) (targetRefLevel*-0.25));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentTargetRefLevel));
+
+            C2StreamDrcEffectTypeTuning::input currentEffectype(0u,
+                    (C2Config::drc_effect_type_t) effectType);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentEffectype));
+
+            C2StreamMaxChannelCountInfo::input currentMaxChannelCnt(0u, maxChannelCount);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentMaxChannelCnt));
+
         } while (decoderErr == AAC_DEC_OK);
     }
 
