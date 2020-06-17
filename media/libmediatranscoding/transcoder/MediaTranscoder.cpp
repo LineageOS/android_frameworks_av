@@ -95,9 +95,38 @@ void MediaTranscoder::sendCallback(media_status_t status) {
         // Transcoding is done and the callback to the client has been sent, so tear down the
         // pipeline but do it asynchronously to avoid deadlocks. If an error occurred, client
         // should clean up the file.
-        std::thread asyncCancelThread{
-                [self = shared_from_this()] { self->cancel(); }};
+        std::thread asyncCancelThread{[self = shared_from_this()] { self->cancel(); }};
         asyncCancelThread.detach();
+    }
+}
+
+void MediaTranscoder::onTrackFormatAvailable(const MediaTrackTranscoder* transcoder) {
+    LOG(INFO) << "TrackTranscoder " << transcoder << " format available.";
+
+    std::scoped_lock lock{mTracksAddedMutex};
+
+    // Ignore duplicate format change.
+    if (mTracksAdded.count(transcoder) > 0) {
+        return;
+    }
+
+    // Add track to the writer.
+    const bool ok =
+            mSampleWriter->addTrack(transcoder->getOutputQueue(), transcoder->getOutputFormat());
+    if (!ok) {
+        LOG(ERROR) << "Unable to add track to sample writer.";
+        sendCallback(AMEDIA_ERROR_UNKNOWN);
+        return;
+    }
+
+    mTracksAdded.insert(transcoder);
+    if (mTracksAdded.size() == mTrackTranscoders.size()) {
+        LOG(INFO) << "Starting sample writer.";
+        bool started = mSampleWriter->start();
+        if (!started) {
+            LOG(ERROR) << "Unable to start sample writer.";
+            sendCallback(AMEDIA_ERROR_UNKNOWN);
+        }
     }
 }
 
@@ -116,7 +145,7 @@ void MediaTranscoder::onSampleWriterFinished(media_status_t status) {
 }
 
 MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks)
-     : mCallbacks(callbacks) {}
+      : mCallbacks(callbacks) {}
 
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         const std::shared_ptr<CallbackInterface>& callbacks,
@@ -268,25 +297,9 @@ media_status_t MediaTranscoder::start() {
         return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
-    // Add tracks to the writer.
-    for (auto& transcoder : mTrackTranscoders) {
-        const bool ok = mSampleWriter->addTrack(transcoder->getOutputQueue(),
-                                                transcoder->getOutputFormat());
-        if (!ok) {
-            LOG(ERROR) << "Unable to add track to sample writer.";
-            return AMEDIA_ERROR_UNKNOWN;
-        }
-    }
-
-    bool started = mSampleWriter->start();
-    if (!started) {
-        LOG(ERROR) << "Unable to start sample writer.";
-        return AMEDIA_ERROR_UNKNOWN;
-    }
-
     // Start transcoders
     for (auto& transcoder : mTrackTranscoders) {
-        started = transcoder->start();
+        bool started = transcoder->start();
         if (!started) {
             LOG(ERROR) << "Unable to start track transcoder.";
             cancel();

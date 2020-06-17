@@ -96,6 +96,9 @@ media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
     MediaSampleInfo info;
     std::shared_ptr<MediaSample> sample;
 
+    // Notify the track format as soon as we start. It's same as the source format.
+    notifyTrackFormatAvailable();
+
     MediaSample::OnSampleReleasedCallback bufferReleaseCallback =
             [bufferPool = mBufferPool](MediaSample* sample) {
                 bufferPool->returnBuffer(const_cast<uint8_t*>(sample->buffer));
