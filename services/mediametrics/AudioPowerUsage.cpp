@@ -34,7 +34,7 @@
 #define PROP_AUDIO_METRICS_DISABLED "persist.media.audio_metrics.power_usage_disabled"
 #define AUDIO_METRICS_DISABLED_DEFAULT (false)
 
-// property to set how long to send audio power use metrics data to westworld, default is 24hrs
+// property to set how long to send audio power use metrics data to statsd, default is 24hrs
 #define PROP_AUDIO_METRICS_INTERVAL_HR "persist.media.audio_metrics.interval_hr"
 #define INTERVAL_HR_DEFAULT (24)
 
