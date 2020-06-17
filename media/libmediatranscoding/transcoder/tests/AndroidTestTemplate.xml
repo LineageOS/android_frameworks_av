@@ -19,7 +19,7 @@
         <option name="cleanup" value="false" />
         <option name="push-file"
             key="assets"
-            value="/data/local/tmp/TranscoderTestAssets" />
+            value="/data/local/tmp/TranscodingTestAssets" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >

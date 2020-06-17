@@ -67,7 +67,7 @@ private:
 };
 
 static const char* SOURCE_PATH =
-        "/data/local/tmp/TranscoderTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
+        "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
 // Write-only, create file if non-existent, don't overwrite existing file.
 static constexpr int kOpenFlags = O_WRONLY | O_CREAT | O_EXCL;
 // User R+W permission.

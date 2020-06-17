@@ -27,7 +27,7 @@
  * Uses the same test assets as the MediaTranscoder unit tests. Before running the test,
  * please make sure to push the test assets to /sdcard:
  *
- * adb push $TOP/frameworks/av/media/libmediatranscoding/transcoder/tests/assets /data/local/tmp/TranscoderTestAssets
+ * adb push $TOP/frameworks/av/media/libmediatranscoding/transcoder/tests/assets /data/local/tmp/TranscodingTestAssets
  */
 namespace android {
 
@@ -37,7 +37,7 @@ constexpr int64_t kPaddingUs = 200000;
 constexpr int64_t kJobWithPaddingUs = 10000000 + kPaddingUs;
 
 constexpr const char* kSrcPath =
-        "/data/local/tmp/TranscoderTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
+        "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
 
 class MediaTranscodingServiceRealTest : public MediaTranscodingServiceTestBase {
 public:
