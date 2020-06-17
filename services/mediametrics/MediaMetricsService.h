@@ -65,7 +65,7 @@ public:
     static nsecs_t roundTime(nsecs_t timeNs);
 
     /**
-     * Returns true if we should use uid for package name when uploading to WestWorld.
+     * Returns true if we should use uid for package name when uploading to statsd.
      */
     static bool useUidForPackage(const std::string& package, const std::string& installer);
 
