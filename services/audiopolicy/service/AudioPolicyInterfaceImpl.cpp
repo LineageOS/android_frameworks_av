@@ -593,7 +593,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // including successes gets very verbose
-    // but once we cut over to westworld, log them all.
+    // but once we cut over to statsd, log them all.
     if (status != NO_ERROR) {
 
         static constexpr char kAudioPolicy[] = "audiopolicy";

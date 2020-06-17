@@ -185,7 +185,7 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
     }
 
     if (!isTrusted || item->getTimestamp() == 0) {
-        // Westworld logs two times for events: ElapsedRealTimeNs (BOOTTIME) and
+        // Statsd logs two times for events: ElapsedRealTimeNs (BOOTTIME) and
         // WallClockTimeNs (REALTIME), but currently logs REALTIME to cloud.
         //
         // For consistency and correlation with other logging mechanisms
