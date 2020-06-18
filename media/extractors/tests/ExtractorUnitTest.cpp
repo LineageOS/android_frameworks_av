@@ -63,6 +63,7 @@ enum inputID {
     VORBIS_1,
     // video streams
     HEVC_1,
+    HEVC_2,
     MPEG2_PS_1,
     MPEG2_TS_1,
     MPEG4_1,
@@ -101,6 +102,7 @@ static const struct InputData {
         // Test (b/151677264) for MP4 extractor
         {HEVC_1, MEDIA_MIMETYPE_VIDEO_HEVC, "crowd_508x240_25fps_hevc.mp4", 508, 240,
          HEVCProfileMain, 25},
+        {HEVC_2, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC, "test3.heic", 820, 460, kUndefined, kUndefined},
         {MPEG2_PS_1, MEDIA_MIMETYPE_VIDEO_MPEG2, "swirl_144x136_mpeg2.mpg", 144, 136,
          MPEG2ProfileMain, 12},
         {MPEG2_TS_1, MEDIA_MIMETYPE_VIDEO_MPEG2, "bbb_cif_768kbps_30fps_mpeg2.ts", 352, 288,
@@ -608,6 +610,19 @@ TEST_P(ExtractorFunctionalityTest, SeekTest) {
             AMediaFormat_delete(trackMeta);
             continue;
         }
+
+        AMediaFormat *trackFormat = AMediaFormat_new();
+        ASSERT_NE(trackFormat, nullptr) << "AMediaFormat_new returned null format";
+        status = track->getFormat(trackFormat);
+        ASSERT_EQ(OK, (media_status_t)status) << "Failed to get track meta data";
+
+        const char *mime;
+        ASSERT_TRUE(AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &mime))
+                << "Failed to get mime";
+
+        // Image formats are not expected to be seekable
+        if (!strncmp(mime, "image/", 6)) continue;
+
         // Request seekable points for remaining extractors which will be used to validate the seek
         // accuracy for the extractors. Depending on SEEK Mode, we expect the extractors to return
         // the expected sync frame. We don't prefer random seek test for these extractors because
@@ -617,15 +632,8 @@ TEST_P(ExtractorFunctionalityTest, SeekTest) {
         ASSERT_GT(seekablePoints.size(), 0)
                 << "Failed to get seekable points for " << mContainer << " extractor";
 
-        AMediaFormat *trackFormat = AMediaFormat_new();
-        ASSERT_NE(trackFormat, nullptr) << "AMediaFormat_new returned null format";
-        status = track->getFormat(trackFormat);
-        ASSERT_EQ(OK, (media_status_t)status) << "Failed to get track meta data";
-
         bool isOpus = false;
         int64_t opusSeekPreRollUs = 0;
-        const char *mime;
-        AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &mime);
         if (!strcmp(mime, "audio/opus")) {
             isOpus = true;
             void *seekPreRollBuf = nullptr;
@@ -762,9 +770,14 @@ TEST_P(ExtractorFunctionalityTest, MonkeySeekTest) {
                 trackMeta, idx, MediaExtractorPluginHelper::kIncludeExtensiveMetaData);
         ASSERT_EQ(OK, (media_status_t)status) << "Failed to get trackMetaData";
 
+        const char *mime;
+        ASSERT_TRUE(AMediaFormat_getString(trackMeta, AMEDIAFORMAT_KEY_MIME, &mime))
+                << "Failed to get mime";
+
         int64_t clipDuration = 0;
         AMediaFormat_getInt64(trackMeta, AMEDIAFORMAT_KEY_DURATION, &clipDuration);
-        ASSERT_GT(clipDuration, 0) << "Invalid clip duration ";
+        // Image formats are not expected to have duration information
+        ASSERT_TRUE(clipDuration > 0 || !strncmp(mime, "image/", 6)) << "Invalid clip duration ";
         AMediaFormat_delete(trackMeta);
 
         int64_t seekToTimeStampUs[] = {-clipDuration, clipDuration / 2, clipDuration,
@@ -1095,6 +1108,7 @@ INSTANTIATE_TEST_SUITE_P(ConfigParamTestAll, ConfigParamTest,
                                            make_pair("ogg", VORBIS_1),
 
                                            make_pair("mpeg4", HEVC_1),
+                                           make_pair("mpeg4", HEVC_2),
                                            make_pair("mpeg2ps", MPEG2_PS_1),
                                            make_pair("mpeg2ts", MPEG2_TS_1),
                                            make_pair("mkv", MPEG4_1),
@@ -1140,6 +1154,7 @@ INSTANTIATE_TEST_SUITE_P(
                 make_tuple("mpeg2ps", "swirl_144x136_mpeg2.mpg", 1, false),
                 make_tuple("mpeg2ps", "programstream.mpeg", 2, false),
                 make_tuple("mpeg4", "color_176x144_bt601_525_lr_sdr_h264.mp4", 1, true),
+                make_tuple("mpeg4", "heifwriter_input.heic", 4, false),
                 make_tuple("mpeg4", "psshtest.mp4", 1, true),
                 make_tuple("mpeg4", "swirl_132x130_mpeg4.mp4", 1, true),
                 make_tuple("mpeg4", "testvideo.3gp", 4, true),
