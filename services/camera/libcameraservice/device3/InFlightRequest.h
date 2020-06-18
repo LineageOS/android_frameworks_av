@@ -32,7 +32,18 @@ namespace android {
 
 namespace camera3 {
 
+typedef enum {
+    // Cache the buffers with STATUS_ERROR within InFlightRequest
+    ERROR_BUF_CACHE,
+    // Return the buffers with STATUS_ERROR to the buffer queue
+    ERROR_BUF_RETURN,
+    // Return the buffers with STATUS_ERROR to the buffer queue, and call
+    // notify(ERROR_BUFFER) as well
+    ERROR_BUF_RETURN_NOTIFY
+} ERROR_BUF_STRATEGY;
+
 struct InFlightRequest {
+
     // Set by notify() SHUTTER call.
     nsecs_t shutterTimestamp;
     // Set by process_capture_result().
@@ -43,6 +54,9 @@ struct InFlightRequest {
     // Decremented by calls to process_capture_result with valid output
     // and input buffers
     int     numBuffersLeft;
+
+    // The inflight request is considered complete if all buffers are returned
+
     CaptureResultExtras resultExtras;
     // If this request has any input buffer
     bool hasInputBuffer;
@@ -79,6 +93,10 @@ struct InFlightRequest {
     // REQUEST/RESULT error.
     bool skipResultMetadata;
 
+    // Whether the buffers with STATUS_ERROR should be cached as pending buffers,
+    // returned to the buffer queue, or returned to the buffer queue and notify with ERROR_BUFFER.
+    ERROR_BUF_STRATEGY errorBufStrategy;
+
     // The physical camera ids being requested.
     std::set<String8> physicalCameraIds;
 
@@ -114,6 +132,7 @@ struct InFlightRequest {
             hasCallback(true),
             maxExpectedDuration(kDefaultExpectedDuration),
             skipResultMetadata(false),
+            errorBufStrategy(ERROR_BUF_CACHE),
             stillCapture(false),
             zslCapture(false),
             rotateAndCropAuto(false) {
@@ -134,6 +153,7 @@ struct InFlightRequest {
             hasCallback(hasAppCallback),
             maxExpectedDuration(maxDuration),
             skipResultMetadata(false),
+            errorBufStrategy(ERROR_BUF_CACHE),
             physicalCameraIds(physicalCameraIdSet),
             stillCapture(isStillCapture),
             zslCapture(isZslCapture),
