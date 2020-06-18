@@ -2879,6 +2879,21 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             break;
         }
 
+        case FOURCC("pasp"):
+        {
+            *offset += chunk_size;
+            // this must be in a VisualSampleEntry box under the Sample Description Box ('stsd')
+            // ignore otherwise
+            if (depth >= 2 && mPath[depth - 2] == FOURCC("stsd")) {
+                status_t err = parsePaspBox(data_offset, chunk_data_size);
+                if (err != OK) {
+                    return err;
+                }
+            }
+
+            break;
+        }
+
         case FOURCC("titl"):
         case FOURCC("perf"):
         case FOURCC("auth"):
@@ -4046,6 +4061,26 @@ status_t MPEG4Extractor::parseColorInfo(off64_t offset, size_t size) {
 
     delete[] buffer;
     buffer = NULL;
+
+    return OK;
+}
+
+status_t MPEG4Extractor::parsePaspBox(off64_t offset, size_t size) {
+    if (size < 8 || size == SIZE_MAX || mLastTrack == NULL) {
+        return ERROR_MALFORMED;
+    }
+
+    uint32_t data[2]; // hSpacing, vSpacing
+    if (mDataSource->readAt(offset, data, 8) < 8) {
+        return ERROR_IO;
+    }
+    uint32_t hSpacing = ntohl(data[0]);
+    uint32_t vSpacing = ntohl(data[1]);
+
+    if (hSpacing != 0 && vSpacing != 0) {
+        AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAR_WIDTH, hSpacing);
+        AMediaFormat_setInt32(mLastTrack->meta, AMEDIAFORMAT_KEY_SAR_HEIGHT, vSpacing);
+    }
 
     return OK;
 }
