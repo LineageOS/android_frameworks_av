@@ -131,7 +131,7 @@ class TestMediaSource {
 public:
     void init() {
         static const char* sourcePath =
-                "/data/local/tmp/TranscoderTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
+                "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
 
         mExtractor = AMediaExtractor_new();
         ASSERT_NE(mExtractor, nullptr);

@@ -144,8 +144,10 @@ cc_library_static {
 
     header_libs: [
         "libaudioclient_headers",
-        "libmedia_headers",
+        "libbase_headers",
+        "libmedia_datasource_headers",
         "media_ndk_headers",
+        "media_plugin_headers",
     ],
 
     cflags: [
@@ -161,6 +163,18 @@ cc_library_static {
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
+    },
+
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+        linux: {
+            cflags: [
+                "-DDISABLE_AUDIO_SYSTEM_OFFLOAD",
+            ],
+        }
     },
 }
 

@@ -6061,10 +6061,6 @@ bool AudioFlinger::DirectOutputThread::shouldStandby_l()
     bool trackPaused = false;
     bool trackStopped = false;
 
-    if ((mType == DIRECT) && audio_is_linear_pcm(mFormat) && !usesHwAvSync()) {
-        return !mStandby;
-    }
-
     // do not put the HAL in standby when paused. AwesomePlayer clear the offloaded AudioTrack
     // after a timeout and we will enter standby then.
     if (mTracks.size() > 0) {
@@ -8435,13 +8431,14 @@ void AudioFlinger::RecordThread::readInputParameters_l()
     }
     result = mInput->stream->getFrameSize(&mFrameSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving frame size from HAL: %d", result);
+    LOG_ALWAYS_FATAL_IF(mFrameSize <= 0, "Error frame size was %zu but must be greater than zero",
+            mFrameSize);
     result = mInput->stream->getBufferSize(&mBufferSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving buffer size from HAL: %d", result);
     mFrameCount = mBufferSize / mFrameSize;
-    ALOGV("%p RecordThread params: mChannelCount=%u, mFormat=%#x, mFrameSize=%lld, "
-            "mBufferSize=%lld, mFrameCount=%lld",
-            this, mChannelCount, mFormat, (long long)mFrameSize, (long long)mBufferSize,
-            (long long)mFrameCount);
+    ALOGV("%p RecordThread params: mChannelCount=%u, mFormat=%#x, mFrameSize=%zu, "
+            "mBufferSize=%zu, mFrameCount=%zu",
+            this, mChannelCount, mFormat, mFrameSize, mBufferSize, mFrameCount);
     // This is the formula for calculating the temporary buffer size.
     // With 7 HAL buffers, we can guarantee ability to down-sample the input by ratio of 6:1 to
     // 1 full output buffer, regardless of the alignment of the available input.
@@ -9017,6 +9014,8 @@ void AudioFlinger::MmapThread::readHalParameters_l()
     LOG_ALWAYS_FATAL_IF(!audio_is_linear_pcm(mFormat), "HAL format %#x is not linear pcm", mFormat);
     result = mHalStream->getFrameSize(&mFrameSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving frame size from HAL: %d", result);
+    LOG_ALWAYS_FATAL_IF(mFrameSize <= 0, "Error frame size was %zu but must be greater than zero",
+            mFrameSize);
     result = mHalStream->getBufferSize(&mBufferSize);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error retrieving buffer size from HAL: %d", result);
     mFrameCount = mBufferSize / mFrameSize;
