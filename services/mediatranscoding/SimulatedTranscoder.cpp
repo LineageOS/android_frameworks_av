@@ -50,8 +50,8 @@ void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackIn
 void SimulatedTranscoder::start(
         ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
-    if (request.testConfig.processingTotalTimeMs > 0) {
-        mJobProcessingTimeMs = request.testConfig.processingTotalTimeMs;
+    if (request.testConfig.has_value() && request.testConfig->processingTotalTimeMs > 0) {
+        mJobProcessingTimeMs = request.testConfig->processingTotalTimeMs;
     }
     ALOGV("%s: job {%d}: processingTime: %lld", __FUNCTION__, jobId,
           (long long)mJobProcessingTimeMs);
