@@ -89,8 +89,15 @@ public:
         addParameter(
                 DefineParam(mChannelCount, C2_PARAMKEY_CHANNEL_COUNT)
                 .withDefault(new C2StreamChannelCountInfo::output(0u, 1))
-                .withFields({C2F(mChannelCount, value).inRange(1, 8)})
+                .withFields({C2F(mChannelCount, value).inRange(1, MAX_CHANNEL_COUNT)})
                 .withSetter(Setter<decltype(*mChannelCount)>::StrictValueWithNoDeps)
+                .build());
+
+        addParameter(
+                DefineParam(mMaxChannelCount, C2_PARAMKEY_MAX_CHANNEL_COUNT)
+                .withDefault(new C2StreamMaxChannelCountInfo::input(0u, MAX_CHANNEL_COUNT))
+                .withFields({C2F(mMaxChannelCount, value).inRange(1, MAX_CHANNEL_COUNT)})
+                .withSetter(Setter<decltype(*mMaxChannelCount)>::StrictValueWithNoDeps)
                 .build());
 
         addParameter(
@@ -225,6 +232,7 @@ public:
     int32_t getDrcAttenuationFactor() const { return mDrcAttenuationFactor->value * 127. + 0.5; }
     int32_t getDrcEffectType() const { return mDrcEffectType->value; }
     int32_t getDrcAlbumMode() const { return mDrcAlbumMode->value; }
+    u_int32_t getMaxChannelCount() const { return mMaxChannelCount->value; }
     int32_t getDrcOutputLoudness() const { return (mDrcOutputLoudness->value <= 0 ? -mDrcOutputLoudness->value * 4. + 0.5 : -1); }
 
 private:
@@ -241,6 +249,7 @@ private:
     std::shared_ptr<C2StreamDrcAttenuationFactorTuning::input> mDrcAttenuationFactor;
     std::shared_ptr<C2StreamDrcEffectTypeTuning::input> mDrcEffectType;
     std::shared_ptr<C2StreamDrcAlbumModeTuning::input> mDrcAlbumMode;
+    std::shared_ptr<C2StreamMaxChannelCountInfo::input> mMaxChannelCount;
     std::shared_ptr<C2StreamDrcOutputLoudnessTuning::output> mDrcOutputLoudness;
     // TODO Add : C2StreamAacSbrModeTuning
 };
@@ -366,9 +375,10 @@ status_t C2SoftAacDec::initDecoder() {
     ALOGV("AAC decoder using MPEG-D DRC album mode %d", albumMode);
     aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_ALBUM_MODE, albumMode);
 
-    // By default, the decoder creates a 5.1 channel downmix signal.
-    // For seven and eight channel input streams, enable 6.1 and 7.1 channel output
-    aacDecoder_SetParam(mAACDecoder, AAC_PCM_MAX_OUTPUT_CHANNELS, -1);
+    // AAC_PCM_MAX_OUTPUT_CHANNELS
+    u_int32_t maxChannelCount = mIntf->getMaxChannelCount();
+    ALOGV("AAC decoder using maximum output channel count %d", maxChannelCount);
+    aacDecoder_SetParam(mAACDecoder, AAC_PCM_MAX_OUTPUT_CHANNELS, maxChannelCount);
 
     return status;
 }
@@ -707,6 +717,11 @@ void C2SoftAacDec::process(
         ALOGV("AAC decoder using MPEG-D DRC album mode %d", albumMode);
         aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_ALBUM_MODE, albumMode);
 
+        // AAC_PCM_MAX_OUTPUT_CHANNELS
+        int32_t maxChannelCount = mIntf->getMaxChannelCount();
+        ALOGV("AAC decoder using maximum output channel count %d", maxChannelCount);
+        aacDecoder_SetParam(mAACDecoder, AAC_PCM_MAX_OUTPUT_CHANNELS, maxChannelCount);
+
         mDrcWrap.update();
 
         UINT inBufferUsedLength = inBufferLength[0] - bytesValid[0];
@@ -847,6 +862,51 @@ void C2SoftAacDec::process(
                     ALOGE("Getting output loudness failed");
                 }
             }
+
+            // update config with values used for decoding:
+            //    Album mode, target reference level, DRC effect type, DRC attenuation and boost
+            //    factor, DRC compression mode, encoder target level and max channel count
+            // with input values as they were not modified by decoder
+
+            C2StreamDrcAttenuationFactorTuning::input currentAttenuationFactor(0u,
+                    (C2FloatValue) (attenuationFactor/127.));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentAttenuationFactor));
+
+            C2StreamDrcBoostFactorTuning::input currentBoostFactor(0u,
+                    (C2FloatValue) (boostFactor/127.));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentBoostFactor));
+
+            C2StreamDrcCompressionModeTuning::input currentCompressMode(0u,
+                    (C2Config::drc_compression_mode_t) compressMode);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentCompressMode));
+
+            C2StreamDrcEncodedTargetLevelTuning::input currentEncodedTargetLevel(0u,
+                    (C2FloatValue) (encTargetLevel*-0.25));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentEncodedTargetLevel));
+
+            C2StreamDrcAlbumModeTuning::input currentAlbumMode(0u,
+                    (C2Config::drc_album_mode_t) albumMode);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentAlbumMode));
+
+            C2StreamDrcTargetReferenceLevelTuning::input currentTargetRefLevel(0u,
+                    (float) (targetRefLevel*-0.25));
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentTargetRefLevel));
+
+            C2StreamDrcEffectTypeTuning::input currentEffectype(0u,
+                    (C2Config::drc_effect_type_t) effectType);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentEffectype));
+
+            C2StreamMaxChannelCountInfo::input currentMaxChannelCnt(0u, maxChannelCount);
+            work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(currentMaxChannelCnt));
+
         } while (decoderErr == AAC_DEC_OK);
     }
 
