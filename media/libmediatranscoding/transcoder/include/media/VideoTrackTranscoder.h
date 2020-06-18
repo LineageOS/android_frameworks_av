@@ -73,6 +73,9 @@ private:
     // Dequeues an encoded buffer from the encoder and adds it to the output queue.
     void dequeueOutputSample(int32_t bufferIndex, AMediaCodecBufferInfo bufferInfo);
 
+    // Updates the video track's actual format based on encoder output format.
+    void updateTrackFormat(AMediaFormat* outputFormat);
+
     AMediaCodec* mDecoder = nullptr;
     // Sample release callback holds a reference to the encoder, hence the shared_ptr.
     std::shared_ptr<AMediaCodec> mEncoder;
@@ -84,6 +87,7 @@ private:
     MediaSampleInfo mSampleInfo;
     BlockingQueue<std::function<void()>> mCodecMessageQueue;
     std::shared_ptr<AMediaFormat> mDestinationFormat;
+    std::shared_ptr<AMediaFormat> mActualOutputFormat;
 };
 
 }  // namespace android
