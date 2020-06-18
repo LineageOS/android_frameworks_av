@@ -76,6 +76,34 @@ struct CaptureResultExtras : public android::Parcelable {
      */
     String16  errorPhysicalCameraId;
 
+    // The last completed frame numbers shouldn't be checked in onResultReceived() and notifyError()
+    // because the output buffers could be arriving after onResultReceived() and
+    // notifyError(). Given this constraint, we check it for each
+    // onCaptureStarted, and if there is no further onCaptureStarted(),
+    // check for onDeviceIdle() to clear out all pending frame numbers.
+
+    /**
+     * The latest regular request frameNumber for which all buffers and capture result have been
+     * returned or notified as an BUFFER_ERROR/RESULT_ERROR/REQUEST_ERROR. -1 if
+     * none has completed.
+     */
+    int64_t lastCompletedRegularFrameNumber;
+
+    /**
+     * The latest reprocess request frameNumber for which all buffers and capture result have been
+     * returned or notified as an BUFFER_ERROR/RESULT_ERROR/REQUEST_ERROR. -1 if
+     * none has completed.
+     */
+    int64_t lastCompletedReprocessFrameNumber;
+
+    /**
+     * The latest Zsl request frameNumber for which all buffers and capture result have been
+     * returned or notified as an BUFFER_ERROR/RESULT_ERROR/REQUEST_ERROR. -1 if
+     * none has completed.
+     */
+    int64_t lastCompletedZslFrameNumber;
+
+
     /**
      * Constructor initializes object as invalid by setting requestId to be -1.
      */
@@ -87,7 +115,10 @@ struct CaptureResultExtras : public android::Parcelable {
           frameNumber(0),
           partialResultCount(0),
           errorStreamId(-1),
-          errorPhysicalCameraId() {
+          errorPhysicalCameraId(),
+          lastCompletedRegularFrameNumber(-1),
+          lastCompletedReprocessFrameNumber(-1),
+          lastCompletedZslFrameNumber(-1) {
     }
 
     /**

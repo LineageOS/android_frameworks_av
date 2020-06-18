@@ -44,7 +44,9 @@ namespace camera3 {
     /**
      * Helper methods shared between Camera3Device/Camera3OfflineSession for HAL callbacks
      */
-    // helper function to return the output buffers to output streams.
+
+    // helper function to return the output buffers to output streams. The
+    // function also optionally calls notify(ERROR_BUFFER).
     void returnOutputBuffers(
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
@@ -53,13 +55,25 @@ namespace camera3 {
             // The following arguments are only meant for surface sharing use case
             const SurfaceMap& outputSurfaces = SurfaceMap{},
             // Used to send buffer error callback when failing to return buffer
-            const CaptureResultExtras &resultExtras = CaptureResultExtras{});
+            const CaptureResultExtras &resultExtras = CaptureResultExtras{},
+            ERROR_BUF_STRATEGY errorBufStrategy = ERROR_BUF_RETURN);
+
+    // helper function to return the output buffers to output streams, and
+    // remove the returned buffers from the inflight request's pending buffers
+    // vector.
+    void returnAndRemovePendingOutputBuffers(
+            bool useHalBufManager,
+            sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
+            InFlightRequest& request);
 
     // Camera3Device/Camera3OfflineSession internal states used in notify/processCaptureResult
     // callbacks
     struct CaptureOutputStates {
         const String8& cameraId;
         std::mutex& inflightLock;
+        int64_t& lastCompletedRegularFrameNumber;
+        int64_t& lastCompletedZslFrameNumber;
+        int64_t& lastCompletedReprocessFrameNumber;
         InFlightRequestMap& inflightMap; // end of inflightLock scope
         std::mutex& outputLock;
         std::list<CaptureResult>& resultQueue;
