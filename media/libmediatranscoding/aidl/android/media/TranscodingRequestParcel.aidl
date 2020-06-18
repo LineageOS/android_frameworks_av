@@ -74,7 +74,7 @@ parcelable TranscodingRequestParcel {
     boolean isForTesting = false;
 
     /**
-     * Test configuration. This is only valid when isForTesting is set to true.
+     * Test configuration. This will be available only when isForTesting is set to true.
      */
-    TranscodingTestConfig testConfig;
+     @nullable TranscodingTestConfig testConfig;
 }
