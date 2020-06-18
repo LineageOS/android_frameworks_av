@@ -620,7 +620,8 @@ void HeicCompositeStream::compilePendingInputLocked() {
         if (mPendingInputFrames.find(mAppSegmentFrameNumbers.front()) == mPendingInputFrames.end()) {
             ALOGE("%s: mPendingInputFrames doesn't contain frameNumber %" PRId64, __FUNCTION__,
                     mAppSegmentFrameNumbers.front());
-            mInputYuvBuffers.erase(it);
+            mInputAppSegmentBuffers.erase(it);
+            mAppSegmentFrameNumbers.pop();
             continue;
         }
 
@@ -664,6 +665,7 @@ void HeicCompositeStream::compilePendingInputLocked() {
             ALOGE("%s: mPendingInputFrames doesn't contain frameNumber %" PRId64, __FUNCTION__,
                     mMainImageFrameNumbers.front());
             mInputYuvBuffers.erase(it);
+            mMainImageFrameNumbers.pop();
             continue;
         }
 
