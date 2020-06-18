@@ -49,6 +49,9 @@ status_t CaptureResultExtras::readFromParcel(const android::Parcel *parcel) {
         }
         errorPhysicalCameraId = cameraId;
     }
+    parcel->readInt64(&lastCompletedRegularFrameNumber);
+    parcel->readInt64(&lastCompletedReprocessFrameNumber);
+    parcel->readInt64(&lastCompletedZslFrameNumber);
 
     return OK;
 }
@@ -76,6 +79,9 @@ status_t CaptureResultExtras::writeToParcel(android::Parcel *parcel) const {
     } else {
         parcel->writeBool(false);
     }
+    parcel->writeInt64(lastCompletedRegularFrameNumber);
+    parcel->writeInt64(lastCompletedReprocessFrameNumber);
+    parcel->writeInt64(lastCompletedZslFrameNumber);
 
     return OK;
 }
