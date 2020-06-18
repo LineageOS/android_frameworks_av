@@ -405,8 +405,8 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
     // In the case of a successful request:
     //      all input and output buffers, all result metadata, shutter callback
     //      arrived.
-    // In the case of a unsuccessful request:
-    //      all input and output buffers arrived.
+    // In the case of an unsuccessful request:
+    //      all input and output buffers, as well as request/result error notifications, arrived.
     if (request.numBuffersLeft == 0 &&
             (request.skipResultMetadata ||
             (request.haveResultMetadata && shutterTimestamp != 0))) {
@@ -434,7 +434,17 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
             states.useHalBufManager, states.listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(), 0, /*timestampIncreasing*/true,
-            request.outputSurfaces, request.resultExtras);
+            request.outputSurfaces, request.resultExtras,
+            request.errorBufStrategy);
+
+        // Note down the just completed frame number
+        if (request.hasInputBuffer) {
+            states.lastCompletedReprocessFrameNumber = frameNumber;
+        } else if (request.zslCapture) {
+            states.lastCompletedZslFrameNumber = frameNumber;
+        } else {
+            states.lastCompletedRegularFrameNumber = frameNumber;
+        }
 
         removeInFlightMapEntryLocked(states, idx);
         ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
@@ -487,10 +497,13 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
         InFlightRequest &request = states.inflightMap.editValueAt(idx);
         ALOGVV("%s: got InFlightRequest requestId = %" PRId32
                 ", frameNumber = %" PRId64 ", burstId = %" PRId32
-                ", partialResultCount = %d, hasCallback = %d",
+                ", partialResultCount = %d/%d, hasCallback = %d, num_output_buffers %d"
+                ", usePartialResult = %d",
                 __FUNCTION__, request.resultExtras.requestId,
                 request.resultExtras.frameNumber, request.resultExtras.burstId,
-                result->partial_result, request.hasCallback);
+                result->partial_result, states.numPartialResults,
+                request.hasCallback, result->num_output_buffers,
+                states.usePartialResult);
         // Always update the partial count to the latest one if it's not 0
         // (buffers only). When framework aggregates adjacent partial results
         // into one, the latest partial count will be used.
@@ -555,6 +568,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
                     request.collectedPartialResult);
             }
             request.haveResultMetadata = true;
+            request.errorBufStrategy = ERROR_BUF_RETURN_NOTIFY;
         }
 
         uint32_t numBuffersReturned = result->num_output_buffers;
@@ -581,18 +595,14 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
             request.sensorTimestamp = entry.data.i64[0];
         }
 
-        // If shutter event isn't received yet, append the output buffers to
-        // the in-flight request. Otherwise, return the output buffers to
-        // streams.
-        if (shutterTimestamp == 0) {
-            request.pendingOutputBuffers.appendArray(result->output_buffers,
+        // If shutter event isn't received yet, do not return the pending output
+        // buffers.
+        request.pendingOutputBuffers.appendArray(result->output_buffers,
                 result->num_output_buffers);
-        } else {
-            bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
-            returnOutputBuffers(states.useHalBufManager, states.listener,
-                result->output_buffers, result->num_output_buffers,
-                shutterTimestamp, timestampIncreasing,
-                request.outputSurfaces, request.resultExtras);
+        if (shutterTimestamp != 0) {
+            returnAndRemovePendingOutputBuffers(
+                states.useHalBufManager, states.listener,
+                request);
         }
 
         if (result->result != NULL && !isPartialResult) {
@@ -791,10 +801,26 @@ void returnOutputBuffers(
         const camera3_stream_buffer_t *outputBuffers, size_t numBuffers,
         nsecs_t timestamp, bool timestampIncreasing,
         const SurfaceMap& outputSurfaces,
-        const CaptureResultExtras &inResultExtras) {
+        const CaptureResultExtras &inResultExtras,
+        ERROR_BUF_STRATEGY errorBufStrategy) {
 
     for (size_t i = 0; i < numBuffers; i++)
     {
+        Camera3StreamInterface *stream = Camera3Stream::cast(outputBuffers[i].stream);
+        int streamId = stream->getId();
+
+        // Call notify(ERROR_BUFFER) if necessary.
+        if (outputBuffers[i].status == CAMERA3_BUFFER_STATUS_ERROR &&
+                errorBufStrategy == ERROR_BUF_RETURN_NOTIFY) {
+            if (listener != nullptr) {
+                CaptureResultExtras extras = inResultExtras;
+                extras.errorStreamId = streamId;
+                listener->notifyError(
+                        hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER,
+                        extras);
+            }
+        }
+
         if (outputBuffers[i].buffer == nullptr) {
             if (!useHalBufManager) {
                 // With HAL buffer management API, HAL sometimes will have to return buffers that
@@ -805,20 +831,23 @@ void returnOutputBuffers(
             continue;
         }
 
-        Camera3StreamInterface *stream = Camera3Stream::cast(outputBuffers[i].stream);
-        int streamId = stream->getId();
         const auto& it = outputSurfaces.find(streamId);
         status_t res = OK;
-        if (it != outputSurfaces.end()) {
-            res = stream->returnBuffer(
-                    outputBuffers[i], timestamp, timestampIncreasing, it->second,
-                    inResultExtras.frameNumber);
-        } else {
-            res = stream->returnBuffer(
-                    outputBuffers[i], timestamp, timestampIncreasing, std::vector<size_t> (),
-                    inResultExtras.frameNumber);
-        }
 
+        // Do not return the buffer if the buffer status is error, and the error
+        // buffer strategy is CACHE.
+        if (outputBuffers[i].status != CAMERA3_BUFFER_STATUS_ERROR ||
+                errorBufStrategy != ERROR_BUF_CACHE) {
+            if (it != outputSurfaces.end()) {
+                res = stream->returnBuffer(
+                        outputBuffers[i], timestamp, timestampIncreasing, it->second,
+                        inResultExtras.frameNumber);
+            } else {
+                res = stream->returnBuffer(
+                        outputBuffers[i], timestamp, timestampIncreasing, std::vector<size_t> (),
+                        inResultExtras.frameNumber);
+            }
+        }
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
         if (res == NO_INIT || res == DEAD_OBJECT) {
@@ -844,6 +873,28 @@ void returnOutputBuffers(
                         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER,
                         extras);
             }
+        }
+    }
+}
+
+void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
+        sp<NotificationListener> listener, InFlightRequest& request) {
+    bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
+    returnOutputBuffers(useHalBufManager, listener,
+            request.pendingOutputBuffers.array(),
+            request.pendingOutputBuffers.size(),
+            request.shutterTimestamp, timestampIncreasing,
+            request.outputSurfaces, request.resultExtras,
+            request.errorBufStrategy);
+
+    // Remove error buffers that are not cached.
+    for (auto iter = request.pendingOutputBuffers.begin();
+            iter != request.pendingOutputBuffers.end(); ) {
+        if (request.errorBufStrategy != ERROR_BUF_CACHE ||
+                iter->status != CAMERA3_BUFFER_STATUS_ERROR) {
+            iter = request.pendingOutputBuffers.erase(iter);
+        } else {
+            iter++;
         }
     }
 }
@@ -899,6 +950,12 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
                     msg.frame_number, r.resultExtras.requestId, msg.timestamp);
                 // Call listener, if any
                 if (states.listener != nullptr) {
+                    r.resultExtras.lastCompletedRegularFrameNumber =
+                            states.lastCompletedRegularFrameNumber;
+                    r.resultExtras.lastCompletedReprocessFrameNumber =
+                            states.lastCompletedReprocessFrameNumber;
+                    r.resultExtras.lastCompletedZslFrameNumber =
+                            states.lastCompletedZslFrameNumber;
                     states.listener->notifyShutter(r.resultExtras, msg.timestamp);
                 }
                 // send pending result and buffers
@@ -908,13 +965,8 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
                     r.hasInputBuffer, r.zslCapture && r.stillCapture,
                     r.rotateAndCropAuto, r.cameraIdsWithZoom, r.physicalMetadatas);
             }
-            bool timestampIncreasing = !(r.zslCapture || r.hasInputBuffer);
-            returnOutputBuffers(
-                    states.useHalBufManager, states.listener,
-                    r.pendingOutputBuffers.array(),
-                    r.pendingOutputBuffers.size(), r.shutterTimestamp, timestampIncreasing,
-                    r.outputSurfaces, r.resultExtras);
-            r.pendingOutputBuffers.clear();
+            returnAndRemovePendingOutputBuffers(
+                    states.useHalBufManager, states.listener, r);
 
             removeInFlightRequestIfReadyLocked(states, idx);
         }
@@ -968,7 +1020,6 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
             break;
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST:
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT:
-        case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER:
             {
                 std::lock_guard<std::mutex> l(states.inflightLock);
                 ssize_t idx = states.inflightMap.indexOfKey(msg.frame_number);
@@ -976,7 +1027,7 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
                     InFlightRequest &r = states.inflightMap.editValueAt(idx);
                     r.requestStatus = msg.error_code;
                     resultExtras = r.resultExtras;
-                    bool logicalDeviceResultError = false;
+                    bool physicalDeviceResultError = false;
                     if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT ==
                             errorCode) {
                         if (physicalCameraId.size() > 0) {
@@ -990,23 +1041,22 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
                             }
                             r.physicalCameraIds.erase(iter);
                             resultExtras.errorPhysicalCameraId = physicalCameraId;
-                        } else {
-                            logicalDeviceResultError = true;
+                            physicalDeviceResultError = true;
                         }
                     }
 
-                    if (logicalDeviceResultError
-                            ||  hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST ==
-                            errorCode) {
+                    if (!physicalDeviceResultError) {
                         r.skipResultMetadata = true;
-                    }
-                    if (logicalDeviceResultError) {
-                        // In case of missing result check whether the buffers
-                        // returned. If they returned, then remove inflight
-                        // request.
-                        // TODO: should we call this for ERROR_CAMERA_REQUEST as well?
-                        //       otherwise we are depending on HAL to send the buffers back after
-                        //       calling notifyError. Not sure if that's in the spec.
+                        if (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT
+                                == errorCode) {
+                            r.errorBufStrategy = ERROR_BUF_RETURN_NOTIFY;
+                        } else {
+                            // errorCode is ERROR_CAMERA_REQUEST
+                            r.errorBufStrategy = ERROR_BUF_RETURN;
+                        }
+
+                        // Check whether the buffers returned. If they returned,
+                        // remove inflight request.
                         removeInFlightRequestIfReadyLocked(states, idx);
                     }
                 } else {
@@ -1023,6 +1073,10 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
                 ALOGE("Camera %s: %s: no listener available",
                         states.cameraId.string(), __FUNCTION__);
             }
+            break;
+        case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER:
+            // Do not depend on HAL ERROR_CAMERA_BUFFER to send buffer error
+            // callback to the app. Rather, use STATUS_ERROR of image buffers.
             break;
         default:
             // SET_ERR calls notifyError
@@ -1338,8 +1392,14 @@ void flushInflightRequests(FlushInflightReqStates& states) {
                 request.pendingOutputBuffers.array(),
                 request.pendingOutputBuffers.size(), 0,
                 /*timestampIncreasing*/true, request.outputSurfaces,
-                request.resultExtras);
+                request.resultExtras, request.errorBufStrategy);
+            ALOGW("%s: Frame %d |  Timestamp: %" PRId64 ", metadata"
+                    " arrived: %s, buffers left: %d.\n", __FUNCTION__,
+                    states.inflightMap.keyAt(idx), request.shutterTimestamp,
+                    request.haveResultMetadata ? "true" : "false",
+                    request.numBuffersLeft);
         }
+
         states.inflightMap.clear();
         states.inflightIntf.onInflightMapFlushedLocked();
     }
