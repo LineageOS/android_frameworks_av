@@ -100,6 +100,36 @@ void MediaTranscoder::sendCallback(media_status_t status) {
     }
 }
 
+void MediaTranscoder::onTrackFormatAvailable(const MediaTrackTranscoder* transcoder) {
+    LOG(INFO) << "TrackTranscoder " << transcoder << " format available.";
+
+    std::scoped_lock lock{mTracksAddedMutex};
+
+    // Ignore duplicate format change.
+    if (mTracksAdded.count(transcoder) > 0) {
+        return;
+    }
+
+    // Add track to the writer.
+    const bool ok =
+            mSampleWriter->addTrack(transcoder->getOutputQueue(), transcoder->getOutputFormat());
+    if (!ok) {
+        LOG(ERROR) << "Unable to add track to sample writer.";
+        sendCallback(AMEDIA_ERROR_UNKNOWN);
+        return;
+    }
+
+    mTracksAdded.insert(transcoder);
+    if (mTracksAdded.size() == mTrackTranscoders.size()) {
+        LOG(INFO) << "Starting sample writer.";
+        bool started = mSampleWriter->start();
+        if (!started) {
+            LOG(ERROR) << "Unable to start sample writer.";
+            sendCallback(AMEDIA_ERROR_UNKNOWN);
+        }
+    }
+}
+
 void MediaTranscoder::onTrackFinished(const MediaTrackTranscoder* transcoder) {
     LOG(DEBUG) << "TrackTranscoder " << transcoder << " finished";
 }
@@ -267,25 +297,9 @@ media_status_t MediaTranscoder::start() {
         return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
-    // Add tracks to the writer.
-    for (auto& transcoder : mTrackTranscoders) {
-        const bool ok = mSampleWriter->addTrack(transcoder->getOutputQueue(),
-                                                transcoder->getOutputFormat());
-        if (!ok) {
-            LOG(ERROR) << "Unable to add track to sample writer.";
-            return AMEDIA_ERROR_UNKNOWN;
-        }
-    }
-
-    bool started = mSampleWriter->start();
-    if (!started) {
-        LOG(ERROR) << "Unable to start sample writer.";
-        return AMEDIA_ERROR_UNKNOWN;
-    }
-
     // Start transcoders
     for (auto& transcoder : mTrackTranscoders) {
-        started = transcoder->start();
+        bool started = transcoder->start();
         if (!started) {
             LOG(ERROR) << "Unable to start track transcoder.";
             cancel();

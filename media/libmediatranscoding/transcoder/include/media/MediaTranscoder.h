@@ -22,9 +22,11 @@
 #include <media/MediaTrackTranscoderCallback.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
+#include <utils/Mutex.h>
 
 #include <atomic>
 #include <memory>
+#include <mutex>
 #include <unordered_set>
 
 namespace android {
@@ -116,6 +118,7 @@ private:
     MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks);
 
     // MediaTrackTranscoderCallback
+    virtual void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder) override;
     virtual void onTrackFinished(const MediaTrackTranscoder* transcoder) override;
     virtual void onTrackError(const MediaTrackTranscoder* transcoder,
                               media_status_t status) override;
@@ -128,6 +131,8 @@ private:
     std::unique_ptr<MediaSampleWriter> mSampleWriter;
     std::vector<std::shared_ptr<AMediaFormat>> mSourceTrackFormats;
     std::vector<std::unique_ptr<MediaTrackTranscoder>> mTrackTranscoders;
+    std::mutex mTracksAddedMutex;
+    std::unordered_set<const MediaTrackTranscoder*> mTracksAdded GUARDED_BY(mTracksAddedMutex);
 
     std::atomic_bool mCallbackSent = false;
     std::atomic_bool mCancelled = false;
