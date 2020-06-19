@@ -192,11 +192,11 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
             ALOGE("WriteSampleData() is called in invalid state %d", mState);
             return INVALID_OPERATION;
         }
+    }
 
-        if (trackIndex >= mTrackList.size()) {
-            ALOGE("WriteSampleData() get an invalid index %zu", trackIndex);
-            return -EINVAL;
-        }
+    if (trackIndex >= mTrackList.size()) {
+        ALOGE("WriteSampleData() get an invalid index %zu", trackIndex);
+        return -EINVAL;
     }
 
     MediaBuffer* mediaBuffer = new MediaBuffer(buffer);
