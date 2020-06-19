@@ -43,9 +43,9 @@ public:
     // Transaction Log between the Low Water Mark and the High Water Mark.
 
     // low water mark
-    static inline constexpr size_t kLogItemsLowWater = 5000;
+    static inline constexpr size_t kLogItemsLowWater = 1700;
     // high water mark
-    static inline constexpr size_t kLogItemsHighWater = 10000;
+    static inline constexpr size_t kLogItemsHighWater = 2000;
 
     // Estimated max data usage is 1KB * kLogItemsHighWater.
 
@@ -79,6 +79,7 @@ public:
         std::lock_guard lock2(other.mLock);
         mLog = other.mLog;
         mItemMap = other.mItemMap;
+        mGarbageCollectionCount = other.mGarbageCollectionCount.load();
 
         return *this;
     }
@@ -181,6 +182,11 @@ public:
         std::lock_guard lock(mLock);
         mLog.clear();
         mItemMap.clear();
+        mGarbageCollectionCount = 0;
+    }
+
+    size_t getGarbageCollectionCount() const {
+        return mGarbageCollectionCount;
     }
 
 private:
@@ -215,8 +221,6 @@ private:
      */
     bool gc(std::vector<std::any>& garbage) REQUIRES(mLock) {
         if (mLog.size() < mHighWaterMark) return false;
-
-        ALOGD("%s: garbage collection", __func__);
 
         auto eraseEnd = mLog.begin();
         size_t toRemove = mLog.size() - mLowWaterMark;
@@ -265,6 +269,7 @@ private:
         ALOGD("%s(%zu, %zu): log size:%zu item map size:%zu, item map items:%zu",
                 __func__, mLowWaterMark, mHighWaterMark,
                 mLog.size(), mItemMap.size(), itemMapCount);
+        ++mGarbageCollectionCount;
         return true;
     }
 
@@ -286,6 +291,8 @@ private:
 
     const size_t mLowWaterMark = kLogItemsLowWater;
     const size_t mHighWaterMark = kLogItemsHighWater;
+
+    std::atomic<size_t> mGarbageCollectionCount{};
 
     mutable std::mutex mLock;
 
