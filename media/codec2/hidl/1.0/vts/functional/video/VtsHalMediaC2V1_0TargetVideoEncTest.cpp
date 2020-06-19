@@ -510,12 +510,10 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         ASSERT_TRUE(false);
     }
 
-    if (!mCsd && (mCompName != vp8 && mCompName != vp9)) {
-        ASSERT_TRUE(false) << "CSD Buffer not received";
-    }
-
-    if (mCsd && (mCompName == vp8 || mCompName == vp9)) {
-        ASSERT_TRUE(false) << "CSD Buffer not expected";
+    if (mCompName == vp8 || mCompName == h263) {
+        ASSERT_FALSE(mCsd) << "CSD Buffer not expected";
+    } else if (mCompName != vp9) {
+        ASSERT_TRUE(mCsd) << "CSD Buffer not received";
     }
 
     if (mTimestampDevTest) EXPECT_EQ(mTimestampUslist.empty(), true);
