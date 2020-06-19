@@ -57,6 +57,8 @@ public:
     ~TestCallback() = default;
 
     // MediaTrackTranscoderCallback
+    void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder __unused) {}
+
     void onTrackFinished(const MediaTrackTranscoder* transcoder __unused) {
         std::unique_lock<std::mutex> lock(mMutex);
         mTranscodingFinished = true;

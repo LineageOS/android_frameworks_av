@@ -4687,10 +4687,18 @@ void MPEG4Writer::Track::writeD263Box() {
 
 // This is useful if the pixel is not square
 void MPEG4Writer::Track::writePaspBox() {
-    mOwner->beginBox("pasp");
-    mOwner->writeInt32(1 << 16);  // hspacing
-    mOwner->writeInt32(1 << 16);  // vspacing
-    mOwner->endBox();  // pasp
+    // Do not write 'pasp' box unless the track format specifies it.
+    // According to ISO/IEC 14496-12 (ISO base media file format), 'pasp' box
+    // is optional. If present, it overrides the SAR from the video CSD. Only
+    // set it if the track format specifically requests that.
+    int32_t hSpacing, vSpacing;
+    if (mMeta->findInt32(kKeySARWidth, &hSpacing) && (hSpacing > 0)
+            && mMeta->findInt32(kKeySARHeight, &vSpacing) && (vSpacing > 0)) {
+        mOwner->beginBox("pasp");
+        mOwner->writeInt32(hSpacing);  // hspacing
+        mOwner->writeInt32(vSpacing);  // vspacing
+        mOwner->endBox();  // pasp
+    }
 }
 
 int64_t MPEG4Writer::Track::getStartTimeOffsetTimeUs() const {

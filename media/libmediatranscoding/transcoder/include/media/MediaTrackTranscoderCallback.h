@@ -27,6 +27,11 @@ class MediaTrackTranscoder;
 class MediaTrackTranscoderCallback {
 public:
     /**
+     * Called when the MediaTrackTranscoder's actual track format becomes available.
+     * @param transcoder The MediaTrackTranscoder whose track format becomes available.
+     */
+    virtual void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder);
+    /**
      * Called when the MediaTrackTranscoder instance have finished transcoding all media samples
      * successfully.
      * @param transcoder The MediaTrackTranscoder that finished the transcoding.

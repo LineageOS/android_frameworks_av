@@ -102,6 +102,12 @@ bool MediaTrackTranscoder::stop() {
     return false;
 }
 
+void MediaTrackTranscoder::notifyTrackFormatAvailable() {
+    if (auto callbacks = mTranscoderCallback.lock()) {
+        callbacks->onTrackFormatAvailable(this);
+    }
+}
+
 std::shared_ptr<MediaSampleQueue> MediaTrackTranscoder::getOutputQueue() const {
     return mOutputQueue;
 }

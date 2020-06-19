@@ -94,6 +94,9 @@ protected:
           : mOutputQueue(std::make_shared<MediaSampleQueue>()),
             mTranscoderCallback(transcoderCallback){};
 
+    // Called by subclasses when the actual track format becomes available.
+    void notifyTrackFormatAvailable();
+
     // configureDestinationFormat needs to be implemented by subclasses, and gets called on an
     // external thread before start.
     virtual media_status_t configureDestinationFormat(
