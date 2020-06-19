@@ -93,7 +93,7 @@ public:
         int32_t ll = lines;
 
         if (ll > 0) {
-            ss << "TransactionLog:\n";
+            ss << "TransactionLog: gc(" << mTransactionLog.getGarbageCollectionCount() << ")\n";
             --ll;
         }
         if (ll > 0) {
@@ -102,7 +102,7 @@ public:
             ll -= l;
         }
         if (ll > 0) {
-            ss << "TimeMachine:\n";
+            ss << "TimeMachine: gc(" << mTimeMachine.getGarbageCollectionCount() << ")\n";
             --ll;
         }
         if (ll > 0) {
