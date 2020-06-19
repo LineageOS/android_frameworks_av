@@ -42,7 +42,7 @@ public:
     void SetUp() override {
         LOG(DEBUG) << "VideoTrackTranscoderTests set up";
         const char* sourcePath =
-                "/data/local/tmp/TranscoderTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
+                "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
 
         const int sourceFd = open(sourcePath, O_RDONLY);
         ASSERT_GT(sourceFd, 0);

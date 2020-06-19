@@ -86,6 +86,10 @@ struct AsyncCodecCallbackDispatch {
         VideoTrackTranscoder* transcoder = static_cast<VideoTrackTranscoder*>(userdata);
         const char* kCodecName = (codec == transcoder->mDecoder ? "Decoder" : "Encoder");
         LOG(DEBUG) << kCodecName << " format changed: " << AMediaFormat_toString(format);
+        if (codec == transcoder->mEncoder.get()) {
+            transcoder->mCodecMessageQueue.push(
+                    [transcoder, format] { transcoder->updateTrackFormat(format); });
+        }
     }
 
     static void onAsyncError(AMediaCodec* codec, void* userdata, media_status_t error,
@@ -311,6 +315,56 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
     }
 }
 
+void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
+    if (mActualOutputFormat != nullptr) {
+        LOG(WARNING) << "Ignoring duplicate format change.";
+        return;
+    }
+
+    AMediaFormat* formatCopy = AMediaFormat_new();
+    if (!formatCopy || AMediaFormat_copy(formatCopy, outputFormat) != AMEDIA_OK) {
+        LOG(ERROR) << "Unable to copy outputFormat";
+        AMediaFormat_delete(formatCopy);
+        mStatus = AMEDIA_ERROR_INVALID_PARAMETER;
+        return;
+    }
+
+    // Generate the actual track format for muxer based on the encoder output format,
+    // since many vital information comes in the encoder format (eg. CSD).
+    // Transfer necessary fields from the user-configured track format (derived from
+    // source track format and user transcoding request) where needed.
+
+    // Transfer SAR settings:
+    // If mDestinationFormat has SAR set, it means the original source has SAR specified
+    // at container level. This is supposed to override any SAR settings in the bitstream,
+    // thus should always be transferred to the container of the transcoded file.
+    int32_t sarWidth, sarHeight;
+    if (AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_SAR_WIDTH, &sarWidth) &&
+        (sarWidth > 0) &&
+        AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_SAR_HEIGHT, &sarHeight) &&
+        (sarHeight > 0)) {
+        AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_SAR_WIDTH, sarWidth);
+        AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_SAR_HEIGHT, sarHeight);
+    }
+    // Transfer DAR settings.
+    int32_t displayWidth, displayHeight;
+    if (AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_DISPLAY_WIDTH,
+                              &displayWidth) &&
+        (displayWidth > 0) &&
+        AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_DISPLAY_HEIGHT,
+                              &displayHeight) &&
+        (displayHeight > 0)) {
+        AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_DISPLAY_WIDTH, displayWidth);
+        AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_DISPLAY_HEIGHT, displayHeight);
+    }
+
+    // TODO: transfer other fields as required.
+
+    mActualOutputFormat = std::shared_ptr<AMediaFormat>(formatCopy, &AMediaFormat_delete);
+
+    notifyTrackFormatAvailable();
+}
+
 media_status_t VideoTrackTranscoder::runTranscodeLoop() {
     media_status_t status = AMEDIA_OK;
 
@@ -350,7 +404,7 @@ void VideoTrackTranscoder::abortTranscodeLoop() {
 }
 
 std::shared_ptr<AMediaFormat> VideoTrackTranscoder::getOutputFormat() const {
-    return mDestinationFormat;
+    return mActualOutputFormat;
 }
 
 }  // namespace android

@@ -31,6 +31,7 @@
 
 #define CODEC_CONFIG_FLAG 32
 
+constexpr uint32_t kMaxTrackCount = 2;
 constexpr uint32_t kMaxCSDStrlen = 16;
 constexpr uint32_t kMaxCount = 20;
 
