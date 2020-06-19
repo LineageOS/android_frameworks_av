@@ -114,6 +114,13 @@ status_t MediaAdapter::pushBuffer(MediaBuffer *buffer) {
         return -EINVAL;
     }
 
+    /* As mAdapterLock is unlocked while waiting for signalBufferReturned,
+     * a new buffer for the same track could be pushed from another thread
+     * in the client process, mBufferGatingMutex will help to hold that
+     * until the previous buffer is processed.
+     */
+    std::unique_lock<std::mutex> lk(mBufferGatingMutex);
+
     Mutex::Autolock autoLock(mAdapterLock);
     if (!mStarted) {
         ALOGE("pushBuffer called before start");
