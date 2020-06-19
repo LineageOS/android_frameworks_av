@@ -64,6 +64,8 @@ auto ENUM_EXTRACT(const T& x) {
 
 static constexpr const auto LOG_LEVEL = android::base::VERBOSE;
 
+static constexpr int PREVIOUS_STATE_EXPIRE_SEC = 60 * 60; // 1 hour.
+
 /*
  * For logging purposes, we list all of the MediaMetrics atom fields,
  * which can then be associated with consecutive arguments to the statsd write.
@@ -173,6 +175,19 @@ AudioAnalytics::AudioAnalytics()
                 // to end of full expression.
                 mAnalyticsState->clear();  // TODO: filter the analytics state.
                 // Perhaps report this.
+
+                // Set up a timer to expire the previous audio state to save space.
+                // Use the transaction log size as a cookie to see if it is the
+                // same as before.  A benign race is possible where a state is cleared early.
+                const size_t size = mPreviousAnalyticsState->transactionLog().size();
+                mTimedAction.postIn(
+                        std::chrono::seconds(PREVIOUS_STATE_EXPIRE_SEC), [this, size](){
+                    if (mPreviousAnalyticsState->transactionLog().size() == size) {
+                        ALOGD("expiring previous audio state after %d seconds.",
+                                PREVIOUS_STATE_EXPIRE_SEC);
+                        mPreviousAnalyticsState->clear();  // removes data from the state.
+                    }
+                });
             }));
 
     // Handle device use record statistics
