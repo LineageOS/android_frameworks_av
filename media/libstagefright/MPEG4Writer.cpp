@@ -542,6 +542,7 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     mNumGrids = 0;
     mNextItemId = kItemIdBase;
     mHasRefs = false;
+    mResetStatus = OK;
     mPreAllocFirstTime = true;
     mPrevAllTracksTotalMetaDataSizeEstimate = 0;
 
@@ -1027,6 +1028,11 @@ status_t MPEG4Writer::start(MetaData *param) {
     return OK;
 }
 
+status_t MPEG4Writer::stop() {
+    // If reset was in progress, wait for it to complete.
+    return reset(true, true);
+}
+
 status_t MPEG4Writer::pause() {
     ALOGW("MPEG4Writer: pause is not supported");
     return ERROR_UNSUPPORTED;
@@ -1141,8 +1147,12 @@ status_t MPEG4Writer::release() {
     return err;
 }
 
-void MPEG4Writer::finishCurrentSession() {
-    reset(false /* stopSource */);
+status_t MPEG4Writer::finishCurrentSession() {
+    ALOGV("finishCurrentSession");
+    /* Don't wait if reset is in progress already, that avoids deadlock
+     * as finishCurrentSession() is called from control looper thread.
+     */
+    return reset(false, false);
 }
 
 status_t MPEG4Writer::switchFd() {
@@ -1164,11 +1174,32 @@ status_t MPEG4Writer::switchFd() {
     return err;
 }
 
-status_t MPEG4Writer::reset(bool stopSource) {
+status_t MPEG4Writer::reset(bool stopSource, bool waitForAnyPreviousCallToComplete) {
     ALOGD("reset()");
-    std::lock_guard<std::mutex> l(mResetMutex);
+    std::unique_lock<std::mutex> lk(mResetMutex, std::defer_lock);
+    if (waitForAnyPreviousCallToComplete) {
+        /* stop=>reset from client needs the return value of reset call, hence wait here
+         * if a reset was in process already.
+         */
+        lk.lock();
+    } else if (!lk.try_lock()) {
+        /* Internal reset from control looper thread shouldn't wait for any reset in
+         * process already.
+         */
+        return INVALID_OPERATION;
+    }
+
+    if (mResetStatus != OK) {
+        /* Don't have to proceed if reset has finished with an error before.
+         * If there was no error before, proceeding reset would be harmless, as the
+         * the call would return from the mInitCheck condition below.
+         */
+        return mResetStatus;
+    }
+
     if (mInitCheck != OK) {
-        return OK;
+        mResetStatus = OK;
+        return mResetStatus;
     } else {
         if (!mWriterThreadStarted ||
             !mStarted) {
@@ -1180,7 +1211,8 @@ status_t MPEG4Writer::reset(bool stopSource) {
             if (writerErr != OK) {
                 retErr = writerErr;
             }
-            return retErr;
+            mResetStatus = retErr;
+            return mResetStatus;
         }
     }
 
@@ -1227,7 +1259,8 @@ status_t MPEG4Writer::reset(bool stopSource) {
     if (err != OK && err != ERROR_MALFORMED) {
         // Ignoring release() return value as there was an "err" already.
         release();
-        return err;
+        mResetStatus = err;
+        return mResetStatus;
     }
 
     // Fix up the size of the 'mdat' chunk.
@@ -1285,7 +1318,8 @@ status_t MPEG4Writer::reset(bool stopSource) {
     if (err == OK) {
         err = errRelease;
     }
-    return err;
+    mResetStatus = err;
+    return mResetStatus;
 }
 
 /*
@@ -1889,7 +1923,7 @@ bool MPEG4Writer::truncatePreAllocation() {
     ALOGD("ftruncate mPreAllocateFileEndOffset:%" PRId64 " mOffset:%" PRIu64
           " mMdatEndOffset:%" PRIu64 " diff:%" PRId64, mPreAllocateFileEndOffset, mOffset,
           mMdatEndOffset, mPreAllocateFileEndOffset - endOffset);
-    if(ftruncate(mFd, endOffset) == -1) {
+    if (ftruncate(mFd, endOffset) == -1) {
         ALOGE("ftruncate err:%s, %d, fd:%d", strerror(errno), errno, mFd);
         status = false;
         /* No need to post and handle(stop & notify client) error like it's done in preAllocate(),
@@ -2426,31 +2460,27 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
             int fd = mNextFd;
             mNextFd = -1;
             mLock.unlock();
-            finishCurrentSession();
-            initInternal(fd, false /*isFirstSession*/);
-            start(mStartMeta.get());
-            mSwitchPending = false;
-            notify(MEDIA_RECORDER_EVENT_INFO, MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED, 0);
+            if (finishCurrentSession() == OK) {
+                initInternal(fd, false /*isFirstSession*/);
+                status_t status = start(mStartMeta.get());
+                mSwitchPending = false;
+                if (status == OK)  {
+                    notify(MEDIA_RECORDER_EVENT_INFO,
+                           MEDIA_RECORDER_INFO_NEXT_OUTPUT_FILE_STARTED, 0);
+                }
+            }
             break;
         }
-        // ::write() or lseek64() wasn't a success, file could be malformed
+        /* ::write() or lseek64() wasn't a success, file could be malformed.
+         * Or fallocate() failed. reset() and notify client on both the cases.
+         */
+        case kWhatFallocateError: // fallthrough
         case kWhatIOError: {
-            ALOGE("kWhatIOError");
             int32_t err;
             CHECK(msg->findInt32("err", &err));
-            // Stop tracks' threads and main writer thread.
-            stop();
-            notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
-            break;
-        }
-        // fallocate() failed, hence stop() and notify app.
-        case kWhatFallocateError: {
-            ALOGE("kWhatFallocateError");
-            int32_t err;
-            CHECK(msg->findInt32("err", &err));
-            // Stop tracks' threads and main writer thread.
-            stop();
-            //TODO: introduce a suitable MEDIA_RECORDER_ERROR_* instead MEDIA_RECORDER_ERROR_UNKNOWN?
+            // If reset already in process, don't wait for it complete to avoid deadlock.
+            reset(true, false);
+            //TODO: new MEDIA_RECORDER_ERROR_**** instead MEDIA_RECORDER_ERROR_UNKNOWN ?
             notify(MEDIA_RECORDER_EVENT_ERROR, MEDIA_RECORDER_ERROR_UNKNOWN, err);
             break;
         }
@@ -2458,7 +2488,7 @@ void MPEG4Writer::onMessageReceived(const sp<AMessage> &msg) {
          * Responding with other options could be added later if required.
          */
         case kWhatNoIOErrorSoFar: {
-            ALOGD("kWhatNoIOErrorSoFar");
+            ALOGV("kWhatNoIOErrorSoFar");
             sp<AMessage> response = new AMessage;
             response->setInt32("err", OK);
             sp<AReplyToken> replyID;
