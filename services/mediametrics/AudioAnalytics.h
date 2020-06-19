@@ -117,7 +117,7 @@ private:
 
     // AnalyticsState is individually locked, and we use SharedPtrWrap
     // to allow safe access even if the shared pointer changes underneath.
-
+    // These wrap pointers always point to a valid state object.
     SharedPtrWrap<AnalyticsState> mAnalyticsState;
     SharedPtrWrap<AnalyticsState> mPreviousAnalyticsState;
 
