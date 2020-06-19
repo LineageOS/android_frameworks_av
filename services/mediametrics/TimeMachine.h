@@ -220,10 +220,10 @@ private:
 
     using History = std::map<std::string /* key */, std::shared_ptr<KeyHistory>>;
 
-    static inline constexpr size_t kTimeSequenceMaxElements = 100;
-    static inline constexpr size_t kKeyMaxProperties = 100;
-    static inline constexpr size_t kKeyLowWaterMark = 500;
-    static inline constexpr size_t kKeyHighWaterMark = 1000;
+    static inline constexpr size_t kTimeSequenceMaxElements = 50;
+    static inline constexpr size_t kKeyMaxProperties = 50;
+    static inline constexpr size_t kKeyLowWaterMark = 400;
+    static inline constexpr size_t kKeyHighWaterMark = 500;
 
     // Estimated max data space usage is 3KB * kKeyHighWaterMark.
 
@@ -255,6 +255,7 @@ public:
         {
             std::lock_guard lock2(other.mLock);
             mHistory = other.mHistory;
+            mGarbageCollectionCount = other.mGarbageCollectionCount.load();
         }
 
         // Now that we safely have our own shared pointers, let's dup them
@@ -420,6 +421,7 @@ public:
     void clear() {
         std::lock_guard lock(mLock);
         mHistory.clear();
+        mGarbageCollectionCount = 0;
     }
 
     /**
@@ -451,6 +453,10 @@ public:
             ll -= l;
         }
         return { ss.str(), lines - ll };
+    }
+
+    size_t getGarbageCollectionCount() const {
+        return mGarbageCollectionCount;
     }
 
 private:
@@ -496,8 +502,6 @@ private:
         // TODO: something better than this for garbage collection.
         if (mHistory.size() < mKeyHighWaterMark) return false;
 
-        ALOGD("%s: garbage collection", __func__);
-
         // erase everything explicitly expired.
         std::multimap<int64_t, std::string> accessList;
         // use a stale vector with precise type to avoid type erasure overhead in garbage
@@ -534,11 +538,15 @@ private:
         ALOGD("%s(%zu, %zu): key size:%zu",
                 __func__, mKeyLowWaterMark, mKeyHighWaterMark,
                 mHistory.size());
+
+        ++mGarbageCollectionCount;
         return true;
     }
 
     const size_t mKeyLowWaterMark = kKeyLowWaterMark;
     const size_t mKeyHighWaterMark = kKeyHighWaterMark;
+
+    std::atomic<size_t> mGarbageCollectionCount{};
 
     /**
      * Locking Strategy
