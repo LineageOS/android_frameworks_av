@@ -175,16 +175,23 @@ status_t MediaMuxer::stop() {
 
 status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
                                      int64_t timeUs, uint32_t flags) {
-    Mutex::Autolock autoLock(mMuxerLock);
-
     if (buffer.get() == NULL) {
         ALOGE("WriteSampleData() get an NULL buffer.");
         return -EINVAL;
     }
-
-    if (mState != STARTED) {
-        ALOGE("WriteSampleData() is called in invalid state %d", mState);
-        return INVALID_OPERATION;
+    {
+        /* As MediaMuxer's writeSampleData handles inputs from multiple tracks,
+         * limited the scope of mMuxerLock to this inner block so that the
+         * current track's buffer does not wait until the completion
+         * of processing of previous buffer of the same or another track.
+         * It's the responsibility of individual track - MediaAdapter object
+         * to gate its buffers.
+         */
+        Mutex::Autolock autoLock(mMuxerLock);
+        if (mState != STARTED) {
+            ALOGE("WriteSampleData() is called in invalid state %d", mState);
+            return INVALID_OPERATION;
+        }
     }
 
     if (trackIndex >= mTrackList.size()) {

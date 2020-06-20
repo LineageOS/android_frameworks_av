@@ -45,7 +45,7 @@ public:
 
     // Returns INVALID_OPERATION if there is no source or track.
     virtual status_t start(MetaData *param = NULL);
-    virtual status_t stop() { return reset(); }
+    virtual status_t stop();
     virtual status_t pause();
     virtual bool reachedEOS();
     virtual status_t dump(int fd, const Vector<String16>& args);
@@ -125,12 +125,15 @@ private:
     bool mWriteSeekErr;
     bool mFallocateErr;
     bool mPreAllocationEnabled;
+    status_t mResetStatus;
 
     sp<ALooper> mLooper;
     sp<AHandlerReflector<MPEG4Writer> > mReflector;
 
     Mutex mLock;
+    // Serialize reset calls from client of MPEG4Writer and MP4WtrCtrlHlpLooper.
     std::mutex mResetMutex;
+    // Serialize preallocation calls from different track threads.
     std::mutex mFallocMutex;
     bool mPreAllocFirstTime; // Pre-allocate space for file and track headers only once per file.
     uint64_t mPrevAllTracksTotalMetaDataSizeEstimate;
@@ -298,7 +301,7 @@ private:
     void writeGeoDataBox();
     void writeLatitude(int degreex10000);
     void writeLongitude(int degreex10000);
-    void finishCurrentSession();
+    status_t finishCurrentSession();
 
     void addDeviceMeta();
     void writeHdlr(const char *handlerType);
@@ -331,7 +334,7 @@ private:
     void sendSessionSummary();
     status_t release();
     status_t switchFd();
-    status_t reset(bool stopSource = true);
+    status_t reset(bool stopSource = true, bool waitForAnyPreviousCallToComplete = true);
 
     static uint32_t getMpeg4Time();
 
