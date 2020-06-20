@@ -35,9 +35,9 @@ cc_test {
     srcs: ["mediatranscodingservice_simulated_tests.cpp"],
 
     required: [
-        ":TranscodingUidPolicy_TestAppA",
-        ":TranscodingUidPolicy_TestAppB",
-        ":TranscodingUidPolicy_TestAppC",
+        "TranscodingUidPolicy_TestAppA",
+        "TranscodingUidPolicy_TestAppB",
+        "TranscodingUidPolicy_TestAppC",
     ],
 }
 
