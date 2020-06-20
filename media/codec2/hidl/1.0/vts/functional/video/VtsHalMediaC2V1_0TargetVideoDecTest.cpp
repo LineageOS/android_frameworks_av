@@ -109,6 +109,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         mFramesReceived = 0;
         mTimestampUs = 0u;
         mWorkResult = C2_OK;
+        mReorderDepth = -1;
         mTimestampDevTest = false;
         mMd5Offset = 0;
         mMd5Enable = false;
@@ -211,34 +212,46 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         for (std::unique_ptr<C2Work>& work : workItems) {
             if (!work->worklets.empty()) {
                 // For decoder components current timestamp always exceeds
-                // previous timestamp
+                // previous timestamp if output is in display order
                 typedef std::unique_lock<std::mutex> ULock;
                 mWorkResult |= work->result;
                 bool codecConfig = ((work->worklets.front()->output.flags &
                                      C2FrameData::FLAG_CODEC_CONFIG) != 0);
                 if (!codecConfig && !work->worklets.front()->output.buffers.empty()) {
-                    EXPECT_GE((work->worklets.front()->output.ordinal.timestamp.peeku()),
-                              mTimestampUs);
-                    mTimestampUs = work->worklets.front()->output.ordinal.timestamp.peeku();
-
-                    ULock l(mQueueLock);
-                    if (mTimestampDevTest) {
-                        bool tsHit = false;
-                        std::list<uint64_t>::iterator it = mTimestampUslist.begin();
-                        while (it != mTimestampUslist.end()) {
-                            if (*it == mTimestampUs) {
-                                mTimestampUslist.erase(it);
-                                tsHit = true;
-                                break;
-                            }
-                            it++;
+                    if (mReorderDepth < 0) {
+                        C2PortReorderBufferDepthTuning::output reorderBufferDepth;
+                        mComponent->query({&reorderBufferDepth}, {}, C2_MAY_BLOCK,
+                                          nullptr);
+                        mReorderDepth = reorderBufferDepth.value;
+                        if (mReorderDepth > 0) {
+                            // TODO: Add validation for reordered output
+                            mTimestampDevTest = false;
                         }
-                        if (tsHit == false) {
-                            if (mTimestampUslist.empty() == false) {
-                                EXPECT_EQ(tsHit, true) << "TimeStamp not recognized";
-                            } else {
-                                std::cout << "[   INFO   ] Received non-zero "
-                                             "output / TimeStamp not recognized \n";
+                    }
+                    if (mTimestampDevTest) {
+                        EXPECT_GE((work->worklets.front()->output.ordinal.timestamp.peeku()),
+                                  mTimestampUs);
+                        mTimestampUs = work->worklets.front()->output.ordinal.timestamp.peeku();
+
+                        ULock l(mQueueLock);
+                        {
+                            bool tsHit = false;
+                            std::list<uint64_t>::iterator it = mTimestampUslist.begin();
+                            while (it != mTimestampUslist.end()) {
+                                if (*it == mTimestampUs) {
+                                    mTimestampUslist.erase(it);
+                                    tsHit = true;
+                                    break;
+                                }
+                                it++;
+                            }
+                            if (tsHit == false) {
+                                if (mTimestampUslist.empty() == false) {
+                                    EXPECT_EQ(tsHit, true) << "TimeStamp not recognized";
+                                } else {
+                                    std::cout << "[   INFO   ] Received non-zero "
+                                                 "output / TimeStamp not recognized \n";
+                                }
                             }
                         }
                     }
@@ -281,6 +294,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     standardComp mCompName;
 
     int32_t mWorkResult;
+    int32_t mReorderDepth;
     uint32_t mFramesReceived;
     C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2BlockPool> mLinearPool;
