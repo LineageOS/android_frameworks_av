@@ -379,9 +379,6 @@ void CameraService::onDeviceStatusChanged(const String8& id,
             clientToDisconnect->notifyError(
                     hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DISCONNECTED,
                     CaptureResultExtras{});
-            // Ensure not in binder RPC so client disconnect PID checks work correctly
-            LOG_ALWAYS_FATAL_IF(CameraThreadState::getCallingPid() != getpid(),
-                    "onDeviceStatusChanged must be called from the camera service process!");
             clientToDisconnect->disconnect();
         }
 
