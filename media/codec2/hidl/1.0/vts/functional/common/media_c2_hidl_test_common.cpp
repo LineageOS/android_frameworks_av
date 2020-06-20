@@ -92,7 +92,10 @@ void workDone(const std::shared_ptr<android::Codec2Client::Component>& component
         for (size_t i = 0; i < updates.size(); ++i) {
             C2Param* param = updates[i].get();
             if (param->index() == C2StreamInitDataInfo::output::PARAM_TYPE) {
-                csd = true;
+                C2StreamInitDataInfo::output* csdBuffer =
+                        (C2StreamInitDataInfo::output*)(param);
+                size_t csdSize = csdBuffer->flexCount();
+                if (csdSize > 0) csd = true;
             } else if ((param->index() == C2StreamSampleRateInfo::output::PARAM_TYPE) ||
                        (param->index() == C2StreamChannelCountInfo::output::PARAM_TYPE) ||
                        (param->index() == C2StreamPictureSizeInfo::output::PARAM_TYPE)) {
