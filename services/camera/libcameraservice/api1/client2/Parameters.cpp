@@ -230,7 +230,7 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
     previewFpsRange[1] = fastInfo.bestStillCaptureFpsRange[1];
 
     // PREVIEW_FRAME_RATE / SUPPORTED_PREVIEW_FRAME_RATES are deprecated, but
-    // still have to do something sane for them
+    // still have to do something reasonable for them
 
     // NOTE: Not scaled like FPS range values are.
     int previewFps = fpsFromRange(previewFpsRange[0], previewFpsRange[1]);
