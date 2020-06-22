@@ -31,6 +31,7 @@
 
 #include <statslog.h>
 
+#include "cleaner.h"
 #include "MediaMetricsService.h"
 #include "frameworks/base/core/proto/android/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
@@ -168,11 +169,6 @@ bool statsd_codec(const mediametrics::Item *item)
     }
     // android.media.mediacodec.latency.hist    NOT EMITTED
 
-#if 0
-    // TODO(b/139143194)
-    // can't send them to statsd until statsd proto updates merge
-    // but in the meantime, they can appear in local 'dumpsys media.metrics' output
-    //
     // android.media.mediacodec.bitrate_mode string
     std::string bitrate_mode;
     if (item->getString("android.media.mediacodec.bitrate_mode", &bitrate_mode)) {
@@ -186,9 +182,9 @@ bool statsd_codec(const mediametrics::Item *item)
     // android.media.mediacodec.lifetimeMs int64
     int64_t lifetimeMs = -1;
     if ( item->getInt64("android.media.mediacodec.lifetimeMs", &lifetimeMs)) {
+        lifetimeMs = mediametrics::bucket_time_minutes(lifetimeMs);
         metrics_proto.set_lifetime_millis(lifetimeMs);
     }
-#endif
 
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
