@@ -57,7 +57,7 @@ private:
     std::weak_ptr<TranscoderCallbackInterface> mCallback;
     std::mutex mLock;
     std::condition_variable mCondition;
-    std::list<Event> mQueue; // GUARDED_BY(mLock);
+    std::list<Event> mQueue;  // GUARDED_BY(mLock);
     ClientIdType mCurrentClientId;
     JobIdType mCurrentJobId;
 

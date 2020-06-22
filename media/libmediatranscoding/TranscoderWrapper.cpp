@@ -200,12 +200,12 @@ static AMediaFormat* getVideoFormat(
 
     AMediaFormat* format = AMediaFormat_new();
     bool changed = false;
-    if (requestedFormat->codecType == TranscodingVideoCodecType::kHevc
-            && strcmp(originalMime, AMEDIA_MIMETYPE_VIDEO_HEVC)) {
+    if (requestedFormat->codecType == TranscodingVideoCodecType::kHevc &&
+        strcmp(originalMime, AMEDIA_MIMETYPE_VIDEO_HEVC)) {
         AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_HEVC);
         changed = true;
-    } else if (requestedFormat->codecType == TranscodingVideoCodecType::kAvc
-        && strcmp(originalMime, AMEDIA_MIMETYPE_VIDEO_AVC)) {
+    } else if (requestedFormat->codecType == TranscodingVideoCodecType::kAvc &&
+               strcmp(originalMime, AMEDIA_MIMETYPE_VIDEO_AVC)) {
         AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_AVC);
         changed = true;
     }

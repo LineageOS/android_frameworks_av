@@ -49,7 +49,6 @@ cc_library_shared {
         "TranscodingJobScheduler.cpp",
         "TranscodingUidPolicy.cpp",
         "TranscoderWrapper.cpp",
-        "NdkCommon.cpp",
     ],
 
     shared_libs: [
