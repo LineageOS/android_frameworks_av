@@ -49,7 +49,6 @@ static constexpr int COLOR_FormatSurface = 0x7f000789;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES;
-extern const char* TBD_AMEDIAFORMAT_KEY_BIT_RATE_MODE;
 static constexpr int TBD_AMEDIACODEC_BUFFER_FLAG_KEY_FRAME = 0x1;
 
 static constexpr int kBitrateModeConstant = 2;
