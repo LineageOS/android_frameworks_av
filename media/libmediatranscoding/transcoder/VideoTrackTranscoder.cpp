@@ -139,6 +139,10 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     }
     AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT, kColorFormatSurface);
 
+    // Always encode without rotation. The rotation degree will be transferred directly to
+    // MediaSampleWriter track format, and MediaSampleWriter will call AMediaMuxer_setOrientationHint.
+    AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_ROTATION, 0);
+
     mDestinationFormat = std::shared_ptr<AMediaFormat>(encoderFormat, &AMediaFormat_delete);
 
     // Create and configure the encoder.
@@ -339,23 +343,33 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
     // at container level. This is supposed to override any SAR settings in the bitstream,
     // thus should always be transferred to the container of the transcoded file.
     int32_t sarWidth, sarHeight;
-    if (AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_SAR_WIDTH, &sarWidth) &&
+    if (AMediaFormat_getInt32(mSourceFormat.get(), AMEDIAFORMAT_KEY_SAR_WIDTH, &sarWidth) &&
         (sarWidth > 0) &&
-        AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_SAR_HEIGHT, &sarHeight) &&
+        AMediaFormat_getInt32(mSourceFormat.get(), AMEDIAFORMAT_KEY_SAR_HEIGHT, &sarHeight) &&
         (sarHeight > 0)) {
         AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_SAR_WIDTH, sarWidth);
         AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_SAR_HEIGHT, sarHeight);
     }
     // Transfer DAR settings.
     int32_t displayWidth, displayHeight;
-    if (AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_DISPLAY_WIDTH,
-                              &displayWidth) &&
+    if (AMediaFormat_getInt32(mSourceFormat.get(), AMEDIAFORMAT_KEY_DISPLAY_WIDTH, &displayWidth) &&
         (displayWidth > 0) &&
-        AMediaFormat_getInt32(mDestinationFormat.get(), AMEDIAFORMAT_KEY_DISPLAY_HEIGHT,
+        AMediaFormat_getInt32(mSourceFormat.get(), AMEDIAFORMAT_KEY_DISPLAY_HEIGHT,
                               &displayHeight) &&
         (displayHeight > 0)) {
         AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_DISPLAY_WIDTH, displayWidth);
         AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_DISPLAY_HEIGHT, displayHeight);
+    }
+
+    // Transfer rotation settings.
+    // Note that muxer itself doesn't take rotation from the track format. It requires
+    // AMediaMuxer_setOrientationHint to set the rotation. Here we pass the rotation to
+    // MediaSampleWriter using the track format. MediaSampleWriter will then call
+    // AMediaMuxer_setOrientationHint as needed.
+    int32_t rotation;
+    if (AMediaFormat_getInt32(mSourceFormat.get(), AMEDIAFORMAT_KEY_ROTATION, &rotation) &&
+        (rotation != 0)) {
+        AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_ROTATION, rotation);
     }
 
     // TODO: transfer other fields as required.

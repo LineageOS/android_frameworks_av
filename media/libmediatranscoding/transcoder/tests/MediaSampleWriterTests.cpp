@@ -58,7 +58,7 @@ private:
 class TestMuxer : public MediaSampleWriterMuxerInterface {
 public:
     // MuxerInterface
-    ssize_t addTrack(const AMediaFormat* trackFormat) override {
+    ssize_t addTrack(AMediaFormat* trackFormat) override {
         mEventQueue.push_back(AddTrack(trackFormat));
         return mTrackCount++;
     }
