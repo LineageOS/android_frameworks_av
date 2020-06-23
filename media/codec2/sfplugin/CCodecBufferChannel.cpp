@@ -1712,6 +1712,17 @@ bool CCodecBufferChannel::handleWork(
                 }
                 break;
             }
+            case C2PortTunnelSystemTime::CORE_INDEX: {
+                C2PortTunnelSystemTime::output frameRenderTime;
+                if (frameRenderTime.updateFrom(*param)) {
+                    ALOGV("[%s] onWorkDone: frame rendered (sys:%lld ns, media:%lld us)",
+                          mName, (long long)frameRenderTime.value,
+                          (long long)worklet->output.ordinal.timestamp.peekll());
+                    mCCodecCallback->onOutputFramesRendered(
+                            worklet->output.ordinal.timestamp.peek(), frameRenderTime.value);
+                }
+                break;
+            }
             default:
                 ALOGV("[%s] onWorkDone: unrecognized config update (%08X)",
                       mName, param->index());
