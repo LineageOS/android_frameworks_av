@@ -212,9 +212,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     setSamplesPerFrame(mAudioRecord->channelCount());
 
     int32_t actualSampleRate = mAudioRecord->getSampleRate();
-    ALOGW_IF(actualSampleRate != getSampleRate(),
-             "open() sampleRate changed from %d to %d",
-             getSampleRate(), actualSampleRate);
     setSampleRate(actualSampleRate);
 
     // We may need to pass the data through a block size adapter to guarantee constant size.
