@@ -15,6 +15,7 @@
  */
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkCommon"
+
 #include <log/log.h>
 #include <media/NdkCommon.h>
 
@@ -37,4 +38,3 @@ const char* AMEDIA_MIMETYPE_VIDEO_H263 = "video/3gpp";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES = "max-bframes";
-const char* TBD_AMEDIAFORMAT_KEY_BIT_RATE_MODE = "bitrate-mode";

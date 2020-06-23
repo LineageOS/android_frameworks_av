@@ -23,6 +23,7 @@ cc_library_shared {
         "MediaSampleWriter.cpp",
         "MediaTrackTranscoder.cpp",
         "MediaTranscoder.cpp",
+        "NdkCommon.cpp",
         "PassthroughTrackTranscoder.cpp",
         "VideoTrackTranscoder.cpp",
     ],

@@ -32,7 +32,7 @@ typedef std::function<CameraMetadata (const String8 &)> metadataGetter;
 class SessionConfigurationUtils {
 public:
     // utility function to convert AIDL SessionConfiguration to HIDL
-    // streamConfiguration. Also checks for sanity of SessionConfiguration and
+    // streamConfiguration. Also checks for validity of SessionConfiguration and
     // returns a non-ok binder::Status if the passed in session configuration
     // isn't valid.
     static binder::Status
