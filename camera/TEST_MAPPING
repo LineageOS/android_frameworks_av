@@ -1,0 +1,11 @@
+{
+  "postsubmit": [
+    {
+      "name": "CtsCameraTestCases"
+    },
+    {
+      "name": "CtsCameraTestCases",
+      "keywords": ["primary-device"]
+    }
+  ]
+}
