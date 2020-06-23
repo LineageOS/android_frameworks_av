@@ -1640,7 +1640,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
                     cameraId.string(), clientName8.string(), clientPid);
         }
 
-        // Enforce client permissions and do basic sanity checks
+        // Enforce client permissions and do basic validity checks
         if(!(ret = validateConnectLocked(cameraId, clientName8,
                 /*inout*/clientUid, /*inout*/clientPid, /*out*/originalClientPid)).isOk()) {
             return ret;
