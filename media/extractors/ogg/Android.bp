@@ -20,4 +20,11 @@ cc_library {
         "libvorbisidec",
     ],
 
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }

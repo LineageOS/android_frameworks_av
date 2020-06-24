@@ -10,4 +10,11 @@ cc_library {
         "libutils",
     ],
 
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
