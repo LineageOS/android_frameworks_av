@@ -8,12 +8,6 @@ cc_library_shared {
 
     srcs: ["PreProcessing.cpp"],
 
-    include_dirs: [
-        "external/webrtc",
-        "external/webrtc/webrtc/modules/include",
-        "external/webrtc/webrtc/modules/audio_processing/include",
-    ],
-
     shared_libs: [
         "libwebrtc_audio_preprocessing",
         "libspeexresampler",
