@@ -25,6 +25,7 @@ aidl_interface {
         "aidl/android/media/ITranscodingClientCallback.aidl",
         "aidl/android/media/TranscodingErrorCode.aidl",
         "aidl/android/media/TranscodingJobPriority.aidl",
+        "aidl/android/media/TranscodingJobStats.aidl",
         "aidl/android/media/TranscodingType.aidl",
         "aidl/android/media/TranscodingVideoCodecType.aidl",
         "aidl/android/media/TranscodingVideoTrackFormat.aidl",

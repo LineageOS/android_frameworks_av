@@ -351,7 +351,8 @@ void TranscodingJobScheduler::onFinish(ClientIdType clientId, JobIdType jobId) {
             auto clientCallback = mJobMap[jobKey].callback.lock();
             if (clientCallback != nullptr) {
                 clientCallback->onTranscodingFinished(
-                        jobId, TranscodingResultParcel({jobId, -1 /*actualBitrateBps*/}));
+                        jobId, TranscodingResultParcel({jobId, -1 /*actualBitrateBps*/,
+                                                        std::nullopt /*jobStats*/}));
             }
         }
 
