@@ -566,7 +566,7 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
         release();
     }
 
-    if (fallocate(mFd, FALLOC_FL_KEEP_SIZE, 0, 1) == 0) {
+    if (fallocate64(mFd, FALLOC_FL_KEEP_SIZE, 0, 1) == 0) {
         ALOGD("PreAllocation enabled");
         mPreAllocationEnabled = true;
     } else {
@@ -1862,7 +1862,7 @@ bool MPEG4Writer::preAllocate(uint64_t wantSize) {
     ALOGV("preAllocateSize :%" PRIu64 " lastFileEndOffset:%" PRIu64, preAllocateSize,
           lastFileEndOffset);
 
-    int res = fallocate(mFd, FALLOC_FL_KEEP_SIZE, lastFileEndOffset, preAllocateSize);
+    int res = fallocate64(mFd, FALLOC_FL_KEEP_SIZE, lastFileEndOffset, preAllocateSize);
     if (res == -1) {
         ALOGE("fallocate err:%s, %d, fd:%d", strerror(errno), errno, mFd);
         sp<AMessage> msg = new AMessage(kWhatFallocateError, mReflector);
@@ -1889,7 +1889,7 @@ bool MPEG4Writer::truncatePreAllocation() {
     ALOGD("ftruncate mPreAllocateFileEndOffset:%" PRId64 " mOffset:%" PRIu64
           " mMdatEndOffset:%" PRIu64 " diff:%" PRId64, mPreAllocateFileEndOffset, mOffset,
           mMdatEndOffset, mPreAllocateFileEndOffset - endOffset);
-    if(ftruncate(mFd, endOffset) == -1) {
+    if (ftruncate64(mFd, endOffset) == -1) {
         ALOGE("ftruncate err:%s, %d, fd:%d", strerror(errno), errno, mFd);
         status = false;
         /* No need to post and handle(stop & notify client) error like it's done in preAllocate(),
