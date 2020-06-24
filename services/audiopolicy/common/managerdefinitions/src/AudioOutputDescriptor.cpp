@@ -690,7 +690,9 @@ bool SwAudioOutputCollection::isActiveLocally(VolumeSource volumeSource, uint32_
         const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
         if (outputDesc->isActive(volumeSource, inPastMs, sysTime)
                 && (!(outputDesc->devices()
-                        .containsDeviceAmongTypes(getAllOutRemoteDevices())))) {
+                        .containsDeviceAmongTypes(getAllOutRemoteDevices())
+                        || outputDesc->devices()
+                            .onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX)))) {
             return true;
         }
     }
@@ -722,7 +724,11 @@ bool SwAudioOutputCollection::isStrategyActiveOnSameModule(product_strategy_t ps
         const sp<SwAudioOutputDescriptor> otherDesc = valueAt(i);
         if (desc->sharesHwModuleWith(otherDesc) &&
                 otherDesc->isStrategyActive(ps, inPastMs, sysTime)) {
-            return true;
+            if (desc == otherDesc
+                    || !otherDesc->devices()
+                            .onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX)) {
+                return true;
+            }
         }
     }
     return false;
