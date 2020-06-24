@@ -45,4 +45,4 @@ docs-internal: $(C2_OUT_TEMP)/doxy-internal.config check-doxygen
 .PHONY: docs-all
 docs-all: docs-api docs-internal
 
-include $(call all-makefiles-under,$(call my-dir))
+include $(call first-makefiles-under,$(call my-dir))
