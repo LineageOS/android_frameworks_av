@@ -195,9 +195,6 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     setDeviceFormat(mAudioTrack->format());
 
     int32_t actualSampleRate = mAudioTrack->getSampleRate();
-    ALOGW_IF(actualSampleRate != getSampleRate(),
-             "open() sampleRate changed from %d to %d",
-             getSampleRate(), actualSampleRate);
     setSampleRate(actualSampleRate);
 
     // We may need to pass the data through a block size adapter to guarantee constant size.
@@ -240,11 +237,11 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     setSharingMode(AAUDIO_SHARING_MODE_SHARED); // EXCLUSIVE mode not supported in legacy
 
-    // Log warning if we did not get what we asked for.
-    ALOGW_IF(actualFlags != flags,
+    // Log if we did not get what we asked for.
+    ALOGD_IF(actualFlags != flags,
              "open() flags changed from 0x%08X to 0x%08X",
              flags, actualFlags);
-    ALOGW_IF(actualPerformanceMode != perfMode,
+    ALOGD_IF(actualPerformanceMode != perfMode,
              "open() perfMode changed from %d to %d",
              perfMode, actualPerformanceMode);
 
