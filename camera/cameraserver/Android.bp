@@ -36,7 +36,7 @@ cc_binary {
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
     ],
-    compile_multilib: "32",
+    compile_multilib: "prefer32",
     cflags: [
         "-Wall",
         "-Wextra",
