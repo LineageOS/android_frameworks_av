@@ -293,6 +293,30 @@ status_t C2SoftAacEnc::setAudioParams() {
     return OK;
 }
 
+static void MaybeLogTimestampWarning(
+        long long lastFrameEndTimestampUs, long long inputTimestampUs) {
+    using Clock = std::chrono::steady_clock;
+    thread_local Clock::time_point sLastLogTimestamp{};
+    thread_local int32_t sOverlapCount = -1;
+    if (Clock::now() - sLastLogTimestamp > std::chrono::minutes(1) || sOverlapCount < 0) {
+        AString countMessage = "";
+        if (sOverlapCount > 0) {
+            countMessage = AStringPrintf(
+                    "(%d overlapping timestamp detected since last log)", sOverlapCount);
+        }
+        ALOGI("Correcting overlapping timestamp: last frame ended at %lldus but "
+                "current frame is starting at %lldus. Using the last frame's end timestamp %s",
+                lastFrameEndTimestampUs, inputTimestampUs, countMessage.c_str());
+        sLastLogTimestamp = Clock::now();
+        sOverlapCount = 0;
+    } else {
+        ALOGV("Correcting overlapping timestamp: last frame ended at %lldus but "
+                "current frame is starting at %lldus. Using the last frame's end timestamp",
+                lastFrameEndTimestampUs, inputTimestampUs);
+        ++sOverlapCount;
+    }
+}
+
 void C2SoftAacEnc::process(
         const std::unique_ptr<C2Work> &work,
         const std::shared_ptr<C2BlockPool> &pool) {
@@ -366,9 +390,7 @@ void C2SoftAacEnc::process(
     }
     c2_cntr64_t inputTimestampUs = work->input.ordinal.timestamp;
     if (inputTimestampUs < mLastFrameEndTimestampUs.value_or(inputTimestampUs)) {
-        ALOGW("Correcting overlapping timestamp: last frame ended at %lldus but "
-              "current frame is starting at %lldus. Using the last frame's end timestamp",
-              mLastFrameEndTimestampUs->peekll(), inputTimestampUs.peekll());
+        MaybeLogTimestampWarning(mLastFrameEndTimestampUs->peekll(), inputTimestampUs.peekll());
         inputTimestampUs = *mLastFrameEndTimestampUs;
     }
     if (capacity > 0) {
