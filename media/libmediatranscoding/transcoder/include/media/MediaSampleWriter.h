@@ -41,7 +41,7 @@ public:
      * @param trackFormat Format of the new track.
      * @return A non-negative track index on success, or a negative number on failure.
      */
-    virtual ssize_t addTrack(const AMediaFormat* trackFormat) = 0;
+    virtual ssize_t addTrack(AMediaFormat* trackFormat) = 0;
 
     /** Starts the muxer. */
     virtual media_status_t start() = 0;
