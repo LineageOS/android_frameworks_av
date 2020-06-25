@@ -185,7 +185,8 @@ struct TestScheduler : public SchedulerClientInterface {
             auto clientCallback = it->second.callback.lock();
             if (clientCallback != nullptr) {
                 clientCallback->onTranscodingFinished(
-                        mLastJob.second, TranscodingResultParcel({mLastJob.second, 0}));
+                        mLastJob.second,
+                        TranscodingResultParcel({mLastJob.second, 0, std::nullopt}));
             }
         }
         mJobs.erase(it);
