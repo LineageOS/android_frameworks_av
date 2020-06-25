@@ -314,8 +314,11 @@ aaudio_result_t AudioStream::safeRelease() {
 
 void AudioStream::setState(aaudio_stream_state_t state) {
     ALOGD("%s(s#%d) from %d to %d", __func__, getId(), mState, state);
+    if (state == mState) {
+        return; // no change
+    }
     // Track transition to DISCONNECTED state.
-    if (state == AAUDIO_STREAM_STATE_DISCONNECTED && mState != state) {
+    if (state == AAUDIO_STREAM_STATE_DISCONNECTED) {
         android::mediametrics::LogItem(mMetricsId)
                 .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
                 .set(AMEDIAMETRICS_PROP_STATE, AudioGlobal_convertStreamStateToText(getState()))
@@ -323,18 +326,18 @@ void AudioStream::setState(aaudio_stream_state_t state) {
     }
     // CLOSED is a final state
     if (mState == AAUDIO_STREAM_STATE_CLOSED) {
-        ALOGE("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
+        ALOGW("%s(%d) tried to set to %d but already CLOSED", __func__, getId(), state);
 
     // Once CLOSING, we can only move to CLOSED state.
     } else if (mState == AAUDIO_STREAM_STATE_CLOSING
                && state != AAUDIO_STREAM_STATE_CLOSED) {
-        ALOGE("%s(%d) tried to set to %d but already CLOSING", __func__, getId(), state);
+        ALOGW("%s(%d) tried to set to %d but already CLOSING", __func__, getId(), state);
 
     // Once DISCONNECTED, we can only move to CLOSING or CLOSED state.
     } else if (mState == AAUDIO_STREAM_STATE_DISCONNECTED
                && !(state == AAUDIO_STREAM_STATE_CLOSING
                    || state == AAUDIO_STREAM_STATE_CLOSED)) {
-        ALOGE("%s(%d) tried to set to %d but already DISCONNECTED", __func__, getId(), state);
+        ALOGW("%s(%d) tried to set to %d but already DISCONNECTED", __func__, getId(), state);
 
     } else {
         mState = state;
