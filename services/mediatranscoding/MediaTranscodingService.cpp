@@ -84,7 +84,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 //static
 void MediaTranscodingService::instantiate() {
     std::shared_ptr<TranscoderInterface> transcoder;
-    if (property_get_bool("debug.transcoding.simulated_transcoder", true)) {
+    if (property_get_bool("debug.transcoding.simulated_transcoder", false)) {
         transcoder = std::make_shared<SimulatedTranscoder>();
     } else {
         transcoder = std::make_shared<TranscoderWrapper>();
