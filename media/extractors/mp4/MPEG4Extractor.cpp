@@ -150,6 +150,7 @@ private:
 
     bool mIsHeif;
     bool mIsAudio;
+    bool mIsUsac = false;
     sp<ItemTable> mItemTable;
 
     /* Shift start offset (move to earlier time) when media_time > 0,
@@ -4456,7 +4457,7 @@ typedef enum {
     //AOT_SLS              = 38, /**< SLS                                       */
     //AOT_ER_AAC_ELD       = 39, /**< AAC Enhanced Low Delay                    */
 
-    //AOT_USAC             = 42, /**< USAC                                      */
+    AOT_USAC               = 42, /**< USAC                                      */
     //AOT_SAOC             = 43, /**< SAOC                                      */
     //AOT_LD_MPEGS         = 44, /**< Low Delay MPEG Surround                   */
 
@@ -4604,7 +4605,7 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
     ABitReader br(csd, csd_size);
     uint32_t objectType = br.getBits(5);
 
-    if (objectType == 31) {  // AAC-ELD => additional 6 bits
+    if (objectType == AOT_ESCAPE) {  // AAC-ELD => additional 6 bits
         objectType = 32 + br.getBits(6);
     }
 
@@ -4980,6 +4981,12 @@ MPEG4Source::MPEG4Source(
 
     mIsPcm = !strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_RAW);
     mIsAudio = !strncasecmp(mime, "audio/", 6);
+
+    int32_t aacObjectType = -1;
+
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_AAC_PROFILE, &aacObjectType)) {
+        mIsUsac = (aacObjectType == AOT_USAC);
+    }
 
     if (mIsPcm) {
         int32_t numChannels = 0;
@@ -5974,10 +5981,10 @@ media_status_t MPEG4Source::read(
             }
 
             uint32_t syncSampleIndex = sampleIndex;
-            // assume every audio sample is a sync sample. This works around
+            // assume every non-USAC audio sample is a sync sample. This works around
             // seek issues with files that were incorrectly written with an
             // empty or single-sample stss block for the audio track
-            if (err == OK && !mIsAudio) {
+            if (err == OK && (!mIsAudio || mIsUsac)) {
                 err = mSampleTable->findSyncSampleNear(
                         sampleIndex, &syncSampleIndex, findFlags);
             }
