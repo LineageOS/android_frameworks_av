@@ -1145,7 +1145,12 @@ INSTANTIATE_TEST_SUITE_P(
                 make_tuple("ogg", "john_cage.ogg", 1, true),
                 make_tuple("ogg", "testopus.opus", 1, true),
                 make_tuple("ogg", "sinesweepoggalbumart.ogg", 1, true),
+                make_tuple("wav", "loudsoftwav.wav", 1, true),
                 make_tuple("wav", "monotestgsm.wav", 1, true),
+                make_tuple("wav", "noise_5ch_44khz_aot2_wave.wav", 1, true),
+                make_tuple("wav", "sine1khzm40db_alaw.wav", 1, true),
+                make_tuple("wav", "sine1khzm40db_f32le.wav", 1, true),
+                make_tuple("wav", "sine1khzm40db_mulaw.wav", 1, true),
 
                 make_tuple("mkv", "swirl_144x136_avc.mkv", 1, true),
                 make_tuple("mkv", "withoutcues.mkv", 2, true),
