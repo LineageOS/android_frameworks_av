@@ -380,20 +380,24 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
 }
 
 media_status_t VideoTrackTranscoder::runTranscodeLoop() {
-    media_status_t status = AMEDIA_OK;
+    // Push start decoder and encoder as two messages, so that these are subject to the
+    // stop request as well. If the job is cancelled (or paused) immediately after start,
+    // we don't need to waste time start then stop the codecs.
+    mCodecMessageQueue.push([this] {
+        media_status_t status = AMediaCodec_start(mDecoder);
+        if (status != AMEDIA_OK) {
+            LOG(ERROR) << "Unable to start video decoder: " << status;
+            mStatus = status;
+        }
+    });
 
-    status = AMediaCodec_start(mDecoder);
-    if (status != AMEDIA_OK) {
-        LOG(ERROR) << "Unable to start video decoder: " << status;
-        return status;
-    }
-
-    status = AMediaCodec_start(mEncoder.get());
-    if (status != AMEDIA_OK) {
-        LOG(ERROR) << "Unable to start video encoder: " << status;
-        AMediaCodec_stop(mDecoder);
-        return status;
-    }
+    mCodecMessageQueue.push([this] {
+        media_status_t status = AMediaCodec_start(mEncoder.get());
+        if (status != AMEDIA_OK) {
+            LOG(ERROR) << "Unable to start video encoder: " << status;
+            mStatus = status;
+        }
+    });
 
     // Process codec events until EOS is reached, transcoding is stopped or an error occurs.
     while (!mStopRequested && !mEosFromEncoder && mStatus == AMEDIA_OK) {
