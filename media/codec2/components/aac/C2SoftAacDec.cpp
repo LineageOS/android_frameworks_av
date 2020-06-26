@@ -791,7 +791,6 @@ void C2SoftAacDec::process(
 
                 // After an error, replace bufferSize with the sum of the
                 // decodedSizes to resynchronize the in/out lists.
-                inInfo.decodedSizes.pop_back();
                 inInfo.bufferSize = std::accumulate(
                         inInfo.decodedSizes.begin(), inInfo.decodedSizes.end(), 0);
 
