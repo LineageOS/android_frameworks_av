@@ -40,7 +40,7 @@ DEFINE_FORMAT_VALUE_EQUAL_FUNC(int32_t, Int32);
 
 struct FormatVerifierEntry {
     const char* key;
-    bool (*equal)(const char* key, AMediaFormat* src, AMediaFormat* dst);
+    std::function<bool(const char*, AMediaFormat*, AMediaFormat*)> equal;
 };
 
 static const FormatVerifierEntry kFieldsToPreserve[] = {
@@ -91,11 +91,6 @@ private:
     std::condition_variable mCondition;
     bool mFinished = false;
 };
-
-static const char* SOURCE_PATH_AVC =
-        "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
-static const char* SOURCE_PATH_HEVC =
-        "/data/local/tmp/TranscodingTestAssets/jets_hevc_1280x720_20Mbps.mp4";
 
 // Write-only, create file if non-existent, don't overwrite existing file.
 static constexpr int kOpenFlags = O_WRONLY | O_CREAT | O_EXCL;
@@ -161,6 +156,44 @@ public:
         return mCallbacks->mStatus;
     }
 
+    void testTranscodeVideo(const char* srcPath, const char* destPath, const char* dstMime) {
+        const int32_t kBitRate = 8 * 1000 * 1000;  // 8Mbs
+
+        EXPECT_EQ(
+                transcodeHelper(
+                        srcPath, destPath,
+                        [dstMime](AMediaFormat* sourceFormat) {
+                            AMediaFormat* format = nullptr;
+                            const char* mime = nullptr;
+                            AMediaFormat_getString(sourceFormat, AMEDIAFORMAT_KEY_MIME, &mime);
+
+                            if (strncmp(mime, "video/", 6) == 0) {
+                                format = AMediaFormat_new();
+                                AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, kBitRate);
+
+                                if (dstMime != nullptr) {
+                                    AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, dstMime);
+                                }
+                            }
+                            return format;
+                        }),
+                AMEDIA_OK);
+
+        if (dstMime != nullptr) {
+            std::vector<FormatVerifierEntry> extraVerifiers = {
+                    {AMEDIAFORMAT_KEY_MIME,
+                     [dstMime](const char* key, AMediaFormat* src __unused, AMediaFormat* dst) {
+                         const char* mime = nullptr;
+                         AMediaFormat_getString(dst, key, &mime);
+                         return !strcmp(mime, dstMime);
+                     }},
+            };
+            verifyOutputFormat(destPath, &extraVerifiers);
+        } else {
+            verifyOutputFormat(destPath);
+        }
+    }
+
     void verifyOutputFormat(const char* destPath,
                             const std::vector<FormatVerifierEntry>* extraVerifiers = nullptr) {
         int dstFd = open(destPath, O_RDONLY);
@@ -194,7 +227,8 @@ public:
 
         for (int i = 0; i < (sizeof(kFieldsToPreserve) / sizeof(kFieldsToPreserve[0])); ++i) {
             EXPECT_TRUE(kFieldsToPreserve[i].equal(kFieldsToPreserve[i].key,
-                                                   mSourceVideoFormat.get(), videoFormat.get()));
+                                                   mSourceVideoFormat.get(), videoFormat.get()))
+                    << "Failed at key " << kFieldsToPreserve[i].key;
         }
 
         if (extraVerifiers != nullptr) {
@@ -212,76 +246,31 @@ public:
 };
 
 TEST_F(MediaTranscoderTests, TestPassthrough) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
     const char* destPath = "/data/local/tmp/MediaTranscoder_Passthrough.MP4";
 
-    EXPECT_EQ(transcodeHelper(SOURCE_PATH_AVC, destPath, [](AMediaFormat*) { return nullptr; }),
-              AMEDIA_OK);
+    EXPECT_EQ(transcodeHelper(srcPath, destPath, [](AMediaFormat*) { return nullptr; }), AMEDIA_OK);
 
     verifyOutputFormat(destPath);
 }
 
-TEST_F(MediaTranscoderTests, TestBasicVideoTranscodeAvcToAvc) {
-    const char* destPath = "/data/local/tmp/MediaTranscoder_VideoTranscodeAvcToAvc.MP4";
-    const int32_t kBitRate = 8 * 1000 * 1000;  // 8Mbs
-
-    EXPECT_EQ(transcodeHelper(
-                      SOURCE_PATH_AVC, destPath,
-                      [](AMediaFormat* sourceFormat) {
-                          AMediaFormat* format = nullptr;
-                          const char* mime = nullptr;
-                          AMediaFormat_getString(sourceFormat, AMEDIAFORMAT_KEY_MIME, &mime);
-
-                          if (strncmp(mime, "video/", 6) == 0) {
-                              format = AMediaFormat_new();
-                              AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, kBitRate);
-                          }
-                          return format;
-                      }),
-              AMEDIA_OK);
-
-    std::vector<FormatVerifierEntry> extraVerifiers = {
-            {AMEDIAFORMAT_KEY_MIME,
-             [](const char* key, AMediaFormat* src __unused, AMediaFormat* dst) {
-                 const char* mime = nullptr;
-                 AMediaFormat_getString(dst, key, &mime);
-                 return !strcmp(mime, AMEDIA_MIMETYPE_VIDEO_AVC);
-             }},
-    };
-
-    verifyOutputFormat(destPath, &extraVerifiers);
+TEST_F(MediaTranscoderTests, TestVideoTranscode_AvcToAvc_Basic) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_VideoTranscode_AvcToAvc_Basic.MP4";
+    testTranscodeVideo(srcPath, destPath, nullptr /*dstMime*/);
 }
 
-TEST_F(MediaTranscoderTests, TestBasicVideoTranscodeHevcToAvc) {
-    const char* destPath = "/data/local/tmp/MediaTranscoder_VideoTranscodeHevcToAvc.MP4";
+TEST_F(MediaTranscoderTests, TestVideoTranscode_HevcToAvc_Basic) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/jets_hevc_1280x720_20Mbps.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_VideoTranscode_HevcToAvc_Basic.MP4";
+    testTranscodeVideo(srcPath, destPath, AMEDIA_MIMETYPE_VIDEO_AVC);
+}
 
-    EXPECT_EQ(transcodeHelper(
-                      SOURCE_PATH_HEVC, destPath,
-                      [](AMediaFormat* sourceFormat) {
-                          AMediaFormat* format = nullptr;
-                          const char* mime = nullptr;
-                          AMediaFormat_getString(sourceFormat, AMEDIAFORMAT_KEY_MIME, &mime);
-
-                          if (strncmp(mime, "video/", 6) == 0) {
-                              const int32_t kBitRate = 8 * 1000 * 1000;  // 8Mbs
-                              format = AMediaFormat_new();
-                              AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, kBitRate);
-                              AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME,
-                                                     AMEDIA_MIMETYPE_VIDEO_AVC);
-                          }
-                          return format;
-                      }),
-              AMEDIA_OK);
-
-    std::vector<FormatVerifierEntry> extraVerifiers = {
-            {AMEDIAFORMAT_KEY_MIME,
-             [](const char* key, AMediaFormat* src __unused, AMediaFormat* dst) {
-                 const char* mime = nullptr;
-                 AMediaFormat_getString(dst, key, &mime);
-                 return !strcmp(mime, AMEDIA_MIMETYPE_VIDEO_AVC);
-             }},
-    };
-
-    verifyOutputFormat(destPath, &extraVerifiers);
+TEST_F(MediaTranscoderTests, TestVideoTranscode_HevcToAvc_Rotation) {
+    const char* srcPath =
+            "/data/local/tmp/TranscodingTestAssets/desk_hevc_1920x1080_aac_48KHz_rot90.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_VideoTranscode_HevcToAvc_Rotation.MP4";
+    testTranscodeVideo(srcPath, destPath, AMEDIA_MIMETYPE_VIDEO_AVC);
 }
 
 }  // namespace android

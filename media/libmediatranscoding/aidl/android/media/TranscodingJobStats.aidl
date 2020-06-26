@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,29 +16,30 @@
 
 package android.media;
 
-import android.media.TranscodingJobStats;
-
 /**
- * Result of the transcoding.
+ * TranscodingJobStats encapsulated the stats of the a TranscodingJob.
  *
  * {@hide}
  */
-//TODO(hkuang): Implement the parcelable.
-parcelable TranscodingResultParcel {
+parcelable TranscodingJobStats {
     /**
-     * The jobId associated with the TranscodingResult.
+     * System time of when the job is created.
      */
-    int jobId;
+    long jobCreatedTimeUs;
 
     /**
-     * Actual bitrate of the transcoded video in bits per second. This will only present for video
-     * transcoding. -1 means not available.
+     * System time of when the job is finished.
      */
-    int actualBitrateBps;
+    long jobFinishedTimeUs;
 
     /**
-     * Stats of the transcoding job. This will only be available when client requests to get the
-     * stats in TranscodingRequestParcel.
+     * Total time spend on transcoding, exclude the time in pause.
      */
-    @nullable TranscodingJobStats jobStats;
+    long totalProcessingTimeUs;
+
+    /**
+     * Total time spend on handling the job, include the time in pause.
+     * The totaltimeUs is actually the same as jobFinishedTimeUs - jobCreatedTimeUs.
+     */
+    long totalTimeUs;
 }
