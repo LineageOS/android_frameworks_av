@@ -21,5 +21,5 @@ fi
 
 #TODO(hkuang): Check if the destination folder already exists. If so, skip the copying.
 echo "Copying files to device"
-adb push $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets /data/local/tmp/TranscodingTestAssets
+adb push $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/* /data/local/tmp/TranscodingTestAssets
 echo "Copy done"

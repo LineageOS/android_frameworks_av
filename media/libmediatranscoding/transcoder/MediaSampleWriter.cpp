@@ -26,7 +26,19 @@ namespace android {
 class DefaultMuxer : public MediaSampleWriterMuxerInterface {
 public:
     // MediaSampleWriterMuxerInterface
-    ssize_t addTrack(const AMediaFormat* trackFormat) override {
+    ssize_t addTrack(AMediaFormat* trackFormat) override {
+        // If the track format has rotation, need to call AMediaMuxer_setOrientationHint
+        // to set the rotation. Muxer doesn't take rotation specified on the track.
+        const char* mime;
+        if (AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &mime) &&
+            strncmp(mime, "video/", 6) == 0) {
+            int32_t rotation;
+            if (AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_ROTATION, &rotation) &&
+                (rotation != 0)) {
+                AMediaMuxer_setOrientationHint(mMuxer, rotation);
+            }
+        }
+
         return AMediaMuxer_addTrack(mMuxer, trackFormat);
     }
     media_status_t start() override { return AMediaMuxer_start(mMuxer); }
