@@ -141,6 +141,7 @@ aaudio_result_t AudioStream::systemStart() {
         case AAUDIO_STREAM_STATE_PAUSED:
         case AAUDIO_STREAM_STATE_STOPPING:
         case AAUDIO_STREAM_STATE_STOPPED:
+        case AAUDIO_STREAM_STATE_FLUSHING:
         case AAUDIO_STREAM_STATE_FLUSHED:
             break; // Proceed with starting.
 
