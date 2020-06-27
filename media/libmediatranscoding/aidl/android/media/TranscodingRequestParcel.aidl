@@ -76,5 +76,12 @@ parcelable TranscodingRequestParcel {
     /**
      * Test configuration. This will be available only when isForTesting is set to true.
      */
-     @nullable TranscodingTestConfig testConfig;
+    @nullable TranscodingTestConfig testConfig;
+
+     /**
+      * Whether to get the stats of the transcoding.
+      * If this is enabled, the TranscodingJobStats will be returned in TranscodingResultParcel
+      * upon transcoding finishes.
+      */
+    boolean enableStats = false;
 }
