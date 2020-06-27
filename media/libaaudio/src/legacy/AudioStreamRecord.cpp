@@ -345,13 +345,17 @@ aaudio_result_t AudioStreamRecord::requestStart()
     // Enable callback before starting AudioRecord to avoid shutting
     // down because of a race condition.
     mCallbackEnabled.store(true);
+    aaudio_stream_state_t originalState = getState();
+    // Set before starting the callback so that we are in the correct state
+    // before updateStateMachine() can be called by the callback.
+    setState(AAUDIO_STREAM_STATE_STARTING);
     mFramesWritten.reset32(); // service writes frames
     mTimestampPosition.reset32();
     status_t err = mAudioRecord->start(); // resets position to zero
     if (err != OK) {
+        mCallbackEnabled.store(false);
+        setState(originalState);
         return AAudioConvert_androidToAAudioResult(err);
-    } else {
-        setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
 }
