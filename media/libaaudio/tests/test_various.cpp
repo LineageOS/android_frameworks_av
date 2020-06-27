@@ -124,7 +124,7 @@ TEST(test_various, aaudio_release_close_low_exclusive) {
 }
 
 enum FunctionToCall {
-    CALL_START, CALL_STOP, CALL_PAUSE, CALL_FLUSH
+    CALL_START, CALL_STOP, CALL_PAUSE, CALL_FLUSH, CALL_RELEASE
 };
 
 void checkStateTransition(aaudio_performance_mode_t perfMode,
@@ -177,11 +177,27 @@ void checkStateTransition(aaudio_performance_mode_t perfMode,
             } else if (originalState == AAUDIO_STREAM_STATE_PAUSED) {
                 ASSERT_EQ(AAUDIO_OK, AAudioStream_requestPause(aaudioStream));
                 inputState = AAUDIO_STREAM_STATE_PAUSING;
+            } else if (originalState == AAUDIO_STREAM_STATE_FLUSHING) {
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_requestPause(aaudioStream));
+                // We can only flush() after pause is complete.
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
+                                                                 AAUDIO_STREAM_STATE_PAUSING,
+                                                                 &state,
+                                                                 1000 * NANOS_PER_MILLISECOND));
+                ASSERT_EQ(AAUDIO_STREAM_STATE_PAUSED, state);
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_requestFlush(aaudioStream));
+                // That will put the stream into the FLUSHING state.
+                // The FLUSHING state will persist until we process functionToCall.
+                // That is because the transition to FLUSHED is caused by the callback,
+                // or by calling write() or waitForStateChange(). But those will not
+                // occur.
+            } else if (originalState == AAUDIO_STREAM_STATE_CLOSING) {
+                ASSERT_EQ(AAUDIO_OK, AAudioStream_release(aaudioStream));
             }
         }
     }
 
-    // Wait until past transitional state.
+    // Wait until we get past the transitional state if requested.
     if (inputState != AAUDIO_STREAM_STATE_UNINITIALIZED) {
         ASSERT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
                                                              inputState,
@@ -208,12 +224,20 @@ void checkStateTransition(aaudio_performance_mode_t perfMode,
             EXPECT_EQ(expectedResult, AAudioStream_requestFlush(aaudioStream));
             transitionalState = AAUDIO_STREAM_STATE_FLUSHING;
             break;
+        case FunctionToCall::CALL_RELEASE:
+            EXPECT_EQ(expectedResult, AAudioStream_release(aaudioStream));
+            // Set to UNINITIALIZED so the waitForStateChange() below will
+            // will return immediately with the current state.
+            transitionalState = AAUDIO_STREAM_STATE_UNINITIALIZED;
+            break;
     }
 
-    EXPECT_EQ(AAUDIO_OK, AAudioStream_waitForStateChange(aaudioStream,
-                                                         transitionalState,
-                                                         &state,
-                                                         1000 * NANOS_PER_MILLISECOND));
+    EXPECT_EQ(AAUDIO_OK,
+            AAudioStream_waitForStateChange(aaudioStream,
+                    transitionalState,
+                    &state,
+                    1000 * NANOS_PER_MILLISECOND));
+
     // We should not change state when a function fails.
     if (expectedResult != AAUDIO_OK) {
         ASSERT_EQ(originalState, expectedState);
@@ -491,6 +515,88 @@ checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
         FunctionToCall::CALL_FLUSH,
         AAUDIO_OK,
         AAUDIO_STREAM_STATE_FLUSHED);
+}
+
+// FLUSHING ================================================================
+TEST(test_various, aaudio_state_lowlat_flushing_start) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_FLUSHING,
+        FunctionToCall::CALL_START,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_none_flushing_start) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_FLUSHING,
+        FunctionToCall::CALL_START,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_STARTED);
+}
+
+TEST(test_various, aaudio_state_lowlat_flushing_release) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_FLUSHING,
+        FunctionToCall::CALL_RELEASE,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+TEST(test_various, aaudio_state_none_flushing_release) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_FLUSHING,
+        FunctionToCall::CALL_RELEASE,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+TEST(test_various, aaudio_state_lowlat_starting_release) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_STARTING,
+        FunctionToCall::CALL_RELEASE,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+TEST(test_various, aaudio_state_none_starting_release) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_STARTING,
+        FunctionToCall::CALL_RELEASE,
+        AAUDIO_OK,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+// CLOSING ================================================================
+TEST(test_various, aaudio_state_lowlat_closing_start) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_CLOSING,
+        FunctionToCall::CALL_START,
+        AAUDIO_ERROR_INVALID_STATE,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+TEST(test_various, aaudio_state_none_closing_start) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_CLOSING,
+        FunctionToCall::CALL_START,
+        AAUDIO_ERROR_INVALID_STATE,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+TEST(test_various, aaudio_state_lowlat_closing_stop) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+        AAUDIO_STREAM_STATE_CLOSING,
+        FunctionToCall::CALL_STOP,
+        AAUDIO_ERROR_INVALID_STATE,
+        AAUDIO_STREAM_STATE_CLOSING);
+}
+
+TEST(test_various, aaudio_state_none_closing_stop) {
+checkStateTransition(AAUDIO_PERFORMANCE_MODE_NONE,
+        AAUDIO_STREAM_STATE_CLOSING,
+        FunctionToCall::CALL_STOP,
+        AAUDIO_ERROR_INVALID_STATE,
+        AAUDIO_STREAM_STATE_CLOSING);
 }
 
 // ==========================================================================
