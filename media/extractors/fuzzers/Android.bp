@@ -132,6 +132,7 @@ cc_fuzz {
 cc_fuzz {
     name: "wav_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "wav_extractor_fuzzer.cpp",
@@ -154,6 +155,7 @@ cc_fuzz {
 cc_fuzz {
     name: "amr_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "amr_extractor_fuzzer.cpp",
@@ -173,6 +175,7 @@ cc_fuzz {
 cc_fuzz {
     name: "mkv_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "mkv_extractor_fuzzer.cpp",
@@ -196,6 +199,7 @@ cc_fuzz {
 cc_fuzz {
     name: "ogg_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "ogg_extractor_fuzzer.cpp",
@@ -243,6 +247,7 @@ cc_fuzz {
 cc_fuzz {
     name: "mp3_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "mp3_extractor_fuzzer.cpp",
@@ -262,6 +267,7 @@ cc_fuzz {
 cc_fuzz {
     name: "aac_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "aac_extractor_fuzzer.cpp",
@@ -280,6 +286,7 @@ cc_fuzz {
 cc_fuzz {
     name: "flac_extractor_fuzzer",
     defaults: ["extractor-fuzzer-defaults"],
+    host_supported: true,
 
     srcs: [
         "flac_extractor_fuzzer.cpp",
