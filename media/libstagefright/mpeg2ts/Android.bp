@@ -1,12 +1,11 @@
-cc_library_static {
-    name: "libstagefright_mpeg2support",
+cc_defaults {
+    name: "libstagefright_mpeg2support_defaults",
 
     srcs: [
         "AnotherPacketSource.cpp",
         "ATSParser.cpp",
         "CasManager.cpp",
         "ESQueue.cpp",
-        "HlsSampleDecryptor.cpp",
     ],
 
     include_dirs: [
@@ -28,7 +27,6 @@ cc_library_static {
     },
 
     shared_libs: [
-        "libcrypto",
         "libhidlmemory",
         "android.hardware.cas.native@1.0",
         "android.hidl.memory@1.0",
@@ -49,4 +47,31 @@ cc_library_static {
     ],
 
     min_sdk_version: "29",
+}
+
+
+cc_library_static {
+    name: "libstagefright_mpeg2support",
+    defaults: [
+        "libstagefright_mpeg2support_defaults",
+    ],
+    cflags: [
+        "-DENABLE_CRYPTO",
+    ],
+    shared_libs: [
+        "libcrypto",
+    ],
+    srcs: [
+        "HlsSampleDecryptor.cpp",
+    ],
+}
+
+cc_library_static {
+    name: "libstagefright_mpeg2support_nocrypto",
+    defaults: [
+        "libstagefright_mpeg2support_defaults",
+    ],
+    apex_available: [
+        "com.android.media",
+    ],
 }
