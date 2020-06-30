@@ -432,7 +432,7 @@ void NuPlayer::GenericSource::onPrepareAsync() {
             }
             if (mDataSource == nullptr) {
                 ALOGD("FileSource local");
-                mDataSource = new PlayerServiceFileSource(mFd.get(), mOffset, mLength);
+                mDataSource = new PlayerServiceFileSource(dup(mFd.get()), mOffset, mLength);
             }
         }
 
