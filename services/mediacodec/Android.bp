@@ -33,8 +33,6 @@ cc_binary {
 
     init_rc: ["mediaswcodec.rc"],
 
-    required: ["mediaswcodec.policy"],
-
     cflags: [
         "-Werror",
         "-Wall",
