@@ -1777,6 +1777,14 @@ void Camera2Client::notifyError(int32_t errorCode,
         case hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER:
             ALOGW("%s: Received recoverable error %d from HAL - ignoring, requestId %" PRId32,
                     __FUNCTION__, errorCode, resultExtras.requestId);
+
+            if ((hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST == errorCode) ||
+                    (hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT == errorCode)) {
+                Mutex::Autolock al(mLatestRequestMutex);
+
+                mLatestFailedRequestId = resultExtras.requestId;
+                mLatestRequestSignal.signal();
+            }
             mCaptureSequencer->notifyError(errorCode, resultExtras);
             return;
         default:
@@ -2303,7 +2311,7 @@ status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
 
 status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t timeout) {
     Mutex::Autolock l(mLatestRequestMutex);
-    while (mLatestRequestId != requestId) {
+    while ((mLatestRequestId != requestId) && (mLatestFailedRequestId != requestId)) {
         nsecs_t startTime = systemTime();
 
         auto res = mLatestRequestSignal.waitRelative(mLatestRequestMutex, timeout);
@@ -2312,7 +2320,7 @@ status_t Camera2Client::waitUntilRequestIdApplied(int32_t requestId, nsecs_t tim
         timeout -= (systemTime() - startTime);
     }
 
-    return OK;
+    return (mLatestRequestId == requestId) ? OK : DEAD_OBJECT;
 }
 
 void Camera2Client::notifyRequestId(int32_t requestId) {
