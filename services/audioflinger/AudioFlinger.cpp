@@ -61,6 +61,7 @@
 #include <system/audio_effects/effect_visualizer.h>
 #include <system/audio_effects/effect_ns.h>
 #include <system/audio_effects/effect_aec.h>
+#include <system/audio_effects/effect_hapticgenerator.h>
 
 #include <audio_utils/primitives.h>
 
@@ -3297,6 +3298,16 @@ AudioFlinger::PlaybackThread *AudioFlinger::fastPlaybackThread_l() const
     return minThread;
 }
 
+AudioFlinger::ThreadBase *AudioFlinger::hapticPlaybackThread_l() const {
+    for (size_t i  = 0; i < mPlaybackThreads.size(); ++i) {
+        PlaybackThread *thread = mPlaybackThreads.valueAt(i).get();
+        if (thread->hapticChannelMask() != AUDIO_CHANNEL_NONE) {
+            return thread;
+        }
+    }
+    return nullptr;
+}
+
 sp<AudioFlinger::SyncEvent> AudioFlinger::createSyncEvent(AudioSystem::sync_event_t type,
                                     audio_session_t triggerSession,
                                     audio_session_t listenerSession,
@@ -3538,6 +3549,16 @@ sp<IEffect> AudioFlinger::createEffect(
             goto Exit;
         }
 
+        const bool hapticPlaybackRequired = EffectModule::isHapticGenerator(&desc.type);
+        if (hapticPlaybackRequired
+                && (sessionId == AUDIO_SESSION_DEVICE
+                        || sessionId == AUDIO_SESSION_OUTPUT_MIX
+                        || sessionId == AUDIO_SESSION_OUTPUT_STAGE)) {
+            // haptic-generating effect is only valid when the session id is a general session id
+            lStatus = INVALID_OPERATION;
+            goto Exit;
+        }
+
         // return effect descriptor
         *pDesc = desc;
         if (io == AUDIO_IO_HANDLE_NONE && sessionId == AUDIO_SESSION_OUTPUT_MIX) {
@@ -3612,7 +3633,17 @@ sp<IEffect> AudioFlinger::createEffect(
             // allow only one effect chain per sessionId on mPlaybackThreads.
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
                 const audio_io_handle_t checkIo = mPlaybackThreads.keyAt(i);
-                if (io == checkIo) continue;
+                if (io == checkIo) {
+                    if (hapticPlaybackRequired
+                            && mPlaybackThreads.valueAt(i)
+                                    ->hapticChannelMask() == AUDIO_CHANNEL_NONE) {
+                        ALOGE("%s: haptic playback thread is required while the required playback "
+                              "thread(io=%d) doesn't support", __func__, (int)io);
+                        lStatus = BAD_VALUE;
+                        goto Exit;
+                    }
+                    continue;
+                }
                 const uint32_t sessionType =
                         mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
                 if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
@@ -3649,6 +3680,20 @@ sp<IEffect> AudioFlinger::createEffect(
 
         // create effect on selected output thread
         bool pinned = !audio_is_global_session(sessionId) && isSessionAcquired_l(sessionId);
+        ThreadBase *oriThread = nullptr;
+        if (hapticPlaybackRequired && thread->hapticChannelMask() == AUDIO_CHANNEL_NONE) {
+            ThreadBase *hapticThread = hapticPlaybackThread_l();
+            if (hapticThread == nullptr) {
+                ALOGE("%s haptic thread not found while it is required", __func__);
+                lStatus = INVALID_OPERATION;
+                goto Exit;
+            }
+            if (hapticThread != thread) {
+                // Force to use haptic thread for haptic-generating effect.
+                oriThread = thread;
+                thread = hapticThread;
+            }
+        }
         handle = thread->createEffect_l(client, effectClient, priority, sessionId,
                 &desc, enabled, &lStatus, pinned, probe);
         if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
@@ -3658,6 +3703,11 @@ sp<IEffect> AudioFlinger::createEffect(
         } else {
             // handle must be valid here, but check again to be safe.
             if (handle.get() != nullptr && id != nullptr) *id = handle->id();
+            // Invalidate audio session when haptic playback is created.
+            if (hapticPlaybackRequired && oriThread != nullptr) {
+                // invalidateTracksForAudioSession will trigger locking the thread.
+                oriThread->invalidateTracksForAudioSession(sessionId);
+            }
         }
     }
 

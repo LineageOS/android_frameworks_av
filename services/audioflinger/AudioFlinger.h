@@ -756,6 +756,8 @@ using effect_buffer_t = int16_t;
 
               sp<ThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
 
+              ThreadBase *hapticPlaybackThread_l() const;
+
 
                 void        removeClient_l(pid_t pid);
                 void        removeNotificationClient(pid_t pid);

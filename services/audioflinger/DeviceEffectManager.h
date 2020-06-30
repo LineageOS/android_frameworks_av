@@ -165,6 +165,7 @@ public:
     uint32_t  sampleRate() const override { return 0; }
     audio_channel_mask_t channelMask() const override { return AUDIO_CHANNEL_NONE; }
     uint32_t channelCount() const override { return 0; }
+    audio_channel_mask_t hapticChannelMask() const override { return AUDIO_CHANNEL_NONE; }
     size_t    frameCount() const override  { return 0; }
     uint32_t  latency() const override  { return 0; }
 

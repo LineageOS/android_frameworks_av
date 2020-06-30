@@ -1243,6 +1243,11 @@ status_t AudioFlinger::RecordThread::checkEffectCompatibility_l(
             return BAD_VALUE;
         }
     }
+
+    if (EffectModule::isHapticGenerator(&desc->type)) {
+        ALOGE("%s(): HapticGenerator is not supported in RecordThread", __func__);
+        return BAD_VALUE;
+    }
     return NO_ERROR;
 }
 
@@ -1260,6 +1265,12 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
     // always allow effects without processing load or latency
     if ((desc->flags & EFFECT_FLAG_NO_PROCESS_MASK) == EFFECT_FLAG_NO_PROCESS) {
         return NO_ERROR;
+    }
+
+    if (EffectModule::isHapticGenerator(&desc->type) && mHapticChannelCount == 0) {
+        ALOGW("%s: thread doesn't support haptic playback while the effect is HapticGenerator",
+                __func__);
+        return BAD_VALUE;
     }
 
     switch (mType) {
@@ -2527,8 +2538,10 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
                     track->sharedBuffer() != 0 ? Track::FS_FILLED : Track::FS_FILLING;
         }
 
-        if ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
-                && mHapticChannelMask != AUDIO_CHANNEL_NONE) {
+        sp<EffectChain> chain = getEffectChain_l(track->sessionId());
+        if (mHapticChannelMask != AUDIO_CHANNEL_NONE
+                && ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
+                        || (chain != nullptr && chain->containsHapticGeneratingEffect_l()))) {
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
             mLock.unlock();
@@ -2549,7 +2562,6 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
         track->mResetDone = false;
         track->mPresentationCompleteFrames = 0;
         mActiveTracks.add(track);
-        sp<EffectChain> chain = getEffectChain_l(track->sessionId());
         if (chain != 0) {
             ALOGV("addTrack_l() starting track on chain %p for session %d", chain.get(),
                     track->sessionId());
@@ -3732,9 +3744,15 @@ bool AudioFlinger::PlaybackThread::threadLoop()
 
             // Determine which session to pick up haptic data.
             // This must be done under the same lock as prepareTracks_l().
+            // The haptic data from the effect is at a higher priority than the one from track.
             // TODO: Write haptic data directly to sink buffer when mixing.
             if (mHapticChannelCount > 0 && effectChains.size() > 0) {
                 for (const auto& track : mActiveTracks) {
+                    sp<EffectChain> effectChain = getEffectChain_l(track->sessionId());
+                    if (effectChain != nullptr && effectChain->containsHapticGeneratingEffect_l()) {
+                        activeHapticSessionId = track->sessionId();
+                        break;
+                    }
                     if (track->getHapticPlaybackEnabled()) {
                         activeHapticSessionId = track->sessionId();
                         break;
@@ -4104,8 +4122,9 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             // remove from our tracks vector
             removeTrack_l(track);
         }
-        if ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
-                && mHapticChannelCount > 0) {
+        if (mHapticChannelCount > 0 &&
+                ((track->channelMask() & AUDIO_CHANNEL_HAPTIC_ALL) != AUDIO_CHANNEL_NONE
+                        || (chain != nullptr && chain->containsHapticGeneratingEffect_l()))) {
             mLock.unlock();
             // Unlock due to VibratorService will lock for this call and will
             // call Tracks.mute/unmute which also require thread's lock.
@@ -9390,6 +9409,11 @@ status_t AudioFlinger::MmapThread::checkEffectCompatibility_l(
 
     // Only allow effects without processing load or latency
     if ((desc->flags & EFFECT_FLAG_NO_PROCESS_MASK) != EFFECT_FLAG_NO_PROCESS) {
+        return BAD_VALUE;
+    }
+
+    if (EffectModule::isHapticGenerator(&desc->type)) {
+        ALOGE("%s(): HapticGenerator is not supported for MmapThread", __func__);
         return BAD_VALUE;
     }
 
