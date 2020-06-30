@@ -1,3 +1,9 @@
+// This is an example of an empty Codec2.0 service.
+//
+// To use this, make a copy of this whole directory and rename modules
+// accordingly. The contents of "vendor.cpp" and files in the subdirectory
+// "seccomp_policy" may also need to be modified.
+
 cc_binary {
     name: "android.hardware.media.c2@1.0-service",
     defaults: ["hidl_defaults"],
@@ -33,5 +39,8 @@ cc_binary {
     },
 
     compile_multilib: "32",
+
+    // Remove this line to enable this module.
+    enabled: false,
 }
 
