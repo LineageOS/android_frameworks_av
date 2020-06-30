@@ -60,6 +60,7 @@
 #include "device3/Camera3SharedOutputStream.h"
 #include "CameraService.h"
 #include "utils/CameraThreadState.h"
+#include "utils/TraceHFR.h"
 
 #include <algorithm>
 #include <tuple>
@@ -2834,7 +2835,7 @@ void Camera3Device::onInflightMapFlushedLocked() {
 }
 
 void Camera3Device::removeInFlightMapEntryLocked(int idx) {
-    ATRACE_CALL();
+    ATRACE_HFR_CALL();
     nsecs_t duration = mInFlightMap.valueAt(idx).maxExpectedDuration;
     mInFlightMap.removeItemsAt(idx, 1);
 
