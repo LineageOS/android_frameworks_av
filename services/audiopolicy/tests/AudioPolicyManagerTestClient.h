@@ -75,6 +75,10 @@ public:
     status_t createAudioPatch(const struct audio_patch *patch,
                               audio_patch_handle_t *handle,
                               int /*delayMs*/) override {
+        auto iter = mActivePatches.find(*handle);
+        if (iter != mActivePatches.end()) {
+            mActivePatches.erase(*handle);
+        }
         *handle = mNextPatchHandle++;
         mActivePatches.insert(std::make_pair(*handle, *patch));
         return NO_ERROR;
