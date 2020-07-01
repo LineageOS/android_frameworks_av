@@ -57,9 +57,11 @@ void DeathNotifier::binderDied() {
         ALOGW("ResourceManagerService is dead as well.");
         return;
     }
-    service->removeResource(mPid, mClientId, false);
 
     service->overridePid(mPid, -1);
+    // thiz is freed in the call below, so it must be last call referring thiz
+    service->removeResource(mPid, mClientId, false);
+
 }
 
 template <typename T>

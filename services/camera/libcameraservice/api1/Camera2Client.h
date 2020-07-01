@@ -237,6 +237,7 @@ private:
     mutable Mutex mLatestRequestMutex;
     Condition mLatestRequestSignal;
     int32_t mLatestRequestId = -1;
+    int32_t mLatestFailedRequestId = -1;
     status_t waitUntilRequestIdApplied(int32_t requestId, nsecs_t timeout);
     status_t waitUntilCurrentRequestIdLocked();
 };
