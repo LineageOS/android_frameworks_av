@@ -27,19 +27,23 @@ namespace android {
 template <class Time, class Bytes>
 class TrafficRecorder : public RefBase {
 private:
+    constexpr static size_t kMinNumEntries = 4;
+    constexpr static size_t kMaxNumEntries = 1024;
+
     size_t mSize;
     size_t mSizeMask;
     Time *mTimeArray = NULL;
     Bytes *mBytesArray = NULL;
-    size_t mHeadIdx = 0;
-    size_t mTailIdx = 0;
+    size_t mHeadIdx;
+    size_t mTailIdx;
 
-    Time mClock = 0;
-    Time mLastTimeOfPrint = 0;
-    Bytes mAccuBytesOfPrint = 0;
+    int mLastReadIdx;
+
+    const Time mRecordLimit;
+    Time mClock;
+    Time mLastTimeOfPrint;
 public:
-    TrafficRecorder();
-    TrafficRecorder(size_t size);
+    TrafficRecorder(size_t size, Time accuTimeLimit);
     virtual ~TrafficRecorder();
 
     void init();
@@ -53,18 +57,19 @@ public:
 };
 
 template <class Time, class Bytes>
-TrafficRecorder<Time, Bytes>::TrafficRecorder() {
-    TrafficRecorder(128);
-}
-
-template <class Time, class Bytes>
-TrafficRecorder<Time, Bytes>::TrafficRecorder(size_t size) {
-    size_t exp;
-    for (exp = 0; exp < 32; exp++) {
-        if (size <= (1ul << exp)) {
-            break;
-        }
+TrafficRecorder<Time, Bytes>::TrafficRecorder(size_t size, Time recordLimit)
+    : mRecordLimit(recordLimit) {
+    if (size > kMaxNumEntries) {
+        LOG(VERBOSE) << "Limiting TrafficRecorder size to " << kMaxNumEntries;
+        size = kMaxNumEntries;
+    } else if (size < kMinNumEntries) {
+        LOG(VERBOSE) << "Limiting TrafficRecorder size to " << kMaxNumEntries;
+        size = kMinNumEntries;
     }
+
+    size_t exp = ((sizeof(size_t) == 8) ?
+                  64 - __builtin_clzl(size - 1) :
+                  32 - __builtin_clz(size - 1));
     mSize = (1ul << exp);         // size = 2^exp
     mSizeMask = mSize - 1;
 
@@ -84,9 +89,14 @@ TrafficRecorder<Time, Bytes>::~TrafficRecorder() {
 template <class Time, class Bytes>
 void TrafficRecorder<Time, Bytes>::init() {
     mHeadIdx = 0;
-    mTailIdx = 0;
-    mTimeArray[0] = 0;
-    mBytesArray[0] = 0;
+    mTailIdx = mSizeMask;
+    for (int i = 0 ; i < mSize ; i++) {
+        mTimeArray[i] = 0;
+        mBytesArray[i] = 0;
+    }
+    mLastReadIdx = 0;
+    mLastTimeOfPrint = 0;
+    mClock = 0;
 }
 
 template <class Time, class Bytes>
@@ -96,53 +106,64 @@ void TrafficRecorder<Time, Bytes>::updateClock(Time now) {
 
 template <class Time, class Bytes>
 Bytes TrafficRecorder<Time, Bytes>::readBytesForLastPeriod(Time period) {
-    Bytes bytes = 0;
+    // Not enough data
+    if (period > mClock)
+        return 0;
 
-    size_t i = mTailIdx;
-    while (i != mHeadIdx) {
-        LOG(VERBOSE) << "READ " << i << " time " << mTimeArray[i] << " \t EndOfPeriod " << mClock - period;
+    Bytes bytes = 0;
+    int i = mHeadIdx;
+    while (i != mTailIdx) {
+        LOG(VERBOSE) << "READ " << i << " time " << mTimeArray[i]
+                << " \t EndOfPeriod " << mClock - period
+                << "\t\t Bytes:" << mBytesArray[i] << "\t\t Accu: " << bytes;
         if (mTimeArray[i] < mClock - period) {
             break;
         }
         bytes += mBytesArray[i];
-        i = (i + mSize - 1) & mSizeMask;
+        i = (i - 1) & mSizeMask;
     }
-    mHeadIdx = i;
+    mLastReadIdx = (i + 1) & mSizeMask;
+
     return bytes;
 }
 
 template <class Time, class Bytes>
 void TrafficRecorder<Time, Bytes>::writeBytes(Bytes bytes) {
-    size_t writeIdx;
-    if (mClock == mTimeArray[mTailIdx]) {
-        writeIdx = mTailIdx;
+    int writeIdx;
+    if (mClock == mTimeArray[mHeadIdx]) {
+        writeIdx = mHeadIdx;
         mBytesArray[writeIdx] += bytes;
     } else {
-        writeIdx = (mTailIdx + 1) % mSize;
+        writeIdx = (mHeadIdx + 1) & mSizeMask;
         mTimeArray[writeIdx] = mClock;
         mBytesArray[writeIdx] = bytes;
     }
 
     LOG(VERBOSE) << "WRITE " << writeIdx << " time " << mClock;
-    if (writeIdx == mHeadIdx) {
-        LOG(WARNING) << "Traffic recorder size exceeded at " << mHeadIdx;
-        mHeadIdx = (mHeadIdx + 1) & mSizeMask;
+    if (writeIdx == mTailIdx) {
+        mTailIdx = (mTailIdx + 1) & mSizeMask;
     }
 
-    mTailIdx = writeIdx;
-    mAccuBytesOfPrint += bytes;
+    mHeadIdx = writeIdx;
 }
 
 template <class Time, class Bytes>
 void TrafficRecorder<Time, Bytes>::printAccuBitsForLastPeriod(Time period, Time unit) {
-    Time duration = mClock - mLastTimeOfPrint;
-    float numOfUnit = (float)duration / unit;
-    if (duration > period) {
-        ALOGD("Actual Tx period %.0f ms \t %.0f Bits/Unit",
-              numOfUnit * 1000.f, mAccuBytesOfPrint * 8.f / numOfUnit);
-        mLastTimeOfPrint = mClock;
-        mAccuBytesOfPrint = 0;
-        init();
+    Time timeSinceLastPrint = mClock - mLastTimeOfPrint;
+    if (timeSinceLastPrint < period)
+        return;
+
+    Bytes sum = readBytesForLastPeriod(period);
+    Time readPeriod = mClock - mTimeArray[mLastReadIdx];
+
+    float numOfUnit = (float)(readPeriod) / (unit + FLT_MIN);
+    ALOGD("Actual Tx period %.3f unit \t %.0f bytes (%.0f Kbits)/Unit",
+          numOfUnit, sum / numOfUnit, sum * 8.f / numOfUnit / 1000.f);
+    mLastTimeOfPrint = mClock;
+
+    if (mClock - mTimeArray[mTailIdx] < mRecordLimit) {
+        // Size is not enough to record bytes for mRecordLimit period
+        ALOGW("Traffic recorder size is not enough. mRecordLimit %d", mRecordLimit);
     }
 }
 

@@ -62,6 +62,9 @@ namespace android {
 static const size_t kMaxPacketSize = 1280;
 static char kCNAME[255] = "someone@somewhere";
 
+static const size_t kTrafficRecorderMaxEntries = 128;
+static const size_t kTrafficRecorderMaxTimeSpanMs = 2000;
+
 static int UniformRand(int limit) {
     return ((double)rand() * limit) / RAND_MAX;
 }
@@ -71,7 +74,8 @@ ARTPWriter::ARTPWriter(int fd)
       mFd(dup(fd)),
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)),
-      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
+      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(
+              kTrafficRecorderMaxEntries, kTrafficRecorderMaxTimeSpanMs)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -122,7 +126,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
       mFd(dup(fd)),
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)),
-      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
+      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(
+              kTrafficRecorderMaxEntries, kTrafficRecorderMaxTimeSpanMs)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
