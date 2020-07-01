@@ -399,7 +399,7 @@ int AudioFlinger::onExternalVibrationStart(const sp<os::ExternalVibration>& exte
             return ret;
         }
     }
-    return AudioMixer::HAPTIC_SCALE_MUTE;
+    return static_cast<int>(os::HapticScale::MUTE);
 }
 
 /* static */

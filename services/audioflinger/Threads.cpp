@@ -2548,7 +2548,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             const int intensity = AudioFlinger::onExternalVibrationStart(
                     track->getExternalVibration());
             mLock.lock();
-            track->setHapticIntensity(static_cast<AudioMixer::haptic_intensity_t>(intensity));
+            track->setHapticIntensity(static_cast<os::HapticScale>(intensity));
             // Haptic playback should be enabled by vibrator service.
             if (track->getHapticPlaybackEnabled()) {
                 // Disable haptic playback of all active track to ensure only
@@ -2556,6 +2556,11 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
                 for (const auto &t : mActiveTracks) {
                     t->setHapticPlaybackEnabled(false);
                 }
+            }
+
+            // Set haptic intensity for effect
+            if (chain != nullptr) {
+                chain->setHapticIntensity_l(track->id(), intensity);
             }
         }
 
@@ -4130,6 +4135,12 @@ void AudioFlinger::PlaybackThread::removeTracks_l(const Vector< sp<Track> >& tra
             // call Tracks.mute/unmute which also require thread's lock.
             AudioFlinger::onExternalVibrationStop(track->getExternalVibration());
             mLock.lock();
+
+            // When the track is stop, set the haptic intensity as MUTE
+            // for the HapticGenerator effect.
+            if (chain != nullptr) {
+                chain->setHapticIntensity_l(track->id(), static_cast<int>(os::HapticScale::MUTE));
+            }
         }
     }
 }
@@ -4472,7 +4483,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
                                                                      // audio to FastMixer
         fastTrack->mFormat = mFormat; // mPipeSink format for audio to FastMixer
         fastTrack->mHapticPlaybackEnabled = mHapticChannelMask != AUDIO_CHANNEL_NONE;
-        fastTrack->mHapticIntensity = AudioMixer::HAPTIC_SCALE_NONE;
+        fastTrack->mHapticIntensity = os::HapticScale::NONE;
         fastTrack->mGeneration++;
         state->mFastTracksGen++;
         state->mTrackMask = 1;

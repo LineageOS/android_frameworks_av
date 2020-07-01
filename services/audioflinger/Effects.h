@@ -261,6 +261,8 @@ public:
     static bool      isHapticGenerator(const effect_uuid_t* type);
     bool             isHapticGenerator() const;
 
+    status_t         setHapticIntensity(int id, int intensity);
+
     void             dump(int fd, const Vector<String16>& args);
 
 private:
@@ -508,6 +510,8 @@ public:
     bool isCompatibleWithThread_l(const sp<ThreadBase>& thread) const;
 
     bool containsHapticGeneratingEffect_l();
+
+    void setHapticIntensity_l(int id, int intensity);
 
     sp<EffectCallbackInterface> effectCallback() const { return mEffectCallback; }
     wp<ThreadBase> thread() const { return mEffectCallback->thread(); }

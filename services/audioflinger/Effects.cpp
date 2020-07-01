@@ -1537,6 +1537,33 @@ bool AudioFlinger::EffectModule::isHapticGenerator() const {
     return isHapticGenerator(&mDescriptor.type);
 }
 
+status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
+{
+    if (mStatus != NO_ERROR) {
+        return mStatus;
+    }
+    if (!isHapticGenerator()) {
+        ALOGW("Should not set haptic intensity for effects that are not HapticGenerator");
+        return INVALID_OPERATION;
+    }
+
+    uint32_t buf32[sizeof(effect_param_t) / sizeof(uint32_t) + 3];
+    effect_param_t *param = (effect_param_t*) buf32;
+    param->psize = sizeof(int32_t);
+    param->vsize = sizeof(int32_t) * 2;
+    *(int32_t*)param->data = HG_PARAM_HAPTIC_INTENSITY;
+    *((int32_t*)param->data + 1) = id;
+    *((int32_t*)param->data + 2) = intensity;
+    uint32_t size = sizeof(int32_t);
+    status_t status = command(
+            EFFECT_CMD_SET_PARAM, sizeof(effect_param_t) + param->psize + param->vsize,
+            param, &size, &param->status);
+    if (status == NO_ERROR) {
+        status = param->status;
+    }
+    return status;
+}
+
 static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterface> &buffer) {
     std::stringstream ss;
 
@@ -2409,6 +2436,14 @@ bool AudioFlinger::EffectChain::containsHapticGeneratingEffect_l()
         }
     }
     return false;
+}
+
+void AudioFlinger::EffectChain::setHapticIntensity_l(int id, int intensity)
+{
+    Mutex::Autolock _l(mLock);
+    for (size_t i = 0; i < mEffects.size(); ++i) {
+        mEffects[i]->setHapticIntensity(id, intensity);
+    }
 }
 
 void AudioFlinger::EffectChain::syncHalEffectsState()

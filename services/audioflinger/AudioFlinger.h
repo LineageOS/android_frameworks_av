@@ -98,6 +98,7 @@
 #include <private/media/AudioTrackShared.h>
 
 #include <vibrator/ExternalVibration.h>
+#include <vibrator/ExternalVibrationUtils.h>
 
 #include "android/media/BnAudioRecord.h"
 
