@@ -28,6 +28,7 @@
 #include <linux/futex.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
