@@ -42,6 +42,7 @@
 #include <set>
 #include <unordered_set>
 #include <vector>
+#include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <media/AudioParameter.h>
