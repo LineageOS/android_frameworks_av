@@ -1865,7 +1865,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
             }
             mChannel->onWorkDone(
-                    std::move(work), changed ? config->mOutputFormat : nullptr,
+                    std::move(work), changed ? config->mOutputFormat->dup() : nullptr,
                     initData.hasChanged() ? initData.update().get() : nullptr);
             break;
         }
