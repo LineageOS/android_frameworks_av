@@ -37,7 +37,7 @@ cc_library {
         "libstagefright_esds",
         "libstagefright_foundation_without_imemory",
         "libstagefright_mpeg2extractor",
-        "libstagefright_mpeg2support",
+        "libstagefright_mpeg2support_nocrypto",
         "libutils",
     ],
 

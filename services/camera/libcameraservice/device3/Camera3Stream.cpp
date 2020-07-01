@@ -22,6 +22,7 @@
 #include <utils/Trace.h>
 #include "device3/Camera3Stream.h"
 #include "device3/StatusTracker.h"
+#include "utils/TraceHFR.h"
 
 #include <cutils/properties.h>
 
@@ -601,7 +602,7 @@ status_t Camera3Stream::tearDown() {
 status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
         nsecs_t waitBufferTimeout,
         const std::vector<size_t>& surface_ids) {
-    ATRACE_CALL();
+    ATRACE_HFR_CALL();
     Mutex::Autolock l(mLock);
     status_t res = OK;
 
@@ -682,7 +683,7 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
 status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
         nsecs_t timestamp, bool timestampIncreasing,
          const std::vector<size_t>& surface_ids, uint64_t frameNumber) {
-    ATRACE_CALL();
+    ATRACE_HFR_CALL();
     Mutex::Autolock l(mLock);
 
     // Check if this buffer is outstanding.

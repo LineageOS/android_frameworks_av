@@ -566,11 +566,13 @@ void AudioPolicyService::updateUidStates_l()
 
         auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) REQUIRES(mLock) {
             bool canCaptureCall = recordClient->canCaptureOutput;
-            bool canCaptureCommunication = recordClient->canCaptureOutput
-                || recordClient->uid == mPhoneStateOwnerUid
-                || isServiceUid(mPhoneStateOwnerUid);
-            return !(isInCall && !canCaptureCall)
-                && !(isInCommunication && !canCaptureCommunication);
+            return !(isInCall && !canCaptureCall);
+//TODO(b/160260850): restore restriction to mode owner once fix for misbehaving apps is merged
+//            bool canCaptureCommunication = recordClient->canCaptureOutput
+//                || recordClient->uid == mPhoneStateOwnerUid
+//                || isServiceUid(mPhoneStateOwnerUid);
+//            return !(isInCall && !canCaptureCall)
+//                && !(isInCommunication && !canCaptureCommunication);
         };
 
         // By default allow capture if:
