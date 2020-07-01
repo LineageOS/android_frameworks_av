@@ -19,7 +19,14 @@ if [ "$SYNC_FINISHED" != true ]; then
   adb root && adb wait-for-device remount
 fi
 
-#TODO(hkuang): Check if the destination folder already exists. If so, skip the copying.
 echo "Copying files to device"
-adb push $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/* /data/local/tmp/TranscodingTestAssets
+
+adb shell mkdir -p /data/local/tmp/TranscodingTestAssets
+
+FILES=$ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/*
+for file in $FILES
+do 
+adb push --sync $file /data/local/tmp/TranscodingTestAssets
+done
+
 echo "Copy done"
