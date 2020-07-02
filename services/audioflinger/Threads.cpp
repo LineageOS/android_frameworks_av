@@ -29,6 +29,7 @@
 #include <linux/futex.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
+#include <cutils/bitops.h>
 #include <cutils/properties.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
@@ -2089,12 +2090,6 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
     // special case for FAST flag considered OK if fast mixer is present
     if (hasFastMixer()) {
         outputFlags = (audio_output_flags_t)(outputFlags | AUDIO_OUTPUT_FLAG_FAST);
-    }
-
-    // Set DIRECT flag if current thread is DirectOutputThread. This can happen when the playback is
-    // rerouted to direct output thread by dynamic audio policy.
-    if (mType == DIRECT) {
-        *flags = (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT);
     }
 
     // Check if requested flags are compatible with output stream flags
