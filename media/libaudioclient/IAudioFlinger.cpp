@@ -653,9 +653,9 @@ public:
         return NO_ERROR;
     }
 
-    virtual sp<IEffect> createEffect(
+    virtual sp<media::IEffect> createEffect(
                                     effect_descriptor_t *pDesc,
-                                    const sp<IEffectClient>& client,
+                                    const sp<media::IEffectClient>& client,
                                     int32_t priority,
                                     audio_io_handle_t output,
                                     audio_session_t sessionId,
@@ -668,7 +668,7 @@ public:
                                     int *enabled)
     {
         Parcel data, reply;
-        sp<IEffect> effect;
+        sp<media::IEffect> effect;
         if (pDesc == NULL) {
             if (status != NULL) {
                 *status = BAD_VALUE;
@@ -705,7 +705,7 @@ public:
             if (enabled != NULL) {
                 *enabled = tmp;
             }
-            effect = interface_cast<IEffect>(reply.readStrongBinder());
+            effect = interface_cast<media::IEffect>(reply.readStrongBinder());
             reply.read(pDesc, sizeof(effect_descriptor_t));
         }
         if (status != NULL) {
@@ -1386,7 +1386,8 @@ status_t BnAudioFlinger::onTransact(
             if (data.read(&desc, sizeof(effect_descriptor_t)) != NO_ERROR) {
                 ALOGE("b/23905951");
             }
-            sp<IEffectClient> client = interface_cast<IEffectClient>(data.readStrongBinder());
+            sp<media::IEffectClient> client =
+                    interface_cast<media::IEffectClient>(data.readStrongBinder());
             int32_t priority = data.readInt32();
             audio_io_handle_t output = (audio_io_handle_t) data.readInt32();
             audio_session_t sessionId = (audio_session_t) data.readInt32();
@@ -1402,8 +1403,8 @@ status_t BnAudioFlinger::onTransact(
             int id = 0;
             int enabled = 0;
 
-            sp<IEffect> effect = createEffect(&desc, client, priority, output, sessionId, device,
-                    opPackageName, pid, probe, &status, &id, &enabled);
+            sp<media::IEffect> effect = createEffect(&desc, client, priority, output, sessionId,
+                    device, opPackageName, pid, probe, &status, &id, &enabled);
             reply->writeInt32(status);
             reply->writeInt32(id);
             reply->writeInt32(enabled);
