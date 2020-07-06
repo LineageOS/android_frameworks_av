@@ -79,7 +79,8 @@ void TranscodingJobScheduler::updateCurrentJob_l() {
                 mTranscoder->start(topJob->key.first, topJob->key.second, topJob->request,
                                    topJob->callback.lock());
             } else if (topJob->state == Job::PAUSED) {
-                mTranscoder->resume(topJob->key.first, topJob->key.second);
+                mTranscoder->resume(topJob->key.first, topJob->key.second, topJob->request,
+                                    topJob->callback.lock());
             }
             topJob->state = Job::RUNNING;
         }

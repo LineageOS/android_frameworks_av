@@ -21,11 +21,13 @@
 #include <media/TranscoderInterface.h>
 
 #include <list>
+#include <map>
 #include <mutex>
 
 namespace android {
 
 class MediaTranscoder;
+class Parcelable;
 
 /*
  * Wrapper class around MediaTranscoder.
@@ -41,7 +43,9 @@ public:
                        const TranscodingRequestParcel& request,
                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     virtual void pause(ClientIdType clientId, JobIdType jobId) override;
-    virtual void resume(ClientIdType clientId, JobIdType jobId) override;
+    virtual void resume(ClientIdType clientId, JobIdType jobId,
+                        const TranscodingRequestParcel& request,
+                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     virtual void stop(ClientIdType clientId, JobIdType jobId) override;
 
 private:
@@ -52,12 +56,15 @@ private:
         JobIdType jobId;
         std::function<void()> runnable;
     };
+    using JobKeyType = std::pair<ClientIdType, JobIdType>;
+
     std::shared_ptr<CallbackImpl> mTranscoderCb;
     std::shared_ptr<MediaTranscoder> mTranscoder;
     std::weak_ptr<TranscoderCallbackInterface> mCallback;
     std::mutex mLock;
     std::condition_variable mCondition;
     std::list<Event> mQueue;  // GUARDED_BY(mLock);
+    std::map<JobKeyType, std::shared_ptr<const Parcel>> mPausedStateMap;
     ClientIdType mCurrentClientId;
     JobIdType mCurrentJobId;
 
@@ -68,6 +75,14 @@ private:
     TranscodingErrorCode handleStart(ClientIdType clientId, JobIdType jobId,
                                      const TranscodingRequestParcel& request,
                                      const std::shared_ptr<ITranscodingClientCallback>& callback);
+    TranscodingErrorCode handlePause(ClientIdType clientId, JobIdType jobId);
+    TranscodingErrorCode handleResume(ClientIdType clientId, JobIdType jobId,
+                                      const TranscodingRequestParcel& request,
+                                      const std::shared_ptr<ITranscodingClientCallback>& callback);
+    TranscodingErrorCode setupTranscoder(
+            ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
+            const std::shared_ptr<ITranscodingClientCallback>& callback,
+            const std::shared_ptr<const Parcel>& pausedState = nullptr);
 
     void cleanup();
     void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,

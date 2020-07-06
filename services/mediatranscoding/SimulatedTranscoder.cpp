@@ -72,7 +72,9 @@ void SimulatedTranscoder::pause(ClientIdType clientId, JobIdType jobId) {
     });
 }
 
-void SimulatedTranscoder::resume(ClientIdType clientId, JobIdType jobId) {
+void SimulatedTranscoder::resume(
+        ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& /*request*/,
+        const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     queueEvent(Event::Resume, clientId, jobId, [=] {
         auto callback = mCallback.lock();
         if (callback != nullptr) {
