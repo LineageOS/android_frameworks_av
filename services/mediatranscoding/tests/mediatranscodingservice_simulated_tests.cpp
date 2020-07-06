@@ -56,7 +56,6 @@ constexpr int64_t kPaddingUs = 1000000;
 constexpr int64_t kJobWithPaddingUs = SimulatedTranscoder::kJobDurationUs + kPaddingUs;
 
 constexpr const char* kClientOpPackageName = "TestClientPackage";
-constexpr const char* kTestActivityName = "/com.android.tests.transcoding.MainActivity";
 
 class MediaTranscodingServiceSimulatedTest : public MediaTranscodingServiceTestBase {
 public:

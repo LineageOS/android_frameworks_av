@@ -18,6 +18,7 @@
 #define LOG_TAG "MediaTranscoder"
 
 #include <android-base/logging.h>
+#include <binder/Parcel.h>
 #include <fcntl.h>
 #include <media/MediaSampleReaderNDK.h>
 #include <media/MediaSampleWriter.h>
@@ -84,6 +85,17 @@ static AMediaFormat* mergeMediaFormats(AMediaFormat* base, AMediaFormat* overlay
 }
 
 void MediaTranscoder::sendCallback(media_status_t status) {
+    // If the transcoder is already cancelled explicitly, don't send any error callbacks.
+    // Tracks and sample writer will report errors for abort. However, currently we can't
+    // tell it apart from real errors. Ideally we still want to report real errors back
+    // to client, as there is a small chance that explicit abort and the real error come
+    // at around the same time, we should report that if abort has a specific error code.
+    // On the other hand, if the transcoder actually finished (status is AMEDIA_OK) at around
+    // the same time of the abort, we should still report the finish back to the client.
+    if (mCancelled && status != AMEDIA_OK) {
+        return;
+    }
+
     bool expected = false;
     if (mCallbackSent.compare_exchange_strong(expected, true)) {
         if (status == AMEDIA_OK) {
@@ -149,11 +161,11 @@ MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callb
 
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         const std::shared_ptr<CallbackInterface>& callbacks,
-        const std::shared_ptr<Parcel>& pausedState) {
+        const std::shared_ptr<const Parcel>& pausedState) {
     if (pausedState != nullptr) {
-        LOG(ERROR) << "Initializing from paused state is currently not supported.";
-        return nullptr;
-    } else if (callbacks == nullptr) {
+        LOG(INFO) << "Initializing from paused state.";
+    }
+    if (callbacks == nullptr) {
         LOG(ERROR) << "Callbacks cannot be null";
         return nullptr;
     }
@@ -309,15 +321,15 @@ media_status_t MediaTranscoder::start() {
     return AMEDIA_OK;
 }
 
-media_status_t MediaTranscoder::pause(std::shared_ptr<const Parcelable>* pausedState) {
-    (void)pausedState;
-    LOG(ERROR) << "Pause is not currently supported";
-    return AMEDIA_ERROR_UNSUPPORTED;
+media_status_t MediaTranscoder::pause(std::shared_ptr<const Parcel>* pausedState) {
+    // TODO: write internal states to parcel.
+    *pausedState = std::make_shared<Parcel>();
+    return cancel();
 }
 
 media_status_t MediaTranscoder::resume() {
-    LOG(ERROR) << "Resume is not currently supported";
-    return AMEDIA_ERROR_UNSUPPORTED;
+    // TODO: restore internal states from parcel.
+    return start();
 }
 
 media_status_t MediaTranscoder::cancel() {

@@ -94,7 +94,8 @@ public:
     void pause(ClientIdType clientId, JobIdType jobId) override {
         mEventQueue.push_back(Pause(clientId, jobId));
     }
-    void resume(ClientIdType clientId, JobIdType jobId) override {
+    void resume(ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& /*request*/,
+                const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) override {
         mEventQueue.push_back(Resume(clientId, jobId));
     }
     void stop(ClientIdType clientId, JobIdType jobId) override {
