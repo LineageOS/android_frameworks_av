@@ -372,6 +372,14 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
         AMediaFormat_setInt32(formatCopy, AMEDIAFORMAT_KEY_ROTATION, rotation);
     }
 
+    // Transfer track duration.
+    // Preserve the source track duration by sending it to MediaSampleWriter.
+    int64_t durationUs;
+    if (AMediaFormat_getInt64(mSourceFormat.get(), AMEDIAFORMAT_KEY_DURATION, &durationUs) &&
+        durationUs > 0) {
+        AMediaFormat_setInt64(formatCopy, AMEDIAFORMAT_KEY_DURATION, durationUs);
+    }
+
     // TODO: transfer other fields as required.
 
     mActualOutputFormat = std::shared_ptr<AMediaFormat>(formatCopy, &AMediaFormat_delete);
