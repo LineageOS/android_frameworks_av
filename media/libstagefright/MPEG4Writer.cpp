@@ -1110,6 +1110,21 @@ void MPEG4Writer::writeCompositionMatrix(int degrees) {
     writeInt32(0x40000000);  // w
 }
 
+void MPEG4Writer::printWriteDurations() {
+    if (mWriteDurationPQ.empty()) {
+        return;
+    }
+    std::string writeDurationsString =
+            "Top " + std::to_string(mWriteDurationPQ.size()) + " write durations(microseconds):";
+    uint8_t i = 0;
+    while (!mWriteDurationPQ.empty()) {
+        writeDurationsString +=
+                " #" + std::to_string(++i) + ":" + std::to_string(mWriteDurationPQ.top().count());
+        mWriteDurationPQ.pop();
+    }
+    ALOGD("%s", writeDurationsString.c_str());
+}
+
 status_t MPEG4Writer::release() {
     ALOGD("release()");
     status_t err = OK;
@@ -1138,6 +1153,9 @@ status_t MPEG4Writer::release() {
     mStarted = false;
     free(mInMemoryCache);
     mInMemoryCache = NULL;
+
+    printWriteDurations();
+
     return err;
 }
 
@@ -1594,7 +1612,17 @@ size_t MPEG4Writer::write(
 void MPEG4Writer::writeOrPostError(int fd, const void* buf, size_t count) {
     if (mWriteSeekErr == true)
         return;
+
+    auto beforeTP = std::chrono::high_resolution_clock::now();
     ssize_t bytesWritten = ::write(fd, buf, count);
+    auto afterTP = std::chrono::high_resolution_clock::now();
+    auto writeDuration =
+            std::chrono::duration_cast<std::chrono::microseconds>(afterTP - beforeTP).count();
+    mWriteDurationPQ.emplace(writeDuration);
+    if (mWriteDurationPQ.size() > kWriteDurationsCount) {
+        mWriteDurationPQ.pop();
+    }
+
     /* Write as much as possible during stop() execution when there was an error
      * (mWriteSeekErr == true) in the previous call to write() or lseek64().
      */
