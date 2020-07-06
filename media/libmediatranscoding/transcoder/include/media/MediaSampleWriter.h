@@ -144,11 +144,20 @@ private:
     media_status_t runWriterLoop();
 
     struct TrackRecord {
-        TrackRecord(const std::shared_ptr<MediaSampleQueue>& sampleQueue, size_t trackIndex)
-              : mSampleQueue(sampleQueue), mTrackIndex(trackIndex), mReachedEos(false) {}
+        TrackRecord(const std::shared_ptr<MediaSampleQueue>& sampleQueue, size_t trackIndex,
+                    int64_t durationUs)
+              : mSampleQueue(sampleQueue),
+                mTrackIndex(trackIndex),
+                mDurationUs(durationUs),
+                mFirstSampleTimeUs(0),
+                mFirstSampleTimeSet(false),
+                mReachedEos(false) {}
 
         std::shared_ptr<MediaSampleQueue> mSampleQueue;
         const size_t mTrackIndex;
+        int64_t mDurationUs;
+        int64_t mFirstSampleTimeUs;
+        bool mFirstSampleTimeSet;
         bool mReachedEos;
     };
 

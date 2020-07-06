@@ -122,7 +122,12 @@ bool MediaSampleWriter::addTrack(const std::shared_ptr<MediaSampleQueue>& sample
         return false;
     }
 
-    mTracks.emplace_back(sampleQueue, static_cast<size_t>(trackIndex));
+    int64_t durationUs;
+    if (!AMediaFormat_getInt64(trackFormat.get(), AMEDIAFORMAT_KEY_DURATION, &durationUs)) {
+        durationUs = 0;
+    }
+
+    mTracks.emplace_back(sampleQueue, static_cast<size_t>(trackIndex), durationUs);
     return true;
 }
 
@@ -200,10 +205,23 @@ media_status_t MediaSampleWriter::runWriterLoop() {
                 } else if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {
                     // Track reached end of stream.
                     track.mReachedEos = true;
-                    break;
+
+                    // Preserve source track duration by setting the appropriate timestamp on the
+                    // empty End-Of-Stream sample.
+                    if (track.mDurationUs > 0 && track.mFirstSampleTimeSet) {
+                        sample->info.presentationTimeUs =
+                                track.mDurationUs + track.mFirstSampleTimeUs;
+                    }
+                } else {
+                    samplesLeft = true;
                 }
 
-                samplesLeft = true;
+                // Record the first sample's timestamp in order to translate duration to EOS time
+                // for tracks that does not start at 0.
+                if (!track.mFirstSampleTimeSet) {
+                    track.mFirstSampleTimeUs = sample->info.presentationTimeUs;
+                    track.mFirstSampleTimeSet = true;
+                }
 
                 bufferInfo.offset = sample->dataOffset;
                 bufferInfo.size = sample->info.size;
@@ -217,7 +235,7 @@ media_status_t MediaSampleWriter::runWriterLoop() {
                     return status;
                 }
 
-            } while (sample->info.presentationTimeUs < segmentEndTimeUs);
+            } while (sample->info.presentationTimeUs < segmentEndTimeUs && !track.mReachedEos);
         }
 
         segmentEndTimeUs += mTrackSegmentLengthUs;

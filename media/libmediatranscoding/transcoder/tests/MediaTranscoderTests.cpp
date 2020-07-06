@@ -203,6 +203,7 @@ public:
 
         std::shared_ptr<MediaSampleReader> sampleReader =
                 MediaSampleReaderNDK::createFromFd(dstFd, 0, fileSize);
+        ASSERT_NE(sampleReader, nullptr);
 
         std::shared_ptr<AMediaFormat> videoFormat;
         const size_t trackCount = sampleReader->getTrackCount();
@@ -211,6 +212,7 @@ public:
             if (trackFormat != nullptr) {
                 const char* mime = nullptr;
                 AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &mime);
+
                 if (strncmp(mime, "video/", 6) == 0) {
                     LOG(INFO) << "Track # " << trackIndex << ": "
                               << AMediaFormat_toString(trackFormat);
