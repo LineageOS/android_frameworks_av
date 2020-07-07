@@ -374,6 +374,16 @@ TEST_F(MediaSampleWriterTests, TestInterleaving) {
         EXPECT_EQ(event.info.flags, sample->info.flags);
     }
 
+    // Verify EOS samples.
+    for (int trackIndex = 0; trackIndex < kNumTracks; ++trackIndex) {
+        auto trackFormat = mediaSource.mTrackFormats[trackIndex % mediaSource.mTrackCount];
+        int64_t duration = 0;
+        AMediaFormat_getInt64(trackFormat.get(), AMEDIAFORMAT_KEY_DURATION, &duration);
+
+        const AMediaCodecBufferInfo info = {0, 0, duration, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM};
+        EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::WriteSample(trackIndex, nullptr, &info));
+    }
+
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Stop());
     EXPECT_TRUE(writer.stop());
 }

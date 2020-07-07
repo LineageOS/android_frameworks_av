@@ -608,7 +608,8 @@ protected:
                                        audio_output_flags_t flags = AUDIO_OUTPUT_FLAG_NONE,
                                        audio_format_t format = AUDIO_FORMAT_INVALID,
                                        audio_channel_mask_t channelMask = AUDIO_CHANNEL_NONE,
-                                       uint32_t samplingRate = 0);
+                                       uint32_t samplingRate = 0,
+                                       audio_session_t sessionId = AUDIO_SESSION_NONE);
         // samplingRate, format, channelMask are in/out and so may be modified
         sp<IOProfile> getInputProfile(const sp<DeviceDescriptor> & device,
                                       uint32_t& samplingRate,

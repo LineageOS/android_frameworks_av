@@ -66,6 +66,8 @@ constexpr const char* kClientPackageA = "com.android.tests.transcoding.testapp.A
 constexpr const char* kClientPackageB = "com.android.tests.transcoding.testapp.B";
 constexpr const char* kClientPackageC = "com.android.tests.transcoding.testapp.C";
 
+constexpr const char* kTestActivityName = "/com.android.tests.transcoding.MainActivity";
+
 static status_t getUidForPackage(String16 packageName, userid_t userId, /*inout*/ uid_t& uid) {
     PermissionController pc;
     uid = pc.getPackageUid(packageName, 0);
@@ -167,13 +169,20 @@ struct EventTracker {
     }
 
     // Push 1 event to back.
-    void append(const Event& event) {
+    void append(const Event& event,
+                const TranscodingErrorCode err = TranscodingErrorCode::kNoError) {
         ALOGD("%s", toString(event).c_str());
 
         std::unique_lock lock(mLock);
 
         mEventQueue.push_back(event);
+        mLastErr = err;
         mCondition.notify_one();
+    }
+
+    TranscodingErrorCode getLastError() {
+        std::unique_lock lock(mLock);
+        return mLastErr;
     }
 
 private:
@@ -181,6 +190,7 @@ private:
     std::condition_variable mCondition;
     Event mPoppedEvent;
     std::list<Event> mEventQueue;
+    TranscodingErrorCode mLastErr;
 };
 
 // Operators for GTest macros.
@@ -205,8 +215,14 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
         ALOGD("@@@ openFileDescriptor: %s", in_fileUri.c_str());
         int fd;
         if (in_mode == "w" || in_mode == "rw") {
-            // Write-only, create file if non-existent, don't overwrite existing file.
-            constexpr int kOpenFlags = O_WRONLY | O_CREAT | O_EXCL;
+            int kOpenFlags;
+            if (in_mode == "w") {
+                // Write-only, create file if non-existent, truncate existing file.
+                kOpenFlags = O_WRONLY | O_CREAT | O_TRUNC;
+            } else {
+                // Read-Write, create if non-existent, no truncate (service will truncate if needed)
+                kOpenFlags = O_RDWR | O_CREAT;
+            }
             // User R+W permission.
             constexpr int kFileMode = S_IRUSR | S_IWUSR;
             fd = open(in_fileUri.c_str(), kOpenFlags, kFileMode);
@@ -239,10 +255,9 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
         return Status::ok();
     }
 
-    Status onTranscodingFailed(
-            int32_t in_jobId,
-            ::aidl::android::media::TranscodingErrorCode /* in_errorCode */) override {
-        append(Failed(mClientId, in_jobId));
+    Status onTranscodingFailed(int32_t in_jobId,
+                               ::aidl::android::media::TranscodingErrorCode in_errorCode) override {
+        append(Failed(mClientId, in_jobId), in_errorCode);
         return Status::ok();
     }
 

@@ -20,6 +20,7 @@
 #define LOG_TAG "MediaTranscoderTests"
 
 #include <android-base/logging.h>
+#include <fcntl.h>
 #include <gtest/gtest.h>
 #include <media/MediaSampleReaderNDK.h>
 #include <media/MediaTranscoder.h>
@@ -74,7 +75,7 @@ public:
                                   int32_t progress __unused) override {}
 
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
-                                     const std::shared_ptr<const Parcelable>& pausedState
+                                     const std::shared_ptr<const Parcel>& pausedState
                                              __unused) override {}
 
     void waitForTranscodingFinished() {
@@ -203,6 +204,7 @@ public:
 
         std::shared_ptr<MediaSampleReader> sampleReader =
                 MediaSampleReaderNDK::createFromFd(dstFd, 0, fileSize);
+        ASSERT_NE(sampleReader, nullptr);
 
         std::shared_ptr<AMediaFormat> videoFormat;
         const size_t trackCount = sampleReader->getTrackCount();
@@ -211,6 +213,7 @@ public:
             if (trackFormat != nullptr) {
                 const char* mime = nullptr;
                 AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &mime);
+
                 if (strncmp(mime, "video/", 6) == 0) {
                     LOG(INFO) << "Track # " << trackIndex << ": "
                               << AMediaFormat_toString(trackFormat);
