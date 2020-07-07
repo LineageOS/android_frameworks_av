@@ -420,7 +420,8 @@ int32_t HapticGenerator_Command(effect_handle_t self, uint32_t cmdCode, uint32_t
 
         case EFFECT_CMD_SET_PARAM: {
             ALOGV("HapticGenerator_Command EFFECT_CMD_SET_PARAM cmdSize %d cmdData %p, "
-                  "*replySize %u, replyData %p", cmdSize, cmdData, *replySize, replyData);
+                  "*replySize %u, replyData %p", cmdSize, cmdData,
+                  replySize ? *replySize : 0, replyData);
             if (cmdData == nullptr || (cmdSize < (int) (sizeof(effect_param_t) + sizeof(int32_t)))
                 || replyData == nullptr || replySize == nullptr ||
                 *replySize != (int) sizeof(int32_t)) {
