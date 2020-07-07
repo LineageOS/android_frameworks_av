@@ -14,15 +14,61 @@
  * limitations under the License.
  */
 
+#include <fstream>
+#include <string>
+
+#include <android-base/file.h>
+#include <android-base/properties.h>
 #include "utility/ValidateXml.h"
+
+bool isFileReadable(std::string const& path) {
+  std::ifstream f(path);
+  return f.good();
+}
 
 TEST(CheckConfig, mediaProfilesValidation) {
     RecordProperty("description",
                    "Verify that the media profiles file "
                    "is valid according to the schema");
 
-    const char* location = "/vendor/etc";
+    // Schema path.
+    constexpr char const* xsdPath = "/data/local/tmp/media_profiles.xsd";
 
-    EXPECT_ONE_VALID_XML_MULTIPLE_LOCATIONS("media_profiles_V1_0.xml", {location},
-                                            "/data/local/tmp/media_profiles.xsd");
+    // If "media.settings.xml" is set, it will be used as an absolute path.
+    std::string mediaSettingsPath = android::base::GetProperty("media.settings.xml", "");
+    if (mediaSettingsPath.empty()) {
+        // If "media.settings.xml" is not set, we will search through a list of
+        // file paths.
+
+        constexpr char const* xmlSearchDirs[] = {
+                "/product/etc/",
+                "/odm/etc/",
+                "/vendor/etc/",
+                "/system/etc/", // Fallback directory
+            };
+
+        const std::string fileName = "media_profiles_V1_0.xml";
+
+        std::vector<std::string> xmlPaths = {
+                xmlSearchDirs[0] + fileName,
+                xmlSearchDirs[1] + fileName,
+                xmlSearchDirs[2] + fileName,
+                xmlSearchDirs[3] + fileName,
+            };
+
+        auto findXmlPath =
+            std::find_if(xmlPaths.begin(), xmlPaths.end(), isFileReadable);
+        ASSERT_TRUE(findXmlPath != xmlPaths.end())
+                << "Cannot read from " << fileName
+                << " in any search directories ("
+                << xmlSearchDirs[0] << ", "
+                << xmlSearchDirs[1] << ", "
+                << xmlSearchDirs[2] << ", "
+                << xmlSearchDirs[3] << ").";
+
+        char const* xmlPath = findXmlPath->c_str();
+        EXPECT_VALID_XML(xmlPath, xsdPath);
+    } else {
+        EXPECT_VALID_XML(mediaSettingsPath.c_str(), xsdPath);
+    }
 }
