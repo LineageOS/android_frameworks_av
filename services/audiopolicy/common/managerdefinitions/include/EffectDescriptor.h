@@ -72,6 +72,9 @@ public:
                      audio_io_handle_t dstOutput);
     void moveEffects(const std::vector<int>& ids, audio_io_handle_t dstOutput);
 
+    audio_io_handle_t getIoForSession(audio_session_t sessionId,
+                                      const effect_uuid_t *effectType = nullptr);
+
     void dump(String8 *dst, int spaces = 0, bool verbose = true) const;
 
 private:

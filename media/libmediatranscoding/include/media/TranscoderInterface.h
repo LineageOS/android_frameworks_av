@@ -32,14 +32,14 @@ class TranscoderCallbackInterface;
 // Interface for the scheduler to call the transcoder to take actions.
 class TranscoderInterface {
 public:
-    // TODO(chz): determine what parameters are needed here.
-    // For now, always pass in clientId&jobId.
     virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) = 0;
     virtual void start(ClientIdType clientId, JobIdType jobId,
                        const TranscodingRequestParcel& request,
                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
     virtual void pause(ClientIdType clientId, JobIdType jobId) = 0;
-    virtual void resume(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void resume(ClientIdType clientId, JobIdType jobId,
+                        const TranscodingRequestParcel& request,
+                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
     virtual void stop(ClientIdType clientId, JobIdType jobId) = 0;
 
 protected:
