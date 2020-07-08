@@ -3817,43 +3817,44 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
     switch ((int32_t)mPath[4]) {
         case FOURCC("\251alb"):
         {
-            metadataKey = "album";
+            metadataKey = AMEDIAFORMAT_KEY_ALBUM;
             break;
         }
         case FOURCC("\251ART"):
         {
-            metadataKey = "artist";
+            metadataKey = AMEDIAFORMAT_KEY_ARTIST;
             break;
         }
         case FOURCC("aART"):
         {
-            metadataKey = "albumartist";
+            metadataKey = AMEDIAFORMAT_KEY_ALBUMARTIST;
             break;
         }
         case FOURCC("\251day"):
         {
-            metadataKey = "year";
+            metadataKey = AMEDIAFORMAT_KEY_YEAR;
             break;
         }
         case FOURCC("\251nam"):
         {
-            metadataKey = "title";
+            metadataKey = AMEDIAFORMAT_KEY_TITLE;
             break;
         }
         case FOURCC("\251wrt"):
         {
-            metadataKey = "writer";
+            // various open source taggers agree that the "©wrt" tag is for composer, not writer
+            metadataKey = AMEDIAFORMAT_KEY_COMPOSER;
             break;
         }
         case FOURCC("covr"):
         {
-            metadataKey = "albumart";
+            metadataKey = AMEDIAFORMAT_KEY_ALBUMART;
             break;
         }
         case FOURCC("gnre"):
         case FOURCC("\251gen"):
         {
-            metadataKey = "genre";
+            metadataKey = AMEDIAFORMAT_KEY_GENRE;
             break;
         }
         case FOURCC("cpil"):
@@ -3958,7 +3959,7 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
         if (!strcmp(metadataKey, "albumart")) {
             AMediaFormat_setBuffer(mFileMetaData, metadataKey,
                     buffer + 8, size - 8);
-        } else if (!strcmp(metadataKey, "genre")) {
+        } else if (!strcmp(metadataKey, AMEDIAFORMAT_KEY_GENRE)) {
             if (flags == 0) {
                 // uint8_t genre code, iTunes genre codes are
                 // the standard id3 codes, except they start
