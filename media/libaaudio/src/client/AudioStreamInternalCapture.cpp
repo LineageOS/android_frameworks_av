@@ -41,9 +41,9 @@ AudioStreamInternalCapture::AudioStreamInternalCapture(AAudioServiceInterface  &
 
 AudioStreamInternalCapture::~AudioStreamInternalCapture() {}
 
-void AudioStreamInternalCapture::advanceClientToMatchServerPosition() {
+void AudioStreamInternalCapture::advanceClientToMatchServerPosition(int32_t serverMargin) {
     int64_t readCounter = mAudioEndpoint->getDataReadCounter();
-    int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
+    int64_t writeCounter = mAudioEndpoint->getDataWriteCounter() + serverMargin;
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
     int64_t offset = readCounter - writeCounter;
