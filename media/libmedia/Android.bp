@@ -219,7 +219,7 @@ cc_library_static {
     ],
 
     header_libs: [
-        "libmedia_headers",
+        "libmedia_datasource_headers",
         "media_ndk_headers",
     ],
 
@@ -235,6 +235,14 @@ cc_library_static {
             "signed-integer-overflow",
         ],
         cfi: true,
+    },
+
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
     },
 }
 
