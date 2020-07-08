@@ -3,12 +3,12 @@ cc_test {
     name: "ResourceManagerService_test",
     srcs: ["ResourceManagerService_test.cpp"],
     test_suites: ["device-tests"],
+    static_libs: ["libresourcemanagerservice"],
     shared_libs: [
         "libbinder",
         "libbinder_ndk",
         "liblog",
         "libmedia",
-        "libresourcemanagerservice",
         "libutils",
     ],
     include_dirs: [
@@ -19,17 +19,16 @@ cc_test {
         "-Werror",
         "-Wall",
     ],
-    compile_multilib: "32",
 }
 
 cc_test {
     name: "ServiceLog_test",
     srcs: ["ServiceLog_test.cpp"],
     test_suites: ["device-tests"],
+    static_libs: ["libresourcemanagerservice"],
     shared_libs: [
         "liblog",
         "libmedia",
-        "libresourcemanagerservice",
         "libutils",
     ],
     include_dirs: [
@@ -40,5 +39,4 @@ cc_test {
         "-Werror",
         "-Wall",
     ],
-    compile_multilib: "32",
 }
