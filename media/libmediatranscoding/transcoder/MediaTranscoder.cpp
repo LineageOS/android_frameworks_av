@@ -151,9 +151,14 @@ void MediaTranscoder::onTrackError(const MediaTrackTranscoder* transcoder, media
     sendCallback(status);
 }
 
-void MediaTranscoder::onSampleWriterFinished(media_status_t status) {
+void MediaTranscoder::onFinished(const MediaSampleWriter* writer __unused, media_status_t status) {
     LOG((status != AMEDIA_OK) ? ERROR : DEBUG) << "Sample writer finished with status " << status;
     sendCallback(status);
+}
+
+void MediaTranscoder::onProgressUpdate(const MediaSampleWriter* writer __unused, int32_t progress) {
+    // Dispatch progress updated to the client.
+    mCallbacks->onProgressUpdate(this, progress);
 }
 
 MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks)
@@ -288,8 +293,7 @@ media_status_t MediaTranscoder::configureDestination(int fd) {
     }
 
     mSampleWriter = std::make_unique<MediaSampleWriter>();
-    const bool initOk = mSampleWriter->init(
-            fd, std::bind(&MediaTranscoder::onSampleWriterFinished, this, std::placeholders::_1));
+    const bool initOk = mSampleWriter->init(fd, shared_from_this());
 
     if (!initOk) {
         LOG(ERROR) << "Unable to initialize sample writer with destination fd: " << fd;
