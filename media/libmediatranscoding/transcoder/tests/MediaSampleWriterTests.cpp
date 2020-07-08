@@ -32,28 +32,6 @@
 
 namespace android {
 
-/** Minimal one-shot semaphore */
-class SimpleSemaphore {
-public:
-    void signal() {
-        std::unique_lock<std::mutex> lock(mMutex);
-        mSignaled = true;
-        mCondition.notify_all();
-    }
-
-    void wait() {
-        std::unique_lock<std::mutex> lock(mMutex);
-        while (!mSignaled) {
-            mCondition.wait(lock);
-        }
-    }
-
-private:
-    std::mutex mMutex;
-    std::condition_variable mCondition;
-    bool mSignaled = false;
-};
-
 /** Muxer interface to enable MediaSampleWriter testing. */
 class TestMuxer : public MediaSampleWriterMuxerInterface {
 public:
@@ -151,11 +129,22 @@ public:
         for (size_t trackIndex = 0; trackIndex < mTrackCount; trackIndex++) {
             AMediaFormat* trackFormat = AMediaExtractor_getTrackFormat(mExtractor, trackIndex);
             ASSERT_NE(trackFormat, nullptr);
+
+            const char* mime = nullptr;
+            AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &mime);
+            if (strncmp(mime, "video/", 6) == 0) {
+                mVideoTrackIndex = trackIndex;
+            } else if (strncmp(mime, "audio/", 6) == 0) {
+                mAudioTrackIndex = trackIndex;
+            }
+
             mTrackFormats.push_back(
                     std::shared_ptr<AMediaFormat>(trackFormat, &AMediaFormat_delete));
 
             AMediaExtractor_selectTrack(mExtractor, trackIndex);
         }
+        EXPECT_GE(mVideoTrackIndex, 0);
+        EXPECT_GE(mAudioTrackIndex, 0);
     }
 
     void reset() const {
@@ -167,6 +156,60 @@ public:
     AMediaExtractor* mExtractor = nullptr;
     size_t mTrackCount = 0;
     std::vector<std::shared_ptr<AMediaFormat>> mTrackFormats;
+    int mVideoTrackIndex = -1;
+    int mAudioTrackIndex = -1;
+};
+
+class TestCallbacks : public MediaSampleWriter::CallbackInterface {
+public:
+    TestCallbacks(bool expectSuccess = true) : mExpectSuccess(expectSuccess) {}
+
+    bool hasFinished() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        return mFinished;
+    }
+
+    // MediaSampleWriter::CallbackInterface
+    virtual void onFinished(const MediaSampleWriter* writer __unused,
+                            media_status_t status) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        EXPECT_FALSE(mFinished);
+        if (mExpectSuccess) {
+            EXPECT_EQ(status, AMEDIA_OK);
+        } else {
+            EXPECT_NE(status, AMEDIA_OK);
+        }
+        mFinished = true;
+        mCondition.notify_all();
+    }
+
+    virtual void onProgressUpdate(const MediaSampleWriter* writer __unused,
+                                  int32_t progress) override {
+        EXPECT_GT(progress, mLastProgress);
+        EXPECT_GE(progress, 0);
+        EXPECT_LE(progress, 100);
+
+        mLastProgress = progress;
+        mProgressUpdateCount++;
+    }
+    // ~MediaSampleWriter::CallbackInterface
+
+    void waitForWritingFinished() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (!mFinished) {
+            mCondition.wait(lock);
+        }
+    }
+
+    uint32_t getProgressUpdateCount() const { return mProgressUpdateCount; }
+
+private:
+    std::mutex mMutex;
+    std::condition_variable mCondition;
+    bool mFinished = false;
+    bool mExpectSuccess;
+    int32_t mLastProgress = -1;
+    uint32_t mProgressUpdateCount = 0;
 };
 
 class MediaSampleWriterTests : public ::testing::Test {
@@ -222,7 +265,7 @@ public:
 protected:
     std::shared_ptr<TestMuxer> mTestMuxer;
     std::shared_ptr<MediaSampleQueue> mSampleQueue;
-    const MediaSampleWriter::OnWritingFinishedCallback mEmptyCallback = [](media_status_t) {};
+    std::shared_ptr<TestCallbacks> mTestCallbacks = std::make_shared<TestCallbacks>();
 };
 
 TEST_F(MediaSampleWriterTests, TestAddTrackWithoutInit) {
@@ -239,14 +282,14 @@ TEST_F(MediaSampleWriterTests, TestStartWithoutInit) {
 
 TEST_F(MediaSampleWriterTests, TestStartWithoutTracks) {
     MediaSampleWriter writer{};
-    EXPECT_TRUE(writer.init(mTestMuxer, mEmptyCallback));
+    EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
     EXPECT_FALSE(writer.start());
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::NoEvent);
 }
 
 TEST_F(MediaSampleWriterTests, TestAddInvalidTrack) {
     MediaSampleWriter writer{};
-    EXPECT_TRUE(writer.init(mTestMuxer, mEmptyCallback));
+    EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
 
     EXPECT_FALSE(writer.addTrack(mSampleQueue, nullptr));
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::NoEvent);
@@ -259,31 +302,25 @@ TEST_F(MediaSampleWriterTests, TestAddInvalidTrack) {
 TEST_F(MediaSampleWriterTests, TestDoubleStartStop) {
     MediaSampleWriter writer{};
 
-    bool callbackFired = false;
-    MediaSampleWriter::OnWritingFinishedCallback stoppedCallback =
-            [&callbackFired](media_status_t status) {
-                EXPECT_NE(status, AMEDIA_OK);
-                EXPECT_FALSE(callbackFired);
-                callbackFired = true;
-            };
-
-    EXPECT_TRUE(writer.init(mTestMuxer, stoppedCallback));
+    std::shared_ptr<TestCallbacks> callbacks =
+            std::make_shared<TestCallbacks>(false /* expectSuccess */);
+    EXPECT_TRUE(writer.init(mTestMuxer, callbacks));
 
     const TestMediaSource& mediaSource = getMediaSource();
     EXPECT_TRUE(writer.addTrack(mSampleQueue, mediaSource.mTrackFormats[0]));
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::AddTrack(mediaSource.mTrackFormats[0].get()));
 
-    EXPECT_TRUE(writer.start());
+    ASSERT_TRUE(writer.start());
     EXPECT_FALSE(writer.start());
 
     EXPECT_TRUE(writer.stop());
-    EXPECT_TRUE(callbackFired);
+    EXPECT_TRUE(callbacks->hasFinished());
     EXPECT_FALSE(writer.stop());
 }
 
 TEST_F(MediaSampleWriterTests, TestStopWithoutStart) {
     MediaSampleWriter writer{};
-    EXPECT_TRUE(writer.init(mTestMuxer, mEmptyCallback));
+    EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
 
     const TestMediaSource& mediaSource = getMediaSource();
     EXPECT_TRUE(writer.addTrack(mSampleQueue, mediaSource.mTrackFormats[0]));
@@ -295,22 +332,48 @@ TEST_F(MediaSampleWriterTests, TestStopWithoutStart) {
 
 TEST_F(MediaSampleWriterTests, TestStartWithoutCallback) {
     MediaSampleWriter writer{};
-    EXPECT_FALSE(writer.init(mTestMuxer, nullptr));
+
+    std::weak_ptr<MediaSampleWriter::CallbackInterface> unassignedWp;
+    EXPECT_FALSE(writer.init(mTestMuxer, unassignedWp));
+
+    std::shared_ptr<MediaSampleWriter::CallbackInterface> unassignedSp;
+    EXPECT_FALSE(writer.init(mTestMuxer, unassignedSp));
 
     const TestMediaSource& mediaSource = getMediaSource();
     EXPECT_FALSE(writer.addTrack(mSampleQueue, mediaSource.mTrackFormats[0]));
     ASSERT_FALSE(writer.start());
 }
 
+TEST_F(MediaSampleWriterTests, TestProgressUpdate) {
+    static constexpr uint32_t kSegmentLengthUs = 1;
+    const TestMediaSource& mediaSource = getMediaSource();
+
+    MediaSampleWriter writer{kSegmentLengthUs};
+    EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
+
+    std::shared_ptr<AMediaFormat> videoFormat =
+            std::shared_ptr<AMediaFormat>(AMediaFormat_new(), &AMediaFormat_delete);
+    AMediaFormat_copy(videoFormat.get(),
+                      mediaSource.mTrackFormats[mediaSource.mVideoTrackIndex].get());
+
+    AMediaFormat_setInt64(videoFormat.get(), AMEDIAFORMAT_KEY_DURATION, 100);
+    EXPECT_TRUE(writer.addTrack(mSampleQueue, videoFormat));
+    ASSERT_TRUE(writer.start());
+
+    for (int64_t pts = 0; pts < 100; ++pts) {
+        mSampleQueue->enqueue(newSampleWithPts(pts));
+    }
+    mSampleQueue->enqueue(newSampleEos());
+    mTestCallbacks->waitForWritingFinished();
+
+    EXPECT_EQ(mTestCallbacks->getProgressUpdateCount(), 100);
+}
+
 TEST_F(MediaSampleWriterTests, TestInterleaving) {
     static constexpr uint32_t kSegmentLength = MediaSampleWriter::kDefaultTrackSegmentLengthUs;
-    SimpleSemaphore semaphore;
 
     MediaSampleWriter writer{kSegmentLength};
-    EXPECT_TRUE(writer.init(mTestMuxer, [&semaphore](media_status_t status) {
-        EXPECT_EQ(status, AMEDIA_OK);
-        semaphore.signal();
-    }));
+    EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
 
     // Use two tracks for this test.
     static constexpr int kNumTracks = 2;
@@ -356,7 +419,7 @@ TEST_F(MediaSampleWriterTests, TestInterleaving) {
     ASSERT_TRUE(writer.start());
 
     // Wait for writer to complete.
-    semaphore.wait();
+    mTestCallbacks->waitForWritingFinished();
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Start());
 
     // Verify sample order.
@@ -386,16 +449,14 @@ TEST_F(MediaSampleWriterTests, TestInterleaving) {
 
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Stop());
     EXPECT_TRUE(writer.stop());
+    EXPECT_TRUE(mTestCallbacks->hasFinished());
 }
 
 TEST_F(MediaSampleWriterTests, TestAbortInputQueue) {
-    SimpleSemaphore semaphore;
-
     MediaSampleWriter writer{};
-    EXPECT_TRUE(writer.init(mTestMuxer, [&semaphore](media_status_t status) {
-        EXPECT_NE(status, AMEDIA_OK);
-        semaphore.signal();
-    }));
+    std::shared_ptr<TestCallbacks> callbacks =
+            std::make_shared<TestCallbacks>(false /* expectSuccess */);
+    EXPECT_TRUE(writer.init(mTestMuxer, callbacks));
 
     // Use two tracks for this test.
     static constexpr int kNumTracks = 2;
@@ -417,7 +478,8 @@ TEST_F(MediaSampleWriterTests, TestAbortInputQueue) {
     for (int trackIdx = 0; trackIdx < kNumTracks; ++trackIdx) {
         sampleQueues[trackIdx]->abort();
     }
-    semaphore.wait();
+
+    callbacks->waitForWritingFinished();
 
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Start());
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Stop());
@@ -465,12 +527,8 @@ TEST_F(MediaSampleWriterTests, TestDefaultMuxer) {
     ASSERT_GT(destinationFd, 0);
 
     // Initialize writer.
-    SimpleSemaphore semaphore;
     MediaSampleWriter writer{};
-    EXPECT_TRUE(writer.init(destinationFd, [&semaphore](media_status_t status) {
-        EXPECT_EQ(status, AMEDIA_OK);
-        semaphore.signal();
-    }));
+    EXPECT_TRUE(writer.init(destinationFd, mTestCallbacks));
     close(destinationFd);
 
     // Add tracks.
@@ -497,7 +555,7 @@ TEST_F(MediaSampleWriterTests, TestDefaultMuxer) {
     }
 
     // Wait for writer.
-    semaphore.wait();
+    mTestCallbacks->waitForWritingFinished();
     EXPECT_TRUE(writer.stop());
 
     // Compare output file with source.

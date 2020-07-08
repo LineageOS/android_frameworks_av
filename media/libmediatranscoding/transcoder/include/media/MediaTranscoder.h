@@ -17,6 +17,9 @@
 #ifndef ANDROID_MEDIA_TRANSCODER_H
 #define ANDROID_MEDIA_TRANSCODER_H
 
+#include <binder/Parcel.h>
+#include <binder/Parcelable.h>
+#include <media/MediaSampleWriter.h>
 #include <media/MediaTrackTranscoderCallback.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
@@ -30,11 +33,11 @@
 namespace android {
 
 class MediaSampleReader;
-class MediaSampleWriter;
 class Parcel;
 
 class MediaTranscoder : public std::enable_shared_from_this<MediaTranscoder>,
-                        public MediaTrackTranscoderCallback {
+                        public MediaTrackTranscoderCallback,
+                        public MediaSampleWriter::CallbackInterface {
 public:
     /** Callbacks from transcoder to client. */
     class CallbackInterface {
@@ -126,6 +129,12 @@ private:
     virtual void onTrackError(const MediaTrackTranscoder* transcoder,
                               media_status_t status) override;
     // ~MediaTrackTranscoderCallback
+
+    // MediaSampleWriter::CallbackInterface
+    virtual void onFinished(const MediaSampleWriter* writer, media_status_t status) override;
+    virtual void onProgressUpdate(const MediaSampleWriter* writer, int32_t progress) override;
+    // ~MediaSampleWriter::CallbackInterface
+
     void onSampleWriterFinished(media_status_t status);
     void sendCallback(media_status_t status);
 
