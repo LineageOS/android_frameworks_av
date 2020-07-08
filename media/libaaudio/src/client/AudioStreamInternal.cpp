@@ -353,6 +353,8 @@ aaudio_result_t AudioStreamInternal::requestStart()
     // Clear any stale timestamps from the previous run.
     drainTimestampsFromService();
 
+    prepareBuffersForStart(); // tell subclasses to get ready
+
     aaudio_result_t result = mServiceInterface.startStream(mServiceStreamHandle);
     if (result == AAUDIO_ERROR_INVALID_HANDLE) {
         ALOGD("%s() INVALID_HANDLE, stream was probably stolen", __func__);

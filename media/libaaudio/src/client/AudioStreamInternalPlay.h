@@ -65,7 +65,9 @@ public:
 
 protected:
 
-    void advanceClientToMatchServerPosition() override;
+    void prepareBuffersForStart() override;
+
+    void advanceClientToMatchServerPosition(int32_t serverMargin = 0) override;
 
     void onFlushFromServer() override;
 

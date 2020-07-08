@@ -86,8 +86,13 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     return mServiceInterface.flushStream(mServiceStreamHandle);
 }
 
-void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
-    int64_t readCounter = mAudioEndpoint->getDataReadCounter();
+void AudioStreamInternalPlay::prepareBuffersForStart() {
+    // Prevent stale data from being played.
+    mAudioEndpoint->eraseDataMemory();
+}
+
+void AudioStreamInternalPlay::advanceClientToMatchServerPosition(int32_t serverMargin) {
+    int64_t readCounter = mAudioEndpoint->getDataReadCounter() + serverMargin;
     int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
@@ -145,7 +150,9 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     if (mNeedCatchUp.isRequested()) {
         // Catch an MMAP pointer that is already advancing.
         // This will avoid initial underruns caused by a slow cold start.
-        advanceClientToMatchServerPosition();
+        // We add a one burst margin in case the DSP advances before we can write the data.
+        // This can help prevent the beginning of the stream from being skipped.
+        advanceClientToMatchServerPosition(getFramesPerBurst());
         mNeedCatchUp.acknowledge();
     }
 
