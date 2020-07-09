@@ -1,6 +1,16 @@
 cc_library {
     name: "libmpeg2extractor",
 
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+        android: {
+            shared_libs: ["libvndksupport#29"],
+        },
+    },
+
     defaults: ["extractor-defaults"],
 
     srcs: [
@@ -11,7 +21,6 @@ cc_library {
 
     shared_libs: [
         "libcgrouprc#29",
-        "libvndksupport#29",
     ],
 
     header_libs: [
