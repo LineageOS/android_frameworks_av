@@ -215,7 +215,7 @@ TEST_F(BufferpoolMultiTest, TransferBuffer) {
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
-  setenv("TREBLE_TESTING_OVERRIDE", "true", true);
+  android::hardware::details::setTrebleTestingOverride(true);
   ::testing::InitGoogleTest(&argc, argv);
   int status = RUN_ALL_TESTS();
   LOG(INFO) << "Test result = " << status;
