@@ -180,6 +180,18 @@ struct EventTracker {
         mCondition.notify_one();
     }
 
+    void updateProgress(int progress) {
+        std::unique_lock lock(mLock);
+        mLastProgress = progress;
+        mUpdateCount++;
+    }
+
+    int getUpdateCount(int *lastProgress) {
+        std::unique_lock lock(mLock);
+        *lastProgress = mLastProgress;
+        return mUpdateCount;
+    }
+
     TranscodingErrorCode getLastError() {
         std::unique_lock lock(mLock);
         return mLastErr;
@@ -191,6 +203,8 @@ private:
     Event mPoppedEvent;
     std::list<Event> mEventQueue;
     TranscodingErrorCode mLastErr;
+    int mUpdateCount = 0;
+    int mLastProgress = -1;
 };
 
 // Operators for GTest macros.
@@ -266,7 +280,8 @@ struct TestClientCallback : public BnTranscodingClientCallback, public EventTrac
         return Status::ok();
     }
 
-    Status onProgressUpdate(int32_t /* in_jobId */, int32_t /* in_progress */) override {
+    Status onProgressUpdate(int32_t /* in_jobId */, int32_t in_progress) override {
+        updateProgress(in_progress);
         return Status::ok();
     }
 

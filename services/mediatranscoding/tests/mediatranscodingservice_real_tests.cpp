@@ -100,6 +100,29 @@ TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideo) {
     unregisterMultipleClients();
 }
 
+TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideoProgress) {
+    registerMultipleClients();
+
+    const char* dstPath = OUTPATH(TestTranscodeVideoProgress);
+    deleteFile(dstPath);
+
+    // Submit one job.
+    EXPECT_TRUE(
+            submit(mClient1, 0, kLongSrcPath, dstPath, TranscodingJobPriority::kNormal, kBitRate));
+
+    // Wait for job to finish.
+    EXPECT_EQ(mClientCallback1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
+    EXPECT_EQ(mClientCallback1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+
+    // Check the progress update messages are received. For this clip (around ~15 second long),
+    // expect at least 10 updates, and the last update should be 100.
+    int lastProgress;
+    EXPECT_GE(mClientCallback1->getUpdateCount(&lastProgress), 10);
+    EXPECT_EQ(lastProgress, 100);
+
+    unregisterMultipleClients();
+}
+
 /*
  * Test cancel immediately after start.
  */
