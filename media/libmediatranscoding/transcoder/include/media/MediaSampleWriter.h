@@ -71,18 +71,27 @@ public:
     /** The default segment length. */
     static constexpr uint32_t kDefaultTrackSegmentLengthUs = 1 * 1000 * 1000;  // 1 sec.
 
-    /** Client callback for when the writer is finished. */
-    using OnWritingFinishedCallback = std::function<void(media_status_t)>;
+    /** Callback interface. */
+    class CallbackInterface {
+    public:
+        /**
+         * Sample writer finished. The finished callback is only called after the sample writer has
+         * been successfully started.
+         */
+        virtual void onFinished(const MediaSampleWriter* writer, media_status_t status) = 0;
+
+        /** Sample writer progress update in percent. */
+        virtual void onProgressUpdate(const MediaSampleWriter* writer, int32_t progress) = 0;
+
+        virtual ~CallbackInterface() = default;
+    };
 
     /**
      * Constructor with custom segment length.
      * @param trackSegmentLengthUs The segment length to use for this MediaSampleWriter.
      */
     MediaSampleWriter(uint32_t trackSegmentLengthUs)
-          : mTrackSegmentLengthUs(trackSegmentLengthUs),
-            mWritingFinishedCallback(nullptr),
-            mMuxer(nullptr),
-            mState(UNINITIALIZED){};
+          : mTrackSegmentLengthUs(trackSegmentLengthUs), mMuxer(nullptr), mState(UNINITIALIZED){};
 
     /** Constructor using the default segment length. */
     MediaSampleWriter() : MediaSampleWriter(kDefaultTrackSegmentLengthUs){};
@@ -95,21 +104,19 @@ public:
      * to be initialized before tracks are added and can only be initialized once.
      * @param fd An open file descriptor to write to. The caller is responsible for closing this
      *        file descriptor and it is safe to do so once this method returns.
-     * @param callback Client callback that gets called when the sample writer has finished, after
-     *        it was successfully started.
+     * @param callbacks Client callback object that gets called by the sample writer.
      * @return True if the writer was successfully initialized.
      */
-    bool init(int fd, const OnWritingFinishedCallback& callback /* nonnull */);
+    bool init(int fd, const std::weak_ptr<CallbackInterface>& callbacks /* nonnull */);
 
     /**
      * Initializes the sample writer with a custom muxer interface implementation.
      * @param muxer The custom muxer interface implementation.
-     * @param callback Client callback that gets called when the sample writer has finished, after
-     *        it was successfully started.
+     * @param @param callbacks Client callback object that gets called by the sample writer.
      * @return True if the writer was successfully initialized.
      */
     bool init(const std::shared_ptr<MediaSampleWriterMuxerInterface>& muxer /* nonnull */,
-              const OnWritingFinishedCallback& callback /* nonnull */);
+              const std::weak_ptr<CallbackInterface>& callbacks /* nonnull */);
 
     /**
      * Adds a new track to the sample writer. Tracks must be added after the sample writer has been
@@ -145,24 +152,28 @@ private:
 
     struct TrackRecord {
         TrackRecord(const std::shared_ptr<MediaSampleQueue>& sampleQueue, size_t trackIndex,
-                    int64_t durationUs)
+                    int64_t durationUs, bool isVideo)
               : mSampleQueue(sampleQueue),
                 mTrackIndex(trackIndex),
                 mDurationUs(durationUs),
                 mFirstSampleTimeUs(0),
+                mPrevSampleTimeUs(0),
                 mFirstSampleTimeSet(false),
-                mReachedEos(false) {}
+                mReachedEos(false),
+                mIsVideo(isVideo) {}
 
         std::shared_ptr<MediaSampleQueue> mSampleQueue;
         const size_t mTrackIndex;
         int64_t mDurationUs;
         int64_t mFirstSampleTimeUs;
+        int64_t mPrevSampleTimeUs;
         bool mFirstSampleTimeSet;
         bool mReachedEos;
+        bool mIsVideo;
     };
 
     const uint32_t mTrackSegmentLengthUs;
-    OnWritingFinishedCallback mWritingFinishedCallback;
+    std::weak_ptr<CallbackInterface> mCallbacks;
     std::shared_ptr<MediaSampleWriterMuxerInterface> mMuxer;
     std::vector<TrackRecord> mTracks;
     std::thread mThread;

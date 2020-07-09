@@ -78,14 +78,14 @@ MediaSampleWriter::~MediaSampleWriter() {
     }
 }
 
-bool MediaSampleWriter::init(int fd, const OnWritingFinishedCallback& callback) {
-    return init(DefaultMuxer::create(fd), callback);
+bool MediaSampleWriter::init(int fd, const std::weak_ptr<CallbackInterface>& callbacks) {
+    return init(DefaultMuxer::create(fd), callbacks);
 }
 
 bool MediaSampleWriter::init(const std::shared_ptr<MediaSampleWriterMuxerInterface>& muxer,
-                             const OnWritingFinishedCallback& callback) {
-    if (callback == nullptr) {
-        LOG(ERROR) << "Callback cannot be null";
+                             const std::weak_ptr<CallbackInterface>& callbacks) {
+    if (callbacks.lock() == nullptr) {
+        LOG(ERROR) << "Callback object cannot be null";
         return false;
     } else if (muxer == nullptr) {
         LOG(ERROR) << "Muxer cannot be null";
@@ -100,7 +100,7 @@ bool MediaSampleWriter::init(const std::shared_ptr<MediaSampleWriterMuxerInterfa
 
     mState = INITIALIZED;
     mMuxer = muxer;
-    mWritingFinishedCallback = callback;
+    mCallbacks = callbacks;
     return true;
 }
 
@@ -127,7 +127,11 @@ bool MediaSampleWriter::addTrack(const std::shared_ptr<MediaSampleQueue>& sample
         durationUs = 0;
     }
 
-    mTracks.emplace_back(sampleQueue, static_cast<size_t>(trackIndex), durationUs);
+    const char* mime = nullptr;
+    const bool isVideo = AMediaFormat_getString(trackFormat.get(), AMEDIAFORMAT_KEY_MIME, &mime) &&
+                         (strncmp(mime, "video/", 6) == 0);
+
+    mTracks.emplace_back(sampleQueue, static_cast<size_t>(trackIndex), durationUs, isVideo);
     return true;
 }
 
@@ -144,7 +148,9 @@ bool MediaSampleWriter::start() {
 
     mThread = std::thread([this] {
         media_status_t status = writeSamples();
-        mWritingFinishedCallback(status);
+        if (auto callbacks = mCallbacks.lock()) {
+            callbacks->onFinished(this, status);
+        }
     });
     mState = STARTED;
     return true;
@@ -191,6 +197,18 @@ media_status_t MediaSampleWriter::runWriterLoop() {
     AMediaCodecBufferInfo bufferInfo;
     uint32_t segmentEndTimeUs = mTrackSegmentLengthUs;
     bool samplesLeft = true;
+    int32_t lastProgressUpdate = 0;
+
+    // Set the "primary" track that will be used to determine progress to the track with longest
+    // duration.
+    int primaryTrackIndex = -1;
+    int64_t longestDurationUs = 0;
+    for (int trackIndex = 0; trackIndex < mTracks.size(); ++trackIndex) {
+        if (mTracks[trackIndex].mDurationUs > longestDurationUs) {
+            primaryTrackIndex = trackIndex;
+            longestDurationUs = mTracks[trackIndex].mDurationUs;
+        }
+    }
 
     while (samplesLeft) {
         samplesLeft = false;
@@ -216,9 +234,10 @@ media_status_t MediaSampleWriter::runWriterLoop() {
                     samplesLeft = true;
                 }
 
-                // Record the first sample's timestamp in order to translate duration to EOS time
-                // for tracks that does not start at 0.
+                track.mPrevSampleTimeUs = sample->info.presentationTimeUs;
                 if (!track.mFirstSampleTimeSet) {
+                    // Record the first sample's timestamp in order to translate duration to EOS
+                    // time for tracks that does not start at 0.
                     track.mFirstSampleTimeUs = sample->info.presentationTimeUs;
                     track.mFirstSampleTimeSet = true;
                 }
@@ -236,6 +255,22 @@ media_status_t MediaSampleWriter::runWriterLoop() {
                 }
 
             } while (sample->info.presentationTimeUs < segmentEndTimeUs && !track.mReachedEos);
+        }
+
+        // TODO(lnilsson): Add option to toggle progress reporting on/off.
+        if (primaryTrackIndex >= 0) {
+            const TrackRecord& track = mTracks[primaryTrackIndex];
+
+            const int64_t elapsed = track.mPrevSampleTimeUs - track.mFirstSampleTimeUs;
+            int32_t progress = (elapsed * 100) / track.mDurationUs;
+            progress = std::clamp(progress, 0, 100);
+
+            if (progress > lastProgressUpdate) {
+                if (auto callbacks = mCallbacks.lock()) {
+                    callbacks->onProgressUpdate(this, progress);
+                }
+                lastProgressUpdate = progress;
+            }
         }
 
         segmentEndTimeUs += mTrackSegmentLengthUs;

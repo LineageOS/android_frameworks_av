@@ -307,6 +307,20 @@ void SoftMP3::onQueueFilled(OMX_U32 /* portIndex */) {
 
             if (inHeader->nFlags & OMX_BUFFERFLAG_EOS) {
                 mSawInputEos = true;
+                if (mIsFirst && !inHeader->nFilledLen) {
+                     ALOGV("empty first EOS");
+                     outHeader->nFilledLen = 0;
+                     outHeader->nTimeStamp = inHeader->nTimeStamp;
+                     outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+                     mSignalledOutputEos = true;
+                     outInfo->mOwnedByUs = false;
+                     outQueue.erase(outQueue.begin());
+                     notifyFillBufferDone(outHeader);
+                     inInfo->mOwnedByUs = false;
+                     inQueue.erase(inQueue.begin());
+                     notifyEmptyBufferDone(inHeader);
+                     return;
+                }
             }
 
             mConfig->pInputBuffer =
