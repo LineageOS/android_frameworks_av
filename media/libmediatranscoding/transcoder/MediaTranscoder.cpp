@@ -224,11 +224,11 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    std::unique_ptr<MediaTrackTranscoder> transcoder = nullptr;
-    std::shared_ptr<AMediaFormat> format = nullptr;
+    std::shared_ptr<MediaTrackTranscoder> transcoder;
+    std::shared_ptr<AMediaFormat> format;
 
     if (trackFormat == nullptr) {
-        transcoder = std::make_unique<PassthroughTrackTranscoder>(shared_from_this());
+        transcoder = std::make_shared<PassthroughTrackTranscoder>(shared_from_this());
     } else {
         const char* srcMime = nullptr;
         if (!AMediaFormat_getString(mSourceTrackFormats[trackIndex].get(), AMEDIAFORMAT_KEY_MIME,
@@ -253,7 +253,7 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
             }
         }
 
-        transcoder = std::make_unique<VideoTrackTranscoder>(shared_from_this());
+        transcoder = VideoTrackTranscoder::create(shared_from_this());
 
         AMediaFormat* mergedFormat =
                 mergeMediaFormats(mSourceTrackFormats[trackIndex].get(), trackFormat);

@@ -133,7 +133,7 @@ private:
     std::shared_ptr<MediaSampleReader> mSampleReader;
     std::unique_ptr<MediaSampleWriter> mSampleWriter;
     std::vector<std::shared_ptr<AMediaFormat>> mSourceTrackFormats;
-    std::vector<std::unique_ptr<MediaTrackTranscoder>> mTrackTranscoders;
+    std::vector<std::shared_ptr<MediaTrackTranscoder>> mTrackTranscoders;
     std::mutex mTracksAddedMutex;
     std::unordered_set<const MediaTrackTranscoder*> mTracksAdded GUARDED_BY(mTracksAddedMutex);
 
