@@ -51,7 +51,7 @@ public:
 private:
     class CallbackImpl;
     struct Event {
-        enum Type { NoEvent, Start, Pause, Resume, Stop, Finish, Error } type;
+        enum Type { NoEvent, Start, Pause, Resume, Stop, Finish, Error, Progress } type;
         ClientIdType clientId;
         JobIdType jobId;
         std::function<void()> runnable;
@@ -71,6 +71,7 @@ private:
     static const char* toString(Event::Type type);
     void onFinish(ClientIdType clientId, JobIdType jobId);
     void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode error);
+    void onProgress(ClientIdType clientId, JobIdType jobId, int32_t progress);
 
     TranscodingErrorCode handleStart(ClientIdType clientId, JobIdType jobId,
                                      const TranscodingRequestParcel& request,
