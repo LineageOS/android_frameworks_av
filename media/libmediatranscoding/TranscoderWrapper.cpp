@@ -103,6 +103,8 @@ const char* TranscoderWrapper::toString(Event::Type type) {
         return "Finish";
     case Event::Error:
         return "Error";
+    case Event::Progress:
+        return "Progress";
     default:
         break;
     }
@@ -132,8 +134,10 @@ public:
 
     virtual void onProgressUpdate(const MediaTranscoder* transcoder __unused,
                                   int32_t progress) override {
-        ALOGV("%s: job {%lld, %d}, progress %d", __FUNCTION__, (long long)mClientId, mJobId,
-              progress);
+        auto owner = mOwner.lock();
+        if (owner != nullptr) {
+            owner->onProgress(mClientId, mJobId, progress);
+        }
     }
 
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
@@ -257,6 +261,15 @@ void TranscoderWrapper::onError(ClientIdType clientId, JobIdType jobId,
         auto callback = mCallback.lock();
         if (callback != nullptr) {
             callback->onError(clientId, jobId, error);
+        }
+    });
+}
+
+void TranscoderWrapper::onProgress(ClientIdType clientId, JobIdType jobId, int32_t progress) {
+    queueEvent(Event::Progress, clientId, jobId, [=] {
+        auto callback = mCallback.lock();
+        if (callback != nullptr) {
+            callback->onProgressUpdate(clientId, jobId, progress);
         }
     });
 }
