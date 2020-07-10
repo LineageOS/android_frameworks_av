@@ -1344,6 +1344,20 @@ status_t CameraProviderManager::ProviderInfo::initialize(
         }
     }
 
+    // cameraDeviceStatusChange callbacks may be called (and causing new devices added)
+    // before setCallback returns
+    hardware::Return<Status> status = interface->setCallback(this);
+    if (!status.isOk()) {
+        ALOGE("%s: Transaction error setting up callbacks with camera provider '%s': %s",
+                __FUNCTION__, mProviderName.c_str(), status.description().c_str());
+        return DEAD_OBJECT;
+    }
+    if (status != Status::OK) {
+        ALOGE("%s: Unable to register callbacks with camera provider '%s'",
+                __FUNCTION__, mProviderName.c_str());
+        return mapToStatusT(status);
+    }
+
     hardware::Return<bool> linked = interface->linkToDeath(this, /*cookie*/ mId);
     if (!linked.isOk()) {
         ALOGE("%s: Transaction error in linking to camera provider '%s' death: %s",
@@ -1372,7 +1386,6 @@ status_t CameraProviderManager::ProviderInfo::initialize(
         return res;
     }
 
-    Status status;
     // Get initial list of camera devices, if any
     std::vector<std::string> devices;
     hardware::Return<void> ret = interface->getCameraIdList([&status, this, &devices](
@@ -1435,22 +1448,6 @@ status_t CameraProviderManager::ProviderInfo::initialize(
                     __FUNCTION__, device.c_str(), strerror(-res), res);
             continue;
         }
-    }
-
-    // cameraDeviceStatusChange callbacks may be called (and causing new devices added)
-    // before setCallback returns. setCallback must be called after addDevice so that
-    // the physical camera status callback can look up available regular
-    // cameras.
-    hardware::Return<Status> st = interface->setCallback(this);
-    if (!st.isOk()) {
-        ALOGE("%s: Transaction error setting up callbacks with camera provider '%s': %s",
-                __FUNCTION__, mProviderName.c_str(), st.description().c_str());
-        return DEAD_OBJECT;
-    }
-    if (st != Status::OK) {
-        ALOGE("%s: Unable to register callbacks with camera provider '%s'",
-                __FUNCTION__, mProviderName.c_str());
-        return mapToStatusT(st);
     }
 
     ALOGI("Camera provider %s ready with %zu camera devices",
@@ -1783,9 +1780,10 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::physicalCameraDevice
         CameraDeviceStatus newStatus) {
     sp<StatusListener> listener;
     std::string id;
-    bool initialized = false;
     {
         std::lock_guard<std::mutex> lock(mLock);
+        if (!mInitialized) return hardware::Void();
+
         bool known = false;
         for (auto& deviceInfo : mDevices) {
             if (deviceInfo->mName == cameraDeviceName) {
@@ -1802,10 +1800,9 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::physicalCameraDevice
                             __FUNCTION__, id.c_str(), physicalCameraDeviceName.c_str());
                     return hardware::Void();
                 }
-                ALOGI("Camera device %s physical device %s status is now %s, was %s",
+                ALOGI("Camera device %s physical device %s status is now %s",
                         cameraDeviceName.c_str(), physicalCameraDeviceName.c_str(),
-                        deviceStatusToString(newStatus), deviceStatusToString(
-                        deviceInfo->mPhysicalStatus[physicalCameraDeviceName]));
+                        deviceStatusToString(newStatus));
                 known = true;
                 break;
             }
@@ -1818,13 +1815,12 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::physicalCameraDevice
             return hardware::Void();
         }
         listener = mManager->getStatusListener();
-        initialized = mInitialized;
     }
     // Call without lock held to allow reentrancy into provider manager
     // Don't send the callback if providerInfo hasn't been initialized.
     // CameraService will initialize device status after provider is
     // initialized
-    if (listener != nullptr && initialized) {
+    if (listener != nullptr) {
         String8 physicalId(physicalCameraDeviceName.c_str());
         listener->onDeviceStatusChanged(String8(id.c_str()),
                 physicalId, newStatus);
