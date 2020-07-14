@@ -69,7 +69,7 @@ interface ICameraService
 
     /**
      * Default UID/PID values for non-privileged callers of
-     * connect(), connectDevice(), and connectLegacy()
+     * connect() and connectDevice()
      */
     const int USE_CALLING_UID = -1;
     const int USE_CALLING_PID = -1;
@@ -90,20 +90,6 @@ interface ICameraService
             String cameraId,
             String opPackageName,
             @nullable String featureId,
-            int clientUid);
-
-    /**
-     * halVersion constant for connectLegacy
-     */
-    const int CAMERA_HAL_API_VERSION_UNSPECIFIED = -1;
-
-    /**
-     * Open a camera device in legacy mode, if supported by the camera module HAL.
-     */
-    ICamera connectLegacy(ICameraClient client,
-            int cameraId,
-            int halVersion,
-            String opPackageName,
             int clientUid);
 
     /**
