@@ -73,6 +73,7 @@ Input
 
 #include "pvmp3_get_side_info.h"
 #include "pvmp3_crc.h"
+#include "pvmp3_getbits.h"
 
 
 /*----------------------------------------------------------------------------
@@ -125,12 +126,22 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
     {
         if (stereo == 1)
         {
+            if (!bitsAvailable(inputStream, 14))
+            {
+                return SIDE_INFO_ERROR;
+            }
+
             tmp = getbits_crc(inputStream, 14, crc, info->error_protection);
             si->main_data_begin = (tmp << 18) >> 23;    /* 9 */
             si->private_bits    = (tmp << 27) >> 27;    /* 5 */
         }
         else
         {
+            if (!bitsAvailable(inputStream, 12))
+            {
+                return SIDE_INFO_ERROR;
+            }
+
             tmp = getbits_crc(inputStream, 12, crc, info->error_protection);
             si->main_data_begin = (tmp << 20) >> 23;    /* 9 */
             si->private_bits    = (tmp << 29) >> 29;    /* 3 */
@@ -139,6 +150,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
 
         for (ch = 0; ch < stereo; ch++)
         {
+            if (!bitsAvailable(inputStream, 4))
+            {
+                return SIDE_INFO_ERROR;
+            }
+
             tmp = getbits_crc(inputStream, 4, crc, info->error_protection);
             si->ch[ch].scfsi[0] = (tmp << 28) >> 31;    /* 1 */
             si->ch[ch].scfsi[1] = (tmp << 29) >> 31;    /* 1 */
@@ -150,6 +166,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
         {
             for (ch = 0; ch < stereo; ch++)
             {
+                if (!bitsAvailable(inputStream, 34))
+                {
+                    return SIDE_INFO_ERROR;
+                }
+
                 si->ch[ch].gran[gr].part2_3_length    = getbits_crc(inputStream, 12, crc, info->error_protection);
                 tmp = getbits_crc(inputStream, 22, crc, info->error_protection);
 
@@ -160,6 +181,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
 
                 if (si->ch[ch].gran[gr].window_switching_flag)
                 {
+                    if (!bitsAvailable(inputStream, 22))
+                    {
+                        return SIDE_INFO_ERROR;
+                    }
+
                     tmp = getbits_crc(inputStream, 22, crc, info->error_protection);
 
                     si->ch[ch].gran[gr].block_type       = (tmp << 10) >> 30;   /* 2 */;
@@ -192,6 +218,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
                 }
                 else
                 {
+                    if (!bitsAvailable(inputStream, 22))
+                    {
+                        return SIDE_INFO_ERROR;
+                    }
+
                     tmp = getbits_crc(inputStream, 22, crc, info->error_protection);
 
                     si->ch[ch].gran[gr].table_select[0] = (tmp << 10) >> 27;   /* 5 */;
@@ -204,6 +235,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
                     si->ch[ch].gran[gr].block_type      = 0;
                 }
 
+                if (!bitsAvailable(inputStream, 3))
+                {
+                    return SIDE_INFO_ERROR;
+                }
+
                 tmp = getbits_crc(inputStream, 3, crc, info->error_protection);
                 si->ch[ch].gran[gr].preflag            = (tmp << 29) >> 31;    /* 1 */
                 si->ch[ch].gran[gr].scalefac_scale     = (tmp << 30) >> 31;    /* 1 */
@@ -213,11 +249,21 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
     }
     else /* Layer 3 LSF */
     {
+        if (!bitsAvailable(inputStream, 8 + stereo))
+        {
+            return SIDE_INFO_ERROR;
+        }
+
         si->main_data_begin = getbits_crc(inputStream,      8, crc, info->error_protection);
         si->private_bits    = getbits_crc(inputStream, stereo, crc, info->error_protection);
 
         for (ch = 0; ch < stereo; ch++)
         {
+            if (!bitsAvailable(inputStream, 39))
+            {
+                return SIDE_INFO_ERROR;
+            }
+
             tmp = getbits_crc(inputStream, 21, crc, info->error_protection);
             si->ch[ch].gran[0].part2_3_length    = (tmp << 11) >> 20;  /* 12 */
             si->ch[ch].gran[0].big_values        = (tmp << 23) >> 23;  /*  9 */
@@ -229,6 +275,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
 
             if (si->ch[ch].gran[0].window_switching_flag)
             {
+
+                if (!bitsAvailable(inputStream, 22))
+                {
+                    return SIDE_INFO_ERROR;
+                }
 
                 tmp = getbits_crc(inputStream, 22, crc, info->error_protection);
 
@@ -262,6 +313,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
             }
             else
             {
+                if (!bitsAvailable(inputStream, 22))
+                {
+                    return SIDE_INFO_ERROR;
+                }
+
                 tmp = getbits_crc(inputStream, 22, crc, info->error_protection);
 
                 si->ch[ch].gran[0].table_select[0] = (tmp << 10) >> 27;   /* 5 */;
@@ -272,6 +328,11 @@ ERROR_CODE pvmp3_get_side_info(tmp3Bits    *inputStream,
                 si->ch[ch].gran[0].region1_count   = (tmp << 29) >> 29;   /* 3 */;
 
                 si->ch[ch].gran[0].block_type      = 0;
+            }
+
+            if (!bitsAvailable(inputStream, 2))
+            {
+                return SIDE_INFO_ERROR;
             }
 
             tmp = getbits_crc(inputStream, 2, crc, info->error_protection);

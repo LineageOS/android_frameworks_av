@@ -104,6 +104,11 @@ extern "C"
 ; Function Prototype declaration
 ----------------------------------------------------------------------------*/
 
+static inline bool bitsAvailable(tmp3Bits *inputStream, uint32 neededBits)
+{
+    return (inputStream->inputBufferCurrentLength << 3) >= (neededBits + inputStream->usedBits);
+}
+
 /*----------------------------------------------------------------------------
 ; END
 ----------------------------------------------------------------------------*/
