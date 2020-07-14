@@ -1048,13 +1048,13 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
             return hardware::Void();
         }
 
+        bufRet.streamId = streamId;
         if (outputStream->isAbandoned()) {
             bufRet.val.error(StreamBufferRequestError::STREAM_DISCONNECTED);
             allReqsSucceeds = false;
             continue;
         }
 
-        bufRet.streamId = streamId;
         size_t handOutBufferCount = outputStream->getOutstandingBuffersCount();
         uint32_t numBuffersRequested = bufReq.numBuffersRequested;
         size_t totalHandout = handOutBufferCount + numBuffersRequested;
