@@ -52,6 +52,9 @@ cc_binary {
     // directly in the main device manifest.xml file or via vintf_fragments.
     // (Remove the line below if the entry is already in the main manifest.)
     vintf_fragments: ["manifest_media_c2_V1_1_default.xml"],
+
+    // Remove this line to enable this module.
+    enabled: false,
 }
 
 // seccomp policy file.
