@@ -234,17 +234,20 @@ void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
     static_assert(NCHAN > 0 && NCHAN <= 8);
     static_assert(MIXTYPE == MIXTYPE_MULTI_STEREOVOL
             || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
-            || MIXTYPE == MIXTYPE_STEREOEXPAND);
+            || MIXTYPE == MIXTYPE_STEREOEXPAND
+            || MIXTYPE == MIXTYPE_MONOEXPAND);
     auto proc = [](auto& a, const auto& b) {
         if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
-                || MIXTYPE == MIXTYPE_STEREOEXPAND) {
+                || MIXTYPE == MIXTYPE_STEREOEXPAND
+                || MIXTYPE == MIXTYPE_MONOEXPAND) {
             a += b;
         } else {
             a = b;
         }
     };
     auto inp = [&in]() -> const TI& {
-        if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND) {
+        if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND
+                || MIXTYPE == MIXTYPE_MONOEXPAND) {
             return *in;
         } else {
             return *in++;
@@ -312,6 +315,8 @@ void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
  *   TV/TAV: int32_t (U4.28) or int16_t (U4.12) or float
  *   Input channel count is 1.
  *   vol: represents volume array.
+ *   This uses stereo balanced volume vol[0] and vol[1].
+ *   Before R, this was a full volume array but was called only for channels <= 2.
  *
  *   This accumulates into the out pointer.
  *
@@ -356,17 +361,13 @@ inline void volumeRampMulti(TO* out, size_t frameCount,
         do {
             TA auxaccum = 0;
             if constexpr (MIXTYPE == MIXTYPE_MULTI) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ += MixMulAux<TO, TI, TV, TA>(*in++, vol[i], &auxaccum);
                     vol[i] += volinc[i];
                 }
-            } else if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) {
-                for (int i = 0; i < NCHAN; ++i) {
-                    *out++ += MixMulAux<TO, TI, TV, TA>(*in, vol[i], &auxaccum);
-                    vol[i] += volinc[i];
-                }
-                in++;
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_SAVEONLY) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ = MixMulAux<TO, TI, TV, TA>(*in++, vol[i], &auxaccum);
                     vol[i] += volinc[i];
@@ -383,11 +384,13 @@ inline void volumeRampMulti(TO* out, size_t frameCount,
                 vol[0] += volinc[0];
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
                     || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
+                    || MIXTYPE == MIXTYPE_MONOEXPAND
                     || MIXTYPE == MIXTYPE_STEREOEXPAND) {
                 stereoVolumeHelper<MIXTYPE, NCHAN>(
                         out, in, vol, [&auxaccum] (auto &a, const auto &b) {
                     return MixMulAux<TO, TI, TV, TA>(a, b, &auxaccum);
                 });
+                if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) in += 1;
                 if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND) in += 2;
                 vol[0] += volinc[0];
                 vol[1] += volinc[1];
@@ -401,17 +404,13 @@ inline void volumeRampMulti(TO* out, size_t frameCount,
     } else {
         do {
             if constexpr (MIXTYPE == MIXTYPE_MULTI) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ += MixMul<TO, TI, TV>(*in++, vol[i]);
                     vol[i] += volinc[i];
                 }
-            } else if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) {
-                for (int i = 0; i < NCHAN; ++i) {
-                    *out++ += MixMul<TO, TI, TV>(*in, vol[i]);
-                    vol[i] += volinc[i];
-                }
-                in++;
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_SAVEONLY) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ = MixMul<TO, TI, TV>(*in++, vol[i]);
                     vol[i] += volinc[i];
@@ -428,10 +427,12 @@ inline void volumeRampMulti(TO* out, size_t frameCount,
                 vol[0] += volinc[0];
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
                     || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
+                    || MIXTYPE == MIXTYPE_MONOEXPAND
                     || MIXTYPE == MIXTYPE_STEREOEXPAND) {
                 stereoVolumeHelper<MIXTYPE, NCHAN>(out, in, vol, [] (auto &a, const auto &b) {
                     return MixMul<TO, TI, TV>(a, b);
                 });
+                if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) in += 1;
                 if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND) in += 2;
                 vol[0] += volinc[0];
                 vol[1] += volinc[1];
@@ -454,15 +455,12 @@ inline void volumeMulti(TO* out, size_t frameCount,
         do {
             TA auxaccum = 0;
             if constexpr (MIXTYPE == MIXTYPE_MULTI) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ += MixMulAux<TO, TI, TV, TA>(*in++, vol[i], &auxaccum);
                 }
-            } else if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) {
-                for (int i = 0; i < NCHAN; ++i) {
-                    *out++ += MixMulAux<TO, TI, TV, TA>(*in, vol[i], &auxaccum);
-                }
-                in++;
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_SAVEONLY) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ = MixMulAux<TO, TI, TV, TA>(*in++, vol[i], &auxaccum);
                 }
@@ -476,11 +474,13 @@ inline void volumeMulti(TO* out, size_t frameCount,
                 }
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
                     || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
+                    || MIXTYPE == MIXTYPE_MONOEXPAND
                     || MIXTYPE == MIXTYPE_STEREOEXPAND) {
                 stereoVolumeHelper<MIXTYPE, NCHAN>(
                         out, in, vol, [&auxaccum] (auto &a, const auto &b) {
                     return MixMulAux<TO, TI, TV, TA>(a, b, &auxaccum);
                 });
+                if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) in += 1;
                 if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND) in += 2;
             } else /* constexpr */ {
                 static_assert(dependent_false<MIXTYPE>, "invalid mixtype");
@@ -490,16 +490,14 @@ inline void volumeMulti(TO* out, size_t frameCount,
         } while (--frameCount);
     } else {
         do {
+            // ALOGD("Mixtype:%d NCHAN:%d", MIXTYPE, NCHAN);
             if constexpr (MIXTYPE == MIXTYPE_MULTI) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ += MixMul<TO, TI, TV>(*in++, vol[i]);
                 }
-            } else if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) {
-                for (int i = 0; i < NCHAN; ++i) {
-                    *out++ += MixMul<TO, TI, TV>(*in, vol[i]);
-                }
-                in++;
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_SAVEONLY) {
+                static_assert(NCHAN <= 2);
                 for (int i = 0; i < NCHAN; ++i) {
                     *out++ = MixMul<TO, TI, TV>(*in++, vol[i]);
                 }
@@ -513,10 +511,12 @@ inline void volumeMulti(TO* out, size_t frameCount,
                 }
             } else if constexpr (MIXTYPE == MIXTYPE_MULTI_STEREOVOL
                     || MIXTYPE == MIXTYPE_MULTI_SAVEONLY_STEREOVOL
+                    || MIXTYPE == MIXTYPE_MONOEXPAND
                     || MIXTYPE == MIXTYPE_STEREOEXPAND) {
                 stereoVolumeHelper<MIXTYPE, NCHAN>(out, in, vol, [] (auto &a, const auto &b) {
                     return MixMul<TO, TI, TV>(a, b);
                 });
+                if constexpr (MIXTYPE == MIXTYPE_MONOEXPAND) in += 1;
                 if constexpr (MIXTYPE == MIXTYPE_STEREOEXPAND) in += 2;
             } else /* constexpr */ {
                 static_assert(dependent_false<MIXTYPE>, "invalid mixtype");
