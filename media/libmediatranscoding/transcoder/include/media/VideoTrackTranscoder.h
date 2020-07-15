@@ -34,10 +34,12 @@ namespace android {
  * using a native surface (ANativeWindow). Codec callback events are placed on a message queue and
  * serviced in order on the transcoding thread managed by MediaTrackTranscoder.
  */
-class VideoTrackTranscoder : public MediaTrackTranscoder {
+class VideoTrackTranscoder : public std::enable_shared_from_this<VideoTrackTranscoder>,
+                             public MediaTrackTranscoder {
 public:
-    VideoTrackTranscoder(const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback)
-          : MediaTrackTranscoder(transcoderCallback){};
+    static std::shared_ptr<VideoTrackTranscoder> create(
+            const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback);
+
     virtual ~VideoTrackTranscoder() override;
 
 private:
@@ -55,6 +57,10 @@ private:
         std::condition_variable mCondition;
         std::deque<T> mQueue;
     };
+    class CodecWrapper;
+
+    VideoTrackTranscoder(const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback)
+          : MediaTrackTranscoder(transcoderCallback){};
 
     // MediaTrackTranscoder
     media_status_t runTranscodeLoop() override;
@@ -77,8 +83,7 @@ private:
     void updateTrackFormat(AMediaFormat* outputFormat);
 
     AMediaCodec* mDecoder = nullptr;
-    // Sample release callback holds a reference to the encoder, hence the shared_ptr.
-    std::shared_ptr<AMediaCodec> mEncoder;
+    std::shared_ptr<CodecWrapper> mEncoder;
     ANativeWindow* mSurface = nullptr;
     bool mEosFromSource = false;
     bool mEosFromEncoder = false;

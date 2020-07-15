@@ -95,12 +95,13 @@ public:
 TEST_F(VideoTrackTranscoderTests, SampleSanity) {
     LOG(DEBUG) << "Testing SampleSanity";
     std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
-    VideoTrackTranscoder transcoder{callback};
+    auto transcoder = VideoTrackTranscoder::create(callback);
 
-    EXPECT_EQ(transcoder.configure(mMediaSampleReader, mTrackIndex, mDestinationFormat), AMEDIA_OK);
-    ASSERT_TRUE(transcoder.start());
+    EXPECT_EQ(transcoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
+              AMEDIA_OK);
+    ASSERT_TRUE(transcoder->start());
 
-    std::shared_ptr<MediaSampleQueue> outputQueue = transcoder.getOutputQueue();
+    std::shared_ptr<MediaSampleQueue> outputQueue = transcoder->getOutputQueue();
     std::thread sampleConsumerThread{[&outputQueue] {
         uint64_t sampleCount = 0;
         std::shared_ptr<MediaSample> sample;
@@ -137,7 +138,7 @@ TEST_F(VideoTrackTranscoderTests, SampleSanity) {
     }};
 
     EXPECT_EQ(callback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(transcoder.stop());
+    EXPECT_TRUE(transcoder->stop());
 
     sampleConsumerThread.join();
 }
@@ -148,9 +149,68 @@ TEST_F(VideoTrackTranscoderTests, NullDestinationFormat) {
     std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
     std::shared_ptr<AMediaFormat> nullFormat;
 
-    VideoTrackTranscoder transcoder{callback};
-    EXPECT_EQ(transcoder.configure(mMediaSampleReader, 0 /* trackIndex */, nullFormat),
+    auto transcoder = VideoTrackTranscoder::create(callback);
+    EXPECT_EQ(transcoder->configure(mMediaSampleReader, 0 /* trackIndex */, nullFormat),
               AMEDIA_ERROR_INVALID_PARAMETER);
+}
+
+TEST_F(VideoTrackTranscoderTests, LingeringEncoder) {
+    struct {
+        void wait() {
+            std::unique_lock<std::mutex> lock(mMutex);
+            while (!mSignaled) {
+                mCondition.wait(lock);
+            }
+        }
+
+        void signal() {
+            std::unique_lock<std::mutex> lock(mMutex);
+            mSignaled = true;
+            mCondition.notify_all();
+        }
+
+        std::mutex mMutex;
+        std::condition_variable mCondition;
+        bool mSignaled = false;
+    } semaphore;
+
+    auto callback = std::make_shared<TestCallback>();
+    auto transcoder = VideoTrackTranscoder::create(callback);
+
+    EXPECT_EQ(transcoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
+              AMEDIA_OK);
+    ASSERT_TRUE(transcoder->start());
+
+    std::shared_ptr<MediaSampleQueue> outputQueue = transcoder->getOutputQueue();
+    std::vector<std::shared_ptr<MediaSample>> samples;
+    std::thread sampleConsumerThread([&outputQueue, &samples, &semaphore] {
+        std::shared_ptr<MediaSample> sample;
+        while (samples.size() < 10 && !outputQueue->dequeue(&sample)) {
+            ASSERT_NE(sample, nullptr);
+            samples.push_back(sample);
+
+            if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {
+                break;
+            }
+            sample.reset();
+        }
+
+        semaphore.signal();
+    });
+
+    // Wait for the encoder to output samples before stopping and releasing the transcoder.
+    semaphore.wait();
+
+    EXPECT_TRUE(transcoder->stop());
+    transcoder.reset();
+    sampleConsumerThread.join();
+
+    // Return buffers to the codec so that it can resume processing, but keep one buffer to avoid
+    // the codec being released.
+    samples.resize(1);
+
+    // Wait for async codec events.
+    std::this_thread::sleep_for(std::chrono::seconds(1));
 }
 
 }  // namespace android
