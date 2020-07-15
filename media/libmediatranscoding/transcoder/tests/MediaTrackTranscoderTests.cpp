@@ -53,7 +53,7 @@ public:
 
         switch (GetParam()) {
         case VIDEO:
-            mTranscoder = std::make_shared<VideoTrackTranscoder>(mCallback);
+            mTranscoder = VideoTrackTranscoder::create(mCallback);
             break;
         case PASSTHROUGH:
             mTranscoder = std::make_shared<PassthroughTrackTranscoder>(mCallback);
@@ -164,8 +164,8 @@ TEST_P(MediaTrackTranscoderTests, WaitNormalOperation) {
     ASSERT_TRUE(mTranscoder->start());
     drainOutputSampleQueue();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(mTranscoder->stop());
     joinDrainThread();
+    EXPECT_TRUE(mTranscoder->stop());
     EXPECT_FALSE(mQueueWasAborted);
     EXPECT_TRUE(mGotEndOfStream);
 }
@@ -232,9 +232,9 @@ TEST_P(MediaTrackTranscoderTests, RestartAfterFinish) {
     ASSERT_TRUE(mTranscoder->start());
     drainOutputSampleQueue();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
+    joinDrainThread();
     EXPECT_TRUE(mTranscoder->stop());
     EXPECT_FALSE(mTranscoder->start());
-    joinDrainThread();
     EXPECT_FALSE(mQueueWasAborted);
     EXPECT_TRUE(mGotEndOfStream);
 }
@@ -247,9 +247,8 @@ TEST_P(MediaTrackTranscoderTests, AbortOutputQueue) {
     mTranscoderOutputQueue->abort();
     drainOutputSampleQueue();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_ERROR_IO);
-    EXPECT_TRUE(mTranscoder->stop());
-
     joinDrainThread();
+    EXPECT_TRUE(mTranscoder->stop());
     EXPECT_TRUE(mQueueWasAborted);
     EXPECT_FALSE(mGotEndOfStream);
 }
@@ -265,8 +264,8 @@ TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderRelease) {
 
     drainOutputSampleQueue();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(mTranscoder->stop());
     joinDrainThread();
+    EXPECT_TRUE(mTranscoder->stop());
     EXPECT_FALSE(mQueueWasAborted);
     EXPECT_TRUE(mGotEndOfStream);
 
