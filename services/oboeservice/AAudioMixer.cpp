@@ -45,7 +45,7 @@ void AAudioMixer::clear() {
     memset(mOutputBuffer.get(), 0, mBufferSizeInBytes);
 }
 
-int32_t AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow) {
+int32_t AAudioMixer::mix(int streamIndex, std::shared_ptr<FifoBuffer> fifo, bool allowUnderflow) {
     WrappingBuffer wrappingBuffer;
     float *destination = mOutputBuffer.get();
 

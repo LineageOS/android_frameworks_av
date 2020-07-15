@@ -46,8 +46,7 @@ using namespace aaudio;   // TODO just import names needed
  */
 
 AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
-        : mUpMessageQueue(nullptr)
-        , mTimestampThread("AATime")
+        : mTimestampThread("AATime")
         , mAtomicStreamTimestamp()
         , mAudioService(audioService) {
     mMmapClient.clientUid = -1;
@@ -56,6 +55,8 @@ AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
+    ALOGD("%s() called", __func__);
+
     // May not be set if open failed.
     if (mMetricsId.size() > 0) {
         mediametrics::LogItem(mMetricsId)
@@ -140,7 +141,7 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
             return AAUDIO_ERROR_INVALID_STATE;
         }
 
-        mUpMessageQueue = new SharedRingBuffer();
+        mUpMessageQueue = std::make_shared<SharedRingBuffer>();
         result = mUpMessageQueue->allocate(sizeof(AAudioServiceMessage),
                                            QUEUE_UP_CAPACITY_COMMANDS);
         if (result != AAUDIO_OK) {
@@ -179,6 +180,8 @@ aaudio_result_t AAudioServiceStreamBase::close_l() {
         return AAUDIO_OK;
     }
 
+    // This will call stopTimestampThread() and also stop the stream,
+    // just in case it was not already stopped.
     stop_l();
 
     aaudio_result_t result = AAUDIO_OK;
@@ -192,13 +195,6 @@ aaudio_result_t AAudioServiceStreamBase::close_l() {
 
         // AAudioService::closeStream() prevents two threads from closing at the same time.
         mServiceEndpoint.clear(); // endpoint will hold the pointer after this method returns.
-    }
-
-    {
-        std::lock_guard<std::mutex> lock(mUpMessageQueueLock);
-        stopTimestampThread();
-        delete mUpMessageQueue;
-        mUpMessageQueue = nullptr;
     }
 
     setState(AAUDIO_STREAM_STATE_CLOSED);
@@ -514,12 +510,8 @@ bool AAudioServiceStreamBase::isUpMessageQueueBusy() {
         ALOGE("%s(): mUpMessageQueue null! - stream not open", __func__);
         return true;
     }
-    int32_t framesAvailable = mUpMessageQueue->getFifoBuffer()
-        ->getFullFramesAvailable();
-    int32_t capacity = mUpMessageQueue->getFifoBuffer()
-        ->getBufferCapacityInFrames();
     // Is it half full or more
-    return framesAvailable >= (capacity / 2);
+    return mUpMessageQueue->getFractionalFullness() >= 0.5;
 }
 
 aaudio_result_t AAudioServiceStreamBase::writeUpMessageQueue(AAudioServiceMessage *command) {
