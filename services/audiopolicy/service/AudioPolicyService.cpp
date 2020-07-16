@@ -488,9 +488,9 @@ void AudioPolicyService::updateUidStates_l()
         }
 
         bool isAccessibility = mUidPolicy->isA11yUid(current->uid);
-        // Clients capturing for Accessibility services are not considered
+        // Clients capturing for Accessibility services or virtual sources are not considered
         // for top or latest active to avoid masking regular clients started before
-        if (!isAccessibility) {
+        if (!isAccessibility && !isVirtualSource(current->attributes.source)) {
             bool isAssistant = mUidPolicy->isAssistantUid(current->uid);
             bool isPrivacySensitive =
                     (current->attributes.flags & AUDIO_FLAG_CAPTURE_PRIVATE) != 0;
