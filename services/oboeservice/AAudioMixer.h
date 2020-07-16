@@ -25,7 +25,6 @@
 class AAudioMixer {
 public:
     AAudioMixer() {}
-    ~AAudioMixer();
 
     void allocate(int32_t samplesPerFrame, int32_t framesPerBurst);
 
@@ -47,7 +46,7 @@ public:
 private:
     void mixPart(float *destination, float *source, int32_t numFrames);
 
-    float   *mOutputBuffer = nullptr;
+    std::unique_ptr<float[]> mOutputBuffer;
     int32_t  mSamplesPerFrame = 0;
     int32_t  mFramesPerBurst = 0;
     int32_t  mBufferSizeInBytes = 0;
