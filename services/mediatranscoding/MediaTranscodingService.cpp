@@ -20,6 +20,7 @@
 
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
+#include <binder/IServiceManager.h>
 #include <cutils/properties.h>
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
@@ -69,6 +70,16 @@ MediaTranscodingService::~MediaTranscodingService() {
 
 binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uint32_t /*numArgs*/) {
     String8 result;
+
+    if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
+        result.format(
+                "Permission Denial: "
+                "can't dump MediaTranscodingService from pid=%d, uid=%d\n",
+                AIBinder_getCallingPid(), AIBinder_getCallingUid());
+        write(fd, result.string(), result.size());
+        return PERMISSION_DENIED;
+    }
+
     const size_t SIZE = 256;
     char buffer[SIZE];
 
