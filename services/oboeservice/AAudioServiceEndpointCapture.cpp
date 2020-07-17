@@ -40,17 +40,12 @@ AAudioServiceEndpointCapture::AAudioServiceEndpointCapture(AAudioService &audioS
     mStreamInternal = &mStreamInternalCapture;
 }
 
-AAudioServiceEndpointCapture::~AAudioServiceEndpointCapture() {
-    delete mDistributionBuffer;
-}
-
 aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAudioServiceEndpointShared::open(request);
     if (result == AAUDIO_OK) {
-        delete mDistributionBuffer;
         int distributionBufferSizeBytes = getStreamInternal()->getFramesPerBurst()
                                           * getStreamInternal()->getBytesPerFrame();
-        mDistributionBuffer = new uint8_t[distributionBufferSizeBytes];
+        mDistributionBuffer = std::make_unique<uint8_t[]>(distributionBufferSizeBytes);
     }
     return result;
 }
@@ -67,7 +62,8 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         int64_t mmapFramesRead = getStreamInternal()->getFramesRead();
 
         // Read audio data from stream using a blocking read.
-        result = getStreamInternal()->read(mDistributionBuffer, getFramesPerBurst(), timeoutNanos);
+        result = getStreamInternal()->read(mDistributionBuffer.get(),
+                getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
             disconnectRegisteredStreams();
             break;
@@ -107,7 +103,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
                                     getFramesPerBurst()) {
                                 streamShared->incrementXRunCount();
                             } else {
-                                fifo->write(mDistributionBuffer, getFramesPerBurst());
+                                fifo->write(mDistributionBuffer.get(), getFramesPerBurst());
                             }
                             clientFramesWritten = fifo->getWriteCounter();
                         }

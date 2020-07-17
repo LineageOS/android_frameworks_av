@@ -17,6 +17,8 @@
 #ifndef AAUDIO_SERVICE_ENDPOINT_CAPTURE_H
 #define AAUDIO_SERVICE_ENDPOINT_CAPTURE_H
 
+#include <memory>
+
 #include "client/AudioStreamInternal.h"
 #include "client/AudioStreamInternalCapture.h"
 
@@ -28,16 +30,15 @@ namespace aaudio {
 class AAudioServiceEndpointCapture : public AAudioServiceEndpointShared {
 public:
     explicit AAudioServiceEndpointCapture(android::AAudioService &audioService);
-    virtual ~AAudioServiceEndpointCapture();
+    virtual ~AAudioServiceEndpointCapture() = default;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
-
 
     void *callbackLoop() override;
 
 private:
     AudioStreamInternalCapture  mStreamInternalCapture;
-    uint8_t                    *mDistributionBuffer = nullptr;
+    std::unique_ptr<uint8_t[]>  mDistributionBuffer;
 };
 
 } /* namespace aaudio */
