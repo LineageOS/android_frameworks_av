@@ -44,8 +44,17 @@ uint8_t* PassthroughTrackTranscoder::BufferPool::getBufferWithSize(size_t minimu
     // Check if the free list contains a large enough buffer.
     auto it = mFreeBufferMap.lower_bound(minimumBufferSize);
     if (it != mFreeBufferMap.end()) {
+        uint8_t* buffer = it->second;
         mFreeBufferMap.erase(it);
-        return it->second;
+        return buffer;
+    }
+
+    // If the maximum buffer count is reached, remove an existing free buffer.
+    if (mAddressSizeMap.size() >= mMaxBufferCount) {
+        auto it = mFreeBufferMap.begin();
+        mAddressSizeMap.erase(it->second);
+        delete[] it->second;
+        mFreeBufferMap.erase(it);
     }
 
     // Allocate a new buffer.
@@ -53,14 +62,6 @@ uint8_t* PassthroughTrackTranscoder::BufferPool::getBufferWithSize(size_t minimu
     if (buffer == nullptr) {
         LOG(ERROR) << "Unable to allocate new buffer of size: " << minimumBufferSize;
         return nullptr;
-    }
-
-    // If the maximum buffer count is reached, remove an existing free buffer.
-    if (mAddressSizeMap.size() >= mMaxBufferCount) {
-        auto it = mFreeBufferMap.begin();
-        mFreeBufferMap.erase(it);
-        mAddressSizeMap.erase(it->second);
-        delete[] it->second;
     }
 
     // Add the buffer to the tracking set.
