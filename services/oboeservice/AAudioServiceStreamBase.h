@@ -21,6 +21,7 @@
 #include <mutex>
 
 #include <android-base/thread_annotations.h>
+#include <media/AidlConversion.h>
 #include <media/AudioClient.h>
 #include <utils/RefBase.h>
 
@@ -159,11 +160,11 @@ public:
     }
 
     uid_t getOwnerUserId() const {
-        return mMmapClient.clientUid;
+        return VALUE_OR_FATAL(android::aidl2legacy_int32_t_uid_t(mMmapClient.identity.uid));
     }
 
     pid_t getOwnerProcessId() const {
-        return mMmapClient.clientPid;
+        return VALUE_OR_FATAL(android::aidl2legacy_int32_t_pid_t(mMmapClient.identity.pid));
     }
 
     aaudio_handle_t getHandle() const {

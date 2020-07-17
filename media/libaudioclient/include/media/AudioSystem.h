@@ -19,6 +19,7 @@
 
 #include <sys/types.h>
 
+#include <android/media/permission/Identity.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <media/AidlConversionUtil.h>
@@ -262,8 +263,7 @@ public:
                                      audio_io_handle_t *output,
                                      audio_session_t session,
                                      audio_stream_type_t *stream,
-                                     pid_t pid,
-                                     uid_t uid,
+                                     const media::permission::Identity& identity,
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
@@ -279,9 +279,7 @@ public:
                                     audio_io_handle_t *input,
                                     audio_unique_id_t riid,
                                     audio_session_t session,
-                                    pid_t pid,
-                                    uid_t uid,
-                                    const String16& opPackageName,
+                                    const media::permission::Identity& identity,
                                     const audio_config_base_t *config,
                                     audio_input_flags_t flags,
                                     audio_port_handle_t *selectedDeviceId,

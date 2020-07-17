@@ -52,6 +52,8 @@
 
 namespace android {
 
+using media::permission::Identity;
+
 //FIXME: workaround for truncated touch sounds
 // to be removed when the problem is handled by system UI
 #define TOUCH_SOUND_FIXED_DELAY_MS 100
@@ -1130,7 +1132,7 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
                                               audio_io_handle_t *output,
                                               audio_session_t session,
                                               audio_stream_type_t *stream,
-                                              uid_t uid,
+                                              const Identity& identity,
                                               const audio_config_t *config,
                                               audio_output_flags_t *flags,
                                               audio_port_handle_t *selectedDeviceId,
@@ -1142,6 +1144,8 @@ status_t AudioPolicyManager::getOutputForAttr(const audio_attributes_t *attr,
     if (*portId != AUDIO_PORT_HANDLE_NONE) {
         return INVALID_OPERATION;
     }
+    const uid_t uid = VALUE_OR_RETURN_STATUS(
+        aidl2legacy_int32_t_uid_t(identity.uid));
     const audio_port_handle_t requestedPortId = *selectedDeviceId;
     audio_attributes_t resultAttr;
     bool isRequestedDeviceForExclusiveUse = false;
@@ -2110,7 +2114,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_io_handle_t *input,
                                              audio_unique_id_t riid,
                                              audio_session_t session,
-                                             uid_t uid,
+                                             const Identity& identity,
                                              const audio_config_base_t *config,
                                              audio_input_flags_t flags,
                                              audio_port_handle_t *selectedDeviceId,
@@ -2129,6 +2133,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
     sp<AudioInputDescriptor> inputDesc;
     sp<RecordClientDescriptor> clientDesc;
     audio_port_handle_t requestedDeviceId = *selectedDeviceId;
+    uid_t uid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(identity.uid));
     bool isSoundTrigger;
 
     // The supplied portId must be AUDIO_PORT_HANDLE_NONE

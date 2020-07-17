@@ -25,6 +25,7 @@
 #define LOG_TAG "APM_Test"
 #include <Serializer.h>
 #include <android-base/file.h>
+#include <android/media/permission/Identity.h>
 #include <media/AudioPolicy.h>
 #include <media/PatchBuilder.h>
 #include <media/RecordingActivityTracker.h>
@@ -39,6 +40,7 @@
 
 using namespace android;
 using testing::UnorderedElementsAre;
+using media::permission::Identity;
 
 TEST(AudioPolicyManagerTestInit, EngineFailure) {
     AudioPolicyTestClient client;
@@ -214,8 +216,11 @@ void AudioPolicyManagerTest::getOutputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
+    // TODO b/182392769: use identity util
+    Identity i = Identity();
+    i.uid = 0;
     ASSERT_EQ(OK, mManager->getOutputForAttr(
-                    &attr, output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
+                    &attr, output, AUDIO_SESSION_NONE, &stream, i, &config, &flags,
                     selectedDeviceId, portId, {}, &outputType));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
     ASSERT_NE(AUDIO_IO_HANDLE_NONE, *output);
@@ -239,8 +244,11 @@ void AudioPolicyManagerTest::getInputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::input_type_t inputType;
+    // TODO b/182392769: use identity util
+    Identity i = Identity();
+    i.uid = 0;
     ASSERT_EQ(OK, mManager->getInputForAttr(
-            &attr, &input, riid, AUDIO_SESSION_NONE, 0 /*uid*/, &config, flags,
+            &attr, &input, riid, AUDIO_SESSION_NONE, i, &config, flags,
             selectedDeviceId, &inputType, portId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }

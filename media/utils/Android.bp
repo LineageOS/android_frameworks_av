@@ -39,6 +39,7 @@ cc_library {
         "libc_malloc_debug_backtrace",
     ],
     shared_libs: [
+        "libaudioclient_aidl_conversion",
         "libaudioutils", // for clock.h
         "libbinder",
         "libcutils",
@@ -47,6 +48,7 @@ cc_library {
         "libhidlbase",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
+        "media_permission-aidl-cpp",
     ],
 
     logtags: ["EventLogTags.logtags"],
@@ -60,6 +62,10 @@ cc_library {
     header_libs: [
         "bionic_libc_platform_headers",
         "libmedia_headers",
+    ],
+
+    export_shared_lib_headers: [
+        "media_permission-aidl-cpp"
     ],
 
     include_dirs: [

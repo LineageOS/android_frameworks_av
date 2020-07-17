@@ -48,6 +48,7 @@ namespace android {
 // ---------------------------------------------------------------------------
 
 using media::VolumeShaper;
+using media::permission::Identity;
 
 // TODO: Move to a separate .h
 
@@ -224,11 +225,11 @@ status_t AudioTrack::getMetrics(mediametrics::Item * &item)
     return NO_ERROR;
 }
 
-AudioTrack::AudioTrack() : AudioTrack("" /*opPackageName*/)
+AudioTrack::AudioTrack() : AudioTrack(Identity())
 {
 }
 
-AudioTrack::AudioTrack(const std::string& opPackageName)
+AudioTrack::AudioTrack(const Identity& identity)
     : mStatus(NO_INIT),
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
@@ -236,7 +237,7 @@ AudioTrack::AudioTrack(const std::string& opPackageName)
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mOpPackageName(opPackageName),
+      mClientIdentity(identity),
       mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -258,19 +259,16 @@ AudioTrack::AudioTrack(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        uid_t uid,
-        pid_t pid,
+        const Identity& identity,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
-        audio_port_handle_t selectedDeviceId,
-        const std::string& opPackageName)
+        audio_port_handle_t selectedDeviceId)
     : mStatus(NO_INIT),
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mOpPackageName(opPackageName),
       mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
@@ -278,7 +276,7 @@ AudioTrack::AudioTrack(
     (void)set(streamType, sampleRate, format, channelMask,
             frameCount, flags, cbf, user, notificationFrames,
             0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType,
-            offloadInfo, uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+            offloadInfo, identity, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
 AudioTrack::AudioTrack(
@@ -294,19 +292,16 @@ AudioTrack::AudioTrack(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        uid_t uid,
-        pid_t pid,
+        const Identity& identity,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
-        float maxRequiredSpeed,
-        const std::string& opPackageName)
+        float maxRequiredSpeed)
     : mStatus(NO_INIT),
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mOpPackageName(opPackageName),
       mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
@@ -314,7 +309,7 @@ AudioTrack::AudioTrack(
     (void)set(streamType, sampleRate, format, channelMask,
             0 /*frameCount*/, flags, cbf, user, notificationFrames,
             sharedBuffer, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
-            uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed);
+            identity, pAttributes, doNotReconnect, maxRequiredSpeed);
 }
 
 AudioTrack::~AudioTrack()
@@ -352,10 +347,11 @@ AudioTrack::~AudioTrack()
         mCblkMemory.clear();
         mSharedBuffer.clear();
         IPCThreadState::self()->flushCommands();
+        pid_t clientPid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientIdentity.pid));
         ALOGV("%s(%d), releasing session id %d from %d on behalf of %d",
                 __func__, mPortId,
-                mSessionId, IPCThreadState::self()->getCallingPid(), mClientPid);
-        AudioSystem::releaseAudioSessionId(mSessionId, mClientPid);
+                mSessionId, IPCThreadState::self()->getCallingPid(), clientPid);
+        AudioSystem::releaseAudioSessionId(mSessionId, clientPid);
     }
 }
 
@@ -374,8 +370,7 @@ status_t AudioTrack::set(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        uid_t uid,
-        pid_t pid,
+        const Identity& identity,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
@@ -385,13 +380,15 @@ status_t AudioTrack::set(
     uint32_t channelCount;
     pid_t callingPid;
     pid_t myPid;
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(identity.uid));
+    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(identity.pid));
 
     // Note mPortId is not valid until the track is created, so omit mPortId in ALOG for set.
     ALOGV("%s(): streamType %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "flags #%x, notificationFrames %d, sessionId %d, transferType %d, uid %d, pid %d",
           __func__,
           streamType, sampleRate, format, channelMask, frameCount, flags, notificationFrames,
-          sessionId, transferType, uid, pid);
+          sessionId, transferType, identity.uid, identity.pid);
 
     mThreadCanCallJava = threadCanCallJava;
     mSelectedDeviceId = selectedDeviceId;
@@ -587,17 +584,19 @@ status_t AudioTrack::set(
                 notificationFrames, minNotificationsPerBuffer, maxNotificationsPerBuffer);
     }
     mNotificationFramesAct = 0;
+    // TODO b/182392553: refactor or remove
     callingPid = IPCThreadState::self()->getCallingPid();
     myPid = getpid();
-    if (uid == AUDIO_UID_INVALID || (callingPid != myPid)) {
-        mClientUid = IPCThreadState::self()->getCallingUid();
+    if (uid == -1 || (callingPid != myPid)) {
+        mClientIdentity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(
+            IPCThreadState::self()->getCallingUid()));
     } else {
-        mClientUid = uid;
+        mClientIdentity.uid = identity.uid;
     }
-    if (pid == -1 || (callingPid != myPid)) {
-        mClientPid = callingPid;
+    if (pid == (pid_t)-1 || (callingPid != myPid)) {
+        mClientIdentity.pid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(callingPid));
     } else {
-        mClientPid = pid;
+        mClientIdentity.pid = identity.pid;
     }
     mAuxEffectId = 0;
     mOrigFlags = mFlags = flags;
@@ -636,7 +635,7 @@ status_t AudioTrack::set(
     mReleased = 0;
     mStartNs = 0;
     mStartFromZeroUs = 0;
-    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid, mClientUid);
+    AudioSystem::acquireAudioSessionId(mSessionId, pid, uid);
     mSequence = 1;
     mObservedSequence = mSequence;
     mInUnderrun = false;
@@ -682,10 +681,13 @@ status_t AudioTrack::set(
         float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId)
 {
+    Identity identity;
+    identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(uid));
+    identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(pid));
     return set(streamType, sampleRate, format,
             static_cast<audio_channel_mask_t>(channelMask),
             frameCount, flags, cbf, user, notificationFrames, sharedBuffer,
-            threadCanCallJava, sessionId, transferType, offloadInfo, uid, pid,
+            threadCanCallJava, sessionId, transferType, offloadInfo, identity,
             pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
@@ -1647,8 +1649,7 @@ status_t AudioTrack::createTrack_l()
     input.config.channel_mask = mChannelMask;
     input.config.format = mFormat;
     input.config.offload_info = mOffloadInfoCopy;
-    input.clientInfo.clientUid = mClientUid;
-    input.clientInfo.clientPid = mClientPid;
+    input.clientInfo.identity = mClientIdentity;
     input.clientInfo.clientTid = -1;
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
         // It is currently meaningless to request SCHED_FIFO for a Java thread.  Even if the
@@ -1672,7 +1673,6 @@ status_t AudioTrack::createTrack_l()
     input.selectedDeviceId = mSelectedDeviceId;
     input.sessionId = mSessionId;
     input.audioTrackCallback = mAudioTrackCallback;
-    input.opPackageName = mOpPackageName;
 
     media::CreateTrackResponse response;
     status = audioFlinger->createTrack(VALUE_OR_FATAL(input.toAidl()), response);

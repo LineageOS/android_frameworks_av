@@ -52,6 +52,7 @@ namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::IAudioPolicyService;
+using media::permission::Identity;
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
@@ -940,8 +941,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
                                        audio_io_handle_t* output,
                                        audio_session_t session,
                                        audio_stream_type_t* stream,
-                                       pid_t pid,
-                                       uid_t uid,
+                                       const Identity& identity,
                                        const audio_config_t* config,
                                        audio_output_flags_t flags,
                                        audio_port_handle_t* selectedDeviceId,
@@ -974,8 +974,6 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
     int32_t sessionAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(session));
-    int32_t pidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(pid));
-    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
     media::AudioConfig configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_t_AudioConfig(*config));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(
@@ -986,7 +984,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     media::GetOutputForAttrResponse responseAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getOutputForAttr(attrAidl, sessionAidl, pidAidl, uidAidl, configAidl, flagsAidl,
+            aps->getOutputForAttr(attrAidl, sessionAidl, identity, configAidl, flagsAidl,
                                   selectedDeviceIdAidl, &responseAidl)));
 
     *output = VALUE_OR_RETURN_STATUS(
@@ -1040,9 +1038,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
                                       audio_io_handle_t* input,
                                       audio_unique_id_t riid,
                                       audio_session_t session,
-                                      pid_t pid,
-                                      uid_t uid,
-                                      const String16& opPackageName,
+                                      const Identity &identity,
                                       const audio_config_base_t* config,
                                       audio_input_flags_t flags,
                                       audio_port_handle_t* selectedDeviceId,
@@ -1072,10 +1068,6 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     int32_t inputAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(*input));
     int32_t riidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_unique_id_t_int32_t(riid));
     int32_t sessionAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(session));
-    int32_t pidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(pid));
-    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
-    std::string opPackageNameAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_String16_string(opPackageName));
     media::AudioConfigBase configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_base_t_AudioConfigBase(*config));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
@@ -1085,9 +1077,8 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     media::GetInputForAttrResponse response;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, pidAidl, uidAidl,
-                                 opPackageNameAidl, configAidl, flagsAidl, selectedDeviceIdAidl,
-                                 &response)));
+            aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, identity,
+                configAidl, flagsAidl, selectedDeviceIdAidl, &response)));
 
     *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.input));
     *selectedDeviceId = VALUE_OR_RETURN_STATUS(

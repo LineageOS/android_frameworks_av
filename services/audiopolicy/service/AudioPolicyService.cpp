@@ -595,23 +595,24 @@ void AudioPolicyService::updateUidStates_l()
 
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
+        uid_t currentUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(current->identity.uid));
         if (!current->active || (!isVirtualSource(current->attributes.source)
-                && isUserSensorPrivacyEnabledForUid(current->uid))) {
+                && isUserSensorPrivacyEnabledForUid(currentUid))) {
             continue;
         }
 
-        app_state_t appState = apmStatFromAmState(mUidPolicy->getUidState(current->uid));
+        app_state_t appState = apmStatFromAmState(mUidPolicy->getUidState(currentUid));
         // clients which app is in IDLE state are not eligible for top active or
         // latest active
         if (appState == APP_STATE_IDLE) {
             continue;
         }
 
-        bool isAccessibility = mUidPolicy->isA11yUid(current->uid);
+        bool isAccessibility = mUidPolicy->isA11yUid(currentUid);
         // Clients capturing for Accessibility services or virtual sources are not considered
         // for top or latest active to avoid masking regular clients started before
         if (!isAccessibility && !isVirtualSource(current->attributes.source)) {
-            bool isAssistant = mUidPolicy->isAssistantUid(current->uid);
+            bool isAssistant = mUidPolicy->isAssistantUid(currentUid);
             bool isPrivacySensitive =
                     (current->attributes.flags & AUDIO_FLAG_CAPTURE_PRIVATE) != 0;
 
@@ -639,9 +640,11 @@ void AudioPolicyService::updateUidStates_l()
                     // if audio mode is IN_COMMUNICATION, make sure the audio mode owner
                     // is marked latest sensitive active even if another app qualifies.
                     if (current->startTimeNs > latestSensitiveStartNs
-                            || (isInCommunication && current->uid == mPhoneStateOwnerUid)) {
+                            || (isInCommunication && currentUid == mPhoneStateOwnerUid)) {
                         if (!isInCommunication || latestSensitiveActiveOrComm == nullptr
-                                || latestSensitiveActiveOrComm->uid != mPhoneStateOwnerUid) {
+                                || VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(
+                                    latestSensitiveActiveOrComm->identity.uid))
+                                        != mPhoneStateOwnerUid) {
                             latestSensitiveActiveOrComm = current;
                             latestSensitiveStartNs = current->startTimeNs;
                         }
@@ -658,7 +661,7 @@ void AudioPolicyService::updateUidStates_l()
         if (current->attributes.source != AUDIO_SOURCE_HOTWORD) {
             onlyHotwordActive = false;
         }
-        if (current->uid == mPhoneStateOwnerUid) {
+        if (currentUid == mPhoneStateOwnerUid) {
             isPhoneStateOwnerActive = true;
         }
     }
@@ -674,7 +677,9 @@ void AudioPolicyService::updateUidStates_l()
     } else if (latestSensitiveActiveOrComm != nullptr) {
         // if audio mode is IN_COMMUNICATION, favor audio mode owner over an app with
         // foreground UI in case both are capturing with privacy sensitive flag.
-        if (isInCommunication && latestSensitiveActiveOrComm->uid == mPhoneStateOwnerUid) {
+        uid_t latestActiveUid = VALUE_OR_FATAL(
+            aidl2legacy_int32_t_uid_t(latestSensitiveActiveOrComm->identity.uid));
+        if (isInCommunication && latestActiveUid == mPhoneStateOwnerUid) {
             topSensitiveActive = latestSensitiveActiveOrComm;
             topSensitiveStartNs = latestSensitiveStartNs;
         }
@@ -692,20 +697,25 @@ void AudioPolicyService::updateUidStates_l()
 
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
+        uid_t currentUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(
+            current->identity.uid));
         if (!current->active) {
             continue;
         }
 
         audio_source_t source = current->attributes.source;
-        bool isTopOrLatestActive = topActive == nullptr ? false : current->uid == topActive->uid;
-        bool isTopOrLatestSensitive = topSensitiveActive == nullptr ?
-                                 false : current->uid == topSensitiveActive->uid;
+        bool isTopOrLatestActive = topActive == nullptr ? false :
+            current->identity.uid == topActive->identity.uid;
+        bool isTopOrLatestSensitive = topSensitiveActive == nullptr ? false :
+            current->identity.uid == topSensitiveActive->identity.uid;
 
         auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) REQUIRES(mLock) {
+            uid_t recordUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(
+                recordClient->identity.uid));
             bool canCaptureCall = recordClient->canCaptureOutput;
             bool canCaptureCommunication = recordClient->canCaptureOutput
                 || !isPhoneStateOwnerActive
-                || recordClient->uid == mPhoneStateOwnerUid;
+                || recordUid == mPhoneStateOwnerUid;
             return !(isInCall && !canCaptureCall)
                 && !(isInCommunication && !canCaptureCommunication);
         };
@@ -724,10 +734,10 @@ void AudioPolicyService::updateUidStates_l()
         if (isVirtualSource(source)) {
             // Allow capture for virtual (remote submix, call audio TX or RX...) sources
             allowCapture = true;
-        } else if (isUserSensorPrivacyEnabledForUid(current->uid)) {
+        } else if (isUserSensorPrivacyEnabledForUid(currentUid)) {
             // If sensor privacy is enabled, don't allow capture
             allowCapture = false;
-        } else if (mUidPolicy->isAssistantUid(current->uid)) {
+        } else if (mUidPolicy->isAssistantUid(currentUid)) {
             // For assistant allow capture if:
             //     An accessibility service is on TOP or a RTT call is active
             //            AND the source is VOICE_RECOGNITION or HOTWORD
@@ -747,7 +757,7 @@ void AudioPolicyService::updateUidStates_l()
                     allowCapture = true;
                 }
             }
-        } else if (mUidPolicy->isA11yUid(current->uid)) {
+        } else if (mUidPolicy->isA11yUid(currentUid)) {
             // For accessibility service allow capture if:
             //     The assistant is not on TOP
             //         AND there is no active privacy sensitive capture or call
@@ -773,7 +783,7 @@ void AudioPolicyService::updateUidStates_l()
                     && canCaptureIfInCallOrCommunication(current)) {
                 allowCapture = true;
             }
-        } else if (mUidPolicy->isCurrentImeUid(current->uid)) {
+        } else if (mUidPolicy->isCurrentImeUid(currentUid)) {
             // For current InputMethodService allow capture if:
             //     A RTT call is active AND the source is VOICE_RECOGNITION
             if (rttCallActive && source == AUDIO_SOURCE_VOICE_RECOGNITION) {
@@ -781,7 +791,7 @@ void AudioPolicyService::updateUidStates_l()
             }
         }
         setAppState_l(current->portId,
-                      allowCapture ? apmStatFromAmState(mUidPolicy->getUidState(current->uid)) :
+                      allowCapture ? apmStatFromAmState(mUidPolicy->getUidState(currentUid)) :
                                 APP_STATE_IDLE);
     }
 }
