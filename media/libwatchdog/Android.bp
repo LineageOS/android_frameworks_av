@@ -14,6 +14,7 @@
 
 cc_library {
     name: "libwatchdog",
+    host_supported: true,
     srcs: [
         "Watchdog.cpp",
     ],
@@ -28,6 +29,11 @@ cc_library {
         },
         darwin: {
             enabled: false,
+        },
+        linux_glibc: {
+            cflags: [
+                "-Dsigev_notify_thread_id=_sigev_un._tid",
+            ],
         },
     },
     apex_available: ["com.android.media"],
