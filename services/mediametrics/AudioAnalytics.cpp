@@ -43,7 +43,7 @@ namespace android::mediametrics {
 #endif
 
 // Maximum length of a device name.
-static constexpr size_t STATSD_DEVICE_NAME_MAX_LENGTH = 32;
+// static constexpr size_t STATSD_DEVICE_NAME_MAX_LENGTH = 32; // unused since we suppress
 
 // Transmit Enums to statsd in integer or strings  (this must match the atoms.proto)
 static constexpr bool STATSD_USE_INT_FOR_ENUM = false;
@@ -65,6 +65,8 @@ auto ENUM_EXTRACT(const T& x) {
 static constexpr const auto LOG_LEVEL = android::base::VERBOSE;
 
 static constexpr int PREVIOUS_STATE_EXPIRE_SEC = 60 * 60; // 1 hour.
+
+static constexpr const char * SUPPRESSED = "SUPPRESSED";
 
 /*
  * For logging purposes, we list all of the MediaMetrics atom fields,
@@ -448,6 +450,8 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
     std::string outputDeviceNames;
     if (outputDevices.find("AUDIO_DEVICE_OUT_BLUETOOTH") != std::string::npos) {
         isBluetooth = true;
+        outputDeviceNames = SUPPRESSED;
+#if 0   // TODO(b/161554630) sanitize name
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
             "audio.device.bt_a2dp", AMEDIAMETRICS_PROP_NAME, &outputDeviceNames);
         // Remove | if present
@@ -455,6 +459,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         if (outputDeviceNames.size() > STATSD_DEVICE_NAME_MAX_LENGTH) {
             outputDeviceNames.resize(STATSD_DEVICE_NAME_MAX_LENGTH); // truncate
         }
+#endif
     }
 
     switch (itemType) {
@@ -775,7 +780,7 @@ void AudioAnalytics::DeviceConnection::postBluetoothA2dpDeviceConnectionStateSup
         std::lock_guard l(mLock);
         mA2dpConnectionRequestNs = atNs;
         ++mA2dpConnectionRequests;
-        mA2dpDeviceName = name;
+        mA2dpDeviceName = SUPPRESSED; // TODO(b/161554630) sanitize name
     }
     ALOGD("(key=%s) a2dp connection name:%s request atNs:%lld",
             key.c_str(), name.c_str(), (long long)atNs);
