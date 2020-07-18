@@ -5,7 +5,7 @@ cc_library {
     srcs: ["MidiExtractor.cpp"],
 
     header_libs: [
-        "libmedia_headers",
+        "libmedia_datasource_headers",
     ],
 
     static_libs: [
@@ -18,4 +18,12 @@ cc_library {
     shared_libs: [
         "libbase",
     ],
+
+    host_supported: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
