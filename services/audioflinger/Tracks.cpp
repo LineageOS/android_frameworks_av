@@ -595,7 +595,10 @@ AudioFlinger::PlaybackThread::Track::Track(
             + "_" + std::to_string(mId) + "_T");
 #endif
 
-    if (channelMask & AUDIO_CHANNEL_HAPTIC_ALL) {
+    if (thread->supportsHapticPlayback()) {
+        // If the track is attached to haptic playback thread, it is potentially to have
+        // HapticGenerator effect, which will generate haptic data, on the track. In that case,
+        // external vibration is always created for all tracks attached to haptic playback thread.
         mAudioVibrationController = new AudioVibrationController(this);
         mExternalVibration = new os::ExternalVibration(
                 mUid, "" /* pkg */, mAttr, mAudioVibrationController);

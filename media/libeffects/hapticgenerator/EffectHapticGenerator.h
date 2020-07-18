@@ -19,9 +19,11 @@
 
 #include <functional>
 #include <vector>
+#include <map>
 
 #include <hardware/audio_effect.h>
 #include <system/audio_effect.h>
+#include <vibrator/ExternalVibrationUtils.h>
 
 #include "Processors.h"
 
@@ -45,6 +47,10 @@ struct HapticGeneratorParam {
                                      // The value will be offset of audio channel
     uint32_t audioChannelCount;
     uint32_t hapticChannelCount;
+
+    // A map from track id to haptic intensity.
+    std::map<int, os::HapticScale> id2Intensity;
+    os::HapticScale maxHapticIntensity; // max intensity will be used to scale haptic data.
 };
 
 // A structure to keep all shared pointers for all processors in HapticGenerator.
