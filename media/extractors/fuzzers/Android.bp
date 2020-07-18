@@ -329,4 +329,6 @@ cc_fuzz {
     ],
 
     dictionary: "midi_extractor_fuzzer.dict",
+
+    host_supported: true,
 }
