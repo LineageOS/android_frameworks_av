@@ -36,8 +36,10 @@ cc_library_shared {
 
     shared_libs: [
         "libaudioutils",
+        "libbinder",
         "liblog",
         "libutils",
+        "libvibrator",
     ],
 
     relative_install_path: "soundfx",
