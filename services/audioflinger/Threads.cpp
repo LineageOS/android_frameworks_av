@@ -6885,6 +6885,8 @@ reacquire_wakelock:
         // reference to a fast track which is about to be removed
         sp<RecordTrack> fastTrackToRemove;
 
+        bool silenceFastCapture = false;
+
         { // scope for mLock
             Mutex::Autolock _l(mLock);
 
@@ -6969,14 +6971,33 @@ reacquire_wakelock:
                             __func__, activeTrackState, activeTrack->id(), size);
                 }
 
-                activeTracks.add(activeTrack);
-                i++;
-
                 if (activeTrack->isFastTrack()) {
                     ALOG_ASSERT(!mFastTrackAvail);
                     ALOG_ASSERT(fastTrack == 0);
+                    // if the active fast track is silenced either:
+                    // 1) silence the whole capture from fast capture buffer if this is
+                    //    the only active track
+                    // 2) invalidate this track: this will cause the client to reconnect and possibly
+                    //    be invalidated again until unsilenced
+                    if (activeTrack->isSilenced()) {
+                        if (size > 1) {
+                            activeTrack->invalidate();
+                            ALOG_ASSERT(fastTrackToRemove == 0);
+                            fastTrackToRemove = activeTrack;
+                            removeTrack_l(activeTrack);
+                            mActiveTracks.remove(activeTrack);
+                            size--;
+                            continue;
+                        } else {
+                            silenceFastCapture = true;
+                        }
+                    }
                     fastTrack = activeTrack;
                 }
+
+                activeTracks.add(activeTrack);
+                i++;
+
             }
 
             mActiveTracks.updatePowerState(this);
@@ -7048,6 +7069,10 @@ reacquire_wakelock:
                 state->mFastPatchRecordBufferProvider = abp;
                 state->mFastPatchRecordFormat = fastTrack == 0 ?
                         AUDIO_FORMAT_INVALID : fastTrack->format();
+                didModify = true;
+            }
+            if (state->mSilenceCapture != silenceFastCapture) {
+                state->mSilenceCapture = silenceFastCapture;
                 didModify = true;
             }
             sq->end(didModify);
