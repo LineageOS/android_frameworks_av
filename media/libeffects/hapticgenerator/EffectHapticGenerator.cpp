@@ -96,7 +96,10 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->config.outputCfg.bufferProvider.cookie = nullptr;
     context->config.outputCfg.mask = EFFECT_CONFIG_ALL;
 
-    memset(&context->param, 0, sizeof(struct HapticGeneratorParam));
+    memset(context->param.hapticChannelSource, 0, sizeof(context->param.hapticChannelSource));
+    context->param.hapticChannelCount = 0;
+    context->param.audioChannelCount = 0;
+    context->param.maxHapticIntensity = os::HapticScale::MUTE;
 
     context->state = HAPTICGENERATOR_STATE_INITIALIZED;
     return 0;
@@ -236,12 +239,36 @@ int HapticGenerator_Reset(struct HapticGeneratorContext *context) {
     return 0;
 }
 
-int HapticGenerator_SetParameter(struct HapticGeneratorContext *context __unused,
-                                 int32_t param __unused,
-                                 uint32_t size __unused,
-                                 void *value __unused) {
-    ALOGW("Setparameter is not implemented in HapticGenerator");
-    return -ENOSYS;
+int HapticGenerator_SetParameter(struct HapticGeneratorContext *context,
+                                 int32_t param,
+                                 uint32_t size,
+                                 void *value) {
+    switch (param) {
+    case HG_PARAM_HAPTIC_INTENSITY: {
+        if (value == nullptr || size != (uint32_t) (2 * sizeof(int))) {
+            return -EINVAL;
+        }
+        int id = *(int *) value;
+        os::HapticScale hapticIntensity = static_cast<os::HapticScale>(*((int *) value + 1));
+        if (hapticIntensity == os::HapticScale::MUTE) {
+            context->param.id2Intensity.erase(id);
+        } else {
+            context->param.id2Intensity.emplace(id, hapticIntensity);
+        }
+        context->param.maxHapticIntensity = hapticIntensity;
+        for (const auto&[id, intensity] : context->param.id2Intensity) {
+            context->param.maxHapticIntensity = std::max(
+                    context->param.maxHapticIntensity, intensity);
+        }
+        break;
+    }
+
+    default:
+        ALOGW("Unknown param: %d", param);
+        return -EINVAL;
+    }
+
+    return 0;
 }
 
 /**
@@ -346,6 +373,11 @@ int32_t HapticGenerator_Process(effect_handle_t self,
         return -ENODATA;
     }
 
+    if (context->param.maxHapticIntensity == os::HapticScale::MUTE) {
+        // Haptic channels are muted, not need to generate haptic data.
+        return 0;
+    }
+
     // Resize buffer if the haptic sample count is greater than buffer size.
     size_t hapticSampleCount = inBuffer->frameCount * context->param.hapticChannelCount;
     if (hapticSampleCount > context->inputBuffer.size()) {
@@ -367,6 +399,7 @@ int32_t HapticGenerator_Process(effect_handle_t self,
     float* hapticOutBuffer = HapticGenerator_runProcessingChain(
             context->processingChain, context->inputBuffer.data(),
             context->outputBuffer.data(), inBuffer->frameCount);
+    os::scaleHapticData(hapticOutBuffer, hapticSampleCount, context->param.maxHapticIntensity);
 
     // For haptic data, the haptic playback thread will copy the data from effect input buffer,
     // which contains haptic data at the end of the buffer, directly to sink buffer.
