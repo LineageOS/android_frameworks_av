@@ -159,12 +159,12 @@ public:
                 mHapticPlaybackEnabled = hapticPlaybackEnabled;
             }
             /** Return at what intensity to play haptics, used in mixer. */
-            AudioMixer::haptic_intensity_t getHapticIntensity() const { return mHapticIntensity; }
+            os::HapticScale getHapticIntensity() const { return mHapticIntensity; }
             /** Set intensity of haptic playback, should be set after querying vibrator service. */
-            void    setHapticIntensity(AudioMixer::haptic_intensity_t hapticIntensity) {
-                if (AudioMixer::isValidHapticIntensity(hapticIntensity)) {
+            void    setHapticIntensity(os::HapticScale hapticIntensity) {
+                if (os::isValidHapticScale(hapticIntensity)) {
                     mHapticIntensity = hapticIntensity;
-                    setHapticPlaybackEnabled(mHapticIntensity != AudioMixer::HAPTIC_SCALE_MUTE);
+                    setHapticPlaybackEnabled(mHapticIntensity != os::HapticScale::MUTE);
                 }
             }
             sp<os::ExternalVibration> getExternalVibration() const { return mExternalVibration; }
@@ -265,7 +265,7 @@ protected:
 
     bool                mHapticPlaybackEnabled = false; // indicates haptic playback enabled or not
     // intensity to play haptic data
-    AudioMixer::haptic_intensity_t mHapticIntensity = AudioMixer::HAPTIC_SCALE_MUTE;
+    os::HapticScale mHapticIntensity = os::HapticScale::MUTE;
     class AudioVibrationController : public os::BnExternalVibrationController {
     public:
         explicit AudioVibrationController(Track* track) : mTrack(track) {}

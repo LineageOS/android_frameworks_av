@@ -98,6 +98,7 @@
 #include <private/media/AudioTrackShared.h>
 
 #include <vibrator/ExternalVibration.h>
+#include <vibrator/ExternalVibrationUtils.h>
 
 #include "android/media/BnAudioRecord.h"
 
@@ -755,6 +756,8 @@ using effect_buffer_t = int16_t;
               PlaybackThread *fastPlaybackThread_l() const;
 
               sp<ThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
+
+              ThreadBase *hapticPlaybackThread_l() const;
 
 
                 void        removeClient_l(pid_t pid);

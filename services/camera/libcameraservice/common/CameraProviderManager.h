@@ -439,8 +439,6 @@ private:
             const hardware::camera::common::V1_0::CameraResourceCost mResourceCost;
 
             hardware::camera::common::V1_0::CameraDeviceStatus mStatus;
-            std::map<std::string, hardware::camera::common::V1_0::CameraDeviceStatus>
-                    mPhysicalStatus;
 
             wp<ProviderInfo> mParentProvider;
 
