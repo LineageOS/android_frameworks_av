@@ -71,6 +71,7 @@ MediaTranscodingService::~MediaTranscodingService() {
 binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uint32_t /*numArgs*/) {
     String8 result;
 
+    // TODO(b/161549994): Remove libbinder dependencies for mainline.
     if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
         result.format(
                 "Permission Denial: "
