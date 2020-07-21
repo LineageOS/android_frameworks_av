@@ -33,7 +33,7 @@ namespace android {
 
 namespace media {
 
-constexpr int64_t kPaddingUs = 200000;
+constexpr int64_t kPaddingUs = 400000;
 constexpr int64_t kJobWithPaddingUs = 10000000 + kPaddingUs;
 constexpr int32_t kBitRate = 8 * 1000 * 1000;  // 8Mbs
 
