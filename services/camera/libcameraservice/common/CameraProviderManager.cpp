@@ -1312,7 +1312,6 @@ CameraProviderManager::ProviderInfo::ProviderInfo(
 status_t CameraProviderManager::ProviderInfo::initialize(
         sp<provider::V2_4::ICameraProvider>& interface,
         hardware::hidl_bitfield<provider::V2_5::DeviceState> currentDeviceState) {
-    std::lock_guard<std::mutex> lock(mLock);
     status_t res = parseProviderName(mProviderName, &mType, &mId);
     if (res != OK) {
         ALOGE("%s: Invalid provider name, ignoring", __FUNCTION__);
