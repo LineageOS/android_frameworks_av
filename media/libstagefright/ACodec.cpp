@@ -8349,13 +8349,34 @@ bool ACodec::OutputPortSettingsChangedState::onMessageReceived(
             FALLTHROUGH_INTENDED;
         }
         case kWhatResume:
-        case kWhatSetParameters:
         {
-            if (msg->what() == kWhatResume) {
-                ALOGV("[%s] Deferring resume", mCodec->mComponentName.c_str());
-            }
+            ALOGV("[%s] Deferring resume", mCodec->mComponentName.c_str());
 
             mCodec->deferMessage(msg);
+            handled = true;
+            break;
+        }
+
+        case kWhatSetParameters:
+        {
+            sp<AMessage> params;
+            CHECK(msg->findMessage("params", &params));
+
+            sp<ABuffer> hdr10PlusInfo;
+            if (params->findBuffer("hdr10-plus-info", &hdr10PlusInfo)) {
+                if (hdr10PlusInfo != nullptr && hdr10PlusInfo->size() > 0) {
+                    (void)mCodec->setHdr10PlusInfo(hdr10PlusInfo);
+                }
+                params->removeEntryAt(params->findEntryByName("hdr10-plus-info"));
+
+                if (params->countEntries() == 0) {
+                    msg->removeEntryAt(msg->findEntryByName("params"));
+                }
+            }
+
+            if (msg->countEntries() > 0) {
+                mCodec->deferMessage(msg);
+            }
             handled = true;
             break;
         }
@@ -8468,6 +8489,15 @@ bool ACodec::OutputPortSettingsChangedState::onOMXEvent(
             }
 
             return false;
+        }
+
+        case OMX_EventConfigUpdate:
+        {
+            CHECK_EQ(data1, (OMX_U32)kPortIndexOutput);
+
+            mCodec->onConfigUpdate((OMX_INDEXTYPE)data2);
+
+            return true;
         }
 
         default:
