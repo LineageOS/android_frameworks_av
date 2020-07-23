@@ -1718,7 +1718,13 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
-    if (notifyClient && !buffer && !flags) {
+    bool drop = false;
+    if (worklet->output.flags & C2FrameData::FLAG_DROP_FRAME) {
+        ALOGV("[%s] onWorkDone: drop buffer but keep metadata", mName);
+        drop = true;
+    }
+
+    if (notifyClient && !buffer && !flags && !drop) {
         ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
         notifyClient = false;
