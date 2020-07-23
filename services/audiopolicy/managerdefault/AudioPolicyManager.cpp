@@ -5670,7 +5670,7 @@ uint32_t AudioPolicyManager::setBeaconMute(bool mute) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
             setVolumeSourceMute(ttsVolumeSource, mute/*on*/, desc, 0 /*delay*/, DeviceTypeSet());
             const uint32_t latency = desc->latency() * 2;
-            if (latency > maxLatency) {
+            if (desc->isActive(latency * 2) && latency > maxLatency) {
                 maxLatency = latency;
             }
         }
