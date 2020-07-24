@@ -6157,7 +6157,9 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
              (isBtScoVolSrc && forceUseForComm != AUDIO_POLICY_FORCE_BT_SCO))) {
         ALOGV("%s cannot set volume group %d volume with force use = %d for comm", __func__,
              volumeSource, forceUseForComm);
-        return INVALID_OPERATION;
+        // Do not return an error here as AudioService will always set both voice call
+        // and bluetooth SCO volumes due to stream aliasing.
+        return NO_ERROR;
     }
     if (deviceTypes.empty()) {
         deviceTypes = outputDesc->devices().types();
