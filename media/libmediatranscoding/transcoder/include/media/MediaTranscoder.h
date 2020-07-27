@@ -17,8 +17,6 @@
 #ifndef ANDROID_MEDIA_TRANSCODER_H
 #define ANDROID_MEDIA_TRANSCODER_H
 
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
 #include <media/MediaSampleWriter.h>
 #include <media/MediaTrackTranscoderCallback.h>
 #include <media/NdkMediaError.h>
