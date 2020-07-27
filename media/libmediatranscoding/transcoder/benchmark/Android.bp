@@ -1,0 +1,6 @@
+cc_test {
+    name: "MediaTranscoderBenchmark",
+    srcs: ["MediaTranscoderBenchmark.cpp"],
+    shared_libs: ["libmediatranscoder", "libmediandk"],
+    static_libs: ["libgoogle-benchmark"],
+}
