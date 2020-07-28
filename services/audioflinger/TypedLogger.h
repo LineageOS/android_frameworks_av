@@ -80,7 +80,7 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 
 // TODO Permit disabling of logging at compile-time.
 
-// TODO A non-nullptr dummy implementation that is a nop would be faster than checking for nullptr
+// TODO A non-nullptr stub implementation that is a nop would be faster than checking for nullptr
 //      in the case when logging is enabled at compile-time and enabled at runtime, but it might be
 //      slower than nullptr check when logging is enabled at compile-time and disabled at runtime.
 
@@ -129,8 +129,8 @@ constexpr uint64_t hash(const char (&file)[n], uint32_t line) {
 
 namespace android {
 extern "C" {
-// TODO consider adding a thread_local NBLog::Writer tlDummyNBLogWriter and then
-// initialize below tlNBLogWriter to &tlDummyNBLogWriter to remove the need to
+// TODO consider adding a thread_local NBLog::Writer tlStubNBLogWriter and then
+// initialize below tlNBLogWriter to &tlStubNBLogWriter to remove the need to
 // check for nullptr every time. Also reduces the need to add a new logging macro above
 // each time we want to log a new type.
 extern thread_local NBLog::Writer *tlNBLogWriter;
