@@ -62,8 +62,8 @@ status_t ClearKeyFetcher::ObtainKey(const sp<ABuffer>& buffer,
     }
     ALOGV("descriptor_size=%zu", container.descriptor_size());
 
-    // Sanity check to verify that the BroadcastEncryptor is sending a properly
-    // formed EcmContainer. If it contains two Ecms, the ids should have different
+    // Validate that the BroadcastEncryptor is sending a properly formed
+    // EcmContainer. If it contains two Ecms, the ids should have different
     // parity (one odd, one even). This does not necessarily affect decryption
     // but indicates a problem with Ecm generation.
     if (container.descriptor_size() == 2) {
