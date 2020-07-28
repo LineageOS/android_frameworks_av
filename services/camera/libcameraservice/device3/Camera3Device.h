@@ -838,6 +838,7 @@ class Camera3Device :
         }
 
         void signalPipelineDrain(const std::vector<int>& streamIds);
+        void resetPipelineDrain();
 
       protected:
 
