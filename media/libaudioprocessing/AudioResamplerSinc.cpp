@@ -404,7 +404,7 @@ void AudioResamplerSinc::filterCoefficient(int32_t* out, uint32_t phase,
     // NOTE: be very careful when modifying the code here. register
     // pressure is very high and a small change might cause the compiler
     // to generate far less efficient code.
-    // Always sanity check the result with objdump or test-resample.
+    // Always validate the result with objdump or test-resample.
 
     // compute the index of the coefficient on the positive side and
     // negative side
