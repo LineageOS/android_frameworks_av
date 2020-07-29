@@ -685,8 +685,8 @@ sp<AudioFlinger::Client> AudioFlinger::registerPid(pid_t pid)
 
 sp<NBLog::Writer> AudioFlinger::newWriter_l(size_t size, const char *name)
 {
-    // If there is no memory allocated for logs, return a dummy writer that does nothing.
-    // Similarly if we can't contact the media.log service, also return a dummy writer.
+    // If there is no memory allocated for logs, return a no-op writer that does nothing.
+    // Similarly if we can't contact the media.log service, also return a no-op writer.
     if (mLogMemoryDealer == 0 || sMediaLogService == 0) {
         return new NBLog::Writer();
     }
@@ -712,7 +712,7 @@ sp<NBLog::Writer> AudioFlinger::newWriter_l(size_t size, const char *name)
             }
         }
         // Even after garbage-collecting all old writers, there is still not enough memory,
-        // so return a dummy writer
+        // so return a no-op writer
         return new NBLog::Writer();
     }
 success:
