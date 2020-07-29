@@ -1151,7 +1151,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             } else if (chunk_type == FOURCC("moov")) {
                 mInitCheck = OK;
 
-                return UNKNOWN_ERROR;  // Return a dummy error.
+                return UNKNOWN_ERROR;  // Return a generic error.
             }
             break;
         }
@@ -5820,7 +5820,7 @@ status_t MPEG4Source::parseTrackFragmentRun(off64_t offset, off64_t size) {
             return -EINVAL;
         }
 
-        // apply some sanity (vs strict legality) checks
+        // apply some quick (vs strict legality) checks
         //
         static constexpr uint32_t kMaxTrunSampleCount = 10000;
         if (sampleCount > kMaxTrunSampleCount) {

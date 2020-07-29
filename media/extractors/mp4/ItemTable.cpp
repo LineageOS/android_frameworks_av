@@ -546,11 +546,11 @@ void ItemReference::apply(
                 continue;
             }
             ALOGV("Image item id %d uses thumbnail item id %d", mRefs[i], mItemId);
-            ImageItem &masterImage = itemIdToItemMap.editValueAt(itemIndex);
-            if (!masterImage.thumbnails.empty()) {
+            ImageItem &imageItem = itemIdToItemMap.editValueAt(itemIndex);
+            if (!imageItem.thumbnails.empty()) {
                 ALOGW("already has thumbnails!");
             }
-            masterImage.thumbnails.push_back(mItemId);
+            imageItem.thumbnails.push_back(mItemId);
         }
         break;
     }
@@ -929,7 +929,7 @@ private:
 
 status_t IpcoBox::parse(off64_t offset, size_t size) {
     ALOGV("%s: offset %lld, size %zu", __FUNCTION__, (long long)offset, size);
-    // push dummy as the index is 1-based
+    // push a placeholder as the index is 1-based
     mItemProperties->push_back(new ItemProperty());
     return parseChunks(offset, size);
 }
@@ -1614,17 +1614,17 @@ status_t ItemTable::findThumbnailItem(const uint32_t imageIndex, uint32_t *itemI
         return BAD_VALUE;
     }
 
-    uint32_t masterItemIndex = mDisplayables[imageIndex];
+    uint32_t imageItemIndex = mDisplayables[imageIndex];
 
-    const ImageItem &masterImage = mItemIdToItemMap[masterItemIndex];
-    if (masterImage.thumbnails.empty()) {
-        *itemIndex = masterItemIndex;
+    const ImageItem &imageItem = mItemIdToItemMap[imageItemIndex];
+    if (imageItem.thumbnails.empty()) {
+        *itemIndex = imageItemIndex;
         return OK;
     }
 
-    ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(masterImage.thumbnails[0]);
+    ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(imageItem.thumbnails[0]);
     if (thumbItemIndex < 0) {
-        // Do not return the master image in this case, fail it so that the
+        // Do not return the image item in this case, fail it so that the
         // thumbnail extraction code knows we really don't have it.
         return INVALID_OPERATION;
     }
