@@ -283,7 +283,7 @@ size_t loadEffects(const Effects& effects, list_elem_t* libList, list_elem_t** s
             }
             listPush(effectLoadResult.effectDesc.get(), subEffectList);
 
-            // Since we return a dummy descriptor for the proxy during
+            // Since we return a stub descriptor for the proxy during
             // get_descriptor call, we replace it with the corresponding
             // sw effect descriptor, but keep the Proxy UUID
             *effectLoadResult.effectDesc = *swEffectLoadResult.effectDesc;
