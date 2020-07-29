@@ -161,6 +161,7 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
         }
 
         if (!callbacks->waitForTranscodingFinished()) {
+            transcoder->cancel();
             state.SkipWithError("Transcoder timed out");
             goto exit;
         }

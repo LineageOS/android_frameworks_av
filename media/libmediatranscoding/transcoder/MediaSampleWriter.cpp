@@ -127,18 +127,16 @@ bool MediaSampleWriter::addTrack(const std::shared_ptr<MediaSampleQueue>& sample
         durationUs = 0;
     }
 
-    const char* mime = nullptr;
-    const bool isVideo = AMediaFormat_getString(trackFormat.get(), AMEDIAFORMAT_KEY_MIME, &mime) &&
-                         (strncmp(mime, "video/", 6) == 0);
-
-    mTracks.emplace_back(sampleQueue, static_cast<size_t>(trackIndex), durationUs, isVideo);
+    mAllTracks.push_back(std::make_unique<TrackRecord>(sampleQueue, static_cast<size_t>(trackIndex),
+                                                       durationUs));
+    mSortedTracks.insert(mAllTracks.back().get());
     return true;
 }
 
 bool MediaSampleWriter::start() {
     std::scoped_lock lock(mStateMutex);
 
-    if (mTracks.size() == 0) {
+    if (mAllTracks.size() == 0) {
         LOG(ERROR) << "No tracks to write.";
         return false;
     } else if (mState != INITIALIZED) {
@@ -165,8 +163,8 @@ bool MediaSampleWriter::stop() {
     }
 
     // Stop the sources, and wait for thread to join.
-    for (auto& track : mTracks) {
-        track.mSampleQueue->abort();
+    for (auto& track : mAllTracks) {
+        track->mSampleQueue->abort();
     }
     mThread.join();
     mState = STOPPED;
@@ -193,76 +191,102 @@ media_status_t MediaSampleWriter::writeSamples() {
     return writeStatus != AMEDIA_OK ? writeStatus : muxerStatus;
 }
 
+std::multiset<MediaSampleWriter::TrackRecord*>::iterator MediaSampleWriter::getNextOutputTrack() {
+    // Find the first track that has samples ready in its queue AND is not more than
+    // mMaxTrackDivergenceUs ahead of the slowest track. If no such track exists then return the
+    // slowest track and let the writer wait for samples to become ready. Note that mSortedTracks is
+    // sorted by each track's previous sample timestamp in ascending order.
+    auto slowestTrack = mSortedTracks.begin();
+    if (slowestTrack == mSortedTracks.end() || !(*slowestTrack)->mSampleQueue->isEmpty()) {
+        return slowestTrack;
+    }
+
+    const int64_t slowestTimeUs = (*slowestTrack)->mPrevSampleTimeUs;
+    int64_t divergenceUs;
+
+    for (auto it = std::next(slowestTrack); it != mSortedTracks.end(); ++it) {
+        // If the current track has diverged then the rest will have too, so we can stop the search.
+        // If not and it has samples ready then return it, otherwise keep looking.
+        if (__builtin_sub_overflow((*it)->mPrevSampleTimeUs, slowestTimeUs, &divergenceUs) ||
+            divergenceUs >= mMaxTrackDivergenceUs) {
+            break;
+        } else if (!(*it)->mSampleQueue->isEmpty()) {
+            return it;
+        }
+    }
+
+    // No track with pending samples within acceptable time interval was found, so let the writer
+    // wait for the slowest track to produce a new sample.
+    return slowestTrack;
+}
+
 media_status_t MediaSampleWriter::runWriterLoop() {
     AMediaCodecBufferInfo bufferInfo;
-    uint32_t segmentEndTimeUs = mTrackSegmentLengthUs;
-    bool samplesLeft = true;
     int32_t lastProgressUpdate = 0;
 
     // Set the "primary" track that will be used to determine progress to the track with longest
     // duration.
     int primaryTrackIndex = -1;
     int64_t longestDurationUs = 0;
-    for (int trackIndex = 0; trackIndex < mTracks.size(); ++trackIndex) {
-        if (mTracks[trackIndex].mDurationUs > longestDurationUs) {
-            primaryTrackIndex = trackIndex;
-            longestDurationUs = mTracks[trackIndex].mDurationUs;
+    for (auto& track : mAllTracks) {
+        if (track->mDurationUs > longestDurationUs) {
+            primaryTrackIndex = track->mTrackIndex;
+            longestDurationUs = track->mDurationUs;
         }
     }
 
-    while (samplesLeft) {
-        samplesLeft = false;
-        for (auto& track : mTracks) {
-            if (track.mReachedEos) continue;
+    while (true) {
+        auto outputTrackIter = getNextOutputTrack();
 
-            std::shared_ptr<MediaSample> sample;
-            do {
-                if (track.mSampleQueue->dequeue(&sample)) {
-                    // Track queue was aborted.
-                    return AMEDIA_ERROR_UNKNOWN;  // TODO(lnilsson): Custom error code.
-                } else if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {
-                    // Track reached end of stream.
-                    track.mReachedEos = true;
-
-                    // Preserve source track duration by setting the appropriate timestamp on the
-                    // empty End-Of-Stream sample.
-                    if (track.mDurationUs > 0 && track.mFirstSampleTimeSet) {
-                        sample->info.presentationTimeUs =
-                                track.mDurationUs + track.mFirstSampleTimeUs;
-                    }
-                } else {
-                    samplesLeft = true;
-                }
-
-                track.mPrevSampleTimeUs = sample->info.presentationTimeUs;
-                if (!track.mFirstSampleTimeSet) {
-                    // Record the first sample's timestamp in order to translate duration to EOS
-                    // time for tracks that does not start at 0.
-                    track.mFirstSampleTimeUs = sample->info.presentationTimeUs;
-                    track.mFirstSampleTimeSet = true;
-                }
-
-                bufferInfo.offset = sample->dataOffset;
-                bufferInfo.size = sample->info.size;
-                bufferInfo.flags = sample->info.flags;
-                bufferInfo.presentationTimeUs = sample->info.presentationTimeUs;
-
-                media_status_t status =
-                        mMuxer->writeSampleData(track.mTrackIndex, sample->buffer, &bufferInfo);
-                if (status != AMEDIA_OK) {
-                    LOG(ERROR) << "writeSampleData returned " << status;
-                    return status;
-                }
-
-            } while (sample->info.presentationTimeUs < segmentEndTimeUs && !track.mReachedEos);
+        // Exit if all tracks have reached end of stream.
+        if (outputTrackIter == mSortedTracks.end()) {
+            break;
         }
 
-        // TODO(lnilsson): Add option to toggle progress reporting on/off.
-        if (primaryTrackIndex >= 0) {
-            const TrackRecord& track = mTracks[primaryTrackIndex];
+        // Remove the track from the set, update it, and then reinsert it to keep the set in order.
+        TrackRecord* track = *outputTrackIter;
+        mSortedTracks.erase(outputTrackIter);
 
-            const int64_t elapsed = track.mPrevSampleTimeUs - track.mFirstSampleTimeUs;
-            int32_t progress = (elapsed * 100) / track.mDurationUs;
+        std::shared_ptr<MediaSample> sample;
+        if (track->mSampleQueue->dequeue(&sample)) {
+            // Track queue was aborted.
+            return AMEDIA_ERROR_UNKNOWN;  // TODO(lnilsson): Custom error code.
+        } else if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {
+            // Track reached end of stream.
+            track->mReachedEos = true;
+
+            // Preserve source track duration by setting the appropriate timestamp on the
+            // empty End-Of-Stream sample.
+            if (track->mDurationUs > 0 && track->mFirstSampleTimeSet) {
+                sample->info.presentationTimeUs = track->mDurationUs + track->mFirstSampleTimeUs;
+            }
+        }
+
+        track->mPrevSampleTimeUs = sample->info.presentationTimeUs;
+        if (!track->mFirstSampleTimeSet) {
+            // Record the first sample's timestamp in order to translate duration to EOS
+            // time for tracks that does not start at 0.
+            track->mFirstSampleTimeUs = sample->info.presentationTimeUs;
+            track->mFirstSampleTimeSet = true;
+        }
+
+        bufferInfo.offset = sample->dataOffset;
+        bufferInfo.size = sample->info.size;
+        bufferInfo.flags = sample->info.flags;
+        bufferInfo.presentationTimeUs = sample->info.presentationTimeUs;
+
+        media_status_t status =
+                mMuxer->writeSampleData(track->mTrackIndex, sample->buffer, &bufferInfo);
+        if (status != AMEDIA_OK) {
+            LOG(ERROR) << "writeSampleData returned " << status;
+            return status;
+        }
+        sample.reset();
+
+        // TODO(lnilsson): Add option to toggle progress reporting on/off.
+        if (track->mTrackIndex == primaryTrackIndex) {
+            const int64_t elapsed = track->mPrevSampleTimeUs - track->mFirstSampleTimeUs;
+            int32_t progress = (elapsed * 100) / track->mDurationUs;
             progress = std::clamp(progress, 0, 100);
 
             if (progress > lastProgressUpdate) {
@@ -273,7 +297,9 @@ media_status_t MediaSampleWriter::runWriterLoop() {
             }
         }
 
-        segmentEndTimeUs += mTrackSegmentLengthUs;
+        if (!track->mReachedEos) {
+            mSortedTracks.insert(track);
+        }
     }
 
     return AMEDIA_OK;
