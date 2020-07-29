@@ -381,7 +381,7 @@ void fir(TO* const out,
     // NOTE: be very careful when modifying the code here. register
     // pressure is very high and a small change might cause the compiler
     // to generate far less efficient code.
-    // Always sanity check the result with objdump or test-resample.
+    // Always validate the result with objdump or test-resample.
 
     if (LOCKED) {
         // locked polyphase (no interpolation)
