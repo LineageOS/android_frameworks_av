@@ -30,7 +30,7 @@
 #include <media/EffectsFactoryApi.h>
 
 namespace android {
-// This is a dummy proxy descriptor just to return to Factory during the initial
+// This is a stub proxy descriptor just to return to Factory during the initial
 // GetDescriptor call. Later in the factory, it is replaced with the
 // SW sub effect descriptor
 // proxy UUID af8da7e0-2ca1-11e3-b71d-0002a5d5c51b
