@@ -138,7 +138,7 @@ private:
 
 SimplePlayer::SimplePlayer()
     : mListener(new Listener(this)),
-      mProducerListener(new DummyProducerListener),
+      mProducerListener(new StubProducerListener),
       mLinearPoolId(C2BlockPool::PLATFORM_START),
       mComposerClient(new SurfaceComposerClient) {
     CHECK_EQ(mComposerClient->initCheck(), (status_t)OK);
