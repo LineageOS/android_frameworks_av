@@ -1936,7 +1936,7 @@ ssize_t AudioTrack::write(const void* buffer, size_t userSize, bool blocking)
     }
 
     if (ssize_t(userSize) < 0 || (buffer == NULL && userSize != 0)) {
-        // Sanity-check: user is most-likely passing an error code, and it would
+        // Validation: user is most-likely passing an error code, and it would
         // make the return value ambiguous (actualSize vs error).
         ALOGE("%s(%d): AudioTrack::write(buffer=%p, size=%zu (%zd)",
                 __func__, mPortId, buffer, userSize, userSize);
@@ -2326,7 +2326,7 @@ nsecs_t AudioTrack::processAudioBuffer()
                 mUserData, &audioBuffer);
         size_t writtenSize = audioBuffer.size;
 
-        // Sanity check on returned size
+        // Validate on returned size
         if (ssize_t(writtenSize) < 0 || writtenSize > reqSize) {
             ALOGE("%s(%d): EVENT_MORE_DATA requested %zu bytes but callback returned %zd bytes",
                     __func__, mPortId, reqSize, ssize_t(writtenSize));
