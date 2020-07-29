@@ -636,7 +636,7 @@ size_t AudioResamplerDyn<TC, TI, TO>::resample(TO* out, size_t outFrameCount,
     const uint32_t phaseWrapLimit = c.mL << c.mShift;
     size_t inFrameCount = (phaseIncrement * (uint64_t)outFrameCount + phaseFraction)
             / phaseWrapLimit;
-    // sanity check that inFrameCount is in signed 32 bit integer range.
+    // validate that inFrameCount is in signed 32 bit integer range.
     ALOG_ASSERT(0 <= inFrameCount && inFrameCount < (1U << 31));
 
     //ALOGV("inFrameCount:%d  outFrameCount:%d"
@@ -646,7 +646,7 @@ size_t AudioResamplerDyn<TC, TI, TO>::resample(TO* out, size_t outFrameCount,
     // NOTE: be very careful when modifying the code here. register
     // pressure is very high and a small change might cause the compiler
     // to generate far less efficient code.
-    // Always sanity check the result with objdump or test-resample.
+    // Always validate the result with objdump or test-resample.
 
     // the following logic is a bit convoluted to keep the main processing loop
     // as tight as possible with register allocation.
