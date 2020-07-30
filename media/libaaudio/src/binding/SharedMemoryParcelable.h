@@ -26,7 +26,7 @@
 
 namespace aaudio {
 
-// Arbitrary limits for sanity checks. TODO remove after debugging.
+// Arbitrary limits for range checks.
 #define MAX_SHARED_MEMORIES (32)
 #define MAX_MMAP_OFFSET_BYTES (32 * 1024 * 8)
 #define MAX_MMAP_SIZE_BYTES (32 * 1024 * 8)
