@@ -262,7 +262,7 @@ public:
     static std::shared_ptr<MediaSample> newSampleWithPts(int64_t ptsUs) {
         static uint32_t sampleCount = 0;
 
-        // Use sampleCount to get a unique dummy sample.
+        // Use sampleCount to get a unique mock sample.
         uint32_t sampleId = ++sampleCount;
         return newSample(ptsUs, 0, sampleId, sampleId, reinterpret_cast<const uint8_t*>(sampleId));
     }
