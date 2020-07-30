@@ -267,7 +267,7 @@ public:
     AudioFloatInputPort input;
 
     /**
-     * Dummy processor. The work happens in the read() method.
+     * Do nothing. The work happens in the read() method.
      *
      * @param framePosition index of first frame to be processed
      * @param numFrames
