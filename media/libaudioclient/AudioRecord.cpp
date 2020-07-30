@@ -1092,7 +1092,7 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize, bool blocking)
     }
 
     if (ssize_t(userSize) < 0 || (buffer == NULL && userSize != 0)) {
-        // sanity-check. user is most-likely passing an error code, and it would
+        // Validation. user is most-likely passing an error code, and it would
         // make the return value ambiguous (actualSize vs error).
         ALOGE("%s(%d) (buffer=%p, size=%zu (%zu)",
                 __func__, mPortId, buffer, userSize, userSize);
@@ -1319,7 +1319,7 @@ nsecs_t AudioRecord::processAudioBuffer()
         mCbf(EVENT_MORE_DATA, mUserData, &audioBuffer);
         size_t readSize = audioBuffer.size;
 
-        // Sanity check on returned size
+        // Validate on returned size
         if (ssize_t(readSize) < 0 || readSize > reqSize) {
             ALOGE("%s(%d):  EVENT_MORE_DATA requested %zu bytes but callback returned %zd bytes",
                     __func__, mPortId, reqSize, ssize_t(readSize));
