@@ -50,6 +50,12 @@ public:
     bool dequeue(std::shared_ptr<MediaSample>* sample /* nonnull */);
 
     /**
+     * Checks if the queue currently holds any media samples.
+     * @return True if the queue is empty or has been aborted. False otherwise.
+     */
+    bool isEmpty();
+
+    /**
      * Aborts the queue operation. This clears the queue and notifies waiting consumers. After the
      * has been aborted it is not possible to enqueue more samples, and dequeue will return null.
      */

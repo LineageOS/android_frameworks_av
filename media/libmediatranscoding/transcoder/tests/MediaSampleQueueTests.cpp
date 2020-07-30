@@ -46,10 +46,12 @@ TEST_F(MediaSampleQueueTests, TestSequentialDequeueOrder) {
 
     static constexpr int kNumSamples = 4;
     MediaSampleQueue sampleQueue;
+    EXPECT_TRUE(sampleQueue.isEmpty());
 
     // Enqueue loop.
     for (int i = 0; i < kNumSamples; ++i) {
         sampleQueue.enqueue(newSample(i));
+        EXPECT_FALSE(sampleQueue.isEmpty());
     }
 
     // Dequeue loop.
@@ -60,6 +62,7 @@ TEST_F(MediaSampleQueueTests, TestSequentialDequeueOrder) {
         EXPECT_EQ(sample->bufferId, i);
         EXPECT_FALSE(aborted);
     }
+    EXPECT_TRUE(sampleQueue.isEmpty());
 }
 
 TEST_F(MediaSampleQueueTests, TestInterleavedDequeueOrder) {
@@ -71,12 +74,14 @@ TEST_F(MediaSampleQueueTests, TestInterleavedDequeueOrder) {
     // Enqueue and dequeue.
     for (int i = 0; i < kNumSamples; ++i) {
         sampleQueue.enqueue(newSample(i));
+        EXPECT_FALSE(sampleQueue.isEmpty());
 
         std::shared_ptr<MediaSample> sample;
         bool aborted = sampleQueue.dequeue(&sample);
         EXPECT_NE(sample, nullptr);
         EXPECT_EQ(sample->bufferId, i);
         EXPECT_FALSE(aborted);
+        EXPECT_TRUE(sampleQueue.isEmpty());
     }
 }
 
@@ -98,6 +103,7 @@ TEST_F(MediaSampleQueueTests, TestBlockingDequeue) {
     EXPECT_NE(sample, nullptr);
     EXPECT_EQ(sample->bufferId, 1);
     EXPECT_FALSE(aborted);
+    EXPECT_TRUE(sampleQueue.isEmpty());
 
     enqueueThread.join();
 }
@@ -160,7 +166,9 @@ TEST_F(MediaSampleQueueTests, TestAbortBufferRelease) {
         EXPECT_FALSE(bufferReleased[i]);
     }
 
+    EXPECT_FALSE(sampleQueue.isEmpty());
     sampleQueue.abort();
+    EXPECT_TRUE(sampleQueue.isEmpty());
 
     for (int i = 0; i < kNumSamples; ++i) {
         EXPECT_TRUE(bufferReleased[i]);
