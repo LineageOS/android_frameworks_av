@@ -105,7 +105,7 @@ int32_t AAudioServiceStreamShared::calculateBufferCapacity(int32_t requestedCapa
     }
     int32_t capacityInFrames = numBursts * framesPerBurst;
 
-    // Final sanity check.
+    // Final range check.
     if (capacityInFrames > MAX_FRAMES_PER_BUFFER) {
         ALOGE("calculateBufferCapacity() calc capacity %d > max %d",
               capacityInFrames, MAX_FRAMES_PER_BUFFER);
