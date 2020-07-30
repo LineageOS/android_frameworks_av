@@ -19,6 +19,7 @@
 
 #include <android-base/logging.h>
 #include <media/VideoTrackTranscoder.h>
+#include <utils/AndroidThreads.h>
 
 namespace android {
 
@@ -437,6 +438,8 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
 }
 
 media_status_t VideoTrackTranscoder::runTranscodeLoop() {
+    androidSetThreadPriority(0 /* tid (0 = current) */, ANDROID_PRIORITY_VIDEO);
+
     // Push start decoder and encoder as two messages, so that these are subject to the
     // stop request as well. If the job is cancelled (or paused) immediately after start,
     // we don't need to waste time start then stop the codecs.
