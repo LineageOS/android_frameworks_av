@@ -394,7 +394,7 @@ int loadEffect(cnode *root)
        }
        sub_effect_entry_t *subEntry = (sub_effect_entry_t*)gSubEffectList->sub_elem->object;
        effect_descriptor_t *subEffectDesc = (effect_descriptor_t*)(subEntry->object);
-       // Since we return a dummy descriptor for the proxy during
+       // Since we return a stub descriptor for the proxy during
        // get_descriptor call,we replace it with the correspoding
        // sw effect descriptor, but with Proxy UUID
        // check for Sw desc
