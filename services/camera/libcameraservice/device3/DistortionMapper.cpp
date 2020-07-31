@@ -485,7 +485,7 @@ float DistortionMapper::calculateUorV(const int32_t pt[2], const GridQuad& quad,
 
     float det = b * b - 4 * a * c;
     if (det < 0) {
-        // Sanity check - should not happen if pt is within the quad
+        // Validation check - should not happen if pt is within the quad
         ALOGE("Bad determinant! a: %f, b: %f, c: %f, det: %f", a,b,c,det);
         return -1;
     }
