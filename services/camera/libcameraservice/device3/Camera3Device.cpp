@@ -56,7 +56,7 @@
 #include "device3/Camera3Device.h"
 #include "device3/Camera3OutputStream.h"
 #include "device3/Camera3InputStream.h"
-#include "device3/Camera3DummyStream.h"
+#include "device3/Camera3FakeStream.h"
 #include "device3/Camera3SharedOutputStream.h"
 #include "CameraService.h"
 #include "utils/CameraThreadState.h"
@@ -309,7 +309,7 @@ status_t Camera3Device::initializeCommonLocked() {
 
     internalUpdateStatusLocked(STATUS_UNCONFIGURED);
     mNextStreamId = 0;
-    mDummyStreamId = NO_STREAM;
+    mFakeStreamId = NO_STREAM;
     mNeedConfig = true;
     mPauseStateNotify = false;
 
@@ -2466,12 +2466,12 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     }
 
     // Workaround for device HALv3.2 or older spec bug - zero streams requires
-    // adding a dummy stream instead.
+    // adding a fake stream instead.
     // TODO: Bug: 17321404 for fixing the HAL spec and removing this workaround.
     if (mOutputStreams.size() == 0) {
-        addDummyStreamLocked();
+        addFakeStreamLocked();
     } else {
-        tryRemoveDummyStreamLocked();
+        tryRemoveFakeStreamLocked();
     }
 
     // Start configuring the streams
@@ -2633,7 +2633,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
 
     mNeedConfig = false;
 
-    internalUpdateStatusLocked((mDummyStreamId == NO_STREAM) ?
+    internalUpdateStatusLocked((mFakeStreamId == NO_STREAM) ?
             STATUS_CONFIGURED : STATUS_UNCONFIGURED);
 
     ALOGV("%s: Camera %s: Stream configuration complete", __FUNCTION__, mId.string());
@@ -2647,69 +2647,69 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         return rc;
     }
 
-    if (mDummyStreamId == NO_STREAM) {
+    if (mFakeStreamId == NO_STREAM) {
         mRequestBufferSM.onStreamsConfigured();
     }
 
     return OK;
 }
 
-status_t Camera3Device::addDummyStreamLocked() {
+status_t Camera3Device::addFakeStreamLocked() {
     ATRACE_CALL();
     status_t res;
 
-    if (mDummyStreamId != NO_STREAM) {
-        // Should never be adding a second dummy stream when one is already
+    if (mFakeStreamId != NO_STREAM) {
+        // Should never be adding a second fake stream when one is already
         // active
-        SET_ERR_L("%s: Camera %s: A dummy stream already exists!",
+        SET_ERR_L("%s: Camera %s: A fake stream already exists!",
                 __FUNCTION__, mId.string());
         return INVALID_OPERATION;
     }
 
-    ALOGV("%s: Camera %s: Adding a dummy stream", __FUNCTION__, mId.string());
+    ALOGV("%s: Camera %s: Adding a fake stream", __FUNCTION__, mId.string());
 
-    sp<Camera3OutputStreamInterface> dummyStream =
-            new Camera3DummyStream(mNextStreamId);
+    sp<Camera3OutputStreamInterface> fakeStream =
+            new Camera3FakeStream(mNextStreamId);
 
-    res = mOutputStreams.add(mNextStreamId, dummyStream);
+    res = mOutputStreams.add(mNextStreamId, fakeStream);
     if (res < 0) {
-        SET_ERR_L("Can't add dummy stream to set: %s (%d)", strerror(-res), res);
+        SET_ERR_L("Can't add fake stream to set: %s (%d)", strerror(-res), res);
         return res;
     }
 
-    mDummyStreamId = mNextStreamId;
+    mFakeStreamId = mNextStreamId;
     mNextStreamId++;
 
     return OK;
 }
 
-status_t Camera3Device::tryRemoveDummyStreamLocked() {
+status_t Camera3Device::tryRemoveFakeStreamLocked() {
     ATRACE_CALL();
     status_t res;
 
-    if (mDummyStreamId == NO_STREAM) return OK;
+    if (mFakeStreamId == NO_STREAM) return OK;
     if (mOutputStreams.size() == 1) return OK;
 
-    ALOGV("%s: Camera %s: Removing the dummy stream", __FUNCTION__, mId.string());
+    ALOGV("%s: Camera %s: Removing the fake stream", __FUNCTION__, mId.string());
 
-    // Ok, have a dummy stream and there's at least one other output stream,
-    // so remove the dummy
+    // Ok, have a fake stream and there's at least one other output stream,
+    // so remove the fake
 
-    sp<Camera3StreamInterface> deletedStream = mOutputStreams.get(mDummyStreamId);
+    sp<Camera3StreamInterface> deletedStream = mOutputStreams.get(mFakeStreamId);
     if (deletedStream == nullptr) {
-        SET_ERR_L("Dummy stream %d does not appear to exist", mDummyStreamId);
+        SET_ERR_L("Fake stream %d does not appear to exist", mFakeStreamId);
         return INVALID_OPERATION;
     }
-    mOutputStreams.remove(mDummyStreamId);
+    mOutputStreams.remove(mFakeStreamId);
 
     // Free up the stream endpoint so that it can be used by some other stream
     res = deletedStream->disconnect();
     if (res != OK) {
-        SET_ERR_L("Can't disconnect deleted dummy stream %d", mDummyStreamId);
+        SET_ERR_L("Can't disconnect deleted fake stream %d", mFakeStreamId);
         // fall through since we want to still list the stream as deleted.
     }
     mDeletedStreams.add(deletedStream);
-    mDummyStreamId = NO_STREAM;
+    mFakeStreamId = NO_STREAM;
 
     return res;
 }
@@ -2814,7 +2814,7 @@ void Camera3Device::onInflightEntryRemovedLocked(nsecs_t duration) {
 }
 
 void Camera3Device::checkInflightMapLengthLocked() {
-    // Sanity check - if we have too many in-flight frames with long total inflight duration,
+    // Validation check - if we have too many in-flight frames with long total inflight duration,
     // something has likely gone wrong. This might still be legit only if application send in
     // a long burst of long exposure requests.
     if (mExpectedInflightDuration > kMinWarnInflightDuration) {
@@ -4405,11 +4405,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             std::set<std::string> cameraIdsWithZoom;
             /**
              * HAL workaround:
-             * Insert a dummy trigger ID if a trigger is set but no trigger ID is
+             * Insert a fake trigger ID if a trigger is set but no trigger ID is
              */
-            res = addDummyTriggerIds(captureRequest);
+            res = addFakeTriggerIds(captureRequest);
             if (res != OK) {
-                SET_ERR("RequestThread: Unable to insert dummy trigger IDs "
+                SET_ERR("RequestThread: Unable to insert fake trigger IDs "
                         "(capture request %d, HAL device: %s (%d)",
                         halRequest->frame_number, strerror(-res), res);
                 return INVALID_OPERATION;
@@ -5313,26 +5313,26 @@ status_t Camera3Device::RequestThread::removeTriggers(
     return OK;
 }
 
-status_t Camera3Device::RequestThread::addDummyTriggerIds(
+status_t Camera3Device::RequestThread::addFakeTriggerIds(
         const sp<CaptureRequest> &request) {
     // Trigger ID 0 had special meaning in the HAL2 spec, so avoid it here
-    static const int32_t dummyTriggerId = 1;
+    static const int32_t fakeTriggerId = 1;
     status_t res;
 
     CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
 
-    // If AF trigger is active, insert a dummy AF trigger ID if none already
+    // If AF trigger is active, insert a fake AF trigger ID if none already
     // exists
     camera_metadata_entry afTrigger = metadata.find(ANDROID_CONTROL_AF_TRIGGER);
     camera_metadata_entry afId = metadata.find(ANDROID_CONTROL_AF_TRIGGER_ID);
     if (afTrigger.count > 0 &&
             afTrigger.data.u8[0] != ANDROID_CONTROL_AF_TRIGGER_IDLE &&
             afId.count == 0) {
-        res = metadata.update(ANDROID_CONTROL_AF_TRIGGER_ID, &dummyTriggerId, 1);
+        res = metadata.update(ANDROID_CONTROL_AF_TRIGGER_ID, &fakeTriggerId, 1);
         if (res != OK) return res;
     }
 
-    // If AE precapture trigger is active, insert a dummy precapture trigger ID
+    // If AE precapture trigger is active, insert a fake precapture trigger ID
     // if none already exists
     camera_metadata_entry pcTrigger =
             metadata.find(ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER);
@@ -5341,7 +5341,7 @@ status_t Camera3Device::RequestThread::addDummyTriggerIds(
             pcTrigger.data.u8[0] != ANDROID_CONTROL_AE_PRECAPTURE_TRIGGER_IDLE &&
             pcId.count == 0) {
         res = metadata.update(ANDROID_CONTROL_AE_PRECAPTURE_ID,
-                &dummyTriggerId, 1);
+                &fakeTriggerId, 1);
         if (res != OK) return res;
     }
 

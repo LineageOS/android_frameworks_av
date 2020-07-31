@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_SERVERS_CAMERA3_DUMMY_STREAM_H
-#define ANDROID_SERVERS_CAMERA3_DUMMY_STREAM_H
+#ifndef ANDROID_SERVERS_CAMERA3_FAKE_STREAM_H
+#define ANDROID_SERVERS_CAMERA3_FAKE_STREAM_H
 
 #include <utils/RefBase.h>
 #include <gui/Surface.h>
@@ -28,23 +28,23 @@ namespace android {
 namespace camera3 {
 
 /**
- * A dummy output stream class, to be used as a placeholder when no valid
+ * A fake output stream class, to be used as a placeholder when no valid
  * streams are configured by the client.
  * This is necessary because camera HAL v3.2 or older disallow configuring
  * 0 output streams, while the public camera2 API allows for it.
  */
-class Camera3DummyStream :
+class Camera3FakeStream :
         public Camera3IOStreamBase,
         public Camera3OutputStreamInterface {
 
   public:
     /**
-     * Set up a dummy stream; doesn't actually connect to anything, and uses
-     * a default dummy format and size.
+     * Set up a fake stream; doesn't actually connect to anything, and uses
+     * a default fake format and size.
      */
-    explicit Camera3DummyStream(int id);
+    explicit Camera3FakeStream(int id);
 
-    virtual ~Camera3DummyStream();
+    virtual ~Camera3FakeStream();
 
     /**
      * Camera3Stream interface
@@ -115,15 +115,15 @@ class Camera3DummyStream :
 
   private:
 
-    // Default dummy parameters; 320x240 is a required size for all devices,
+    // Default fake parameters; 320x240 is a required size for all devices,
     // otherwise act like a SurfaceView would.
-    static const int DUMMY_WIDTH = 320;
-    static const int DUMMY_HEIGHT = 240;
-    static const int DUMMY_FORMAT = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
-    static const android_dataspace DUMMY_DATASPACE = HAL_DATASPACE_UNKNOWN;
-    static const camera3_stream_rotation_t DUMMY_ROTATION = CAMERA3_STREAM_ROTATION_0;
-    static const uint64_t DUMMY_USAGE = GRALLOC_USAGE_HW_COMPOSER;
-    static const String8 DUMMY_ID;
+    static const int FAKE_WIDTH = 320;
+    static const int FAKE_HEIGHT = 240;
+    static const int FAKE_FORMAT = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+    static const android_dataspace FAKE_DATASPACE = HAL_DATASPACE_UNKNOWN;
+    static const camera3_stream_rotation_t FAKE_ROTATION = CAMERA3_STREAM_ROTATION_0;
+    static const uint64_t FAKE_USAGE = GRALLOC_USAGE_HW_COMPOSER;
+    static const String8 FAKE_ID;
 
     /**
      * Internal Camera3Stream interface
@@ -138,7 +138,7 @@ class Camera3DummyStream :
 
     virtual status_t getEndpointUsage(uint64_t *usage) const;
 
-}; // class Camera3DummyStream
+}; // class Camera3FakeStream
 
 } // namespace camera3
 
