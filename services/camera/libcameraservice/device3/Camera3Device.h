@@ -474,7 +474,7 @@ class Camera3Device :
     int                        mNextStreamId;
     bool                       mNeedConfig;
 
-    int                        mDummyStreamId;
+    int                        mFakeStreamId;
 
     // Whether to send state updates upstream
     // Pause when doing transparent reconfiguration
@@ -668,15 +668,15 @@ class Camera3Device :
     void               cancelStreamsConfigurationLocked();
 
     /**
-     * Add a dummy stream to the current stream set as a workaround for
+     * Add a fake stream to the current stream set as a workaround for
      * not allowing 0 streams in the camera HAL spec.
      */
-    status_t           addDummyStreamLocked();
+    status_t           addFakeStreamLocked();
 
     /**
-     * Remove a dummy stream if the current config includes real streams.
+     * Remove a fake stream if the current config includes real streams.
      */
-    status_t           tryRemoveDummyStreamLocked();
+    status_t           tryRemoveFakeStreamLocked();
 
     /**
      * Set device into an error state due to some fatal failure, and set an
@@ -860,7 +860,7 @@ class Camera3Device :
 
         // HAL workaround: Make sure a trigger ID always exists if
         // a trigger does
-        status_t           addDummyTriggerIds(const sp<CaptureRequest> &request);
+        status_t           addFakeTriggerIds(const sp<CaptureRequest> &request);
 
         // Override rotate_and_crop control if needed; returns true if the current value was changed
         bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);

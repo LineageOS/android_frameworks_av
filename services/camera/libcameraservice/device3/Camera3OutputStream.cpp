@@ -114,7 +114,7 @@ Camera3OutputStream::Camera3OutputStream(int id,
         mState = STATE_ERROR;
     }
 
-    // Sanity check for the consumer usage flag.
+    // Validation check for the consumer usage flag.
     if ((consumerUsage & GraphicBuffer::USAGE_HW_TEXTURE) == 0 &&
             (consumerUsage & GraphicBuffer::USAGE_HW_COMPOSER) == 0) {
         ALOGE("%s: Deferred consumer usage flag is illegal %" PRIu64 "!",
