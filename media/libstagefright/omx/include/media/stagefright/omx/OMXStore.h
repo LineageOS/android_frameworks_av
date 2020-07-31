@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 
-#ifndef OMX_MASTER_H_
+#ifndef OMX_STORE_H_
 
-#define OMX_MASTER_H_
+#define OMX_STORE_H_
 
 #include <media/hardware/OMXPluginBase.h>
 
@@ -27,9 +27,9 @@
 
 namespace android {
 
-struct OMXMaster : public OMXPluginBase {
-    OMXMaster();
-    virtual ~OMXMaster();
+struct OMXStore : public OMXPluginBase {
+    OMXStore();
+    virtual ~OMXStore();
 
     virtual OMX_ERRORTYPE makeComponentInstance(
             const char *name,
@@ -66,10 +66,10 @@ private:
     void addPlugin(OMXPluginBase *plugin);
     void clearPlugins();
 
-    OMXMaster(const OMXMaster &);
-    OMXMaster &operator=(const OMXMaster &);
+    OMXStore(const OMXStore &);
+    OMXStore &operator=(const OMXStore &);
 };
 
 }  // namespace android
 
-#endif  // OMX_MASTER_H_
+#endif  // OMX_STORE_H_
