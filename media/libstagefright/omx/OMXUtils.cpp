@@ -354,7 +354,7 @@ bool IsFlexibleColorFormat(
     DescribeColorFormat2Params describeParams;
     InitOMXParams(&describeParams);
     describeParams.eColorFormat = (OMX_COLOR_FORMATTYPE)colorFormat;
-    // reasonable dummy values
+    // reasonable initial values (that will be overwritten)
     describeParams.nFrameWidth = 128;
     describeParams.nFrameHeight = 128;
     describeParams.nStride = 128;
