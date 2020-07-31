@@ -23,6 +23,7 @@
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <media/MediaSampleReaderNDK.h>
+#include <media/NdkCommon.h>
 #include <media/VideoTrackTranscoder.h>
 #include <utils/Timers.h>
 
@@ -66,8 +67,7 @@ public:
             if (strncmp(mime, "video/", 6) == 0) {
                 mTrackIndex = trackIndex;
 
-                mSourceFormat = std::shared_ptr<AMediaFormat>(
-                        trackFormat, std::bind(AMediaFormat_delete, std::placeholders::_1));
+                mSourceFormat = std::shared_ptr<AMediaFormat>(trackFormat, &AMediaFormat_delete);
                 ASSERT_NE(mSourceFormat, nullptr);
 
                 mDestinationFormat =
@@ -141,6 +141,35 @@ TEST_F(VideoTrackTranscoderTests, SampleSanity) {
     EXPECT_TRUE(transcoder->stop());
 
     sampleConsumerThread.join();
+}
+
+TEST_F(VideoTrackTranscoderTests, PreserveBitrate) {
+    LOG(DEBUG) << "Testing PreserveBitrate";
+    std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
+    std::shared_ptr<MediaTrackTranscoder> transcoder = VideoTrackTranscoder::create(callback);
+
+    auto destFormat = TrackTranscoderTestUtils::getDefaultVideoDestinationFormat(
+            mSourceFormat.get(), false /* includeBitrate*/);
+    EXPECT_NE(destFormat, nullptr);
+
+    ASSERT_EQ(transcoder->configure(mMediaSampleReader, mTrackIndex, destFormat), AMEDIA_OK);
+    ASSERT_TRUE(transcoder->start());
+
+    callback->waitUntilTrackFormatAvailable();
+
+    auto outputFormat = transcoder->getOutputFormat();
+    ASSERT_NE(outputFormat, nullptr);
+
+    ASSERT_TRUE(transcoder->stop());
+    transcoder->getOutputQueue()->abort();
+
+    int32_t outBitrate;
+    EXPECT_TRUE(AMediaFormat_getInt32(outputFormat.get(), AMEDIAFORMAT_KEY_BIT_RATE, &outBitrate));
+
+    int32_t srcBitrate;
+    EXPECT_EQ(mMediaSampleReader->getEstimatedBitrateForTrack(mTrackIndex, &srcBitrate), AMEDIA_OK);
+
+    EXPECT_EQ(srcBitrate, outBitrate);
 }
 
 // VideoTrackTranscoder needs a valid destination format.

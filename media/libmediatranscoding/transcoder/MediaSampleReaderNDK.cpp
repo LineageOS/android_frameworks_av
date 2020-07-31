@@ -21,6 +21,7 @@
 #include <media/MediaSampleReaderNDK.h>
 
 #include <algorithm>
+#include <cmath>
 #include <vector>
 
 namespace android {
@@ -186,6 +187,78 @@ media_status_t MediaSampleReaderNDK::positionExtractorForTrack_l(int trackIndex)
         }
     }
 
+    return AMEDIA_OK;
+}
+
+media_status_t MediaSampleReaderNDK::getEstimatedBitrateForTrack(int trackIndex, int32_t* bitrate) {
+    std::scoped_lock lock(mExtractorMutex);
+    media_status_t status = AMEDIA_OK;
+
+    if (trackIndex < 0 || trackIndex >= mTrackCount) {
+        LOG(ERROR) << "Invalid trackIndex " << trackIndex << " for trackCount " << mTrackCount;
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    } else if (bitrate == nullptr) {
+        LOG(ERROR) << "bitrate pointer is NULL.";
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    // Rewind the extractor and sample from the beginning of the file.
+    if (mExtractorSampleIndex > 0) {
+        status = AMediaExtractor_seekTo(mExtractor, 0, AMEDIAEXTRACTOR_SEEK_PREVIOUS_SYNC);
+        if (status != AMEDIA_OK) {
+            LOG(ERROR) << "Unable to reset extractor: " << status;
+            return status;
+        }
+
+        mExtractorTrackIndex = AMediaExtractor_getSampleTrackIndex(mExtractor);
+        mExtractorSampleIndex = 0;
+    }
+
+    // Sample the track.
+    static constexpr int64_t kSamplingDurationUs = 10 * 1000 * 1000;  // 10 seconds
+    size_t lastSampleSize = 0;
+    size_t totalSampleSize = 0;
+    int64_t firstSampleTimeUs = 0;
+    int64_t lastSampleTimeUs = 0;
+
+    do {
+        if (mExtractorTrackIndex == trackIndex) {
+            lastSampleTimeUs = AMediaExtractor_getSampleTime(mExtractor);
+            if (totalSampleSize == 0) {
+                firstSampleTimeUs = lastSampleTimeUs;
+            }
+
+            lastSampleSize = AMediaExtractor_getSampleSize(mExtractor);
+            totalSampleSize += lastSampleSize;
+        }
+    } while ((lastSampleTimeUs - firstSampleTimeUs) < kSamplingDurationUs && advanceExtractor_l());
+
+    int64_t durationUs = 0;
+    const int64_t sampledDurationUs = lastSampleTimeUs - firstSampleTimeUs;
+
+    if (sampledDurationUs < kSamplingDurationUs) {
+        // Track is shorter than the sampling duration so use the full track duration to get better
+        // accuracy (i.e. don't skip the last sample).
+        AMediaFormat* trackFormat = getTrackFormat(trackIndex);
+        if (!AMediaFormat_getInt64(trackFormat, AMEDIAFORMAT_KEY_DURATION, &durationUs)) {
+            durationUs = 0;
+        }
+        AMediaFormat_delete(trackFormat);
+    }
+
+    if (durationUs == 0) {
+        // The sampled duration does not account for the last sample's duration so its size should
+        // not be included either.
+        totalSampleSize -= lastSampleSize;
+        durationUs = sampledDurationUs;
+    }
+
+    if (totalSampleSize == 0 || durationUs <= 0) {
+        LOG(ERROR) << "Unable to estimate track bitrate";
+        return AMEDIA_ERROR_MALFORMED;
+    }
+
+    *bitrate = roundf((float)totalSampleSize * 8 * 1000000 / durationUs);
     return AMEDIA_OK;
 }
 
