@@ -22,7 +22,7 @@
 #include <inttypes.h>
 
 #include <media/stagefright/omx/OMXNodeInstance.h>
-#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/OMXStore.h>
 #include <media/stagefright/omx/OMXUtils.h>
 #include <android/IOMXBufferSource.h>
 
