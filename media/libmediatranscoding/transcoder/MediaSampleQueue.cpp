@@ -47,6 +47,11 @@ bool MediaSampleQueue::dequeue(std::shared_ptr<MediaSample>* sample) NO_THREAD_S
     return mAborted;
 }
 
+bool MediaSampleQueue::isEmpty() {
+    std::scoped_lock<std::mutex> lock(mMutex);
+    return mSampleQueue.empty();
+}
+
 void MediaSampleQueue::abort() {
     std::scoped_lock<std::mutex> lock(mMutex);
     // Clear the queue and notify consumers.

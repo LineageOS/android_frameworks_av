@@ -416,7 +416,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
 
         ATRACE_ASYNC_END("frame capture", frameNumber);
 
-        // Sanity check - if sensor timestamp matches shutter timestamp in the
+        // Validation check - if sensor timestamp matches shutter timestamp in the
         // case of request having callback.
         if (request.hasCallback && request.requestStatus == OK &&
                 sensorTimestamp != shutterTimestamp) {

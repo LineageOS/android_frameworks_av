@@ -92,8 +92,8 @@ public:
     std::shared_ptr<AMediaFormat> mDestinationFormat;
 };
 
-TEST_F(VideoTrackTranscoderTests, SampleSanity) {
-    LOG(DEBUG) << "Testing SampleSanity";
+TEST_F(VideoTrackTranscoderTests, SampleSoundness) {
+    LOG(DEBUG) << "Testing SampleSoundness";
     std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
     auto transcoder = VideoTrackTranscoder::create(callback);
 

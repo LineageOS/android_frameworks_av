@@ -78,7 +78,22 @@ public:
         return {.type = Event::WriteSample, .trackIndex = trackIndex, .data = data, .info = *info};
     }
 
-    const Event& popEvent() {
+    static Event WriteSampleWithPts(size_t trackIndex, int64_t pts) {
+        return {.type = Event::WriteSample, .trackIndex = trackIndex, .info = {0, 0, pts, 0}};
+    }
+
+    void pushEvent(const Event& e) {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mEventQueue.push_back(e);
+        mCondition.notify_one();
+    }
+
+    const Event& popEvent(bool wait = false) {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (wait && mEventQueue.empty()) {
+            mCondition.wait_for(lock, std::chrono::milliseconds(200));
+        }
+
         if (mEventQueue.empty()) {
             mPoppedEvent = NoEvent;
         } else {
@@ -92,6 +107,8 @@ private:
     Event mPoppedEvent;
     std::list<Event> mEventQueue;
     ssize_t mTrackCount = 0;
+    std::mutex mMutex;
+    std::condition_variable mCondition;
 };
 
 bool operator==(const AMediaCodecBufferInfo& lhs, const AMediaCodecBufferInfo& rhs) {
@@ -245,9 +262,13 @@ public:
     static std::shared_ptr<MediaSample> newSampleWithPts(int64_t ptsUs) {
         static uint32_t sampleCount = 0;
 
-        // Use sampleCount to get a unique dummy sample.
+        // Use sampleCount to get a unique mock sample.
         uint32_t sampleId = ++sampleCount;
         return newSample(ptsUs, 0, sampleId, sampleId, reinterpret_cast<const uint8_t*>(sampleId));
+    }
+
+    static std::shared_ptr<MediaSample> newSampleWithPtsOnly(int64_t ptsUs) {
+        return newSample(ptsUs, 0, 0, 0, nullptr);
     }
 
     void SetUp() override {
@@ -345,10 +366,9 @@ TEST_F(MediaSampleWriterTests, TestStartWithoutCallback) {
 }
 
 TEST_F(MediaSampleWriterTests, TestProgressUpdate) {
-    static constexpr uint32_t kSegmentLengthUs = 1;
     const TestMediaSource& mediaSource = getMediaSource();
 
-    MediaSampleWriter writer{kSegmentLengthUs};
+    MediaSampleWriter writer{};
     EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
 
     std::shared_ptr<AMediaFormat> videoFormat =
@@ -370,9 +390,7 @@ TEST_F(MediaSampleWriterTests, TestProgressUpdate) {
 }
 
 TEST_F(MediaSampleWriterTests, TestInterleaving) {
-    static constexpr uint32_t kSegmentLength = MediaSampleWriter::kDefaultTrackSegmentLengthUs;
-
-    MediaSampleWriter writer{kSegmentLength};
+    MediaSampleWriter writer{};
     EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
 
     // Use two tracks for this test.
@@ -398,18 +416,19 @@ TEST_F(MediaSampleWriterTests, TestInterleaving) {
     };
 
     addSampleToTrackWithPts(0, 0);
-    addSampleToTrackWithPts(0, kSegmentLength / 2);
-    addSampleToTrackWithPts(0, kSegmentLength);  // Track 0 reached 1st segment end
+    addSampleToTrackWithPts(1, 4);
 
-    addSampleToTrackWithPts(1, 0);
-    addSampleToTrackWithPts(1, kSegmentLength);  // Track 1 reached 1st segment end
+    addSampleToTrackWithPts(0, 1);
+    addSampleToTrackWithPts(0, 2);
+    addSampleToTrackWithPts(0, 3);
+    addSampleToTrackWithPts(0, 10);
 
-    addSampleToTrackWithPts(0, kSegmentLength * 2);  // Track 0 reached 2nd segment end
+    addSampleToTrackWithPts(1, 5);
+    addSampleToTrackWithPts(1, 6);
+    addSampleToTrackWithPts(1, 11);
 
-    addSampleToTrackWithPts(1, kSegmentLength + 1);
-    addSampleToTrackWithPts(1, kSegmentLength * 2);  // Track 1 reached 2nd segment end
-
-    addSampleToTrackWithPts(0, kSegmentLength * 2 + 1);
+    addSampleToTrackWithPts(0, 12);
+    addSampleToTrackWithPts(1, 13);
 
     for (int trackIndex = 0; trackIndex < kNumTracks; ++trackIndex) {
         sampleQueues[trackIndex]->enqueue(newSampleEos());
@@ -443,13 +462,134 @@ TEST_F(MediaSampleWriterTests, TestInterleaving) {
         int64_t duration = 0;
         AMediaFormat_getInt64(trackFormat.get(), AMEDIAFORMAT_KEY_DURATION, &duration);
 
-        const AMediaCodecBufferInfo info = {0, 0, duration, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM};
+        // EOS timestamp = first sample timestamp + duration.
+        const int64_t endTime = duration + (trackIndex == 1 ? 4 : 0);
+        const AMediaCodecBufferInfo info = {0, 0, endTime, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM};
+
         EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::WriteSample(trackIndex, nullptr, &info));
     }
 
     EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Stop());
     EXPECT_TRUE(writer.stop());
     EXPECT_TRUE(mTestCallbacks->hasFinished());
+}
+
+TEST_F(MediaSampleWriterTests, TestMaxDivergence) {
+    static constexpr uint32_t kMaxDivergenceUs = 10;
+
+    MediaSampleWriter writer{kMaxDivergenceUs};
+    EXPECT_TRUE(writer.init(mTestMuxer, mTestCallbacks));
+
+    // Use two tracks for this test.
+    static constexpr int kNumTracks = 2;
+    std::shared_ptr<MediaSampleQueue> sampleQueues[kNumTracks];
+    const TestMediaSource& mediaSource = getMediaSource();
+
+    for (int trackIdx = 0; trackIdx < kNumTracks; ++trackIdx) {
+        sampleQueues[trackIdx] = std::make_shared<MediaSampleQueue>();
+
+        auto trackFormat = mediaSource.mTrackFormats[trackIdx % mediaSource.mTrackCount];
+        EXPECT_TRUE(writer.addTrack(sampleQueues[trackIdx], trackFormat));
+        EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::AddTrack(trackFormat.get()));
+    }
+
+    ASSERT_TRUE(writer.start());
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::Start());
+
+    // The first samples of each track can be written in any order since the writer does not have
+    // any previous timestamps to compare.
+    sampleQueues[0]->enqueue(newSampleWithPtsOnly(0));
+    sampleQueues[1]->enqueue(newSampleWithPtsOnly(1));
+    mTestMuxer->popEvent(true);
+    mTestMuxer->popEvent(true);
+
+    // The writer will now be waiting on track 0 since it has the lowest previous timestamp.
+    sampleQueues[0]->enqueue(newSampleWithPtsOnly(kMaxDivergenceUs + 1));
+    sampleQueues[0]->enqueue(newSampleWithPtsOnly(kMaxDivergenceUs + 2));
+
+    // The writer should dequeue the first sample above but not the second since track 0 now is too
+    // far ahead. Instead it should wait for track 1.
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(0, kMaxDivergenceUs + 1));
+
+    // Enqueue a sample from track 1 that puts it within acceptable divergence range again. The
+    // writer should dequeue that sample and then go back to track 0 since track 1 is empty.
+    sampleQueues[1]->enqueue(newSampleWithPtsOnly(kMaxDivergenceUs));
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(1, kMaxDivergenceUs));
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(0, kMaxDivergenceUs + 2));
+
+    // Both tracks are now empty so the writer should wait for track 1 which is farthest behind.
+    sampleQueues[1]->enqueue(newSampleWithPtsOnly(kMaxDivergenceUs + 3));
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(1, kMaxDivergenceUs + 3));
+
+    for (int trackIndex = 0; trackIndex < kNumTracks; ++trackIndex) {
+        sampleQueues[trackIndex]->enqueue(newSampleEos());
+    }
+
+    // Wait for writer to complete.
+    mTestCallbacks->waitForWritingFinished();
+
+    // Verify EOS samples.
+    for (int trackIndex = 0; trackIndex < kNumTracks; ++trackIndex) {
+        auto trackFormat = mediaSource.mTrackFormats[trackIndex % mediaSource.mTrackCount];
+        int64_t duration = 0;
+        AMediaFormat_getInt64(trackFormat.get(), AMEDIAFORMAT_KEY_DURATION, &duration);
+
+        // EOS timestamp = first sample timestamp + duration.
+        const int64_t endTime = duration + (trackIndex == 1 ? 1 : 0);
+        const AMediaCodecBufferInfo info = {0, 0, endTime, AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM};
+        EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::WriteSample(trackIndex, nullptr, &info));
+    }
+
+    EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Stop());
+    EXPECT_TRUE(writer.stop());
+    EXPECT_TRUE(mTestCallbacks->hasFinished());
+}
+
+TEST_F(MediaSampleWriterTests, TestTimestampDivergenceOverflow) {
+    auto testCallbacks = std::make_shared<TestCallbacks>(false /* expectSuccess */);
+    MediaSampleWriter writer{};
+    EXPECT_TRUE(writer.init(mTestMuxer, testCallbacks));
+
+    // Use two tracks for this test.
+    static constexpr int kNumTracks = 2;
+    std::shared_ptr<MediaSampleQueue> sampleQueues[kNumTracks];
+    const TestMediaSource& mediaSource = getMediaSource();
+
+    for (int trackIdx = 0; trackIdx < kNumTracks; ++trackIdx) {
+        sampleQueues[trackIdx] = std::make_shared<MediaSampleQueue>();
+
+        auto trackFormat = mediaSource.mTrackFormats[trackIdx % mediaSource.mTrackCount];
+        EXPECT_TRUE(writer.addTrack(sampleQueues[trackIdx], trackFormat));
+        EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::AddTrack(trackFormat.get()));
+    }
+
+    // Prime track 0 with lower end of INT64 range, and track 1 with positive timestamps making the
+    // difference larger than INT64_MAX.
+    sampleQueues[0]->enqueue(newSampleWithPtsOnly(INT64_MIN + 1));
+    sampleQueues[1]->enqueue(newSampleWithPtsOnly(1000));
+    sampleQueues[1]->enqueue(newSampleWithPtsOnly(1001));
+
+    ASSERT_TRUE(writer.start());
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::Start());
+
+    // The first sample of each track can be pulled in any order.
+    mTestMuxer->popEvent(true);
+    mTestMuxer->popEvent(true);
+
+    // Wait to make sure the writer compares track 0 empty against track 1 non-empty. The writer
+    // should handle the large timestamp differences and chose to wait for track 0 even though
+    // track 1 has a sample ready.
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+
+    sampleQueues[0]->enqueue(newSampleWithPtsOnly(INT64_MIN + 2));
+    sampleQueues[0]->enqueue(newSampleWithPtsOnly(1000));  // <-- Close the gap between the tracks.
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(0, INT64_MIN + 2));
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(0, 1000));
+    EXPECT_EQ(mTestMuxer->popEvent(true), TestMuxer::WriteSampleWithPts(1, 1001));
+
+    EXPECT_TRUE(writer.stop());
+    EXPECT_EQ(mTestMuxer->popEvent(), TestMuxer::Stop());
+    EXPECT_TRUE(testCallbacks->hasFinished());
 }
 
 TEST_F(MediaSampleWriterTests, TestAbortInputQueue) {
