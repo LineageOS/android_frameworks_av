@@ -516,7 +516,7 @@ void AudioInputDescriptor::dump(String8 *dst) const
     dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
     dst->appendFormat(" Format: %d\n", mFormat);
     dst->appendFormat(" Channels: %08x\n", mChannelMask);
-    dst->appendFormat(" Devices %s\n", mDevice->toString().c_str());
+    dst->appendFormat(" Devices %s\n", mDevice->toString(true /*includeSensitiveInfo*/).c_str());
     mEnabledEffects.dump(dst, 1 /*spaces*/, false /*verbose*/);
     dst->append(" AudioRecord Clients:\n");
     ClientMapHandler<RecordClientDescriptor>::dump(dst);
