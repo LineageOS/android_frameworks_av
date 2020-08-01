@@ -36,62 +36,8 @@ namespace android {
 // ---------------------------------------------------------------------------
 
 AudioEffect::AudioEffect(const String16& opPackageName)
-    : mStatus(NO_INIT), mProbe(false), mOpPackageName(opPackageName)
+    : mOpPackageName(opPackageName)
 {
-}
-
-
-AudioEffect::AudioEffect(const effect_uuid_t *type,
-                const String16& opPackageName,
-                const effect_uuid_t *uuid,
-                int32_t priority,
-                effect_callback_t cbf,
-                void* user,
-                audio_session_t sessionId,
-                audio_io_handle_t io,
-                const AudioDeviceTypeAddr& device,
-                bool probe
-                )
-    : mStatus(NO_INIT), mProbe(false), mOpPackageName(opPackageName)
-{
-    AutoMutex lock(mConstructLock);
-    mStatus = set(type, uuid, priority, cbf, user, sessionId, io, device, probe);
-}
-
-AudioEffect::AudioEffect(const char *typeStr,
-                const String16& opPackageName,
-                const char *uuidStr,
-                int32_t priority,
-                effect_callback_t cbf,
-                void* user,
-                audio_session_t sessionId,
-                audio_io_handle_t io,
-                const AudioDeviceTypeAddr& device,
-                bool probe
-                )
-    : mStatus(NO_INIT), mProbe(false), mOpPackageName(opPackageName)
-{
-    effect_uuid_t type;
-    effect_uuid_t *pType = NULL;
-    effect_uuid_t uuid;
-    effect_uuid_t *pUuid = NULL;
-
-    ALOGV("Constructor string\n - type: %s\n - uuid: %s", typeStr, uuidStr);
-
-    if (typeStr != NULL) {
-        if (stringToGuid(typeStr, &type) == NO_ERROR) {
-            pType = &type;
-        }
-    }
-
-    if (uuidStr != NULL) {
-        if (stringToGuid(uuidStr, &uuid) == NO_ERROR) {
-            pUuid = &uuid;
-        }
-    }
-
-    AutoMutex lock(mConstructLock);
-    mStatus = set(pType, pUuid, priority, cbf, user, sessionId, io, device, probe);
 }
 
 status_t AudioEffect::set(const effect_uuid_t *type,
@@ -192,6 +138,34 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     }
 
     return mStatus;
+}
+
+status_t AudioEffect::set(const char *typeStr,
+                const char *uuidStr,
+                int32_t priority,
+                effect_callback_t cbf,
+                void* user,
+                audio_session_t sessionId,
+                audio_io_handle_t io,
+                const AudioDeviceTypeAddr& device,
+                bool probe)
+{
+    effect_uuid_t type;
+    effect_uuid_t *pType = nullptr;
+    effect_uuid_t uuid;
+    effect_uuid_t *pUuid = nullptr;
+
+    ALOGV("AudioEffect::set string\n - type: %s\n - uuid: %s",
+            typeStr ? typeStr : "nullptr", uuidStr ? uuidStr : "nullptr");
+
+    if (stringToGuid(typeStr, &type) == NO_ERROR) {
+        pType = &type;
+    }
+    if (stringToGuid(uuidStr, &uuid) == NO_ERROR) {
+        pUuid = &uuid;
+    }
+
+    return set(pType, pUuid, priority, cbf, user, sessionId, io, device, probe);
 }
 
 
