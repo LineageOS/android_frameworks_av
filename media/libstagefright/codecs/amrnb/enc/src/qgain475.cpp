@@ -1106,7 +1106,7 @@ MR475_gain_quant(              // o  : index of quantization.
     // the real, quantized gains)
     gc_pred(pred_st, MR475, sf1_code_nosharp,
             &sf1_exp_gcode0, &sf1_frac_gcode0,
-            &sf0_exp_gcode0, &sf0_gcode0); // last two args are dummy
+            &sf0_exp_gcode0, &sf0_gcode0); // last two args are unused
     sf1_gcode0 = extract_l(Pow2(14, sf1_frac_gcode0));
 
     tmp = add (tmp, 2);
@@ -1426,7 +1426,7 @@ Word16 MR475_gain_quant(       /* o  : index of quantization.                 */
        the real, quantized gains)                                   */
     gc_pred(pred_st, MR475, sf1_code_nosharp,
             &sf1_exp_gcode0, &sf1_frac_gcode0,
-            &sf0_exp_gcode0, &sf0_gcode0, /* dummy args */
+            &sf0_exp_gcode0, &sf0_gcode0, /* unused args */
             pOverflow);
 
     sf1_gcode0 = (Word16)(Pow2(14, sf1_frac_gcode0, pOverflow));
