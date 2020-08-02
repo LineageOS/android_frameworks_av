@@ -245,7 +245,7 @@ void AudioOutputDescriptor::dump(String8 *dst) const
     dst->appendFormat(" Sampling rate: %d\n", mSamplingRate);
     dst->appendFormat(" Format: %08x\n", mFormat);
     dst->appendFormat(" Channels: %08x\n", mChannelMask);
-    dst->appendFormat(" Devices: %s\n", devices().toString().c_str());
+    dst->appendFormat(" Devices: %s\n", devices().toString(true /*includeSensitiveInfo*/).c_str());
     dst->appendFormat(" Global active count: %u\n", mGlobalActiveCount);
     for (const auto &iter : mRoutingActivities) {
         dst->appendFormat(" Product Strategy id: %d", iter.first);
