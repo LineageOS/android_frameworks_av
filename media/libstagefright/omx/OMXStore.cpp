@@ -15,11 +15,11 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "OMXMaster"
+#define LOG_TAG "OMXStore"
 #include <android-base/properties.h>
 #include <utils/Log.h>
 
-#include <media/stagefright/omx/OMXMaster.h>
+#include <media/stagefright/omx/OMXStore.h>
 #include <media/stagefright/omx/SoftOMXPlugin.h>
 #include <media/stagefright/foundation/ADebug.h>
 
@@ -30,7 +30,7 @@
 
 namespace android {
 
-OMXMaster::OMXMaster() {
+OMXStore::OMXStore() {
 
     pid_t pid = getpid();
     char filename[20];
@@ -55,19 +55,19 @@ OMXMaster::OMXMaster() {
     addPlatformPlugin();
 }
 
-OMXMaster::~OMXMaster() {
+OMXStore::~OMXStore() {
     clearPlugins();
 }
 
-void OMXMaster::addVendorPlugin() {
+void OMXStore::addVendorPlugin() {
     addPlugin("libstagefrighthw.so");
 }
 
-void OMXMaster::addPlatformPlugin() {
+void OMXStore::addPlatformPlugin() {
     addPlugin("libstagefright_softomx_plugin.so");
 }
 
-void OMXMaster::addPlugin(const char *libname) {
+void OMXStore::addPlugin(const char *libname) {
     if (::android::base::GetIntProperty("vendor.media.omx", int64_t(1)) == 0) {
         return;
     }
@@ -99,7 +99,7 @@ void OMXMaster::addPlugin(const char *libname) {
     }
 }
 
-void OMXMaster::addPlugin(OMXPluginBase *plugin) {
+void OMXStore::addPlugin(OMXPluginBase *plugin) {
     Mutex::Autolock autoLock(mLock);
 
     OMX_U32 index = 0;
@@ -126,7 +126,7 @@ void OMXMaster::addPlugin(OMXPluginBase *plugin) {
     }
 }
 
-void OMXMaster::clearPlugins() {
+void OMXStore::clearPlugins() {
     Mutex::Autolock autoLock(mLock);
 
     mPluginByComponentName.clear();
@@ -148,7 +148,7 @@ void OMXMaster::clearPlugins() {
     mPlugins.clear();
 }
 
-OMX_ERRORTYPE OMXMaster::makeComponentInstance(
+OMX_ERRORTYPE OMXStore::makeComponentInstance(
         const char *name,
         const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData,
@@ -177,7 +177,7 @@ OMX_ERRORTYPE OMXMaster::makeComponentInstance(
     return err;
 }
 
-OMX_ERRORTYPE OMXMaster::destroyComponentInstance(
+OMX_ERRORTYPE OMXStore::destroyComponentInstance(
         OMX_COMPONENTTYPE *component) {
     Mutex::Autolock autoLock(mLock);
 
@@ -193,7 +193,7 @@ OMX_ERRORTYPE OMXMaster::destroyComponentInstance(
     return plugin->destroyComponentInstance(component);
 }
 
-OMX_ERRORTYPE OMXMaster::enumerateComponents(
+OMX_ERRORTYPE OMXStore::enumerateComponents(
         OMX_STRING name,
         size_t size,
         OMX_U32 index) {
@@ -213,7 +213,7 @@ OMX_ERRORTYPE OMXMaster::enumerateComponents(
     return OMX_ErrorNone;
 }
 
-OMX_ERRORTYPE OMXMaster::getRolesOfComponent(
+OMX_ERRORTYPE OMXStore::getRolesOfComponent(
         const char *name,
         Vector<String8> *roles) {
     Mutex::Autolock autoLock(mLock);

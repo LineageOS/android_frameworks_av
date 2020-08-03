@@ -27,7 +27,7 @@
 
 namespace android {
 
-struct OMXMaster;
+struct OMXStore;
 struct OMXNodeInstance;
 
 namespace hardware {
@@ -51,7 +51,7 @@ using ::android::hardware::Void;
 using ::android::sp;
 using ::android::wp;
 
-using ::android::OMXMaster;
+using ::android::OMXStore;
 using ::android::OMXNodeInstance;
 
 struct Omx : public IOmx, public hidl_death_recipient {
@@ -73,7 +73,7 @@ struct Omx : public IOmx, public hidl_death_recipient {
     status_t freeNode(sp<OMXNodeInstance> const& instance);
 
 protected:
-    OMXMaster* mMaster;
+    OMXStore* mStore;
     Mutex mLock;
     KeyedVector<wp<IBase>, sp<OMXNodeInstance> > mLiveNodes;
     KeyedVector<OMXNodeInstance*, wp<IBase> > mNode2Observer;
