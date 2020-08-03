@@ -30,7 +30,7 @@ protected:
     enum IA : int32_t { };
 };
 
-// =========== basic sanity tests for type-support templates
+// =========== basic tests for type-support templates
 TEST_F(TypeTraitsTest, StaticTests) {
 
     // ============ is_integral_or_enum
