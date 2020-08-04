@@ -31,7 +31,7 @@
 # 6: Percent
 # Default value for data of type int/long is 2 (bytes).
 #
-# See system/core/logcat/event.logtags for the master copy of the tags.
+# See system/core/logcat/event.logtags for the original definition of the tags.
 
 # 61000 - 61199 reserved for audioserver
 
