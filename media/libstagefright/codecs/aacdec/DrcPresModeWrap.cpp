@@ -217,7 +217,7 @@ CDrcPresModeWrapper::update()
         }
         else { // handle other used encoder target levels
 
-            // Sanity check: DRC presentation mode is only specified for max. 5.1 channels
+            // Validation check: DRC presentation mode is only specified for max. 5.1 channels
             if (mStreamNrAACChan > 6) {
                 drcPresMode = 0;
             }
@@ -308,7 +308,7 @@ CDrcPresModeWrapper::update()
             } // switch()
         } // if (mEncoderTarget  == GPM_ENCODER_TARGET_LEVEL)
 
-        // sanity again
+        // validation check again
         if (newHeavy == 1) {
             newBoostFactor=127; // not really needed as the same would be done by the decoder anyway
             newAttFactor = 127;
