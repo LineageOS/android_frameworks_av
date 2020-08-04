@@ -1283,9 +1283,9 @@ status_t AudioFlinger::setMasterMute(bool muted)
     }
 
     // Now set the master mute in each playback thread.  Playback threads
-    // assigned to HALs which do not have master mute support will apply master
-    // mute during the mix operation.  Threads with HALs which do support master
-    // mute will simply ignore the setting.
+    // assigned to HALs which do not have master mute support will apply master mute
+    // during the mix operation.  Threads with HALs which do support master mute
+    // will simply ignore the setting.
     Vector<VolumeInterface *> volumeInterfaces = getAllVolumeInterfaces_l();
     for (size_t i = 0; i < volumeInterfaces.size(); i++) {
         volumeInterfaces[i]->setMasterMute(muted);
