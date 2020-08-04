@@ -164,6 +164,8 @@ VideoTrackTranscoder::~VideoTrackTranscoder() {
 // Creates and configures the codecs.
 media_status_t VideoTrackTranscoder::configureDestinationFormat(
         const std::shared_ptr<AMediaFormat>& destinationFormat) {
+    static constexpr int32_t kDefaultBitrateMbps = 10 * 1000 * 1000;
+
     media_status_t status = AMEDIA_OK;
 
     if (destinationFormat == nullptr) {
@@ -175,6 +177,18 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     if (!encoderFormat || AMediaFormat_copy(encoderFormat, destinationFormat.get()) != AMEDIA_OK) {
         LOG(ERROR) << "Unable to copy destination format";
         return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    int32_t bitrate;
+    if (!AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, &bitrate)) {
+        status = mMediaSampleReader->getEstimatedBitrateForTrack(mTrackIndex, &bitrate);
+        if (status != AMEDIA_OK) {
+            LOG(ERROR) << "Unable to estimate bitrate. Using default " << kDefaultBitrateMbps;
+            bitrate = kDefaultBitrateMbps;
+        }
+
+        LOG(INFO) << "Configuring bitrate " << bitrate;
+        AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, bitrate);
     }
 
     float tmp;
