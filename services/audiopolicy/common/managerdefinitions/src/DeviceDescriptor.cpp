@@ -227,6 +227,7 @@ void DeviceVector::add(const DeviceVector &devices)
 {
     bool added = false;
     for (const auto& device : devices) {
+        ALOG_ASSERT(device != nullptr, "Null pointer found when adding DeviceVector");
         if (indexOf(device) < 0 && SortedVector::add(device) >= 0) {
             added = true;
         }
@@ -238,6 +239,7 @@ void DeviceVector::add(const DeviceVector &devices)
 
 ssize_t DeviceVector::add(const sp<DeviceDescriptor>& item)
 {
+    ALOG_ASSERT(item != nullptr, "Adding null pointer to DeviceVector");
     ssize_t ret = indexOf(item);
 
     if (ret < 0) {
