@@ -3253,6 +3253,8 @@ Parameters::CropRegion Parameters::calculateCropRegion(bool previewOnly) const {
 
 status_t Parameters::calculatePictureFovs(float *horizFov, float *vertFov)
         const {
+    // For external camera, use FOVs = (-1.0, -1.0) as default values. Calculate
+    // FOVs only if there is sufficient information.
     if (fastInfo.isExternalCamera) {
         if (horizFov != NULL) {
             *horizFov = -1.0;
@@ -3260,16 +3262,29 @@ status_t Parameters::calculatePictureFovs(float *horizFov, float *vertFov)
         if (vertFov != NULL) {
             *vertFov = -1.0;
         }
-        return OK;
     }
 
     camera_metadata_ro_entry_t sensorSize =
             staticInfo(ANDROID_SENSOR_INFO_PHYSICAL_SIZE, 2, 2);
-    if (!sensorSize.count) return NO_INIT;
+    if (!sensorSize.count) {
+        // It is non-fatal for external cameras since it has default values.
+        if (fastInfo.isExternalCamera) {
+            return OK;
+        } else {
+            return NO_INIT;
+        }
+    }
 
     camera_metadata_ro_entry_t pixelArraySize =
             staticInfo(ANDROID_SENSOR_INFO_PIXEL_ARRAY_SIZE, 2, 2);
-    if (!pixelArraySize.count) return NO_INIT;
+    if (!pixelArraySize.count) {
+        // It is non-fatal for external cameras since it has default values.
+        if (fastInfo.isExternalCamera) {
+            return OK;
+        } else {
+            return NO_INIT;
+        }
+    }
 
     float arrayAspect = static_cast<float>(fastInfo.arrayWidth) /
             fastInfo.arrayHeight;
