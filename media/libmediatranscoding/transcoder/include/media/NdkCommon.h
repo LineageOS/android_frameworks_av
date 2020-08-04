@@ -46,6 +46,7 @@ static constexpr int COLOR_FormatYUV420Flexible = 0x7F420888;
 static constexpr int COLOR_FormatSurface = 0x7f000789;
 
 // constants not defined in NDK
+extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES;

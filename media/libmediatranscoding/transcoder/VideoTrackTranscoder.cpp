@@ -18,6 +18,7 @@
 #define LOG_TAG "VideoTrackTranscoder"
 
 #include <android-base/logging.h>
+#include <media/NdkCommon.h>
 #include <media/VideoTrackTranscoder.h>
 #include <utils/AndroidThreads.h>
 
@@ -233,7 +234,17 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_UNSUPPORTED;
     }
 
-    status = AMediaCodec_configure(mDecoder, mSourceFormat.get(), mSurface, NULL /* crypto */,
+    auto decoderFormat = std::shared_ptr<AMediaFormat>(AMediaFormat_new(), &AMediaFormat_delete);
+    if (!decoderFormat ||
+        AMediaFormat_copy(decoderFormat.get(), mSourceFormat.get()) != AMEDIA_OK) {
+        LOG(ERROR) << "Unable to copy source format";
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    // Prevent decoder from overwriting frames that the encoder has not yet consumed.
+    AMediaFormat_setInt32(decoderFormat.get(), TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP, 0);
+
+    status = AMediaCodec_configure(mDecoder, decoderFormat.get(), mSurface, NULL /* crypto */,
                                    0 /* flags */);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to configure video decoder: " << status;

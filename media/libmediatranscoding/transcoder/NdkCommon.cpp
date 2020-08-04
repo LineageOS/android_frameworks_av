@@ -35,6 +35,7 @@ const char* AMEDIA_MIMETYPE_VIDEO_MPEG4 = "video/mp4v-es";
 const char* AMEDIA_MIMETYPE_VIDEO_H263 = "video/3gpp";
 
 /* TODO(b/153592281) */
+const char* TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP = "allow-frame-drop";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES = "max-bframes";
