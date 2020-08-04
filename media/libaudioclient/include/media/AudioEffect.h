@@ -339,16 +339,21 @@ public:
      *
      * opPackageName:      The package name used for app op checks.
      */
-    AudioEffect(const String16& opPackageName);
+    explicit AudioEffect(const String16& opPackageName);
 
+    /* Terminates the AudioEffect and unregisters it from AudioFlinger.
+     * The effect engine is also destroyed if this AudioEffect was the last controlling
+     * the engine.
+     */
+                        ~AudioEffect();
 
-    /* Constructor.
+    /**
+     * Initialize an uninitialized AudioEffect.
      *
      * Parameters:
      *
      * type:  type of effect created: can be null if uuid is specified. This corresponds to
      *        the OpenSL ES interface implemented by this effect.
-     * opPackageName:  The package name used for app op checks.
      * uuid:  Uuid of effect created: can be null if type is specified. This uuid corresponds to
      *        a particular implementation of an effect type.
      * priority:    requested priority for effect control: the priority level corresponds to the
@@ -356,7 +361,7 @@ public:
      *      higher priorities, 0 being the normal priority.
      * cbf:         optional callback function (see effect_callback_t)
      * user:        pointer to context for use by the callback receiver.
-     * sessionID:   audio session this effect is associated to.
+     * sessionId:   audio session this effect is associated to.
      *      If equal to AUDIO_SESSION_OUTPUT_MIX, the effect will be global to
      *      the output mix.  Otherwise, the effect will be applied to all players
      *      (AudioTrack or MediaPLayer) within the same audio session.
@@ -369,48 +374,27 @@ public:
      *        In this mode, no IEffect interface to AudioFlinger is created and all actions
      *        besides getters implemented in client AudioEffect object are no ops
      *        after effect creation.
+     *
+     * Returned status (from utils/Errors.h) can be:
+     *  - NO_ERROR or ALREADY_EXISTS: successful initialization
+     *  - INVALID_OPERATION: AudioEffect is already initialized
+     *  - BAD_VALUE: invalid parameter
+     *  - NO_INIT: audio flinger or audio hardware not initialized
      */
-
-    AudioEffect(const effect_uuid_t *type,
-                const String16& opPackageName,
-                const effect_uuid_t *uuid = NULL,
-                int32_t priority = 0,
-                effect_callback_t cbf = NULL,
-                void* user = NULL,
-                audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
-                audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                const AudioDeviceTypeAddr& device = {},
-                bool probe = false);
-
-    /* Constructor.
-     *      Same as above but with type and uuid specified by character strings
-     */
-    AudioEffect(const char *typeStr,
-                    const String16& opPackageName,
-                    const char *uuidStr = NULL,
-                    int32_t priority = 0,
-                    effect_callback_t cbf = NULL,
-                    void* user = NULL,
-                    audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
-                    audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                    const AudioDeviceTypeAddr& device = {},
-                    bool probe = false);
-
-    /* Terminates the AudioEffect and unregisters it from AudioFlinger.
-     * The effect engine is also destroyed if this AudioEffect was the last controlling
-     * the engine.
-     */
-                        ~AudioEffect();
-
-    /* Initialize an uninitialized AudioEffect.
-    * Returned status (from utils/Errors.h) can be:
-    *  - NO_ERROR or ALREADY_EXISTS: successful initialization
-    *  - INVALID_OPERATION: AudioEffect is already initialized
-    *  - BAD_VALUE: invalid parameter
-    *  - NO_INIT: audio flinger or audio hardware not initialized
-    * */
             status_t    set(const effect_uuid_t *type,
                             const effect_uuid_t *uuid = NULL,
+                            int32_t priority = 0,
+                            effect_callback_t cbf = NULL,
+                            void* user = NULL,
+                            audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
+                            audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
+                            const AudioDeviceTypeAddr& device = {},
+                            bool probe = false);
+    /*
+     * Same as above but with type and uuid specified by character strings.
+     */
+            status_t    set(const char *typeStr,
+                            const char *uuidStr = NULL,
                             int32_t priority = 0,
                             effect_callback_t cbf = NULL,
                             void* user = NULL,
@@ -547,21 +531,20 @@ public:
      static const uint32_t kMaxPreProcessing = 10;
 
 protected:
-     bool                    mEnabled;           // enable state
-     audio_session_t         mSessionId;         // audio session ID
-     int32_t                 mPriority;          // priority for effect control
-     status_t                mStatus;            // effect status
-     bool                    mProbe;             // effect created in probe mode: all commands
+     const String16          mOpPackageName;     // The package name used for app op checks.
+     bool                    mEnabled = false;   // enable state
+     audio_session_t         mSessionId = AUDIO_SESSION_OUTPUT_MIX; // audio session ID
+     int32_t                 mPriority = 0;      // priority for effect control
+     status_t                mStatus = NO_INIT;  // effect status
+     bool                    mProbe = false;     // effect created in probe mode: all commands
                                                  // are no ops because mIEffect is NULL
-     effect_callback_t       mCbf;               // callback function for status, control and
+     effect_callback_t       mCbf = nullptr;     // callback function for status, control and
                                                  // parameter changes notifications
-     void*                   mUserData;          // client context for callback function
-     effect_descriptor_t     mDescriptor;        // effect descriptor
-     int32_t                 mId;                // system wide unique effect engine instance ID
+     void*                   mUserData = nullptr;// client context for callback function
+     effect_descriptor_t     mDescriptor = {};   // effect descriptor
+     int32_t                 mId = -1;           // system wide unique effect engine instance ID
      Mutex                   mLock;              // Mutex for mEnabled access
-     Mutex                   mConstructLock;     // Mutex for integrality construction
 
-     String16                mOpPackageName;     // The package name used for app op checks.
 
      // IEffectClient
      virtual void controlStatusChanged(bool controlGranted);
@@ -586,22 +569,12 @@ private:
         virtual void controlStatusChanged(bool controlGranted) {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
-                {
-                    // Got the mConstructLock means the construction of AudioEffect
-                    // has finished, we should release the mConstructLock immediately.
-                    AutoMutex lock(effect->mConstructLock);
-                }
                 effect->controlStatusChanged(controlGranted);
             }
         }
         virtual void enableStatusChanged(bool enabled) {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
-                {
-                    // Got the mConstructLock means the construction of AudioEffect
-                    // has finished, we should release the mConstructLock immediately.
-                    AutoMutex lock(effect->mConstructLock);
-                }
                 effect->enableStatusChanged(enabled);
             }
         }
@@ -612,11 +585,6 @@ private:
                                      void *pReplyData) {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
-                {
-                    // Got the mConstructLock means the construction of AudioEffect
-                    // has finished, we should release the mConstructLock immediately.
-                    AutoMutex lock(effect->mConstructLock);
-                }
                 effect->commandExecuted(
                     cmdCode, cmdSize, pCmdData, replySize, pReplyData);
             }
@@ -626,11 +594,6 @@ private:
         virtual void binderDied(const wp<IBinder>& /*who*/) {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
-                {
-                    // Got the mConstructLock means the construction of AudioEffect
-                    // has finished, we should release the mConstructLock immediately.
-                    AutoMutex lock(effect->mConstructLock);
-                }
                 effect->binderDied();
             }
         }
@@ -644,7 +607,7 @@ private:
     sp<IEffect>             mIEffect;           // IEffect binder interface
     sp<EffectClient>        mIEffectClient;     // IEffectClient implementation
     sp<IMemory>             mCblkMemory;        // shared memory for deferred parameter setting
-    effect_param_cblk_t*    mCblk;              // control block for deferred parameter setting
+    effect_param_cblk_t*    mCblk = nullptr;    // control block for deferred parameter setting
     pid_t                   mClientPid = (pid_t)-1;
     uid_t                   mClientUid = (uid_t)-1;
 };
