@@ -23,7 +23,7 @@
 namespace android {
 
 // Pipe is multi-thread safe for readers (see PipeReader), but safe for only a single writer thread.
-// It cannot UNDERRUN on write, unless we allow designation of a master reader that provides the
+// It cannot UNDERRUN on write, unless we allow designation of a primary reader that provides the
 // time-base. Readers can be added and removed dynamically, and it's OK to have no readers.
 class Pipe : public NBAIO_Sink {
 
