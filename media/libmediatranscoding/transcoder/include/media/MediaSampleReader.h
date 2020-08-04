@@ -57,6 +57,16 @@ public:
     virtual AMediaFormat* getTrackFormat(int trackIndex) = 0;
 
     /**
+     * Estimates the bitrate of a source track by sampling sample sizes. The bitrate is returned in
+     * megabits per second (Mbps). This method will fail if the track only contains a single sample
+     * and does not have an associated duration.
+     * @param trackIndex The source track index.
+     * @param bitrate Output param for the bitrate.
+     * @return AMEDIA_OK on success.
+     */
+    virtual media_status_t getEstimatedBitrateForTrack(int trackIndex, int32_t* bitrate);
+
+    /**
      * Returns the sample information for the current sample in the specified track.
      * @param trackIndex The track index (zero-based).
      * @param info Pointer to a MediaSampleInfo object where the sample information is written.

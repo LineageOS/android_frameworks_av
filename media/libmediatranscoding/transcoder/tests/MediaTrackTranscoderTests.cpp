@@ -91,8 +91,7 @@ public:
             if (GetParam() == VIDEO && strncmp(mime, "video/", 6) == 0) {
                 mTrackIndex = trackIndex;
 
-                mSourceFormat = std::shared_ptr<AMediaFormat>(
-                        trackFormat, std::bind(AMediaFormat_delete, std::placeholders::_1));
+                mSourceFormat = std::shared_ptr<AMediaFormat>(trackFormat, &AMediaFormat_delete);
                 ASSERT_NE(mSourceFormat, nullptr);
 
                 mDestinationFormat =
@@ -103,8 +102,7 @@ public:
                 // TODO(lnilsson): Test metadata track passthrough after hkuang@ provides sample.
                 mTrackIndex = trackIndex;
 
-                mSourceFormat = std::shared_ptr<AMediaFormat>(
-                        trackFormat, std::bind(AMediaFormat_delete, std::placeholders::_1));
+                mSourceFormat = std::shared_ptr<AMediaFormat>(trackFormat, &AMediaFormat_delete);
                 ASSERT_NE(mSourceFormat, nullptr);
                 break;
             }
