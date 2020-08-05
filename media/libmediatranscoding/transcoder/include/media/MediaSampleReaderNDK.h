@@ -46,6 +46,7 @@ public:
     AMediaFormat* getFileFormat() override;
     size_t getTrackCount() const override;
     AMediaFormat* getTrackFormat(int trackIndex) override;
+    media_status_t getEstimatedBitrateForTrack(int trackIndex, int32_t* bitrate) override;
     media_status_t getSampleInfoForTrack(int trackIndex, MediaSampleInfo* info) override;
     media_status_t readSampleDataForTrack(int trackIndex, uint8_t* buffer,
                                           size_t bufferSize) override;
