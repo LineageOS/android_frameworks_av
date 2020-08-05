@@ -136,7 +136,7 @@ const engineConfig::ProductStrategies gOrderedSystemStrategies = {
     {"rerouting",
      {
          {"", AUDIO_STREAM_REROUTING, "AUDIO_STREAM_REROUTING",
-          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_DEFAULT, 0, ""}}
+          {{AUDIO_CONTENT_TYPE_UNKNOWN, AUDIO_USAGE_VIRTUAL_SOURCE, AUDIO_SOURCE_DEFAULT, 0, ""}}
          }
      },
     },
