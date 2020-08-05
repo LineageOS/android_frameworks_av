@@ -18,6 +18,7 @@
 #define LOG_TAG "VideoTrackTranscoder"
 
 #include <android-base/logging.h>
+#include <media/NdkCommon.h>
 #include <media/VideoTrackTranscoder.h>
 #include <utils/AndroidThreads.h>
 
@@ -163,6 +164,8 @@ VideoTrackTranscoder::~VideoTrackTranscoder() {
 // Creates and configures the codecs.
 media_status_t VideoTrackTranscoder::configureDestinationFormat(
         const std::shared_ptr<AMediaFormat>& destinationFormat) {
+    static constexpr int32_t kDefaultBitrateMbps = 10 * 1000 * 1000;
+
     media_status_t status = AMEDIA_OK;
 
     if (destinationFormat == nullptr) {
@@ -174,6 +177,18 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     if (!encoderFormat || AMediaFormat_copy(encoderFormat, destinationFormat.get()) != AMEDIA_OK) {
         LOG(ERROR) << "Unable to copy destination format";
         return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    int32_t bitrate;
+    if (!AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, &bitrate)) {
+        status = mMediaSampleReader->getEstimatedBitrateForTrack(mTrackIndex, &bitrate);
+        if (status != AMEDIA_OK) {
+            LOG(ERROR) << "Unable to estimate bitrate. Using default " << kDefaultBitrateMbps;
+            bitrate = kDefaultBitrateMbps;
+        }
+
+        LOG(INFO) << "Configuring bitrate " << bitrate;
+        AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, bitrate);
     }
 
     float tmp;
@@ -233,7 +248,17 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_UNSUPPORTED;
     }
 
-    status = AMediaCodec_configure(mDecoder, mSourceFormat.get(), mSurface, NULL /* crypto */,
+    auto decoderFormat = std::shared_ptr<AMediaFormat>(AMediaFormat_new(), &AMediaFormat_delete);
+    if (!decoderFormat ||
+        AMediaFormat_copy(decoderFormat.get(), mSourceFormat.get()) != AMEDIA_OK) {
+        LOG(ERROR) << "Unable to copy source format";
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+
+    // Prevent decoder from overwriting frames that the encoder has not yet consumed.
+    AMediaFormat_setInt32(decoderFormat.get(), TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP, 0);
+
+    status = AMediaCodec_configure(mDecoder, decoderFormat.get(), mSurface, NULL /* crypto */,
                                    0 /* flags */);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to configure video decoder: " << status;

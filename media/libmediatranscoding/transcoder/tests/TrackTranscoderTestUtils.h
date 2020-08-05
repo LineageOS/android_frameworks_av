@@ -30,7 +30,7 @@ namespace android {
 class TrackTranscoderTestUtils {
 public:
     static std::shared_ptr<AMediaFormat> getDefaultVideoDestinationFormat(
-            AMediaFormat* sourceFormat) {
+            AMediaFormat* sourceFormat, bool includeBitrate = true) {
         // Default video destination format setup.
         static constexpr float kFrameRate = 30.0f;
         static constexpr float kIFrameInterval = 30.0f;
@@ -42,12 +42,13 @@ public:
         AMediaFormat_setFloat(destinationFormat, AMEDIAFORMAT_KEY_FRAME_RATE, kFrameRate);
         AMediaFormat_setFloat(destinationFormat, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
                               kIFrameInterval);
-        AMediaFormat_setInt32(destinationFormat, AMEDIAFORMAT_KEY_BIT_RATE, kBitRate);
+        if (includeBitrate) {
+            AMediaFormat_setInt32(destinationFormat, AMEDIAFORMAT_KEY_BIT_RATE, kBitRate);
+        }
         AMediaFormat_setInt32(destinationFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT,
                               kColorFormatSurface);
 
-        return std::shared_ptr<AMediaFormat>(destinationFormat,
-                                             std::bind(AMediaFormat_delete, std::placeholders::_1));
+        return std::shared_ptr<AMediaFormat>(destinationFormat, &AMediaFormat_delete);
     }
 };
 
@@ -57,35 +58,48 @@ public:
     ~TestCallback() = default;
 
     // MediaTrackTranscoderCallback
-    void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder __unused) {}
+    void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder __unused) {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mTrackFormatAvailable = true;
+        mTrackFormatAvailableCondition.notify_all();
+    }
 
     void onTrackFinished(const MediaTrackTranscoder* transcoder __unused) {
         std::unique_lock<std::mutex> lock(mMutex);
         mTranscodingFinished = true;
-        mCv.notify_all();
+        mTranscodingFinishedCondition.notify_all();
     }
 
     void onTrackError(const MediaTrackTranscoder* transcoder __unused, media_status_t status) {
         std::unique_lock<std::mutex> lock(mMutex);
         mTranscodingFinished = true;
         mStatus = status;
-        mCv.notify_all();
+        mTranscodingFinishedCondition.notify_all();
     }
     // ~MediaTrackTranscoderCallback
 
     media_status_t waitUntilFinished() {
         std::unique_lock<std::mutex> lock(mMutex);
         while (!mTranscodingFinished) {
-            mCv.wait(lock);
+            mTranscodingFinishedCondition.wait(lock);
         }
         return mStatus;
+    }
+
+    void waitUntilTrackFormatAvailable() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (!mTrackFormatAvailable) {
+            mTrackFormatAvailableCondition.wait(lock);
+        }
     }
 
 private:
     media_status_t mStatus = AMEDIA_OK;
     std::mutex mMutex;
-    std::condition_variable mCv;
+    std::condition_variable mTranscodingFinishedCondition;
+    std::condition_variable mTrackFormatAvailableCondition;
     bool mTranscodingFinished = false;
+    bool mTrackFormatAvailable = false;
 };
 
 };  // namespace android
