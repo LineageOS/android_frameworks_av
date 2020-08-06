@@ -93,8 +93,8 @@ public:
     void dump() const;
 
 private:
-    std::unique_ptr<android::FifoBuffer> mUpCommandQueue;
-    std::unique_ptr<android::FifoBuffer> mDataQueue;
+    std::unique_ptr<android::FifoBufferIndirect> mUpCommandQueue;
+    std::unique_ptr<android::FifoBufferIndirect> mDataQueue;
     bool                    mFreeRunning;
     android::fifo_counter_t mDataReadCounter; // only used if free-running
     android::fifo_counter_t mDataWriteCounter; // only used if free-running
