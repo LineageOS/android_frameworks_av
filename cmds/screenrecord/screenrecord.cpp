@@ -1170,14 +1170,14 @@ int main(int argc, char* const argv[]) {
             }
             break;
         case 'd':
-            gPhysicalDisplayId = atoll(optarg);
-            if (gPhysicalDisplayId == 0) {
+            gPhysicalDisplayId = PhysicalDisplayId(atoll(optarg));
+            if (gPhysicalDisplayId.value == 0) {
                 fprintf(stderr, "Please specify a valid physical display id\n");
                 return 2;
             } else if (SurfaceComposerClient::
                     getPhysicalDisplayToken(gPhysicalDisplayId) == nullptr) {
-                fprintf(stderr, "Invalid physical display id: %"
-                        ANDROID_PHYSICAL_DISPLAY_ID_FORMAT "\n", gPhysicalDisplayId);
+                fprintf(stderr, "Invalid physical display id: %s\n",
+                        to_string(gPhysicalDisplayId).c_str());
                 return 2;
             }
             break;
