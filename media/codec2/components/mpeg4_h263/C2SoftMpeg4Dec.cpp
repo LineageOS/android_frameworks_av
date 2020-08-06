@@ -464,34 +464,34 @@ bool C2SoftMpeg4Dec::handleResChange(const std::unique_ptr<C2Work> &work) {
 /* TODO: can remove temporary copy after library supports writing to display
  * buffer Y, U and V plane pointers using stride info. */
 static void copyOutputBufferToYuvPlanarFrame(
-        uint8_t *dst, uint8_t *src,
+        uint8_t *dstY, uint8_t *dstU, uint8_t *dstV, uint8_t *src,
         size_t dstYStride, size_t dstUVStride,
         size_t srcYStride, uint32_t width,
         uint32_t height) {
     size_t srcUVStride = srcYStride / 2;
     uint8_t *srcStart = src;
-    uint8_t *dstStart = dst;
+
     size_t vStride = align(height, 16);
     for (size_t i = 0; i < height; ++i) {
-         memcpy(dst, src, width);
+         memcpy(dstY, src, width);
          src += srcYStride;
-         dst += dstYStride;
+         dstY += dstYStride;
     }
+
     /* U buffer */
     src = srcStart + vStride * srcYStride;
-    dst = dstStart + (dstYStride * height) + (dstUVStride * height / 2);
     for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dst, src, width / 2);
+         memcpy(dstU, src, width / 2);
          src += srcUVStride;
-         dst += dstUVStride;
+         dstU += dstUVStride;
     }
+
     /* V buffer */
     src = srcStart + vStride * srcYStride * 5 / 4;
-    dst = dstStart + (dstYStride * height);
     for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dst, src, width / 2);
+         memcpy(dstV, src, width / 2);
          src += srcUVStride;
-         dst += dstUVStride;
+         dstV += dstUVStride;
     }
 }
 
@@ -672,11 +672,14 @@ void C2SoftMpeg4Dec::process(
         }
 
         uint8_t *outputBufferY = wView.data()[C2PlanarLayout::PLANE_Y];
+        uint8_t *outputBufferU = wView.data()[C2PlanarLayout::PLANE_U];
+        uint8_t *outputBufferV = wView.data()[C2PlanarLayout::PLANE_V];
+
         C2PlanarLayout layout = wView.layout();
         size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
         size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
         (void)copyOutputBufferToYuvPlanarFrame(
-                outputBufferY,
+                outputBufferY, outputBufferU, outputBufferV,
                 mOutputBuffer[mNumSamplesOutput & 1],
                 dstYStride, dstUVStride,
                 align(mWidth, 16), mWidth, mHeight);

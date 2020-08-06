@@ -506,30 +506,28 @@ void C2SoftAomDec::process(const std::unique_ptr<C2Work>& work,
 }
 
 static void copyOutputBufferToYuvPlanarFrame(
-        uint8_t *dst, const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
+        uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
+        const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
         size_t srcYStride, size_t srcUStride, size_t srcVStride,
         size_t dstYStride, size_t dstUVStride,
         uint32_t width, uint32_t height) {
-    uint8_t* dstStart = dst;
 
     for (size_t i = 0; i < height; ++i) {
-        memcpy(dst, srcY, width);
+        memcpy(dstY, srcY, width);
         srcY += srcYStride;
-        dst += dstYStride;
+        dstY += dstYStride;
     }
 
-    dst = dstStart + dstYStride * height;
     for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dst, srcV, width / 2);
+        memcpy(dstV, srcV, width / 2);
         srcV += srcVStride;
-        dst += dstUVStride;
+        dstV += dstUVStride;
     }
 
-    dst = dstStart + (dstYStride * height) + (dstUVStride * height / 2);
     for (size_t i = 0; i < height / 2; ++i) {
-         memcpy(dst, srcU, width / 2);
+        memcpy(dstU, srcU, width / 2);
         srcU += srcUStride;
-        dst += dstUVStride;
+        dstU += dstUVStride;
     }
 }
 
@@ -596,16 +594,12 @@ static void convertYUV420Planar16ToY410(uint32_t *dst,
     return;
 }
 
-static void convertYUV420Planar16ToYUV420Planar(uint8_t *dst,
+static void convertYUV420Planar16ToYUV420Planar(
+        uint8_t *dstY, uint8_t *dstU, uint8_t *dstV,
         const uint16_t *srcY, const uint16_t *srcU, const uint16_t *srcV,
         size_t srcYStride, size_t srcUStride, size_t srcVStride,
-        size_t dstYStride, size_t dstUVStride, size_t width, size_t height) {
-
-    uint8_t *dstY = (uint8_t *)dst;
-    size_t dstYSize = dstYStride * height;
-    size_t dstUVSize = dstUVStride * height / 2;
-    uint8_t *dstV = dstY + dstYSize;
-    uint8_t *dstU = dstV + dstUVSize;
+        size_t dstYStride, size_t dstUVStride,
+        size_t width, size_t height) {
 
     for (size_t y = 0; y < height; ++y) {
         for (size_t x = 0; x < width; ++x) {
@@ -696,7 +690,9 @@ bool C2SoftAomDec::outputBuffer(
           block->width(), block->height(), mWidth, mHeight,
           (int)*(int64_t*)img->user_priv);
 
-    uint8_t* dst = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_Y]);
+    uint8_t* dstY = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_Y]);
+    uint8_t* dstU = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_U]);
+    uint8_t* dstV = const_cast<uint8_t*>(wView.data()[C2PlanarLayout::PLANE_V]);
     size_t srcYStride = img->stride[AOM_PLANE_Y];
     size_t srcUStride = img->stride[AOM_PLANE_U];
     size_t srcVStride = img->stride[AOM_PLANE_V];
@@ -710,13 +706,14 @@ bool C2SoftAomDec::outputBuffer(
         const uint16_t *srcV = (const uint16_t *)img->planes[AOM_PLANE_V];
 
         if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
-            convertYUV420Planar16ToY410((uint32_t *)dst, srcY, srcU, srcV, srcYStride / 2,
+            convertYUV420Planar16ToY410((uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2,
                                     srcUStride / 2, srcVStride / 2,
                                     dstYStride / sizeof(uint32_t),
                                     mWidth, mHeight);
         } else {
-            convertYUV420Planar16ToYUV420Planar(dst, srcY, srcU, srcV, srcYStride / 2,
-                                    srcUStride / 2, srcVStride / 2,
+            convertYUV420Planar16ToYUV420Planar(dstY, dstU, dstV,
+                                    srcY, srcU, srcV,
+                                    srcYStride / 2, srcUStride / 2, srcVStride / 2,
                                     dstYStride, dstUVStride,
                                     mWidth, mHeight);
         }
@@ -725,7 +722,7 @@ bool C2SoftAomDec::outputBuffer(
         const uint8_t *srcU = (const uint8_t *)img->planes[AOM_PLANE_U];
         const uint8_t *srcV = (const uint8_t *)img->planes[AOM_PLANE_V];
         copyOutputBufferToYuvPlanarFrame(
-                dst, srcY, srcU, srcV,
+                dstY, dstU, dstV, srcY, srcU, srcV,
                 srcYStride, srcUStride, srcVStride,
                 dstYStride, dstUVStride,
                 mWidth, mHeight);
