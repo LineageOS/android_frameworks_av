@@ -452,22 +452,26 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_TELEPHONY_TX);
         break;
 
+    case STRATEGY_NONE:
+        // Happens when internal strategies are processed ("rerouting", "patch"...)
+        break;
+
     default:
-        ALOGW("getDevicesForStrategy() unknown strategy: %d", strategy);
+        ALOGW("%s unknown strategy: %d", __func__, strategy);
         break;
     }
 
     if (devices.isEmpty()) {
-        ALOGV("getDevicesForStrategy() no device found for strategy %d", strategy);
+        ALOGV("%s no device found for strategy %d", __func__, strategy);
         sp<DeviceDescriptor> defaultOutputDevice = getApmObserver()->getDefaultOutputDevice();
         if (defaultOutputDevice != nullptr) {
             devices.add(defaultOutputDevice);
         }
         ALOGE_IF(devices.isEmpty(),
-                 "getDevicesForStrategy() no default device defined");
+                 "%s no default device defined", __func__);
     }
 
-    ALOGVV("getDevices ForStrategy() strategy %d, device %s",
+    ALOGVV("%s strategy %d, device %s", __func__,
            strategy, dumpDeviceTypes(devices.types()).c_str());
     return devices;
 }
