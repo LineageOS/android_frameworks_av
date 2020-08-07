@@ -1362,7 +1362,7 @@ status_t AudioSystem::registerPolicyMixes(const Vector<AudioMix>& mixes, bool re
     return aps->registerPolicyMixes(mixes, registration);
 }
 
-status_t AudioSystem::setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices)
+status_t AudioSystem::setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
@@ -1376,7 +1376,7 @@ status_t AudioSystem::removeUidDeviceAffinities(uid_t uid) {
 }
 
 status_t AudioSystem::setUserIdDeviceAffinities(int userId,
-                                                const Vector<AudioDeviceTypeAddr>& devices)
+                                                const AudioDeviceTypeAddrVector& devices)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
