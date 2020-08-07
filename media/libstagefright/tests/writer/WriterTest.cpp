@@ -18,9 +18,13 @@
 #define LOG_TAG "WriterTest"
 #include <utils/Log.h>
 
+#include <binder/ProcessState.h>
+
+#include <inttypes.h>
 #include <fstream>
 #include <iostream>
 
+#include <media/NdkMediaExtractor.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/Utils.h>
@@ -39,15 +43,13 @@
 
 #define OUTPUT_FILE_NAME "/data/local/tmp/writer.out"
 
-static WriterTestEnvironment *gEnv = nullptr;
+// Stts values within 0.1ms(100us) difference are fudged to save too
+// many stts entries in MPEG4Writer.
+constexpr int32_t kMpeg4MuxToleranceTimeUs = 100;
+// Tolerance value for other writers
+constexpr int32_t kMuxToleranceTimeUs = 1;
 
-struct configFormat {
-    char mime[128];
-    int32_t width;
-    int32_t height;
-    int32_t sampleRate;
-    int32_t channelCount;
-};
+static WriterTestEnvironment *gEnv = nullptr;
 
 enum inputId {
     // audio streams
@@ -82,8 +84,8 @@ static const struct InputData {
     int32_t secondParam;
     bool isAudio;
 } kInputData[] = {
-        {AAC_1, MEDIA_MIMETYPE_AUDIO_AAC, "bbb_aac_stereo_128kbps_48000hz.aac",
-         "bbb_aac_stereo_128kbps_48000hz.info", 48000, 2, true},
+        {AAC_1, MEDIA_MIMETYPE_AUDIO_AAC, "audio_aac_stereo_8kbps_11025hz.aac",
+         "audio_aac_stereo_8kbps_11025hz.info", 11025, 2, true},
         {AAC_ADTS_1, MEDIA_MIMETYPE_AUDIO_AAC_ADTS, "Mps_2_c2_fr1_Sc1_Dc2_0x03_raw.adts",
          "Mps_2_c2_fr1_Sc1_Dc2_0x03_raw.info", 48000, 2, true},
         {AMR_NB_1, MEDIA_MIMETYPE_AUDIO_AMR_NB, "sine_amrnb_1ch_12kbps_8000hz.amrnb",
@@ -94,17 +96,17 @@ static const struct InputData {
          "bbb_flac_stereo_680kbps_48000hz.info", 48000, 2, true},
         {OPUS_1, MEDIA_MIMETYPE_AUDIO_OPUS, "bbb_opus_stereo_128kbps_48000hz.opus",
          "bbb_opus_stereo_128kbps_48000hz.info", 48000, 2, true},
-        {VORBIS_1, MEDIA_MIMETYPE_AUDIO_VORBIS, "bbb_vorbis_stereo_128kbps_48000hz.vorbis",
-         "bbb_vorbis_stereo_128kbps_48000hz.info", 48000, 2, true},
+        {VORBIS_1, MEDIA_MIMETYPE_AUDIO_VORBIS, "bbb_vorbis_1ch_64kbps_16kHz.vorbis",
+         "bbb_vorbis_1ch_64kbps_16kHz.info", 16000, 1, true},
 
         {AV1_1, MEDIA_MIMETYPE_VIDEO_AV1, "bbb_av1_176_144.av1", "bbb_av1_176_144.info", 176, 144,
          false},
-        {AVC_1, MEDIA_MIMETYPE_VIDEO_AVC, "bbb_avc_176x144_300kbps_60fps.h264",
-         "bbb_avc_176x144_300kbps_60fps.info", 176, 144, false},
+        {AVC_1, MEDIA_MIMETYPE_VIDEO_AVC, "bbb_avc_352x288_768kbps_30fps.avc",
+         "bbb_avc_352x288_768kbps_30fps.info", 352, 288, false},
         {H263_1, MEDIA_MIMETYPE_VIDEO_H263, "bbb_h263_352x288_300kbps_12fps.h263",
          "bbb_h263_352x288_300kbps_12fps.info", 352, 288, false},
-        {HEVC_1, MEDIA_MIMETYPE_VIDEO_HEVC, "bbb_hevc_176x144_176kbps_60fps.hevc",
-         "bbb_hevc_176x144_176kbps_60fps.info", 176, 144, false},
+        {HEVC_1, MEDIA_MIMETYPE_VIDEO_HEVC, "bbb_hevc_340x280_768kbps_30fps.hevc",
+         "bbb_hevc_340x280_768kbps_30fps.info", 340, 280, false},
         {MPEG4_1, MEDIA_MIMETYPE_VIDEO_MPEG4, "bbb_mpeg4_352x288_512kbps_30fps.m4v",
          "bbb_mpeg4_352x288_512kbps_30fps.info", 352, 288, false},
         {VP8_1, MEDIA_MIMETYPE_VIDEO_VP8, "bbb_vp8_176x144_240kbps_60fps.vp8",
@@ -163,6 +165,14 @@ class WriterTest {
     int32_t createWriter(int32_t fd);
 
     int32_t addWriterSource(bool isAudio, configFormat params, int32_t idx = 0);
+
+    void setupExtractor(AMediaExtractor *extractor, string inputFileName, int32_t &trackCount);
+
+    void extract(AMediaExtractor *extractor, configFormat &params, vector<BufferInfo> &bufferInfo,
+                 uint8_t *buffer, size_t bufSize, size_t *bytesExtracted, int32_t idx);
+
+    void compareParams(configFormat srcParam, configFormat dstParam, vector<BufferInfo> dstBufInfo,
+                       int32_t index);
 
     enum standardWriters {
         OGG,
@@ -316,6 +326,146 @@ void getFileDetails(string &inputFilePath, string &info, configFormat &params, b
     return;
 }
 
+void WriterTest::setupExtractor(AMediaExtractor *extractor, string inputFileName,
+                                int32_t &trackCount) {
+    ALOGV("Input file for extractor: %s", inputFileName.c_str());
+
+    int32_t fd = open(inputFileName.c_str(), O_RDONLY);
+    ASSERT_GE(fd, 0) << "Failed to open writer's output file to validate";
+
+    struct stat buf;
+    int32_t status = fstat(fd, &buf);
+    ASSERT_EQ(status, 0) << "Failed to get properties of input file for extractor";
+
+    size_t fileSize = buf.st_size;
+    ALOGV("Size of input file to extractor: %zu", fileSize);
+
+    status = AMediaExtractor_setDataSourceFd(extractor, fd, 0, fileSize);
+    ASSERT_EQ(status, AMEDIA_OK) << "Failed to set data source for extractor";
+
+    trackCount = AMediaExtractor_getTrackCount(extractor);
+    ASSERT_GT(trackCount, 0) << "No tracks reported by extractor";
+    ALOGV("Number of tracks reported by extractor : %d", trackCount);
+    return;
+}
+
+void WriterTest::extract(AMediaExtractor *extractor, configFormat &params,
+                         vector<BufferInfo> &bufferInfo, uint8_t *buffer, size_t bufSize,
+                         size_t *bytesExtracted, int32_t idx) {
+    AMediaExtractor_selectTrack(extractor, idx);
+    AMediaFormat *format = AMediaExtractor_getTrackFormat(extractor, idx);
+    ASSERT_NE(format, nullptr) << "Track format is NULL";
+    ALOGI("Track format = %s", AMediaFormat_toString(format));
+
+    const char *mime = nullptr;
+    AMediaFormat_getString(format, AMEDIAFORMAT_KEY_MIME, &mime);
+    ASSERT_NE(mime, nullptr) << "Track mime is NULL";
+    ALOGI("Track mime = %s", mime);
+    strlcpy(params.mime, mime, kMimeSize);
+
+    if (!strncmp(mime, "audio/", 6)) {
+        ASSERT_TRUE(
+                AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &params.channelCount))
+                << "Extractor did not report channel count";
+        ASSERT_TRUE(AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_SAMPLE_RATE, &params.sampleRate))
+                << "Extractor did not report sample rate";
+    } else if (!strncmp(mime, "video/", 6) || !strncmp(mime, "image/", 6)) {
+        ASSERT_TRUE(AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_WIDTH, &params.width))
+                << "Extractor did not report width";
+        ASSERT_TRUE(AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_HEIGHT, &params.height))
+                << "Extractor did not report height";
+    } else {
+        ASSERT_TRUE(false) << "Invalid mime " << mime;
+    }
+
+    int32_t bufferOffset = 0;
+    // Get CSD data
+    int index = 0;
+    void *csdBuf;
+    while (1) {
+        csdBuf = nullptr;
+        char csdName[16];
+        snprintf(csdName, 16, "csd-%d", index);
+        size_t csdSize = 0;
+        bool csdFound = AMediaFormat_getBuffer(format, csdName, &csdBuf, &csdSize);
+        if (!csdFound || !csdBuf || !csdSize) break;
+
+        bufferInfo.push_back({static_cast<int32_t>(csdSize), CODEC_CONFIG_FLAG, 0});
+        memcpy(buffer + bufferOffset, csdBuf, csdSize);
+        bufferOffset += csdSize;
+        index++;
+    }
+
+    // Get frame data
+    while (1) {
+        ssize_t sampleSize = AMediaExtractor_getSampleSize(extractor);
+        if (sampleSize < 0) break;
+
+        uint8_t *sampleBuffer = (uint8_t *)malloc(sampleSize);
+        ASSERT_NE(sampleBuffer, nullptr) << "Failed to allocate the buffer of size " << sampleSize;
+
+        int bytesRead = AMediaExtractor_readSampleData(extractor, sampleBuffer, sampleSize);
+        ASSERT_EQ(bytesRead, sampleSize)
+                << "Number of bytes extracted does not match with sample size";
+        int64_t pts = AMediaExtractor_getSampleTime(extractor);
+        uint32_t flag = AMediaExtractor_getSampleFlags(extractor);
+
+        if (mime == MEDIA_MIMETYPE_AUDIO_VORBIS) {
+            // Removing 4 bytes of AMEDIAFORMAT_KEY_VALID_SAMPLES from sample size
+            bytesRead = bytesRead - 4;
+        }
+
+        ASSERT_LE(bufferOffset + bytesRead, bufSize)
+                << "Size of the buffer is insufficient to store the extracted data";
+        bufferInfo.push_back({bytesRead, flag, pts});
+        memcpy(buffer + bufferOffset, sampleBuffer, bytesRead);
+        bufferOffset += bytesRead;
+
+        AMediaExtractor_advance(extractor);
+        free(sampleBuffer);
+    }
+    *bytesExtracted = bufferOffset;
+    return;
+}
+
+void WriterTest::compareParams(configFormat srcParam, configFormat dstParam,
+                               vector<BufferInfo> dstBufInfo, int32_t index) {
+    ASSERT_STREQ(srcParam.mime, dstParam.mime)
+            << "Extracted mime type does not match with input mime type";
+
+    if (!strncmp(srcParam.mime, "audio/", 6)) {
+        ASSERT_EQ(srcParam.channelCount, dstParam.channelCount)
+                << "Extracted channel count does not match with input channel count";
+        ASSERT_EQ(srcParam.sampleRate, dstParam.sampleRate)
+                << "Extracted sample rate does not match with input sample rate";
+    } else if (!strncmp(srcParam.mime, "video/", 6) || !strncmp(srcParam.mime, "image/", 6)) {
+        ASSERT_EQ(srcParam.width, dstParam.width)
+                << "Extracted width does not match with input width";
+        ASSERT_EQ(srcParam.height, dstParam.height)
+                << "Extracted height does not match with input height";
+    } else {
+        ASSERT_TRUE(false) << "Invalid mime type" << srcParam.mime;
+    }
+
+    int32_t toleranceValueUs = kMuxToleranceTimeUs;
+    if (mWriterName == MPEG4) {
+        toleranceValueUs = kMpeg4MuxToleranceTimeUs;
+    }
+    for (int32_t i = 0; i < dstBufInfo.size(); i++) {
+        ASSERT_EQ(mBufferInfo[index][i].size, dstBufInfo[i].size)
+                << "Input size " << mBufferInfo[index][i].size << " mismatched with extracted size "
+                << dstBufInfo[i].size;
+        ASSERT_EQ(mBufferInfo[index][i].flags, dstBufInfo[i].flags)
+                << "Input flag " << mBufferInfo[index][i].flags
+                << " mismatched with extracted size " << dstBufInfo[i].flags;
+        ASSERT_LE(abs(mBufferInfo[index][i].timeUs - dstBufInfo[i].timeUs), toleranceValueUs)
+                << "Difference between original timestamp " << mBufferInfo[index][i].timeUs
+                << " and extracted timestamp " << dstBufInfo[i].timeUs
+                << "is greater than tolerance value = " << toleranceValueUs << " micro seconds";
+    }
+    return;
+}
+
 TEST_P(WriteFunctionalityTest, CreateWriterTest) {
     if (mDisableTest) return;
     ALOGV("Tests the creation of writers");
@@ -350,16 +500,23 @@ TEST_P(WriteFunctionalityTest, WriterTest) {
     if (inpId[1] != UNUSED_ID) {
         numTracks++;
     }
+
+    size_t fileSize[numTracks];
+    configFormat param[numTracks];
     for (int32_t idx = 0; idx < numTracks; idx++) {
         string inputFile = gEnv->getRes();
         string inputInfo = gEnv->getRes();
-        configFormat param;
         bool isAudio;
-        getFileDetails(inputFile, inputInfo, param, isAudio, inpId[idx]);
+        getFileDetails(inputFile, inputInfo, param[idx], isAudio, inpId[idx]);
         ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
 
+        struct stat buf;
+        status = stat(inputFile.c_str(), &buf);
+        ASSERT_EQ(status, 0) << "Failed to get properties of input file:" << inputFile;
+        fileSize[idx] = buf.st_size;
+
         ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo, idx));
-        status = addWriterSource(isAudio, param, idx);
+        status = addWriterSource(isAudio, param[idx], idx);
         ASSERT_EQ((status_t)OK, status) << "Failed to add source for " << writerFormat << "Writer";
     }
 
@@ -389,6 +546,50 @@ TEST_P(WriteFunctionalityTest, WriterTest) {
     status = mWriter->stop();
     ASSERT_EQ((status_t)OK, status) << "Failed to stop the writer";
     close(fd);
+
+    // Validate the output muxed file created by writer
+    // TODO(b/146423022): Skip validating output for webm writer
+    // TODO(b/146421018): Skip validating output for ogg writer
+    if (mWriterName != OGG && mWriterName != WEBM) {
+        configFormat extractorParams[numTracks];
+        vector<BufferInfo> extractorBufferInfo[numTracks];
+        int32_t trackCount = -1;
+
+        AMediaExtractor *extractor = AMediaExtractor_new();
+        ASSERT_NE(extractor, nullptr) << "Failed to create extractor";
+        ASSERT_NO_FATAL_FAILURE(setupExtractor(extractor, outputFile, trackCount));
+        ASSERT_EQ(trackCount, numTracks)
+                << "Tracks reported by extractor does not match with input number of tracks";
+
+        for (int32_t idx = 0; idx < numTracks; idx++) {
+            char *inputBuffer = (char *)malloc(fileSize[idx]);
+            ASSERT_NE(inputBuffer, nullptr)
+                    << "Failed to allocate the buffer of size " << fileSize[idx];
+            mInputStream[idx].seekg(0, mInputStream[idx].beg);
+            mInputStream[idx].read(inputBuffer, fileSize[idx]);
+            ASSERT_EQ(mInputStream[idx].gcount(), fileSize[idx]);
+
+            uint8_t *extractedBuffer = (uint8_t *)malloc(fileSize[idx]);
+            ASSERT_NE(extractedBuffer, nullptr)
+                    << "Failed to allocate the buffer of size " << fileSize[idx];
+            size_t bytesExtracted = 0;
+
+            ASSERT_NO_FATAL_FAILURE(extract(extractor, extractorParams[idx],
+                                            extractorBufferInfo[idx], extractedBuffer,
+                                            fileSize[idx], &bytesExtracted, idx));
+            ASSERT_GT(bytesExtracted, 0) << "Total bytes extracted by extractor cannot be zero";
+
+            ASSERT_NO_FATAL_FAILURE(
+                    compareParams(param[idx], extractorParams[idx], extractorBufferInfo[idx], idx));
+
+            ASSERT_EQ(memcmp(extractedBuffer, (uint8_t *)inputBuffer, bytesExtracted), 0)
+                    << "Extracted bit stream does not match with input bit stream";
+
+            free(inputBuffer);
+            free(extractedBuffer);
+        }
+        AMediaExtractor_delete(extractor);
+    }
 }
 
 TEST_P(WriteFunctionalityTest, PauseWriterTest) {
@@ -704,6 +905,7 @@ INSTANTIATE_TEST_SUITE_P(
                 make_tuple("webm", VORBIS_1, VP8_1, 0.25)));
 
 int main(int argc, char **argv) {
+    ProcessState::self()->startThreadPool();
     gEnv = new WriterTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);

@@ -100,9 +100,10 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
                 {
                     // Lock the AudioFifo to protect against close.
                     std::lock_guard <std::mutex> lock(streamShared->getAudioDataQueueLock());
-
-                    FifoBuffer *fifo = streamShared->getAudioDataFifoBuffer_l();
-                    if (fifo != nullptr) {
+                    std::shared_ptr<SharedRingBuffer> audioDataQueue
+                            = streamShared->getAudioDataQueue_l();
+                    std::shared_ptr<FifoBuffer> fifo;
+                    if (audioDataQueue && (fifo = audioDataQueue->getFifoBuffer())) {
 
                         // Determine offset between framePosition in client's stream
                         // vs the underlying MMAP stream.

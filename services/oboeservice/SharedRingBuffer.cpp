@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <iomanip>
+#include <iostream>
 #include <sys/mman.h>
 
 #include "binding/RingBufferParcelable.h"
@@ -30,8 +32,8 @@ using namespace aaudio;
 
 SharedRingBuffer::~SharedRingBuffer()
 {
+    mFifoBuffer.reset(); // uses mSharedMemory
     if (mSharedMemory != nullptr) {
-        delete mFifoBuffer;
         munmap(mSharedMemory, mSharedMemorySizeInBytes);
         mSharedMemory = nullptr;
     }
@@ -76,7 +78,7 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
             (fifo_counter_t *) &mSharedMemory[SHARED_RINGBUFFER_WRITE_OFFSET];
     uint8_t *dataAddress = &mSharedMemory[SHARED_RINGBUFFER_DATA_OFFSET];
 
-    mFifoBuffer = new FifoBuffer(bytesPerFrame, capacityInFrames,
+    mFifoBuffer = std::make_shared<FifoBufferIndirect>(bytesPerFrame, capacityInFrames,
                                  readCounterAddress, writeCounterAddress, dataAddress);
     return AAUDIO_OK;
 }
@@ -93,4 +95,20 @@ void SharedRingBuffer::fillParcelable(AudioEndpointParcelable &endpointParcelabl
     ringBufferParcelable.setBytesPerFrame(mFifoBuffer->getBytesPerFrame());
     ringBufferParcelable.setFramesPerBurst(1);
     ringBufferParcelable.setCapacityInFrames(mCapacityInFrames);
+}
+
+double SharedRingBuffer::getFractionalFullness() const {
+  int32_t framesAvailable = mFifoBuffer->getFullFramesAvailable();
+  int32_t capacity = mFifoBuffer->getBufferCapacityInFrames();
+  return framesAvailable / (double) capacity;
+}
+
+std::string SharedRingBuffer::dump() const {
+    std::stringstream result;
+    int32_t readCounter = mFifoBuffer->getReadCounter();
+    int32_t writeCounter = mFifoBuffer->getWriteCounter();
+    result << std::setw(10) << writeCounter;
+    result << std::setw(10) << readCounter;
+    result << std::setw(8) << (writeCounter - readCounter);
+    return result.str();
 }
