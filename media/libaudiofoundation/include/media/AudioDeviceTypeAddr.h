@@ -27,13 +27,19 @@
 
 namespace android {
 
-struct AudioDeviceTypeAddr : public Parcelable {
+class AudioDeviceTypeAddr : public Parcelable {
+public:
     AudioDeviceTypeAddr() = default;
 
-    AudioDeviceTypeAddr(audio_devices_t type, const std::string& address) :
-            mType(type), mAddress(address) {}
+    AudioDeviceTypeAddr(audio_devices_t type, const std::string& address);
 
     const char* getAddress() const;
+
+    const std::string& address() const;
+
+    void setAddress(const std::string& address);
+
+    bool isAddressSensitive();
 
     bool equals(const AudioDeviceTypeAddr& other) const;
 
@@ -43,12 +49,17 @@ struct AudioDeviceTypeAddr : public Parcelable {
 
     void reset();
 
+    std::string toString(bool includeSensitiveInfo=false) const;
+
     status_t readFromParcel(const Parcel *parcel) override;
 
     status_t writeToParcel(Parcel *parcel) const override;
 
     audio_devices_t mType = AUDIO_DEVICE_NONE;
+
+private:
     std::string mAddress;
+    bool mIsAddressSensitive;
 };
 
 using AudioDeviceTypeAddrVector = std::vector<AudioDeviceTypeAddr>;
@@ -58,4 +69,7 @@ using AudioDeviceTypeAddrVector = std::vector<AudioDeviceTypeAddr>;
  */
 DeviceTypeSet getAudioDeviceTypes(const AudioDeviceTypeAddrVector& deviceTypeAddrs);
 
-}
+std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
+                                          bool includeSensitiveInfo=false);
+
+} // namespace android

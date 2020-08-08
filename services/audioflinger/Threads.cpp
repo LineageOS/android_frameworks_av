@@ -8584,7 +8584,7 @@ status_t AudioFlinger::RecordThread::createAudioPatch_l(const struct audio_patch
 
     // store new device and send to effects
     mInDeviceTypeAddr.mType = patch->sources[0].ext.device.type;
-    mInDeviceTypeAddr.mAddress = patch->sources[0].ext.device.address;
+    mInDeviceTypeAddr.setAddress(patch->sources[0].ext.device.address);
     audio_port_handle_t deviceId = patch->sources[0].id;
     for (size_t i = 0; i < mEffectChains.size(); i++) {
         mEffectChains[i]->setInputDevice_l(inDeviceTypeAddr());
@@ -9225,7 +9225,7 @@ status_t AudioFlinger::MmapThread::createAudioPatch_l(const struct audio_patch *
         deviceId = patch->sources[0].id;
         numDevices = mPatch.num_sources;
         sourceDeviceTypeAddr.mType = patch->sources[0].ext.device.type;
-        sourceDeviceTypeAddr.mAddress = patch->sources[0].ext.device.address;
+        sourceDeviceTypeAddr.setAddress(patch->sources[0].ext.device.address);
     }
 
     for (size_t i = 0; i < mEffectChains.size(); i++) {

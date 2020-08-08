@@ -631,19 +631,17 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
 
     // check if this strategy has a preferred device that is available,
     // if yes, give priority to it
-    AudioDeviceTypeAddr preferredStrategyDevice;
-    const status_t status = getPreferredDeviceForStrategy(strategy, preferredStrategyDevice);
+    AudioDeviceTypeAddrVector preferredStrategyDevices;
+    const status_t status = getDevicesForRoleAndStrategy(
+            strategy, DEVICE_ROLE_PREFERRED, preferredStrategyDevices);
     if (status == NO_ERROR) {
         // there is a preferred device, is it available?
-        sp<DeviceDescriptor> preferredAvailableDevDescr = availableOutputDevices.getDevice(
-                preferredStrategyDevice.mType,
-                String8(preferredStrategyDevice.mAddress.c_str()),
-                AUDIO_FORMAT_DEFAULT);
-        if (preferredAvailableDevDescr != nullptr) {
-            ALOGVV("%s using pref device 0x%08x/%s for strategy %u",
-                   __func__, preferredStrategyDevice.mType,
-                   preferredStrategyDevice.mAddress.c_str(), strategy);
-            return DeviceVector(preferredAvailableDevDescr);
+        DeviceVector preferredAvailableDevVec =
+                availableOutputDevices.getDevicesFromDeviceTypeAddrVec(preferredStrategyDevices);
+        if (preferredAvailableDevVec.size() == preferredAvailableDevVec.size()) {
+            ALOGVV("%s using pref device %s for strategy %u",
+                   __func__, preferredAvailableDevVec.toString().c_str(), strategy);
+            return preferredAvailableDevVec;
         }
     }
 

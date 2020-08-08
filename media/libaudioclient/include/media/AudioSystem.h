@@ -425,13 +425,13 @@ public:
      */
     static status_t setAudioHalPids(const std::vector<pid_t>& pids);
 
-    static status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-            const AudioDeviceTypeAddr &device);
+    static status_t setDevicesRoleForStrategy(product_strategy_t strategy,
+            device_role_t role, const AudioDeviceTypeAddrVector &devices);
 
-    static status_t removePreferredDeviceForStrategy(product_strategy_t strategy);
+    static status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role);
 
-    static status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-            AudioDeviceTypeAddr &device);
+    static status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
+            device_role_t role, AudioDeviceTypeAddrVector &devices);
 
     static status_t getDeviceForStrategy(product_strategy_t strategy,
             AudioDeviceTypeAddr &device);

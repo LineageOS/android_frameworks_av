@@ -293,36 +293,44 @@ public:
     virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const = 0;
 
     /**
-     * @brief setPreferredDeviceForStrategy sets the default device to be used for a
-     * strategy when available
+     * @brief setDevicesRoleForStrategy sets devices role for a strategy when available. To remove
+     * devices role, removeDevicesRoleForStrategy must be called. When devices role is set
+     * successfully, previously set devices for the same role and strategy will be removed.
      * @param strategy the audio strategy whose routing will be affected
-     * @param device the audio device to route to when available
-     * @return BAD_VALUE if the strategy is invalid,
-     *     or NO_ERROR if the preferred device was set
+     * @param role the role of the devices for the strategy. All device roles are defined at
+     *             system/media/audio/include/system/audio_policy.h. DEVICE_ROLE_NONE is invalid
+     *             for setting.
+     * @param devices the audio devices to be set
+     * @return BAD_VALUE if the strategy or role is invalid,
+     *     or NO_ERROR if the role of the devices for strategy was set
      */
-    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-            const AudioDeviceTypeAddr &device) = 0;
+    virtual status_t setDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) = 0;
 
     /**
-     * @brief removePreferredDeviceForStrategy removes the preferred device previously set
+     * @brief removeDevicesRoleForStrategy removes the role of device(s) previously set
      * for the given strategy
      * @param strategy the audio strategy whose routing will be affected
-     * @return BAD_VALUE if the strategy is invalid,
-     *     or NO_ERROR if the preferred device was removed
+     * @param role the role of the devices for strategy
+     * @return BAD_VALUE if the strategy or role is invalid,
+     *     or NO_ERROR if the devices for this role was removed
      */
-    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy) = 0;
+    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
+            device_role_t role) = 0;
 
     /**
-     * @brief getPreferredDeviceForStrategy queries which device is set as the
-     * preferred device for the given strategy
+     * @brief getDevicesForRoleAndStrategy queries which devices have the specified role for the
+     * specified strategy
      * @param strategy the strategy to query
-     * @param device returns configured as the preferred device if one was set
-     * @return BAD_VALUE if the strategy is invalid,
-     *     or NAME_NOT_FOUND if no preferred device was set
-     *     or NO_ERROR if the device parameter was initialized to the preferred device
+     * @param role the role of the devices to query
+     * @param devices returns list of devices with matching role for the specified strategy.
+     *                DEVICE_ROLE_NONE is invalid as input.
+     * @return BAD_VALUE if the strategy or role is invalid,
+     *     or NAME_NOT_FOUND if no device for the role and strategy was set
+     *     or NO_ERROR if the devices parameter contains a list of devices
      */
-    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-            AudioDeviceTypeAddr &device) const = 0;
+    virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy, device_role_t role,
+            AudioDeviceTypeAddrVector &devices) const = 0;
 
 
     virtual void dump(String8 *dst) const = 0;

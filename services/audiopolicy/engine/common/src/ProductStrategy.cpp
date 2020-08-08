@@ -321,10 +321,11 @@ void ProductStrategyMap::dump(String8 *dst, int spaces) const
 void ProductStrategyPreferredRoutingMap::dump(android::String8* dst, int spaces) const {
     dst->appendFormat("\n%*sPreferred devices per product strategy dump:", spaces, "");
     for (const auto& iter : *this) {
-        dst->appendFormat("\n%*sStrategy %u dev:%08x addr:%s",
+        dst->appendFormat("\n%*sStrategy %u %s",
                           spaces + 2, "",
                           (uint32_t) iter.first,
-                          iter.second.mType, iter.second.mAddress.c_str());
+                          dumpAudioDeviceTypeAddrVector(iter.second, true /*includeSensitiveInfo*/)
+                                  .c_str());
     }
     dst->appendFormat("\n");
 }

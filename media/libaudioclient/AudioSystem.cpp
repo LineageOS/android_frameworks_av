@@ -1603,33 +1603,35 @@ bool AudioSystem::isCallScreenModeSupported()
     return aps->isCallScreenModeSupported();
 }
 
-status_t AudioSystem::setPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                    const AudioDeviceTypeAddr &device)
+status_t AudioSystem::setDevicesRoleForStrategy(product_strategy_t strategy,
+                                                device_role_t role,
+                                                const AudioDeviceTypeAddrVector &devices)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    return aps->setPreferredDeviceForStrategy(strategy, device);
+    return aps->setDevicesRoleForStrategy(strategy, role, devices);
 }
 
-status_t AudioSystem::removePreferredDeviceForStrategy(product_strategy_t strategy)
+status_t AudioSystem::removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    return aps->removePreferredDeviceForStrategy(strategy);
+    return aps->removeDevicesRoleForStrategy(strategy, role);
 }
 
-status_t AudioSystem::getPreferredDeviceForStrategy(product_strategy_t strategy,
-        AudioDeviceTypeAddr &device)
+status_t AudioSystem::getDevicesForRoleAndStrategy(product_strategy_t strategy,
+                                                   device_role_t role,
+                                                   AudioDeviceTypeAddrVector &devices)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    return aps->getPreferredDeviceForStrategy(strategy, device);
+    return aps->getDevicesForRoleAndStrategy(strategy, role, devices);
 }
 
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
