@@ -37,7 +37,7 @@ public:
      * @param allowUnderflow if true then allow mixer to advance read index past the write index
      * @return frames read from this stream
      */
-    int32_t mix(int streamIndex, android::FifoBuffer *fifo, bool allowUnderflow);
+    int32_t mix(int streamIndex, std::shared_ptr<android::FifoBuffer> fifo, bool allowUnderflow);
 
     float *getOutputBuffer();
 

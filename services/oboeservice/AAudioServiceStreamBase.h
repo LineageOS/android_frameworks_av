@@ -284,8 +284,8 @@ protected:
 
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
-    SharedRingBuffer*       mUpMessageQueue;
     std::mutex              mUpMessageQueueLock;
+    std::shared_ptr<SharedRingBuffer> mUpMessageQueue;
 
     AAudioThread            mTimestampThread;
     // This is used by one thread to tell another thread to exit. So it must be atomic.
