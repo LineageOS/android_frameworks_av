@@ -2994,7 +2994,7 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
             __func__, port->type, port->ext.device.type,
             port->ext.device.address, port->id, patch.isSoftware());
     if (port->type != AUDIO_PORT_TYPE_DEVICE || port->ext.device.type != mDevice.mType
-        || port->ext.device.address != mDevice.mAddress) {
+        || port->ext.device.address != mDevice.address()) {
         return NAME_NOT_FOUND;
     }
     status_t status = NAME_NOT_FOUND;
