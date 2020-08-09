@@ -468,6 +468,7 @@ bool MediaMetricsService::isContentValid(const mediametrics::Item *item, bool is
                                      "codec",
                                      "extractor",
                                      "mediadrm",
+                                     "mediaparser",
                                      "nuplayer",
                                  }) {
         if (key == allowedKey) {
