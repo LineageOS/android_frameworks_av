@@ -76,6 +76,7 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceInMap() {
         {"AUDIO_DEVICE_IN_ECHO_REFERENCE",         1LL << 27},
         {"AUDIO_DEVICE_IN_DEFAULT",                1LL << 28},
         // R values above.
+        {"AUDIO_DEVICE_IN_BLE_HEADSET",            1LL << 29},
     };
     return map;
 }
@@ -121,6 +122,8 @@ const std::unordered_map<std::string, int64_t>& getAudioDeviceOutMap() {
         {"AUDIO_DEVICE_OUT_ECHO_CANCELLER",            1LL << 29},
         {"AUDIO_DEVICE_OUT_DEFAULT",                   1LL << 30},
         // R values above.
+        {"AUDIO_DEVICE_OUT_BLE_HEADSET",               1LL << 31},
+        {"AUDIO_DEVICE_OUT_BLE_SPAEKER",               1LL << 32},
     };
     return map;
 }
