@@ -462,7 +462,16 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
             }
         }
     }
-
+    auto musicStrategy = streamToStrategy(AUDIO_STREAM_MUSIC);
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+       sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
+       // mute media strategies and delay device switch by the largest
+       // This avoid sending the music tail into the earpiece or headset.
+       setStrategyMute(musicStrategy, true, desc);
+       setStrategyMute(musicStrategy, false, desc, MUTE_TIME_MS,
+          mEngine->getOutputDevicesForAttributes(attributes_initializer(AUDIO_USAGE_MEDIA),
+                                              nullptr, true /*fromCache*/).types());
+    }
     // Toggle the device state: UNAVAILABLE -> AVAILABLE
     // This will force reading again the device configuration
     status = setDeviceConnectionState(device,
