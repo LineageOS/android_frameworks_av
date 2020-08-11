@@ -4,3 +4,11 @@ cc_test {
     shared_libs: ["libmediatranscoder", "libmediandk"],
     static_libs: ["libgoogle-benchmark"],
 }
+
+cc_test {
+    name: "MediaSampleReaderBenchmark",
+    srcs: ["MediaSampleReaderBenchmark.cpp"],
+    shared_libs: ["libmediatranscoder", "libmediandk", "libbase"],
+    static_libs: ["libgoogle-benchmark"],
+}
+
