@@ -83,7 +83,6 @@ void Copy_Float( const LVM_FLOAT *src,
 
     return;
 }
-#ifdef SUPPORT_MC
 // Extract out the stereo channel pair from multichannel source.
 void Copy_Float_Mc_Stereo(const LVM_FLOAT *src,
                  LVM_FLOAT *dst,
@@ -143,5 +142,4 @@ void Copy_Float_Stereo_Mc(const LVM_FLOAT *src,
         StereoOut -= 2;
     }
 }
-#endif
 /**********************************************************************************/

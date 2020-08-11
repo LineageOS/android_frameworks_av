@@ -113,7 +113,6 @@ void LVC_Core_MixInSoft_D16C31_SAT(LVMixer3_FLOAT_st *ptrInstance,
     }
     pInstance->Current = Current;
 }
-#ifdef SUPPORT_MC
 /*
  * FUNCTION:       LVC_Core_MixInSoft_Mc_D16C31_SAT
  *
@@ -245,5 +244,4 @@ void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st *ptrInstance,
     pInstance->Current = Current;
 }
 
-#endif
 /**********************************************************************************/

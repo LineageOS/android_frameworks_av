@@ -88,53 +88,45 @@ void LVC_MixSoft_1St_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
                                 const LVM_FLOAT       *src,
                                       LVM_FLOAT       *dst,
                                       LVM_INT16       n);
-#ifdef SUPPORT_MC
 void LVC_MixSoft_Mc_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
                                const LVM_FLOAT       *src,
                                      LVM_FLOAT       *dst,
                                      LVM_INT16       NrFrames,
                                      LVM_INT16       NrChannels);
-#endif
 
 void LVC_MixInSoft_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
                               const LVM_FLOAT       *src,
                                     LVM_FLOAT       *dst,
                                     LVM_INT16       n);
-#ifdef SUPPORT_MC
 void LVC_MixInSoft_Mc_D16C31_SAT(LVMixer3_1St_FLOAT_st *pInstance,
                                  const LVM_FLOAT       *src,
                                        LVM_FLOAT       *dst,
                                        LVM_INT16       NrFrames,
                                        LVM_INT16       NrChannels);
-#endif
 
 void LVC_MixSoft_2St_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
                                 const LVM_FLOAT       *src1,
                                 const LVM_FLOAT       *src2,
                                 LVM_FLOAT             *dst,  /* dst cannot be equal to src2 */
                                 LVM_INT16             n);
-#ifdef SUPPORT_MC
 void LVC_MixSoft_2Mc_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
                                 const LVM_FLOAT       *src1,
                                 const LVM_FLOAT       *src2,
                                 LVM_FLOAT             *dst,  /* dst cannot be equal to src2 */
                                 LVM_INT16             NrFrames,
                                 LVM_INT16             NrChannels);
-#endif
 /**********************************************************************************/
 /* For applying different gains to Left and right chennals                        */
 /* MixerStream[0] applies to Left channel                                         */
 /* MixerStream[1] applies to Right channel                                        */
 /* Gain values should not be more that 1.0                                        */
 /**********************************************************************************/
-#ifdef SUPPORT_MC
 void LVC_MixSoft_1St_MC_float_SAT(LVMixer3_2St_FLOAT_st *pInstance,
                                    const   LVM_FLOAT     *src,
                                    LVM_FLOAT             *dst,   /* dst can be equal to src */
                                    LVM_INT16             NrFrames,
                                    LVM_INT32             NrChannels,
                                    LVM_INT32             ChMask);
-#endif
 void LVC_MixSoft_1St_2i_D16C31_SAT(LVMixer3_2St_FLOAT_st *pInstance,
                                    const   LVM_FLOAT     *src,
                                    LVM_FLOAT             *dst,   /* dst can be equal to src */

@@ -137,7 +137,6 @@ cc_library_static {
     ],
     cppflags: [
         "-fvisibility=hidden",
-        "-DSUPPORT_MC",
 
         "-Wall",
         "-Werror",
