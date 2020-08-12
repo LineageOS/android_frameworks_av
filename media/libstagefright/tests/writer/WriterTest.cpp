@@ -726,6 +726,176 @@ TEST_P(WriteFunctionalityTest, MultiStartStopPauseTest) {
     close(fd);
 }
 
+class WriterValidityTest
+    : public WriterTest,
+      public ::testing::TestWithParam<
+              tuple<string /* writerFormat*/, inputId /* inputId0*/, bool /* addSourceFail*/>> {
+  public:
+    virtual void SetUp() override { setupWriterType(get<0>(GetParam())); }
+};
+
+TEST_P(WriterValidityTest, InvalidInputTest) {
+    if (mDisableTest) return;
+    ALOGV("Validates writer's behavior for invalid inputs");
+
+    string writerFormat = get<0>(GetParam());
+    inputId inpId = get<1>(GetParam());
+    bool addSourceFailExpected = get<2>(GetParam());
+
+    // Test writers for invalid FD value
+    int32_t fd = -1;
+    int32_t status = createWriter(fd);
+    if (status != OK) {
+        ALOGV("createWriter failed for invalid FD, this is expected behavior");
+        return;
+    }
+
+    // If writer was created for invalid fd, test it further.
+    string inputFile = gEnv->getRes();
+    string inputInfo = gEnv->getRes();
+    configFormat param;
+    bool isAudio;
+    ASSERT_NE(inpId, UNUSED_ID) << "Test expects first inputId to be a valid id";
+
+    getFileDetails(inputFile, inputInfo, param, isAudio, inpId);
+    ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
+    status = addWriterSource(isAudio, param);
+    if (status != OK) {
+        ASSERT_TRUE(addSourceFailExpected)
+                << "Failed to add source for " << writerFormat << " writer";
+        ALOGV("addWriterSource failed for invalid FD, this is expected behavior");
+        return;
+    }
+
+    // start the writer with valid argument but invalid FD
+    status = mWriter->start(mFileMeta.get());
+    ASSERT_NE((status_t)OK, status) << "Writer did not fail for invalid FD";
+
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], 0, mBufferInfo[0].size());
+    ASSERT_NE((status_t)OK, status) << "Writer did not report error for invalid FD";
+
+    status = mCurrentTrack[0]->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop the track";
+
+    status = mWriter->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop " << writerFormat << " writer";
+}
+
+TEST_P(WriterValidityTest, MalFormedDataTest) {
+    if (mDisableTest) return;
+    // Enable test for Ogg writer
+    ASSERT_NE(mWriterName, OGG) << "TODO(b/160105646)";
+    ALOGV("Test writer for malformed inputs");
+
+    string writerFormat = get<0>(GetParam());
+    inputId inpId = get<1>(GetParam());
+    bool addSourceFailExpected = get<2>(GetParam());
+    int32_t fd =
+            open(OUTPUT_FILE_NAME, O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    ASSERT_GE(fd, 0) << "Failed to open output file to dump writer's data";
+
+    int32_t status = createWriter(fd);
+    ASSERT_EQ(status, (status_t)OK)
+            << "Failed to create writer for " << writerFormat << " output format";
+
+    string inputFile = gEnv->getRes();
+    string inputInfo = gEnv->getRes();
+    configFormat param;
+    bool isAudio;
+    ASSERT_NE(inpId, UNUSED_ID) << "Test expects first inputId to be a valid id";
+
+    getFileDetails(inputFile, inputInfo, param, isAudio, inpId);
+    ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
+    // Remove CSD data from input
+    mNumCsds[0] = 0;
+    status = addWriterSource(isAudio, param);
+    if (status != OK) {
+        ASSERT_TRUE(addSourceFailExpected)
+                << "Failed to add source for " << writerFormat << " writer";
+        ALOGV("%s writer failed to addSource after removing CSD from input", writerFormat.c_str());
+        return;
+    }
+
+    status = mWriter->start(mFileMeta.get());
+    ASSERT_EQ((status_t)OK, status) << "Could not start " << writerFormat << "writer";
+
+    // Skip first few frames. These may contain sync frames also.
+    int32_t frameID = mInputFrameId[0] + mBufferInfo[0].size() / 4;
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], frameID, mCurrentTrack[0], 0,
+                                 mBufferInfo[0].size());
+    ASSERT_EQ((status_t)OK, status) << writerFormat << " writer failed";
+
+    status = mCurrentTrack[0]->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop the track";
+
+    Vector<String16> args;
+    status = mWriter->dump(fd, args);
+    ASSERT_EQ((status_t)OK, status) << "Failed to dump statistics from writer";
+
+    status = mWriter->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop " << writerFormat << " writer";
+    close(fd);
+}
+
+// This test is specific to MPEG4Writer to test more APIs
+TEST_P(WriteFunctionalityTest, Mpeg4WriterTest) {
+    if (mDisableTest) return;
+    if (mWriterName != standardWriters::MPEG4) return;
+    ALOGV("Test MPEG4 writer specific APIs");
+
+    inputId inpId = get<1>(GetParam());
+    int32_t fd =
+            open(OUTPUT_FILE_NAME, O_CREAT | O_LARGEFILE | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+    ASSERT_GE(fd, 0) << "Failed to open output file to dump writer's data";
+
+    int32_t status = createWriter(fd);
+    ASSERT_EQ(status, (status_t)OK) << "Failed to create writer for mpeg4 output format";
+
+    string inputFile = gEnv->getRes();
+    string inputInfo = gEnv->getRes();
+    configFormat param;
+    bool isAudio;
+    ASSERT_NE(inpId, UNUSED_ID) << "Test expects first inputId to be a valid id";
+
+    getFileDetails(inputFile, inputInfo, param, isAudio, inpId);
+    ASSERT_NE(inputFile.compare(gEnv->getRes()), 0) << "No input file specified";
+
+    ASSERT_NO_FATAL_FAILURE(getInputBufferInfo(inputFile, inputInfo));
+    status = addWriterSource(isAudio, param);
+    ASSERT_EQ((status_t)OK, status) << "Failed to add source for mpeg4 Writer";
+
+    // signal meta data for the writer
+    sp<MPEG4Writer> mp4writer = static_cast<MPEG4Writer *>(mWriter.get());
+    status = mp4writer->setInterleaveDuration(kDefaultInterleaveDuration);
+    ASSERT_EQ((status_t)OK, status) << "setInterleaveDuration failed";
+
+    status = mp4writer->setGeoData(kDefaultLatitudex10000, kDefaultLongitudex10000);
+    ASSERT_EQ((status_t)OK, status) << "setGeoData failed";
+
+    status = mp4writer->setCaptureRate(kDefaultFPS);
+    ASSERT_EQ((status_t)OK, status) << "setCaptureRate failed";
+
+    status = mWriter->start(mFileMeta.get());
+    ASSERT_EQ((status_t)OK, status) << "Could not start the writer";
+
+    status = sendBuffersToWriter(mInputStream[0], mBufferInfo[0], mInputFrameId[0],
+                                 mCurrentTrack[0], 0, mBufferInfo[0].size());
+    ASSERT_EQ((status_t)OK, status) << "mpeg4 writer failed";
+
+    status = mCurrentTrack[0]->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop the track";
+
+    status = mWriter->stop();
+    ASSERT_EQ((status_t)OK, status) << "Failed to stop the writer";
+    mp4writer.clear();
+    close(fd);
+}
+
 class ListenerTest
     : public WriterTest,
       public ::testing::TestWithParam<tuple<
@@ -858,6 +1028,7 @@ INSTANTIATE_TEST_SUITE_P(ListenerTestAll, ListenerTest,
                                            make_tuple("amrwb", AMR_WB_1, UNUSED_ID, 0.5, 0.5, 1),
                                            make_tuple("mpeg2Ts", AAC_1, UNUSED_ID, 0.2, 1, 1),
                                            make_tuple("mpeg4", AAC_1, UNUSED_ID, 0.4, 0.3, 0.25),
+                                           make_tuple("mpeg4", AAC_1, UNUSED_ID, 0.3, 1, 0.5),
                                            make_tuple("ogg", OPUS_1, UNUSED_ID, 0.7, 0.3, 1)));
 
 // TODO: (b/144476164)
@@ -903,6 +1074,29 @@ INSTANTIATE_TEST_SUITE_P(
                 make_tuple("webm", VP9_1, UNUSED_ID, 1),
                 make_tuple("webm", VP8_1, OPUS_1, 0.50),
                 make_tuple("webm", VORBIS_1, VP8_1, 0.25)));
+
+INSTANTIATE_TEST_SUITE_P(
+        WriterValidityTest, WriterValidityTest,
+        ::testing::Values(
+                make_tuple("aac", AAC_1, true),
+
+                make_tuple("amrnb", AMR_NB_1, true),
+                make_tuple("amrwb", AMR_WB_1, true),
+
+                make_tuple("mpeg4", AAC_1, false),
+                make_tuple("mpeg4", AMR_NB_1, false),
+                make_tuple("mpeg4", AVC_1, false),
+                make_tuple("mpeg4", H263_1, false),
+                make_tuple("mpeg4", HEIC_1, false),
+                make_tuple("mpeg4", HEVC_1, false),
+                make_tuple("mpeg4", MPEG4_1, false),
+
+                make_tuple("ogg", OPUS_1, true),
+
+                make_tuple("webm", OPUS_1, false),
+                make_tuple("webm", VORBIS_1, true),
+                make_tuple("webm", VP8_1, false),
+                make_tuple("webm", VP9_1, false)));
 
 int main(int argc, char **argv) {
     ProcessState::self()->startThreadPool();
