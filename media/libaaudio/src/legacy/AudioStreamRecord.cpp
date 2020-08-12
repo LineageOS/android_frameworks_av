@@ -293,12 +293,18 @@ aaudio_result_t AudioStreamRecord::release_l() {
     if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
         logReleaseBufferState();
-        mAudioRecord.clear();
-        mFixedBlockWriter.close();
+        // Data callbacks may still be running!
         return AudioStream::release_l();
     } else {
         return AAUDIO_OK; // already released
     }
+}
+
+void AudioStreamRecord::close_l() {
+    // Stop callbacks before deleting mFixedBlockWriter memory.
+    mAudioRecord.clear();
+    mFixedBlockWriter.close();
+    AudioStream::close_l();
 }
 
 const void * AudioStreamRecord::maybeConvertDeviceData(const void *audioData, int32_t numFrames) {
