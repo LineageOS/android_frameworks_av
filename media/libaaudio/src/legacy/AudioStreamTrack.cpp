@@ -252,15 +252,18 @@ aaudio_result_t AudioStreamTrack::release_l() {
     if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioTrack->removeAudioDeviceCallback(mDeviceCallback);
         logReleaseBufferState();
-        // TODO Investigate why clear() causes a hang in test_various.cpp
-        // if I call close() from a data callback.
-        // But the same thing in AudioRecord is OK!
-        // mAudioTrack.clear();
-        mFixedBlockReader.close();
+        // Data callbacks may still be running!
         return AudioStream::release_l();
     } else {
         return AAUDIO_OK; // already released
     }
+}
+
+void AudioStreamTrack::close_l() {
+    // Stop callbacks before deleting mFixedBlockReader memory.
+    mAudioTrack.clear();
+    mFixedBlockReader.close();
+    AudioStream::close_l();
 }
 
 void AudioStreamTrack::processCallback(int event, void *info) {

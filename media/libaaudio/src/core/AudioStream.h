@@ -117,6 +117,17 @@ public:
     virtual void logOpen();
     void logReleaseBufferState();
 
+    /* Note about naming for "release"  and "close" related methods.
+     *
+     * These names are intended to match the public AAudio API.
+     * The original AAudio API had an AAudioStream_close() function that
+     * released the hardware and deleted the stream. That made it difficult
+     * because apps want to release the HW ASAP but are not in a rush to delete
+     * the stream object. So in R we added an AAudioStream_release() function
+     * that just released the hardware.
+     * The AAudioStream_close() method releases if needed and then closes.
+     */
+
     /**
      * Free any hardware or system resources from the open() call.
      * It is safe to call release_l() multiple times.
@@ -126,22 +137,27 @@ public:
         return AAUDIO_OK;
     }
 
-    aaudio_result_t closeFinal() {
+    /**
+     * Free any resources not already freed by release_l().
+     * Assume release_l() already called.
+     */
+    virtual void close_l() {
+        // Releasing the stream will set the state to CLOSING.
+        assert(getState() == AAUDIO_STREAM_STATE_CLOSING);
+        // setState() prevents a transition from CLOSING to any state other than CLOSED.
         // State is checked by destructor.
         setState(AAUDIO_STREAM_STATE_CLOSED);
-        return AAUDIO_OK;
     }
 
     /**
      * Release then close the stream.
-     * @return AAUDIO_OK or negative error.
      */
-    aaudio_result_t releaseCloseFinal() {
-        aaudio_result_t result = release_l(); // TODO review locking
-        if (result == AAUDIO_OK) {
-          result = closeFinal();
+    void releaseCloseFinal() {
+        if (getState() != AAUDIO_STREAM_STATE_CLOSING) { // not already released?
+            // Ignore result and keep closing.
+            (void) release_l();
         }
-        return result;
+        close_l();
     }
 
     // This is only used to identify a stream in the logs without
@@ -395,7 +411,19 @@ public:
      */
     aaudio_result_t systemStopFromCallback();
 
+    /**
+     * Safely RELEASE a stream after taking mStreamLock and checking
+     * to make sure we are not being called from a callback.
+     * @return AAUDIO_OK or a negative error
+     */
     aaudio_result_t safeRelease();
+
+    /**
+     * Safely RELEASE and CLOSE a stream after taking mStreamLock and checking
+     * to make sure we are not being called from a callback.
+     * @return AAUDIO_OK or a negative error
+     */
+    aaudio_result_t safeReleaseClose();
 
 protected:
 
