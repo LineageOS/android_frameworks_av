@@ -263,7 +263,8 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream) {
                   __func__, id);
         } else {
             audioStream->unregisterPlayerBase();
-            delete audioStream;
+            // Allow the stream to be deleted.
+            AudioStreamBuilder::stopUsingStream(audioStream);
         }
         ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     }
