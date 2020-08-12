@@ -36,8 +36,8 @@ using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointCapture::AAudioServiceEndpointCapture(AAudioService &audioService)
-        : mStreamInternalCapture(audioService, true) {
-    mStreamInternal = &mStreamInternalCapture;
+    : AAudioServiceEndpointShared(
+            (AudioStreamInternal *)(new AudioStreamInternalCapture(audioService, true))) {
 }
 
 aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamRequest &request) {

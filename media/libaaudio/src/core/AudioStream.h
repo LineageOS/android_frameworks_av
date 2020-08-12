@@ -25,8 +25,10 @@
 #include <binder/Status.h>
 #include <utils/StrongPointer.h>
 
-#include "media/VolumeShaper.h"
-#include "media/PlayerBase.h"
+#include <media/AudioSystem.h>
+#include <media/PlayerBase.h>
+#include <media/VolumeShaper.h>
+
 #include "utility/AAudioUtilities.h"
 #include "utility/MonotonicCounter.h"
 
@@ -45,7 +47,8 @@ constexpr pid_t        CALLBACK_THREAD_NONE = 0;
 /**
  * AAudio audio stream.
  */
-class AudioStream {
+// By extending AudioDeviceCallback, we also inherit from RefBase.
+class AudioStream : public android::AudioSystem::AudioDeviceCallback {
 public:
 
     AudioStream();
@@ -344,6 +347,10 @@ public:
      */
     bool collidesWithCallback() const;
 
+    // Implement AudioDeviceCallback
+    void onAudioDeviceUpdate(audio_io_handle_t audioIo,
+            audio_port_handle_t deviceId) override {};
+
     // ============== I/O ===========================
     // A Stream will only implement read() or write() depending on its direction.
     virtual aaudio_result_t write(const void *buffer __unused,
@@ -382,7 +389,7 @@ public:
      */
     void registerPlayerBase() {
         if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
-            mPlayerBase->registerWithAudioManager();
+            mPlayerBase->registerWithAudioManager(this);
         }
     }
 
@@ -430,14 +437,14 @@ protected:
     // PlayerBase allows the system to control the stream volume.
     class MyPlayerBase : public android::PlayerBase {
     public:
-        explicit MyPlayerBase(AudioStream *parent);
+        MyPlayerBase() {};
 
-        virtual ~MyPlayerBase();
+        virtual ~MyPlayerBase() = default;
 
         /**
          * Register for volume changes and remote control.
          */
-        void registerWithAudioManager();
+        void registerWithAudioManager(const android::sp<AudioStream>& parent);
 
         /**
          * UnRegister.
@@ -448,8 +455,6 @@ protected:
          * Just calls unregisterWithAudioManager().
          */
         void destroy() override;
-
-        void clearParentReference() { mParent = nullptr; }
 
         // Just a stub. The ability to start audio through PlayerBase is being deprecated.
         android::status_t playerStart() override {
@@ -466,18 +471,10 @@ protected:
             return android::NO_ERROR;
         }
 
-        android::status_t playerSetVolume() override {
-            // No pan and only left volume is taken into account from IPLayer interface
-            mParent->setDuckAndMuteVolume(mVolumeMultiplierL  /* * mPanMultiplierL */);
-            return android::NO_ERROR;
-        }
+        android::status_t playerSetVolume() override;
 
 #if AAUDIO_USE_VOLUME_SHAPER
-        ::android::binder::Status applyVolumeShaper(
-                const ::android::media::VolumeShaper::Configuration& configuration,
-                const ::android::media::VolumeShaper::Operation& operation) {
-            return mParent->applyVolumeShaper(configuration, operation);
-        }
+        ::android::binder::Status applyVolumeShaper();
 #endif
 
         aaudio_result_t getResult() {
@@ -485,9 +482,12 @@ protected:
         }
 
     private:
-        AudioStream          *mParent;
-        aaudio_result_t       mResult = AAUDIO_OK;
-        bool                  mRegistered = false;
+        // Use a weak pointer so the AudioStream can be deleted.
+
+        std::mutex               mParentLock;
+        android::wp<AudioStream> mParent;
+        aaudio_result_t          mResult = AAUDIO_OK;
+        bool                     mRegistered = false;
     };
 
     /**

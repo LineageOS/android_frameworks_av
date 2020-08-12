@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_TAG (mInService ? "AudioStreamInternalCapture_Service" \
-                          : "AudioStreamInternalCapture_Client")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -28,6 +26,14 @@
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 #include <utils/Trace.h>
+
+// We do this after the #includes because if a header uses ALOG.
+// it would fail on the reference to mInService.
+#undef LOG_TAG
+// This file is used in both client and server processes.
+// This is needed to make sense of the logs more easily.
+#define LOG_TAG (mInService ? "AudioStreamInternalCapture_Service" \
+                          : "AudioStreamInternalCapture_Client")
 
 using android::WrappingBuffer;
 
