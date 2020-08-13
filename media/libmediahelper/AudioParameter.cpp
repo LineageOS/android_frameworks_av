@@ -57,6 +57,10 @@ const char * const AudioParameter::keyReconfigA2dpSupported = AUDIO_PARAMETER_A2
 //        AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES;
 // const char * const AudioParameter::keyDeviceSupportedEncapsulationMetadataTypes =
 //        AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_METADATA_TYPES;
+// const char * const AudioParameter::keyAdditionalOutputDeviceDelay =
+//        AUDIO_PARAMETER_DEVICE_ADDITIONAL_OUTPUT_DELAY;
+// const char * const AudioParameter::keyMaxAdditionalOutputDeviceDelay =
+//        AUDIO_PARAMETER_DEVICE_MAX_ADDITIONAL_OUTPUT_DELAY;
 
 AudioParameter::AudioParameter(const String8& keyValuePairs)
 {

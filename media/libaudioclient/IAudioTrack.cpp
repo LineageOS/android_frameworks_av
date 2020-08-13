@@ -44,6 +44,12 @@ enum {
     SIGNAL,
     APPLY_VOLUME_SHAPER,
     GET_VOLUME_SHAPER_STATE,
+    SET_DUAL_MONO_MODE,
+    GET_DUAL_MONO_MODE,
+    SET_AUDIO_DESCRIPTION_MIX_LEVEL,
+    GET_AUDIO_DESCRIPTION_MIX_LEVEL,
+    SET_PLAYBACK_RATE_PARAMETERS,
+    GET_PLAYBACK_RATE_PARAMETERS,
 };
 
 class BpAudioTrack : public BpInterface<IAudioTrack>
@@ -207,6 +213,92 @@ public:
         }
         return state;
     }
+
+    status_t getDualMonoMode(audio_dual_mono_mode_t* mode) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_DUAL_MONO_MODE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = (status_t)reply.readInt32();
+        if (status != NO_ERROR) {
+            return status;
+        }
+        *mode = (audio_dual_mono_mode_t)reply.readInt32();
+        return NO_ERROR;
+    }
+
+    status_t setDualMonoMode(audio_dual_mono_mode_t mode) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        data.writeInt32((int32_t)mode);
+        status_t status = remote()->transact(SET_DUAL_MONO_MODE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    status_t getAudioDescriptionMixLevel(float* leveldB) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_AUDIO_DESCRIPTION_MIX_LEVEL, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = (status_t)reply.readInt32();
+        if (status != NO_ERROR) {
+            return status;
+        }
+        *leveldB = reply.readFloat();
+        return NO_ERROR;
+    }
+
+    status_t setAudioDescriptionMixLevel(float leveldB) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        data.writeFloat(leveldB);
+        status_t status = remote()->transact(SET_AUDIO_DESCRIPTION_MIX_LEVEL, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    status_t getPlaybackRateParameters(audio_playback_rate_t* playbackRate) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        status_t status = remote()->transact(GET_PLAYBACK_RATE_PARAMETERS, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = (status_t)reply.readInt32();
+        if (status != NO_ERROR) {
+            return status;
+        }
+        playbackRate->mSpeed = reply.readFloat();
+        playbackRate->mPitch = reply.readFloat();
+        playbackRate->mStretchMode =
+            static_cast<audio_timestretch_stretch_mode_t>(reply.readInt32());
+        playbackRate->mFallbackMode =
+            static_cast<audio_timestretch_fallback_mode_t>(reply.readInt32());
+        return NO_ERROR;
+    }
+
+    status_t setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) override {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioTrack::getInterfaceDescriptor());
+        data.writeFloat(playbackRate.mSpeed);
+        data.writeFloat(playbackRate.mPitch);
+        data.writeInt32(playbackRate.mStretchMode);
+        data.writeInt32(playbackRate.mFallbackMode);
+        status_t status = remote()->transact(SET_PLAYBACK_RATE_PARAMETERS, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return reply.readInt32();
+    }
 };
 
 IMPLEMENT_META_INTERFACE(AudioTrack, "android.media.IAudioTrack");
@@ -306,6 +398,59 @@ status_t BnAudioTrack::onTransact(
                 if (state.get() != nullptr) {
                      status = state->writeToParcel(reply);
                 }
+            }
+            return NO_ERROR;
+        } break;
+        case SET_DUAL_MONO_MODE: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            reply->writeInt32( setDualMonoMode((audio_dual_mono_mode_t)data.readInt32()) );
+            return NO_ERROR;
+        } break;
+        case GET_DUAL_MONO_MODE: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            audio_dual_mono_mode_t mode;
+            const status_t status = getDualMonoMode(&mode);
+            reply->writeInt32((int32_t)status);
+            if (status == NO_ERROR) {
+                reply->writeInt32(mode);
+            }
+            return NO_ERROR;
+        } break;
+        case SET_AUDIO_DESCRIPTION_MIX_LEVEL: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            reply->writeInt32( setAudioDescriptionMixLevel(data.readFloat()) );
+            return NO_ERROR;
+        } break;
+        case GET_AUDIO_DESCRIPTION_MIX_LEVEL: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            float f;
+            const status_t status = getAudioDescriptionMixLevel(&f);
+            reply->writeInt32((int32_t)status);
+            if (status == NO_ERROR) {
+                reply->writeFloat(f);
+            }
+            return NO_ERROR;
+        } break;
+        case SET_PLAYBACK_RATE_PARAMETERS: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            audio_playback_rate_t playbackRate = {
+                data.readFloat(),
+                data.readFloat(),
+                static_cast<audio_timestretch_stretch_mode_t>(data.readInt32()),
+                static_cast<audio_timestretch_fallback_mode_t>(data.readInt32())};
+            reply->writeInt32( setPlaybackRateParameters(playbackRate) );
+            return NO_ERROR;
+        } break;
+        case GET_PLAYBACK_RATE_PARAMETERS: {
+            CHECK_INTERFACE(IAudioTrack, data, reply);
+            audio_playback_rate_t playbackRate;
+            const status_t status = getPlaybackRateParameters(&playbackRate);
+            reply->writeInt32((int32_t)status);
+            if (status == NO_ERROR) {
+                reply->writeFloat(playbackRate.mSpeed);
+                reply->writeFloat(playbackRate.mPitch);
+                reply->writeInt32(playbackRate.mStretchMode);
+                reply->writeInt32(playbackRate.mFallbackMode);
             }
             return NO_ERROR;
         } break;

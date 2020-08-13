@@ -636,12 +636,105 @@ status_t StreamOutHalHidl::updateSourceMetadata(
 #endif
 
 #if MAJOR_VERSION < 6
+status_t StreamOutHalHidl::getDualMonoMode(audio_dual_mono_mode_t* mode __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::setDualMonoMode(audio_dual_mono_mode_t mode __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::getAudioDescriptionMixLevel(float* leveldB __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::setAudioDescriptionMixLevel(float leveldB __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::getPlaybackRateParameters(
+        audio_playback_rate_t* playbackRate __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::setPlaybackRateParameters(
+        const audio_playback_rate_t& playbackRate __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t StreamOutHalHidl::setEventCallback(
         const sp<StreamOutHalInterfaceEventCallback>& callback __unused) {
     // Codec format callback is supported starting from audio HAL V6.0
     return INVALID_OPERATION;
 }
 #else
+
+status_t StreamOutHalHidl::getDualMonoMode(audio_dual_mono_mode_t* mode) {
+    if (mStream == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getDualMonoMode(
+            [&](Result r, DualMonoMode hidlMode) {
+                retval = r;
+                if (retval == Result::OK) {
+                    *mode = static_cast<audio_dual_mono_mode_t>(hidlMode);
+                }
+            });
+    return processReturn("getDualMonoMode", ret, retval);
+}
+
+status_t StreamOutHalHidl::setDualMonoMode(audio_dual_mono_mode_t mode) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn(
+            "setDualMonoMode", mStream->setDualMonoMode(static_cast<DualMonoMode>(mode)));
+}
+
+status_t StreamOutHalHidl::getAudioDescriptionMixLevel(float* leveldB) {
+    if (mStream == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getAudioDescriptionMixLevel(
+            [&](Result r, float hidlLeveldB) {
+                retval = r;
+                if (retval == Result::OK) {
+                    *leveldB = hidlLeveldB;
+                }
+            });
+    return processReturn("getAudioDescriptionMixLevel", ret, retval);
+}
+
+status_t StreamOutHalHidl::setAudioDescriptionMixLevel(float leveldB) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn(
+            "setAudioDescriptionMixLevel", mStream->setAudioDescriptionMixLevel(leveldB));
+}
+
+status_t StreamOutHalHidl::getPlaybackRateParameters(audio_playback_rate_t* playbackRate) {
+    if (mStream == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getPlaybackRateParameters(
+            [&](Result r, PlaybackRate hidlPlaybackRate) {
+                retval = r;
+                if (retval == Result::OK) {
+                    playbackRate->mSpeed = hidlPlaybackRate.speed;
+                    playbackRate->mPitch = hidlPlaybackRate.pitch;
+                    playbackRate->mStretchMode =
+                        static_cast<audio_timestretch_stretch_mode_t>(
+                            hidlPlaybackRate.timestretchMode);
+                    playbackRate->mFallbackMode =
+                        static_cast<audio_timestretch_fallback_mode_t>(
+                            hidlPlaybackRate.fallbackMode);
+                }
+            });
+    return processReturn("getPlaybackRateParameters", ret, retval);
+}
+
+status_t StreamOutHalHidl::setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn(
+            "setPlaybackRateParameters", mStream->setPlaybackRateParameters(
+                PlaybackRate{playbackRate.mSpeed, playbackRate.mPitch,
+                    static_cast<TimestretchMode>(playbackRate.mStretchMode),
+                    static_cast<TimestretchFallbackMode>(playbackRate.mFallbackMode)}));
+}
 
 #include PATH(android/hardware/audio/FILE_VERSION/IStreamOutEventCallback.h)
 
