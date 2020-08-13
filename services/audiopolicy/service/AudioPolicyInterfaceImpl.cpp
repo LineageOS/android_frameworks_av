@@ -1257,7 +1257,7 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
 }
 
 status_t AudioPolicyService::setUidDeviceAffinities(uid_t uid,
-        const Vector<AudioDeviceTypeAddr>& devices) {
+        const AudioDeviceTypeAddrVector& devices) {
     Mutex::Autolock _l(mLock);
     if(!modifyAudioRoutingAllowed()) {
         return PERMISSION_DENIED;
@@ -1282,7 +1282,7 @@ status_t AudioPolicyService::removeUidDeviceAffinities(uid_t uid) {
 }
 
 status_t AudioPolicyService::setUserIdDeviceAffinities(int userId,
-        const Vector<AudioDeviceTypeAddr>& devices) {
+        const AudioDeviceTypeAddrVector& devices) {
     Mutex::Autolock _l(mLock);
     if(!modifyAudioRoutingAllowed()) {
         return PERMISSION_DENIED;

@@ -3107,7 +3107,7 @@ void AudioPolicyManager::dumpManualSurroundFormats(String8 *dst) const
 
 // Returns true if all devices types match the predicate and are supported by one HW module
 bool  AudioPolicyManager::areAllDevicesSupported(
-        const Vector<AudioDeviceTypeAddr>& devices,
+        const AudioDeviceTypeAddrVector& devices,
         std::function<bool(audio_devices_t)> predicate,
         const char *context) {
     for (size_t i = 0; i < devices.size(); i++) {
@@ -3124,7 +3124,7 @@ bool  AudioPolicyManager::areAllDevicesSupported(
 }
 
 status_t AudioPolicyManager::setUidDeviceAffinities(uid_t uid,
-        const Vector<AudioDeviceTypeAddr>& devices) {
+        const AudioDeviceTypeAddrVector& devices) {
     ALOGV("%s() uid=%d num devices %zu", __FUNCTION__, uid, devices.size());
     if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
         return BAD_VALUE;
@@ -3161,8 +3161,8 @@ status_t AudioPolicyManager::setPreferredDeviceForStrategy(product_strategy_t st
     ALOGV("%s() strategy=%d device=%08x addr=%s", __FUNCTION__,
             strategy, device.mType, device.mAddress.c_str());
 
-    Vector<AudioDeviceTypeAddr> devices;
-    devices.add(device);
+    AudioDeviceTypeAddrVector devices;
+    devices.push_back(device);
     if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
         return BAD_VALUE;
     }
@@ -3223,8 +3223,8 @@ status_t AudioPolicyManager::getPreferredDeviceForStrategy(product_strategy_t st
 }
 
 status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
-        const Vector<AudioDeviceTypeAddr>& devices) {
-    ALOGI("%s() userId=%d num devices %zu", __FUNCTION__, userId, devices.size());\
+        const AudioDeviceTypeAddrVector& devices) {
+    ALOGI("%s() userId=%d num devices %zu", __func__, userId, devices.size());
     if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
         return BAD_VALUE;
     }

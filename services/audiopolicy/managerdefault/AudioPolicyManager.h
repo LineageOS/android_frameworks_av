@@ -263,10 +263,10 @@ public:
         virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes);
         virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes);
         virtual status_t setUidDeviceAffinities(uid_t uid,
-                const Vector<AudioDeviceTypeAddr>& devices);
+                const AudioDeviceTypeAddrVector& devices);
         virtual status_t removeUidDeviceAffinities(uid_t uid);
         virtual status_t setUserIdDeviceAffinities(int userId,
-                const Vector<AudioDeviceTypeAddr>& devices);
+                const AudioDeviceTypeAddrVector& devices);
         virtual status_t removeUserIdDeviceAffinities(int userId);
 
         virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
@@ -939,7 +939,7 @@ private:
                 sp<AudioPatch> *patchDescPtr);
 
         bool areAllDevicesSupported(
-                const Vector<AudioDeviceTypeAddr>& devices,
+                const AudioDeviceTypeAddrVector& devices,
                 std::function<bool(audio_devices_t)> predicate,
                 const char* context);
 

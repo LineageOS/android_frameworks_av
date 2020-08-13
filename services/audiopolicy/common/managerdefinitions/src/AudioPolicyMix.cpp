@@ -463,7 +463,7 @@ status_t AudioPolicyMixCollection::getInputMixForAttr(
 }
 
 status_t AudioPolicyMixCollection::setUidDeviceAffinities(uid_t uid,
-        const Vector<AudioDeviceTypeAddr>& devices) {
+        const AudioDeviceTypeAddrVector& devices) {
     // verify feasibility: for each player mix: if it already contains a
     //    "match uid" rule for this uid, return an error
     //    (adding a uid-device affinity would result in contradictory rules)
@@ -565,7 +565,7 @@ status_t AudioPolicyMixCollection::getDevicesForUid(uid_t uid,
 }
 
 status_t AudioPolicyMixCollection::setUserIdDeviceAffinities(int userId,
-        const Vector<AudioDeviceTypeAddr>& devices) {
+        const AudioDeviceTypeAddrVector& devices) {
     // verify feasibility: for each player mix: if it already contains a
     //    "match userId" rule for this userId, return an error
     //    (adding a userId-device affinity would result in contradictory rules)

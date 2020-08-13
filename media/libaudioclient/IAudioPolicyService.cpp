@@ -1173,31 +1173,18 @@ public:
         return reply.readBool();
     }
 
-    virtual status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices)
+    virtual status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
 
         data.writeInt32((int32_t) uid);
-        size_t size = devices.size();
-        size_t sizePosition = data.dataPosition();
-        data.writeInt32((int32_t) size);
-        size_t finalSize = size;
-        for (size_t i = 0; i < size; i++) {
-            size_t position = data.dataPosition();
-            if (devices[i].writeToParcel(&data) != NO_ERROR) {
-                data.setDataPosition(position);
-                finalSize--;
-            }
-        }
-        if (size != finalSize) {
-            size_t position = data.dataPosition();
-            data.setDataPosition(sizePosition);
-            data.writeInt32(finalSize);
-            data.setDataPosition(position);
+        status_t status = data.writeParcelableVector(devices);
+        if (status != NO_ERROR) {
+            return status;
         }
 
-        status_t status = remote()->transact(SET_UID_DEVICE_AFFINITY, data, &reply);
+        status = remote()->transact(SET_UID_DEVICE_AFFINITY, data, &reply);
         if (status == NO_ERROR) {
             status = (status_t)reply.readInt32();
         }
@@ -1218,51 +1205,37 @@ public:
         return status;
     }
 
-        virtual status_t setUserIdDeviceAffinities(int userId,
-                const Vector<AudioDeviceTypeAddr>& devices)
-        {
-            Parcel data, reply;
-            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+    virtual status_t setUserIdDeviceAffinities(int userId, const AudioDeviceTypeAddrVector& devices)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
 
-            data.writeInt32((int32_t) userId);
-            size_t size = devices.size();
-            size_t sizePosition = data.dataPosition();
-            data.writeInt32((int32_t) size);
-            size_t finalSize = size;
-            for (size_t i = 0; i < size; i++) {
-                size_t position = data.dataPosition();
-                if (devices[i].writeToParcel(&data) != NO_ERROR) {
-                    data.setDataPosition(position);
-                    finalSize--;
-                }
-            }
-            if (size != finalSize) {
-                size_t position = data.dataPosition();
-                data.setDataPosition(sizePosition);
-                data.writeInt32(finalSize);
-                data.setDataPosition(position);
-            }
-
-            status_t status = remote()->transact(SET_USERID_DEVICE_AFFINITY, data, &reply);
-            if (status == NO_ERROR) {
-                status = (status_t)reply.readInt32();
-            }
+        data.writeInt32((int32_t) userId);
+        status_t status = data.writeParcelableVector(devices);
+        if (status != NO_ERROR) {
             return status;
         }
 
-        virtual status_t removeUserIdDeviceAffinities(int userId) {
-            Parcel data, reply;
-            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-
-            data.writeInt32((int32_t) userId);
-
-            status_t status =
-                remote()->transact(REMOVE_USERID_DEVICE_AFFINITY, data, &reply);
-            if (status == NO_ERROR) {
-                status = (status_t) reply.readInt32();
-            }
-            return status;
+        status = remote()->transact(SET_USERID_DEVICE_AFFINITY, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t)reply.readInt32();
         }
+        return status;
+    }
+
+    virtual status_t removeUserIdDeviceAffinities(int userId) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+        data.writeInt32((int32_t) userId);
+
+        status_t status =
+            remote()->transact(REMOVE_USERID_DEVICE_AFFINITY, data, &reply);
+        if (status == NO_ERROR) {
+            status = (status_t) reply.readInt32();
+        }
+        return status;
+    }
 
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
     {
@@ -2460,15 +2433,12 @@ status_t BnAudioPolicyService::onTransact(
         case SET_UID_DEVICE_AFFINITY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             const uid_t uid = (uid_t) data.readInt32();
-            Vector<AudioDeviceTypeAddr> devices;
-            size_t size = (size_t)data.readInt32();
-            for (size_t i = 0; i < size; i++) {
-                AudioDeviceTypeAddr device;
-                if (device.readFromParcel((Parcel*)&data) == NO_ERROR) {
-                    devices.add(device);
-                }
+            AudioDeviceTypeAddrVector devices;
+            status_t status = data.readParcelableVector(&devices);
+            if (status != NO_ERROR) {
+                return status;
             }
-            status_t status = setUidDeviceAffinities(uid, devices);
+            status = setUidDeviceAffinities(uid, devices);
             reply->writeInt32(status);
             return NO_ERROR;
         }
@@ -2484,15 +2454,12 @@ status_t BnAudioPolicyService::onTransact(
         case SET_USERID_DEVICE_AFFINITY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             const int userId = (int) data.readInt32();
-            Vector<AudioDeviceTypeAddr> devices;
-            size_t size = (size_t)data.readInt32();
-            for (size_t i = 0; i < size; i++) {
-                AudioDeviceTypeAddr device;
-                if (device.readFromParcel((Parcel*)&data) == NO_ERROR) {
-                    devices.add(device);
-                }
+            AudioDeviceTypeAddrVector devices;
+            status_t status = data.readParcelableVector(&devices);
+            if (status != NO_ERROR) {
+                return status;
             }
-            status_t status = setUserIdDeviceAffinities(userId, devices);
+            status = setUserIdDeviceAffinities(userId, devices);
             reply->writeInt32(status);
             return NO_ERROR;
         }
