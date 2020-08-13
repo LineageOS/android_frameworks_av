@@ -16,10 +16,54 @@
 
 #include <media/AudioDeviceTypeAddr.h>
 
+#include <arpa/inet.h>
+#include <iostream>
+#include <regex>
+#include <sstream>
+
 namespace android {
+
+namespace {
+
+static const std::string SUPPRESSED = "SUPPRESSED";
+static const std::regex MAC_ADDRESS_REGEX("([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}");
+
+bool isSenstiveAddress(const std::string &address) {
+    if (std::regex_match(address, MAC_ADDRESS_REGEX)) {
+        return true;
+    }
+
+    sockaddr_storage ss4;
+    if (inet_pton(AF_INET, address.c_str(), &ss4) > 0) {
+        return true;
+    }
+
+    sockaddr_storage ss6;
+    if (inet_pton(AF_INET6, address.c_str(), &ss6) > 0) {
+        return true;
+    }
+
+    return false;
+}
+
+} // namespace
+
+AudioDeviceTypeAddr::AudioDeviceTypeAddr(audio_devices_t type, const std::string &address) :
+        mType(type), mAddress(address) {
+    mIsAddressSensitive = isSenstiveAddress(mAddress);
+}
 
 const char* AudioDeviceTypeAddr::getAddress() const {
     return mAddress.c_str();
+}
+
+const std::string& AudioDeviceTypeAddr::address() const {
+    return mAddress;
+}
+
+void AudioDeviceTypeAddr::setAddress(const std::string& address) {
+    mAddress = address;
+    mIsAddressSensitive = isSenstiveAddress(mAddress);
 }
 
 bool AudioDeviceTypeAddr::equals(const AudioDeviceTypeAddr& other) const {
@@ -38,7 +82,17 @@ bool AudioDeviceTypeAddr::operator<(const AudioDeviceTypeAddr& other) const {
 
 void AudioDeviceTypeAddr::reset() {
     mType = AUDIO_DEVICE_NONE;
-    mAddress = "";
+    setAddress("");
+}
+
+std::string AudioDeviceTypeAddr::toString(bool includeSensitiveInfo) const {
+    std::stringstream sstream;
+    sstream << "type:0x" << std::hex << mType;
+    // IP and MAC address are sensitive information. The sensitive information will be suppressed
+    // is `includeSensitiveInfo` is false.
+    sstream << ",@:"
+            << (!includeSensitiveInfo && mIsAddressSensitive ? SUPPRESSED : mAddress);
+    return sstream.str();
 }
 
 status_t AudioDeviceTypeAddr::readFromParcel(const Parcel *parcel) {
@@ -64,4 +118,16 @@ DeviceTypeSet getAudioDeviceTypes(const AudioDeviceTypeAddrVector& deviceTypeAdd
     return deviceTypes;
 }
 
+std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
+                                          bool includeSensitiveInfo) {
+    std::stringstream stream;
+    for (auto it = deviceTypeAddrs.begin(); it != deviceTypeAddrs.end(); ++it) {
+        if (it != deviceTypeAddrs.begin()) {
+            stream << " ";
+        }
+        stream << it->toString(includeSensitiveInfo);
+    }
+    return stream.str();
 }
+
+} // namespace android

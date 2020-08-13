@@ -3112,11 +3112,11 @@ bool  AudioPolicyManager::areAllDevicesSupported(
         const char *context) {
     for (size_t i = 0; i < devices.size(); i++) {
         sp<DeviceDescriptor> devDesc = mHwModules.getDeviceDescriptor(
-                devices[i].mType, devices[i].mAddress.c_str(), String8(),
+                devices[i].mType, devices[i].getAddress(), String8(),
                 AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, true /*matchAddress*/);
         if (devDesc == nullptr || (predicate != nullptr && !predicate(devices[i].mType))) {
             ALOGE("%s: device type %#x address %s not supported or not an output device",
-                    context, devices[i].mType, devices[i].mAddress.c_str());
+                    context, devices[i].mType, devices[i].getAddress());
             return false;
         }
     }
@@ -3156,20 +3156,19 @@ status_t AudioPolicyManager::removeUidDeviceAffinities(uid_t uid) {
     return res;
 }
 
-status_t AudioPolicyManager::setPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   const AudioDeviceTypeAddr &device) {
-    ALOGV("%s() strategy=%d device=%08x addr=%s", __FUNCTION__,
-            strategy, device.mType, device.mAddress.c_str());
+status_t AudioPolicyManager::setDevicesRoleForStrategy(product_strategy_t strategy,
+                                                       device_role_t role,
+                                                       const AudioDeviceTypeAddrVector &devices) {
+    ALOGV("%s() strategy=%d role=%d %s", __func__, strategy, role,
+            dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    AudioDeviceTypeAddrVector devices;
-    devices.push_back(device);
     if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
         return BAD_VALUE;
     }
-    status_t status = mEngine->setPreferredDeviceForStrategy(strategy, device);
+    status_t status = mEngine->setDevicesRoleForStrategy(strategy, role, devices);
     if (status != NO_ERROR) {
-        ALOGW("Engine could not set preferred device %08x %s for strategy %d",
-                device.mType, device.mAddress.c_str(), strategy);
+        ALOGW("Engine could not set preferred devices %s for strategy %d role %d",
+                dumpAudioDeviceTypeAddrVector(devices).c_str(), strategy, role);
         return status;
     }
 
@@ -3201,11 +3200,12 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
     }
 }
 
-status_t AudioPolicyManager::removePreferredDeviceForStrategy(product_strategy_t strategy)
+status_t AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
+                                                          device_role_t role)
 {
-    ALOGI("%s() strategy=%d", __FUNCTION__, strategy);
+    ALOGI("%s() strategy=%d role=%d", __func__, strategy, role);
 
-    status_t status = mEngine->removePreferredDeviceForStrategy(strategy);
+    status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role);
     if (status != NO_ERROR) {
         ALOGW("Engine could not remove preferred device for strategy %d", strategy);
         return status;
@@ -3217,9 +3217,10 @@ status_t AudioPolicyManager::removePreferredDeviceForStrategy(product_strategy_t
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::getPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   AudioDeviceTypeAddr &device) {
-    return mEngine->getPreferredDeviceForStrategy(strategy, device);
+status_t AudioPolicyManager::getDevicesForRoleAndStrategy(product_strategy_t strategy,
+                                                          device_role_t role,
+                                                          AudioDeviceTypeAddrVector &devices) {
+    return mEngine->getDevicesForRoleAndStrategy(strategy, role, devices);
 }
 
 status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,

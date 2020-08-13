@@ -390,6 +390,24 @@ sp<DeviceDescriptor> DeviceVector::getDeviceForOpening() const
     return nullptr;
 }
 
+sp<DeviceDescriptor> DeviceVector::getDeviceFromDeviceTypeAddr(
+            const AudioDeviceTypeAddr& deviceTypeAddr) const {
+    return getDevice(deviceTypeAddr.mType, String8(deviceTypeAddr.getAddress()),
+            AUDIO_FORMAT_DEFAULT);
+}
+
+DeviceVector DeviceVector::getDevicesFromDeviceTypeAddrVec(
+        const AudioDeviceTypeAddrVector& deviceTypeAddrVector) const {
+    DeviceVector devices;
+    for (const auto& deviceTypeAddr : deviceTypeAddrVector) {
+        sp<DeviceDescriptor> device = getDeviceFromDeviceTypeAddr(deviceTypeAddr);
+        if (device != nullptr) {
+            devices.add(device);
+        }
+    }
+    return devices;
+}
+
 void DeviceVector::replaceDevicesByType(
         audio_devices_t typeToRemove, const DeviceVector &devicesToAdd) {
     DeviceVector devicesToRemove = getDevicesFromType(typeToRemove);

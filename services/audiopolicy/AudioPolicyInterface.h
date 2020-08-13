@@ -295,13 +295,17 @@ public:
 
     virtual bool     isCallScreenModeSupported() = 0;
 
-    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   const AudioDeviceTypeAddr &device) = 0;
+    virtual status_t setDevicesRoleForStrategy(product_strategy_t strategy,
+                                               device_role_t role,
+                                               const AudioDeviceTypeAddrVector &devices) = 0;
 
-    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy) = 0;
+    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
+                                                  device_role_t role) = 0;
 
-    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   AudioDeviceTypeAddr &device) = 0;
+
+    virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
+                                                  device_role_t role,
+                                                  AudioDeviceTypeAddrVector &devices) = 0;
 };
 
 
