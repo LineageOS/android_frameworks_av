@@ -311,6 +311,36 @@ status_t StreamOutHalLocal::getMmapPosition(struct audio_mmap_position *position
     return mStream->get_mmap_position(mStream, position);
 }
 
+status_t StreamOutHalLocal::getDualMonoMode(audio_dual_mono_mode_t* mode) {
+    if (mStream->get_dual_mono_mode == nullptr) return INVALID_OPERATION;
+    return mStream->get_dual_mono_mode(mStream, mode);
+}
+
+status_t StreamOutHalLocal::setDualMonoMode(audio_dual_mono_mode_t mode) {
+    if (mStream->set_dual_mono_mode == nullptr) return INVALID_OPERATION;
+    return mStream->set_dual_mono_mode(mStream, mode);
+}
+
+status_t StreamOutHalLocal::getAudioDescriptionMixLevel(float* leveldB) {
+    if (mStream->get_audio_description_mix_level == nullptr) return INVALID_OPERATION;
+    return mStream->get_audio_description_mix_level(mStream, leveldB);
+}
+
+status_t StreamOutHalLocal::setAudioDescriptionMixLevel(float leveldB) {
+    if (mStream->set_audio_description_mix_level == nullptr) return INVALID_OPERATION;
+    return mStream->set_audio_description_mix_level(mStream, leveldB);
+}
+
+status_t StreamOutHalLocal::getPlaybackRateParameters(audio_playback_rate_t* playbackRate) {
+    if (mStream->get_playback_rate_parameters == nullptr) return INVALID_OPERATION;
+    return mStream->get_playback_rate_parameters(mStream, playbackRate);
+}
+
+status_t StreamOutHalLocal::setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) {
+    if (mStream->set_playback_rate_parameters == nullptr) return INVALID_OPERATION;
+    return mStream->set_playback_rate_parameters(mStream, &playbackRate);
+}
+
 status_t StreamOutHalLocal::setEventCallback(
         const sp<StreamOutHalInterfaceEventCallback>& callback) {
     if (mStream->set_event_callback == nullptr) {
