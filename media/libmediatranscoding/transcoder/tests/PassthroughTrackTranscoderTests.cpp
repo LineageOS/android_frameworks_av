@@ -159,6 +159,7 @@ TEST_F(PassthroughTrackTranscoderTests, SampleEquality) {
             MediaSampleReaderNDK::createFromFd(mSourceFd, 0, mSourceFileSize);
     EXPECT_NE(mediaSampleReader, nullptr);
 
+    EXPECT_EQ(mediaSampleReader->selectTrack(mTrackIndex), AMEDIA_OK);
     EXPECT_EQ(transcoder.configure(mediaSampleReader, mTrackIndex, nullptr /* destinationFormat */),
               AMEDIA_OK);
     ASSERT_TRUE(transcoder.start());

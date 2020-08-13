@@ -77,7 +77,8 @@ private:
 };
 
 static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFileName,
-                               const std::string& dstFileName, bool includeAudio) {
+                               const std::string& dstFileName, bool includeAudio,
+                               bool transcodeVideo = true) {
     // Default bitrate
     static constexpr int32_t kVideoBitRate = 20 * 1000 * 1000;  // 20Mbs
     // Write-only, create file if non-existent.
@@ -132,8 +133,10 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
             }
 
             if (strncmp(mime, "video/", 6) == 0) {
-                dstFormat = AMediaFormat_new();
-                AMediaFormat_setInt32(dstFormat, AMEDIAFORMAT_KEY_BIT_RATE, kVideoBitRate);
+                if (transcodeVideo) {
+                    dstFormat = AMediaFormat_new();
+                    AMediaFormat_setInt32(dstFormat, AMEDIAFORMAT_KEY_BIT_RATE, kVideoBitRate);
+                }
 
                 int32_t frameCount;
                 if (AMediaFormat_getInt32(srcFormat, AMEDIAFORMAT_KEY_FRAME_COUNT, &frameCount)) {
@@ -198,8 +201,21 @@ static void BM_TranscodeAvc2AvcVideo2Video(benchmark::State& state) {
                        false /* includeAudio */);
 }
 
+static void BM_TranscodeAudioVideoPassthrough(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
+                       "video_1920x1080_3648frame_h264_22Mbps_30fps_aac_passthrough_AV.mp4",
+                       true /* includeAudio */, false /* transcodeVideo */);
+}
+static void BM_TranscodeVideoPassthrough(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps.mp4",
+                       "video_1920x1080_3648frame_h264_22Mbps_30fps_passthrough_AV.mp4",
+                       false /* includeAudio */, false /* transcodeVideo */);
+}
+
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAudioVideo2AudioVideo);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAudioVideo2Video);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcVideo2Video);
+TRANSCODER_BENCHMARK(BM_TranscodeAudioVideoPassthrough);
+TRANSCODER_BENCHMARK(BM_TranscodeVideoPassthrough);
 
 BENCHMARK_MAIN();

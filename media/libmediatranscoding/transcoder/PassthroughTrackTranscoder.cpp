@@ -142,8 +142,6 @@ media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
             LOG(ERROR) << "Output queue aborted";
             return AMEDIA_ERROR_IO;
         }
-
-        mMediaSampleReader->advanceTrack(mTrackIndex);
     }
 
     if (mStopRequested && !mEosFromSource) {
