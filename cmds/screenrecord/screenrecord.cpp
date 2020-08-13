@@ -273,14 +273,11 @@ static status_t setDisplayProjection(
         SurfaceComposerClient::Transaction& t,
         const sp<IBinder>& dpy,
         const ui::DisplayState& displayState) {
-    const ui::Size& viewport = displayState.viewport;
-
-    // Set the region of the layer stack we're interested in, which in our
-    // case is "all of it".
-    Rect layerStackRect(viewport);
+    // Set the region of the layer stack we're interested in, which in our case is "all of it".
+    Rect layerStackRect(displayState.layerStackSpaceRect);
 
     // We need to preserve the aspect ratio of the display.
-    float displayAspect = viewport.getHeight() / static_cast<float>(viewport.getWidth());
+    float displayAspect = layerStackRect.getHeight() / static_cast<float>(layerStackRect.getWidth());
 
 
     // Set the way we map the output onto the display surface (which will
@@ -699,20 +696,21 @@ static status_t recordScreen(const char* fileName) {
         return err;
     }
 
-    const ui::Size& viewport = displayState.viewport;
+    const ui::Size& layerStackSpaceRect = displayState.layerStackSpaceRect;
     if (gVerbose) {
         printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
-                viewport.getWidth(), viewport.getHeight(), displayConfig.refreshRate,
-                toCString(displayState.orientation), displayState.layerStack);
+                layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
+                displayConfig.refreshRate, toCString(displayState.orientation),
+                displayState.layerStack);
         fflush(stdout);
     }
 
     // Encoder can't take odd number as config
     if (gVideoWidth == 0) {
-        gVideoWidth = floorToEven(viewport.getWidth());
+        gVideoWidth = floorToEven(layerStackSpaceRect.getWidth());
     }
     if (gVideoHeight == 0) {
-        gVideoHeight = floorToEven(viewport.getHeight());
+        gVideoHeight = floorToEven(layerStackSpaceRect.getHeight());
     }
 
     // Configure and start the encoder.
