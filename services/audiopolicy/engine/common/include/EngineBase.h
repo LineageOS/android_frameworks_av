@@ -93,13 +93,13 @@ public:
 
     void dump(String8 *dst) const override;
 
-    status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-            const AudioDeviceTypeAddr &device) override;
+    status_t setDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) override;
 
-    status_t removePreferredDeviceForStrategy(product_strategy_t strategy) override;
+    status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role) override;
 
-    status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-            AudioDeviceTypeAddr &device) const override;
+    status_t getDevicesForRoleAndStrategy(product_strategy_t strategy, device_role_t role,
+            AudioDeviceTypeAddrVector &devices) const override;
 
     engineConfig::ParsingResult loadAudioPolicyEngineConfig();
 

@@ -226,19 +226,22 @@ public:
 
     virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
 
-    virtual status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
+    virtual status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices);
 
     virtual status_t removeUidDeviceAffinities(uid_t uid);
 
-    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   const AudioDeviceTypeAddr &device);
+    virtual status_t setDevicesRoleForStrategy(product_strategy_t strategy,
+                                               device_role_t role,
+                                               const AudioDeviceTypeAddrVector &devices);
 
-    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy);
+    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role);
 
+    virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
+                                                  device_role_t role,
+                                                  AudioDeviceTypeAddrVector &devices);
 
-    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   AudioDeviceTypeAddr &device);
-    virtual status_t setUserIdDeviceAffinities(int userId, const Vector<AudioDeviceTypeAddr>& devices);
+    virtual status_t setUserIdDeviceAffinities(int userId,
+            const AudioDeviceTypeAddrVector& devices);
 
     virtual status_t removeUserIdDeviceAffinities(int userId);
 

@@ -250,12 +250,12 @@ public:
     virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes) = 0;
     virtual status_t unregisterPolicyMixes(Vector<AudioMix> mixes) = 0;
 
-    virtual status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices)
+    virtual status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices)
             = 0;
     virtual status_t removeUidDeviceAffinities(uid_t uid) = 0;
 
     virtual status_t setUserIdDeviceAffinities(int userId,
-            const Vector<AudioDeviceTypeAddr>& devices) = 0;
+            const AudioDeviceTypeAddrVector& devices) = 0;
     virtual status_t removeUserIdDeviceAffinities(int userId) = 0;
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
@@ -295,13 +295,17 @@ public:
 
     virtual bool     isCallScreenModeSupported() = 0;
 
-    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   const AudioDeviceTypeAddr &device) = 0;
+    virtual status_t setDevicesRoleForStrategy(product_strategy_t strategy,
+                                               device_role_t role,
+                                               const AudioDeviceTypeAddrVector &devices) = 0;
 
-    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy) = 0;
+    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy,
+                                                  device_role_t role) = 0;
 
-    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-                                                   AudioDeviceTypeAddr &device) = 0;
+
+    virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
+                                                  device_role_t role,
+                                                  AudioDeviceTypeAddrVector &devices) = 0;
 };
 
 
