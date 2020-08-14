@@ -60,16 +60,18 @@ aaudio_result_t SharedRingBuffer::allocate(fifo_frames_t   bytesPerFrame,
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
 
-    // Map the fd to memory addresses.
-    mSharedMemory = (uint8_t *) mmap(0, mSharedMemorySizeInBytes,
+    // Map the fd to memory addresses. Use a temporary pointer to keep the mmap result and update
+    // it to `mSharedMemory` only when mmap operate successfully.
+    uint8_t* tmpPtr = (uint8_t *) mmap(0, mSharedMemorySizeInBytes,
                          PROT_READ|PROT_WRITE,
                          MAP_SHARED,
                          mFileDescriptor.get(), 0);
-    if (mSharedMemory == MAP_FAILED) {
+    if (tmpPtr == MAP_FAILED) {
         ALOGE("allocate() mmap() failed %d", errno);
         mFileDescriptor.reset();
         return AAUDIO_ERROR_INTERNAL; // TODO convert errno to a better AAUDIO_ERROR;
     }
+    mSharedMemory = tmpPtr;
 
     // Get addresses for our counters and data from the shared memory.
     fifo_counter_t *readCounterAddress =

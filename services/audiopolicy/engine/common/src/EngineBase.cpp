@@ -339,8 +339,8 @@ status_t EngineBase::listAudioVolumeGroups(AudioVolumeGroupVector &groups) const
     return NO_ERROR;
 }
 
-status_t EngineBase::setPreferredDeviceForStrategy(product_strategy_t strategy,
-            const AudioDeviceTypeAddr &device)
+status_t EngineBase::setDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices)
 {
     // verify strategy exists
     if (mProductStrategies.find(strategy) == mProductStrategies.end()) {
@@ -348,11 +348,24 @@ status_t EngineBase::setPreferredDeviceForStrategy(product_strategy_t strategy,
         return BAD_VALUE;
     }
 
-    mProductStrategyPreferredDevices[strategy] = device;
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+        mProductStrategyPreferredDevices[strategy] = devices;
+        break;
+    case DEVICE_ROLE_DISABLED:
+        // TODO: support set devices role as disabled for strategy.
+        ALOGI("%s no implemented for role as %d", __func__, role);
+        break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it is no need to set device role as none for a strategy.
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
     return NO_ERROR;
 }
 
-status_t EngineBase::removePreferredDeviceForStrategy(product_strategy_t strategy)
+status_t EngineBase::removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role)
 {
     // verify strategy exists
     if (mProductStrategies.find(strategy) == mProductStrategies.end()) {
@@ -360,29 +373,53 @@ status_t EngineBase::removePreferredDeviceForStrategy(product_strategy_t strateg
         return BAD_VALUE;
     }
 
-    if (mProductStrategyPreferredDevices.erase(strategy) == 0) {
-        // no preferred device was set
-        return NAME_NOT_FOUND;
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+        if (mProductStrategyPreferredDevices.erase(strategy) == 0) {
+            // no preferred device was set
+            return NAME_NOT_FOUND;
+        }
+        break;
+    case DEVICE_ROLE_DISABLED:
+        // TODO: support remove devices role as disabled for strategy.
+        ALOGI("%s no implemented for role as %d", __func__, role);
+        break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it makes no sense to remove devices with
+        // role as DEVICE_ROLE_NONE for a strategy
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
     }
     return NO_ERROR;
 }
 
-status_t EngineBase::getPreferredDeviceForStrategy(product_strategy_t strategy,
-            AudioDeviceTypeAddr &device) const
+status_t EngineBase::getDevicesForRoleAndStrategy(product_strategy_t strategy, device_role_t role,
+            AudioDeviceTypeAddrVector &devices) const
 {
     // verify strategy exists
     if (mProductStrategies.find(strategy) == mProductStrategies.end()) {
         ALOGE("%s unknown strategy %u", __func__, strategy);
         return BAD_VALUE;
     }
-    // preferred device for this strategy?
-    auto devIt = mProductStrategyPreferredDevices.find(strategy);
-    if (devIt == mProductStrategyPreferredDevices.end()) {
-        ALOGV("%s no preferred device for strategy %u", __func__, strategy);
-        return NAME_NOT_FOUND;
-    }
 
-    device = devIt->second;
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED: {
+        // preferred device for this strategy?
+        auto devIt = mProductStrategyPreferredDevices.find(strategy);
+        if (devIt == mProductStrategyPreferredDevices.end()) {
+            ALOGV("%s no preferred device for strategy %u", __func__, strategy);
+            return NAME_NOT_FOUND;
+        }
+
+        devices = devIt->second;
+    } break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as the DEVICE_ROLE_NONE is never set
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
     return NO_ERROR;
 }
 

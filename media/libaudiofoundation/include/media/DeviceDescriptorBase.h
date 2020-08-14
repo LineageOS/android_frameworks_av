@@ -41,7 +41,7 @@ public:
     virtual ~DeviceDescriptorBase() {}
 
     audio_devices_t type() const { return mDeviceTypeAddr.mType; }
-    std::string address() const { return mDeviceTypeAddr.mAddress; }
+    const std::string& address() const { return mDeviceTypeAddr.address(); }
     void setAddress(const std::string &address);
     const AudioDeviceTypeAddr& getDeviceTypeAddr() const { return mDeviceTypeAddr; }
 
@@ -77,7 +77,6 @@ public:
 
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
-    bool mIsAddressSensitive;
     uint32_t mEncapsulationModes = 0;
     uint32_t mEncapsulationMetadataTypes = 0;
 };
