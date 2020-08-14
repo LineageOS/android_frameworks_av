@@ -318,7 +318,7 @@ public:
 
     /**
      * Removes all the rights information of each plug-in associated with
-     * DRM framework. Will be used in master reset
+     * DRM framework.
      *
      * @return status_t
      *     Returns DRM_NO_ERROR for success, DRM_ERROR_UNKNOWN for failure
