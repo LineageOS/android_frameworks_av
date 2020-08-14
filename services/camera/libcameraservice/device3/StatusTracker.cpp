@@ -40,7 +40,7 @@ StatusTracker::StatusTracker(wp<Camera3Device> parent) :
 StatusTracker::~StatusTracker() {
 }
 
-int StatusTracker::addComponent() {
+int StatusTracker::addComponent(std::string componentName) {
     int id;
     ssize_t err;
     {
@@ -49,8 +49,12 @@ int StatusTracker::addComponent() {
         ALOGV("%s: Adding new component %d", __FUNCTION__, id);
 
         err = mStates.add(id, IDLE);
-        ALOGE_IF(err < 0, "%s: Can't add new component %d: %s (%zd)",
-                __FUNCTION__, id, strerror(-err), err);
+        if (componentName.empty()) {
+            componentName = std::to_string(id);
+        }
+        mComponentNames.add(id, componentName);
+        ALOGE_IF(err < 0, "%s: Can't add new component %d (%s): %s (%zd)",
+                __FUNCTION__, id, componentName.c_str(), strerror(-err), err);
     }
 
     if (err >= 0) {
@@ -68,6 +72,7 @@ void StatusTracker::removeComponent(int id) {
         Mutex::Autolock l(mLock);
         ALOGV("%s: Removing component %d", __FUNCTION__, id);
         idx = mStates.removeItem(id);
+        mComponentNames.removeItem(id);
     }
 
     if (idx >= 0) {
@@ -79,6 +84,20 @@ void StatusTracker::removeComponent(int id) {
     return;
 }
 
+
+void StatusTracker::dumpActiveComponents() {
+    Mutex::Autolock l(mLock);
+    if (mDeviceState == IDLE) {
+        ALOGI("%s: all components are IDLE", __FUNCTION__);
+        return;
+    }
+    for (size_t i = 0; i < mStates.size(); i++) {
+        if (mStates.valueAt(i) == ACTIVE) {
+            ALOGI("%s: component %d (%s) is active", __FUNCTION__, mStates.keyAt(i),
+                    mComponentNames.valueAt(i).c_str());
+        }
+    }
+}
 
 void StatusTracker::markComponentIdle(int id, const sp<Fence>& componentFence) {
     markComponent(id, IDLE, componentFence);
