@@ -3751,9 +3751,14 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
                 __FUNCTION__, cameraId.string());
         return;
     }
+
+    // Collect the logical cameras without holding mStatusLock in updateStatus
+    // as that can lead to a deadlock(b/162192331).
+    auto logicalCameraIds = getLogicalCameras(cameraId);
     // Update the status for this camera state, then send the onStatusChangedCallbacks to each
     // of the listeners with both the mStatusLock and mStatusListenerLock held
-    state->updateStatus(status, cameraId, rejectSourceStates, [this, &deviceKind, &supportsHAL3]
+    state->updateStatus(status, cameraId, rejectSourceStates, [this, &deviceKind, &supportsHAL3,
+                        &logicalCameraIds]
             (const String8& cameraId, StatusInternal status) {
 
             if (status != StatusInternal::ENUMERATING) {
@@ -3773,8 +3778,8 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
             }
 
             Mutex::Autolock lock(mStatusListenerLock);
-
-            notifyPhysicalCameraStatusLocked(mapToInterface(status), cameraId, deviceKind);
+            notifyPhysicalCameraStatusLocked(mapToInterface(status), String16(cameraId),
+                    logicalCameraIds, deviceKind);
 
             for (auto& listener : mListenerList) {
                 bool isVendorListener = listener->isVendorListener();
@@ -3892,8 +3897,9 @@ status_t CameraService::setTorchStatusLocked(const String8& cameraId,
     return OK;
 }
 
-void CameraService::notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId,
-        SystemCameraKind deviceKind) {
+std::list<String16> CameraService::getLogicalCameras(
+        const String8& physicalCameraId) {
+    std::list<String16> retList;
     Mutex::Autolock lock(mCameraStatesLock);
     for (const auto& state : mCameraStates) {
         std::vector<std::string> physicalCameraIds;
@@ -3901,25 +3907,38 @@ void CameraService::notifyPhysicalCameraStatusLocked(int32_t status, const Strin
             // This is not a logical multi-camera.
             continue;
         }
-        if (std::find(physicalCameraIds.begin(), physicalCameraIds.end(), cameraId.c_str())
+        if (std::find(physicalCameraIds.begin(), physicalCameraIds.end(), physicalCameraId.c_str())
                 == physicalCameraIds.end()) {
             // cameraId is not a physical camera of this logical multi-camera.
             continue;
         }
 
-        String16 id16(state.first), physicalId16(cameraId);
+        retList.emplace_back(String16(state.first));
+    }
+    return retList;
+}
+
+void CameraService::notifyPhysicalCameraStatusLocked(int32_t status,
+        const String16& physicalCameraId, const std::list<String16>& logicalCameraIds,
+        SystemCameraKind deviceKind) {
+    // mStatusListenerLock is expected to be locked
+    for (const auto& logicalCameraId : logicalCameraIds) {
         for (auto& listener : mListenerList) {
+            // Note: we check only the deviceKind of the physical camera id
+            // since, logical camera ids and their physical camera ids are
+            // guaranteed to have the same system camera kind.
             if (shouldSkipStatusUpdates(deviceKind, listener->isVendorListener(),
                     listener->getListenerPid(), listener->getListenerUid())) {
                 ALOGV("Skipping discovery callback for system-only camera device %s",
-                        cameraId.c_str());
+                        String8(physicalCameraId).c_str());
                 continue;
             }
             listener->getListener()->onPhysicalCameraStatusChanged(status,
-                    id16, physicalId16);
+                    logicalCameraId, physicalCameraId);
         }
     }
 }
+
 
 void CameraService::blockClientsForUid(uid_t uid) {
     const auto clients = mActiveClientManager.getAll();

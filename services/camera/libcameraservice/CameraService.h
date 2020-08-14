@@ -49,6 +49,7 @@
 
 #include <set>
 #include <string>
+#include <list>
 #include <map>
 #include <memory>
 #include <utility>
@@ -1005,8 +1006,13 @@ private:
             hardware::camera::common::V1_0::TorchModeStatus status);
 
     // notify physical camera status when the physical camera is public.
-    void notifyPhysicalCameraStatusLocked(int32_t status, const String8& cameraId,
-            SystemCameraKind deviceKind);
+    // Expects mStatusListenerLock to be locked.
+    void notifyPhysicalCameraStatusLocked(int32_t status, const String16& physicalCameraId,
+            const std::list<String16>& logicalCameraIds, SystemCameraKind deviceKind);
+
+    // get list of logical cameras which are backed by physicalCameraId
+    std::list<String16> getLogicalCameras(const String8& physicalCameraId);
+
 
     // IBinder::DeathRecipient implementation
     virtual void        binderDied(const wp<IBinder> &who);
