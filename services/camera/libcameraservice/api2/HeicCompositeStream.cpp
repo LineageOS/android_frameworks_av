@@ -510,7 +510,8 @@ status_t HeicCompositeStream::configureStream() {
 
     sp<camera3::StatusTracker> statusTracker = mStatusTracker.promote();
     if (statusTracker != nullptr) {
-        mStatusId = statusTracker->addComponent();
+        std::string name = std::string("HeicStream ") + std::to_string(getStreamId());
+        mStatusId = statusTracker->addComponent(name);
     }
 
     run("HeicCompositeStreamProc");
