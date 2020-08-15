@@ -171,13 +171,7 @@ status_t FrameCaptureProcessor::onCapture(const sp<Layer> &layer,
             err = OK;
         }
     }
-    mRE->cleanupPostRender();
-    // Unbind the buffer now to remove it from the RenderEngine's image cache.
-    // The buffer was put into the image cache during the drawLayers() call above.
-    const sp<GraphicBuffer> &gbuf = layerSettings.source.buffer.buffer;
-    if (gbuf != nullptr) {
-        mRE->unbindExternalTextureBuffer(gbuf->getId());
-    }
+    mRE->cleanupPostRender(renderengine::RenderEngine::CleanupMode::CLEAN_ALL);
     return err;
 }
 
