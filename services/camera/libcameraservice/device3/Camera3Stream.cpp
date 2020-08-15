@@ -330,7 +330,8 @@ status_t Camera3Stream::finishConfiguration(/*out*/bool* streamReconfigured) {
     // Register for idle tracking
     sp<StatusTracker> statusTracker = mStatusTracker.promote();
     if (statusTracker != 0 && mStatusId == StatusTracker::NO_STATUS_ID) {
-        mStatusId = statusTracker->addComponent();
+        std::string name = std::string("Stream ") + std::to_string(mId);
+        mStatusId = statusTracker->addComponent(name.c_str());
     }
 
     // Check if the stream configuration is unchanged, and skip reallocation if
