@@ -22,7 +22,7 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/ExtractorUnitTest/ExtractorUnitTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/extractors/tests/extractor.zip). Download, unzip and push these files into device for testing.
+The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/extractors/tests/extractor-1.4.zip). Download, unzip and push these files into device for testing.
 
 ```
 adb push extractor /data/local/tmp/
