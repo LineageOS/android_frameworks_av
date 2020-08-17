@@ -1038,6 +1038,11 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
         // initial state-stopping. next state-pausing.
         // What if resume is called ?
 
+        if (state == FLUSHED) {
+            // avoid underrun glitches when starting after flush
+            reset();
+        }
+
         if (state == PAUSED || state == PAUSING) {
             if (mResumeToStopping) {
                 // happened we need to resume to STOPPING_1
