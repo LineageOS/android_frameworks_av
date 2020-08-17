@@ -25,13 +25,13 @@
 
 namespace android {
 
-using Q = List<sp<ABuffer> >;
-
 struct ABuffer;
 struct AMessage;
 
 struct AHEVCAssembler : public ARTPAssembler {
     AHEVCAssembler(const sp<AMessage> &notify);
+
+    typedef List<sp<ABuffer> > Queue;
 
 protected:
     virtual ~AHEVCAssembler();
@@ -48,7 +48,7 @@ private:
     uint32_t mNextExpectedSeqNo;
     bool mAccessUnitDamaged;
     bool mFirstIFrameProvided;
-    uint64_t mLastIFrameProvidedAt;
+    uint64_t mLastIFrameProvidedAtMs;
     int32_t mWidth;
     int32_t mHeight;
     List<sp<ABuffer> > mNALUnits;
@@ -64,10 +64,10 @@ private:
 
     void submitAccessUnit();
 
-    int32_t pickProperSeq(const Q *q, uint32_t jit, int64_t play);
+    int32_t pickProperSeq(const Queue *queue, uint32_t jit, int64_t play);
     bool recycleUnit(uint32_t start, uint32_t end, uint32_t conneceted,
              size_t avail, float goodRatio);
-    int32_t deleteUnitUnderSeq(Q *q, uint32_t seq);
+    int32_t deleteUnitUnderSeq(Queue *queue, uint32_t seq);
     void printNowTimeUs(int64_t start, int64_t now, int64_t play);
     void printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp);
 

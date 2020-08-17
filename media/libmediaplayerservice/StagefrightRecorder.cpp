@@ -17,6 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "StagefrightRecorder"
 #include <inttypes.h>
+// TODO/workaround: including base logging now as it conflicts with ADebug.h
+// and it must be included first.
+#include <android-base/logging.h>
 #include <utils/Log.h>
 
 #include "WebmWriter.h"
@@ -582,7 +585,7 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
         const float coefficient = 0.8f;
         mVideoBitRate = (bitRate * coefficient) / 1000 * 1000;
     }
-    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP &&  mStarted && mPauseStartTimeUs == 0) {
+    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP && mStarted && mPauseStartTimeUs == 0) {
         mVideoEncoderSource->setEncodingBitrate(mVideoBitRate);
         ARTPWriter* rtpWriter  = static_cast<ARTPWriter*>(mWriter.get());
         rtpWriter->setTMMBNInfo(mOpponentID, bitRate);

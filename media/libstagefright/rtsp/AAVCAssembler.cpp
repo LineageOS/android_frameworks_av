@@ -39,7 +39,7 @@ AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
       mNextExpectedSeqNo(0),
       mAccessUnitDamaged(false),
       mFirstIFrameProvided(false),
-      mLastIFrameProvidedAt(0) {
+      mLastIFrameProvidedAtMs(0) {
 }
 
 AAVCAssembler::~AAVCAssembler() {
@@ -52,17 +52,18 @@ int32_t AAVCAssembler::addNack(
 
     List<sp<ABuffer> >::iterator it = queue->begin();
 
-    uint16_t queueHeadSeqNum;
-    if (it != queue->end())
-        queueHeadSeqNum = (*it)->int32Data();
+    if (it == queue->end()) {
+        return nackCount /* 0 */;
+    }
 
-    // move to the packet after that RTCP:NACK sent.
-    while (it != queue->end()) {
+    uint16_t queueHeadSeqNum = (*it)->int32Data();
+
+    // move to the packet after which RTCP:NACK was sent.
+    for (; it != queue->end(); ++it) {
         int32_t seqNum = (*it)->int32Data();
-        if (seqNum < source->mHighestNackNumber)
-            it++;
-        else
+        if (seqNum >= source->mHighestNackNumber) {
             break;
+        }
     }
 
     int32_t nackStartAt = -1;
@@ -70,20 +71,21 @@ int32_t AAVCAssembler::addNack(
     while (it != queue->end()) {
         int32_t seqBeforeLast = (*it)->int32Data();
         // increase iterator.
-        if ((++it) == queue->end())
+        if ((++it) == queue->end()) {
             break;
+        }
         int32_t seqLast = (*it)->int32Data();
 
         if ((seqLast - seqBeforeLast) < 0) {
-            ALOGD("addNack : found end of seqNum from(%d) to(%d)", seqBeforeLast, seqLast);
+            ALOGD("addNack: found end of seqNum from(%d) to(%d)", seqBeforeLast, seqLast);
             source->mHighestNackNumber = 0;
         }
 
         // missed packet found
         if (seqLast > (seqBeforeLast + 1) &&
-            // we didn't send RTCP:NACK for this packet yet.
-            (seqLast - 1) > source->mHighestNackNumber) {
-            source->mHighestNackNumber = seqLast -1;
+                // we didn't send RTCP:NACK for this packet yet.
+                (seqLast - 1) > source->mHighestNackNumber) {
+            source->mHighestNackNumber = seqLast - 1;
             nackStartAt = seqBeforeLast + 1;
             break;
         }
@@ -92,10 +94,10 @@ int32_t AAVCAssembler::addNack(
 
     if (nackStartAt != -1) {
         nackCount = source->mHighestNackNumber - nackStartAt + 1;
-        ALOGD("addNack : nackCount=%d, nackFrom=%d, nackTo=%d", nackCount,
-            nackStartAt, source->mHighestNackNumber);
+        ALOGD("addNack: nackCount=%d, nackFrom=%d, nackTo=%d", nackCount,
+                nackStartAt, source->mHighestNackNumber);
 
-        uint16_t mask = (uint16_t)(0xffff) >> (16-nackCount+1);
+        uint16_t mask = (uint16_t)(0xffff) >> (16 - nackCount + 1);
         source->setSeqNumToNACK(nackStartAt, mask, queueHeadSeqNum);
     }
 
@@ -116,9 +118,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     int64_t startTime = source->mFirstSysTime / 1000;
     int64_t nowTime = ALooper::GetNowUs() / 1000;
     int64_t playedTime = nowTime - startTime;
-    int64_t playedTimeRtp = source->mFirstRtpTime +
-        (((uint32_t)playedTime) * (source->mClockRate / 1000));
-    const uint32_t jitterTime = (uint32_t)(source->mClockRate / ((float)1000 / (source->mJbTime)));
+    int64_t playedTimeRtp =
+        source->mFirstRtpTime + (((uint32_t)playedTime) * (source->mClockRate / 1000));
+    const uint32_t jitterTime =
+        (uint32_t)(source->mClockRate / ((float)1000 / (source->mJbTimeMs)));
     uint32_t expiredTimeInJb = rtpTime + jitterTime;
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
     bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
@@ -138,8 +141,9 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         return NOT_ENOUGH_DATA;
     }
 
-    if (isTooLate200)
+    if (isTooLate200) {
         ALOGW("=== WARNING === buffer arrived 200ms late. === WARNING === ");
+    }
 
     if (isTooLate300) {
         ALOGW("buffer arrived after 300ms ... \t Diff in Jb=%lld \t Seq# %d",
@@ -221,15 +225,18 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
 }
 
 void AAVCAssembler::checkIFrameProvided(const sp<ABuffer> &buffer) {
+    if (buffer->size() == 0) {
+        return;
+    }
     const uint8_t *data = buffer->data();
     unsigned nalType = data[0] & 0x1f;
     if (nalType == 0x5) {
         mFirstIFrameProvided = true;
-        mLastIFrameProvidedAt = ALooper::GetNowUs() / 1000;
+        mLastIFrameProvidedAtMs = ALooper::GetNowUs() / 1000;
 
         uint32_t rtpTime;
         CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
-        ALOGD("got First I-frame to be decoded. rtpTime=%d, size=%zu", rtpTime, buffer->size());
+        ALOGD("got First I-frame to be decoded. rtpTime=%u, size=%zu", rtpTime, buffer->size());
     }
 }
 
@@ -352,16 +359,18 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
             size_t size = buffer->size();
 
             if ((uint32_t)buffer->int32Data() != expectedSeqNo) {
-                ALOGV("sequence not complete, expected seqNo %d, got %d, nalType %d",
-                     expectedSeqNo, (uint32_t)buffer->int32Data(), nalType);
+                ALOGD("sequence not complete, expected seqNo %u, got %u, nalType %u",
+                     expectedSeqNo, (unsigned)buffer->int32Data(), nalType);
                 snapped = true;
 
-                if (!pFrame)
+                if (!pFrame) {
                     return WRONG_SEQUENCE_NUMBER;
+                }
             }
 
-            if (!snapped)
+            if (!snapped) {
                 connected++;
+            }
 
             uint32_t rtpTime;
             CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
@@ -383,7 +392,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
             totalSize += size - 2;
             ++totalCount;
 
-            expectedSeqNo = buffer->int32Data() + 1;
+            expectedSeqNo = (uint32_t)buffer->int32Data() + 1;
 
             if (data[1] & 0x40) {
                 if (pFrame && !recycleUnit(startSeqNo, expectedSeqNo,
@@ -500,13 +509,13 @@ void AAVCAssembler::submitAccessUnit() {
     msg->post();
 }
 
-int32_t AAVCAssembler::pickProperSeq(const Q *q, uint32_t jit, int64_t play) {
-    sp<ABuffer> buffer = *(q->begin());
+int32_t AAVCAssembler::pickProperSeq(const Queue *queue, uint32_t jit, int64_t play) {
+    sp<ABuffer> buffer = *(queue->begin());
     uint32_t rtpTime;
     int32_t nextSeqNo = buffer->int32Data();
 
-    Q::const_iterator it = q->begin();
-    while (it != q->end()) {
+    Queue::const_iterator it = queue->begin();
+    while (it != queue->end()) {
         CHECK((*it)->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
         // if pkt in time exists, that should be the next pivot
         if (rtpTime + jit >= play) {
@@ -531,17 +540,17 @@ bool AAVCAssembler::recycleUnit(uint32_t start, uint32_t end, uint32_t connected
     return isRecycle;
 }
 
-int32_t AAVCAssembler::deleteUnitUnderSeq(Q *q, uint32_t seq) {
-    int32_t initSize = q->size();
-    Q::iterator it = q->begin();
-    while (it != q->end()) {
+int32_t AAVCAssembler::deleteUnitUnderSeq(Queue *queue, uint32_t seq) {
+    int32_t initSize = queue->size();
+    Queue::iterator it = queue->begin();
+    while (it != queue->end()) {
         if ((uint32_t)(*it)->int32Data() >= seq) {
             break;
         }
         it++;
     }
-    q->erase(q->begin(), it);
-    return initSize - q->size();
+    queue->erase(queue->begin(), it);
+    return initSize - queue->size();
 }
 
 inline void AAVCAssembler::printNowTimeUs(int64_t start, int64_t now, int64_t play) {
@@ -558,10 +567,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::assembleMore(
         const sp<ARTPSource> &source) {
     AssemblyStatus status = addNALUnit(source);
     if (status == MALFORMED_PACKET) {
-        uint64_t timeAfterLastIFrame = (ALooper::GetNowUs() / 1000) - mLastIFrameProvidedAt;
-        if (timeAfterLastIFrame > 1000) {
-            ALOGV("request FIR to get a new I-Frame, time after "
-                    "last I-Frame in miils %llu", (unsigned long long)timeAfterLastIFrame);
+        uint64_t msecsSinceLastIFrame = (ALooper::GetNowUs() / 1000) - mLastIFrameProvidedAtMs;
+        if (msecsSinceLastIFrame > 1000) {
+            ALOGV("request FIR to get a new I-Frame, time since "
+                    "last I-Frame %llu ms", (unsigned long long)msecsSinceLastIFrame);
             source->onIssueFIRByAssembler();
         }
     }
@@ -570,7 +579,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::assembleMore(
 
 void AAVCAssembler::packetLost() {
     CHECK(mNextExpectedSeqNoValid);
-    ALOGD("packetLost (expected %d)", mNextExpectedSeqNo);
+    ALOGD("packetLost (expected %u)", mNextExpectedSeqNo);
     ++mNextExpectedSeqNo;
 }
 

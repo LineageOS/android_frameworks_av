@@ -80,7 +80,7 @@ ARTPConnection::ARTPConnection(uint32_t flags)
       mLastReceiverReportTimeUs(-1),
       mLastBitrateReportTimeUs(-1),
       mTargetBitrate(-1),
-      mJbTime(300) {
+      mJbTimeMs(300) {
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -544,8 +544,9 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
         (!receiveRTP && s->mNumRTCPPacketsReceived == 0)
             ? sizeSockSt : 0;
 
-    if (mFlags & kViLTEConnection)
+    if (mFlags & kViLTEConnection) {
         remoteAddrLen = 0;
+    }
 
     ssize_t nbytes;
     do {
@@ -1032,11 +1033,12 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
         source = new ARTPSource(
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
-        if (mFlags & kViLTEConnection)
+        if (mFlags & kViLTEConnection) {
             source->setPeriodicFIR(false);
+        }
 
         source->setSelfID(mSelfID);
-        source->setJbTime(mJbTime > 0 ? mJbTime : 300);
+        source->setJbTime(mJbTimeMs > 0 ? mJbTimeMs : 300);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -1056,8 +1058,8 @@ void ARTPConnection::setSelfID(const uint32_t selfID) {
     mSelfID = selfID;
 }
 
-void ARTPConnection::setJbTime(const uint32_t jbTime) {
-    mJbTime = jbTime;
+void ARTPConnection::setJbTime(const uint32_t jbTimeMs) {
+    mJbTimeMs = jbTimeMs;
 }
 
 void ARTPConnection::setTargetBitrate(int32_t targetBitrate) {

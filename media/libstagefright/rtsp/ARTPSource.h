@@ -53,7 +53,7 @@ struct ARTPSource : public RefBase {
     void setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJitterHeadSeqNum);
     uint32_t getSelfID();
     void setSelfID(const uint32_t selfID);
-    void setJbTime(const uint32_t jbTime);
+    void setJbTime(const uint32_t jbTimeMs);
     void setPeriodicFIR(bool enable);
     void notifyPktInfo(int32_t bitrate, int64_t time);
     // FIR needs to be sent by missing packet or broken video image.
@@ -66,7 +66,7 @@ struct ARTPSource : public RefBase {
     int64_t mFirstSysTime;
     int32_t mClockRate;
 
-    uint32_t mJbTime;
+    uint32_t mJbTimeMs;
     int32_t mFirstSsrc;
     int32_t mHighestNackNumber;
 
