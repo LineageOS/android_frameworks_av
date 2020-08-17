@@ -295,8 +295,8 @@ static uint32_t StripStartcode(MediaBufferBase *buffer) {
 
     ptr = (const uint8_t *)buffer->data() + buffer->range_offset();
 
-    if (buffer->range_length() > 0 && (*ptr & H264_NALU_MASK) == H264_NALU_SPS) {
-        for (uint32_t i = 1; i + 4 <= buffer->range_length(); i++) {
+    if ((*ptr & H264_NALU_MASK) == H264_NALU_SPS) {
+        for (uint32_t i = 0; i < buffer->range_length(); i++) {
 
             if (!memcmp(ptr + i, "\x00\x00\x00\x01", 4)) {
                 // Now, we found one more NAL unit in the media buffer.
@@ -316,28 +316,28 @@ static void SpsPpsParser(MediaBufferBase *mediaBuffer,
     if (mediaBuffer == NULL || mediaBuffer->range_length() < 4)
         return;
 
-    if ((*spsBuffer) != NULL) {
+    if((*spsBuffer) != NULL) {
         (*spsBuffer)->release();
         (*spsBuffer) = NULL;
     }
 
-    if ((*ppsBuffer) != NULL) {
+    if((*ppsBuffer) != NULL) {
         (*ppsBuffer)->release();
         (*ppsBuffer) = NULL;
     }
 
     // we got sps/pps but startcode of sps is striped.
     (*spsBuffer) = MediaBufferBase::Create(spsSize);
+    int32_t ppsSize = mediaBuffer->range_length() - spsSize - 4/*startcode*/;
+    (*ppsBuffer) = MediaBufferBase::Create(ppsSize);
     memcpy((*spsBuffer)->data(),
             (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
             spsSize);
 
-    int32_t ppsSize = mediaBuffer->range_length() - spsSize - 4 /*startcode*/;
     if (ppsSize > 0) {
-        (*ppsBuffer) = MediaBufferBase::Create(ppsSize);
         ALOGV("PPS found. size=%d", (int)ppsSize);
-        mediaBuffer->set_range(mediaBuffer->range_offset() + spsSize + 4 /*startcode*/,
-                mediaBuffer->range_length() - spsSize - 4 /*startcode*/);
+        mediaBuffer->set_range(mediaBuffer->range_offset() + spsSize + 4/*startcode*/,
+                mediaBuffer->range_length() - spsSize - 4/*startcode*/);
         memcpy((*ppsBuffer)->data(),
                 (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
                 ppsSize);
