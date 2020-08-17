@@ -23,7 +23,9 @@
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceSession.h>
 #include <camera_metadata_hidden.h>
+#include <hidl/HidlBinderSupport.h>
 #include <gtest/gtest.h>
+#include <utility>
 
 using namespace android;
 using namespace android::hardware::camera;
@@ -172,6 +174,25 @@ struct TestICameraProvider : virtual public provider::V2_5::ICameraProvider {
         mCurrentState = newState;
         return hardware::Void();
     }
+
+    virtual ::android::hardware::Return<bool> linkToDeath(
+            const ::android::sp<::android::hardware::hidl_death_recipient>& recipient,
+            uint64_t cookie) {
+        if (mInitialDeathRecipient.get() == nullptr) {
+            mInitialDeathRecipient =
+                std::make_unique<::android::hardware::hidl_binder_death_recipient>(recipient,
+                        cookie, this);
+        }
+        return true;
+    }
+
+    void signalInitialBinderDeathRecipient() {
+        if (mInitialDeathRecipient.get() != nullptr) {
+            mInitialDeathRecipient->binderDied(nullptr /*who*/);
+        }
+    }
+
+    std::unique_ptr<::android::hardware::hidl_binder_death_recipient> mInitialDeathRecipient;
 
     enum MethodNames {
         SET_CALLBACK,
@@ -566,4 +587,48 @@ TEST(CameraProviderManagerTest, BadHalStartupTest) {
 
     ASSERT_EQ(serviceProxy.mLastRequestedServiceNames.back(), testProviderInstanceName) <<
             "Incorrect instance requested from service manager";
+}
+
+// Test that CameraProviderManager can handle races between provider death notifications and
+// provider registration callbacks
+TEST(CameraProviderManagerTest, BinderDeathRegistrationRaceTest) {
+
+    std::vector<hardware::hidl_string> deviceNames;
+    deviceNames.push_back("device@3.2/test/0");
+    deviceNames.push_back("device@3.2/test/1");
+    hardware::hidl_vec<common::V1_0::VendorTagSection> vendorSection;
+    status_t res;
+
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+    sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
+            vendorSection);
+
+    // Not setting up provider in the service proxy yet, to test cases where a
+    // HAL isn't starting right
+    res = providerManager->initialize(statusListener, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+
+    // Now set up provider and trigger a registration
+    serviceProxy.setProvider(provider);
+
+    hardware::hidl_string testProviderFqInterfaceName =
+            "android.hardware.camera.provider@2.4::ICameraProvider";
+    hardware::hidl_string testProviderInstanceName = "test/0";
+    serviceProxy.mManagerNotificationInterface->onRegistration(
+            testProviderFqInterfaceName,
+            testProviderInstanceName, false);
+
+    // Simulate artificial delay of the registration callback which arrives before the
+    // death notification
+    serviceProxy.mManagerNotificationInterface->onRegistration(
+            testProviderFqInterfaceName,
+            testProviderInstanceName, false);
+
+    provider->signalInitialBinderDeathRecipient();
+
+    auto deviceCount = static_cast<unsigned> (providerManager->getCameraCount().second);
+    ASSERT_EQ(deviceCount, deviceNames.size()) <<
+            "Unexpected amount of camera devices";
 }

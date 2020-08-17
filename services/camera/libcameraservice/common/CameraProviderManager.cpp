@@ -474,12 +474,12 @@ void CameraProviderManager::removeRef(DeviceMode usageType, const std::string &c
 hardware::Return<void> CameraProviderManager::onRegistration(
         const hardware::hidl_string& /*fqName*/,
         const hardware::hidl_string& name,
-        bool /*preexisting*/) {
+        bool preexisting) {
     std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
     {
         std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-        addProviderLocked(name);
+        addProviderLocked(name, preexisting);
     }
 
     sp<StatusListener> listener = getStatusListener();
@@ -1230,33 +1230,53 @@ CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraI
     return falseRet;
 }
 
-status_t CameraProviderManager::addProviderLocked(const std::string& newProvider) {
-    for (const auto& providerInfo : mProviders) {
-        if (providerInfo->mProviderName == newProvider) {
-            ALOGW("%s: Camera provider HAL with name '%s' already registered", __FUNCTION__,
-                    newProvider.c_str());
-            return ALREADY_EXISTS;
-        }
-    }
-
+status_t CameraProviderManager::tryToInitializeProviderLocked(
+        const std::string& providerName, const sp<ProviderInfo>& providerInfo) {
     sp<provider::V2_4::ICameraProvider> interface;
-    interface = mServiceProxy->tryGetService(newProvider);
+    interface = mServiceProxy->tryGetService(providerName);
 
     if (interface == nullptr) {
         // The interface may not be started yet. In that case, this is not a
         // fatal error.
         ALOGW("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
-                newProvider.c_str());
+                providerName.c_str());
         return BAD_VALUE;
     }
 
-    sp<ProviderInfo> providerInfo = new ProviderInfo(newProvider, this);
-    status_t res = providerInfo->initialize(interface, mDeviceState);
-    if (res != OK) {
-        return res;
+    return providerInfo->initialize(interface, mDeviceState);
+}
+
+status_t CameraProviderManager::addProviderLocked(const std::string& newProvider,
+        bool preexisting) {
+    // Several camera provider instances can be temporarily present.
+    // Defer initialization of a new instance until the older instance is properly removed.
+    auto providerInstance = newProvider + "-" + std::to_string(mProviderInstanceId);
+    bool providerPresent = false;
+    for (const auto& providerInfo : mProviders) {
+        if (providerInfo->mProviderName == newProvider) {
+            ALOGW("%s: Camera provider HAL with name '%s' already registered",
+                    __FUNCTION__, newProvider.c_str());
+            if (preexisting) {
+                return ALREADY_EXISTS;
+            } else{
+                ALOGW("%s: The new provider instance will get initialized immediately after the"
+                        " currently present instance is removed!", __FUNCTION__);
+                providerPresent = true;
+                break;
+            }
+        }
+    }
+
+    sp<ProviderInfo> providerInfo = new ProviderInfo(newProvider, providerInstance, this);
+    if (!providerPresent) {
+        status_t res = tryToInitializeProviderLocked(newProvider, providerInfo);
+        if (res != OK) {
+            return res;
+        }
     }
 
     mProviders.push_back(providerInfo);
+    mProviderInstanceId++;
 
     return OK;
 }
@@ -1266,12 +1286,14 @@ status_t CameraProviderManager::removeProvider(const std::string& provider) {
     std::unique_lock<std::mutex> lock(mInterfaceMutex);
     std::vector<String8> removedDeviceIds;
     status_t res = NAME_NOT_FOUND;
+    std::string removedProviderName;
     for (auto it = mProviders.begin(); it != mProviders.end(); it++) {
-        if ((*it)->mProviderName == provider) {
+        if ((*it)->mProviderInstance == provider) {
             removedDeviceIds.reserve((*it)->mDevices.size());
             for (auto& deviceInfo : (*it)->mDevices) {
                 removedDeviceIds.push_back(String8(deviceInfo->mId.c_str()));
             }
+            removedProviderName = (*it)->mProviderName;
             mProviders.erase(it);
             res = OK;
             break;
@@ -1281,6 +1303,14 @@ status_t CameraProviderManager::removeProvider(const std::string& provider) {
         ALOGW("%s: Camera provider HAL with name '%s' is not registered", __FUNCTION__,
                 provider.c_str());
     } else {
+        // Check if there are any newer camera instances from the same provider and try to
+        // initialize.
+        for (const auto& providerInfo : mProviders) {
+            if (providerInfo->mProviderName == removedProviderName) {
+                return tryToInitializeProviderLocked(removedProviderName, providerInfo);
+            }
+        }
+
         // Inform camera service of loss of presence for all the devices from this provider,
         // without lock held for reentrancy
         sp<StatusListener> listener = getStatusListener();
@@ -1289,7 +1319,9 @@ status_t CameraProviderManager::removeProvider(const std::string& provider) {
             for (auto& id : removedDeviceIds) {
                 listener->onDeviceStatusChanged(id, CameraDeviceStatus::NOT_PRESENT);
             }
+            lock.lock();
         }
+
     }
     return res;
 }
@@ -1303,8 +1335,10 @@ sp<CameraProviderManager::StatusListener> CameraProviderManager::getStatusListen
 
 CameraProviderManager::ProviderInfo::ProviderInfo(
         const std::string &providerName,
+        const std::string &providerInstance,
         CameraProviderManager *manager) :
         mProviderName(providerName),
+        mProviderInstance(providerInstance),
         mProviderTagid(generateVendorTagId(providerName)),
         mUniqueDeviceCount(0),
         mManager(manager) {
@@ -1628,7 +1662,7 @@ void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
 
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
     dprintf(fd, "== Camera Provider HAL %s (v2.%d, %s) static info: %zu devices: ==\n",
-            mProviderName.c_str(),
+            mProviderInstance.c_str(),
             mMinorVersion,
             mIsRemote ? "remote" : "passthrough",
             mDevices.size());
@@ -1944,12 +1978,12 @@ hardware::Return<void> CameraProviderManager::ProviderInfo::torchModeStatusChang
 void CameraProviderManager::ProviderInfo::serviceDied(uint64_t cookie,
         const wp<hidl::base::V1_0::IBase>& who) {
     (void) who;
-    ALOGI("Camera provider '%s' has died; removing it", mProviderName.c_str());
+    ALOGI("Camera provider '%s' has died; removing it", mProviderInstance.c_str());
     if (cookie != mId) {
         ALOGW("%s: Unexpected serviceDied cookie %" PRIu64 ", expected %" PRIu32,
                 __FUNCTION__, cookie, mId);
     }
-    mManager->removeProvider(mProviderName);
+    mManager->removeProvider(mProviderInstance);
 }
 
 status_t CameraProviderManager::ProviderInfo::setUpVendorTags() {
