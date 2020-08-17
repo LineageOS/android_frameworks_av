@@ -2356,10 +2356,20 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
             }
         }
 
+        // Set DIRECT flag if current thread is DirectOutputThread. This can
+        // happen when the playback is rerouted to direct output thread by
+        // dynamic audio policy.
+        // Do NOT report the flag changes back to client, since the client
+        // doesn't explicitly request a direct flag.
+        audio_output_flags_t trackFlags = *flags;
+        if (mType == DIRECT) {
+            trackFlags = static_cast<audio_output_flags_t>(trackFlags | AUDIO_OUTPUT_FLAG_DIRECT);
+        }
+
         track = new Track(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
-                          sessionId, creatorPid, uid, *flags, TrackBase::TYPE_DEFAULT, portId);
+                          sessionId, creatorPid, uid, trackFlags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
