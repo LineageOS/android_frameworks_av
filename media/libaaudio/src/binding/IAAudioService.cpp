@@ -45,7 +45,7 @@ public:
     {
     }
 
-    void registerClient(const sp<IAAudioClient>& client) override
+    void registerClient(const sp<aaudio::IAAudioClient>& client) override
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAAudioService::getInterfaceDescriptor());
@@ -249,7 +249,7 @@ status_t BnAAudioService::onTransact(uint32_t code, const Parcel& data,
     switch(code) {
         case REGISTER_CLIENT: {
             CHECK_INTERFACE(IAAudioService, data, reply);
-            sp<IAAudioClient> client = interface_cast<IAAudioClient>(
+            sp<aaudio::IAAudioClient> client = interface_cast<aaudio::IAAudioClient>(
                     data.readStrongBinder());
             // readStrongBinder() can return null
             if (client.get() == nullptr) {

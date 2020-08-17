@@ -21,6 +21,7 @@
 #include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
+#include "aaudio/BnAAudioClient.h"
 #include "AAudioServiceDefinitions.h"
 #include "AAudioServiceInterface.h"
 #include "binding/AAudioStreamRequest.h"
@@ -48,7 +49,7 @@ public:
 
     void dropAAudioService();
 
-    void registerClient(const android::sp<android::IAAudioClient>& client __unused) override {}
+    void registerClient(const android::sp<IAAudioClient>& client __unused) override {}
 
     /**
      * @param request info needed to create the stream
@@ -115,7 +116,7 @@ public:
         ALOGW("onStreamChange called!");
     }
 
-    class AAudioClient : public android::IBinder::DeathRecipient , public android::BnAAudioClient
+    class AAudioClient : public android::IBinder::DeathRecipient , public BnAAudioClient
     {
     public:
         AAudioClient(android::wp<AAudioBinderClient> aaudioBinderClient)
@@ -132,11 +133,13 @@ public:
         }
 
         // implement BnAAudioClient
-        void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) {
+        android::binder::Status onStreamChange(int32_t handle, int32_t opcode, int32_t value) {
+            static_assert(std::is_same_v<aaudio_handle_t, int32_t>);
             android::sp<AAudioBinderClient> client = mBinderClient.promote();
             if (client.get() != nullptr) {
                 client->onStreamChange(handle, opcode, value);
             }
+            return android::binder::Status::ok();
         }
     private:
         android::wp<AAudioBinderClient> mBinderClient;

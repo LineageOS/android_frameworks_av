@@ -57,6 +57,10 @@ cc_library_shared {
         "libutils",
     ],
 
+    export_shared_lib_headers: [
+        "libaaudio_internal",
+    ],
+
     header_libs: [
         "libaudiohal_headers",
     ],

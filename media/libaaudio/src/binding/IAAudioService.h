@@ -24,12 +24,12 @@
 
 #include <aaudio/AAudio.h>
 
+#include "aaudio/IAAudioClient.h"
 #include "binding/AAudioCommon.h"
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AudioEndpointParcelable.h"
-#include "binding/IAAudioClient.h"
 
 namespace android {
 
@@ -44,7 +44,7 @@ public:
     // Register an object to receive audio input/output change and track notifications.
     // For a given calling pid, AAudio service disregards any registrations after the first.
     // Thus the IAAudioClient must be a singleton per process.
-    virtual void registerClient(const sp<IAAudioClient>& client) = 0;
+    virtual void registerClient(const sp<aaudio::IAAudioClient>& client) = 0;
 
     /**
      * @param request info needed to create the stream

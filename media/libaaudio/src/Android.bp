@@ -85,6 +85,7 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "aaudio-aidl-cpp",
     ],
 
     cflags: [
@@ -117,7 +118,6 @@ cc_library {
         "binding/AAudioBinderClient.cpp",
         "binding/AAudioStreamRequest.cpp",
         "binding/AAudioStreamConfiguration.cpp",
-        "binding/IAAudioClient.cpp",
         "binding/IAAudioService.cpp",
         "binding/RingBufferParcelable.cpp",
         "binding/SharedMemoryParcelable.cpp",
@@ -137,4 +137,13 @@ cc_library {
         integer_overflow: true,
         misc_undefined: ["bounds"],
     },
+}
+
+aidl_interface {
+    name: "aaudio-aidl",
+    unstable: true,
+    local_include_dir: "binding/aidl",
+    srcs: [
+        "binding/aidl/aaudio/IAAudioClient.aidl",
+    ],
 }
