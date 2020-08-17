@@ -1703,8 +1703,9 @@ void NuPlayer::updateInternalTimers() {
 }
 
 void NuPlayer::setTargetBitrate(int bitrate) {
-    if (mSource != NULL)
+    if (mSource != NULL) {
         mSource->setTargetBitrate(bitrate);
+    }
 }
 
 void NuPlayer::onPause() {

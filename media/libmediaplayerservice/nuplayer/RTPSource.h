@@ -129,8 +129,8 @@ private:
         int32_t mTimeScale;
         int32_t mAS;
 
-        /* RTP jitter buffer time in millsecond */
-        uint32_t mJbTime;
+        /* RTP jitter buffer time in milliseconds */
+        uint32_t mJbTimeMs;
         /* Unique ID indicates itself */
         uint32_t mSelfID;
         /* extmap:<value> for CVO will be set to here */

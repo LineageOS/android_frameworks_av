@@ -46,7 +46,7 @@ ARTPSource::ARTPSource(
       mFirstRtpTime(0),
       mFirstSysTime(0),
       mClockRate(0),
-      mJbTime(300), // default jitter buffer time is 300ms.
+      mJbTimeMs(300), // default jitter buffer time is 300ms.
       mFirstSsrc(0),
       mHighestNackNumber(0),
       mID(id),
@@ -217,22 +217,23 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
 
     bool send = false;
     int64_t nowUs = ALooper::GetNowUs();
-    int64_t timeAfterLastFIR = nowUs - mLastFIRRequestUs;
+    int64_t usecsSinceLastFIR = nowUs - mLastFIRRequestUs;
     if (mLastFIRRequestUs < 0) {
         // A first FIR, just send it.
         send = true;
-    }  else if (mIssueFIRByAssembler && (timeAfterLastFIR > 1000000)) {
+    }  else if (mIssueFIRByAssembler && (usecsSinceLastFIR > 1000000)) {
         // A FIR issued by Assembler.
         // Send it if last FIR is not sent within a sec.
         send = true;
-    } else if (mIssueFIRRequests && (timeAfterLastFIR > 5000000)) {
+    } else if (mIssueFIRRequests && (usecsSinceLastFIR > 5000000)) {
         // A FIR issued periodically reagardless packet loss.
         // Send it if last FIR is not sent within 5 secs.
         send = true;
     }
 
-    if (!send)
+    if (!send) {
         return;
+    }
 
     mLastFIRRequestUs = nowUs;
 
@@ -246,7 +247,7 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
     data[0] = 0x80 | 4;
     data[1] = 206;  // PSFB
     data[2] = 0;
-    data[3] = 4;
+    data[3] = 4;    // total (4+1) * sizeof(int32_t) = 20 bytes
     data[4] = kSourceID >> 24;
     data[5] = (kSourceID >> 16) & 0xff;
     data[6] = (kSourceID >> 8) & 0xff;
@@ -270,8 +271,7 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
 
     buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
 
-    if (mIssueFIRByAssembler)
-        mIssueFIRByAssembler = false;
+    mIssueFIRByAssembler = false;
 
     ALOGV("Added FIR request.");
 }
@@ -303,7 +303,7 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     data[0] = 0x80 | 1;
     data[1] = 201;  // RR
     data[2] = 0;
-    data[3] = 7;
+    data[3] = 7;    // total (7+1) * sizeof(int32_t) = 32 bytes
     data[4] = kSourceID >> 24;
     data[5] = (kSourceID >> 16) & 0xff;
     data[6] = (kSourceID >> 8) & 0xff;
@@ -358,8 +358,9 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate) {
         return;
     }
 
-    if (targetBitrate <= 0)
+    if (targetBitrate <= 0) {
         return;
+    }
 
     uint8_t *data = buffer->data() + buffer->size();
 
@@ -397,8 +398,9 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate) {
 }
 
 int ARTPSource::addNACK(const sp<ABuffer> &buffer) {
-    if (buffer->size() + 52 > buffer->capacity()) {
-        ALOGW("RTCP buffer too small to accomodate NACK.");
+    constexpr size_t kMaxFCIs = 10; // max number of FCIs
+    if (buffer->size() + (3 + kMaxFCIs) * sizeof(int32_t) > buffer->capacity()) {
+        ALOGW("RTCP buffer too small to accommodate NACK.");
         return -1;
     }
 
@@ -420,11 +422,11 @@ int ARTPSource::addNACK(const sp<ABuffer> &buffer) {
 
     List<int> list;
     List<int>::iterator it;
-    getSeqNumToNACK(list, 10);
-    int cnt = 0;
+    getSeqNumToNACK(list, kMaxFCIs);
+    size_t cnt = 0;
 
-    int* FCI = (int*)(data + 12);
-    for (it = list.begin() ; it != list.end() ; it++) {
+    int *FCI = (int *)(data + 12);
+    for (it = list.begin(); it != list.end() && cnt < kMaxFCIs; it++) {
         *(FCI + cnt) = *it;
         cnt++;
     }
@@ -441,16 +443,13 @@ int ARTPSource::getSeqNumToNACK(List<int>& list, int size) {
     int cnt = 0;
 
     std::map<uint16_t, infoNACK>::iterator it;
-    for(it = mNACKMap.begin() ; it != mNACKMap.end() ; it++) {
-        infoNACK& info_it = it->second;
-        // list full
-        if (cnt == size)
-            break;
+    for(it = mNACKMap.begin(); it != mNACKMap.end() && cnt < size; it++) {
+        infoNACK &info_it = it->second;
         if (info_it.needToNACK) {
             info_it.needToNACK = false;
             // switch LSB to MSB for sending N/W
             uint32_t FCI;
-            uint8_t* temp = (uint8_t*)&FCI;
+            uint8_t *temp = (uint8_t *)&FCI;
             temp[0] = (info_it.seqNum >> 8) & 0xff;
             temp[1] = (info_it.seqNum)      & 0xff;
             temp[2] = (info_it.mask >> 8)   & 0xff;
@@ -471,9 +470,9 @@ void ARTPSource::setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJit
 
     it = mNACKMap.find(seqNum);
     if (it != mNACKMap.end()) {
-        infoNACK& info_it = it->second;
+        infoNACK &info_it = it->second;
         // renew if (mask or head seq) is changed
-        if((info_it.mask != mask) || (info_it.nowJitterHeadSeqNum != nowJitterHeadSeqNum)) {
+        if ((info_it.mask != mask) || (info_it.nowJitterHeadSeqNum != nowJitterHeadSeqNum)) {
             info_it = info;
         }
     } else {
@@ -482,16 +481,16 @@ void ARTPSource::setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJit
 
     // delete all NACK far from current Jitter's first sequence number
     it = mNACKMap.begin();
-    while(it != mNACKMap.end()) {
-        infoNACK& info_it = it->second;
+    while (it != mNACKMap.end()) {
+        infoNACK &info_it = it->second;
 
         int diff = nowJitterHeadSeqNum - info_it.nowJitterHeadSeqNum;
         if (diff > 100) {
             ALOGV("Delete %d pkt from NACK map ", info_it.seqNum);
             it = mNACKMap.erase(it);
-        }
-        else
+        } else {
             it++;
+        }
     }
 
 }
@@ -499,12 +498,13 @@ void ARTPSource::setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJit
 uint32_t ARTPSource::getSelfID() {
     return kSourceID;
 }
+
 void ARTPSource::setSelfID(const uint32_t selfID) {
     kSourceID = selfID;
 }
 
-void ARTPSource::setJbTime(const uint32_t jbTime) {
-    mJbTime = jbTime;
+void ARTPSource::setJbTime(const uint32_t jbTimeMs) {
+    mJbTimeMs = jbTimeMs;
 }
 
 void ARTPSource::setPeriodicFIR(bool enable) {

@@ -18,7 +18,7 @@
 
 #define A_TRAFFIC_RECORDER_H_
 
-#include <utils/Log.h>
+#include <android-base/logging.h>
 #include <utils/RefBase.h>
 
 namespace android {
@@ -27,12 +27,12 @@ namespace android {
 template <class Time, class Bytes>
 class TrafficRecorder : public RefBase {
 private:
-    int mSize;
-    int mSizeMask;
-    Time* mTimeArray = NULL;
-    Bytes* mBytesArray = NULL;
-    int mHeadIdx = 0;
-    int mTailIdx = 0;
+    size_t mSize;
+    size_t mSizeMask;
+    Time *mTimeArray = NULL;
+    Bytes *mBytesArray = NULL;
+    size_t mHeadIdx = 0;
+    size_t mTailIdx = 0;
 
     Time mClock = 0;
     Time mLastTimeOfPrint = 0;
@@ -59,29 +59,26 @@ TrafficRecorder<Time, Bytes>::TrafficRecorder() {
 
 template <class Time, class Bytes>
 TrafficRecorder<Time, Bytes>::TrafficRecorder(size_t size) {
-    int exp;
-    for (exp = 0 ; exp < 32 ; exp++) {
-        if (size <= (1 << exp))
+    size_t exp;
+    for (exp = 0; exp < 32; exp++) {
+        if (size <= (1ul << exp)) {
             break;
+        }
     }
-    mSize = (1 << exp);         // size = 2^exp
+    mSize = (1ul << exp);         // size = 2^exp
     mSizeMask = mSize - 1;
 
-    ALOGV("TrafficRecorder Init size %u", mSize);
-    if (mTimeArray != NULL)
-        free(mTimeArray);
-    if (mBytesArray != NULL)
-        free(mBytesArray);
-    mTimeArray = (Time*)malloc(sizeof(Time) * mSize);
-    mBytesArray = (Bytes*)malloc(sizeof(Bytes) * mSize);
+    LOG(VERBOSE) << "TrafficRecorder Init size " << mSize;
+    mTimeArray = new Time[mSize];
+    mBytesArray = new Bytes[mSize];
 
     init();
 }
 
 template <class Time, class Bytes>
 TrafficRecorder<Time, Bytes>::~TrafficRecorder() {
-    free(mTimeArray);
-    free(mBytesArray);
+    delete[] mTimeArray;
+    delete[] mBytesArray;
 }
 
 template <class Time, class Bytes>
@@ -101,14 +98,14 @@ template <class Time, class Bytes>
 Bytes TrafficRecorder<Time, Bytes>::readBytesForLastPeriod(Time period) {
     Bytes bytes = 0;
 
-    int i = mTailIdx;
-    while(i != mHeadIdx) {
-        ALOGV("READ %d time %d \t EndOfPeriod %d", i, mTimeArray[i], mClock - period);
+    size_t i = mTailIdx;
+    while (i != mHeadIdx) {
+        LOG(VERBOSE) << "READ " << i << " time " << mTimeArray[i] << " \t EndOfPeriod " << mClock - period;
         if (mTimeArray[i] < mClock - period) {
             break;
         }
         bytes += mBytesArray[i];
-        i = (i - 1 + mSize) & mSizeMask;
+        i = (i + mSize - 1) & mSizeMask;
     }
     mHeadIdx = i;
     return bytes;
@@ -116,8 +113,8 @@ Bytes TrafficRecorder<Time, Bytes>::readBytesForLastPeriod(Time period) {
 
 template <class Time, class Bytes>
 void TrafficRecorder<Time, Bytes>::writeBytes(Bytes bytes) {
-    int writeIdx;
-    if(mClock == mTimeArray[mTailIdx]) {
+    size_t writeIdx;
+    if (mClock == mTimeArray[mTailIdx]) {
         writeIdx = mTailIdx;
         mBytesArray[writeIdx] += bytes;
     } else {
@@ -126,9 +123,9 @@ void TrafficRecorder<Time, Bytes>::writeBytes(Bytes bytes) {
         mBytesArray[writeIdx] = bytes;
     }
 
-    ALOGV("WRITE %d time %d", writeIdx, mClock);
+    LOG(VERBOSE) << "WRITE " << writeIdx << " time " << mClock;
     if (writeIdx == mHeadIdx) {
-        ALOGW("Traffic recorder size exceeded at %d", mHeadIdx);
+        LOG(WARNING) << "Traffic recorder size exceeded at " << mHeadIdx;
         mHeadIdx = (mHeadIdx + 1) & mSizeMask;
     }
 
@@ -140,7 +137,7 @@ template <class Time, class Bytes>
 void TrafficRecorder<Time, Bytes>::printAccuBitsForLastPeriod(Time period, Time unit) {
     Time duration = mClock - mLastTimeOfPrint;
     float numOfUnit = (float)duration / unit;
-    if(duration > period) {
+    if (duration > period) {
         ALOGD("Actual Tx period %.0f ms \t %.0f Bits/Unit",
               numOfUnit * 1000.f, mAccuBytesOfPrint * 8.f / numOfUnit);
         mLastTimeOfPrint = mClock;
@@ -148,6 +145,7 @@ void TrafficRecorder<Time, Bytes>::printAccuBitsForLastPeriod(Time period, Time 
         init();
     }
 }
+
 }  // namespace android
 
 #endif  // A_TRAFFIC_RECORDER_H_
