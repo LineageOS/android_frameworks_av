@@ -142,7 +142,8 @@ status_t BnCameraClient::onTransact(
             camera_frame_metadata_t metadata;
             if (data.dataAvail() > 0) {
                 metadata.number_of_faces = data.readInt32();
-                if (metadata.number_of_faces <= 0 ||
+                // Zero faces is a valid case, to notify clients that no faces are now visible
+                if (metadata.number_of_faces < 0 ||
                         metadata.number_of_faces > (int32_t)(INT32_MAX / sizeof(camera_face_t))) {
                     ALOGE("%s: Too large face count: %d", __FUNCTION__, metadata.number_of_faces);
                     return BAD_VALUE;
