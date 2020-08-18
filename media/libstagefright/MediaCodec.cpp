@@ -2094,8 +2094,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     CHECK(msg->findInt32("err", &err));
                     CHECK(msg->findInt32("actionCode", &actionCode));
 
-                    ALOGE("Codec reported err %#x, actionCode %d, while in state %d",
-                            err, actionCode, mState);
+                    ALOGE("Codec reported err %#x, actionCode %d, while in state %d/%s",
+                            err, actionCode, mState, stateString(mState).c_str());
                     if (err == DEAD_OBJECT) {
                         mFlags |= kFlagSawMediaServerDie;
                         mFlags &= ~kFlagIsComponentAllocated;
@@ -2253,8 +2253,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState == RELEASING || mState == UNINITIALIZED) {
                         // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("allocate interrupted by error or release, current state %d",
-                              mState);
+                        ALOGW("allocate interrupted by error or release, current state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     CHECK_EQ(mState, INITIALIZING);
@@ -2300,8 +2300,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState == RELEASING || mState == UNINITIALIZED || mState == INITIALIZED) {
                         // In case a kWhatError or kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("configure interrupted by error or release, current state %d",
-                              mState);
+                        ALOGW("configure interrupted by error or release, current state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     CHECK_EQ(mState, CONFIGURING);
@@ -2430,7 +2430,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState == RELEASING || mState == UNINITIALIZED) {
                         // In case a kWhatRelease message came in and replied,
                         // we log a warning and ignore.
-                        ALOGW("start interrupted by release, current state %d", mState);
+                        ALOGW("start interrupted by release, current state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
 
@@ -2666,7 +2667,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 case kWhatStopCompleted:
                 {
                     if (mState != STOPPING) {
-                        ALOGW("Received kWhatStopCompleted in state %d", mState);
+                        ALOGW("Received kWhatStopCompleted in state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     setState(INITIALIZED);
@@ -2677,7 +2679,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 case kWhatReleaseCompleted:
                 {
                     if (mState != RELEASING) {
-                        ALOGW("Received kWhatReleaseCompleted in state %d", mState);
+                        ALOGW("Received kWhatReleaseCompleted in state %d/%s",
+                              mState, stateString(mState).c_str());
                         break;
                     }
                     setState(UNINITIALIZED);
@@ -2707,8 +2710,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 case kWhatFlushCompleted:
                 {
                     if (mState != FLUSHING) {
-                        ALOGW("received FlushCompleted message in state %d",
-                                mState);
+                        ALOGW("received FlushCompleted message in state %d/%s",
+                                mState, stateString(mState).c_str());
                         break;
                     }
 
