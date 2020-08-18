@@ -292,6 +292,9 @@ ssize_t AudioFlinger::EffectBase::removeHandle_l(EffectHandle *handle)
         }
     }
 
+    // Prevent calls to process() and other functions on effect interface from now on.
+    // The effect engine will be released by the destructor when the last strong reference on
+    // this object is released which can happen after next process is called.
     if (mHandles.size() == 0 && !mPinned) {
         mState = DESTROYED;
     }
@@ -563,20 +566,6 @@ AudioFlinger::EffectModule::~EffectModule()
         release_l();
     }
 
-}
-
-ssize_t AudioFlinger::EffectModule::removeHandle_l(EffectHandle *handle)
-{
-    ssize_t status = EffectBase::removeHandle_l(handle);
-
-    // Prevent calls to process() and other functions on effect interface from now on.
-    // The effect engine will be released by the destructor when the last strong reference on
-    // this object is released which can happen after next process is called.
-    if (status == 0 && !mPinned) {
-        mEffectInterface->close();
-    }
-
-    return status;
 }
 
 bool AudioFlinger::EffectModule::updateState() {
