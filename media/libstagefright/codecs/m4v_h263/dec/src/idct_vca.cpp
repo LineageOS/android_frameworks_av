@@ -94,6 +94,7 @@ void idctcol1(int16 *blk)
     return;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow2(int16 *blk, uint8 *pred, uint8 *dst, int width)
 {
     int32 x0, x1, x2, x4, x5;
@@ -182,6 +183,7 @@ void idctcol2(int16 *blk)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow3(int16 *blk, uint8 *pred, uint8 *dst, int width)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -291,6 +293,7 @@ void idctcol3(int16 *blk)
 }
 
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow4(int16 *blk, uint8 *pred, uint8 *dst, int width)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -368,6 +371,7 @@ void idctrow4(int16 *blk, uint8 *pred, uint8 *dst, int width)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctcol4(int16 *blk)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
@@ -445,6 +449,7 @@ void idctrow1_intra(int16 *blk, PIXEL *comp, int width)
     return;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow2_intra(int16 *blk, PIXEL *comp, int width)
 {
     int32 x0, x1, x2, x4, x5, temp;
@@ -502,6 +507,7 @@ void idctrow2_intra(int16 *blk, PIXEL *comp, int width)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow3_intra(int16 *blk, PIXEL *comp, int width)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8, temp;
@@ -575,6 +581,7 @@ void idctrow3_intra(int16 *blk, PIXEL *comp, int width)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow4_intra(int16 *blk, PIXEL *comp, int width)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8, temp;
