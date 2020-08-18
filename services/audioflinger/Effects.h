@@ -144,7 +144,7 @@ public:
     status_t addHandle(EffectHandle *handle);
     ssize_t disconnectHandle(EffectHandle *handle, bool unpinIfLast);
     ssize_t removeHandle(EffectHandle *handle);
-    virtual ssize_t removeHandle_l(EffectHandle *handle);
+    ssize_t removeHandle_l(EffectHandle *handle);
     EffectHandle* controlHandle_l();
     bool purgeHandles();
 
@@ -239,8 +239,6 @@ public:
     int16_t     *outBuffer() const {
         return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
     }
-
-    ssize_t removeHandle_l(EffectHandle *handle) override;
 
     status_t         setDevices(const AudioDeviceTypeAddrVector &devices);
     status_t         setInputDevice(const AudioDeviceTypeAddr &device);
