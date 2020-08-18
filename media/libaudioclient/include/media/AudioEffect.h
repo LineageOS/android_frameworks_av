@@ -22,14 +22,15 @@
 
 #include <media/IAudioFlinger.h>
 #include <media/IAudioPolicyService.h>
-#include <media/IEffect.h>
-#include <media/IEffectClient.h>
 #include <media/AudioSystem.h>
 #include <system/audio_effect.h>
 
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
+
+#include "android/media/IEffect.h"
+#include "android/media/BnEffectClient.h"
 
 
 namespace android {
@@ -549,45 +550,43 @@ protected:
      // IEffectClient
      virtual void controlStatusChanged(bool controlGranted);
      virtual void enableStatusChanged(bool enabled);
-     virtual void commandExecuted(uint32_t cmdCode,
-             uint32_t cmdSize,
-             void *pCmdData,
-             uint32_t replySize,
-             void *pReplyData);
+     virtual void commandExecuted(int32_t cmdCode,
+                                  const std::vector<uint8_t>& cmdData,
+                                  const std::vector<uint8_t>& replyData);
 
 private:
 
      // Implements the IEffectClient interface
     class EffectClient :
-        public android::BnEffectClient, public android::IBinder::DeathRecipient
+        public media::BnEffectClient, public android::IBinder::DeathRecipient
     {
     public:
 
         EffectClient(AudioEffect *effect) : mEffect(effect){}
 
         // IEffectClient
-        virtual void controlStatusChanged(bool controlGranted) {
+        binder::Status controlStatusChanged(bool controlGranted) override {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
                 effect->controlStatusChanged(controlGranted);
             }
+            return binder::Status::ok();
         }
-        virtual void enableStatusChanged(bool enabled) {
+        binder::Status enableStatusChanged(bool enabled) override {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
                 effect->enableStatusChanged(enabled);
             }
+            return binder::Status::ok();
         }
-        virtual void commandExecuted(uint32_t cmdCode,
-                                     uint32_t cmdSize,
-                                     void *pCmdData,
-                                     uint32_t replySize,
-                                     void *pReplyData) {
+        binder::Status commandExecuted(int32_t cmdCode,
+                             const std::vector<uint8_t>& cmdData,
+                             const std::vector<uint8_t>& replyData) override {
             sp<AudioEffect> effect = mEffect.promote();
             if (effect != 0) {
-                effect->commandExecuted(
-                    cmdCode, cmdSize, pCmdData, replySize, pReplyData);
+                effect->commandExecuted(cmdCode, cmdData, replyData);
             }
+            return binder::Status::ok();
         }
 
         // IBinder::DeathRecipient
@@ -604,7 +603,7 @@ private:
 
     void binderDied();
 
-    sp<IEffect>             mIEffect;           // IEffect binder interface
+    sp<media::IEffect>      mIEffect;           // IEffect binder interface
     sp<EffectClient>        mIEffectClient;     // IEffectClient implementation
     sp<IMemory>             mCblkMemory;        // shared memory for deferred parameter setting
     effect_param_cblk_t*    mCblk = nullptr;    // control block for deferred parameter setting
