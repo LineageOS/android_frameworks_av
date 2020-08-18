@@ -506,6 +506,7 @@ void BlockIDCT(
 /*----------------------------------------------------------------------------
 ; Function Code FOR idctrow
 ----------------------------------------------------------------------------*/
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow(
     int16 *blk, uint8 *pred, uint8 *dst, int width
 )
@@ -828,6 +829,7 @@ void idctrow_intra(
 /*----------------------------------------------------------------------------
 ; Function Code FOR idctcol
 ----------------------------------------------------------------------------*/
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctcol(
     int16 *blk
 )
