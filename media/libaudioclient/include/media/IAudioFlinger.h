@@ -33,14 +33,14 @@
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
-#include <media/IEffect.h>
-#include <media/IEffectClient.h>
 #include <utils/String8.h>
 #include <media/MicrophoneInfo.h>
 #include <vector>
 
 #include "android/media/IAudioRecord.h"
 #include "android/media/IAudioTrackCallback.h"
+#include "android/media/IEffect.h"
+#include "android/media/IEffectClient.h"
 
 namespace android {
 
@@ -463,9 +463,9 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *pDescriptor) const = 0;
 
-    virtual sp<IEffect> createEffect(
+    virtual sp<media::IEffect> createEffect(
                                     effect_descriptor_t *pDesc,
-                                    const sp<IEffectClient>& client,
+                                    const sp<media::IEffectClient>& client,
                                     int32_t priority,
                                     // AudioFlinger doesn't take over handle reference from client
                                     audio_io_handle_t output,

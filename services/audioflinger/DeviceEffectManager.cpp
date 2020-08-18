@@ -30,6 +30,8 @@
 
 namespace android {
 
+using media::IEffectClient;
+
 void AudioFlinger::DeviceEffectManager::createAudioPatch(audio_patch_handle_t handle,
         const PatchPanel::Patch& patch) {
     ALOGV("%s handle %d mHalHandle %d num sinks %d device sink %08x",

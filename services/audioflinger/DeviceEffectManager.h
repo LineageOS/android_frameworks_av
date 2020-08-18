@@ -33,7 +33,7 @@ public:
     sp<EffectHandle> createEffect_l(effect_descriptor_t *descriptor,
                 const AudioDeviceTypeAddr& device,
                 const sp<AudioFlinger::Client>& client,
-                const sp<IEffectClient>& effectClient,
+                const sp<media::IEffectClient>& effectClient,
                 const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches,
                 int *enabled,
                 status_t *status,

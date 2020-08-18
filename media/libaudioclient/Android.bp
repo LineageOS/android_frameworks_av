@@ -77,8 +77,6 @@ cc_library_shared {
         "IAudioPolicyService.cpp",
         "IAudioPolicyServiceClient.cpp",
         "IAudioTrack.cpp",
-        "IEffect.cpp",
-        "IEffectClient.cpp",
         "ToneGenerator.cpp",
         "PlayerBase.cpp",
         "RecordingActivityTracker.cpp",
@@ -99,6 +97,7 @@ cc_library_shared {
         "libmediautils",
         "libnblog",
         "libprocessgroup",
+        "libshmemcompat",
         "libutils",
         "libvibrator",
     ],
@@ -108,7 +107,8 @@ cc_library_shared {
         "frameworks/av/media/libnbaio/include_mono/",
     ],
     local_include_dirs: [
-        "include/media", "aidl"
+        "include/media",
+        "aidl",
     ],
     header_libs: [
         "libaudioclient_headers",
@@ -116,10 +116,16 @@ cc_library_shared {
         "libmedia_headers",
     ],
     export_header_lib_headers: ["libaudioclient_headers"],
+    export_static_lib_headers: [
+        "effect-aidl-cpp",
+        "shared-file-region-aidl-cpp",
+    ],
 
-    // for memory heap analysis
     static_libs: [
+        "effect-aidl-cpp",
+        // for memory heap analysis
         "libc_malloc_debug_backtrace",
+        "shared-file-region-aidl-cpp",
     ],
     cflags: [
         "-Wall",
@@ -127,7 +133,7 @@ cc_library_shared {
         "-Wno-error=deprecated-declarations",
     ],
     sanitize: {
-        misc_undefined : [
+        misc_undefined: [
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
@@ -168,5 +174,18 @@ aidl_interface {
     local_include_dir: "aidl",
     srcs: [
         "aidl/android/media/ICaptureStateListener.aidl",
+    ],
+}
+
+aidl_interface {
+    name: "effect-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/IEffect.aidl",
+        "aidl/android/media/IEffectClient.aidl",
+    ],
+    imports: [
+        "shared-file-region-aidl",
     ],
 }
