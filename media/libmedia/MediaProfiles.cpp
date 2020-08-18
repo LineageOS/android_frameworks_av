@@ -63,7 +63,7 @@ std::array<char const*, 5> const& getXmlPaths() {
                      searchDirs[1] + fileName,
                      searchDirs[2] + fileName,
                      searchDirs[3] + fileName,
-                     "system/etc/media_profiles_V1_0.xml" // System fallback
+                     "system/etc/media_profiles.xml" // System fallback
                    };
         }();
     static std::array<char const*, 5> const cPaths = {
