@@ -24,20 +24,22 @@
 #include <media/AudioClient.h>
 
 #include <aaudio/AAudio.h>
+#include <aaudio/BnAAudioService.h>
 
 #include "binding/AAudioCommon.h"
 #include "binding/AAudioBinderAdapter.h"
 #include "binding/AAudioServiceInterface.h"
-#include "binding/IAAudioService.h"
 
 #include "AAudioServiceStreamBase.h"
 #include "AAudioStreamTracker.h"
 
 namespace android {
 
+#define AAUDIO_SERVICE_NAME  "media.aaudio"
+
 class AAudioService :
     public BinderService<AAudioService>,
-    public BnAAudioService
+    public aaudio::BnAAudioService
 {
     friend class BinderService<AAudioService>;
 
@@ -53,36 +55,32 @@ public:
 
     virtual status_t        dump(int fd, const Vector<String16>& args) override;
 
-    virtual void            registerClient(const sp<aaudio::IAAudioClient>& client);
+    binder::Status registerClient(const ::android::sp<::aaudio::IAAudioClient>& client) override;
 
-    aaudio::aaudio_handle_t openStream(const aaudio::AAudioStreamRequest &request,
-                                       aaudio::AAudioStreamConfiguration &configurationOutput)
-                                       override;
+    binder::Status openStream(const ::aaudio::StreamRequest& request,
+                              ::aaudio::StreamParameters* paramsOut,
+                              int32_t* _aidl_return) override;
 
-    /*
-     * This is called from Binder. It checks for permissions
-     * and converts the handle passed through Binder to a stream pointer.
-     */
-    aaudio_result_t closeStream(aaudio::aaudio_handle_t streamHandle) override;
+    binder::Status closeStream(int32_t streamHandle, int32_t* _aidl_return) override;
 
-    aaudio_result_t getStreamDescription(
-                aaudio::aaudio_handle_t streamHandle,
-                aaudio::AudioEndpointParcelable &parcelable) override;
+    binder::Status
+    getStreamDescription(int32_t streamHandle, ::aaudio::Endpoint* endpoint,
+                         int32_t* _aidl_return) override;
 
-    aaudio_result_t startStream(aaudio::aaudio_handle_t streamHandle) override;
+    binder::Status startStream(int32_t streamHandle, int32_t* _aidl_return) override;
 
-    aaudio_result_t pauseStream(aaudio::aaudio_handle_t streamHandle) override;
+    binder::Status pauseStream(int32_t streamHandle, int32_t* _aidl_return) override;
 
-    aaudio_result_t stopStream(aaudio::aaudio_handle_t streamHandle) override;
+    binder::Status stopStream(int32_t streamHandle, int32_t* _aidl_return) override;
 
-    aaudio_result_t flushStream(aaudio::aaudio_handle_t streamHandle) override;
+    binder::Status flushStream(int32_t streamHandle, int32_t* _aidl_return) override;
 
-    aaudio_result_t registerAudioThread(aaudio::aaudio_handle_t streamHandle,
-                                                pid_t tid,
-                                                int64_t periodNanoseconds) override;
+    binder::Status
+    registerAudioThread(int32_t streamHandle, int32_t clientThreadId, int64_t periodNanoseconds,
+                        int32_t* _aidl_return) override;
 
-    aaudio_result_t unregisterAudioThread(aaudio::aaudio_handle_t streamHandle,
-                                                  pid_t tid) override;
+    binder::Status unregisterAudioThread(int32_t streamHandle, int32_t clientThreadId,
+                                         int32_t* _aidl_return) override;
 
     aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
                                 const android::AudioClient& client,

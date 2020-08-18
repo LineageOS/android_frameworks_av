@@ -16,7 +16,7 @@
 
 #pragma once
 
-#include <binding/IAAudioService.h>
+#include <aaudio/IAAudioService.h>
 #include <binding/AAudioServiceInterface.h>
 
 namespace aaudio {
@@ -30,7 +30,7 @@ namespace aaudio {
  */
 class AAudioBinderAdapter : public AAudioServiceInterface {
 public:
-    explicit AAudioBinderAdapter(android::IAAudioService* delegate);
+    explicit AAudioBinderAdapter(IAAudioService* delegate);
 
     void registerClient(const android::sp<IAAudioClient>& client) override;
 
@@ -40,7 +40,7 @@ public:
     aaudio_result_t closeStream(aaudio_handle_t streamHandle) override;
 
     aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
-                                         AudioEndpointParcelable& parcelable) override;
+                                         AudioEndpointParcelable& endpoint) override;
 
     aaudio_result_t startStream(aaudio_handle_t streamHandle) override;
 
@@ -58,7 +58,7 @@ public:
                                           pid_t clientThreadId) override;
 
 private:
-    android::IAAudioService* const mDelegate;
+    IAAudioService* const mDelegate;
 };
 
 }  // namespace aaudio

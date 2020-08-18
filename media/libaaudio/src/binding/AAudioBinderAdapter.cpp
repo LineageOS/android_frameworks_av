@@ -15,55 +15,111 @@
  */
 
 #include <binding/AAudioBinderAdapter.h>
+#include <utility/AAudioUtilities.h>
 
 namespace aaudio {
 
-AAudioBinderAdapter::AAudioBinderAdapter(android::IAAudioService *delegate)
+using android::binder::Status;
+
+AAudioBinderAdapter::AAudioBinderAdapter(IAAudioService* delegate)
         : mDelegate(delegate) {}
 
-void AAudioBinderAdapter::registerClient(const android::sp<aaudio::IAAudioClient> &client) {
+void AAudioBinderAdapter::registerClient(const android::sp<IAAudioClient>& client) {
     mDelegate->registerClient(client);
 }
 
-aaudio_handle_t AAudioBinderAdapter::openStream(const AAudioStreamRequest &request,
-                                                AAudioStreamConfiguration &configuration) {
-    return mDelegate->openStream(request, configuration);
+aaudio_handle_t AAudioBinderAdapter::openStream(const AAudioStreamRequest& request,
+                                                AAudioStreamConfiguration& config) {
+    aaudio_handle_t result;
+    StreamParameters params;
+    Status status = mDelegate->openStream(request.parcelable(),
+                                          &params,
+                                          &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    config = params;
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::closeStream(aaudio_handle_t streamHandle) {
-    return mDelegate->closeStream(streamHandle);
+    aaudio_result_t result;
+    Status status = mDelegate->closeStream(streamHandle, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::getStreamDescription(aaudio_handle_t streamHandle,
-                                                          AudioEndpointParcelable &parcelable) {
-    return mDelegate->getStreamDescription(streamHandle, parcelable);
+                                                          AudioEndpointParcelable& endpointOut) {
+    aaudio_result_t result;
+    Endpoint endpoint;
+    Status status = mDelegate->getStreamDescription(streamHandle,
+                                                    &endpoint,
+                                                    &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    endpointOut = std::move(endpoint);
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::startStream(aaudio_handle_t streamHandle) {
-    return mDelegate->startStream(streamHandle);
+    aaudio_result_t result;
+    Status status = mDelegate->startStream(streamHandle, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::pauseStream(aaudio_handle_t streamHandle) {
-    return mDelegate->pauseStream(streamHandle);
+    aaudio_result_t result;
+    Status status = mDelegate->pauseStream(streamHandle, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::stopStream(aaudio_handle_t streamHandle) {
-    return mDelegate->stopStream(streamHandle);
+    aaudio_result_t result;
+    Status status = mDelegate->stopStream(streamHandle, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::flushStream(aaudio_handle_t streamHandle) {
-    return mDelegate->flushStream(streamHandle);
+    aaudio_result_t result;
+    Status status = mDelegate->flushStream(streamHandle, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::registerAudioThread(aaudio_handle_t streamHandle,
                                                          pid_t clientThreadId,
                                                          int64_t periodNanoseconds) {
-    return mDelegate->registerAudioThread(streamHandle, clientThreadId, periodNanoseconds);
+    aaudio_result_t result;
+    Status status = mDelegate->registerAudioThread(streamHandle, clientThreadId, periodNanoseconds, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 aaudio_result_t AAudioBinderAdapter::unregisterAudioThread(aaudio_handle_t streamHandle,
                                                            pid_t clientThreadId) {
-    return mDelegate->unregisterAudioThread(streamHandle, clientThreadId);
+    aaudio_result_t result;
+    Status status = mDelegate->unregisterAudioThread(streamHandle, clientThreadId, &result);
+    if (!status.isOk()) {
+        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+    }
+    return result;
 }
 
 }  // namespace aaudio

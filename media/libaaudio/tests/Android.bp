@@ -11,10 +11,12 @@ cc_test {
     defaults: ["libaaudio_tests_defaults"],
     srcs: ["test_marshalling.cpp"],
     shared_libs: [
+        "aaudio-aidl-cpp",
         "libaaudio_internal",
         "libbinder",
         "libcutils",
         "libutils",
+        "shared-file-region-aidl-unstable-cpp",
     ],
 }
 

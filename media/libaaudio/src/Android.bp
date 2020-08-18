@@ -119,7 +119,6 @@ cc_library {
         "binding/AAudioBinderClient.cpp",
         "binding/AAudioStreamRequest.cpp",
         "binding/AAudioStreamConfiguration.cpp",
-        "binding/IAAudioService.cpp",
         "binding/RingBufferParcelable.cpp",
         "binding/SharedMemoryParcelable.cpp",
         "binding/SharedRegionParcelable.cpp",
@@ -145,6 +144,27 @@ aidl_interface {
     unstable: true,
     local_include_dir: "binding/aidl",
     srcs: [
+        "binding/aidl/aaudio/Endpoint.aidl",
+        "binding/aidl/aaudio/RingBuffer.aidl",
+        "binding/aidl/aaudio/SharedRegion.aidl",
+        "binding/aidl/aaudio/StreamParameters.aidl",
+        "binding/aidl/aaudio/StreamRequest.aidl",
         "binding/aidl/aaudio/IAAudioClient.aidl",
+        "binding/aidl/aaudio/IAAudioService.aidl",
     ],
+    imports: [
+        "audio_common-aidl",
+        "shared-file-region-aidl",
+    ],
+    backend:
+    {
+        cpp: {
+            enabled: true,
+        },
+        java: {
+            // TODO: need to have audio_common-aidl available in Java to enable
+            //       this.
+            enabled: false,
+        },
+    },
 }
