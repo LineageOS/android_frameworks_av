@@ -101,6 +101,7 @@
 #include <vibrator/ExternalVibrationUtils.h>
 
 #include "android/media/BnAudioRecord.h"
+#include "android/media/BnEffect.h"
 
 namespace android {
 
@@ -232,9 +233,9 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *descriptor) const;
 
-    virtual sp<IEffect> createEffect(
+    virtual sp<media::IEffect> createEffect(
                         effect_descriptor_t *pDesc,
-                        const sp<IEffectClient>& effectClient,
+                        const sp<media::IEffectClient>& effectClient,
                         int32_t priority,
                         audio_io_handle_t io,
                         audio_session_t sessionId,

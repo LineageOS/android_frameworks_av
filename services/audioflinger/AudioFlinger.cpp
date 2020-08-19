@@ -98,6 +98,8 @@
 
 namespace android {
 
+using media::IEffectClient;
+
 static const char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
 static const char kHardwareLockedString[] = "Hardware lock is taken\n";
 static const char kClientLockedString[] = "Client lock is taken\n";
@@ -3438,7 +3440,7 @@ status_t AudioFlinger::getEffectDescriptor(const effect_uuid_t *pUuid,
     return status;
 }
 
-sp<IEffect> AudioFlinger::createEffect(
+sp<media::IEffect> AudioFlinger::createEffect(
         effect_descriptor_t *pDesc,
         const sp<IEffectClient>& effectClient,
         int32_t priority,

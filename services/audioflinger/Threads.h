@@ -349,7 +349,7 @@ public:
 
                 sp<EffectHandle> createEffect_l(
                                     const sp<AudioFlinger::Client>& client,
-                                    const sp<IEffectClient>& effectClient,
+                                    const sp<media::IEffectClient>& effectClient,
                                     int32_t priority,
                                     audio_session_t sessionId,
                                     effect_descriptor_t *desc,

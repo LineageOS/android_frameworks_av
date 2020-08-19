@@ -116,6 +116,8 @@ static inline T min(const T& a, const T& b)
 
 namespace android {
 
+using media::IEffectClient;
+
 // retry counts for buffer fill timeout
 // 50 * ~20msecs = 1 second
 static const int8_t kMaxTrackRetries = 50;

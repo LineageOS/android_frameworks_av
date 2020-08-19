@@ -23,15 +23,27 @@
 #include <sys/types.h>
 #include <limits.h>
 
-#include <private/media/AudioEffectShared.h>
-#include <media/AudioEffect.h>
-
-#include <utils/Log.h>
 #include <binder/IPCThreadState.h>
-
-
+#include <media/AudioEffect.h>
+#include <media/ShmemCompat.h>
+#include <private/media/AudioEffectShared.h>
+#include <utils/Log.h>
 
 namespace android {
+
+using binder::Status;
+
+namespace {
+
+// Copy from a raw pointer + size into a vector of bytes.
+void appendToBuffer(const void* data,
+                    size_t size,
+                    std::vector<uint8_t>* buffer) {
+    const uint8_t* p = reinterpret_cast<const uint8_t*>(data);
+    buffer->insert(buffer->end(), p, p + size);
+}
+
+}  // namespace
 
 // ---------------------------------------------------------------------------
 
@@ -50,7 +62,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
                 const AudioDeviceTypeAddr& device,
                 bool probe)
 {
-    sp<IEffect> iEffect;
+    sp<media::IEffect> iEffect;
     sp<IMemory> cblk;
     int enabled;
 
@@ -112,8 +124,10 @@ status_t AudioEffect::set(const effect_uuid_t *type,
 
     mEnabled = (volatile int32_t)enabled;
 
-    cblk = iEffect->getCblk();
-    if (cblk == 0) {
+    if (media::SharedFileRegion shmem;
+            !iEffect->getCblk(&shmem).isOk()
+            || !convertSharedFileRegionToIMemory(shmem, &cblk)
+            || cblk == 0) {
         mStatus = NO_INIT;
         ALOGE("Could not get control block");
         return mStatus;
@@ -216,15 +230,19 @@ status_t AudioEffect::setEnabled(bool enabled)
     }
 
     status_t status = NO_ERROR;
-
     AutoMutex lock(mLock);
     if (enabled != mEnabled) {
+        Status bs;
+
         if (enabled) {
             ALOGV("enable %p", this);
-            status = mIEffect->enable();
+            bs = mIEffect->enable(&status);
         } else {
             ALOGV("disable %p", this);
-            status = mIEffect->disable();
+            bs = mIEffect->disable(&status);
+        }
+        if (!bs.isOk()) {
+            status = bs.transactionError();
         }
         if (status == NO_ERROR) {
             mEnabled = enabled;
@@ -257,7 +275,20 @@ status_t AudioEffect::command(uint32_t cmdCode,
         mLock.lock();
     }
 
-    status_t status = mIEffect->command(cmdCode, cmdSize, cmdData, replySize, replyData);
+    std::vector<uint8_t> data;
+    appendToBuffer(cmdData, cmdSize, &data);
+
+    status_t status;
+    std::vector<uint8_t> response;
+
+    Status bs = mIEffect->command(cmdCode, data, *replySize, &response, &status);
+    if (!bs.isOk()) {
+        status = bs.transactionError();
+    }
+    if (status == NO_ERROR) {
+        memcpy(replyData, response.data(), response.size());
+        *replySize = response.size();
+    }
 
     if (cmdCode == EFFECT_CMD_ENABLE || cmdCode == EFFECT_CMD_DISABLE) {
         if (status == NO_ERROR) {
@@ -272,7 +303,6 @@ status_t AudioEffect::command(uint32_t cmdCode,
     return status;
 }
 
-
 status_t AudioEffect::setParameter(effect_param_t *param)
 {
     if (mProbe) {
@@ -286,14 +316,27 @@ status_t AudioEffect::setParameter(effect_param_t *param)
         return BAD_VALUE;
     }
 
-    uint32_t size = sizeof(int);
     uint32_t psize = ((param->psize - 1) / sizeof(int) + 1) * sizeof(int) + param->vsize;
 
     ALOGV("setParameter: param: %d, param2: %d", *(int *)param->data,
             (param->psize == 8) ? *((int *)param->data + 1): -1);
 
-    return mIEffect->command(EFFECT_CMD_SET_PARAM, sizeof (effect_param_t) + psize, param, &size,
-            &param->status);
+    std::vector<uint8_t> cmd;
+    appendToBuffer(param, sizeof(effect_param_t) + psize, &cmd);
+    std::vector<uint8_t> response;
+    status_t status;
+    Status bs = mIEffect->command(EFFECT_CMD_SET_PARAM,
+                                  cmd,
+                                  sizeof(int),
+                                  &response,
+                                  &status);
+    if (!bs.isOk()) {
+        status = bs.transactionError();
+        return status;
+    }
+    assert(response.size() == sizeof(int));
+    memcpy(&param->status, response.data(), response.size());
+    return status;
 }
 
 status_t AudioEffect::setParameterDeferred(effect_param_t *param)
@@ -338,8 +381,18 @@ status_t AudioEffect::setParameterCommit()
     if (mCblk->clientIndex == 0) {
         return INVALID_OPERATION;
     }
-    uint32_t size = 0;
-    return mIEffect->command(EFFECT_CMD_SET_PARAM_COMMIT, 0, NULL, &size, NULL);
+    std::vector<uint8_t> cmd;
+    std::vector<uint8_t> response;
+    status_t status;
+    Status bs = mIEffect->command(EFFECT_CMD_SET_PARAM_COMMIT,
+                                  cmd,
+                                  0,
+                                  &response,
+                                  &status);
+    if (!bs.isOk()) {
+        status = bs.transactionError();
+    }
+    return status;
 }
 
 status_t AudioEffect::getParameter(effect_param_t *param)
@@ -361,8 +414,18 @@ status_t AudioEffect::getParameter(effect_param_t *param)
     uint32_t psize = sizeof(effect_param_t) + ((param->psize - 1) / sizeof(int) + 1) * sizeof(int) +
             param->vsize;
 
-    return mIEffect->command(EFFECT_CMD_GET_PARAM, sizeof(effect_param_t) + param->psize, param,
-            &psize, param);
+    status_t status;
+    std::vector<uint8_t> cmd;
+    std::vector<uint8_t> response;
+    appendToBuffer(param, sizeof(effect_param_t) + param->psize, &cmd);
+
+    Status bs = mIEffect->command(EFFECT_CMD_GET_PARAM, cmd, psize, &response, &status);
+    if (!bs.isOk()) {
+        status = bs.transactionError();
+        return status;
+    }
+    memcpy(param, response.data(), response.size());
+    return status;
 }
 
 
@@ -410,19 +473,18 @@ void AudioEffect::enableStatusChanged(bool enabled)
     }
 }
 
-void AudioEffect::commandExecuted(uint32_t cmdCode,
-                                  uint32_t cmdSize __unused,
-                                  void *cmdData,
-                                  uint32_t replySize __unused,
-                                  void *replyData)
+void AudioEffect::commandExecuted(int32_t cmdCode,
+                                  const std::vector<uint8_t>& cmdData,
+                                  const std::vector<uint8_t>& replyData)
 {
-    if (cmdData == NULL || replyData == NULL) {
+    if (cmdData.empty() || replyData.empty()) {
         return;
     }
 
     if (mCbf != NULL && cmdCode == EFFECT_CMD_SET_PARAM) {
-        effect_param_t *cmd = (effect_param_t *)cmdData;
-        cmd->status = *(int32_t *)replyData;
+        std::vector<uint8_t> cmdDataCopy(cmdData);
+        effect_param_t* cmd = reinterpret_cast<effect_param_t *>(cmdDataCopy.data());
+        cmd->status = *reinterpret_cast<const int32_t *>(replyData.data());
         mCbf(EVENT_PARAMETER_CHANGED, mUserData, cmd);
     }
 }

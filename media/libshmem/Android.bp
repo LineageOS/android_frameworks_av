@@ -1,0 +1,50 @@
+aidl_interface {
+    name: "shared-file-region-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/SharedFileRegion.aidl",
+    ],
+}
+
+cc_library {
+    name: "libshmemcompat",
+    export_include_dirs: ["include"],
+    srcs: ["ShmemCompat.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libshmemutil",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+    ],
+    export_shared_lib_headers: [
+        "libbinder",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+    ],
+}
+
+cc_library {
+    name: "libshmemutil",
+    export_include_dirs: ["include"],
+    srcs: ["ShmemUtil.cpp"],
+    shared_libs: [
+        "shared-file-region-aidl-cpp",
+    ],
+    export_shared_lib_headers: [
+        "shared-file-region-aidl-cpp",
+    ],
+}
+
+cc_test {
+    name: "shmemTest",
+    srcs: ["ShmemTest.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libshmemcompat",
+        "libshmemutil",
+        "libutils",
+        "shared-file-region-aidl-cpp",
+    ],
+    test_suites: ["device-tests"],
+}

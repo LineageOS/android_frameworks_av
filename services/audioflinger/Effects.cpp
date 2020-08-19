@@ -34,6 +34,7 @@
 #include <media/AudioContainers.h>
 #include <media/AudioEffect.h>
 #include <media/AudioDeviceTypeAddr.h>
+#include <media/ShmemCompat.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <mediautils/ServiceUtilities.h>
@@ -58,6 +59,27 @@
 #define DEFAULT_OUTPUT_SAMPLE_RATE 48000
 
 namespace android {
+
+using binder::Status;
+
+namespace {
+
+// Append a POD value into a vector of bytes.
+template<typename T>
+void appendToBuffer(const T& value, std::vector<uint8_t>* buffer) {
+    const uint8_t* ar(reinterpret_cast<const uint8_t*>(&value));
+    buffer->insert(buffer->end(), ar, ar + sizeof(T));
+}
+
+// Write a POD value into a vector of bytes (clears the previous buffer
+// content).
+template<typename T>
+void writeToBuffer(const T& value, std::vector<uint8_t>* buffer) {
+    buffer->clear();
+    appendToBuffer(value, buffer);
+}
+
+}  // namespace
 
 // ----------------------------------------------------------------------------
 //  EffectBase implementation
@@ -1166,11 +1188,10 @@ static T roundUpDelta(const T &value, const T &divisor) {
     return remainder == 0 ? 0 : divisor - remainder;
 }
 
-status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
-                                             uint32_t cmdSize,
-                                             void *pCmdData,
-                                             uint32_t *replySize,
-                                             void *pReplyData)
+status_t AudioFlinger::EffectModule::command(int32_t cmdCode,
+                     const std::vector<uint8_t>& cmdData,
+                     int32_t maxReplySize,
+                     std::vector<uint8_t>* reply)
 {
     Mutex::Autolock _l(mLock);
     ALOGVV("command(), cmdCode: %d, mEffectInterface: %p", cmdCode, mEffectInterface.get());
@@ -1181,63 +1202,68 @@ status_t AudioFlinger::EffectModule::command(uint32_t cmdCode,
     if (mStatus != NO_ERROR) {
         return mStatus;
     }
+    if (maxReplySize < 0 || maxReplySize > EFFECT_PARAM_SIZE_MAX) {
+        return -EINVAL;
+    }
+    size_t cmdSize = cmdData.size();
+    const effect_param_t* param = cmdSize >= sizeof(effect_param_t)
+                                  ? reinterpret_cast<const effect_param_t*>(cmdData.data())
+                                  : nullptr;
     if (cmdCode == EFFECT_CMD_GET_PARAM &&
-            (sizeof(effect_param_t) > cmdSize ||
-                    ((effect_param_t *)pCmdData)->psize > cmdSize
-                                                          - sizeof(effect_param_t))) {
+            (param == nullptr || param->psize > cmdSize - sizeof(effect_param_t))) {
         android_errorWriteLog(0x534e4554, "32438594");
         android_errorWriteLog(0x534e4554, "33003822");
         return -EINVAL;
     }
     if (cmdCode == EFFECT_CMD_GET_PARAM &&
-            (*replySize < sizeof(effect_param_t) ||
-                    ((effect_param_t *)pCmdData)->psize > *replySize - sizeof(effect_param_t))) {
+            (maxReplySize < sizeof(effect_param_t) ||
+                   param->psize > maxReplySize - sizeof(effect_param_t))) {
         android_errorWriteLog(0x534e4554, "29251553");
         return -EINVAL;
     }
     if (cmdCode == EFFECT_CMD_GET_PARAM &&
-        (sizeof(effect_param_t) > *replySize
-          || ((effect_param_t *)pCmdData)->psize > *replySize
-                                                   - sizeof(effect_param_t)
-          || ((effect_param_t *)pCmdData)->vsize > *replySize
-                                                   - sizeof(effect_param_t)
-                                                   - ((effect_param_t *)pCmdData)->psize
-          || roundUpDelta(((effect_param_t *)pCmdData)->psize, (uint32_t)sizeof(int)) >
-                                                   *replySize
-                                                   - sizeof(effect_param_t)
-                                                   - ((effect_param_t *)pCmdData)->psize
-                                                   - ((effect_param_t *)pCmdData)->vsize)) {
+            (sizeof(effect_param_t) > maxReplySize
+                    || param->psize > maxReplySize - sizeof(effect_param_t)
+                    || param->vsize > maxReplySize - sizeof(effect_param_t)
+                            - param->psize
+                    || roundUpDelta(param->psize, (uint32_t) sizeof(int)) >
+                            maxReplySize
+                                    - sizeof(effect_param_t)
+                                    - param->psize
+                                    - param->vsize)) {
         ALOGV("\tLVM_ERROR : EFFECT_CMD_GET_PARAM: reply size inconsistent");
                      android_errorWriteLog(0x534e4554, "32705438");
         return -EINVAL;
     }
     if ((cmdCode == EFFECT_CMD_SET_PARAM
-            || cmdCode == EFFECT_CMD_SET_PARAM_DEFERRED) &&  // DEFERRED not generally used
-        (sizeof(effect_param_t) > cmdSize
-            || ((effect_param_t *)pCmdData)->psize > cmdSize
-                                                     - sizeof(effect_param_t)
-            || ((effect_param_t *)pCmdData)->vsize > cmdSize
-                                                     - sizeof(effect_param_t)
-                                                     - ((effect_param_t *)pCmdData)->psize
-            || roundUpDelta(((effect_param_t *)pCmdData)->psize, (uint32_t)sizeof(int)) >
-                                                     cmdSize
-                                                     - sizeof(effect_param_t)
-                                                     - ((effect_param_t *)pCmdData)->psize
-                                                     - ((effect_param_t *)pCmdData)->vsize)) {
+            || cmdCode == EFFECT_CMD_SET_PARAM_DEFERRED)
+            &&  // DEFERRED not generally used
+                    (param == nullptr
+                            || param->psize > cmdSize - sizeof(effect_param_t)
+                            || param->vsize > cmdSize - sizeof(effect_param_t)
+                                    - param->psize
+                            || roundUpDelta(param->psize,
+                                            (uint32_t) sizeof(int)) >
+                                    cmdSize
+                                            - sizeof(effect_param_t)
+                                            - param->psize
+                                            - param->vsize)) {
         android_errorWriteLog(0x534e4554, "30204301");
         return -EINVAL;
     }
+    uint32_t replySize = maxReplySize;
+    reply->resize(replySize);
     status_t status = mEffectInterface->command(cmdCode,
                                                 cmdSize,
-                                                pCmdData,
-                                                replySize,
-                                                pReplyData);
+                                                const_cast<uint8_t*>(cmdData.data()),
+                                                &replySize,
+                                                reply->data());
+    reply->resize(status == NO_ERROR ? replySize : 0);
     if (cmdCode != EFFECT_CMD_GET_PARAM && status == NO_ERROR) {
-        uint32_t size = (replySize == NULL) ? 0 : *replySize;
         for (size_t i = 1; i < mHandles.size(); i++) {
             EffectHandle *h = mHandles[i];
             if (h != NULL && !h->disconnected()) {
-                h->commandExecuted(cmdCode, cmdSize, pCmdData, size, pReplyData);
+                h->commandExecuted(cmdCode, cmdData, *reply);
             }
         }
     }
@@ -1547,19 +1573,18 @@ status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
         return INVALID_OPERATION;
     }
 
-    uint32_t buf32[sizeof(effect_param_t) / sizeof(uint32_t) + 3];
-    effect_param_t *param = (effect_param_t*) buf32;
+    std::vector<uint8_t> request(sizeof(effect_param_t) + 3 * sizeof(uint32_t));
+    effect_param_t *param = (effect_param_t*) request.data();
     param->psize = sizeof(int32_t);
     param->vsize = sizeof(int32_t) * 2;
     *(int32_t*)param->data = HG_PARAM_HAPTIC_INTENSITY;
     *((int32_t*)param->data + 1) = id;
     *((int32_t*)param->data + 2) = intensity;
-    uint32_t size = sizeof(int32_t);
-    status_t status = command(
-            EFFECT_CMD_SET_PARAM, sizeof(effect_param_t) + param->psize + param->vsize,
-            param, &size, &param->status);
+    std::vector<uint8_t> response;
+    status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
     if (status == NO_ERROR) {
-        status = param->status;
+        LOG_ALWAYS_FATAL_IF(response.size() != 4);
+        status = *reinterpret_cast<const status_t*>(response.data());
     }
     return status;
 }
@@ -1642,9 +1667,9 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args)
 #define LOG_TAG "AudioFlinger::EffectHandle"
 
 AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
-                                        const sp<AudioFlinger::Client>& client,
-                                        const sp<IEffectClient>& effectClient,
-                                        int32_t priority)
+                                         const sp<AudioFlinger::Client>& client,
+                                         const sp<media::IEffectClient>& effectClient,
+                                         int32_t priority)
     : BnEffect(),
     mEffect(effect), mEffectClient(effectClient), mClient(client), mCblk(NULL),
     mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false)
@@ -1678,20 +1703,24 @@ status_t AudioFlinger::EffectHandle::initCheck()
     return mClient == 0 || mCblkMemory != 0 ? OK : NO_MEMORY;
 }
 
-status_t AudioFlinger::EffectHandle::enable()
+#define RETURN(code) \
+  *_aidl_return = (code); \
+  return Status::ok();
+
+Status AudioFlinger::EffectHandle::enable(int32_t* _aidl_return)
 {
     AutoMutex _l(mLock);
     ALOGV("enable %p", this);
     sp<EffectBase> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
-        return DEAD_OBJECT;
+        RETURN(DEAD_OBJECT);
     }
     if (!mHasControl) {
-        return INVALID_OPERATION;
+        RETURN(INVALID_OPERATION);
     }
 
     if (mEnabled) {
-        return NO_ERROR;
+        RETURN(NO_ERROR);
     }
 
     mEnabled = true;
@@ -1699,54 +1728,55 @@ status_t AudioFlinger::EffectHandle::enable()
     status_t status = effect->updatePolicyState();
     if (status != NO_ERROR) {
         mEnabled = false;
-        return status;
+        RETURN(status);
     }
 
     effect->checkSuspendOnEffectEnabled(true, false /*threadLocked*/);
 
     // checkSuspendOnEffectEnabled() can suspend this same effect when enabled
     if (effect->suspended()) {
-        return NO_ERROR;
+        RETURN(NO_ERROR);
     }
 
     status = effect->setEnabled(true, true /*fromHandle*/);
     if (status != NO_ERROR) {
         mEnabled = false;
     }
-    return status;
+    RETURN(status);
 }
 
-status_t AudioFlinger::EffectHandle::disable()
+Status AudioFlinger::EffectHandle::disable(int32_t* _aidl_return)
 {
     ALOGV("disable %p", this);
     AutoMutex _l(mLock);
     sp<EffectBase> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
-        return DEAD_OBJECT;
+        RETURN(DEAD_OBJECT);
     }
     if (!mHasControl) {
-        return INVALID_OPERATION;
+        RETURN(INVALID_OPERATION);
     }
 
     if (!mEnabled) {
-        return NO_ERROR;
+        RETURN(NO_ERROR);
     }
     mEnabled = false;
 
     effect->updatePolicyState();
 
     if (effect->suspended()) {
-        return NO_ERROR;
+        RETURN(NO_ERROR);
     }
 
     status_t status = effect->setEnabled(false, true /*fromHandle*/);
-    return status;
+    RETURN(status);
 }
 
-void AudioFlinger::EffectHandle::disconnect()
+Status AudioFlinger::EffectHandle::disconnect()
 {
     ALOGV("%s %p", __FUNCTION__, this);
     disconnect(true);
+    return Status::ok();
 }
 
 void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
@@ -1783,11 +1813,16 @@ void AudioFlinger::EffectHandle::disconnect(bool unpinIfLast)
     }
 }
 
-status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
-                                             uint32_t cmdSize,
-                                             void *pCmdData,
-                                             uint32_t *replySize,
-                                             void *pReplyData)
+Status AudioFlinger::EffectHandle::getCblk(media::SharedFileRegion* _aidl_return) {
+    LOG_ALWAYS_FATAL_IF(!convertIMemoryToSharedFileRegion(mCblkMemory, _aidl_return));
+    return Status::ok();
+}
+
+Status AudioFlinger::EffectHandle::command(int32_t cmdCode,
+                       const std::vector<uint8_t>& cmdData,
+                       int32_t maxResponseSize,
+                       std::vector<uint8_t>* response,
+                       int32_t* _aidl_return)
 {
     ALOGVV("command(), cmdCode: %d, mHasControl: %d, mEffect: %p",
             cmdCode, mHasControl, mEffect.unsafe_get());
@@ -1807,49 +1842,46 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
                 break;
             }
             android_errorWriteLog(0x534e4554, "62019992");
-            return BAD_VALUE;
+            RETURN(BAD_VALUE);
     }
 
     if (cmdCode == EFFECT_CMD_ENABLE) {
-        if (*replySize < sizeof(int)) {
+        if (maxResponseSize < sizeof(int)) {
             android_errorWriteLog(0x534e4554, "32095713");
-            return BAD_VALUE;
+            RETURN(BAD_VALUE);
         }
-        *(int *)pReplyData = NO_ERROR;
-        *replySize = sizeof(int);
-        return enable();
+        writeToBuffer(NO_ERROR, response);
+        return enable(_aidl_return);
     } else if (cmdCode == EFFECT_CMD_DISABLE) {
-        if (*replySize < sizeof(int)) {
+        if (maxResponseSize < sizeof(int)) {
             android_errorWriteLog(0x534e4554, "32095713");
-            return BAD_VALUE;
+            RETURN(BAD_VALUE);
         }
-        *(int *)pReplyData = NO_ERROR;
-        *replySize = sizeof(int);
-        return disable();
+        writeToBuffer(NO_ERROR, response);
+        return disable(_aidl_return);
     }
 
     AutoMutex _l(mLock);
     sp<EffectBase> effect = mEffect.promote();
     if (effect == 0 || mDisconnected) {
-        return DEAD_OBJECT;
+        RETURN(DEAD_OBJECT);
     }
     // only get parameter command is permitted for applications not controlling the effect
     if (!mHasControl && cmdCode != EFFECT_CMD_GET_PARAM) {
-        return INVALID_OPERATION;
+        RETURN(INVALID_OPERATION);
     }
 
     // handle commands that are not forwarded transparently to effect engine
     if (cmdCode == EFFECT_CMD_SET_PARAM_COMMIT) {
         if (mClient == 0) {
-            return INVALID_OPERATION;
+            RETURN(INVALID_OPERATION);
         }
 
-        if (*replySize < sizeof(int)) {
+        if (maxResponseSize < sizeof(int)) {
             android_errorWriteLog(0x534e4554, "32095713");
-            return BAD_VALUE;
+            RETURN(BAD_VALUE);
         }
-        *(int *)pReplyData = NO_ERROR;
-        *replySize = sizeof(int);
+        writeToBuffer(NO_ERROR, response);
 
         // No need to trylock() here as this function is executed in the binder thread serving a
         // particular client process:  no risk to block the whole media server process or mixer
@@ -1862,10 +1894,10 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
             serverIndex > EFFECT_PARAM_BUFFER_SIZE) {
             mCblk->serverIndex = 0;
             mCblk->clientIndex = 0;
-            return BAD_VALUE;
+            RETURN(BAD_VALUE);
         }
         status_t status = NO_ERROR;
-        effect_param_t *param = NULL;
+        std::vector<uint8_t> param;
         for (uint32_t index = serverIndex; index < clientIndex;) {
             int *p = (int *)(mBuffer + index);
             const int size = *p++;
@@ -1877,23 +1909,16 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
                 break;
             }
 
-            // copy to local memory in case of client corruption b/32220769
-            auto *newParam = (effect_param_t *)realloc(param, size);
-            if (newParam == NULL) {
-                ALOGW("command(): out of memory");
-                status = NO_MEMORY;
-                break;
-            }
-            param = newParam;
-            memcpy(param, p, size);
+            std::copy(reinterpret_cast<const uint8_t*>(p),
+                      reinterpret_cast<const uint8_t*>(p) + size,
+                      std::back_inserter(param));
 
-            int reply = 0;
-            uint32_t rsize = sizeof(reply);
+            std::vector<uint8_t> replyBuffer;
             status_t ret = effect->command(EFFECT_CMD_SET_PARAM,
-                                            size,
                                             param,
-                                            &rsize,
-                                            &reply);
+                                            sizeof(int),
+                                            &replyBuffer);
+            int reply = *reinterpret_cast<const int*>(replyBuffer.data());
 
             // verify shared memory: server index shouldn't change; client index can't go back.
             if (serverIndex != mCblk->serverIndex
@@ -1906,21 +1931,24 @@ status_t AudioFlinger::EffectHandle::command(uint32_t cmdCode,
             // stop at first error encountered
             if (ret != NO_ERROR) {
                 status = ret;
-                *(int *)pReplyData = reply;
+                writeToBuffer(reply, response);
                 break;
             } else if (reply != NO_ERROR) {
-                *(int *)pReplyData = reply;
+                writeToBuffer(reply, response);
                 break;
             }
             index += size;
         }
-        free(param);
         mCblk->serverIndex = 0;
         mCblk->clientIndex = 0;
-        return status;
+        RETURN(status);
     }
 
-    return effect->command(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
+    status_t status = effect->command(cmdCode,
+                                      cmdData,
+                                      maxResponseSize,
+                                      response);
+    RETURN(status);
 }
 
 void AudioFlinger::EffectHandle::setControl(bool hasControl, bool signal, bool enabled)
@@ -1936,13 +1964,11 @@ void AudioFlinger::EffectHandle::setControl(bool hasControl, bool signal, bool e
 }
 
 void AudioFlinger::EffectHandle::commandExecuted(uint32_t cmdCode,
-                                                 uint32_t cmdSize,
-                                                 void *pCmdData,
-                                                 uint32_t replySize,
-                                                 void *pReplyData)
+                         const std::vector<uint8_t>& cmdData,
+                         const std::vector<uint8_t>& replyData)
 {
     if (mEffectClient != 0) {
-        mEffectClient->commandExecuted(cmdCode, cmdSize, pCmdData, replySize, pReplyData);
+        mEffectClient->commandExecuted(cmdCode, cmdData, replyData);
     }
 }
 
@@ -1954,13 +1980,6 @@ void AudioFlinger::EffectHandle::setEnabled(bool enabled)
         mEffectClient->enableStatusChanged(enabled);
     }
 }
-
-status_t AudioFlinger::EffectHandle::onTransact(
-    uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
-{
-    return BnEffect::onTransact(code, data, reply, flags);
-}
-
 
 void AudioFlinger::EffectHandle::dumpToBuffer(char* buffer, size_t size)
 {
@@ -3012,10 +3031,14 @@ status_t AudioFlinger::DeviceEffectProxy::setEnabled(bool enabled, bool fromHand
     Mutex::Autolock _l(mProxyLock);
     if (status == NO_ERROR) {
         for (auto& handle : mEffectHandles) {
+            Status bs;
             if (enabled) {
-                status = handle.second->enable();
+                bs = handle.second->enable(&status);
             } else {
-                status = handle.second->disable();
+                bs = handle.second->disable(&status);
+            }
+            if (!bs.isOk()) {
+              status = bs.transactionError();
             }
         }
     }
@@ -3123,10 +3146,14 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         status = BAD_VALUE;
     }
     if (status == NO_ERROR || status == ALREADY_EXISTS) {
+        Status bs;
         if (isEnabled()) {
-            (*handle)->enable();
+            bs = (*handle)->enable(&status);
         } else {
-            (*handle)->disable();
+            bs = (*handle)->disable(&status);
+        }
+        if (!bs.isOk()) {
+            status = bs.transactionError();
         }
     }
     return status;

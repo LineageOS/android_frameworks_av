@@ -25,7 +25,6 @@
 
 #include <cutils/compiler.h>
 #include <cutils/properties.h>
-#include <utils/Debug.h>
 #include <utils/Log.h>
 #include <audio_utils/primitives.h>
 
