@@ -54,7 +54,7 @@ private:
 /// \note this will contain any initialization, which we will remove when converting to lower-case
 #define _C2_GET_ENUM_NAME(x, y) #x
 /// mapper to get value of enum
-#define _C2_GET_ENUM_VALUE(x, type) (_C2EnumConst<type>)x
+#define _C2_GET_ENUM_VALUE(x, type_) (_C2EnumConst<typename std::underlying_type<type_>::type>)type_::x
 
 /// \endcond
 
@@ -106,7 +106,7 @@ public:
 template<> \
 C2FieldDescriptor::NamedValuesType C2FieldDescriptor::namedValuesFor(const name &r __unused) { \
     return _C2EnumUtils::sanitizeEnumValues( \
-            std::vector<C2Value::Primitive> { _C2_MAP(_C2_GET_ENUM_VALUE, type, __VA_ARGS__) }, \
+            std::vector<C2Value::Primitive> { _C2_MAP(_C2_GET_ENUM_VALUE, name, __VA_ARGS__) }, \
             { _C2_MAP(_C2_GET_ENUM_NAME, type, __VA_ARGS__) }, \
             prefix); \
 }
