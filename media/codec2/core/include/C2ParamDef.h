@@ -270,6 +270,11 @@ protected:
         } \
         return 0; \
     } \
+    inline void setFlexCount(size_t count) { \
+        if (count < flexCount()) { \
+            this->setSize(sizeof(_Type) + _Type::FLEX_SIZE * count); \
+        } \
+    } \
 
 /// Mark flexible member variable and make structure flexible.
 #define FLEX(cls, m) \
