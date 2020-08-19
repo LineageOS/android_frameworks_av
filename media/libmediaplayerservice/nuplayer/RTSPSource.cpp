@@ -146,7 +146,9 @@ void NuPlayer::RTSPSource::stop() {
     }
 
     // Close socket before posting message to RTSPSource message handler.
-    close(mHandler->getARTSPConnection()->getSocket());
+    if (mHandler != NULL) {
+        close(mHandler->getARTSPConnection()->getSocket());
+    }
 
     sp<AMessage> msg = new AMessage(kWhatDisconnect, this);
 
