@@ -97,6 +97,9 @@ public:
         PARAM_TYPE = CoreIndex | TypeFlags
     };
 
+    // the underlying param struct type
+    typedef S Struct;
+
 protected:
     enum : uint32_t {
         FLEX_SIZE = 0,
