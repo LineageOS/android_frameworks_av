@@ -34,6 +34,8 @@ namespace android {
 using DeviceStrategyMap = std::map<product_strategy_t, DeviceVector>;
 using StrategyVector = std::vector<product_strategy_t>;
 using VolumeGroupVector = std::vector<volume_group_t>;
+using CapturePresetDevicesRoleMap =
+        std::map<audio_source_t, std::map<device_role_t, AudioDeviceTypeAddrVector>>;
 
 /**
  * This interface is dedicated to the policy manager that a Policy Engine shall implement.
@@ -331,6 +333,75 @@ public:
      */
     virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy, device_role_t role,
             AudioDeviceTypeAddrVector &devices) const = 0;
+
+    /**
+     * @brief setDevicesRoleForCapturePreset sets devices role for a capture preset when available.
+     * To remove devices role, removeDevicesRoleForCapturePreset must be called. Calling
+     * clearDevicesRoleForCapturePreset will remove all devices as role. When devices role is set
+     * successfully, previously set devices for the same role and capture preset will be removed.
+     * @param audioSource the audio capture preset whose routing will be affected
+     * @param role the role of the devices for the capture preset. All device roles are defined at
+     *             system/media/audio/include/system/audio_policy.h. DEVICE_ROLE_NONE is invalid
+     *             for setting.
+     * @param devices the audio devices to be set
+     * @return BAD_VALUE if the capture preset or role is invalid,
+     *     or NO_ERROR if the role of the devices for capture preset was set
+     */
+    virtual status_t setDevicesRoleForCapturePreset(audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) = 0;
+
+    /**
+     * @brief addDevicesRoleForCapturePreset adds devices role for a capture preset when available.
+     * To remove devices role, removeDevicesRoleForCapturePreset must be called. Calling
+     * clearDevicesRoleForCapturePreset will remove all devices as role.
+     * @param audioSource the audio capture preset whose routing will be affected
+     * @param role the role of the devices for the capture preset. All device roles are defined at
+     *             system/media/audio/include/system/audio_policy.h. DEVICE_ROLE_NONE is invalid
+     *             for setting.
+     * @param devices the audio devices to be added
+     * @return BAD_VALUE if the capture preset or role is invalid,
+     *     or NO_ERROR if the role of the devices for capture preset was added
+     */
+    virtual status_t addDevicesRoleForCapturePreset(audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) = 0;
+
+    /**
+     * @brief removeDevicesRoleForCapturePreset removes the role of device(s) previously set
+     * for the given capture preset
+     * @param audioSource the audio capture preset whose routing will be affected
+     * @param role the role of the devices for the capture preset
+     * @param devices the devices to be removed
+     * @return BAD_VALUE if 1) the capture preset is invalid, 2) role is invalid or 3) the list of
+     *     devices to be removed are not all present as role for a capture preset
+     *     or NO_ERROR if the devices for this role was removed
+     */
+    virtual status_t removeDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role, const AudioDeviceTypeAddrVector& devices) = 0;
+
+    /**
+     * @brief clearDevicesRoleForCapturePreset removes the role of all device(s) previously set
+     * for the given capture preset
+     * @param audioSource the audio capture preset whose routing will be affected
+     * @param role the role of the devices for the capture preset
+     * @return BAD_VALUE if the capture preset or role is invalid,
+     *     or NO_ERROR if the devices for this role was removed
+     */
+    virtual status_t clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role);
+
+    /**
+     * @brief getDevicesForRoleAndCapturePreset queries which devices have the specified role for
+     * the specified capture preset
+     * @param audioSource the capture preset to query
+     * @param role the role of the devices to query
+     * @param devices returns list of devices with matching role for the specified capture preset.
+     *                DEVICE_ROLE_NONE is invalid as input.
+     * @return BAD_VALUE if the capture preset or role is invalid,
+     *     or NAME_NOT_FOUND if no device for the role and capture preset was set
+     *     or NO_ERROR if the devices parameter contains a list of devices
+     */
+    virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+            device_role_t role, AudioDeviceTypeAddrVector &devices) const = 0;
 
 
     virtual void dump(String8 *dst) const = 0;

@@ -306,6 +306,25 @@ public:
     virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
                                                   device_role_t role,
                                                   AudioDeviceTypeAddrVector &devices) = 0;
+
+    virtual status_t setDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                    device_role_t role,
+                                                    const AudioDeviceTypeAddrVector &devices) = 0;
+
+    virtual status_t addDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                    device_role_t role,
+                                                    const AudioDeviceTypeAddrVector &devices) = 0;
+
+    virtual status_t removeDevicesRoleForCapturePreset(
+            audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector& devices) = 0;
+
+    virtual status_t clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                      device_role_t role) = 0;
+
+    virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+                                                       device_role_t role,
+                                                       AudioDeviceTypeAddrVector &devices) = 0;
 };
 
 

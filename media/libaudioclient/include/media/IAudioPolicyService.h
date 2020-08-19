@@ -252,6 +252,25 @@ public:
                                                   device_role_t role,
                                                   AudioDeviceTypeAddrVector &devices) = 0;
 
+    virtual status_t setDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                    device_role_t role,
+                                                    const AudioDeviceTypeAddrVector &devices) = 0;
+
+    virtual status_t addDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                    device_role_t role,
+                                                    const AudioDeviceTypeAddrVector &devices) = 0;
+
+    virtual status_t removeDevicesRoleForCapturePreset(
+            audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector& devices) = 0;
+
+    virtual status_t clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                      device_role_t role) = 0;
+
+    virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+                                                       device_role_t role,
+                                                       AudioDeviceTypeAddrVector &devices) = 0;
+
     // The return code here is only intended to represent transport errors. The
     // actual server implementation should always return NO_ERROR.
     virtual status_t registerSoundTriggerCaptureStateListener(
