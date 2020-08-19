@@ -133,11 +133,10 @@ public:
     void             setSuspended(bool suspended);
     bool             suspended() const;
 
-    virtual status_t command(uint32_t cmdCode __unused,
-                 uint32_t cmdSize __unused,
-                 void *pCmdData __unused,
-                 uint32_t *replySize __unused,
-                 void *pReplyData __unused) { return NO_ERROR; };
+    virtual status_t command(int32_t __unused,
+                             const std::vector<uint8_t>& __unused,
+                             int32_t __unused,
+                             std::vector<uint8_t>* __unused) { return NO_ERROR; };
 
     void setCallback(const sp<EffectCallbackInterface>& callback) { mCallback = callback; }
     sp<EffectCallbackInterface>&     callback() { return mCallback; }
@@ -145,7 +144,7 @@ public:
     status_t addHandle(EffectHandle *handle);
     ssize_t disconnectHandle(EffectHandle *handle, bool unpinIfLast);
     ssize_t removeHandle(EffectHandle *handle);
-    virtual ssize_t removeHandle_l(EffectHandle *handle);
+    ssize_t removeHandle_l(EffectHandle *handle);
     EffectHandle* controlHandle_l();
     bool purgeHandles();
 
@@ -214,11 +213,10 @@ public:
 
     void process();
     bool updateState();
-    status_t command(uint32_t cmdCode,
-                     uint32_t cmdSize,
-                     void *pCmdData,
-                     uint32_t *replySize,
-                     void *pReplyData) override;
+    status_t command(int32_t cmdCode,
+                     const std::vector<uint8_t>& cmdData,
+                     int32_t maxReplySize,
+                     std::vector<uint8_t>* reply) override;
 
     void reset_l();
     status_t configure();
@@ -240,8 +238,6 @@ public:
     int16_t     *outBuffer() const {
         return mOutBuffer != 0 ? reinterpret_cast<int16_t*>(mOutBuffer->ptr()) : NULL;
     }
-
-    ssize_t removeHandle_l(EffectHandle *handle) override;
 
     status_t         setDevices(const AudioDeviceTypeAddrVector &devices);
     status_t         setInputDevice(const AudioDeviceTypeAddr &device);
@@ -322,32 +318,29 @@ private:
 // There is one EffectHandle object for each application controlling (or using)
 // an effect module.
 // The EffectHandle is obtained by calling AudioFlinger::createEffect().
-class EffectHandle: public android::BnEffect {
+class EffectHandle: public android::media::BnEffect {
 public:
 
     EffectHandle(const sp<EffectBase>& effect,
             const sp<AudioFlinger::Client>& client,
-            const sp<IEffectClient>& effectClient,
+            const sp<media::IEffectClient>& effectClient,
             int32_t priority);
     virtual ~EffectHandle();
     virtual status_t initCheck();
 
     // IEffect
-    virtual status_t enable();
-    virtual status_t disable();
-    virtual status_t command(uint32_t cmdCode,
-                             uint32_t cmdSize,
-                             void *pCmdData,
-                             uint32_t *replySize,
-                             void *pReplyData);
-    virtual void disconnect();
-private:
-            void disconnect(bool unpinIfLast);
-public:
-    virtual sp<IMemory> getCblk() const { return mCblkMemory; }
-    virtual status_t onTransact(uint32_t code, const Parcel& data,
-            Parcel* reply, uint32_t flags);
+    android::binder::Status enable(int32_t* _aidl_return) override;
+    android::binder::Status disable(int32_t* _aidl_return) override;
+    android::binder::Status command(int32_t cmdCode,
+                                    const std::vector<uint8_t>& cmdData,
+                                    int32_t maxResponseSize,
+                                    std::vector<uint8_t>* response,
+                                    int32_t* _aidl_return) override;
+    android::binder::Status disconnect() override;
+    android::binder::Status getCblk(media::SharedFileRegion* _aidl_return) override;
 
+private:
+    void disconnect(bool unpinIfLast);
 
     // Give or take control of effect module
     // - hasControl: true if control is given, false if removed
@@ -355,10 +348,8 @@ public:
     // - enabled: state of the effect when control is passed
     void setControl(bool hasControl, bool signal, bool enabled);
     void commandExecuted(uint32_t cmdCode,
-                         uint32_t cmdSize,
-                         void *pCmdData,
-                         uint32_t replySize,
-                         void *pReplyData);
+                         const std::vector<uint8_t>& cmdData,
+                         const std::vector<uint8_t>& replyData);
     void setEnabled(bool enabled);
     bool enabled() const { return mEnabled; }
 
@@ -381,19 +372,20 @@ private:
     friend class AudioFlinger;          // for mEffect, mHasControl, mEnabled
     DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
-    Mutex mLock;                        // protects IEffect method calls
-    wp<EffectBase> mEffect;           // pointer to controlled EffectModule
-    sp<IEffectClient> mEffectClient;    // callback interface for client notifications
-    /*const*/ sp<Client> mClient;       // client for shared memory allocation, see disconnect()
-    sp<IMemory>         mCblkMemory;    // shared memory for control block
-    effect_param_cblk_t* mCblk;         // control block for deferred parameter setting via
-                                        // shared memory
-    uint8_t*            mBuffer;        // pointer to parameter area in shared memory
-    int mPriority;                      // client application priority to control the effect
-    bool mHasControl;                   // true if this handle is controlling the effect
-    bool mEnabled;                      // cached enable state: needed when the effect is
-                                        // restored after being suspended
-    bool mDisconnected;                 // Set to true by disconnect()
+    Mutex mLock;                             // protects IEffect method calls
+    wp<EffectBase> mEffect;                  // pointer to controlled EffectModule
+    sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
+    /*const*/ sp<Client> mClient;            // client for shared memory allocation, see
+                                             //   disconnect()
+    sp<IMemory> mCblkMemory;                 // shared memory for control block
+    effect_param_cblk_t* mCblk;              // control block for deferred parameter setting via
+                                             // shared memory
+    uint8_t* mBuffer;                        // pointer to parameter area in shared memory
+    int mPriority;                           // client application priority to control the effect
+    bool mHasControl;                        // true if this handle is controlling the effect
+    bool mEnabled;                           // cached enable state: needed when the effect is
+                                             // restored after being suspended
+    bool mDisconnected;                      // Set to true by disconnect()
 };
 
 // the EffectChain class represents a group of effects associated to one audio session.
