@@ -37,7 +37,6 @@
 #include <binder/ActivityManager.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <binder/PermissionController.h>
@@ -75,6 +74,7 @@
 #include "utils/CameraTraces.h"
 #include "utils/TagMonitor.h"
 #include "utils/CameraThreadState.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 namespace {
     const char* kPermissionServiceName = "permission";
@@ -87,7 +87,6 @@ using binder::Status;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
-using hardware::ICameraServiceProxy;
 using hardware::ICameraServiceListener;
 using hardware::camera::common::V1_0::CameraDeviceStatus;
 using hardware::camera::common::V1_0::TorchModeStatus;
@@ -134,9 +133,6 @@ static constexpr int32_t kVendorClientScore = 200;
 static constexpr int32_t kVendorClientState = 1;
 const String8 CameraService::kOfflineDevice("offline-");
 
-Mutex CameraService::sProxyMutex;
-sp<hardware::ICameraServiceProxy> CameraService::sCameraServiceProxy;
-
 CameraService::CameraService() :
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0),
@@ -178,7 +174,7 @@ void CameraService::onFirstRef()
 
     // This needs to be last call in this function, so that it's as close to
     // ServiceManager::addService() as possible.
-    CameraService::pingCameraServiceProxy();
+    CameraServiceProxyWrapper::pingCameraServiceProxy();
     ALOGI("CameraService pinged cameraservice proxy");
 }
 
@@ -226,29 +222,6 @@ status_t CameraService::enumerateProviders() {
     }
 
     return OK;
-}
-
-sp<ICameraServiceProxy> CameraService::getCameraServiceProxy() {
-#ifndef __BRILLO__
-    Mutex::Autolock al(sProxyMutex);
-    if (sCameraServiceProxy == nullptr) {
-        sp<IServiceManager> sm = defaultServiceManager();
-        // Use checkService because cameraserver normally starts before the
-        // system server and the proxy service. So the long timeout that getService
-        // has before giving up is inappropriate.
-        sp<IBinder> binder = sm->checkService(String16("media.camera.proxy"));
-        if (binder != nullptr) {
-            sCameraServiceProxy = interface_cast<ICameraServiceProxy>(binder);
-        }
-    }
-#endif
-    return sCameraServiceProxy;
-}
-
-void CameraService::pingCameraServiceProxy() {
-    sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
-    if (proxyBinder == nullptr) return;
-    proxyBinder->pingForUserUpdate();
 }
 
 void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeStatus status) {
@@ -1573,7 +1546,11 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             "Camera API version %d", clientPid, clientName8.string(), cameraId.string(),
             static_cast<int>(effectiveApiLevel));
 
+    nsecs_t openTimeNs = systemTime();
+
     sp<CLIENT> client = nullptr;
+    int facing = -1;
+    bool isNdk = (clientPackageName.size() == 0);
     {
         // Acquire mServiceLock and prevent other clients from connecting
         std::unique_ptr<AutoConditionLock> lock =
@@ -1638,7 +1615,6 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // give flashlight a chance to close devices if necessary.
         mFlashlight->prepareDeviceOpen(cameraId);
 
-        int facing = -1;
         int deviceVersion = getDeviceVersion(cameraId, /*out*/&facing);
         if (facing == -1) {
             ALOGE("%s: Unable to get camera device \"%s\"  facing", __FUNCTION__, cameraId.string());
@@ -1723,6 +1699,11 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
     // Important: release the mutex here so the client can call back into the service from its
     // destructor (can be at the end of the call)
     device = client;
+
+    int32_t openLatencyMs = ns2ms(systemTime() - openTimeNs);
+    CameraServiceProxyWrapper::logOpen(cameraId, facing, clientPackageName,
+            effectiveApiLevel, isNdk, openLatencyMs);
+
     return ret;
 }
 
@@ -2880,14 +2861,6 @@ status_t CameraService::BasicClient::startCameraOps() {
     // Transition device availability listeners from PRESENT -> NOT_AVAILABLE
     sCameraService->updateStatus(StatusInternal::NOT_AVAILABLE, mCameraIdStr);
 
-    int apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1;
-    if (canCastToApiClient(API_2)) {
-        apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_2;
-    }
-    // Transition device state to OPEN
-    sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_OPEN,
-            mCameraIdStr, mCameraFacing, mClientPackageName, apiLevel);
-
     sCameraService->mUidPolicy->registerMonitorUid(mClientUid);
 
     // Notify listeners of camera open/close status
@@ -2916,14 +2889,6 @@ status_t CameraService::BasicClient::finishCameraOps() {
         // Transition to PRESENT if the camera is not in either of the rejected states
         sCameraService->updateStatus(StatusInternal::PRESENT,
                 mCameraIdStr, rejected);
-
-        int apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1;
-        if (canCastToApiClient(API_2)) {
-            apiLevel = hardware::ICameraServiceProxy::CAMERA_API_LEVEL_2;
-        }
-        // Transition device state to CLOSED
-        sCameraService->updateProxyDeviceState(ICameraServiceProxy::CAMERA_STATE_CLOSED,
-                mCameraIdStr, mCameraFacing, mClientPackageName, apiLevel);
     }
     // Always stop watching, even if no camera op is active
     if (mOpsCallback != nullptr && mAppOpsManager != nullptr) {
@@ -3801,14 +3766,6 @@ void CameraService::CameraState::updateStatus(StatusInternal status,
     }
 
     onStatusUpdatedLocked(cameraId, status);
-}
-
-void CameraService::updateProxyDeviceState(int newState,
-        const String8& cameraId, int facing, const String16& clientName, int apiLevel) {
-    sp<ICameraServiceProxy> proxyBinder = getCameraServiceProxy();
-    if (proxyBinder == nullptr) return;
-    String16 id(cameraId);
-    proxyBinder->notifyCameraState(id, newState, facing, clientName, apiLevel);
 }
 
 status_t CameraService::getTorchStatusLocked(

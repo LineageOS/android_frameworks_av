@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2015 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,23 +16,5 @@
 
 package android.hardware;
 
-import android.hardware.CameraSessionStats;
-
-/**
- * Binder interface for the camera service proxy running in system_server.
- *
- * @hide
- */
-interface ICameraServiceProxy
-{
-    /**
-     * Ping the service proxy to update the valid users for the camera service.
-     */
-    oneway void pingForUserUpdate();
-
-
-    /**
-     * Update the status of a camera device.
-     */
-    oneway void notifyCameraState(in CameraSessionStats cameraSessionStats);
-}
+/** @hide */
+parcelable CameraSessionStats cpp_header "camera/CameraSessionStats.h";

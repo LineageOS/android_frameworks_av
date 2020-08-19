@@ -35,6 +35,7 @@ cc_library_shared {
         "CameraParameters.cpp",
         "CaptureResult.cpp",
         "CameraParameters2.cpp",
+        "CameraSessionStats.cpp",
         "ICamera.cpp",
         "ICameraClient.cpp",
         "ICameraRecordingProxy.cpp",

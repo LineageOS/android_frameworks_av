@@ -38,7 +38,7 @@ using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
 
 using device::V2_0::implementation::H2BCameraDeviceCallbacks;
-using device::V2_0::implementation::HidlCameraDeviceUser;
+using device::V2_1::implementation::HidlCameraDeviceUser;
 using service::V2_0::implementation::H2BCameraServiceListener;
 using HCameraMetadataType = frameworks::cameraservice::common::V2_0::CameraMetadataType;
 using HVendorTag = frameworks::cameraservice::common::V2_0::VendorTag;

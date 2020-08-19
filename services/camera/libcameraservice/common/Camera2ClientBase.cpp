@@ -27,12 +27,15 @@
 #include <gui/Surface.h>
 #include <gui/Surface.h>
 
+#include <camera/CameraSessionStats.h>
+
 #include "common/Camera2ClientBase.h"
 
 #include "api2/CameraDeviceClient.h"
 
 #include "device3/Camera3Device.h"
 #include "utils/CameraThreadState.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 namespace android {
 using namespace camera2;
@@ -194,7 +197,7 @@ binder::Status Camera2ClientBase<TClientBase>::disconnect() {
 
     CameraService::BasicClient::disconnect();
 
-    ALOGV("Camera %s: Shut down complete complete", TClientBase::mCameraIdStr.string());
+    ALOGV("Camera %s: Shut down complete", TClientBase::mCameraIdStr.string());
 
     return res;
 }
@@ -245,13 +248,12 @@ void Camera2ClientBase<TClientBase>::notifyError(
 }
 
 template <typename TClientBase>
-void Camera2ClientBase<TClientBase>::notifyIdle() {
+void Camera2ClientBase<TClientBase>::notifyIdle(
+        int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+        const std::vector<hardware::CameraStreamStats>& streamStats) {
     if (mDeviceActive) {
-        getCameraService()->updateProxyDeviceState(
-            hardware::ICameraServiceProxy::CAMERA_STATE_IDLE, TClientBase::mCameraIdStr,
-            TClientBase::mCameraFacing, TClientBase::mClientPackageName,
-            ((mApi1CameraId < 0) ? hardware::ICameraServiceProxy::CAMERA_API_LEVEL_2 :
-             hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1));
+        CameraServiceProxyWrapper::logIdle(TClientBase::mCameraIdStr,
+                requestCount, resultErrorCount, deviceError, streamStats);
     }
     mDeviceActive = false;
 
@@ -265,11 +267,7 @@ void Camera2ClientBase<TClientBase>::notifyShutter(const CaptureResultExtras& re
     (void)timestamp;
 
     if (!mDeviceActive) {
-        getCameraService()->updateProxyDeviceState(
-            hardware::ICameraServiceProxy::CAMERA_STATE_ACTIVE, TClientBase::mCameraIdStr,
-            TClientBase::mCameraFacing, TClientBase::mClientPackageName,
-            ((mApi1CameraId < 0) ? hardware::ICameraServiceProxy::CAMERA_API_LEVEL_2 :
-             hardware::ICameraServiceProxy::CAMERA_API_LEVEL_1));
+        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr);
     }
     mDeviceActive = true;
 
