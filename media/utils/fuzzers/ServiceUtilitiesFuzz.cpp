@@ -44,6 +44,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
     uid_t uid = data_provider.ConsumeIntegral<uid_t>();
     pid_t pid = data_provider.ConsumeIntegral<pid_t>();
+    bool isHotword = data_provider.ConsumeBool();
 
     // There is not state here, and order is not significant,
     // so we can simply call all of the target functions
@@ -54,8 +55,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     std::string packageNameStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
     android::String16 opPackageName(packageNameStr.c_str());
     android::recordingAllowed(opPackageName, pid, uid);
-    android::startRecording(opPackageName, pid, uid);
-    android::finishRecording(opPackageName, uid);
+    android::startRecording(opPackageName, pid, uid, isHotword);
+    android::finishRecording(opPackageName, uid, isHotword);
     android::captureAudioOutputAllowed(pid, uid);
     android::captureMediaOutputAllowed(pid, uid);
     android::captureHotwordAllowed(opPackageName, pid, uid);
