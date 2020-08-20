@@ -1946,7 +1946,7 @@ void AudioFlinger::PlaybackThread::onFirstRef()
         // here instead of constructor of PlaybackThread so that the onFirstRef
         // callback would not be made on an incompletely constructed object.
         if (mOutput->stream->setEventCallback(this) != OK) {
-            ALOGE("Failed to add event callback");
+            ALOGD("Failed to add event callback");
         }
     }
     run(mThreadName, ANDROID_PRIORITY_URGENT_AUDIO);
