@@ -28,6 +28,7 @@
 #include <sys/socket.h>
 
 #include <android/multinetwork.h>
+#include "TrafficRecorder.h"
 
 #define LOG_TO_FILES    0
 
@@ -102,6 +103,7 @@ private:
     AString mSeqParamSet;
     AString mPicParamSet;
 
+    MediaBufferBase *mVPSBuf;
     MediaBufferBase *mSPSBuf;
     MediaBufferBase *mPPSBuf;
 
@@ -116,6 +118,7 @@ private:
 
     uint32_t mOpponentID;
     uint32_t mBitrate;
+    sp<TrafficRecorder<uint32_t, size_t> > mTrafficRec;
 
     int32_t mNumSRsSent;
     int32_t mRTPCVOExtMap;
@@ -143,6 +146,7 @@ private:
     void dumpSessionDesc();
 
     void sendBye();
+    void sendVPSSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
     void sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
     void sendHEVCData(MediaBufferBase *mediaBuf);
     void sendAVCData(MediaBufferBase *mediaBuf);
@@ -152,6 +156,7 @@ private:
     void send(const sp<ABuffer> &buffer, bool isRTCP);
     void makeSocketPairAndBind(String8& localIp, int localPort, String8& remoteIp, int remotePort);
 
+    void ModerateInstantTraffic(uint32_t samplePeriod, uint32_t limitBytes);
     DISALLOW_EVIL_CONSTRUCTORS(ARTPWriter);
 };
 

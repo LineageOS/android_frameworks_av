@@ -52,6 +52,9 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
             const String8& rtpParams);
 
     enum {
+        RTP_FIRST_PACKET = 100,
+        RTCP_FIRST_PACKET = 101,
+        RTP_QUALITY = 102,
         RTCP_TSFB = 205,
         RTCP_PSFB = 206,
         RTP_CVO = 300,
@@ -77,7 +80,11 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
             int64_t seekTimeUs,
             MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) override;
 
+    virtual bool isRealTime() const;
+
     void onMessageReceived(const sp<AMessage> &msg);
+
+    virtual void setTargetBitrate(int32_t bitrate) override;
 
 protected:
     virtual ~RTPSource();
@@ -95,7 +102,6 @@ private:
     };
 
     const int64_t kBufferingPollIntervalUs = 1000000ll;
-    const int32_t kMinVideoBitrate = 192000; /* bps */
 
     enum State {
         DISCONNECTED,
@@ -123,6 +129,8 @@ private:
         int32_t mTimeScale;
         int32_t mAS;
 
+        /* RTP jitter buffer time in milliseconds */
+        uint32_t mJbTimeMs;
         /* Unique ID indicates itself */
         uint32_t mSelfID;
         /* extmap:<value> for CVO will be set to here */
