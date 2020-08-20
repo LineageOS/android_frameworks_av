@@ -70,7 +70,8 @@ ARTPWriter::ARTPWriter(int fd)
     : mFlags(0),
       mFd(dup(fd)),
       mLooper(new ALooper),
-      mReflector(new AHandlerReflector<ARTPWriter>(this)) {
+      mReflector(new AHandlerReflector<ARTPWriter>(this)),
+      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -120,7 +121,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
     : mFlags(0),
       mFd(dup(fd)),
       mLooper(new ALooper),
-      mReflector(new AHandlerReflector<ARTPWriter>(this)) {
+      mReflector(new AHandlerReflector<ARTPWriter>(this)),
+      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -301,15 +303,15 @@ static void StripStartcode(MediaBufferBase *buffer) {
 }
 
 static const uint8_t SPCSize = 4;      // Start Prefix Code Size
-static const uint8_t startPrefixCode[SPCSize] = {0,0,0,1};
-static const uint8_t spcKMPidx[SPCSize] = {0,0,2,0};
+static const uint8_t startPrefixCode[SPCSize] = {0, 0, 0, 1};
+static const uint8_t spcKMPidx[SPCSize] = {0, 0, 2, 0};
 static void SpsPpsParser(MediaBufferBase *buffer,
-    MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
+        MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
 
-    while (true) {
-        const uint8_t* NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
+    while (buffer->range_length() > 0) {
+        const uint8_t *NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
 
-        MediaBufferBase** targetPtr = NULL;
+        MediaBufferBase **targetPtr = NULL;
         if ((*NALPtr & H264_NALU_MASK) == H264_NALU_SPS) {
             targetPtr = spsBuffer;
         } else if ((*NALPtr & H264_NALU_MASK) == H264_NALU_PPS) {
@@ -320,12 +322,13 @@ static void SpsPpsParser(MediaBufferBase *buffer,
         ALOGV("SPS(7) or PPS(8) found. Type %d", *NALPtr & H264_NALU_MASK);
 
         uint32_t bufferSize = buffer->range_length();
-        MediaBufferBase*& target = *targetPtr;
+        MediaBufferBase *&target = *targetPtr;
         uint32_t i = 0, j = 0;
         bool isBoundFound = false;
-        for (i = 0; i < bufferSize ; i++) {
-            while (j > 0 && NALPtr[i] != startPrefixCode[j])
-                j = spcKMPidx[j-1];
+        for (i = 0; i < bufferSize; i++) {
+            while (j > 0 && NALPtr[i] != startPrefixCode[j]) {
+                j = spcKMPidx[j - 1];
+            }
             if (NALPtr[i] == startPrefixCode[j]) {
                 j++;
                 if (j == SPCSize) {
@@ -336,8 +339,11 @@ static void SpsPpsParser(MediaBufferBase *buffer,
         }
 
         uint32_t targetSize;
-        if (target != NULL)
+        if (target != NULL) {
             target->release();
+        }
+        // note that targetSize is never 0 as the first byte is never part
+        // of a start prefix
         if (isBoundFound) {
             targetSize = i - SPCSize + 1;
             target = MediaBufferBase::Create(targetSize);
@@ -359,13 +365,13 @@ static void SpsPpsParser(MediaBufferBase *buffer,
 }
 
 static void VpsSpsPpsParser(MediaBufferBase *buffer,
-    MediaBufferBase **vpsBuffer, MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
+        MediaBufferBase **vpsBuffer, MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer) {
 
-    while (true) {
-        const uint8_t* NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
+    while (buffer->range_length() > 0) {
+        const uint8_t *NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
         uint8_t nalType = ((*NALPtr) >> 1) & H265_NALU_MASK;
 
-        MediaBufferBase** targetPtr = NULL;
+        MediaBufferBase **targetPtr = NULL;
         if (nalType == H265_NALU_VPS) {
             targetPtr = vpsBuffer;
         } else if (nalType == H265_NALU_SPS) {
@@ -377,32 +383,44 @@ static void VpsSpsPpsParser(MediaBufferBase *buffer,
         }
         ALOGV("VPS(32) SPS(33) or PPS(34) found. Type %d", nalType);
 
-        uint32_t targetSize = buffer->range_length();
-        MediaBufferBase*& target = *targetPtr;
-        uint32_t j;
+        uint32_t bufferSize = buffer->range_length();
+        MediaBufferBase *&target = *targetPtr;
+        uint32_t i = 0, j = 0;
         bool isBoundFound = false;
-        for (j = 0; j < targetSize - SPCSize ; j++) {
-            if (!memcmp(NALPtr + j, startPrefixCode, SPCSize)) {
-                isBoundFound = true;
-                break;
+        for (i = 0; i < bufferSize; i++) {
+            while (j > 0 && NALPtr[i] != startPrefixCode[j]) {
+                j = spcKMPidx[j - 1];
+            }
+            if (NALPtr[i] == startPrefixCode[j]) {
+                j++;
+                if (j == SPCSize) {
+                    isBoundFound = true;
+                    break;
+                }
             }
         }
 
-        if (target != NULL)
+        if (target != NULL) {
             target->release();
+        }
+        uint32_t targetSize;
+        // note that targetSize is never 0 as the first byte is never part
+        // of a start prefix
         if (isBoundFound) {
+            targetSize = i - SPCSize + 1;
             target = MediaBufferBase::Create(j);
             memcpy(target->data(),
                    (const uint8_t *)buffer->data() + buffer->range_offset(),
                    j);
-            buffer->set_range(buffer->range_offset() + j + SPCSize,
-                              buffer->range_length() - j - SPCSize);
+            buffer->set_range(buffer->range_offset() + targetSize + SPCSize,
+                              buffer->range_length() - targetSize - SPCSize);
         } else {
+            targetSize = bufferSize;
             target = MediaBufferBase::Create(targetSize);
             memcpy(target->data(),
                    (const uint8_t *)buffer->data() + buffer->range_offset(),
                    targetSize);
-            buffer->set_range(buffer->range_offset() + targetSize, 0);
+            buffer->set_range(buffer->range_offset() + bufferSize, 0);
             return;
         }
     }
@@ -517,13 +535,15 @@ void ARTPWriter::onRead(const sp<AMessage> &msg) {
         if (mMode == H264) {
             StripStartcode(mediaBuf);
             SpsPpsParser(mediaBuf, &mSPSBuf, &mPPSBuf);
-            if (mediaBuf->range_length() > 0)
+            if (mediaBuf->range_length() > 0) {
                 sendAVCData(mediaBuf);
+            }
         } else if (mMode == H265) {
             StripStartcode(mediaBuf);
             VpsSpsPpsParser(mediaBuf, &mVPSBuf, &mSPSBuf, &mPPSBuf);
-            if (mediaBuf->range_length() > 0)
+            if (mediaBuf->range_length() > 0) {
                 sendHEVCData(mediaBuf);
+            }
         } else if (mMode == H263) {
             sendH263Data(mediaBuf);
         } else if (mMode == AMR_NB || mMode == AMR_WB) {
@@ -568,11 +588,20 @@ void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
             remAddr = (struct sockaddr *)&mRTPAddr;
     }
 
+    // Unseal code if moderator is needed (prevent overflow of instant bandwidth)
+    // Set limit bits per period through the moderator.
+    // ex) 6KByte/10ms = 48KBit/10ms = 4.8MBit/s instant limit
+    // ModerateInstantTraffic(10, 6 * 1024);
+
     ssize_t n = sendto(isRTCP ? mRTCPSocket : mRTPSocket,
             buffer->data(), buffer->size(), 0, remAddr, sizeSockSt);
 
     if (n != (ssize_t)buffer->size()) {
         ALOGW("packets can not be sent. ret=%d, buf=%d", (int)n, (int)buffer->size());
+    } else {
+        // Record current traffic & Print bits while last 1sec (1000ms)
+        mTrafficRec->writeBytes(buffer->size());
+        mTrafficRec->printAccuBitsForLastPeriod(1000, 1000);
     }
 
 #if LOG_TO_FILES
@@ -871,12 +900,13 @@ void ARTPWriter::sendBye() {
 }
 
 void ARTPWriter::sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
+    CHECK(mediaBuf->range_length() > 0);
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
 
-    if (mediaBuf->range_length() == 0
-            || (mediaData[0] & H264_NALU_MASK) != H264_NALU_IFRAME)
+    if ((mediaData[0] & H264_NALU_MASK) != H264_NALU_IFRAME) {
         return;
+    }
 
     if (mSPSBuf != NULL) {
         mSPSBuf->meta_data().setInt64(kKeyTime, timeUs);
@@ -892,11 +922,14 @@ void ARTPWriter::sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
 }
 
 void ARTPWriter::sendVPSSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
+    CHECK(mediaBuf->range_length() > 0);
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
+
     int nalType = ((mediaData[0] >> 1) & H265_NALU_MASK);
-    if (!(nalType >= 16 && nalType <= 21)/*H265_NALU_IFRAME*/)
+    if (!(nalType >= 16 && nalType <= 21) /*H265_NALU_IFRAME*/) {
         return;
+    }
 
     if (mVPSBuf != NULL) {
         mVPSBuf->meta_data().setInt64(kKeyTime, timeUs);
@@ -928,6 +961,7 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
 
     uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
 
+    CHECK(mediaBuf->range_length() > 0);
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
 
@@ -945,10 +979,11 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
-        if (isNonVCL)
+        if (isNonVCL) {
             data[1] = mPayloadType;  // Marker bit should not be set in case of Non-VCL
-        else
+        } else {
             data[1] = (1 << 7) | mPayloadType;  // M-bit
+        }
         data[2] = (mSeqNo >> 8) & 0xff;
         data[3] = mSeqNo & 0xff;
         data[4] = rtpTime >> 24;
@@ -1063,6 +1098,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
 
     uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100LL);
 
+    CHECK(mediaBuf->range_length() > 0);
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
 
@@ -1073,6 +1109,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         isSpsPps = true;
     }
 
+    mTrafficRec->updateClock(ALooper::GetNowUs() / 1000);
     sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
     if (mediaBuf->range_length() + TCPIP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_HEADER_EXT_SIZE
             + RTP_PAYLOAD_ROOM_SIZE <= buffer->capacity()) {
@@ -1505,6 +1542,17 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
         ALOGE("failed to bind rtcp %s:%d err=%s", localIp.string(), localPort + 1, strerror(errno));
     } else {
         ALOGD("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
+    }
+}
+
+// TODO : Develop more advanced moderator based on AS & TMMBR value
+void ARTPWriter::ModerateInstantTraffic(uint32_t samplePeriod, uint32_t limitBytes) {
+    unsigned int bytes =  mTrafficRec->readBytesForLastPeriod(samplePeriod);
+    if (bytes > limitBytes) {
+        ALOGI("Nuclear moderator. #seq = %d \t\t %d bits / 10ms",
+              mSeqNo, bytes * 8);
+        usleep(4000);
+        mTrafficRec->updateClock(ALooper::GetNowUs() / 1000);
     }
 }
 

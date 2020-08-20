@@ -178,7 +178,10 @@ enum media_parameter_keys {
     KEY_PARAMETER_PLAYBACK_RATE_PERMILLE = 1300,                // set only
 
     // Set a Parcel containing the value of a parcelled Java AudioAttribute instance
-    KEY_PARAMETER_AUDIO_ATTRIBUTES = 1400                       // set only
+    KEY_PARAMETER_AUDIO_ATTRIBUTES = 1400,                       // set only
+
+    // Set a Parcel containing the values of RTP attribute
+    KEY_PARAMETER_RTP_ATTRIBUTES = 2000                       // set only
 };
 
 // Keep INVOKE_ID_* in sync with MediaPlayer.java.

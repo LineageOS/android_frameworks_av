@@ -23,7 +23,9 @@
 #include <media/stagefright/foundation/ABase.h>
 #include <utils/List.h>
 #include <utils/RefBase.h>
-#include <QualManager.h>
+#include <utils/Thread.h>
+
+#include <map>
 
 namespace android {
 
@@ -46,25 +48,27 @@ struct ARTPSource : public RefBase {
 
     void addReceiverReport(const sp<ABuffer> &buffer);
     void addFIR(const sp<ABuffer> &buffer);
-    void addTMMBR(const sp<ABuffer> &buffer);
+    void addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate);
+    int addNACK(const sp<ABuffer> &buffer);
+    void setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJitterHeadSeqNum);
     uint32_t getSelfID();
     void setSelfID(const uint32_t selfID);
-    void setJbTime(const uint32_t jbTime);
-    void setMinMaxBitrate(int32_t min, int32_t max);
-    void setBitrateData(int32_t bitrate, int64_t time);
-    void setTargetBitrate();
-
-    bool isNeedToReport();
-    bool isNeedToDowngrade();
+    void setJbTime(const uint32_t jbTimeMs);
+    void setPeriodicFIR(bool enable);
+    void notifyPktInfo(int32_t bitrate, int64_t time);
+    // FIR needs to be sent by missing packet or broken video image.
+    void onIssueFIRByAssembler();
 
     void noticeAbandonBuffer(int cnt=1);
 
     int32_t mFirstSeqNumber;
-    int32_t mFirstRtpTime;
+    uint32_t mFirstRtpTime;
     int64_t mFirstSysTime;
     int32_t mClockRate;
 
-    uint32_t mJbTime;
+    uint32_t mJbTimeMs;
+    int32_t mFirstSsrc;
+    int32_t mHighestNackNumber;
 
 private:
 
@@ -74,20 +78,32 @@ private:
     uint32_t mBaseSeqNumber;
     int32_t mNumBuffersReceived;
     int32_t mPrevNumBuffersReceived;
+    uint32_t mPrevExpectedForRR;
+    int32_t mPrevNumBuffersReceivedForRR;
 
     List<sp<ABuffer> > mQueue;
     sp<ARTPAssembler> mAssembler;
+
+    typedef struct infoNACK {
+        uint16_t seqNum;
+        uint16_t mask;
+        uint16_t nowJitterHeadSeqNum;
+        bool    needToNACK;
+    } infoNACK;
+
+    Mutex mMapLock;
+    std::map<uint16_t, infoNACK> mNACKMap;
+    int getSeqNumToNACK(List<int>& list, int size);
 
     uint64_t mLastNTPTime;
     int64_t mLastNTPTimeUpdateUs;
 
     bool mIssueFIRRequests;
+    bool mIssueFIRByAssembler;
     int64_t mLastFIRRequestUs;
     uint8_t mNextFIRSeqNo;
 
     sp<AMessage> mNotify;
-
-    QualManager mQualManager;
 
     bool queuePacket(const sp<ABuffer> &buffer);
 
