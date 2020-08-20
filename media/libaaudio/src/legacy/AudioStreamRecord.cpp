@@ -118,6 +118,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         setDeviceFormat(getFormat());
     }
 
+    // To avoid glitching, let AudioFlinger pick the optimal burst size.
     uint32_t notificationFrames = 0;
 
     // Setup the callback if there is one.
@@ -128,7 +129,6 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         streamTransferType = AudioRecord::transfer_type::TRANSFER_CALLBACK;
         callback = getLegacyCallback();
         callbackData = this;
-        notificationFrames = builder.getFramesPerDataCallback();
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
 
