@@ -42,8 +42,8 @@ using namespace aaudio;   // TODO just import names needed
 #define BURSTS_PER_BUFFER_DEFAULT   2
 
 AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService)
-        : mStreamInternalPlay(audioService, true) {
-    mStreamInternal = &mStreamInternalPlay;
+    : AAudioServiceEndpointShared(
+        (AudioStreamInternal *)(new AudioStreamInternalPlay(audioService, true))) {
 }
 
 aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamRequest &request) {
