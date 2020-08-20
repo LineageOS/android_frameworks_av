@@ -1721,7 +1721,8 @@ status_t AudioPolicyManager::startSource(const sp<SwAudioOutputDescriptor>& outp
         checkAndSetVolume(curves, client->volumeSource(),
                           curves.getVolumeIndex(outputDesc->devices().types()),
                           outputDesc,
-                          outputDesc->devices().types());
+                          outputDesc->devices().types(), 0 /*delay*/,
+                          outputDesc->useHwGain() /*force*/);
 
         // update the outputs if starting an output with a stream that can affect notification
         // routing
