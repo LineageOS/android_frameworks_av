@@ -40,6 +40,9 @@ using namespace aaudio;
 // This is the maximum size in frames. The effective size can be tuned smaller at runtime.
 #define DEFAULT_BUFFER_CAPACITY   (48 * 8)
 
+AAudioServiceEndpointShared::AAudioServiceEndpointShared(AudioStreamInternal *streamInternal)
+    : mStreamInternal(streamInternal) {}
+
 std::string AAudioServiceEndpointShared::dump() const {
     std::stringstream result;
 
@@ -84,8 +87,8 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointShared::close() {
-    return getStreamInternal()->releaseCloseFinal();
+void AAudioServiceEndpointShared::close() {
+    getStreamInternal()->releaseCloseFinal();
 }
 
 // Glue between C and C++ callbacks.

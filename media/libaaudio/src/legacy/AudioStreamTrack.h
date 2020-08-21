@@ -42,6 +42,7 @@ public:
 
     aaudio_result_t open(const AudioStreamBuilder & builder) override;
     aaudio_result_t release_l() override;
+    void close_l() override;
 
     aaudio_result_t requestStart() override;
     aaudio_result_t requestPause() override;

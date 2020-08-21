@@ -114,7 +114,8 @@ void NuPlayer::RTPSource::prepareAsync() {
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
-        mRTPConn->setMinMaxBitrate(kMinVideoBitrate, info->mAS * 1000 /* kbps */);
+        mRTPConn->setJbTime(
+                (info->mJbTimeMs <= 3000 && info->mJbTimeMs >= 40) ? info->mJbTimeMs : 300);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
@@ -135,11 +136,16 @@ void NuPlayer::RTPSource::prepareAsync() {
 
         if (info->mIsAudio) {
             mAudioTrack = source;
+            info->mTimeScale = 16000;
         } else {
             mVideoTrack = source;
+            info->mTimeScale = 90000;
         }
 
         info->mSource = source;
+        info->mRTPTime = 0;
+        info->mNormalPlaytimeUs = 0;
+        info->mNPTMappingValid = false;
     }
 
     if (mInPreparationPhase) {
@@ -280,20 +286,19 @@ status_t NuPlayer::RTPSource::dequeueAccessUnit(
     }
 
     int32_t cvo;
-    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo)) {
-        if (cvo != mLastCVOUpdated) {
-            sp<AMessage> msg = new AMessage();
-            msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
-            msg->setInt32("cvo", cvo);
+    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo) &&
+            cvo != mLastCVOUpdated) {
+        sp<AMessage> msg = new AMessage();
+        msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
+        msg->setInt32("cvo", cvo);
 
-            sp<AMessage> notify = dupNotify();
-            notify->setInt32("what", kWhatIMSRxNotice);
-            notify->setMessage("message", msg);
-            notify->post();
+        sp<AMessage> notify = dupNotify();
+        notify->setInt32("what", kWhatIMSRxNotice);
+        notify->setMessage("message", msg);
+        notify->post();
 
-            ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
-            mLastCVOUpdated = cvo;
-        }
+        ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
+        mLastCVOUpdated = cvo;
     }
 
     return finalResult;
@@ -345,6 +350,11 @@ void NuPlayer::RTPSource::schedulePollBuffering() {
 
 void NuPlayer::RTPSource::onPollBuffering() {
     schedulePollBuffering();
+}
+
+bool NuPlayer::RTPSource::isRealTime() const {
+    ALOGD("RTPSource::isRealTime=%d", true);
+    return true;
 }
 
 void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
@@ -429,7 +439,6 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                     source->queueAccessUnit(accessUnit);
                     break;
                 }
-                */
 
                 int64_t nptUs =
                     ((double)rtpTime - (double)info->mRTPTime)
@@ -437,7 +446,8 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                         * 1000000ll
                         + info->mNormalPlaytimeUs;
 
-                accessUnit->meta()->setInt64("timeUs", nptUs);
+                */
+                accessUnit->meta()->setInt64("timeUs", ALooper::GetNowUs());
 
                 source->queueAccessUnit(accessUnit);
             }
@@ -488,6 +498,10 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
         default:
             TRESPASS();
     }
+}
+
+void NuPlayer::RTPSource::setTargetBitrate(int32_t bitrate) {
+    mRTPConn->setTargetBitrate(bitrate);
 }
 
 void NuPlayer::RTPSource::onTimeUpdate(int32_t trackIndex, uint32_t rtpTime, uint64_t ntpTime) {
@@ -656,6 +670,7 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
         newTrackInfo.mIsAudio = isAudioKey;
         mTracks.push(newTrackInfo);
         info = &mTracks.editTop();
+        info->mJbTimeMs = 300;
     }
 
     if (key == "rtp-param-mime-type") {
@@ -698,6 +713,8 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
     } else if (key == "rtp-param-set-socket-network") {
         int64_t networkHandle = atoll(value);
         setSocketNetwork(networkHandle);
+    } else if (key == "rtp-param-jitter-buffer-time") {
+        info->mJbTimeMs = atoi(value);
     }
 
     return OK;

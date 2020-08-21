@@ -46,7 +46,8 @@ struct ARTPConnection : public AHandler {
     void injectPacket(int index, const sp<ABuffer> &buffer);
 
     void setSelfID(const uint32_t selfID);
-    void setMinMaxBitrate(int32_t min, int32_t max);
+    void setJbTime(const uint32_t jbTimeMs);
+    void setTargetBitrate(int32_t targetBitrate);
 
     // Creates a pair of UDP datagram sockets bound to adjacent ports
     // (the rtpSocket is bound to an even port, the rtcpSocket to the
@@ -85,9 +86,10 @@ private:
     int64_t mLastBitrateReportTimeUs;
 
     int32_t mSelfID;
+    int32_t mTargetBitrate;
 
-    int32_t mMinBitrate;
-    int32_t mMaxBitrate;
+    uint32_t mJbTimeMs;
+
     int32_t mCumulativeBytes;
 
     void onAddStream(const sp<AMessage> &msg);
