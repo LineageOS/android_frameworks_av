@@ -37,7 +37,6 @@ public:
     void *callbackLoop() override;
 
 private:
-    AudioStreamInternalCapture  mStreamInternalCapture;
     std::unique_ptr<uint8_t[]>  mDistributionBuffer;
 };
 

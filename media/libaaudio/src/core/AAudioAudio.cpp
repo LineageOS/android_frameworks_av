@@ -255,17 +255,16 @@ AAUDIO_API aaudio_result_t  AAudioStream_close(AAudioStream* stream) {
     if (audioStream != nullptr) {
         aaudio_stream_id_t id = audioStream->getId();
         ALOGD("%s(s#%u) called ---------------", __func__, id);
-        result = audioStream->safeRelease();
-        // safeRelease will only fail if called illegally, for example, from a callback.
+        result = audioStream->safeReleaseClose();
+        // safeReleaseClose will only fail if called illegally, for example, from a callback.
         // That would result in deleting an active stream, which would cause a crash.
         if (result != AAUDIO_OK) {
             ALOGW("%s(s#%u) failed. Close it from another thread.",
                   __func__, id);
         } else {
             audioStream->unregisterPlayerBase();
-             // Mark CLOSED to keep destructors from asserting.
-            audioStream->closeFinal();
-            delete audioStream;
+            // Allow the stream to be deleted.
+            AudioStreamBuilder::stopUsingStream(audioStream);
         }
         ALOGD("%s(s#%u) returned %d ---------", __func__, id, result);
     }
