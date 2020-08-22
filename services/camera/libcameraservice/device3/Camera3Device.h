@@ -517,6 +517,19 @@ class Camera3Device :
         // overriding of ROTATE_AND_CROP value and adjustment of coordinates
         // in several other controls in both the request and the result
         bool                                mRotateAndCropAuto;
+        // Whether this capture request has its zoom ratio set to 1.0x before
+        // the framework overrides it for camera HAL consumption.
+        bool                                mZoomRatioIs1x;
+
+
+        // Whether this capture request's distortion correction update has
+        // been done.
+        bool                                mDistortionCorrectionUpdated = false;
+        // Whether this capture request's rotation and crop update has been
+        // done.
+        bool                                mRotationAndCropUpdated = false;
+        // Whether this capture request's zoom ratio update has been done.
+        bool                                mZoomRatioUpdated = false;
     };
     typedef List<sp<CaptureRequest> > RequestList;
 
