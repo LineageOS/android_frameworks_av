@@ -2207,7 +2207,8 @@ status_t AudioFlinger::RecordThread::RecordTrack::start(AudioSystem::sync_event_
         RecordThread *recordThread = (RecordThread *)thread.get();
         return recordThread->start(this, event, triggerSession);
     } else {
-        return BAD_VALUE;
+        ALOGW("%s track %d: thread was destroyed", __func__, portId());
+        return DEAD_OBJECT;
     }
 }
 
