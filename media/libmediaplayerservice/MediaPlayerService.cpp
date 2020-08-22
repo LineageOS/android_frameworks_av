@@ -480,14 +480,14 @@ sp<IMediaMetadataRetriever> MediaPlayerService::createMetadataRetriever()
 }
 
 sp<IMediaPlayer> MediaPlayerService::create(const sp<IMediaPlayerClient>& client,
-        audio_session_t audioSessionId)
+        audio_session_t audioSessionId, std::string opPackageName)
 {
     pid_t pid = IPCThreadState::self()->getCallingPid();
     int32_t connId = android_atomic_inc(&mNextConnId);
 
     sp<Client> c = new Client(
             this, pid, connId, client, audioSessionId,
-            IPCThreadState::self()->getCallingUid());
+            IPCThreadState::self()->getCallingUid(), opPackageName);
 
     ALOGV("Create new client(%d) from pid %d, uid %d, ", connId, pid,
          IPCThreadState::self()->getCallingUid());
@@ -733,7 +733,8 @@ bool MediaPlayerService::hasClient(wp<Client> client)
 MediaPlayerService::Client::Client(
         const sp<MediaPlayerService>& service, pid_t pid,
         int32_t connId, const sp<IMediaPlayerClient>& client,
-        audio_session_t audioSessionId, uid_t uid)
+        audio_session_t audioSessionId, uid_t uid, const std::string& opPackageName)
+        : mOpPackageName(opPackageName)
 {
     ALOGV("Client(%d) constructor", connId);
     mPid = pid;
@@ -922,7 +923,7 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
 
     if (!p->hardwareOutput()) {
         mAudioOutput = new AudioOutput(mAudioSessionId, IPCThreadState::self()->getCallingUid(),
-                mPid, mAudioAttributes, mAudioDeviceUpdatedListener);
+                mPid, mAudioAttributes, mAudioDeviceUpdatedListener, mOpPackageName);
         static_cast<MediaPlayerInterface*>(p.get())->setAudioSink(mAudioOutput);
     }
 
@@ -1761,7 +1762,8 @@ int Antagonizer::callbackThread(void* user)
 #undef LOG_TAG
 #define LOG_TAG "AudioSink"
 MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t uid, int pid,
-        const audio_attributes_t* attr, const sp<AudioSystem::AudioDeviceCallback>& deviceCallback)
+        const audio_attributes_t* attr, const sp<AudioSystem::AudioDeviceCallback>& deviceCallback,
+        const std::string& opPackageName)
     : mCallback(NULL),
       mCallbackCookie(NULL),
       mCallbackData(NULL),
@@ -1782,7 +1784,8 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, uid_t ui
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mDeviceCallbackEnabled(false),
-      mDeviceCallback(deviceCallback)
+      mDeviceCallback(deviceCallback),
+      mOpPackageName(opPackageName)
 {
     ALOGV("AudioOutput(%d)", sessionId);
     if (attr != NULL) {
@@ -2176,7 +2179,8 @@ status_t MediaPlayerService::AudioOutput::open(
                     mAttributes,
                     doNotReconnect,
                     1.0f,  // default value for maxRequiredSpeed
-                    mSelectedDeviceId);
+                    mSelectedDeviceId,
+                    mOpPackageName);
         } else {
             // TODO: Due to buffer memory concerns, we use a max target playback speed
             // based on mPlaybackRate at the time of open (instead of kMaxRequiredSpeed),
@@ -2204,7 +2208,8 @@ status_t MediaPlayerService::AudioOutput::open(
                     mAttributes,
                     doNotReconnect,
                     targetSpeed,
-                    mSelectedDeviceId);
+                    mSelectedDeviceId,
+                    mOpPackageName);
         }
         // Set caller name so it can be logged in destructor.
         // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA
