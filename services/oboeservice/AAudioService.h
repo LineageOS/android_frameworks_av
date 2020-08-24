@@ -26,6 +26,7 @@
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioCommon.h"
+#include "binding/AAudioBinderAdapter.h"
 #include "binding/AAudioServiceInterface.h"
 #include "binding/IAAudioService.h"
 
@@ -36,14 +37,17 @@ namespace android {
 
 class AAudioService :
     public BinderService<AAudioService>,
-    public BnAAudioService,
-    public aaudio::AAudioServiceInterface
+    public BnAAudioService
 {
     friend class BinderService<AAudioService>;
 
 public:
     AAudioService();
-    virtual ~AAudioService();
+    virtual ~AAudioService() = default;
+
+    aaudio::AAudioServiceInterface& asAAudioServiceInterface() {
+        return mAdapter;
+    }
 
     static const char* getServiceName() { return AAUDIO_SERVICE_NAME; }
 
@@ -83,10 +87,10 @@ public:
     aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
                                 const android::AudioClient& client,
                                 const audio_attributes_t *attr,
-                                audio_port_handle_t *clientHandle) override;
+                                audio_port_handle_t *clientHandle);
 
     aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
-                                       audio_port_handle_t clientHandle) override;
+                                       audio_port_handle_t clientHandle);
 
  // ===============================================================================
  // The following public methods are only called from the service and NOT by Binder.
@@ -101,6 +105,29 @@ public:
     aaudio_result_t closeStream(sp<aaudio::AAudioServiceStreamBase> serviceStream);
 
 private:
+    class Adapter : public aaudio::AAudioBinderAdapter {
+    public:
+        explicit Adapter(AAudioService *service)
+                : aaudio::AAudioBinderAdapter(service),
+                  mService(service) {}
+
+        aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
+                                    const android::AudioClient &client,
+                                    const audio_attributes_t *attr,
+                                    audio_port_handle_t *clientHandle) override {
+            return mService->startClient(streamHandle, client, attr, clientHandle);
+        }
+
+        aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
+                                   audio_port_handle_t clientHandle) override {
+            return mService->stopClient(streamHandle, clientHandle);
+        }
+
+    private:
+        AAudioService* const mService;
+    };
+
+    Adapter mAdapter;
 
     /** @return true if the client is the audioserver
      */

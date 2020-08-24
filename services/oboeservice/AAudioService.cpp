@@ -42,14 +42,12 @@ using namespace aaudio;
 using android::AAudioService;
 
 android::AAudioService::AAudioService()
-    : BnAAudioService() {
+    : BnAAudioService(),
+      mAdapter(this) {
     mAudioClient.clientUid = getuid();   // TODO consider using geteuid()
     mAudioClient.clientPid = getpid();
     mAudioClient.packageName = String16("");
     AAudioClientTracker::getInstance().setAAudioService(this);
-}
-
-AAudioService::~AAudioService() {
 }
 
 status_t AAudioService::dump(int fd, const Vector<String16>& args) {
