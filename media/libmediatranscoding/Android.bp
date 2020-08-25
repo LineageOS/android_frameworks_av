@@ -14,11 +14,8 @@
  * limitations under the License.
  */
 
-// AIDL interfaces of MediaTranscoding.
-aidl_interface {
-    name: "mediatranscoding_aidl_interface",
-    unstable: true,
-    local_include_dir: "aidl",
+filegroup {
+    name: "libmediatranscoding_aidl",
     srcs: [
         "aidl/android/media/IMediaTranscodingService.aidl",
         "aidl/android/media/ITranscodingClient.aidl",
@@ -34,6 +31,15 @@ aidl_interface {
         "aidl/android/media/TranscodingResultParcel.aidl",
         "aidl/android/media/TranscodingTestConfig.aidl",
     ],
+    path: "aidl",
+}
+
+// AIDL interfaces of MediaTranscoding.
+aidl_interface {
+    name: "mediatranscoding_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [":libmediatranscoding_aidl"],
     backend:
     {
         java: {
