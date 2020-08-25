@@ -78,7 +78,7 @@ TEST_F(C2UtilTest, EnumUtilsTest) {
       { "value2", Enum3Value2 },
       { "value4", Enum3Value4 },
       { "invalid", Invalid } });
-    Enum3 e3;
+    Enum3 e3(Invalid);
     C2FieldDescriptor::namedValuesFor(e3);
 
     // upper case
