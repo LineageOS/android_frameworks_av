@@ -73,6 +73,7 @@ enum {
     METADATA_KEY_COLOR_RANGE     = 37,
     METADATA_KEY_SAMPLERATE      = 38,
     METADATA_KEY_BITS_PER_SAMPLE = 39,
+    METADATA_KEY_VIDEO_CODEC_MIME_TYPE = 40,
 
     // Add more here...
 };
