@@ -249,6 +249,12 @@ class VendorTagDescriptorCache :
      */
     static void clearGlobalVendorTagCache();
 
+    /**
+     * Return true if given vendor id is present in the vendor tag caches, return
+     * false otherwise.
+     */
+    static bool isVendorCachePresent(metadata_vendor_id_t vendorId);
+
 };
 
 } /* namespace android */
