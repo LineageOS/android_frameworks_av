@@ -171,6 +171,8 @@ status_t FrameCaptureProcessor::onCapture(const sp<Layer> &layer,
     if (err != OK) {
         ALOGW("wait for fence returned err %d", err);
     }
+
+    mRE->cleanupPostRender(renderengine::RenderEngine::CleanupMode::CLEAN_ALL);
     return OK;
 }
 
