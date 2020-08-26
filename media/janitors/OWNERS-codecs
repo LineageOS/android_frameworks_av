@@ -1,0 +1,5 @@
+# gerrit owner/approvers for the actual software codec libraries
+# differentiated from plugins connecting those codecs to either omx or codec2 infrastructure
+essick@google.com
+lajos@google.com
+marcone@google.com
