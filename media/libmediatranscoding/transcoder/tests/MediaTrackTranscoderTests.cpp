@@ -111,6 +111,7 @@ public:
         }
 
         ASSERT_NE(mSourceFormat, nullptr);
+        EXPECT_EQ(mMediaSampleReader->selectTrack(mTrackIndex), AMEDIA_OK);
     }
 
     // Drains the transcoder's output queue in a loop.

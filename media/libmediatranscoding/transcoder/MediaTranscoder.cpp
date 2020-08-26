@@ -133,6 +133,12 @@ void MediaTranscoder::onTrackFormatAvailable(const MediaTrackTranscoder* transco
 
     mTracksAdded.insert(transcoder);
     if (mTracksAdded.size() == mTrackTranscoders.size()) {
+        // Enable sequential access mode on the sample reader to achieve optimal read performance.
+        // This has to wait until all tracks have delivered their output formats and the sample
+        // writer is started. Otherwise the tracks will not get their output sample queues drained
+        // and the transcoder could hang due to one track running out of buffers and blocking the
+        // other tracks from reading source samples before they could output their formats.
+        mSampleReader->setEnforceSequentialAccess(true);
         LOG(INFO) << "Starting sample writer.";
         bool started = mSampleWriter->start();
         if (!started) {
@@ -229,6 +235,12 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
+    media_status_t status = mSampleReader->selectTrack(trackIndex);
+    if (status != AMEDIA_OK) {
+        LOG(ERROR) << "Unable to select track " << trackIndex;
+        return status;
+    }
+
     std::shared_ptr<MediaTrackTranscoder> transcoder;
     std::shared_ptr<AMediaFormat> format;
 
@@ -270,7 +282,7 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         format = std::shared_ptr<AMediaFormat>(mergedFormat, &AMediaFormat_delete);
     }
 
-    media_status_t status = transcoder->configure(mSampleReader, trackIndex, format);
+    transcoder->configure(mSampleReader, trackIndex, format);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Configure track transcoder for track #" << trackIndex << " returned error "
                    << status;
@@ -344,6 +356,7 @@ media_status_t MediaTranscoder::cancel() {
     }
 
     mSampleWriter->stop();
+    mSampleReader->setEnforceSequentialAccess(false);
     for (auto& transcoder : mTrackTranscoders) {
         transcoder->stop();
     }

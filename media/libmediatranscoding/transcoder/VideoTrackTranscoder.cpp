@@ -326,8 +326,6 @@ void VideoTrackTranscoder::enqueueInputSample(int32_t bufferIndex) {
             mStatus = status;
             return;
         }
-
-        mMediaSampleReader->advanceTrack(mTrackIndex);
     } else {
         LOG(DEBUG) << "EOS from source.";
         mEosFromSource = true;
