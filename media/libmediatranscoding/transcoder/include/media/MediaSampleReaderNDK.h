@@ -20,6 +20,7 @@
 #include <media/MediaSampleReader.h>
 #include <media/NdkMediaExtractor.h>
 
+#include <map>
 #include <memory>
 #include <mutex>
 #include <vector>
@@ -46,6 +47,8 @@ public:
     AMediaFormat* getFileFormat() override;
     size_t getTrackCount() const override;
     AMediaFormat* getTrackFormat(int trackIndex) override;
+    media_status_t selectTrack(int trackIndex) override;
+    media_status_t setEnforceSequentialAccess(bool enforce) override;
     media_status_t getEstimatedBitrateForTrack(int trackIndex, int32_t* bitrate) override;
     media_status_t getSampleInfoForTrack(int trackIndex, MediaSampleInfo* info) override;
     media_status_t readSampleDataForTrack(int trackIndex, uint8_t* buffer,
@@ -55,20 +58,6 @@ public:
     virtual ~MediaSampleReaderNDK() override;
 
 private:
-    /**
-     * Creates a new MediaSampleReaderNDK object from an AMediaExtractor. The extractor needs to be
-     * initialized with a valid data source before attempting to create a MediaSampleReaderNDK.
-     * @param extractor The initialized media extractor.
-     */
-    MediaSampleReaderNDK(AMediaExtractor* extractor);
-    media_status_t init();
-
-    AMediaExtractor* mExtractor = nullptr;
-    std::mutex mExtractorMutex;
-    const size_t mTrackCount;
-
-    int mExtractorTrackIndex = -1;
-    uint64_t mExtractorSampleIndex = 0;
 
     /**
      * SamplePosition describes the position of a single sample in the media file using its
@@ -100,13 +89,52 @@ private:
         SamplePosition next;
     };
 
-    /** Samples cursor for each track in the file. */
-    std::vector<SampleCursor> mTrackCursors;
+    /**
+     * Creates a new MediaSampleReaderNDK object from an AMediaExtractor. The extractor needs to be
+     * initialized with a valid data source before attempting to create a MediaSampleReaderNDK.
+     * @param extractor The initialized media extractor.
+     */
+    MediaSampleReaderNDK(AMediaExtractor* extractor);
 
+    /** Advances the track to next sample. */
+    void advanceTrack_l(int trackIndex);
+
+    /** Advances the extractor to next sample. */
     bool advanceExtractor_l();
-    media_status_t positionExtractorForTrack_l(int trackIndex);
+
+    /** Moves the extractor backwards to the specified sample. */
     media_status_t seekExtractorBackwards_l(int64_t targetTimeUs, int targetTrackIndex,
                                             uint64_t targetSampleIndex);
+
+    /** Moves the extractor to the specified sample. */
+    media_status_t moveToSample_l(SamplePosition& pos, int trackIndex);
+
+    /** Moves the extractor to the next sample of the specified track. */
+    media_status_t moveToTrack_l(int trackIndex);
+
+    /** In sequential mode, waits for the extractor to reach the next sample for the track. */
+    media_status_t waitForTrack_l(int trackIndex, std::unique_lock<std::mutex>& lockHeld);
+
+    /**
+     * Ensures the extractor is ready for the next sample of the track regardless of access mode.
+     */
+    media_status_t primeExtractorForTrack_l(int trackIndex, std::unique_lock<std::mutex>& lockHeld);
+
+    AMediaExtractor* mExtractor = nullptr;
+    std::mutex mExtractorMutex;
+    const size_t mTrackCount;
+
+    int mExtractorTrackIndex = -1;
+    uint64_t mExtractorSampleIndex = 0;
+
+    bool mEosReached = false;
+    bool mEnforceSequentialAccess = false;
+
+    // Maps selected track indices to condition variables for sequential sample access control.
+    std::map<int, std::condition_variable> mTrackSignals;
+
+    // Samples cursor for each track in the file.
+    std::vector<SampleCursor> mTrackCursors;
 };
 
 }  // namespace android

@@ -42,8 +42,8 @@
 using namespace android;
 
 static void ReadMediaSamples(benchmark::State& state, const std::string& srcFileName,
-                             bool readAudio) {
-    // Asset directory
+                             bool readAudio, bool sequentialAccess = false) {
+    // Asset directory.
     static const std::string kAssetDirectory = "/data/local/tmp/TranscodingBenchmark/";
 
     int srcFd = 0;
@@ -59,9 +59,13 @@ static void ReadMediaSamples(benchmark::State& state, const std::string& srcFile
 
     for (auto _ : state) {
         auto sampleReader = MediaSampleReaderNDK::createFromFd(srcFd, 0, fileSize);
+        if (sampleReader->setEnforceSequentialAccess(sequentialAccess) != AMEDIA_OK) {
+            state.SkipWithError("setEnforceSequentialAccess failed");
+            return;
+        }
 
-        std::vector<std::thread> trackThreads;
-
+        // Select tracks.
+        std::vector<int> trackIndices;
         for (int trackIndex = 0; trackIndex < sampleReader->getTrackCount(); ++trackIndex) {
             const char* mime = nullptr;
 
@@ -78,6 +82,13 @@ static void ReadMediaSamples(benchmark::State& state, const std::string& srcFile
                 continue;
             }
 
+            trackIndices.push_back(trackIndex);
+            sampleReader->selectTrack(trackIndex);
+        }
+
+        // Start threads.
+        std::vector<std::thread> trackThreads;
+        for (auto trackIndex : trackIndices) {
             trackThreads.emplace_back([trackIndex, sampleReader, &state] {
                 LOG(INFO) << "Track " << trackIndex << " started";
                 MediaSampleInfo info;
@@ -102,14 +113,13 @@ static void ReadMediaSamples(benchmark::State& state, const std::string& srcFile
                         state.SkipWithError("Error reading sample data");
                         break;
                     }
-
-                    sampleReader->advanceTrack(trackIndex);
                 }
 
                 LOG(INFO) << "Track " << trackIndex << " finished";
             });
         }
 
+        // Join threads.
         for (auto& thread : trackThreads) {
             thread.join();
         }
@@ -122,9 +132,14 @@ static void ReadMediaSamples(benchmark::State& state, const std::string& srcFile
 #define TRANSCODER_BENCHMARK(func) \
     BENCHMARK(func)->UseRealTime()->MeasureProcessCPUTime()->Unit(benchmark::kMillisecond)
 
-static void BM_MediaSampleReader_AudioVideo(benchmark::State& state) {
+static void BM_MediaSampleReader_AudioVideo_Parallel(benchmark::State& state) {
     ReadMediaSamples(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
                      true /* readAudio */);
+}
+
+static void BM_MediaSampleReader_AudioVideo_Sequential(benchmark::State& state) {
+    ReadMediaSamples(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
+                     true /* readAudio */, true /* sequentialAccess */);
 }
 
 static void BM_MediaSampleReader_Video(benchmark::State& state) {
@@ -132,7 +147,8 @@ static void BM_MediaSampleReader_Video(benchmark::State& state) {
                      false /* readAudio */);
 }
 
-TRANSCODER_BENCHMARK(BM_MediaSampleReader_AudioVideo);
+TRANSCODER_BENCHMARK(BM_MediaSampleReader_AudioVideo_Parallel);
+TRANSCODER_BENCHMARK(BM_MediaSampleReader_AudioVideo_Sequential);
 TRANSCODER_BENCHMARK(BM_MediaSampleReader_Video);
 
 BENCHMARK_MAIN();
