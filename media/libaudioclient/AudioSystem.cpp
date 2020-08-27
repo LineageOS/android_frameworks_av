@@ -47,8 +47,9 @@ dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
 
 // Required to be held while calling into gSoundTriggerCaptureStateListener.
+class CaptureStateListenerImpl;
 Mutex gSoundTriggerCaptureStateListenerLock;
-sp<AudioSystem::CaptureStateListener> gSoundTriggerCaptureStateListener = nullptr;
+sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener = nullptr;
 
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
@@ -1634,42 +1635,54 @@ status_t AudioSystem::getPreferredDeviceForStrategy(product_strategy_t strategy,
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {
 public:
+    CaptureStateListenerImpl(
+            const sp<IAudioPolicyService>& aps,
+            const sp<AudioSystem::CaptureStateListener>& listener)
+            : mAps(aps), mListener(listener) {}
+
+    void init() {
+        bool active;
+        status_t status = mAps->registerSoundTriggerCaptureStateListener(this, &active);
+        if (status != NO_ERROR) {
+            mListener->onServiceDied();
+            return;
+        }
+        mListener->onStateChanged(active);
+        IInterface::asBinder(mAps)->linkToDeath(this);
+    }
+
     binder::Status setCaptureState(bool active) override {
         Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
-        gSoundTriggerCaptureStateListener->onStateChanged(active);
+        mListener->onStateChanged(active);
         return binder::Status::ok();
     }
 
     void binderDied(const wp<IBinder>&) override {
         Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
-        gSoundTriggerCaptureStateListener->onServiceDied();
+        mListener->onServiceDied();
         gSoundTriggerCaptureStateListener = nullptr;
     }
+
+private:
+    // Need this in order to keep the death receipent alive.
+    sp<IAudioPolicyService> mAps;
+    sp<AudioSystem::CaptureStateListener> mListener;
 };
 
 status_t AudioSystem::registerSoundTriggerCaptureStateListener(
     const sp<CaptureStateListener>& listener) {
+    LOG_ALWAYS_FATAL_IF(listener == nullptr);
+
     const sp<IAudioPolicyService>& aps =
             AudioSystem::get_audio_policy_service();
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
 
-    sp<CaptureStateListenerImpl> wrapper = new CaptureStateListenerImpl();
-
     Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+    gSoundTriggerCaptureStateListener = new CaptureStateListenerImpl(aps, listener);
+    gSoundTriggerCaptureStateListener->init();
 
-    bool active;
-    status_t status =
-        aps->registerSoundTriggerCaptureStateListener(wrapper, &active);
-    if (status != NO_ERROR) {
-        listener->onServiceDied();
-        return NO_ERROR;
-    }
-    gSoundTriggerCaptureStateListener = listener;
-    listener->onStateChanged(active);
-    sp<IBinder> binder = IInterface::asBinder(aps);
-    binder->linkToDeath(wrapper);
     return NO_ERROR;
 }
 
