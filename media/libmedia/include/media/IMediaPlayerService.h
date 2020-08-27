@@ -28,8 +28,6 @@
 #include <media/IMediaPlayerClient.h>
 #include <media/IMediaMetadataRetriever.h>
 
-#include <string>
-
 namespace android {
 
 class IMediaPlayer;
@@ -49,8 +47,7 @@ public:
     virtual sp<IMediaRecorder> createMediaRecorder(const String16 &opPackageName) = 0;
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever() = 0;
     virtual sp<IMediaPlayer> create(const sp<IMediaPlayerClient>& client,
-            audio_session_t audioSessionId = AUDIO_SESSION_ALLOCATE,
-            const std::string opPackage = "") = 0;
+            audio_session_t audioSessionId = AUDIO_SESSION_ALLOCATE) = 0;
     virtual sp<IMediaCodecList> getCodecList() const = 0;
 
     // Connects to a remote display.

@@ -26,8 +26,6 @@
 #include <media/Modulo.h>
 #include <utils/threads.h>
 
-#include <string>
-
 #include "android/media/BnAudioTrackCallback.h"
 #include "android/media/IAudioTrackCallback.h"
 
@@ -179,8 +177,6 @@ public:
      */
                         AudioTrack();
 
-                        AudioTrack(const std::string& opPackageName);
-
     /* Creates an AudioTrack object and registers it with AudioFlinger.
      * Once created, the track needs to be started before it can be used.
      * Unspecified values are set to appropriate default values.
@@ -262,8 +258,7 @@ public:
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
                                     float maxRequiredSpeed = 1.0f,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
-                                    const std::string& opPackageName = "");
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
 
     /* Creates an audio track and registers it with AudioFlinger.
      * With this constructor, the track is configured for static buffer mode.
@@ -293,8 +288,7 @@ public:
                                     pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
-                                    float maxRequiredSpeed = 1.0f,
-                                    const std::string& opPackageName = "");
+                                    float maxRequiredSpeed = 1.0f);
 
     /* Terminates the AudioTrack and unregisters it from AudioFlinger.
      * Also destroys all resources associated with the AudioTrack.
@@ -1241,8 +1235,6 @@ public:
                                               // activity and connected devices.
 
     sp<media::VolumeHandler>       mVolumeHandler;
-
-    const std::string      mOpPackageName;
 
 private:
     class DeathNotifier : public IBinder::DeathRecipient {

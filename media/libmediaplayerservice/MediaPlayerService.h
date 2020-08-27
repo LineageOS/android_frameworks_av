@@ -19,7 +19,6 @@
 #define ANDROID_MEDIAPLAYERSERVICE_H
 
 #include <arpa/inet.h>
-#include <string>
 
 #include <utils/threads.h>
 #include <utils/Errors.h>
@@ -82,8 +81,7 @@ class MediaPlayerService : public BnMediaPlayerService
                                         uid_t uid,
                                         int pid,
                                         const audio_attributes_t * attr,
-                                        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback,
-                                        const std::string& opPackageName);
+                                        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback);
         virtual                 ~AudioOutput();
 
         virtual bool            ready() const { return mTrack != 0; }
@@ -180,7 +178,6 @@ class MediaPlayerService : public BnMediaPlayerService
         bool                    mDeviceCallbackEnabled;
         wp<AudioSystem::AudioDeviceCallback>        mDeviceCallback;
         mutable Mutex           mLock;
-        const std::string       mOpPackageName;
 
         // static variables below not protected by mutex
         static bool             mIsOnEmulator;
@@ -238,8 +235,7 @@ public:
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever();
 
     virtual sp<IMediaPlayer>    create(const sp<IMediaPlayerClient>& client,
-                                       audio_session_t audioSessionId,
-                                       const std::string opPackageName);
+                                       audio_session_t audioSessionId);
 
     virtual sp<IMediaCodecList> getCodecList() const;
 
@@ -415,8 +411,7 @@ private:
                                         int32_t connId,
                                         const sp<IMediaPlayerClient>& client,
                                         audio_session_t audioSessionId,
-                                        uid_t uid,
-                                        const std::string& opPackageName);
+                                        uid_t uid);
                                 Client();
         virtual                 ~Client();
 
@@ -473,7 +468,6 @@ private:
                     bool                          mRetransmitEndpointValid;
                     sp<Client>                    mNextClient;
                     sp<MediaPlayerBase::Listener> mListener;
-                    const std::string             mOpPackageName;
 
         // Metadata filters.
         media::Metadata::Filter mMetadataAllow;  // protected by mLock
