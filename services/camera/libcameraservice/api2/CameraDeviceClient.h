@@ -204,16 +204,6 @@ public:
     virtual void notifyRequestQueueEmpty();
     virtual void notifyRepeatingRequestError(long lastFrameNumber);
 
-    // utility function to convert AIDL SessionConfiguration to HIDL
-    // streamConfiguration. Also checks for validity of SessionConfiguration and
-    // returns a non-ok binder::Status if the passed in session configuration
-    // isn't valid.
-    static binder::Status
-    convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
-            const String8 &cameraId, const CameraMetadata &deviceInfo,
-            metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-            hardware::camera::device::V3_4::StreamConfiguration &streamConfiguration,
-            bool *earlyExit);
     /**
      * Interface used by independent components of CameraDeviceClient.
      */
@@ -266,17 +256,7 @@ private:
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
-    static binder::Status checkOperatingMode(int operatingMode, const CameraMetadata &staticInfo,
-            const String8 &cameraId);
-    static binder::Status checkSurfaceType(size_t numBufferProducers, bool deferredConsumer,
-            int surfaceType);
-    static void mapStreamInfo(const OutputStreamInfo &streamInfo,
-            camera3_stream_rotation_t rotation, String8 physicalId,
-            hardware::camera::device::V3_4::Stream *stream /*out*/);
     bool enforceRequestPermissions(CameraMetadata& metadata);
-
-    // Find the square of the euclidean distance between two points
-    static int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
     // Create an output stream with surface deferred for future.
     binder::Status createDeferredSurfaceStreamLocked(
@@ -288,32 +268,10 @@ private:
     // cases.
     binder::Status setStreamTransformLocked(int streamId);
 
-    // Find the closest dimensions for a given format in available stream configurations with
-    // a width <= ROUNDING_WIDTH_CAP
-    static const int32_t ROUNDING_WIDTH_CAP = 1920;
-    static bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
-            android_dataspace dataSpace, const CameraMetadata& info,
-            /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
-
-    //check if format is not custom format
-    static bool isPublicFormat(int32_t format);
-
-    // Create a Surface from an IGraphicBufferProducer. Returns error if
-    // IGraphicBufferProducer's property doesn't match with streamInfo
-    static binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp, const String8 &cameraId,
-            const CameraMetadata &physicalCameraMetadata);
-
-
     // Utility method to insert the surface into SurfaceMap
     binder::Status insertGbpLocked(const sp<IGraphicBufferProducer>& gbp,
             /*out*/SurfaceMap* surfaceMap, /*out*/Vector<int32_t>* streamIds,
             /*out*/int32_t*  currentStreamId);
-
-    // Check that the physicalCameraId passed in is spported by the camera
-    // device.
-    static binder::Status checkPhysicalCameraId(const std::vector<std::string> &physicalCameraIds,
-            const String8 &physicalCameraId, const String8 &logicalCameraId);
 
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;
@@ -346,7 +304,6 @@ private:
 
     KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 
-    static const int32_t MAX_SURFACES_PER_STREAM = 4;
     sp<CameraProviderManager> mProviderManager;
 };
 
