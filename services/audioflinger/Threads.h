@@ -884,7 +884,8 @@ public:
                                 uid_t uid,
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
-                                const sp<media::IAudioTrackCallback>& callback);
+                                const sp<media::IAudioTrackCallback>& callback,
+                                const std::string& opPackageName);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
