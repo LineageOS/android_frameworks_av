@@ -23,9 +23,6 @@
 #include <camera/camera2/SubmitInfo.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 
-#include <hardware/camera3.h>
-#include <device3/Camera3StreamInterface.h>
-
 #include <stdint.h>
 
 namespace android {
@@ -34,41 +31,6 @@ typedef std::function<CameraMetadata (const String8 &)> metadataGetter;
 
 class SessionConfigurationUtils {
 public:
-
-    static int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
-
-    // Find the closest dimensions for a given format in available stream configurations with
-    // a width <= ROUNDING_WIDTH_CAP
-    static bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
-            android_dataspace dataSpace, const CameraMetadata& info,
-            /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
-
-    //check if format is not custom format
-    static bool isPublicFormat(int32_t format);
-
-    // Create a Surface from an IGraphicBufferProducer. Returns error if
-    // IGraphicBufferProducer's property doesn't match with streamInfo
-    static binder::Status createSurfaceFromGbp(
-        camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-        sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
-        const String8 &cameraId, const CameraMetadata &physicalCameraMetadata);
-
-    static void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
-            camera3_stream_rotation_t rotation, String8 physicalId,
-            hardware::camera::device::V3_4::Stream *stream /*out*/);
-
-    // Check that the physicalCameraId passed in is spported by the camera
-    // device.
-    static binder::Status checkPhysicalCameraId(
-        const std::vector<std::string> &physicalCameraIds, const String8 &physicalCameraId,
-        const String8 &logicalCameraId);
-
-    static binder::Status checkSurfaceType(size_t numBufferProducers,
-        bool deferredConsumer, int surfaceType);
-
-    static binder::Status checkOperatingMode(int operatingMode,
-        const CameraMetadata &staticInfo, const String8 &cameraId);
-
     // utility function to convert AIDL SessionConfiguration to HIDL
     // streamConfiguration. Also checks for validity of SessionConfiguration and
     // returns a non-ok binder::Status if the passed in session configuration
@@ -79,10 +41,6 @@ public:
             metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
             hardware::camera::device::V3_4::StreamConfiguration &streamConfiguration,
             bool *earlyExit);
-
-    static const int32_t MAX_SURFACES_PER_STREAM = 4;
-
-    static const int32_t ROUNDING_WIDTH_CAP = 1920;
 };
 
 } // android

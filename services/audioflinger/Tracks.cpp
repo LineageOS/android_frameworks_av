@@ -386,12 +386,11 @@ status_t AudioFlinger::TrackHandle::onTransact(
 // static
 sp<AudioFlinger::PlaybackThread::OpPlayAudioMonitor>
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
-            uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType,
-            const std::string& opPackageName)
+            uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType)
 {
-    Vector <String16> packages;
-    getPackagesForUid(uid, packages);
     if (isServiceUid(uid)) {
+        Vector <String16> packages;
+        getPackagesForUid(uid, packages);
         if (packages.isEmpty()) {
             ALOGD("OpPlayAudio: not muting track:%d usage:%d for service UID %d",
                   id,
@@ -411,32 +410,12 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
             id, attr.flags);
         return nullptr;
     }
-
-    String16 opPackageNameStr(opPackageName.c_str());
-    if (opPackageName.empty()) {
-        // If no package name is provided by the client, use the first associated with the uid
-        if (!packages.isEmpty()) {
-            opPackageNameStr = packages[0];
-        }
-    } else {
-        // If the provided package name is invalid, we force app ops denial by clearing the package
-        // name passed to OpPlayAudioMonitor
-        if (std::find_if(packages.begin(), packages.end(),
-                [&opPackageNameStr](const auto& package) {
-                return opPackageNameStr == package; }) == packages.end()) {
-            ALOGW("The package name(%s) provided does not correspond to the uid %d, "
-                  "force muting the track", opPackageName.c_str(), uid);
-            // Set package name as an empty string so that hasOpPlayAudio will always return false.
-            opPackageNameStr = String16("");
-        }
-    }
-    return new OpPlayAudioMonitor(uid, attr.usage, id, opPackageNameStr);
+    return new OpPlayAudioMonitor(uid, attr.usage, id);
 }
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(
-        uid_t uid, audio_usage_t usage, int id, const String16& opPackageName)
-        : mHasOpPlayAudio(true), mUid(uid), mUsage((int32_t) usage), mId(id),
-          mOpPackageName(opPackageName)
+        uid_t uid, audio_usage_t usage, int id)
+        : mHasOpPlayAudio(true), mUid(uid), mUsage((int32_t) usage), mId(id)
 {
 }
 
@@ -450,10 +429,11 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::~OpPlayAudioMonitor()
 
 void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::onFirstRef()
 {
+    getPackagesForUid(mUid, mPackages);
     checkPlayAudioForUsage();
-    if (mOpPackageName.size() != 0) {
+    if (!mPackages.isEmpty()) {
         mOpCallback = new PlayAudioOpCallback(this);
-        mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO, mOpPackageName, mOpCallback);
+        mAppOpsManager.startWatchingMode(AppOpsManager::OP_PLAY_AUDIO, mPackages[0], mOpCallback);
     }
 }
 
@@ -466,11 +446,18 @@ bool AudioFlinger::PlaybackThread::OpPlayAudioMonitor::hasOpPlayAudio() const {
 // - not called from PlayAudioOpCallback because the callback is not installed in this case
 void AudioFlinger::PlaybackThread::OpPlayAudioMonitor::checkPlayAudioForUsage()
 {
-    if (mOpPackageName.size() == 0) {
+    if (mPackages.isEmpty()) {
         mHasOpPlayAudio.store(false);
     } else {
-        bool hasIt = mAppOpsManager.checkAudioOpNoThrow(AppOpsManager::OP_PLAY_AUDIO,
-                    mUsage, mUid, mOpPackageName) == AppOpsManager::MODE_ALLOWED;
+        bool hasIt = true;
+        for (const String16& packageName : mPackages) {
+            const int32_t mode = mAppOpsManager.checkAudioOpNoThrow(AppOpsManager::OP_PLAY_AUDIO,
+                    mUsage, mUid, packageName);
+            if (mode != AppOpsManager::MODE_ALLOWED) {
+                hasIt = false;
+                break;
+            }
+        }
         ALOGD("OpPlayAudio: track:%d usage:%d %smuted", mId, mUsage, hasIt ? "not " : "");
         mHasOpPlayAudio.store(hasIt);
     }
@@ -524,8 +511,7 @@ AudioFlinger::PlaybackThread::Track::Track(
             audio_output_flags_t flags,
             track_type type,
             audio_port_handle_t portId,
-            size_t frameCountToBeReady,
-            const std::string opPackageName)
+            size_t frameCountToBeReady)
     :   TrackBase(thread, client, attr, sampleRate, format, channelMask, frameCount,
                   // TODO: Using unsecurePointer() has some associated security pitfalls
                   //       (see declaration for details).
@@ -548,8 +534,7 @@ AudioFlinger::PlaybackThread::Track::Track(
     mPresentationCompleteFrames(0),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
     mVolumeHandler(new media::VolumeHandler(sampleRate)),
-    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(
-            uid, attr, id(), streamType, opPackageName)),
+    mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(uid, attr, id(), streamType)),
     // mSinkTimestamp
     mFrameCountToBeReady(frameCountToBeReady),
     mFastIndex(-1),
@@ -616,7 +601,7 @@ AudioFlinger::PlaybackThread::Track::Track(
         // external vibration is always created for all tracks attached to haptic playback thread.
         mAudioVibrationController = new AudioVibrationController(this);
         mExternalVibration = new os::ExternalVibration(
-                mUid, opPackageName, mAttr, mAudioVibrationController);
+                mUid, "" /* pkg */, mAttr, mAudioVibrationController);
     }
 
     // Once this item is logged by the server, the client can add properties.

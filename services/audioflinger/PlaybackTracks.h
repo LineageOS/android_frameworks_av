@@ -26,11 +26,10 @@ public:
     bool hasOpPlayAudio() const;
 
     static sp<OpPlayAudioMonitor> createIfNeeded(
-            uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType,
-            const std::string& opPackageName);
+            uid_t uid, const audio_attributes_t& attr, int id, audio_stream_type_t streamType);
 
 private:
-    OpPlayAudioMonitor(uid_t uid, audio_usage_t usage, int id, const String16& opPackageName);
+    OpPlayAudioMonitor(uid_t uid, audio_usage_t usage, int id);
     void onFirstRef() override;
     static void getPackagesForUid(uid_t uid, Vector<String16>& packages);
 
@@ -50,10 +49,10 @@ private:
     void checkPlayAudioForUsage();
 
     std::atomic_bool mHasOpPlayAudio;
+    Vector<String16> mPackages;
     const uid_t mUid;
     const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
     const int mId; // for logging purposes only
-    const String16 mOpPackageName;
 };
 
 // playback track
@@ -78,8 +77,7 @@ public:
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 /** default behaviour is to start when there are as many frames
                                   * ready as possible (aka. Buffer is full). */
-                                size_t frameCountToBeReady = SIZE_MAX,
-                                const std::string opPackageName = "");
+                                size_t frameCountToBeReady = SIZE_MAX);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 

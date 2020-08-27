@@ -119,8 +119,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             // that is some multiple of the burst size.
             notificationFrames = 0 - DEFAULT_BURSTS_PER_BUFFER_CAPACITY;
         } else {
-            // To avoid glitching, let AudioFlinger pick the optimal burst size.
-            notificationFrames = 0;
+            notificationFrames = builder.getFramesPerDataCallback();
         }
     }
     mCallbackBufferSize = builder.getFramesPerDataCallback();
