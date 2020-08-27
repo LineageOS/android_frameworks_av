@@ -22,6 +22,7 @@
 
 #include <binder/Parcel.h>
 #include <camera/CameraMetadata.h>
+#include <camera_metadata_hidden.h>
 
 namespace android {
 
@@ -872,5 +873,8 @@ status_t CameraMetadata::getTagFromName(const char *name,
     return OK;
 }
 
+metadata_vendor_id_t CameraMetadata::getVendorId() {
+    return get_camera_metadata_vendor_id(mBuffer);
+}
 
 }; // namespace android

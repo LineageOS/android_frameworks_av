@@ -92,6 +92,7 @@ bool MediaTrackTranscoder::stop() {
 
     if (mState == STARTED) {
         abortTranscodeLoop();
+        mMediaSampleReader->setEnforceSequentialAccess(false);
         mTranscodingThread.join();
         mOutputQueue->abort();  // Wake up any threads waiting for samples.
         mState = STOPPED;

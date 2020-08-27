@@ -24,12 +24,15 @@
 namespace android {
 
 /**
- * MediaSampleReader is an interface for reading media samples from a container.
- * MediaSampleReader allows for reading samples from multiple tracks independently of each other
- * while preserving the order of samples within each individual track.
- * MediaSampleReader implementations are thread safe and can be used by multiple threads
- * concurrently. But note that MediaSampleReader only maintains one state per track so concurrent
- * usage of the same track from multiple threads has no benefit.
+ * MediaSampleReader is an interface for reading media samples from a container. MediaSampleReader
+ * allows for reading samples from multiple tracks on individual threads independently of each other
+ * while preserving the order of samples. Due to poor non-sequential access performance of the
+ * underlying extractor, MediaSampleReader can optionally enforce sequential sample access by
+ * blocking requests for tracks that the underlying extractor does not currently point to. Waiting
+ * threads are serviced once the reader advances to a sample from the specified track. Due to this
+ * it is important to read samples and advance the reader from all selected tracks to avoid hanging
+ * other tracks. MediaSampleReader implementations are thread safe and sample access should be done
+ * on one thread per selected track.
  */
 class MediaSampleReader {
 public:
@@ -57,6 +60,24 @@ public:
     virtual AMediaFormat* getTrackFormat(int trackIndex) = 0;
 
     /**
+     * Select a track for sample access. Tracks must be selected in order for sample information and
+     * sample data to be available for that track. Samples for selected tracks must be accessed on
+     * its own thread to avoid blocking other tracks.
+     * @param trackIndex The track to select.
+     * @return AMEDIA_OK on success.
+     */
+    virtual media_status_t selectTrack(int trackIndex) = 0;
+
+    /**
+     * Toggles sequential access enforcement on or off. When the reader enforces sequential access
+     * calls to read sample information will block unless the underlying extractor points to the
+     * specified track.
+     * @param enforce True to enforce sequential access.
+     * @return AMEDIA_OK on success.
+     */
+    virtual media_status_t setEnforceSequentialAccess(bool enforce) = 0;
+
+    /**
      * Estimates the bitrate of a source track by sampling sample sizes. The bitrate is returned in
      * megabits per second (Mbps). This method will fail if the track only contains a single sample
      * and does not have an associated duration.
@@ -67,7 +88,9 @@ public:
     virtual media_status_t getEstimatedBitrateForTrack(int trackIndex, int32_t* bitrate);
 
     /**
-     * Returns the sample information for the current sample in the specified track.
+     * Returns the sample information for the current sample in the specified track. Note that this
+     * method will block until the reader advances to a sample belonging to the requested track if
+     * the reader is in sequential access mode.
      * @param trackIndex The track index (zero-based).
      * @param info Pointer to a MediaSampleInfo object where the sample information is written.
      * @return AMEDIA_OK on success, AMEDIA_ERROR_END_OF_STREAM if there are no more samples to read
@@ -77,7 +100,10 @@ public:
     virtual media_status_t getSampleInfoForTrack(int trackIndex, MediaSampleInfo* info) = 0;
 
     /**
-     * Reads the current sample's data into the supplied buffer.
+     * Returns the sample data for the current sample in the specified track into the supplied
+     * buffer. Note that this method will block until the reader advances to a sample belonging to
+     * the requested track if the reader is in sequential access mode. Upon successful return this
+     * method will also advance the specified track to the next sample.
      * @param trackIndex The track index (zero-based).
      * @param buffer The buffer to write the sample's data to.
      * @param bufferSize The size of the supplied buffer.
@@ -90,7 +116,9 @@ public:
                                                   size_t bufferSize) = 0;
 
     /**
-     * Advance the specified track to the next sample.
+     * Advance the specified track to the next sample. If the reader is in sequential access mode
+     * and the current sample belongs to the specified track, the reader will also advance to the
+     * next sample and wake up any threads waiting on the new track.
      * @param trackIndex The track index (zero-based).
      */
     virtual void advanceTrack(int trackIndex) = 0;

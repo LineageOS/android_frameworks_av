@@ -1,0 +1,4 @@
+A collection of OWNERS files that we reference from other projects,
+such as the software codecs in directories like external/libavc.
+This is to simplify our owner/approver management across the multiple
+projects related to media.
