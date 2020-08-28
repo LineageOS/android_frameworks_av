@@ -1833,10 +1833,12 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
 
     mStatusWaiters++;
 
+    bool signalPipelineDrain = false;
     if (!active && mUseHalBufManager) {
         auto streamIds = mOutputStreams.getStreamIds();
         if (mStatus == STATUS_ACTIVE) {
             mRequestThread->signalPipelineDrain(streamIds);
+            signalPipelineDrain = true;
         }
         mRequestBufferSM.onWaitUntilIdle();
     }
@@ -1865,6 +1867,10 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
             }
         }
     } while (!stateSeen);
+
+    if (signalPipelineDrain) {
+        mRequestThread->resetPipelineDrain();
+    }
 
     mStatusWaiters--;
 
@@ -4800,6 +4806,12 @@ void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& s
     // If request thread is still busy, wait until paused then notify HAL
     mNotifyPipelineDrain = true;
     mStreamIdsToBeDrained = streamIds;
+}
+
+void Camera3Device::RequestThread::resetPipelineDrain() {
+    Mutex::Autolock pl(mPauseLock);
+    mNotifyPipelineDrain = false;
+    mStreamIdsToBeDrained.clear();
 }
 
 void Camera3Device::RequestThread::clearPreviousRequest() {

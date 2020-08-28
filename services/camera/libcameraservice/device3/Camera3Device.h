@@ -845,6 +845,7 @@ class Camera3Device :
         }
 
         void signalPipelineDrain(const std::vector<int>& streamIds);
+        void resetPipelineDrain();
 
         status_t switchToOffline(
                 const std::vector<int32_t>& streamsToKeep,
