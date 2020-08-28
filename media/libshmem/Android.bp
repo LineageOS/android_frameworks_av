@@ -15,12 +15,12 @@ cc_library {
         "libbinder",
         "libshmemutil",
         "libutils",
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
     export_shared_lib_headers: [
         "libbinder",
         "libutils",
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
 }
 
@@ -29,10 +29,10 @@ cc_library {
     export_include_dirs: ["include"],
     srcs: ["ShmemUtil.cpp"],
     shared_libs: [
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
     export_shared_lib_headers: [
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
 }
 
@@ -44,7 +44,7 @@ cc_test {
         "libshmemcompat",
         "libshmemutil",
         "libutils",
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
     test_suites: ["device-tests"],
 }
