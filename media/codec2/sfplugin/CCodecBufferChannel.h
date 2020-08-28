@@ -56,6 +56,9 @@ public:
     virtual ~CCodecBufferChannel();
 
     // BufferChannelBase interface
+    void setCrypto(const sp<ICrypto> &crypto) override;
+    void setDescrambler(const sp<IDescrambler> &descrambler) override;
+
     virtual status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t queueSecureInputBuffer(
             const sp<MediaCodecBuffer> &buffer,
@@ -67,6 +70,20 @@ public:
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
             AString *errorDetailMsg) override;
+    virtual status_t attachBuffer(
+            const std::shared_ptr<C2Buffer> &c2Buffer,
+            const sp<MediaCodecBuffer> &buffer) override;
+    virtual status_t attachEncryptedBuffer(
+            const sp<hardware::HidlMemory> &memory,
+            bool secure,
+            const uint8_t *key,
+            const uint8_t *iv,
+            CryptoPlugin::Mode mode,
+            CryptoPlugin::Pattern pattern,
+            size_t offset,
+            const CryptoPlugin::SubSample *subSamples,
+            size_t numSubSamples,
+            const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
     virtual status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
@@ -105,7 +122,10 @@ public:
      * Start queueing buffers to the component. This object should never queue
      * buffers before this call has completed.
      */
-    status_t start(const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat);
+    status_t start(
+            const sp<AMessage> &inputFormat,
+            const sp<AMessage> &outputFormat,
+            bool buffersBoundToCodec);
 
     /**
      * Request initial input buffers to be filled by client.
@@ -117,6 +137,16 @@ public:
      * buffers after this call, until start() is called.
      */
     void stop();
+
+    /**
+     * Stop queueing buffers to the component and release all buffers.
+     */
+    void reset();
+
+    /**
+     * Release all resources.
+     */
+    void release();
 
     void flush(const std::list<std::unique_ptr<C2Work>> &flushedWork);
 
@@ -213,11 +243,14 @@ private:
             std::unique_ptr<C2Work> work, const sp<AMessage> &outputFormat,
             const C2StreamInitDataInfo::output *initData);
     void sendOutputBuffers();
+    void ensureDecryptDestination(size_t size);
+    int32_t getHeapSeqNum(const sp<hardware::HidlMemory> &memory);
 
     QueueSync mSync;
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
     int32_t mHeapSeqNum;
+    std::map<wp<hardware::HidlMemory>, int32_t> mHeapSeqNumMap;
 
     std::shared_ptr<Codec2Client::Component> mComponent;
     std::string mComponentName; ///< component name for debugging
@@ -273,50 +306,11 @@ private:
 
     Mutexed<PipelineWatcher> mPipelineWatcher;
 
-    class ReorderStash {
-    public:
-        struct Entry {
-            inline Entry() : buffer(nullptr), timestamp(0), flags(0), ordinal({0, 0, 0}) {}
-            inline Entry(
-                    const std::shared_ptr<C2Buffer> &b,
-                    int64_t t,
-                    int32_t f,
-                    const C2WorkOrdinalStruct &o)
-                : buffer(b), timestamp(t), flags(f), ordinal(o) {}
-            std::shared_ptr<C2Buffer> buffer;
-            int64_t timestamp;
-            int32_t flags;
-            C2WorkOrdinalStruct ordinal;
-        };
-
-        ReorderStash();
-
-        void clear();
-        void flush();
-        void setDepth(uint32_t depth);
-        void setKey(C2Config::ordinal_key_t key);
-        bool pop(Entry *entry);
-        void emplace(
-                const std::shared_ptr<C2Buffer> &buffer,
-                int64_t timestamp,
-                int32_t flags,
-                const C2WorkOrdinalStruct &ordinal);
-        void defer(const Entry &entry);
-        bool hasPending() const;
-        uint32_t depth() const { return mDepth; }
-
-    private:
-        std::list<Entry> mPending;
-        std::list<Entry> mStash;
-        uint32_t mDepth;
-        C2Config::ordinal_key_t mKey;
-
-        bool less(const C2WorkOrdinalStruct &o1, const C2WorkOrdinalStruct &o2);
-    };
-    Mutexed<ReorderStash> mReorderStash;
-
     std::atomic_bool mInputMetEos;
     std::once_flag mRenderWarningFlag;
+
+    sp<ICrypto> mCrypto;
+    sp<IDescrambler> mDescrambler;
 
     inline bool hasCryptoOrDescrambler() {
         return mCrypto != nullptr || mDescrambler != nullptr;

@@ -19,7 +19,7 @@
 #define CAMERA_SOURCE_H_
 
 #include <deque>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <camera/android/hardware/ICamera.h>
 #include <camera/ICameraRecordingProxy.h>

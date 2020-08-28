@@ -27,7 +27,6 @@ namespace android {
 
 struct ABuffer;
 struct AMessage;
-struct AudioPlaybackRate;
 struct AVSyncSettings;
 class IDataSource;
 struct MediaClock;

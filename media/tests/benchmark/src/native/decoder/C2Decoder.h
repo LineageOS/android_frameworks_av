@@ -17,10 +17,6 @@
 #ifndef __C2_DECODER_H__
 #define __C2_DECODER_H__
 
-#include <stdio.h>
-#include <algorithm>
-#include <fstream>
-
 #include "BenchmarkC2Common.h"
 
 #define ALIGN(_sz, _align) (((_sz) + ((_align) - 1)) & ~((_align) - 1))

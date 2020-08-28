@@ -196,13 +196,9 @@ private:
                 frameIndex(frameIndex),
                 bufferIndex(bufferIndex),
                 buffer(buffer) {}
-        TrackedBuffer(const TrackedBuffer&) = default;
-        bool operator<(const TrackedBuffer& other) const {
-            return bufferIndex < other.bufferIndex;
-        }
     };
 
-    // Map: listener -> frameIndex -> set<TrackedBuffer>.
+    // Map: listener -> frameIndex -> set<TrackedBuffer*>.
     // Essentially, this is used to store triples (listener, frameIndex,
     // bufferIndex) that's searchable by listener and (listener, frameIndex).
     // However, the value of the innermost map is TrackedBuffer, which also
@@ -210,7 +206,7 @@ private:
     // because onBufferDestroyed() needs to know listener and frameIndex too.
     typedef std::map<wp<IComponentListener>,
                      std::map<uint64_t,
-                              std::set<TrackedBuffer>>> TrackedBuffersMap;
+                              std::set<TrackedBuffer*>>> TrackedBuffersMap;
 
     // Storage for pending (unsent) death notifications for one listener.
     // Each pair in member named "indices" are (frameIndex, bufferIndex) from
@@ -246,6 +242,16 @@ private:
 
     // Mutex for the management of all input buffers.
     std::mutex mMutex;
+
+    // Cache for all TrackedBuffers.
+    //
+    // Whenever registerOnDestroyNotify() is called, an argument of type
+    // TrackedBuffer is created and stored into this cache.
+    // Whenever unregisterOnDestroyNotify() or onBufferDestroyed() is called,
+    // the TrackedBuffer is removed from this cache.
+    //
+    // mTrackedBuffersMap stores references to TrackedBuffers inside this cache.
+    std::set<TrackedBuffer*> mTrackedBufferCache;
 
     // Tracked input buffers.
     TrackedBuffersMap mTrackedBuffersMap;

@@ -575,7 +575,7 @@ protected:
 class AudioTrackServerProxy : public ServerProxy {
 public:
     AudioTrackServerProxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCount,
-            size_t frameSize, bool clientInServer = false, uint32_t sampleRate = 0)
+            size_t frameSize, bool clientInServer, uint32_t sampleRate)
         : ServerProxy(cblk, buffers, frameCount, frameSize, true /*isOut*/, clientInServer),
           mPlaybackRateObserver(&cblk->mPlaybackRateQueue),
           mUnderrunCount(0), mUnderrunning(false), mDrained(true) {
@@ -614,6 +614,8 @@ public:
     // and thus which resulted in an underrun.
     virtual uint32_t    getUnderrunFrames() const { return mCblk->u.mStreaming.mUnderrunFrames; }
 
+    virtual uint32_t    getUnderrunCount() const { return mCblk->u.mStreaming.mUnderrunCount; }
+
     // Return the playback speed and pitch read atomically. Not multi-thread safe on server side.
     AudioPlaybackRate getPlaybackRate();
 
@@ -651,7 +653,7 @@ private:
 class StaticAudioTrackServerProxy : public AudioTrackServerProxy {
 public:
     StaticAudioTrackServerProxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCount,
-            size_t frameSize);
+            size_t frameSize, uint32_t sampleRate);
 protected:
     virtual ~StaticAudioTrackServerProxy() { }
 

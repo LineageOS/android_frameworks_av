@@ -35,7 +35,6 @@ class AudioEndpoint {
 
 public:
     AudioEndpoint();
-    virtual ~AudioEndpoint();
 
     /**
      * Configure based on the EndPointDescriptor_t.
@@ -67,11 +66,11 @@ public:
      */
     void setDataReadCounter(android::fifo_counter_t framesRead);
 
-    android::fifo_counter_t getDataReadCounter();
+    android::fifo_counter_t getDataReadCounter() const;
 
     void setDataWriteCounter(android::fifo_counter_t framesWritten);
 
-    android::fifo_counter_t getDataWriteCounter();
+    android::fifo_counter_t getDataWriteCounter() const;
 
     /**
      * The result is not valid until after configure() is called.
@@ -94,8 +93,8 @@ public:
     void dump() const;
 
 private:
-    android::FifoBuffer    *mUpCommandQueue;
-    android::FifoBuffer    *mDataQueue;
+    std::unique_ptr<android::FifoBuffer> mUpCommandQueue;
+    std::unique_ptr<android::FifoBuffer> mDataQueue;
     bool                    mFreeRunning;
     android::fifo_counter_t mDataReadCounter; // only used if free-running
     android::fifo_counter_t mDataWriteCounter; // only used if free-running

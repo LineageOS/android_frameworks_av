@@ -67,7 +67,7 @@ struct LWOmx : public IOMX {
             sp<IOMXNode>* omxNode) override;
     status_t createInputSurface(
             sp<::android::IGraphicBufferProducer>* bufferProducer,
-            sp<::android::IGraphicBufferSource>* bufferSource) override;
+            sp<::android::hardware::media::omx::V1_0::IGraphicBufferSource>* bufferSource) override;
 };
 
 }  // namespace utils

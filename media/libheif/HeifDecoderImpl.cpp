@@ -21,22 +21,39 @@
 
 #include <stdio.h>
 
+#include <android/IDataSource.h>
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <drm/drm_framework_common.h>
-#include <media/IDataSource.h>
 #include <media/mediametadataretriever.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <private/media/VideoFrame.h>
 #include <utils/Log.h>
 #include <utils/RefBase.h>
+#include <vector>
 
 HeifDecoder* createHeifDecoder() {
     return new android::HeifDecoderImpl();
 }
 
 namespace android {
+
+void initFrameInfo(HeifFrameInfo *info, const VideoFrame *videoFrame) {
+    info->mWidth = videoFrame->mWidth;
+    info->mHeight = videoFrame->mHeight;
+    info->mRotationAngle = videoFrame->mRotationAngle;
+    info->mBytesPerPixel = videoFrame->mBytesPerPixel;
+    info->mDurationUs = videoFrame->mDurationUs;
+    if (videoFrame->mIccSize > 0) {
+        info->mIccData.assign(
+                videoFrame->getFlattenedIccData(),
+                videoFrame->getFlattenedIccData() + videoFrame->mIccSize);
+    } else {
+        // clear old Icc data if there is no Icc data.
+        info->mIccData.clear();
+    }
+}
 
 /*
  * HeifDataSource
@@ -153,7 +170,7 @@ ssize_t HeifDataSource::readAt(off64_t offset, size_t size) {
 
     // copy from cache if the request falls entirely in cache
     if (offset + size <= mCachedOffset + mCachedSize) {
-        memcpy(mMemory->pointer(), mCache.get() + offset - mCachedOffset, size);
+        memcpy(mMemory->unsecurePointer(), mCache.get() + offset - mCachedOffset, size);
         return size;
     }
 
@@ -251,7 +268,7 @@ ssize_t HeifDataSource::readAt(off64_t offset, size_t size) {
     if (bytesAvailable < (int64_t)size) {
         size = bytesAvailable;
     }
-    memcpy(mMemory->pointer(), mCache.get() + offset - mCachedOffset, size);
+    memcpy(mMemory->unsecurePointer(), mCache.get() + offset - mCachedOffset, size);
     return size;
 }
 
@@ -290,11 +307,11 @@ HeifDecoderImpl::HeifDecoderImpl() :
     // it's not, default to HAL_PIXEL_FORMAT_RGB_565.
     mOutputColor(HAL_PIXEL_FORMAT_RGB_565),
     mCurScanline(0),
-    mWidth(0),
-    mHeight(0),
+    mTotalScanline(0),
     mFrameDecoded(false),
     mHasImage(false),
     mHasVideo(false),
+    mSequenceLength(0),
     mAvailableLines(0),
     mNumSlices(1),
     mSliceHeight(0),
@@ -317,6 +334,13 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
     }
     mDataSource = dataSource;
 
+    return reinit(frameInfo);
+}
+
+bool HeifDecoderImpl::reinit(HeifFrameInfo* frameInfo) {
+    mFrameDecoded = false;
+    mFrameMemory.clear();
+
     mRetriever = new MediaMetadataRetriever();
     status_t err = mRetriever->setDataSource(mDataSource, "image/heif");
     if (err != OK) {
@@ -333,48 +357,103 @@ bool HeifDecoderImpl::init(HeifStream* stream, HeifFrameInfo* frameInfo) {
 
     mHasImage = hasImage && !strcasecmp(hasImage, "yes");
     mHasVideo = hasVideo && !strcasecmp(hasVideo, "yes");
-    sp<IMemory> sharedMem;
+
+    HeifFrameInfo* defaultInfo = nullptr;
     if (mHasImage) {
         // image index < 0 to retrieve primary image
-        sharedMem = mRetriever->getImageAtIndex(
+        sp<IMemory> sharedMem = mRetriever->getImageAtIndex(
                 -1, mOutputColor, true /*metaOnly*/);
-    } else if (mHasVideo) {
-        sharedMem = mRetriever->getFrameAtTime(0,
-                MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
-                mOutputColor, true /*metaOnly*/);
+
+        if (sharedMem == nullptr || sharedMem->unsecurePointer() == nullptr) {
+            ALOGE("init: videoFrame is a nullptr");
+            return false;
+        }
+
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->unsecurePointer());
+
+        ALOGV("Image dimension %dx%d, display %dx%d, angle %d, iccSize %d",
+                videoFrame->mWidth,
+                videoFrame->mHeight,
+                videoFrame->mDisplayWidth,
+                videoFrame->mDisplayHeight,
+                videoFrame->mRotationAngle,
+                videoFrame->mIccSize);
+
+        initFrameInfo(&mImageInfo, videoFrame);
+
+        if (videoFrame->mTileHeight >= 512) {
+            // Try decoding in slices only if the image has tiles and is big enough.
+            mSliceHeight = videoFrame->mTileHeight;
+            ALOGV("mSliceHeight %u", mSliceHeight);
+        }
+
+        defaultInfo = &mImageInfo;
     }
 
-    if (sharedMem == nullptr || sharedMem->pointer() == nullptr) {
-        ALOGE("getFrameAtTime: videoFrame is a nullptr");
+    if (mHasVideo) {
+        sp<IMemory> sharedMem = mRetriever->getFrameAtTime(0,
+                MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC,
+                mOutputColor, true /*metaOnly*/);
+
+        if (sharedMem == nullptr || sharedMem->unsecurePointer() == nullptr) {
+            ALOGE("init: videoFrame is a nullptr");
+            return false;
+        }
+
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        VideoFrame* videoFrame = static_cast<VideoFrame*>(
+            sharedMem->unsecurePointer());
+
+        ALOGV("Sequence dimension %dx%d, display %dx%d, angle %d, iccSize %d",
+                videoFrame->mWidth,
+                videoFrame->mHeight,
+                videoFrame->mDisplayWidth,
+                videoFrame->mDisplayHeight,
+                videoFrame->mRotationAngle,
+                videoFrame->mIccSize);
+
+        initFrameInfo(&mSequenceInfo, videoFrame);
+
+        mSequenceLength = atoi(mRetriever->extractMetadata(METADATA_KEY_VIDEO_FRAME_COUNT));
+
+        if (defaultInfo == nullptr) {
+            defaultInfo = &mSequenceInfo;
+        }
+    }
+
+    if (defaultInfo == nullptr) {
+        ALOGD("No valid image or sequence available");
         return false;
     }
 
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(sharedMem->pointer());
-
-    ALOGV("Meta dimension %dx%d, display %dx%d, angle %d, iccSize %d",
-            videoFrame->mWidth,
-            videoFrame->mHeight,
-            videoFrame->mDisplayWidth,
-            videoFrame->mDisplayHeight,
-            videoFrame->mRotationAngle,
-            videoFrame->mIccSize);
-
     if (frameInfo != nullptr) {
-        frameInfo->set(
-                videoFrame->mWidth,
-                videoFrame->mHeight,
-                videoFrame->mRotationAngle,
-                videoFrame->mBytesPerPixel,
-                videoFrame->mIccSize,
-                videoFrame->getFlattenedIccData());
+        *frameInfo = *defaultInfo;
     }
-    mWidth = videoFrame->mWidth;
-    mHeight = videoFrame->mHeight;
-    if (mHasImage && videoFrame->mTileHeight >= 512 && mWidth >= 3000 && mHeight >= 2000 ) {
-        // Try decoding in slices only if the image has tiles and is big enough.
-        mSliceHeight = videoFrame->mTileHeight;
-        mNumSlices = (videoFrame->mHeight + mSliceHeight - 1) / mSliceHeight;
-        ALOGV("mSliceHeight %u, mNumSlices %zu", mSliceHeight, mNumSlices);
+
+    // default total scanline, this might change if decodeSequence() is used
+    mTotalScanline = defaultInfo->mHeight;
+
+    return true;
+}
+
+bool HeifDecoderImpl::getSequenceInfo(
+        HeifFrameInfo* frameInfo, size_t *frameCount) {
+    ALOGV("%s", __FUNCTION__);
+    if (!mHasVideo) {
+        return false;
+    }
+    if (frameInfo != nullptr) {
+        *frameInfo = mSequenceInfo;
+    }
+    if (frameCount != nullptr) {
+        *frameCount = mSequenceLength;
     }
     return true;
 }
@@ -385,27 +464,35 @@ bool HeifDecoderImpl::getEncodedColor(HeifEncodedColor* /*outColor*/) const {
 }
 
 bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
+    if (heifColor == mOutputColor) {
+        return true;
+    }
+
     switch(heifColor) {
         case kHeifColorFormat_RGB565:
         {
             mOutputColor = HAL_PIXEL_FORMAT_RGB_565;
-            return true;
+            break;
         }
         case kHeifColorFormat_RGBA_8888:
         {
             mOutputColor = HAL_PIXEL_FORMAT_RGBA_8888;
-            return true;
+            break;
         }
         case kHeifColorFormat_BGRA_8888:
         {
             mOutputColor = HAL_PIXEL_FORMAT_BGRA_8888;
-            return true;
+            break;
         }
         default:
-            break;
+            ALOGE("Unsupported output color format %d", heifColor);
+            return false;
     }
-    ALOGE("Unsupported output color format %d", heifColor);
-    return false;
+
+    if (mFrameDecoded) {
+        return reinit(nullptr);
+    }
+    return true;
 }
 
 bool HeifDecoderImpl::decodeAsync() {
@@ -413,15 +500,15 @@ bool HeifDecoderImpl::decodeAsync() {
         ALOGV("decodeAsync(): decoding slice %zu", i);
         size_t top = i * mSliceHeight;
         size_t bottom = (i + 1) * mSliceHeight;
-        if (bottom > mHeight) {
-            bottom = mHeight;
+        if (bottom > mImageInfo.mHeight) {
+            bottom = mImageInfo.mHeight;
         }
         sp<IMemory> frameMemory = mRetriever->getImageRectAtIndex(
-                -1, mOutputColor, 0, top, mWidth, bottom);
+                -1, mOutputColor, 0, top, mImageInfo.mWidth, bottom);
         {
             Mutex::Autolock autolock(mLock);
 
-            if (frameMemory == nullptr || frameMemory->pointer() == nullptr) {
+            if (frameMemory == nullptr || frameMemory->unsecurePointer() == nullptr) {
                 mAsyncDecodeDone = true;
                 mScanlineReady.signal();
                 break;
@@ -434,7 +521,8 @@ bool HeifDecoderImpl::decodeAsync() {
     }
     // Aggressive clear to avoid holding on to resources
     mRetriever.clear();
-    mDataSource.clear();
+
+    // Hold on to mDataSource in case the client wants to redecode.
     return false;
 }
 
@@ -449,42 +537,48 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
     // See if we want to decode in slices to allow client to start
     // scanline processing in parallel with decode. If this fails
     // we fallback to decoding the full frame.
-    if (mHasImage && mNumSlices > 1) {
-        // get first slice and metadata
-        sp<IMemory> frameMemory = mRetriever->getImageRectAtIndex(
-                -1, mOutputColor, 0, 0, mWidth, mSliceHeight);
-
-        if (frameMemory == nullptr || frameMemory->pointer() == nullptr) {
-            ALOGE("decode: metadata is a nullptr");
-            return false;
+    if (mHasImage) {
+        if (mSliceHeight >= 512 &&
+                mImageInfo.mWidth >= 3000 &&
+                mImageInfo.mHeight >= 2000 ) {
+            // Try decoding in slices only if the image has tiles and is big enough.
+            mNumSlices = (mImageInfo.mHeight + mSliceHeight - 1) / mSliceHeight;
+            ALOGV("mSliceHeight %u, mNumSlices %zu", mSliceHeight, mNumSlices);
         }
 
-        VideoFrame* videoFrame = static_cast<VideoFrame*>(frameMemory->pointer());
+        if (mNumSlices > 1) {
+            // get first slice and metadata
+            sp<IMemory> frameMemory = mRetriever->getImageRectAtIndex(
+                    -1, mOutputColor, 0, 0, mImageInfo.mWidth, mSliceHeight);
 
-        if (frameInfo != nullptr) {
-            frameInfo->set(
-                    videoFrame->mWidth,
-                    videoFrame->mHeight,
-                    videoFrame->mRotationAngle,
-                    videoFrame->mBytesPerPixel,
-                    videoFrame->mIccSize,
-                    videoFrame->getFlattenedIccData());
+            if (frameMemory == nullptr || frameMemory->unsecurePointer() == nullptr) {
+                ALOGE("decode: metadata is a nullptr");
+                return false;
+            }
+
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
+            VideoFrame* videoFrame = static_cast<VideoFrame*>(frameMemory->unsecurePointer());
+
+            if (frameInfo != nullptr) {
+                initFrameInfo(frameInfo, videoFrame);
+            }
+            mFrameMemory = frameMemory;
+            mAvailableLines = mSliceHeight;
+            mThread = new DecodeThread(this);
+            if (mThread->run("HeifDecode", ANDROID_PRIORITY_FOREGROUND) == OK) {
+                mFrameDecoded = true;
+                return true;
+            }
+            // Fallback to decode without slicing
+            mThread.clear();
+            mNumSlices = 1;
+            mSliceHeight = 0;
+            mAvailableLines = 0;
+            mFrameMemory.clear();
         }
-
-        mFrameMemory = frameMemory;
-        mAvailableLines = mSliceHeight;
-        mThread = new DecodeThread(this);
-        if (mThread->run("HeifDecode", ANDROID_PRIORITY_FOREGROUND) == OK) {
-            mFrameDecoded = true;
-            return true;
-        }
-
-        // Fallback to decode without slicing
-        mThread.clear();
-        mNumSlices = 1;
-        mSliceHeight = 0;
-        mAvailableLines = 0;
-        mFrameMemory.clear();
     }
 
     if (mHasImage) {
@@ -495,12 +589,16 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
                 MediaSource::ReadOptions::SEEK_PREVIOUS_SYNC, mOutputColor);
     }
 
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
+    if (mFrameMemory == nullptr || mFrameMemory->unsecurePointer() == nullptr) {
         ALOGE("decode: videoFrame is a nullptr");
         return false;
     }
 
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
     if (videoFrame->mSize == 0 ||
             mFrameMemory->size() < videoFrame->getFlattenedSize()) {
         ALOGE("decode: videoFrame size is invalid");
@@ -517,34 +615,82 @@ bool HeifDecoderImpl::decode(HeifFrameInfo* frameInfo) {
             videoFrame->mSize);
 
     if (frameInfo != nullptr) {
-        frameInfo->set(
-                videoFrame->mWidth,
-                videoFrame->mHeight,
-                videoFrame->mRotationAngle,
-                videoFrame->mBytesPerPixel,
-                videoFrame->mIccSize,
-                videoFrame->getFlattenedIccData());
+        initFrameInfo(frameInfo, videoFrame);
+
     }
     mFrameDecoded = true;
 
     // Aggressively clear to avoid holding on to resources
     mRetriever.clear();
-    mDataSource.clear();
+
+    // Hold on to mDataSource in case the client wants to redecode.
+    return true;
+}
+
+bool HeifDecoderImpl::decodeSequence(int frameIndex, HeifFrameInfo* frameInfo) {
+    ALOGV("%s: frame index %d", __FUNCTION__, frameIndex);
+    if (!mHasVideo) {
+        return false;
+    }
+
+    if (frameIndex < 0 || frameIndex >= mSequenceLength) {
+        ALOGE("invalid frame index: %d, total frames %zu", frameIndex, mSequenceLength);
+        return false;
+    }
+
+    mCurScanline = 0;
+
+    // set total scanline to sequence height now
+    mTotalScanline = mSequenceInfo.mHeight;
+
+    mFrameMemory = mRetriever->getFrameAtIndex(frameIndex, mOutputColor);
+    if (mFrameMemory == nullptr || mFrameMemory->unsecurePointer() == nullptr) {
+        ALOGE("decode: videoFrame is a nullptr");
+        return false;
+    }
+
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
+    if (videoFrame->mSize == 0 ||
+            mFrameMemory->size() < videoFrame->getFlattenedSize()) {
+        ALOGE("decode: videoFrame size is invalid");
+        return false;
+    }
+
+    ALOGV("Decoded dimension %dx%d, display %dx%d, angle %d, rowbytes %d, size %d",
+            videoFrame->mWidth,
+            videoFrame->mHeight,
+            videoFrame->mDisplayWidth,
+            videoFrame->mDisplayHeight,
+            videoFrame->mRotationAngle,
+            videoFrame->mRowBytes,
+            videoFrame->mSize);
+
+    if (frameInfo != nullptr) {
+        initFrameInfo(frameInfo, videoFrame);
+    }
     return true;
 }
 
 bool HeifDecoderImpl::getScanlineInner(uint8_t* dst) {
-    if (mFrameMemory == nullptr || mFrameMemory->pointer() == nullptr) {
+    if (mFrameMemory == nullptr || mFrameMemory->unsecurePointer() == nullptr) {
         return false;
     }
-    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->pointer());
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    VideoFrame* videoFrame = static_cast<VideoFrame*>(mFrameMemory->unsecurePointer());
     uint8_t* src = videoFrame->getFlattenedData() + videoFrame->mRowBytes * mCurScanline++;
     memcpy(dst, src, videoFrame->mBytesPerPixel * videoFrame->mWidth);
     return true;
 }
 
 bool HeifDecoderImpl::getScanline(uint8_t* dst) {
-    if (mCurScanline >= mHeight) {
+    if (mCurScanline >= mTotalScanline) {
         ALOGE("no more scanline available");
         return false;
     }
@@ -564,8 +710,8 @@ bool HeifDecoderImpl::getScanline(uint8_t* dst) {
 size_t HeifDecoderImpl::skipScanlines(size_t count) {
     uint32_t oldScanline = mCurScanline;
     mCurScanline += count;
-    if (mCurScanline > mHeight) {
-        mCurScanline = mHeight;
+    if (mCurScanline > mTotalScanline) {
+        mCurScanline = mTotalScanline;
     }
     return (mCurScanline > oldScanline) ? (mCurScanline - oldScanline) : 0;
 }

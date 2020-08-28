@@ -23,6 +23,7 @@
 #include <TypeConverter.h>
 #include "AudioOutputDescriptor.h"
 #include "AudioPatch.h"
+#include "AudioPolicyMix.h"
 #include "ClientDescriptor.h"
 #include "DeviceDescriptor.h"
 #include "HwModule.h"
@@ -55,6 +56,12 @@ void TrackClientDescriptor::dump(String8 *dst, int spaces, int index) const
     ClientDescriptor::dump(dst, spaces, index);
     dst->appendFormat("%*s- Stream: %d flags: %08x\n", spaces, "", mStream, mFlags);
     dst->appendFormat("%*s- Refcount: %d\n", spaces, "", mActivityCount);
+    dst->appendFormat("%*s- DAP Primary Mix: %p\n", spaces, "", mPrimaryMix.promote().get());
+    dst->appendFormat("%*s- DAP Secondary Outputs:\n", spaces, "");
+    for (auto desc : mSecondaryOutputs) {
+        dst->appendFormat("%*s  - %d\n", spaces, "",
+                desc.promote() == nullptr ? 0 : desc.promote()->mIoHandle);
+    }
 }
 
 std::string TrackClientDescriptor::toShortString() const
@@ -88,7 +95,7 @@ SourceClientDescriptor::SourceClientDescriptor(audio_port_handle_t portId, uid_t
     TrackClientDescriptor::TrackClientDescriptor(portId, uid, AUDIO_SESSION_NONE, attributes,
         {config.sample_rate, config.channel_mask, config.format}, AUDIO_PORT_HANDLE_NONE,
         stream, strategy, volumeSource, AUDIO_OUTPUT_FLAG_NONE, false,
-        {} /* Sources do not support secondary outputs*/), mSrcDevice(srcDevice)
+        {} /* Sources do not support secondary outputs*/, nullptr), mSrcDevice(srcDevice)
 {
 }
 

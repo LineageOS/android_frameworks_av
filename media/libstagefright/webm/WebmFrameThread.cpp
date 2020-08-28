@@ -321,6 +321,7 @@ status_t WebmFrameMediaSourceThread::resume() {
 status_t WebmFrameMediaSourceThread::pause() {
     if (mStarted) {
         mPaused = true;
+        mResumed = false;
     }
     return OK;
 }

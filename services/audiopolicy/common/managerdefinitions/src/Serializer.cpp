@@ -199,6 +199,7 @@ struct GlobalConfigTraits
     struct Attributes
     {
         static constexpr const char *speakerDrcEnabled = "speaker_drc_enabled";
+        static constexpr const char *callScreenModeSupported= "call_screen_mode_supported";
         static constexpr const char *engineLibrarySuffix = "engine_library";
     };
 
@@ -681,12 +682,16 @@ status_t GlobalConfigTraits::deserialize(const xmlNode *root, AudioPolicyConfig 
 {
     for (const xmlNode *cur = root->xmlChildrenNode; cur != NULL; cur = cur->next) {
         if (!xmlStrcmp(cur->name, reinterpret_cast<const xmlChar*>(tag))) {
-            std::string speakerDrcEnabled =
-                    getXmlAttribute(cur, Attributes::speakerDrcEnabled);
-            bool isSpeakerDrcEnabled;
-            if (!speakerDrcEnabled.empty() &&
-                    convertTo<std::string, bool>(speakerDrcEnabled, isSpeakerDrcEnabled)) {
-                config->setSpeakerDrcEnabled(isSpeakerDrcEnabled);
+            bool value;
+            std::string attr = getXmlAttribute(cur, Attributes::speakerDrcEnabled);
+            if (!attr.empty() &&
+                    convertTo<std::string, bool>(attr, value)) {
+                config->setSpeakerDrcEnabled(value);
+            }
+            attr = getXmlAttribute(cur, Attributes::callScreenModeSupported);
+            if (!attr.empty() &&
+                    convertTo<std::string, bool>(attr, value)) {
+                config->setCallScreenModeSupported(value);
             }
             std::string engineLibrarySuffix = getXmlAttribute(cur, Attributes::engineLibrarySuffix);
             if (!engineLibrarySuffix.empty()) {

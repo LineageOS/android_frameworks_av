@@ -105,7 +105,8 @@ enum {
     ERROR_CAS_CARD_MUTE                      = CAS_ERROR_BASE - 15,
     ERROR_CAS_CARD_INVALID                   = CAS_ERROR_BASE - 16,
     ERROR_CAS_BLACKOUT                       = CAS_ERROR_BASE - 17,
-    ERROR_CAS_LAST_USED_ERRORCODE            = CAS_ERROR_BASE - 17,
+    ERROR_CAS_REBOOTING                      = CAS_ERROR_BASE - 18,
+    ERROR_CAS_LAST_USED_ERRORCODE            = CAS_ERROR_BASE - 18,
 
     ERROR_CAS_VENDOR_MAX                     = CAS_ERROR_BASE - 500,
     ERROR_CAS_VENDOR_MIN                     = CAS_ERROR_BASE - 999,

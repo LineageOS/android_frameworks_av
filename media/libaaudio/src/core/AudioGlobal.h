@@ -25,9 +25,12 @@ namespace aaudio {
 aaudio_policy_t AudioGlobal_getMMapPolicy();
 aaudio_result_t AudioGlobal_setMMapPolicy(aaudio_policy_t policy);
 
+const char* AudioGlobal_convertFormatToText(aaudio_format_t format);
+const char* AudioGlobal_convertDirectionToText(aaudio_direction_t direction);
+const char* AudioGlobal_convertPerformanceModeToText(aaudio_performance_mode_t mode);
 const char* AudioGlobal_convertResultToText(aaudio_result_t returnCode);
+const char* AudioGlobal_convertSharingModeToText(aaudio_sharing_mode_t mode);
 const char* AudioGlobal_convertStreamStateToText(aaudio_stream_state_t state);
-
 }
 
 #endif  // AAUDIO_AUDIOGLOBAL_H

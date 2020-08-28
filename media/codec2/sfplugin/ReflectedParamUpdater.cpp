@@ -125,18 +125,6 @@ void ReflectedParamUpdater::addParamDesc(
         }
         addParamDesc(desc, *structDesc, reflector, true /* markVendor */);
     }
-
-    // TEMP: also add vendor parameters as non-vendor
-    for (const std::shared_ptr<C2ParamDescriptor> &desc : paramDescs) {
-        if (!desc->index().isVendor()) {
-            continue;
-        }
-        std::unique_ptr<C2StructDescriptor> structDesc = reflector->describe(
-                desc->index().coreIndex());
-        if (structDesc) {
-            addParamDesc(desc, *structDesc, reflector, false /* markVendor */);
-        }
-    }
 }
 
 void ReflectedParamUpdater::addParamStructDesc(
@@ -283,6 +271,20 @@ void ReflectedParamUpdater::getParamIndicesForKeys(
 
     for (const C2Param::Index &index : indices) {
         vec->push_back(index);
+    }
+}
+
+void ReflectedParamUpdater::getKeysForParamIndex(
+        const C2Param::Index &index,
+        std::vector<std::string> *keys /* nonnull */) const {
+    CHECK(keys != nullptr);
+    keys->clear();
+    for (const std::pair<const std::string, FieldDesc> &kv : mMap) {
+        const std::string &name = kv.first;
+        const FieldDesc &desc = kv.second;
+        if (desc.paramDesc->index() == index) {
+            keys->push_back(name);
+        }
     }
 }
 

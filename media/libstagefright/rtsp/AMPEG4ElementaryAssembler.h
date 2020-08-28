@@ -36,6 +36,7 @@ struct AMPEG4ElementaryAssembler : public ARTPAssembler {
     AMPEG4ElementaryAssembler(
             const sp<AMessage> &notify, const AString &desc,
             const AString &params);
+    virtual bool initCheck();
 
 protected:
     virtual ~AMPEG4ElementaryAssembler();

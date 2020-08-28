@@ -156,9 +156,12 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     // Called when the metadata of the stream's source has been changed.
     status_t updateSourceMetadata(const SourceMetadata& sourceMetadata) override;
 
+    status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) override;
+
   private:
     audio_stream_out_t *mStream;
     wp<StreamOutHalInterfaceCallback> mCallback;
+    wp<StreamOutHalInterfaceEventCallback> mEventCallback;
 
     friend class DeviceHalLocal;
 
@@ -168,6 +171,8 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     virtual ~StreamOutHalLocal();
 
     static int asyncCallback(stream_callback_event_t event, void *param, void *cookie);
+
+    static int asyncEventCallback(stream_event_callback_type_t event, void *param, void *cookie);
 };
 
 class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {

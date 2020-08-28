@@ -18,6 +18,8 @@
 #define LOG_TAG "CCodecBufferChannel"
 #include <utils/Log.h>
 
+#include <algorithm>
+#include <list>
 #include <numeric>
 
 #include <C2AllocatorGralloc.h>
@@ -27,10 +29,13 @@
 #include <C2Debug.h>
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
+#include <android/hardware/drm/1.0/types.h>
 #include <android-base/stringprintf.h>
+#include <binder/MemoryBase.h>
 #include <binder/MemoryDealer.h>
 #include <cutils/properties.h>
 #include <gui/Surface.h>
+#include <hidlmemory/FrameworkUtils.h>
 #include <media/openmax/OMX_Core.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ALookup.h>
@@ -39,12 +44,13 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/SkipCutBuffer.h>
 #include <media/MediaCodecBuffer.h>
+#include <mediadrm/ICrypto.h>
 #include <system/window.h>
 
 #include "CCodecBufferChannel.h"
 #include "Codec2Buffer.h"
-#include "SkipCutBuffer.h"
 
 namespace android {
 
@@ -52,10 +58,14 @@ using android::base::StringPrintf;
 using hardware::hidl_handle;
 using hardware::hidl_string;
 using hardware::hidl_vec;
+using hardware::fromHeap;
+using hardware::HidlMemory;
+
 using namespace hardware::cas::V1_0;
 using namespace hardware::cas::native::V1_0;
 
 using CasStatus = hardware::cas::V1_0::Status;
+using DrmBufferType = hardware::drm::V1_0::BufferType;
 
 namespace {
 
@@ -120,97 +130,6 @@ void CCodecBufferChannel::QueueSync::stop() {
     count->value = -1;
 }
 
-// CCodecBufferChannel::ReorderStash
-
-CCodecBufferChannel::ReorderStash::ReorderStash() {
-    clear();
-}
-
-void CCodecBufferChannel::ReorderStash::clear() {
-    mPending.clear();
-    mStash.clear();
-    mDepth = 0;
-    mKey = C2Config::ORDINAL;
-}
-
-void CCodecBufferChannel::ReorderStash::flush() {
-    mPending.clear();
-    mStash.clear();
-}
-
-void CCodecBufferChannel::ReorderStash::setDepth(uint32_t depth) {
-    mPending.splice(mPending.end(), mStash);
-    mDepth = depth;
-}
-
-void CCodecBufferChannel::ReorderStash::setKey(C2Config::ordinal_key_t key) {
-    mPending.splice(mPending.end(), mStash);
-    mKey = key;
-}
-
-bool CCodecBufferChannel::ReorderStash::pop(Entry *entry) {
-    if (mPending.empty()) {
-        return false;
-    }
-    entry->buffer     = mPending.front().buffer;
-    entry->timestamp  = mPending.front().timestamp;
-    entry->flags      = mPending.front().flags;
-    entry->ordinal    = mPending.front().ordinal;
-    mPending.pop_front();
-    return true;
-}
-
-void CCodecBufferChannel::ReorderStash::emplace(
-        const std::shared_ptr<C2Buffer> &buffer,
-        int64_t timestamp,
-        int32_t flags,
-        const C2WorkOrdinalStruct &ordinal) {
-    bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
-    if (!buffer && eos) {
-        // TRICKY: we may be violating ordering of the stash here. Because we
-        // don't expect any more emplace() calls after this, the ordering should
-        // not matter.
-        mStash.emplace_back(buffer, timestamp, flags, ordinal);
-    } else {
-        flags = flags & ~MediaCodec::BUFFER_FLAG_EOS;
-        auto it = mStash.begin();
-        for (; it != mStash.end(); ++it) {
-            if (less(ordinal, it->ordinal)) {
-                break;
-            }
-        }
-        mStash.emplace(it, buffer, timestamp, flags, ordinal);
-        if (eos) {
-            mStash.back().flags = mStash.back().flags | MediaCodec::BUFFER_FLAG_EOS;
-        }
-    }
-    while (!mStash.empty() && mStash.size() > mDepth) {
-        mPending.push_back(mStash.front());
-        mStash.pop_front();
-    }
-}
-
-void CCodecBufferChannel::ReorderStash::defer(
-        const CCodecBufferChannel::ReorderStash::Entry &entry) {
-    mPending.push_front(entry);
-}
-
-bool CCodecBufferChannel::ReorderStash::hasPending() const {
-    return !mPending.empty();
-}
-
-bool CCodecBufferChannel::ReorderStash::less(
-        const C2WorkOrdinalStruct &o1, const C2WorkOrdinalStruct &o2) {
-    switch (mKey) {
-        case C2Config::ORDINAL:   return o1.frameIndex < o2.frameIndex;
-        case C2Config::TIMESTAMP: return o1.timestamp < o2.timestamp;
-        case C2Config::CUSTOM:    return o1.customOrdinal < o2.customOrdinal;
-        default:
-            ALOGD("Unrecognized key; default to timestamp");
-            return o1.frameIndex < o2.frameIndex;
-    }
-}
-
 // Input
 
 CCodecBufferChannel::Input::Input() : extraBuffers("extra") {}
@@ -243,7 +162,7 @@ CCodecBufferChannel::CCodecBufferChannel(
 }
 
 CCodecBufferChannel::~CCodecBufferChannel() {
-    if (mCrypto != nullptr && mDealer != nullptr && mHeapSeqNum >= 0) {
+    if (mCrypto != nullptr && mHeapSeqNum >= 0) {
         mCrypto->unsetHeap(mHeapSeqNum);
     }
 }
@@ -403,6 +322,173 @@ status_t CCodecBufferChannel::setParameters(std::vector<std::unique_ptr<C2Param>
     return OK;
 }
 
+status_t CCodecBufferChannel::attachBuffer(
+        const std::shared_ptr<C2Buffer> &c2Buffer,
+        const sp<MediaCodecBuffer> &buffer) {
+    if (!buffer->copy(c2Buffer)) {
+        return -ENOSYS;
+    }
+    return OK;
+}
+
+void CCodecBufferChannel::ensureDecryptDestination(size_t size) {
+    if (!mDecryptDestination || mDecryptDestination->size() < size) {
+        sp<IMemoryHeap> heap{new MemoryHeapBase(size * 2)};
+        if (mDecryptDestination && mCrypto && mHeapSeqNum >= 0) {
+            mCrypto->unsetHeap(mHeapSeqNum);
+        }
+        mDecryptDestination = new MemoryBase(heap, 0, size * 2);
+        if (mCrypto) {
+            mHeapSeqNum = mCrypto->setHeap(hardware::fromHeap(heap));
+        }
+    }
+}
+
+int32_t CCodecBufferChannel::getHeapSeqNum(const sp<HidlMemory> &memory) {
+    CHECK(mCrypto);
+    auto it = mHeapSeqNumMap.find(memory);
+    int32_t heapSeqNum = -1;
+    if (it == mHeapSeqNumMap.end()) {
+        heapSeqNum = mCrypto->setHeap(memory);
+        mHeapSeqNumMap.emplace(memory, heapSeqNum);
+    } else {
+        heapSeqNum = it->second;
+    }
+    return heapSeqNum;
+}
+
+status_t CCodecBufferChannel::attachEncryptedBuffer(
+        const sp<hardware::HidlMemory> &memory,
+        bool secure,
+        const uint8_t *key,
+        const uint8_t *iv,
+        CryptoPlugin::Mode mode,
+        CryptoPlugin::Pattern pattern,
+        size_t offset,
+        const CryptoPlugin::SubSample *subSamples,
+        size_t numSubSamples,
+        const sp<MediaCodecBuffer> &buffer) {
+    static const C2MemoryUsage kSecureUsage{C2MemoryUsage::READ_PROTECTED, 0};
+    static const C2MemoryUsage kDefaultReadWriteUsage{
+        C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+
+    size_t size = 0;
+    for (size_t i = 0; i < numSubSamples; ++i) {
+        size += subSamples[i].mNumBytesOfClearData + subSamples[i].mNumBytesOfEncryptedData;
+    }
+    std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
+    std::shared_ptr<C2LinearBlock> block;
+    c2_status_t err = pool->fetchLinearBlock(
+            size,
+            secure ? kSecureUsage : kDefaultReadWriteUsage,
+            &block);
+    if (err != C2_OK) {
+        return NO_MEMORY;
+    }
+    if (!secure) {
+        ensureDecryptDestination(size);
+    }
+    ssize_t result = -1;
+    ssize_t codecDataOffset = 0;
+    if (mCrypto) {
+        AString errorDetailMsg;
+        int32_t heapSeqNum = getHeapSeqNum(memory);
+        hardware::drm::V1_0::SharedBuffer src{(uint32_t)heapSeqNum, offset, size};
+        hardware::drm::V1_0::DestinationBuffer dst;
+        if (secure) {
+            dst.type = DrmBufferType::NATIVE_HANDLE;
+            dst.secureMemory = hardware::hidl_handle(block->handle());
+        } else {
+            dst.type = DrmBufferType::SHARED_MEMORY;
+            IMemoryToSharedBuffer(
+                    mDecryptDestination, mHeapSeqNum, &dst.nonsecureMemory);
+        }
+        result = mCrypto->decrypt(
+                key, iv, mode, pattern, src, 0, subSamples, numSubSamples,
+                dst, &errorDetailMsg);
+        if (result < 0) {
+            return result;
+        }
+        if (dst.type == DrmBufferType::SHARED_MEMORY) {
+            C2WriteView view = block->map().get();
+            if (view.error() != C2_OK) {
+                return false;
+            }
+            if (view.size() < result) {
+                return false;
+            }
+            memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
+        }
+    } else {
+        // Here we cast CryptoPlugin::SubSample to hardware::cas::native::V1_0::SubSample
+        // directly, the structure definitions should match as checked in DescramblerImpl.cpp.
+        hidl_vec<SubSample> hidlSubSamples;
+        hidlSubSamples.setToExternal((SubSample *)subSamples, numSubSamples, false /*own*/);
+
+        hardware::cas::native::V1_0::SharedBuffer src{*memory, offset, size};
+        hardware::cas::native::V1_0::DestinationBuffer dst;
+        if (secure) {
+            dst.type = BufferType::NATIVE_HANDLE;
+            dst.secureMemory = hardware::hidl_handle(block->handle());
+        } else {
+            dst.type = BufferType::SHARED_MEMORY;
+            dst.nonsecureMemory = src;
+        }
+
+        CasStatus status = CasStatus::OK;
+        hidl_string detailedError;
+        ScramblingControl sctrl = ScramblingControl::UNSCRAMBLED;
+
+        if (key != nullptr) {
+            sctrl = (ScramblingControl)key[0];
+            // Adjust for the PES offset
+            codecDataOffset = key[2] | (key[3] << 8);
+        }
+
+        auto returnVoid = mDescrambler->descramble(
+                sctrl,
+                hidlSubSamples,
+                src,
+                0,
+                dst,
+                0,
+                [&status, &result, &detailedError] (
+                        CasStatus _status, uint32_t _bytesWritten,
+                        const hidl_string& _detailedError) {
+                    status = _status;
+                    result = (ssize_t)_bytesWritten;
+                    detailedError = _detailedError;
+                });
+
+        if (!returnVoid.isOk() || status != CasStatus::OK || result < 0) {
+            ALOGI("[%s] descramble failed, trans=%s, status=%d, result=%zd",
+                    mName, returnVoid.description().c_str(), status, result);
+            return UNKNOWN_ERROR;
+        }
+
+        if (result < codecDataOffset) {
+            ALOGD("invalid codec data offset: %zd, result %zd", codecDataOffset, result);
+            return BAD_VALUE;
+        }
+    }
+    if (!secure) {
+        C2WriteView view = block->map().get();
+        if (view.error() != C2_OK) {
+            return UNKNOWN_ERROR;
+        }
+        if (view.size() < result) {
+            return UNKNOWN_ERROR;
+        }
+        memcpy(view.data(), mDecryptDestination->unsecurePointer(), result);
+    }
+    std::shared_ptr<C2Buffer> c2Buffer{C2Buffer::CreateLinearBuffer(
+            block->share(codecDataOffset, result - codecDataOffset, C2Fence{}))};
+    if (!buffer->copy(c2Buffer)) {
+        return -ENOSYS;
+    }
+    return OK;
+}
+
 status_t CCodecBufferChannel::queueInputBuffer(const sp<MediaCodecBuffer> &buffer) {
     QueueGuard guard(mSync);
     if (!guard.isRunning()) {
@@ -430,24 +516,31 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
 
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
-    if (mCrypto != nullptr) {
-        ICrypto::DestinationBuffer destination;
+    if (numSubSamples == 1
+            && subSamples[0].mNumBytesOfClearData == 0
+            && subSamples[0].mNumBytesOfEncryptedData == 0) {
+        // We don't need to go through crypto or descrambler if the input is empty.
+        result = 0;
+    } else if (mCrypto != nullptr) {
+        hardware::drm::V1_0::DestinationBuffer destination;
         if (secure) {
-            destination.mType = ICrypto::kDestinationTypeNativeHandle;
-            destination.mHandle = encryptedBuffer->handle();
+            destination.type = DrmBufferType::NATIVE_HANDLE;
+            destination.secureMemory = hidl_handle(encryptedBuffer->handle());
         } else {
-            destination.mType = ICrypto::kDestinationTypeSharedMemory;
-            destination.mSharedMemory = mDecryptDestination;
+            destination.type = DrmBufferType::SHARED_MEMORY;
+            IMemoryToSharedBuffer(
+                    mDecryptDestination, mHeapSeqNum, &destination.nonsecureMemory);
         }
-        ICrypto::SourceBuffer source;
+        hardware::drm::V1_0::SharedBuffer source;
         encryptedBuffer->fillSourceBuffer(&source);
         result = mCrypto->decrypt(
                 key, iv, mode, pattern, source, buffer->offset(),
                 subSamples, numSubSamples, destination, errorDetailMsg);
         if (result < 0) {
+            ALOGI("[%s] decrypt failed: result=%zd", mName, result);
             return result;
         }
-        if (destination.mType == ICrypto::kDestinationTypeSharedMemory) {
+        if (destination.type == DrmBufferType::SHARED_MEMORY) {
             encryptedBuffer->copyDecryptedContent(mDecryptDestination, result);
         }
     } else {
@@ -525,13 +618,14 @@ void CCodecBufferChannel::feedInputBufferIfAvailable() {
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
-    if (mInputMetEos ||
-           mReorderStash.lock()->hasPending() ||
-           mPipelineWatcher.lock()->pipelineFull()) {
+    if (mInputMetEos || mPipelineWatcher.lock()->pipelineFull()) {
         return;
-    } else {
+    }
+    {
         Mutexed<Output>::Locked output(mOutput);
-        if (output->buffers->numClientBuffers() >= output->numSlots) {
+        if (!output->buffers ||
+                output->buffers->hasPending() ||
+                output->buffers->numClientBuffers() >= output->numSlots) {
             return;
         }
     }
@@ -638,6 +732,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     std::shared_ptr<const C2StreamHdr10PlusInfo::output> hdr10PlusInfo =
         std::static_pointer_cast<const C2StreamHdr10PlusInfo::output>(
                 c2Buffer->getInfo(C2StreamHdr10PlusInfo::output::PARAM_TYPE));
+    if (hdr10PlusInfo && hdr10PlusInfo->flexCount() == 0) {
+        hdr10PlusInfo.reset();
+    }
 
     {
         Mutexed<OutputSurface>::Locked output(mOutputSurface);
@@ -669,31 +766,39 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     if (hdrStaticInfo || hdr10PlusInfo) {
         HdrMetadata hdr;
         if (hdrStaticInfo) {
-            struct android_smpte2086_metadata smpte2086_meta = {
-                .displayPrimaryRed = {
-                    hdrStaticInfo->mastering.red.x, hdrStaticInfo->mastering.red.y
-                },
-                .displayPrimaryGreen = {
-                    hdrStaticInfo->mastering.green.x, hdrStaticInfo->mastering.green.y
-                },
-                .displayPrimaryBlue = {
-                    hdrStaticInfo->mastering.blue.x, hdrStaticInfo->mastering.blue.y
-                },
-                .whitePoint = {
-                    hdrStaticInfo->mastering.white.x, hdrStaticInfo->mastering.white.y
-                },
-                .maxLuminance = hdrStaticInfo->mastering.maxLuminance,
-                .minLuminance = hdrStaticInfo->mastering.minLuminance,
-            };
-
-            struct android_cta861_3_metadata cta861_meta = {
-                .maxContentLightLevel = hdrStaticInfo->maxCll,
-                .maxFrameAverageLightLevel = hdrStaticInfo->maxFall,
-            };
-
-            hdr.validTypes = HdrMetadata::SMPTE2086 | HdrMetadata::CTA861_3;
-            hdr.smpte2086 = smpte2086_meta;
-            hdr.cta8613 = cta861_meta;
+            // If mastering max and min luminance fields are 0, do not use them.
+            // It indicates the value may not be present in the stream.
+            if (hdrStaticInfo->mastering.maxLuminance > 0.0f &&
+                hdrStaticInfo->mastering.minLuminance > 0.0f) {
+                struct android_smpte2086_metadata smpte2086_meta = {
+                    .displayPrimaryRed = {
+                        hdrStaticInfo->mastering.red.x, hdrStaticInfo->mastering.red.y
+                    },
+                    .displayPrimaryGreen = {
+                        hdrStaticInfo->mastering.green.x, hdrStaticInfo->mastering.green.y
+                    },
+                    .displayPrimaryBlue = {
+                        hdrStaticInfo->mastering.blue.x, hdrStaticInfo->mastering.blue.y
+                    },
+                    .whitePoint = {
+                        hdrStaticInfo->mastering.white.x, hdrStaticInfo->mastering.white.y
+                    },
+                    .maxLuminance = hdrStaticInfo->mastering.maxLuminance,
+                    .minLuminance = hdrStaticInfo->mastering.minLuminance,
+                };
+                hdr.validTypes |= HdrMetadata::SMPTE2086;
+                hdr.smpte2086 = smpte2086_meta;
+            }
+            // If the content light level fields are 0, do not use them, it
+            // indicates the value may not be present in the stream.
+            if (hdrStaticInfo->maxCll > 0.0f && hdrStaticInfo->maxFall > 0.0f) {
+                struct android_cta861_3_metadata cta861_meta = {
+                    .maxContentLightLevel = hdrStaticInfo->maxCll,
+                    .maxFrameAverageLightLevel = hdrStaticInfo->maxFall,
+                };
+                hdr.validTypes |= HdrMetadata::CTA861_3;
+                hdr.cta8613 = cta861_meta;
+            }
         }
         if (hdr10PlusInfo) {
             hdr.validTypes |= HdrMetadata::HDR10PLUS;
@@ -767,7 +872,9 @@ void CCodecBufferChannel::getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *arr
 }
 
 status_t CCodecBufferChannel::start(
-        const sp<AMessage> &inputFormat, const sp<AMessage> &outputFormat) {
+        const sp<AMessage> &inputFormat,
+        const sp<AMessage> &outputFormat,
+        bool buffersBoundToCodec) {
     C2StreamBufferTypeSetting::input iStreamFormat(0u);
     C2StreamBufferTypeSetting::output oStreamFormat(0u);
     C2PortReorderBufferDepthTuning::output reorderDepth;
@@ -797,17 +904,6 @@ status_t CCodecBufferChannel::start(
         return UNKNOWN_ERROR;
     }
 
-    {
-        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
-        reorder->clear();
-        if (reorderDepth) {
-            reorder->setDepth(reorderDepth.value);
-        }
-        if (reorderKey) {
-            reorder->setKey(reorderKey.value);
-        }
-    }
-
     uint32_t inputDelayValue = inputDelay ? inputDelay.value : 0;
     uint32_t pipelineDelayValue = pipelineDelay ? pipelineDelay.value : 0;
     uint32_t outputDelayValue = outputDelay ? outputDelay.value : 0;
@@ -819,32 +915,37 @@ status_t CCodecBufferChannel::start(
     bool secure = mComponent->getName().find(".secure") != std::string::npos;
 
     std::shared_ptr<C2AllocatorStore> allocatorStore = GetCodec2PlatformAllocatorStore();
-    int poolMask = property_get_int32(
-            "debug.stagefright.c2-poolmask",
-            1 << C2PlatformAllocatorStore::ION |
-            1 << C2PlatformAllocatorStore::BUFFERQUEUE);
+    int poolMask = GetCodec2PoolMask();
+    C2PlatformAllocatorStore::id_t preferredLinearId = GetPreferredLinearAllocatorId(poolMask);
 
     if (inputFormat != nullptr) {
         bool graphic = (iStreamFormat.value == C2BufferData::GRAPHIC);
+        C2Config::api_feature_t apiFeatures = C2Config::api_feature_t(
+                API_REFLECTION |
+                API_VALUES |
+                API_CURRENT_VALUES |
+                API_DEPENDENCY |
+                API_SAME_INPUT_BUFFER);
         std::shared_ptr<C2BlockPool> pool;
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
 
             // set default allocator ID.
             pools->inputAllocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
-                                                : C2PlatformAllocatorStore::ION;
+                                                : preferredLinearId;
 
             // query C2PortAllocatorsTuning::input from component. If an allocator ID is obtained
             // from component, create the input block pool with given ID. Otherwise, use default IDs.
             std::vector<std::unique_ptr<C2Param>> params;
-            err = mComponent->query({ },
+            C2ApiFeaturesSetting featuresSetting{apiFeatures};
+            err = mComponent->query({ &featuresSetting },
                                     { C2PortAllocatorsTuning::input::PARAM_TYPE },
                                     C2_DONT_BLOCK,
                                     &params);
             if ((err != C2_OK && err != C2_BAD_INDEX) || params.size() != 1) {
                 ALOGD("[%s] Query input allocators returned %zu params => %s (%u)",
                         mName, params.size(), asString(err), err);
-            } else if (err == C2_OK && params.size() == 1) {
+            } else if (params.size() == 1) {
                 C2PortAllocatorsTuning::input *inputAllocators =
                     C2PortAllocatorsTuning::input::From(params[0].get());
                 if (inputAllocators && inputAllocators->flexCount() > 0) {
@@ -858,6 +959,9 @@ status_t CCodecBufferChannel::start(
                                 mName, inputAllocators->m.values[0]);
                     }
                 }
+            }
+            if (featuresSetting) {
+                apiFeatures = featuresSetting.value;
             }
 
             // TODO: use C2Component wrapper to associate this pool with ourselves
@@ -892,7 +996,12 @@ status_t CCodecBufferChannel::start(
         input->numSlots = numInputSlots;
         input->extraBuffers.flush();
         input->numExtraSlots = 0u;
-        if (graphic) {
+        bool conforming = (apiFeatures & API_SAME_INPUT_BUFFER);
+        // For encrypted content, framework decrypts source buffer (ashmem) into
+        // C2Buffers. Thus non-conforming codecs can process these.
+        if (!buffersBoundToCodec && (hasCryptoOrDescrambler() || conforming)) {
+            input->buffers.reset(new SlotInputBuffers(mName));
+        } else if (graphic) {
             if (mInputSurface) {
                 input->buffers.reset(new DummyInputBuffers(mName));
             } else if (mMetaMode == MODE_ANW) {
@@ -901,7 +1010,7 @@ status_t CCodecBufferChannel::start(
                 // TODO: handle this without going into array mode
                 forceArrayMode = true;
             } else {
-                input->buffers.reset(new GraphicInputBuffers(numInputSlots, mName));
+                input->buffers.reset(new GraphicInputBuffers(mName));
             }
         } else {
             if (hasCryptoOrDescrambler()) {
@@ -919,7 +1028,8 @@ status_t CCodecBufferChannel::start(
                     mDecryptDestination = mDealer->allocate((size_t)capacity);
                 }
                 if (mCrypto != nullptr && mHeapSeqNum < 0) {
-                    mHeapSeqNum = mCrypto->setHeap(mDealer->getMemoryHeap());
+                    sp<HidlMemory> heap = fromHeap(mDealer->getMemoryHeap());
+                    mHeapSeqNum = mCrypto->setHeap(heap);
                 } else {
                     mHeapSeqNum = -1;
                 }
@@ -970,7 +1080,7 @@ status_t CCodecBufferChannel::start(
 
             // set default allocator ID.
             pools->outputAllocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
-                                                 : C2PlatformAllocatorStore::ION;
+                                                 : preferredLinearId;
 
             // query C2PortAllocatorsTuning::output from component, or use default allocator if
             // unsuccessful.
@@ -1065,16 +1175,23 @@ status_t CCodecBufferChannel::start(
         output->outputDelay = outputDelayValue;
         output->numSlots = numOutputSlots;
         if (graphic) {
-            if (outputSurface) {
+            if (outputSurface || !buffersBoundToCodec) {
                 output->buffers.reset(new GraphicOutputBuffers(mName));
             } else {
-                output->buffers.reset(new RawGraphicOutputBuffers(numOutputSlots, mName));
+                output->buffers.reset(new RawGraphicOutputBuffers(mName));
             }
         } else {
             output->buffers.reset(new LinearOutputBuffers(mName));
         }
         output->buffers->setFormat(outputFormat);
 
+        output->buffers->clearStash();
+        if (reorderDepth) {
+            output->buffers->setReorderDepth(reorderDepth.value);
+        }
+        if (reorderKey) {
+            output->buffers->setReorderKey(reorderKey.value);
+        }
 
         // Try to set output surface to created block pool if given.
         if (outputSurface) {
@@ -1084,12 +1201,13 @@ status_t CCodecBufferChannel::start(
                     outputGeneration);
         }
 
-        if (oStreamFormat.value == C2BufferData::LINEAR
-                && mComponentName.find("c2.qti.") == std::string::npos) {
-            // WORKAROUND: if we're using early CSD workaround we convert to
-            //             array mode, to appease apps assuming the output
-            //             buffers to be of the same size.
-            output->buffers = output->buffers->toArrayMode(numOutputSlots);
+        if (oStreamFormat.value == C2BufferData::LINEAR) {
+            if (buffersBoundToCodec) {
+                // WORKAROUND: if we're using early CSD workaround we convert to
+                //             array mode, to appease apps assuming the output
+                //             buffers to be of the same size.
+                output->buffers = output->buffers->toArrayMode(numOutputSlots);
+            }
 
             int32_t channelCount;
             int32_t sampleRate;
@@ -1137,67 +1255,104 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
     }
 
     C2StreamBufferTypeSetting::output oStreamFormat(0u);
-    c2_status_t err = mComponent->query({ &oStreamFormat }, {}, C2_DONT_BLOCK, nullptr);
-    if (err != C2_OK) {
+    C2PrependHeaderModeSetting prepend(PREPEND_HEADER_TO_NONE);
+    c2_status_t err = mComponent->query({ &oStreamFormat, &prepend }, {}, C2_DONT_BLOCK, nullptr);
+    if (err != C2_OK && err != C2_BAD_INDEX) {
         return UNKNOWN_ERROR;
     }
     size_t numInputSlots = mInput.lock()->numSlots;
-    std::vector<sp<MediaCodecBuffer>> toBeQueued;
-    for (size_t i = 0; i < numInputSlots; ++i) {
+
+    struct ClientInputBuffer {
         size_t index;
         sp<MediaCodecBuffer> buffer;
-        {
-            Mutexed<Input>::Locked input(mInput);
-            if (!input->buffers->requestNewBuffer(&index, &buffer)) {
-                if (i == 0) {
-                    ALOGW("[%s] start: cannot allocate memory at all", mName);
-                    return NO_MEMORY;
-                } else {
-                    ALOGV("[%s] start: cannot allocate memory, only %zu buffers allocated",
-                            mName, i);
-                }
+        size_t capacity;
+    };
+    std::list<ClientInputBuffer> clientInputBuffers;
+
+    {
+        Mutexed<Input>::Locked input(mInput);
+        while (clientInputBuffers.size() < numInputSlots) {
+            ClientInputBuffer clientInputBuffer;
+            if (!input->buffers->requestNewBuffer(&clientInputBuffer.index,
+                                                  &clientInputBuffer.buffer)) {
                 break;
             }
+            clientInputBuffer.capacity = clientInputBuffer.buffer->capacity();
+            clientInputBuffers.emplace_back(std::move(clientInputBuffer));
         }
-        if (buffer) {
-            Mutexed<std::list<sp<ABuffer>>>::Locked configs(mFlushedConfigs);
-            ALOGV("[%s] input buffer %zu available", mName, index);
-            bool post = true;
-            if (!configs->empty()) {
+    }
+    if (clientInputBuffers.empty()) {
+        ALOGW("[%s] start: cannot allocate memory at all", mName);
+        return NO_MEMORY;
+    } else if (clientInputBuffers.size() < numInputSlots) {
+        ALOGD("[%s] start: cannot allocate memory for all slots, "
+              "only %zu buffers allocated",
+              mName, clientInputBuffers.size());
+    } else {
+        ALOGV("[%s] %zu initial input buffers available",
+              mName, clientInputBuffers.size());
+    }
+    // Sort input buffers by their capacities in increasing order.
+    clientInputBuffers.sort(
+            [](const ClientInputBuffer& a, const ClientInputBuffer& b) {
+                return a.capacity < b.capacity;
+            });
+
+    {
+        Mutexed<std::list<sp<ABuffer>>>::Locked configs(mFlushedConfigs);
+        if (!configs->empty()) {
+            while (!configs->empty()) {
                 sp<ABuffer> config = configs->front();
                 configs->pop_front();
-                if (buffer->capacity() >= config->size()) {
-                    memcpy(buffer->base(), config->data(), config->size());
-                    buffer->setRange(0, config->size());
-                    buffer->meta()->clear();
-                    buffer->meta()->setInt64("timeUs", 0);
-                    buffer->meta()->setInt32("csd", 1);
-                    post = false;
-                } else {
-                    ALOGD("[%s] buffer capacity too small for the config (%zu < %zu)",
-                            mName, buffer->capacity(), config->size());
+                // Find the smallest input buffer that can fit the config.
+                auto i = std::find_if(
+                        clientInputBuffers.begin(),
+                        clientInputBuffers.end(),
+                        [cfgSize = config->size()](const ClientInputBuffer& b) {
+                            return b.capacity >= cfgSize;
+                        });
+                if (i == clientInputBuffers.end()) {
+                    ALOGW("[%s] no input buffer large enough for the config "
+                          "(%zu bytes)",
+                          mName, config->size());
+                    return NO_MEMORY;
                 }
-            } else if (oStreamFormat.value == C2BufferData::LINEAR && i == 0
-                    && mComponentName.find("c2.qti.") == std::string::npos) {
-                // WORKAROUND: Some apps expect CSD available without queueing
-                //             any input. Queue an empty buffer to get the CSD.
-                buffer->setRange(0, 0);
+                sp<MediaCodecBuffer> buffer = i->buffer;
+                memcpy(buffer->base(), config->data(), config->size());
+                buffer->setRange(0, config->size());
                 buffer->meta()->clear();
                 buffer->meta()->setInt64("timeUs", 0);
-                post = false;
+                buffer->meta()->setInt32("csd", 1);
+                if (queueInputBufferInternal(buffer) != OK) {
+                    ALOGW("[%s] Error while queueing a flushed config",
+                          mName);
+                    return UNKNOWN_ERROR;
+                }
+                clientInputBuffers.erase(i);
             }
-            if (post) {
-                mCallback->onInputBufferAvailable(index, buffer);
-            } else {
-                toBeQueued.emplace_back(buffer);
+        } else if (oStreamFormat.value == C2BufferData::LINEAR &&
+                   (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
+            sp<MediaCodecBuffer> buffer = clientInputBuffers.front().buffer;
+            // WORKAROUND: Some apps expect CSD available without queueing
+            //             any input. Queue an empty buffer to get the CSD.
+            buffer->setRange(0, 0);
+            buffer->meta()->clear();
+            buffer->meta()->setInt64("timeUs", 0);
+            if (queueInputBufferInternal(buffer) != OK) {
+                ALOGW("[%s] Error while queueing an empty buffer to get CSD",
+                      mName);
+                return UNKNOWN_ERROR;
             }
+            clientInputBuffers.pop_front();
         }
     }
-    for (const sp<MediaCodecBuffer> &buffer : toBeQueued) {
-        if (queueInputBufferInternal(buffer) != OK) {
-            ALOGV("[%s] Error while queueing initial buffers", mName);
-        }
+
+    for (const ClientInputBuffer& clientInputBuffer: clientInputBuffers) {
+        mCallback->onInputBufferAvailable(
+                clientInputBuffer.index,
+                clientInputBuffer.buffer);
     }
+
     return OK;
 }
 
@@ -1207,7 +1362,35 @@ void CCodecBufferChannel::stop() {
     if (mInputSurface != nullptr) {
         mInputSurface.reset();
     }
+    mPipelineWatcher.lock()->flush();
 }
+
+void CCodecBufferChannel::reset() {
+    stop();
+    {
+        Mutexed<Input>::Locked input(mInput);
+        input->buffers.reset(new DummyInputBuffers(""));
+        input->extraBuffers.flush();
+    }
+    {
+        Mutexed<Output>::Locked output(mOutput);
+        output->buffers.reset();
+    }
+}
+
+void CCodecBufferChannel::release() {
+    mComponent.reset();
+    mInputAllocator.reset();
+    mOutputSurface.lock()->surface.clear();
+    {
+        Mutexed<BlockPools>::Locked blockPools{mBlockPools};
+        blockPools->inputPool.reset();
+        blockPools->outputPoolIntf.reset();
+    }
+    setCrypto(nullptr);
+    setDescrambler(nullptr);
+}
+
 
 void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushedWork) {
     ALOGV("[%s] flush", mName);
@@ -1239,9 +1422,11 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
     }
     {
         Mutexed<Output>::Locked output(mOutput);
-        output->buffers->flush(flushedWork);
+        if (output->buffers) {
+            output->buffers->flush(flushedWork);
+            output->buffers->flushStash();
+        }
     }
-    mReorderStash.lock()->flush();
     mPipelineWatcher.lock()->flush();
 }
 
@@ -1277,45 +1462,41 @@ bool CCodecBufferChannel::handleWork(
         std::unique_ptr<C2Work> work,
         const sp<AMessage> &outputFormat,
         const C2StreamInitDataInfo::output *initData) {
-    if (outputFormat != nullptr) {
+    {
         Mutexed<Output>::Locked output(mOutput);
-        ALOGD("[%s] onWorkDone: output format changed to %s",
-                mName, outputFormat->debugString().c_str());
-        output->buffers->setFormat(outputFormat);
-
-        AString mediaType;
-        if (outputFormat->findString(KEY_MIME, &mediaType)
-                && mediaType == MIMETYPE_AUDIO_RAW) {
-            int32_t channelCount;
-            int32_t sampleRate;
-            if (outputFormat->findInt32(KEY_CHANNEL_COUNT, &channelCount)
-                    && outputFormat->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
-                output->buffers->updateSkipCutBuffer(sampleRate, channelCount);
-            }
+        if (!output->buffers) {
+            return false;
         }
     }
 
-    if ((work->input.ordinal.frameIndex - mFirstValidFrameIndex.load()).peek() < 0) {
+    // Whether the output buffer should be reported to the client or not.
+    bool notifyClient = false;
+
+    if (work->result == C2_OK){
+        notifyClient = true;
+    } else if (work->result == C2_NOT_FOUND) {
+        ALOGD("[%s] flushed work; ignored.", mName);
+    } else {
+        // C2_OK and C2_NOT_FOUND are the only results that we accept for processing
+        // the config update.
+        ALOGD("[%s] work failed to complete: %d", mName, work->result);
+        mCCodecCallback->onError(work->result, ACTION_CODE_FATAL);
+        return false;
+    }
+
+    if ((work->input.ordinal.frameIndex -
+            mFirstValidFrameIndex.load()).peek() < 0) {
         // Discard frames from previous generation.
         ALOGD("[%s] Discard frames from previous generation.", mName);
-        return false;
+        notifyClient = false;
     }
 
     if (mInputSurface == nullptr && (work->worklets.size() != 1u
             || !work->worklets.front()
-            || !(work->worklets.front()->output.flags & C2FrameData::FLAG_INCOMPLETE))) {
-        mPipelineWatcher.lock()->onWorkDone(work->input.ordinal.frameIndex.peeku());
-    }
-
-    if (work->result == C2_NOT_FOUND) {
-        ALOGD("[%s] flushed work; ignored.", mName);
-        return true;
-    }
-
-    if (work->result != C2_OK) {
-        ALOGD("[%s] work failed to complete: %d", mName, work->result);
-        mCCodecCallback->onError(work->result, ACTION_CODE_FATAL);
-        return false;
+            || !(work->worklets.front()->output.flags &
+                 C2FrameData::FLAG_INCOMPLETE))) {
+        mPipelineWatcher.lock()->onWorkDone(
+                work->input.ordinal.frameIndex.peeku());
     }
 
     // NOTE: MediaCodec usage supposedly have only one worklet
@@ -1351,8 +1532,10 @@ bool CCodecBufferChannel::handleWork(
             case C2PortReorderBufferDepthTuning::CORE_INDEX: {
                 C2PortReorderBufferDepthTuning::output reorderDepth;
                 if (reorderDepth.updateFrom(*param)) {
-                    bool secure = mComponent->getName().find(".secure") != std::string::npos;
-                    mReorderStash.lock()->setDepth(reorderDepth.value);
+                    bool secure = mComponent->getName().find(".secure") !=
+                                  std::string::npos;
+                    mOutput.lock()->buffers->setReorderDepth(
+                            reorderDepth.value);
                     ALOGV("[%s] onWorkDone: updated reorder depth to %u",
                           mName, reorderDepth.value);
                     size_t numOutputSlots = mOutput.lock()->numSlots;
@@ -1364,17 +1547,19 @@ bool CCodecBufferChannel::handleWork(
                         output->maxDequeueBuffers += numInputSlots;
                     }
                     if (output->surface) {
-                        output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+                        output->surface->setMaxDequeuedBufferCount(
+                                output->maxDequeueBuffers);
                     }
                 } else {
-                    ALOGD("[%s] onWorkDone: failed to read reorder depth", mName);
+                    ALOGD("[%s] onWorkDone: failed to read reorder depth",
+                          mName);
                 }
                 break;
             }
             case C2PortReorderKeySetting::CORE_INDEX: {
                 C2PortReorderKeySetting::output reorderKey;
                 if (reorderKey.updateFrom(*param)) {
-                    mReorderStash.lock()->setKey(reorderKey.value);
+                    mOutput.lock()->buffers->setReorderKey(reorderKey.value);
                     ALOGV("[%s] onWorkDone: updated reorder key to %u",
                           mName, reorderKey.value);
                 } else {
@@ -1389,7 +1574,8 @@ bool CCodecBufferChannel::handleWork(
                         ALOGV("[%s] onWorkDone: updating pipeline delay %u",
                               mName, pipelineDelay.value);
                         newPipelineDelay = pipelineDelay.value;
-                        (void)mPipelineWatcher.lock()->pipelineDelay(pipelineDelay.value);
+                        (void)mPipelineWatcher.lock()->pipelineDelay(
+                                pipelineDelay.value);
                     }
                 }
                 if (param->forInput()) {
@@ -1398,7 +1584,8 @@ bool CCodecBufferChannel::handleWork(
                         ALOGV("[%s] onWorkDone: updating input delay %u",
                               mName, inputDelay.value);
                         newInputDelay = inputDelay.value;
-                        (void)mPipelineWatcher.lock()->inputDelay(inputDelay.value);
+                        (void)mPipelineWatcher.lock()->inputDelay(
+                                inputDelay.value);
                     }
                 }
                 if (param->forOutput()) {
@@ -1406,16 +1593,22 @@ bool CCodecBufferChannel::handleWork(
                     if (outputDelay.updateFrom(*param)) {
                         ALOGV("[%s] onWorkDone: updating output delay %u",
                               mName, outputDelay.value);
-                        bool secure = mComponent->getName().find(".secure") != std::string::npos;
-                        (void)mPipelineWatcher.lock()->outputDelay(outputDelay.value);
+                        bool secure = mComponent->getName().find(".secure") !=
+                                      std::string::npos;
+                        (void)mPipelineWatcher.lock()->outputDelay(
+                                outputDelay.value);
 
                         bool outputBuffersChanged = false;
                         size_t numOutputSlots = 0;
                         size_t numInputSlots = mInput.lock()->numSlots;
                         {
                             Mutexed<Output>::Locked output(mOutput);
+                            if (!output->buffers) {
+                                return false;
+                            }
                             output->outputDelay = outputDelay.value;
-                            numOutputSlots = outputDelay.value + kSmoothnessFactor;
+                            numOutputSlots = outputDelay.value +
+                                             kSmoothnessFactor;
                             if (output->numSlots < numOutputSlots) {
                                 output->numSlots = numOutputSlots;
                                 if (output->buffers->isArrayMode()) {
@@ -1434,7 +1627,7 @@ bool CCodecBufferChannel::handleWork(
                             mCCodecCallback->onOutputBuffersChanged();
                         }
 
-                        uint32_t depth = mReorderStash.lock()->depth();
+                        uint32_t depth = mOutput.lock()->buffers->getReorderDepth();
                         Mutexed<OutputSurface>::Locked output(mOutputSurface);
                         output->maxDequeueBuffers = numOutputSlots + depth + kRenderingDepth;
                         if (!secure) {
@@ -1478,9 +1671,6 @@ bool CCodecBufferChannel::handleWork(
         ALOGV("[%s] onWorkDone: output EOS", mName);
     }
 
-    sp<MediaCodecBuffer> outBuffer;
-    size_t index;
-
     // WORKAROUND: adjust output timestamp based on client input timestamp and codec
     // input timestamp. Codec output timestamp (in the timestamp field) shall correspond to
     // the codec input timestamp, but client output timestamp should (reported in timeUs)
@@ -1501,9 +1691,19 @@ bool CCodecBufferChannel::handleWork(
           worklet->output.ordinal.timestamp.peekll(),
           timestamp.peekll());
 
+    // csd cannot be re-ordered and will always arrive first.
     if (initData != nullptr) {
         Mutexed<Output>::Locked output(mOutput);
-        if (output->buffers->registerCsd(initData, &index, &outBuffer) == OK) {
+        if (output->buffers && outputFormat) {
+            output->buffers->updateSkipCutBuffer(outputFormat);
+            output->buffers->setFormat(outputFormat);
+        }
+        if (!notifyClient) {
+            return false;
+        }
+        size_t index;
+        sp<MediaCodecBuffer> outBuffer;
+        if (output->buffers && output->buffers->registerCsd(initData, &index, &outBuffer) == OK) {
             outBuffer->meta()->setInt64("timeUs", timestamp.peek());
             outBuffer->meta()->setInt32("flags", MediaCodec::BUFFER_FLAG_CODECCONFIG);
             ALOGV("[%s] onWorkDone: csd index = %zu [%p]", mName, index, outBuffer.get());
@@ -1518,10 +1718,10 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
-    if (!buffer && !flags) {
+    if (notifyClient && !buffer && !flags) {
         ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
-        return true;
+        notifyClient = false;
     }
 
     if (buffer) {
@@ -1540,63 +1740,65 @@ bool CCodecBufferChannel::handleWork(
     }
 
     {
-        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
-        reorder->emplace(buffer, timestamp.peek(), flags, worklet->output.ordinal);
-        if (flags & MediaCodec::BUFFER_FLAG_EOS) {
-            // Flush reorder stash
-            reorder->setDepth(0);
+        Mutexed<Output>::Locked output(mOutput);
+        if (!output->buffers) {
+            return false;
         }
+        output->buffers->pushToStash(
+                buffer,
+                notifyClient,
+                timestamp.peek(),
+                flags,
+                outputFormat,
+                worklet->output.ordinal);
     }
     sendOutputBuffers();
     return true;
 }
 
 void CCodecBufferChannel::sendOutputBuffers() {
-    ReorderStash::Entry entry;
-    sp<MediaCodecBuffer> outBuffer;
+    OutputBuffers::BufferAction action;
     size_t index;
+    sp<MediaCodecBuffer> outBuffer;
+    std::shared_ptr<C2Buffer> c2Buffer;
 
     while (true) {
-        Mutexed<ReorderStash>::Locked reorder(mReorderStash);
-        if (!reorder->hasPending()) {
-            break;
-        }
-        if (!reorder->pop(&entry)) {
-            break;
-        }
-
         Mutexed<Output>::Locked output(mOutput);
-        status_t err = output->buffers->registerBuffer(entry.buffer, &index, &outBuffer);
-        if (err != OK) {
-            bool outputBuffersChanged = false;
-            if (err != WOULD_BLOCK) {
-                if (!output->buffers->isArrayMode()) {
-                    output->buffers = output->buffers->toArrayMode(output->numSlots);
-                }
-                OutputBuffersArray *array = (OutputBuffersArray *)output->buffers.get();
-                array->realloc(entry.buffer);
-                outputBuffersChanged = true;
-            }
-            ALOGV("[%s] sendOutputBuffers: unable to register output buffer", mName);
-            reorder->defer(entry);
-
-            output.unlock();
-            reorder.unlock();
-
-            if (outputBuffersChanged) {
-                mCCodecCallback->onOutputBuffersChanged();
-            }
+        if (!output->buffers) {
             return;
         }
-        output.unlock();
-        reorder.unlock();
-
-        outBuffer->meta()->setInt64("timeUs", entry.timestamp);
-        outBuffer->meta()->setInt32("flags", entry.flags);
-        ALOGV("[%s] sendOutputBuffers: out buffer index = %zu [%p] => %p + %zu (%lld)",
-                mName, index, outBuffer.get(), outBuffer->data(), outBuffer->size(),
-                (long long)entry.timestamp);
-        mCallback->onOutputBufferAvailable(index, outBuffer);
+        action = output->buffers->popFromStashAndRegister(
+                &c2Buffer, &index, &outBuffer);
+        switch (action) {
+        case OutputBuffers::SKIP:
+            return;
+        case OutputBuffers::DISCARD:
+            break;
+        case OutputBuffers::NOTIFY_CLIENT:
+            output.unlock();
+            mCallback->onOutputBufferAvailable(index, outBuffer);
+            break;
+        case OutputBuffers::REALLOCATE:
+            if (!output->buffers->isArrayMode()) {
+                output->buffers =
+                    output->buffers->toArrayMode(output->numSlots);
+            }
+            static_cast<OutputBuffersArray*>(output->buffers.get())->
+                    realloc(c2Buffer);
+            output.unlock();
+            mCCodecCallback->onOutputBuffersChanged();
+            break;
+        case OutputBuffers::RETRY:
+            ALOGV("[%s] sendOutputBuffers: unable to register output buffer",
+                  mName);
+            return;
+        default:
+            LOG_ALWAYS_FATAL("[%s] sendOutputBuffers: "
+                    "corrupted BufferAction value (%d) "
+                    "returned from popFromStashAndRegister.",
+                    mName, int(action));
+            return;
+        }
     }
 }
 
@@ -1660,6 +1862,24 @@ PipelineWatcher::Clock::duration CCodecBufferChannel::elapsed() {
 
 void CCodecBufferChannel::setMetaMode(MetaMode mode) {
     mMetaMode = mode;
+}
+
+void CCodecBufferChannel::setCrypto(const sp<ICrypto> &crypto) {
+    if (mCrypto != nullptr) {
+        for (std::pair<wp<HidlMemory>, int32_t> entry : mHeapSeqNumMap) {
+            mCrypto->unsetHeap(entry.second);
+        }
+        mHeapSeqNumMap.clear();
+        if (mHeapSeqNum >= 0) {
+            mCrypto->unsetHeap(mHeapSeqNum);
+            mHeapSeqNum = -1;
+        }
+    }
+    mCrypto = crypto;
+}
+
+void CCodecBufferChannel::setDescrambler(const sp<IDescrambler> &descrambler) {
+    mDescrambler = descrambler;
 }
 
 status_t toStatusT(c2_status_t c2s, c2_operation_t c2op) {

@@ -1,0 +1,10 @@
+{
+  "presubmit": [
+    {
+       "name": "mediametrics_tests"
+    },
+    {
+       "name": "CtsNativeMediaMetricsTestCases"
+    }
+  ]
+}

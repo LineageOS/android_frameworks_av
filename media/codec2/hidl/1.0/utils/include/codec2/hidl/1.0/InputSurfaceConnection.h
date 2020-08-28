@@ -62,12 +62,12 @@ protected:
     InputSurfaceConnection(
             const sp<GraphicBufferSource>& source,
             const std::shared_ptr<C2Component>& comp,
-            const sp<ComponentStore>& store);
+            const std::shared_ptr<ParameterCache>& cache);
 
     InputSurfaceConnection(
             const sp<GraphicBufferSource>& source,
             const sp<IInputSink>& sink,
-            const sp<ComponentStore>& store);
+            const std::shared_ptr<ParameterCache>& cache);
 
     bool init();
 

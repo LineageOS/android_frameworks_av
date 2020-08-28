@@ -26,6 +26,7 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     using AudioPolicyManager::getConfig;
     using AudioPolicyManager::loadConfig;
     using AudioPolicyManager::initialize;
+    using AudioPolicyManager::getOutputs;
     using AudioPolicyManager::getAvailableOutputDevices;
     using AudioPolicyManager::getAvailableInputDevices;
     uint32_t getAudioPortGeneration() const { return mAudioPortGeneration; }

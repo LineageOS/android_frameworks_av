@@ -30,7 +30,7 @@
 #include <datasource/DataSourceFactory.h>
 #include <media/DataSource.h>
 #include <media/IMediaHTTPService.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/OMXBuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
@@ -210,6 +210,17 @@ status_t Harness::allocatePortBuffers(
     OMX_PARAM_PORTDEFINITIONTYPE def;
     status_t err = getPortDefinition(portIndex, &def);
     EXPECT_SUCCESS(err, "getPortDefinition");
+
+    switch (def.eDomain) {
+        case OMX_PortDomainVideo:
+            EXPECT(def.format.video.cMIMEType == 0, "portDefinition video MIME");
+            break;
+        case OMX_PortDomainAudio:
+            EXPECT(def.format.audio.cMIMEType == 0, "portDefinition audio MIME");
+            break;
+        default:
+            break;
+    }
 
     for (OMX_U32 i = 0; i < def.nBufferCountActual; ++i) {
         Buffer buffer;

@@ -13,6 +13,7 @@ cc_test {
            "test_create_utils.cpp"],
     header_libs: [
         "libmedia_headers",
+        "libmediametrics_headers",
     ],
     shared_libs: [
         "libaudioclient",
@@ -30,6 +31,7 @@ cc_test {
            "test_create_utils.cpp"],
     header_libs: [
         "libmedia_headers",
+        "libmediametrics_headers",
     ],
     shared_libs: [
         "libaudioclient",

@@ -93,33 +93,31 @@ audio_source_t AAudioConvert_inputPresetToAudioSource(aaudio_input_preset_t pres
 audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
         aaudio_allowed_capture_policy_t policy);
 
-// Note that this code may be replaced by Settings or by some other system configuration tool.
+audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
+        bool privacySensitive);
 
-#define AAUDIO_PROP_MMAP_POLICY           "aaudio.mmap_policy"
+// Note that this code may be replaced by Settings or by some other system configuration tool.
 
 /**
  * Read system property.
  * @return AAUDIO_UNSPECIFIED, AAUDIO_POLICY_NEVER or AAUDIO_POLICY_AUTO or AAUDIO_POLICY_ALWAYS
  */
 int32_t AAudioProperty_getMMapPolicy();
-
-#define AAUDIO_PROP_MMAP_EXCLUSIVE_POLICY "aaudio.mmap_exclusive_policy"
+#define AAUDIO_PROP_MMAP_POLICY           "aaudio.mmap_policy"
 
 /**
  * Read system property.
  * @return AAUDIO_UNSPECIFIED, AAUDIO_POLICY_NEVER or AAUDIO_POLICY_AUTO or AAUDIO_POLICY_ALWAYS
  */
 int32_t AAudioProperty_getMMapExclusivePolicy();
-
-#define AAUDIO_PROP_MIXER_BURSTS           "aaudio.mixer_bursts"
+#define AAUDIO_PROP_MMAP_EXCLUSIVE_POLICY "aaudio.mmap_exclusive_policy"
 
 /**
  * Read system property.
  * @return number of bursts per AAudio service mixer cycle
  */
 int32_t AAudioProperty_getMixerBursts();
-
-#define AAUDIO_PROP_HW_BURST_MIN_USEC      "aaudio.hw_burst_min_usec"
+#define AAUDIO_PROP_MIXER_BURSTS           "aaudio.mixer_bursts"
 
 /**
  * Read a system property that specifies the number of extra microseconds that a thread
@@ -131,7 +129,6 @@ int32_t AAudioProperty_getMixerBursts();
  * @return number of microseconds to delay the wakeup.
  */
 int32_t AAudioProperty_getWakeupDelayMicros();
-
 #define AAUDIO_PROP_WAKEUP_DELAY_USEC      "aaudio.wakeup_delay_usec"
 
 /**
@@ -140,7 +137,6 @@ int32_t AAudioProperty_getWakeupDelayMicros();
  * @return minimum number of microseconds to sleep.
  */
 int32_t AAudioProperty_getMinimumSleepMicros();
-
 #define AAUDIO_PROP_MINIMUM_SLEEP_USEC      "aaudio.minimum_sleep_usec"
 
 /**
@@ -154,7 +150,35 @@ int32_t AAudioProperty_getMinimumSleepMicros();
  * @return minimum number of microseconds for a MMAP HW burst
  */
 int32_t AAudioProperty_getHardwareBurstMinMicros();
+#define AAUDIO_PROP_HW_BURST_MIN_USEC      "aaudio.hw_burst_min_usec"
 
+/**
+ * Read a system property that specifies an offset that will be added to MMAP timestamps.
+ * This can be used to correct bias in the timestamp.
+ * It can also be used to analyze the time distribution of the timestamp
+ * by progressively modifying the offset and listening for glitches.
+ *
+ * @return number of microseconds to offset the time part of an MMAP timestamp
+ */
+int32_t AAudioProperty_getInputMMapOffsetMicros();
+#define AAUDIO_PROP_INPUT_MMAP_OFFSET_USEC    "aaudio.in_mmap_offset_usec"
+
+int32_t AAudioProperty_getOutputMMapOffsetMicros();
+#define AAUDIO_PROP_OUTPUT_MMAP_OFFSET_USEC   "aaudio.out_mmap_offset_usec"
+
+// These are powers of two that can be combined as a bit mask.
+// AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM must be enabled before the stream is opened.
+#define AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM   1
+#define AAUDIO_LOG_RESERVED_2              2
+#define AAUDIO_LOG_RESERVED_4              4
+#define AAUDIO_LOG_RESERVED_8              8
+
+/**
+ * Use a mask to enable various logs in AAudio.
+ * @return mask that enables various AAudio logs, such as AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM
+ */
+int32_t AAudioProperty_getLogMask();
+#define AAUDIO_PROP_LOG_MASK   "aaudio.log_mask"
 
 /**
  * Is flush allowed for the given state?

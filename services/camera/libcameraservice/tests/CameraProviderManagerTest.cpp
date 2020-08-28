@@ -40,8 +40,15 @@ using android::hardware::camera::provider::V2_5::DeviceState;
  */
 struct TestDeviceInterface : public device::V3_2::ICameraDevice {
     std::vector<hardware::hidl_string> mDeviceNames;
+    android::hardware::hidl_vec<uint8_t> mCharacteristics;
+
+    TestDeviceInterface(std::vector<hardware::hidl_string> deviceNames,
+            android::hardware::hidl_vec<uint8_t> chars) :
+        mDeviceNames(deviceNames), mCharacteristics(chars) {}
+
     TestDeviceInterface(std::vector<hardware::hidl_string> deviceNames) :
         mDeviceNames(deviceNames) {}
+
     using getResourceCost_cb = std::function<void(
             hardware::camera::common::V1_0::Status status,
             const hardware::camera::common::V1_0::CameraResourceCost& resourceCost)>;
@@ -58,8 +65,7 @@ struct TestDeviceInterface : public device::V3_2::ICameraDevice {
             const hardware::hidl_vec<uint8_t>& cameraCharacteristics)>;
     hardware::Return<void> getCameraCharacteristics(
             getCameraCharacteristics_cb _hidl_cb) override {
-        hardware::hidl_vec<uint8_t> cameraCharacteristics;
-        _hidl_cb(Status::OK, cameraCharacteristics);
+        _hidl_cb(Status::OK, mCharacteristics);
         return hardware::Void();
     }
 
@@ -98,6 +104,13 @@ struct TestICameraProvider : virtual public provider::V2_5::ICameraProvider {
             const hardware::hidl_vec<common::V1_0::VendorTagSection> &vendorSection) :
         mDeviceNames(devices),
         mDeviceInterface(new TestDeviceInterface(devices)),
+        mVendorTagSections (vendorSection) {}
+
+    TestICameraProvider(const std::vector<hardware::hidl_string> &devices,
+            const hardware::hidl_vec<common::V1_0::VendorTagSection> &vendorSection,
+            android::hardware::hidl_vec<uint8_t> chars) :
+        mDeviceNames(devices),
+        mDeviceInterface(new TestDeviceInterface(devices, chars)),
         mVendorTagSections (vendorSection) {}
 
     virtual hardware::Return<Status> setCallback(
@@ -183,6 +196,7 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
     sp<TestICameraProvider> mTestCameraProvider;
 
     TestInteractionProxy() {}
+
     void setProvider(sp<TestICameraProvider> provider) {
         mTestCameraProvider = provider;
     }
@@ -199,13 +213,31 @@ struct TestInteractionProxy : public CameraProviderManager::ServiceInteractionPr
         return true;
     }
 
+    virtual sp<hardware::camera::provider::V2_4::ICameraProvider> tryGetService(
+            const std::string &serviceName) override {
+        // If no provider has been given, act like the HAL isn't available and return null.
+        if (mTestCameraProvider == nullptr) return nullptr;
+        return getService(serviceName);
+    }
+
     virtual sp<hardware::camera::provider::V2_4::ICameraProvider> getService(
             const std::string &serviceName) override {
+        // If no provider has been given, fail; in reality, getService would
+        // block for HALs that don't start correctly, so we should never use
+        // getService when we don't have a valid HAL running
+        if (mTestCameraProvider == nullptr) {
+            ADD_FAILURE() << "getService called with no valid provider; would block indefinitely";
+            // Real getService would block, but that's bad in unit tests. So
+            // just record an error and return nullptr
+            return nullptr;
+        }
         mLastRequestedServiceNames.push_back(serviceName);
         return mTestCameraProvider;
     }
 
     virtual hardware::hidl_vec<hardware::hidl_string> listServices() override {
+        // Always provide a list even if there's no actual provider yet, to
+        // simulate stuck HAL situations as well
         hardware::hidl_vec<hardware::hidl_string> ret = {"test/0"};
         return ret;
     }
@@ -217,10 +249,58 @@ struct TestStatusListener : public CameraProviderManager::StatusListener {
 
     void onDeviceStatusChanged(const String8 &,
             hardware::camera::common::V1_0::CameraDeviceStatus) override {}
+    void onDeviceStatusChanged(const String8 &, const String8 &,
+            hardware::camera::common::V1_0::CameraDeviceStatus) override {}
     void onTorchStatusChanged(const String8 &,
             hardware::camera::common::V1_0::TorchModeStatus) override {}
     void onNewProviderRegistered() override {}
 };
+
+TEST(CameraProviderManagerTest, InitializeDynamicDepthTest) {
+    std::vector<hardware::hidl_string> deviceNames;
+    deviceNames.push_back("device@3.2/test/0");
+    hardware::hidl_vec<common::V1_0::VendorTagSection> vendorSection;
+    status_t res;
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+
+    android::hardware::hidl_vec<uint8_t> chars;
+    CameraMetadata meta;
+    int32_t charKeys[] = { ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE,
+            ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS };
+    meta.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, charKeys,
+            sizeof(charKeys) / sizeof(charKeys[0]));
+    uint8_t depthIsExclusive = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE_FALSE;
+    meta.update(ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE, &depthIsExclusive, 1);
+    int32_t sizes[] = { HAL_PIXEL_FORMAT_BLOB,
+            640, 480, ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT };
+    meta.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, sizes,
+            sizeof(sizes) / sizeof(sizes[0]));
+    sizes[0] = HAL_PIXEL_FORMAT_Y16;
+    meta.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS, sizes,
+            sizeof(sizes) / sizeof(sizes[0]));
+    int64_t durations[] = { HAL_PIXEL_FORMAT_BLOB, 640, 480, 0 };
+    meta.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    meta.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    durations[0]= HAL_PIXEL_FORMAT_Y16;
+    meta.update(ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    meta.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS, durations,
+            sizeof(durations) / sizeof(durations[0]));
+    camera_metadata_t* metaBuffer = const_cast<camera_metadata_t*>(meta.getAndLock());
+    chars.setToExternal(reinterpret_cast<uint8_t*>(metaBuffer),
+            get_camera_metadata_size(metaBuffer));
+
+    sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
+            vendorSection, chars);
+    serviceProxy.setProvider(provider);
+
+    res = providerManager->initialize(statusListener, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+}
 
 TEST(CameraProviderManagerTest, InitializeTest) {
     std::vector<hardware::hidl_string> deviceNames;
@@ -437,4 +517,53 @@ TEST(CameraProviderManagerTest, NotifyStateChangeTest) {
             static_cast<hardware::hidl_bitfield<DeviceState>>(DeviceState::FOLDED))
             << "Unable to change device state";
 
+}
+
+// Test that CameraProviderManager doesn't get stuck when the camera HAL isn't really working
+TEST(CameraProviderManagerTest, BadHalStartupTest) {
+
+    std::vector<hardware::hidl_string> deviceNames;
+    deviceNames.push_back("device@3.2/test/0");
+    deviceNames.push_back("device@1.0/test/0");
+    deviceNames.push_back("device@3.2/test/1");
+    hardware::hidl_vec<common::V1_0::VendorTagSection> vendorSection;
+    status_t res;
+
+    sp<CameraProviderManager> providerManager = new CameraProviderManager();
+    sp<TestStatusListener> statusListener = new TestStatusListener();
+    TestInteractionProxy serviceProxy;
+    sp<TestICameraProvider> provider =  new TestICameraProvider(deviceNames,
+            vendorSection);
+
+    // Not setting up provider in the service proxy yet, to test cases where a
+    // HAL isn't starting right
+    res = providerManager->initialize(statusListener, &serviceProxy);
+    ASSERT_EQ(res, OK) << "Unable to initialize provider manager";
+
+    // Now set up provider and trigger a registration
+    serviceProxy.setProvider(provider);
+    int numProviders = static_cast<int>(serviceProxy.listServices().size());
+
+    hardware::hidl_string testProviderFqInterfaceName =
+            "android.hardware.camera.provider@2.4::ICameraProvider";
+    hardware::hidl_string testProviderInstanceName = "test/0";
+    serviceProxy.mManagerNotificationInterface->onRegistration(
+            testProviderFqInterfaceName,
+            testProviderInstanceName, false);
+
+    // Check that new provider is called once for all the init methods
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::SET_CALLBACK], numProviders) <<
+            "Only one call to setCallback per provider expected during register";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_VENDOR_TAGS], numProviders) <<
+            "Only one call to getVendorTags per provider expected during register";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::IS_SET_TORCH_MODE_SUPPORTED],
+            numProviders) <<
+            "Only one call to isSetTorchModeSupported per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::GET_CAMERA_ID_LIST], numProviders) <<
+            "Only one call to getCameraIdList per provider expected during init";
+    EXPECT_EQ(provider->mCalledCounter[TestICameraProvider::NOTIFY_DEVICE_STATE], numProviders) <<
+            "Only one call to notifyDeviceState per provider expected during init";
+
+    ASSERT_EQ(serviceProxy.mLastRequestedServiceNames.back(), testProviderInstanceName) <<
+            "Incorrect instance requested from service manager";
 }

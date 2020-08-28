@@ -49,7 +49,7 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
                              getDeviceChannelCount());
 
         if (result != AAUDIO_OK) {
-            close();
+            releaseCloseFinal();
         }
         // Sample rate is constrained to common values by now and should not overflow.
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
@@ -87,8 +87,8 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush() {
 }
 
 void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
-    int64_t readCounter = mAudioEndpoint.getDataReadCounter();
-    int64_t writeCounter = mAudioEndpoint.getDataWriteCounter();
+    int64_t readCounter = mAudioEndpoint->getDataReadCounter();
+    int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
     int64_t offset = writeCounter - readCounter;
@@ -98,7 +98,7 @@ void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
 
     // Force writeCounter to match readCounter.
     // This is because we cannot change the read counter in the hardware.
-    mAudioEndpoint.setDataWriteCounter(readCounter);
+    mAudioEndpoint->setDataWriteCounter(readCounter);
 }
 
 void AudioStreamInternalPlay::onFlushFromServer() {
@@ -135,11 +135,11 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     // If we have gotten this far then we have at least one timestamp from server.
 
     // If a DMA channel or DSP is reading the other end then we have to update the readCounter.
-    if (mAudioEndpoint.isFreeRunning()) {
+    if (mAudioEndpoint->isFreeRunning()) {
         // Update data queue based on the timing model.
         int64_t estimatedReadCounter = mClockModel.convertTimeToPosition(currentNanoTime);
         // ALOGD("AudioStreamInternal::processDataNow() - estimatedReadCounter = %d", (int)estimatedReadCounter);
-        mAudioEndpoint.setDataReadCounter(estimatedReadCounter);
+        mAudioEndpoint->setDataReadCounter(estimatedReadCounter);
     }
 
     if (mNeedCatchUp.isRequested()) {
@@ -151,7 +151,7 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
 
     // If the read index passed the write index then consider it an underrun.
     // For shared streams, the xRunCount is passed up from the service.
-    if (mAudioEndpoint.isFreeRunning() && mAudioEndpoint.getFullFramesAvailable() < 0) {
+    if (mAudioEndpoint->isFreeRunning() && mAudioEndpoint->getFullFramesAvailable() < 0) {
         mXRunCount++;
         if (ATRACE_ENABLED()) {
             ATRACE_INT("aaUnderRuns", mXRunCount);
@@ -167,8 +167,10 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
         ATRACE_INT("aaWrote", framesWritten);
     }
 
+    // Sleep if there is too much data in the buffer.
     // Calculate an ideal time to wake up.
-    if (wakeTimePtr != nullptr && framesWritten >= 0) {
+    if (wakeTimePtr != nullptr
+            && (mAudioEndpoint->getFullFramesAvailable() >= getBufferSize())) {
         // By default wake up a few milliseconds from now.  // TODO review
         int64_t wakeTime = currentNanoTime + (1 * AAUDIO_NANOS_PER_MILLISECOND);
         aaudio_stream_state_t state = getState();
@@ -184,14 +186,10 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
                 break;
             case AAUDIO_STREAM_STATE_STARTED:
             {
-                // When do we expect the next read burst to occur?
-
-                // Calculate frame position based off of the writeCounter because
-                // the readCounter might have just advanced in the background,
-                // causing us to sleep until a later burst.
-                int64_t nextPosition = mAudioEndpoint.getDataWriteCounter() + mFramesPerBurst
-                        - mAudioEndpoint.getBufferSizeInFrames();
-                wakeTime = mClockModel.convertPositionToTime(nextPosition);
+                // Sleep until the readCounter catches up and we only have
+                // the getBufferSize() frames of data sitting in the buffer.
+                int64_t nextReadPosition = mAudioEndpoint->getDataWriteCounter() - getBufferSize();
+                wakeTime = mClockModel.convertPositionToTime(nextReadPosition);
             }
                 break;
             default:
@@ -212,7 +210,7 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
     uint8_t *byteBuffer = (uint8_t *) buffer;
     int32_t framesLeft = numFrames;
 
-    mAudioEndpoint.getEmptyFramesAvailable(&wrappingBuffer);
+    mAudioEndpoint->getEmptyFramesAvailable(&wrappingBuffer);
 
     // Write data in one or two parts.
     int partIndex = 0;
@@ -238,24 +236,28 @@ aaudio_result_t AudioStreamInternalPlay::writeNowWithConversion(const void *buff
         partIndex++;
     }
     int32_t framesWritten = numFrames - framesLeft;
-    mAudioEndpoint.advanceWriteIndex(framesWritten);
+    mAudioEndpoint->advanceWriteIndex(framesWritten);
 
     return framesWritten;
 }
 
 int64_t AudioStreamInternalPlay::getFramesRead() {
-    const int64_t framesReadHardware = isClockModelInControl()
-            ? mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
-            : mAudioEndpoint.getDataReadCounter();
-    // Add service offset and prevent retrograde motion.
-    mLastFramesRead = std::max(mLastFramesRead, framesReadHardware + mFramesOffsetFromService);
+    if (mAudioEndpoint) {
+        const int64_t framesReadHardware = isClockModelInControl()
+                ? mClockModel.convertTimeToPosition(AudioClock::getNanoseconds())
+                : mAudioEndpoint->getDataReadCounter();
+        // Add service offset and prevent retrograde motion.
+        mLastFramesRead = std::max(mLastFramesRead, framesReadHardware + mFramesOffsetFromService);
+    }
     return mLastFramesRead;
 }
 
 int64_t AudioStreamInternalPlay::getFramesWritten() {
-    const int64_t framesWritten = mAudioEndpoint.getDataWriteCounter()
-                               + mFramesOffsetFromService;
-    return framesWritten;
+    if (mAudioEndpoint) {
+        mLastFramesWritten = mAudioEndpoint->getDataWriteCounter()
+                             + mFramesOffsetFromService;
+    }
+    return mLastFramesWritten;
 }
 
 
@@ -270,11 +272,11 @@ void *AudioStreamInternalPlay::callbackLoop() {
     // result might be a frame count
     while (mCallbackEnabled.load() && isActive() && (result >= 0)) {
         // Call application using the AAudio callback interface.
-        callbackResult = maybeCallDataCallback(mCallbackBuffer, mCallbackFrames);
+        callbackResult = maybeCallDataCallback(mCallbackBuffer.get(), mCallbackFrames);
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_CONTINUE) {
             // Write audio data to stream. This is a BLOCKING WRITE!
-            result = write(mCallbackBuffer, mCallbackFrames, timeoutNanos);
+            result = write(mCallbackBuffer.get(), mCallbackFrames, timeoutNanos);
             if ((result != mCallbackFrames)) {
                 if (result >= 0) {
                     // Only wrote some of the frames requested. Must have timed out.

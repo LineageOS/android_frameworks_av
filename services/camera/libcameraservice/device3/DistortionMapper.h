@@ -22,6 +22,7 @@
 #include <mutex>
 
 #include "camera/CameraMetadata.h"
+#include "device3/CoordinateMapper.h"
 
 namespace android {
 
@@ -31,9 +32,18 @@ namespace camera3 {
  * Utilities to transform between raw (distorted) and warped (corrected) coordinate systems
  * for cameras that support geometric distortion
  */
-class DistortionMapper {
+class DistortionMapper : private CoordinateMapper {
   public:
     DistortionMapper();
+
+    DistortionMapper(const DistortionMapper& other) :
+            mValidMapping(other.mValidMapping), mValidGrids(other.mValidGrids),
+            mFx(other.mFx), mFy(other.mFy), mCx(other.mCx), mCy(other.mCy), mS(other.mS),
+            mInvFx(other.mInvFx), mInvFy(other.mInvFy), mK(other.mK),
+            mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight),
+            mActiveWidth(other.mActiveWidth), mActiveHeight(other.mActiveHeight),
+            mArrayDiffX(other.mArrayDiffX), mArrayDiffY(other.mArrayDiffY),
+            mCorrectedGrid(other.mCorrectedGrid), mDistortedGrid(other.mDistortedGrid) {}
 
     /**
      * Check whether distortion correction is supported by the camera HAL
@@ -150,20 +160,6 @@ class DistortionMapper {
     // Fuzziness for float inequality tests
     constexpr static float kFloatFuzz = 1e-4;
 
-    // Metadata key lists to correct
-
-    // Both capture request and result
-    static const std::array<uint32_t, 3> kMeteringRegionsToCorrect;
-
-    // Only capture request
-    static const std::array<uint32_t, 1> kRequestRectsToCorrect;
-
-    // Only capture result
-    static const std::array<uint32_t, 1> kResultRectsToCorrect;
-
-    // Only for capture results; don't clamp
-    static const std::array<uint32_t, 2> kResultPointsToCorrectNoClamp;
-
     // Single implementation for various mapCorrectedToRaw methods
     template<typename T>
     status_t mapCorrectedToRawImpl(T* coordPairs, int coordCount, bool clamp, bool simple) const;
@@ -186,7 +182,7 @@ class DistortionMapper {
     // pre-calculated inverses for speed
     float mInvFx, mInvFy;
     // radial/tangential distortion parameters
-    float mK[5];
+    std::array<float, 5> mK;
 
     // pre-correction active array dimensions
     float mArrayWidth, mArrayHeight;

@@ -21,7 +21,10 @@
 #include <C2PlatformSupport.h>
 
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
+#include <media/stagefright/SkipCutBuffer.h>
+#include <mediadrm/ICrypto.h>
 
 #include "CCodecBuffers.h"
 
@@ -120,17 +123,26 @@ sp<Codec2Buffer> InputBuffers::cloneAndReleaseBuffer(const sp<MediaCodecBuffer> 
 
 // OutputBuffers
 
+OutputBuffers::OutputBuffers(const char *componentName, const char *name)
+    : CCodecBuffers(componentName, name) { }
+
+OutputBuffers::~OutputBuffers() = default;
+
 void OutputBuffers::initSkipCutBuffer(
         int32_t delay, int32_t padding, int32_t sampleRate, int32_t channelCount) {
     CHECK(mSkipCutBuffer == nullptr);
     mDelay = delay;
     mPadding = padding;
     mSampleRate = sampleRate;
-    setSkipCutBuffer(delay, padding, channelCount);
+    mChannelCount = channelCount;
+    setSkipCutBuffer(delay, padding);
 }
 
 void OutputBuffers::updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount) {
     if (mSkipCutBuffer == nullptr) {
+        return;
+    }
+    if (mSampleRate == sampleRate && mChannelCount == channelCount) {
         return;
     }
     int32_t delay = mDelay;
@@ -139,7 +151,26 @@ void OutputBuffers::updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount
         delay = ((int64_t)delay * sampleRate) / mSampleRate;
         padding = ((int64_t)padding * sampleRate) / mSampleRate;
     }
-    setSkipCutBuffer(delay, padding, channelCount);
+    mSampleRate = sampleRate;
+    mChannelCount = channelCount;
+    setSkipCutBuffer(delay, padding);
+}
+
+void OutputBuffers::updateSkipCutBuffer(
+        const sp<AMessage> &format, bool notify) {
+    AString mediaType;
+    if (format->findString(KEY_MIME, &mediaType)
+            && mediaType == MIMETYPE_AUDIO_RAW) {
+        int32_t channelCount;
+        int32_t sampleRate;
+        if (format->findInt32(KEY_CHANNEL_COUNT, &channelCount)
+                && format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+            updateSkipCutBuffer(sampleRate, channelCount);
+        }
+    }
+    if (notify) {
+        mUnreportedFormat = nullptr;
+    }
 }
 
 void OutputBuffers::submit(const sp<MediaCodecBuffer> &buffer) {
@@ -148,24 +179,192 @@ void OutputBuffers::submit(const sp<MediaCodecBuffer> &buffer) {
     }
 }
 
-void OutputBuffers::transferSkipCutBuffer(const sp<SkipCutBuffer> &scb) {
-    mSkipCutBuffer = scb;
-}
-
-void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut, int32_t channelCount) {
+void OutputBuffers::setSkipCutBuffer(int32_t skip, int32_t cut) {
     if (mSkipCutBuffer != nullptr) {
         size_t prevSize = mSkipCutBuffer->size();
         if (prevSize != 0u) {
             ALOGD("[%s] Replacing SkipCutBuffer holding %zu bytes", mName, prevSize);
         }
     }
-    mSkipCutBuffer = new SkipCutBuffer(skip, cut, channelCount);
+    mSkipCutBuffer = new SkipCutBuffer(skip, cut, mChannelCount);
+}
+
+void OutputBuffers::clearStash() {
+    mPending.clear();
+    mReorderStash.clear();
+    mDepth = 0;
+    mKey = C2Config::ORDINAL;
+    mUnreportedFormat = nullptr;
+}
+
+void OutputBuffers::flushStash() {
+    for (StashEntry& e : mPending) {
+        e.notify = false;
+    }
+    for (StashEntry& e : mReorderStash) {
+        e.notify = false;
+    }
+}
+
+uint32_t OutputBuffers::getReorderDepth() const {
+    return mDepth;
+}
+
+void OutputBuffers::setReorderDepth(uint32_t depth) {
+    mPending.splice(mPending.end(), mReorderStash);
+    mDepth = depth;
+}
+
+void OutputBuffers::setReorderKey(C2Config::ordinal_key_t key) {
+    mPending.splice(mPending.end(), mReorderStash);
+    mKey = key;
+}
+
+void OutputBuffers::pushToStash(
+        const std::shared_ptr<C2Buffer>& buffer,
+        bool notify,
+        int64_t timestamp,
+        int32_t flags,
+        const sp<AMessage>& format,
+        const C2WorkOrdinalStruct& ordinal) {
+    bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
+    if (!buffer && eos) {
+        // TRICKY: we may be violating ordering of the stash here. Because we
+        // don't expect any more emplace() calls after this, the ordering should
+        // not matter.
+        mReorderStash.emplace_back(
+                buffer, notify, timestamp, flags, format, ordinal);
+    } else {
+        flags = flags & ~MediaCodec::BUFFER_FLAG_EOS;
+        auto it = mReorderStash.begin();
+        for (; it != mReorderStash.end(); ++it) {
+            if (less(ordinal, it->ordinal)) {
+                break;
+            }
+        }
+        mReorderStash.emplace(it,
+                buffer, notify, timestamp, flags, format, ordinal);
+        if (eos) {
+            mReorderStash.back().flags =
+                mReorderStash.back().flags | MediaCodec::BUFFER_FLAG_EOS;
+        }
+    }
+    while (!mReorderStash.empty() && mReorderStash.size() > mDepth) {
+        mPending.push_back(mReorderStash.front());
+        mReorderStash.pop_front();
+    }
+    ALOGV("[%s] %s: pushToStash -- pending size = %zu", mName, __func__, mPending.size());
+}
+
+OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
+        std::shared_ptr<C2Buffer>* c2Buffer,
+        size_t* index,
+        sp<MediaCodecBuffer>* outBuffer) {
+    if (mPending.empty()) {
+        return SKIP;
+    }
+
+    // Retrieve the first entry.
+    StashEntry &entry = mPending.front();
+
+    *c2Buffer = entry.buffer;
+    sp<AMessage> outputFormat = entry.format;
+
+    // The output format can be processed without a registered slot.
+    if (outputFormat) {
+        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
+                mName, outputFormat->debugString().c_str());
+        updateSkipCutBuffer(outputFormat, entry.notify);
+    }
+
+    if (entry.notify) {
+        if (outputFormat) {
+            setFormat(outputFormat);
+        } else if (mUnreportedFormat) {
+            outputFormat = mUnreportedFormat;
+            setFormat(outputFormat);
+        }
+        mUnreportedFormat = nullptr;
+    } else {
+        if (outputFormat) {
+            mUnreportedFormat = outputFormat;
+        } else if (!mUnreportedFormat) {
+            mUnreportedFormat = mFormat;
+        }
+    }
+
+    // Flushing mReorderStash because no other buffers should come after output
+    // EOS.
+    if (entry.flags & MediaCodec::BUFFER_FLAG_EOS) {
+        // Flush reorder stash
+        setReorderDepth(0);
+    }
+
+    if (!entry.notify) {
+        mPending.pop_front();
+        return DISCARD;
+    }
+
+    // Try to register the buffer.
+    status_t err = registerBuffer(*c2Buffer, index, outBuffer);
+    if (err != OK) {
+        if (err != WOULD_BLOCK) {
+            return REALLOCATE;
+        }
+        return RETRY;
+    }
+
+    // Append information from the front stash entry to outBuffer.
+    (*outBuffer)->meta()->setInt64("timeUs", entry.timestamp);
+    (*outBuffer)->meta()->setInt32("flags", entry.flags);
+    ALOGV("[%s] popFromStashAndRegister: "
+          "out buffer index = %zu [%p] => %p + %zu (%lld)",
+          mName, *index, outBuffer->get(),
+          (*outBuffer)->data(), (*outBuffer)->size(),
+          (long long)entry.timestamp);
+
+    // The front entry of mPending will be removed now that the registration
+    // succeeded.
+    mPending.pop_front();
+    return NOTIFY_CLIENT;
+}
+
+bool OutputBuffers::popPending(StashEntry *entry) {
+    if (mPending.empty()) {
+        return false;
+    }
+    *entry = mPending.front();
+    mPending.pop_front();
+    return true;
+}
+
+void OutputBuffers::deferPending(const OutputBuffers::StashEntry &entry) {
+    mPending.push_front(entry);
+}
+
+bool OutputBuffers::hasPending() const {
+    return !mPending.empty();
+}
+
+bool OutputBuffers::less(
+        const C2WorkOrdinalStruct &o1, const C2WorkOrdinalStruct &o2) const {
+    switch (mKey) {
+        case C2Config::ORDINAL:   return o1.frameIndex < o2.frameIndex;
+        case C2Config::TIMESTAMP: return o1.timestamp < o2.timestamp;
+        case C2Config::CUSTOM:    return o1.customOrdinal < o2.customOrdinal;
+        default:
+            ALOGD("Unrecognized key; default to timestamp");
+            return o1.frameIndex < o2.frameIndex;
+    }
 }
 
 // LocalBufferPool
 
-std::shared_ptr<LocalBufferPool> LocalBufferPool::Create(size_t poolCapacity) {
-    return std::shared_ptr<LocalBufferPool>(new LocalBufferPool(poolCapacity));
+constexpr size_t kInitialPoolCapacity = kMaxLinearBufferSize;
+constexpr size_t kMaxPoolCapacity = kMaxLinearBufferSize * 32;
+
+std::shared_ptr<LocalBufferPool> LocalBufferPool::Create() {
+    return std::shared_ptr<LocalBufferPool>(new LocalBufferPool(kInitialPoolCapacity));
 }
 
 sp<ABuffer> LocalBufferPool::newBuffer(size_t capacity) {
@@ -184,6 +383,11 @@ sp<ABuffer> LocalBufferPool::newBuffer(size_t capacity) {
         while (!mPool.empty()) {
             mUsedSize -= mPool.back().capacity();
             mPool.pop_back();
+        }
+        while (mUsedSize + capacity > mPoolCapacity && mPoolCapacity * 2 <= kMaxPoolCapacity) {
+            ALOGD("Increasing local buffer pool capacity from %zu to %zu",
+                  mPoolCapacity, mPoolCapacity * 2);
+            mPoolCapacity *= 2;
         }
         if (mUsedSize + capacity > mPoolCapacity) {
             ALOGD("mUsedSize = %zu, capacity = %zu, mPoolCapacity = %zu",
@@ -254,6 +458,7 @@ bool FlexBuffersImpl::releaseSlot(
     std::shared_ptr<C2Buffer> result = mBuffers[index].compBuffer.lock();
     if (!result) {
         result = clientBuffer->asC2Buffer();
+        clientBuffer->clearC2BufferRefs();
         mBuffers[index].compBuffer = result;
     }
     if (c2buffer) {
@@ -372,6 +577,7 @@ bool BuffersArrayImpl::returnBuffer(
     std::shared_ptr<C2Buffer> result = mBuffers[index].compBuffer.lock();
     if (!result) {
         result = clientBuffer->asC2Buffer();
+        clientBuffer->clearC2BufferRefs();
         mBuffers[index].compBuffer = result;
     }
     if (c2buffer) {
@@ -491,6 +697,44 @@ size_t InputBuffersArray::numClientBuffers() const {
 
 sp<Codec2Buffer> InputBuffersArray::createNewBuffer() {
     return mAllocate();
+}
+
+// SlotInputBuffers
+
+bool SlotInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
+    sp<Codec2Buffer> newBuffer = createNewBuffer();
+    *index = mImpl.assignSlot(newBuffer);
+    *buffer = newBuffer;
+    return true;
+}
+
+bool SlotInputBuffers::releaseBuffer(
+        const sp<MediaCodecBuffer> &buffer,
+        std::shared_ptr<C2Buffer> *c2buffer,
+        bool release) {
+    return mImpl.releaseSlot(buffer, c2buffer, release);
+}
+
+bool SlotInputBuffers::expireComponentBuffer(
+        const std::shared_ptr<C2Buffer> &c2buffer) {
+    return mImpl.expireComponentBuffer(c2buffer);
+}
+
+void SlotInputBuffers::flush() {
+    mImpl.flush();
+}
+
+std::unique_ptr<InputBuffers> SlotInputBuffers::toArrayMode(size_t) {
+    TRESPASS("Array mode should not be called at non-legacy mode");
+    return nullptr;
+}
+
+size_t SlotInputBuffers::numClientBuffers() const {
+    return mImpl.numClientBuffers();
+}
+
+sp<Codec2Buffer> SlotInputBuffers::createNewBuffer() {
+    return new DummyContainerBuffer{mFormat, nullptr};
 }
 
 // LinearInputBuffers
@@ -730,11 +974,10 @@ sp<Codec2Buffer> GraphicMetadataInputBuffers::createNewBuffer() {
 // GraphicInputBuffers
 
 GraphicInputBuffers::GraphicInputBuffers(
-        size_t numInputSlots, const char *componentName, const char *name)
+        const char *componentName, const char *name)
     : InputBuffers(componentName, name),
       mImpl(mName),
-      mLocalBufferPool(LocalBufferPool::Create(
-              kMaxLinearBufferSize * numInputSlots)) { }
+      mLocalBufferPool(LocalBufferPool::Create()) { }
 
 bool GraphicInputBuffers::requestNewBuffer(size_t *index, sp<MediaCodecBuffer> *buffer) {
     sp<Codec2Buffer> newBuffer = createNewBuffer();
@@ -895,7 +1138,7 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
         case C2BufferData::GRAPHIC: {
             // This is only called for RawGraphicOutputBuffers.
             mAlloc = [format = mFormat,
-                      lbp = LocalBufferPool::Create(kMaxLinearBufferSize * mImpl.arraySize())] {
+                      lbp = LocalBufferPool::Create()] {
                 return ConstGraphicBlockBuffer::AllocateEmpty(
                         format,
                         [lbp](size_t capacity) {
@@ -919,6 +1162,16 @@ void OutputBuffersArray::realloc(const std::shared_ptr<C2Buffer> &c2buffer) {
 
 void OutputBuffersArray::grow(size_t newSize) {
     mImpl.grow(newSize, mAlloc);
+}
+
+void OutputBuffersArray::transferFrom(OutputBuffers* source) {
+    mFormat = source->mFormat;
+    mSkipCutBuffer = source->mSkipCutBuffer;
+    mUnreportedFormat = source->mUnreportedFormat;
+    mPending = std::move(source->mPending);
+    mReorderStash = std::move(source->mReorderStash);
+    mDepth = source->mDepth;
+    mKey = source->mKey;
 }
 
 // FlexOutputBuffers
@@ -963,13 +1216,12 @@ void FlexOutputBuffers::flush(
     // track of the flushed work.
 }
 
-std::unique_ptr<OutputBuffers> FlexOutputBuffers::toArrayMode(size_t size) {
+std::unique_ptr<OutputBuffersArray> FlexOutputBuffers::toArrayMode(size_t size) {
     std::unique_ptr<OutputBuffersArray> array(new OutputBuffersArray(mComponentName.c_str()));
-    array->setFormat(mFormat);
-    array->transferSkipCutBuffer(mSkipCutBuffer);
+    array->transferFrom(this);
     std::function<sp<Codec2Buffer>()> alloc = getAlloc();
     array->initialize(mImpl, size, alloc);
-    return std::move(array);
+    return array;
 }
 
 size_t FlexOutputBuffers::numClientBuffers() const {
@@ -1032,10 +1284,9 @@ std::function<sp<Codec2Buffer>()> GraphicOutputBuffers::getAlloc() {
 // RawGraphicOutputBuffers
 
 RawGraphicOutputBuffers::RawGraphicOutputBuffers(
-        size_t numOutputSlots, const char *componentName, const char *name)
+        const char *componentName, const char *name)
     : FlexOutputBuffers(componentName, name),
-      mLocalBufferPool(LocalBufferPool::Create(
-              kMaxLinearBufferSize * numOutputSlots)) { }
+      mLocalBufferPool(LocalBufferPool::Create()) { }
 
 sp<Codec2Buffer> RawGraphicOutputBuffers::wrap(const std::shared_ptr<C2Buffer> &buffer) {
     if (buffer == nullptr) {

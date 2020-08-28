@@ -98,6 +98,12 @@ public:
         return this;
     }
 
+    AudioStreamBuilder* setPrivacySensitiveRequest(bool privacySensitive) {
+        mPrivacySensitiveReq =
+            privacySensitive ? PRIVACY_SENSITIVE_ENABLED : PRIVACY_SENSITIVE_DISABLED;
+        return this;
+    }
+
     aaudio_result_t build(AudioStream **streamPtr);
 
     virtual aaudio_result_t validate() const override;
@@ -114,6 +120,14 @@ private:
 
     AAudioStream_errorCallback mErrorCallbackProc = nullptr;
     void                      *mErrorCallbackUserData = nullptr;
+
+    enum {
+        PRIVACY_SENSITIVE_DEFAULT = -1,
+        PRIVACY_SENSITIVE_DISABLED = 0,
+        PRIVACY_SENSITIVE_ENABLED = 1,
+    };
+    typedef int32_t privacy_sensitive_t;
+    privacy_sensitive_t        mPrivacySensitiveReq = PRIVACY_SENSITIVE_DEFAULT;
 };
 
 } /* namespace aaudio */

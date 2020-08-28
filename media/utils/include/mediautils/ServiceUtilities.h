@@ -28,6 +28,7 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace android {
@@ -58,10 +59,11 @@ static inline bool isAudioServerOrSystemServerUid(uid_t uid) {
     return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER;
 }
 
-// used for calls that should come from system_server or audio_server and
+// used for calls that should come from system_server or audio_server or media server and
 // include AID_ROOT for command-line tests.
-static inline bool isAudioServerOrSystemServerOrRootUid(uid_t uid) {
-    return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER || uid == AID_ROOT;
+static inline bool isAudioServerOrMediaServerOrSystemServerOrRootUid(uid_t uid) {
+    return multiuser_get_app_id(uid) == AID_SYSTEM || uid == AID_AUDIOSERVER
+              || uid == AID_MEDIA || uid == AID_ROOT;
 }
 
 // Mediaserver may forward the client PID and UID as part of a binder interface call;
@@ -81,9 +83,11 @@ bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid);
 void finishRecording(const String16& opPackageName, uid_t uid);
 bool captureAudioOutputAllowed(pid_t pid, uid_t uid);
 bool captureMediaOutputAllowed(pid_t pid, uid_t uid);
+bool captureVoiceCommunicationOutputAllowed(pid_t pid, uid_t uid);
 bool captureHotwordAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
+bool modifyAudioRoutingAllowed(pid_t pid, uid_t uid);
 bool modifyDefaultAudioEffectsAllowed();
 bool modifyDefaultAudioEffectsAllowed(pid_t pid, uid_t uid);
 bool dumpAllowed();
@@ -116,6 +120,40 @@ private:
     using Packages = std::vector<Package>;
     std::map<uid_t, Packages> mDebugLog;
 };
-}
+
+namespace mediautils {
+
+/**
+ * This class is used to retrieve (and cache) package information
+ * for a given uid.
+ */
+class UidInfo {
+public:
+    struct Info {
+        uid_t uid = -1;           // uid used for lookup.
+        std::string package;      // package name.
+        std::string installer;    // installer for the package (e.g. preload, play store).
+        int64_t versionCode = 0;  // reported version code.
+        int64_t expirationNs = 0; // after this time in SYSTEM_TIME_REALTIME we refetch.
+    };
+
+    /**
+     * Returns the package information for a UID.
+     *
+     * The package name will be the uid if we cannot find the associated name.
+     *
+     * \param uid is the uid of the app or service.
+     */
+    Info getInfo(uid_t uid);
+
+private:
+    std::mutex mLock;
+    // TODO: use concurrent hashmap with striped lock.
+    std::unordered_map<uid_t, Info> mInfoMap; // GUARDED_BY(mLock)
+};
+
+} // namespace mediautils
+
+} // namespace android
 
 #endif // ANDROID_MEDIAUTILS_SERVICEUTILITIES_H

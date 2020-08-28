@@ -11,8 +11,13 @@ cc_library_shared {
         "libdatasource",
         "libmedia",
         "libstagefright",
+        "libstagefright_foundation",
         "libbinder",
         "libutils",
+        "liblog",
+    ],
+    header_libs: [
+        "libmediametrics_headers",
     ],
 }
 
@@ -24,6 +29,7 @@ cc_binary {
     shared_libs: [
         "libmedia",
         "libmediaextractorservice",
+        "libmediautils",
         "libbinder",
         "libutils",
         "liblog",
@@ -31,12 +37,12 @@ cc_binary {
     ],
     init_rc: ["mediaextractor.rc"],
 
-    include_dirs: ["frameworks/av/media/libmedia"],
-
     cflags: [
         "-Wall",
         "-Werror",
     ],
+
+    required: ["mediaextractor.policy"],
 }
 
 prebuilt_etc {

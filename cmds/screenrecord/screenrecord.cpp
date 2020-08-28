@@ -37,23 +37,28 @@
 
 #include <binder/IPCThreadState.h>
 #include <utils/Errors.h>
+#include <utils/SystemClock.h>
 #include <utils/Timers.h>
 #include <utils/Trace.h>
 
+#include <gui/ISurfaceComposer.h>
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 #include <gui/ISurfaceComposer.h>
-#include <ui/DisplayInfo.h>
+#include <media/MediaCodecBuffer.h>
+#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaFormatPriv.h>
+#include <media/NdkMediaMuxer.h>
 #include <media/openmax/OMX_IVCommon.h>
-#include <media/stagefright/foundation/ABuffer.h>
-#include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/stagefright/MediaMuxer.h>
 #include <media/stagefright/PersistentSurface.h>
+#include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/AMessage.h>
 #include <mediadrm/ICrypto.h>
-#include <media/MediaCodecBuffer.h>
+#include <ui/DisplayConfig.h>
+#include <ui/DisplayState.h>
 
 #include "screenrecord.h"
 #include "Overlay.h"
@@ -63,16 +68,16 @@ using android::ABuffer;
 using android::ALooper;
 using android::AMessage;
 using android::AString;
-using android::DisplayInfo;
+using android::DisplayConfig;
 using android::FrameOutput;
 using android::IBinder;
 using android::IGraphicBufferProducer;
 using android::ISurfaceComposer;
 using android::MediaCodec;
 using android::MediaCodecBuffer;
-using android::MediaMuxer;
 using android::Overlay;
 using android::PersistentSurface;
+using android::PhysicalDisplayId;
 using android::ProcessState;
 using android::Rect;
 using android::String8;
@@ -81,13 +86,12 @@ using android::Vector;
 using android::sp;
 using android::status_t;
 
-using android::DISPLAY_ORIENTATION_0;
-using android::DISPLAY_ORIENTATION_180;
-using android::DISPLAY_ORIENTATION_90;
 using android::INVALID_OPERATION;
 using android::NAME_NOT_FOUND;
 using android::NO_ERROR;
 using android::UNKNOWN_ERROR;
+
+namespace ui = android::ui;
 
 static const uint32_t kMinBitRate = 100000;         // 0.1Mbps
 static const uint32_t kMaxBitRate = 200 * 1000000;  // 200Mbps
@@ -95,6 +99,8 @@ static const uint32_t kMaxTimeLimitSec = 180;       // 3 minutes
 static const uint32_t kFallbackWidth = 1280;        // 720p
 static const uint32_t kFallbackHeight = 720;
 static const char* kMimeTypeAvc = "video/avc";
+static const char* kMimeTypeApplicationOctetstream = "application/octet-stream";
+static const char* kWinscopeMagicString = "#VV1NSC0PET1ME!#";
 
 // Command-line parameters.
 static bool gVerbose = false;           // chatty on stdout
@@ -113,7 +119,7 @@ static uint32_t gVideoHeight = 0;
 static uint32_t gBitRate = 20000000;     // 20Mbps
 static uint32_t gTimeLimitSec = kMaxTimeLimitSec;
 static uint32_t gBframes = 0;
-
+static PhysicalDisplayId gPhysicalDisplayId;
 // Set by signal handler to stop recording.
 static volatile bool gStopRequested = false;
 
@@ -266,14 +272,15 @@ static status_t prepareEncoder(float displayFps, sp<MediaCodec>* pCodec,
 static status_t setDisplayProjection(
         SurfaceComposerClient::Transaction& t,
         const sp<IBinder>& dpy,
-        const DisplayInfo& mainDpyInfo) {
+        const ui::DisplayState& displayState) {
+    const ui::Size& viewport = displayState.viewport;
 
     // Set the region of the layer stack we're interested in, which in our
     // case is "all of it".
-    Rect layerStackRect(mainDpyInfo.viewportW, mainDpyInfo.viewportH);
+    Rect layerStackRect(viewport);
 
     // We need to preserve the aspect ratio of the display.
-    float displayAspect = (float) mainDpyInfo.viewportH / (float) mainDpyInfo.viewportW;
+    float displayAspect = viewport.getHeight() / static_cast<float>(viewport.getWidth());
 
 
     // Set the way we map the output onto the display surface (which will
@@ -323,7 +330,7 @@ static status_t setDisplayProjection(
     }
 
     t.setDisplayProjection(dpy,
-            gRotate ? DISPLAY_ORIENTATION_90 : DISPLAY_ORIENTATION_0,
+            gRotate ? ui::ROTATION_90 : ui::ROTATION_0,
             layerStackRect, displayRect);
     return NO_ERROR;
 }
@@ -332,21 +339,71 @@ static status_t setDisplayProjection(
  * Configures the virtual display.  When this completes, virtual display
  * frames will start arriving from the buffer producer.
  */
-static status_t prepareVirtualDisplay(const DisplayInfo& mainDpyInfo,
+static status_t prepareVirtualDisplay(
+        const ui::DisplayState& displayState,
         const sp<IGraphicBufferProducer>& bufferProducer,
         sp<IBinder>* pDisplayHandle) {
     sp<IBinder> dpy = SurfaceComposerClient::createDisplay(
             String8("ScreenRecorder"), false /*secure*/);
-
     SurfaceComposerClient::Transaction t;
     t.setDisplaySurface(dpy, bufferProducer);
-    setDisplayProjection(t, dpy, mainDpyInfo);
-    t.setDisplayLayerStack(dpy, 0);    // default stack
+    setDisplayProjection(t, dpy, displayState);
+    t.setDisplayLayerStack(dpy, displayState.layerStack);
     t.apply();
 
     *pDisplayHandle = dpy;
 
     return NO_ERROR;
+}
+
+/*
+ * Writes an unsigned integer byte-by-byte in little endian order regardless
+ * of the platform endianness.
+ */
+template <typename UINT>
+static void writeValueLE(UINT value, uint8_t* buffer) {
+    for (int i = 0; i < sizeof(UINT); ++i) {
+        buffer[i] = static_cast<uint8_t>(value);
+        value >>= 8;
+    }
+}
+
+/*
+ * Saves frames presentation time relative to the elapsed realtime clock in microseconds
+ * preceded by a Winscope magic string and frame count to a metadata track.
+ * This metadata is used by the Winscope tool to sync video with SurfaceFlinger
+ * and WindowManager traces.
+ *
+ * The metadata is written as a binary array as follows:
+ * - winscope magic string (kWinscopeMagicString constant), without trailing null char,
+ * - the number of recorded frames (as little endian uint32),
+ * - for every frame its presentation time relative to the elapsed realtime clock in microseconds
+ *   (as little endian uint64).
+ */
+static status_t writeWinscopeMetadata(const Vector<int64_t>& timestamps,
+        const ssize_t metaTrackIdx, AMediaMuxer *muxer) {
+    ALOGV("Writing metadata");
+    int64_t systemTimeToElapsedTimeOffsetMicros = (android::elapsedRealtimeNano()
+        - systemTime(SYSTEM_TIME_MONOTONIC)) / 1000;
+    sp<ABuffer> buffer = new ABuffer(timestamps.size() * sizeof(int64_t)
+        + sizeof(uint32_t) + strlen(kWinscopeMagicString));
+    uint8_t* pos = buffer->data();
+    strcpy(reinterpret_cast<char*>(pos), kWinscopeMagicString);
+    pos += strlen(kWinscopeMagicString);
+    writeValueLE<uint32_t>(timestamps.size(), pos);
+    pos += sizeof(uint32_t);
+    for (size_t idx = 0; idx < timestamps.size(); ++idx) {
+        writeValueLE<uint64_t>(static_cast<uint64_t>(timestamps[idx]
+            + systemTimeToElapsedTimeOffsetMicros), pos);
+        pos += sizeof(uint64_t);
+    }
+    AMediaCodecBufferInfo bufferInfo = {
+        0,
+        static_cast<int32_t>(buffer->size()),
+        timestamps[0],
+        0
+    };
+    return AMediaMuxer_writeSampleData(muxer, metaTrackIdx, buffer->data(), &bufferInfo);
 }
 
 /*
@@ -359,15 +416,16 @@ static status_t prepareVirtualDisplay(const DisplayInfo& mainDpyInfo,
  * The muxer must *not* have been started before calling.
  */
 static status_t runEncoder(const sp<MediaCodec>& encoder,
-        const sp<MediaMuxer>& muxer, FILE* rawFp, const sp<IBinder>& mainDpy,
-        const sp<IBinder>& virtualDpy, uint8_t orientation) {
+        AMediaMuxer *muxer, FILE* rawFp, const sp<IBinder>& display,
+        const sp<IBinder>& virtualDpy, ui::Rotation orientation) {
     static int kTimeout = 250000;   // be responsive on signal
     status_t err;
     ssize_t trackIdx = -1;
+    ssize_t metaTrackIdx = -1;
     uint32_t debugNumFrames = 0;
     int64_t startWhenNsec = systemTime(CLOCK_MONOTONIC);
     int64_t endWhenNsec = startWhenNsec + seconds_to_nanoseconds(gTimeLimitSec);
-    DisplayInfo mainDpyInfo;
+    Vector<int64_t> timestamps;
     bool firstFrame = true;
 
     assert((rawFp == NULL && muxer != NULL) || (rawFp != NULL && muxer == NULL));
@@ -423,16 +481,16 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     //
                     // Polling for changes is inefficient and wrong, but the
                     // useful stuff is hard to get at without a Dalvik VM.
-                    err = SurfaceComposerClient::getDisplayInfo(mainDpy,
-                            &mainDpyInfo);
+                    ui::DisplayState displayState;
+                    err = SurfaceComposerClient::getDisplayState(display, &displayState);
                     if (err != NO_ERROR) {
-                        ALOGW("getDisplayInfo(main) failed: %d", err);
-                    } else if (orientation != mainDpyInfo.orientation) {
-                        ALOGD("orientation changed, now %d", mainDpyInfo.orientation);
+                        ALOGW("getDisplayState() failed: %d", err);
+                    } else if (orientation != displayState.orientation) {
+                        ALOGD("orientation changed, now %s", toCString(displayState.orientation));
                         SurfaceComposerClient::Transaction t;
-                        setDisplayProjection(t, virtualDpy, mainDpyInfo);
+                        setDisplayProjection(t, virtualDpy, displayState);
                         t.apply();
-                        orientation = mainDpyInfo.orientation;
+                        orientation = displayState.orientation;
                     }
                 }
 
@@ -464,12 +522,20 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                     // TODO
                     sp<ABuffer> buffer = new ABuffer(
                             buffers[bufIndex]->data(), buffers[bufIndex]->size());
-                    err = muxer->writeSampleData(buffer, trackIdx,
-                            ptsUsec, flags);
+                    AMediaCodecBufferInfo bufferInfo = {
+                        0,
+                        static_cast<int32_t>(buffer->size()),
+                        ptsUsec,
+                        flags
+                    };
+                    err = AMediaMuxer_writeSampleData(muxer, trackIdx, buffer->data(), &bufferInfo);
                     if (err != NO_ERROR) {
                         fprintf(stderr,
                             "Failed writing data to muxer (err=%d)\n", err);
                         return err;
+                    }
+                    if (gOutputFormat == FORMAT_MP4) {
+                        timestamps.add(ptsUsec);
                     }
                 }
                 debugNumFrames++;
@@ -495,10 +561,18 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 ALOGV("Encoder format changed");
                 sp<AMessage> newFormat;
                 encoder->getOutputFormat(&newFormat);
+                // TODO remove when MediaCodec has been replaced with AMediaCodec
+                AMediaFormat *ndkFormat = AMediaFormat_fromMsg(&newFormat);
                 if (muxer != NULL) {
-                    trackIdx = muxer->addTrack(newFormat);
+                    trackIdx = AMediaMuxer_addTrack(muxer, ndkFormat);
+                    if (gOutputFormat == FORMAT_MP4) {
+                        AMediaFormat *metaFormat = AMediaFormat_new();
+                        AMediaFormat_setString(metaFormat, AMEDIAFORMAT_KEY_MIME, kMimeTypeApplicationOctetstream);
+                        metaTrackIdx = AMediaMuxer_addTrack(muxer, metaFormat);
+                        AMediaFormat_delete(metaFormat);
+                    }
                     ALOGV("Starting muxer");
-                    err = muxer->start();
+                    err = AMediaMuxer_start(muxer);
                     if (err != NO_ERROR) {
                         fprintf(stderr, "Unable to start muxer (err=%d)\n", err);
                         return err;
@@ -532,6 +606,13 @@ static status_t runEncoder(const sp<MediaCodec>& encoder,
                 debugNumFrames, nanoseconds_to_seconds(
                         systemTime(CLOCK_MONOTONIC) - startWhenNsec));
         fflush(stdout);
+    }
+    if (metaTrackIdx >= 0 && !timestamps.isEmpty()) {
+        err = writeWinscopeMetadata(timestamps, metaTrackIdx, muxer);
+        if (err != NO_ERROR) {
+            fprintf(stderr, "Failed writing metadata to muxer (err=%d)\n", err);
+            return err;
+        }
     }
     return NO_ERROR;
 }
@@ -597,32 +678,41 @@ static status_t recordScreen(const char* fileName) {
     self->startThreadPool();
 
     // Get main display parameters.
-    const sp<IBinder> mainDpy = SurfaceComposerClient::getInternalDisplayToken();
-    if (mainDpy == nullptr) {
+    sp<IBinder> display = SurfaceComposerClient::getPhysicalDisplayToken(
+            gPhysicalDisplayId);
+    if (display == nullptr) {
         fprintf(stderr, "ERROR: no display\n");
         return NAME_NOT_FOUND;
     }
 
-    DisplayInfo mainDpyInfo;
-    err = SurfaceComposerClient::getDisplayInfo(mainDpy, &mainDpyInfo);
+    ui::DisplayState displayState;
+    err = SurfaceComposerClient::getDisplayState(display, &displayState);
     if (err != NO_ERROR) {
-        fprintf(stderr, "ERROR: unable to get display characteristics\n");
+        fprintf(stderr, "ERROR: unable to get display state\n");
         return err;
     }
 
+    DisplayConfig displayConfig;
+    err = SurfaceComposerClient::getActiveDisplayConfig(display, &displayConfig);
+    if (err != NO_ERROR) {
+        fprintf(stderr, "ERROR: unable to get display config\n");
+        return err;
+    }
+
+    const ui::Size& viewport = displayState.viewport;
     if (gVerbose) {
-        printf("Main display is %dx%d @%.2ffps (orientation=%u)\n",
-                mainDpyInfo.viewportW, mainDpyInfo.viewportH, mainDpyInfo.fps,
-                mainDpyInfo.orientation);
+        printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
+                viewport.getWidth(), viewport.getHeight(), displayConfig.refreshRate,
+                toCString(displayState.orientation), displayState.layerStack);
         fflush(stdout);
     }
 
     // Encoder can't take odd number as config
     if (gVideoWidth == 0) {
-        gVideoWidth = floorToEven(mainDpyInfo.viewportW);
+        gVideoWidth = floorToEven(viewport.getWidth());
     }
     if (gVideoHeight == 0) {
-        gVideoHeight = floorToEven(mainDpyInfo.viewportH);
+        gVideoHeight = floorToEven(viewport.getHeight());
     }
 
     // Configure and start the encoder.
@@ -630,7 +720,7 @@ static status_t recordScreen(const char* fileName) {
     sp<FrameOutput> frameOutput;
     sp<IGraphicBufferProducer> encoderInputSurface;
     if (gOutputFormat != FORMAT_FRAMES && gOutputFormat != FORMAT_RAW_FRAMES) {
-        err = prepareEncoder(mainDpyInfo.fps, &encoder, &encoderInputSurface);
+        err = prepareEncoder(displayConfig.refreshRate, &encoder, &encoderInputSurface);
 
         if (err != NO_ERROR && !gSizeSpecified) {
             // fallback is defined for landscape; swap if we're in portrait
@@ -643,8 +733,7 @@ static status_t recordScreen(const char* fileName) {
                         gVideoWidth, gVideoHeight, newWidth, newHeight);
                 gVideoWidth = newWidth;
                 gVideoHeight = newHeight;
-                err = prepareEncoder(mainDpyInfo.fps, &encoder,
-                        &encoderInputSurface);
+                err = prepareEncoder(displayConfig.refreshRate, &encoder, &encoderInputSurface);
             }
         }
         if (err != NO_ERROR) return err;
@@ -691,13 +780,13 @@ static status_t recordScreen(const char* fileName) {
 
     // Configure virtual display.
     sp<IBinder> dpy;
-    err = prepareVirtualDisplay(mainDpyInfo, bufferProducer, &dpy);
+    err = prepareVirtualDisplay(displayState, bufferProducer, &dpy);
     if (err != NO_ERROR) {
         if (encoder != NULL) encoder->release();
         return err;
     }
 
-    sp<MediaMuxer> muxer = NULL;
+    AMediaMuxer *muxer = nullptr;
     FILE* rawFp = NULL;
     switch (gOutputFormat) {
         case FORMAT_MP4:
@@ -716,15 +805,15 @@ static status_t recordScreen(const char* fileName) {
                 abort();
             }
             if (gOutputFormat == FORMAT_MP4) {
-                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_MPEG_4);
+                muxer = AMediaMuxer_new(fd, AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4);
             } else if (gOutputFormat == FORMAT_WEBM) {
-                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_WEBM);
+                muxer = AMediaMuxer_new(fd, AMEDIAMUXER_OUTPUT_FORMAT_WEBM);
             } else {
-                muxer = new MediaMuxer(fd, MediaMuxer::OUTPUT_FORMAT_THREE_GPP);
+                muxer = AMediaMuxer_new(fd, AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP);
             }
             close(fd);
             if (gRotate) {
-                muxer->setOrientationHint(90);  // TODO: does this do anything?
+                AMediaMuxer_setOrientationHint(muxer, 90); // TODO: does this do anything?
             }
             break;
         }
@@ -774,8 +863,7 @@ static status_t recordScreen(const char* fileName) {
         }
     } else {
         // Main encoder loop.
-        err = runEncoder(encoder, muxer, rawFp, mainDpy, dpy,
-                mainDpyInfo.orientation);
+        err = runEncoder(encoder, muxer, rawFp, display, dpy, displayState.orientation);
         if (err != NO_ERROR) {
             fprintf(stderr, "Encoder failed (err=%d)\n", err);
             // fall through to cleanup
@@ -795,7 +883,7 @@ static status_t recordScreen(const char* fileName) {
     if (muxer != NULL) {
         // If we don't stop muxer explicitly, i.e. let the destructor run,
         // it may hang (b/11050628).
-        err = muxer->stop();
+        err = AMediaMuxer_stop(muxer);
     } else if (rawFp != stdout) {
         fclose(rawFp);
     }
@@ -941,6 +1029,9 @@ static void usage() {
         "    in videos captured to illustrate bugs.\n"
         "--time-limit TIME\n"
         "    Set the maximum recording time, in seconds.  Default / maximum is %d.\n"
+        "--display-id ID\n"
+        "    specify the physical display ID to record. Default is the primary display.\n"
+        "    see \"dumpsys SurfaceFlinger --display-id\" for valid display IDs.\n"
         "--verbose\n"
         "    Display interesting information on stdout.\n"
         "--help\n"
@@ -972,8 +1063,17 @@ int main(int argc, char* const argv[]) {
         { "monotonic-time",     no_argument,        NULL, 'm' },
         { "persistent-surface", no_argument,        NULL, 'p' },
         { "bframes",            required_argument,  NULL, 'B' },
+        { "display-id",         required_argument,  NULL, 'd' },
         { NULL,                 0,                  NULL, 0 }
     };
+
+    std::optional<PhysicalDisplayId> displayId = SurfaceComposerClient::getInternalDisplayId();
+    if (!displayId) {
+        fprintf(stderr, "Failed to get token for internal display\n");
+        return 1;
+    }
+
+    gPhysicalDisplayId = *displayId;
 
     while (true) {
         int optionIndex = 0;
@@ -1066,6 +1166,18 @@ int main(int argc, char* const argv[]) {
             break;
         case 'B':
             if (parseValueWithUnit(optarg, &gBframes) != NO_ERROR) {
+                return 2;
+            }
+            break;
+        case 'd':
+            gPhysicalDisplayId = atoll(optarg);
+            if (gPhysicalDisplayId == 0) {
+                fprintf(stderr, "Please specify a valid physical display id\n");
+                return 2;
+            } else if (SurfaceComposerClient::
+                    getPhysicalDisplayToken(gPhysicalDisplayId) == nullptr) {
+                fprintf(stderr, "Invalid physical display id: %"
+                        ANDROID_PHYSICAL_DISPLAY_ID_FORMAT "\n", gPhysicalDisplayId);
                 return 2;
             }
             break;

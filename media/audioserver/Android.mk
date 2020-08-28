@@ -19,9 +19,12 @@ LOCAL_SHARED_LIBRARIES := \
 	libmediautils \
 	libnbaio \
 	libnblog \
-	libsoundtriggerservice \
 	libutils \
 	libvibrator
+
+LOCAL_HEADER_LIBRARIES := \
+	libaudiohal_headers \
+	libmediametrics_headers \
 
 # TODO oboeservice is the old folder name for aaudioservice. It will be changed.
 LOCAL_C_INCLUDES := \
@@ -33,11 +36,10 @@ LOCAL_C_INCLUDES := \
 	frameworks/av/services/audiopolicy/service \
 	frameworks/av/services/medialog \
 	frameworks/av/services/oboeservice \
-	frameworks/av/services/soundtrigger \
 	frameworks/av/media/libaaudio/include \
 	frameworks/av/media/libaaudio/src \
 	frameworks/av/media/libaaudio/src/binding \
-	frameworks/av/media/libmedia \
+	frameworks/av/media/libmedia/include \
 	external/sonic \
 
 LOCAL_MODULE := audioserver

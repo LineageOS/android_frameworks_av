@@ -17,11 +17,15 @@
 #ifndef CLEARKEY_UUID_H_
 #define CLEARKEY_UUID_H_
 
-#include <stdint.h>
+#include <array>
+#include <cstdint>
+#include <vector>
 
 namespace clearkeydrm {
 
 bool isClearKeyUUID(const uint8_t uuid[16]);
+
+std::vector<std::array<uint8_t, 16>> getSupportedCryptoSchemes();
 
 } // namespace clearkeydrm
 

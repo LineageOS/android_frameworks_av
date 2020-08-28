@@ -91,6 +91,8 @@ bool HeicEncoderInfoManager::isSizeSupported(int32_t width, int32_t height, bool
             // The "measured-frame-rate-WIDTHxHEIGHT-range" key is optional.
             // Hardcode to some default value (3.33ms * tile count) based on resolution.
             *stall = 3333333LL * width * height / (kGridWidth * kGridHeight);
+            *useHeic = chooseHeic;
+            *useGrid = enableGrid;
             return true;
         }
 
@@ -275,9 +277,13 @@ bool HeicEncoderInfoManager::getHevcCodecDetails(
             ALOGE("%s: Failed to get codec info for %s", __FUNCTION__, mime);
             break;
         }
+        ALOGV("%s: [%s] codec found", __FUNCTION__,
+                info->getCodecName());
 
         // Filter out software ones as they may be too slow
         if (!(info->getAttributes() & MediaCodecInfo::kFlagIsHardwareAccelerated)) {
+            ALOGV("%s: [%s] Filter out software ones as they may be too slow", __FUNCTION__,
+                    info->getCodecName());
             continue;
         }
 

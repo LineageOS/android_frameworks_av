@@ -50,6 +50,8 @@ class TagMonitor {
 
     TagMonitor();
 
+    TagMonitor(const TagMonitor& other);
+
     void initialize(metadata_vendor_id_t id) { mVendorTagId = id; }
 
     // Parse tag name list (comma-separated) and if valid, enable monitoring

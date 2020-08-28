@@ -984,8 +984,9 @@ AudioPlaybackRate AudioTrackServerProxy::getPlaybackRate()
 // ---------------------------------------------------------------------------
 
 StaticAudioTrackServerProxy::StaticAudioTrackServerProxy(audio_track_cblk_t* cblk, void *buffers,
-        size_t frameCount, size_t frameSize)
-    : AudioTrackServerProxy(cblk, buffers, frameCount, frameSize),
+        size_t frameCount, size_t frameSize, uint32_t sampleRate)
+    : AudioTrackServerProxy(cblk, buffers, frameCount, frameSize, false /*clientInServer*/,
+                            sampleRate),
       mObserver(&cblk->u.mStatic.mSingleStateQueue),
       mPosLoopMutator(&cblk->u.mStatic.mPosLoopQueue),
       mFramesReadySafe(frameCount), mFramesReady(frameCount),

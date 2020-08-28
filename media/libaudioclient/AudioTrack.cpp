@@ -35,7 +35,7 @@
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
 #define WAIT_PERIOD_MS                  10
@@ -73,7 +73,7 @@ static int64_t convertTimespecToUs(const struct timespec &tv)
 static inline struct timespec convertNsToTimespec(int64_t ns) {
     struct timespec tv;
     tv.tv_sec = static_cast<time_t>(ns / NANOS_PER_SECOND);
-    tv.tv_nsec = static_cast<long>(ns % NANOS_PER_SECOND);
+    tv.tv_nsec = static_cast<int64_t>(ns % NANOS_PER_SECOND);
     return tv;
 }
 
@@ -183,26 +183,26 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
 #define MM_PREFIX "android.media.audiotrack." // avoid cut-n-paste errors.
 
     // Java API 28 entries, do not change.
-    mAnalyticsItem->setCString(MM_PREFIX "streamtype", toString(track->streamType()).c_str());
-    mAnalyticsItem->setCString(MM_PREFIX "type",
+    mMetricsItem->setCString(MM_PREFIX "streamtype", toString(track->streamType()).c_str());
+    mMetricsItem->setCString(MM_PREFIX "type",
             toString(track->mAttributes.content_type).c_str());
-    mAnalyticsItem->setCString(MM_PREFIX "usage", toString(track->mAttributes.usage).c_str());
+    mMetricsItem->setCString(MM_PREFIX "usage", toString(track->mAttributes.usage).c_str());
 
     // Non-API entries, these can change due to a Java string mistake.
-    mAnalyticsItem->setInt32(MM_PREFIX "sampleRate", (int32_t)track->mSampleRate);
-    mAnalyticsItem->setInt64(MM_PREFIX "channelMask", (int64_t)track->mChannelMask);
+    mMetricsItem->setInt32(MM_PREFIX "sampleRate", (int32_t)track->mSampleRate);
+    mMetricsItem->setInt64(MM_PREFIX "channelMask", (int64_t)track->mChannelMask);
     // Non-API entries, these can change.
-    mAnalyticsItem->setInt32(MM_PREFIX "portId", (int32_t)track->mPortId);
-    mAnalyticsItem->setCString(MM_PREFIX "encoding", toString(track->mFormat).c_str());
-    mAnalyticsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
-    mAnalyticsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
+    mMetricsItem->setInt32(MM_PREFIX "portId", (int32_t)track->mPortId);
+    mMetricsItem->setCString(MM_PREFIX "encoding", toString(track->mFormat).c_str());
+    mMetricsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
+    mMetricsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
 }
 
 // hand the user a snapshot of the metrics.
-status_t AudioTrack::getMetrics(MediaAnalyticsItem * &item)
+status_t AudioTrack::getMetrics(mediametrics::Item * &item)
 {
     mMediaMetrics.gather(this);
-    MediaAnalyticsItem *tmp = mMediaMetrics.dup();
+    mediametrics::Item *tmp = mMediaMetrics.dup();
     if (tmp == nullptr) {
         return BAD_VALUE;
     }
@@ -217,7 +217,8 @@ AudioTrack::AudioTrack()
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
     mAttributes.usage = AUDIO_USAGE_UNKNOWN;
@@ -248,7 +249,8 @@ AudioTrack::AudioTrack(
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
-      mPausedPosition(0)
+      mPausedPosition(0),
+      mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
 
@@ -281,7 +283,8 @@ AudioTrack::AudioTrack(
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
       mPreviousSchedulingGroup(SP_DEFAULT),
       mPausedPosition(0),
-      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE)
+      mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
+      mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
 
@@ -295,6 +298,16 @@ AudioTrack::~AudioTrack()
 {
     // pull together the numbers, before we clean up our structures
     mMediaMetrics.gather(this);
+
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
+        .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                mCallerName.empty()
+                ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                : mCallerName.c_str())
+        .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
+        .record();
 
     if (mStatus == NO_ERROR) {
         // Make sure that callback function exits in the case where
@@ -406,7 +419,7 @@ status_t AudioTrack::set(
     mDoNotReconnect = doNotReconnect;
 
     ALOGV_IF(sharedBuffer != 0, "%s(): sharedBuffer: %p, size: %zu",
-            __func__, sharedBuffer->pointer(), sharedBuffer->size());
+            __func__, sharedBuffer->unsecurePointer(), sharedBuffer->size());
 
     ALOGV("%s(): streamType %d frameCount %zu flags %04x",
             __func__, streamType, frameCount, flags);
@@ -599,7 +612,7 @@ status_t AudioTrack::set(
     mReleased = 0;
     mStartNs = 0;
     mStartFromZeroUs = 0;
-    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid);
+    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid, mClientUid);
     mSequence = 1;
     mObservedSequence = mSequence;
     mInUnderrun = false;
@@ -627,11 +640,29 @@ exit:
 status_t AudioTrack::start()
 {
     AutoMutex lock(mLock);
-    ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
 
     if (mState == STATE_ACTIVE) {
         return INVALID_OPERATION;
     }
+
+    ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
+
+    // Defer logging here due to OpenSL ES repeated start calls.
+    // TODO(b/154868033) after fix, restore this logging back to the beginning of start().
+    const int64_t beginNs = systemTime();
+    status_t status = NO_ERROR; // logged: make sure to set this before returning.
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                    mCallerName.empty()
+                    ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                    : mCallerName.c_str())
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
+            .record(); });
+
 
     mInUnderrun = true;
 
@@ -703,7 +734,6 @@ status_t AudioTrack::start()
     mNewPosition = mPosition + mUpdatePeriod;
     int32_t flags = android_atomic_and(~(CBLK_STREAM_END_DONE | CBLK_DISABLED), &mCblk->mFlags);
 
-    status_t status = NO_ERROR;
     if (!(flags & CBLK_INVALID)) {
         status = mAudioTrack->start();
         if (status == DEAD_OBJECT) {
@@ -749,7 +779,19 @@ status_t AudioTrack::start()
 
 void AudioTrack::stop()
 {
+    const int64_t beginNs = systemTime();
+
     AutoMutex lock(mLock);
+    mediametrics::Defer defer([&]() {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t)mProxy->getBufferSizeInFrames())
+            .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t) getUnderrunCount_l())
+            .record();
+    });
+
     ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
 
     if (mState != STATE_ACTIVE && mState != STATE_PAUSED) {
@@ -801,7 +843,15 @@ bool AudioTrack::stopped() const
 
 void AudioTrack::flush()
 {
+    const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
+    mediametrics::Defer defer([&]() {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_FLUSH)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .record(); });
+
     ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
 
     if (mSharedBuffer != 0) {
@@ -834,7 +884,15 @@ void AudioTrack::flush_l()
 
 void AudioTrack::pause()
 {
+    const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
+    mediametrics::Defer defer([&]() {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_PAUSE)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .record(); });
+
     ALOGV("%s(%d): prior state:%s", __func__, mPortId, stateToString(mState));
 
     if (mState == STATE_ACTIVE) {
@@ -875,6 +933,12 @@ status_t AudioTrack::setVolume(float left, float right)
             isnanf(right) || right < GAIN_FLOAT_ZERO || right > GAIN_FLOAT_UNITY) {
         return BAD_VALUE;
     }
+
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME)
+        .set(AMEDIAMETRICS_PROP_VOLUME_LEFT, (double)left)
+        .set(AMEDIAMETRICS_PROP_VOLUME_RIGHT, (double)right)
+        .record();
 
     AutoMutex lock(mLock);
     mVolume[AUDIO_INTERLEAVE_LEFT] = left;
@@ -1027,6 +1091,20 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
     //set effective rates
     mProxy->setPlaybackRate(playbackRateTemp);
     mProxy->setSampleRate(effectiveRate); // FIXME: not quite "atomic" with setPlaybackRate
+
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYBACKPARAM)
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+        .set(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)mPlaybackRate.mSpeed)
+        .set(AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)mPlaybackRate.mPitch)
+        .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)effectiveRate)
+        .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)playbackRateTemp.mSpeed)
+        .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)playbackRateTemp.mPitch)
+        .record();
+
     return NO_ERROR;
 }
 
@@ -1042,6 +1120,7 @@ ssize_t AudioTrack::getBufferSizeInFrames()
     if (mOutput == AUDIO_IO_HANDLE_NONE || mProxy.get() == 0) {
         return NO_INIT;
     }
+
     return (ssize_t) mProxy->getBufferSizeInFrames();
 }
 
@@ -1073,7 +1152,17 @@ ssize_t AudioTrack::setBufferSizeInFrames(size_t bufferSizeInFrames)
     if (!audio_is_linear_pcm(mFormat)) {
         return INVALID_OPERATION;
     }
-    return (ssize_t) mProxy->setBufferSizeInFrames((uint32_t) bufferSizeInFrames);
+
+    ssize_t originalBufferSize = mProxy->getBufferSizeInFrames();
+    ssize_t finalBufferSize  = mProxy->setBufferSizeInFrames((uint32_t) bufferSizeInFrames);
+    if (originalBufferSize != finalBufferSize) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETBUFFERSIZE)
+                .set(AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, (int32_t)mProxy->getBufferSizeInFrames())
+                .set(AMEDIAMETRICS_PROP_UNDERRUN, (int32_t)getUnderrunCount_l())
+                .record();
+    }
+    return finalBufferSize;
 }
 
 status_t AudioTrack::setLoop(uint32_t loopStart, uint32_t loopEnd, int loopCount)
@@ -1465,6 +1554,7 @@ status_t AudioTrack::createTrack_l()
     input.notificationFrameCount = mNotificationFramesReq;
     input.selectedDeviceId = mSelectedDeviceId;
     input.sessionId = mSessionId;
+    input.audioTrackCallback = mAudioTrackCallback;
 
     IAudioFlinger::CreateTrackOutput output;
 
@@ -1508,7 +1598,11 @@ status_t AudioTrack::createTrack_l()
         status = NO_INIT;
         goto exit;
     }
-    void *iMemPointer = iMem->pointer();
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    void *iMemPointer = iMem->unsecurePointer();
     if (iMemPointer == NULL) {
         ALOGE("%s(%d): Could not get control block pointer", __func__, mPortId);
         status = NO_INIT;
@@ -1535,7 +1629,7 @@ status_t AudioTrack::createTrack_l()
                 mAwaitBoost = true;
             }
         } else {
-            ALOGW("%s(%d): AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu",
+            ALOGD("%s(%d): AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu",
                   __func__, mPortId, mReqFrameCount, mFrameCount);
         }
     }
@@ -1563,7 +1657,11 @@ status_t AudioTrack::createTrack_l()
     if (mSharedBuffer == 0) {
         buffers = cblk + 1;
     } else {
-        buffers = mSharedBuffer->pointer();
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        buffers = mSharedBuffer->unsecurePointer();
         if (buffers == NULL) {
             ALOGE("%s(%d): Could not get buffer pointer", __func__, mPortId);
             status = NO_INIT;
@@ -1610,6 +1708,48 @@ status_t AudioTrack::createTrack_l()
     mDeathNotifier = new DeathNotifier(this);
     IInterface::asBinder(mAudioTrack)->linkToDeath(mDeathNotifier, this);
 
+    // This is the first log sent from the AudioTrack client.
+    // The creation of the audio track by AudioFlinger (in the code above)
+    // is the first log of the AudioTrack and must be present before
+    // any AudioTrack client logs will be accepted.
+
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK) + std::to_string(mPortId);
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
+        // the following are immutable
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(mFlags).c_str())
+        .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
+        .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
+        .set(AMEDIAMETRICS_PROP_TRACKID, mPortId) // dup from key
+        .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(mAttributes.content_type).c_str())
+        .set(AMEDIAMETRICS_PROP_USAGE, toString(mAttributes.usage).c_str())
+        .set(AMEDIAMETRICS_PROP_THREADID, (int32_t)output.outputId)
+        .set(AMEDIAMETRICS_PROP_SELECTEDDEVICEID, (int32_t)mSelectedDeviceId)
+        .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEID, (int32_t)mRoutedDeviceId)
+        .set(AMEDIAMETRICS_PROP_ENCODING, toString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
+        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
+        // the following are NOT immutable
+        .set(AMEDIAMETRICS_PROP_VOLUME_LEFT, (double)mVolume[AUDIO_INTERLEAVE_LEFT])
+        .set(AMEDIAMETRICS_PROP_VOLUME_RIGHT, (double)mVolume[AUDIO_INTERLEAVE_RIGHT])
+        .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+        .set(AMEDIAMETRICS_PROP_AUXEFFECTID, (int32_t)mAuxEffectId)
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+        .set(AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)mPlaybackRate.mSpeed)
+        .set(AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)mPlaybackRate.mPitch)
+        .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)effectiveSampleRate)
+        .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                AMEDIAMETRICS_PROP_PLAYBACK_SPEED, (double)effectiveSpeed)
+        .set(AMEDIAMETRICS_PROP_PREFIX_EFFECTIVE
+                AMEDIAMETRICS_PROP_PLAYBACK_PITCH, (double)effectivePitch)
+        .record();
+
+    // mSendLevel
+    // mReqFrameCount?
+    // mNotificationFramesAct, mNotificationFramesReq, mNotificationsPerBufferReq
+    // mLatency, mAfLatency, mAfFrameCount, mAfSampleRate
+
     }
 
 exit:
@@ -1651,7 +1791,7 @@ status_t AudioTrack::obtainBuffer(Buffer* audioBuffer, int32_t waitCount, size_t
     } else if (waitCount > 0) {
         time_t ms = WAIT_PERIOD_MS * (time_t) waitCount;
         timeout.tv_sec = ms / 1000;
-        timeout.tv_nsec = (long) (ms % 1000) * 1000000;
+        timeout.tv_nsec = (ms % 1000) * 1000000;
         requested = &timeout;
     } else {
         ALOGE("%s(%d): invalid waitCount %d", __func__, mPortId, waitCount);
@@ -2292,6 +2432,17 @@ nsecs_t AudioTrack::processAudioBuffer()
 
 status_t AudioTrack::restoreTrack_l(const char *from)
 {
+    status_t result = NO_ERROR;  // logged: make sure to set this before returning.
+    const int64_t beginNs = systemTime();
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mState))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
+            .set(AMEDIAMETRICS_PROP_WHERE, from)
+            .record(); });
+
     ALOGW("%s(%d): dead IAudioTrack, %s, creating a new one from %s()",
             __func__, mPortId, isOffloadedOrDirect_l() ? "Offloaded or Direct" : "PCM", from);
     ++mSequence;
@@ -2303,7 +2454,8 @@ status_t AudioTrack::restoreTrack_l(const char *from)
     if (isOffloadedOrDirect_l() || mDoNotReconnect) {
         // FIXME re-creation of offloaded and direct tracks is not yet implemented;
         // reconsider enabling for linear PCM encodings when position can be preserved.
-        return DEAD_OBJECT;
+        result = DEAD_OBJECT;
+        return result;
     }
 
     // Save so we can return count since creation.
@@ -2334,7 +2486,7 @@ retry:
     // following member variables: mAudioTrack, mCblkMemory and mCblk.
     // It will also delete the strong references on previous IAudioTrack and IMemory.
     // If a new IAudioTrack cannot be created, the previous (dead) instance will be left intact.
-    status_t result = createTrack_l();
+    result = createTrack_l();
 
     if (result == NO_ERROR) {
         // take the frames that will be lost by track recreation into account in saved position
@@ -3250,6 +3402,25 @@ void AudioTrack::AudioTrackThread::pauseInternal(nsecs_t ns)
     AutoMutex _l(mMyLock);
     mPausedInt = true;
     mPausedNs = ns;
+}
+
+binder::Status AudioTrack::AudioTrackCallback::onCodecFormatChanged(
+        const std::vector<uint8_t>& audioMetadata)
+{
+    AutoMutex _l(mAudioTrackCbLock);
+    sp<media::IAudioTrackCallback> callback = mCallback.promote();
+    if (callback.get() != nullptr) {
+        callback->onCodecFormatChanged(audioMetadata);
+    } else {
+        mCallback.clear();
+    }
+    return binder::Status::ok();
+}
+
+void AudioTrack::AudioTrackCallback::setAudioTrackCallback(
+        const sp<media::IAudioTrackCallback> &callback) {
+    AutoMutex lock(mAudioTrackCbLock);
+    mCallback = callback;
 }
 
 } // namespace android

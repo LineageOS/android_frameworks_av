@@ -59,7 +59,8 @@ public:
                                audio_port_handle_t clientHandle) override;
 
     aaudio_result_t startClient(const android::AudioClient& client,
-                                        audio_port_handle_t *clientHandle)  override;
+                                const audio_attributes_t *attr,
+                                audio_port_handle_t *clientHandle)  override;
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle)  override;
 
@@ -67,13 +68,15 @@ public:
 
     aaudio_result_t getTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 
+    void handleTearDownAsync(audio_port_handle_t portHandle);
+
     // -------------- Callback functions for MmapStreamCallback ---------------------
-    void onTearDown(audio_port_handle_t handle) override;
+    void onTearDown(audio_port_handle_t portHandle) override;
 
     void onVolumeChanged(audio_channel_mask_t channels,
                          android::Vector<float> values) override;
 
-    void onRoutingChanged(audio_port_handle_t deviceId) override;
+    void onRoutingChanged(audio_port_handle_t portHandle) override;
     // ------------------------------------------------------------------------------
 
     aaudio_result_t getDownDataDescription(AudioEndpointParcelable &parcelable);

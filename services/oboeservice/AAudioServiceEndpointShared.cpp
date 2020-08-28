@@ -85,7 +85,7 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
 }
 
 aaudio_result_t AAudioServiceEndpointShared::close() {
-    return getStreamInternal()->close();
+    return getStreamInternal()->releaseCloseFinal();
 }
 
 // Glue between C and C++ callbacks.
@@ -152,7 +152,9 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
     }
 
     if (result == AAUDIO_OK) {
-        result = getStreamInternal()->startClient(sharedStream->getAudioClient(), clientHandle);
+        const audio_attributes_t attr = getAudioAttributesFrom(sharedStream.get());
+        result = getStreamInternal()->startClient(
+                sharedStream->getAudioClient(), &attr, clientHandle);
         if (result != AAUDIO_OK) {
             if (--mRunningStreamCount == 0) { // atomic
                 stopSharingThread();
@@ -166,13 +168,11 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
 
 aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBase> sharedStream,
                                                         audio_port_handle_t clientHandle) {
-    // Don't lock here because the disconnectRegisteredStreams also uses the lock.
-
     // Ignore result.
     (void) getStreamInternal()->stopClient(clientHandle);
 
     if (--mRunningStreamCount == 0) { // atomic
-        stopSharingThread();
+        stopSharingThread(); // the sharing thread locks mLockStreams
         getStreamInternal()->requestStop();
     }
     return AAUDIO_OK;

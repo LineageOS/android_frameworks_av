@@ -20,6 +20,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "libbase",
         "libcgrouprc#29",
     ],
 
@@ -37,7 +38,6 @@ cc_library {
         "android.hidl.memory@1.0",
         "android.hidl.token@1.0",
         "android.hidl.token@1.0-utils",
-        "libbase",
         "libcutils",
         "libhidlbase",
         "libhidlmemory",
@@ -54,4 +54,11 @@ cc_library {
         "com.android.media",
         "test_com.android.media",
     ],
+
+    static: {
+        apex_available: [
+            // Needed for unit tests
+            "//apex_available:platform",
+        ],
+    },
 }

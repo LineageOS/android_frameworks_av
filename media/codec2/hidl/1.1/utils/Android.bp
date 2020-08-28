@@ -1,0 +1,165 @@
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-hidl-client-defaults instead
+cc_library {
+    name: "libcodec2_hidl_client@1.1",
+
+    defaults: ["hidl_defaults"],
+
+    srcs: [
+        "OutputBufferQueue.cpp",
+        "types.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.c2@1.1",
+        "libbase",
+        "libcodec2",
+        "libcodec2_hidl_client@1.0",
+        "libcodec2_vndk",
+        "libcutils",
+        "libgui",
+        "libhidlbase",
+        "liblog",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+        "libutils",
+    ],
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.c2@1.1",
+        "libcodec2",
+        "libcodec2_hidl_client@1.0",
+        "libgui",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+    ],
+}
+
+
+// DO NOT DEPEND ON THIS DIRECTLY
+// use libcodec2-hidl-defaults instead
+cc_library {
+    name: "libcodec2_hidl@1.1",
+    vendor_available: true,
+    min_sdk_version: "29",
+
+    defaults: ["hidl_defaults"],
+
+    srcs: [
+        "Component.cpp",
+        "ComponentInterface.cpp",
+        "ComponentStore.cpp",
+        "Configurable.cpp",
+        "InputBufferManager.cpp",
+        "InputSurface.cpp",
+        "InputSurfaceConnection.cpp",
+        "types.cpp",
+    ],
+
+    header_libs: [
+        "libbinder_headers",
+        "libsystem_headers",
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "android.hardware.graphics.bufferqueue@1.0",
+        "android.hardware.graphics.bufferqueue@2.0",
+        "android.hardware.graphics.common@1.0",
+        "android.hardware.media@1.0",
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.c2@1.1",
+        "android.hardware.media.omx@1.0",
+        "libbase",
+        "libcodec2",
+        "libcodec2_hidl@1.0",
+        "libcodec2_vndk",
+        "libcutils",
+        "libhidlbase",
+        "liblog",
+        "libstagefright_bufferpool@2.0.1",
+        "libstagefright_bufferqueue_helper_novndk",
+        "libui",
+        "libutils",
+    ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libstagefright_bufferqueue_helper_novndk",
+            ],
+            shared_libs: [
+                "libstagefright_bufferqueue_helper",
+            ],
+        },
+    },
+
+    export_include_dirs: [
+        "include",
+    ],
+
+    export_shared_lib_headers: [
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.c2@1.1",
+        "libcodec2",
+        "libcodec2_hidl@1.0",
+        "libcodec2_vndk",
+        "libhidlbase",
+        "libstagefright_bufferpool@2.0.1",
+        "libui",
+    ],
+}
+
+// public dependency for Codec 2.0 HAL service implementations
+cc_defaults {
+    name: "libcodec2-hidl-defaults@1.1",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.c2@1.1",
+        "libcodec2_hidl@1.0",
+        "libcodec2_hidl@1.1",
+        "libcodec2_vndk",
+        "libhidlbase",
+    ],
+}
+
+// public dependency for Codec 2.0 HAL client
+cc_defaults {
+    name: "libcodec2-hidl-client-defaults@1.1",
+    defaults: ["libcodec2-impl-defaults"],
+
+    shared_libs: [
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.c2@1.1",
+        "libcodec2_hidl_client@1.0",
+        "libcodec2_hidl_client@1.1",
+        "libcodec2_vndk",
+        "libhidlbase",
+    ],
+}
+
+// Alias to the latest "defaults" for Codec 2.0 HAL service implementations
+cc_defaults {
+    name: "libcodec2-hidl-defaults",
+    defaults: ["libcodec2-hidl-defaults@1.1"],
+}
+
+// Alias to the latest "defaults" for Codec 2.0 HAL client
+cc_defaults {
+    name: "libcodec2-hidl-client-defaults",
+    defaults: ["libcodec2-hidl-client-defaults@1.1"],
+}

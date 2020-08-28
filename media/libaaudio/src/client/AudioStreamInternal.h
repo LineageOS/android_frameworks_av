@@ -58,7 +58,7 @@ public:
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
-    aaudio_result_t close() override;
+    aaudio_result_t release_l() override;
 
     aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 
@@ -90,6 +90,7 @@ public:
     int64_t calculateReasonableTimeout();
 
     aaudio_result_t startClient(const android::AudioClient& client,
+                                const audio_attributes_t *attr,
                                 audio_port_handle_t *clientHandle);
 
     aaudio_result_t stopClient(audio_port_handle_t clientHandle);
@@ -154,7 +155,8 @@ protected:
 
     IsochronousClockModel    mClockModel;      // timing model for chasing the HAL
 
-    AudioEndpoint            mAudioEndpoint;   // source for reads or sink for writes
+    std::unique_ptr<AudioEndpoint> mAudioEndpoint;   // source for reads or sink for writes
+
     aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
 
     int32_t                  mFramesPerBurst = MIN_FRAMES_PER_BURST; // frames per HAL transfer
@@ -163,7 +165,7 @@ protected:
     // Offset from underlying frame position.
     int64_t                  mFramesOffsetFromService = 0; // offset for timestamps
 
-    uint8_t                 *mCallbackBuffer = nullptr;
+    std::unique_ptr<uint8_t[]> mCallbackBuffer;
     int32_t                  mCallbackFrames = 0;
 
     // The service uses this for SHARED mode.
@@ -176,6 +178,9 @@ protected:
     AtomicRequestor          mNeedCatchUp;   // Ask read() or write() to sync on first timestamp.
 
     float                    mStreamVolume = 1.0f;
+
+    int64_t                  mLastFramesWritten = 0;
+    int64_t                  mLastFramesRead = 0;
 
 private:
     /*
@@ -194,6 +199,7 @@ private:
     // By delaying slightly we can avoid waking up before other side is ready.
     const int32_t            mWakeupDelayNanos; // delay past typical wakeup jitter
     const int32_t            mMinimumSleepNanos; // minimum sleep while polling
+    int32_t                  mTimeOffsetNanos = 0; // add to time part of an MMAP timestamp
 
     AudioEndpointParcelable  mEndPointParcelable; // description of the buffers filled by service
     EndpointDescriptor       mEndpointDescriptor; // buffer description with resolved addresses
@@ -203,6 +209,11 @@ private:
     // Sometimes the hardware is operating with a different channel count from the app.
     // Then we require conversion in AAudio.
     int32_t                  mDeviceChannelCount = 0;
+
+    int32_t                  mBufferSizeInFrames = 0; // local threshold to control latency
+    int32_t                  mBufferCapacityInFrames = 0;
+
+
 };
 
 } /* namespace aaudio */

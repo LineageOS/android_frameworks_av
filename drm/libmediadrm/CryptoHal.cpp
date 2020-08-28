@@ -19,9 +19,8 @@
 #include <utils/Log.h>
 
 #include <android/hardware/drm/1.0/types.h>
-#include <android/hidl/manager/1.0/IServiceManager.h>
-
-#include <binder/IMemory.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
+#include <hidl/ServiceManagement.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -45,9 +44,9 @@ using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_memory;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
+using ::android::hardware::HidlMemory;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
-using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::sp;
 
 typedef drm::V1_2::Status Status_V1_2;
@@ -119,7 +118,6 @@ static String8 toString8(hidl_string hString) {
 CryptoHal::CryptoHal()
     : mFactories(makeCryptoFactories()),
       mInitCheck((mFactories.size() == 0) ? ERROR_UNSUPPORTED : NO_INIT),
-      mNextBufferId(0),
       mHeapSeqNum(0) {
 }
 
@@ -129,9 +127,9 @@ CryptoHal::~CryptoHal() {
 Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
     Vector<sp<ICryptoFactory>> factories;
 
-    auto manager = ::IServiceManager::getService();
+    auto manager = hardware::defaultServiceManager1_2();
     if (manager != NULL) {
-        manager->listByInterface(drm::V1_0::ICryptoFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_0::ICryptoFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_0::ICryptoFactory::getService(instance);
@@ -142,7 +140,7 @@ Vector<sp<ICryptoFactory>> CryptoHal::makeCryptoFactories() {
                     }
                 }
             );
-        manager->listByInterface(drm::V1_1::ICryptoFactory::descriptor,
+        manager->listManifestByInterface(drm::V1_1::ICryptoFactory::descriptor,
                 [&factories](const hidl_vec<hidl_string> &registered) {
                     for (const auto &instance : registered) {
                         auto factory = drm::V1_1::ICryptoFactory::getService(instance);
@@ -252,26 +250,23 @@ bool CryptoHal::requiresSecureDecoderComponent(const char *mime) const {
 
 
 /**
- * If the heap base isn't set, get the heap base from the IMemory
+ * If the heap base isn't set, get the heap base from the HidlMemory
  * and send it to the HAL so it can map a remote heap of the same
  * size.  Once the heap base is established, shared memory buffers
  * are sent by providing an offset into the heap and a buffer size.
  */
-int32_t CryptoHal::setHeapBase(const sp<IMemoryHeap>& heap) {
-    using ::android::hardware::fromHeap;
-    using ::android::hardware::HidlMemory;
-
-    if (heap == NULL) {
-        ALOGE("setHeapBase(): heap is NULL");
+int32_t CryptoHal::setHeapBase(const sp<HidlMemory>& heap) {
+    if (heap == NULL || mHeapSeqNum < 0) {
+        ALOGE("setHeapBase(): heap %p mHeapSeqNum %d", heap.get(), mHeapSeqNum);
         return -1;
     }
 
     Mutex::Autolock autoLock(mLock);
 
     int32_t seqNum = mHeapSeqNum++;
-    sp<HidlMemory> hidlMemory = fromHeap(heap);
-    mHeapBases.add(seqNum, HeapBase(mNextBufferId, heap->getSize()));
-    Return<void> hResult = mPlugin->setSharedBufferBase(*hidlMemory, mNextBufferId++);
+    uint32_t bufferId = static_cast<uint32_t>(seqNum);
+    mHeapSizes.add(seqNum, heap->size());
+    Return<void> hResult = mPlugin->setSharedBufferBase(*heap, bufferId);
     ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
     return seqNum;
 }
@@ -286,60 +281,40 @@ void CryptoHal::clearHeapBase(int32_t seqNum) {
      * TODO: Add a releaseSharedBuffer method in a future DRM HAL
      * API version to make this explicit.
      */
-    ssize_t index = mHeapBases.indexOfKey(seqNum);
+    ssize_t index = mHeapSizes.indexOfKey(seqNum);
     if (index >= 0) {
         if (mPlugin != NULL) {
-            uint32_t bufferId = mHeapBases[index].getBufferId();
+            uint32_t bufferId = static_cast<uint32_t>(seqNum);
             Return<void> hResult = mPlugin->setSharedBufferBase(hidl_memory(), bufferId);
             ALOGE_IF(!hResult.isOk(), "setSharedBufferBase(): remote call failed");
         }
-        mHeapBases.removeItem(seqNum);
+        mHeapSizes.removeItem(seqNum);
     }
 }
 
-status_t CryptoHal::toSharedBuffer(const sp<IMemory>& memory, int32_t seqNum, ::SharedBuffer* buffer) {
-    ssize_t offset;
-    size_t size;
-
-    if (memory == NULL || buffer == NULL) {
-        return UNEXPECTED_NULL;
-    }
-
-    sp<IMemoryHeap> heap = memory->getMemory(&offset, &size);
-    if (heap == NULL) {
-        return UNEXPECTED_NULL;
-    }
-
+status_t CryptoHal::checkSharedBuffer(const ::SharedBuffer &buffer) {
+    int32_t seqNum = static_cast<int32_t>(buffer.bufferId);
     // memory must be in one of the heaps that have been set
-    if (mHeapBases.indexOfKey(seqNum) < 0) {
+    if (mHeapSizes.indexOfKey(seqNum) < 0) {
         return UNKNOWN_ERROR;
     }
-
-    // heap must be the same size as the one that was set in setHeapBase
-    if (mHeapBases.valueFor(seqNum).getSize() != heap->getSize()) {
-        android_errorWriteLog(0x534e4554, "76221123");
-        return UNKNOWN_ERROR;
-     }
 
     // memory must be within the address space of the heap
-    if (memory->pointer() != static_cast<uint8_t *>(heap->getBase()) + memory->offset()  ||
-            heap->getSize() < memory->offset() + memory->size() ||
-            SIZE_MAX - memory->offset() < memory->size()) {
+    size_t heapSize = mHeapSizes.valueFor(seqNum);
+    if (heapSize < buffer.offset + buffer.size ||
+            SIZE_MAX - buffer.offset < buffer.size) {
         android_errorWriteLog(0x534e4554, "76221123");
         return UNKNOWN_ERROR;
     }
 
-    buffer->bufferId = mHeapBases.valueFor(seqNum).getBufferId();
-    buffer->offset = offset >= 0 ? offset : 0;
-    buffer->size = size;
     return OK;
 }
 
 ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
         CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-        const ICrypto::SourceBuffer &source, size_t offset,
+        const ::SharedBuffer &hSource, size_t offset,
         const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
-        const ICrypto::DestinationBuffer &destination, AString *errorDetailMsg) {
+        const ::DestinationBuffer &hDestination, AString *errorDetailMsg) {
     Mutex::Autolock autoLock(mLock);
 
     if (mInitCheck != OK) {
@@ -377,28 +352,21 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
     }
     auto hSubSamples = hidl_vec<SubSample>(stdSubSamples);
 
-    int32_t heapSeqNum = source.mHeapSeqNum;
     bool secure;
-    ::DestinationBuffer hDestination;
-    if (destination.mType == kDestinationTypeSharedMemory) {
-        hDestination.type = BufferType::SHARED_MEMORY;
-        status_t status = toSharedBuffer(destination.mSharedMemory, heapSeqNum,
-                &hDestination.nonsecureMemory);
+    if (hDestination.type == BufferType::SHARED_MEMORY) {
+        status_t status = checkSharedBuffer(hDestination.nonsecureMemory);
         if (status != OK) {
             return status;
         }
         secure = false;
-    } else if (destination.mType == kDestinationTypeNativeHandle) {
-        hDestination.type = BufferType::NATIVE_HANDLE;
-        hDestination.secureMemory = hidl_handle(destination.mHandle);
+    } else if (hDestination.type == BufferType::NATIVE_HANDLE) {
         secure = true;
     } else {
         android_errorWriteLog(0x534e4554, "70526702");
         return UNKNOWN_ERROR;
     }
 
-    ::SharedBuffer hSource;
-    status_t status = toSharedBuffer(source.mSharedMemory, heapSeqNum, &hSource);
+    status_t status = checkSharedBuffer(hSource);
     if (status != OK) {
         return status;
     }

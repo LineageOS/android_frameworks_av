@@ -25,7 +25,8 @@ public:
     ~OpRecordAudioMonitor() override;
     bool hasOpRecordAudio() const;
 
-    static sp<OpRecordAudioMonitor> createIfNeeded(uid_t uid, const String16& opPackageName);
+    static sp<OpRecordAudioMonitor> createIfNeeded
+        (uid_t uid, const audio_attributes_t& attr, const String16& opPackageName);
 
 private:
     OpRecordAudioMonitor(uid_t uid, const String16& opPackageName);

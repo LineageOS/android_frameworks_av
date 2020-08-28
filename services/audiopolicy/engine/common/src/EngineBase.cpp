@@ -108,10 +108,9 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
 {
     auto loadVolumeConfig = [](auto &volumeGroups, auto &volumeConfig) {
         // Ensure name unicity to prevent duplicate
-        const auto &iter = std::find_if(std::begin(volumeGroups), std::end(volumeGroups),
+        LOG_ALWAYS_FATAL_IF(std::any_of(std::begin(volumeGroups), std::end(volumeGroups),
                                      [&volumeConfig](const auto &volumeGroup) {
-                return volumeConfig.name == volumeGroup.second->getName(); });
-        LOG_ALWAYS_FATAL_IF(iter != std::end(volumeGroups),
+                return volumeConfig.name == volumeGroup.second->getName(); }),
                             "group name %s defined twice, review the configuration",
                             volumeConfig.name.c_str());
 

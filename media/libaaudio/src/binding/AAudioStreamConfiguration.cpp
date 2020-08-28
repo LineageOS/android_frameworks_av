@@ -66,6 +66,8 @@ status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
     if (status != NO_ERROR) goto error;
     status = parcel->writeInt32(getSessionId());
     if (status != NO_ERROR) goto error;
+    status = parcel->writeInt32(isPrivacySensitive() ? 1 : 0);
+    if (status != NO_ERROR) goto error;
     return NO_ERROR;
 error:
     ALOGE("%s(): write failed = %d", __func__, status);
@@ -111,7 +113,9 @@ status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
     status = parcel->readInt32(&value);
     if (status != NO_ERROR) goto error;
     setSessionId(value);
-
+    status = parcel->readInt32(&value);
+    if (status != NO_ERROR) goto error;
+    setPrivacySensitive(value == 1);
     return NO_ERROR;
 error:
     ALOGE("%s(): read failed = %d", __func__, status);

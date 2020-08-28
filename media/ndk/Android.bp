@@ -56,6 +56,7 @@ cc_library_shared {
     name: "libmediandk",
 
     srcs: [
+        "NdkJavaVMHelper.cpp",
         "NdkMediaCodec.cpp",
         "NdkMediaCrypto.cpp",
         "NdkMediaDataSource.cpp",
@@ -86,6 +87,7 @@ cc_library_shared {
     header_libs: [
         "jni_headers",
         "libmediadrm_headers",
+        "libmediametrics_headers",
     ],
 
     shared_libs: [
@@ -93,7 +95,6 @@ cc_library_shared {
         "android.hidl.token@1.0-utils",
         "libandroid_runtime_lazy",
         "libbase",
-        "libbinder",
         "libdatasource",
         "libmedia",
         "libmediadrm",
@@ -105,11 +106,11 @@ cc_library_shared {
         "libutils",
         "libcutils",
         "libnativewindow",
-        "libbinder",
         "libhidlbase",
         "libgui",
         "libui",
         "libmediandk_utils",
+        "libnativehelper",
     ],
 
     export_header_lib_headers: ["jni_headers"],
@@ -192,6 +193,10 @@ cc_test {
         "libcutils",
         "android.hardware.graphics.bufferqueue@1.0",
     ],
+    header_libs: [
+        "libstagefright_foundation_headers",
+    ],
+
     cflags: [
         "-D__ANDROID_VNDK__",
     ],

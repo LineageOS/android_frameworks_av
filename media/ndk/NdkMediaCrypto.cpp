@@ -26,9 +26,8 @@
 #include <cutils/properties.h>
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
-#include <binder/IServiceManager.h>
+#include <mediadrm/DrmUtils.h>
 #include <mediadrm/ICrypto.h>
-#include <mediadrm/IMediaDrmService.h>
 #include <android_util_Binder.h>
 
 #include <jni.h>
@@ -36,19 +35,7 @@
 using namespace android;
 
 static sp<ICrypto> makeCrypto() {
-    sp<IServiceManager> sm = defaultServiceManager();
-    sp<IBinder> binder = sm->getService(String16("media.drm"));
-
-    sp<IMediaDrmService> service = interface_cast<IMediaDrmService>(binder);
-    if (service == NULL) {
-        return NULL;
-    }
-
-    sp<ICrypto> crypto = service->makeCrypto();
-    if (crypto == NULL || (crypto->initCheck() != OK && crypto->initCheck() != NO_INIT)) {
-        return NULL;
-    }
-    return crypto;
+    return DrmUtils::MakeCrypto();
 }
 
 struct AMediaCrypto {

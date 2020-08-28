@@ -15,7 +15,6 @@ cc_library_shared {
         "libutils",
         "liblog",
         "libaudiopolicy",
-        "libsoundtrigger",
         "libmedia_helper",
         "libmediametrics",
         "libbinder",

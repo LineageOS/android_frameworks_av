@@ -399,29 +399,31 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
             mEncoderWriteData = true;
             mEncoderReturnedEncodedData = false;
             mEncoderReturnedNbBytes = 0;
-            mCurrentInputTimeStamp = inHeader->nTimeStamp;
+            if (inHeader->nFilledLen) {
+                mCurrentInputTimeStamp = inHeader->nTimeStamp;
 
-            const unsigned nbInputFrames = inHeader->nFilledLen / frameSize;
-            const unsigned nbInputSamples = inHeader->nFilledLen / sampleSize;
+                const unsigned nbInputFrames = inHeader->nFilledLen / frameSize;
+                const unsigned nbInputSamples = inHeader->nFilledLen / sampleSize;
 
-            if (inputFloat) {
-                CHECK_LE(nbInputSamples, kNumSamplesPerFrame * kMaxChannels);
-                const float * const pcmFloat = reinterpret_cast<float *>(inHeader->pBuffer);
-                 memcpy_to_q8_23_from_float_with_clamp(
-                         mInputBufferPcm32, pcmFloat, nbInputSamples);
-            } else {
-                // note nbInputSamples may be 2x as large for pcm16 data.
-                CHECK_LE(nbInputSamples, kNumSamplesPerFrame * kMaxChannels * 2);
-                const int16_t * const pcm16 = reinterpret_cast<int16_t *>(inHeader->pBuffer);
-                for (unsigned i = 0; i < nbInputSamples; ++i) {
-                    mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+                if (inputFloat) {
+                    CHECK_LE(nbInputSamples, kNumSamplesPerFrame * kMaxChannels);
+                    const float * const pcmFloat = reinterpret_cast<float *>(inHeader->pBuffer);
+                     memcpy_to_q8_23_from_float_with_clamp(
+                             mInputBufferPcm32, pcmFloat, nbInputSamples);
+                } else {
+                    // note nbInputSamples may be 2x as large for pcm16 data.
+                    CHECK_LE(nbInputSamples, kNumSamplesPerFrame * kMaxChannels * 2);
+                    const int16_t * const pcm16 = reinterpret_cast<int16_t *>(inHeader->pBuffer);
+                    for (unsigned i = 0; i < nbInputSamples; ++i) {
+                        mInputBufferPcm32[i] = (FLAC__int32) pcm16[i];
+                    }
                 }
+                ALOGV(" about to encode %u samples per channel", nbInputFrames);
+                ok = FLAC__stream_encoder_process_interleaved(
+                                mFlacStreamEncoder,
+                                mInputBufferPcm32,
+                                nbInputFrames /*samples per channel*/ );
             }
-            ALOGV(" about to encode %u samples per channel", nbInputFrames);
-            ok = FLAC__stream_encoder_process_interleaved(
-                            mFlacStreamEncoder,
-                            mInputBufferPcm32,
-                            nbInputFrames /*samples per channel*/ );
 
             inInfo->mOwnedByUs = false;
             inQueue.erase(inQueue.begin());
@@ -434,7 +436,15 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
         OMX_BUFFERHEADERTYPE *outHeader = outInfo->mHeader;
 
         if (ok) {
-            if (mEncoderReturnedEncodedData && (mEncoderReturnedNbBytes != 0)) {
+            ALOGV("encoded %d, bytes %lld, eos %d", mEncoderReturnedEncodedData,
+                  (long long )mEncoderReturnedNbBytes, mSawInputEOS);
+            if (mSawInputEOS && !mEncoderReturnedEncodedData) {
+                ALOGV("finishing encoder");
+                mSentOutputEOS = true;
+                FLAC__stream_encoder_finish(mFlacStreamEncoder);
+                outHeader->nFlags = OMX_BUFFERFLAG_EOS;
+            }
+            if (mSawInputEOS || mEncoderReturnedEncodedData) {
                 ALOGV(" dequeueing buffer on output port after writing data");
                 outInfo->mOwnedByUs = false;
                 outQueue.erase(outQueue.begin());
@@ -442,23 +452,6 @@ void SoftFlacEncoder::onQueueFilled(OMX_U32 portIndex) {
                 notifyFillBufferDone(outHeader);
                 outHeader = NULL;
                 mEncoderReturnedEncodedData = false;
-            } else {
-                ALOGV(" encoder process_interleaved returned without data to write");
-                if (mSawInputEOS) {
-                    ALOGV("finishing encoder");
-                    mSentOutputEOS = true;
-                    FLAC__stream_encoder_finish(mFlacStreamEncoder);
-                    if (mEncoderReturnedEncodedData && (mEncoderReturnedNbBytes != 0)) {
-                        ALOGV(" dequeueing residual buffer on output port after writing data");
-                        outInfo->mOwnedByUs = false;
-                        outQueue.erase(outQueue.begin());
-                        outInfo = NULL;
-                        outHeader->nFlags = OMX_BUFFERFLAG_EOS;
-                        notifyFillBufferDone(outHeader);
-                        outHeader = NULL;
-                        mEncoderReturnedEncodedData = false;
-                    }
-                }
             }
         } else {
             ALOGE(" error encountered during encoding");

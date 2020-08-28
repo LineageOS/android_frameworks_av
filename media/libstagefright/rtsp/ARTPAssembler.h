@@ -39,6 +39,7 @@ struct ARTPAssembler : public RefBase {
 
     void onPacketReceived(const sp<ARTPSource> &source);
     virtual void onByeReceived() = 0;
+    virtual bool initCheck() { return true; }
 
 protected:
     virtual AssemblyStatus assembleMore(const sp<ARTPSource> &source) = 0;

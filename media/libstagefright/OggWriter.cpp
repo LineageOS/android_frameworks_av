@@ -22,7 +22,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/mediarecorder.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaDefs.h>

@@ -123,6 +123,21 @@ typedef void (*ACameraManager_AvailabilityCallback)(void* context,
         const char* cameraId);
 
 /**
+ * Definition of physical camera availability callbacks.
+ *
+ * @param context The optional application context provided by user in
+ *                {@link ACameraManager_AvailabilityCallbacks}.
+ * @param cameraId The ID of the logical multi-camera device whose physical camera status is
+ *                 changing. The memory of this argument is owned by camera framework and will
+ *                 become invalid immediately after this callback returns.
+ * @param physicalCameraId The ID of the physical camera device whose status is changing. The
+ *                 memory of this argument is owned by camera framework and will become invalid
+ *                 immediately after this callback returns.
+ */
+typedef void (*ACameraManager_PhysicalCameraAvailabilityCallback)(void* context,
+        const char* cameraId, const char* physicalCameraId);
+
+/**
  * A listener for camera devices becoming available or unavailable to open.
  *
  * <p>Cameras become available when they are no longer in use, or when a new
@@ -175,6 +190,9 @@ camera_status_t ACameraManager_registerAvailabilityCallback(
  * Unregister camera availability callbacks.
  *
  * <p>Removing a callback that isn't registered has no effect.</p>
+ *
+ * <p>This function must not be called with a mutex lock also held by
+ * the availability callbacks.</p>
  *
  * @param manager the {@link ACameraManager} of interest.
  * @param callback the {@link ACameraManager_AvailabilityCallbacks} to be unregistered.
@@ -320,8 +338,15 @@ typedef struct ACameraManager_ExtendedAvailabilityListener {
     /// Called when there is camera access permission change
     ACameraManager_AccessPrioritiesChangedCallback onCameraAccessPrioritiesChanged;
 
+    /// Called when a physical camera becomes available
+    ACameraManager_PhysicalCameraAvailabilityCallback onPhysicalCameraAvailable __INTRODUCED_IN(30);
+
+    /// Called when a physical camera becomes unavailable
+    ACameraManager_PhysicalCameraAvailabilityCallback onPhysicalCameraUnavailable
+            __INTRODUCED_IN(30);
+
     /// Reserved for future use, please ensure that all entries are set to NULL
-    void *reserved[6];
+    void *reserved[4];
 } ACameraManager_ExtendedAvailabilityCallbacks;
 
 /**
@@ -359,6 +384,9 @@ camera_status_t ACameraManager_registerExtendedAvailabilityCallback(
  * Unregister camera extended availability callbacks.
  *
  * <p>Removing a callback that isn't registered has no effect.</p>
+ *
+ * <p>This function must not be called with a mutex lock also held by
+ * the extended availability callbacks.</p>
  *
  * @param manager the {@link ACameraManager} of interest.
  * @param callback the {@link ACameraManager_ExtendedAvailabilityCallbacks} to be unregistered.

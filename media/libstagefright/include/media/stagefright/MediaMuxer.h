@@ -22,7 +22,7 @@
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
-#include "foundation/ABase.h"
+#include "media/stagefright/foundation/ABase.h"
 
 namespace android {
 
@@ -122,7 +122,6 @@ private:
     sp<MediaWriter> mWriter;
     Vector< sp<MediaAdapter> > mTrackList;  // Each track has its MediaAdapter.
     sp<MetaData> mFileMeta;  // Metadata for the whole file.
-
     Mutex mMuxerLock;
 
     enum State {

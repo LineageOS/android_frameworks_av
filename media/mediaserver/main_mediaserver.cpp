@@ -22,6 +22,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
+#include <hidl/HidlTransportSupport.h>
 #include <utils/Log.h>
 #include "RegisterExtensions.h"
 
@@ -42,6 +43,8 @@ int main(int argc __unused, char **argv __unused)
     MediaPlayerService::instantiate();
     ResourceManagerService::instantiate();
     registerExtensions();
+    ::android::hardware::configureRpcThreadpool(16, false);
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
+    ::android::hardware::joinRpcThreadpool();
 }

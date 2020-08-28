@@ -8,6 +8,9 @@ LOCAL_SRC_FILES:=       \
         jpeg.cpp        \
         SineSource.cpp
 
+LOCAL_HEADER_LIBRARIES := \
+        libmediametrics_headers \
+
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia libmedia_codeclist libutils libbinder \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
@@ -37,6 +40,9 @@ LOCAL_SRC_FILES:=         \
         SineSource.cpp    \
         record.cpp
 
+LOCAL_HEADER_LIBRARIES := \
+        libmediametrics_headers \
+
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
         libstagefright_foundation libdatasource libaudioclient
@@ -62,6 +68,9 @@ include $(CLEAR_VARS)
 LOCAL_SRC_FILES:=         \
         AudioPlayer.cpp \
         recordvideo.cpp
+
+LOCAL_HEADER_LIBRARIES := \
+        libmediametrics_headers \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
@@ -90,6 +99,9 @@ LOCAL_SRC_FILES:=         \
         SineSource.cpp    \
         audioloop.cpp
 
+LOCAL_HEADER_LIBRARIES := \
+        libmediametrics_headers \
+
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
         libstagefright_foundation libaudioclient
@@ -112,6 +124,9 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=         \
         stream.cpp    \
+
+LOCAL_HEADER_LIBRARIES := \
+        libmediametrics_headers \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libui libgui \
@@ -139,6 +154,7 @@ LOCAL_SRC_FILES:=               \
 
 LOCAL_HEADER_LIBRARIES := \
         libmediadrm_headers \
+        libmediametrics_headers \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \
@@ -168,6 +184,7 @@ LOCAL_SRC_FILES:= \
 
 LOCAL_HEADER_LIBRARIES := \
         libmediadrm_headers \
+        libmediametrics_headers \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright \
@@ -208,6 +225,9 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES:=               \
         muxer.cpp            \
+
+LOCAL_HEADER_LIBRARIES := \
+        libmediametrics_headers \
 
 LOCAL_SHARED_LIBRARIES := \
         libstagefright liblog libutils libbinder libstagefright_foundation \

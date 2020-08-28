@@ -19,6 +19,7 @@
 
 #include <map>
 #include <mutex>
+#include <sys/types.h>
 #include <utils/Singleton.h>
 
 #include "binding/AAudioServiceMessage.h"
@@ -62,7 +63,8 @@ public:
 
 private:
     android::sp<AAudioServiceEndpoint> openExclusiveEndpoint(android::AAudioService &aaudioService,
-                                                 const aaudio::AAudioStreamRequest &request);
+                                                 const aaudio::AAudioStreamRequest &request,
+                                                 sp<AAudioServiceEndpoint> &endpointToSteal);
 
     android::sp<AAudioServiceEndpoint> openSharedEndpoint(android::AAudioService &aaudioService,
                                               const aaudio::AAudioStreamRequest &request);
@@ -91,11 +93,16 @@ private:
     int32_t mExclusiveFoundCount  = 0; // number of times we FOUND an exclusive endpoint
     int32_t mExclusiveOpenCount   = 0; // number of times we OPENED an exclusive endpoint
     int32_t mExclusiveCloseCount  = 0; // number of times we CLOSED an exclusive endpoint
+    int32_t mExclusiveStolenCount = 0; // number of times we STOLE an exclusive endpoint
+
     // Same as above but for SHARED endpoints.
     int32_t mSharedSearchCount    = 0;
     int32_t mSharedFoundCount     = 0;
     int32_t mSharedOpenCount      = 0;
     int32_t mSharedCloseCount     = 0;
+
+    // For easily disabling the stealing of exclusive streams.
+    static constexpr bool kStealingEnabled = true;
 };
 } /* namespace aaudio */
 

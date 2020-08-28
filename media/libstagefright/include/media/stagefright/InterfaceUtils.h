@@ -19,8 +19,8 @@
 
 #include <utils/RefBase.h>
 #include <media/stagefright/RemoteMediaExtractor.h>
-#include <media/MediaSource.h>
-#include <media/IMediaExtractor.h>
+#include <media/stagefright/MediaSource.h>
+#include <android/IMediaExtractor.h>
 #include <media/IMediaSource.h>
 
 namespace android {

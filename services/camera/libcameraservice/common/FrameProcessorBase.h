@@ -27,21 +27,24 @@
 
 namespace android {
 
-class CameraDeviceBase;
+class FrameProducer;
 
 namespace camera2 {
 
 /* Output frame metadata processing thread.  This thread waits for new
- * frames from the device, and analyzes them as necessary.
+ * frames from the frame producer, and analyzes them as necessary.
  */
 class FrameProcessorBase: public Thread {
   public:
-    explicit FrameProcessorBase(wp<CameraDeviceBase> device);
+    explicit FrameProcessorBase(wp<FrameProducer> device);
     virtual ~FrameProcessorBase();
 
     struct FilteredListener: virtual public RefBase {
         virtual void onResultAvailable(const CaptureResult &result) = 0;
     };
+
+    static const int32_t FRAME_PROCESSOR_LISTENER_MIN_ID = 0;
+    static const int32_t FRAME_PROCESSOR_LISTENER_MAX_ID = 0x7fffffffL;
 
     // Register a listener for a range of IDs [minId, maxId). Multiple listeners
     // can be listening to the same range. Registering the same listener with
@@ -56,7 +59,7 @@ class FrameProcessorBase: public Thread {
     void dump(int fd, const Vector<String16>& args);
   protected:
     static const nsecs_t kWaitDuration = 10000000; // 10 ms
-    wp<CameraDeviceBase> mDevice;
+    wp<FrameProducer> mDevice;
 
     virtual bool threadLoop();
 
@@ -74,13 +77,13 @@ class FrameProcessorBase: public Thread {
     // Number of partial result the HAL will potentially send.
     int32_t mNumPartialResults;
 
-    void processNewFrames(const sp<CameraDeviceBase> &device);
+    void processNewFrames(const sp<FrameProducer> &device);
 
     virtual bool processSingleFrame(CaptureResult &result,
-                                    const sp<CameraDeviceBase> &device);
+                                    const sp<FrameProducer> &device);
 
     status_t processListeners(const CaptureResult &result,
-                              const sp<CameraDeviceBase> &device);
+                              const sp<FrameProducer> &device);
 
     CameraMetadata mLastFrame;
     std::vector<PhysicalCaptureResultInfo> mLastPhysicalFrames;

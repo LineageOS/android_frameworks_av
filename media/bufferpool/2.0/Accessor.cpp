@@ -117,6 +117,10 @@ void Accessor::createInvalidator() {
     Accessor::Impl::createInvalidator();
 }
 
+void Accessor::createEvictor() {
+    Accessor::Impl::createEvictor();
+}
+
 // Methods from ::android::hardware::media::bufferpool::V2_0::IAccessor follow.
 Return<void> Accessor::connect(
         const sp<::android::hardware::media::bufferpool::V2_0::IObserver>& observer,

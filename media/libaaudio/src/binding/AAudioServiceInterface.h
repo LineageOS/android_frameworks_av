@@ -89,8 +89,9 @@ public:
                                                   pid_t clientThreadId) = 0;
 
     virtual aaudio_result_t startClient(aaudio_handle_t streamHandle,
-                                      const android::AudioClient& client,
-                                      audio_port_handle_t *clientHandle) = 0;
+                                        const android::AudioClient& client,
+                                        const audio_attributes_t *attr,
+                                        audio_port_handle_t *clientHandle) = 0;
 
     virtual aaudio_result_t stopClient(aaudio_handle_t streamHandle,
                                        audio_port_handle_t clientHandle) = 0;

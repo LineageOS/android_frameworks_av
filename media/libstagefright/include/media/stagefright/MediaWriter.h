@@ -19,8 +19,9 @@
 #define MEDIA_WRITER_H_
 
 #include <utils/RefBase.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/IMediaRecorderClient.h>
+#include <media/mediarecorder.h>
 
 namespace android {
 
@@ -36,7 +37,7 @@ struct MediaWriter : public RefBase {
     virtual status_t stop() = 0;
     virtual status_t pause() = 0;
     virtual status_t setCaptureRate(float /* captureFps */) {
-        ALOGW("setCaptureRate unsupported");
+        ALOG(LOG_WARN, "MediaWriter", "setCaptureRate unsupported");
         return ERROR_UNSUPPORTED;
     }
 
@@ -61,7 +62,16 @@ protected:
     sp<IMediaRecorderClient> mListener;
 
     void notify(int msg, int ext1, int ext2) {
-        if (mListener != NULL) {
+        if (msg == MEDIA_RECORDER_TRACK_EVENT_INFO || msg == MEDIA_RECORDER_TRACK_EVENT_ERROR) {
+            uint32_t trackId = (ext1 >> 28) & 0xf;
+            int type = ext1 & 0xfffffff;
+            ALOG(LOG_VERBOSE, "MediaWriter", "Track event err/info msg:%d, trackId:%u, type:%d,"
+                                             "val:%d", msg, trackId, type, ext2);
+        } else {
+            ALOG(LOG_VERBOSE, "MediaWriter", "Recorder event msg:%d, ext1:%d, ext2:%d",
+                                              msg, ext1, ext2);
+        }
+        if (mListener != nullptr) {
             mListener->notify(msg, ext1, ext2);
         }
     }

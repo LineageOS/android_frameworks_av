@@ -27,41 +27,14 @@ namespace android {
 
 namespace camera3 {
 
-/**
- * Metadata keys to correct when adjusting coordinates for distortion correction
- */
-
-// Both capture request and result
-constexpr std::array<uint32_t, 3> DistortionMapper::kMeteringRegionsToCorrect = {
-    ANDROID_CONTROL_AF_REGIONS,
-    ANDROID_CONTROL_AE_REGIONS,
-    ANDROID_CONTROL_AWB_REGIONS
-};
-
-// Only capture request
-constexpr std::array<uint32_t, 1> DistortionMapper::kRequestRectsToCorrect = {
-    ANDROID_SCALER_CROP_REGION,
-};
-
-// Only for capture result
-constexpr std::array<uint32_t, 1> DistortionMapper::kResultRectsToCorrect = {
-    ANDROID_SCALER_CROP_REGION,
-};
-
-// Only for capture result
-constexpr std::array<uint32_t, 2> DistortionMapper::kResultPointsToCorrectNoClamp = {
-    ANDROID_STATISTICS_FACE_RECTANGLES, // Says rectangles, is really points
-    ANDROID_STATISTICS_FACE_LANDMARKS,
-};
-
 
 DistortionMapper::DistortionMapper() : mValidMapping(false), mValidGrids(false) {
 }
 
-bool DistortionMapper::isDistortionSupported(const CameraMetadata &result) {
+bool DistortionMapper::isDistortionSupported(const CameraMetadata &deviceInfo) {
     bool isDistortionCorrectionSupported = false;
     camera_metadata_ro_entry_t distortionCorrectionModes =
-            result.find(ANDROID_DISTORTION_CORRECTION_AVAILABLE_MODES);
+            deviceInfo.find(ANDROID_DISTORTION_CORRECTION_AVAILABLE_MODES);
     for (size_t i = 0; i < distortionCorrectionModes.count; i++) {
         if (distortionCorrectionModes.data.u8[i] !=
                 ANDROID_DISTORTION_CORRECTION_MODE_OFF) {
@@ -124,7 +97,7 @@ status_t DistortionMapper::correctCaptureRequest(CameraMetadata *request) {
                 if (res != OK) return res;
             }
         }
-        for (auto rect : kRequestRectsToCorrect) {
+        for (auto rect : kRectsToCorrect) {
             e = request->find(rect);
             res = mapCorrectedRectToRaw(e.data.i32, e.count / 4, /*clamp*/true);
             if (res != OK) return res;
@@ -160,7 +133,7 @@ status_t DistortionMapper::correctCaptureResult(CameraMetadata *result) {
                 if (res != OK) return res;
             }
         }
-        for (auto rect : kResultRectsToCorrect) {
+        for (auto rect : kRectsToCorrect) {
             e = result->find(rect);
             res = mapRawRectToCorrected(e.data.i32, e.count / 4, /*clamp*/true);
             if (res != OK) return res;
@@ -389,7 +362,6 @@ status_t DistortionMapper::mapCorrectedToRawImplSimple(T *coordPairs, int coordC
 
     return OK;
 }
-
 
 status_t DistortionMapper::mapCorrectedRectToRaw(int32_t *rects, int rectCount, bool clamp,
         bool simple) const {

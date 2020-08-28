@@ -395,7 +395,6 @@
         ScaleFilterCols_NEON*;
         ScaleFilterReduce;
         ScaleFilterRows_NEON*;
-        ScaleOffset;
         ScalePlane;
         ScalePlane_16;
         ScalePlaneBilinearDown;
@@ -505,4 +504,8 @@
         YUY2ToYRow_Any_NEON*;
         YUY2ToYRow_C;
         YUY2ToYRow_NEON*;
+        ogg_packet_*;
+        ogg_page_*;
+        ogg_stream_*;
+        ogg_sync_*;
 };

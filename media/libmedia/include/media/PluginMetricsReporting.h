@@ -18,6 +18,7 @@
 
 #define PLUGIN_METRICS_REPORTING_H_
 
+#include <sys/types.h>
 #include <utils/Errors.h>
 #include <utils/String8.h>
 
@@ -26,7 +27,7 @@ namespace android {
 status_t reportDrmPluginMetrics(const std::string& b64EncodedMetrics,
                                 const String8& vendorName,
                                 const String8& description,
-                                const String8& appPackageName);
+                                uid_t appUid);
 
 }  // namespace android
 

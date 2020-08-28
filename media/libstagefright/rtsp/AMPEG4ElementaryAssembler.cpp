@@ -203,6 +203,14 @@ struct AUHeader {
     unsigned mSerial;
 };
 
+bool AMPEG4ElementaryAssembler::initCheck() {
+    if(mSizeLength == 0 || mIndexLength == 0 || mIndexDeltaLength == 0) {
+        android_errorWriteLog(0x534e4554, "124777537");
+        return false;
+    }
+    return true;
+}
+
 ARTPAssembler::AssemblyStatus AMPEG4ElementaryAssembler::addPacket(
         const sp<ARTPSource> &source) {
     List<sp<ABuffer> > *queue = source->queue();
@@ -250,12 +258,16 @@ ARTPAssembler::AssemblyStatus AMPEG4ElementaryAssembler::addPacket(
     } else {
         // hexdump(buffer->data(), buffer->size());
         if (buffer->size() < 2) {
+            android_errorWriteLog(0x534e4554, "124783982");
+            queue->erase(queue->begin());
             return MALFORMED_PACKET;
         }
 
         unsigned AU_headers_length = U16_AT(buffer->data());  // in bits
 
         if (buffer->size() < 2 + (AU_headers_length + 7) / 8) {
+            android_errorWriteLog(0x534e4554, "124783982");
+            queue->erase(queue->begin());
             return MALFORMED_PACKET;
         }
 
@@ -359,6 +371,8 @@ ARTPAssembler::AssemblyStatus AMPEG4ElementaryAssembler::addPacket(
                 return MALFORMED_PACKET;
             }
             if (buffer->size() < offset + header.mSize) {
+                android_errorWriteLog(0x534e4554, "124783982");
+                queue->erase(queue->begin());
                 return MALFORMED_PACKET;
             }
 

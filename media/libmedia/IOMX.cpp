@@ -29,7 +29,6 @@
 #include <utils/NativeHandle.h>
 
 #include <media/omx/1.0/WOmxNode.h>
-#include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
 
 namespace android {

@@ -18,6 +18,8 @@
 //#define LOG_NDEBUG 0
 
 #include <utils/Log.h>
+
+#include <android/media/BnCaptureStateListener.h>
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
 #include <binder/IPCThreadState.h>
@@ -36,18 +38,24 @@ namespace android {
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
+Mutex AudioSystem::gLockErrorCallbacks;
 Mutex AudioSystem::gLockAPS;
 sp<IAudioFlinger> AudioSystem::gAudioFlinger;
 sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
-audio_error_callback AudioSystem::gAudioErrorCallback = NULL;
+std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
+
+// Required to be held while calling into gSoundTriggerCaptureStateListener.
+Mutex gSoundTriggerCaptureStateListenerLock;
+sp<AudioSystem::CaptureStateListener> gSoundTriggerCaptureStateListener = nullptr;
 
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
 {
     sp<IAudioFlinger> af;
     sp<AudioFlingerClient> afc;
+    bool reportNoError = false;
     {
         Mutex::Autolock _l(gLock);
         if (gAudioFlinger == 0) {
@@ -63,9 +71,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
             if (gAudioFlingerClient == NULL) {
                 gAudioFlingerClient = new AudioFlingerClient();
             } else {
-                if (gAudioErrorCallback) {
-                    gAudioErrorCallback(NO_ERROR);
-                }
+                reportNoError = true;
             }
             binder->linkToDeath(gAudioFlingerClient);
             gAudioFlinger = interface_cast<IAudioFlinger>(binder);
@@ -81,6 +87,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
         af->registerClient(afc);
         IPCThreadState::self()->restoreCallingIdentity(token);
     }
+    if (reportNoError) reportError(NO_ERROR);
     return af;
 }
 
@@ -434,11 +441,11 @@ audio_unique_id_t AudioSystem::newAudioUniqueId(audio_unique_id_use_t use)
     return af->newAudioUniqueId(use);
 }
 
-void AudioSystem::acquireAudioSessionId(audio_session_t audioSession, pid_t pid)
+void AudioSystem::acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid)
 {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af != 0) {
-        af->acquireAudioSessionId(audioSession, pid);
+        af->acquireAudioSessionId(audioSession, pid, uid);
     }
 }
 
@@ -500,19 +507,16 @@ void AudioSystem::AudioFlingerClient::clearIoCache()
 
 void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused)
 {
-    audio_error_callback cb = NULL;
     {
         Mutex::Autolock _l(AudioSystem::gLock);
         AudioSystem::gAudioFlinger.clear();
-        cb = gAudioErrorCallback;
     }
 
     // clear output handles and stream to output map caches
     clearIoCache();
 
-    if (cb) {
-        cb(DEAD_OBJECT);
-    }
+    reportError(DEAD_OBJECT);
+
     ALOGW("AudioFlinger server died!");
 }
 
@@ -718,10 +722,23 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
     return NO_ERROR;
 }
 
-/* static */ void AudioSystem::setErrorCallback(audio_error_callback cb)
+/* static */ uintptr_t AudioSystem::addErrorCallback(audio_error_callback cb)
 {
-    Mutex::Autolock _l(gLock);
-    gAudioErrorCallback = cb;
+    Mutex::Autolock _l(gLockErrorCallbacks);
+    gAudioErrorCallbacks.insert(cb);
+    return reinterpret_cast<uintptr_t>(cb);
+}
+
+/* static */ void AudioSystem::removeErrorCallback(uintptr_t cb) {
+    Mutex::Autolock _l(gLockErrorCallbacks);
+    gAudioErrorCallbacks.erase(reinterpret_cast<audio_error_callback>(cb));
+}
+
+/* static */ void AudioSystem::reportError(status_t err) {
+    Mutex::Autolock _l(gLockErrorCallbacks);
+    for (auto callback : gAudioErrorCallbacks) {
+      callback(err);
+    }
 }
 
 /*static*/ void AudioSystem::setDynPolicyCallback(dynamic_policy_callback cb)
@@ -841,13 +858,13 @@ status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
     return aps->handleDeviceConfigChange(device, address, name, encodedFormat);
 }
 
-status_t AudioSystem::setPhoneState(audio_mode_t state)
+status_t AudioSystem::setPhoneState(audio_mode_t state, uid_t uid)
 {
     if (uint32_t(state) >= AUDIO_MODE_CNT) return BAD_VALUE;
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    return aps->setPhoneState(state);
+    return aps->setPhoneState(state, uid);
 }
 
 status_t AudioSystem::setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config)
@@ -1025,6 +1042,16 @@ audio_devices_t AudioSystem::getDevicesForStream(audio_stream_type_t stream)
     return aps->getDevicesForStream(stream);
 }
 
+status_t AudioSystem::getDevicesForAttributes(const AudioAttributes &aa,
+                                              AudioDeviceTypeAddrVector *devices) {
+    if (devices == nullptr) {
+        return BAD_VALUE;
+    }
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->getDevicesForAttributes(aa, devices);
+}
+
 audio_io_handle_t AudioSystem::getOutputForEffect(const effect_descriptor_t *desc)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
@@ -1129,6 +1156,12 @@ void AudioSystem::clearAudioConfigCache()
         Mutex::Autolock _l(gLockAPS);
         gAudioPolicyService.clear();
     }
+}
+
+status_t AudioSystem::setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == nullptr) return PERMISSION_DENIED;
+    return aps->setSupportedSystemUsages(systemUsages);
 }
 
 status_t AudioSystem::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) {
@@ -1342,6 +1375,21 @@ status_t AudioSystem::removeUidDeviceAffinities(uid_t uid) {
     return aps->removeUidDeviceAffinities(uid);
 }
 
+status_t AudioSystem::setUserIdDeviceAffinities(int userId,
+                                                const Vector<AudioDeviceTypeAddr>& devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->setUserIdDeviceAffinities(userId, devices);
+}
+
+status_t AudioSystem::removeUserIdDeviceAffinities(int userId)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    return aps->removeUserIdDeviceAffinities(userId);
+}
+
 status_t AudioSystem::startAudioSource(const struct audio_port_config *source,
                                        const audio_attributes_t *attributes,
                                        audio_port_handle_t *portId)
@@ -1438,6 +1486,14 @@ status_t AudioSystem::setA11yServicesUids(const std::vector<uid_t>& uids)
     if (aps == 0) return PERMISSION_DENIED;
 
     return aps->setA11yServicesUids(uids);
+}
+
+status_t AudioSystem::setCurrentImeUid(uid_t uid)
+{
+    const sp <IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    return aps->setCurrentImeUid(uid);
 }
 
 bool AudioSystem::isHapticPlaybackSupported()
@@ -1540,6 +1596,13 @@ status_t AudioSystem::setRttEnabled(bool enabled)
     return aps->setRttEnabled(enabled);
 }
 
+bool AudioSystem::isCallScreenModeSupported()
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return false;
+    return aps->isCallScreenModeSupported();
+}
+
 status_t AudioSystem::setPreferredDeviceForStrategy(product_strategy_t strategy,
                                                     const AudioDeviceTypeAddr &device)
 {
@@ -1567,6 +1630,48 @@ status_t AudioSystem::getPreferredDeviceForStrategy(product_strategy_t strategy,
         return PERMISSION_DENIED;
     }
     return aps->getPreferredDeviceForStrategy(strategy, device);
+}
+
+class CaptureStateListenerImpl : public media::BnCaptureStateListener,
+                                 public IBinder::DeathRecipient {
+public:
+    binder::Status setCaptureState(bool active) override {
+        Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+        gSoundTriggerCaptureStateListener->onStateChanged(active);
+        return binder::Status::ok();
+    }
+
+    void binderDied(const wp<IBinder>&) override {
+        Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+        gSoundTriggerCaptureStateListener->onServiceDied();
+        gSoundTriggerCaptureStateListener = nullptr;
+    }
+};
+
+status_t AudioSystem::registerSoundTriggerCaptureStateListener(
+    const sp<CaptureStateListener>& listener) {
+    const sp<IAudioPolicyService>& aps =
+            AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<CaptureStateListenerImpl> wrapper = new CaptureStateListenerImpl();
+
+    Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
+
+    bool active;
+    status_t status =
+        aps->registerSoundTriggerCaptureStateListener(wrapper, &active);
+    if (status != NO_ERROR) {
+        listener->onServiceDied();
+        return NO_ERROR;
+    }
+    gSoundTriggerCaptureStateListener = listener;
+    listener->onStateChanged(active);
+    sp<IBinder> binder = IInterface::asBinder(aps);
+    binder->linkToDeath(wrapper);
+    return NO_ERROR;
 }
 
 // ---------------------------------------------------------------------------

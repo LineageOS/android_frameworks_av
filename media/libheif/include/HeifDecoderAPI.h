@@ -17,7 +17,7 @@
 #ifndef _HEIF_DECODER_API_
 #define _HEIF_DECODER_API_
 
-#include <memory>
+#include <vector>
 
 /*
  * The output color pixel format of heif decoder.
@@ -40,41 +40,13 @@ typedef enum {
 /*
  * Represents a color converted (RGB-based) video frame
  */
-struct HeifFrameInfo
-{
-    HeifFrameInfo() :
-        mWidth(0), mHeight(0), mRotationAngle(0), mBytesPerPixel(0),
-        mIccSize(0), mIccData(nullptr) {}
-
-    // update the frame info, will make a copy of |iccData| internally
-    void set(uint32_t width, uint32_t height, int32_t rotation, uint32_t bpp,
-            uint32_t iccSize, uint8_t* iccData) {
-        mWidth = width;
-        mHeight = height;
-        mRotationAngle = rotation;
-        mBytesPerPixel = bpp;
-
-        if (mIccData != nullptr) {
-            mIccData.reset(nullptr);
-        }
-        mIccSize = iccSize;
-        if (iccSize > 0) {
-            mIccData.reset(new uint8_t[iccSize]);
-            if (mIccData.get() != nullptr) {
-                memcpy(mIccData.get(), iccData, iccSize);
-            } else {
-                mIccSize = 0;
-            }
-        }
-    }
-
-    // Intentional public access modifiers:
+struct HeifFrameInfo {
     uint32_t mWidth;
     uint32_t mHeight;
     int32_t  mRotationAngle;           // Rotation angle, clockwise, should be multiple of 90
     uint32_t mBytesPerPixel;           // Number of bytes for one pixel
-    uint32_t mIccSize;                 // Number of bytes in mIccData
-    std::unique_ptr<uint8_t[]> mIccData; // Actual ICC data, memory is owned by this structure
+    int64_t mDurationUs;               // Duration of the frame in us
+    std::vector<uint8_t> mIccData;     // ICC data array
 };
 
 /*
@@ -113,8 +85,8 @@ struct HeifStream {
     virtual size_t getLength() const = 0;
 
 private:
-    HeifStream(const HeifFrameInfo&) = delete;
-    HeifStream& operator=(const HeifFrameInfo&) = delete;
+    HeifStream(const HeifStream&) = delete;
+    HeifStream& operator=(const HeifStream&) = delete;
 };
 
 /*
@@ -146,6 +118,14 @@ struct HeifDecoder {
     virtual bool init(HeifStream* stream, HeifFrameInfo* frameInfo) = 0;
 
     /*
+     * Returns true if the stream contains an image sequence and false otherwise.
+     * |frameInfo| will be filled with information of pictures in the sequence
+     * and |frameCount| the length of the sequence upon success and unmodified
+     * upon failure.
+     */
+    virtual bool getSequenceInfo(HeifFrameInfo* frameInfo, size_t *frameCount) = 0;
+
+    /*
      * Decode the picture internally, returning whether it succeeded. |frameInfo|
      * will be filled with information of the primary picture upon success and
      * unmodified upon failure.
@@ -154,6 +134,20 @@ struct HeifDecoder {
      * that were decoded.
      */
     virtual bool decode(HeifFrameInfo* frameInfo) = 0;
+
+    /*
+     * Decode the picture from the image sequence at index |frameIndex|.
+     * |frameInfo| will be filled with information of the decoded picture upon
+     * success and unmodified upon failure.
+     *
+     * |frameIndex| is the 0-based index of the video frame to retrieve. The frame
+     * index must be that of a valid frame. The total number of frames available for
+     * retrieval was reported via getSequenceInfo().
+     *
+     * After this succeeded, getScanline can be called to read the scanlines
+     * that were decoded.
+     */
+    virtual bool decodeSequence(int frameIndex, HeifFrameInfo* frameInfo) = 0;
 
     /*
      * Read the next scanline (in top-down order), returns true upon success

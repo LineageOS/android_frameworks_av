@@ -230,7 +230,7 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
     previewFpsRange[1] = fastInfo.bestStillCaptureFpsRange[1];
 
     // PREVIEW_FRAME_RATE / SUPPORTED_PREVIEW_FRAME_RATES are deprecated, but
-    // still have to do something sane for them
+    // still have to do something reasonable for them
 
     // NOTE: Not scaled like FPS range values are.
     int previewFps = fpsFromRange(previewFpsRange[0], previewFpsRange[1]);
@@ -2454,12 +2454,9 @@ status_t Parameters::getDefaultFocalLength(CameraDeviceBase *device) {
 
     camera_metadata_ro_entry_t availableFocalLengths =
         staticInfo(ANDROID_LENS_INFO_AVAILABLE_FOCAL_LENGTHS, 0, 0, /*required*/false);
-    if (!availableFocalLengths.count && !fastInfo.isExternalCamera) return NO_INIT;
 
     // Find focal length in PREVIEW template to use as default focal length.
-    if (fastInfo.isExternalCamera) {
-        fastInfo.defaultFocalLength = -1.0;
-    } else {
+    if (availableFocalLengths.count) {
         // Find smallest (widest-angle) focal length to use as basis of still
         // picture FOV reporting.
         fastInfo.defaultFocalLength = availableFocalLengths.data.f[0];
@@ -2481,6 +2478,10 @@ status_t Parameters::getDefaultFocalLength(CameraDeviceBase *device) {
         if (entry.count != 0) {
             fastInfo.defaultFocalLength = entry.data.f[0];
         }
+    } else if (fastInfo.isExternalCamera) {
+        fastInfo.defaultFocalLength = -1.0;
+    } else {
+        return NO_INIT;
     }
     return OK;
 }

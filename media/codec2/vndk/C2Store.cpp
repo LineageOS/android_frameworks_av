@@ -18,6 +18,7 @@
 #define LOG_NDEBUG 0
 #include <utils/Log.h>
 
+#include <C2AllocatorBlob.h>
 #include <C2AllocatorGralloc.h>
 #include <C2AllocatorIon.h>
 #include <C2BufferPriv.h>
@@ -26,6 +27,7 @@
 #include <C2Config.h>
 #include <C2PlatformStorePluginLoader.h>
 #include <C2PlatformSupport.h>
+#include <cutils/properties.h>
 #include <util/C2InterfaceHelper.h>
 
 #include <dlfcn.h>
@@ -75,6 +77,9 @@ public:
     ~C2PlatformAllocatorStoreImpl() override = default;
 
 private:
+    /// returns a shared-singleton blob allocator (gralloc-backed)
+    std::shared_ptr<C2Allocator> fetchBlobAllocator();
+
     /// returns a shared-singleton ion allocator
     std::shared_ptr<C2Allocator> fetchIonAllocator();
 
@@ -97,10 +102,12 @@ C2PlatformAllocatorStoreImpl::C2PlatformAllocatorStoreImpl() {
 c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
         id_t id, std::shared_ptr<C2Allocator> *const allocator) {
     allocator->reset();
+    if (id == C2AllocatorStore::DEFAULT_LINEAR) {
+        id = GetPreferredLinearAllocatorId(GetCodec2PoolMask());
+    }
     switch (id) {
     // TODO: should we implement a generic registry for all, and use that?
     case C2PlatformAllocatorStore::ION:
-    case C2AllocatorStore::DEFAULT_LINEAR:
         *allocator = fetchIonAllocator();
         break;
 
@@ -111,6 +118,10 @@ c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
 
     case C2PlatformAllocatorStore::BUFFERQUEUE:
         *allocator = fetchBufferQueueAllocator();
+        break;
+
+    case C2PlatformAllocatorStore::BLOB:
+        *allocator = fetchBlobAllocator();
         break;
 
     default:
@@ -222,6 +233,18 @@ std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchIonAllocator() {
     return allocator;
 }
 
+std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchBlobAllocator() {
+    static std::mutex mutex;
+    static std::weak_ptr<C2Allocator> blobAllocator;
+    std::lock_guard<std::mutex> lock(mutex);
+    std::shared_ptr<C2Allocator> allocator = blobAllocator.lock();
+    if (allocator == nullptr) {
+        allocator = std::make_shared<C2AllocatorBlob>(C2PlatformAllocatorStore::BLOB);
+        blobAllocator = allocator;
+    }
+    return allocator;
+}
+
 std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchGrallocAllocator() {
     static std::mutex mutex;
     static std::weak_ptr<C2Allocator> grallocAllocator;
@@ -292,6 +315,18 @@ std::shared_ptr<C2ComponentStore> GetPreferredCodec2ComponentStore() {
     return gPreferredComponentStore ? gPreferredComponentStore : GetCodec2PlatformComponentStore();
 }
 
+int GetCodec2PoolMask() {
+    return property_get_int32(
+            "debug.stagefright.c2-poolmask",
+            1 << C2PlatformAllocatorStore::ION |
+            1 << C2PlatformAllocatorStore::BUFFERQUEUE);
+}
+
+C2PlatformAllocatorStore::id_t GetPreferredLinearAllocatorId(int poolMask) {
+    return ((poolMask >> C2PlatformAllocatorStore::BLOB) & 1) ? C2PlatformAllocatorStore::BLOB
+                                                              : C2PlatformAllocatorStore::ION;
+}
+
 namespace {
 
 class _C2BlockPoolCache {
@@ -308,11 +343,25 @@ public:
         std::shared_ptr<C2Allocator> allocator;
         c2_status_t res = C2_NOT_FOUND;
 
+        if (allocatorId == C2AllocatorStore::DEFAULT_LINEAR) {
+            allocatorId = GetPreferredLinearAllocatorId(GetCodec2PoolMask());
+        }
         switch(allocatorId) {
             case C2PlatformAllocatorStore::ION:
-            case C2AllocatorStore::DEFAULT_LINEAR:
                 res = allocatorStore->fetchAllocator(
-                        C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+                        C2PlatformAllocatorStore::ION, &allocator);
+                if (res == C2_OK) {
+                    std::shared_ptr<C2BlockPool> ptr =
+                            std::make_shared<C2PooledBlockPool>(
+                                    allocator, poolId);
+                    *pool = ptr;
+                    mBlockPools[poolId] = ptr;
+                    mComponents[poolId] = component;
+                }
+                break;
+            case C2PlatformAllocatorStore::BLOB:
+                res = allocatorStore->fetchAllocator(
+                        C2PlatformAllocatorStore::BLOB, &allocator);
                 if (res == C2_OK) {
                     std::shared_ptr<C2BlockPool> ptr =
                             std::make_shared<C2PooledBlockPool>(

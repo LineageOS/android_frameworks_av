@@ -59,6 +59,7 @@ enum {
     kKeyAACProfile        = 'aacp',  // int32_t
     kKeyAVCC              = 'avcc',  // raw data
     kKeyHVCC              = 'hvcc',  // raw data
+    kKeyDVCC              = 'dvcc',  // raw data
     kKeyAV1C              = 'av1c',  // raw data
     kKeyThumbnailHVCC     = 'thvc',  // raw data
     kKeyD263              = 'd263',  // raw data
@@ -69,6 +70,7 @@ enum {
     kKeyIsSyncFrame       = 'sync',  // int32_t (bool)
     kKeyIsCodecConfig     = 'conf',  // int32_t (bool)
     kKeyIsMuxerData       = 'muxd',  // int32_t (bool)
+    kKeyIsEndOfStream     = 'feos',  // int32_t (bool)
     kKeyTime              = 'time',  // int64_t (usecs)
     kKeyDecodingTime      = 'decT',  // int64_t (decoding timestamp in usecs)
     kKeyNTPTime           = 'ntpT',  // uint64_t (ntp-timestamp)
@@ -112,8 +114,6 @@ enum {
     kKeyVideoProfile      = 'vprf',  // int32_t
     kKeyVideoLevel        = 'vlev',  // int32_t
 
-    // Set this key to enable authoring files in 64-bit offset
-    kKey64BitFileOffset   = 'fobt',  // int32_t (bool)
     kKey2ByteNalLength    = '2NAL',  // int32_t (bool)
 
     // Identify the file output format for authoring
@@ -238,6 +238,15 @@ enum {
     kKeyOpaqueCSD2       = 'csd2',
 
     kKeyHapticChannelCount = 'hapC',
+
+    /* MediaRecorder.h, error notifications can represent track ids with 4 bits only.
+     * | track id | reserved |     error or info type     |
+     * 31         28         16                           0
+     */
+    kKey4BitTrackIds = '4bid',
+
+    // Treat empty track as malformed for MediaRecorder.
+    kKeyEmptyTrackMalFormed = 'nemt', // bool (int32_t)
 };
 
 enum {
@@ -245,6 +254,7 @@ enum {
     kTypeAVCC        = 'avcc',
     kTypeHVCC        = 'hvcc',
     kTypeAV1C        = 'av1c',
+    kTypeDVCC        = 'dvcc',
     kTypeD263        = 'd263',
 };
 

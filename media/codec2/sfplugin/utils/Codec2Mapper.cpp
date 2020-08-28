@@ -190,6 +190,7 @@ ALookup<C2Config::profile_t, int32_t> sDolbyVisionProfiles = {
     { C2Config::PROFILE_DV_HE_07, DolbyVisionProfileDvheDtb },
     { C2Config::PROFILE_DV_HE_08, DolbyVisionProfileDvheSt },
     { C2Config::PROFILE_DV_AV_09, DolbyVisionProfileDvavSe },
+    { C2Config::PROFILE_DV_AV1_10, DolbyVisionProfileDvav110 },
 };
 
 ALookup<C2Config::level_t, int32_t> sH263Levels = {
@@ -382,10 +383,11 @@ ALookup<C2Config::profile_t, int32_t> sAv1Profiles = {
     // TODO: will need to disambiguate between Main8 and Main10
     { C2Config::PROFILE_AV1_0, AV1ProfileMain8 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10 },
+    { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10 },
+    { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10Plus },
 };
 
 ALookup<C2Config::profile_t, int32_t> sAv1HdrProfiles = {
-    { C2Config::PROFILE_AV1_0, AV1ProfileMain10 },
     { C2Config::PROFILE_AV1_0, AV1ProfileMain10HDR10 },
 };
 
@@ -629,7 +631,7 @@ private:
 // static
 std::shared_ptr<C2Mapper::ProfileLevelMapper>
 C2Mapper::GetProfileLevelMapper(std::string mediaType) {
-    std::transform(mediaType.begin(), mediaType.begin(), mediaType.end(), ::tolower);
+    std::transform(mediaType.begin(), mediaType.end(), mediaType.begin(), ::tolower);
     if (mediaType == MIMETYPE_AUDIO_AAC) {
         return std::make_shared<AacProfileLevelMapper>();
     } else if (mediaType == MIMETYPE_VIDEO_AVC) {
@@ -657,11 +659,13 @@ C2Mapper::GetProfileLevelMapper(std::string mediaType) {
 // static
 std::shared_ptr<C2Mapper::ProfileLevelMapper>
 C2Mapper::GetHdrProfileLevelMapper(std::string mediaType, bool isHdr10Plus) {
-    std::transform(mediaType.begin(), mediaType.begin(), mediaType.end(), ::tolower);
+    std::transform(mediaType.begin(), mediaType.end(), mediaType.begin(), ::tolower);
     if (mediaType == MIMETYPE_VIDEO_HEVC) {
         return std::make_shared<HevcProfileLevelMapper>(true, isHdr10Plus);
     } else if (mediaType == MIMETYPE_VIDEO_VP9) {
         return std::make_shared<Vp9ProfileLevelMapper>(true, isHdr10Plus);
+    } else if (mediaType == MIMETYPE_VIDEO_AV1) {
+        return std::make_shared<Av1ProfileLevelMapper>(true, isHdr10Plus);
     }
     return nullptr;
 }
@@ -944,4 +948,42 @@ bool C2Mapper::map(C2Color::transfer_t from, ColorAspects::Transfer *to) {
 // static
 bool C2Mapper::map(ColorAspects::Transfer from, C2Color::transfer_t *to) {
     return sColorTransfersSf.map(from, to);
+}
+
+// static
+bool C2Mapper::mapPixelFormatFrameworkToCodec(
+        int32_t frameworkValue, uint32_t *c2Value) {
+    switch (frameworkValue) {
+        case COLOR_FormatSurface:
+            *c2Value = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
+            return true;
+        case COLOR_FormatYUV420Flexible:
+            *c2Value = HAL_PIXEL_FORMAT_YCBCR_420_888;
+            return true;
+        case COLOR_FormatYUV420Planar:
+        case COLOR_FormatYUV420SemiPlanar:
+        case COLOR_FormatYUV420PackedPlanar:
+        case COLOR_FormatYUV420PackedSemiPlanar:
+            *c2Value = HAL_PIXEL_FORMAT_YV12;
+            return true;
+        default:
+            // TODO: support some sort of passthrough
+            return false;
+    }
+}
+
+// static
+bool C2Mapper::mapPixelFormatCodecToFramework(
+        uint32_t c2Value, int32_t *frameworkValue) {
+    switch (c2Value) {
+        case HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED:
+            *frameworkValue = COLOR_FormatSurface;
+            return true;
+        case HAL_PIXEL_FORMAT_YV12:
+        case HAL_PIXEL_FORMAT_YCBCR_420_888:
+            *frameworkValue = COLOR_FormatYUV420Flexible;
+            return true;
+        default:
+            return false;
+    }
 }

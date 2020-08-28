@@ -35,11 +35,19 @@ cc_library {
         "libaaudio_internal",
         "libaudioclient",
         "libaudioutils",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
         "liblog",
         "libcutils",
         "libutils",
         "libbinder",
     ],
+
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+    },
 
     stubs: {
         symbol_file: "libaaudio.map.txt",
@@ -62,13 +70,17 @@ cc_library {
     export_include_dirs: ["."],
     header_libs: [
         "libaaudio_headers",
-        "libmedia_headers"
+        "libmedia_headers",
+        "libmediametrics_headers",
     ],
     export_header_lib_headers: ["libaaudio_headers"],
 
     shared_libs: [
         "libaudioclient",
         "libaudioutils",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
         "liblog",
         "libcutils",
         "libutils",
@@ -121,4 +133,8 @@ cc_library {
         "flowgraph/SourceI16.cpp",
         "flowgraph/SourceI24.cpp",
     ],
+    sanitize: {
+        integer_overflow: true,
+        misc_undefined: ["bounds"],
+    },
 }

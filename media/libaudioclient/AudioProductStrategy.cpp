@@ -70,6 +70,7 @@ status_t AudioProductStrategy::writeToParcel(Parcel *parcel) const
     return NO_ERROR;
 }
 
+// Keep in sync with android/media/audiopolicy/AudioProductStrategy#attributeMatches
 bool AudioProductStrategy::attributesMatches(const audio_attributes_t refAttributes,
                                         const audio_attributes_t clientAttritubes)
 {

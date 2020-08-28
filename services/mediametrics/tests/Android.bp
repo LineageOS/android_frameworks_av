@@ -1,0 +1,31 @@
+cc_test {
+    name: "mediametrics_tests",
+    test_suites: ["device-tests"],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/mediametrics",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libmediametrics",
+        "libmediametricsservice",
+        "libmediautils",
+        "libutils",
+    ],
+
+    header_libs: [
+        "libaudioutils_headers",
+    ],
+
+    srcs: [
+        "mediametrics_tests.cpp",
+    ],
+}
