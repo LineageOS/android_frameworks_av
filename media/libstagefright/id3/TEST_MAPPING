@@ -1,9 +1,13 @@
 // frameworks/av/media/libstagefright/id3
 {
-  "presubmit": [
-    // TODO(b/148094059): unit tests not allowed to download content
-    //{ "name": "ID3Test" },
+  // tests which require dynamic content
+  // invoke with: atest -- --enable-module-dynamic-download=true
+  // TODO(b/148094059): unit tests not allowed to download content
+  "dynamic-presubmit": [
+    { "name": "ID3Test" }
+  ],
 
+  "presubmit": [
     // this doesn't seem to run any tests.
     // but: cts-tradefed run -m CtsMediaTestCases -t android.media.cts.MediaMetadataRetrieverTest
     // does run he 32 and 64 bit tests, but not the instant tests

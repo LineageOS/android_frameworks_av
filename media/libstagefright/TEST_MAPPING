@@ -1,12 +1,17 @@
 {
-  "presubmit": [
-    // TODO(b/148094059): unit tests not allowed to download content
-    // { "name": "HEVCUtilsUnitTest" },
-    //{ "name": "ExtractorFactoryTest" },
+  // tests which require dynamic content
+  // invoke with: atest -- --enable-module-dynamic-download=true
+  // TODO(b/148094059): unit tests not allowed to download content
+  "dynamic-presubmit": [
     // writerTest fails about 5 out of 66
-    // in addition to needing the download ability
-    //{ "name": "writerTest" },
+    // { "name": "writerTest" },
 
+    { "name": "HEVCUtilsUnitTest" },
+    { "name": "ExtractorFactoryTest" }
+
+  ],
+
+  "presubmit": [
     {
       "name": "CtsMediaTestCases",
       "options": [
