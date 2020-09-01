@@ -69,7 +69,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         // Read audio data from stream using a blocking read.
         result = getStreamInternal()->read(mDistributionBuffer, getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
-            disconnectRegisteredStreams();
+            ALOGV("%s() read() returned AAUDIO_ERROR_DISCONNECTED, break", __func__);
             break;
         } else if (result != getFramesPerBurst()) {
             ALOGW("callbackLoop() read %d / %d",

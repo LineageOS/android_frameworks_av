@@ -145,7 +145,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
         result = getStreamInternal()->write(mMixer.getOutputBuffer(),
                                             getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
-            AAudioServiceEndpointShared::disconnectRegisteredStreams();
+            ALOGV("%s() write() returned AAUDIO_ERROR_DISCONNECTED, break", __func__);
             break;
         } else if (result != getFramesPerBurst()) {
             ALOGW("callbackLoop() wrote %d / %d",
