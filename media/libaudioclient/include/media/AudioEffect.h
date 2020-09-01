@@ -370,6 +370,10 @@ public:
      * device: An audio device descriptor. Only used when "sessionID" is AUDIO_SESSION_DEVICE.
      *         Specifies the audio device type and address the effect must be attached to.
      *         If "sessionID" is AUDIO_SESSION_DEVICE then "io" must be AUDIO_IO_HANDLE_NONE.
+     * probe: true if created in a degraded mode to only verify if effect creation is possible.
+     *        In this mode, no IEffect interface to AudioFlinger is created and all actions
+     *        besides getters implemented in client AudioEffect object are no ops
+     *        after effect creation.
      *
      * Returned status (from utils/Errors.h) can be:
      *  - NO_ERROR or ALREADY_EXISTS: successful initialization
@@ -384,7 +388,8 @@ public:
                             void* user = NULL,
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                            const AudioDeviceTypeAddr& device = {});
+                            const AudioDeviceTypeAddr& device = {},
+                            bool probe = false);
     /*
      * Same as above but with type and uuid specified by character strings.
      */
@@ -395,7 +400,8 @@ public:
                             void* user = NULL,
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
-                            const AudioDeviceTypeAddr& device = {});
+                            const AudioDeviceTypeAddr& device = {},
+                            bool probe = false);
 
     /* Result of constructing the AudioEffect. This must be checked
      * before using any AudioEffect API.
@@ -530,6 +536,8 @@ protected:
      audio_session_t         mSessionId = AUDIO_SESSION_OUTPUT_MIX; // audio session ID
      int32_t                 mPriority = 0;      // priority for effect control
      status_t                mStatus = NO_INIT;  // effect status
+     bool                    mProbe = false;     // effect created in probe mode: all commands
+                                                 // are no ops because mIEffect is NULL
      effect_callback_t       mCbf = nullptr;     // callback function for status, control and
                                                  // parameter changes notifications
      void*                   mUserData = nullptr;// client context for callback function
@@ -601,6 +609,7 @@ private:
     sp<IMemory>             mCblkMemory;        // shared memory for deferred parameter setting
     effect_param_cblk_t*    mCblk = nullptr;    // control block for deferred parameter setting
     pid_t                   mClientPid = (pid_t)-1;
+    uid_t                   mClientUid = (uid_t)-1;
 };
 
 

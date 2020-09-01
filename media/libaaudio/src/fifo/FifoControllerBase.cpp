@@ -33,7 +33,9 @@ FifoControllerBase::~FifoControllerBase() {
 }
 
 fifo_frames_t FifoControllerBase::getFullFramesAvailable() {
-    return (fifo_frames_t) (getWriteCounter() - getReadCounter());
+    fifo_frames_t temp = 0;
+    __builtin_sub_overflow(getWriteCounter(), getReadCounter(), &temp);
+    return temp;
 }
 
 fifo_frames_t FifoControllerBase::getReadIndex() {
@@ -42,7 +44,9 @@ fifo_frames_t FifoControllerBase::getReadIndex() {
 }
 
 void FifoControllerBase::advanceReadIndex(fifo_frames_t numFrames) {
-    setReadCounter(getReadCounter() + numFrames);
+   fifo_counter_t temp = 0;
+    __builtin_add_overflow(getReadCounter(), numFrames, &temp);
+    setReadCounter(temp);
 }
 
 fifo_frames_t FifoControllerBase::getEmptyFramesAvailable() {
@@ -55,7 +59,9 @@ fifo_frames_t FifoControllerBase::getWriteIndex() {
 }
 
 void FifoControllerBase::advanceWriteIndex(fifo_frames_t numFrames) {
-    setWriteCounter(getWriteCounter() + numFrames);
+    fifo_counter_t temp = 0;
+    __builtin_add_overflow(getWriteCounter(), numFrames, &temp);
+    setWriteCounter(temp);
 }
 
 void FifoControllerBase::setThreshold(fifo_frames_t threshold) {

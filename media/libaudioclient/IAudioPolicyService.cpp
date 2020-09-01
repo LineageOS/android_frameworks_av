@@ -22,6 +22,7 @@
 #include <math.h>
 #include <sys/types.h>
 
+#include <android/media/ICaptureStateListener.h>
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <media/AudioEffect.h>
@@ -31,6 +32,8 @@
 #include <system/audio.h>
 
 namespace android {
+
+using media::ICaptureStateListener;
 
 enum {
     SET_DEVICE_CONNECTION_STATE = IBinder::FIRST_CALL_TRANSACTION,
@@ -97,18 +100,25 @@ enum {
     IS_HAPTIC_PLAYBACK_SUPPORTED,
     SET_UID_DEVICE_AFFINITY,
     REMOVE_UID_DEVICE_AFFINITY,
+    SET_USERID_DEVICE_AFFINITY,
+    REMOVE_USERID_DEVICE_AFFINITY,
     GET_OFFLOAD_FORMATS_A2DP,
     LIST_AUDIO_PRODUCT_STRATEGIES,
     GET_STRATEGY_FOR_ATTRIBUTES,
     LIST_AUDIO_VOLUME_GROUPS,
     GET_VOLUME_GROUP_FOR_ATTRIBUTES,
+    SET_SUPPORTED_SYSTEM_USAGES,
     SET_ALLOWED_CAPTURE_POLICY,
     MOVE_EFFECTS_TO_IO,
     SET_RTT_ENABLED,
+    IS_CALL_SCREEN_MODE_SUPPORTED,
     SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
     GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+    GET_DEVICES_FOR_ATTRIBUTES,
     AUDIO_MODULES_UPDATED,  // oneway
+    SET_CURRENT_IME_UID,
+    REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -166,11 +176,12 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
-    virtual status_t setPhoneState(audio_mode_t state)
+    virtual status_t setPhoneState(audio_mode_t state, uid_t uid)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(state);
+        data.writeInt32(uid);
         remote()->transact(SET_PHONE_STATE, data, &reply);
         return static_cast <status_t> (reply.readInt32());
     }
@@ -331,6 +342,7 @@ public:
             ALOGE("getInputForAttr NULL portId - shouldn't happen");
             return BAD_VALUE;
         }
+
         data.write(attr, sizeof(audio_attributes_t));
         data.writeInt32(*input);
         data.writeInt32(riid);
@@ -619,6 +631,20 @@ public:
         }
         *count = retCount;
         return status;
+    }
+
+    status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(systemUsages.size());
+        for (auto systemUsage : systemUsages) {
+            data.writeInt32(systemUsage);
+        }
+        status_t status = remote()->transact(SET_SUPPORTED_SYSTEM_USAGES, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
     }
 
     status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) override {
@@ -1124,6 +1150,18 @@ public:
         return static_cast <status_t> (reply.readInt32());
     }
 
+    virtual status_t setCurrentImeUid(uid_t uid)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(uid);
+        status_t status = remote()->transact(SET_CURRENT_IME_UID, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast <status_t> (reply.readInt32());
+    }
+
     virtual bool isHapticPlaybackSupported()
     {
         Parcel data, reply;
@@ -1179,6 +1217,52 @@ public:
         }
         return status;
     }
+
+        virtual status_t setUserIdDeviceAffinities(int userId,
+                const Vector<AudioDeviceTypeAddr>& devices)
+        {
+            Parcel data, reply;
+            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+            data.writeInt32((int32_t) userId);
+            size_t size = devices.size();
+            size_t sizePosition = data.dataPosition();
+            data.writeInt32((int32_t) size);
+            size_t finalSize = size;
+            for (size_t i = 0; i < size; i++) {
+                size_t position = data.dataPosition();
+                if (devices[i].writeToParcel(&data) != NO_ERROR) {
+                    data.setDataPosition(position);
+                    finalSize--;
+                }
+            }
+            if (size != finalSize) {
+                size_t position = data.dataPosition();
+                data.setDataPosition(sizePosition);
+                data.writeInt32(finalSize);
+                data.setDataPosition(position);
+            }
+
+            status_t status = remote()->transact(SET_USERID_DEVICE_AFFINITY, data, &reply);
+            if (status == NO_ERROR) {
+                status = (status_t)reply.readInt32();
+            }
+            return status;
+        }
+
+        virtual status_t removeUserIdDeviceAffinities(int userId) {
+            Parcel data, reply;
+            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+
+            data.writeInt32((int32_t) userId);
+
+            status_t status =
+                remote()->transact(REMOVE_USERID_DEVICE_AFFINITY, data, &reply);
+            if (status == NO_ERROR) {
+                status = (status_t) reply.readInt32();
+            }
+            return status;
+        }
 
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies)
     {
@@ -1289,6 +1373,17 @@ public:
         return static_cast<status_t>(reply.readInt32());
     }
 
+    virtual bool isCallScreenModeSupported()
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = remote()->transact(IS_CALL_SCREEN_MODE_SUPPORTED, data, &reply);
+        if (status != NO_ERROR) {
+            return false;
+        }
+        return reply.readBool();
+    }
+
     virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
             const AudioDeviceTypeAddr &device)
     {
@@ -1338,11 +1433,67 @@ public:
         return static_cast<status_t>(reply.readInt32());
     }
 
+    virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
+            AudioDeviceTypeAddrVector *devices) const
+    {
+        if (devices == nullptr) {
+            return BAD_VALUE;
+        }
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        status_t status = aa.writeToParcel(&data);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = remote()->transact(GET_DEVICES_FOR_ATTRIBUTES, data, &reply);
+        if (status != NO_ERROR) {
+            // transaction failed, return error
+            return status;
+        }
+        status = static_cast<status_t>(reply.readInt32());
+        if (status != NO_ERROR) {
+            // APM method call failed, return error
+            return status;
+        }
+
+        const size_t numberOfDevices = (size_t)reply.readInt32();
+        for (size_t i = 0; i < numberOfDevices; i++) {
+            AudioDeviceTypeAddr device;
+            if (device.readFromParcel((Parcel*)&reply) == NO_ERROR) {
+                devices->push_back(device);
+            } else {
+                return FAILED_TRANSACTION;
+            }
+        }
+        return NO_ERROR;
+    }
+
     virtual void onNewAudioModulesAvailable()
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         remote()->transact(AUDIO_MODULES_UPDATED, data, &reply, IBinder::FLAG_ONEWAY);
+    }
+
+    status_t registerSoundTriggerCaptureStateListener(
+            const sp<media::ICaptureStateListener>& listener,
+            bool* result) override {
+        Parcel data, reply;
+        status_t status;
+        status =
+            data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        if (status != NO_ERROR) return status;
+        status = data.writeStrongBinder(IInterface::asBinder(listener));
+        if (status != NO_ERROR) return status;
+        status =
+            remote()->transact(REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER,
+                               data,
+                               &reply,
+                               0);
+        if (status != NO_ERROR) return status;
+        status = reply.readBool(result);
+        if (status != NO_ERROR) return status;
+        return NO_ERROR;
     }
 };
 
@@ -1367,8 +1518,6 @@ status_t BnAudioPolicyService::onTransact(
         case UNREGISTER_EFFECT:
         case SET_EFFECT_ENABLED:
         case GET_OUTPUT_FOR_ATTR:
-        case ACQUIRE_SOUNDTRIGGER_SESSION:
-        case RELEASE_SOUNDTRIGGER_SESSION:
         case MOVE_EFFECTS_TO_IO:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
@@ -1403,15 +1552,24 @@ status_t BnAudioPolicyService::onTransact(
         case SET_A11Y_SERVICES_UIDS:
         case SET_UID_DEVICE_AFFINITY:
         case REMOVE_UID_DEVICE_AFFINITY:
+        case SET_USERID_DEVICE_AFFINITY:
+        case REMOVE_USERID_DEVICE_AFFINITY:
         case GET_OFFLOAD_FORMATS_A2DP:
         case LIST_AUDIO_VOLUME_GROUPS:
         case GET_VOLUME_GROUP_FOR_ATTRIBUTES:
+        case ACQUIRE_SOUNDTRIGGER_SESSION:
+        case RELEASE_SOUNDTRIGGER_SESSION:
         case SET_RTT_ENABLED:
+        case IS_CALL_SCREEN_MODE_SUPPORTED:
         case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case SET_SUPPORTED_SYSTEM_USAGES:
         case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
         case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case GET_DEVICES_FOR_ATTRIBUTES:
         case SET_ALLOWED_CAPTURE_POLICY:
-        case AUDIO_MODULES_UPDATED: {
+        case AUDIO_MODULES_UPDATED:
+        case SET_CURRENT_IME_UID:
+        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -1488,7 +1646,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_PHONE_STATE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             reply->writeInt32(static_cast <uint32_t>(setPhoneState(
-                    (audio_mode_t) data.readInt32())));
+                    (audio_mode_t) data.readInt32(),
+                    (uid_t) data.readInt32())));
             return NO_ERROR;
         } break;
 
@@ -2024,8 +2183,6 @@ status_t BnAudioPolicyService::onTransact(
 
         case ACQUIRE_SOUNDTRIGGER_SESSION: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            sp<IAudioPolicyServiceClient> client = interface_cast<IAudioPolicyServiceClient>(
-                    data.readStrongBinder());
             audio_session_t session = AUDIO_SESSION_NONE;
             audio_io_handle_t ioHandle = AUDIO_IO_HANDLE_NONE;
             audio_devices_t device = AUDIO_DEVICE_NONE;
@@ -2041,8 +2198,6 @@ status_t BnAudioPolicyService::onTransact(
 
         case RELEASE_SOUNDTRIGGER_SESSION: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            sp<IAudioPolicyServiceClient> client = interface_cast<IAudioPolicyServiceClient>(
-                    data.readStrongBinder());
             audio_session_t session = (audio_session_t)data.readInt32();
             status_t status = releaseSoundTriggerSession(session);
             reply->writeInt32(status);
@@ -2302,7 +2457,6 @@ status_t BnAudioPolicyService::onTransact(
             reply->writeBool(isSupported);
             return NO_ERROR;
         }
-
         case SET_UID_DEVICE_AFFINITY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             const uid_t uid = (uid_t) data.readInt32();
@@ -2323,6 +2477,30 @@ status_t BnAudioPolicyService::onTransact(
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             const uid_t uid = (uid_t) data.readInt32();
             status_t status = removeUidDeviceAffinities(uid);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case SET_USERID_DEVICE_AFFINITY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            const int userId = (int) data.readInt32();
+            Vector<AudioDeviceTypeAddr> devices;
+            size_t size = (size_t)data.readInt32();
+            for (size_t i = 0; i < size; i++) {
+                AudioDeviceTypeAddr device;
+                if (device.readFromParcel((Parcel*)&data) == NO_ERROR) {
+                    devices.add(device);
+                }
+            }
+            status_t status = setUserIdDeviceAffinities(userId, devices);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case REMOVE_USERID_DEVICE_AFFINITY: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            const int userId = (int) data.readInt32();
+            status_t status = removeUserIdDeviceAffinities(userId);
             reply->writeInt32(status);
             return NO_ERROR;
         }
@@ -2407,14 +2585,44 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
+
             volume_group_t group;
             status = getVolumeGroupFromAudioAttributes(attributes, group);
-            reply->writeInt32(status);
             if (status != NO_ERROR) {
                 return NO_ERROR;
             }
+
+            reply->writeInt32(status);
             reply->writeUint32(static_cast<int>(group));
             return NO_ERROR;
+        }
+
+        case SET_SUPPORTED_SYSTEM_USAGES: {
+             CHECK_INTERFACE(IAudioPolicyService, data, reply);
+             std::vector<audio_usage_t> systemUsages;
+
+             int32_t size;
+             status_t status = data.readInt32(&size);
+             if (status != NO_ERROR) {
+                 return status;
+             }
+             if (size > MAX_ITEMS_PER_LIST) {
+                 size = MAX_ITEMS_PER_LIST;
+             }
+
+             for (int32_t i = 0; i < size; i++) {
+                 int32_t systemUsageInt;
+                 status = data.readInt32(&systemUsageInt);
+                 if (status != NO_ERROR) {
+                     return status;
+                 }
+
+                 audio_usage_t systemUsage = static_cast<audio_usage_t>(systemUsageInt);
+                 systemUsages.push_back(systemUsage);
+             }
+             status = setSupportedSystemUsages(systemUsages);
+             reply->writeInt32(static_cast <int32_t>(status));
+             return NO_ERROR;
         }
 
         case SET_ALLOWED_CAPTURE_POLICY: {
@@ -2431,6 +2639,13 @@ status_t BnAudioPolicyService::onTransact(
             bool enabled = static_cast<bool>(data.readInt32());
             status_t status = setRttEnabled(enabled);
             reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case IS_CALL_SCREEN_MODE_SUPPORTED: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            bool isAvailable = isCallScreenModeSupported();
+            reply->writeBool(isAvailable);
             return NO_ERROR;
         }
 
@@ -2468,9 +2683,77 @@ status_t BnAudioPolicyService::onTransact(
             return NO_ERROR;
         }
 
+        case GET_DEVICES_FOR_ATTRIBUTES: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            AudioAttributes attributes;
+            status_t status = attributes.readFromParcel(&data);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            AudioDeviceTypeAddrVector devices;
+            status = getDevicesForAttributes(attributes.getAttributes(), &devices);
+            // reply data formatted as:
+            //  - (int32) method call result from APM
+            //  - (int32) number of devices (n) if method call returned NO_ERROR
+            //  - n AudioDeviceTypeAddr         if method call returned NO_ERROR
+            reply->writeInt32(status);
+            if (status != NO_ERROR) {
+                return NO_ERROR;
+            }
+            status = reply->writeInt32(devices.size());
+            if (status != NO_ERROR) {
+                return status;
+            }
+            for (const auto& device : devices) {
+                status = device.writeToParcel(reply);
+                if (status != NO_ERROR) {
+                    return status;
+                }
+            }
+
+            return NO_ERROR;
+        }
+
         case AUDIO_MODULES_UPDATED: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             onNewAudioModulesAvailable();
+            return NO_ERROR;
+        } break;
+
+        case SET_CURRENT_IME_UID: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            int32_t uid;
+            status_t status = data.readInt32(&uid);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = setCurrentImeUid(uid);
+            reply->writeInt32(static_cast <int32_t>(status));
+            return NO_ERROR;
+        }
+
+        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            sp<IBinder> binder = data.readStrongBinder();
+            if (binder == nullptr) {
+                return BAD_VALUE;
+            }
+            sp<ICaptureStateListener>
+                listener = interface_cast<ICaptureStateListener>(
+                binder);
+            if (listener == nullptr) {
+                return BAD_VALUE;
+            }
+            bool ret;
+            status_t status =
+                registerSoundTriggerCaptureStateListener(listener, &ret);
+            LOG_ALWAYS_FATAL_IF(status != NO_ERROR,
+                                "Server returned unexpected status code: %d",
+                                status);
+            status = reply->writeBool(ret);
+            if (status != NO_ERROR) {
+                return status;
+            }
             return NO_ERROR;
         } break;
 

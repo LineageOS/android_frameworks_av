@@ -16,24 +16,31 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmSessionManager_test"
+#include <android/binder_auto_utils.h>
 #include <utils/Log.h>
 
 #include <gtest/gtest.h>
 
-#include <media/IResourceManagerService.h>
-#include <media/IResourceManagerClient.h>
+#include <aidl/android/media/BnResourceManagerClient.h>
+#include <aidl/android/media/BnResourceManagerService.h>
+
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
-#include <mediadrm/DrmHal.h>
-#include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
 
 #include <algorithm>
+#include <iostream>
 #include <vector>
 
 #include "ResourceManagerService.h"
 
 namespace android {
+
+using Status = ::ndk::ScopedAStatus;
+using ::aidl::android::media::BnResourceManagerClient;
+using ::aidl::android::media::BnResourceManagerService;
+using ::aidl::android::media::MediaResourceParcel;
+using ::aidl::android::media::IResourceManagerClient;
 
 static Vector<uint8_t> toAndroidVector(const std::vector<uint8_t> &vec) {
     Vector<uint8_t> aVec;
@@ -68,21 +75,21 @@ struct FakeDrm : public BnResourceManagerClient {
           mReclaimed(false),
           mDrmSessionManager(manager) {}
 
-    virtual ~FakeDrm() {}
-
-    virtual bool reclaimResource() {
+    Status reclaimResource(bool* _aidl_return) {
         mReclaimed = true;
         mDrmSessionManager->removeSession(mSessionId);
-        return true;
+        *_aidl_return = true;
+        return Status::ok();
     }
 
-    virtual String8 getName() {
+    Status getName(::std::string* _aidl_return) {
         String8 name("FakeDrm[");
         for (size_t i = 0; i < mSessionId.size(); ++i) {
             name.appendFormat("%02x", mSessionId[i]);
         }
         name.append("]");
-        return name;
+        *_aidl_return = name;
+        return Status::ok();
     }
 
     bool isReclaimed() const {
@@ -108,8 +115,7 @@ struct FakeSystemCallback :
 
     virtual void noteResetVideo() override {}
 
-    virtual bool requestCpusetBoost(
-            bool /*enable*/, const sp<IInterface> &/*client*/) override {
+    virtual bool requestCpusetBoost(bool /*enable*/) override {
         return true;
     }
 
@@ -130,14 +136,15 @@ static const std::vector<uint8_t> kTestSessionId3{9, 0};
 class DrmSessionManagerTest : public ::testing::Test {
 public:
     DrmSessionManagerTest()
-        : mService(new ResourceManagerService(new FakeProcessInfo(), new FakeSystemCallback())),
+        : mService(::ndk::SharedRefBase::make<ResourceManagerService>
+            (new FakeProcessInfo(), new FakeSystemCallback())),
           mDrmSessionManager(new DrmSessionManager(mService)),
-          mTestDrm1(new FakeDrm(kTestSessionId1, mDrmSessionManager)),
-          mTestDrm2(new FakeDrm(kTestSessionId2, mDrmSessionManager)),
-          mTestDrm3(new FakeDrm(kTestSessionId3, mDrmSessionManager)) {
-        DrmSessionManager *ptr = new DrmSessionManager(mService);
-        EXPECT_NE(ptr, nullptr);
-        /* mDrmSessionManager = ptr; */
+          mTestDrm1(::ndk::SharedRefBase::make<FakeDrm>(
+                  kTestSessionId1, mDrmSessionManager)),
+          mTestDrm2(::ndk::SharedRefBase::make<FakeDrm>(
+                  kTestSessionId2, mDrmSessionManager)),
+          mTestDrm3(::ndk::SharedRefBase::make<FakeDrm>(
+                  kTestSessionId3, mDrmSessionManager)) {
     }
 
 protected:
@@ -147,11 +154,11 @@ protected:
         mDrmSessionManager->addSession(kTestPid2, mTestDrm3, mTestDrm3->mSessionId);
     }
 
-    sp<IResourceManagerService> mService;
+    std::shared_ptr<ResourceManagerService> mService;
     sp<DrmSessionManager> mDrmSessionManager;
-    sp<FakeDrm> mTestDrm1;
-    sp<FakeDrm> mTestDrm2;
-    sp<FakeDrm> mTestDrm3;
+    std::shared_ptr<FakeDrm> mTestDrm1;
+    std::shared_ptr<FakeDrm> mTestDrm2;
+    std::shared_ptr<FakeDrm> mTestDrm3;
 };
 
 TEST_F(DrmSessionManagerTest, addSession) {
@@ -198,7 +205,8 @@ TEST_F(DrmSessionManagerTest, reclaimSession) {
 
     // add a session from a higher priority process.
     const std::vector<uint8_t> sid{1, 3, 5};
-    sp<FakeDrm> drm = new FakeDrm(sid, mDrmSessionManager);
+    std::shared_ptr<FakeDrm> drm =
+            ::ndk::SharedRefBase::make<FakeDrm>(sid, mDrmSessionManager);
     mDrmSessionManager->addSession(15, drm, drm->mSessionId);
 
     // make sure mTestDrm2 is reclaimed next instead of mTestDrm3

@@ -23,6 +23,7 @@
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
 
+#include "CameraOfflineSessionClient.h"
 #include "CameraService.h"
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
@@ -32,6 +33,8 @@ using android::camera3::OutputStreamInfo;
 using android::camera3::CompositeStream;
 
 namespace android {
+
+typedef std::function<CameraMetadata (const String8 &)> metadataGetter;
 
 struct CameraDeviceClientBase :
          public CameraService::BasicClient,
@@ -47,6 +50,7 @@ protected:
     CameraDeviceClientBase(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
+            const std::optional<String16>& clientFeatureId,
             const String8& cameraId,
             int api1CameraId,
             int cameraFacing,
@@ -90,7 +94,9 @@ public:
     virtual binder::Status beginConfigure() override;
 
     virtual binder::Status endConfigure(int operatingMode,
-            const hardware::camera2::impl::CameraMetadataNative& sessionParams) override;
+            const hardware::camera2::impl::CameraMetadataNative& sessionParams,
+            /*out*/
+            std::vector<int>* offlineStreamIds) override;
 
     // Verify specific session configuration.
     virtual binder::Status isSessionConfigurationSupported(
@@ -152,6 +158,16 @@ public:
     virtual binder::Status finalizeOutputConfigurations(int32_t streamId,
             const hardware::camera2::params::OutputConfiguration &outputConfiguration) override;
 
+    virtual binder::Status setCameraAudioRestriction(int32_t mode) override;
+
+    virtual binder::Status getGlobalAudioRestriction(/*out*/int32_t* outMode) override;
+
+    virtual binder::Status switchToOffline(
+            const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
+            const std::vector<int>& offlineOutputIds,
+            /*out*/
+            sp<hardware::camera2::ICameraOfflineSession>* session) override;
+
     /**
      * Interface used by CameraService
      */
@@ -159,6 +175,7 @@ public:
     CameraDeviceClient(const sp<CameraService>& cameraService,
             const sp<hardware::camera2::ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
+            const std::optional<String16>& clientFeatureId,
             const String8& cameraId,
             int cameraFacing,
             int clientPid,
@@ -168,6 +185,8 @@ public:
 
     virtual status_t      initialize(sp<CameraProviderManager> manager,
             const String8& monitorTags) override;
+
+    virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
@@ -185,6 +204,16 @@ public:
     virtual void notifyRequestQueueEmpty();
     virtual void notifyRepeatingRequestError(long lastFrameNumber);
 
+    // utility function to convert AIDL SessionConfiguration to HIDL
+    // streamConfiguration. Also checks for validity of SessionConfiguration and
+    // returns a non-ok binder::Status if the passed in session configuration
+    // isn't valid.
+    static binder::Status
+    convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
+            const String8 &cameraId, const CameraMetadata &deviceInfo,
+            metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
+            hardware::camera::device::V3_4::StreamConfiguration &streamConfiguration,
+            bool *earlyExit);
     /**
      * Interface used by independent components of CameraDeviceClient.
      */
@@ -229,8 +258,6 @@ private:
 
     /** Preview callback related members */
     sp<camera2::FrameProcessorBase> mFrameProcessor;
-    static const int32_t FRAME_PROCESSOR_LISTENER_MIN_ID = 0;
-    static const int32_t FRAME_PROCESSOR_LISTENER_MAX_ID = 0x7fffffffL;
 
     std::vector<int32_t> mSupportedPhysicalRequestKeys;
 
@@ -239,10 +266,10 @@ private:
 
     /** Utility members */
     binder::Status checkPidStatus(const char* checkLocation);
-    binder::Status checkOperatingModeLocked(int operatingMode) const;
-    binder::Status checkPhysicalCameraIdLocked(String8 physicalCameraId);
-    binder::Status checkSurfaceTypeLocked(size_t numBufferProducers, bool deferredConsumer,
-            int surfaceType) const;
+    static binder::Status checkOperatingMode(int operatingMode, const CameraMetadata &staticInfo,
+            const String8 &cameraId);
+    static binder::Status checkSurfaceType(size_t numBufferProducers, bool deferredConsumer,
+            int surfaceType);
     static void mapStreamInfo(const OutputStreamInfo &streamInfo,
             camera3_stream_rotation_t rotation, String8 physicalId,
             hardware::camera::device::V3_4::Stream *stream /*out*/);
@@ -273,9 +300,9 @@ private:
 
     // Create a Surface from an IGraphicBufferProducer. Returns error if
     // IGraphicBufferProducer's property doesn't match with streamInfo
-    binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
-            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
-            const String8& physicalCameraId);
+    static binder::Status createSurfaceFromGbp(OutputStreamInfo& streamInfo, bool isStreamInfoValid,
+            sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp, const String8 &cameraId,
+            const CameraMetadata &physicalCameraMetadata);
 
 
     // Utility method to insert the surface into SurfaceMap
@@ -285,7 +312,8 @@ private:
 
     // Check that the physicalCameraId passed in is spported by the camera
     // device.
-    bool checkPhysicalCameraId(const String8& physicalCameraId);
+    static binder::Status checkPhysicalCameraId(const std::vector<std::string> &physicalCameraIds,
+            const String8 &physicalCameraId, const String8 &logicalCameraId);
 
     // IGraphicsBufferProducer binder -> Stream ID + Surface ID for output streams
     KeyedVector<sp<IBinder>, StreamSurfaceId> mStreamMap;

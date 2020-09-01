@@ -32,17 +32,10 @@ using namespace aaudio;
 #define RIDICULOUSLY_LARGE_FRAME_SIZE        4096
 
 AudioEndpoint::AudioEndpoint()
-    : mUpCommandQueue(nullptr)
-    , mDataQueue(nullptr)
-    , mFreeRunning(false)
+    : mFreeRunning(false)
     , mDataReadCounter(0)
     , mDataWriteCounter(0)
 {
-}
-
-AudioEndpoint::~AudioEndpoint() {
-    delete mDataQueue;
-    delete mUpCommandQueue;
 }
 
 // TODO Consider moving to a method in RingBufferDescriptor
@@ -144,7 +137,7 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
         return AAUDIO_ERROR_INTERNAL;
     }
 
-    mUpCommandQueue = new FifoBuffer(
+    mUpCommandQueue = std::make_unique<FifoBuffer>(
             descriptor->bytesPerFrame,
             descriptor->capacityInFrames,
             descriptor->readCounterAddress,
@@ -173,7 +166,7 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
                                   ? &mDataWriteCounter
                                   : descriptor->writeCounterAddress;
 
-    mDataQueue = new FifoBuffer(
+    mDataQueue = std::make_unique<FifoBuffer>(
             descriptor->bytesPerFrame,
             descriptor->capacityInFrames,
             readCounterAddress,
@@ -194,18 +187,15 @@ int32_t AudioEndpoint::getEmptyFramesAvailable(WrappingBuffer *wrappingBuffer) {
     return mDataQueue->getEmptyRoomAvailable(wrappingBuffer);
 }
 
-int32_t AudioEndpoint::getEmptyFramesAvailable()
-{
+int32_t AudioEndpoint::getEmptyFramesAvailable() {
     return mDataQueue->getEmptyFramesAvailable();
 }
 
-int32_t AudioEndpoint::getFullFramesAvailable(WrappingBuffer *wrappingBuffer)
-{
+int32_t AudioEndpoint::getFullFramesAvailable(WrappingBuffer *wrappingBuffer) {
     return mDataQueue->getFullDataAvailable(wrappingBuffer);
 }
 
-int32_t AudioEndpoint::getFullFramesAvailable()
-{
+int32_t AudioEndpoint::getFullFramesAvailable() {
     return mDataQueue->getFullFramesAvailable();
 }
 
@@ -217,29 +207,24 @@ void AudioEndpoint::advanceReadIndex(int32_t deltaFrames) {
     mDataQueue->advanceReadIndex(deltaFrames);
 }
 
-void AudioEndpoint::setDataReadCounter(fifo_counter_t framesRead)
-{
+void AudioEndpoint::setDataReadCounter(fifo_counter_t framesRead) {
     mDataQueue->setReadCounter(framesRead);
 }
 
-fifo_counter_t AudioEndpoint::getDataReadCounter()
-{
+fifo_counter_t AudioEndpoint::getDataReadCounter() const {
     return mDataQueue->getReadCounter();
 }
 
-void AudioEndpoint::setDataWriteCounter(fifo_counter_t framesRead)
-{
+void AudioEndpoint::setDataWriteCounter(fifo_counter_t framesRead) {
     mDataQueue->setWriteCounter(framesRead);
 }
 
-fifo_counter_t AudioEndpoint::getDataWriteCounter()
-{
+fifo_counter_t AudioEndpoint::getDataWriteCounter() const {
     return mDataQueue->getWriteCounter();
 }
 
 int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
-                                            int32_t *actualFrames)
-{
+                                            int32_t *actualFrames) {
     if (requestedFrames < ENDPOINT_DATA_QUEUE_SIZE_MIN) {
         requestedFrames = ENDPOINT_DATA_QUEUE_SIZE_MIN;
     }
@@ -248,19 +233,17 @@ int32_t AudioEndpoint::setBufferSizeInFrames(int32_t requestedFrames,
     return AAUDIO_OK;
 }
 
-int32_t AudioEndpoint::getBufferSizeInFrames() const
-{
+int32_t AudioEndpoint::getBufferSizeInFrames() const {
     return mDataQueue->getThreshold();
 }
 
-int32_t AudioEndpoint::getBufferCapacityInFrames() const
-{
+int32_t AudioEndpoint::getBufferCapacityInFrames() const {
     return (int32_t)mDataQueue->getBufferCapacityInFrames();
 }
 
 void AudioEndpoint::dump() const {
-    ALOGD("data readCounter  = %lld", (long long) mDataQueue->getReadCounter());
-    ALOGD("data writeCounter = %lld", (long long) mDataQueue->getWriteCounter());
+    ALOGD("data readCounter  = %lld", (long long) getDataReadCounter());
+    ALOGD("data writeCounter = %lld", (long long) getDataWriteCounter());
 }
 
 void AudioEndpoint::eraseDataMemory() {

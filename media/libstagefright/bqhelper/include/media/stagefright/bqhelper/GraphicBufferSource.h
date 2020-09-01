@@ -31,8 +31,6 @@
 
 namespace android {
 
-using ::android::binder::Status;
-
 struct FrameDropper;
 class BufferItem;
 class IGraphicBufferProducer;
@@ -99,26 +97,26 @@ public:
     // This is called when component transitions to running state, which means
     // we can start handing it buffers.  If we already have buffers of data
     // sitting in the BufferQueue, this will send them to the codec.
-    Status start();
+    status_t start();
 
     // This is called when component transitions to stopped, indicating that
     // the codec is meant to return all buffers back to the client for them
     // to be freed. Do NOT submit any more buffers to the component.
-    Status stop();
+    status_t stop();
 
     // This is called when component transitions to released, indicating that
     // we are shutting down.
-    Status release();
+    status_t release();
 
     // A "codec buffer", i.e. a buffer that can be used to pass data into
     // the encoder, has been allocated.  (This call does not call back into
     // component.)
-    Status onInputBufferAdded(int32_t bufferId);
+    status_t onInputBufferAdded(int32_t bufferId);
 
     // Called when encoder is no longer using the buffer.  If we have a BQ
     // buffer available, fill it with a new frame of data; otherwise, just mark
     // it as available.
-    Status onInputBufferEmptied(int32_t bufferId, int fenceFd);
+    status_t onInputBufferEmptied(int32_t bufferId, int fenceFd);
 
     // IGraphicBufferSource interface
     // ------------------------------
@@ -461,12 +459,33 @@ private:
     // Slow motion mode is enabled if both encoding and capture frame rates are
     // defined and the encoding frame rate is less than half the capture frame
     // rate. In this mode, the source is expected to produce frames with an even
-    // timestamp interval (after rounding) with the configured capture fps. The
-    // first source timestamp is used as the source base time. Afterwards, the
-    // timestamp of each source frame is snapped to the nearest expected capture
-    // timestamp and scaled to match the configured encoding frame rate.
+    // timestamp interval (after rounding) with the configured capture fps.
+    //
+    // These modes must be configured by calling setTimeLapseConfig() before
+    // using this source.
+    //
+    // Timestamp snapping for slow motion recording
+    // ============================================
+    //
+    // When the slow motion mode is configured with setTimeLapseConfig(), the
+    // property "debug.stagefright.snap_timestamps" will be checked. If the
+    // value of the property is set to any value other than 1, mSnapTimestamps
+    // will be set to false. Otherwise, mSnapTimestamps will be set to true.
+    // (mSnapTimestamps will be false for time lapse recording regardless of the
+    // value of the property.)
+    //
+    // If mSnapTimestamps is true, i.e., timestamp snapping is enabled, the
+    // first source timestamp will be used as the source base time; afterwards,
+    // the timestamp of each source frame will be snapped to the nearest
+    // expected capture timestamp and scaled to match the configured encoding
+    // frame rate.
+    //
+    // If timestamp snapping is disabled, the timestamp of source frames will
+    // be scaled to match the ratio between the configured encoding frame rate
+    // and the configured capture frame rate.
 
-    // These modes must be enabled before using this source.
+    // whether timestamps will be snapped
+    bool mSnapTimestamps{true};
 
     // adjusted capture timestamp of the base frame
     int64_t mBaseCaptureUs;

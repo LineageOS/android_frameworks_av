@@ -72,8 +72,8 @@ public:
      */
     status_t getOutputForAttr(const audio_attributes_t& attributes, uid_t uid,
                               audio_output_flags_t flags,
-                              sp<SwAudioOutputDescriptor> &primaryDesc,
-                              std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs);
+                              sp<AudioPolicyMix> &primaryMix,
+                              std::vector<sp<AudioPolicyMix>> *secondaryMixes);
 
     sp<DeviceDescriptor> getDeviceAndMixForInputSource(audio_source_t inputSource,
                                                        const DeviceVector &availableDeviceTypes,
@@ -105,12 +105,27 @@ public:
     status_t removeUidDeviceAffinities(uid_t uid);
     status_t getDevicesForUid(uid_t uid, Vector<AudioDeviceTypeAddr>& devices) const;
 
+    /**
+     * Updates the mix rules in order to make streams associated with the given user
+     * be routed to the given audio devices.
+     * @param userId the userId for which the device affinity is set
+     * @param devices the vector of devices that this userId may be routed to. A typical
+     *    use is to pass the devices associated with a given zone in a multi-zone setup.
+     * @return NO_ERROR if the update was successful, INVALID_OPERATION otherwise.
+     *    An example of failure is when there are already rules in place to restrict
+     *    a mix to the given userId (i.e. when a MATCH_USERID rule was set for it).
+     */
+    status_t setUserIdDeviceAffinities(int userId, const Vector<AudioDeviceTypeAddr>& devices);
+    status_t removeUserIdDeviceAffinities(int userId);
+    status_t getDevicesForUserId(int userId, Vector<AudioDeviceTypeAddr>& devices) const;
+
     void dump(String8 *dst) const;
 
 private:
     enum class MixMatchStatus { MATCH, NO_MATCH, INVALID_MIX };
     MixMatchStatus mixMatch(const AudioMix* mix, size_t mixIndex,
-                            const audio_attributes_t& attributes, uid_t uid);
+                            const audio_attributes_t& attributes,
+                            uid_t uid);
 };
 
 } // namespace android

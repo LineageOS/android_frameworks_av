@@ -121,7 +121,8 @@ public:
                                   audio_output_flags_t *flags,
                                   audio_port_handle_t *selectedDeviceId,
                                   audio_port_handle_t *portId,
-                                  std::vector<audio_io_handle_t> *secondaryOutputs) override;
+                                  std::vector<audio_io_handle_t> *secondaryOutputs,
+                                  output_type_t *outputType) override;
         virtual status_t startOutput(audio_port_handle_t portId);
         virtual status_t stopOutput(audio_port_handle_t portId);
         virtual void releaseOutput(audio_port_handle_t portId);
@@ -192,6 +193,10 @@ public:
         // return the enabled output devices for the given stream type
         virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
 
+        virtual status_t getDevicesForAttributes(
+                const audio_attributes_t &attributes,
+                AudioDeviceTypeAddrVector *devices);
+
         virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc = NULL);
         virtual status_t registerEffect(const effect_descriptor_t *desc,
                                         audio_io_handle_t io,
@@ -260,6 +265,9 @@ public:
         virtual status_t setUidDeviceAffinities(uid_t uid,
                 const Vector<AudioDeviceTypeAddr>& devices);
         virtual status_t removeUidDeviceAffinities(uid_t uid);
+        virtual status_t setUserIdDeviceAffinities(int userId,
+                const Vector<AudioDeviceTypeAddr>& devices);
+        virtual status_t removeUserIdDeviceAffinities(int userId);
 
         virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    const AudioDeviceTypeAddr &device);
@@ -287,7 +295,7 @@ public:
         virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
                     std::vector<audio_format_t> *formats);
 
-        virtual void setAppState(uid_t uid, app_state_t state);
+        virtual void setAppState(audio_port_handle_t portId, app_state_t state);
 
         virtual bool isHapticPlaybackSupported();
 
@@ -314,6 +322,8 @@ public:
             volumeGroup = mEngine->getVolumeGroupForAttributes(aa.getAttributes());
             return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
         }
+
+        bool isCallScreenModeSupported() override;
 
         void onNewAudioModulesAvailable() override;
 
@@ -487,6 +497,8 @@ protected:
         virtual bool isInCall();
         // true if given state represents a device in a telephony or VoIP call
         virtual bool isStateInCall(int state);
+        // true if playback to call TX or capture from call RX is possible
+        bool isCallAudioAccessible();
 
         // when a device is connected, checks if an open output can be routed
         // to this device. If none is open, tries to open one of the available outputs.
@@ -825,7 +837,8 @@ private:
                 audio_output_flags_t *flags,
                 audio_port_handle_t *selectedDeviceId,
                 bool *isRequestedDeviceForExclusiveUse,
-                std::vector<sp<SwAudioOutputDescriptor>> *secondaryDescs);
+                std::vector<sp<AudioPolicyMix>> *secondaryMixes,
+                output_type_t *outputType);
         // internal method to return the output handle for the given device and format
         audio_io_handle_t getOutputForDevices(
                 const DeviceVector &devices,
@@ -835,6 +848,16 @@ private:
                 audio_output_flags_t *flags,
                 bool forceMutingHaptic = false);
 
+        // Internal method checking if a direct output can be opened matching the requested
+        // attributes, flags, config and devices.
+        // If NAME_NOT_FOUND is returned, an attempt can be made to open a mixed output.
+        status_t openDirectOutput(
+                audio_stream_type_t stream,
+                audio_session_t session,
+                const audio_config_t *config,
+                audio_output_flags_t flags,
+                const DeviceVector &devices,
+                audio_io_handle_t *output);
         /**
          * @brief getInputForDevice selects an input handle for a given input device and
          * requester context
@@ -887,7 +910,7 @@ private:
          * @param[in] delayMs if required
          * @param[in] sourceDesc [optional] in case of external source, source client to be
          * configured by the patch, i.e. assigning an Output (HW or SW)
-         * @return NO_ERROR if patch installed correclty, error code otherwise.
+         * @return NO_ERROR if patch installed correctly, error code otherwise.
          */
         status_t createAudioPatchInternal(const struct audio_patch *patch,
                                           audio_patch_handle_t *handle,
@@ -897,7 +920,7 @@ private:
          * @brief releaseAudioPatchInternal internal function to remove an audio patch
          * @param[in] handle of the patch to be removed
          * @param[in] delayMs if required
-         * @return NO_ERROR if patch removed correclty, error code otherwise.
+         * @return NO_ERROR if patch removed correctly, error code otherwise.
          */
         status_t releaseAudioPatchInternal(audio_patch_handle_t handle, uint32_t delayMs = 0);
 
@@ -914,7 +937,11 @@ private:
                 uid_t uid,
                 sp<AudioPatch> *patchDescPtr);
 
-        void cleanUpEffectsForIo(audio_io_handle_t io);
+        bool areAllDevicesSupported(
+                const Vector<AudioDeviceTypeAddr>& devices,
+                std::function<bool(audio_devices_t)> predicate,
+                const char* context);
+
 };
 
 };

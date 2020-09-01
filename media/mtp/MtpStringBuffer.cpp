@@ -26,14 +26,31 @@
 
 namespace {
 
-std::wstring_convert<std::codecvt_utf8_utf16<char16_t>,char16_t> gConvert;
+const char * utf16_cerror = "__CONVERSION_ERROR__";
+const char16_t * utf8_cerror = u"__CONVERSION_ERROR__";
+
+std::wstring_convert<std::codecvt_utf8_utf16<char16_t>,char16_t> gConvert(utf16_cerror, utf8_cerror);
 
 static std::string utf16ToUtf8(std::u16string input_str) {
-    return gConvert.to_bytes(input_str);
+    std::string conversion = gConvert.to_bytes(input_str);
+
+    if (conversion == utf16_cerror) {
+        ALOGE("Unable to convert UTF-16 string to UTF-8");
+        return "";
+    } else {
+        return conversion;
+    }
 }
 
 static std::u16string utf8ToUtf16(std::string input_str) {
-    return gConvert.from_bytes(input_str);
+    std::u16string conversion = gConvert.from_bytes(input_str);
+
+    if (conversion == utf8_cerror) {
+        ALOGE("Unable to convert UTF-8 string to UTF-16");
+        return u"";
+    } else {
+        return conversion;
+    }
 }
 
 } // namespace

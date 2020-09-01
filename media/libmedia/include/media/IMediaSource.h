@@ -22,7 +22,7 @@
 
 #include <binder/IInterface.h>
 #include <binder/IMemory.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaErrors.h>
 
@@ -135,6 +135,7 @@ protected:
 
 private:
     uint32_t mBuffersSinceStop; // Buffer tracking variable
+    Mutex mBnLock; // to guard readMultiple against concurrent access to the buffer cache
 
     std::unique_ptr<MediaBufferGroup> mGroup;
 

@@ -336,11 +336,10 @@ void C2SoftAmrDec::process(
                 memset(output, 0, outSamples * sizeof(int16_t));
             } else {
                 int16_t FT;
-                RX_State_wb rx_state;
                 int16_t numRecSamples;
 
                 mime_unsorting(const_cast<uint8_t *>(&input[1]),
-                               mInputSampleBuffer, &FT, &FM, 1, &rx_state);
+                               mInputSampleBuffer, &FT, &FM, 1, &mRxState);
                 pvDecoder_AmrWb(FM, mInputSampleBuffer, output, &numRecSamples,
                                 mDecoderBuf, FT, mDecoderCookie);
                 if (numRecSamples != outSamples) {

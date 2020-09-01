@@ -92,8 +92,6 @@ private:
     aaudio_result_t writeNowWithConversion(const void *buffer,
                                            int32_t numFrames);
 
-    int64_t                  mLastFramesRead = 0; // used to prevent retrograde motion
-
     AAudioFlowGraph          mFlowGraph;
 
 };

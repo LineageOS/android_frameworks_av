@@ -21,9 +21,7 @@
 
 namespace android {
 
-class ACodecBufferChannel;
 struct GraphicBufferListener;
-class MemoryDealer;
 struct SimpleFilter;
 
 struct MediaFilter : public CodecBase {
@@ -65,6 +63,8 @@ private:
         sp<MediaCodecBuffer> mData;
     };
 
+    class BufferChannel;
+
     enum State {
       UNINITIALIZED,
       INITIALIZED,
@@ -104,7 +104,6 @@ private:
     sp<AMessage> mInputFormat;
     sp<AMessage> mOutputFormat;
 
-    sp<MemoryDealer> mDealer[2];
     Vector<BufferInfo> mBuffers[2];
     Vector<BufferInfo*> mAvailableInputBuffers;
     Vector<BufferInfo*> mAvailableOutputBuffers;
@@ -113,15 +112,15 @@ private:
     sp<SimpleFilter> mFilter;
     sp<GraphicBufferListener> mGraphicBufferListener;
 
-    std::shared_ptr<ACodecBufferChannel> mBufferChannel;
+    std::shared_ptr<BufferChannel> mBufferChannel;
 
     // helper functions
     void signalProcessBuffers();
     void signalError(status_t error);
 
     status_t allocateBuffersOnPort(OMX_U32 portIndex);
-    BufferInfo *findBufferByID(
-            uint32_t portIndex, uint32_t bufferID,
+    BufferInfo *findBuffer(
+            uint32_t portIndex, const sp<MediaCodecBuffer> &buffer,
             ssize_t *index = NULL);
     void postFillThisBuffer(BufferInfo *info);
     void postDrainThisBuffer(BufferInfo *info);

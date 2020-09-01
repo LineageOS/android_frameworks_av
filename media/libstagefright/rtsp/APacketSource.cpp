@@ -112,7 +112,9 @@ static sp<ABuffer> MakeAVCCodecSpecificData(
     sp<ABuffer> profileLevelID = NULL;
     if (GetAttribute(params, "profile-level-id", &val)) {
         profileLevelID = decodeHex(val);
-        CHECK_EQ(profileLevelID->size(), 3u);
+        if (profileLevelID != NULL && profileLevelID->size() != 3u) {
+            profileLevelID = NULL;
+        }
     }
 
     Vector<sp<ABuffer> > paramSets;

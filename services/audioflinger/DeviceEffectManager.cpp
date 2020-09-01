@@ -74,13 +74,14 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::DeviceEffectManager::createEffect_l
         const sp<IEffectClient>& effectClient,
         const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches,
         int *enabled,
-        status_t *status) {
+        status_t *status,
+        bool probe) {
     sp<DeviceEffectProxy> effect;
     sp<EffectHandle> handle;
     status_t lStatus;
 
     lStatus = checkEffectCompatibility(descriptor);
-    if (lStatus != NO_ERROR) {
+    if (probe || lStatus != NO_ERROR) {
        *status = lStatus;
        return handle;
     }
@@ -143,7 +144,8 @@ void AudioFlinger::DeviceEffectManager::dump(int fd) {
         write(fd, result.string(), result.size());
     }
 
-    write(fd, "\nDevice Effects:\n", sizeof("\nDevice Effects:\n"));
+    String8 heading("\nDevice Effects:\n");
+    write(fd, heading.string(), heading.size());
     for (const auto& iter : mDeviceEffects) {
         String8 outStr;
         outStr.appendFormat("%*sEffect for device %s address %s:\n", 2, "",

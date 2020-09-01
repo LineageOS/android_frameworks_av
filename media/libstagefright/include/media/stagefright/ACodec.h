@@ -37,6 +37,15 @@
 #define TRACK_BUFFER_TIMING     0
 
 namespace android {
+namespace hardware {
+namespace media {
+namespace omx {
+namespace V1_0 {
+struct IGraphicBufferSource;
+}  // namespace V1_0
+}  // namespace omx
+}  // namespace media
+}  // namespace hardware
 
 struct ABuffer;
 class ACodecBufferChannel;
@@ -149,6 +158,7 @@ private:
         kFlagIsSecure                                 = 1,
         kFlagPushBlankBuffersToNativeWindowOnShutdown = 2,
         kFlagIsGrallocUsageProtected                  = 4,
+        kFlagPreregisterMetadataBuffers               = 8,
     };
 
     enum {
@@ -279,7 +289,7 @@ private:
     size_t mNumUndequeuedBuffers;
     sp<DataConverter> mConverter[2];
 
-    sp<IGraphicBufferSource> mGraphicBufferSource;
+    sp<hardware::media::omx::V1_0::IGraphicBufferSource> mGraphicBufferSource;
     int64_t mRepeatFrameDelayUs;
     int64_t mMaxPtsGapUs;
     float mMaxFps;
@@ -466,6 +476,8 @@ private:
         int32_t targetRefLevel;
         int32_t encodedTargetLevel;
         int32_t effectType;
+        int32_t albumMode;
+        int32_t outputLoudness;
     } drcParams_t;
 
     status_t setupAACCodec(
@@ -496,6 +508,7 @@ private:
             AudioEncoding encoding = kAudioEncodingPcm16bit);
 
     status_t setPriority(int32_t priority);
+    status_t setLowLatency(int32_t lowLatency);
     status_t setLatency(uint32_t latency);
     status_t getLatency(uint32_t *latency);
     status_t setAudioPresentation(int32_t presentationId, int32_t programId);

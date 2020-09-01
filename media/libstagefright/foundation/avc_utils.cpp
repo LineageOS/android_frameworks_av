@@ -166,10 +166,21 @@ void FindAVCDimensions(
     unsigned pic_height_in_map_units_minus1 = parseUE(&br);
     unsigned frame_mbs_only_flag = br.getBits(1);
 
-    *width = pic_width_in_mbs_minus1 * 16 + 16;
+    //    *width = pic_width_in_mbs_minus1 * 16 + 16;
+    if (__builtin_mul_overflow(pic_width_in_mbs_minus1, 16, &pic_width_in_mbs_minus1) ||
+        __builtin_add_overflow(pic_width_in_mbs_minus1, 16, width)) {
+        *width = 0;
+    }
 
-    *height = (2 - frame_mbs_only_flag)
-        * (pic_height_in_map_units_minus1 * 16 + 16);
+    //    *height = (2 - frame_mbs_only_flag) * (pic_height_in_map_units_minus1 * 16 + 16);
+    if (__builtin_mul_overflow(
+                pic_height_in_map_units_minus1, 16, &pic_height_in_map_units_minus1) ||
+        __builtin_add_overflow(
+                pic_height_in_map_units_minus1, 16, &pic_height_in_map_units_minus1) ||
+        __builtin_mul_overflow(
+                pic_height_in_map_units_minus1, (2 - frame_mbs_only_flag), height)) {
+        *height = 0;
+    }
 
     if (!frame_mbs_only_flag) {
         br.getBits(1);  // mb_adaptive_frame_field_flag
@@ -202,17 +213,19 @@ void FindAVCDimensions(
 
 
         // *width -= (frame_crop_left_offset + frame_crop_right_offset) * cropUnitX;
-        if(__builtin_add_overflow(frame_crop_left_offset, frame_crop_right_offset, &frame_crop_left_offset) ||
-            __builtin_mul_overflow(frame_crop_left_offset, cropUnitX, &frame_crop_left_offset) ||
-            __builtin_sub_overflow(*width, frame_crop_left_offset, width) ||
+        if(__builtin_add_overflow(
+                   frame_crop_left_offset, frame_crop_right_offset, &frame_crop_left_offset) ||
+           __builtin_mul_overflow(frame_crop_left_offset, cropUnitX, &frame_crop_left_offset) ||
+           __builtin_sub_overflow(*width, frame_crop_left_offset, width) ||
             *width < 0) {
             *width = 0;
         }
 
         //*height -= (frame_crop_top_offset + frame_crop_bottom_offset) * cropUnitY;
-        if(__builtin_add_overflow(frame_crop_top_offset, frame_crop_bottom_offset, &frame_crop_top_offset) ||
-            __builtin_mul_overflow(frame_crop_top_offset, cropUnitY, &frame_crop_top_offset) ||
-            __builtin_sub_overflow(*height, frame_crop_top_offset, height) ||
+        if(__builtin_add_overflow(
+                   frame_crop_top_offset, frame_crop_bottom_offset, &frame_crop_top_offset) ||
+           __builtin_mul_overflow(frame_crop_top_offset, cropUnitY, &frame_crop_top_offset) ||
+           __builtin_sub_overflow(*height, frame_crop_top_offset, height) ||
             *height < 0) {
             *height = 0;
         }

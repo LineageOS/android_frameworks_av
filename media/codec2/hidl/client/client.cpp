@@ -19,6 +19,29 @@
 #include <android-base/logging.h>
 
 #include <codec2/hidl/client.h>
+#include <C2Debug.h>
+#include <C2BufferPriv.h>
+#include <C2PlatformSupport.h>
+
+#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
+#include <android/hardware/media/c2/1.0/IComponent.h>
+#include <android/hardware/media/c2/1.0/IComponentInterface.h>
+#include <android/hardware/media/c2/1.0/IComponentListener.h>
+#include <android/hardware/media/c2/1.0/IComponentStore.h>
+#include <android/hardware/media/c2/1.0/IConfigurable.h>
+#include <android/hidl/manager/1.2/IServiceManager.h>
+
+#include <android-base/properties.h>
+#include <bufferpool/ClientManager.h>
+#include <codec2/hidl/1.0/OutputBufferQueue.h>
+#include <codec2/hidl/1.0/types.h>
+#include <codec2/hidl/1.1/OutputBufferQueue.h>
+#include <codec2/hidl/1.1/types.h>
+
+#include <cutils/native_handle.h>
+#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
+#include <gui/bufferqueue/2.0/H2BGraphicBufferProducer.h>
+#include <hidl/HidlSupport.h>
 
 #include <deque>
 #include <iterator>
@@ -30,25 +53,6 @@
 #include <type_traits>
 #include <vector>
 
-#include <android-base/properties.h>
-#include <bufferpool/ClientManager.h>
-#include <cutils/native_handle.h>
-#include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
-#include <gui/bufferqueue/2.0/H2BGraphicBufferProducer.h>
-#include <hidl/HidlSupport.h>
-
-#include <android/hardware/media/bufferpool/2.0/IClientManager.h>
-#include <android/hardware/media/c2/1.0/IComponent.h>
-#include <android/hardware/media/c2/1.0/IComponentInterface.h>
-#include <android/hardware/media/c2/1.0/IComponentListener.h>
-#include <android/hardware/media/c2/1.0/IComponentStore.h>
-#include <android/hardware/media/c2/1.0/IConfigurable.h>
-#include <android/hidl/manager/1.2/IServiceManager.h>
-
-#include <C2Debug.h>
-#include <C2BufferPriv.h>
-#include <C2PlatformSupport.h>
-
 namespace android {
 
 using ::android::hardware::hidl_vec;
@@ -56,8 +60,8 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 
-using namespace ::android::hardware::media::c2::V1_0;
-using namespace ::android::hardware::media::c2::V1_0::utils;
+using namespace ::android::hardware::media::c2::V1_1;
+using namespace ::android::hardware::media::c2::V1_1::utils;
 using namespace ::android::hardware::media::bufferpool::V2_0;
 using namespace ::android::hardware::media::bufferpool::V2_0::implementation;
 
@@ -88,6 +92,69 @@ size_t getServiceIndex(char const* name) {
     }
     return i;
 }
+
+class Client2Store : public C2ComponentStore {
+    std::shared_ptr<Codec2Client> mClient;
+
+public:
+    Client2Store(std::shared_ptr<Codec2Client> const& client)
+        : mClient(client) { }
+
+    virtual ~Client2Store() = default;
+
+    virtual c2_status_t config_sm(
+            std::vector<C2Param*> const &params,
+            std::vector<std::unique_ptr<C2SettingResult>>* const failures) {
+        return mClient->config(params, C2_MAY_BLOCK, failures);
+    };
+
+    virtual c2_status_t copyBuffer(
+            std::shared_ptr<C2GraphicBuffer>,
+            std::shared_ptr<C2GraphicBuffer>) {
+        return C2_OMITTED;
+    }
+
+    virtual c2_status_t createComponent(
+            C2String, std::shared_ptr<C2Component>* const component) {
+        component->reset();
+        return C2_OMITTED;
+    }
+
+    virtual c2_status_t createInterface(
+            C2String, std::shared_ptr<C2ComponentInterface>* const interface) {
+        interface->reset();
+        return C2_OMITTED;
+    }
+
+    virtual c2_status_t query_sm(
+            std::vector<C2Param*> const& stackParams,
+            std::vector<C2Param::Index> const& heapParamIndices,
+            std::vector<std::unique_ptr<C2Param>>* const heapParams) const {
+        return mClient->query(stackParams, heapParamIndices, C2_MAY_BLOCK, heapParams);
+    }
+
+    virtual c2_status_t querySupportedParams_nb(
+            std::vector<std::shared_ptr<C2ParamDescriptor>>* const params) const {
+        return mClient->querySupportedParams(params);
+    }
+
+    virtual c2_status_t querySupportedValues_sm(
+            std::vector<C2FieldSupportedValuesQuery>& fields) const {
+        return mClient->querySupportedValues(fields, C2_MAY_BLOCK);
+    }
+
+    virtual C2String getName() const {
+        return mClient->getName();
+    }
+
+    virtual std::shared_ptr<C2ParamReflector> getParamReflector() const {
+        return mClient->getParamReflector();
+    }
+
+    virtual std::vector<std::shared_ptr<C2Component::Traits const>> listComponents() {
+        return std::vector<std::shared_ptr<C2Component::Traits const>>();
+    }
+};
 
 }  // unnamed namespace
 
@@ -152,6 +219,7 @@ public:
                 if (success) {
                     break;
                 }
+                invalidate();
                 using namespace std::chrono_literals;
                 static constexpr auto kServiceRetryPeriod = 5s;
                 LOG(INFO) << "Failed to retrieve component traits from service "
@@ -514,8 +582,24 @@ struct Codec2Client::Component::HidlListener : public IComponentListener {
 
 };
 
+// Codec2Client::Component::BufferPoolSender
+struct Codec2Client::Component::BufferPoolSender :
+        hardware::media::c2::V1_1::utils::DefaultBufferPoolSender {
+    BufferPoolSender()
+          : hardware::media::c2::V1_1::utils::DefaultBufferPoolSender() {
+    }
+};
+
+// Codec2Client::Component::OutputBufferQueue
+struct Codec2Client::Component::OutputBufferQueue :
+        hardware::media::c2::V1_1::utils::OutputBufferQueue {
+    OutputBufferQueue()
+          : hardware::media::c2::V1_1::utils::OutputBufferQueue() {
+    }
+};
+
 // Codec2Client
-Codec2Client::Codec2Client(const sp<IComponentStore>& base,
+Codec2Client::Codec2Client(sp<Base> const& base,
                            size_t serviceIndex)
       : Configurable{
             [base]() -> sp<IConfigurable> {
@@ -526,7 +610,8 @@ Codec2Client::Codec2Client(const sp<IComponentStore>& base,
                         nullptr;
             }()
         },
-        mBase{base},
+        mBase1_0{base},
+        mBase1_1{Base1_1::castFrom(base)},
         mServiceIndex{serviceIndex} {
     Return<sp<IClientManager>> transResult = base->getPoolClientManager();
     if (!transResult.isOk()) {
@@ -537,7 +622,15 @@ Codec2Client::Codec2Client(const sp<IComponentStore>& base,
 }
 
 sp<Codec2Client::Base> const& Codec2Client::getBase() const {
-    return mBase;
+    return mBase1_0;
+}
+
+sp<Codec2Client::Base1_0> const& Codec2Client::getBase1_0() const {
+    return mBase1_0;
+}
+
+sp<Codec2Client::Base1_1> const& Codec2Client::getBase1_1() const {
+    return mBase1_1;
 }
 
 std::string const& Codec2Client::getServiceName() const {
@@ -552,7 +645,8 @@ c2_status_t Codec2Client::createComponent(
     c2_status_t status;
     sp<Component::HidlListener> hidlListener = new Component::HidlListener{};
     hidlListener->base = listener;
-    Return<void> transStatus = mBase->createComponent(
+    Return<void> transStatus = mBase1_1 ?
+        mBase1_1->createComponent_1_1(
             name,
             hidlListener,
             ClientManager::getInstance(),
@@ -565,14 +659,33 @@ c2_status_t Codec2Client::createComponent(
                 }
                 *component = std::make_shared<Codec2Client::Component>(c);
                 hidlListener->component = *component;
+            }) :
+        mBase1_0->createComponent(
+            name,
+            hidlListener,
+            ClientManager::getInstance(),
+            [&status, component, hidlListener](
+                    Status s,
+                    const sp<hardware::media::c2::V1_0::IComponent>& c) {
+                status = static_cast<c2_status_t>(s);
+                if (status != C2_OK) {
+                    return;
+                }
+                *component = std::make_shared<Codec2Client::Component>(c);
+                hidlListener->component = *component;
             });
     if (!transStatus.isOk()) {
         LOG(ERROR) << "createComponent(" << name.c_str()
                    << ") -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     } else if (status != C2_OK) {
-        LOG(ERROR) << "createComponent(" << name.c_str()
-                   << ") -- call failed: " << status << ".";
+        if (status == C2_NOT_FOUND) {
+            LOG(VERBOSE) << "createComponent(" << name.c_str()
+                         << ") -- component not found.";
+        } else {
+            LOG(ERROR) << "createComponent(" << name.c_str()
+                       << ") -- call failed: " << status << ".";
+        }
         return status;
     } else if (!*component) {
         LOG(ERROR) << "createComponent(" << name.c_str()
@@ -587,7 +700,7 @@ c2_status_t Codec2Client::createComponent(
                    << status << ".";
     }
 
-    (*component)->mBufferPoolSender.setReceiver(mHostPoolManager);
+    (*component)->mBufferPoolSender->setReceiver(mHostPoolManager);
     return status;
 }
 
@@ -595,7 +708,7 @@ c2_status_t Codec2Client::createInterface(
         const C2String& name,
         std::shared_ptr<Codec2Client::Interface>* const interface) {
     c2_status_t status;
-    Return<void> transStatus = mBase->createInterface(
+    Return<void> transStatus = mBase1_0->createInterface(
             name,
             [&status, interface](
                     Status s,
@@ -611,8 +724,13 @@ c2_status_t Codec2Client::createInterface(
                    << ") -- transaction failed.";
         return C2_TRANSACTION_FAILED;
     } else if (status != C2_OK) {
-        LOG(ERROR) << "createComponent(" << name.c_str()
-                   << ") -- call failed: " << status << ".";
+        if (status == C2_NOT_FOUND) {
+            LOG(VERBOSE) << "createInterface(" << name.c_str()
+                         << ") -- component not found.";
+        } else {
+            LOG(ERROR) << "createInterface(" << name.c_str()
+                       << ") -- call failed: " << status << ".";
+        }
         return status;
     }
 
@@ -622,7 +740,7 @@ c2_status_t Codec2Client::createInterface(
 c2_status_t Codec2Client::createInputSurface(
         std::shared_ptr<InputSurface>* const inputSurface) {
     c2_status_t status;
-    Return<void> transStatus = mBase->createInputSurface(
+    Return<void> transStatus = mBase1_0->createInputSurface(
             [&status, inputSurface](
                     Status s,
                     const sp<IInputSurface>& i) {
@@ -650,7 +768,7 @@ std::vector<C2Component::Traits> Codec2Client::_listComponents(
         bool* success) const {
     std::vector<C2Component::Traits> traits;
     std::string const& serviceName = getServiceName();
-    Return<void> transStatus = mBase->listComponents(
+    Return<void> transStatus = mBase1_0->listComponents(
             [&traits, &serviceName](Status s,
                    const hidl_vec<IComponentStore::ComponentTraits>& t) {
                 if (s != Status::OK) {
@@ -734,7 +852,7 @@ std::shared_ptr<C2ParamReflector>
         sp<Base> mBase;
     };
 
-    return std::make_shared<SimpleParamReflector>(mBase);
+    return std::make_shared<SimpleParamReflector>(mBase1_0);
 };
 
 std::vector<std::string> const& Codec2Client::GetServiceNames() {
@@ -806,10 +924,24 @@ std::vector<std::string> const& Codec2Client::GetServiceNames() {
 }
 
 std::shared_ptr<Codec2Client> Codec2Client::CreateFromService(
-        const char* name) {
+        const char* name,
+        bool setAsPreferredCodec2ComponentStore) {
     size_t index = getServiceIndex(name);
-    return index == GetServiceNames().size() ?
-            nullptr : _CreateFromIndex(index);
+    if (index == GetServiceNames().size()) {
+        if (setAsPreferredCodec2ComponentStore) {
+            LOG(WARNING) << "CreateFromService(" << name
+                         << ") -- preferred C2ComponentStore not set.";
+        }
+        return nullptr;
+    }
+    std::shared_ptr<Codec2Client> client = _CreateFromIndex(index);
+    if (setAsPreferredCodec2ComponentStore) {
+        SetPreferredCodec2ComponentStore(
+                std::make_shared<Client2Store>(client));
+        LOG(INFO) << "CreateFromService(" << name
+                  << ") -- service set as preferred C2ComponentStore.";
+    }
+    return client;
 }
 
 std::vector<std::shared_ptr<Codec2Client>> Codec2Client::
@@ -825,11 +957,11 @@ std::vector<std::shared_ptr<Codec2Client>> Codec2Client::
 
 std::shared_ptr<Codec2Client> Codec2Client::_CreateFromIndex(size_t index) {
     std::string const& name = GetServiceNames()[index];
-    LOG(INFO) << "Creating a Codec2 client to service \"" << name << "\"";
+    LOG(VERBOSE) << "Creating a Codec2 client to service \"" << name << "\"";
     sp<Base> baseStore = Base::getService(name);
     CHECK(baseStore) << "Codec2 service \"" << name << "\""
                         " inaccessible for unknown reasons.";
-    LOG(INFO) << "Client to Codec2 service \"" << name << "\" created";
+    LOG(VERBOSE) << "Client to Codec2 service \"" << name << "\" created";
     return std::make_shared<Codec2Client>(baseStore, index);
 }
 
@@ -1053,8 +1185,32 @@ Codec2Client::Component::Component(const sp<Base>& base)
                         nullptr;
             }()
         },
-        mBase{base},
-        mBufferPoolSender{nullptr} {
+        mBase1_0{base},
+        mBase1_1{Base1_1::castFrom(base)},
+        mBufferPoolSender{std::make_unique<BufferPoolSender>()},
+        mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
+}
+
+Codec2Client::Component::Component(const sp<Base1_1>& base)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IComponentInterface>> transResult1 =
+                        base->getInterface();
+                if (!transResult1.isOk()) {
+                    return nullptr;
+                }
+                Return<sp<IConfigurable>> transResult2 =
+                        static_cast<sp<IComponentInterface>>(transResult1)->
+                        getConfigurable();
+                return transResult2.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult2) :
+                        nullptr;
+            }()
+        },
+        mBase1_0{base},
+        mBase1_1{base},
+        mBufferPoolSender{std::make_unique<BufferPoolSender>()},
+        mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
 }
 
 Codec2Client::Component::~Component() {
@@ -1065,7 +1221,7 @@ c2_status_t Codec2Client::Component::createBlockPool(
         C2BlockPool::local_id_t* blockPoolId,
         std::shared_ptr<Codec2Client::Configurable>* configurable) {
     c2_status_t status;
-    Return<void> transStatus = mBase->createBlockPool(
+    Return<void> transStatus = mBase1_0->createBlockPool(
             static_cast<uint32_t>(id),
             [&status, blockPoolId, configurable](
                     Status s,
@@ -1090,7 +1246,7 @@ c2_status_t Codec2Client::Component::createBlockPool(
 
 c2_status_t Codec2Client::Component::destroyBlockPool(
         C2BlockPool::local_id_t localId) {
-    Return<Status> transResult = mBase->destroyBlockPool(
+    Return<Status> transResult = mBase1_0->destroyBlockPool(
             static_cast<uint64_t>(localId));
     if (!transResult.isOk()) {
         LOG(ERROR) << "destroyBlockPool -- transaction failed.";
@@ -1102,17 +1258,17 @@ c2_status_t Codec2Client::Component::destroyBlockPool(
 void Codec2Client::Component::handleOnWorkDone(
         const std::list<std::unique_ptr<C2Work>> &workItems) {
     // Output bufferqueue-based blocks' lifetime management
-    mOutputBufferQueue.holdBufferQueueBlocks(workItems);
+    mOutputBufferQueue->holdBufferQueueBlocks(workItems);
 }
 
 c2_status_t Codec2Client::Component::queue(
         std::list<std::unique_ptr<C2Work>>* const items) {
     WorkBundle workBundle;
-    if (!objcpy(&workBundle, *items, &mBufferPoolSender)) {
+    if (!objcpy(&workBundle, *items, mBufferPoolSender.get())) {
         LOG(ERROR) << "queue -- bad input.";
         return C2_TRANSACTION_FAILED;
     }
-    Return<Status> transStatus = mBase->queue(workBundle);
+    Return<Status> transStatus = mBase1_0->queue(workBundle);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "queue -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1130,7 +1286,7 @@ c2_status_t Codec2Client::Component::flush(
         std::list<std::unique_ptr<C2Work>>* const flushedWork) {
     (void)mode; // Flush mode isn't supported in HIDL yet.
     c2_status_t status;
-    Return<void> transStatus = mBase->flush(
+    Return<void> transStatus = mBase1_0->flush(
             [&status, flushedWork](
                     Status s, const WorkBundle& wb) {
                 status = static_cast<c2_status_t>(s);
@@ -1165,13 +1321,13 @@ c2_status_t Codec2Client::Component::flush(
     }
 
     // Output bufferqueue-based blocks' lifetime management
-    mOutputBufferQueue.holdBufferQueueBlocks(*flushedWork);
+    mOutputBufferQueue->holdBufferQueueBlocks(*flushedWork);
 
     return status;
 }
 
 c2_status_t Codec2Client::Component::drain(C2Component::drain_mode_t mode) {
-    Return<Status> transStatus = mBase->drain(
+    Return<Status> transStatus = mBase1_0->drain(
             mode == C2Component::DRAIN_COMPONENT_WITH_EOS);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "drain -- transaction failed.";
@@ -1186,7 +1342,7 @@ c2_status_t Codec2Client::Component::drain(C2Component::drain_mode_t mode) {
 }
 
 c2_status_t Codec2Client::Component::start() {
-    Return<Status> transStatus = mBase->start();
+    Return<Status> transStatus = mBase1_0->start();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "start -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1200,7 +1356,7 @@ c2_status_t Codec2Client::Component::start() {
 }
 
 c2_status_t Codec2Client::Component::stop() {
-    Return<Status> transStatus = mBase->stop();
+    Return<Status> transStatus = mBase1_0->stop();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "stop -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1214,7 +1370,7 @@ c2_status_t Codec2Client::Component::stop() {
 }
 
 c2_status_t Codec2Client::Component::reset() {
-    Return<Status> transStatus = mBase->reset();
+    Return<Status> transStatus = mBase1_0->reset();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "reset -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1228,7 +1384,7 @@ c2_status_t Codec2Client::Component::reset() {
 }
 
 c2_status_t Codec2Client::Component::release() {
-    Return<Status> transStatus = mBase->release();
+    Return<Status> transStatus = mBase1_0->release();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "release -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1237,6 +1393,29 @@ c2_status_t Codec2Client::Component::release() {
             static_cast<c2_status_t>(static_cast<Status>(transStatus));
     if (status != C2_OK) {
         LOG(DEBUG) << "release -- call failed: " << status << ".";
+    }
+    return status;
+}
+
+c2_status_t Codec2Client::Component::configureVideoTunnel(
+        uint32_t avSyncHwId,
+        native_handle_t** sidebandHandle) {
+    *sidebandHandle = nullptr;
+    if (!mBase1_1) {
+        return C2_OMITTED;
+    }
+    c2_status_t status{};
+    Return<void> transStatus = mBase1_1->configureVideoTunnel(avSyncHwId,
+            [&status, sidebandHandle](
+                    Status s, hardware::hidl_handle const& h) {
+                status = static_cast<c2_status_t>(s);
+                if (h.getNativeHandle()) {
+                    *sidebandHandle = native_handle_clone(h.getNativeHandle());
+                }
+            });
+    if (!transStatus.isOk()) {
+        LOG(ERROR) << "configureVideoTunnel -- transaction failed.";
+        return C2_TRANSACTION_FAILED;
     }
     return status;
 }
@@ -1256,18 +1435,18 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     }
 
     if (!surface) {
-        mOutputBufferQueue.configure(nullIgbp, generation, 0);
+        mOutputBufferQueue->configure(nullIgbp, generation, 0);
     } else if (surface->getUniqueId(&bqId) != OK) {
         LOG(ERROR) << "setOutputSurface -- "
                    "cannot obtain bufferqueue id.";
         bqId = 0;
-        mOutputBufferQueue.configure(nullIgbp, generation, 0);
+        mOutputBufferQueue->configure(nullIgbp, generation, 0);
     } else {
-        mOutputBufferQueue.configure(surface, generation, bqId);
+        mOutputBufferQueue->configure(surface, generation, bqId);
     }
     ALOGD("generation remote change %u", generation);
 
-    Return<Status> transStatus = mBase->setOutputSurface(
+    Return<Status> transStatus = mBase1_0->setOutputSurface(
             static_cast<uint64_t>(blockPoolId),
             bqId == 0 ? nullHgbp : igbp);
     if (!transStatus.isOk()) {
@@ -1286,14 +1465,14 @@ status_t Codec2Client::Component::queueToOutputSurface(
         const C2ConstGraphicBlock& block,
         const QueueBufferInput& input,
         QueueBufferOutput* output) {
-    return mOutputBufferQueue.outputBuffer(block, input, output);
+    return mOutputBufferQueue->outputBuffer(block, input, output);
 }
 
 c2_status_t Codec2Client::Component::connectToInputSurface(
         const std::shared_ptr<InputSurface>& inputSurface,
         std::shared_ptr<InputSurfaceConnection>* connection) {
     c2_status_t status;
-    Return<void> transStatus = mBase->connectToInputSurface(
+    Return<void> transStatus = mBase1_0->connectToInputSurface(
             inputSurface->mBase,
             [&status, connection](
                     Status s, const sp<IInputSurfaceConnection>& c) {
@@ -1317,7 +1496,7 @@ c2_status_t Codec2Client::Component::connectToOmxInputSurface(
         const sp<HGraphicBufferSource>& source,
         std::shared_ptr<InputSurfaceConnection>* connection) {
     c2_status_t status;
-    Return<void> transStatus = mBase->connectToOmxInputSurface(
+    Return<void> transStatus = mBase1_0->connectToOmxInputSurface(
             producer, source,
             [&status, connection](
                     Status s, const sp<IInputSurfaceConnection>& c) {
@@ -1337,7 +1516,7 @@ c2_status_t Codec2Client::Component::connectToOmxInputSurface(
 }
 
 c2_status_t Codec2Client::Component::disconnectFromInputSurface() {
-    Return<Status> transStatus = mBase->disconnectFromInputSurface();
+    Return<Status> transStatus = mBase1_0->disconnectFromInputSurface();
     if (!transStatus.isOk()) {
         LOG(ERROR) << "disconnectToInputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1376,7 +1555,7 @@ c2_status_t Codec2Client::Component::setDeathListener(
     deathRecipient->component = component;
 
     component->mDeathRecipient = deathRecipient;
-    Return<bool> transResult = component->mBase->linkToDeath(
+    Return<bool> transResult = component->mBase1_0->linkToDeath(
             component->mDeathRecipient, 0);
     if (!transResult.isOk()) {
         LOG(ERROR) << "setDeathListener -- linkToDeath() transaction failed.";

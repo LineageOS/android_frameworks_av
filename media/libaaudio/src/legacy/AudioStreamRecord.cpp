@@ -142,11 +142,13 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     const audio_source_t source =
             AAudioConvert_inputPresetToAudioSource(builder.getInputPreset());
 
+    const audio_flags_mask_t attrFlags =
+            AAudioConvert_privacySensitiveToAudioFlagsMask(builder.isPrivacySensitive());
     const audio_attributes_t attributes = {
             .content_type = contentType,
             .usage = AUDIO_USAGE_UNKNOWN, // only used for output
             .source = source,
-            .flags = AUDIO_FLAG_NONE, // Different than the AUDIO_INPUT_FLAGS
+            .flags = attrFlags, // Different than the AUDIO_INPUT_FLAGS
             .tags = ""
     };
 
@@ -177,10 +179,13 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
                 selectedDeviceId
         );
 
+        // Set it here so it can be logged by the destructor if the open failed.
+        mAudioRecord->setCallerName(kCallerName);
+
         // Did we get a valid track?
         status_t status = mAudioRecord->initCheck();
         if (status != OK) {
-            close();
+            releaseCloseFinal();
             ALOGE("open(), initCheck() returned %d", status);
             return AAudioConvert_androidToAAudioResult(status);
         }
@@ -200,6 +205,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         }
     }
 
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD)
+            + std::to_string(mAudioRecord->getPortId());
+
     // Get the actual values from the AudioRecord.
     setSamplesPerFrame(mAudioRecord->channelCount());
 
@@ -211,7 +219,10 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
 
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
-        int callbackSizeBytes = getBytesPerFrame() * mCallbackBufferSize;
+        // The block adapter runs before the format conversion.
+        // So we need to use the device frame size.
+        mBlockAdapterBytesPerFrame = getBytesPerDeviceFrame();
+        int callbackSizeBytes = mBlockAdapterBytesPerFrame * mCallbackBufferSize;
         mFixedBlockWriter.open(callbackSizeBytes);
         mBlockAdapter = &mFixedBlockWriter;
     } else {
@@ -276,16 +287,18 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::close()
-{
-    // TODO add close() or release() to AudioRecord API then call it from here
-    if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
+aaudio_result_t AudioStreamRecord::release_l() {
+    // TODO add close() or release() to AudioFlinger's AudioRecord API.
+    //  Then call it from here
+    if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioRecord->removeAudioDeviceCallback(mDeviceCallback);
+        logReleaseBufferState();
         mAudioRecord.clear();
-        setState(AAUDIO_STREAM_STATE_CLOSED);
+        mFixedBlockWriter.close();
+        return AudioStream::release_l();
+    } else {
+        return AAUDIO_OK; // already released
     }
-    mFixedBlockWriter.close();
-    return AudioStream::close();
 }
 
 const void * AudioStreamRecord::maybeConvertDeviceData(const void *audioData, int32_t numFrames) {
@@ -332,13 +345,17 @@ aaudio_result_t AudioStreamRecord::requestStart()
     // Enable callback before starting AudioRecord to avoid shutting
     // down because of a race condition.
     mCallbackEnabled.store(true);
+    aaudio_stream_state_t originalState = getState();
+    // Set before starting the callback so that we are in the correct state
+    // before updateStateMachine() can be called by the callback.
+    setState(AAUDIO_STREAM_STATE_STARTING);
     mFramesWritten.reset32(); // service writes frames
     mTimestampPosition.reset32();
     status_t err = mAudioRecord->start(); // resets position to zero
     if (err != OK) {
+        mCallbackEnabled.store(false);
+        setState(originalState);
         return AAudioConvert_androidToAAudioResult(err);
-    } else {
-        setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
 }

@@ -26,7 +26,7 @@
 #include <media/IMediaHTTPService.h>
 #include <media/IStreamSource.h>
 #include <media/mediaplayer.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/InterfaceUtils.h>
@@ -42,7 +42,7 @@
 #include <gui/Surface.h>
 
 #include <fcntl.h>
-#include <ui/DisplayInfo.h>
+#include <ui/DisplayConfig.h>
 
 using namespace android;
 
@@ -116,7 +116,7 @@ void MyStreamSource::onBufferAvailable(size_t index) {
 
     sp<IMemory> mem = mBuffers.itemAt(index);
 
-    ssize_t n = read(mFd, mem->pointer(), mem->size());
+    ssize_t n = read(mFd, mem->unsecurePointer(), mem->size());
     if (n <= 0) {
         mListener->issueCommand(IStreamListener::EOS, false /* synchronous */);
     } else {
@@ -238,7 +238,7 @@ ssize_t MyConvertingStreamSource::writeData(const void *data, size_t size) {
             copy = mem->size() - mCurrentBufferOffset;
         }
 
-        memcpy((uint8_t *)mem->pointer() + mCurrentBufferOffset, data, copy);
+        memcpy((uint8_t *)mem->unsecurePointer() + mCurrentBufferOffset, data, copy);
         mCurrentBufferOffset += copy;
 
         if (mCurrentBufferOffset == mem->size()) {
@@ -321,11 +321,12 @@ int main(int argc, char **argv) {
     const sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
     CHECK(display != nullptr);
 
-    DisplayInfo info;
-    CHECK_EQ(SurfaceComposerClient::getDisplayInfo(display, &info), NO_ERROR);
+    DisplayConfig config;
+    CHECK_EQ(SurfaceComposerClient::getActiveDisplayConfig(display, &config), NO_ERROR);
 
-    ssize_t displayWidth = info.w;
-    ssize_t displayHeight = info.h;
+    const ui::Size& resolution = config.resolution;
+    const ssize_t displayWidth = resolution.getWidth();
+    const ssize_t displayHeight = resolution.getHeight();
 
     ALOGV("display is %zd x %zd\n", displayWidth, displayHeight);
 

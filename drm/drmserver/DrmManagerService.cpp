@@ -19,7 +19,7 @@
 #include <utils/Log.h>
 
 #include <private/android_filesystem_config.h>
-#include <media/MemoryLeakTrackUtil.h>
+#include <mediautils/MemoryLeakTrackUtil.h>
 
 #include <errno.h>
 #include <utils/threads.h>
@@ -130,13 +130,14 @@ DrmManagerService::DrmManagerService() :
         mDrmManager(NULL) {
     ALOGV("created");
     mDrmManager = new DrmManager();
+    mDrmManager->initMetricsLooper();
     mDrmManager->loadPlugIns();
 }
 
 DrmManagerService::~DrmManagerService() {
     ALOGV("Destroyed");
     mDrmManager->unloadPlugIns();
-    delete mDrmManager; mDrmManager = NULL;
+    mDrmManager = NULL;
 }
 
 int DrmManagerService::addUniqueId(bool isNative) {

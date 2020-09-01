@@ -68,8 +68,6 @@ private:
      * @return frames written or negative error
      */
     aaudio_result_t readNowWithConversion(void *buffer, int32_t numFrames);
-
-    int64_t       mLastFramesWritten = 0; // used to prevent retrograde motion
 };
 
 } /* namespace aaudio */

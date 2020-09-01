@@ -95,7 +95,6 @@ public:
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) = 0;
 
-
     /**
      * Update state machine.()
      * @return
@@ -114,12 +113,35 @@ public:
      */
     virtual aaudio_result_t open(const AudioStreamBuilder& builder);
 
+    // log to MediaMetrics
+    virtual void logOpen();
+    void logReleaseBufferState();
+
     /**
-     * Close the stream and deallocate any resources from the open() call.
-     * It is safe to call close() multiple times.
+     * Free any hardware or system resources from the open() call.
+     * It is safe to call release_l() multiple times.
      */
-    virtual aaudio_result_t close() {
+    virtual aaudio_result_t release_l() {
+        setState(AAUDIO_STREAM_STATE_CLOSING);
         return AAUDIO_OK;
+    }
+
+    aaudio_result_t closeFinal() {
+        // State is checked by destructor.
+        setState(AAUDIO_STREAM_STATE_CLOSED);
+        return AAUDIO_OK;
+    }
+
+    /**
+     * Release then close the stream.
+     * @return AAUDIO_OK or negative error.
+     */
+    aaudio_result_t releaseCloseFinal() {
+        aaudio_result_t result = release_l(); // TODO review locking
+        if (result == AAUDIO_OK) {
+          result = closeFinal();
+        }
+        return result;
     }
 
     // This is only used to identify a stream in the logs without
@@ -232,6 +254,10 @@ public:
 
     int32_t getSessionId() const {
         return mSessionId;
+    }
+
+    bool isPrivacySensitive() const {
+        return mIsPrivacySensitive;
     }
 
     /**
@@ -369,7 +395,7 @@ public:
      */
     aaudio_result_t systemStopFromCallback();
 
-    aaudio_result_t safeClose();
+    aaudio_result_t safeRelease();
 
 protected:
 
@@ -543,6 +569,15 @@ protected:
         mAllowedCapturePolicy = policy;
     }
 
+    /**
+     * This should not be called after the open() call.
+     */
+    void setPrivacySensitive(bool privacySensitive) {
+        mIsPrivacySensitive = privacySensitive;
+    }
+
+    std::string mMetricsId; // set once during open()
+
 private:
 
     aaudio_result_t safeStop();
@@ -565,6 +600,7 @@ private:
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;
     aaudio_input_preset_t       mInputPreset     = AAUDIO_UNSPECIFIED;
     aaudio_allowed_capture_policy_t mAllowedCapturePolicy = AAUDIO_ALLOW_CAPTURE_BY_ALL;
+    bool                        mIsPrivacySensitive = false;
 
     int32_t                     mSessionId = AAUDIO_UNSPECIFIED;
 

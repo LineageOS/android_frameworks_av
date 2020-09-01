@@ -107,8 +107,11 @@ int main(int argc, char* argv[])
 
     if (useMic) {
         // talk into the appropriate microphone for the duration
+        audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+        attr.source = AUDIO_SOURCE_MIC;
+
         source = new AudioSource(
-                AUDIO_SOURCE_MIC,
+                &attr,
                 String16(),
                 sampleRate,
                 channels);

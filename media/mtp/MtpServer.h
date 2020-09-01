@@ -34,8 +34,11 @@ namespace android {
 
 class IMtpDatabase;
 class MtpStorage;
+class MtpMockServer;
 
 class MtpServer {
+    // libFuzzer testing
+    friend class MtpMockServer;
 
 private:
     IMtpDatabase*       mDatabase;

@@ -173,6 +173,11 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     void onDrainReady();
     void onError();
 
+    status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) override;
+
+    // Methods used by StreamCodecFormatCallback (HIDL).
+    void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs);
+
   private:
     friend class DeviceHalHidl;
     typedef MessageQueue<WriteCommand, hardware::kSynchronizedReadWrite> CommandMQ;
@@ -180,6 +185,7 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     typedef MessageQueue<WriteStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
     wp<StreamOutHalInterfaceCallback> mCallback;
+    wp<StreamOutHalInterfaceEventCallback> mEventCallback;
     sp<IStreamOut> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;

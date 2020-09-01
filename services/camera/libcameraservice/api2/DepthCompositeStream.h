@@ -41,7 +41,7 @@ class DepthCompositeStream : public CompositeStream, public Thread,
         public CpuConsumer::FrameAvailableListener {
 
 public:
-    DepthCompositeStream(wp<CameraDeviceBase> device,
+    DepthCompositeStream(sp<CameraDeviceBase> device,
             wp<hardware::camera2::ICameraDeviceCallbacks> cb);
     ~DepthCompositeStream() override;
 
@@ -56,6 +56,7 @@ public:
     status_t configureStream() override;
     status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap, Vector<int32_t>* /*out*/outputStreamIds,
             int32_t* /*out*/currentStreamId) override;
+    status_t insertCompositeStreamIds(std::vector<int32_t>* compositeStreamIds /*out*/) override;
     int getStreamId() override { return mBlobStreamId; }
 
     // CpuConsumer listener implementation
@@ -79,8 +80,9 @@ private:
         bool                      error;
         bool                      errorNotified;
         int64_t                   frameNumber;
+        int32_t                   requestId;
 
-        InputFrame() : error(false), errorNotified(false), frameNumber(-1) { }
+        InputFrame() : error(false), errorNotified(false), frameNumber(-1), requestId(-1) { }
     };
 
     // Helper methods
@@ -126,8 +128,6 @@ private:
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
     std::vector<float>   mIntrinsicCalibration, mLensDistortion;
     bool                 mIsLogicalCamera;
-    void*                mDepthPhotoLibHandle;
-    process_depth_photo_frame mDepthPhotoProcess;
 
     // Keep all incoming Depth buffer timestamps pending further processing.
     std::vector<int64_t> mInputDepthBuffers;

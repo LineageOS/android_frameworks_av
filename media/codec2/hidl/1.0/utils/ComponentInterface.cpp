@@ -87,10 +87,10 @@ protected:
 // ComponentInterface
 ComponentInterface::ComponentInterface(
         const std::shared_ptr<C2ComponentInterface>& intf,
-        ComponentStore* store)
+        const std::shared_ptr<ParameterCache>& cache)
       : mInterface{intf},
         mConfigurable{new CachedConfigurable(std::make_unique<CompIntf>(intf))} {
-    mInit = mConfigurable->init(store);
+    mInit = mConfigurable->init(cache);
 }
 
 c2_status_t ComponentInterface::status() const {

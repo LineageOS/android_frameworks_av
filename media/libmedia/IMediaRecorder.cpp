@@ -67,7 +67,9 @@ enum {
     GET_ACTIVE_MICROPHONES,
     GET_PORT_ID,
     SET_PREFERRED_MICROPHONE_DIRECTION,
-    SET_PREFERRED_MICROPHONE_FIELD_DIMENSION
+    SET_PREFERRED_MICROPHONE_FIELD_DIMENSION,
+    SET_PRIVACY_SENSITIVE,
+    GET_PRIVACY_SENSITIVE
 };
 
 class BpMediaRecorder: public BpInterface<IMediaRecorder>
@@ -149,6 +151,36 @@ public:
         data.writeInt32(as);
         remote()->transact(SET_AUDIO_SOURCE, data, &reply);
         return reply.readInt32();
+    }
+
+    status_t setPrivacySensitive(bool privacySensitive)
+    {
+        ALOGV("%s(%s)", __func__, privacySensitive ? "true" : "false");
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        data.writeInt32(privacySensitive ? 1 : 0);
+        status_t status = remote()->transact(SET_PRIVACY_SENSITIVE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return reply.readInt32();
+    }
+
+    status_t isPrivacySensitive(bool *privacySensitive) const
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IMediaRecorder::getInterfaceDescriptor());
+        *privacySensitive = false;
+        status_t status = remote()->transact(GET_PRIVACY_SENSITIVE, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = reply.readInt32();
+        if (status == NO_ERROR) {
+            *privacySensitive = reply.readInt32() == 1;
+        }
+        ALOGV("%s status %d enabled: %s", __func__, status, *privacySensitive ? "true" : "false");
+        return status;
     }
 
     status_t setOutputFormat(int of)
@@ -535,6 +567,24 @@ status_t BnMediaRecorder::onTransact(
             CHECK_INTERFACE(IMediaRecorder, data, reply);
             int as = data.readInt32();
             reply->writeInt32(setAudioSource(as));
+            return NO_ERROR;
+        } break;
+        case SET_PRIVACY_SENSITIVE: {
+            ALOGV("SET_PRIVACY_SENSITIVE");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            bool privacySensitive = data.readInt32() == 1;
+            reply->writeInt32(setPrivacySensitive(privacySensitive));
+            return NO_ERROR;
+        } break;
+        case GET_PRIVACY_SENSITIVE: {
+            ALOGV("GET_PRIVACY_SENSITIVE");
+            CHECK_INTERFACE(IMediaRecorder, data, reply);
+            bool privacySensitive = false;
+            status_t status = isPrivacySensitive(&privacySensitive);
+            reply->writeInt32(status);
+            if (status == NO_ERROR) {
+                reply->writeInt32(privacySensitive ? 1 : 0);
+            }
             return NO_ERROR;
         } break;
         case SET_OUTPUT_FORMAT: {

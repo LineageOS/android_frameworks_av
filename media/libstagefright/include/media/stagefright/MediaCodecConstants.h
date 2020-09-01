@@ -510,22 +510,24 @@ constexpr int32_t DolbyVisionProfileDvheDtr = 0x10;
 constexpr int32_t DolbyVisionProfileDvheStn = 0x20;
 constexpr int32_t DolbyVisionProfileDvheDth = 0x40;
 constexpr int32_t DolbyVisionProfileDvheDtb = 0x80;
-constexpr int32_t DolbyVisionProfileDvheSt = 0x100;
-constexpr int32_t DolbyVisionProfileDvavSe = 0x200;
+constexpr int32_t DolbyVisionProfileDvheSt  = 0x100;
+constexpr int32_t DolbyVisionProfileDvavSe  = 0x200;
+constexpr int32_t DolbyVisionProfileDvav110 = 0x400;
 
 inline static const char *asString_DolbyVisionProfile(int32_t i, const char *def = "??") {
     switch (i) {
-        case DolbyVisionProfileDvavPer: return "DvavPer";
-        case DolbyVisionProfileDvavPen: return "DvavPen";
-        case DolbyVisionProfileDvheDer: return "DvheDer";
-        case DolbyVisionProfileDvheDen: return "DvheDen";
-        case DolbyVisionProfileDvheDtr: return "DvheDtr";
-        case DolbyVisionProfileDvheStn: return "DvheStn";
-        case DolbyVisionProfileDvheDth: return "DvheDth";
-        case DolbyVisionProfileDvheDtb: return "DvheDtb";
-        case DolbyVisionProfileDvheSt:  return "DvheSt";
-        case DolbyVisionProfileDvavSe:  return "DvavSe";
-        default:                        return def;
+        case DolbyVisionProfileDvavPer:  return "DvavPer";
+        case DolbyVisionProfileDvavPen:  return "DvavPen";
+        case DolbyVisionProfileDvheDer:  return "DvheDer";
+        case DolbyVisionProfileDvheDen:  return "DvheDen";
+        case DolbyVisionProfileDvheDtr:  return "DvheDtr";
+        case DolbyVisionProfileDvheStn:  return "DvheStn";
+        case DolbyVisionProfileDvheDth:  return "DvheDth";
+        case DolbyVisionProfileDvheDtb:  return "DvheDtb";
+        case DolbyVisionProfileDvheSt:   return "DvheSt";
+        case DolbyVisionProfileDvavSe:   return "DvavSe";
+        case DolbyVisionProfileDvav110:  return "Dav110";
+        default:                         return def;
     }
 }
 
@@ -731,10 +733,12 @@ constexpr int32_t COLOR_TRANSFER_LINEAR = 1;
 constexpr int32_t COLOR_TRANSFER_SDR_VIDEO = 3;
 constexpr int32_t COLOR_TRANSFER_ST2084 = 6;
 
+constexpr char KEY_AAC_DRC_ALBUM_MODE[] = "aac-drc-album-mode";
 constexpr char KEY_AAC_DRC_ATTENUATION_FACTOR[] = "aac-drc-cut-level";
 constexpr char KEY_AAC_DRC_BOOST_FACTOR[] = "aac-drc-boost-level";
 constexpr char KEY_AAC_DRC_EFFECT_TYPE[] = "aac-drc-effect-type";
 constexpr char KEY_AAC_DRC_HEAVY_COMPRESSION[] = "aac-drc-heavy-compression";
+constexpr char KEY_AAC_DRC_OUTPUT_LOUDNESS[] = "aac-drc-output-loudness";
 constexpr char KEY_AAC_DRC_TARGET_REFERENCE_LEVEL[] = "aac-target-ref-level";
 constexpr char KEY_AAC_ENCODED_TARGET_LEVEL[] = "aac-encoded-target-level";
 constexpr char KEY_AAC_MAX_OUTPUT_CHANNEL_COUNT[] = "aac-max-output-channel_count";
@@ -774,6 +778,7 @@ constexpr char KEY_IS_TIMED_TEXT[] = "is-timed-text";
 constexpr char KEY_LANGUAGE[] = "language";
 constexpr char KEY_LATENCY[] = "latency";
 constexpr char KEY_LEVEL[] = "level";
+constexpr char KEY_LOW_LATENCY[] = "low-latency";
 constexpr char KEY_MAX_B_FRAMES[] = "max-bframes";
 constexpr char KEY_MAX_BIT_RATE[] = "max-bitrate";
 constexpr char KEY_MAX_FPS_TO_ENCODER[] = "max-fps-to-encoder";
@@ -785,6 +790,8 @@ constexpr char KEY_MIME[] = "mime";
 constexpr char KEY_OPERATING_RATE[] = "operating-rate";
 constexpr char KEY_OUTPUT_REORDER_DEPTH[] = "output-reorder-depth";
 constexpr char KEY_PCM_ENCODING[] = "pcm-encoding";
+constexpr char KEY_PIXEL_ASPECT_RATIO_HEIGHT[] = "sar-height";
+constexpr char KEY_PIXEL_ASPECT_RATIO_WIDTH[] = "sar-width";
 constexpr char KEY_PREPEND_HEADERS_TO_SYNC_FRAMES[] = "prepend-sps-pps-to-idr-frames";
 constexpr char KEY_PRIORITY[] = "priority";
 constexpr char KEY_PROFILE[] = "profile";
@@ -827,6 +834,7 @@ constexpr int32_t BUFFER_FLAG_KEY_FRAME = 1;
 constexpr int32_t BUFFER_FLAG_PARTIAL_FRAME = 8;
 constexpr int32_t BUFFER_FLAG_SYNC_FRAME = 1;
 constexpr int32_t CONFIGURE_FLAG_ENCODE = 1;
+constexpr int32_t CONFIGURE_FLAG_USE_BLOCK_MODEL = 2;
 constexpr int32_t CRYPTO_MODE_AES_CBC     = 2;
 constexpr int32_t CRYPTO_MODE_AES_CTR     = 1;
 constexpr int32_t CRYPTO_MODE_UNENCRYPTED = 0;

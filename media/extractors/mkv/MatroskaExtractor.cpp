@@ -22,7 +22,7 @@
 #include "MatroskaExtractor.h"
 #include "common/webmids.h"
 
-#include <media/DataSourceBase.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AUtils.h>
@@ -339,7 +339,12 @@ void BlockIterator::advance() {
 }
 
 void BlockIterator::advance_l() {
-    for (;;) {
+    for (int i = 0;; i++) {
+        if (i == 1000) {
+            ALOGE("no block found after %d iterations, stopping", i);
+            mCluster = NULL;
+            break;
+        }
         long res = mCluster->GetEntry(mBlockEntryIndex, mBlockEntry);
         ALOGV("GetEntry returned %ld", res);
 
@@ -809,11 +814,13 @@ media_status_t MatroskaSource::readBlock() {
             int32_t sampleRate;
             if (!AMediaFormat_getInt32(trackInfo->mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE,
                                        &sampleRate)) {
+                mbuf->release();
                 return AMEDIA_ERROR_MALFORMED;
             }
             int64_t durationUs;
             if (!AMediaFormat_getInt64(trackInfo->mMeta, AMEDIAFORMAT_KEY_DURATION,
                                        &durationUs)) {
+                mbuf->release();
                 return AMEDIA_ERROR_MALFORMED;
             }
             // TODO: Explore if this can be handled similar to MPEG4 extractor where padding is
@@ -976,6 +983,7 @@ media_status_t MatroskaSource::mp3FrameRead(
         while (mPendingFrames.empty()) {
             media_status_t err = readBlock();
             if (err != OK) {
+                buffer->release();
                 clearPendingFrames();
                 return err;
             }
@@ -995,6 +1003,7 @@ media_status_t MatroskaSource::mp3FrameRead(
             while (mPendingFrames.empty()) {
                 media_status_t err = readBlock();
                 if (err != OK) {
+                    buffer->release();
                     clearPendingFrames();
                     return err;
                 }

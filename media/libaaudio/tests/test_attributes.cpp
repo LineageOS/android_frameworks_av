@@ -33,6 +33,7 @@ static void checkAttributes(aaudio_performance_mode_t perfMode,
                             aaudio_content_type_t contentType,
                             aaudio_input_preset_t preset = DONT_SET,
                             aaudio_allowed_capture_policy_t capturePolicy = DONT_SET,
+                            int privacyMode = DONT_SET,
                             aaudio_direction_t direction = AAUDIO_DIRECTION_OUTPUT) {
 
     float *buffer = new float[kNumFrames * kChannelCount];
@@ -59,6 +60,9 @@ static void checkAttributes(aaudio_performance_mode_t perfMode,
     }
     if (capturePolicy != DONT_SET) {
         AAudioStreamBuilder_setAllowedCapturePolicy(aaudioBuilder, capturePolicy);
+    }
+    if (privacyMode != DONT_SET) {
+        AAudioStreamBuilder_setPrivacySensitive(aaudioBuilder, (bool)privacyMode);
     }
 
     // Create an AAudioStream using the Builder.
@@ -90,6 +94,13 @@ static void checkAttributes(aaudio_performance_mode_t perfMode,
             : preset;
     EXPECT_EQ(expectedCapturePolicy, AAudioStream_getAllowedCapturePolicy(aaudioStream));
 
+    bool expectedPrivacyMode =
+            (privacyMode == DONT_SET) ?
+                ((preset == AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION
+                    || preset == AAUDIO_INPUT_PRESET_CAMCORDER) ? true : false) :
+                privacyMode;
+    EXPECT_EQ(expectedPrivacyMode, AAudioStream_isPrivacySensitive(aaudioStream));
+
     EXPECT_EQ(AAUDIO_OK, AAudioStream_requestStart(aaudioStream));
 
     if (direction == AAUDIO_DIRECTION_INPUT) {
@@ -120,7 +131,11 @@ static const aaudio_usage_t sUsages[] = {
     AAUDIO_USAGE_ASSISTANCE_NAVIGATION_GUIDANCE,
     AAUDIO_USAGE_ASSISTANCE_SONIFICATION,
     AAUDIO_USAGE_GAME,
-    AAUDIO_USAGE_ASSISTANT
+    AAUDIO_USAGE_ASSISTANT,
+    AAUDIO_SYSTEM_USAGE_EMERGENCY,
+    AAUDIO_SYSTEM_USAGE_SAFETY,
+    AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS,
+    AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT
 };
 
 static const aaudio_content_type_t sContentypes[] = {
@@ -151,6 +166,12 @@ static const aaudio_input_preset_t sAllowCapturePolicies[] = {
     AAUDIO_ALLOW_CAPTURE_BY_NONE,
 };
 
+static const int sPrivacyModes[] = {
+    DONT_SET,
+    false,
+    true,
+};
+
 static void checkAttributesUsage(aaudio_performance_mode_t perfMode) {
     for (aaudio_usage_t usage : sUsages) {
         checkAttributes(perfMode, usage, DONT_SET);
@@ -170,6 +191,7 @@ static void checkAttributesInputPreset(aaudio_performance_mode_t perfMode) {
                         DONT_SET,
                         inputPreset,
                         DONT_SET,
+                        DONT_SET,
                         AAUDIO_DIRECTION_INPUT);
     }
 }
@@ -181,6 +203,18 @@ static void checkAttributesAllowedCapturePolicy(aaudio_performance_mode_t perfMo
                         DONT_SET,
                         DONT_SET,
                         policy,
+                        AAUDIO_DIRECTION_INPUT);
+    }
+}
+
+static void checkAttributesPrivacySensitive(aaudio_performance_mode_t perfMode) {
+    for (int privacyMode : sPrivacyModes) {
+        checkAttributes(perfMode,
+                        DONT_SET,
+                        DONT_SET,
+                        DONT_SET,
+                        DONT_SET,
+                        privacyMode,
                         AAUDIO_DIRECTION_INPUT);
     }
 }
@@ -215,4 +249,8 @@ TEST(test_attributes, aaudio_input_preset_lowlat) {
 
 TEST(test_attributes, aaudio_allowed_capture_policy_lowlat) {
     checkAttributesAllowedCapturePolicy(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
+}
+
+TEST(test_attributes, aaudio_allowed_privacy_sensitive_lowlat) {
+    checkAttributesPrivacySensitive(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY);
 }

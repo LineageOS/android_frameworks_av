@@ -28,6 +28,10 @@
 #undef HIDE
 #define HIDE __attribute__((visibility("hidden")))
 
+// The internals of AUnion cause problems with CFI
+#undef  NO_CFI
+#define NO_CFI __attribute__((no_sanitize("cfi")))
+
 namespace android {
 
 /**
@@ -93,7 +97,7 @@ struct HIDE _AUnion_impl {
      * \param args      arbitrary arguments for constructor
      */
     template<typename T, typename ...Args>
-    inline static void emplace(size_t totalSize, T *addr, Args&&... args) {
+    inline static void NO_CFI emplace(size_t totalSize, T *addr, Args&&... args) {
         new(addr)T(std::forward<Args>(args)...);
         // clear slack space - this is not technically required
         constexpr size_t size = sizeof(T);
@@ -160,7 +164,7 @@ public:
     template<
             typename T, typename ...Args,
             typename=typename std::enable_if<is_one_of<T, void, Ts...>::value>::type>
-    inline void emplace(Args&&... args) {
+    inline void NO_CFI emplace(Args&&... args) {
         _AUnion_impl::emplace(
                 sizeof(_type), reinterpret_cast<T*>(&mValue), std::forward<Args>(args)...);
     }

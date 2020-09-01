@@ -38,7 +38,7 @@ namespace camera3 {
 class CompositeStream : public camera3::Camera3StreamBufferListener {
 
 public:
-    CompositeStream(wp<CameraDeviceBase> device, wp<hardware::camera2::ICameraDeviceCallbacks> cb);
+    CompositeStream(sp<CameraDeviceBase> device, wp<hardware::camera2::ICameraDeviceCallbacks> cb);
     virtual ~CompositeStream() {}
 
     status_t createStream(const std::vector<sp<Surface>>& consumers,
@@ -47,6 +47,9 @@ public:
             std::vector<int> *surfaceIds, int streamSetId, bool isShared);
 
     status_t deleteStream();
+
+    // Switch to offline mode and release any online resources.
+    void switchToOffline();
 
     // Create and register all internal camera streams.
     virtual status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
@@ -63,6 +66,10 @@ public:
     // Insert the internal composite stream id in the user capture request.
     virtual status_t insertGbp(SurfaceMap* /*out*/outSurfaceMap,
             Vector<int32_t>* /*out*/outputStreamIds, int32_t* /*out*/currentStreamId) = 0;
+
+    // Attach the internal composite stream ids.
+    virtual status_t insertCompositeStreamIds(
+            std::vector<int32_t>* compositeStreamIds /*out*/) = 0;
 
     // Return composite stream id.
     virtual int getStreamId() = 0;
@@ -88,7 +95,7 @@ protected:
     status_t registerCompositeStreamListener(int32_t streamId);
     void eraseResult(int64_t frameNumber);
     void flagAnErrorFrameNumber(int64_t frameNumber);
-    void notifyError(int64_t frameNumber);
+    void notifyError(int64_t frameNumber, int32_t requestId);
 
     // Subclasses should check for buffer errors from internal streams and return 'true' in
     // case the error notification should remain within camera service.
@@ -98,11 +105,16 @@ protected:
     // internal processing needs result data.
     virtual void onResultError(const CaptureResultExtras& resultExtras) = 0;
 
+    // Subclasses can decide how to handle request errors depending on whether
+    // or not the internal processing needs clean up.
+    virtual void onRequestError(const CaptureResultExtras& /*resultExtras*/) {}
+
     // Device and/or service is in unrecoverable error state.
     // Composite streams should behave accordingly.
     void enableErrorState();
 
     wp<CameraDeviceBase>   mDevice;
+    wp<camera3::StatusTracker> mStatusTracker;
     wp<hardware::camera2::ICameraDeviceCallbacks> mRemoteCallback;
 
     mutable Mutex          mMutex;

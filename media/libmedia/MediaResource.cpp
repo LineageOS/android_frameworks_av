@@ -23,39 +23,51 @@
 
 namespace android {
 
-MediaResource::MediaResource()
-        : mType(kUnspecified),
-          mSubType(kUnspecifiedSubType),
-          mValue(0) {}
-
-MediaResource::MediaResource(Type type, uint64_t value)
-        : mType(type),
-          mSubType(kUnspecifiedSubType),
-          mValue(value) {}
-
-MediaResource::MediaResource(Type type, SubType subType, uint64_t value)
-        : mType(type),
-          mSubType(subType),
-          mValue(value) {}
-
-MediaResource::MediaResource(Type type, const std::vector<uint8_t> &id, uint64_t value)
-        : mType(type),
-          mSubType(kUnspecifiedSubType),
-          mValue(value),
-          mId(id) {}
-
-void MediaResource::readFromParcel(const Parcel &parcel) {
-    mType = static_cast<Type>(parcel.readInt32());
-    mSubType = static_cast<SubType>(parcel.readInt32());
-    mValue = parcel.readUint64();
-    parcel.readByteVector(&mId);
+MediaResource::MediaResource(Type type, int64_t value) {
+    this->type = type;
+    this->subType = SubType::kUnspecifiedSubType;
+    this->value = value;
 }
 
-void MediaResource::writeToParcel(Parcel *parcel) const {
-    parcel->writeInt32(static_cast<int32_t>(mType));
-    parcel->writeInt32(static_cast<int32_t>(mSubType));
-    parcel->writeUint64(mValue);
-    parcel->writeByteVector(mId);
+MediaResource::MediaResource(Type type, SubType subType, int64_t value) {
+    this->type = type;
+    this->subType = subType;
+    this->value = value;
+}
+
+MediaResource::MediaResource(Type type, const std::vector<uint8_t> &id, int64_t value) {
+    this->type = type;
+    this->subType = SubType::kUnspecifiedSubType;
+    this->id = id;
+    this->value = value;
+}
+
+//static
+MediaResource MediaResource::CodecResource(bool secure, bool video) {
+    return MediaResource(
+            secure ? Type::kSecureCodec : Type::kNonSecureCodec,
+            video ? SubType::kVideoCodec : SubType::kAudioCodec,
+            1);
+}
+
+//static
+MediaResource MediaResource::GraphicMemoryResource(int64_t value) {
+    return MediaResource(Type::kGraphicMemory, value);
+}
+
+//static
+MediaResource MediaResource::CpuBoostResource() {
+    return MediaResource(Type::kCpuBoost, 1);
+}
+
+//static
+MediaResource MediaResource::VideoBatteryResource() {
+    return MediaResource(Type::kBattery, SubType::kVideoCodec, 1);
+}
+
+//static
+MediaResource MediaResource::DrmSessionResource(const std::vector<uint8_t> &id, int64_t value) {
+    return MediaResource(Type::kDrmSession, id, value);
 }
 
 static String8 bytesToHexString(const std::vector<uint8_t> &bytes) {
@@ -66,24 +78,14 @@ static String8 bytesToHexString(const std::vector<uint8_t> &bytes) {
     return str;
 }
 
-String8 MediaResource::toString() const {
+String8 toString(const MediaResourceParcel& resource) {
     String8 str;
-    str.appendFormat("%s/%s:[%s]:%llu",
-        asString(mType), asString(mSubType),
-        bytesToHexString(mId).c_str(),
-        (unsigned long long)mValue);
+
+    str.appendFormat("%s/%s:[%s]:%lld",
+            asString(resource.type), asString(resource.subType),
+            bytesToHexString(resource.id).c_str(),
+            (long long)resource.value);
     return str;
-}
-
-bool MediaResource::operator==(const MediaResource &other) const {
-    return (other.mType == mType)
-      && (other.mSubType == mSubType)
-      && (other.mValue == mValue)
-      && (other.mId == mId);
-}
-
-bool MediaResource::operator!=(const MediaResource &other) const {
-    return !(*this == other);
 }
 
 }; // namespace android

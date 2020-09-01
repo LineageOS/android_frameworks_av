@@ -19,7 +19,6 @@
 #include <utils/Log.h>
 
 #include "MediaCodecListOverrides.h"
-#include "StagefrightPluginLoader.h"
 
 #include <binder/IServiceManager.h>
 
@@ -30,11 +29,14 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/MediaDefs.h>
+#include <media/stagefright/omx/OMXUtils.h>
+#include <media/stagefright/xmlparser/MediaCodecsXmlParser.h>
+#include <media/stagefright/CCodec.h>
+#include <media/stagefright/Codec2InfoBuilder.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/OmxInfoBuilder.h>
-#include <media/stagefright/omx/OMXUtils.h>
-#include <xmlparser/include/media/stagefright/xmlparser/MediaCodecsXmlParser.h>
+#include <media/stagefright/PersistentSurface.h>
 
 #include <sys/stat.h>
 #include <utils/threads.h>
@@ -86,8 +88,7 @@ std::unique_ptr<MediaCodecListBuilderBase> sCodec2InfoBuilder;
 MediaCodecListBuilderBase *GetCodec2InfoBuilder() {
     Mutex::Autolock _l(sCodec2InfoBuilderMutex);
     if (!sCodec2InfoBuilder) {
-        sCodec2InfoBuilder.reset(
-                StagefrightPluginLoader::GetCCodecInstance()->createBuilder());
+        sCodec2InfoBuilder.reset(new Codec2InfoBuilder);
     }
     return sCodec2InfoBuilder.get();
 }
@@ -96,8 +97,7 @@ std::vector<MediaCodecListBuilderBase *> GetBuilders() {
     std::vector<MediaCodecListBuilderBase *> builders;
     // if plugin provides the input surface, we cannot use OMX video encoders.
     // In this case, rely on plugin to provide list of OMX codecs that are usable.
-    sp<PersistentSurface> surfaceTest =
-        StagefrightPluginLoader::GetCCodecInstance()->createInputSurface();
+    sp<PersistentSurface> surfaceTest = CCodec::CreateInputSurface();
     if (surfaceTest == nullptr) {
         ALOGD("Allowing all OMX codecs");
         builders.push_back(&sOmxInfoBuilder);

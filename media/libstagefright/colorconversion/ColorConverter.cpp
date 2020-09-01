@@ -324,8 +324,8 @@ status_t ColorConverter::convertCbYCrY(
 }
 
 #define DECLARE_YUV2RGBFUNC(func, rgb) int (*func)(     \
-        const uint8*, int, const uint8*, int,           \
-        const uint8*, int, uint8*, int, int, int)       \
+        const uint8_t*, int, const uint8_t*, int,           \
+        const uint8_t*, int, uint8_t*, int, int, int)       \
         = mSrcColorSpace.isBt709() ? libyuv::H420To##rgb \
         : mSrcColorSpace.isJpeg() ? libyuv::J420To##rgb  \
         : libyuv::I420To##rgb
@@ -350,7 +350,7 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
     {
         DECLARE_YUV2RGBFUNC(func, RGB565);
         (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
+                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
     }
 
@@ -358,7 +358,7 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
     {
         DECLARE_YUV2RGBFUNC(func, ABGR);
         (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
+                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
     }
 
@@ -366,7 +366,7 @@ status_t ColorConverter::convertYUV420PlanarUseLibYUV(
     {
         DECLARE_YUV2RGBFUNC(func, ARGB);
         (*func)(src_y, src.mStride, src_u, src.mStride / 2, src_v, src.mStride / 2,
-                (uint8 *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
+                (uint8_t *)dst_ptr, dst.mStride, src.cropWidth(), src.cropHeight());
         break;
     }
 
@@ -391,17 +391,17 @@ status_t ColorConverter::convertYUV420SemiPlanarUseLibYUV(
 
     switch (mDstFormat) {
     case OMX_COLOR_Format16bitRGB565:
-        libyuv::NV12ToRGB565(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
+        libyuv::NV12ToRGB565(src_y, src.mStride, src_u, src.mStride, (uint8_t *)dst_ptr,
                 dst.mStride, src.cropWidth(), src.cropHeight());
         break;
 
     case OMX_COLOR_Format32bitBGRA8888:
-        libyuv::NV12ToARGB(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
+        libyuv::NV12ToARGB(src_y, src.mStride, src_u, src.mStride, (uint8_t *)dst_ptr,
                 dst.mStride, src.cropWidth(), src.cropHeight());
         break;
 
     case OMX_COLOR_Format32BitRGBA8888:
-        libyuv::NV12ToABGR(src_y, src.mStride, src_u, src.mStride, (uint8 *)dst_ptr,
+        libyuv::NV12ToABGR(src_y, src.mStride, src_u, src.mStride, (uint8_t *)dst_ptr,
                 dst.mStride, src.cropWidth(), src.cropHeight());
         break;
 

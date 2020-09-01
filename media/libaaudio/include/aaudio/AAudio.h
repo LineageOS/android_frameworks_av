@@ -29,6 +29,8 @@
 #ifndef AAUDIO_AAUDIO_H
 #define AAUDIO_AAUDIO_H
 
+#include <stdbool.h>
+#include <stdint.h>
 #include <time.h>
 
 #ifdef __cplusplus
@@ -227,6 +229,8 @@ enum {
 };
 typedef int32_t aaudio_performance_mode_t;
 
+#define AAUDIO_SYSTEM_USAGE_OFFSET 1000
+
 /**
  * The USAGE attribute expresses "why" you are playing a sound, what is this sound used for.
  * This information is used by certain platforms or routing policies
@@ -297,7 +301,31 @@ enum {
     /**
      * Use this for audio responses to user queries, audio instructions or help utterances.
      */
-    AAUDIO_USAGE_ASSISTANT = 16
+    AAUDIO_USAGE_ASSISTANT = 16,
+
+    /**
+     * Use this in case of playing sounds in an emergency.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_EMERGENCY = AAUDIO_SYSTEM_USAGE_OFFSET,
+
+    /**
+     * Use this for safety sounds and alerts, for example backup camera obstacle detection.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_SAFETY = AAUDIO_SYSTEM_USAGE_OFFSET + 1,
+
+    /**
+     * Use this for vehicle status alerts and information, for example the check engine light.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS = AAUDIO_SYSTEM_USAGE_OFFSET + 2,
+
+    /**
+     * Use this for traffic announcements, etc.
+     * Privileged MODIFY_AUDIO_ROUTING permission required.
+     */
+    AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT = AAUDIO_SYSTEM_USAGE_OFFSET + 3,
 };
 typedef int32_t aaudio_usage_t;
 
@@ -380,6 +408,7 @@ enum {
      * Use this preset for capturing audio meant to be processed in real time
      * and played back for live performance (e.g karaoke).
      * The capture path will minimize latency and coupling with playback path.
+     * Available since API level 29.
      */
     AAUDIO_INPUT_PRESET_VOICE_PERFORMANCE = 10,
 };
@@ -724,7 +753,7 @@ AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
  * Available since API level 29.
  *
  * @param builder reference provided by AAudio_createStreamBuilder()
- * @param inputPreset the desired level of opt-out from being captured.
+ * @param capturePolicy the desired level of opt-out from being captured.
  */
 AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(AAudioStreamBuilder* builder,
         aaudio_allowed_capture_policy_t capturePolicy) __INTRODUCED_IN(29);
@@ -758,6 +787,28 @@ AAUDIO_API void AAudioStreamBuilder_setAllowedCapturePolicy(AAudioStreamBuilder*
  */
 AAUDIO_API void AAudioStreamBuilder_setSessionId(AAudioStreamBuilder* builder,
         aaudio_session_id_t sessionId) __INTRODUCED_IN(28);
+
+
+/** Indicates whether this input stream must be marked as privacy sensitive or not.
+ *
+ * When true, this input stream is privacy sensitive and any concurrent capture
+ * is not permitted.
+ *
+ * This is off (false) by default except when the input preset is {@link #AAUDIO_INPUT_PRESET_VOICE_COMMUNICATION}
+ * or {@link #AAUDIO_INPUT_PRESET_CAMCORDER}.
+ *
+ * Always takes precedence over default from input preset when set explicitly.
+ *
+ * Only relevant if the stream direction is {@link #AAUDIO_DIRECTION_INPUT}.
+ *
+ * Added in API level 30.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param privacySensitive true if capture from this stream must be marked as privacy sensitive,
+ * false otherwise.
+ */
+AAUDIO_API void AAudioStreamBuilder_setPrivacySensitive(AAudioStreamBuilder* builder,
+        bool privacySensitive) __INTRODUCED_IN(30);
 
 /**
  * Return one of these values from the data callback function.
@@ -973,10 +1024,30 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
 // Stream Control
 // ============================================================
 
+#if __ANDROID_API__ >= 30
 /**
- * Free the resources associated with a stream created by AAudioStreamBuilder_openStream()
+ * Free the audio resources associated with a stream created by
+ * AAudioStreamBuilder_openStream().
+ * AAudioStream_close() should be called at some point after calling
+ * this function.
  *
- * Available since API level 26.
+ * After this call, the stream will be in {@link #AAUDIO_STREAM_STATE_CLOSING}
+ *
+ * This function is useful if you want to release the audio resources immediately,
+ * but still allow queries to the stream to occur from other threads. This often
+ * happens if you are monitoring stream progress from a UI thread.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return {@link #AAUDIO_OK} or a negative error.
+ */
+AAUDIO_API aaudio_result_t  AAudioStream_release(AAudioStream* stream) __INTRODUCED_IN(30);
+#endif // __ANDROID_API__
+
+/**
+ * Delete the internal data structures associated with the stream created
+ * by AAudioStreamBuilder_openStream().
+ *
+ * If AAudioStream_release() has not been called then it will be called automatically.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return {@link #AAUDIO_OK} or a negative error.
@@ -1443,6 +1514,20 @@ AAUDIO_API aaudio_input_preset_t AAudioStream_getInputPreset(AAudioStream* strea
  */
 AAUDIO_API aaudio_allowed_capture_policy_t AAudioStream_getAllowedCapturePolicy(
         AAudioStream* stream) __INTRODUCED_IN(29);
+
+
+/**
+ * Return whether this input stream is marked as privacy sensitive or not.
+ *
+ * See {@link #AAudioStreamBuilder_setPrivacySensitive()}.
+ *
+ * Added in API level 30.
+ *
+ * @param stream reference provided by AAudioStreamBuilder_openStream()
+ * @return true if privacy sensitive, false otherwise
+ */
+AAUDIO_API bool AAudioStream_isPrivacySensitive(AAudioStream* stream)
+        __INTRODUCED_IN(30);
 
 #ifdef __cplusplus
 }

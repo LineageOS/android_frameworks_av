@@ -39,6 +39,9 @@ getegid32: 1
 getgroups32: 1
 nanosleep: 1
 getrandom: 1
+timer_create: 1
+timer_settime: 1
+timer_delete: 1
 
 # for dynamically loading extractors
 getdents64: 1
@@ -56,5 +59,5 @@ sched_yield: 1
 getpid: 1
 gettid: 1
 
-@include /system/etc/seccomp_policy/crash_dump.x86.policy
-@include /system/etc/seccomp_policy/code_coverage.x86.policy
+@include /apex/com.android.media/etc/seccomp_policy/crash_dump.x86.policy
+@include /apex/com.android.media/etc/seccomp_policy/code_coverage.x86.policy

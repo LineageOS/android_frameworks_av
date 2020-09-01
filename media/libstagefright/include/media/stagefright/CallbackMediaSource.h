@@ -17,7 +17,7 @@
 #ifndef CALLBACK_MEDIA_SOURCE_H_
 #define CALLBACK_MEDIA_SOURCE_H_
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 
 namespace android {

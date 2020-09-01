@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaDataSource"
 
+#include "NdkJavaVMHelperPriv.h"
 #include "NdkMediaDataSourcePriv.h"
 
 #include <inttypes.h>
@@ -167,7 +168,8 @@ sp<MediaHTTPService> createMediaHttpService(const char *uri) {
     JNIEnv *env;
     const char *clazz, *method, *signature;
 
-    env = AndroidRuntime::getJNIEnv();
+    env = NdkJavaVMHelper::getJNIEnv();
+
     clazz = "android/media/MediaHTTPService";
     method = "createHttpServiceBinderIfNecessary";
     signature = "(Ljava/lang/String;)Landroid/os/IBinder;";

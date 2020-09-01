@@ -140,6 +140,12 @@ public:
     // Set the video buffer producer for camera to use in VIDEO_BUFFER_MODE_BUFFER_QUEUE mode.
     virtual status_t        setVideoTarget(
             const sp<IGraphicBufferProducer>& bufferProducer) = 0;
+
+    // Set the audio restriction mode
+    virtual status_t        setAudioRestriction(int32_t mode) = 0;
+
+    // Get the global audio restriction mode
+    virtual int32_t         getGlobalAudioRestriction() = 0;
 };
 
 // ----------------------------------------------------------------------------

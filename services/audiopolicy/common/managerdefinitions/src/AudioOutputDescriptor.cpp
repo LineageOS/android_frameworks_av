@@ -152,10 +152,16 @@ bool AudioOutputDescriptor::isFixedVolume(const DeviceTypeSet& deviceTypes __unu
 bool AudioOutputDescriptor::setVolume(float volumeDb,
                                       VolumeSource volumeSource,
                                       const StreamTypeVector &/*streams*/,
-                                      const DeviceTypeSet& /*deviceTypes*/,
+                                      const DeviceTypeSet& deviceTypes,
                                       uint32_t delayMs,
                                       bool force)
 {
+
+    if (!supportedDevices().containsDeviceAmongTypes(deviceTypes)) {
+        ALOGV("%s output ID %d unsupported device %s",
+                __func__, getId(), toString(deviceTypes).c_str());
+        return false;
+    }
     // We actually change the volume if:
     // - the float value returned by computeVolume() changed
     // - the force flag is set
@@ -684,7 +690,9 @@ bool SwAudioOutputCollection::isActiveLocally(VolumeSource volumeSource, uint32_
         const sp<SwAudioOutputDescriptor> outputDesc = this->valueAt(i);
         if (outputDesc->isActive(volumeSource, inPastMs, sysTime)
                 && (!(outputDesc->devices()
-                        .containsDeviceAmongTypes(getAllOutRemoteDevices())))) {
+                        .containsDeviceAmongTypes(getAllOutRemoteDevices())
+                        || outputDesc->devices()
+                            .onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX)))) {
             return true;
         }
     }
@@ -716,7 +724,11 @@ bool SwAudioOutputCollection::isStrategyActiveOnSameModule(product_strategy_t ps
         const sp<SwAudioOutputDescriptor> otherDesc = valueAt(i);
         if (desc->sharesHwModuleWith(otherDesc) &&
                 otherDesc->isStrategyActive(ps, inPastMs, sysTime)) {
-            return true;
+            if (desc == otherDesc
+                    || !otherDesc->devices()
+                            .onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX)) {
+                return true;
+            }
         }
     }
     return false;

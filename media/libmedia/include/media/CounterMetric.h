@@ -20,7 +20,7 @@
 #include <map>
 #include <string>
 
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <utils/Log.h>
 
 namespace android {

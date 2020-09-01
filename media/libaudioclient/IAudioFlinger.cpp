@@ -342,11 +342,11 @@ public:
         return reply.readInt32();
     }
 
-    virtual void setRecordSilenced(uid_t uid, bool silenced)
+    virtual void setRecordSilenced(audio_port_handle_t portId, bool silenced)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32(uid);
+        data.writeInt32(portId);
         data.writeInt32(silenced ? 1 : 0);
         remote()->transact(SET_RECORD_SILENCED, data, &reply);
     }
@@ -571,12 +571,13 @@ public:
         return id;
     }
 
-    virtual void acquireAudioSessionId(audio_session_t audioSession, int pid)
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
         data.writeInt32(audioSession);
-        data.writeInt32(pid);
+        data.writeInt32((int32_t)pid);
+        data.writeInt32((int32_t)uid);
         remote()->transact(ACQUIRE_AUDIO_SESSION_ID, data, &reply);
     }
 
@@ -661,6 +662,7 @@ public:
                                     const AudioDeviceTypeAddr& device,
                                     const String16& opPackageName,
                                     pid_t pid,
+                                    bool probe,
                                     status_t *status,
                                     int *id,
                                     int *enabled)
@@ -688,6 +690,7 @@ public:
         }
         data.writeString16(opPackageName);
         data.writeInt32((int32_t) pid);
+        data.writeInt32(probe ? 1 : 0);
 
         status_t lStatus = remote()->transact(CREATE_EFFECT, data, &reply);
         if (lStatus != NO_ERROR) {
@@ -1176,11 +1179,9 @@ status_t BnAudioFlinger::onTransact(
         } break;
         case SET_RECORD_SILENCED: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            uid_t uid = data.readInt32();
-            audio_source_t source;
-            data.read(&source, sizeof(audio_source_t));
+            audio_port_handle_t portId = data.readInt32();
             bool silenced = data.readInt32() == 1;
-            setRecordSilenced(uid, silenced);
+            setRecordSilenced(portId, silenced);
             return NO_ERROR;
         } break;
         case SET_PARAMETERS: {
@@ -1328,8 +1329,9 @@ status_t BnAudioFlinger::onTransact(
         case ACQUIRE_AUDIO_SESSION_ID: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             audio_session_t audioSession = (audio_session_t) data.readInt32();
-            int pid = data.readInt32();
-            acquireAudioSessionId(audioSession, pid);
+            const pid_t pid = (pid_t)data.readInt32();
+            const uid_t uid = (uid_t)data.readInt32();
+            acquireAudioSessionId(audioSession, pid, uid);
             return NO_ERROR;
         } break;
         case RELEASE_AUDIO_SESSION_ID: {
@@ -1395,12 +1397,13 @@ status_t BnAudioFlinger::onTransact(
             }
             const String16 opPackageName = data.readString16();
             pid_t pid = (pid_t)data.readInt32();
+            bool probe = data.readInt32() == 1;
 
             int id = 0;
             int enabled = 0;
 
             sp<IEffect> effect = createEffect(&desc, client, priority, output, sessionId, device,
-                    opPackageName, pid, &status, &id, &enabled);
+                    opPackageName, pid, probe, &status, &id, &enabled);
             reply->writeInt32(status);
             reply->writeInt32(id);
             reply->writeInt32(enabled);

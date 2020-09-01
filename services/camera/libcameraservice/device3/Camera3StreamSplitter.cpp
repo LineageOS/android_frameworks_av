@@ -498,7 +498,7 @@ void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /*item*/) {
         mInputSlots[bufferItem.mSlot].mFrameNumber = bufferItem.mFrameNumber;
     } else {
         SP_LOGE("%s: Invalid input graphic buffer!", __FUNCTION__);
-        res = BAD_VALUE;
+        mOnFrameAvailableRes.store(BAD_VALUE);
         return;
     }
     bufferId = bufferItem.mGraphicBuffer->getId();
@@ -541,6 +541,11 @@ void Camera3StreamSplitter::onFrameAvailable(const BufferItem& /*item*/) {
     }
 
     mOnFrameAvailableRes.store(res);
+}
+
+void Camera3StreamSplitter::onFrameReplaced(const BufferItem& item) {
+    ATRACE_CALL();
+    onFrameAvailable(item);
 }
 
 void Camera3StreamSplitter::decrementBufRefCountLocked(uint64_t id, size_t surfaceId) {

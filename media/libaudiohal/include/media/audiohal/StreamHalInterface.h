@@ -101,6 +101,15 @@ class StreamOutHalInterfaceCallback : public virtual RefBase {
     virtual ~StreamOutHalInterfaceCallback() {}
 };
 
+class StreamOutHalInterfaceEventCallback : public virtual RefBase {
+public:
+    virtual void onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) = 0;
+
+protected:
+    StreamOutHalInterfaceEventCallback() {}
+    virtual ~StreamOutHalInterfaceEventCallback() {}
+};
+
 class StreamOutHalInterface : public virtual StreamHalInterface {
   public:
     // Return the audio hardware driver estimated latency in milliseconds.
@@ -156,6 +165,8 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
      * @param sourceMetadata Description of the audio that is played by the clients.
      */
     virtual status_t updateSourceMetadata(const SourceMetadata& sourceMetadata) = 0;
+
+    virtual status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) = 0;
 
   protected:
     virtual ~StreamOutHalInterface() {}

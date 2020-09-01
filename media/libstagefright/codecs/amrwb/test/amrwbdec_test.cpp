@@ -110,6 +110,7 @@ int main(int argc, char *argv[]) {
 
     // Decode loop.
     int retVal = EXIT_SUCCESS;
+    RX_State_wb rx_state{};
     while (1) {
         // Read mode.
         uint8_t modeByte;
@@ -134,7 +135,6 @@ int main(int argc, char *argv[]) {
             if (bytesRead != frameSize) break;
 
             int16 frameType, frameMode;
-            RX_State_wb rx_state;
             frameMode = mode;
             mime_unsorting(
                     (uint8_t *)inputBuf,

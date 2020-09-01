@@ -128,12 +128,12 @@ struct BpMediaHTTPConnection : public BpInterface<IMediaHTTPConnection> {
            ALOGE("readAt got a NULL buffer");
            return UNKNOWN_ERROR;
         }
-        if (mMemory->pointer() == NULL) {
-           ALOGE("readAt got a NULL mMemory->pointer()");
+        if (mMemory->unsecurePointer() == NULL) {
+           ALOGE("readAt got a NULL mMemory->unsecurePointer()");
            return UNKNOWN_ERROR;
         }
 
-        memcpy(buffer, mMemory->pointer(), len);
+        memcpy(buffer, mMemory->unsecurePointer(), len);
 
         return len;
     }

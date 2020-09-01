@@ -20,7 +20,6 @@
 
 #include "api1/client2/JpegProcessor.h"
 #include "common/CameraProviderManager.h"
-#include "dlfcn.h"
 #include <gui/Surface.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
@@ -30,7 +29,7 @@
 namespace android {
 namespace camera3 {
 
-DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
+DepthCompositeStream::DepthCompositeStream(sp<CameraDeviceBase> device,
         wp<hardware::camera2::ICameraDeviceCallbacks> cb) :
         CompositeStream(device, cb),
         mBlobStreamId(-1),
@@ -43,12 +42,9 @@ DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
         mBlobBufferAcquired(false),
         mProducerListener(new ProducerListener()),
         mMaxJpegSize(-1),
-        mIsLogicalCamera(false),
-        mDepthPhotoLibHandle(nullptr),
-        mDepthPhotoProcess(nullptr) {
-    sp<CameraDeviceBase> cameraDevice = device.promote();
-    if (cameraDevice.get() != nullptr) {
-        CameraMetadata staticInfo = cameraDevice->info();
+        mIsLogicalCamera(false) {
+    if (device != nullptr) {
+        CameraMetadata staticInfo = device->info();
         auto entry = staticInfo.find(ANDROID_JPEG_MAX_SIZE);
         if (entry.count > 0) {
             mMaxJpegSize = entry.data.i32[0];
@@ -83,19 +79,6 @@ DepthCompositeStream::DepthCompositeStream(wp<CameraDeviceBase> device,
         }
 
         getSupportedDepthSizes(staticInfo, &mSupportedDepthSizes);
-
-        mDepthPhotoLibHandle = dlopen(camera3::kDepthPhotoLibrary, RTLD_NOW | RTLD_LOCAL);
-        if (mDepthPhotoLibHandle != nullptr) {
-            mDepthPhotoProcess = reinterpret_cast<camera3::process_depth_photo_frame> (
-                    dlsym(mDepthPhotoLibHandle, camera3::kDepthPhotoProcessFunction));
-            if (mDepthPhotoProcess == nullptr) {
-                ALOGE("%s: Failed to link to depth photo process function: %s", __FUNCTION__,
-                        dlerror());
-            }
-        } else {
-            ALOGE("%s: Failed to link to depth photo library: %s", __FUNCTION__, dlerror());
-        }
-
     }
 }
 
@@ -108,11 +91,6 @@ DepthCompositeStream::~DepthCompositeStream() {
     mDepthSurface.clear();
     mDepthConsumer = nullptr;
     mDepthSurface = nullptr;
-    if (mDepthPhotoLibHandle != nullptr) {
-        dlclose(mDepthPhotoLibHandle);
-        mDepthPhotoLibHandle = nullptr;
-    }
-    mDepthPhotoProcess = nullptr;
 }
 
 void DepthCompositeStream::compilePendingInputLocked() {
@@ -356,7 +334,7 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
     }
 
     size_t actualJpegSize = 0;
-    res = mDepthPhotoProcess(depthPhoto, finalJpegBufferSize, dstBuffer, &actualJpegSize);
+    res = processDepthPhotoFrame(depthPhoto, finalJpegBufferSize, dstBuffer, &actualJpegSize);
     if (res != 0) {
         ALOGE("%s: Depth photo processing failed: %s (%d)", __FUNCTION__, strerror(-res), res);
         outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
@@ -406,7 +384,8 @@ void DepthCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*
     }
 
     if ((inputFrame->error || mErrorState) && !inputFrame->errorNotified) {
-        notifyError(inputFrame->frameNumber);
+        //TODO: Figure out correct requestId
+        notifyError(inputFrame->frameNumber, -1 /*requestId*/);
         inputFrame->errorNotified = true;
     }
 }
@@ -583,11 +562,6 @@ status_t DepthCompositeStream::configureStream() {
         return NO_ERROR;
     }
 
-    if ((mDepthPhotoLibHandle == nullptr) || (mDepthPhotoProcess == nullptr)) {
-        ALOGE("%s: Depth photo library is not present!", __FUNCTION__);
-        return NO_INIT;
-    }
-
     if (mOutputSurface.get() == nullptr) {
         ALOGE("%s: No valid output surface set!", __FUNCTION__);
         return NO_INIT;
@@ -645,14 +619,15 @@ status_t DepthCompositeStream::deleteInternalStreams() {
                 strerror(-ret), ret);
     }
 
-    sp<CameraDeviceBase> device = mDevice.promote();
-    if (!device.get()) {
-        ALOGE("%s: Invalid camera device!", __FUNCTION__);
-        return NO_INIT;
-    }
-
     if (mDepthStreamId >= 0) {
-        ret = device->deleteStream(mDepthStreamId);
+        // Camera devices may not be valid after switching to offline mode.
+        // In this case, all offline streams including internal composite streams
+        // are managed and released by the offline session.
+        sp<CameraDeviceBase> device = mDevice.promote();
+        if (device.get() != nullptr) {
+            ret = device->deleteStream(mDepthStreamId);
+        }
+
         mDepthStreamId = -1;
     }
 
@@ -707,6 +682,18 @@ status_t DepthCompositeStream::insertGbp(SurfaceMap* /*out*/outSurfaceMap,
     }
 
     return NO_ERROR;
+}
+
+status_t DepthCompositeStream::insertCompositeStreamIds(
+        std::vector<int32_t>* compositeStreamIds /*out*/) {
+    if (compositeStreamIds == nullptr) {
+        return BAD_VALUE;
+    }
+
+    compositeStreamIds->push_back(mDepthStreamId);
+    compositeStreamIds->push_back(mBlobStreamId);
+
+    return OK;
 }
 
 void DepthCompositeStream::onResultError(const CaptureResultExtras& resultExtras) {

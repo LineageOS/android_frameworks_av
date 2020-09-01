@@ -17,10 +17,10 @@
 #ifndef REMOTE_DATA_SOURCE_H_
 #define REMOTE_DATA_SOURCE_H_
 
+#include <android/IDataSource.h>
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <media/DataSource.h>
-#include <media/IDataSource.h>
 
 namespace android {
 
@@ -48,7 +48,7 @@ public:
         if (size > kBufferSize) {
             size = kBufferSize;
         }
-        return mSource->readAt(offset, mMemory->pointer(), size);
+        return mSource->readAt(offset, mMemory->unsecurePointer(), size);
     }
     virtual status_t getSize(off64_t *size) {
         return mSource->getSize(size);

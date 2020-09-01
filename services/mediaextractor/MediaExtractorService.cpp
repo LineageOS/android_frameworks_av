@@ -29,48 +29,56 @@
 
 namespace android {
 
-MediaExtractorService::MediaExtractorService()
-        : BnMediaExtractorService() {
+MediaExtractorService::MediaExtractorService() {
     MediaExtractorFactory::LoadExtractors();
 }
 
-sp<IMediaExtractor> MediaExtractorService::makeExtractor(
-        const sp<IDataSource> &remoteSource, const char *mime) {
-    ALOGV("@@@ MediaExtractorService::makeExtractor for %s", mime);
+MediaExtractorService::~MediaExtractorService() {
+    ALOGE("should not be in ~MediaExtractorService");
+}
+
+::android::binder::Status MediaExtractorService::makeExtractor(
+        const ::android::sp<::android::IDataSource>& remoteSource,
+        const ::std::optional< ::std::string> &mime,
+        ::android::sp<::android::IMediaExtractor>* _aidl_return) {
+    ALOGV("@@@ MediaExtractorService::makeExtractor for %s", mime ? mime->c_str() : nullptr);
 
     sp<DataSource> localSource = CreateDataSourceFromIDataSource(remoteSource);
 
-    sp<IMediaExtractor> extractor = MediaExtractorFactory::CreateFromService(localSource, mime);
+    MediaBuffer::useSharedMemory();
+    sp<IMediaExtractor> extractor = MediaExtractorFactory::CreateFromService(
+            localSource,
+            mime ? mime->c_str() : nullptr);
 
     ALOGV("extractor service created %p (%s)",
             extractor.get(),
             extractor == nullptr ? "" : extractor->name());
 
     if (extractor != nullptr) {
-        registerMediaExtractor(extractor, localSource, mime);
-        return extractor;
+        registerMediaExtractor(extractor, localSource, mime ? mime->c_str() : nullptr);
     }
-    return nullptr;
+    *_aidl_return = extractor;
+    return binder::Status::ok();
 }
 
-sp<IDataSource> MediaExtractorService::makeIDataSource(int fd, int64_t offset, int64_t length)
-{
-    sp<DataSource> source = DataSourceFactory::getInstance()->CreateFromFd(fd, offset, length);
-    return CreateIDataSourceFromDataSource(source);
+::android::binder::Status MediaExtractorService::makeIDataSource(
+        base::unique_fd fd,
+        int64_t offset,
+        int64_t length,
+        ::android::sp<::android::IDataSource>* _aidl_return) {
+    sp<DataSource> source = DataSourceFactory::getInstance()->CreateFromFd(fd.release(), offset, length);
+    *_aidl_return = CreateIDataSourceFromDataSource(source);
+    return binder::Status::ok();
 }
 
-std::unordered_set<std::string> MediaExtractorService::getSupportedTypes() {
-    return MediaExtractorFactory::getSupportedTypes();
+::android::binder::Status MediaExtractorService::getSupportedTypes(
+        ::std::vector<::std::string>* _aidl_return) {
+    *_aidl_return = MediaExtractorFactory::getSupportedTypes();
+    return binder::Status::ok();
 }
 
 status_t MediaExtractorService::dump(int fd, const Vector<String16>& args) {
     return MediaExtractorFactory::dump(fd, args) || dumpExtractors(fd, args);
-}
-
-status_t MediaExtractorService::onTransact(uint32_t code, const Parcel& data, Parcel* reply,
-        uint32_t flags)
-{
-    return BnMediaExtractorService::onTransact(code, data, reply, flags);
 }
 
 }   // namespace android

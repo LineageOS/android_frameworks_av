@@ -201,7 +201,7 @@ private:
      */
     class DeviceEffects {
     public:
-        explicit DeviceEffects(std::unique_ptr<EffectDescVector> effectDescriptors,
+        DeviceEffects(std::unique_ptr<EffectDescVector> effectDescriptors,
                                audio_devices_t device, const std::string& address) :
             mEffectDescriptors(std::move(effectDescriptors)),
             mDeviceType(device), mDeviceAddress(address) {}

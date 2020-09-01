@@ -19,7 +19,7 @@
 #define LOG_TAG "MemoryLeackTrackUtil"
 #include <utils/Log.h>
 
-#include "media/MemoryLeakTrackUtil.h"
+#include <mediautils/MemoryLeakTrackUtil.h>
 #include <sstream>
 
 #include <bionic/malloc.h>

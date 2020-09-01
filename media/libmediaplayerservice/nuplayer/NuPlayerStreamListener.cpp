@@ -152,7 +152,7 @@ ssize_t NuPlayer::NuPlayerStreamListener::read(
     }
 
     memcpy(data,
-           (const uint8_t *)mem->pointer()
+           (const uint8_t *)mem->unsecurePointer()
             + entry->mOffset,
            copy);
 

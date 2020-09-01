@@ -25,6 +25,7 @@
 #include <sstream>
 #include <utility/AAudioUtilities.h>
 
+#include "AAudioClientTracker.h"
 #include "AAudioEndpointManager.h"
 #include "AAudioServiceEndpointShared.h"
 #include "AAudioServiceEndpointMMAP.h"
@@ -76,6 +77,7 @@ std::string AAudioEndpointManager::dump() const {
         result << "  ExclusiveFoundCount:   " << mExclusiveFoundCount << "\n";
         result << "  ExclusiveOpenCount:    " << mExclusiveOpenCount << "\n";
         result << "  ExclusiveCloseCount:   " << mExclusiveCloseCount << "\n";
+        result << "  ExclusiveStolenCount:  " << mExclusiveStolenCount << "\n";
         result << "\n";
 
         if (isExclusiveLocked) {
@@ -142,7 +144,13 @@ sp<AAudioServiceEndpointShared> AAudioEndpointManager::findSharedEndpoint_l(
 sp<AAudioServiceEndpoint> AAudioEndpointManager::openEndpoint(AAudioService &audioService,
                                         const aaudio::AAudioStreamRequest &request) {
     if (request.getConstantConfiguration().getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
-        return openExclusiveEndpoint(audioService, request);
+        sp<AAudioServiceEndpoint> endpointToSteal;
+        sp<AAudioServiceEndpoint> foundEndpoint =
+                openExclusiveEndpoint(audioService, request, endpointToSteal);
+        if (endpointToSteal.get()) {
+            endpointToSteal->releaseRegisteredStreams(); // free the MMAP resource
+        }
+        return foundEndpoint;
     } else {
         return openSharedEndpoint(audioService, request);
     }
@@ -150,7 +158,8 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openEndpoint(AAudioService &aud
 
 sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
         AAudioService &aaudioService,
-        const aaudio::AAudioStreamRequest &request) {
+        const aaudio::AAudioStreamRequest &request,
+        sp<AAudioServiceEndpoint> &endpointToSteal) {
 
     std::lock_guard<std::mutex> lock(mExclusiveLock);
 
@@ -161,18 +170,30 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
 
     // If we find an existing one then this one cannot be exclusive.
     if (endpoint.get() != nullptr) {
-        ALOGW("openExclusiveEndpoint() already in use");
-        // Already open so do not allow a second stream.
+        if (kStealingEnabled
+                && !endpoint->isForSharing() // not currently SHARED
+                && !request.isSharingModeMatchRequired()) { // app did not request a shared stream
+            ALOGD("%s() endpoint in EXCLUSIVE use. Steal it!", __func__);
+            mExclusiveStolenCount++;
+            // Prevent this process from getting another EXCLUSIVE stream.
+            // This will prevent two clients from colliding after a DISCONNECTION
+            // when they both try to open an exclusive stream at the same time.
+            // That can result in a stream getting disconnected between the OPEN
+            // and START calls. This will help preserve app compatibility.
+            // An app can avoid having this happen by closing their streams when
+            // the app is paused.
+            AAudioClientTracker::getInstance().setExclusiveEnabled(request.getProcessId(), false);
+            endpointToSteal = endpoint; // return it to caller
+        }
         return nullptr;
     } else {
         sp<AAudioServiceEndpointMMAP> endpointMMap = new AAudioServiceEndpointMMAP(aaudioService);
-        ALOGV("openExclusiveEndpoint(), no match so try to open MMAP %p for dev %d",
-              endpointMMap.get(), configuration.getDeviceId());
+        ALOGV("%s(), no match so try to open MMAP %p for dev %d",
+              __func__, endpointMMap.get(), configuration.getDeviceId());
         endpoint = endpointMMap;
 
         aaudio_result_t result = endpoint->open(request);
         if (result != AAUDIO_OK) {
-            ALOGV("openExclusiveEndpoint(), open failed");
             endpoint.clear();
         } else {
             mExclusiveStreams.push_back(endpointMMap);
@@ -183,7 +204,9 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
     if (endpoint.get() != nullptr) {
         // Increment the reference count under this lock.
         endpoint->setOpenCount(endpoint->getOpenCount() + 1);
+        endpoint->setForSharing(request.isSharingModeMatchRequired());
     }
+
     return endpoint;
 }
 
@@ -284,7 +307,7 @@ void AAudioEndpointManager::closeSharedEndpoint(sp<AAudioServiceEndpoint> servic
 
         serviceEndpoint->close();
         mSharedCloseCount++;
-        ALOGV("%s() %p for device %d",
+        ALOGV("%s(%p) closed for device %d",
               __func__, serviceEndpoint.get(), serviceEndpoint->getDeviceId());
     }
 }

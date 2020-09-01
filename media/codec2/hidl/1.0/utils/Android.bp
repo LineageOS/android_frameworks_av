@@ -6,12 +6,11 @@ cc_library {
     defaults: ["hidl_defaults"],
 
     srcs: [
-        "ClientBlockHelper.cpp",
+        "OutputBufferQueue.cpp",
         "types.cpp",
     ],
 
     header_libs: [
-        "libbinder_headers",
         "libcodec2_internal", // private
     ],
 
@@ -85,10 +84,21 @@ cc_library {
         "libhidlbase",
         "liblog",
         "libstagefright_bufferpool@2.0.1",
-        "libstagefright_bufferqueue_helper",
+        "libstagefright_bufferqueue_helper_novndk",
         "libui",
         "libutils",
     ],
+
+    target: {
+        vendor: {
+            exclude_shared_libs: [
+                "libstagefright_bufferqueue_helper_novndk",
+            ],
+            shared_libs: [
+                "libstagefright_bufferqueue_helper",
+            ],
+        },
+    },
 
     export_include_dirs: [
         "include",
@@ -106,7 +116,7 @@ cc_library {
 
 // public dependency for Codec 2.0 HAL service implementations
 cc_defaults {
-    name: "libcodec2-hidl-defaults",
+    name: "libcodec2-hidl-defaults@1.0",
     defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [
@@ -117,7 +127,7 @@ cc_defaults {
 
 // public dependency for Codec 2.0 HAL client
 cc_defaults {
-    name: "libcodec2-hidl-client-defaults",
+    name: "libcodec2-hidl-client-defaults@1.0",
     defaults: ["libcodec2-impl-defaults"],
 
     shared_libs: [

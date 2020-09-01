@@ -30,7 +30,7 @@
 #include "C2SoftVpxDec.h"
 
 namespace android {
-
+constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
 #ifdef VP9
 constexpr char COMPONENT_NAME[] = "c2.android.vp9.decoder";
 #else
@@ -166,7 +166,7 @@ public:
 
         addParameter(
                 DefineParam(mMaxInputSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
-                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, 320 * 240 * 3 / 4))
+                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, kMinInputBufferSize))
                 .withFields({
                     C2F(mMaxInputSize, value).any(),
                 })
@@ -244,7 +244,8 @@ public:
                                   const C2P<C2StreamMaxPictureSizeTuning::output> &maxSize) {
         (void)mayBlock;
         // assume compression ratio of 2
-        me.set().value = (((maxSize.v.width + 63) / 64) * ((maxSize.v.height + 63) / 64) * 3072);
+        me.set().value = c2_max((((maxSize.v.width + 63) / 64)
+                * ((maxSize.v.height + 63) / 64) * 3072), kMinInputBufferSize);
         return C2R::Ok();
     }
 

@@ -4,7 +4,7 @@ cc_library_headers {
     min_sdk_version: "29",
 
     export_include_dirs: ["include"],
-    header_libs:[
+    header_libs: [
         "libbase_headers",
         "libgui_headers",
         "libstagefright_headers",
@@ -36,10 +36,39 @@ cc_library_headers {
 filegroup {
     name: "libmedia_omx_aidl",
     srcs: [
-        "aidl/android/IGraphicBufferSource.aidl",
         "aidl/android/IOMXBufferSource.aidl",
     ],
     path: "aidl",
+}
+
+filegroup {
+    name: "mediaextractorservice_aidl",
+    srcs: [
+        "aidl/android/IMediaExtractorService.aidl",
+    ],
+    path: "aidl",
+}
+
+filegroup {
+    name: "resourcemanager_aidl",
+    srcs: [
+        "aidl/android/media/IResourceManagerClient.aidl",
+        "aidl/android/media/IResourceManagerService.aidl",
+        "aidl/android/media/MediaResourceType.aidl",
+        "aidl/android/media/MediaResourceSubType.aidl",
+        "aidl/android/media/MediaResourceParcel.aidl",
+        "aidl/android/media/MediaResourcePolicyParcel.aidl",
+    ],
+    path: "aidl",
+}
+
+aidl_interface {
+    name: "resourcemanager_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":resourcemanager_aidl",
+    ],
 }
 
 cc_library_shared {
@@ -56,7 +85,6 @@ cc_library_shared {
         "IOMX.cpp",
         "MediaCodecBuffer.cpp",
         "OMXBuffer.cpp",
-        "omx/1.0/WGraphicBufferSource.cpp",
         "omx/1.0/WOmxBufferSource.cpp",
         "omx/1.0/WOmxNode.cpp",
         "omx/1.0/WOmxObserver.cpp",
@@ -119,7 +147,6 @@ cc_library_shared {
         cfi: true,
     },
 }
-
 
 cc_library_shared {
     name: "libmedia_omx_client",
@@ -188,7 +215,7 @@ cc_library_static {
     srcs: ["MidiIoWrapper.cpp"],
 
     static_libs: [
-        "libsonivox",
+        "libsonivoxwithoutjet",
     ],
 
     header_libs: [
@@ -266,13 +293,13 @@ cc_library {
     name: "libmedia",
 
     srcs: [
+        ":mediaextractorservice_aidl",
         "IDataSource.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
         "IMediaHTTPConnection.cpp",
         "IMediaHTTPService.cpp",
         "IMediaExtractor.cpp",
-        "IMediaExtractorService.cpp",
         "IMediaPlayerService.cpp",
         "IMediaPlayerClient.cpp",
         "IMediaRecorderClient.cpp",
@@ -281,10 +308,7 @@ cc_library {
         "IMediaSource.cpp",
         "IRemoteDisplay.cpp",
         "IRemoteDisplayClient.cpp",
-        "IResourceManagerClient.cpp",
-        "IResourceManagerService.cpp",
         "IStreamSource.cpp",
-        "MediaUtils.cpp",
         "Metadata.cpp",
         "mediarecorder.cpp",
         "IMediaMetadataRetriever.cpp",
@@ -307,7 +331,6 @@ cc_library {
     },
 
     header_libs: [
-        "bionic_libc_platform_headers",
         "libstagefright_headers",
         "media_ndk_headers",
         "jni_headers",
@@ -326,7 +349,8 @@ cc_library {
         "libprocessgroup",
         "libutils",
         "libbinder",
-        "libsonivox",
+        "libbinder_ndk",
+        //"libsonivox",
         "libandroidicu",
         "libexpat",
         "libcamera_client",
@@ -342,12 +366,16 @@ cc_library {
         "libaudioclient",
         "libbinder",
         "libandroidicu",
-        "libsonivox",
+        //"libsonivox",
         "libmedia_omx",
     ],
 
     static_libs: [
-        "libc_malloc_debug_backtrace",  // for memory heap analysis
+        "resourcemanager_aidl_interface-ndk_platform",
+    ],
+
+    export_static_lib_headers: [
+        "resourcemanager_aidl_interface-ndk_platform",
     ],
 
     export_include_dirs: [

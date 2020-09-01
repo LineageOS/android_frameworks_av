@@ -64,9 +64,7 @@ struct DepthPhotoInputFrame {
             mOrientation(DepthPhotoOrientation::DEPTH_ORIENTATION_0_DEGREES) {}
 };
 
-static const char *kDepthPhotoLibrary = "libdepthphoto.so";
-static const char *kDepthPhotoProcessFunction = "processDepthPhotoFrame";
-typedef int (*process_depth_photo_frame) (DepthPhotoInputFrame /*inputFrame*/,
+int processDepthPhotoFrame(DepthPhotoInputFrame /*inputFrame*/,
         size_t /*depthPhotoBufferSize*/, void* /*depthPhotoBuffer out*/,
         size_t* /*depthPhotoActualSize out*/);
 

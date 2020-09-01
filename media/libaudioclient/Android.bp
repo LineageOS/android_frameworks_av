@@ -29,6 +29,7 @@ cc_library_shared {
         "AudioVolumeGroup.cpp",
     ],
     shared_libs: [
+        "capture_state_listener-aidl-cpp",
         "libaudiofoundation",
         "libaudioutils",
         "libbinder",
@@ -42,6 +43,9 @@ cc_library_shared {
     ],
     include_dirs: ["system/media/audio_utils/include"],
     export_include_dirs: ["include"],
+    export_shared_lib_headers: [
+        "capture_state_listener-aidl-cpp",
+    ],
 }
 
 cc_library_shared {
@@ -59,6 +63,7 @@ cc_library_shared {
         // AIDL files for audioclient interfaces
         // The headers for these interfaces will be available to any modules that
         // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
+        ":libaudioclient_aidl_callback",
         ":libaudioclient_aidl_private",
         ":libaudioclient_aidl",
 
@@ -80,6 +85,7 @@ cc_library_shared {
         "TrackPlayerBase.cpp",
     ],
     shared_libs: [
+        "capture_state_listener-aidl-cpp",
         "libaudiofoundation",
         "libaudioutils",
         "libaudiopolicy",
@@ -98,7 +104,12 @@ cc_library_shared {
     ],
     export_shared_lib_headers: ["libbinder"],
 
-    local_include_dirs: ["include/media", "aidl"],
+    include_dirs: [
+        "frameworks/av/media/libnbaio/include_mono/",
+    ],
+    local_include_dirs: [
+        "include/media", "aidl"
+    ],
     header_libs: [
         "libaudioclient_headers",
         "libbase_headers",
@@ -140,4 +151,22 @@ filegroup {
         "aidl/android/media/IAudioRecord.aidl",
     ],
     path: "aidl",
+}
+
+// AIDL interface for audio track callback
+filegroup {
+    name: "libaudioclient_aidl_callback",
+    srcs: [
+        "aidl/android/media/IAudioTrackCallback.aidl",
+    ],
+    path: "aidl",
+}
+
+aidl_interface {
+    name: "capture_state_listener-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/ICaptureStateListener.aidl",
+    ],
 }

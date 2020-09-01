@@ -33,6 +33,7 @@
 #include <media/stagefright/Utils.h>
 #include <media/stagefright/VideoFrameScheduler.h>
 #include <media/MediaCodecBuffer.h>
+#include <utils/SystemClock.h>
 
 #include <inttypes.h>
 
@@ -156,6 +157,7 @@ NuPlayer::Renderer::Renderer(
     CHECK(mediaClock != NULL);
     mPlaybackRate = mPlaybackSettings.mSpeed;
     mMediaClock->setPlaybackRate(mPlaybackRate);
+    (void)mSyncFlag.test_and_set();
 }
 
 NuPlayer::Renderer::~Renderer() {
@@ -326,9 +328,27 @@ void NuPlayer::Renderer::flush(bool audio, bool notifyComplete) {
         mSyncQueues = false;
     }
 
+    // Wait until the current job in the message queue is done, to make sure
+    // buffer processing from the old generation is finished. After the current
+    // job is finished, access to buffers are protected by generation.
+    Mutex::Autolock syncLock(mSyncLock);
+    int64_t syncCount = mSyncCount;
+    mSyncFlag.clear();
+
+    // Make sure message queue is not empty after mSyncFlag is cleared.
     sp<AMessage> msg = new AMessage(kWhatFlush, this);
     msg->setInt32("audio", static_cast<int32_t>(audio));
     msg->post();
+
+    int64_t uptimeMs = uptimeMillis();
+    while (mSyncCount == syncCount) {
+        (void)mSyncCondition.waitRelative(mSyncLock, ms2ns(1000));
+        if (uptimeMillis() - uptimeMs > 1000) {
+            ALOGW("flush(): no wake-up from sync point for 1s; stop waiting to "
+                  "prevent being stuck indefinitely.");
+            break;
+        }
+    }
 }
 
 void NuPlayer::Renderer::signalTimeDiscontinuity() {
@@ -780,6 +800,11 @@ void NuPlayer::Renderer::onMessageReceived(const sp<AMessage> &msg) {
         default:
             TRESPASS();
             break;
+    }
+    if (!mSyncFlag.test_and_set()) {
+        Mutex::Autolock syncLock(mSyncLock);
+        ++mSyncCount;
+        mSyncCondition.broadcast();
     }
 }
 

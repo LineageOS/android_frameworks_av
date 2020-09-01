@@ -68,13 +68,16 @@ public:
     // does not include EOL
     virtual std::string dump() const;
 
-    // -------------------------------------------------------------------
     /**
      * Open the device.
      */
     virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request) = 0;
 
-    virtual aaudio_result_t close();
+    // We log the CLOSE from the close() method. We needed this separate method to log the OPEN
+    // because we had to wait until we generated the handle.
+    void logOpen(aaudio_handle_t streamHandle);
+
+    aaudio_result_t close();
 
     /**
      * Start the flow of audio data.
@@ -82,7 +85,7 @@ public:
      * This is not guaranteed to be synchronous but it currently is.
      * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
      */
-    virtual aaudio_result_t start();
+    aaudio_result_t start();
 
     /**
      * Stop the flow of data so that start() can resume without loss of data.
@@ -90,7 +93,7 @@ public:
      * This is not guaranteed to be synchronous but it currently is.
      * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
     */
-    virtual aaudio_result_t pause();
+    aaudio_result_t pause();
 
     /**
      * Stop the flow of data after the currently queued data has finished playing.
@@ -99,19 +102,17 @@ public:
      * An AAUDIO_SERVICE_EVENT_STOPPED will be sent to the client when complete.
      *
      */
-    virtual aaudio_result_t stop();
-
-    aaudio_result_t stopTimestampThread();
+    aaudio_result_t stop();
 
     /**
      * Discard any data held by the underlying HAL or Service.
      *
      * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
      */
-    virtual aaudio_result_t flush();
+    aaudio_result_t flush();
 
-
-    virtual aaudio_result_t startClient(const android::AudioClient& client __unused,
+    virtual aaudio_result_t startClient(const android::AudioClient& client,
+                                        const audio_attributes_t *attr __unused,
                                         audio_port_handle_t *clientHandle __unused) {
         ALOGD("AAudioServiceStreamBase::startClient(%p, ...) AAUDIO_ERROR_UNAVAILABLE", &client);
         return AAUDIO_ERROR_UNAVAILABLE;
@@ -122,28 +123,18 @@ public:
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
+    aaudio_result_t registerAudioThread(pid_t clientThreadId, int priority);
+
+    aaudio_result_t unregisterAudioThread(pid_t clientThreadId);
+
     bool isRunning() const {
         return mState == AAUDIO_STREAM_STATE_STARTED;
     }
-
-    // -------------------------------------------------------------------
-
-    /**
-     * Send a message to the client with an int64_t data value.
-     */
-    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
-                                     int64_t dataLong = 0);
-    /**
-     * Send a message to the client with an double data value.
-     */
-    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
-                                     double  dataDouble);
 
     /**
      * Fill in a parcelable description of stream.
      */
     aaudio_result_t getDescription(AudioEndpointParcelable &parcelable);
-
 
     void setRegisteredThread(pid_t pid) {
         mRegisteredClientThread = pid;
@@ -258,9 +249,13 @@ protected:
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request,
                          aaudio_sharing_mode_t sharingMode);
 
-    void setState(aaudio_stream_state_t state) {
-        mState = state;
-    }
+    // These must be called under mLock
+    virtual aaudio_result_t close_l();
+    virtual aaudio_result_t pause_l();
+    virtual aaudio_result_t stop_l();
+    void disconnect_l();
+
+    void setState(aaudio_stream_state_t state);
 
     /**
      * Device specific startup.
@@ -311,7 +306,22 @@ protected:
     android::sp<AAudioServiceEndpoint> mServiceEndpoint;
     android::wp<AAudioServiceEndpoint> mServiceEndpointWeak;
 
+    std::string mMetricsId;  // set once during open()
+
 private:
+
+    aaudio_result_t stopTimestampThread();
+
+    /**
+     * Send a message to the client with an int64_t data value.
+     */
+    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
+                                     int64_t dataLong = 0);
+    /**
+     * Send a message to the client with a double data value.
+     */
+    aaudio_result_t sendServiceEvent(aaudio_service_event_t event,
+                                     double dataDouble);
 
     /**
      * @return true if the queue is getting full.
@@ -330,6 +340,10 @@ private:
     // This indicate that a running stream should not be processed because of an error,
     // for example a full message queue. Note that this atomic is unrelated to mCloseNeeded.
     std::atomic<bool>       mSuspended{false};
+
+    // Locking order is important.
+    // Always acquire mLock before acquiring AAudioServiceEndpoint::mLockStreams
+    std::mutex              mLock; // Prevent start/stop/close etcetera from colliding
 };
 
 } /* namespace aaudio */

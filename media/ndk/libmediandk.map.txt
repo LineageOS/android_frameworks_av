@@ -105,6 +105,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_LEVEL; # var introduced=28
     AMEDIAFORMAT_KEY_LOCATION; # var introduced=29
     AMEDIAFORMAT_KEY_LOOP; # var introduced=29
+    AMEDIAFORMAT_KEY_LOW_LATENCY; # var introduced=30
     AMEDIAFORMAT_KEY_LYRICIST; # var introduced=29
     AMEDIAFORMAT_KEY_MANUFACTURER; # var introduced=29
     AMEDIAFORMAT_KEY_MAX_BIT_RATE; # var introduced=29

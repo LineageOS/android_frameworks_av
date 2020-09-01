@@ -19,30 +19,25 @@
 
 #include <android-base/logging.h>
 #include <gtest/gtest.h>
+#include <hidl/GtestPrinter.h>
+#include <hidl/ServiceManagement.h>
 
 #include <codec2/hidl/client.h>
 
 #include <VtsHalHidlTargetTestBase.h>
 #include "media_c2_hidl_test_common.h"
 
-static ComponentTestEnvironment* gEnv = nullptr;
-
 namespace {
 
 // google.codec2 Master test setup
-class Codec2MasterHalTest : public ::testing::VtsHalHidlTargetTestBase {
-   private:
-    typedef ::testing::VtsHalHidlTargetTestBase Super;
-
-   public:
+class Codec2MasterHalTest : public ::testing::TestWithParam<std::string> {
+  public:
     virtual void SetUp() override {
-        Super::SetUp();
-        mClient = android::Codec2Client::CreateFromService(
-            gEnv->getInstance().c_str());
+        mClient = android::Codec2Client::CreateFromService(GetParam().c_str());
         ASSERT_NE(mClient, nullptr);
     }
 
-   protected:
+  protected:
     static void description(const std::string& description) {
         RecordProperty("description", description);
     }
@@ -58,15 +53,14 @@ void displayComponentInfo(const std::vector<C2Component::Traits>& compList) {
 }
 
 // List Components
-TEST_F(Codec2MasterHalTest, ListComponents) {
+TEST_P(Codec2MasterHalTest, ListComponents) {
     ALOGV("ListComponents Test");
 
     C2String name = mClient->getName();
     EXPECT_NE(name.empty(), true) << "Invalid Codec2Client Name";
 
     // Get List of components from all known services
-    const std::vector<C2Component::Traits> listTraits =
-        mClient->ListComponents();
+    const std::vector<C2Component::Traits> listTraits = mClient->ListComponents();
 
     if (listTraits.size() == 0)
         ALOGE("Warning, ComponentInfo list empty");
@@ -79,24 +73,16 @@ TEST_F(Codec2MasterHalTest, ListComponents) {
             ASSERT_NE(listener, nullptr);
 
             // Create component from all known services
-            component = mClient->CreateComponentByName(
-                listTraits[i].name.c_str(), listener, &mClient);
-            ASSERT_NE(component, nullptr) << "Create component failed for "
-                                          << listTraits[i].name.c_str();
+            component =
+                    mClient->CreateComponentByName(listTraits[i].name.c_str(), listener, &mClient);
+            ASSERT_NE(component, nullptr)
+                    << "Create component failed for " << listTraits[i].name.c_str();
         }
     }
 }
 
 }  // anonymous namespace
 
-int main(int argc, char** argv) {
-    gEnv = new ComponentTestEnvironment();
-    ::testing::InitGoogleTest(&argc, argv);
-    gEnv->init(&argc, argv);
-    int status = gEnv->initFromOptions(argc, argv);
-    if (status == 0) {
-        status = RUN_ALL_TESTS();
-        LOG(INFO) << "C2 Test result = " << status;
-    }
-    return status;
-}
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2MasterHalTest,
+                         testing::ValuesIn(android::Codec2Client::GetServiceNames()),
+                         android::hardware::PrintInstanceNameToString);
