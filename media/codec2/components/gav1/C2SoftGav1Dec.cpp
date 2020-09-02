@@ -288,9 +288,7 @@ void C2SoftGav1Dec::onReset() {
 void C2SoftGav1Dec::onRelease() { destroyDecoder(); }
 
 c2_status_t C2SoftGav1Dec::onFlush_sm() {
-  Libgav1StatusCode status =
-      mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
-                              /*user_private_data=*/0);
+  Libgav1StatusCode status = mCodecCtx->SignalEOS();
   if (status != kLibgav1StatusOk) {
     ALOGE("Failed to flush av1 decoder. status: %d.", status);
     return C2_CORRUPTED;
@@ -299,7 +297,7 @@ c2_status_t C2SoftGav1Dec::onFlush_sm() {
   // Dequeue frame (if any) that was enqueued previously.
   const libgav1::DecoderBuffer *buffer;
   status = mCodecCtx->DequeueFrame(&buffer);
-  if (status != kLibgav1StatusOk) {
+  if (status != kLibgav1StatusOk && status != kLibgav1StatusNothingToDequeue) {
     ALOGE("Failed to dequeue frame after flushing the av1 decoder. status: %d",
           status);
     return C2_CORRUPTED;
@@ -433,7 +431,8 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
     TIME_DIFF(mTimeEnd, mTimeStart, delay);
 
     const Libgav1StatusCode status =
-        mCodecCtx->EnqueueFrame(bitstream, inSize, frameIndex);
+        mCodecCtx->EnqueueFrame(bitstream, inSize, frameIndex,
+                                /*buffer_private_data=*/nullptr);
 
     GETTIME(&mTimeEnd, nullptr);
     TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
@@ -448,9 +447,7 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
     }
 
   } else {
-    const Libgav1StatusCode status =
-        mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
-                                /*user_private_data=*/0);
+    const Libgav1StatusCode status = mCodecCtx->SignalEOS();
     if (status != kLibgav1StatusOk) {
       ALOGE("Failed to flush av1 decoder. status: %d.", status);
       work->result = C2_CORRUPTED;
@@ -606,13 +603,14 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   const libgav1::DecoderBuffer *buffer;
   const Libgav1StatusCode status = mCodecCtx->DequeueFrame(&buffer);
 
-  if (status != kLibgav1StatusOk) {
+  if (status != kLibgav1StatusOk && status != kLibgav1StatusNothingToDequeue) {
     ALOGE("av1 decoder DequeueFrame failed. status: %d.", status);
     return false;
   }
 
-  // |buffer| can be NULL if status was equal to kLibgav1StatusOk. This is not
-  // an error. This could mean one of two things:
+  // |buffer| can be NULL if status was equal to kLibgav1StatusOk or
+  // kLibgav1StatusNothingToDequeue. This is not an error. This could mean one
+  // of two things:
   //  - The EnqueueFrame() call was either a flush (called with nullptr).
   //  - The enqueued frame did not have any displayable frames.
   if (!buffer) {
@@ -725,9 +723,7 @@ c2_status_t C2SoftGav1Dec::drainInternal(
     return C2_OMITTED;
   }
 
-  Libgav1StatusCode status =
-      mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
-                              /*user_private_data=*/0);
+  const Libgav1StatusCode status = mCodecCtx->SignalEOS();
   if (status != kLibgav1StatusOk) {
     ALOGE("Failed to flush av1 decoder. status: %d.", status);
     return C2_CORRUPTED;
