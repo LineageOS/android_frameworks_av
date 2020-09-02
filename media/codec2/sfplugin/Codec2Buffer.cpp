@@ -353,6 +353,66 @@ public:
                         mediaImage->mPlane[mediaImage->V].mVertSubsampling = 2;
                         break;
 
+                    case COLOR_FormatYUVP010:
+                        if (!copy) {
+                            // try to map directly. check if the planes are near one another
+                            const uint8_t *minPtr = mView.data()[0];
+                            const uint8_t *maxPtr = mView.data()[0];
+                            int32_t planeSize = 0;
+                            for (uint32_t i = 0; i < layout.numPlanes; ++i) {
+                                const C2PlaneInfo &plane = layout.planes[i];
+                                ssize_t minOffset = plane.minOffset(
+                                        mWidth / plane.colSampling, mHeight / plane.rowSampling);
+                                ssize_t maxOffset = plane.maxOffset(
+                                        mWidth / plane.colSampling, mHeight / plane.rowSampling);
+                                if (minPtr > mView.data()[i] + minOffset) {
+                                    minPtr = mView.data()[i] + minOffset;
+                                }
+                                if (maxPtr < mView.data()[i] + maxOffset) {
+                                    maxPtr = mView.data()[i] + maxOffset;
+                                }
+                                planeSize += std::abs(plane.rowInc) * align(mHeight, 64)
+                                        / plane.rowSampling / plane.colSampling
+                                        * divUp(mAllocatedDepth, 8u);
+                            }
+
+                            if ((maxPtr - minPtr + 1) <= planeSize) {
+                                // FIXME: this is risky as reading/writing data out of bound results
+                                //        in an undefined behavior, but gralloc does assume a
+                                //        contiguous mapping
+                                for (uint32_t i = 0; i < layout.numPlanes; ++i) {
+                                    const C2PlaneInfo &plane = layout.planes[i];
+                                    mediaImage->mPlane[i].mOffset = mView.data()[i] - minPtr;
+                                    mediaImage->mPlane[i].mColInc = plane.colInc;
+                                    mediaImage->mPlane[i].mRowInc = plane.rowInc;
+                                    mediaImage->mPlane[i].mHorizSubsampling = plane.colSampling;
+                                    mediaImage->mPlane[i].mVertSubsampling = plane.rowSampling;
+                                }
+                                mWrapped = new ABuffer(
+                                        const_cast<uint8_t *>(minPtr),
+                                        maxPtr - minPtr + divUp(mAllocatedDepth, 8u));
+                                break;
+                            }
+                        }
+                        mediaImage->mPlane[mediaImage->Y].mOffset = 0;
+                        mediaImage->mPlane[mediaImage->Y].mColInc = 2;
+                        mediaImage->mPlane[mediaImage->Y].mRowInc = stride * 2;
+                        mediaImage->mPlane[mediaImage->Y].mHorizSubsampling = 1;
+                        mediaImage->mPlane[mediaImage->Y].mVertSubsampling = 1;
+
+                        mediaImage->mPlane[mediaImage->U].mOffset = stride * vStride * 2;
+                        mediaImage->mPlane[mediaImage->U].mColInc = 4;
+                        mediaImage->mPlane[mediaImage->U].mRowInc = stride * 2;
+                        mediaImage->mPlane[mediaImage->U].mHorizSubsampling = 2;
+                        mediaImage->mPlane[mediaImage->U].mVertSubsampling = 2;
+
+                        mediaImage->mPlane[mediaImage->V].mOffset = stride * vStride * 2 + 2;
+                        mediaImage->mPlane[mediaImage->V].mColInc = 4;
+                        mediaImage->mPlane[mediaImage->V].mRowInc = stride * 2;
+                        mediaImage->mPlane[mediaImage->V].mHorizSubsampling = 2;
+                        mediaImage->mPlane[mediaImage->V].mVertSubsampling = 2;
+                        break;
+
                     default:
                         ALOGD("Converter: incompactible color format (%d) for YUV layout", mColorFormat);
                         mInitCheck = BAD_VALUE;

@@ -967,8 +967,9 @@ bool C2Mapper::mapPixelFormatFrameworkToCodec(
             *c2Value = HAL_PIXEL_FORMAT_YV12;
             return true;
         default:
-            // TODO: support some sort of passthrough
-            return false;
+            // Passthrough
+            *c2Value = uint32_t(frameworkValue);
+            return true;
     }
 }
 
@@ -984,6 +985,8 @@ bool C2Mapper::mapPixelFormatCodecToFramework(
             *frameworkValue = COLOR_FormatYUV420Flexible;
             return true;
         default:
-            return false;
+            // Passthrough
+            *frameworkValue = int32_t(c2Value);
+            return true;
     }
 }
