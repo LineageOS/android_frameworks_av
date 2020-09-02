@@ -19,6 +19,7 @@
 
 #include "EngineBase.h"
 #include "EngineDefaultConfig.h"
+#include "../include/EngineBase.h"
 #include <TypeConverter.h>
 
 namespace android {
@@ -409,6 +410,171 @@ status_t EngineBase::getDevicesForRoleAndStrategy(product_strategy_t strategy, d
         auto devIt = mProductStrategyPreferredDevices.find(strategy);
         if (devIt == mProductStrategyPreferredDevices.end()) {
             ALOGV("%s no preferred device for strategy %u", __func__, strategy);
+            return NAME_NOT_FOUND;
+        }
+
+        devices = devIt->second;
+    } break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as the DEVICE_ROLE_NONE is never set
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+status_t EngineBase::setDevicesRoleForCapturePreset(audio_source_t audioSource, device_role_t role,
+        const AudioDeviceTypeAddrVector &devices)
+{
+    // verify if the audio source is valid
+    if (!audio_is_valid_audio_source(audioSource)) {
+        ALOGE("%s unknown audio source %u", __func__, audioSource);
+    }
+
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+        mCapturePresetDevicesRole[audioSource][role] = devices;
+        // When the devices are set as preferred devices, remove them from the disabled devices.
+        doRemoveDevicesRoleForCapturePreset(
+                audioSource, DEVICE_ROLE_DISABLED, devices, false /*forceMatched*/);
+        break;
+    case DEVICE_ROLE_DISABLED:
+        // TODO: support setting devices role as disabled for capture preset.
+        ALOGI("%s no implemented for role as %d", __func__, role);
+        break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it is no need to set device role as none
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+status_t EngineBase::addDevicesRoleForCapturePreset(audio_source_t audioSource, device_role_t role,
+        const AudioDeviceTypeAddrVector &devices)
+{
+    // verify if the audio source is valid
+    if (!audio_is_valid_audio_source(audioSource)) {
+        ALOGE("%s unknown audio source %u", __func__, audioSource);
+    }
+
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+        mCapturePresetDevicesRole[audioSource][role] = excludeDeviceTypeAddrsFrom(
+                mCapturePresetDevicesRole[audioSource][role], devices);
+        for (const auto& device : devices) {
+            mCapturePresetDevicesRole[audioSource][role].push_back(device);
+        }
+        // When the devices are set as preferred devices, remove them from the disabled devices.
+        doRemoveDevicesRoleForCapturePreset(
+                audioSource, DEVICE_ROLE_DISABLED, devices, false /*forceMatched*/);
+        break;
+    case DEVICE_ROLE_DISABLED:
+        // TODO: support setting devices role as disabled for capture preset.
+        ALOGI("%s no implemented for role as %d", __func__, role);
+        break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it is no need to set device role as none
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+status_t EngineBase::removeDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector& devices) {
+    return doRemoveDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t EngineBase::doRemoveDevicesRoleForCapturePreset(audio_source_t audioSource,
+        device_role_t role, const AudioDeviceTypeAddrVector& devices, bool forceMatched)
+{
+    // verify if the audio source is valid
+    if (!audio_is_valid_audio_source(audioSource)) {
+        ALOGE("%s unknown audio source %u", __func__, audioSource);
+    }
+
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+    case DEVICE_ROLE_DISABLED: {
+        if (mCapturePresetDevicesRole.count(audioSource) == 0 ||
+                mCapturePresetDevicesRole[audioSource].count(role) == 0) {
+            return NAME_NOT_FOUND;
+        }
+        AudioDeviceTypeAddrVector remainingDevices = excludeDeviceTypeAddrsFrom(
+                mCapturePresetDevicesRole[audioSource][role], devices);
+        if (forceMatched && remainingDevices.size() !=
+                mCapturePresetDevicesRole[audioSource][role].size() - devices.size()) {
+            // There are some devices from `devicesToRemove` that are not shown in the cached record
+            return BAD_VALUE;
+        }
+        mCapturePresetDevicesRole[audioSource][role] = remainingDevices;
+        if (mCapturePresetDevicesRole[audioSource][role].empty()) {
+            // Remove the role when device list is empty
+            mCapturePresetDevicesRole[audioSource].erase(role);
+        }
+    } break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it makes no sense to remove devices with
+        // role as DEVICE_ROLE_NONE
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+status_t EngineBase::clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                      device_role_t role)
+{
+    // verify if the audio source is valid
+    if (!audio_is_valid_audio_source(audioSource)) {
+        ALOGE("%s unknown audio source %u", __func__, audioSource);
+    }
+
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+        if (mCapturePresetDevicesRole.count(audioSource) == 0 ||
+                mCapturePresetDevicesRole[audioSource].erase(role) == 0) {
+            // no preferred device for the given audio source
+            return NAME_NOT_FOUND;
+        }
+        break;
+    case DEVICE_ROLE_DISABLED:
+        // TODO: support remove devices role as disabled for strategy.
+        ALOGI("%s no implemented for role as %d", __func__, role);
+        break;
+    case DEVICE_ROLE_NONE:
+        // Intentionally fall-through as it makes no sense to remove devices with
+        // role as DEVICE_ROLE_NONE for a strategy
+    default:
+        ALOGE("%s invalid role %d", __func__, role);
+        return BAD_VALUE;
+    }
+    return NO_ERROR;
+}
+
+status_t EngineBase::getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+        device_role_t role, AudioDeviceTypeAddrVector &devices) const
+{
+    // verify if the audio source is valid
+    if (!audio_is_valid_audio_source(audioSource)) {
+        ALOGE("%s unknown audio source %u", __func__, audioSource);
+        return BAD_VALUE;
+    }
+
+    switch (role) {
+    case DEVICE_ROLE_PREFERRED:
+    case DEVICE_ROLE_DISABLED: {
+        if (mCapturePresetDevicesRole.count(audioSource) == 0) {
+            return NAME_NOT_FOUND;
+        }
+        auto devIt = mCapturePresetDevicesRole.at(audioSource).find(role);
+        if (devIt == mCapturePresetDevicesRole.at(audioSource).end()) {
+            ALOGV("%s no devices role(%d) for capture preset %u", __func__, role, audioSource);
             return NAME_NOT_FOUND;
         }
 
