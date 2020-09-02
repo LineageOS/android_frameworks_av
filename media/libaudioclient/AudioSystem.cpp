@@ -1641,16 +1641,17 @@ public:
     CaptureStateListenerImpl(
             const sp<IAudioPolicyService>& aps,
             const sp<AudioSystem::CaptureStateListener>& listener)
-            : mAps(aps), mListener(listener) {
+            : mAps(aps), mListener(listener) {}
+
+    void init() {
         bool active;
-        status_t status = aps->registerSoundTriggerCaptureStateListener(this, &active);
+        status_t status = mAps->registerSoundTriggerCaptureStateListener(this, &active);
         if (status != NO_ERROR) {
             mListener->onServiceDied();
             return;
         }
         mListener->onStateChanged(active);
-        sp<IBinder> binder = IInterface::asBinder(aps);
-        binder->linkToDeath(this);
+        IInterface::asBinder(mAps)->linkToDeath(this);
     }
 
     binder::Status setCaptureState(bool active) override {
@@ -1683,6 +1684,7 @@ status_t AudioSystem::registerSoundTriggerCaptureStateListener(
 
     Mutex::Autolock _l(gSoundTriggerCaptureStateListenerLock);
     gSoundTriggerCaptureStateListener = new CaptureStateListenerImpl(aps, listener);
+    gSoundTriggerCaptureStateListener->init();
 
     return NO_ERROR;
 }
