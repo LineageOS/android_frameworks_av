@@ -2068,8 +2068,8 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
         Mutex::Autolock _l(mLock);
         RecordThread *thread = checkRecordThread_l(output.inputId);
         if (thread == NULL) {
-            ALOGE("createRecord() checkRecordThread_l failed, input handle %d", output.inputId);
-            lStatus = BAD_VALUE;
+            ALOGW("createRecord() checkRecordThread_l failed, input handle %d", output.inputId);
+            lStatus = FAILED_TRANSACTION;
             goto Exit;
         }
 
