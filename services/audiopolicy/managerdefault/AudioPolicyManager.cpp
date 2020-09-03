@@ -3104,7 +3104,7 @@ bool  AudioPolicyManager::areAllDevicesSupported(
                 devices[i].mType, devices[i].getAddress(), String8(),
                 AUDIO_FORMAT_DEFAULT, false /*allowToCreate*/, true /*matchAddress*/);
         if (devDesc == nullptr || (predicate != nullptr && !predicate(devices[i].mType))) {
-            ALOGE("%s: device type %#x address %s not supported or not an output device",
+            ALOGE("%s: device type %#x address %s not supported or not match predicate",
                     context, devices[i].mType, devices[i].getAddress());
             return false;
         }
@@ -3214,6 +3214,72 @@ status_t AudioPolicyManager::getDevicesForRoleAndStrategy(product_strategy_t str
                                                           device_role_t role,
                                                           AudioDeviceTypeAddrVector &devices) {
     return mEngine->getDevicesForRoleAndStrategy(strategy, role, devices);
+}
+
+status_t AudioPolicyManager::setDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector &devices) {
+    ALOGV("%s() audioSource=%d role=%d %s", __func__, audioSource, role,
+            dumpAudioDeviceTypeAddrVector(devices).c_str());
+
+    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
+        return BAD_VALUE;
+    }
+    status_t status = mEngine->setDevicesRoleForCapturePreset(audioSource, role, devices);
+    ALOGW_IF(status != NO_ERROR,
+            "Engine could not set preferred devices %s for audio source %d role %d",
+            dumpAudioDeviceTypeAddrVector(devices).c_str(), audioSource, role);
+
+    return status;
+}
+
+status_t AudioPolicyManager::addDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector &devices) {
+    ALOGV("%s() audioSource=%d role=%d %s", __func__, audioSource, role,
+            dumpAudioDeviceTypeAddrVector(devices).c_str());
+
+    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
+        return BAD_VALUE;
+    }
+    status_t status = mEngine->addDevicesRoleForCapturePreset(audioSource, role, devices);
+    ALOGW_IF(status != NO_ERROR,
+            "Engine could not add preferred devices %s for audio source %d role %d",
+            dumpAudioDeviceTypeAddrVector(devices).c_str(), audioSource, role);
+
+    return status;
+}
+
+status_t AudioPolicyManager::removeDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector& devices)
+{
+    ALOGV("%s() audioSource=%d role=%d devices=%s", __func__, audioSource, role,
+            dumpAudioDeviceTypeAddrVector(devices).c_str());
+
+    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
+        return BAD_VALUE;
+    }
+
+    status_t status = mEngine->removeDevicesRoleForCapturePreset(
+            audioSource, role, devices);
+    ALOGW_IF(status != NO_ERROR,
+            "Engine could not remove devices role (%d) for capture preset %d", role, audioSource);
+
+    return status;
+}
+
+status_t AudioPolicyManager::clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                              device_role_t role) {
+    ALOGV("%s() audioSource=%d role=%d", __func__, audioSource, role);
+
+    status_t status = mEngine->clearDevicesRoleForCapturePreset(audioSource, role);
+    ALOGW_IF(status != NO_ERROR,
+            "Engine could not clear devices role (%d) for capture preset %d", role, audioSource);
+
+    return status;
+}
+
+status_t AudioPolicyManager::getDevicesForRoleAndCapturePreset(
+        audio_source_t audioSource, device_role_t role, AudioDeviceTypeAddrVector &devices) {
+    return mEngine->getDevicesForRoleAndCapturePreset(audioSource, role, devices);
 }
 
 status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
