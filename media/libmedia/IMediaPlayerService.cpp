@@ -20,7 +20,9 @@
 
 #include <binder/Parcel.h>
 #include <binder/IMemory.h>
+#ifdef LEGACY_WFD
 #include <media/IHDCP.h>
+#endif
 #include <media/IMediaCodecList.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayerService.h>
@@ -40,7 +42,9 @@ enum {
     CREATE = IBinder::FIRST_CALL_TRANSACTION,
     CREATE_MEDIA_RECORDER,
     CREATE_METADATA_RETRIEVER,
+#ifdef LEGACY_WFD
     MAKE_HDCP,
+#endif
     ADD_BATTERY_DATA,
     PULL_BATTERY_DATA,
     LISTEN_FOR_REMOTE_DISPLAY,
@@ -83,6 +87,7 @@ public:
         return interface_cast<IMediaRecorder>(reply.readStrongBinder());
     }
 
+#ifdef LEGACY_WFD
     virtual sp<IHDCP> makeHDCP(bool createEncryptionModule) {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayerService::getInterfaceDescriptor());
@@ -90,6 +95,7 @@ public:
         remote()->transact(MAKE_HDCP, data, &reply);
         return interface_cast<IHDCP>(reply.readStrongBinder());
     }
+#endif
 
     virtual void addBatteryData(uint32_t params) {
         Parcel data, reply;
@@ -154,6 +160,7 @@ status_t BnMediaPlayerService::onTransact(
             reply->writeStrongBinder(IInterface::asBinder(retriever));
             return NO_ERROR;
         } break;
+#ifdef LEGACY_WFD
         case MAKE_HDCP: {
             CHECK_INTERFACE(IMediaPlayerService, data, reply);
             bool createEncryptionModule = data.readInt32();
@@ -161,6 +168,7 @@ status_t BnMediaPlayerService::onTransact(
             reply->writeStrongBinder(IInterface::asBinder(hdcp));
             return NO_ERROR;
         } break;
+#endif
         case ADD_BATTERY_DATA: {
             CHECK_INTERFACE(IMediaPlayerService, data, reply);
             uint32_t params = data.readInt32();

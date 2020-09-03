@@ -225,7 +225,6 @@ cc_library {
 
     srcs: [
         "IDataSource.cpp",
-        "IHDCP.cpp",
         "BufferingSettings.cpp",
         "mediaplayer.cpp",
         "IMediaHTTPConnection.cpp",
@@ -291,7 +290,6 @@ cc_library {
         "libcamera_client",
         "libstagefright_foundation",
         "libgui",
-        "libui",
         "libdl",
         "libaudioutils",
         "libaudioclient",
@@ -329,6 +327,16 @@ cc_library {
             "signed-integer-overflow",
         ],
         cfi: true,
+    },
+
+    product_variables: {
+        lineage: {
+            uses_legacy_wfd: {
+                cflags: ["-DLEGACY_WFD"],
+                srcs: ["IHDCP.cpp"],
+                shared_libs: ["libui"],
+            },
+        },
     },
 }
 

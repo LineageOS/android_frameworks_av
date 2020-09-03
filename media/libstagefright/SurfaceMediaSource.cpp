@@ -217,7 +217,11 @@ status_t SurfaceMediaSource::stop()
 
 #if DEBUG_PENDING_BUFFERS
         for (size_t i = 0; i < mPendingBuffers.size(); ++i) {
+#ifdef LEGACY_WFD
             ALOGI("%zu: %p", i, mPendingBuffers.itemAt(i));
+#else
+            ALOGI("%d: %p", i, mPendingBuffers.itemAt(i));
+#endif
         }
 #endif
 
@@ -355,7 +359,11 @@ status_t SurfaceMediaSource::read(
 
     (*buffer)->setObserver(this);
     (*buffer)->add_ref();
+#ifdef LEGACY_WFD
     (*buffer)->meta_data().setInt64(kKeyTime, mCurrentTimestamp / 1000);
+#else
+    (*buffer)->meta_data()->setInt64(kKeyTime, mCurrentTimestamp / 1000);
+#endif
     ALOGV("Frames encoded = %d, timestamp = %" PRId64 ", time diff = %" PRId64,
             mNumFramesEncoded, mCurrentTimestamp / 1000,
             mCurrentTimestamp / 1000 - prevTimeStamp / 1000);
@@ -375,9 +383,13 @@ static buffer_handle_t getMediaBufferHandle(MediaBufferBase *buffer) {
     // need to convert to char* for pointer arithmetic and then
     // copy the byte stream into our handle
     buffer_handle_t bufferHandle;
+#ifdef LEGACY_WFD
     VideoNativeMetadata *data = (VideoNativeMetadata *)buffer->data();
     ANativeWindowBuffer *anwbuffer = (ANativeWindowBuffer *)data->pBuffer;
     bufferHandle = anwbuffer->handle;
+#else
+    memcpy(&bufferHandle, (char*)(buffer->data()) + 4, sizeof(buffer_handle_t));
+#endif
     return bufferHandle;
 }
 
@@ -389,12 +401,19 @@ void SurfaceMediaSource::signalBufferReturned(MediaBufferBase *buffer) {
     Mutex::Autolock lock(mMutex);
 
     buffer_handle_t bufferHandle = getMediaBufferHandle(buffer);
+#ifdef LEGACY_WFD
     ANativeWindowBuffer* curNativeHandle = NULL;
+#endif
 
     for (size_t i = 0; i < mCurrentBuffers.size(); i++) {
+#ifdef LEGACY_WFD
         curNativeHandle = mCurrentBuffers[i]->getNativeBuffer();
         if ((mCurrentBuffers[i]->handle == bufferHandle) ||
-            ((buffer_handle_t)curNativeHandle == bufferHandle)) {
+            ((buffer_handle_t)curNativeHandle == bufferHandle))
+#else
+        if (mCurrentBuffers[i]->handle == bufferHandle)
+#endif
+        {
             mCurrentBuffers.removeAt(i);
             foundBuffer = true;
             break;
@@ -410,10 +429,15 @@ void SurfaceMediaSource::signalBufferReturned(MediaBufferBase *buffer) {
             continue;
         }
 
+#ifdef LEGACY_WFD
         curNativeHandle = mSlots[id].mGraphicBuffer->getNativeBuffer();
 
         if ((bufferHandle == mSlots[id].mGraphicBuffer->handle) ||
-            (bufferHandle == (buffer_handle_t)curNativeHandle)) {
+            (bufferHandle == (buffer_handle_t)curNativeHandle))
+#else
+        if (bufferHandle == mSlots[id].mGraphicBuffer->handle)
+#endif
+        {
             ALOGV("Slot %d returned, matches handle = %p", id,
                     mSlots[id].mGraphicBuffer->handle);
 
