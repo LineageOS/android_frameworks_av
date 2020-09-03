@@ -80,9 +80,11 @@
 #include "TestPlayerStub.h"
 #include "nuplayer/NuPlayerDriver.h"
 
+#ifdef LEGACY_WFD
 #include "HDCP.h"
-#include "HTTPBase.h"
 #include "RemoteDisplay.h"
+#endif
+#include "HTTPBase.h"
 
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
@@ -339,6 +341,7 @@ sp<IMediaCodecList> MediaPlayerService::getCodecList() const {
     return MediaCodecList::getLocalInstance();
 }
 
+#ifdef LEGACY_WFD
 sp<IHDCP> MediaPlayerService::makeHDCP(bool createEncryptionModule) {
     return new HDCP(createEncryptionModule);
 }
@@ -352,6 +355,16 @@ sp<IRemoteDisplay> MediaPlayerService::listenForRemoteDisplay(
 
     return new RemoteDisplay(opPackageName, client, iface.string());
 }
+
+#else
+sp<IRemoteDisplay> MediaPlayerService::listenForRemoteDisplay(
+        const String16 &/*opPackageName*/,
+        const sp<IRemoteDisplayClient>& /*client*/,
+        const String8& /*iface*/) {
+    ALOGE("listenForRemoteDisplay is no longer supported!");
+    return NULL;
+}
+#endif
 
 status_t MediaPlayerService::AudioOutput::dump(int fd, const Vector<String16>& args) const
 {

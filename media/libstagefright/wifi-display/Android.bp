@@ -49,4 +49,12 @@ cc_library_shared {
             cfi: true,
         },
     },
+
+    product_variables: {
+        lineage: {
+            uses_legacy_wfd: {
+                cflags: ["-DLEGACY_WFD"],
+            },
+        },
+    },
 }

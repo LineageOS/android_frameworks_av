@@ -187,7 +187,11 @@ private:
     size_t mNumPendingBuffers;
 
 #if DEBUG_PENDING_BUFFERS
+#ifdef LEGACY_WFD
     Vector<MediaBufferBase *> mPendingBuffers;
+#else
+    Vector<MediaBuffer *> mPendingBuffers;
+#endif
 #endif
 
     // mCurrentTimestamp is the timestamp for the current texture. It

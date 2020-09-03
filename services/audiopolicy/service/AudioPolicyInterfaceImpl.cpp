@@ -399,7 +399,12 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     }
 
     // check calling permissions
-    if (!isAudioServerOrMediaServerUid(callingUid) && !recordingAllowed(opPackageName, pid, uid)) {
+#if LEGACY_WFD
+    if (!isAudioServerOrMediaServerUid(callingUid) && !recordingAllowed(opPackageName, pid, uid))
+#else
+    if (!recordingAllowed(opPackageName, pid, uid))
+#endif
+    {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, uid, pid);
         return PERMISSION_DENIED;
@@ -446,7 +451,12 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
             case AudioPolicyInterface::API_INPUT_TELEPHONY_RX:
                 // FIXME: use the same permission as for remote submix for now.
             case AudioPolicyInterface::API_INPUT_MIX_CAPTURE:
-                if (!isAudioServerOrMediaServerUid(callingUid) && !canCaptureOutput) {
+#if LEGACY_WFD
+                if (!isAudioServerOrMediaServerUid(callingUid) && !canCaptureOutput)
+#else
+                if (!canCaptureOutput)
+#endif
+                {
                     ALOGE("getInputForAttr() permission denied: capture not allowed");
                     status = PERMISSION_DENIED;
                 }
@@ -515,7 +525,12 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // check calling permissions
-    if (!isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid()) && !startRecording(client->opPackageName, client->pid, client->uid)) {
+#if LEGACY_WFD
+    if (!isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid()) && !startRecording(client->opPackageName, client->pid, client->uid))
+#else
+    if (!startRecording(client->opPackageName, client->pid, client->uid))
+#endif
+    {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, client->uid, client->pid);
         return PERMISSION_DENIED;
