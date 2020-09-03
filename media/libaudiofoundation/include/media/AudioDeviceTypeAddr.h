@@ -47,10 +47,6 @@ public:
 
     bool operator<(const AudioDeviceTypeAddr& other) const;
 
-    bool operator==(const AudioDeviceTypeAddr& rhs) const;
-
-    bool operator!=(const AudioDeviceTypeAddr& rhs) const;
-
     void reset();
 
     std::string toString(bool includeSensitiveInfo=false) const;
@@ -72,14 +68,6 @@ using AudioDeviceTypeAddrVector = std::vector<AudioDeviceTypeAddr>;
  * Return a collection of audio device types from a collection of AudioDeviceTypeAddr
  */
 DeviceTypeSet getAudioDeviceTypes(const AudioDeviceTypeAddrVector& deviceTypeAddrs);
-
-/**
- * Return a collection of AudioDeviceTypeAddrs that are shown in `devices` but not
- * in `devicesToExclude`
- */
-AudioDeviceTypeAddrVector excludeDeviceTypeAddrsFrom(
-        const AudioDeviceTypeAddrVector& devices,
-        const AudioDeviceTypeAddrVector& devicesToExclude);
 
 std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
                                           bool includeSensitiveInfo=false);
