@@ -3,12 +3,10 @@ cc_library_shared {
     srcs: [
         "ActivityManager.cpp",
         "DeathNotifier.cpp",
-        "HDCP.cpp",
         "MediaPlayerFactory.cpp",
         "MediaPlayerService.cpp",
         "MediaRecorderClient.cpp",
         "MetadataRetrieverClient.cpp",
-        "RemoteDisplay.cpp",
         "StagefrightRecorder.cpp",
         "TestPlayerStub.cpp",
     ],
@@ -36,7 +34,6 @@ cc_library_shared {
         "libnetd_client",
         "libpowermanager",
         "libstagefright",
-        "libstagefright_wfd",
         "libstagefright_foundation",
         "libstagefright_httplive",
         "libutils",
@@ -74,5 +71,17 @@ cc_library_shared {
         cfi: true,
     },
 
+    product_variables: {
+        lineage: {
+            uses_legacy_wfd: {
+                cflags: ["-DLEGACY_WFD"],
+                srcs: [
+                    "HDCP.cpp",
+                    "RemoteDisplay.cpp",
+                ],
+                shared_libs: ["libstagefright_wfd"],
+            },
+        },
+    },
 }
 
