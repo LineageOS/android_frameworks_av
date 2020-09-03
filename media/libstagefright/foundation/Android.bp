@@ -57,11 +57,9 @@ cc_defaults {
         "ABuffer.cpp",
         "ADebug.cpp",
         "AHandler.cpp",
-        "AHierarchicalStateMachine.cpp",
         "ALooper.cpp",
         "ALooperRoster.cpp",
         "AMessage.cpp",
-        "ANetworkSession.cpp",
         "AString.cpp",
         "AStringUtils.cpp",
         "AudioPresentationInfo.cpp",
@@ -75,7 +73,6 @@ cc_defaults {
         "MetaData.cpp",
         "MetaDataBase.cpp",
         "OpusHeader.cpp",
-        "ParsedMessage.cpp",
         "avc_utils.cpp",
         "base64.cpp",
         "hexdump.cpp",
@@ -89,6 +86,18 @@ cc_defaults {
             "signed-integer-overflow",
         ],
         cfi: true,
+    },
+
+    product_variables: {
+        lineage: {
+            uses_legacy_wfd: {
+                srcs: [
+                    "AHierarchicalStateMachine.cpp",
+                    "ANetworkSession.cpp",
+                    "ParsedMessage.cpp",
+                ],
+            },
+        },
     },
 }
 
