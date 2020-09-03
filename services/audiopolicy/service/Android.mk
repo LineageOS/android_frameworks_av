@@ -42,6 +42,10 @@ LOCAL_MULTILIB := $(AUDIOSERVER_MULTILIB)
 
 LOCAL_MODULE:= libaudiopolicyservice
 
+ifeq ($(TARGET_USES_LEGACY_WFD),true)
+LOCAL_CFLAGS += -DLEGACY_WFD
+endif
+
 LOCAL_CFLAGS += -fvisibility=hidden
 LOCAL_CFLAGS += -Wall -Werror
 

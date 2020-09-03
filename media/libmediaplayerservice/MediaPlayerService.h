@@ -236,7 +236,9 @@ public:
                                        audio_session_t audioSessionId);
 
     virtual sp<IMediaCodecList> getCodecList() const;
+#ifdef LEGACY_WFD
     virtual sp<IHDCP>           makeHDCP(bool createEncryptionModule);
+#endif
 
     virtual sp<IRemoteDisplay> listenForRemoteDisplay(const String16 &opPackageName,
             const sp<IRemoteDisplayClient>& client, const String8& iface);
