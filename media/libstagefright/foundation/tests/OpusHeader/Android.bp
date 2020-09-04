@@ -16,6 +16,7 @@
 
 cc_test {
     name: "OpusHeaderTest",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: [
