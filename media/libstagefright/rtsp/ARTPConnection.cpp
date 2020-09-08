@@ -678,14 +678,14 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
         const uint8_t *extensionData = &data[payloadOffset];
 
         size_t extensionLength =
-            4 * (extensionData[2] << 8 | extensionData[3]);
+            (4 * (extensionData[2] << 8 | extensionData[3])) + 4;
 
-        if (size < payloadOffset + 4 + extensionLength) {
+        if (size < payloadOffset + extensionLength) {
             return -1;
         }
 
         parseRTPExt(s, (const uint8_t *)extensionData, extensionLength, &cvoDegrees);
-        payloadOffset += 4 + extensionLength;
+        payloadOffset += extensionLength;
     }
 
     uint32_t srcId = u32at(&data[8]);
@@ -699,8 +699,9 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
     meta->setInt32("rtp-time", rtpTime);
     meta->setInt32("PT", data[1] & 0x7f);
     meta->setInt32("M", data[1] >> 7);
-    if (cvoDegrees >= 0)
+    if (cvoDegrees >= 0) {
         meta->setInt32("cvo", cvoDegrees);
+    }
 
     buffer->setInt32Data(u16at(&data[2]));
     buffer->setRange(payloadOffset, size - payloadOffset);
