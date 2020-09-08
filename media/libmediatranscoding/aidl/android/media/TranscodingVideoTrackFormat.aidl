@@ -67,4 +67,18 @@ parcelable TranscodingVideoTrackFormat {
      * -1 means unavailable.
      */
     int level = -1;
+
+    /**
+     * Decoder operating rate. This is used to work around the fact that vendor does not boost the
+     * hardware to maximum speed in transcoding usage case. This operating rate will be applied
+     * to decoder inside MediaTranscoder. -1 means unavailable.
+     */
+    int decoderOperatingRate = -1;
+
+    /**
+     * Encoder operating rate. This is used to work around the fact that vendor does not boost the
+     * hardware to maximum speed in transcoding usage case. This operating rate will be applied
+     * to encoder inside MediaTranscoder. -1 means unavailable.
+     */
+    int encoderOperatingRate = -1;
 }
