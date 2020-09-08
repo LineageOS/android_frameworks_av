@@ -119,6 +119,11 @@ enum {
     AUDIO_MODULES_UPDATED,  // oneway
     SET_CURRENT_IME_UID,
     REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER,
+    SET_DEVICES_ROLE_FOR_CAPTURE_PRESET,
+    ADD_DEVICES_ROLE_FOR_CAPTURE_PRESET,
+    REMOVE_DEVICES_ROLE_FOR_CAPTURE_PRESET,
+    CLEAR_DEVICES_ROLE_FOR_CAPTURE_PRESET,
+    GET_DEVICES_FOR_ROLE_AND_CAPTURE_PRESET,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -1408,6 +1413,95 @@ public:
         return static_cast<status_t>(reply.readInt32());
     }
 
+    virtual status_t setDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role, const AudioDeviceTypeAddrVector &devices) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(audioSource));
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = data.writeParcelableVector(devices);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = remote()->transact(SET_DEVICES_ROLE_FOR_CAPTURE_PRESET, data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t addDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role, const AudioDeviceTypeAddrVector &devices)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(audioSource));
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = data.writeParcelableVector(devices);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = remote()->transact(ADD_DEVICES_ROLE_FOR_CAPTURE_PRESET, data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t removeDevicesRoleForCapturePreset(
+            audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector& devices)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(audioSource));
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = data.writeParcelableVector(devices);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = remote()->transact(REMOVE_DEVICES_ROLE_FOR_CAPTURE_PRESET,
+                data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t clearDevicesRoleForCapturePreset(
+            audio_source_t audioSource, device_role_t role)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(audioSource));
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = remote()->transact(CLEAR_DEVICES_ROLE_FOR_CAPTURE_PRESET,
+                data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+            device_role_t role, AudioDeviceTypeAddrVector &devices)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(audioSource));
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = remote()->transact(GET_DEVICES_FOR_ROLE_AND_CAPTURE_PRESET,
+                data, &reply);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        status = reply.readParcelableVector(&devices);
+        if (status != NO_ERROR) {
+            return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
     virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
             AudioDeviceTypeAddrVector *devices) const
     {
@@ -1544,7 +1638,12 @@ status_t BnAudioPolicyService::onTransact(
         case SET_ALLOWED_CAPTURE_POLICY:
         case AUDIO_MODULES_UPDATED:
         case SET_CURRENT_IME_UID:
-        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER: {
+        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER:
+        case SET_DEVICES_ROLE_FOR_CAPTURE_PRESET:
+        case ADD_DEVICES_ROLE_FOR_CAPTURE_PRESET:
+        case REMOVE_DEVICES_ROLE_FOR_CAPTURE_PRESET:
+        case CLEAR_DEVICES_ROLE_FOR_CAPTURE_PRESET:
+        case GET_DEVICES_FOR_ROLE_AND_CAPTURE_PRESET: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
@@ -2728,6 +2827,71 @@ status_t BnAudioPolicyService::onTransact(
             }
             return NO_ERROR;
         } break;
+
+        case SET_DEVICES_ROLE_FOR_CAPTURE_PRESET: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_source_t audioSource = (audio_source_t) data.readUint32();
+            device_role_t role = (device_role_t) data.readUint32();
+            AudioDeviceTypeAddrVector devices;
+            status_t status = data.readParcelableVector(&devices);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = setDevicesRoleForCapturePreset(audioSource, role, devices);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case ADD_DEVICES_ROLE_FOR_CAPTURE_PRESET: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_source_t audioSource = (audio_source_t) data.readUint32();
+            device_role_t role = (device_role_t) data.readUint32();
+            AudioDeviceTypeAddrVector devices;
+            status_t status = data.readParcelableVector(&devices);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = addDevicesRoleForCapturePreset(audioSource, role, devices);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case REMOVE_DEVICES_ROLE_FOR_CAPTURE_PRESET: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_source_t audioSource = (audio_source_t) data.readUint32();
+            device_role_t role = (device_role_t) data.readUint32();
+            AudioDeviceTypeAddrVector devices;
+            status_t status = data.readParcelableVector(&devices);
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = removeDevicesRoleForCapturePreset(audioSource, role, devices);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case CLEAR_DEVICES_ROLE_FOR_CAPTURE_PRESET: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_source_t audioSource = (audio_source_t) data.readUint32();
+            device_role_t role = (device_role_t) data.readUint32();
+            status_t status = clearDevicesRoleForCapturePreset(audioSource, role);
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
+
+        case GET_DEVICES_FOR_ROLE_AND_CAPTURE_PRESET: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            audio_source_t audioSource = (audio_source_t) data.readUint32();
+            device_role_t role = (device_role_t) data.readUint32();
+            AudioDeviceTypeAddrVector devices;
+            status_t status = getDevicesForRoleAndCapturePreset(audioSource, role, devices);
+            status_t marshall_status = reply->writeParcelableVector(devices);
+            if (marshall_status != NO_ERROR) {
+                return marshall_status;
+            }
+            reply->writeInt32(status);
+            return NO_ERROR;
+        }
 
         default:
             return BBinder::onTransact(code, data, reply, flags);

@@ -281,6 +281,25 @@ public:
                                                       device_role_t role,
                                                       AudioDeviceTypeAddrVector &devices);
 
+        virtual status_t setDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                        device_role_t role,
+                                                        const AudioDeviceTypeAddrVector &devices);
+
+        virtual status_t addDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                        device_role_t role,
+                                                        const AudioDeviceTypeAddrVector &devices);
+
+        virtual status_t removeDevicesRoleForCapturePreset(
+                audio_source_t audioSource, device_role_t role,
+                const AudioDeviceTypeAddrVector& devices);
+
+        virtual status_t clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                          device_role_t role);
+
+        virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+                                                           device_role_t role,
+                                                           AudioDeviceTypeAddrVector &devices);
+
         virtual status_t startAudioSource(const struct audio_port_config *source,
                                           const audio_attributes_t *attributes,
                                           audio_port_handle_t *portId,
