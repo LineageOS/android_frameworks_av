@@ -56,7 +56,7 @@ struct DrmSessionManager : public IBinder::DeathRecipient {
     void removeSession(const Vector<uint8_t>& sessionId);
     bool reclaimSession(int callingPid);
 
-    // sanity check APIs
+    // inspection APIs
     size_t getSessionCount() const;
     bool containsSession(const Vector<uint8_t>& sessionId) const;
 
