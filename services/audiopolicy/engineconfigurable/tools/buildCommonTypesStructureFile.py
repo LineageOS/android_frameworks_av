@@ -52,13 +52,19 @@ def parseArgs():
 def findBitPos(decimal):
     pos = 0
     i = 1
-    while i != decimal:
+    while i < decimal:
         i = i << 1
         pos = pos + 1
         if pos == 32:
             return -1
-    return pos
 
+    # TODO: b/168065706. This is just to fix the build. That the problem of devices with
+    # multiple bits set must be addressed more generally in the configurable audio policy
+    # and parameter framework.
+    if i > decimal:
+        logging.info("Device:{} which has multiple bits set is skipped. b/168065706".format(decimal))
+        return -2
+    return pos
 
 def generateXmlStructureFile(componentTypeDict, structureTypesFile, outputFile):
 
@@ -74,10 +80,12 @@ def generateXmlStructureFile(componentTypeDict, structureTypesFile, outputFile):
                 if bitparameters_node is not None:
                     ordered_values = OrderedDict(sorted(values_dict.items(), key=lambda x: x[1]))
                     for key, value in ordered_values.items():
-                        value_node = ET.SubElement(bitparameters_node, "BitParameter")
-                        value_node.set('Name', key)
-                        value_node.set('Size', "1")
-                        value_node.set('Pos', str(findBitPos(value)))
+                        pos = findBitPos(value)
+                        if pos >= 0:
+                            value_node = ET.SubElement(bitparameters_node, "BitParameter")
+                            value_node.set('Name', key)
+                            value_node.set('Size', "1")
+                            value_node.set('Pos', str(pos))
 
                 enum_parameter_node = component_type.find("EnumParameter")
                 if enum_parameter_node is not None:
