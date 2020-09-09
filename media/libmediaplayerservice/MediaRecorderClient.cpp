@@ -28,6 +28,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/MemoryHeapBase.h>
 #include <binder/MemoryBase.h>
+#include <camera/CameraUtils.h>
 #include <codec2/hidl/client.h>
 #include <cutils/atomic.h>
 #include <cutils/properties.h> // for property_get
@@ -423,30 +424,35 @@ status_t MediaRecorderClient::setListener(const sp<IMediaRecorderClient>& listen
 
     sp<IServiceManager> sm = defaultServiceManager();
 
-    // WORKAROUND: We don't know if camera exists here and getService might block for 5 seconds.
-    // Use checkService for camera if we don't know it exists.
-    static std::atomic<bool> sCameraChecked(false);  // once true never becomes false.
-    static std::atomic<bool> sCameraVerified(false); // once true never becomes false.
-    sp<IBinder> binder = (sCameraVerified || !sCameraChecked)
-        ? sm->getService(String16("media.camera")) : sm->checkService(String16("media.camera"));
-    // If the device does not have a camera, do not create a death listener for it.
-    if (binder != NULL) {
-        sCameraVerified = true;
-        mDeathNotifiers.emplace_back(
-                binder, [l = wp<IMediaRecorderClient>(listener)](){
-            sp<IMediaRecorderClient> listener = l.promote();
-            if (listener) {
-                ALOGV("media.camera service died. "
-                      "Sending death notification.");
-                listener->notify(
-                        MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED,
-                        MediaPlayerService::CAMERA_PROCESS_DEATH);
-            } else {
-                ALOGW("media.camera service died without a death handler.");
-            }
-        });
+    static const bool sCameraDisabled = CameraUtils::isCameraServiceDisabled();
+
+    if (!sCameraDisabled) {
+        // WORKAROUND: We don't know if camera exists here and getService might block for 5 seconds.
+        // Use checkService for camera if we don't know it exists.
+        static std::atomic<bool> sCameraChecked(false);  // once true never becomes false.
+        static std::atomic<bool> sCameraVerified(false); // once true never becomes false.
+
+        sp<IBinder> binder = (sCameraVerified || !sCameraChecked)
+            ? sm->getService(String16("media.camera")) : sm->checkService(String16("media.camera"));
+        // If the device does not have a camera, do not create a death listener for it.
+        if (binder != NULL) {
+            sCameraVerified = true;
+            mDeathNotifiers.emplace_back(
+                    binder, [l = wp<IMediaRecorderClient>(listener)](){
+                sp<IMediaRecorderClient> listener = l.promote();
+                if (listener) {
+                    ALOGV("media.camera service died. "
+                          "Sending death notification.");
+                    listener->notify(
+                            MEDIA_ERROR, MEDIA_ERROR_SERVER_DIED,
+                            MediaPlayerService::CAMERA_PROCESS_DEATH);
+                } else {
+                    ALOGW("media.camera service died without a death handler.");
+                }
+            });
+        }
+        sCameraChecked = true;
     }
-    sCameraChecked = true;
 
     {
         using ::android::hidl::base::V1_0::IBase;
