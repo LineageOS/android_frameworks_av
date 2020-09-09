@@ -33,6 +33,7 @@ namespace android {
 
 class DeathNotifier;
 class ResourceManagerService;
+class ResourceObserverService;
 class ServiceLog;
 struct ProcessInfoInterface;
 
@@ -95,6 +96,8 @@ public:
             const sp<ProcessInfoInterface> &processInfo,
             const sp<SystemCallbackInterface> &systemResource);
     virtual ~ResourceManagerService();
+    void setObserverService(
+            const std::shared_ptr<ResourceObserverService>& observerService);
 
     // IResourceManagerService interface
     Status config(const std::vector<MediaResourcePolicyParcel>& policies) override;
@@ -180,6 +183,7 @@ private:
     int32_t mCpuBoostCount;
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
     std::map<int, int> mOverridePidMap;
+    std::shared_ptr<ResourceObserverService> mObserverService;
 };
 
 // ----------------------------------------------------------------------------
