@@ -23,6 +23,7 @@
 #include <system/window.h>
 #include <system/graphics.h>
 
+#include <cutils/properties.h>
 #include <utils/Log.h>
 
 namespace android {
@@ -120,6 +121,12 @@ status_t CameraUtils::getRotationTransform(const CameraMetadata& staticInfo,
     ALOGV("%s: final transform = 0x%x", __FUNCTION__, flags);
 
     return OK;
+}
+
+bool CameraUtils::isCameraServiceDisabled() {
+    char value[PROPERTY_VALUE_MAX];
+    property_get("config.disable_cameraservice", value, "0");
+    return (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0);
 }
 
 } /* namespace android */

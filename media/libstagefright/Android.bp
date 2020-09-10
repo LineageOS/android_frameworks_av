@@ -211,7 +211,7 @@ cc_library_shared {
     ],
 
     static_libs: [
-        "librenderengine",
+        "librenderfright",
     ],
 
     export_include_dirs: [
