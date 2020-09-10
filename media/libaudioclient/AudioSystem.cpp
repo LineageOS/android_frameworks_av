@@ -1635,6 +1635,59 @@ status_t AudioSystem::getDevicesForRoleAndStrategy(product_strategy_t strategy,
     return aps->getDevicesForRoleAndStrategy(strategy, role, devices);
 }
 
+status_t AudioSystem::setDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                     device_role_t role,
+                                                     const AudioDeviceTypeAddrVector &devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->setDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t AudioSystem::addDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                     device_role_t role,
+                                                     const AudioDeviceTypeAddrVector &devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->addDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t AudioSystem::removeDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector& devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->removeDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t AudioSystem::clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                       device_role_t role)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->clearDevicesRoleForCapturePreset(audioSource, role);
+}
+
+status_t AudioSystem::getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+                                                        device_role_t role,
+                                                        AudioDeviceTypeAddrVector &devices)
+{
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) {
+        return PERMISSION_DENIED;
+    }
+    return aps->getDevicesForRoleAndCapturePreset(audioSource, role, devices);
+}
+
 class CaptureStateListenerImpl : public media::BnCaptureStateListener,
                                  public IBinder::DeathRecipient {
 public:

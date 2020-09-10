@@ -118,14 +118,14 @@ cc_library_shared {
     export_header_lib_headers: ["libaudioclient_headers"],
     export_static_lib_headers: [
         "effect-aidl-cpp",
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
 
     static_libs: [
         "effect-aidl-cpp",
         // for memory heap analysis
         "libc_malloc_debug_backtrace",
-        "shared-file-region-aidl-cpp",
+        "shared-file-region-aidl-unstable-cpp",
     ],
     cflags: [
         "-Wall",
