@@ -245,11 +245,11 @@ sp<IMemory> CameraSourceTimeLapse::createIMemoryCopy(
 
     ALOGV("createIMemoryCopy");
     size_t source_size = source_data->size();
-    void* source_pointer = source_data->pointer();
+    void* source_pointer = source_data->unsecurePointer();
 
     sp<MemoryHeapBase> newMemoryHeap = new MemoryHeapBase(source_size);
     sp<MemoryBase> newMemory = new MemoryBase(newMemoryHeap, 0, source_size);
-    memcpy(newMemory->pointer(), source_pointer, source_size);
+    memcpy(newMemory->unsecurePointer(), source_pointer, source_size);
     return newMemory;
 }
 

@@ -20,14 +20,14 @@
 
 #include <utils/Log.h>
 
-#include <binder/IPCThreadState.h>
-#include <binder/IServiceManager.h>
+#include <android/binder_manager.h>
 
+#include <aidl/android/media/BnResourceManagerClient.h>
 #include <android/hardware/drm/1.2/types.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
-
 #include <media/EventMetric.h>
+#include <media/MediaMetrics.h>
 #include <media/PluginMetricsReporting.h>
 #include <media/drm/DrmAPI.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -38,6 +38,10 @@
 #include <mediadrm/DrmHal.h>
 #include <mediadrm/DrmSessionClientInterface.h>
 #include <mediadrm/DrmSessionManager.h>
+#include <mediadrm/IDrmMetricsConsumer.h>
+#include <mediadrm/DrmUtils.h>
+
+#include <vector>
 
 using drm::V1_0::KeyedVector;
 using drm::V1_0::KeyRequestType;
@@ -57,7 +61,6 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
-using ::android::hidl::manager::V1_0::IServiceManager;
 using ::android::os::PersistableBundle;
 using ::android::sp;
 
@@ -96,17 +99,6 @@ std::string toBase64StringNoPad(const T* data, size_t size) {
 namespace android {
 
 #define INIT_CHECK() {if (mInitCheck != OK) return mInitCheck;}
-
-static inline int getCallingPid() {
-    return IPCThreadState::self()->getCallingPid();
-}
-
-static bool checkPermission(const char* permissionString) {
-    if (getpid() == IPCThreadState::self()->getCallingPid()) return true;
-    bool ok = checkCallingPermission(String16(permissionString));
-    if (!ok) ALOGE("Request requires %s", permissionString);
-    return ok;
-}
 
 static const Vector<uint8_t> toVector(const hidl_vec<uint8_t> &vec) {
     Vector<uint8_t> vector;
@@ -297,21 +289,43 @@ static status_t toStatusT_1_2(Status_V1_2 status) {
 
 Mutex DrmHal::mLock;
 
-bool DrmHal::DrmSessionClient::reclaimResource() {
+struct DrmHal::DrmSessionClient : public aidl::android::media::BnResourceManagerClient {
+    explicit DrmSessionClient(DrmHal* drm, const Vector<uint8_t>& sessionId)
+      : mSessionId(sessionId),
+        mDrm(drm) {}
+
+    ::ndk::ScopedAStatus reclaimResource(bool* _aidl_return) override;
+    ::ndk::ScopedAStatus getName(::std::string* _aidl_return) override;
+
+    const Vector<uint8_t> mSessionId;
+
+    virtual ~DrmSessionClient();
+
+private:
+    wp<DrmHal> mDrm;
+
+    DISALLOW_EVIL_CONSTRUCTORS(DrmSessionClient);
+};
+
+::ndk::ScopedAStatus DrmHal::DrmSessionClient::reclaimResource(bool* _aidl_return) {
+    auto sessionId = mSessionId;
     sp<DrmHal> drm = mDrm.promote();
     if (drm == NULL) {
-        return true;
+        *_aidl_return = true;
+        return ::ndk::ScopedAStatus::ok();
     }
-    status_t err = drm->closeSession(mSessionId);
+    status_t err = drm->closeSession(sessionId);
     if (err != OK) {
-        return false;
+        *_aidl_return = false;
+        return ::ndk::ScopedAStatus::ok();
     }
     drm->sendEvent(EventType::SESSION_RECLAIMED,
-            toHidlVec(mSessionId), hidl_vec<uint8_t>());
-    return true;
+            toHidlVec(sessionId), hidl_vec<uint8_t>());
+    *_aidl_return = true;
+    return ::ndk::ScopedAStatus::ok();
 }
 
-String8 DrmHal::DrmSessionClient::getName() {
+::ndk::ScopedAStatus DrmHal::DrmSessionClient::getName(::std::string* _aidl_return) {
     String8 name;
     sp<DrmHal> drm = mDrm.promote();
     if (drm == NULL) {
@@ -325,7 +339,8 @@ String8 DrmHal::DrmSessionClient::getName() {
         name.appendFormat("%02x", mSessionId[i]);
     }
     name.append("]");
-    return name;
+    *_aidl_return = name;
+    return ::ndk::ScopedAStatus::ok();
 }
 
 DrmHal::DrmSessionClient::~DrmSessionClient() {
@@ -374,44 +389,8 @@ void DrmHal::cleanup() {
     mPluginV1_2.clear();
 }
 
-Vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
-    Vector<sp<IDrmFactory>> factories;
-
-    auto manager = hardware::defaultServiceManager1_2();
-
-    if (manager != NULL) {
-        manager->listManifestByInterface(drm::V1_0::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_0::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-        manager->listManifestByInterface(drm::V1_1::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_1::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-        manager->listByInterface(drm::V1_2::IDrmFactory::descriptor,
-                [&factories](const hidl_vec<hidl_string> &registered) {
-                    for (const auto &instance : registered) {
-                        auto factory = drm::V1_2::IDrmFactory::getService(instance);
-                        if (factory != NULL) {
-                            factories.push_back(factory);
-                        }
-                    }
-                }
-            );
-    }
-
+std::vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
+    std::vector<sp<IDrmFactory>> factories(DrmUtils::MakeDrmFactories());
     if (factories.size() == 0) {
         // must be in passthrough mode, load the default passthrough service
         auto passthrough = IDrmFactory::getService();
@@ -429,6 +408,7 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         const uint8_t uuid[16], const String8& appPackageName) {
     mAppPackageName = appPackageName;
     mMetrics.SetAppPackageName(appPackageName);
+    mMetrics.SetAppUid(AIBinder_getCallingUid());
 
     sp<IDrmPlugin> plugin;
     Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
@@ -455,12 +435,6 @@ status_t DrmHal::initCheck() const {
 status_t DrmHal::setListener(const sp<IDrmClient>& listener)
 {
     Mutex::Autolock lock(mEventLock);
-    if (mListener != NULL){
-        IInterface::asBinder(mListener)->unlinkToDeath(this);
-    }
-    if (listener != NULL) {
-        IInterface::asBinder(listener)->linkToDeath(this);
-    }
     mListener = listener;
     return NO_ERROR;
 }
@@ -474,10 +448,6 @@ Return<void> DrmHal::sendEvent(EventType hEventType,
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
-        writeByteArray(obj, data);
-
         Mutex::Autolock lock(mNotifyLock);
         DrmPlugin::EventType eventType;
         switch(hEventType) {
@@ -499,7 +469,7 @@ Return<void> DrmHal::sendEvent(EventType hEventType,
         default:
             return Void();
         }
-        listener->notify(eventType, 0, &obj);
+        listener->sendEvent(eventType, sessionId, data);
     }
     return Void();
 }
@@ -512,12 +482,8 @@ Return<void> DrmHal::sendExpirationUpdate(const hidl_vec<uint8_t>& sessionId,
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
-        obj.writeInt64(expiryTimeInMS);
-
         Mutex::Autolock lock(mNotifyLock);
-        listener->notify(DrmPlugin::kDrmPluginEventExpirationUpdate, 0, &obj);
+        listener->sendExpirationUpdate(sessionId, expiryTimeInMS);
     }
     return Void();
 }
@@ -534,21 +500,17 @@ Return<void> DrmHal::sendKeysChange(const hidl_vec<uint8_t>& sessionId,
 }
 
 Return<void> DrmHal::sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
-        const hidl_vec<KeyStatus>& keyStatusList, bool hasNewUsableKey) {
+        const hidl_vec<KeyStatus>& hKeyStatusList, bool hasNewUsableKey) {
 
     mEventLock.lock();
     sp<IDrmClient> listener = mListener;
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
-
-        size_t nKeys = keyStatusList.size();
-        obj.writeInt32(nKeys);
+        std::vector<DrmKeyStatus> keyStatusList;
+        size_t nKeys = hKeyStatusList.size();
         for (size_t i = 0; i < nKeys; ++i) {
-            const KeyStatus &keyStatus = keyStatusList[i];
-            writeByteArray(obj, keyStatus.keyId);
+            const KeyStatus &keyStatus = hKeyStatusList[i];
             uint32_t type;
             switch(keyStatus.type) {
             case KeyStatusType::USABLE:
@@ -571,19 +533,18 @@ Return<void> DrmHal::sendKeysChange_1_2(const hidl_vec<uint8_t>& sessionId,
                 type = DrmPlugin::kKeyStatusType_InternalError;
                 break;
             }
-            obj.writeInt32(type);
+            keyStatusList.push_back({type, keyStatus.keyId});
             mMetrics.mKeyStatusChangeCounter.Increment(keyStatus.type);
         }
-        obj.writeInt32(hasNewUsableKey);
 
         Mutex::Autolock lock(mNotifyLock);
-        listener->notify(DrmPlugin::kDrmPluginEventKeysChange, 0, &obj);
+        listener->sendKeysChange(sessionId, keyStatusList, hasNewUsableKey);
     } else {
         // There's no listener. But we still want to count the key change
         // events.
-        size_t nKeys = keyStatusList.size();
+        size_t nKeys = hKeyStatusList.size();
         for (size_t i = 0; i < nKeys; i++) {
-            mMetrics.mKeyStatusChangeCounter.Increment(keyStatusList[i].type);
+            mMetrics.mKeyStatusChangeCounter.Increment(hKeyStatusList[i].type);
         }
     }
 
@@ -598,10 +559,8 @@ Return<void> DrmHal::sendSessionLostState(
     mEventLock.unlock();
 
     if (listener != NULL) {
-        Parcel obj;
-        writeByteArray(obj, sessionId);
         Mutex::Autolock lock(mNotifyLock);
-        listener->notify(DrmPlugin::kDrmPluginEventSessionLostState, 0, &obj);
+        listener->sendSessionLostState(sessionId);
     }
     return Void();
 }
@@ -746,7 +705,7 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
             // reclaimSession may call back to closeSession, since mLock is
             // shared between Drm instances, we should unlock here to avoid
             // deadlock.
-            retry = DrmSessionManager::Instance()->reclaimSession(getCallingPid());
+            retry = DrmSessionManager::Instance()->reclaimSession(AIBinder_getCallingPid());
             mLock.lock();
         } else {
             retry = false;
@@ -754,9 +713,11 @@ status_t DrmHal::openSession(DrmPlugin::SecurityLevel level,
     } while (retry);
 
     if (err == OK) {
-        sp<DrmSessionClient> client(new DrmSessionClient(this, sessionId));
-        DrmSessionManager::Instance()->addSession(getCallingPid(), client, sessionId);
-        mOpenSessions.push(client);
+        std::shared_ptr<DrmSessionClient> client =
+                ndk::SharedRefBase::make<DrmSessionClient>(this, sessionId);
+        DrmSessionManager::Instance()->addSession(AIBinder_getCallingPid(),
+                std::static_pointer_cast<IResourceManagerClient>(client), sessionId);
+        mOpenSessions.push_back(client);
         mMetrics.SetSessionStart(sessionId);
     }
 
@@ -772,9 +733,9 @@ status_t DrmHal::closeSession(Vector<uint8_t> const &sessionId) {
     if (status.isOk()) {
         if (status == Status::OK) {
             DrmSessionManager::Instance()->removeSession(sessionId);
-            for (size_t i = 0; i < mOpenSessions.size(); i++) {
-                if (isEqualSessionId(mOpenSessions[i]->mSessionId, sessionId)) {
-                    mOpenSessions.removeAt(i);
+            for (auto i = mOpenSessions.begin(); i != mOpenSessions.end(); i++) {
+                if (isEqualSessionId((*i)->mSessionId, sessionId)) {
+                    mOpenSessions.erase(i);
                     break;
                 }
             }
@@ -1368,11 +1329,11 @@ status_t DrmHal::setPropertyByteArray(String8 const &name,
     return status.isOk() ? toStatusT(status) : DEAD_OBJECT;
 }
 
-status_t DrmHal::getMetrics(PersistableBundle* metrics) {
-    if (metrics == nullptr) {
+status_t DrmHal::getMetrics(const sp<IDrmMetricsConsumer> &consumer) {
+    if (consumer == nullptr) {
         return UNEXPECTED_NULL;
     }
-    mMetrics.Export(metrics);
+    consumer->consumeFrameworkMetrics(mMetrics);
 
     // Append vendor metrics if they are supported.
     if (mPluginV1_1 != NULL) {
@@ -1399,11 +1360,7 @@ status_t DrmHal::getMetrics(PersistableBundle* metrics) {
                     if (status != Status::OK) {
                       ALOGV("Error getting plugin metrics: %d", status);
                     } else {
-                        PersistableBundle pluginBundle;
-                        if (MediaDrmMetrics::HidlMetricsToBundle(
-                                pluginMetrics, &pluginBundle) == OK) {
-                            metrics->putPersistableBundle(String16(vendor), pluginBundle);
-                        }
+                      consumer->consumeHidlMetrics(vendor, pluginMetrics);
                     }
                     err = toStatusT(status);
                 });
@@ -1537,10 +1494,6 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
     Mutex::Autolock autoLock(mLock);
     INIT_CHECK();
 
-    if (!checkPermission("android.permission.ACCESS_DRM_CERTIFICATES")) {
-        return -EPERM;
-    }
-
     DrmSessionManager::Instance()->useSession(sessionId);
 
     status_t err = UNKNOWN_ERROR;
@@ -1558,39 +1511,23 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
     return hResult.isOk() ? err : DEAD_OBJECT;
 }
 
-void DrmHal::binderDied(const wp<IBinder> &the_late_who __unused)
-{
-    cleanup();
-}
-
-void DrmHal::writeByteArray(Parcel &obj, hidl_vec<uint8_t> const &vec)
-{
-    if (vec.size()) {
-        obj.writeInt32(vec.size());
-        obj.write(vec.data(), vec.size());
-    } else {
-        obj.writeInt32(0);
-    }
-}
-
 void DrmHal::reportFrameworkMetrics() const
 {
-    std::unique_ptr<MediaAnalyticsItem> item(MediaAnalyticsItem::create("mediadrm"));
-    item->generateSessionID();
-    item->setPkgName(mMetrics.GetAppPackageName().c_str());
+    mediametrics_handle_t item(mediametrics_create("mediadrm"));
+    mediametrics_setUid(item, mMetrics.GetAppUid());
     String8 vendor;
     String8 description;
     status_t result = getPropertyStringInternal(String8("vendor"), vendor);
     if (result != OK) {
         ALOGE("Failed to get vendor from drm plugin: %d", result);
     } else {
-        item->setCString("vendor", vendor.c_str());
+        mediametrics_setCString(item, "vendor", vendor.c_str());
     }
     result = getPropertyStringInternal(String8("description"), description);
     if (result != OK) {
         ALOGE("Failed to get description from drm plugin: %d", result);
     } else {
-        item->setCString("description", description.c_str());
+        mediametrics_setCString(item, "description", description.c_str());
     }
 
     std::string serializedMetrics;
@@ -1601,11 +1538,12 @@ void DrmHal::reportFrameworkMetrics() const
     std::string b64EncodedMetrics = toBase64StringNoPad(serializedMetrics.data(),
                                                         serializedMetrics.size());
     if (!b64EncodedMetrics.empty()) {
-        item->setCString("serialized_metrics", b64EncodedMetrics.c_str());
+        mediametrics_setCString(item, "serialized_metrics", b64EncodedMetrics.c_str());
     }
-    if (!item->selfrecord()) {
+    if (!mediametrics_selfRecord(item)) {
         ALOGE("Failed to self record framework metrics");
     }
+    mediametrics_delete(item);
 }
 
 void DrmHal::reportPluginMetrics() const
@@ -1619,7 +1557,7 @@ void DrmHal::reportPluginMetrics() const
         std::string metricsString = toBase64StringNoPad(metricsVector.array(),
                                                         metricsVector.size());
         status_t res = android::reportDrmPluginMetrics(metricsString, vendor,
-                                                       description, mAppPackageName);
+                                                       description, mMetrics.GetAppUid());
         if (res != OK) {
             ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }

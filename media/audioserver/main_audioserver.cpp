@@ -26,6 +26,7 @@
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
 #include <hidl/HidlTransportSupport.h>
+#include <mediautils/LimitProcessMemory.h>
 #include <utils/Log.h>
 
 // from LOCAL_C_INCLUDES
@@ -35,8 +36,6 @@
 #include "AAudioService.h"
 #include "utility/AAudioUtilities.h"
 #include "MediaLogService.h"
-#include "MediaUtils.h"
-#include "SoundTriggerHwService.h"
 
 using namespace android;
 
@@ -148,7 +147,6 @@ int main(int argc __unused, char **argv)
             AAudioService::instantiate();
         }
 
-        SoundTriggerHwService::instantiate();
         ProcessState::self()->startThreadPool();
         IPCThreadState::self()->joinThreadPool();
     }

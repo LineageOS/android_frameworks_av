@@ -21,6 +21,7 @@
 // use MediaDefs here vs. MediaCodecConstants as this is not MediaCodec specific/dependent
 #include <media/stagefright/foundation/MediaDefs.h>
 
+#include <C2PlatformSupport.h>
 #include <SimpleC2Interface.h>
 
 namespace android {
@@ -36,6 +37,16 @@ SimpleInterface<void>::BaseParams::BaseParams(
         std::vector<C2String> aliases)
     : C2InterfaceHelper(reflector) {
     setDerivedInstance(this);
+
+    addParameter(
+            DefineParam(mApiFeatures, C2_PARAMKEY_API_FEATURES)
+            .withConstValue(new C2ApiFeaturesSetting(C2Config::api_feature_t(
+                    API_REFLECTION |
+                    API_VALUES |
+                    API_CURRENT_VALUES |
+                    API_DEPENDENCY |
+                    API_SAME_INPUT_BUFFER)))
+            .build());
 
     addParameter(
             DefineParam(mName, C2_PARAMKEY_COMPONENT_NAME)
@@ -85,22 +96,24 @@ SimpleInterface<void>::BaseParams::BaseParams(
     C2Allocator::id_t rawAllocator = C2AllocatorStore::DEFAULT_LINEAR;
     C2BlockPool::local_id_t rawPoolId = C2BlockPool::BASIC_LINEAR;
     C2BufferData::type_t codedBufferType = C2BufferData::LINEAR;
-    C2Allocator::id_t codedAllocator = C2AllocatorStore::DEFAULT_LINEAR;
+    int poolMask = GetCodec2PoolMask();
+    C2Allocator::id_t preferredLinearId = GetPreferredLinearAllocatorId(poolMask);
+    C2Allocator::id_t codedAllocator = preferredLinearId;
     C2BlockPool::local_id_t codedPoolId = C2BlockPool::BASIC_LINEAR;
 
     switch (domain) {
-        case C2Component::DOMAIN_IMAGE:
+        case C2Component::DOMAIN_IMAGE: [[fallthrough]];
         case C2Component::DOMAIN_VIDEO:
             // TODO: should we define raw image? The only difference is timestamp handling
             rawBufferType = C2BufferData::GRAPHIC;
             rawMediaType = MEDIA_MIMETYPE_VIDEO_RAW;
-            rawAllocator = C2AllocatorStore::DEFAULT_GRAPHIC;
+            rawAllocator = C2PlatformAllocatorStore::GRALLOC;
             rawPoolId = C2BlockPool::BASIC_GRAPHIC;
             break;
         case C2Component::DOMAIN_AUDIO:
             rawBufferType = C2BufferData::LINEAR;
             rawMediaType = MEDIA_MIMETYPE_AUDIO_RAW;
-            rawAllocator = C2AllocatorStore::DEFAULT_LINEAR;
+            rawAllocator = preferredLinearId;
             rawPoolId = C2BlockPool::BASIC_LINEAR;
             break;
         default:
@@ -302,7 +315,6 @@ void SimpleInterface<void>::BaseParams::noTimeStretch() {
     Clients need to handle the following base params due to custom dependency.
 
     std::shared_ptr<C2ApiLevelSetting> mApiLevel;
-    std::shared_ptr<C2ApiFeaturesSetting> mApiFeatures;
     std::shared_ptr<C2ComponentAttributesSetting> mAttrib;
 
     std::shared_ptr<C2PortSuggestedBufferCountTuning::input> mSuggestedInputBufferCount;

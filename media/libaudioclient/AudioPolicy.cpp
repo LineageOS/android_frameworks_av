@@ -53,6 +53,10 @@ status_t AudioMixMatchCriterion::readFromParcel(Parcel *parcel)
     case RULE_EXCLUDE_UID:
         mValue.mUid = (uid_t) parcel->readInt32();
         break;
+    case RULE_MATCH_USERID:
+    case RULE_EXCLUDE_USERID:
+        mValue.mUserId = (int) parcel->readInt32();
+        break;
     default:
         ALOGE("Trying to build AudioMixMatchCriterion from unknown rule %d", mRule);
         return BAD_VALUE;
@@ -82,6 +86,7 @@ status_t AudioMix::readFromParcel(Parcel *parcel)
     mDeviceAddress = parcel->readString8();
     mCbFlags = (uint32_t)parcel->readInt32();
     mAllowPrivilegedPlaybackCapture = parcel->readBool();
+    mVoiceCommunicationCaptureAllowed = parcel->readBool();
     size_t size = (size_t)parcel->readInt32();
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
@@ -106,6 +111,7 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
     parcel->writeString8(mDeviceAddress);
     parcel->writeInt32(mCbFlags);
     parcel->writeBool(mAllowPrivilegedPlaybackCapture);
+    parcel->writeBool(mVoiceCommunicationCaptureAllowed);
     size_t size = mCriteria.size();
     if (size > MAX_CRITERIA_PER_MIX) {
         size = MAX_CRITERIA_PER_MIX;
@@ -157,6 +163,40 @@ bool AudioMix::hasUidRule(bool match, uid_t uid) const {
 bool AudioMix::hasMatchUidRule() const {
     for (size_t i = 0; i < mCriteria.size(); i++) {
         if (mCriteria[i].mRule == RULE_MATCH_UID) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void AudioMix::setExcludeUserId(int userId) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_EXCLUDE_USERID;
+    crit.mValue.mUserId = userId;
+    mCriteria.add(crit);
+}
+
+void AudioMix::setMatchUserId(int userId) const {
+    AudioMixMatchCriterion crit;
+    crit.mRule = RULE_MATCH_USERID;
+    crit.mValue.mUserId = userId;
+    mCriteria.add(crit);
+}
+
+bool AudioMix::hasUserIdRule(bool match, int userId) const {
+    const uint32_t rule = match ? RULE_MATCH_USERID : RULE_EXCLUDE_USERID;
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == rule
+                && mCriteria[i].mValue.mUserId == userId) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool AudioMix::hasMatchUserIdRule() const {
+    for (size_t i = 0; i < mCriteria.size(); i++) {
+        if (mCriteria[i].mRule == RULE_MATCH_USERID) {
             return true;
         }
     }

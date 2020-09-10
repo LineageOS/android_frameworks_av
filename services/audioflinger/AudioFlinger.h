@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/media/IAudioTrackCallback.h>
 #include <android/os/BnExternalVibrationController.h>
 #include <android-base/macros.h>
 
@@ -70,11 +71,12 @@
 #include <media/AudioMixer.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/ExtendedAudioBufferProvider.h>
-#include <media/LinearMap.h>
 #include <media/VolumeShaper.h>
+#include <mediautils/ServiceUtilities.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
+#include <audio_utils/LinearMap.h>
 #include <audio_utils/SimpleLog.h>
 #include <audio_utils/TimestampVerifier.h>
 
@@ -86,6 +88,8 @@
 #include "SpdifStreamOut.h"
 #include "AudioHwDevice.h"
 #include "NBAIO_Tee.h"
+#include "ThreadMetrics.h"
+#include "TrackMetrics.h"
 
 #include <powermanager/IPowerManager.h>
 
@@ -166,7 +170,7 @@ public:
     virtual     status_t    setMicMute(bool state);
     virtual     bool        getMicMute() const;
 
-    virtual     void        setRecordSilenced(uid_t uid, bool silenced);
+    virtual     void        setRecordSilenced(audio_port_handle_t portId, bool silenced);
 
     virtual     status_t    setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs);
     virtual     String8     getParameters(audio_io_handle_t ioHandle, const String8& keys) const;
@@ -214,7 +218,7 @@ public:
     // This is the binder API.  For the internal API see nextUniqueId().
     virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
 
-    virtual void acquireAudioSessionId(audio_session_t audioSession, pid_t pid);
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override;
 
     virtual void releaseAudioSessionId(audio_session_t audioSession, pid_t pid);
 
@@ -236,6 +240,7 @@ public:
                         const AudioDeviceTypeAddr& device,
                         const String16& opPackageName,
                         pid_t pid,
+                        bool probe,
                         status_t *status /*non-NULL*/,
                         int *id,
                         int *enabled);
@@ -343,7 +348,10 @@ public:
 
         virtual ~SyncEvent() {}
 
-        void trigger() { Mutex::Autolock _l(mLock); if (mCallback) mCallback(this); }
+        void trigger() {
+            Mutex::Autolock _l(mLock);
+            if (mCallback) mCallback(wp<SyncEvent>(this));
+        }
         bool isCancelled() const { Mutex::Autolock _l(mLock); return (mCallback == NULL); }
         void cancel() { Mutex::Autolock _l(mLock); mCallback = NULL; }
         AudioSystem::sync_event_t type() const { return mType; }
@@ -481,10 +489,13 @@ private:
     public:
                             NotificationClient(const sp<AudioFlinger>& audioFlinger,
                                                 const sp<IAudioFlingerClient>& client,
-                                                pid_t pid);
+                                                pid_t pid,
+                                                uid_t uid);
         virtual             ~NotificationClient();
 
                 sp<IAudioFlingerClient> audioFlingerClient() const { return mAudioFlingerClient; }
+                pid_t getPid() const { return mPid; }
+                uid_t getUid() const { return mUid; }
 
                 // IBinder::DeathRecipient
                 virtual     void        binderDied(const wp<IBinder>& who);
@@ -494,6 +505,7 @@ private:
 
         const sp<AudioFlinger>  mAudioFlinger;
         const pid_t             mPid;
+        const uid_t             mUid;
         const sp<IAudioFlingerClient> mAudioFlingerClient;
     };
 
@@ -671,7 +683,8 @@ using effect_buffer_t = int16_t;
                                           struct audio_mmap_buffer_info *info);
         virtual status_t getMmapPosition(struct audio_mmap_position *position);
         virtual status_t start(const AudioClient& client,
-                                         audio_port_handle_t *handle);
+                               const audio_attributes_t *attr,
+                               audio_port_handle_t *handle);
         virtual status_t stop(audio_port_handle_t handle);
         virtual status_t standby();
 
@@ -804,10 +817,11 @@ using effect_buffer_t = int16_t;
 
     // for mAudioSessionRefs only
     struct AudioSessionRef {
-        AudioSessionRef(audio_session_t sessionid, pid_t pid) :
-            mSessionid(sessionid), mPid(pid), mCnt(1) {}
+        AudioSessionRef(audio_session_t sessionid, pid_t pid, uid_t uid) :
+            mSessionid(sessionid), mPid(pid), mUid(uid), mCnt(1) {}
         const audio_session_t mSessionid;
         const pid_t mPid;
+        const uid_t mUid;
         int         mCnt;
     };
 
@@ -942,9 +956,13 @@ private:
 
     bool       mSystemReady;
 
+    mediautils::UidInfo mUidInfo;
+
     SimpleLog  mRejectedSetParameterLog;
     SimpleLog  mAppSetParameterLog;
     SimpleLog  mSystemSetParameterLog;
+
+    static inline constexpr const char *mMetricsId = AMEDIAMETRICS_KEY_AUDIO_FLINGER;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

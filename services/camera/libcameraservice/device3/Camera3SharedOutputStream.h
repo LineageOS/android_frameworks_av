@@ -65,6 +65,12 @@ public:
             const std::vector<size_t> &removedSurfaceIds,
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
+    virtual bool getOfflineProcessingSupport() const {
+        // As per Camera spec. shared streams currently do not support
+        // offline mode.
+        return false;
+    }
+
 private:
 
     static const size_t kMaxOutputs = 4;

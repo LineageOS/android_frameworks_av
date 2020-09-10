@@ -106,16 +106,17 @@ NuPlayer::Decoder::~Decoder() {
     releaseAndResetMediaBuffers();
 }
 
-sp<AMessage> NuPlayer::Decoder::getStats() const {
+sp<AMessage> NuPlayer::Decoder::getStats() {
 
+    Mutex::Autolock autolock(mStatsLock);
     mStats->setInt64("frames-total", mNumFramesTotal);
     mStats->setInt64("frames-dropped-input", mNumInputFramesDropped);
     mStats->setInt64("frames-dropped-output", mNumOutputFramesDropped);
     mStats->setFloat("frame-rate-total", mFrameRateTotal);
 
-    // i'm mutexed right now.
     // make our own copy, so we aren't victim to any later changes.
     sp<AMessage> copiedStats = mStats->dup();
+
     return copiedStats;
 }
 
@@ -362,13 +363,17 @@ void NuPlayer::Decoder::onConfigure(const sp<AMessage> &format) {
     CHECK_EQ((status_t)OK, mCodec->getOutputFormat(&mOutputFormat));
     CHECK_EQ((status_t)OK, mCodec->getInputFormat(&mInputFormat));
 
-    mStats->setString("mime", mime.c_str());
-    mStats->setString("component-name", mComponentName.c_str());
+    {
+        Mutex::Autolock autolock(mStatsLock);
+        mStats->setString("mime", mime.c_str());
+        mStats->setString("component-name", mComponentName.c_str());
+    }
 
     if (!mIsAudio) {
         int32_t width, height;
         if (mOutputFormat->findInt32("width", &width)
                 && mOutputFormat->findInt32("height", &height)) {
+            Mutex::Autolock autolock(mStatsLock);
             mStats->setInt32("width", width);
             mStats->setInt32("height", height);
         }
@@ -799,6 +804,7 @@ void NuPlayer::Decoder::handleOutputFormatChange(const sp<AMessage> &format) {
         int32_t width, height;
         if (format->findInt32("width", &width)
                 && format->findInt32("height", &height)) {
+            Mutex::Autolock autolock(mStatsLock);
             mStats->setInt32("width", width);
             mStats->setInt32("height", height);
         }

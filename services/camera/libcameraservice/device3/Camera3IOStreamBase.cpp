@@ -269,8 +269,6 @@ status_t Camera3IOStreamBase::returnAnyBufferLocked(
         }
     }
 
-    mBufferReturnedSignal.signal();
-
     if (output) {
         mLastTimestamp = timestamp;
     }

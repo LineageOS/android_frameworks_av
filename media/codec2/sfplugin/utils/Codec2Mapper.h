@@ -75,6 +75,11 @@ namespace android {
         static bool map(ColorAspects::MatrixCoeffs, C2Color::matrix_t*);
         static bool map(C2Color::transfer_t, ColorAspects::Transfer*);
         static bool map(ColorAspects::Transfer, C2Color::transfer_t*);
+
+        static bool mapPixelFormatFrameworkToCodec(
+                int32_t frameworkValue, uint32_t *c2Value);
+        static bool mapPixelFormatCodecToFramework(
+                uint32_t c2Value, int32_t *frameworkValue);
     };
 }
 

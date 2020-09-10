@@ -57,8 +57,8 @@
 #include <media/MediaMetadataRetrieverInterface.h>
 #include <media/Metadata.h>
 #include <media/AudioTrack.h>
-#include <media/MemoryLeakTrackUtil.h>
 #include <media/stagefright/InterfaceUtils.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaCodecList.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
@@ -67,7 +67,7 @@
 #include <media/stagefright/foundation/ALooperRoster.h>
 #include <media/stagefright/SurfaceUtils.h>
 #include <mediautils/BatteryNotifier.h>
-
+#include <mediautils/MemoryLeakTrackUtil.h>
 #include <memunreachable/memunreachable.h>
 #include <system/audio.h>
 
@@ -265,6 +265,172 @@ static bool checkPermission(const char* permissionString) {
     return ok;
 }
 
+static void dumpCodecDetails(int fd, const sp<IMediaCodecList> &codecList, bool queryDecoders) {
+    const size_t SIZE = 256;
+    char buffer[SIZE];
+    String8 result;
+
+    const char *codecType = queryDecoders? "Decoder" : "Encoder";
+    snprintf(buffer, SIZE - 1, "\n%s infos by media types:\n"
+             "=============================\n", codecType);
+    result.append(buffer);
+
+    size_t numCodecs = codecList->countCodecs();
+
+    // gather all media types supported by codec class, and link to codecs that support them
+    KeyedVector<AString, Vector<sp<MediaCodecInfo>>> allMediaTypes;
+    for (size_t codec_ix = 0; codec_ix < numCodecs; ++codec_ix) {
+        sp<MediaCodecInfo> info = codecList->getCodecInfo(codec_ix);
+        if (info->isEncoder() == !queryDecoders) {
+            Vector<AString> supportedMediaTypes;
+            info->getSupportedMediaTypes(&supportedMediaTypes);
+            if (!supportedMediaTypes.size()) {
+                snprintf(buffer, SIZE - 1, "warning: %s does not support any media types\n",
+                        info->getCodecName());
+                result.append(buffer);
+            } else {
+                for (const AString &mediaType : supportedMediaTypes) {
+                    if (allMediaTypes.indexOfKey(mediaType) < 0) {
+                        allMediaTypes.add(mediaType, Vector<sp<MediaCodecInfo>>());
+                    }
+                    allMediaTypes.editValueFor(mediaType).add(info);
+                }
+            }
+        }
+    }
+
+    KeyedVector<AString, bool> visitedCodecs;
+    for (size_t type_ix = 0; type_ix < allMediaTypes.size(); ++type_ix) {
+        const AString &mediaType = allMediaTypes.keyAt(type_ix);
+        snprintf(buffer, SIZE - 1, "\nMedia type '%s':\n", mediaType.c_str());
+        result.append(buffer);
+
+        for (const sp<MediaCodecInfo> &info : allMediaTypes.valueAt(type_ix)) {
+            sp<MediaCodecInfo::Capabilities> caps = info->getCapabilitiesFor(mediaType.c_str());
+            if (caps == NULL) {
+                snprintf(buffer, SIZE - 1, "warning: %s does not have capabilities for type %s\n",
+                        info->getCodecName(), mediaType.c_str());
+                result.append(buffer);
+                continue;
+            }
+            snprintf(buffer, SIZE - 1, "  %s \"%s\" supports\n",
+                       codecType, info->getCodecName());
+            result.append(buffer);
+
+            auto printList = [&](const char *type, const Vector<AString> &values){
+                snprintf(buffer, SIZE - 1, "    %s: [", type);
+                result.append(buffer);
+                for (size_t j = 0; j < values.size(); ++j) {
+                    snprintf(buffer, SIZE - 1, "\n      %s%s", values[j].c_str(),
+                            j == values.size() - 1 ? " " : ",");
+                    result.append(buffer);
+                }
+                result.append("]\n");
+            };
+
+            if (visitedCodecs.indexOfKey(info->getCodecName()) < 0) {
+                visitedCodecs.add(info->getCodecName(), true);
+                {
+                    Vector<AString> aliases;
+                    info->getAliases(&aliases);
+                    // quote alias
+                    for (AString &alias : aliases) {
+                        alias.insert("\"", 1, 0);
+                        alias.append('"');
+                    }
+                    printList("aliases", aliases);
+                }
+                {
+                    uint32_t attrs = info->getAttributes();
+                    Vector<AString> list;
+                    list.add(AStringPrintf("encoder: %d",
+                                           !!(attrs & MediaCodecInfo::kFlagIsEncoder)));
+                    list.add(AStringPrintf("vendor: %d",
+                                           !!(attrs & MediaCodecInfo::kFlagIsVendor)));
+                    list.add(AStringPrintf("software-only: %d",
+                                           !!(attrs & MediaCodecInfo::kFlagIsSoftwareOnly)));
+                    list.add(AStringPrintf("hw-accelerated: %d",
+                                           !!(attrs & MediaCodecInfo::kFlagIsHardwareAccelerated)));
+                    printList(AStringPrintf("attributes: %#x", attrs).c_str(), list);
+                }
+
+                snprintf(buffer, SIZE - 1, "    owner: \"%s\"\n", info->getOwnerName());
+                result.append(buffer);
+                snprintf(buffer, SIZE - 1, "    rank: %u\n", info->getRank());
+                result.append(buffer);
+            } else {
+                result.append("    aliases, attributes, owner, rank: see above\n");
+            }
+
+            {
+                Vector<AString> list;
+                Vector<MediaCodecInfo::ProfileLevel> profileLevels;
+                caps->getSupportedProfileLevels(&profileLevels);
+                for (const MediaCodecInfo::ProfileLevel &pl : profileLevels) {
+                    const char *niceProfile =
+                        mediaType.equalsIgnoreCase(MIMETYPE_AUDIO_AAC)
+                            ? asString_AACObject(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG2)
+                            ? asString_MPEG2Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_H263)
+                            ? asString_H263Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG4)
+                            ? asString_MPEG4Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AVC)
+                            ? asString_AVCProfile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP8)
+                            ? asString_VP8Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_HEVC)
+                            ? asString_HEVCProfile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP9)
+                            ? asString_VP9Profile(pl.mProfile) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)
+                            ? asString_AV1Profile(pl.mProfile) : "??";
+                    const char *niceLevel =
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG2)
+                            ? asString_MPEG2Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_H263)
+                            ? asString_H263Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_MPEG4)
+                            ? asString_MPEG4Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AVC)
+                            ? asString_AVCLevel(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP8)
+                            ? asString_VP8Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_HEVC)
+                            ? asString_HEVCTierLevel(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_VP9)
+                            ? asString_VP9Level(pl.mLevel) :
+                        mediaType.equalsIgnoreCase(MIMETYPE_VIDEO_AV1)
+                            ? asString_AV1Level(pl.mLevel) : "??";
+
+                    list.add(AStringPrintf("% 5u/% 5u (%s/%s)",
+                            pl.mProfile, pl.mLevel, niceProfile, niceLevel));
+                }
+                printList("profile/levels", list);
+            }
+
+            {
+                Vector<AString> list;
+                Vector<uint32_t> colors;
+                caps->getSupportedColorFormats(&colors);
+                for (uint32_t color : colors) {
+                    list.add(AStringPrintf("%#x (%s)", color,
+                            asString_ColorFormat((int32_t)color)));
+                }
+                printList("colors", list);
+            }
+
+            result.append("    details: ");
+            result.append(caps->getDetails()->debugString(6).c_str());
+            result.append("\n");
+        }
+    }
+    result.append("\n");
+    ::write(fd, result.string(), result.size());
+}
+
+
 // TODO: Find real cause of Audio/Video delay in PV framework and remove this workaround
 /* static */ int MediaPlayerService::AudioOutput::mMinBufferCount = 4;
 /* static */ bool MediaPlayerService::AudioOutput::mIsOnEmulator = false;
@@ -424,7 +590,7 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
     SortedVector< sp<MediaRecorderClient> > mediaRecorderClients;
 
     if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
-        snprintf(buffer, SIZE, "Permission Denial: "
+        snprintf(buffer, SIZE - 1, "Permission Denial: "
                 "can't dump MediaPlayerService from pid=%d, uid=%d\n",
                 IPCThreadState::self()->getCallingPid(),
                 IPCThreadState::self()->getCallingUid());
@@ -453,11 +619,11 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
         }
 
         result.append(" Files opened and/or mapped:\n");
-        snprintf(buffer, SIZE, "/proc/%d/maps", getpid());
+        snprintf(buffer, SIZE - 1, "/proc/%d/maps", getpid());
         FILE *f = fopen(buffer, "r");
         if (f) {
             while (!feof(f)) {
-                fgets(buffer, SIZE, f);
+                fgets(buffer, SIZE - 1, f);
                 if (strstr(buffer, " /storage/") ||
                     strstr(buffer, " /system/sounds/") ||
                     strstr(buffer, " /data/") ||
@@ -473,13 +639,13 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
             result.append("\n");
         }
 
-        snprintf(buffer, SIZE, "/proc/%d/fd", getpid());
+        snprintf(buffer, SIZE - 1, "/proc/%d/fd", getpid());
         DIR *d = opendir(buffer);
         if (d) {
             struct dirent *ent;
             while((ent = readdir(d)) != NULL) {
                 if (strcmp(ent->d_name,".") && strcmp(ent->d_name,"..")) {
-                    snprintf(buffer, SIZE, "/proc/%d/fd/%s", getpid(), ent->d_name);
+                    snprintf(buffer, SIZE - 1, "/proc/%d/fd/%s", getpid(), ent->d_name);
                     struct stat s;
                     if (lstat(buffer, &s) == 0) {
                         if ((s.st_mode & S_IFMT) == S_IFLNK) {
@@ -522,6 +688,10 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
 
         gLooperRoster.dump(fd, args);
 
+        sp<IMediaCodecList> codecList = getCodecList();
+        dumpCodecDetails(fd, codecList, true /* decoders */);
+        dumpCodecDetails(fd, codecList, false /* !decoders */);
+
         bool dumpMem = false;
         bool unreachableMemory = false;
         for (size_t i = 0; i < args.size(); i++) {
@@ -544,6 +714,7 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
         }
     }
     write(fd, result.string(), result.size());
+
     return NO_ERROR;
 }
 
@@ -2035,7 +2206,9 @@ status_t MediaPlayerService::AudioOutput::open(
                     targetSpeed,
                     mSelectedDeviceId);
         }
-
+        // Set caller name so it can be logged in destructor.
+        // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_MEDIA
+        t->setCallerName("media");
         if ((t == 0) || (t->initCheck() != NO_ERROR)) {
             ALOGE("Unable to create audio track");
             delete newcbd;

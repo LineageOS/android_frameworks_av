@@ -201,8 +201,9 @@ Return<HStatus> HidlCameraDeviceUser::endConfigure(StreamConfigurationMode opera
         return HStatus::ILLEGAL_ARGUMENT;
     }
 
+    std::vector<int> offlineStreamIds;
     binder::Status ret = mDeviceRemote->endConfigure(convertFromHidl(operatingMode),
-                                                     cameraMetadata);
+                                                     cameraMetadata, &offlineStreamIds);
     return B2HStatus(ret);
 }
 

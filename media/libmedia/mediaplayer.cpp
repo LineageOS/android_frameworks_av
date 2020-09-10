@@ -17,6 +17,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaPlayerNative"
+#include <utils/Log.h>
 
 #include <fcntl.h>
 #include <inttypes.h>
@@ -24,25 +25,15 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#include <utils/Log.h>
 
-#include <binder/IServiceManager.h>
+#include <android/IDataSource.h>
 #include <binder/IPCThreadState.h>
-
-#include <gui/Surface.h>
-
 #include <media/mediaplayer.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/AVSyncSettings.h>
-#include <media/IDataSource.h>
-#include <media/MediaAnalyticsItem.h>
-
-#include <binder/MemoryBase.h>
-
 #include <utils/KeyedVector.h>
 #include <utils/String8.h>
-
 #include <system/audio.h>
 #include <system/window.h>
 
@@ -69,7 +60,7 @@ MediaPlayer::MediaPlayer()
     mVideoWidth = mVideoHeight = 0;
     mLockThreadId = 0;
     mAudioSessionId = (audio_session_t) AudioSystem::newAudioUniqueId(AUDIO_UNIQUE_ID_USE_SESSION);
-    AudioSystem::acquireAudioSessionId(mAudioSessionId, -1);
+    AudioSystem::acquireAudioSessionId(mAudioSessionId, (pid_t)-1, (uid_t)-1); // always in client.
     mSendLevel = 0;
     mRetransmitEndpointValid = false;
 }
@@ -81,7 +72,7 @@ MediaPlayer::~MediaPlayer()
         delete mAudioAttributesParcel;
         mAudioAttributesParcel = NULL;
     }
-    AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
+    AudioSystem::releaseAudioSessionId(mAudioSessionId, (pid_t)-1);
     disconnect();
     IPCThreadState::self()->flushCommands();
 }
@@ -718,8 +709,8 @@ status_t MediaPlayer::setAudioSessionId(audio_session_t sessionId)
         return BAD_VALUE;
     }
     if (sessionId != mAudioSessionId) {
-        AudioSystem::acquireAudioSessionId(sessionId, -1);
-        AudioSystem::releaseAudioSessionId(mAudioSessionId, -1);
+        AudioSystem::acquireAudioSessionId(sessionId, (pid_t)-1, (uid_t)-1);
+        AudioSystem::releaseAudioSessionId(mAudioSessionId, (pid_t)-1);
         mAudioSessionId = sessionId;
     }
     return NO_ERROR;

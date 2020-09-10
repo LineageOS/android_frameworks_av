@@ -26,18 +26,16 @@
 #include <android/hardware/media/omx/1.0/IOmxNode.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 
-#include <android/BnGraphicBufferSource.h>
-
-#include <media/stagefright/omx/OmxGraphicBufferSource.h>
-
 namespace android {
+
+class OmxGraphicBufferSource;
+
 namespace hardware {
 namespace media {
 namespace omx {
 namespace V1_0 {
 namespace implementation {
 
-using ::android::OmxGraphicBufferSource;
 using ::android::hardware::graphics::common::V1_0::Dataspace;
 using ::android::hardware::media::omx::V1_0::ColorAspects;
 using ::android::hardware::media::omx::V1_0::IGraphicBufferSource;
@@ -51,8 +49,6 @@ using ::android::hardware::hidl_vec;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
-
-using ::android::IOMXNode;
 
 /**
  * Wrapper classes for conversion

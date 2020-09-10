@@ -484,6 +484,7 @@ sp<ClientManager> ClientManager::getInstance() {
         sInstance = new ClientManager();
     }
     Accessor::createInvalidator();
+    Accessor::createEvictor();
     return sInstance;
 }
 

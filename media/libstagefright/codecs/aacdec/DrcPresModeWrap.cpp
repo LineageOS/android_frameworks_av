@@ -47,10 +47,9 @@ CDrcPresModeWrapper::CDrcPresModeWrapper()
     mEncoderTarget = -1;
 
     /* Values from last time. */
-    /* Initialized to the same values as the desired values */
-    mLastTarget = -1;
-    mLastAttFactor = 0;
-    mLastBoostFactor = 0;
+    mLastTarget = -2;
+    mLastAttFactor = -1;
+    mLastBoostFactor = -1;
     mLastHeavy = 0;
 }
 
@@ -163,7 +162,7 @@ CDrcPresModeWrapper::update()
 
     if (mDataUpdate) {
         // sanity check
-        if (mDesTarget < MAX_TARGET_LEVEL){
+        if ((mDesTarget < MAX_TARGET_LEVEL) && (mDesTarget != -1)){
             mDesTarget = MAX_TARGET_LEVEL;  // limit target level to -10 dB or below
             newTarget = MAX_TARGET_LEVEL;
         }

@@ -181,6 +181,8 @@ AACExtractor::AACExtractor(
 }
 
 AACExtractor::~AACExtractor() {
+    mOffsetVector.clear();
+    delete mDataSource;
     if (mMeta != nullptr) {
         AMediaFormat_delete(mMeta);
     }

@@ -600,6 +600,10 @@ bool AC4DSIParser::parse() {
         if (ac4_dsi_version == 1) {
             uint64_t end = (mDSISize - mBitReader.numBitsLeft()) / 8;
             uint64_t presentation_bytes = end - start;
+            if (pres_bytes < presentation_bytes) {
+                ALOGE("pres_bytes is smaller than presentation_bytes.");
+                return false;
+            }
             uint64_t skip_bytes = pres_bytes - presentation_bytes;
             ALOGV("skipping = %" PRIu64 " bytes", skip_bytes);
             CHECK_BITS_LEFT(skip_bytes * 8);

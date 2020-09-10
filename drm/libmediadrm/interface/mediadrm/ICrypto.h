@@ -14,23 +14,38 @@
  * limitations under the License.
  */
 
-#include <binder/IInterface.h>
 #include <cutils/native_handle.h>
 #include <media/hardware/CryptoAPI.h>
 #include <media/stagefright/foundation/ABase.h>
+#include <utils/RefBase.h>
+#include <utils/StrongPointer.h>
 
 #ifndef ANDROID_ICRYPTO_H_
 
 #define ANDROID_ICRYPTO_H_
 
 namespace android {
+namespace hardware {
+class HidlMemory;
+namespace drm {
+namespace V1_0 {
+struct SharedBuffer;
+struct DestinationBuffer;
+}  // namespace V1_0
+}  // namespace drm
+}  // namespace hardware
+}  // namespace android
+
+namespace drm = ::android::hardware::drm;
+using drm::V1_0::SharedBuffer;
+
+namespace android {
 
 struct AString;
-class IMemory;
-class IMemoryHeap;
 
-struct ICrypto : public IInterface {
-    DECLARE_META_INTERFACE(Crypto);
+struct ICrypto : public RefBase {
+
+    virtual ~ICrypto() {}
 
     virtual status_t initCheck() const = 0;
 
@@ -48,27 +63,16 @@ struct ICrypto : public IInterface {
 
     virtual status_t setMediaDrmSession(const Vector<uint8_t> &sessionId) = 0;
 
-    struct SourceBuffer {
-        sp<IMemory> mSharedMemory;
-        int32_t mHeapSeqNum;
-    };
-
     enum DestinationType {
         kDestinationTypeSharedMemory, // non-secure
         kDestinationTypeNativeHandle  // secure
     };
 
-    struct DestinationBuffer {
-        DestinationType mType;
-        native_handle_t *mHandle;
-        sp<IMemory> mSharedMemory;
-    };
-
-    virtual ssize_t decrypt(const uint8_t key[16], const uint8_t iv[16],
-            CryptoPlugin::Mode mode, const CryptoPlugin::Pattern &pattern,
-            const SourceBuffer &source, size_t offset,
-            const CryptoPlugin::SubSample *subSamples, size_t numSubSamples,
-            const DestinationBuffer &destination, AString *errorDetailMsg) = 0;
+    virtual ssize_t decrypt(const uint8_t /*key*/[16], const uint8_t /*iv*/[16],
+            CryptoPlugin::Mode /*mode*/, const CryptoPlugin::Pattern &/*pattern*/,
+            const drm::V1_0::SharedBuffer &/*source*/, size_t /*offset*/,
+            const CryptoPlugin::SubSample * /*subSamples*/, size_t /*numSubSamples*/,
+            const drm::V1_0::DestinationBuffer &/*destination*/, AString * /*errorDetailMsg*/) = 0;
 
     /**
      * Declare the heap that the shared memory source buffers passed
@@ -76,20 +80,14 @@ struct ICrypto : public IInterface {
      * that subsequent decrypt calls can use to refer to the heap,
      * with -1 indicating failure.
      */
-    virtual int32_t setHeap(const sp<IMemoryHeap>& heap) = 0;
+    virtual int32_t setHeap(const sp<hardware::HidlMemory>& heap) = 0;
     virtual void unsetHeap(int32_t seqNum) = 0;
+
+protected:
+    ICrypto() {}
 
 private:
     DISALLOW_EVIL_CONSTRUCTORS(ICrypto);
-};
-
-struct BnCrypto : public BnInterface<ICrypto> {
-    virtual status_t onTransact(
-            uint32_t code, const Parcel &data, Parcel *reply,
-            uint32_t flags = 0);
-private:
-    void readVector(const Parcel &data, Vector<uint8_t> &vector) const;
-    void writeVector(Parcel *reply, Vector<uint8_t> const &vector) const;
 };
 
 }  // namespace android

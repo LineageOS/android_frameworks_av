@@ -34,7 +34,7 @@
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/stagefright/RenderScriptWrapper.h>
 #include <OMX_IVCommon.h>
-#include <ui/DisplayInfo.h>
+#include <ui/DisplayConfig.h>
 
 #include "RenderScript.h"
 #include "ScriptC_argbtorgba.h"
@@ -751,11 +751,12 @@ int main(int argc, char **argv) {
         const android::sp<IBinder> display = SurfaceComposerClient::getInternalDisplayToken();
         CHECK(display != nullptr);
 
-        DisplayInfo info;
-        CHECK_EQ(SurfaceComposerClient::getDisplayInfo(display, &info), NO_ERROR);
+        DisplayConfig config;
+        CHECK_EQ(SurfaceComposerClient::getActiveDisplayConfig(display, &config), NO_ERROR);
 
-        ssize_t displayWidth = info.w;
-        ssize_t displayHeight = info.h;
+        const ui::Size& resolution = config.resolution;
+        const ssize_t displayWidth = resolution.getWidth();
+        const ssize_t displayHeight = resolution.getHeight();
 
         ALOGV("display is %zd x %zd", displayWidth, displayHeight);
 

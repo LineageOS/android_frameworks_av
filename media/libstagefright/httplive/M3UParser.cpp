@@ -615,7 +615,7 @@ status_t M3UParser::parse(const void *_data, size_t size) {
                 if (mIsVariantPlaylist) {
                     return ERROR_MALFORMED;
                 }
-                err = parseCipherInfo(line, &itemMeta, mBaseURI);
+                err = parseCipherInfo(line, &itemMeta);
             } else if (line.startsWith("#EXT-X-ENDLIST")) {
                 mIsComplete = true;
             } else if (line.startsWith("#EXT-X-PLAYLIST-TYPE:EVENT")) {
@@ -936,7 +936,7 @@ status_t M3UParser::parseStreamInf(
 
 // static
 status_t M3UParser::parseCipherInfo(
-        const AString &line, sp<AMessage> *meta, const AString &baseURI) {
+        const AString &line, sp<AMessage> *meta) {
     ssize_t colonPos = line.find(":");
 
     if (colonPos < 0) {
@@ -985,13 +985,9 @@ status_t M3UParser::parseCipherInfo(
                     val = tmp;
                 }
 
-                AString absURI;
-                if (MakeURL(baseURI.c_str(), val.c_str(), &absURI)) {
-                    val = absURI;
-                } else {
-                    ALOGE("failed to make absolute url for %s.",
-                            uriDebugString(baseURI).c_str());
-                }
+                // To save space, we only store the partial Uri here
+                // The full Uri will be constructed from this plus
+                // the base Uri as needed by PlaylistFetcher
             }
 
             key.insert(AString("cipher-"), 0);
@@ -1001,6 +997,14 @@ status_t M3UParser::parseCipherInfo(
     }
 
     return OK;
+}
+
+AString M3UParser::getFullCipherUri(const AString &partial) {
+    AString full;
+    if (MakeURL(mBaseURI.c_str(), partial.c_str(), &full)) {
+        return full;
+    }
+    return AString("");
 }
 
 // static

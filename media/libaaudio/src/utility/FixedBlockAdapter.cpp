@@ -18,22 +18,17 @@
 
 #include "FixedBlockAdapter.h"
 
-FixedBlockAdapter::~FixedBlockAdapter() {
-    close();
-}
-
 int32_t FixedBlockAdapter::open(int32_t bytesPerFixedBlock)
 {
     mSize = bytesPerFixedBlock;
-    mStorage = new uint8_t[bytesPerFixedBlock];
+    mStorage = std::make_unique<uint8_t[]>(bytesPerFixedBlock);
     mPosition = 0;
     return 0;
 }
 
 int32_t FixedBlockAdapter::close()
 {
-    delete[] mStorage;
-    mStorage = nullptr;
+    mStorage.reset();
     mSize = 0;
     mPosition = 0;
     return 0;

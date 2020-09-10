@@ -320,7 +320,7 @@ sp<DeviceDescriptor> HwModuleCollection::getDeviceDescriptor(const audio_devices
 {
     String8 devAddress = (address == nullptr || !matchAddress) ? String8("") : String8(address);
     // handle legacy remote submix case where the address was not always specified
-    if (device_distinguishes_on_address(deviceType) && (devAddress.length() == 0)) {
+    if (audio_is_remote_submix_device(deviceType) && (devAddress.length() == 0)) {
         devAddress = String8("0");
     }
 

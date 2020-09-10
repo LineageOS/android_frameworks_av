@@ -35,7 +35,7 @@ StagefrightMediaScanner::StagefrightMediaScanner() {}
 
 StagefrightMediaScanner::~StagefrightMediaScanner() {}
 
-static std::unordered_set<std::string> gSupportedExtensions;
+static std::vector<std::string> gSupportedExtensions;
 
 static bool FileHasAcceptableExtension(const char *extension) {
 
@@ -44,7 +44,12 @@ static bool FileHasAcceptableExtension(const char *extension) {
         gSupportedExtensions = MediaExtractorFactory::getSupportedTypes();
     }
 
-    return  gSupportedExtensions.count(std::string(extension + 1)) != 0;
+    for (auto ext: gSupportedExtensions) {
+        if (ext == (extension + 1)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 MediaScanResult StagefrightMediaScanner::processFile(
@@ -158,7 +163,11 @@ MediaAlbumArt *StagefrightMediaScanner::extractAlbumArt(int fd) {
     if (mRetriever->setDataSource(fd, 0, size) == OK) {
         sp<IMemory> mem = mRetriever->extractAlbumArt();
         if (mem != NULL) {
-            MediaAlbumArt *art = static_cast<MediaAlbumArt *>(mem->pointer());
+            // TODO: Using unsecurePointer() has some associated security pitfalls
+            //       (see declaration for details).
+            //       Either document why it is safe in this case or address the
+            //       issue (e.g. by copying).
+            MediaAlbumArt *art = static_cast<MediaAlbumArt *>(mem->unsecurePointer());
             return art->clone();
         }
     }

@@ -160,12 +160,12 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
             return false;
         }
         for (int32_t i = 0; i < kBufferCount; ++i) {
-            if (!mSource->onInputBufferAdded(i).isOk()) {
+            if (mSource->onInputBufferAdded(i) != OK) {
                 LOG(WARNING) << "Impl::init: failed to populate GBS slots.";
                 return false;
             }
         }
-        if (!mSource->start().isOk()) {
+        if (mSource->start() != OK) {
             LOG(WARNING) << "Impl::init -- GBS failed to start.";
             return false;
         }
@@ -445,21 +445,21 @@ private:
 InputSurfaceConnection::InputSurfaceConnection(
         const sp<GraphicBufferSource>& source,
         const std::shared_ptr<C2Component>& comp,
-        const sp<ComponentStore>& store)
+        const std::shared_ptr<ParameterCache>& cache)
       : mImpl{new Impl(source, comp)},
         mConfigurable{new CachedConfigurable(
             std::make_unique<Impl::ConfigurableIntf>(mImpl))} {
-    mConfigurable->init(store.get());
+    mConfigurable->init(cache);
 }
 
 InputSurfaceConnection::InputSurfaceConnection(
         const sp<GraphicBufferSource>& source,
         const sp<IInputSink>& sink,
-        const sp<ComponentStore>& store)
+        const std::shared_ptr<ParameterCache>& cache)
       : mImpl{new Impl(source, sink)},
         mConfigurable{new CachedConfigurable(
             std::make_unique<Impl::ConfigurableIntf>(mImpl))} {
-    mConfigurable->init(store.get());
+    mConfigurable->init(cache);
 }
 
 Return<Status> InputSurfaceConnection::disconnect() {

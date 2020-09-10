@@ -337,7 +337,10 @@ int32 pvDecoder_AmrWb(
     st = (Decoder_State *) spd_state;
 
     /* mode verification */
-
+    if (mode < 0 || mode >= NUM_OF_MODES)
+    {
+        return (-1);
+    }
     nb_bits = AMR_WB_COMPRESSED[mode];
 
     *frame_length = AMR_WB_PCM_FRAME;

@@ -21,6 +21,7 @@
 #include <utils/Log.h>
 #include <utils/Trace.h>
 #include "Camera3OutputStream.h"
+#include "utils/TraceHFR.h"
 
 #ifndef container_of
 #define container_of(ptr, type, member) \
@@ -160,7 +161,7 @@ Camera3OutputStream::~Camera3OutputStream() {
 
 status_t Camera3OutputStream::getBufferLocked(camera3_stream_buffer *buffer,
         const std::vector<size_t>&) {
-    ATRACE_CALL();
+    ATRACE_HFR_CALL();
 
     ANativeWindowBuffer* anb;
     int fenceFd = -1;
@@ -190,7 +191,7 @@ status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
 status_t Camera3OutputStream::returnBufferLocked(
         const camera3_stream_buffer &buffer,
         nsecs_t timestamp, const std::vector<size_t>& surface_ids) {
-    ATRACE_CALL();
+    ATRACE_HFR_CALL();
 
     status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true, surface_ids);
 
@@ -516,7 +517,7 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
 }
 
 status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, int* fenceFd) {
-    ATRACE_CALL();
+    ATRACE_HFR_CALL();
     status_t res;
 
     if ((res = getBufferPreconditionCheckLocked()) != OK) {

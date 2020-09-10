@@ -38,10 +38,11 @@ CachedConfigurable::CachedConfigurable(
       : mIntf{std::move(intf)} {
 }
 
-c2_status_t CachedConfigurable::init(ComponentStore* store) {
+c2_status_t CachedConfigurable::init(
+        const std::shared_ptr<ParameterCache>& cache) {
     // Retrieve supported parameters from store
     c2_status_t init = mIntf->querySupportedParams(&mSupportedParams);
-    c2_status_t validate = store->validateSupportedParams(mSupportedParams);
+    c2_status_t validate = cache->validate(mSupportedParams);
     return init == C2_OK ? C2_OK : validate;
 }
 

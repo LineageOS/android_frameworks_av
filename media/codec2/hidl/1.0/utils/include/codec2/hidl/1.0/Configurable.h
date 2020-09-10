@@ -79,6 +79,20 @@ protected:
 };
 
 /**
+ * Type for validating and caching parameters when CachedConfigurable is
+ * initialized.
+ *
+ * This is meant to be created by the ComponentStore. The purpose of abstracting
+ * this is to allow different versions of ComponentStore to work with this
+ * CachedConfigurable.
+ */
+struct ParameterCache {
+    virtual c2_status_t validate(
+            const std::vector<std::shared_ptr<C2ParamDescriptor>>&) = 0;
+    virtual ~ParameterCache() = default;
+};
+
+/**
  * Implementation of the IConfigurable interface that supports caching of
  * supported parameters from a supplied ComponentStore.
  *
@@ -91,7 +105,8 @@ protected:
 struct CachedConfigurable : public IConfigurable {
     CachedConfigurable(std::unique_ptr<ConfigurableC2Intf>&& intf);
 
-    c2_status_t init(ComponentStore* store);
+    // Populates mSupportedParams.
+    c2_status_t init(const std::shared_ptr<ParameterCache> &cache);
 
     // Methods from ::android::hardware::media::c2::V1_0::IConfigurable
 

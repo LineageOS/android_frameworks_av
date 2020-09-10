@@ -150,6 +150,7 @@ int copyRecursive(const char *fromPath, const char *toPath) {
             ret += copyFile(oldFile.c_str(), newFile.c_str());
         }
     }
+    closedir(dir);
     return ret;
 }
 

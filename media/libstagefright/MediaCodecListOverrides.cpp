@@ -264,7 +264,9 @@ void profileCodecs(
             }
         }
     }
-    global_results->add(kPolicySupportsMultipleSecureCodecs, supportMultipleSecureCodecs);
+    global_results->add(
+            MediaResourcePolicy::kPolicySupportsMultipleSecureCodecs(),
+            supportMultipleSecureCodecs);
 }
 
 static AString globalResultsToXml(const CodecSettings &results) {

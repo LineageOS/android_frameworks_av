@@ -59,11 +59,16 @@ public:
     virtual String8         getParameters() const;
     virtual status_t        sendCommand(int32_t cmd, int32_t arg1, int32_t arg2);
     virtual status_t        setVideoTarget(const sp<IGraphicBufferProducer>& bufferProducer);
+    virtual status_t        setAudioRestriction(int mode);
+    virtual int32_t         getGlobalAudioRestriction();
+
+    virtual status_t        setRotateAndCropOverride(uint8_t override);
 
     // Interface used by CameraService
     CameraClient(const sp<CameraService>& cameraService,
             const sp<hardware::ICameraClient>& cameraClient,
             const String16& clientPackageName,
+            const std::optional<String16>& clientFeatureId,
             int cameraId,
             int cameraFacing,
             int clientPid,

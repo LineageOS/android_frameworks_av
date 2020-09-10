@@ -20,14 +20,28 @@
 
 #include <C2Buffer.h>
 
-#include <android/hardware/cas/native/1.0/types.h>
 #include <binder/IMemory.h>
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/MediaCodecBuffer.h>
-#include <mediadrm/ICrypto.h>
 
 namespace android {
+
+namespace hardware {
+class HidlMemory;
+namespace cas {
+namespace native {
+namespace V1_0 {
+struct SharedBuffer;
+}  // namespace V1_0
+}  // namespace native
+}  // namespace cas
+namespace drm {
+namespace V1_0 {
+struct SharedBuffer;
+}  // namespace V1_0
+}  // namespace drm
+}  // namespace hardware
 
 /**
  * Copies a graphic view into a media image.
@@ -56,37 +70,9 @@ public:
     using MediaCodecBuffer::MediaCodecBuffer;
     ~Codec2Buffer() override = default;
 
-    /**
-     * \return  C2Buffer object represents this buffer.
-     */
-    virtual std::shared_ptr<C2Buffer> asC2Buffer() = 0;
-
-    /**
-     * Test if we can copy the content of |buffer| into this object.
-     *
-     * \param   buffer  C2Buffer object to copy.
-     * \return  true    if the content of buffer can be copied over to this buffer
-     *          false   otherwise.
-     */
-    virtual bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
-        (void)buffer;
-        return false;
-    }
-
-    /**
-     * Copy the content of |buffer| into this object. This method assumes that
-     * canCopy() check already passed.
-     *
-     * \param   buffer  C2Buffer object to copy.
-     * \return  true    if successful
-     *          false   otherwise.
-     */
-    virtual bool copy(const std::shared_ptr<C2Buffer> &buffer) {
-        (void)buffer;
-        return false;
-    }
-
     sp<ABuffer> getImageData() const { return mImageData; }
+
+    virtual void clearC2BufferRefs() {}
 
 protected:
     /**
@@ -131,6 +117,7 @@ public:
             const std::shared_ptr<C2Buffer> &buffer = nullptr);
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
+    void clearC2BufferRefs() override;
     bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
     bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
 
@@ -190,6 +177,7 @@ public:
     virtual ~ConstLinearBlockBuffer() = default;
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
+    void clearC2BufferRefs() override;
 
 private:
     ConstLinearBlockBuffer(
@@ -309,6 +297,7 @@ public:
     virtual ~ConstGraphicBlockBuffer() = default;
 
     std::shared_ptr<C2Buffer> asC2Buffer() override;
+    void clearC2BufferRefs() override;
     bool canCopy(const std::shared_ptr<C2Buffer> &buffer) const override;
     bool copy(const std::shared_ptr<C2Buffer> &buffer) override;
 
@@ -361,7 +350,8 @@ public:
      *
      * \param source  source buffer structure to fill.
      */
-    void fillSourceBuffer(ICrypto::SourceBuffer *source);
+    void fillSourceBuffer(
+            hardware::drm::V1_0::SharedBuffer *source);
     void fillSourceBuffer(
             hardware::cas::native::V1_0::SharedBuffer *source);
 

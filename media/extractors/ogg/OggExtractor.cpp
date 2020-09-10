@@ -22,7 +22,7 @@
 
 #include <cutils/properties.h>
 #include <utils/Vector.h>
-#include <media/DataSourceBase.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/ExtractorUtils.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -635,7 +635,8 @@ media_status_t MyOpusExtractor::readNextPacket(MediaBufferHelper **out) {
             currentPageSamples -= mStartGranulePosition;
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, currentPageSamples);
         }
-        mCurGranulePosition = mCurrentPage.mGranulePosition - currentPageSamples;
+        (void) __builtin_sub_overflow(mCurrentPage.mGranulePosition, currentPageSamples,
+                                      &mCurGranulePosition);
     }
 
     int64_t timeUs = getTimeUsOfGranule(mCurGranulePosition);
@@ -1062,8 +1063,15 @@ media_status_t MyOpusExtractor::verifyOpusHeader(MediaBufferHelper *buffer) {
     size_t size = buffer->range_length();
 
     if (size < kOpusHeaderSize
-            || memcmp(data, "OpusHead", 8)
-            || /* version = */ data[8] != 1) {
+            || memcmp(data, "OpusHead", 8)) {
+        return AMEDIA_ERROR_MALFORMED;
+    }
+    // allow both version 0 and 1. Per the opus specification:
+    // An earlier draft of the specification described a version 0, but the only difference
+    // between version 1 and version 0 is that version 0 did not specify the semantics for
+    // handling the version field
+    if ( /* version = */ data[8] > 1) {
+        ALOGW("no support for opus version %d", data[8]);
         return AMEDIA_ERROR_MALFORMED;
     }
 
@@ -1384,7 +1392,7 @@ static CreatorFunc Sniff(
         return NULL;
     }
 
-    *confidence = 0.2f;
+    *confidence = 0.5f;
 
     return CreateExtractor;
 }

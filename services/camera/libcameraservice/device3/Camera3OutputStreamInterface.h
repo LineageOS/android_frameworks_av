@@ -97,6 +97,26 @@ class Camera3OutputStreamInterface : public virtual Camera3StreamInterface {
     virtual const String8& getPhysicalCameraId() const = 0;
 };
 
+// Helper class to organize a synchronized mapping of stream IDs to stream instances
+class StreamSet {
+  public:
+    status_t add(int streamId, sp<camera3::Camera3OutputStreamInterface>);
+    ssize_t remove(int streamId);
+    sp<camera3::Camera3OutputStreamInterface> get(int streamId);
+    // get by (underlying) vector index
+    sp<camera3::Camera3OutputStreamInterface> operator[] (size_t index);
+    size_t size() const;
+    std::vector<int> getStreamIds();
+    void clear();
+
+    StreamSet() {};
+    StreamSet(const StreamSet& other);
+
+  private:
+    mutable std::mutex mLock;
+    KeyedVector<int, sp<camera3::Camera3OutputStreamInterface>> mData;
+};
+
 } // namespace camera3
 
 } // namespace android

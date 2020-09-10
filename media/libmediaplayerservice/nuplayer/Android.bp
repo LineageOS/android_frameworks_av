@@ -19,6 +19,7 @@ cc_library_static {
 
     header_libs: [
         "libmediadrm_headers",
+        "libmediametrics_headers",
         "media_plugin_headers",
     ],
 

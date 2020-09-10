@@ -23,6 +23,7 @@
 
 #include "ATSParser.h"
 
+#include <android-base/unique_fd.h>
 #include <media/mediaplayer.h>
 #include <media/stagefright/MediaBuffer.h>
 
@@ -154,7 +155,7 @@ private:
     sp<IMediaHTTPService> mHTTPService;
     AString mUri;
     KeyedVector<String8, String8> mUriHeaders;
-    int mFd;
+    base::unique_fd mFd;
     int64_t mOffset;
     int64_t mLength;
 

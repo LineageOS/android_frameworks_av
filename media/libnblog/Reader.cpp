@@ -45,7 +45,12 @@ Reader::Reader(const void *shared, size_t size, const std::string &name)
 }
 
 Reader::Reader(const sp<IMemory>& iMemory, size_t size, const std::string &name)
-    : Reader(iMemory != 0 ? (Shared *) iMemory->pointer() : NULL, size, name)
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    : Reader(iMemory != 0 ? (Shared *) iMemory->unsecurePointer() : NULL, size,
+             name)
 {
     mIMemory = iMemory;
 }
@@ -156,7 +161,8 @@ std::unique_ptr<Snapshot> Reader::getSnapshot(bool flush)
 
 bool Reader::isIMemory(const sp<IMemory>& iMemory) const
 {
-    return iMemory != 0 && mIMemory != 0 && iMemory->pointer() == mIMemory->pointer();
+    return iMemory != 0 && mIMemory != 0 &&
+           iMemory->unsecurePointer() == mIMemory->unsecurePointer();
 }
 
 // We make a set of the invalid types rather than the valid types when aligning

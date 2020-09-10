@@ -51,6 +51,7 @@ typedef struct AMediaMuxer AMediaMuxer;
 typedef enum {
     AMEDIAMUXER_OUTPUT_FORMAT_MPEG_4 = 0,
     AMEDIAMUXER_OUTPUT_FORMAT_WEBM   = 1,
+    AMEDIAMUXER_OUTPUT_FORMAT_THREE_GPP   = 2,
 } OutputFormat;
 
 #if __ANDROID_API__ >= 21

@@ -55,7 +55,6 @@ class Camera3IOStreamBase :
     // number of output buffers that are currently acquired by HAL. This will be
     // Redundant when camera3 streams are no longer bidirectional streams.
     size_t            mHandoutOutputBufferCount;
-    Condition         mBufferReturnedSignal;
     uint32_t          mFrameCount;
     // Last received output buffer's timestamp
     nsecs_t           mLastTimestamp;

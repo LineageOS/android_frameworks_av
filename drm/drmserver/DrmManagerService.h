@@ -142,7 +142,7 @@ public:
     virtual status_t dump(int fd, const Vector<String16>& args);
 
 private:
-    DrmManager* mDrmManager;
+    sp<DrmManager> mDrmManager;
 };
 
 };

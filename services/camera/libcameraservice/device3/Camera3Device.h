@@ -34,6 +34,7 @@
 #include <android/hardware/camera/device/3.3/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.6/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
@@ -42,9 +43,15 @@
 #include <camera/CaptureResult.h>
 
 #include "common/CameraDeviceBase.h"
+#include "device3/BufferUtils.h"
 #include "device3/StatusTracker.h"
 #include "device3/Camera3BufferManager.h"
 #include "device3/DistortionMapper.h"
+#include "device3/ZoomRatioMapper.h"
+#include "device3/RotateAndCropMapper.h"
+#include "device3/InFlightRequest.h"
+#include "device3/Camera3OutputInterface.h"
+#include "device3/Camera3OfflineSession.h"
 #include "utils/TagMonitor.h"
 #include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
@@ -67,7 +74,11 @@ class Camera3StreamInterface;
  */
 class Camera3Device :
             public CameraDeviceBase,
-            virtual public hardware::camera::device::V3_5::ICameraDeviceCallback {
+            virtual public hardware::camera::device::V3_5::ICameraDeviceCallback,
+            public camera3::SetErrorInterface,
+            public camera3::InflightRequestUpdateInterface,
+            public camera3::RequestBufferInterface,
+            public camera3::FlushBufferInterface {
   public:
 
     explicit Camera3Device(const String8& id);
@@ -87,7 +98,7 @@ class Camera3Device :
     status_t disconnect() override;
     status_t dump(int fd, const Vector<String16> &args) override;
     const CameraMetadata& info() const override;
-    const CameraMetadata& info(const String8& physicalId) const override;
+    const CameraMetadata& infoPhysical(const String8& physicalId) const override;
 
     // Capture and setStreamingRequest will configure streams if currently in
     // idle state
@@ -139,6 +150,8 @@ class Camera3Device :
             override;
     status_t getInputBufferProducer(
             sp<IGraphicBufferProducer> *producer) override;
+
+    void getOfflineStreamIds(std::vector<int> *offlineStreamIds) override;
 
     status_t createDefaultRequest(int templateId, CameraMetadata *request) override;
 
@@ -194,6 +207,33 @@ class Camera3Device :
      */
     status_t dropStreamBuffers(bool dropping, int streamId) override;
 
+    nsecs_t getExpectedInFlightDuration() override;
+
+    status_t switchToOffline(const std::vector<int32_t>& streamsToKeep,
+            /*out*/ sp<CameraOfflineSessionBase>* session) override;
+
+    // RequestBufferInterface
+    bool startRequestBuffer() override;
+    void endRequestBuffer() override;
+    nsecs_t getWaitDuration() override;
+
+    // FlushBufferInterface
+    void getInflightBufferKeys(std::vector<std::pair<int32_t, int32_t>>* out) override;
+    void getInflightRequestBufferKeys(std::vector<uint64_t>* out) override;
+    std::vector<sp<camera3::Camera3StreamInterface>> getAllStreams() override;
+
+    /**
+     * Set the current behavior for the ROTATE_AND_CROP control when in AUTO.
+     *
+     * The value must be one of the ROTATE_AND_CROP_* values besides AUTO,
+     * and defaults to NONE.
+     */
+    status_t setRotateAndCropAutoBehavior(
+            camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
+
+    // Get the status trackeer for the camera device
+    wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
+
     /**
      * Helper functions to map between framework and HIDL values
      */
@@ -206,8 +246,6 @@ class Camera3Device :
     // Returns a negative error code if the passed-in operation mode is not valid.
     static status_t mapToStreamConfigurationMode(camera3_stream_configuration_mode_t operationMode,
             /*out*/ hardware::camera::device::V3_2::StreamConfigurationMode *mode);
-    static camera3_buffer_status_t mapHidlBufferStatus(
-            hardware::camera::device::V3_2::BufferStatus status);
     static int mapToFrameworkFormat(hardware::graphics::common::V1_0::PixelFormat pixelFormat);
     static android_dataspace mapToFrameworkDataspace(
             hardware::camera::device::V3_2::DataspaceFlags);
@@ -222,7 +260,6 @@ class Camera3Device :
 
     // internal typedefs
     using RequestMetadataQueue = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
-    using ResultMetadataQueue  = hardware::MessageQueue<uint8_t, hardware::kSynchronizedReadWrite>;
 
     static const size_t        kDumpLockAttempts  = 10;
     static const size_t        kDumpSleepDuration = 100000; // 0.10 sec
@@ -275,11 +312,12 @@ class Camera3Device :
      * Adapter for legacy HAL / HIDL HAL interface calls; calls either into legacy HALv3 or the
      * HIDL HALv3 interfaces.
      */
-    class HalInterface : public camera3::Camera3StreamBufferFreedListener {
+    class HalInterface : public camera3::Camera3StreamBufferFreedListener,
+            public camera3::BufferRecordsInterface {
       public:
         HalInterface(sp<hardware::camera::device::V3_2::ICameraDeviceSession> &session,
                      std::shared_ptr<RequestMetadataQueue> queue,
-                     bool useHalBufManager);
+                     bool useHalBufManager, bool supportOfflineProcessing);
         HalInterface(const HalInterface &other);
         HalInterface();
 
@@ -313,22 +351,31 @@ class Camera3Device :
         bool isReconfigurationRequired(CameraMetadata& oldSessionParams,
                 CameraMetadata& newSessionParams);
 
-        // method to extract buffer's unique ID
-        // return pair of (newlySeenBuffer?, bufferId)
-        std::pair<bool, uint64_t> getBufferId(const buffer_handle_t& buf, int streamId);
+        // Upon successful return, HalInterface will return buffer maps needed for offline
+        // processing, and clear all its internal buffer maps.
+        status_t switchToOffline(
+                const std::vector<int32_t>& streamsToKeep,
+                /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
+                /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession,
+                /*out*/camera3::BufferRecords* bufferRecords);
 
-        // Find a buffer_handle_t based on frame number and stream ID
+        /////////////////////////////////////////////////////////////////////
+        // Implements BufferRecordsInterface
+
+        std::pair<bool, uint64_t> getBufferId(
+                const buffer_handle_t& buf, int streamId) override;
+
         status_t popInflightBuffer(int32_t frameNumber, int32_t streamId,
-                /*out*/ buffer_handle_t **buffer);
+                /*out*/ buffer_handle_t **buffer) override;
 
-        // Register a bufId (streamId, buffer_handle_t) to inflight request buffer
         status_t pushInflightRequestBuffer(
-                uint64_t bufferId, buffer_handle_t* buf, int32_t streamId);
+                uint64_t bufferId, buffer_handle_t* buf, int32_t streamId) override;
 
-        // Find a buffer_handle_t based on bufferId
         status_t popInflightRequestBuffer(uint64_t bufferId,
                 /*out*/ buffer_handle_t** buffer,
-                /*optional out*/ int32_t* streamId = nullptr);
+                /*optional out*/ int32_t* streamId = nullptr) override;
+
+        /////////////////////////////////////////////////////////////////////
 
         // Get a vector of (frameNumber, streamId) pair of currently inflight
         // buffers
@@ -339,7 +386,6 @@ class Camera3Device :
 
         void onStreamReConfigured(int streamId);
 
-        static const uint64_t BUFFER_ID_NO_BUFFER = 0;
       private:
         // Always valid
         sp<hardware::camera::device::V3_2::ICameraDeviceSession> mHidlSession;
@@ -349,10 +395,10 @@ class Camera3Device :
         sp<hardware::camera::device::V3_4::ICameraDeviceSession> mHidlSession_3_4;
         // Valid if ICameraDeviceSession is @3.5 or newer
         sp<hardware::camera::device::V3_5::ICameraDeviceSession> mHidlSession_3_5;
+        // Valid if ICameraDeviceSession is @3.6 or newer
+        sp<hardware::camera::device::V3_6::ICameraDeviceSession> mHidlSession_3_6;
 
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
-
-        std::mutex mInflightLock;
 
         // The output HIDL request still depends on input camera3_capture_request_t
         // Do not free input camera3_capture_request_t before output HIDL request
@@ -367,65 +413,33 @@ class Camera3Device :
         // Pop inflight buffers based on pairs of (frameNumber,streamId)
         void popInflightBuffers(const std::vector<std::pair<int32_t, int32_t>>& buffers);
 
-        // Cache of buffer handles keyed off (frameNumber << 32 | streamId)
-        std::unordered_map<uint64_t, buffer_handle_t*> mInflightBufferMap;
+        // Return true if the input caches match what we have; otherwise false
+        bool verifyBufferIds(int32_t streamId, std::vector<uint64_t>& inBufIds);
 
         // Delete and optionally close native handles and clear the input vector afterward
         static void cleanupNativeHandles(
                 std::vector<native_handle_t*> *handles, bool closeFd = false);
 
-        struct BufferHasher {
-            size_t operator()(const buffer_handle_t& buf) const {
-                if (buf == nullptr)
-                    return 0;
-
-                size_t result = 1;
-                result = 31 * result + buf->numFds;
-                for (int i = 0; i < buf->numFds; i++) {
-                    result = 31 * result + buf->data[i];
-                }
-                return result;
-            }
-        };
-
-        struct BufferComparator {
-            bool operator()(const buffer_handle_t& buf1, const buffer_handle_t& buf2) const {
-                if (buf1->numFds == buf2->numFds) {
-                    for (int i = 0; i < buf1->numFds; i++) {
-                        if (buf1->data[i] != buf2->data[i]) {
-                            return false;
-                        }
-                    }
-                    return true;
-                }
-                return false;
-            }
-        };
-
-        std::mutex mBufferIdMapLock; // protecting mBufferIdMaps and mNextBufferId
-        typedef std::unordered_map<const buffer_handle_t, uint64_t,
-                BufferHasher, BufferComparator> BufferIdMap;
-        // stream ID -> per stream buffer ID map
-        std::unordered_map<int, BufferIdMap> mBufferIdMaps;
-        uint64_t mNextBufferId = 1; // 0 means no buffer
-
         virtual void onBufferFreed(int streamId, const native_handle_t* handle) override;
 
+        std::mutex mFreedBuffersLock;
         std::vector<std::pair<int, uint64_t>> mFreedBuffers;
 
-        // Buffers given to HAL through requestStreamBuffer API
-        std::mutex mRequestedBuffersLock;
-        std::unordered_map<uint64_t, std::pair<int32_t, buffer_handle_t*>> mRequestedBuffers;
+        // Keep track of buffer cache and inflight buffer records
+        camera3::BufferRecords mBufferRecords;
 
         uint32_t mNextStreamConfigCounter = 1;
 
         const bool mUseHalBufManager;
         bool mIsReconfigurationQuerySupported;
+
+        const bool mSupportOfflineProcessing;
     };
 
     sp<HalInterface> mInterface;
 
     CameraMetadata             mDeviceInfo;
+    bool                       mSupportNativeZoomRatio;
     std::unordered_map<std::string, CameraMetadata> mPhysicalDeviceInfoMap;
 
     CameraMetadata             mRequestTemplateCache[CAMERA3_TEMPLATE_COUNT];
@@ -455,24 +469,7 @@ class Camera3Device :
     // Tracking cause of fatal errors when in STATUS_ERROR
     String8                    mErrorCause;
 
-    // Synchronized mapping of stream IDs to stream instances
-    class StreamSet {
-      public:
-        status_t add(int streamId, sp<camera3::Camera3OutputStreamInterface>);
-        ssize_t remove(int streamId);
-        sp<camera3::Camera3OutputStreamInterface> get(int streamId);
-        // get by (underlying) vector index
-        sp<camera3::Camera3OutputStreamInterface> operator[] (size_t index);
-        size_t size() const;
-        std::vector<int> getStreamIds();
-        void clear();
-
-      private:
-        mutable std::mutex mLock;
-        KeyedVector<int, sp<camera3::Camera3OutputStreamInterface>> mData;
-    };
-
-    StreamSet                  mOutputStreams;
+    camera3::StreamSet         mOutputStreams;
     sp<camera3::Camera3Stream> mInputStream;
     int                        mNextStreamId;
     bool                       mNeedConfig;
@@ -516,6 +513,10 @@ class Camera3Device :
         int                                 mBatchSize;
         //  Whether this request is from a repeating or repeating burst.
         bool                                mRepeating;
+        // Whether this request has ROTATE_AND_CROP_AUTO set, so needs both
+        // overriding of ROTATE_AND_CROP value and adjustment of coordinates
+        // in several other controls in both the request and the result
+        bool                                mRotateAndCropAuto;
     };
     typedef List<sp<CaptureRequest> > RequestList;
 
@@ -560,15 +561,6 @@ class Camera3Device :
     hardware::Return<void> returnStreamBuffers(
             const hardware::hidl_vec<
                     hardware::camera::device::V3_2::StreamBuffer>& buffers) override;
-
-    // Handle one capture result. Assume that mProcessCaptureResultLock is held.
-    void processOneCaptureResultLocked(
-            const hardware::camera::device::V3_2::CaptureResult& result,
-            const hardware::hidl_vec<
-            hardware::camera::device::V3_4::PhysicalCameraMetadata> physicalCameraMetadata);
-    status_t readOneCameraMetadataLocked(uint64_t fmqResultSize,
-            hardware::camera::device::V3_2::CameraMetadata& resultMetadata,
-            const hardware::camera::device::V3_2::CameraMetadata& result);
 
     // Handle one notify message
     void notify(const hardware::camera::device::V3_2::NotifyMsg& msg);
@@ -646,17 +638,16 @@ class Camera3Device :
                                             const SurfaceMap &surfaceMap);
 
     /**
-     * Pause state updates to the client application.  Needed to mask out idle/active
-     * transitions during internal reconfigure
+     * Internally re-configure camera device using new session parameters.
+     * This will get triggered by the request thread.
      */
-    void pauseStateNotify(bool enable);
+    bool reconfigureCamera(const CameraMetadata& sessionParams, int clientStatusId);
 
     /**
-     * Internally re-configure camera device using new session parameters.
-     * This will get triggered by the request thread. Be sure to call
-     * pauseStateNotify(true) before going idle in the requesting location.
+     * Return true in case of any output or input abandoned streams,
+     * otherwise return false.
      */
-    bool reconfigureCamera(const CameraMetadata& sessionParams);
+    bool checkAbandonedStreamsLocked();
 
     /**
      * Filter stream session parameters and configure camera HAL.
@@ -692,22 +683,25 @@ class Camera3Device :
      * error message to indicate why. Only the first call's message will be
      * used. The message is also sent to the log.
      */
-    void               setErrorState(const char *fmt, ...);
+    void               setErrorState(const char *fmt, ...) override;
+    void               setErrorStateLocked(const char *fmt, ...) override;
     void               setErrorStateV(const char *fmt, va_list args);
-    void               setErrorStateLocked(const char *fmt, ...);
     void               setErrorStateLockedV(const char *fmt, va_list args);
+
+    /////////////////////////////////////////////////////////////////////
+    // Implements InflightRequestUpdateInterface
+
+    void onInflightEntryRemovedLocked(nsecs_t duration) override;
+    void checkInflightMapLengthLocked() override;
+    void onInflightMapFlushedLocked() override;
+
+    /////////////////////////////////////////////////////////////////////
 
     /**
      * Debugging trylock/spin method
      * Try to acquire a lock a few times with sleeps between before giving up.
      */
     bool               tryLockSpinRightRound(Mutex& lock);
-
-    /**
-     * Helper function to determine if an input size for implementation defined
-     * format is supported.
-     */
-    bool isOpaqueInputSizeSupported(uint32_t width, uint32_t height);
 
     /**
      * Helper function to get the largest Jpeg resolution (in area)
@@ -840,6 +834,17 @@ class Camera3Device :
         void signalPipelineDrain(const std::vector<int>& streamIds);
         void resetPipelineDrain();
 
+        status_t switchToOffline(
+                const std::vector<int32_t>& streamsToKeep,
+                /*out*/hardware::camera::device::V3_6::CameraOfflineSessionInfo* offlineSessionInfo,
+                /*out*/sp<hardware::camera::device::V3_6::ICameraOfflineSession>* offlineSession,
+                /*out*/camera3::BufferRecords* bufferRecords);
+
+        void clearPreviousRequest();
+
+        status_t setRotateAndCropAutoBehavior(
+                camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
+
       protected:
 
         virtual bool threadLoop();
@@ -856,9 +861,15 @@ class Camera3Device :
 
         // HAL workaround: Make sure a trigger ID always exists if
         // a trigger does
-        status_t          addDummyTriggerIds(const sp<CaptureRequest> &request);
+        status_t           addDummyTriggerIds(const sp<CaptureRequest> &request);
+
+        // Override rotate_and_crop control if needed; returns true if the current value was changed
+        bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);
 
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
+
+        // TODO: does this need to be adjusted for long exposure requests?
+        static const nsecs_t kRequestSubmitTimeout = 200e6; // 200 ms
 
         // Used to prepare a batch of requests.
         struct NextRequest {
@@ -934,6 +945,7 @@ class Camera3Device :
 
         Mutex              mRequestLock;
         Condition          mRequestSignal;
+        Condition          mRequestSubmittedSignal;
         RequestList        mRequestQueue;
         RequestList        mRepeatingRequests;
         // The next batch of requests being prepped for submission to the HAL, no longer
@@ -956,6 +968,7 @@ class Camera3Device :
 
         sp<CaptureRequest> mPrevRequest;
         int32_t            mPrevTriggers;
+        std::set<std::string> mPrevCameraIdsWithZoom;
 
         uint32_t           mFrameNumber;
 
@@ -973,6 +986,7 @@ class Camera3Device :
         TriggerMap         mTriggerReplacedMap;
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
+        camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
 
         int64_t            mRepeatingLastFrameNumber;
 
@@ -994,127 +1008,21 @@ class Camera3Device :
     /**
      * In-flight queue for tracking completion of capture requests.
      */
+    std::mutex                    mInFlightLock;
+    camera3::InFlightRequestMap   mInFlightMap;
+    nsecs_t                       mExpectedInflightDuration = 0;
+    int64_t                       mLastCompletedRegularFrameNumber = -1;
+    int64_t                       mLastCompletedReprocessFrameNumber = -1;
+    int64_t                       mLastCompletedZslFrameNumber = -1;
+    // End of mInFlightLock protection scope
 
-    struct InFlightRequest {
-        // Set by notify() SHUTTER call.
-        nsecs_t shutterTimestamp;
-        // Set by process_capture_result().
-        nsecs_t sensorTimestamp;
-        int     requestStatus;
-        // Set by process_capture_result call with valid metadata
-        bool    haveResultMetadata;
-        // Decremented by calls to process_capture_result with valid output
-        // and input buffers
-        int     numBuffersLeft;
-        CaptureResultExtras resultExtras;
-        // If this request has any input buffer
-        bool hasInputBuffer;
-
-        // The last metadata that framework receives from HAL and
-        // not yet send out because the shutter event hasn't arrived.
-        // It's added by process_capture_result and sent when framework
-        // receives the shutter event.
-        CameraMetadata pendingMetadata;
-
-        // The metadata of the partial results that framework receives from HAL so far
-        // and has sent out.
-        CameraMetadata collectedPartialResult;
-
-        // Buffers are added by process_capture_result when output buffers
-        // return from HAL but framework has not yet received the shutter
-        // event. They will be returned to the streams when framework receives
-        // the shutter event.
-        Vector<camera3_stream_buffer_t> pendingOutputBuffers;
-
-        // Whether this inflight request's shutter and result callback are to be
-        // called. The policy is that if the request is the last one in the constrained
-        // high speed recording request list, this flag will be true. If the request list
-        // is not for constrained high speed recording, this flag will also be true.
-        bool hasCallback;
-
-        // Maximum expected frame duration for this request.
-        // For manual captures, equal to the max of requested exposure time and frame duration
-        // For auto-exposure modes, equal to 1/(lower end of target FPS range)
-        nsecs_t maxExpectedDuration;
-
-        // Whether the result metadata for this request is to be skipped. The
-        // result metadata should be skipped in the case of
-        // REQUEST/RESULT error.
-        bool skipResultMetadata;
-
-        // The physical camera ids being requested.
-        std::set<String8> physicalCameraIds;
-
-        // Map of physicalCameraId <-> Metadata
-        std::vector<PhysicalCaptureResultInfo> physicalMetadatas;
-
-        // Indicates a still capture request.
-        bool stillCapture;
-
-        // Indicates a ZSL capture request
-        bool zslCapture;
-
-        // What shared surfaces an output should go to
-        SurfaceMap outputSurfaces;
-
-        // Default constructor needed by KeyedVector
-        InFlightRequest() :
-                shutterTimestamp(0),
-                sensorTimestamp(0),
-                requestStatus(OK),
-                haveResultMetadata(false),
-                numBuffersLeft(0),
-                hasInputBuffer(false),
-                hasCallback(true),
-                maxExpectedDuration(kDefaultExpectedDuration),
-                skipResultMetadata(false),
-                stillCapture(false),
-                zslCapture(false) {
-        }
-
-        InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
-                bool hasAppCallback, nsecs_t maxDuration,
-                const std::set<String8>& physicalCameraIdSet, bool isStillCapture,
-                bool isZslCapture,
-                const SurfaceMap& outSurfaces = SurfaceMap{}) :
-                shutterTimestamp(0),
-                sensorTimestamp(0),
-                requestStatus(OK),
-                haveResultMetadata(false),
-                numBuffersLeft(numBuffers),
-                resultExtras(extras),
-                hasInputBuffer(hasInput),
-                hasCallback(hasAppCallback),
-                maxExpectedDuration(maxDuration),
-                skipResultMetadata(false),
-                physicalCameraIds(physicalCameraIdSet),
-                stillCapture(isStillCapture),
-                zslCapture(isZslCapture),
-                outputSurfaces(outSurfaces) {
-        }
-    };
-
-    // Map from frame number to the in-flight request state
-    typedef KeyedVector<uint32_t, InFlightRequest> InFlightMap;
-
-
-    Mutex                  mInFlightLock; // Protects mInFlightMap and
-                                          // mExpectedInflightDuration
-    InFlightMap            mInFlightMap;
-    nsecs_t                mExpectedInflightDuration = 0;
-    int                    mInFlightStatusId;
+    int mInFlightStatusId; // const after initialize
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
-            bool isStillCapture, bool isZslCapture,
-            const SurfaceMap& outputSurfaces);
-
-    /**
-     * Returns the maximum expected time it'll take for all currently in-flight
-     * requests to complete, based on their settings
-     */
-    nsecs_t getExpectedInFlightDuration();
+            bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
+            const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces);
 
     /**
      * Tracking for idle detection
@@ -1186,7 +1094,7 @@ class Camera3Device :
      */
 
     // Lock for output side of device
-    Mutex                  mOutputLock;
+    std::mutex             mOutputLock;
 
     /**** Scope for mOutputLock ****/
     // the minimal frame number of the next non-reprocess result
@@ -1201,60 +1109,18 @@ class Camera3Device :
     uint32_t               mNextReprocessShutterFrameNumber;
     // the minimal frame number of the next ZSL still capture shutter
     uint32_t               mNextZslStillShutterFrameNumber;
-    List<CaptureResult>   mResultQueue;
-    Condition              mResultSignal;
-    wp<NotificationListener>  mListener;
+    std::list<CaptureResult>    mResultQueue;
+    std::condition_variable  mResultSignal;
+    wp<NotificationListener> mListener;
 
     /**** End scope for mOutputLock ****/
-
-    /**
-     * Callback functions from HAL device
-     */
-    void processCaptureResult(const camera3_capture_result *result);
-
-    void notify(const camera3_notify_msg *msg);
-
-    // Specific notify handlers
-    void notifyError(const camera3_error_msg_t &msg,
-            sp<NotificationListener> listener);
-    void notifyShutter(const camera3_shutter_msg_t &msg,
-            sp<NotificationListener> listener);
-
-    // helper function to return the output buffers to the streams.
-    void returnOutputBuffers(const camera3_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true,
-            // The following arguments are only meant for surface sharing use case
-            const SurfaceMap& outputSurfaces = SurfaceMap{},
-            // Used to send buffer error callback when failing to return buffer
-            const CaptureResultExtras &resultExtras = CaptureResultExtras{});
-
-    // Send a partial capture result.
-    void sendPartialCaptureResult(const camera_metadata_t * partialResult,
-            const CaptureResultExtras &resultExtras, uint32_t frameNumber);
-
-    // Send a total capture result given the pending metadata and result extras,
-    // partial results, and the frame number to the result queue.
-    void sendCaptureResult(CameraMetadata &pendingMetadata,
-            CaptureResultExtras &resultExtras,
-            CameraMetadata &collectedPartialResult, uint32_t frameNumber,
-            bool reprocess, bool zslStillCapture,
-            const std::vector<PhysicalCaptureResultInfo>& physicalMetadatas);
-
-    bool isLastFullResult(const InFlightRequest& inFlightRequest);
-
-    // Insert the result to the result queue after updating frame number and overriding AE
-    // trigger cancel.
-    // mOutputLock must be held when calling this function.
-    void insertResultLocked(CaptureResult *result, uint32_t frameNumber);
 
     /**** Scope for mInFlightLock ****/
 
     // Remove the in-flight map entry of the given index from mInFlightMap.
     // It must only be called with mInFlightLock held.
     void removeInFlightMapEntryLocked(int idx);
-    // Remove the in-flight request of the given index from mInFlightMap
-    // if it's no longer needed. It must only be called with mInFlightLock held.
-    void removeInFlightRequestIfReadyLocked(int idx);
+
     // Remove all in-flight requests and return all buffers.
     // This is used after HAL interface is closed to cleanup any request/buffers
     // not returned by HAL.
@@ -1269,6 +1135,16 @@ class Camera3Device :
     // 1 ID if the device isn't a logical multi-camera. Otherwise contains both
     // logical camera and its physical subcameras.
     std::unordered_map<std::string, camera3::DistortionMapper> mDistortionMappers;
+
+    /**
+     * Zoom ratio mapper support
+     */
+    std::unordered_map<std::string, camera3::ZoomRatioMapper> mZoomRatioMappers;
+
+    /**
+     * RotateAndCrop mapper support
+     */
+    std::unordered_map<std::string, camera3::RotateAndCropMapper> mRotateAndCropMappers;
 
     // Debug tracker for metadata tag value changes
     // - Enabled with the -m <taglist> option to dumpsys, such as
@@ -1347,6 +1223,10 @@ class Camera3Device :
         void onSubmittingRequest();
         void onRequestThreadPaused();
 
+        // Events triggered by successful switchToOffline call
+        // Return true is there is no ongoing requestBuffer call.
+        bool onSwitchToOfflineSuccess();
+
       private:
         void notifyTrackerLocked(bool active);
 
@@ -1360,6 +1240,7 @@ class Camera3Device :
         bool mRequestThreadPaused = true;
         bool mInflightMapEmpty = true;
         bool mRequestBufferOngoing = false;
+        bool mSwitchedToOffline = false;
 
         wp<camera3::StatusTracker> mStatusTracker;
         int  mRequestBufferStatusId;
@@ -1367,7 +1248,9 @@ class Camera3Device :
 
     // Fix up result metadata for monochrome camera.
     bool mNeedFixupMonochromeTags;
-    status_t fixupMonochromeTags(const CameraMetadata& deviceInfo, CameraMetadata& resultMetadata);
+
+    // Whether HAL supports offline processing capability.
+    bool mSupportOfflineProcessing = false;
 }; // class Camera3Device
 
 }; // namespace android

@@ -45,7 +45,7 @@ using android::hardware::camera::device::V3_5::CameraBlobId;
 namespace android {
 namespace camera3 {
 
-HeicCompositeStream::HeicCompositeStream(wp<CameraDeviceBase> device,
+HeicCompositeStream::HeicCompositeStream(sp<CameraDeviceBase> device,
         wp<hardware::camera2::ICameraDeviceCallbacks> cb) :
         CompositeStream(device, cb),
         mUseHeic(false),
@@ -67,7 +67,9 @@ HeicCompositeStream::HeicCompositeStream(wp<CameraDeviceBase> device,
         mDequeuedOutputBufferCnt(0),
         mLockedAppSegmentBufferCnt(0),
         mCodecOutputCounter(0),
-        mGridTimestampUs(0) {
+        mQuality(-1),
+        mGridTimestampUs(0),
+        mStatusId(StatusTracker::NO_STATUS_ID) {
 }
 
 HeicCompositeStream::~HeicCompositeStream() {
@@ -187,9 +189,17 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
     }
 
     mOutputSurface = consumers[0];
-    res = registerCompositeStreamListener(getStreamId());
+    res = registerCompositeStreamListener(mMainImageStreamId);
     if (res != OK) {
-        ALOGE("%s: Failed to register HAL main image stream", __FUNCTION__);
+        ALOGE("%s: Failed to register HAL main image stream: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
+        return res;
+    }
+
+    res = registerCompositeStreamListener(mAppSegmentStreamId);
+    if (res != OK) {
+        ALOGE("%s: Failed to register HAL app segment stream: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
         return res;
     }
 
@@ -208,13 +218,14 @@ status_t HeicCompositeStream::deleteInternalStreams() {
     deinitCodec();
 
     if (mAppSegmentStreamId >= 0) {
+        // Camera devices may not be valid after switching to offline mode.
+        // In this case, all offline streams including internal composite streams
+        // are managed and released by the offline session.
         sp<CameraDeviceBase> device = mDevice.promote();
-        if (!device.get()) {
-            ALOGE("%s: Invalid camera device!", __FUNCTION__);
-            return NO_INIT;
+        if (device.get() != nullptr) {
+            res = device->deleteStream(mAppSegmentStreamId);
         }
 
-        res = device->deleteStream(mAppSegmentStreamId);
         mAppSegmentStreamId = -1;
     }
 
@@ -222,6 +233,19 @@ status_t HeicCompositeStream::deleteInternalStreams() {
         mOutputSurface->disconnect(NATIVE_WINDOW_API_CAMERA);
         mOutputSurface.clear();
     }
+
+    sp<StatusTracker> statusTracker = mStatusTracker.promote();
+    if (statusTracker != nullptr && mStatusId != StatusTracker::NO_STATUS_ID) {
+        statusTracker->removeComponent(mStatusId);
+        mStatusId = StatusTracker::NO_STATUS_ID;
+    }
+
+    if (mPendingInputFrames.size() > 0) {
+        ALOGW("%s: mPendingInputFrames has %zu stale entries",
+                __FUNCTION__, mPendingInputFrames.size());
+        mPendingInputFrames.clear();
+    }
+
     return res;
 }
 
@@ -230,9 +254,16 @@ void HeicCompositeStream::onBufferReleased(const BufferInfo& bufferInfo) {
 
     if (bufferInfo.mError) return;
 
-    mCodecOutputBufferTimestamps.push(bufferInfo.mTimestamp);
-    ALOGV("%s: [%" PRId64 "]: Adding codecOutputBufferTimestamp (%zu timestamps in total)",
-            __FUNCTION__, bufferInfo.mTimestamp, mCodecOutputBufferTimestamps.size());
+    if (bufferInfo.mStreamId == mMainImageStreamId) {
+        mMainImageFrameNumbers.push(bufferInfo.mFrameNumber);
+        mCodecOutputBufferFrameNumbers.push(bufferInfo.mFrameNumber);
+        ALOGV("%s: [%" PRId64 "]: Adding main image frame number (%zu frame numbers in total)",
+                __FUNCTION__, bufferInfo.mFrameNumber, mMainImageFrameNumbers.size());
+    } else if (bufferInfo.mStreamId == mAppSegmentStreamId) {
+        mAppSegmentFrameNumbers.push(bufferInfo.mFrameNumber);
+        ALOGV("%s: [%" PRId64 "]: Adding app segment frame number (%zu frame numbers in total)",
+                __FUNCTION__, bufferInfo.mFrameNumber, mAppSegmentFrameNumbers.size());
+    }
 }
 
 // We need to get the settings early to handle the case where the codec output
@@ -262,7 +293,7 @@ void HeicCompositeStream::onBufferRequestForFrameNumber(uint64_t frameNumber, in
         quality = entry.data.i32[0];
     }
 
-    mSettingsByFrameNumber[frameNumber] = std::make_pair(orientation, quality);
+    mSettingsByFrameNumber[frameNumber] = {orientation, quality};
 }
 
 void HeicCompositeStream::onFrameAvailable(const BufferItem& item) {
@@ -477,6 +508,11 @@ status_t HeicCompositeStream::configureStream() {
         return res;
     }
 
+    sp<camera3::StatusTracker> statusTracker = mStatusTracker.promote();
+    if (statusTracker != nullptr) {
+        mStatusId = statusTracker->addComponent();
+    }
+
     run("HeicCompositeStreamProc");
 
     return NO_ERROR;
@@ -503,6 +539,18 @@ status_t HeicCompositeStream::insertGbp(SurfaceMap* /*out*/outSurfaceMap,
     return NO_ERROR;
 }
 
+status_t HeicCompositeStream::insertCompositeStreamIds(
+        std::vector<int32_t>* compositeStreamIds /*out*/) {
+    if (compositeStreamIds == nullptr) {
+        return BAD_VALUE;
+    }
+
+    compositeStreamIds->push_back(mAppSegmentStreamId);
+    compositeStreamIds->push_back(mMainImageStreamId);
+
+    return OK;
+}
+
 void HeicCompositeStream::onShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp) {
     Mutex::Autolock l(mMutex);
     if (mErrorState) {
@@ -510,24 +558,44 @@ void HeicCompositeStream::onShutter(const CaptureResultExtras& resultExtras, nse
     }
 
     if (mSettingsByFrameNumber.find(resultExtras.frameNumber) != mSettingsByFrameNumber.end()) {
-        ALOGV("%s: [%" PRId64 "]: frameNumber %" PRId64, __FUNCTION__,
-                timestamp, resultExtras.frameNumber);
-        mFrameNumberMap.emplace(resultExtras.frameNumber, timestamp);
-        mSettingsByTimestamp[timestamp] = mSettingsByFrameNumber[resultExtras.frameNumber];
-        mSettingsByFrameNumber.erase(resultExtras.frameNumber);
+        ALOGV("%s: [%" PRId64 "]: timestamp %" PRId64 ", requestId %d", __FUNCTION__,
+                resultExtras.frameNumber, timestamp, resultExtras.requestId);
+        mSettingsByFrameNumber[resultExtras.frameNumber].shutterNotified = true;
+        mSettingsByFrameNumber[resultExtras.frameNumber].timestamp = timestamp;
+        mSettingsByFrameNumber[resultExtras.frameNumber].requestId = resultExtras.requestId;
         mInputReadyCondition.signal();
     }
 }
 
 void HeicCompositeStream::compilePendingInputLocked() {
-    while (!mSettingsByTimestamp.empty()) {
-        auto it = mSettingsByTimestamp.begin();
-        mPendingInputFrames[it->first].orientation = it->second.first;
-        mPendingInputFrames[it->first].quality = it->second.second;
-        mSettingsByTimestamp.erase(it);
+    auto i = mSettingsByFrameNumber.begin();
+    while (i != mSettingsByFrameNumber.end()) {
+        if (i->second.shutterNotified) {
+            mPendingInputFrames[i->first].orientation = i->second.orientation;
+            mPendingInputFrames[i->first].quality = i->second.quality;
+            mPendingInputFrames[i->first].timestamp = i->second.timestamp;
+            mPendingInputFrames[i->first].requestId = i->second.requestId;
+            ALOGV("%s: [%" PRId64 "]: timestamp is %" PRId64, __FUNCTION__,
+                    i->first, i->second.timestamp);
+            i = mSettingsByFrameNumber.erase(i);
+
+            // Set encoder quality if no inflight encoding
+            if (mPendingInputFrames.size() == 1) {
+                sp<StatusTracker> statusTracker = mStatusTracker.promote();
+                if (statusTracker != nullptr) {
+                    statusTracker->markComponentActive(mStatusId);
+                    ALOGV("%s: Mark component as active", __FUNCTION__);
+                }
+
+                int32_t newQuality = mPendingInputFrames.begin()->second.quality;
+                updateCodecQualityLocked(newQuality);
+            }
+        } else {
+            i++;
+        }
     }
 
-    while (!mInputAppSegmentBuffers.empty()) {
+    while (!mInputAppSegmentBuffers.empty() && mAppSegmentFrameNumbers.size() > 0) {
         CpuConsumer::LockedBuffer imgBuffer;
         auto it = mInputAppSegmentBuffers.begin();
         auto res = mAppSegmentConsumer->lockNextBuffer(&imgBuffer);
@@ -549,17 +617,30 @@ void HeicCompositeStream::compilePendingInputLocked() {
             continue;
         }
 
-        if ((mPendingInputFrames.find(imgBuffer.timestamp) != mPendingInputFrames.end()) &&
-                (mPendingInputFrames[imgBuffer.timestamp].error)) {
+        if (mPendingInputFrames.find(mAppSegmentFrameNumbers.front()) == mPendingInputFrames.end()) {
+            ALOGE("%s: mPendingInputFrames doesn't contain frameNumber %" PRId64, __FUNCTION__,
+                    mAppSegmentFrameNumbers.front());
+            mInputAppSegmentBuffers.erase(it);
+            mAppSegmentFrameNumbers.pop();
+            continue;
+        }
+
+        int64_t frameNumber = mAppSegmentFrameNumbers.front();
+        // If mPendingInputFrames doesn't contain the expected frame number, the captured
+        // input app segment frame must have been dropped via a buffer error.  Simply
+        // return the buffer to the buffer queue.
+        if ((mPendingInputFrames.find(frameNumber) == mPendingInputFrames.end()) ||
+                (mPendingInputFrames[frameNumber].error)) {
             mAppSegmentConsumer->unlockBuffer(imgBuffer);
         } else {
-            mPendingInputFrames[imgBuffer.timestamp].appSegmentBuffer = imgBuffer;
+            mPendingInputFrames[frameNumber].appSegmentBuffer = imgBuffer;
             mLockedAppSegmentBufferCnt++;
         }
         mInputAppSegmentBuffers.erase(it);
+        mAppSegmentFrameNumbers.pop();
     }
 
-    while (!mInputYuvBuffers.empty() && !mYuvBufferAcquired) {
+    while (!mInputYuvBuffers.empty() && !mYuvBufferAcquired && mMainImageFrameNumbers.size() > 0) {
         CpuConsumer::LockedBuffer imgBuffer;
         auto it = mInputYuvBuffers.begin();
         auto res = mMainImageConsumer->lockNextBuffer(&imgBuffer);
@@ -580,59 +661,68 @@ void HeicCompositeStream::compilePendingInputLocked() {
             continue;
         }
 
-        if ((mPendingInputFrames.find(imgBuffer.timestamp) != mPendingInputFrames.end()) &&
-                (mPendingInputFrames[imgBuffer.timestamp].error)) {
+        if (mPendingInputFrames.find(mMainImageFrameNumbers.front()) == mPendingInputFrames.end()) {
+            ALOGE("%s: mPendingInputFrames doesn't contain frameNumber %" PRId64, __FUNCTION__,
+                    mMainImageFrameNumbers.front());
+            mInputYuvBuffers.erase(it);
+            mMainImageFrameNumbers.pop();
+            continue;
+        }
+
+        int64_t frameNumber = mMainImageFrameNumbers.front();
+        // If mPendingInputFrames doesn't contain the expected frame number, the captured
+        // input main image must have been dropped via a buffer error. Simply
+        // return the buffer to the buffer queue.
+        if ((mPendingInputFrames.find(frameNumber) == mPendingInputFrames.end()) ||
+                (mPendingInputFrames[frameNumber].error)) {
             mMainImageConsumer->unlockBuffer(imgBuffer);
         } else {
-            mPendingInputFrames[imgBuffer.timestamp].yuvBuffer = imgBuffer;
+            mPendingInputFrames[frameNumber].yuvBuffer = imgBuffer;
             mYuvBufferAcquired = true;
         }
         mInputYuvBuffers.erase(it);
+        mMainImageFrameNumbers.pop();
     }
 
     while (!mCodecOutputBuffers.empty()) {
         auto it = mCodecOutputBuffers.begin();
-        // Bitstream buffer timestamp doesn't necessarily directly correlate with input
-        // buffer timestamp. Assume encoder input to output is FIFO, use a queue
-        // to look up timestamp.
-        int64_t bufferTime = -1;
-        if (mCodecOutputBufferTimestamps.empty()) {
-            ALOGV("%s: Failed to find buffer timestamp for codec output buffer!", __FUNCTION__);
+        // Assume encoder input to output is FIFO, use a queue to look up
+        // frameNumber when handling codec outputs.
+        int64_t bufferFrameNumber = -1;
+        if (mCodecOutputBufferFrameNumbers.empty()) {
+            ALOGV("%s: Failed to find buffer frameNumber for codec output buffer!", __FUNCTION__);
             break;
         } else {
-            // Direct mapping between camera timestamp (in ns) and codec timestamp (in us).
-            bufferTime = mCodecOutputBufferTimestamps.front();
+            // Direct mapping between camera frame number and codec timestamp (in us).
+            bufferFrameNumber = mCodecOutputBufferFrameNumbers.front();
             mCodecOutputCounter++;
             if (mCodecOutputCounter == mNumOutputTiles) {
-                mCodecOutputBufferTimestamps.pop();
+                mCodecOutputBufferFrameNumbers.pop();
                 mCodecOutputCounter = 0;
             }
 
-            mPendingInputFrames[bufferTime].codecOutputBuffers.push_back(*it);
-            ALOGV("%s: [%" PRId64 "]: Pushing codecOutputBuffers (time %" PRId64 " us)",
-                    __FUNCTION__, bufferTime, it->timeUs);
+            mPendingInputFrames[bufferFrameNumber].codecOutputBuffers.push_back(*it);
+            ALOGV("%s: [%" PRId64 "]: Pushing codecOutputBuffers (frameNumber %" PRId64 ")",
+                    __FUNCTION__, bufferFrameNumber, it->timeUs);
         }
         mCodecOutputBuffers.erase(it);
     }
 
-    while (!mFrameNumberMap.empty()) {
-        auto it = mFrameNumberMap.begin();
-        mPendingInputFrames[it->second].frameNumber = it->first;
-        ALOGV("%s: [%" PRId64 "]: frameNumber is %" PRId64, __FUNCTION__, it->second, it->first);
-        mFrameNumberMap.erase(it);
-    }
-
     while (!mCaptureResults.empty()) {
         auto it = mCaptureResults.begin();
-        // Negative timestamp indicates that something went wrong during the capture result
+        // Negative frame number indicates that something went wrong during the capture result
         // collection process.
-        if (it->first >= 0) {
-            if (mPendingInputFrames[it->first].frameNumber == std::get<0>(it->second)) {
-                mPendingInputFrames[it->first].result =
+        int64_t frameNumber = std::get<0>(it->second);
+        if (it->first >= 0 &&
+                mPendingInputFrames.find(frameNumber) != mPendingInputFrames.end()) {
+            if (mPendingInputFrames[frameNumber].timestamp == it->first) {
+                mPendingInputFrames[frameNumber].result =
                         std::make_unique<CameraMetadata>(std::get<1>(it->second));
             } else {
                 ALOGE("%s: Capture result frameNumber/timestamp mapping changed between "
-                        "shutter and capture result!", __FUNCTION__);
+                        "shutter and capture result! before: %" PRId64 ", after: %" PRId64,
+                        __FUNCTION__, mPendingInputFrames[frameNumber].timestamp,
+                        it->first);
             }
         }
         mCaptureResults.erase(it);
@@ -641,22 +731,24 @@ void HeicCompositeStream::compilePendingInputLocked() {
     // mErrorFrameNumbers stores frame number of dropped buffers.
     auto it = mErrorFrameNumbers.begin();
     while (it != mErrorFrameNumbers.end()) {
-        bool frameFound = false;
-        for (auto &inputFrame : mPendingInputFrames) {
-            if (inputFrame.second.frameNumber == *it) {
-                inputFrame.second.error = true;
-                frameFound = true;
-                break;
-            }
-        }
-
-        if (frameFound) {
-            it = mErrorFrameNumbers.erase(it);
+        if (mPendingInputFrames.find(*it) != mPendingInputFrames.end()) {
+            mPendingInputFrames[*it].error = true;
         } else {
+            //Error callback is guaranteed to arrive after shutter notify, which
+            //results in mPendingInputFrames being populated.
             ALOGW("%s: Not able to find failing input with frame number: %" PRId64, __FUNCTION__,
                     *it);
-            it++;
         }
+        it = mErrorFrameNumbers.erase(it);
+    }
+
+    // mExifErrorFrameNumbers stores the frame number of dropped APP_SEGMENT buffers
+    it = mExifErrorFrameNumbers.begin();
+    while (it != mExifErrorFrameNumbers.end()) {
+        if (mPendingInputFrames.find(*it) != mPendingInputFrames.end()) {
+            mPendingInputFrames[*it].exifError = true;
+        }
+        it = mExifErrorFrameNumbers.erase(it);
     }
 
     // Distribute codec input buffers to be filled out from YUV output
@@ -681,8 +773,8 @@ void HeicCompositeStream::compilePendingInputLocked() {
     }
 }
 
-bool HeicCompositeStream::getNextReadyInputLocked(int64_t *currentTs /*out*/) {
-    if (currentTs == nullptr) {
+bool HeicCompositeStream::getNextReadyInputLocked(int64_t *frameNumber /*out*/) {
+    if (frameNumber == nullptr) {
         return false;
     }
 
@@ -695,7 +787,8 @@ bool HeicCompositeStream::getNextReadyInputLocked(int64_t *currentTs /*out*/) {
         // This makes sure that muxer gets created only when an output tile is
         // generated, because right now we only handle 1 HEIC output buffer at a
         // time (max dequeued buffer count is 1).
-        bool appSegmentReady = (it.second.appSegmentBuffer.data != nullptr) &&
+        bool appSegmentReady =
+                (it.second.appSegmentBuffer.data != nullptr || it.second.exifError) &&
                 !it.second.appSegmentWritten && it.second.result != nullptr &&
                 it.second.muxer != nullptr;
         bool codecOutputReady = !it.second.codecOutputBuffers.empty();
@@ -704,9 +797,8 @@ bool HeicCompositeStream::getNextReadyInputLocked(int64_t *currentTs /*out*/) {
         bool hasOutputBuffer = it.second.muxer != nullptr ||
                 (mDequeuedOutputBufferCnt < kMaxOutputSurfaceProducerCount);
         if ((!it.second.error) &&
-                (it.first < *currentTs) &&
                 (appSegmentReady || (codecOutputReady && hasOutputBuffer) || codecInputReady)) {
-            *currentTs = it.first;
+            *frameNumber = it.first;
             if (it.second.format == nullptr && mFormat != nullptr) {
                 it.second.format = mFormat->dup();
             }
@@ -718,16 +810,12 @@ bool HeicCompositeStream::getNextReadyInputLocked(int64_t *currentTs /*out*/) {
     return newInputAvailable;
 }
 
-int64_t HeicCompositeStream::getNextFailingInputLocked(int64_t *currentTs /*out*/) {
+int64_t HeicCompositeStream::getNextFailingInputLocked() {
     int64_t res = -1;
-    if (currentTs == nullptr) {
-        return res;
-    }
 
     for (const auto& it : mPendingInputFrames) {
-        if (it.second.error && !it.second.errorNotified && (it.first < *currentTs)) {
-            *currentTs = it.first;
-            res = it.second.frameNumber;
+        if (it.second.error) {
+            res = it.first;
             break;
         }
     }
@@ -735,12 +823,13 @@ int64_t HeicCompositeStream::getNextFailingInputLocked(int64_t *currentTs /*out*
     return res;
 }
 
-status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
+status_t HeicCompositeStream::processInputFrame(int64_t frameNumber,
         InputFrame &inputFrame) {
     ATRACE_CALL();
     status_t res = OK;
 
-    bool appSegmentReady = inputFrame.appSegmentBuffer.data != nullptr &&
+    bool appSegmentReady =
+            (inputFrame.appSegmentBuffer.data != nullptr || inputFrame.exifError) &&
             !inputFrame.appSegmentWritten && inputFrame.result != nullptr &&
             inputFrame.muxer != nullptr;
     bool codecOutputReady = inputFrame.codecOutputBuffers.size() > 0;
@@ -750,8 +839,9 @@ status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
             (mDequeuedOutputBufferCnt < kMaxOutputSurfaceProducerCount);
 
     ALOGV("%s: [%" PRId64 "]: appSegmentReady %d, codecOutputReady %d, codecInputReady %d,"
-            " dequeuedOutputBuffer %d", __FUNCTION__, timestamp, appSegmentReady,
-            codecOutputReady, codecInputReady, mDequeuedOutputBufferCnt);
+            " dequeuedOutputBuffer %d, timestamp %" PRId64, __FUNCTION__, frameNumber,
+            appSegmentReady, codecOutputReady, codecInputReady, mDequeuedOutputBufferCnt,
+            inputFrame.timestamp);
 
     // Handle inputs for Hevc tiling
     if (codecInputReady) {
@@ -771,7 +861,7 @@ status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
     // codecOutputReady must be true. Otherwise, appSegmentReady is guaranteed
     // to be false, and the function must have returned early.
     if (inputFrame.muxer == nullptr) {
-        res = startMuxerForInputFrame(timestamp, inputFrame);
+        res = startMuxerForInputFrame(frameNumber, inputFrame);
         if (res != OK) {
             ALOGE("%s: Failed to create and start muxer: %s (%d)", __FUNCTION__,
                     strerror(-res), res);
@@ -781,7 +871,7 @@ status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
 
     // Write JPEG APP segments data to the muxer.
     if (appSegmentReady) {
-        res = processAppSegment(timestamp, inputFrame);
+        res = processAppSegment(frameNumber, inputFrame);
         if (res != OK) {
             ALOGE("%s: Failed to process JPEG APP segments: %s (%d)", __FUNCTION__,
                     strerror(-res), res);
@@ -791,7 +881,7 @@ status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
 
     // Write media codec bitstream buffers to muxer.
     while (!inputFrame.codecOutputBuffers.empty()) {
-        res = processOneCodecOutputFrame(timestamp, inputFrame);
+        res = processOneCodecOutputFrame(frameNumber, inputFrame);
         if (res != OK) {
             ALOGE("%s: Failed to process codec output frame: %s (%d)", __FUNCTION__,
                     strerror(-res), res);
@@ -801,7 +891,7 @@ status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
 
     if (inputFrame.pendingOutputTiles == 0) {
         if (inputFrame.appSegmentWritten) {
-            res = processCompletedInputFrame(timestamp, inputFrame);
+            res = processCompletedInputFrame(frameNumber, inputFrame);
             if (res != OK) {
                 ALOGE("%s: Failed to process completed input frame: %s (%d)", __FUNCTION__,
                         strerror(-res), res);
@@ -817,7 +907,7 @@ status_t HeicCompositeStream::processInputFrame(nsecs_t timestamp,
     return res;
 }
 
-status_t HeicCompositeStream::startMuxerForInputFrame(nsecs_t timestamp, InputFrame &inputFrame) {
+status_t HeicCompositeStream::startMuxerForInputFrame(int64_t frameNumber, InputFrame &inputFrame) {
     sp<ANativeWindow> outputANW = mOutputSurface;
 
     auto res = outputANW->dequeueBuffer(mOutputSurface.get(), &inputFrame.anb, &inputFrame.fenceFd);
@@ -831,7 +921,7 @@ status_t HeicCompositeStream::startMuxerForInputFrame(nsecs_t timestamp, InputFr
     // Combine current thread id, stream id and timestamp to uniquely identify image.
     std::ostringstream tempOutputFile;
     tempOutputFile << "HEIF-" << pthread_self() << "-"
-            << getStreamId() << "-" << timestamp;
+            << getStreamId() << "-" << frameNumber;
     inputFrame.fileFd = syscall(__NR_memfd_create, tempOutputFile.str().c_str(), MFD_CLOEXEC);
     if (inputFrame.fileFd < 0) {
         ALOGE("%s: Failed to create file %s. Error no is %d", __FUNCTION__,
@@ -851,17 +941,6 @@ status_t HeicCompositeStream::startMuxerForInputFrame(nsecs_t timestamp, InputFr
                 strerror(-res), res);
         return res;
     }
-    // Set encoder quality
-    {
-        sp<AMessage> qualityParams = new AMessage;
-        qualityParams->setInt32(PARAMETER_KEY_VIDEO_BITRATE, inputFrame.quality);
-        res = mCodec->setParameters(qualityParams);
-        if (res != OK) {
-            ALOGE("%s: Failed to set codec quality: %s (%d)",
-                    __FUNCTION__, strerror(-res), res);
-            return res;
-        }
-    }
 
     ssize_t trackId = inputFrame.muxer->addTrack(inputFrame.format);
     if (trackId < 0) {
@@ -880,22 +959,27 @@ status_t HeicCompositeStream::startMuxerForInputFrame(nsecs_t timestamp, InputFr
     }
 
     ALOGV("%s: [%" PRId64 "]: Muxer started for inputFrame", __FUNCTION__,
-            timestamp);
+            frameNumber);
     return OK;
 }
 
-status_t HeicCompositeStream::processAppSegment(nsecs_t timestamp, InputFrame &inputFrame) {
+status_t HeicCompositeStream::processAppSegment(int64_t frameNumber, InputFrame &inputFrame) {
     size_t app1Size = 0;
-    auto appSegmentSize = findAppSegmentsSize(inputFrame.appSegmentBuffer.data,
-            inputFrame.appSegmentBuffer.width * inputFrame.appSegmentBuffer.height,
-            &app1Size);
-    if (appSegmentSize == 0) {
-        ALOGE("%s: Failed to find JPEG APP segment size", __FUNCTION__);
-        return NO_INIT;
+    size_t appSegmentSize = 0;
+    if (!inputFrame.exifError) {
+        appSegmentSize = findAppSegmentsSize(inputFrame.appSegmentBuffer.data,
+                inputFrame.appSegmentBuffer.width * inputFrame.appSegmentBuffer.height,
+                &app1Size);
+        if (appSegmentSize == 0) {
+            ALOGE("%s: Failed to find JPEG APP segment size", __FUNCTION__);
+            return NO_INIT;
+        }
     }
 
     std::unique_ptr<ExifUtils> exifUtils(ExifUtils::create());
-    auto exifRes = exifUtils->initialize(inputFrame.appSegmentBuffer.data, app1Size);
+    auto exifRes = inputFrame.exifError ?
+            exifUtils->initializeEmpty() :
+            exifUtils->initialize(inputFrame.appSegmentBuffer.data, app1Size);
     if (!exifRes) {
         ALOGE("%s: Failed to initialize ExifUtils object!", __FUNCTION__);
         return BAD_VALUE;
@@ -936,7 +1020,7 @@ status_t HeicCompositeStream::processAppSegment(nsecs_t timestamp, InputFrame &i
 
     sp<ABuffer> aBuffer = new ABuffer(appSegmentBuffer, appSegmentBufferSize);
     auto res = inputFrame.muxer->writeSampleData(aBuffer, inputFrame.trackIndex,
-            timestamp, MediaCodec::BUFFER_FLAG_MUXER_DATA);
+            inputFrame.timestamp, MediaCodec::BUFFER_FLAG_MUXER_DATA);
     delete[] appSegmentBuffer;
 
     if (res != OK) {
@@ -946,13 +1030,14 @@ status_t HeicCompositeStream::processAppSegment(nsecs_t timestamp, InputFrame &i
     }
 
     ALOGV("%s: [%" PRId64 "]: appSegmentSize is %zu, width %d, height %d, app1Size %zu",
-          __FUNCTION__, timestamp, appSegmentSize, inputFrame.appSegmentBuffer.width,
+          __FUNCTION__, frameNumber, appSegmentSize, inputFrame.appSegmentBuffer.width,
           inputFrame.appSegmentBuffer.height, app1Size);
 
     inputFrame.appSegmentWritten = true;
     // Release the buffer now so any pending input app segments can be processed
     mAppSegmentConsumer->unlockBuffer(inputFrame.appSegmentBuffer);
     inputFrame.appSegmentBuffer.data = nullptr;
+    inputFrame.exifError = false;
     mLockedAppSegmentBufferCnt--;
 
     return OK;
@@ -1001,7 +1086,7 @@ status_t HeicCompositeStream::processCodecInputFrame(InputFrame &inputFrame) {
     return OK;
 }
 
-status_t HeicCompositeStream::processOneCodecOutputFrame(nsecs_t timestamp,
+status_t HeicCompositeStream::processOneCodecOutputFrame(int64_t frameNumber,
         InputFrame &inputFrame) {
     auto it = inputFrame.codecOutputBuffers.begin();
     sp<MediaCodecBuffer> buffer;
@@ -1019,7 +1104,7 @@ status_t HeicCompositeStream::processOneCodecOutputFrame(nsecs_t timestamp,
 
     sp<ABuffer> aBuffer = new ABuffer(buffer->data(), buffer->size());
     res = inputFrame.muxer->writeSampleData(
-            aBuffer, inputFrame.trackIndex, timestamp, 0 /*flags*/);
+            aBuffer, inputFrame.trackIndex, inputFrame.timestamp, 0 /*flags*/);
     if (res != OK) {
         ALOGE("%s: Failed to write buffer index %d to muxer: %s (%d)",
                 __FUNCTION__, it->index, strerror(-res), res);
@@ -1036,11 +1121,11 @@ status_t HeicCompositeStream::processOneCodecOutputFrame(nsecs_t timestamp,
     inputFrame.codecOutputBuffers.erase(inputFrame.codecOutputBuffers.begin());
 
     ALOGV("%s: [%" PRId64 "]: Output buffer index %d",
-        __FUNCTION__, timestamp, it->index);
+        __FUNCTION__, frameNumber, it->index);
     return OK;
 }
 
-status_t HeicCompositeStream::processCompletedInputFrame(nsecs_t timestamp,
+status_t HeicCompositeStream::processCompletedInputFrame(int64_t frameNumber,
         InputFrame &inputFrame) {
     sp<ANativeWindow> outputANW = mOutputSurface;
     inputFrame.muxer->stop();
@@ -1079,7 +1164,7 @@ status_t HeicCompositeStream::processCompletedInputFrame(nsecs_t timestamp,
     blobHeader->blobId = static_cast<CameraBlobId>(0x00FE);
     blobHeader->blobSize = fSize;
 
-    res = native_window_set_buffers_timestamp(mOutputSurface.get(), timestamp);
+    res = native_window_set_buffers_timestamp(mOutputSurface.get(), inputFrame.timestamp);
     if (res != OK) {
         ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)",
                __FUNCTION__, getStreamId(), strerror(-res), res);
@@ -1095,13 +1180,14 @@ status_t HeicCompositeStream::processCompletedInputFrame(nsecs_t timestamp,
     inputFrame.anb = nullptr;
     mDequeuedOutputBufferCnt--;
 
-    ALOGV("%s: [%" PRId64 "]", __FUNCTION__, timestamp);
-    ATRACE_ASYNC_END("HEIC capture", inputFrame.frameNumber);
+    ALOGV("%s: [%" PRId64 "]", __FUNCTION__, frameNumber);
+    ATRACE_ASYNC_END("HEIC capture", frameNumber);
     return OK;
 }
 
 
-void HeicCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*/) {
+void HeicCompositeStream::releaseInputFrameLocked(int64_t frameNumber,
+        InputFrame *inputFrame /*out*/) {
     if (inputFrame == nullptr) {
         return;
     }
@@ -1129,9 +1215,9 @@ void HeicCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*/
         inputFrame->codecInputBuffers.erase(it);
     }
 
-    if ((inputFrame->error || mErrorState) && !inputFrame->errorNotified) {
-        notifyError(inputFrame->frameNumber);
-        inputFrame->errorNotified = true;
+    if (inputFrame->error || mErrorState) {
+        ALOGV("%s: notifyError called for frameNumber %" PRId64, __FUNCTION__, frameNumber);
+        notifyError(frameNumber, inputFrame->requestId);
     }
 
     if (inputFrame->fileFd >= 0) {
@@ -1143,19 +1229,37 @@ void HeicCompositeStream::releaseInputFrameLocked(InputFrame *inputFrame /*out*/
         sp<ANativeWindow> outputANW = mOutputSurface;
         outputANW->cancelBuffer(mOutputSurface.get(), inputFrame->anb, /*fence*/ -1);
         inputFrame->anb = nullptr;
+
+        mDequeuedOutputBufferCnt--;
     }
 }
 
 void HeicCompositeStream::releaseInputFramesLocked() {
     auto it = mPendingInputFrames.begin();
+    bool inputFrameDone = false;
     while (it != mPendingInputFrames.end()) {
         auto& inputFrame = it->second;
         if (inputFrame.error ||
-            (inputFrame.appSegmentWritten && inputFrame.pendingOutputTiles == 0)) {
-            releaseInputFrameLocked(&inputFrame);
+                (inputFrame.appSegmentWritten && inputFrame.pendingOutputTiles == 0)) {
+            releaseInputFrameLocked(it->first, &inputFrame);
             it = mPendingInputFrames.erase(it);
+            inputFrameDone = true;
         } else {
             it++;
+        }
+    }
+
+    // Update codec quality based on first upcoming input frame.
+    // Note that when encoding is in surface mode, currently there is  no
+    // way for camera service to synchronize quality setting on a per-frame
+    // basis: we don't get notification when codec is ready to consume a new
+    // input frame. So we update codec quality on a best-effort basis.
+    if (inputFrameDone) {
+        auto firstPendingFrame = mPendingInputFrames.begin();
+        if (firstPendingFrame != mPendingInputFrames.end()) {
+            updateCodecQualityLocked(firstPendingFrame->second.quality);
+        } else {
+            markTrackerIdle();
         }
     }
 }
@@ -1260,7 +1364,7 @@ status_t HeicCompositeStream::initializeCodec(uint32_t width, uint32_t height,
     outputFormat->setInt32(KEY_I_FRAME_INTERVAL, 0);
     outputFormat->setInt32(KEY_COLOR_FORMAT,
             useGrid ? COLOR_FormatYUV420Flexible : COLOR_FormatSurface);
-    outputFormat->setInt32(KEY_FRAME_RATE, gridRows * gridCols);
+    outputFormat->setInt32(KEY_FRAME_RATE, useGrid ? gridRows * gridCols : kNoGridOpRate);
     // This only serves as a hint to encoder when encoding is not real-time.
     outputFormat->setInt32(KEY_OPERATING_RATE, useGrid ? kGridOpRate : kNoGridOpRate);
 
@@ -1372,20 +1476,6 @@ size_t HeicCompositeStream::findAppSegmentsSize(const uint8_t* appSegmentBuffer,
 
     *app1SegmentSize = app1Size + sizeof(app1Marker);
     return expectedSize;
-}
-
-int64_t HeicCompositeStream::findTimestampInNsLocked(int64_t timeInUs) {
-    for (const auto& fn : mFrameNumberMap) {
-        if (timeInUs == ns2us(fn.second)) {
-            return fn.second;
-        }
-    }
-    for (const auto& inputFrame : mPendingInputFrames) {
-        if (timeInUs == ns2us(inputFrame.first)) {
-            return inputFrame.first;
-        }
-    }
-    return -1;
 }
 
 status_t HeicCompositeStream::copyOneYuvTile(sp<MediaCodecBuffer>& codecBuffer,
@@ -1546,8 +1636,22 @@ size_t HeicCompositeStream::calcAppSegmentMaxSize(const CameraMetadata& info) {
     return maxAppsSegment * (2 + 0xFFFF) + sizeof(struct CameraBlob);
 }
 
+void HeicCompositeStream::updateCodecQualityLocked(int32_t quality) {
+    if (quality != mQuality) {
+        sp<AMessage> qualityParams = new AMessage;
+        qualityParams->setInt32(PARAMETER_KEY_VIDEO_BITRATE, quality);
+        status_t res = mCodec->setParameters(qualityParams);
+        if (res != OK) {
+            ALOGE("%s: Failed to set codec quality: %s (%d)",
+                    __FUNCTION__, strerror(-res), res);
+        } else {
+            mQuality = quality;
+        }
+    }
+}
+
 bool HeicCompositeStream::threadLoop() {
-    int64_t currentTs = INT64_MAX;
+    int64_t frameNumber = -1;
     bool newInputAvailable = false;
 
     {
@@ -1563,19 +1667,25 @@ bool HeicCompositeStream::threadLoop() {
 
         while (!newInputAvailable) {
             compilePendingInputLocked();
-            newInputAvailable = getNextReadyInputLocked(&currentTs);
+            newInputAvailable = getNextReadyInputLocked(&frameNumber);
 
             if (!newInputAvailable) {
-                auto failingFrameNumber = getNextFailingInputLocked(&currentTs);
+                auto failingFrameNumber = getNextFailingInputLocked();
                 if (failingFrameNumber >= 0) {
-                    // We cannot erase 'mPendingInputFrames[currentTs]' at this point because it is
-                    // possible for two internal stream buffers to fail. In such scenario the
-                    // composite stream should notify the client about a stream buffer error only
-                    // once and this information is kept within 'errorNotified'.
-                    // Any present failed input frames will be removed on a subsequent call to
-                    // 'releaseInputFramesLocked()'.
-                    releaseInputFrameLocked(&mPendingInputFrames[currentTs]);
-                    currentTs = INT64_MAX;
+                    releaseInputFrameLocked(failingFrameNumber,
+                            &mPendingInputFrames[failingFrameNumber]);
+
+                    // It's okay to remove the entry from mPendingInputFrames
+                    // because:
+                    // 1. Only one internal stream (main input) is critical in
+                    // backing the output stream.
+                    // 2. If captureResult/appSegment arrives after the entry is
+                    // removed, they are simply skipped.
+                    mPendingInputFrames.erase(failingFrameNumber);
+                    if (mPendingInputFrames.size() == 0) {
+                        markTrackerIdle();
+                    }
+                    return true;
                 }
 
                 auto ret = mInputReadyCondition.waitRelative(mMutex, kWaitDuration);
@@ -1590,12 +1700,13 @@ bool HeicCompositeStream::threadLoop() {
         }
     }
 
-    auto res = processInputFrame(currentTs, mPendingInputFrames[currentTs]);
+    auto res = processInputFrame(frameNumber, mPendingInputFrames[frameNumber]);
     Mutex::Autolock l(mMutex);
     if (res != OK) {
-        ALOGE("%s: Failed processing frame with timestamp: %" PRIu64 ": %s (%d)",
-                __FUNCTION__, currentTs, strerror(-res), res);
-        mPendingInputFrames[currentTs].error = true;
+        ALOGE("%s: Failed processing frame with timestamp: %" PRIu64 ", frameNumber: %"
+                PRId64 ": %s (%d)", __FUNCTION__, mPendingInputFrames[frameNumber].timestamp,
+                frameNumber, strerror(-res), res);
+        mPendingInputFrames[frameNumber].error = true;
     }
 
     releaseInputFramesLocked();
@@ -1603,14 +1714,26 @@ bool HeicCompositeStream::threadLoop() {
     return true;
 }
 
+void HeicCompositeStream::flagAnExifErrorFrameNumber(int64_t frameNumber) {
+    Mutex::Autolock l(mMutex);
+    mExifErrorFrameNumbers.emplace(frameNumber);
+    mInputReadyCondition.signal();
+}
+
 bool HeicCompositeStream::onStreamBufferError(const CaptureResultExtras& resultExtras) {
     bool res = false;
+    int64_t frameNumber = resultExtras.frameNumber;
+
     // Buffer errors concerning internal composite streams should not be directly visible to
     // camera clients. They must only receive a single buffer error with the public composite
     // stream id.
-    if ((resultExtras.errorStreamId == mAppSegmentStreamId) ||
-            (resultExtras.errorStreamId == mMainImageStreamId)) {
-        flagAnErrorFrameNumber(resultExtras.frameNumber);
+    if (resultExtras.errorStreamId == mAppSegmentStreamId) {
+        ALOGV("%s: APP_SEGMENT frameNumber: %" PRId64, __FUNCTION__, frameNumber);
+        flagAnExifErrorFrameNumber(frameNumber);
+        res = true;
+    } else if (resultExtras.errorStreamId == mMainImageStreamId) {
+        ALOGV("%s: YUV frameNumber: %" PRId64, __FUNCTION__, frameNumber);
+        flagAnErrorFrameNumber(frameNumber);
         res = true;
     }
 
@@ -1623,16 +1746,16 @@ void HeicCompositeStream::onResultError(const CaptureResultExtras& resultExtras)
     Mutex::Autolock l(mMutex);
 
     int64_t timestamp = -1;
-    for (const auto& fn : mFrameNumberMap) {
+    for (const auto& fn : mSettingsByFrameNumber) {
         if (fn.first == resultExtras.frameNumber) {
-            timestamp = fn.second;
+            timestamp = fn.second.timestamp;
             break;
         }
     }
     if (timestamp == -1) {
         for (const auto& inputFrame : mPendingInputFrames) {
-            if (inputFrame.second.frameNumber == resultExtras.frameNumber) {
-                timestamp = inputFrame.first;
+            if (inputFrame.first == resultExtras.frameNumber) {
+                timestamp = inputFrame.second.timestamp;
                 break;
             }
         }
@@ -1644,7 +1767,31 @@ void HeicCompositeStream::onResultError(const CaptureResultExtras& resultExtras)
     }
 
     mCaptureResults.emplace(timestamp, std::make_tuple(resultExtras.frameNumber, CameraMetadata()));
+    ALOGV("%s: timestamp %" PRId64 ", frameNumber %" PRId64, __FUNCTION__,
+            timestamp, resultExtras.frameNumber);
     mInputReadyCondition.signal();
+}
+
+void HeicCompositeStream::onRequestError(const CaptureResultExtras& resultExtras) {
+    auto frameNumber = resultExtras.frameNumber;
+    ALOGV("%s: frameNumber: %" PRId64, __FUNCTION__, frameNumber);
+    Mutex::Autolock l(mMutex);
+    auto numRequests = mSettingsByFrameNumber.erase(frameNumber);
+    if (numRequests == 0) {
+        // Pending request has been populated into mPendingInputFrames
+        mErrorFrameNumbers.emplace(frameNumber);
+        mInputReadyCondition.signal();
+    } else {
+        // REQUEST_ERROR was received without onShutter.
+    }
+}
+
+void HeicCompositeStream::markTrackerIdle() {
+    sp<StatusTracker> statusTracker = mStatusTracker.promote();
+    if (statusTracker != nullptr) {
+        statusTracker->markComponentIdle(mStatusId, Fence::NO_FENCE);
+        ALOGV("%s: Mark component as idle", __FUNCTION__);
+    }
 }
 
 void HeicCompositeStream::CodecCallbackHandler::onMessageReceived(const sp<AMessage> &msg) {

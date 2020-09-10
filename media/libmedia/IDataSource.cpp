@@ -19,8 +19,7 @@
 #include <utils/Log.h>
 #include <utils/Timers.h>
 
-#include <media/IDataSource.h>
-
+#include <android/IDataSource.h>
 #include <binder/IMemory.h>
 #include <binder/Parcel.h>
 #include <media/stagefright/foundation/ADebug.h>

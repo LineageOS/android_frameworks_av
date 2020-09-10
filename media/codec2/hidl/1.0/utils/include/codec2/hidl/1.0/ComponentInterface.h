@@ -45,7 +45,7 @@ struct ComponentStore;
 struct ComponentInterface : public IComponentInterface {
     ComponentInterface(
             const std::shared_ptr<C2ComponentInterface>& interface,
-            ComponentStore* store);
+            const std::shared_ptr<ParameterCache>& cache);
     c2_status_t status() const;
     virtual Return<sp<IConfigurable>> getConfigurable() override;
 

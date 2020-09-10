@@ -236,6 +236,8 @@ public:
     status_t    setPreviewSurface(const sp<IGraphicBufferProducer>& surface);
     status_t    setVideoSource(int vs);
     status_t    setAudioSource(int as);
+    status_t    setPrivacySensitive(bool privacySensitive);
+    status_t    isPrivacySensitive(bool *privacySensitive) const;
     status_t    setOutputFormat(int of);
     status_t    setVideoEncoder(int ve);
     status_t    setAudioEncoder(int ae);

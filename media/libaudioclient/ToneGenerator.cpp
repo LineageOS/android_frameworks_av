@@ -1262,7 +1262,9 @@ bool ToneGenerator::initAudioTrack() {
             AUDIO_UID_INVALID,
             -1,
             &attr);
-
+    // Set caller name so it can be logged in destructor.
+    // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_TONEGENERATOR
+    mpAudioTrack->setCallerName("tonegenerator");
     if (status != NO_ERROR) {
         ALOGE("AudioTrack(%p) set failed with error %d", mpAudioTrack.get(), status);
         mpAudioTrack.clear();

@@ -40,6 +40,7 @@
 #include <vector>
 
 #include "android/media/IAudioRecord.h"
+#include "android/media/IAudioTrackCallback.h"
 
 namespace android {
 
@@ -71,13 +72,19 @@ public:
                 return DEAD_OBJECT;
             }
             if (parcel->readInt32() != 0) {
+                // TODO: Using unsecurePointer() has some associated security
+                //       pitfalls (see declaration for details).
+                //       Either document why it is safe in this case or address
+                //       the issue (e.g. by copying).
                 sharedBuffer = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (sharedBuffer == 0 || sharedBuffer->pointer() == NULL) {
+                if (sharedBuffer == 0 || sharedBuffer->unsecurePointer() == NULL) {
                     return BAD_VALUE;
                 }
             }
             notificationsPerBuffer = parcel->readInt32();
             speed = parcel->readFloat();
+            audioTrackCallback = interface_cast<media::IAudioTrackCallback>(
+                    parcel->readStrongBinder());
 
             /* input/output arguments*/
             (void)parcel->read(&flags, sizeof(audio_output_flags_t));
@@ -101,6 +108,7 @@ public:
             }
             (void)parcel->writeInt32(notificationsPerBuffer);
             (void)parcel->writeFloat(speed);
+            (void)parcel->writeStrongBinder(IInterface::asBinder(audioTrackCallback));
 
             /* input/output arguments*/
             (void)parcel->write(&flags, sizeof(audio_output_flags_t));
@@ -118,6 +126,7 @@ public:
         sp<IMemory> sharedBuffer;
         uint32_t notificationsPerBuffer;
         float speed;
+        sp<media::IAudioTrackCallback> audioTrackCallback;
 
         /* input/output */
         audio_output_flags_t flags;
@@ -270,13 +279,21 @@ public:
             (void)parcel->read(&inputId, sizeof(audio_io_handle_t));
             if (parcel->readInt32() != 0) {
                 cblk = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (cblk == 0 || cblk->pointer() == NULL) {
+                // TODO: Using unsecurePointer() has some associated security
+                //       pitfalls (see declaration for details).
+                //       Either document why it is safe in this case or address
+                //       the issue (e.g. by copying).
+                if (cblk == 0 || cblk->unsecurePointer() == NULL) {
                     return BAD_VALUE;
                 }
             }
             if (parcel->readInt32() != 0) {
                 buffers = interface_cast<IMemory>(parcel->readStrongBinder());
-                if (buffers == 0 || buffers->pointer() == NULL) {
+                // TODO: Using unsecurePointer() has some associated security
+                //       pitfalls (see declaration for details).
+                //       Either document why it is safe in this case or address
+                //       the issue (e.g. by copying).
+                if (buffers == 0 || buffers->unsecurePointer() == NULL) {
                     return BAD_VALUE;
                 }
             }
@@ -385,7 +402,7 @@ public:
     // mic mute/state
     virtual     status_t    setMicMute(bool state) = 0;
     virtual     bool        getMicMute() const = 0;
-    virtual     void        setRecordSilenced(uid_t uid, bool silenced) = 0;
+    virtual     void        setRecordSilenced(audio_port_handle_t portId, bool silenced) = 0;
 
     virtual     status_t    setParameters(audio_io_handle_t ioHandle,
                                     const String8& keyValuePairs) = 0;
@@ -397,7 +414,7 @@ public:
     // Thus the IAudioFlingerClient must be a singleton per process.
     virtual void registerClient(const sp<IAudioFlingerClient>& client) = 0;
 
-    // retrieve the audio recording buffer size
+    // retrieve the audio recording buffer size in bytes
     // FIXME This API assumes a route, and so should be deprecated.
     virtual size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
             audio_channel_mask_t channelMask) const = 0;
@@ -434,7 +451,7 @@ public:
 
     virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use) = 0;
 
-    virtual void acquireAudioSessionId(audio_session_t audioSession, pid_t pid) = 0;
+    virtual void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) = 0;
     virtual void releaseAudioSessionId(audio_session_t audioSession, pid_t pid) = 0;
 
     virtual status_t queryNumberEffects(uint32_t *numEffects) const = 0;
@@ -456,6 +473,7 @@ public:
                                     const AudioDeviceTypeAddr& device,
                                     const String16& callingPackage,
                                     pid_t pid,
+                                    bool probe,
                                     status_t *status,
                                     int *id,
                                     int *enabled) = 0;

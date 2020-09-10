@@ -46,6 +46,8 @@ struct ARTSPConnection : public AHandler {
             const char *url, AString *host, unsigned *port, AString *path,
             AString *user, AString *pass);
 
+    int getSocket() { return mSocket; }
+
 protected:
     virtual ~ARTSPConnection();
     virtual void onMessageReceived(const sp<AMessage> &msg);

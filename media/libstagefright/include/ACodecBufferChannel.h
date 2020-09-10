@@ -67,6 +67,9 @@ public:
     virtual ~ACodecBufferChannel();
 
     // BufferChannelBase interface
+    void setCrypto(const sp<ICrypto> &crypto) override;
+    void setDescrambler(const sp<IDescrambler> &descrambler) override;
+
     virtual status_t queueInputBuffer(const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t queueSecureInputBuffer(
             const sp<MediaCodecBuffer> &buffer,
@@ -78,6 +81,20 @@ public:
             const CryptoPlugin::SubSample *subSamples,
             size_t numSubSamples,
             AString *errorDetailMsg) override;
+    virtual status_t attachBuffer(
+            const std::shared_ptr<C2Buffer> &c2Buffer,
+            const sp<MediaCodecBuffer> &buffer) override;
+    virtual status_t attachEncryptedBuffer(
+            const sp<hardware::HidlMemory> &memory,
+            bool secure,
+            const uint8_t *key,
+            const uint8_t *iv,
+            CryptoPlugin::Mode mode,
+            CryptoPlugin::Pattern pattern,
+            size_t offset,
+            const CryptoPlugin::SubSample *subSamples,
+            size_t numSubSamples,
+            const sp<MediaCodecBuffer> &buffer) override;
     virtual status_t renderOutputBuffer(
             const sp<MediaCodecBuffer> &buffer, int64_t timestampNs) override;
     virtual status_t discardBuffer(const sp<MediaCodecBuffer> &buffer) override;
@@ -115,12 +132,15 @@ public:
     void drainThisBuffer(IOMX::buffer_id bufferID, OMX_U32 omxFlags);
 
 private:
+    int32_t getHeapSeqNum(const sp<HidlMemory> &memory);
+
     const sp<AMessage> mInputBufferFilled;
     const sp<AMessage> mOutputBufferDrained;
 
     sp<MemoryDealer> mDealer;
     sp<IMemory> mDecryptDestination;
     int32_t mHeapSeqNum;
+    std::map<wp<HidlMemory>, int32_t> mHeapSeqNumMap;
     sp<HidlMemory> mHidlMemory;
 
     // These should only be accessed via std::atomic_* functions.
@@ -134,6 +154,9 @@ private:
     std::shared_ptr<const std::vector<const BufferInfo>> mOutputBuffers;
 
     sp<MemoryDealer> makeMemoryDealer(size_t heapSize);
+
+    sp<ICrypto> mCrypto;
+    sp<IDescrambler> mDescrambler;
 
     bool hasCryptoOrDescrambler() {
         return mCrypto != NULL || mDescrambler != NULL;

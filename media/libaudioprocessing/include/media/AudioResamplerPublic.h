@@ -19,6 +19,7 @@
 
 #include <stdint.h>
 #include <math.h>
+#include <system/audio.h>
 
 namespace android {
 
@@ -37,68 +38,16 @@ namespace android {
 // an int32_t of the phase increments, making the resulting sample rate inexact.
 #define AUDIO_RESAMPLER_UP_RATIO_MAX 65536
 
-// AUDIO_TIMESTRETCH_SPEED_MIN and AUDIO_TIMESTRETCH_SPEED_MAX define the min and max time stretch
-// speeds supported by the system. These are enforced by the system and values outside this range
-// will result in a runtime error.
-// Depending on the AudioPlaybackRate::mStretchMode, the effective limits might be narrower than
-// the ones specified here
-// AUDIO_TIMESTRETCH_SPEED_MIN_DELTA is the minimum absolute speed difference that might trigger a
-// parameter update
-#define AUDIO_TIMESTRETCH_SPEED_MIN    0.01f
-#define AUDIO_TIMESTRETCH_SPEED_MAX    20.0f
-#define AUDIO_TIMESTRETCH_SPEED_NORMAL 1.0f
-#define AUDIO_TIMESTRETCH_SPEED_MIN_DELTA 0.0001f
-
-// AUDIO_TIMESTRETCH_PITCH_MIN and AUDIO_TIMESTRETCH_PITCH_MAX define the min and max time stretch
-// pitch shifting supported by the system. These are not enforced by the system and values
-// outside this range might result in a pitch different than the one requested.
-// Depending on the AudioPlaybackRate::mStretchMode, the effective limits might be narrower than
-// the ones specified here.
-// AUDIO_TIMESTRETCH_PITCH_MIN_DELTA is the minimum absolute pitch difference that might trigger a
-// parameter update
-#define AUDIO_TIMESTRETCH_PITCH_MIN    0.25f
-#define AUDIO_TIMESTRETCH_PITCH_MAX    4.0f
-#define AUDIO_TIMESTRETCH_PITCH_NORMAL 1.0f
-#define AUDIO_TIMESTRETCH_PITCH_MIN_DELTA 0.0001f
-
-
 //Determines the current algorithm used for stretching
-enum AudioTimestretchStretchMode : int32_t {
-    AUDIO_TIMESTRETCH_STRETCH_DEFAULT            = 0,
-    AUDIO_TIMESTRETCH_STRETCH_SPEECH             = 1,
-    //TODO: add more stretch modes/algorithms
-};
-
-//Limits for AUDIO_TIMESTRETCH_STRETCH_SPEECH mode
-#define TIMESTRETCH_SONIC_SPEED_MIN 0.1f
-#define TIMESTRETCH_SONIC_SPEED_MAX 6.0f
+using AudioTimestretchStretchMode = ::audio_timestretch_stretch_mode_t;
 
 //Determines behavior of Timestretch if current algorithm can't perform
 //with current parameters.
-// FALLBACK_CUT_REPEAT: (internal only) for speed <1.0 will truncate frames
-//    for speed > 1.0 will repeat frames
-// FALLBACK_MUTE: will set all processed frames to zero
-// FALLBACK_FAIL:  will stop program execution and log a fatal error
-enum AudioTimestretchFallbackMode : int32_t {
-    AUDIO_TIMESTRETCH_FALLBACK_CUT_REPEAT     = -1,
-    AUDIO_TIMESTRETCH_FALLBACK_DEFAULT        = 0,
-    AUDIO_TIMESTRETCH_FALLBACK_MUTE           = 1,
-    AUDIO_TIMESTRETCH_FALLBACK_FAIL           = 2,
-};
+using AudioTimestretchFallbackMode = ::audio_timestretch_fallback_mode_t;
 
-struct AudioPlaybackRate {
-    float mSpeed;
-    float mPitch;
-    enum AudioTimestretchStretchMode  mStretchMode;
-    enum AudioTimestretchFallbackMode mFallbackMode;
-};
+using AudioPlaybackRate = ::audio_playback_rate_t;
 
-static const AudioPlaybackRate AUDIO_PLAYBACK_RATE_DEFAULT = {
-        AUDIO_TIMESTRETCH_SPEED_NORMAL,
-        AUDIO_TIMESTRETCH_PITCH_NORMAL,
-        AUDIO_TIMESTRETCH_STRETCH_DEFAULT,
-        AUDIO_TIMESTRETCH_FALLBACK_DEFAULT
-};
+static const AudioPlaybackRate AUDIO_PLAYBACK_RATE_DEFAULT = ::AUDIO_PLAYBACK_RATE_INITIALIZER;
 
 static inline bool isAudioPlaybackRateEqual(const AudioPlaybackRate &pr1,
         const AudioPlaybackRate &pr2) {

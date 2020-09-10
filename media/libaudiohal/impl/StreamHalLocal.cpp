@@ -275,6 +275,43 @@ status_t StreamOutHalLocal::getMmapPosition(struct audio_mmap_position *position
     return mStream->get_mmap_position(mStream, position);
 }
 
+status_t StreamOutHalLocal::setEventCallback(
+        const sp<StreamOutHalInterfaceEventCallback>& callback) {
+    if (mStream->set_event_callback == nullptr) {
+        return INVALID_OPERATION;
+    }
+    stream_event_callback_t asyncCallback =
+            callback == nullptr ? nullptr : StreamOutHalLocal::asyncEventCallback;
+    status_t result = mStream->set_event_callback(mStream, asyncCallback, this);
+    if (result == OK) {
+        mEventCallback = callback;
+    }
+    return result;
+}
+
+// static
+int StreamOutHalLocal::asyncEventCallback(
+        stream_event_callback_type_t event, void *param, void *cookie) {
+    // We act as if we gave a wp<StreamOutHalLocal> to HAL. This way we should handle
+    // correctly the case when the callback is invoked while StreamOutHalLocal's destructor is
+    // already running, because the destructor is invoked after the refcount has been atomically
+    // decremented.
+    wp<StreamOutHalLocal> weakSelf(static_cast<StreamOutHalLocal*>(cookie));
+    sp<StreamOutHalLocal> self = weakSelf.promote();
+    if (self == nullptr) return 0;
+    sp<StreamOutHalInterfaceEventCallback> callback = self->mEventCallback.promote();
+    if (callback.get() == nullptr) return 0;
+    switch (event) {
+        case STREAM_EVENT_CBK_TYPE_CODEC_FORMAT_CHANGED:
+            callback->onCodecFormatChanged(std::basic_string<uint8_t>((uint8_t*)param));
+            break;
+        default:
+            ALOGW("%s unknown event %d", __func__, event);
+            break;
+    }
+    return 0;
+}
+
 StreamInHalLocal::StreamInHalLocal(audio_stream_in_t *stream, sp<DeviceHalLocal> device)
         : StreamHalLocal(&stream->common, device), mStream(stream) {
 }

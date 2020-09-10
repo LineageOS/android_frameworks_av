@@ -86,6 +86,7 @@ public:
     void setEffectSuspended(int effectId __unused,
                             audio_session_t sessionId __unused,
                             bool suspended __unused) {}
+    void setSoundTriggerCaptureState(bool active __unused) override {};
 };
 
 } // namespace android

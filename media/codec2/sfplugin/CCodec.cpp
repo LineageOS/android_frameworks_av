@@ -26,8 +26,8 @@
 #include <C2ParamInternal.h>
 #include <C2PlatformSupport.h>
 
-#include <android/IGraphicBufferSource.h>
 #include <android/IOMXBufferSource.h>
+#include <android/hardware/media/c2/1.0/IInputSurface.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
 #include <android/hardware/media/omx/1.0/IOmx.h>
 #include <android-base/stringprintf.h>
@@ -35,17 +35,21 @@
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
-#include <media/omx/1.0/WGraphicBufferSource.h>
+#include <media/omx/1.0/WOmxNode.h>
+#include <media/openmax/OMX_Core.h>
 #include <media/openmax/OMX_IndexExt.h>
+#include <media/stagefright/omx/1.0/WGraphicBufferSource.h>
+#include <media/stagefright/omx/OmxGraphicBufferSource.h>
+#include <media/stagefright/CCodec.h>
 #include <media/stagefright/BufferProducerWrapper.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/PersistentSurface.h>
 
 #include "C2OMXNode.h"
-#include "CCodec.h"
 #include "CCodecBufferChannel.h"
+#include "CCodecConfig.h"
+#include "Codec2Mapper.h"
 #include "InputSurfaceWrapper.h"
-#include "Omx2IGraphicBufferSource.h"
 
 extern "C" android::PersistentSurface *CreateInputSurface();
 
@@ -54,8 +58,10 @@ namespace android {
 using namespace std::chrono_literals;
 using ::android::hardware::graphics::bufferqueue::V1_0::utils::H2BGraphicBufferProducer;
 using android::base::StringPrintf;
-using BGraphicBufferSource = ::android::IGraphicBufferSource;
 using ::android::hardware::media::c2::V1_0::IInputSurface;
+
+typedef hardware::media::omx::V1_0::IGraphicBufferSource HGraphicBufferSource;
+typedef CCodecConfig Config;
 
 namespace {
 
@@ -180,9 +186,10 @@ private:
 
 class GraphicBufferSourceWrapper : public InputSurfaceWrapper {
 public:
-//    explicit GraphicBufferSourceWrapper(const sp<BGraphicBufferSource> &source) : mSource(source) {}
+    typedef hardware::media::omx::V1_0::Status OmxStatus;
+
     GraphicBufferSourceWrapper(
-            const sp<BGraphicBufferSource> &source,
+            const sp<HGraphicBufferSource> &source,
             uint32_t width,
             uint32_t height,
             uint64_t usage)
@@ -194,6 +201,7 @@ public:
 
     status_t connect(const std::shared_ptr<Codec2Client::Component> &comp) override {
         mNode = new C2OMXNode(comp);
+        mOmxNode = new hardware::media::omx::V1_0::utils::TWOmxNode(mNode);
         mNode->setFrameSize(mWidth, mHeight);
 
         // Usage is queried during configure(), so setting it beforehand.
@@ -204,7 +212,8 @@ public:
 
         // NOTE: we do not use/pass through color aspects from GraphicBufferSource as we
         // communicate that directly to the component.
-        mSource->configure(mNode, mDataSpace);
+        mSource->configure(
+                mOmxNode, static_cast<hardware::graphics::common::V1_0::Dataspace>(mDataSpace));
         return OK;
     }
 
@@ -220,21 +229,16 @@ public:
         source->onOmxIdle();
         source->onOmxLoaded();
         mNode.clear();
+        mOmxNode.clear();
     }
 
-    status_t GetStatus(const binder::Status &status) {
-        status_t err = OK;
-        if (!status.isOk()) {
-            err = status.serviceSpecificErrorCode();
-            if (err == OK) {
-                err = status.transactionError();
-                if (err == OK) {
-                    // binder status failed, but there is no servie or transaction error
-                    err = UNKNOWN_ERROR;
-                }
-            }
+    status_t GetStatus(hardware::Return<OmxStatus> &&status) {
+        if (status.isOk()) {
+            return static_cast<status_t>(status.withDefault(OmxStatus::UNKNOWN_ERROR));
+        } else if (status.isDeadObject()) {
+            return DEAD_OBJECT;
         }
-        return err;
+        return UNKNOWN_ERROR;
     }
 
     status_t start() override {
@@ -359,7 +363,15 @@ public:
                 err = res;
             } else {
                 status << " delayUs";
-                res = GetStatus(mSource->getStopTimeOffsetUs(&config.mInputDelayUs));
+                hardware::Return<void> trans = mSource->getStopTimeOffsetUs(
+                        [&res, &delayUs = config.mInputDelayUs](
+                                auto status, auto stopTimeOffsetUs) {
+                            res = static_cast<status_t>(status);
+                            delayUs = stopTimeOffsetUs;
+                        });
+                if (!trans.isOk()) {
+                    res = trans.isDeadObject() ? DEAD_OBJECT : UNKNOWN_ERROR;
+                }
                 if (res != OK) {
                     status << " (=> " << asString(res) << ")";
                 } else {
@@ -388,8 +400,9 @@ public:
     }
 
 private:
-    sp<BGraphicBufferSource> mSource;
+    sp<HGraphicBufferSource> mSource;
     sp<C2OMXNode> mNode;
+    sp<hardware::media::omx::V1_0::IOmxNode> mOmxNode;
     uint32_t mWidth;
     uint32_t mHeight;
     Config mConfig;
@@ -561,7 +574,8 @@ private:
 // CCodec
 
 CCodec::CCodec()
-    : mChannel(new CCodecBufferChannel(std::make_shared<CCodecCallbackImpl>(this))) {
+    : mChannel(new CCodecBufferChannel(std::make_shared<CCodecCallbackImpl>(this))),
+      mConfig(new CCodecConfig) {
 }
 
 CCodec::~CCodec() {
@@ -652,8 +666,9 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
     }
 
     // initialize config here in case setParameters is called prior to configure
-    Mutexed<Config>::Locked config(mConfig);
-    status_t err = config->initialize(mClient, comp);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    status_t err = config->initialize(mClient->getParamReflector(), comp);
     if (err != OK) {
         ALOGW("Failed to initialize configuration support");
         // TODO: report error once we complete implementation.
@@ -703,6 +718,11 @@ void CCodec::configure(const sp<AMessage> &msg) {
             encoder = false;
         }
 
+        int32_t flags;
+        if (!msg->findInt32("flags", &flags)) {
+            return BAD_VALUE;
+        }
+
         // TODO: read from intf()
         if ((!encoder) != (comp->getName().find("encoder") == std::string::npos)) {
             return UNKNOWN_ERROR;
@@ -726,8 +746,12 @@ void CCodec::configure(const sp<AMessage> &msg) {
             setSurface(surface);
         }
 
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         config->mUsingSurface = surface != nullptr;
+        config->mBuffersBoundToCodec = ((flags & CONFIGURE_FLAG_USE_BLOCK_MODEL) == 0);
+        ALOGD("[%s] buffers are %sbound to CCodec for this session",
+              comp->getName().c_str(), config->mBuffersBoundToCodec ? "" : "not ");
 
         // Enforce required parameters
         int32_t i32;
@@ -857,6 +881,13 @@ void CCodec::configure(const sp<AMessage> &msg) {
 
             if (format >= 0) {
                 msg->setInt32("android._color-format", format);
+            }
+        }
+
+        int32_t subscribeToAllVendorParams;
+        if (msg->findInt32("x-*", &subscribeToAllVendorParams) && subscribeToAllVendorParams) {
+            if (config->subscribeToAllVendorParams(comp, C2_MAY_BLOCK) != OK) {
+                ALOGD("[%s] Failed to subscribe to all vendor params", comp->getName().c_str());
             }
         }
 
@@ -1042,7 +1073,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
         return;
     }
 
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
 
     mCallback->onComponentConfigured(config->mInputFormat, config->mOutputFormat);
 }
@@ -1092,9 +1124,7 @@ sp<PersistentSurface> CCodec::CreateOmxInputSurface() {
                 gbs = source;
             });
     if (transStatus.isOk() && s == OmxStatus::OK) {
-        return new PersistentSurface(
-                new H2BGraphicBufferProducer(gbp),
-                sp<::android::IGraphicBufferSource>(new LWGraphicBufferSource(gbs)));
+        return new PersistentSurface(new H2BGraphicBufferProducer(gbp), gbs);
     }
 
     return nullptr;
@@ -1118,35 +1148,36 @@ void CCodec::createInputSurface() {
     sp<AMessage> outputFormat;
     uint64_t usage = 0;
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
         usage = config->mISConfig ? config->mISConfig->mUsage : 0;
     }
 
     sp<PersistentSurface> persistentSurface = CreateCompatibleInputSurface();
+    sp<hidl::base::V1_0::IBase> hidlTarget = persistentSurface->getHidlTarget();
+    sp<IInputSurface> hidlInputSurface = IInputSurface::castFrom(hidlTarget);
+    sp<HGraphicBufferSource> gbs = HGraphicBufferSource::castFrom(hidlTarget);
 
-    if (persistentSurface->getHidlTarget()) {
-        sp<IInputSurface> hidlInputSurface = IInputSurface::castFrom(
-                persistentSurface->getHidlTarget());
-        if (!hidlInputSurface) {
-            ALOGE("Corrupted input surface");
-            mCallback->onInputSurfaceCreationFailed(UNKNOWN_ERROR);
-            return;
-        }
+    if (hidlInputSurface) {
         std::shared_ptr<Codec2Client::InputSurface> inputSurface =
                 std::make_shared<Codec2Client::InputSurface>(hidlInputSurface);
         err = setupInputSurface(std::make_shared<C2InputSurfaceWrapper>(
                 inputSurface));
         bufferProducer = inputSurface->getGraphicBufferProducer();
-    } else {
+    } else if (gbs) {
         int32_t width = 0;
         (void)outputFormat->findInt32("width", &width);
         int32_t height = 0;
         (void)outputFormat->findInt32("height", &height);
         err = setupInputSurface(std::make_shared<GraphicBufferSourceWrapper>(
-                persistentSurface->getBufferSource(), width, height, usage));
+                gbs, width, height, usage));
         bufferProducer = persistentSurface->getBufferProducer();
+    } else {
+        ALOGE("Corrupted input surface");
+        mCallback->onInputSurfaceCreationFailed(UNKNOWN_ERROR);
+        return;
     }
 
     if (err != OK) {
@@ -1162,12 +1193,13 @@ void CCodec::createInputSurface() {
 }
 
 status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &surface) {
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
     config->mUsingSurface = true;
 
     // we are now using surface - apply default color aspects to input format - as well as
     // get dataspace
-    bool inputFormatChanged = config->updateFormats(config->IS_INPUT);
+    bool inputFormatChanged = config->updateFormats(Config::IS_INPUT);
     ALOGD("input format %s to %s",
             inputFormatChanged ? "changed" : "unchanged",
             config->mInputFormat->debugString().c_str());
@@ -1182,7 +1214,7 @@ status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &s
     if (err != OK) {
         // undo input format update
         config->mUsingSurface = false;
-        (void)config->updateFormats(config->IS_INPUT);
+        (void)config->updateFormats(Config::IS_INPUT);
         return err;
     }
     config->mInputSurface = surface;
@@ -1207,20 +1239,16 @@ void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
     sp<AMessage> outputFormat;
     uint64_t usage = 0;
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
         outputFormat = config->mOutputFormat;
         usage = config->mISConfig ? config->mISConfig->mUsage : 0;
     }
-    auto hidlTarget = surface->getHidlTarget();
-    if (hidlTarget) {
-        sp<IInputSurface> inputSurface =
-                IInputSurface::castFrom(hidlTarget);
-        if (!inputSurface) {
-            ALOGE("Failed to set input surface: Corrupted surface.");
-            mCallback->onInputSurfaceDeclined(UNKNOWN_ERROR);
-            return;
-        }
+    sp<hidl::base::V1_0::IBase> hidlTarget = surface->getHidlTarget();
+    sp<IInputSurface> inputSurface = IInputSurface::castFrom(hidlTarget);
+    sp<HGraphicBufferSource> gbs = HGraphicBufferSource::castFrom(hidlTarget);
+    if (inputSurface) {
         status_t err = setupInputSurface(std::make_shared<C2InputSurfaceWrapper>(
                 std::make_shared<Codec2Client::InputSurface>(inputSurface)));
         if (err != OK) {
@@ -1228,18 +1256,22 @@ void CCodec::setInputSurface(const sp<PersistentSurface> &surface) {
             mCallback->onInputSurfaceDeclined(err);
             return;
         }
-    } else {
+    } else if (gbs) {
         int32_t width = 0;
         (void)outputFormat->findInt32("width", &width);
         int32_t height = 0;
         (void)outputFormat->findInt32("height", &height);
         status_t err = setupInputSurface(std::make_shared<GraphicBufferSourceWrapper>(
-                surface->getBufferSource(), width, height, usage));
+                gbs, width, height, usage));
         if (err != OK) {
             ALOGE("Failed to set up input surface: %d", err);
             mCallback->onInputSurfaceDeclined(err);
             return;
         }
+    } else {
+        ALOGE("Failed to set input surface: Corrupted surface.");
+        mCallback->onInputSurfaceDeclined(UNKNOWN_ERROR);
+        return;
     }
     mCallback->onInputSurfaceAccepted(inputFormat, outputFormat);
 }
@@ -1283,14 +1315,17 @@ void CCodec::start() {
     sp<AMessage> inputFormat;
     sp<AMessage> outputFormat;
     status_t err2 = OK;
+    bool buffersBoundToCodec = false;
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         inputFormat = config->mInputFormat;
         // start triggers format dup
         outputFormat = config->mOutputFormat = config->mOutputFormat->dup();
         if (config->mInputSurface) {
             err2 = config->mInputSurface->start();
         }
+        buffersBoundToCodec = config->mBuffersBoundToCodec;
     }
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
@@ -1298,7 +1333,7 @@ void CCodec::start() {
     }
     // We're not starting after flush.
     (void)mSentConfigAfterResume.test_and_set();
-    err2 = mChannel->start(inputFormat, outputFormat);
+    err2 = mChannel->start(inputFormat, outputFormat, buffersBoundToCodec);
     if (err2 != OK) {
         mCallback->onError(err2, ACTION_CODE_FATAL);
         return;
@@ -1344,7 +1379,7 @@ void CCodec::initiateStop() {
         state->set(STOPPING);
     }
 
-    mChannel->stop();
+    mChannel->reset();
     (new AMessage(kWhatStop, this))->post();
 }
 
@@ -1373,7 +1408,8 @@ void CCodec::stop() {
     }
 
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         if (config->mInputSurface) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
@@ -1421,14 +1457,15 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
     }
 
     if (clearInputSurfaceIfNeeded) {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         if (config->mInputSurface) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
         }
     }
 
-    mChannel->stop();
+    mChannel->reset();
     // thiz holds strong ref to this while the thread is running.
     sp<CCodec> thiz(this);
     std::thread([thiz, sendCallback] { thiz->release(sendCallback); }).detach();
@@ -1455,6 +1492,7 @@ void CCodec::release(bool sendCallback) {
         state->set(RELEASED);
         state->comp.reset();
     }
+    (new AMessage(kWhatRelease, this))->post();
     if (sendCallback) {
         mCallback->onReleaseCompleted();
     }
@@ -1520,7 +1558,9 @@ void CCodec::flush() {
 
     {
         Mutexed<State>::Locked state(mState);
-        state->set(FLUSHED);
+        if (state->get() == FLUSHING) {
+            state->set(FLUSHED);
+        }
     }
     mCallback->onFlushCompleted();
 }
@@ -1542,11 +1582,16 @@ void CCodec::signalResume() {
 
     mSentConfigAfterResume.clear();
     {
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         config->queryConfiguration(comp);
     }
 
-    (void)mChannel->start(nullptr, nullptr);
+    (void)mChannel->start(nullptr, nullptr, [&]{
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
+        return config->mBuffersBoundToCodec;
+    }());
 
     {
         Mutexed<State>::Locked state(mState);
@@ -1585,13 +1630,15 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
         params->removeEntryAt(params->findEntryByName(KEY_BIT_RATE));
     }
 
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
 
     /**
      * Handle input surface parameters
      */
     if ((config->mDomain & (Config::IS_VIDEO | Config::IS_IMAGE))
-            && (config->mDomain & Config::IS_ENCODER) && config->mInputSurface && config->mISConfig) {
+            && (config->mDomain & Config::IS_ENCODER)
+            && config->mInputSurface && config->mISConfig) {
         (void)params->findInt64(PARAMETER_KEY_OFFSET_TIME, &config->mISConfig->mTimeOffsetUs);
 
         if (params->findInt64("skip-frames-before", &config->mISConfig->mStartAtUs)) {
@@ -1644,7 +1691,8 @@ void CCodec::signalRequestIDRFrame() {
         comp = state->comp;
     }
     ALOGV("request IDR");
-    Mutexed<Config>::Locked config(mConfig);
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
     std::vector<std::unique_ptr<C2Param>> params;
     params.push_back(
             std::make_unique<C2StreamRequestSyncFrameTuning::output>(0u, true));
@@ -1663,7 +1711,8 @@ void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {
     mChannel->onInputBufferDone(frameIndex, arrayIndex);
     if (arrayIndex == 0) {
         // We always put no more than one buffer per work, if we use an input surface.
-        Mutexed<Config>::Locked config(mConfig);
+        Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+        const std::unique_ptr<Config> &config = *configLocked;
         if (config->mInputSurface) {
             config->mInputSurface->onInputBufferDone(frameIndex);
         }
@@ -1708,6 +1757,12 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             flush();
             break;
         }
+        case kWhatRelease: {
+            mChannel->release();
+            mClient.reset();
+            mClientListener.reset();
+            break;
+        }
         case kWhatCreateInputSurface: {
             // Surface operations may be briefly blocking.
             setDeadline(now, 1500ms, "createInputSurface");
@@ -1740,7 +1795,8 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             // handle configuration changes in work done
-            Mutexed<Config>::Locked config(mConfig);
+            Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+            const std::unique_ptr<Config> &config = *configLocked;
             bool changed = !mSentConfigAfterResume.test_and_set();
             Config::Watcher<C2StreamInitDataInfo::output> initData =
                 config->watch<C2StreamInitDataInfo::output>();
@@ -1812,7 +1868,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
             }
             mChannel->onWorkDone(
-                    std::move(work), changed ? config->mOutputFormat : nullptr,
+                    std::move(work), changed ? config->mOutputFormat->dup() : nullptr,
                     initData.hasChanged() ? initData.update().get() : nullptr);
             break;
         }
@@ -1874,15 +1930,10 @@ void CCodec::initiateReleaseIfStuck() {
     mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
 }
 
-}  // namespace android
-
-extern "C" android::CodecBase *CreateCodec() {
-    return new android::CCodec;
-}
-
-// Create Codec 2.0 input surface
-extern "C" android::PersistentSurface *CreateInputSurface() {
+// static
+PersistentSurface *CCodec::CreateInputSurface() {
     using namespace android;
+    using ::android::hardware::media::omx::V1_0::implementation::TWGraphicBufferSource;
     // Attempt to create a Codec2's input surface.
     std::shared_ptr<Codec2Client::InputSurface> inputSurface =
             Codec2Client::CreateInputSurface();
@@ -1896,9 +1947,7 @@ extern "C" android::PersistentSurface *CreateInputSurface() {
                 return nullptr;
             }
             return new PersistentSurface(
-                    gbs->getIGraphicBufferProducer(),
-                    sp<IGraphicBufferSource>(
-                        new Omx2IGraphicBufferSource(gbs)));
+                    gbs->getIGraphicBufferProducer(), new TWGraphicBufferSource(gbs));
         } else {
             return nullptr;
         }
@@ -1908,4 +1957,341 @@ extern "C" android::PersistentSurface *CreateInputSurface() {
             static_cast<sp<android::hidl::base::V1_0::IBase>>(
             inputSurface->getHalInterface()));
 }
+
+class IntfCache {
+public:
+    IntfCache() = default;
+
+    status_t init(const std::string &name) {
+        std::shared_ptr<Codec2Client::Interface> intf{
+            Codec2Client::CreateInterfaceByName(name.c_str())};
+        if (!intf) {
+            ALOGW("IntfCache [%s]: Unrecognized interface name", name.c_str());
+            mInitStatus = NO_INIT;
+            return NO_INIT;
+        }
+        const static C2StreamUsageTuning::input sUsage{0u /* stream id */};
+        mFields.push_back(C2FieldSupportedValuesQuery::Possible(
+                C2ParamField{&sUsage, &sUsage.value}));
+        c2_status_t err = intf->querySupportedValues(mFields, C2_MAY_BLOCK);
+        if (err != C2_OK) {
+            ALOGW("IntfCache [%s]: failed to query usage supported value (err=%d)",
+                    name.c_str(), err);
+            mFields[0].status = err;
+        }
+        std::vector<std::unique_ptr<C2Param>> params;
+        err = intf->query(
+                {&mApiFeatures},
+                {C2PortAllocatorsTuning::input::PARAM_TYPE},
+                C2_MAY_BLOCK,
+                &params);
+        if (err != C2_OK && err != C2_BAD_INDEX) {
+            ALOGW("IntfCache [%s]: failed to query api features (err=%d)",
+                    name.c_str(), err);
+        }
+        while (!params.empty()) {
+            C2Param *param = params.back().release();
+            params.pop_back();
+            if (!param) {
+                continue;
+            }
+            if (param->type() == C2PortAllocatorsTuning::input::PARAM_TYPE) {
+                mInputAllocators.reset(
+                        C2PortAllocatorsTuning::input::From(params[0].get()));
+            }
+        }
+        mInitStatus = OK;
+        return OK;
+    }
+
+    status_t initCheck() const { return mInitStatus; }
+
+    const C2FieldSupportedValuesQuery &getUsageSupportedValues() const {
+        CHECK_EQ(1u, mFields.size());
+        return mFields[0];
+    }
+
+    const C2ApiFeaturesSetting &getApiFeatures() const {
+        return mApiFeatures;
+    }
+
+    const C2PortAllocatorsTuning::input &getInputAllocators() const {
+        static std::unique_ptr<C2PortAllocatorsTuning::input> sInvalidated = []{
+            std::unique_ptr<C2PortAllocatorsTuning::input> param =
+                C2PortAllocatorsTuning::input::AllocUnique(0);
+            param->invalidate();
+            return param;
+        }();
+        return mInputAllocators ? *mInputAllocators : *sInvalidated;
+    }
+
+private:
+    status_t mInitStatus{NO_INIT};
+
+    std::vector<C2FieldSupportedValuesQuery> mFields;
+    C2ApiFeaturesSetting mApiFeatures;
+    std::unique_ptr<C2PortAllocatorsTuning::input> mInputAllocators;
+};
+
+static const IntfCache &GetIntfCache(const std::string &name) {
+    static IntfCache sNullIntfCache;
+    static std::mutex sMutex;
+    static std::map<std::string, IntfCache> sCache;
+    std::unique_lock<std::mutex> lock{sMutex};
+    auto it = sCache.find(name);
+    if (it == sCache.end()) {
+        lock.unlock();
+        IntfCache intfCache;
+        status_t err = intfCache.init(name);
+        if (err != OK) {
+            return sNullIntfCache;
+        }
+        lock.lock();
+        it = sCache.insert({name, std::move(intfCache)}).first;
+    }
+    return it->second;
+}
+
+static status_t GetCommonAllocatorIds(
+        const std::vector<std::string> &names,
+        C2Allocator::type_t type,
+        std::set<C2Allocator::id_t> *ids) {
+    int poolMask = GetCodec2PoolMask();
+    C2PlatformAllocatorStore::id_t preferredLinearId = GetPreferredLinearAllocatorId(poolMask);
+    C2Allocator::id_t defaultAllocatorId =
+        (type == C2Allocator::LINEAR) ? preferredLinearId : C2PlatformAllocatorStore::GRALLOC;
+
+    ids->clear();
+    if (names.empty()) {
+        return OK;
+    }
+    bool firstIteration = true;
+    for (const std::string &name : names) {
+        const IntfCache &intfCache = GetIntfCache(name);
+        if (intfCache.initCheck() != OK) {
+            continue;
+        }
+        const C2PortAllocatorsTuning::input &allocators = intfCache.getInputAllocators();
+        if (firstIteration) {
+            firstIteration = false;
+            if (allocators && allocators.flexCount() > 0) {
+                ids->insert(allocators.m.values,
+                            allocators.m.values + allocators.flexCount());
+            }
+            if (ids->empty()) {
+                // The component does not advertise allocators. Use default.
+                ids->insert(defaultAllocatorId);
+            }
+            continue;
+        }
+        bool filtered = false;
+        if (allocators && allocators.flexCount() > 0) {
+            filtered = true;
+            for (auto it = ids->begin(); it != ids->end(); ) {
+                bool found = false;
+                for (size_t j = 0; j < allocators.flexCount(); ++j) {
+                    if (allocators.m.values[j] == *it) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (found) {
+                    ++it;
+                } else {
+                    it = ids->erase(it);
+                }
+            }
+        }
+        if (!filtered) {
+            // The component does not advertise supported allocators. Use default.
+            bool containsDefault = (ids->count(defaultAllocatorId) > 0u);
+            if (ids->size() != (containsDefault ? 1 : 0)) {
+                ids->clear();
+                if (containsDefault) {
+                    ids->insert(defaultAllocatorId);
+                }
+            }
+        }
+    }
+    // Finally, filter with pool masks
+    for (auto it = ids->begin(); it != ids->end(); ) {
+        if ((poolMask >> *it) & 1) {
+            ++it;
+        } else {
+            it = ids->erase(it);
+        }
+    }
+    return OK;
+}
+
+static status_t CalculateMinMaxUsage(
+        const std::vector<std::string> &names, uint64_t *minUsage, uint64_t *maxUsage) {
+    static C2StreamUsageTuning::input sUsage{0u /* stream id */};
+    *minUsage = 0;
+    *maxUsage = ~0ull;
+    for (const std::string &name : names) {
+        const IntfCache &intfCache = GetIntfCache(name);
+        if (intfCache.initCheck() != OK) {
+            continue;
+        }
+        const C2FieldSupportedValuesQuery &usageSupportedValues =
+            intfCache.getUsageSupportedValues();
+        if (usageSupportedValues.status != C2_OK) {
+            continue;
+        }
+        const C2FieldSupportedValues &supported = usageSupportedValues.values;
+        if (supported.type != C2FieldSupportedValues::FLAGS) {
+            continue;
+        }
+        if (supported.values.empty()) {
+            *maxUsage = 0;
+            continue;
+        }
+        *minUsage |= supported.values[0].u64;
+        int64_t currentMaxUsage = 0;
+        for (const C2Value::Primitive &flags : supported.values) {
+            currentMaxUsage |= flags.u64;
+        }
+        *maxUsage &= currentMaxUsage;
+    }
+    return OK;
+}
+
+// static
+status_t CCodec::CanFetchLinearBlock(
+        const std::vector<std::string> &names, const C2MemoryUsage &usage, bool *isCompatible) {
+    for (const std::string &name : names) {
+        const IntfCache &intfCache = GetIntfCache(name);
+        if (intfCache.initCheck() != OK) {
+            continue;
+        }
+        const C2ApiFeaturesSetting &features = intfCache.getApiFeatures();
+        if (features && !(features.value & API_SAME_INPUT_BUFFER)) {
+            *isCompatible = false;
+            return OK;
+        }
+    }
+    uint64_t minUsage = usage.expected;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
+    if (allocators.empty()) {
+        *isCompatible = false;
+        return OK;
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    *isCompatible = ((maxUsage & minUsage) == minUsage);
+    return OK;
+}
+
+static std::shared_ptr<C2BlockPool> GetPool(C2Allocator::id_t allocId) {
+    static std::mutex sMutex{};
+    static std::map<C2Allocator::id_t, std::shared_ptr<C2BlockPool>> sPools;
+    std::unique_lock<std::mutex> lock{sMutex};
+    std::shared_ptr<C2BlockPool> pool;
+    auto it = sPools.find(allocId);
+    if (it == sPools.end()) {
+        c2_status_t err = CreateCodec2BlockPool(allocId, nullptr, &pool);
+        if (err == OK) {
+            sPools.emplace(allocId, pool);
+        } else {
+            pool.reset();
+        }
+    } else {
+        pool = it->second;
+    }
+    return pool;
+}
+
+// static
+std::shared_ptr<C2LinearBlock> CCodec::FetchLinearBlock(
+        size_t capacity, const C2MemoryUsage &usage, const std::vector<std::string> &names) {
+    uint64_t minUsage = usage.expected;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
+    if (allocators.empty()) {
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    if ((maxUsage & minUsage) != minUsage) {
+        allocators.clear();
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
+    }
+    std::shared_ptr<C2LinearBlock> block;
+    for (C2Allocator::id_t allocId : allocators) {
+        std::shared_ptr<C2BlockPool> pool = GetPool(allocId);
+        if (!pool) {
+            continue;
+        }
+        c2_status_t err = pool->fetchLinearBlock(capacity, C2MemoryUsage{minUsage}, &block);
+        if (err != C2_OK || !block) {
+            block.reset();
+            continue;
+        }
+        break;
+    }
+    return block;
+}
+
+// static
+status_t CCodec::CanFetchGraphicBlock(
+        const std::vector<std::string> &names, bool *isCompatible) {
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::GRAPHIC, &allocators);
+    if (allocators.empty()) {
+        *isCompatible = false;
+        return OK;
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    *isCompatible = ((maxUsage & minUsage) == minUsage);
+    return OK;
+}
+
+// static
+std::shared_ptr<C2GraphicBlock> CCodec::FetchGraphicBlock(
+        int32_t width,
+        int32_t height,
+        int32_t format,
+        uint64_t usage,
+        const std::vector<std::string> &names) {
+    uint32_t halPixelFormat = HAL_PIXEL_FORMAT_YCBCR_420_888;
+    if (!C2Mapper::mapPixelFormatFrameworkToCodec(format, &halPixelFormat)) {
+        ALOGD("Unrecognized pixel format: %d", format);
+        return nullptr;
+    }
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
+    std::set<C2Allocator::id_t> allocators;
+    GetCommonAllocatorIds(names, C2Allocator::GRAPHIC, &allocators);
+    if (allocators.empty()) {
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_GRAPHIC);
+    }
+    CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    minUsage |= usage;
+    if ((maxUsage & minUsage) != minUsage) {
+        allocators.clear();
+        allocators.insert(C2PlatformAllocatorStore::DEFAULT_GRAPHIC);
+    }
+    std::shared_ptr<C2GraphicBlock> block;
+    for (C2Allocator::id_t allocId : allocators) {
+        std::shared_ptr<C2BlockPool> pool;
+        c2_status_t err = CreateCodec2BlockPool(allocId, nullptr, &pool);
+        if (err != C2_OK || !pool) {
+            continue;
+        }
+        err = pool->fetchGraphicBlock(
+                width, height, halPixelFormat, C2MemoryUsage{minUsage}, &block);
+        if (err != C2_OK || !block) {
+            block.reset();
+            continue;
+        }
+        break;
+    }
+    return block;
+}
+
+}  // namespace android
 

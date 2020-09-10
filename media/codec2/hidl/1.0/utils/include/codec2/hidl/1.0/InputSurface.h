@@ -57,29 +57,25 @@ struct InputSurface : public IInputSurface {
             const sp<IInputSink>& sink,
             connect_cb _hidl_cb) override;
 
+    InputSurface(
+            const std::shared_ptr<ParameterCache>& cache,
+            const std::shared_ptr<C2ReflectorHelper>& reflector,
+            const sp<HGraphicBufferProducer>& base,
+            const sp<GraphicBufferSource>& source);
+
 protected:
 
     class Interface;
     class ConfigurableIntf;
 
-    sp<ComponentStore> mStore;
+    std::shared_ptr<ParameterCache> mParameterCache;
     sp<HGraphicBufferProducer> mProducer;
     sp<GraphicBufferSource> mSource;
     std::shared_ptr<Interface> mIntf;
     sp<CachedConfigurable> mConfigurable;
 
-    InputSurface(
-            const sp<ComponentStore>& store,
-            const std::shared_ptr<C2ReflectorHelper>& reflector,
-            const sp<HGraphicBufferProducer>& base,
-            const sp<GraphicBufferSource>& source);
-
     virtual ~InputSurface() override = default;
-
-    friend struct ComponentStore;
-
 };
-
 
 }  // namespace utils
 }  // namespace V1_0

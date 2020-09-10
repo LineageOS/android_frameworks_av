@@ -66,7 +66,7 @@ FrameProcessor::~FrameProcessor() {
 }
 
 bool FrameProcessor::processSingleFrame(CaptureResult &frame,
-                                        const sp<CameraDeviceBase> &device) {
+                                        const sp<FrameProducer> &device) {
 
     sp<Camera2Client> client = mClient.promote();
     if (!client.get()) {
@@ -84,6 +84,12 @@ bool FrameProcessor::processSingleFrame(CaptureResult &frame,
 
     if (mSynthesize3ANotify) {
         process3aState(frame, client);
+    }
+
+    if (mCurrentRequestId != frame.mResultExtras.requestId) {
+        mCurrentRequestId = frame.mResultExtras.requestId;
+
+        client->notifyRequestId(mCurrentRequestId);
     }
 
     return FrameProcessorBase::processSingleFrame(frame, device);

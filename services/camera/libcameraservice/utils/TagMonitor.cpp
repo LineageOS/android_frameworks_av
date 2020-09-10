@@ -33,6 +33,16 @@ TagMonitor::TagMonitor():
         mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID)
 {}
 
+TagMonitor::TagMonitor(const TagMonitor& other):
+        mMonitoringEnabled(other.mMonitoringEnabled.load()),
+        mMonitoredTagList(other.mMonitoredTagList),
+        mLastMonitoredRequestValues(other.mLastMonitoredRequestValues),
+        mLastMonitoredResultValues(other.mLastMonitoredResultValues),
+        mLastMonitoredPhysicalRequestKeys(other.mLastMonitoredPhysicalRequestKeys),
+        mLastMonitoredPhysicalResultKeys(other.mLastMonitoredPhysicalResultKeys),
+        mMonitoringEvents(other.mMonitoringEvents),
+        mVendorTagId(other.mVendorTagId) {}
+
 const String16 TagMonitor::kMonitorOption = String16("-m");
 
 const char* TagMonitor::k3aTags =

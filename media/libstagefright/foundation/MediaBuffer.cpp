@@ -72,7 +72,7 @@ MediaBuffer::MediaBuffer(size_t size)
             }
         } else {
             getSharedControl()->clear();
-            mData = (uint8_t *)mMemory->pointer() + sizeof(SharedControl);
+            mData = (uint8_t *)mMemory->unsecurePointer() + sizeof(SharedControl);
             ALOGV("Allocated shared mem buffer of size %zu @ %p", size, mData);
         }
     }

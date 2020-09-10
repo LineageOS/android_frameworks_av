@@ -24,6 +24,7 @@
 #include <binder/ProcessState.h>
 #include <datasource/FileSource.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <media/MediaExtractorPluginHelper.h>
 
 #define MAXPATHLEN 256
 
@@ -72,7 +73,8 @@ void scanFile(const char *path) {
     sp<FileSource> file = new FileSource(path);
     CHECK_EQ(file->initCheck(), (status_t)OK);
 
-    ID3 tag(file.get());
+    DataSourceHelper helper(file->wrap());
+    ID3 tag(&helper);
     if (!tag.isValid()) {
         printf("FAIL %s\n", path);
     } else {

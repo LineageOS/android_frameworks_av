@@ -19,6 +19,7 @@
 
 #include <android/frameworks/cameraservice/common/2.0/types.h>
 #include <android/frameworks/cameraservice/service/2.0/ICameraServiceListener.h>
+#include <android/frameworks/cameraservice/service/2.1/ICameraServiceListener.h>
 #include <android/frameworks/cameraservice/device/2.0/types.h>
 #include <android/hardware/BnCameraServiceListener.h>
 #include <android/hardware/BpCameraServiceListener.h>
@@ -46,10 +47,13 @@ struct H2BCameraServiceListener :
     ~H2BCameraServiceListener() { }
 
     virtual ::android::binder::Status onStatusChanged(int32_t status,
-                                                      const ::android::String16& cameraId) override;
+            const ::android::String16& cameraId) override;
+    virtual ::android::binder::Status onPhysicalCameraStatusChanged(int32_t status,
+            const ::android::String16& cameraId,
+            const ::android::String16& physicalCameraId) override;
 
     virtual ::android::binder::Status onTorchStatusChanged(
-        int32_t status, const ::android::String16& cameraId) override;
+            int32_t status, const ::android::String16& cameraId) override;
     virtual binder::Status onCameraAccessPrioritiesChanged() {
         // TODO: no implementation yet.
         return binder::Status::ok();
