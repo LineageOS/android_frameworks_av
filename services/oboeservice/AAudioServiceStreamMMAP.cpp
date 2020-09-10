@@ -49,16 +49,6 @@ AAudioServiceStreamMMAP::AAudioServiceStreamMMAP(android::AAudioService &aAudioS
         , mInService(inService) {
 }
 
-aaudio_result_t AAudioServiceStreamMMAP::close() {
-    if (getState() == AAUDIO_STREAM_STATE_CLOSED) {
-        return AAUDIO_OK;
-    }
-
-    stop();
-
-    return AAudioServiceStreamBase::close();
-}
-
 // Open stream on HAL and pass information about the shared memory buffer back to the client.
 aaudio_result_t AAudioServiceStreamMMAP::open(const aaudio::AAudioStreamRequest &request) {
 
@@ -96,17 +86,17 @@ aaudio_result_t AAudioServiceStreamMMAP::startDevice() {
     aaudio_result_t result = AAudioServiceStreamBase::startDevice();
     if (!mInService && result == AAUDIO_OK) {
         // Note that this can sometimes take 200 to 300 msec for a cold start!
-        result = startClient(mMmapClient, &mClientHandle);
+        result = startClient(mMmapClient, nullptr /*const audio_attributes_t* */, &mClientHandle);
     }
     return result;
 }
 
 // Stop the flow of data such that start() can resume with loss of data.
-aaudio_result_t AAudioServiceStreamMMAP::pause() {
+aaudio_result_t AAudioServiceStreamMMAP::pause_l() {
     if (!isRunning()) {
         return AAUDIO_OK;
     }
-    aaudio_result_t result = AAudioServiceStreamBase::pause();
+    aaudio_result_t result = AAudioServiceStreamBase::pause_l();
     // TODO put before base::pause()?
     if (!mInService) {
         (void) stopClient(mClientHandle);
@@ -114,11 +104,11 @@ aaudio_result_t AAudioServiceStreamMMAP::pause() {
     return result;
 }
 
-aaudio_result_t AAudioServiceStreamMMAP::stop() {
+aaudio_result_t AAudioServiceStreamMMAP::stop_l() {
     if (!isRunning()) {
         return AAUDIO_OK;
     }
-    aaudio_result_t result = AAudioServiceStreamBase::stop();
+    aaudio_result_t result = AAudioServiceStreamBase::stop_l();
     // TODO put before base::stop()?
     if (!mInService) {
         (void) stopClient(mClientHandle);
@@ -127,14 +117,15 @@ aaudio_result_t AAudioServiceStreamMMAP::stop() {
 }
 
 aaudio_result_t AAudioServiceStreamMMAP::startClient(const android::AudioClient& client,
-                                                       audio_port_handle_t *clientHandle) {
+                                                     const audio_attributes_t *attr,
+                                                     audio_port_handle_t *clientHandle) {
     sp<AAudioServiceEndpoint> endpoint = mServiceEndpointWeak.promote();
     if (endpoint == nullptr) {
         ALOGE("%s() has no endpoint", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
     // Start the client on behalf of the application. Generate a new porthandle.
-    aaudio_result_t result = endpoint->startClient(client, clientHandle);
+    aaudio_result_t result = endpoint->startClient(client, attr, clientHandle);
     return result;
 }
 

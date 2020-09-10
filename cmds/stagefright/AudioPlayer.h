@@ -18,14 +18,14 @@
 
 #define AUDIO_PLAYER_H_
 
-#include <media/MediaSource.h>
+#include <media/AudioResamplerPublic.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/MediaPlayerInterface.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <utils/threads.h>
 
 namespace android {
 
-struct AudioPlaybackRate;
 class AudioTrack;
 struct AwesomePlayer;
 

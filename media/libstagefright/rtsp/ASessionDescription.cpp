@@ -141,6 +141,12 @@ bool ASessionDescription::parse(const void *data, size_t size) {
                 AString key, value;
 
                 ssize_t equalPos = line.find("=");
+                /* The condition 'if (line.size() < 2 || line.c_str()[1] != '=')' a few lines above
+                 * ensures '=' is at position 1.  However for robustness we do the following check.
+                 */
+                if (equalPos < 0) {
+                    return false;
+                }
 
                 key = AString(line, 0, equalPos + 1);
                 value = AString(line, equalPos + 1, line.size() - equalPos - 1);

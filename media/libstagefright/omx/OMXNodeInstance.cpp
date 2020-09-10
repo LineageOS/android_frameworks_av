@@ -47,6 +47,8 @@
 
 #include <hidlmemory/mapping.h>
 
+#include <vector>
+
 static const OMX_U32 kPortIndexInput = 0;
 static const OMX_U32 kPortIndexOutput = 1;
 
@@ -128,7 +130,7 @@ struct BufferMeta {
     }
 
     OMX_U8 *getPointer() {
-        return mMem.get() ? static_cast<OMX_U8*>(mMem->pointer()) :
+        return mMem.get() ? static_cast<OMX_U8*>(mMem->unsecurePointer()) :
                 mHidlMemory.get() ? static_cast<OMX_U8*>(
                 static_cast<void*>(mHidlMemory->getPointer())) : nullptr;
     }
@@ -209,6 +211,80 @@ static inline const char *portString(OMX_U32 portIndex) {
         case kPortIndexOutput: return "Output";
         case ~0U:              return "All";
         default:               return "port";
+    }
+}
+
+template <typename T>
+inline static T *asSetting(void *setting /* nonnull */, size_t size) {
+    // no need to check internally stored size as that is outside of sanitizing
+    // the underlying buffer's size is the one passed into this method.
+    if (size < sizeof(T)) {
+        return nullptr;
+    }
+
+    return (T *)setting;
+}
+
+inline static void sanitize(OMX_CONFIG_CONTAINERNODEIDTYPE *s) {
+    s->cNodeName = 0;
+}
+
+inline static void sanitize(OMX_CONFIG_METADATAITEMTYPE *s) {
+    s->sLanguageCountry = 0;
+}
+
+inline static void sanitize(OMX_PARAM_PORTDEFINITIONTYPE *s) {
+    switch (s->eDomain) {
+    case OMX_PortDomainAudio:
+        s->format.audio.cMIMEType = 0;
+        break;
+    case OMX_PortDomainVideo:
+        s->format.video.cMIMEType = 0;
+        break;
+    case OMX_PortDomainImage:
+        s->format.image.cMIMEType = 0;
+        break;
+    default:
+        break;
+    }
+}
+
+template <typename T>
+static bool sanitizeAs(void *setting, size_t size) {
+    T *s = asSetting<T>(setting, size);
+    if (s) {
+        sanitize(s);
+        return true;
+    }
+    return false;
+}
+
+static void sanitizeSetting(OMX_INDEXTYPE index, void *setting, size_t size) {
+    if (size < 8 || setting == nullptr) {
+        return;
+    }
+
+    bool ok = true;
+
+    // there are 3 standard OMX settings that contain pointer members
+    switch ((OMX_U32)index) {
+    case OMX_IndexConfigCounterNodeID:
+        ok = sanitizeAs<OMX_CONFIG_CONTAINERNODEIDTYPE>(setting, size);
+        break;
+    case OMX_IndexConfigMetadataItem:
+        ok = sanitizeAs<OMX_CONFIG_METADATAITEMTYPE>(setting, size);
+        break;
+    case OMX_IndexParamPortDefinition:
+        ok = sanitizeAs<OMX_PARAM_PORTDEFINITIONTYPE>(setting, size);
+        break;
+    }
+
+    if (!ok) {
+        // cannot effectively sanitize - we should not be here as IOMX.cpp
+        // should guard against size being too small. Nonetheless, log and
+        // clear result.
+        android_errorWriteLog(0x534e4554, "120781925");
+        memset(setting, 0, size);
     }
 }
 
@@ -492,6 +568,10 @@ status_t OMXNodeInstance::freeNode() {
         }
 
         case OMX_StateLoaded:
+        {
+            freeActiveBuffers();
+            FALLTHROUGH_INTENDED;
+        }
         case OMX_StateInvalid:
             break;
 
@@ -602,7 +682,7 @@ bool OMXNodeInstance::isProhibitedIndex_l(OMX_INDEXTYPE index) {
 }
 
 status_t OMXNodeInstance::getParameter(
-        OMX_INDEXTYPE index, void *params, size_t /* size */) {
+        OMX_INDEXTYPE index, void *params, size_t size) {
     Mutex::Autolock autoLock(mLock);
     if (mHandle == NULL) {
         return DEAD_OBJECT;
@@ -619,6 +699,7 @@ status_t OMXNodeInstance::getParameter(
     if (err != OMX_ErrorNoMore) {
         CLOG_IF_ERROR(getParameter, err, "%s(%#x)", asString(extIndex), index);
     }
+    sanitizeSetting(index, params, size);
     return StatusFromOMXError(err);
 }
 
@@ -644,11 +725,12 @@ status_t OMXNodeInstance::setParameter(
     OMX_ERRORTYPE err = OMX_SetParameter(
             mHandle, index, const_cast<void *>(params));
     CLOG_IF_ERROR(setParameter, err, "%s(%#x)", asString(extIndex), index);
+    sanitizeSetting(index, const_cast<void *>(params), size);
     return StatusFromOMXError(err);
 }
 
 status_t OMXNodeInstance::getConfig(
-        OMX_INDEXTYPE index, void *params, size_t /* size */) {
+        OMX_INDEXTYPE index, void *params, size_t size) {
     Mutex::Autolock autoLock(mLock);
     if (mHandle == NULL) {
         return DEAD_OBJECT;
@@ -665,6 +747,8 @@ status_t OMXNodeInstance::getConfig(
     if (err != OMX_ErrorNoMore) {
         CLOG_IF_ERROR(getConfig, err, "%s(%#x)", asString(extIndex), index);
     }
+
+    sanitizeSetting(index, params, size);
     return StatusFromOMXError(err);
 }
 
@@ -686,6 +770,7 @@ status_t OMXNodeInstance::setConfig(
     OMX_ERRORTYPE err = OMX_SetConfig(
             mHandle, index, const_cast<void *>(params));
     CLOG_IF_ERROR(setConfig, err, "%s(%#x)", asString(extIndex), index);
+    sanitizeSetting(index, const_cast<void *>(params), size);
     return StatusFromOMXError(err);
 }
 
@@ -1173,7 +1258,11 @@ status_t OMXNodeInstance::useBuffer_l(
         return BAD_VALUE;
     }
     if (params != NULL) {
-        paramsPointer = params->pointer();
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        paramsPointer = params->unsecurePointer();
         paramsSize = params->size();
     } else if (hParams != NULL) {
         paramsPointer = hParams->getPointer();
@@ -2420,11 +2509,19 @@ void OMXNodeInstance::removeActiveBuffer(
 }
 
 void OMXNodeInstance::freeActiveBuffers() {
-    // Make sure to count down here, as freeBuffer will in turn remove
-    // the active buffer from the vector...
-    for (size_t i = mActiveBuffers.size(); i > 0;) {
-        i--;
-        freeBuffer(mActiveBuffers[i].mPortIndex, mActiveBuffers[i].mID);
+    std::vector<OMX_U32> portIndices;
+    std::vector<IOMX::buffer_id> bufferIds;
+    {
+        // Access to mActiveBuffers must be protected by mLock.
+        Mutex::Autolock _l(mLock);
+        for (const ActiveBuffer& activeBuffer : mActiveBuffers) {
+            portIndices.emplace_back(activeBuffer.mPortIndex);
+            bufferIds.emplace_back(activeBuffer.mID);
+        }
+    }
+    for (size_t i = bufferIds.size(); i > 0; ) {
+        --i;
+        freeBuffer(portIndices[i], bufferIds[i]);
     }
 }
 

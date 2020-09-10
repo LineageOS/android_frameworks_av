@@ -18,6 +18,9 @@
 #define ANDROID_AAUDIO_ISOCHRONOUS_CLOCK_MODEL_H
 
 #include <stdint.h>
+
+#include <audio_utils/Histogram.h>
+
 #include "utility/AudioClock.h"
 
 namespace aaudio {
@@ -32,7 +35,7 @@ class IsochronousClockModel {
 
 public:
     IsochronousClockModel();
-    virtual ~IsochronousClockModel();
+    virtual ~IsochronousClockModel() = default;
 
     void start(int64_t nanoTime);
     void stop(int64_t nanoTime);
@@ -122,9 +125,12 @@ public:
 
     void dump() const;
 
+    void dumpHistogram() const;
+
 private:
 
     int32_t getLateTimeOffsetNanos() const;
+    void update();
 
     enum clock_model_state_t {
         STATE_STOPPED,
@@ -134,23 +140,31 @@ private:
     };
 
     // Amount of time to drift forward when we get a late timestamp.
-    // This value was calculated to allow tracking of a clock with 50 ppm error.
-    static constexpr int32_t   kDriftNanos         =  10 * 1000;
-    // TODO review value of kExtraLatenessNanos
+    static constexpr int32_t   kDriftNanos         =   1 * 1000;
+    // Safety margin to add to the late edge of the timestamp window.
     static constexpr int32_t   kExtraLatenessNanos = 100 * 1000;
+    // Initial small threshold for causing a drift later in time.
+    static constexpr int32_t   kInitialLatenessForDriftNanos = 10 * 1000;
 
-    int64_t             mMarkerFramePosition;
-    int64_t             mMarkerNanoTime;
+    static constexpr int32_t   kHistogramBinWidthMicros = 50;
+    static constexpr int32_t   kHistogramBinCount = 128;
+
+    int64_t             mMarkerFramePosition; // Estimated HW position.
+    int64_t             mMarkerNanoTime;      // Estimated HW time.
     int32_t             mSampleRate;
-    int32_t             mFramesPerBurst;
-    int32_t             mBurstPeriodNanos;
+    int32_t             mFramesPerBurst;      // number of frames transferred at one time.
+    int32_t             mBurstPeriodNanos;    // Time between HW bursts.
     // Includes mBurstPeriodNanos because we sample randomly over time.
     int32_t             mMaxMeasuredLatenessNanos;
-    clock_model_state_t mState;
+    // Threshold for lateness that triggers a drift later in time.
+    int32_t             mLatenessForDriftNanos;
+    clock_model_state_t mState;               // State machine handles startup sequence.
 
-    int32_t             mTimestampCount = 0;
+    int32_t             mTimestampCount = 0;  // For logging.
 
-    void update();
+    // distribution of timestamps relative to earliest
+    std::unique_ptr<android::audio_utils::Histogram>   mHistogramMicros;
+
 };
 
 } /* namespace aaudio */

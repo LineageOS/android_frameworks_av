@@ -16,6 +16,7 @@
 
 #define LOG_TAG "ServiceUtilities"
 
+#include <audio_utils/clock.h>
 #include <binder/AppOpsManager.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -24,6 +25,7 @@
 
 #include <iterator>
 #include <algorithm>
+#include <pwd.h>
 
 /* When performing permission checks we do not use permission cache for
  * runtime permissions (protection level dangerous) as they may change at
@@ -61,12 +63,12 @@ static String16 resolveCallingPackage(PermissionController& permissionController
 
 static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
         uid_t uid, bool start) {
-    // Okay to not track in app ops as audio server is us and if
+    // Okay to not track in app ops as audio server or media server is us and if
     // device is rooted security model is considered compromised.
     // system_server loses its RECORD_AUDIO permission when a secondary
     // user is active, but it is a core system service so let it through.
     // TODO(b/141210120): UserManager.DISALLOW_RECORD_AUDIO should not affect system user 0
-    if (isAudioServerOrSystemServerOrRootUid(uid)) return true;
+    if (isAudioServerOrMediaServerOrSystemServerOrRootUid(uid)) return true;
 
     // We specify a pid and uid here as mediaserver (aka MediaRecorder or StageFrightRecorder)
     // may open a record track on behalf of a client.  Note that pid may be a tid.
@@ -143,6 +145,15 @@ bool captureMediaOutputAllowed(pid_t pid, uid_t uid) {
     return ok;
 }
 
+bool captureVoiceCommunicationOutputAllowed(pid_t pid, uid_t uid) {
+    if (isAudioServerOrRootUid(uid)) return true;
+    static const String16 sCaptureVoiceCommOutput(
+        "android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT");
+    bool ok = PermissionCache::checkPermission(sCaptureVoiceCommOutput, pid, uid);
+    if (!ok) ALOGE("Request requires android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT");
+    return ok;
+}
+
 bool captureHotwordAllowed(const String16& opPackageName, pid_t pid, uid_t uid) {
     // CAPTURE_AUDIO_HOTWORD permission implies RECORD_AUDIO permission
     bool ok = recordingAllowed(opPackageName, pid, uid);
@@ -167,9 +178,16 @@ bool settingsAllowed() {
 }
 
 bool modifyAudioRoutingAllowed() {
+    return modifyAudioRoutingAllowed(
+        IPCThreadState::self()->getCallingPid(), IPCThreadState::self()->getCallingUid());
+}
+
+bool modifyAudioRoutingAllowed(pid_t pid, uid_t uid) {
+    if (isAudioServerUid(IPCThreadState::self()->getCallingUid())) return true;
     // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
-    bool ok = PermissionCache::checkCallingPermission(sModifyAudioRouting);
-    if (!ok) ALOGE("android.permission.MODIFY_AUDIO_ROUTING");
+    bool ok = PermissionCache::checkPermission(sModifyAudioRouting, pid, uid);
+    if (!ok) ALOGE("%s(): android.permission.MODIFY_AUDIO_ROUTING denied for uid %d",
+        __func__, uid);
     return ok;
 }
 
@@ -232,9 +250,9 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
     off_t size = lseek(heap->getHeapID(), 0, SEEK_END);
     lseek(heap->getHeapID(), 0, SEEK_SET);
 
-    if (iMemory->pointer() == NULL || size < (off_t)iMemory->size()) {
+    if (iMemory->unsecurePointer() == NULL || size < (off_t)iMemory->size()) {
         ALOGE("%s check failed: pointer %p size %zu fd size %u",
-              __FUNCTION__, iMemory->pointer(), iMemory->size(), (uint32_t)size);
+              __FUNCTION__, iMemory->unsecurePointer(), iMemory->size(), (uint32_t)size);
         return BAD_VALUE;
     }
 
@@ -320,6 +338,132 @@ void MediaPackageManager::dump(int fd, int spaces) const {
                     package.name.c_str());
         }
     }
+}
+
+// How long we hold info before we re-fetch it (24 hours) if we found it previously.
+static constexpr nsecs_t INFO_EXPIRATION_NS = 24 * 60 * 60 * NANOS_PER_SECOND;
+// Maximum info records we retain before clearing everything.
+static constexpr size_t INFO_CACHE_MAX = 1000;
+
+// The original code is from MediaMetricsService.cpp.
+mediautils::UidInfo::Info mediautils::UidInfo::getInfo(uid_t uid)
+{
+    const nsecs_t now = systemTime(SYSTEM_TIME_REALTIME);
+    struct mediautils::UidInfo::Info info;
+    {
+        std::lock_guard _l(mLock);
+        auto it = mInfoMap.find(uid);
+        if (it != mInfoMap.end()) {
+            info = it->second;
+            ALOGV("%s: uid %d expiration %lld now %lld",
+                    __func__, uid, (long long)info.expirationNs, (long long)now);
+            if (info.expirationNs <= now) {
+                // purge the stale entry and fall into re-fetching
+                ALOGV("%s: entry for uid %d expired, now %lld",
+                        __func__, uid, (long long)now);
+                mInfoMap.erase(it);
+                info.uid = (uid_t)-1;  // this is always fully overwritten
+            }
+        }
+    }
+
+    // if we did not find it in our map, look it up
+    if (info.uid == (uid_t)(-1)) {
+        sp<IServiceManager> sm = defaultServiceManager();
+        sp<content::pm::IPackageManagerNative> package_mgr;
+        if (sm.get() == nullptr) {
+            ALOGE("%s: Cannot find service manager", __func__);
+        } else {
+            sp<IBinder> binder = sm->getService(String16("package_native"));
+            if (binder.get() == nullptr) {
+                ALOGE("%s: Cannot find package_native", __func__);
+            } else {
+                package_mgr = interface_cast<content::pm::IPackageManagerNative>(binder);
+            }
+        }
+
+        // find package name
+        std::string pkg;
+        if (package_mgr != nullptr) {
+            std::vector<std::string> names;
+            binder::Status status = package_mgr->getNamesForUids({(int)uid}, &names);
+            if (!status.isOk()) {
+                ALOGE("%s: getNamesForUids failed: %s",
+                        __func__, status.exceptionMessage().c_str());
+            } else {
+                if (!names[0].empty()) {
+                    pkg = names[0].c_str();
+                }
+            }
+        }
+
+        if (pkg.empty()) {
+            struct passwd pw{}, *result;
+            char buf[8192]; // extra buffer space - should exceed what is
+                            // required in struct passwd_pw (tested),
+                            // and even then this is only used in backup
+                            // when the package manager is unavailable.
+            if (getpwuid_r(uid, &pw, buf, sizeof(buf), &result) == 0
+                    && result != nullptr
+                    && result->pw_name != nullptr) {
+                pkg = result->pw_name;
+            }
+        }
+
+        // strip any leading "shared:" strings that came back
+        if (pkg.compare(0, 7, "shared:") == 0) {
+            pkg.erase(0, 7);
+        }
+
+        // determine how pkg was installed and the versionCode
+        std::string installer;
+        int64_t versionCode = 0;
+        bool notFound = false;
+        if (pkg.empty()) {
+            pkg = std::to_string(uid); // not found
+            notFound = true;
+        } else if (strchr(pkg.c_str(), '.') == nullptr) {
+            // not of form 'com.whatever...'; assume internal
+            // so we don't need to look it up in package manager.
+        } else if (strncmp(pkg.c_str(), "android.", 8) == 0) {
+            // android.* packages are assumed fine
+        } else if (package_mgr.get() != nullptr) {
+            String16 pkgName16(pkg.c_str());
+            binder::Status status = package_mgr->getInstallerForPackage(pkgName16, &installer);
+            if (!status.isOk()) {
+                ALOGE("%s: getInstallerForPackage failed: %s",
+                        __func__, status.exceptionMessage().c_str());
+            }
+
+            // skip if we didn't get an installer
+            if (status.isOk()) {
+                status = package_mgr->getVersionCodeForPackage(pkgName16, &versionCode);
+                if (!status.isOk()) {
+                    ALOGE("%s: getVersionCodeForPackage failed: %s",
+                            __func__, status.exceptionMessage().c_str());
+                }
+            }
+
+            ALOGV("%s: package '%s' installed by '%s' versioncode %lld",
+                    __func__, pkg.c_str(), installer.c_str(), (long long)versionCode);
+        }
+
+        // add it to the map, to save a subsequent lookup
+        std::lock_guard _l(mLock);
+        // first clear if we have too many cached elements.  This would be rare.
+        if (mInfoMap.size() >= INFO_CACHE_MAX) mInfoMap.clear();
+
+        // always overwrite
+        info.uid = uid;
+        info.package = std::move(pkg);
+        info.installer = std::move(installer);
+        info.versionCode = versionCode;
+        info.expirationNs = now + (notFound ? 0 : INFO_EXPIRATION_NS);
+        ALOGV("%s: adding uid %d package '%s' expirationNs: %lld",
+                __func__, uid, info.package.c_str(), (long long)info.expirationNs);
+        mInfoMap[uid] = info;
+    }
+    return info;
 }
 
 } // namespace android

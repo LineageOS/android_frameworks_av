@@ -60,6 +60,13 @@ status_t CameraStatus::writeToParcel(android::Parcel* parcel) const {
     if (res != OK) return res;
 
     res = parcel->writeInt32(status);
+    if (res != OK) return res;
+
+    std::vector<String16> unavailablePhysicalIds16;
+    for (auto& id8 : unavailablePhysicalIds) {
+        unavailablePhysicalIds16.push_back(String16(id8));
+    }
+    res = parcel->writeString16Vector(unavailablePhysicalIds16);
     return res;
 }
 
@@ -70,6 +77,14 @@ status_t CameraStatus::readFromParcel(const android::Parcel* parcel) {
     cameraId = String8(tempCameraId);
 
     res = parcel->readInt32(&status);
+    if (res != OK) return res;
+
+    std::vector<String16> unavailablePhysicalIds16;
+    res = parcel->readString16Vector(&unavailablePhysicalIds16);
+    if (res != OK) return res;
+    for (auto& id16 : unavailablePhysicalIds16) {
+        unavailablePhysicalIds.push_back(String8(id16));
+    }
     return res;
 }
 

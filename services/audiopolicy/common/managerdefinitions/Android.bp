@@ -25,12 +25,14 @@ cc_library_static {
         "libhidlbase",
         "liblog",
         "libmedia",
+        "libmedia_helper",
         "libutils",
         "libxml2",
     ],
     export_shared_lib_headers: [
         "libaudiofoundation",
         "libmedia",
+        "libmedia_helper",
     ],
     static_libs: [
         "libaudioutils",

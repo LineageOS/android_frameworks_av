@@ -62,12 +62,12 @@ public:
         return reply.readInt32();
     }
 
-    virtual int requestCpusetBoost(bool enable, const sp<IInterface>& client)
+    virtual int requestCpusetBoost(bool enable, const sp<IBinder>& client)
     {
         Parcel data, reply;
         data.writeInterfaceToken(ISchedulingPolicyService::getInterfaceDescriptor());
         data.writeInt32(enable);
-        data.writeStrongBinder(IInterface::asBinder(client));
+        data.writeStrongBinder(client);
         status_t status = remote()->transact(REQUEST_CPUSET_BOOST, data, &reply, 0);
         if (status != NO_ERROR) {
             return status;

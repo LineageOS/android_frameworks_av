@@ -31,6 +31,11 @@
 #include <vector>
 
 namespace android {
+namespace media {
+// Must be pre-declared, or else there isn't a good way to generate a header
+// library.
+class ICaptureStateListener;
+}
 
 // ----------------------------------------------------------------------------
 
@@ -54,7 +59,7 @@ public:
                                               const char *device_address,
                                               const char *device_name,
                                               audio_format_t encodedFormat) = 0;
-    virtual status_t setPhoneState(audio_mode_t state) = 0;
+    virtual status_t setPhoneState(audio_mode_t state, uid_t uid) = 0;
     virtual status_t setForceUse(audio_policy_force_use_t usage,
                                     audio_policy_forced_cfg_t config) = 0;
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage) = 0;
@@ -109,6 +114,8 @@ public:
 
     virtual uint32_t getStrategyForStream(audio_stream_type_t stream) = 0;
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream) = 0;
+    virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
+            AudioDeviceTypeAddrVector *devices) const = 0;
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc) = 0;
     virtual status_t registerEffect(const effect_descriptor_t *desc,
                                     audio_io_handle_t io,
@@ -139,6 +146,7 @@ public:
                                             audio_unique_id_t* id) = 0;
     virtual status_t removeSourceDefaultEffect(audio_unique_id_t id) = 0;
     virtual status_t removeStreamDefaultEffect(audio_unique_id_t id) = 0;
+    virtual status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages) = 0;
     virtual status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) = 0;
    // Check if offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled
@@ -193,6 +201,11 @@ public:
 
     virtual status_t removeUidDeviceAffinities(uid_t uid) = 0;
 
+    virtual status_t setUserIdDeviceAffinities(int userId,
+            const Vector<AudioDeviceTypeAddr>& devices) = 0;
+
+    virtual status_t removeUserIdDeviceAffinities(int userId) = 0;
+
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
                                       audio_port_handle_t *portId) = 0;
@@ -213,6 +226,7 @@ public:
 
     virtual status_t setAssistantUid(uid_t uid) = 0;
     virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids) = 0;
+    virtual status_t setCurrentImeUid(uid_t uid) = 0;
 
     virtual bool     isHapticPlaybackSupported() = 0;
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
@@ -225,6 +239,8 @@ public:
 
     virtual status_t setRttEnabled(bool enabled) = 0;
 
+    virtual bool     isCallScreenModeSupported() = 0;
+
     virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    const AudioDeviceTypeAddr &device) = 0;
 
@@ -232,6 +248,12 @@ public:
 
     virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    AudioDeviceTypeAddr &device) = 0;
+
+    // The return code here is only intended to represent transport errors. The
+    // actual server implementation should always return NO_ERROR.
+    virtual status_t registerSoundTriggerCaptureStateListener(
+        const sp<media::ICaptureStateListener>& listener,
+        bool* result) = 0;
 };
 
 

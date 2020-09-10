@@ -35,6 +35,7 @@
 
 namespace android {
 
+class AudioPolicyMix;
 class DeviceDescriptor;
 class HwAudioOutputDescriptor;
 class SwAudioOutputDescriptor;
@@ -90,11 +91,12 @@ public:
                           product_strategy_t strategy, VolumeSource volumeSource,
                           audio_output_flags_t flags,
                           bool isPreferredDeviceForExclusiveUse,
-                          std::vector<wp<SwAudioOutputDescriptor>> secondaryOutputs) :
+                          std::vector<wp<SwAudioOutputDescriptor>> secondaryOutputs,
+                          wp<AudioPolicyMix> primaryMix) :
         ClientDescriptor(portId, uid, sessionId, attributes, config, preferredDeviceId,
                          isPreferredDeviceForExclusiveUse),
         mStream(stream), mStrategy(strategy), mVolumeSource(volumeSource), mFlags(flags),
-        mSecondaryOutputs(std::move(secondaryOutputs)) {}
+        mSecondaryOutputs(std::move(secondaryOutputs)), mPrimaryMix(primaryMix) {}
     ~TrackClientDescriptor() override = default;
 
     using ClientDescriptor::dump;
@@ -108,6 +110,9 @@ public:
         return mSecondaryOutputs;
     };
     VolumeSource volumeSource() const { return mVolumeSource; }
+    const sp<AudioPolicyMix> getPrimaryMix() const {
+        return mPrimaryMix.promote();
+    };
 
     void setActive(bool active) override
     {
@@ -136,7 +141,7 @@ private:
     const VolumeSource mVolumeSource;
     const audio_output_flags_t mFlags;
     const std::vector<wp<SwAudioOutputDescriptor>> mSecondaryOutputs;
-
+    const wp<AudioPolicyMix> mPrimaryMix;
     /**
      * required for duplicating thread, prevent from removing active client from an output
      * involved in a duplication.

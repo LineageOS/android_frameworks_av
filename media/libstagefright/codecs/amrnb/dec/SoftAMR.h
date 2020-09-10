@@ -19,6 +19,8 @@
 #define SOFT_AMR_H_
 
 #include <media/stagefright/omx/SimpleSoftOMXComponent.h>
+#include "gsmamr_dec.h"
+#include "pvamrwbdecoder.h"
 
 namespace android {
 
@@ -60,6 +62,7 @@ private:
     void *mState;
     void *mDecoderBuf;
     int16_t *mDecoderCookie;
+    RX_State_wb mRxState{};
 
     size_t mInputBufferCount;
     int64_t mAnchorTimeUs;

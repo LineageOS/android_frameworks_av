@@ -1,3 +1,6 @@
+on property:init.svc.media=*
+    setprop init.svc.mediadrm ${init.svc.media}
+
 service media /system/bin/mediaserver
     class main
     user media

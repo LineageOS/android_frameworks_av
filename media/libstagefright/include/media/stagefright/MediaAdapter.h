@@ -17,7 +17,7 @@
 #ifndef MEDIA_ADAPTER_H
 #define MEDIA_ADAPTER_H
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MetaData.h>

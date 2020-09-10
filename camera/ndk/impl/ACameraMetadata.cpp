@@ -28,7 +28,28 @@ using namespace android;
  * ACameraMetadata Implementation
  */
 ACameraMetadata::ACameraMetadata(camera_metadata_t* buffer, ACAMERA_METADATA_TYPE type) :
-        mData(buffer), mType(type) {
+        mData(std::make_shared<CameraMetadata>(buffer)),
+        mType(type) {
+    init();
+}
+
+ACameraMetadata::ACameraMetadata(const std::shared_ptr<CameraMetadata>& cameraMetadata,
+        ACAMERA_METADATA_TYPE type) :
+        mData(cameraMetadata),
+        mType(type) {
+    init();
+}
+
+ACameraMetadata::ACameraMetadata(const ACameraMetadata& other) :
+        mData(std::make_shared<CameraMetadata>(*(other.mData))),
+        mType(other.mType) {
+}
+
+ACameraMetadata::~ACameraMetadata() {
+}
+
+void
+ACameraMetadata::init() {
     if (mType == ACM_CHARACTERISTICS) {
         filterUnsupportedFeatures();
         filterStreamConfigurations();
@@ -61,7 +82,7 @@ ACameraMetadata::isNdkSupportedCapability(int32_t capability) {
 void
 ACameraMetadata::filterUnsupportedFeatures() {
     // Hide unsupported capabilities (reprocessing)
-    camera_metadata_entry entry = mData.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+    camera_metadata_entry entry = mData->find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
     if (entry.count == 0 || entry.type != TYPE_BYTE) {
         ALOGE("%s: malformed available capability key! count %zu, type %d",
                 __FUNCTION__, entry.count, entry.type);
@@ -80,7 +101,7 @@ ACameraMetadata::filterUnsupportedFeatures() {
             }
         }
     }
-    mData.update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES, capabilities);
+    mData->update(ANDROID_REQUEST_AVAILABLE_CAPABILITIES, capabilities);
 }
 
 void
@@ -118,12 +139,20 @@ ACameraMetadata::filterDurations(uint32_t tag) {
     const int STREAM_WIDTH_OFFSET = 1;
     const int STREAM_HEIGHT_OFFSET = 2;
     const int STREAM_DURATION_OFFSET = 3;
-    camera_metadata_entry entry = mData.find(tag);
-    if (entry.count == 0 || entry.count % 4 || entry.type != TYPE_INT64) {
+
+    camera_metadata_entry entry = mData->find(tag);
+
+    if (entry.count == 0) {
+        // Duration keys can be missing when corresponding capture feature is not supported
+        return;
+    }
+
+    if (entry.count % 4 || entry.type != TYPE_INT64) {
         ALOGE("%s: malformed duration key %d! count %zu, type %d",
                 __FUNCTION__, tag, entry.count, entry.type);
         return;
     }
+
     Vector<int64_t> filteredDurations;
     filteredDurations.setCapacity(entry.count * 2);
 
@@ -194,7 +223,7 @@ ACameraMetadata::filterDurations(uint32_t tag) {
         }
     }
 
-    mData.update(tag, filteredDurations);
+    mData->update(tag, filteredDurations);
 }
 
 void
@@ -204,7 +233,7 @@ ACameraMetadata::filterStreamConfigurations() {
     const int STREAM_WIDTH_OFFSET = 1;
     const int STREAM_HEIGHT_OFFSET = 2;
     const int STREAM_IS_INPUT_OFFSET = 3;
-    camera_metadata_entry entry = mData.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    camera_metadata_entry entry = mData->find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
     if (entry.count > 0 && (entry.count % 4 || entry.type != TYPE_INT32)) {
         ALOGE("%s: malformed available stream configuration key! count %zu, type %d",
                 __FUNCTION__, entry.count, entry.type);
@@ -234,10 +263,10 @@ ACameraMetadata::filterStreamConfigurations() {
     }
 
     if (filteredStreamConfigs.size() > 0) {
-        mData.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, filteredStreamConfigs);
+        mData->update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, filteredStreamConfigs);
     }
 
-    entry = mData.find(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS);
+    entry = mData->find(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS);
     if (entry.count > 0 && (entry.count % 4 || entry.type != TYPE_INT32)) {
         ALOGE("%s: malformed available depth stream configuration key! count %zu, type %d",
                 __FUNCTION__, entry.count, entry.type);
@@ -270,11 +299,11 @@ ACameraMetadata::filterStreamConfigurations() {
     }
 
     if (filteredDepthStreamConfigs.size() > 0) {
-        mData.update(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS,
+        mData->update(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS,
                 filteredDepthStreamConfigs);
     }
 
-    entry = mData.find(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS);
+    entry = mData->find(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS);
     Vector<int32_t> filteredHeicStreamConfigs;
     filteredHeicStreamConfigs.setCapacity(entry.count);
 
@@ -297,9 +326,9 @@ ACameraMetadata::filterStreamConfigurations() {
         filteredHeicStreamConfigs.push_back(height);
         filteredHeicStreamConfigs.push_back(isInput);
     }
-    mData.update(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, filteredHeicStreamConfigs);
+    mData->update(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, filteredHeicStreamConfigs);
 
-    entry = mData.find(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
+    entry = mData->find(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
     Vector<int32_t> filteredDynamicDepthStreamConfigs;
     filteredDynamicDepthStreamConfigs.setCapacity(entry.count);
 
@@ -322,7 +351,7 @@ ACameraMetadata::filterStreamConfigurations() {
         filteredDynamicDepthStreamConfigs.push_back(height);
         filteredDynamicDepthStreamConfigs.push_back(isInput);
     }
-    mData.update(ACAMERA_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
+    mData->update(ACAMERA_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
             filteredDynamicDepthStreamConfigs);
 }
 
@@ -343,7 +372,7 @@ ACameraMetadata::getConstEntry(uint32_t tag, ACameraMetadata_const_entry* entry)
 
     Mutex::Autolock _l(mLock);
 
-    camera_metadata_ro_entry rawEntry = mData.find(tag);
+    camera_metadata_ro_entry rawEntry = static_cast<const CameraMetadata*>(mData.get())->find(tag);
     if (rawEntry.count == 0) {
         ALOGE("%s: cannot find metadata tag %d", __FUNCTION__, tag);
         return ACAMERA_ERROR_METADATA_NOT_FOUND;
@@ -390,9 +419,9 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
                          /*out*/const uint32_t** tags) const {
     Mutex::Autolock _l(mLock);
     if (mTags.size() == 0) {
-        size_t entry_count = mData.entryCount();
+        size_t entry_count = mData->entryCount();
         mTags.setCapacity(entry_count);
-        const camera_metadata_t* rawMetadata = mData.getAndLock();
+        const camera_metadata_t* rawMetadata = mData->getAndLock();
         for (size_t i = 0; i < entry_count; i++) {
             camera_metadata_ro_entry_t entry;
             int ret = get_camera_metadata_ro_entry(rawMetadata, i, &entry);
@@ -405,7 +434,7 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
                 mTags.push_back(entry.tag);
             }
         }
-        mData.unlock(rawMetadata);
+        mData->unlock(rawMetadata);
     }
 
     *numTags = mTags.size();
@@ -415,7 +444,7 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
 
 const CameraMetadata&
 ACameraMetadata::getInternalData() const {
-    return mData;
+    return (*mData);
 }
 
 bool
@@ -479,6 +508,8 @@ ACameraMetadata::isCaptureRequestTag(const uint32_t tag) {
         case ACAMERA_CONTROL_VIDEO_STABILIZATION_MODE:
         case ACAMERA_CONTROL_POST_RAW_SENSITIVITY_BOOST:
         case ACAMERA_CONTROL_ENABLE_ZSL:
+        case ACAMERA_CONTROL_EXTENDED_SCENE_MODE:
+        case ACAMERA_CONTROL_ZOOM_RATIO:
         case ACAMERA_EDGE_MODE:
         case ACAMERA_FLASH_MODE:
         case ACAMERA_HOT_PIXEL_MODE:

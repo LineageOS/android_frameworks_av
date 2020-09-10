@@ -34,6 +34,8 @@
 #include <system/graphics.h>
 #include <utils/NativeHandle.h>
 
+class C2Buffer;
+
 namespace android {
 class BufferChannelBase;
 struct BufferProducerWrapper;
@@ -42,12 +44,21 @@ struct PersistentSurface;
 struct RenderedFrameInfo;
 class Surface;
 struct ICrypto;
+class IMemory;
+
 namespace hardware {
+class HidlMemory;
 namespace cas {
 namespace native {
 namespace V1_0 {
 struct IDescrambler;
-}}}}
+}}}
+namespace drm {
+namespace V1_0 {
+struct SharedBuffer;
+}}
+}
+
 using hardware::cas::native::V1_0::IDescrambler;
 
 struct CodecBase : public AHandler, /* static */ ColorUtils {
@@ -249,15 +260,15 @@ private:
  */
 class BufferChannelBase {
 public:
+    BufferChannelBase() = default;
     virtual ~BufferChannelBase() = default;
 
     inline void setCallback(std::unique_ptr<CodecBase::BufferCallback> &&callback) {
         mCallback = std::move(callback);
     }
 
-    void setCrypto(const sp<ICrypto> &crypto);
-
-    void setDescrambler(const sp<IDescrambler> &descrambler);
+    virtual void setCrypto(const sp<ICrypto> &) {}
+    virtual void setDescrambler(const sp<IDescrambler> &) {}
 
     /**
      * Queue an input buffer into the buffer channel.
@@ -287,6 +298,50 @@ public:
             size_t numSubSamples,
             AString *errorDetailMsg) = 0;
     /**
+     * Attach a Codec 2.0 buffer to MediaCodecBuffer.
+     *
+     * @return    OK if successful;
+     *            -ENOENT if index is not recognized
+     *            -ENOSYS if attaching buffer is not possible or not supported
+     */
+    virtual status_t attachBuffer(
+            const std::shared_ptr<C2Buffer> &c2Buffer,
+            const sp<MediaCodecBuffer> &buffer) {
+        (void)c2Buffer;
+        (void)buffer;
+        return -ENOSYS;
+    }
+    /**
+     * Attach an encrypted HidlMemory buffer to an index
+     *
+     * @return    OK if successful;
+     *            -ENOENT if index is not recognized
+     *            -ENOSYS if attaching buffer is not possible or not supported
+     */
+    virtual status_t attachEncryptedBuffer(
+            const sp<hardware::HidlMemory> &memory,
+            bool secure,
+            const uint8_t *key,
+            const uint8_t *iv,
+            CryptoPlugin::Mode mode,
+            CryptoPlugin::Pattern pattern,
+            size_t offset,
+            const CryptoPlugin::SubSample *subSamples,
+            size_t numSubSamples,
+            const sp<MediaCodecBuffer> &buffer) {
+        (void)memory;
+        (void)secure;
+        (void)key;
+        (void)iv;
+        (void)mode;
+        (void)pattern;
+        (void)offset;
+        (void)subSamples;
+        (void)numSubSamples;
+        (void)buffer;
+        return -ENOSYS;
+    }
+    /**
      * Request buffer rendering at specified time.
      *
      * @param     timestampNs   nanosecond timestamp for rendering time.
@@ -314,10 +369,20 @@ public:
      */
     virtual void getOutputBufferArray(Vector<sp<MediaCodecBuffer>> *array) = 0;
 
+    /**
+     * Convert binder IMemory to drm SharedBuffer
+     *
+     * \param   memory      IMemory object to store encrypted content.
+     * \param   heapSeqNum  Heap sequence number from ICrypto; -1 if N/A
+     * \param   buf         SharedBuffer structure to fill.
+     */
+    static void IMemoryToSharedBuffer(
+            const sp<IMemory> &memory,
+            int32_t heapSeqNum,
+            hardware::drm::V1_0::SharedBuffer *buf);
+
 protected:
     std::unique_ptr<CodecBase::BufferCallback> mCallback;
-    sp<ICrypto> mCrypto;
-    sp<IDescrambler> mDescrambler;
 };
 
 }  // namespace android

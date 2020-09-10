@@ -102,8 +102,29 @@ protected:
 
 } // unnamed namespace
 
+struct ComponentStore::StoreParameterCache : public ParameterCache {
+    std::mutex mStoreMutex;
+    ComponentStore* mStore;
+
+    StoreParameterCache(ComponentStore* store): mStore{store} {
+    }
+
+    virtual c2_status_t validate(
+            const std::vector<std::shared_ptr<C2ParamDescriptor>>& params
+            ) override {
+        std::scoped_lock _lock(mStoreMutex);
+        return mStore ? mStore->validateSupportedParams(params) : C2_NO_INIT;
+    }
+
+    void onStoreDestroyed() {
+        std::scoped_lock _lock(mStoreMutex);
+        mStore = nullptr;
+    }
+};
+
 ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store)
       : mConfigurable{new CachedConfigurable(std::make_unique<StoreIntf>(store))},
+        mParameterCache{std::make_shared<StoreParameterCache>(this)},
         mStore{store} {
 
     std::shared_ptr<C2ComponentStore> platformStore = android::GetCodec2PlatformComponentStore();
@@ -113,7 +134,12 @@ ComponentStore::ComponentStore(const std::shared_ptr<C2ComponentStore>& store)
     mParamReflector = mStore->getParamReflector();
 
     // Retrieve supported parameters from store
-    mInit = mConfigurable->init(this);
+    using namespace std::placeholders;
+    mInit = mConfigurable->init(mParameterCache);
+}
+
+ComponentStore::~ComponentStore() {
+    mParameterCache->onStoreDestroyed();
 }
 
 c2_status_t ComponentStore::status() const {
@@ -144,6 +170,10 @@ c2_status_t ComponentStore::validateSupportedParams(
         }
     }
     return res;
+}
+
+std::shared_ptr<ParameterCache> ComponentStore::getParameterCache() const {
+    return mParameterCache;
 }
 
 // Methods from ::android::hardware::media::c2::V1_0::IComponentStore
@@ -187,7 +217,7 @@ Return<void> ComponentStore::createInterface(
     sp<IComponentInterface> interface;
     if (res == C2_OK) {
         onInterfaceLoaded(c2interface);
-        interface = new ComponentInterface(c2interface, this);
+        interface = new ComponentInterface(c2interface, mParameterCache);
     }
     _hidl_cb(static_cast<Status>(res), interface);
     return Void();
@@ -218,8 +248,9 @@ Return<void> ComponentStore::createInputSurface(createInputSurface_cb _hidl_cb) 
         _hidl_cb(Status::CORRUPTED, nullptr);
         return Void();
     }
+    using namespace std::placeholders;
     sp<InputSurface> inputSurface = new InputSurface(
-            this,
+            mParameterCache,
             std::make_shared<C2ReflectorHelper>(),
             source->getHGraphicBufferProducer(),
             source);

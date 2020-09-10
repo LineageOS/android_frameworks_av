@@ -32,7 +32,7 @@
 #include <private/media/AudioTrackShared.h>
 #include <processgroup/sched_policy.h>
 #include <media/IAudioFlinger.h>
-#include <media/MediaAnalyticsItem.h>
+#include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
 #define WAIT_PERIOD_MS          10
@@ -79,37 +79,41 @@ void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
 #define MM_PREFIX "android.media.audiorecord." // avoid cut-n-paste errors.
 
     // Java API 28 entries, do not change.
-    mAnalyticsItem->setCString(MM_PREFIX "encoding", toString(record->mFormat).c_str());
-    mAnalyticsItem->setCString(MM_PREFIX "source", toString(record->mAttributes.source).c_str());
-    mAnalyticsItem->setInt32(MM_PREFIX "latency", (int32_t)record->mLatency); // bad estimate.
-    mAnalyticsItem->setInt32(MM_PREFIX "samplerate", (int32_t)record->mSampleRate);
-    mAnalyticsItem->setInt32(MM_PREFIX "channels", (int32_t)record->mChannelCount);
+    mMetricsItem->setCString(MM_PREFIX "encoding", toString(record->mFormat).c_str());
+    mMetricsItem->setCString(MM_PREFIX "source", toString(record->mAttributes.source).c_str());
+    mMetricsItem->setInt32(MM_PREFIX "latency", (int32_t)record->mLatency); // bad estimate.
+    mMetricsItem->setInt32(MM_PREFIX "samplerate", (int32_t)record->mSampleRate);
+    mMetricsItem->setInt32(MM_PREFIX "channels", (int32_t)record->mChannelCount);
 
     // Non-API entries, these can change.
-    mAnalyticsItem->setInt32(MM_PREFIX "portId", (int32_t)record->mPortId);
-    mAnalyticsItem->setInt32(MM_PREFIX "frameCount", (int32_t)record->mFrameCount);
-    mAnalyticsItem->setCString(MM_PREFIX "attributes", toString(record->mAttributes).c_str());
-    mAnalyticsItem->setInt64(MM_PREFIX "channelMask", (int64_t)record->mChannelMask);
+    mMetricsItem->setInt32(MM_PREFIX "portId", (int32_t)record->mPortId);
+    mMetricsItem->setInt32(MM_PREFIX "frameCount", (int32_t)record->mFrameCount);
+    mMetricsItem->setCString(MM_PREFIX "attributes", toString(record->mAttributes).c_str());
+    mMetricsItem->setInt64(MM_PREFIX "channelMask", (int64_t)record->mChannelMask);
 
     // log total duration recording, including anything currently running.
     int64_t activeNs = 0;
     if (mStartedNs != 0) {
         activeNs = systemTime() - mStartedNs;
     }
-    mAnalyticsItem->setDouble(MM_PREFIX "durationMs", (mDurationNs + activeNs) * 1e-6);
-    mAnalyticsItem->setInt64(MM_PREFIX "startCount", (int64_t)mCount);
+    mMetricsItem->setDouble(MM_PREFIX "durationMs", (mDurationNs + activeNs) * 1e-6);
+    mMetricsItem->setInt64(MM_PREFIX "startCount", (int64_t)mCount);
 
     if (mLastError != NO_ERROR) {
-        mAnalyticsItem->setInt32(MM_PREFIX "lastError.code", (int32_t)mLastError);
-        mAnalyticsItem->setCString(MM_PREFIX "lastError.at", mLastErrorFunc.c_str());
+        mMetricsItem->setInt32(MM_PREFIX "lastError.code", (int32_t)mLastError);
+        mMetricsItem->setCString(MM_PREFIX "lastError.at", mLastErrorFunc.c_str());
     }
 }
 
+static const char *stateToString(bool active) {
+    return active ? "ACTIVE" : "STOPPED";
+}
+
 // hand the user a snapshot of the metrics.
-status_t AudioRecord::getMetrics(MediaAnalyticsItem * &item)
+status_t AudioRecord::getMetrics(mediametrics::Item * &item)
 {
     mMediaMetrics.gather(this);
-    MediaAnalyticsItem *tmp = mMediaMetrics.dup();
+    mediametrics::Item *tmp = mMediaMetrics.dup();
     if (tmp == nullptr) {
         return BAD_VALUE;
     }
@@ -164,6 +168,15 @@ AudioRecord::~AudioRecord()
 {
     mMediaMetrics.gather(this);
 
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DTOR)
+        .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                mCallerName.empty()
+                ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                : mCallerName.c_str())
+        .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
+        .record();
+
     if (mStatus == NO_ERROR) {
         // Make sure that callback function exits in the case where
         // it is looping on buffer empty condition in obtainBuffer().
@@ -186,7 +199,7 @@ AudioRecord::~AudioRecord()
         IPCThreadState::self()->flushCommands();
         ALOGV("%s(%d): releasing session id %d",
                 __func__, mPortId, mSessionId);
-        AudioSystem::releaseAudioSessionId(mSessionId, -1 /*pid*/);
+        AudioSystem::releaseAudioSessionId(mSessionId, mClientPid);
     }
 }
 
@@ -262,8 +275,12 @@ status_t AudioRecord::set(
     }
 
     if (pAttributes == NULL) {
-        memset(&mAttributes, 0, sizeof(audio_attributes_t));
+        mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
         mAttributes.source = inputSource;
+        if (inputSource == AUDIO_SOURCE_VOICE_COMMUNICATION
+                || inputSource == AUDIO_SOURCE_CAMCORDER) {
+            mAttributes.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+        }
     } else {
         // stream type shouldn't be looked at, this track has audio attributes
         memcpy(&mAttributes, pAttributes, sizeof(audio_attributes_t));
@@ -357,7 +374,7 @@ status_t AudioRecord::set(
     mMarkerReached = false;
     mNewPosition = 0;
     mUpdatePeriod = 0;
-    AudioSystem::acquireAudioSessionId(mSessionId, -1);
+    AudioSystem::acquireAudioSessionId(mSessionId, mClientPid, mClientUid);
     mSequence = 1;
     mObservedSequence = mSequence;
     mInOverrun = false;
@@ -376,11 +393,25 @@ exit:
 
 status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t triggerSession)
 {
+    const int64_t beginNs = systemTime();
     ALOGV("%s(%d): sync event %d trigger session %d", __func__, mPortId, event, triggerSession);
-
     AutoMutex lock(mLock);
+
+    status_t status = NO_ERROR;
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_CALLERNAME,
+                    mCallerName.empty()
+                    ? AMEDIAMETRICS_PROP_CALLERNAME_VALUE_UNKNOWN
+                    : mCallerName.c_str())
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_START)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mActive))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)status)
+            .record(); });
+
     if (mActive) {
-        return NO_ERROR;
+        return status;
     }
 
     // discard data in buffer
@@ -408,7 +439,6 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     // mActive is checked by restoreRecord_l
     mActive = true;
 
-    status_t status = NO_ERROR;
     if (!(flags & CBLK_INVALID)) {
         status = mAudioRecord->start(event, triggerSession).transactionError();
         if (status == DEAD_OBJECT) {
@@ -446,7 +476,15 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
 
 void AudioRecord::stop()
 {
+    const int64_t beginNs = systemTime();
     AutoMutex lock(mLock);
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_STOP)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mActive))
+            .record(); });
+
     ALOGV("%s(%d): mActive:%d\n", __func__, mPortId, mActive);
     if (!mActive) {
         return;
@@ -695,6 +733,7 @@ const char * AudioRecord::convertTransferToText(transfer_type transferType) {
 // must be called with mLock held
 status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName)
 {
+    const int64_t beginNs = systemTime();
     const sp<IAudioFlinger>& audioFlinger = AudioSystem::get_audio_flinger();
     IAudioFlinger::CreateRecordInput input;
     IAudioFlinger::CreateRecordOutput output;
@@ -732,7 +771,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
             // use case 3: obtain/release mode
             (mTransfer == TRANSFER_OBTAIN);
         if (!useCaseAllowed) {
-            ALOGW("%s(%d): AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
+            ALOGD("%s(%d): AUDIO_INPUT_FLAG_FAST denied, incompatible transfer = %s",
                   __func__, mPortId,
                   convertTransferToText(mTransfer));
             mFlags = (audio_input_flags_t) (mFlags & ~(AUDIO_INPUT_FLAG_FAST |
@@ -795,7 +834,11 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
         status = NO_INIT;
         goto exit;
     }
-    iMemPointer = output.cblk ->pointer();
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    iMemPointer = output.cblk ->unsecurePointer();
     if (iMemPointer == NULL) {
         ALOGE("%s(%d): Could not get control block pointer", __func__, mPortId);
         status = NO_INIT;
@@ -810,7 +853,11 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     if (output.buffers == 0) {
         buffers = cblk + 1;
     } else {
-        buffers = output.buffers->pointer();
+        // TODO: Using unsecurePointer() has some associated security pitfalls
+        //       (see declaration for details).
+        //       Either document why it is safe in this case or address the
+        //       issue (e.g. by copying).
+        buffers = output.buffers->unsecurePointer();
         if (buffers == NULL) {
             ALOGE("%s(%d): Could not get buffer pointer", __func__, mPortId);
             status = NO_INIT;
@@ -872,6 +919,29 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
 
     mDeathNotifier = new DeathNotifier(this);
     IInterface::asBinder(mAudioRecord)->linkToDeath(mDeathNotifier, this);
+
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_RECORD) + std::to_string(mPortId);
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CREATE)
+        .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+        // the following are immutable (at least until restore)
+        .set(AMEDIAMETRICS_PROP_FLAGS, toString(mFlags).c_str())
+        .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
+        .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
+        .set(AMEDIAMETRICS_PROP_TRACKID, mPortId)
+        .set(AMEDIAMETRICS_PROP_SOURCE, toString(mAttributes.source).c_str())
+        .set(AMEDIAMETRICS_PROP_THREADID, (int32_t)output.inputId)
+        .set(AMEDIAMETRICS_PROP_SELECTEDDEVICEID, (int32_t)mSelectedDeviceId)
+        .set(AMEDIAMETRICS_PROP_ROUTEDDEVICEID, (int32_t)mRoutedDeviceId)
+        .set(AMEDIAMETRICS_PROP_ENCODING, toString(mFormat).c_str())
+        .set(AMEDIAMETRICS_PROP_CHANNELMASK, (int32_t)mChannelMask)
+        .set(AMEDIAMETRICS_PROP_FRAMECOUNT, (int32_t)mFrameCount)
+        .set(AMEDIAMETRICS_PROP_SAMPLERATE, (int32_t)mSampleRate)
+        // the following are NOT immutable
+        .set(AMEDIAMETRICS_PROP_STATE, stateToString(mActive))
+        .set(AMEDIAMETRICS_PROP_SELECTEDMICDIRECTION, (int32_t)mSelectedMicDirection)
+        .set(AMEDIAMETRICS_PROP_SELECTEDMICFIELDDIRECTION, (double)mSelectedMicFieldDimension)
+        .record();
 
 exit:
     mStatus = status;
@@ -1312,6 +1382,17 @@ nsecs_t AudioRecord::processAudioBuffer()
 
 status_t AudioRecord::restoreRecord_l(const char *from)
 {
+    status_t result = NO_ERROR;  // logged: make sure to set this before returning.
+    const int64_t beginNs = systemTime();
+    mediametrics::Defer defer([&] {
+        mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE)
+            .set(AMEDIAMETRICS_PROP_EXECUTIONTIMENS, (int64_t)(systemTime() - beginNs))
+            .set(AMEDIAMETRICS_PROP_STATE, stateToString(mActive))
+            .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)result)
+            .set(AMEDIAMETRICS_PROP_WHERE, from)
+            .record(); });
+
     ALOGW("%s(%d): dead IAudioRecord, creating a new one from %s()", __func__, mPortId, from);
     ++mSequence;
 
@@ -1330,7 +1411,7 @@ retry:
     // It will also delete the strong references on previous IAudioRecord and IMemory
     Modulo<uint32_t> position(mProxy->getPosition());
     mNewPosition = position + mUpdatePeriod;
-    status_t result = createRecord_l(position, mOpPackageName);
+    result = createRecord_l(position, mOpPackageName);
 
     if (result == NO_ERROR) {
         if (mActive) {

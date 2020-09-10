@@ -74,6 +74,7 @@ int32_t AmrwbDecoderTest::DecodeFrames(int16_t *decoderCookie, void *decoderBuf,
     uint8_t inputBuf[kInputBufferSize];
     int16_t inputSampleBuf[kMaxSourceDataUnitSize];
     int16_t outputBuf[kOutputBufferSize];
+    RX_State_wb rx_state{};
 
     while (frameCount > 0) {
         uint8_t modeByte;
@@ -98,7 +99,6 @@ int32_t AmrwbDecoderTest::DecodeFrames(int16_t *decoderCookie, void *decoderBuf,
 
             int16 frameMode = mode;
             int16 frameType;
-            RX_State_wb rx_state;
             mime_unsorting(inputBuf, inputSampleBuf, &frameType, &frameMode, 1, &rx_state);
 
             int16_t numSamplesOutput;

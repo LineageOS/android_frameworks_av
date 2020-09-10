@@ -1,0 +1,17 @@
+{
+  "presubmit": [
+    // TODO(b/153661591) enable test once the bug is fixed
+    // This tests the extractor path
+    // {
+    //    "name": "GtsYouTubeTestCases",
+    //    "options" : [
+    //      {
+    //        "include-annotation": "android.platform.test.annotations.Presubmit"
+    //      },
+    //      {
+    //        "include-filter": "com.google.android.youtube.gts.SimultaneousClearAndProtectedDecodeTest#testSimultaneousClearAndProtectedDecode"
+    //      }
+    //    ]
+    //  }
+  ]
+}

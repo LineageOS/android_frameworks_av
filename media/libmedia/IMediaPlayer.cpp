@@ -19,18 +19,15 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#include <android/IDataSource.h>
 #include <binder/Parcel.h>
-
+#include <gui/IGraphicBufferProducer.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AVSyncSettings.h>
 #include <media/BufferingSettings.h>
-
-#include <media/IDataSource.h>
 #include <media/IMediaHTTPService.h>
 #include <media/IMediaPlayer.h>
 #include <media/IStreamSource.h>
-
-#include <gui/IGraphicBufferProducer.h>
 #include <utils/String8.h>
 
 namespace android {

@@ -19,6 +19,7 @@ cc_library {
         "AImageReaderUtils.cpp",
         "BatteryNotifier.cpp",
         "ISchedulingPolicyService.cpp",
+        "LimitProcessMemory.cpp",
         "MemoryLeakTrackUtil.cpp",
         "ProcessInfo.cpp",
         "SchedulingPolicyService.cpp",
@@ -29,6 +30,7 @@ cc_library {
         "libc_malloc_debug_backtrace",
     ],
     shared_libs: [
+        "libaudioutils", // for clock.h
         "libbinder",
         "libcutils",
         "liblog",

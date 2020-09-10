@@ -24,7 +24,7 @@
 #include <media/stagefright/MediaMuxer.h>
 
 #include <media/mediarecorder.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -155,7 +155,6 @@ status_t MediaMuxer::start() {
 
 status_t MediaMuxer::stop() {
     Mutex::Autolock autoLock(mMuxerLock);
-
     if (mState == STARTED) {
         mState = STOPPED;
         for (size_t i = 0; i < mTrackList.size(); i++) {
@@ -163,7 +162,11 @@ status_t MediaMuxer::stop() {
                 return INVALID_OPERATION;
             }
         }
-        return mWriter->stop();
+        status_t err = mWriter->stop();
+        if (err != OK) {
+            ALOGE("stop() err: %d", err);
+        }
+        return err;
     } else {
         ALOGE("stop() is called in invalid state %d", mState);
         return INVALID_OPERATION;
@@ -205,6 +208,11 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
 
     if (flags & MediaCodec::BUFFER_FLAG_MUXER_DATA) {
         sampleMetaData.setInt32(kKeyIsMuxerData, 1);
+    }
+
+    if (flags & MediaCodec::BUFFER_FLAG_EOS) {
+        sampleMetaData.setInt32(kKeyIsEndOfStream, 1);
+        ALOGV("BUFFER_FLAG_EOS");
     }
 
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];

@@ -92,6 +92,12 @@ public:
     audio_config_base_t getConfig() const override;
     audio_patch_handle_t getPatchHandle() const override;
     void setPatchHandle(audio_patch_handle_t handle) override;
+    bool isMmap() override {
+        if (getPolicyAudioPort() != nullptr) {
+            return getPolicyAudioPort()->isMmap();
+        }
+        return false;
+    }
 
     status_t open(const audio_config_t *config,
                   const sp<DeviceDescriptor> &device,
@@ -110,7 +116,7 @@ public:
     RecordClientVector clientsList(bool activeOnly = false,
         audio_source_t source = AUDIO_SOURCE_DEFAULT, bool preferredDeviceOnly = false) const;
 
-    void setAppState(uid_t uid, app_state_t state);
+    void setAppState(audio_port_handle_t portId, app_state_t state);
 
     // implementation of ClientMapHandler<RecordClientDescriptor>
     void addClient(const sp<RecordClientDescriptor> &client) override;

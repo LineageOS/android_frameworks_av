@@ -22,14 +22,17 @@
 #include <map>
 #include <mutex>
 
-#include <C2AllocatorIon.h>
+#include <C2AllocatorBlob.h>
 #include <C2AllocatorGralloc.h>
+#include <C2AllocatorIon.h>
 #include <C2BufferPriv.h>
 #include <C2BlockInternal.h>
+#include <C2PlatformSupport.h>
 #include <bufferpool/ClientManager.h>
 
 namespace {
 
+using android::C2AllocatorBlob;
 using android::C2AllocatorGralloc;
 using android::C2AllocatorIon;
 using android::hardware::media::bufferpool::BufferPoolData;
@@ -393,10 +396,29 @@ std::shared_ptr<_C2BlockPoolData> _C2BlockFactory::GetLinearBlockPoolData(
 std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
         const C2Handle *handle) {
     // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2AllocatorIon> sAllocator = std::make_unique<C2AllocatorIon>(0);
+    static std::unique_ptr<C2Allocator> sAllocator = []{
+        std::unique_ptr<C2Allocator> allocator;
+        if (android::GetPreferredLinearAllocatorId(android::GetCodec2PoolMask()) ==
+                android::C2PlatformAllocatorStore::BLOB) {
+            allocator = std::make_unique<C2AllocatorBlob>(android::C2PlatformAllocatorStore::BLOB);
+        } else {
+            allocator = std::make_unique<C2AllocatorIon>(android::C2PlatformAllocatorStore::ION);
+        }
+        return allocator;
+    }();
+
+    if (sAllocator == nullptr)
+        return nullptr;
+
+    bool isValidHandle = false;
+    if (sAllocator->getId() == android::C2PlatformAllocatorStore::BLOB) {
+        isValidHandle = C2AllocatorBlob::isValid(handle);
+    } else {
+        isValidHandle = C2AllocatorIon::isValid(handle);
+    }
 
     std::shared_ptr<C2LinearAllocation> alloc;
-    if (C2AllocatorIon::isValid(handle)) {
+    if (isValidHandle) {
         c2_status_t err = sAllocator->priorLinearAllocation(handle, &alloc);
         if (err == C2_OK) {
             std::shared_ptr<C2LinearBlock> block = _C2BlockFactory::CreateLinearBlock(alloc);
@@ -409,10 +431,29 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
 std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
         const C2Handle *cHandle, const std::shared_ptr<BufferPoolData> &data) {
     // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2AllocatorIon> sAllocator = std::make_unique<C2AllocatorIon>(0);
+    static std::unique_ptr<C2Allocator> sAllocator = []{
+        std::unique_ptr<C2Allocator> allocator;
+        if (android::GetPreferredLinearAllocatorId(android::GetCodec2PoolMask()) ==
+                android::C2PlatformAllocatorStore::BLOB) {
+            allocator = std::make_unique<C2AllocatorBlob>(android::C2PlatformAllocatorStore::BLOB);
+        } else {
+            allocator = std::make_unique<C2AllocatorIon>(android::C2PlatformAllocatorStore::ION);
+        }
+        return allocator;
+    }();
+
+    if (sAllocator == nullptr)
+        return nullptr;
+
+    bool isValidHandle = false;
+    if (sAllocator->getId() == android::C2PlatformAllocatorStore::BLOB) {
+        isValidHandle = C2AllocatorBlob::isValid(cHandle);
+    } else {
+        isValidHandle = C2AllocatorIon::isValid(cHandle);
+    }
 
     std::shared_ptr<C2LinearAllocation> alloc;
-    if (C2AllocatorIon::isValid(cHandle)) {
+    if (isValidHandle) {
         c2_status_t err = sAllocator->priorLinearAllocation(cHandle, &alloc);
         const std::shared_ptr<C2PooledBlockPoolData> poolData =
                 std::make_shared<C2PooledBlockPoolData>(data);

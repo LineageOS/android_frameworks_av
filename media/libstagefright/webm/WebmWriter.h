@@ -21,7 +21,7 @@
 #include "WebmFrameThread.h"
 #include "LinkedBlockingQueue.h"
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MediaWriter.h>
 
 #include <utils/Errors.h>

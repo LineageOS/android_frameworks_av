@@ -20,7 +20,6 @@
 #include <array>
 #include <random>
 
-#include <dlfcn.h>
 #include <gtest/gtest.h>
 
 #include "../common/DepthPhotoProcessor.h"
@@ -35,19 +34,6 @@ static const size_t kTestBufferHeight = 480;
 static const size_t kTestBufferNV12Size ((((kTestBufferWidth) * (kTestBufferHeight)) * 3) / 2);
 static const size_t kTestBufferDepthSize (kTestBufferWidth * kTestBufferHeight);
 static const size_t kSeed = 1234;
-
-void linkToDepthPhotoLibrary(void **libHandle /*out*/,
-        process_depth_photo_frame *processFrameFunc /*out*/) {
-    ASSERT_NE(libHandle, nullptr);
-    ASSERT_NE(processFrameFunc, nullptr);
-
-    *libHandle = dlopen(kDepthPhotoLibrary, RTLD_NOW | RTLD_LOCAL);
-    if (*libHandle != nullptr) {
-        *processFrameFunc = reinterpret_cast<camera3::process_depth_photo_frame> (
-                dlsym(*libHandle, kDepthPhotoProcessFunction));
-        ASSERT_NE(*processFrameFunc, nullptr);
-    }
-}
 
 void generateColorJpegBuffer(int jpegQuality, ExifOrientation orientationValue, bool includeExif,
         bool switchDimensions, std::vector<uint8_t> *colorJpegBuffer /*out*/) {
@@ -91,25 +77,8 @@ void generateDepth16Buffer(std::array<uint16_t, kTestBufferDepthSize> *depth16Bu
     }
 }
 
-TEST(DepthProcessorTest, LinkToLibray) {
-    void *libHandle;
-    process_depth_photo_frame processFunc;
-    linkToDepthPhotoLibrary(&libHandle, &processFunc);
-    if (libHandle != nullptr) {
-        dlclose(libHandle);
-    }
-}
-
 TEST(DepthProcessorTest, BadInput) {
-    void *libHandle;
     int jpegQuality = 95;
-
-    process_depth_photo_frame processFunc;
-    linkToDepthPhotoLibrary(&libHandle, &processFunc);
-    if (libHandle == nullptr) {
-        // Depth library no present, nothing more to test.
-        return;
-    }
 
     DepthPhotoInputFrame inputFrame;
     // Worst case both depth and confidence maps have the same size as the main color image.
@@ -128,36 +97,26 @@ TEST(DepthProcessorTest, BadInput) {
     inputFrame.mMainJpegWidth = kTestBufferWidth;
     inputFrame.mMainJpegHeight = kTestBufferHeight;
     inputFrame.mJpegQuality = jpegQuality;
-    ASSERT_NE(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
+    ASSERT_NE(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
                 &actualDepthPhotoSize), 0);
 
     inputFrame.mMainJpegBuffer = reinterpret_cast<const char*> (colorJpegBuffer.data());
     inputFrame.mMainJpegSize = colorJpegBuffer.size();
-    ASSERT_NE(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
+    ASSERT_NE(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
                 &actualDepthPhotoSize), 0);
 
     inputFrame.mDepthMapBuffer = depth16Buffer.data();
     inputFrame.mDepthMapWidth = inputFrame.mDepthMapStride = kTestBufferWidth;
     inputFrame.mDepthMapHeight = kTestBufferHeight;
-    ASSERT_NE(processFunc(inputFrame, depthPhotoBuffer.size(), nullptr,
+    ASSERT_NE(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(), nullptr,
                 &actualDepthPhotoSize), 0);
 
-    ASSERT_NE(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(), nullptr),
-            0);
-
-    dlclose(libHandle);
+    ASSERT_NE(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
+                nullptr), 0);
 }
 
 TEST(DepthProcessorTest, BasicDepthPhotoValidation) {
-    void *libHandle;
     int jpegQuality = 95;
-
-    process_depth_photo_frame processFunc;
-    linkToDepthPhotoLibrary(&libHandle, &processFunc);
-    if (libHandle == nullptr) {
-        // Depth library no present, nothing more to test.
-        return;
-    }
 
     std::vector<uint8_t> colorJpegBuffer;
     generateColorJpegBuffer(jpegQuality, ExifOrientation::ORIENTATION_UNDEFINED,
@@ -180,7 +139,7 @@ TEST(DepthProcessorTest, BasicDepthPhotoValidation) {
 
     std::vector<uint8_t> depthPhotoBuffer(inputFrame.mMaxJpegSize);
     size_t actualDepthPhotoSize = 0;
-    ASSERT_EQ(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
+    ASSERT_EQ(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
                 &actualDepthPhotoSize), 0);
     ASSERT_TRUE((actualDepthPhotoSize > 0) && (depthPhotoBuffer.size() >= actualDepthPhotoSize));
 
@@ -196,20 +155,10 @@ TEST(DepthProcessorTest, BasicDepthPhotoValidation) {
     ASSERT_EQ(NV12Compressor::findJpegSize(depthPhotoBuffer.data() + mainJpegSize,
                 actualDepthPhotoSize - mainJpegSize, &depthMapSize), OK);
     ASSERT_TRUE((depthMapSize > 0) && (depthMapSize < (actualDepthPhotoSize - mainJpegSize)));
-
-    dlclose(libHandle);
 }
 
 TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
-    void *libHandle;
     int jpegQuality = 95;
-
-    process_depth_photo_frame processFunc;
-    linkToDepthPhotoLibrary(&libHandle, &processFunc);
-    if (libHandle == nullptr) {
-        // Depth library no present, nothing more to test.
-        return;
-    }
 
     ExifOrientation exifOrientations[] = { ExifOrientation::ORIENTATION_UNDEFINED,
             ExifOrientation::ORIENTATION_0_DEGREES, ExifOrientation::ORIENTATION_90_DEGREES,
@@ -242,8 +191,8 @@ TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
 
         std::vector<uint8_t> depthPhotoBuffer(inputFrame.mMaxJpegSize);
         size_t actualDepthPhotoSize = 0;
-        ASSERT_EQ(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
-                &actualDepthPhotoSize), 0);
+        ASSERT_EQ(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(),
+                    depthPhotoBuffer.data(), &actualDepthPhotoSize), 0);
         ASSERT_TRUE((actualDepthPhotoSize > 0) &&
                 (depthPhotoBuffer.size() >= actualDepthPhotoSize));
 
@@ -281,20 +230,10 @@ TEST(DepthProcessorTest, TestDepthPhotoExifOrientation) {
             ASSERT_EQ(confidenceJpegExifOrientation, exifOrientation);
         }
     }
-
-    dlclose(libHandle);
 }
 
 TEST(DepthProcessorTest, TestDephtPhotoPhysicalRotation) {
-    void *libHandle;
     int jpegQuality = 95;
-
-    process_depth_photo_frame processFunc;
-    linkToDepthPhotoLibrary(&libHandle, &processFunc);
-    if (libHandle == nullptr) {
-        // Depth library no present, nothing more to test.
-        return;
-    }
 
     // In case of physical rotation, the EXIF orientation must always be 0.
     auto exifOrientation = ExifOrientation::ORIENTATION_0_DEGREES;
@@ -339,8 +278,8 @@ TEST(DepthProcessorTest, TestDephtPhotoPhysicalRotation) {
 
         std::vector<uint8_t> depthPhotoBuffer(inputFrame.mMaxJpegSize);
         size_t actualDepthPhotoSize = 0;
-        ASSERT_EQ(processFunc(inputFrame, depthPhotoBuffer.size(), depthPhotoBuffer.data(),
-                &actualDepthPhotoSize), 0);
+        ASSERT_EQ(processDepthPhotoFrame(inputFrame, depthPhotoBuffer.size(),
+                    depthPhotoBuffer.data(), &actualDepthPhotoSize), 0);
         ASSERT_TRUE((actualDepthPhotoSize > 0) &&
                 (depthPhotoBuffer.size() >= actualDepthPhotoSize));
 
@@ -377,6 +316,4 @@ TEST(DepthProcessorTest, TestDephtPhotoPhysicalRotation) {
         ASSERT_EQ(confidenceMapWidth, expectedWidth);
         ASSERT_EQ(confidenceMapHeight, expectedHeight);
     }
-
-    dlclose(libHandle);
 }

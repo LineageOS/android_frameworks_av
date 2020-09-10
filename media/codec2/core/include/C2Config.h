@@ -58,6 +58,7 @@ struct C2Config {
     enum bitrate_mode_t : uint32_t;         ///< bitrate control mode
     enum drc_compression_mode_t : int32_t;  ///< DRC compression mode
     enum drc_effect_type_t : int32_t;       ///< DRC effect type
+    enum drc_album_mode_t : int32_t;        ///< DRC album mode
     enum intra_refresh_mode_t : uint32_t;   ///< intra refresh modes
     enum level_t : uint32_t;                ///< coding level
     enum ordinal_key_t : uint32_t;          ///< work ordering keys
@@ -218,6 +219,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexDrcBoostFactor, // drc, float (0-1)
     kParamIndexDrcAttenuationFactor, // drc, float (0-1)
     kParamIndexDrcEffectType, // drc, enum
+    kParamIndexDrcOutputLoudness, // drc, float (dBFS)
+    kParamIndexDrcAlbumMode, // drc, enum
 
     /* ============================== platform-defined parameters ============================== */
 
@@ -243,6 +246,9 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTimestampGapAdjustment, // input-surface, struct
 
     kParamIndexSurfaceAllocator, // u32
+
+    // low latency mode
+    kParamIndexLowLatencyMode, // bool
 };
 
 }
@@ -272,16 +278,19 @@ typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Config::api_level_t>, kPa
         C2ApiLevelSetting;
 constexpr char C2_PARAMKEY_API_LEVEL[] = "api.level";
 
-enum C2Config::api_feature_t : uint64_t {
+C2ENUM(C2Config::api_feature_t, uint64_t,
     API_REFLECTION       = (1U << 0),  ///< ability to list supported parameters
     API_VALUES           = (1U << 1),  ///< ability to list supported values for each parameter
     API_CURRENT_VALUES   = (1U << 2),  ///< ability to list currently supported values for each parameter
     API_DEPENDENCY       = (1U << 3),  ///< have a defined parameter dependency
 
+    API_SAME_INPUT_BUFFER = (1U << 16),   ///< supporting multiple input buffers
+                                          ///< backed by the same allocation
+
     API_STREAMS          = (1ULL << 32),  ///< supporting variable number of streams
 
-    API_TUNNELING        = (1ULL << 48),  ///< tunneling API
-};
+    API_TUNNELING        = (1ULL << 48)   ///< tunneling API
+)
 
 // read-only
 typedef C2GlobalParam<C2Setting, C2SimpleValueStruct<C2Config::api_feature_t>, kParamIndexApiFeatures>
@@ -521,6 +530,7 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_DV_HE_07 = _C2_PL_DV_BASE + 7,      ///< Dolby Vision dvhe.07 profile
     PROFILE_DV_HE_08 = _C2_PL_DV_BASE + 8,      ///< Dolby Vision dvhe.08 profile
     PROFILE_DV_AV_09 = _C2_PL_DV_BASE + 9,      ///< Dolby Vision dvav.09 profile
+    PROFILE_DV_AV1_10 = _C2_PL_DV_BASE + 10,    ///< Dolby Vision dav1.10 profile
 
     // AV1 profiles
     PROFILE_AV1_0 = _C2_PL_AV1_BASE,            ///< AV1 Profile 0 (4:2:0, 8 to 10 bit)
@@ -802,6 +812,16 @@ constexpr char C2_PARAMKEY_OUTPUT_DELAY[] = "output.delay";
 typedef C2GlobalParam<C2Tuning, C2Uint32Value, kParamIndexDelay> C2PipelineDelayTuning;
 typedef C2PipelineDelayTuning C2ActualPipelineDelayTuning; // deprecated
 constexpr char C2_PARAMKEY_PIPELINE_DELAY[] = "algo.delay";
+
+/**
+ * Enable/disable low latency mode.
+ * If true, low latency is preferred over low power. Disable power optimizations that
+ * may result in increased latency. For decoders, this means that the decoder does not
+ * hold input and output data more than required by the codec standards.
+ */
+typedef C2GlobalParam<C2Tuning, C2EasyBoolValue, kParamIndexLowLatencyMode>
+        C2GlobalLowLatencyModeTuning;
+constexpr char C2_PARAMKEY_LOW_LATENCY_MODE[] = "algo.low-latency";
 
 /**
  * Reference characteristics.
@@ -1927,6 +1947,24 @@ typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2Config::drc_effect_type_t>,
                 kParamIndexDrcEffectType>
         C2StreamDrcEffectTypeTuning;
 constexpr char C2_PARAMKEY_DRC_EFFECT_TYPE[] = "coding.drc.effect-type";
+
+/**
+ * DRC album mode. Used during decoding.
+ */
+C2ENUM(C2Config::drc_album_mode_t, int32_t,
+    DRC_ALBUM_MODE_OFF = 0,
+    DRC_ALBUM_MODE_ON = 1
+)
+typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2Config::drc_album_mode_t>, kParamIndexDrcAlbumMode>
+        C2StreamDrcAlbumModeTuning;
+constexpr char C2_PARAMKEY_DRC_ALBUM_MODE[] = "coding.drc.album-mode";
+
+/**
+ * DRC output loudness in dBFS. Retrieved during decoding
+ */
+ typedef C2StreamParam<C2Info, C2FloatValue, kParamIndexDrcOutputLoudness>
+        C2StreamDrcOutputLoudnessTuning;
+ constexpr char C2_PARAMKEY_DRC_OUTPUT_LOUDNESS[] = "output.drc.output-loudness";
 
 /* --------------------------------------- AAC components --------------------------------------- */
 

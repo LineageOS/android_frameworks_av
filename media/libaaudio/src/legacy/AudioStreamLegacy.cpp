@@ -26,6 +26,7 @@
 #include <media/AudioTimestamp.h>
 #include <utils/String16.h>
 
+#include "core/AudioGlobal.h"
 #include "core/AudioStream.h"
 #include "legacy/AudioStreamLegacy.h"
 
@@ -72,7 +73,7 @@ aaudio_data_callback_result_t AudioStreamLegacy::callDataCallbackFrames(uint8_t 
 
 // Implement FixedBlockProcessor
 int32_t AudioStreamLegacy::onProcessFixedBlock(uint8_t *buffer, int32_t numBytes) {
-    int32_t numFrames = numBytes / getBytesPerDeviceFrame();
+    int32_t numFrames = numBytes / mBlockAdapterBytesPerFrame;
     return (int32_t) callDataCallbackFrames(buffer, numFrames);
 }
 

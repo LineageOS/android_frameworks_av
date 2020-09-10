@@ -1,0 +1,22 @@
+{
+  "presubmit": [
+    {
+      "name": "CtsMediaTestCases",
+      "options": [
+        {
+          "include-annotation": "android.platform.test.annotations.Presubmit"
+        },
+        {
+          "exclude-annotation": "android.platform.test.annotations.RequiresDevice"
+        },
+        // TODO: b/149314419
+        {
+          "exclude-filter": "android.media.cts.AudioPlaybackCaptureTest"
+        },
+        {
+          "exclude-filter": "android.media.cts.AudioRecordTest"
+        }
+      ]
+    }
+  ]
+}

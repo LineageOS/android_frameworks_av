@@ -132,7 +132,7 @@ public:
             , mDurationMs(1000.) {
         }
 
-        explicit Configuration(const Configuration &configuration)
+        Configuration(const Configuration &configuration)
             : Interpolator<S, T>(*static_cast<const Interpolator<S, T> *>(&configuration))
             , RefBase()
             , mType(configuration.mType)
@@ -361,7 +361,7 @@ public:
             : Operation(flags, replaceId, std::numeric_limits<S>::quiet_NaN() /* xOffset */) {
         }
 
-        explicit Operation(const Operation &operation)
+        Operation(const Operation &operation)
             : Operation(operation.mFlags, operation.mReplaceId, operation.mXOffset) {
         }
 

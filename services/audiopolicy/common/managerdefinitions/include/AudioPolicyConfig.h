@@ -45,7 +45,8 @@ public:
           mOutputDevices(outputDevices),
           mInputDevices(inputDevices),
           mDefaultOutputDevice(defaultOutputDevice),
-          mIsSpeakerDrcEnabled(false)
+          mIsSpeakerDrcEnabled(false),
+          mIsCallScreenModeSupported(false)
     {}
 
     const std::string& getSource() const {
@@ -94,6 +95,14 @@ public:
     {
         mIsSpeakerDrcEnabled = isSpeakerDrcEnabled;
     }
+
+    bool isCallScreenModeSupported() const { return mIsCallScreenModeSupported; }
+
+    void setCallScreenModeSupported(bool isCallScreenModeSupported)
+    {
+        mIsCallScreenModeSupported = isCallScreenModeSupported;
+    }
+
 
     const HwModuleCollection getHwModules() const { return mHwModules; }
 
@@ -187,6 +196,7 @@ private:
     // DEVICE_CATEGORY_SPEAKER path to boost soft sounds, used to adjust volume curves accordingly.
     // Note: remove also speaker_drc_enabled from global configuration of XML config file.
     bool mIsSpeakerDrcEnabled;
+    bool mIsCallScreenModeSupported;
     SurroundFormats mSurroundFormats;
 };
 

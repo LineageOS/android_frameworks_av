@@ -90,7 +90,7 @@ public:
     typedef typename std::make_unsigned<T>::type unsignedT;
 
     Modulo() { } // intentionally uninitialized data
-    Modulo(const T &value) { mValue = value; }
+    Modulo(const T &value) { mValue = value; } // NOLINT
     const T & value() const { return mValue; } // not assignable
     signedT signedValue() const { return mValue; }
     unsignedT unsignedValue() const { return mValue; }

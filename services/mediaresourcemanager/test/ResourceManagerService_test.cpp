@@ -21,15 +21,28 @@
 #include <gtest/gtest.h>
 
 #include "ResourceManagerService.h"
-#include <media/IResourceManagerService.h>
+#include <aidl/android/media/BnResourceManagerClient.h>
 #include <media/MediaResource.h>
 #include <media/MediaResourcePolicy.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
 
+namespace aidl {
+namespace android {
+namespace media {
+bool operator== (const MediaResourceParcel& lhs, const MediaResourceParcel& rhs) {
+    return lhs.type == rhs.type && lhs.subType == rhs.subType &&
+            lhs.id == rhs.id && lhs.value == rhs.value;
+}}}}
+
 namespace android {
 
-static int64_t getId(const sp<IResourceManagerClient>& client) {
+using Status = ::ndk::ScopedAStatus;
+using ::aidl::android::media::BnResourceManagerClient;
+using ::aidl::android::media::IResourceManagerService;
+using ::aidl::android::media::IResourceManagerClient;
+
+static int64_t getId(const std::shared_ptr<IResourceManagerClient>& client) {
     return (int64_t) client.get();
 }
 
@@ -86,8 +99,7 @@ struct TestSystemCallback :
         mEventCount++;
     }
 
-    virtual bool requestCpusetBoost(
-            bool enable, const sp<IInterface> &/*client*/) override {
+    virtual bool requestCpusetBoost(bool enable) override {
         mLastEvent = {enable ? EventType::CPUSET_ENABLE : EventType::CPUSET_DISABLE, 0};
         mEventCount++;
         return true;
@@ -109,18 +121,19 @@ private:
 
 
 struct TestClient : public BnResourceManagerClient {
-    TestClient(int pid, sp<ResourceManagerService> service)
+    TestClient(int pid, const std::shared_ptr<ResourceManagerService> &service)
         : mReclaimed(false), mPid(pid), mService(service) {}
 
-    virtual bool reclaimResource() {
-        sp<IResourceManagerClient> client(this);
-        mService->removeClient(mPid, (int64_t) client.get());
+    Status reclaimResource(bool* _aidl_return) override {
+        mService->removeClient(mPid, getId(ref<TestClient>()));
         mReclaimed = true;
-        return true;
+        *_aidl_return = true;
+        return Status::ok();
     }
 
-    virtual String8 getName() {
-        return String8("test_client");
+    Status getName(::std::string* _aidl_return) override {
+        *_aidl_return = "test_client";
+        return Status::ok();
     }
 
     bool reclaimed() const {
@@ -131,13 +144,12 @@ struct TestClient : public BnResourceManagerClient {
         mReclaimed = false;
     }
 
-protected:
     virtual ~TestClient() {}
 
 private:
     bool mReclaimed;
     int mPid;
-    sp<ResourceManagerService> mService;
+    std::shared_ptr<ResourceManagerService> mService;
     DISALLOW_EVIL_CONSTRUCTORS(TestClient);
 };
 
@@ -157,24 +169,31 @@ bool operator== (const EventEntry& lhs, const EventEntry& rhs) {
     return lhs.type == rhs.type && lhs.arg == rhs.arg;
 }
 
+#define CHECK_STATUS_TRUE(condition) \
+    EXPECT_TRUE((condition).isOk() && (result))
+
+#define CHECK_STATUS_FALSE(condition) \
+    EXPECT_TRUE((condition).isOk() && !(result))
+
 class ResourceManagerServiceTest : public ::testing::Test {
 public:
     ResourceManagerServiceTest()
         : mSystemCB(new TestSystemCallback()),
-          mService(new ResourceManagerService(new TestProcessInfo, mSystemCB)),
-          mTestClient1(new TestClient(kTestPid1, mService)),
-          mTestClient2(new TestClient(kTestPid2, mService)),
-          mTestClient3(new TestClient(kTestPid2, mService)) {
+          mService(::ndk::SharedRefBase::make<ResourceManagerService>(
+                  new TestProcessInfo, mSystemCB)),
+          mTestClient1(::ndk::SharedRefBase::make<TestClient>(kTestPid1, mService)),
+          mTestClient2(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)),
+          mTestClient3(::ndk::SharedRefBase::make<TestClient>(kTestPid2, mService)) {
     }
 
 protected:
-    static bool isEqualResources(const Vector<MediaResource> &resources1,
+    static bool isEqualResources(const std::vector<MediaResourceParcel> &resources1,
             const ResourceList &resources2) {
         // convert resource1 to ResourceList
         ResourceList r1;
         for (size_t i = 0; i < resources1.size(); ++i) {
             const auto &res = resources1[i];
-            const auto resType = std::tuple(res.mType, res.mSubType, res.mId);
+            const auto resType = std::tuple(res.type, res.subType, res.id);
             r1[resType] = res;
         }
         return r1 == resources2;
@@ -182,8 +201,8 @@ protected:
 
     static void expectEqResourceInfo(const ResourceInfo &info,
             int uid,
-            sp<IResourceManagerClient> client,
-            const Vector<MediaResource> &resources) {
+            std::shared_ptr<IResourceManagerClient> client,
+            const std::vector<MediaResourceParcel> &resources) {
         EXPECT_EQ(uid, info.uid);
         EXPECT_EQ(client, info.client);
         EXPECT_TRUE(isEqualResources(resources, info.resources));
@@ -219,25 +238,25 @@ protected:
     // ---------------------------------------------------------------------------------
     void addResource() {
         // kTestPid1 mTestClient1
-        Vector<MediaResource> resources1;
-        resources1.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        std::vector<MediaResourceParcel> resources1;
+        resources1.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
-        resources1.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
-        Vector<MediaResource> resources11;
-        resources11.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
+        resources1.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
+        std::vector<MediaResourceParcel> resources11;
+        resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
 
         // kTestPid2 mTestClient2
-        Vector<MediaResource> resources2;
-        resources2.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
-        resources2.push_back(MediaResource(MediaResource::kGraphicMemory, 300));
+        std::vector<MediaResourceParcel> resources2;
+        resources2.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+        resources2.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 300));
         mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources2);
 
         // kTestPid2 mTestClient3
-        Vector<MediaResource> resources3;
+        std::vector<MediaResourceParcel> resources3;
         mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources3);
-        resources3.push_back(MediaResource(MediaResource::kSecureCodec, 1));
-        resources3.push_back(MediaResource(MediaResource::kGraphicMemory, 100));
+        resources3.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
+        resources3.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 100));
         mService->addResource(kTestPid2, kTestUid2, getId(mTestClient3), mTestClient3, resources3);
 
         const PidResourceInfosMap &map = mService->mMap;
@@ -256,32 +275,92 @@ protected:
         expectEqResourceInfo(infos2.valueFor(getId(mTestClient3)), kTestUid2, mTestClient3, resources3);
     }
 
+    void testCombineResourceWithNegativeValues() {
+        // kTestPid1 mTestClient1
+        std::vector<MediaResourceParcel> resources1;
+        resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, -100));
+        resources1.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, -100));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        // Expected result:
+        // 1) the client should have been added;
+        // 2) both resource entries should have been rejected, resource list should be empty.
+        const PidResourceInfosMap &map = mService->mMap;
+        EXPECT_EQ(1u, map.size());
+        ssize_t index1 = map.indexOfKey(kTestPid1);
+        ASSERT_GE(index1, 0);
+        const ResourceInfos &infos1 = map[index1];
+        EXPECT_EQ(1u, infos1.size());
+        std::vector<MediaResourceParcel> expected;
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+
+        resources1.clear();
+        resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, INT64_MAX));
+        resources1.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MAX));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+        resources1.clear();
+        resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, 10));
+        resources1.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 10));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        // Expected result:
+        // Both values should saturate to INT64_MAX
+        expected.push_back(MediaResource(MediaResource::Type::kDrmSession, INT64_MAX));
+        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MAX));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+
+        resources1.clear();
+        resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, -10));
+        resources1.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, -10));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        // Expected result:
+        // 1) DrmSession resource should allow negative value addition, and value should drop accordingly
+        // 2) Non-drm session resource should ignore negative value addition.
+        expected.push_back(MediaResource(MediaResource::Type::kDrmSession, INT64_MAX - 10));
+        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MAX));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+
+        resources1.clear();
+        resources1.push_back(MediaResource(MediaResource::Type::kDrmSession, INT64_MIN));
+        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MIN));
+        mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
+
+        // Expected result:
+        // 1) DrmSession resource value should drop to 0, but the entry shouldn't be removed.
+        // 2) Non-drm session resource should ignore negative value addition.
+        expected.clear();
+        expected.push_back(MediaResource(MediaResource::Type::kDrmSession, 0));
+        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, INT64_MAX));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+    }
+
     void testConfig() {
         EXPECT_TRUE(mService->mSupportsMultipleSecureCodecs);
         EXPECT_TRUE(mService->mSupportsSecureWithNonSecureCodec);
 
-        Vector<MediaResourcePolicy> policies1;
+        std::vector<MediaResourcePolicyParcel> policies1;
         policies1.push_back(
                 MediaResourcePolicy(
-                        String8(kPolicySupportsMultipleSecureCodecs),
-                        String8("true")));
+                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
+                        "true"));
         policies1.push_back(
                 MediaResourcePolicy(
-                        String8(kPolicySupportsSecureWithNonSecureCodec),
-                        String8("false")));
+                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
+                        "false"));
         mService->config(policies1);
         EXPECT_TRUE(mService->mSupportsMultipleSecureCodecs);
         EXPECT_FALSE(mService->mSupportsSecureWithNonSecureCodec);
 
-        Vector<MediaResourcePolicy> policies2;
+        std::vector<MediaResourcePolicyParcel> policies2;
         policies2.push_back(
                 MediaResourcePolicy(
-                        String8(kPolicySupportsMultipleSecureCodecs),
-                        String8("false")));
+                        IResourceManagerService::kPolicySupportsMultipleSecureCodecs,
+                        "false"));
         policies2.push_back(
                 MediaResourcePolicy(
-                        String8(kPolicySupportsSecureWithNonSecureCodec),
-                        String8("true")));
+                        IResourceManagerService::kPolicySupportsSecureWithNonSecureCodec,
+                        "true"));
         mService->config(policies2);
         EXPECT_FALSE(mService->mSupportsMultipleSecureCodecs);
         EXPECT_TRUE(mService->mSupportsSecureWithNonSecureCodec);
@@ -289,12 +368,12 @@ protected:
 
     void testCombineResource() {
         // kTestPid1 mTestClient1
-        Vector<MediaResource> resources1;
-        resources1.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        std::vector<MediaResourceParcel> resources1;
+        resources1.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
 
-        Vector<MediaResource> resources11;
-        resources11.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
+        std::vector<MediaResourceParcel> resources11;
+        resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
 
         const PidResourceInfosMap &map = mService->mMap;
@@ -305,35 +384,35 @@ protected:
         EXPECT_EQ(1u, infos1.size());
 
         // test adding existing types to combine values
-        resources1.push_back(MediaResource(MediaResource::kGraphicMemory, 100));
+        resources1.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 100));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
 
-        Vector<MediaResource> expected;
-        expected.push_back(MediaResource(MediaResource::kSecureCodec, 2));
-        expected.push_back(MediaResource(MediaResource::kGraphicMemory, 300));
+        std::vector<MediaResourceParcel> expected;
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, 2));
+        expected.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 300));
         expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
 
         // test adding new types (including types that differs only in subType)
-        resources11.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
-        resources11.push_back(MediaResource(MediaResource::kSecureCodec, MediaResource::kVideoCodec, 1));
+        resources11.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+        resources11.push_back(MediaResource(MediaResource::Type::kSecureCodec, MediaResource::SubType::kVideoCodec, 1));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
 
         expected.clear();
-        expected.push_back(MediaResource(MediaResource::kSecureCodec, 2));
-        expected.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
-        expected.push_back(MediaResource(MediaResource::kSecureCodec, MediaResource::kVideoCodec, 1));
-        expected.push_back(MediaResource(MediaResource::kGraphicMemory, 500));
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, 2));
+        expected.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, MediaResource::SubType::kVideoCodec, 1));
+        expected.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 500));
         expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
     }
 
     void testRemoveResource() {
         // kTestPid1 mTestClient1
-        Vector<MediaResource> resources1;
-        resources1.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        std::vector<MediaResourceParcel> resources1;
+        resources1.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
 
-        Vector<MediaResource> resources11;
-        resources11.push_back(MediaResource(MediaResource::kGraphicMemory, 200));
+        std::vector<MediaResourceParcel> resources11;
+        resources11.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 200));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources11);
 
         const PidResourceInfosMap &map = mService->mMap;
@@ -344,21 +423,103 @@ protected:
         EXPECT_EQ(1u, infos1.size());
 
         // test partial removal
-        resources11.editItemAt(0).mValue = 100;
+        resources11[0].value = 100;
         mService->removeResource(kTestPid1, getId(mTestClient1), resources11);
 
-        Vector<MediaResource> expected;
-        expected.push_back(MediaResource(MediaResource::kSecureCodec, 1));
-        expected.push_back(MediaResource(MediaResource::kGraphicMemory, 100));
+        std::vector<MediaResourceParcel> expected;
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
+        expected.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 100));
+        expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+
+        // test removal request with negative value, should be ignored
+        resources11[0].value = -10000;
+        mService->removeResource(kTestPid1, getId(mTestClient1), resources11);
+
         expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
 
         // test complete removal with overshoot value
-        resources11.editItemAt(0).mValue = 1000;
+        resources11[0].value = 1000;
         mService->removeResource(kTestPid1, getId(mTestClient1), resources11);
 
         expected.clear();
-        expected.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+        expected.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
         expectEqResourceInfo(infos1.valueFor(getId(mTestClient1)), kTestUid1, mTestClient1, expected);
+    }
+
+    void testOverridePid() {
+
+        bool result;
+        std::vector<MediaResourceParcel> resources;
+        resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
+        resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
+
+        // ### secure codec can't coexist and secure codec can coexist with non-secure codec ###
+        {
+            addResource();
+            mService->mSupportsMultipleSecureCodecs = false;
+            mService->mSupportsSecureWithNonSecureCodec = true;
+
+            // priority too low to reclaim resource
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+
+            // override Low Priority Pid with High Priority Pid
+            mService->overridePid(kLowPriorityPid, kHighPriorityPid);
+            CHECK_STATUS_TRUE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+
+            // restore Low Priority Pid
+            mService->overridePid(kLowPriorityPid, -1);
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+        }
+    }
+
+    void testMarkClientForPendingRemoval() {
+        bool result;
+
+        {
+            addResource();
+            mService->mSupportsSecureWithNonSecureCodec = true;
+
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+
+            // Remove low priority clients
+            mService->removeClient(kTestPid1, getId(mTestClient1));
+
+            // no lower priority client
+            CHECK_STATUS_FALSE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(false /* c1 */, false /* c2 */, false /* c3 */);
+
+            mService->markClientForPendingRemoval(kTestPid2, getId(mTestClient2));
+
+            // client marked for pending removal from the same process got reclaimed
+            CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+
+            // clean up client 3 which still left
+            mService->removeClient(kTestPid2, getId(mTestClient3));
+        }
+
+        {
+            addResource();
+            mService->mSupportsSecureWithNonSecureCodec = true;
+
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+
+            mService->markClientForPendingRemoval(kTestPid2, getId(mTestClient2));
+
+            // client marked for pending removal from the same process got reclaimed
+            // first, even though there are lower priority process
+            CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
+
+            // lower priority client got reclaimed
+            CHECK_STATUS_TRUE(mService->reclaimResource(kTestPid2, resources, &result));
+            verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
+
+            // clean up client 3 which still left
+            mService->removeClient(kTestPid2, getId(mTestClient3));
+        }
     }
 
     void testRemoveClient() {
@@ -380,8 +541,8 @@ protected:
     void testGetAllClients() {
         addResource();
 
-        MediaResource::Type type = MediaResource::kSecureCodec;
-        Vector<sp<IResourceManagerClient> > clients;
+        MediaResource::Type type = MediaResource::Type::kSecureCodec;
+        Vector<std::shared_ptr<IResourceManagerClient> > clients;
         EXPECT_FALSE(mService->getAllClients_l(kLowPriorityPid, type, &clients));
         // some higher priority process (e.g. kTestPid2) owns the resource, so getAllClients_l
         // will fail.
@@ -395,9 +556,10 @@ protected:
     }
 
     void testReclaimResourceSecure() {
-        Vector<MediaResource> resources;
-        resources.push_back(MediaResource(MediaResource::kSecureCodec, 1));
-        resources.push_back(MediaResource(MediaResource::kGraphicMemory, 150));
+        bool result;
+        std::vector<MediaResourceParcel> resources;
+        resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
+        resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
 
         // ### secure codec can't coexist and secure codec can coexist with non-secure codec ###
         {
@@ -406,19 +568,19 @@ protected:
             mService->mSupportsSecureWithNonSecureCodec = true;
 
             // priority too low
-            EXPECT_FALSE(mService->reclaimResource(kLowPriorityPid, resources));
-            EXPECT_FALSE(mService->reclaimResource(kMidPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kMidPriorityPid, resources, &result));
 
             // reclaim all secure codecs
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(true /* c1 */, false /* c2 */, true /* c3 */);
 
             // call again should reclaim one largest graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
 
             // nothing left
-            EXPECT_FALSE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
         }
 
         // ### secure codecs can't coexist and secure codec can't coexist with non-secure codec ###
@@ -428,15 +590,15 @@ protected:
             mService->mSupportsSecureWithNonSecureCodec = false;
 
             // priority too low
-            EXPECT_FALSE(mService->reclaimResource(kLowPriorityPid, resources));
-            EXPECT_FALSE(mService->reclaimResource(kMidPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kMidPriorityPid, resources, &result));
 
             // reclaim all secure and non-secure codecs
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(true /* c1 */, true /* c2 */, true /* c3 */);
 
             // nothing left
-            EXPECT_FALSE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
         }
 
 
@@ -447,23 +609,23 @@ protected:
             mService->mSupportsSecureWithNonSecureCodec = false;
 
             // priority too low
-            EXPECT_FALSE(mService->reclaimResource(kLowPriorityPid, resources));
-            EXPECT_FALSE(mService->reclaimResource(kMidPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kMidPriorityPid, resources, &result));
 
             // reclaim all non-secure codecs
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
 
             // call again should reclaim one largest graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
 
             // call again should reclaim another largest graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
 
             // nothing left
-            EXPECT_FALSE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
         }
 
         // ### secure codecs can coexist and secure codec can coexist with non-secure codec ###
@@ -473,22 +635,22 @@ protected:
             mService->mSupportsSecureWithNonSecureCodec = true;
 
             // priority too low
-            EXPECT_FALSE(mService->reclaimResource(kLowPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
 
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // one largest graphic memory from lowest process got reclaimed
             verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
 
             // call again should reclaim another graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
 
             // call again should reclaim another graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
 
             // nothing left
-            EXPECT_FALSE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
         }
 
         // ### secure codecs can coexist and secure codec can coexist with non-secure codec ###
@@ -497,27 +659,28 @@ protected:
             mService->mSupportsMultipleSecureCodecs = true;
             mService->mSupportsSecureWithNonSecureCodec = true;
 
-            Vector<MediaResource> resources;
-            resources.push_back(MediaResource(MediaResource::kSecureCodec, 1));
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(MediaResource(MediaResource::Type::kSecureCodec, 1));
 
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // secure codec from lowest process got reclaimed
             verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
 
             // call again should reclaim another secure codec from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
 
             // no more secure codec, non-secure codec will be reclaimed.
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
         }
     }
 
     void testReclaimResourceNonSecure() {
-        Vector<MediaResource> resources;
-        resources.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
-        resources.push_back(MediaResource(MediaResource::kGraphicMemory, 150));
+        bool result;
+        std::vector<MediaResourceParcel> resources;
+        resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
+        resources.push_back(MediaResource(MediaResource::Type::kGraphicMemory, 150));
 
         // ### secure codec can't coexist with non-secure codec ###
         {
@@ -525,19 +688,19 @@ protected:
             mService->mSupportsSecureWithNonSecureCodec = false;
 
             // priority too low
-            EXPECT_FALSE(mService->reclaimResource(kLowPriorityPid, resources));
-            EXPECT_FALSE(mService->reclaimResource(kMidPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kMidPriorityPid, resources, &result));
 
             // reclaim all secure codecs
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(true /* c1 */, false /* c2 */, true /* c3 */);
 
             // call again should reclaim one graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
 
             // nothing left
-            EXPECT_FALSE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
         }
 
 
@@ -547,22 +710,22 @@ protected:
             mService->mSupportsSecureWithNonSecureCodec = true;
 
             // priority too low
-            EXPECT_FALSE(mService->reclaimResource(kLowPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kLowPriorityPid, resources, &result));
 
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // one largest graphic memory from lowest process got reclaimed
             verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
 
             // call again should reclaim another graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
 
             // call again should reclaim another graphic memory from lowest process
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(false /* c1 */, false /* c2 */, true /* c3 */);
 
             // nothing left
-            EXPECT_FALSE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_FALSE(mService->reclaimResource(kHighPriorityPid, resources, &result));
         }
 
         // ### secure codec can coexist with non-secure codec ###
@@ -570,15 +733,15 @@ protected:
             addResource();
             mService->mSupportsSecureWithNonSecureCodec = true;
 
-            Vector<MediaResource> resources;
-            resources.push_back(MediaResource(MediaResource::kNonSecureCodec, 1));
+            std::vector<MediaResourceParcel> resources;
+            resources.push_back(MediaResource(MediaResource::Type::kNonSecureCodec, 1));
 
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             // one non secure codec from lowest process got reclaimed
             verifyClients(false /* c1 */, true /* c2 */, false /* c3 */);
 
             // no more non-secure codec, secure codec from lowest priority process will be reclaimed
-            EXPECT_TRUE(mService->reclaimResource(kHighPriorityPid, resources));
+            CHECK_STATUS_TRUE(mService->reclaimResource(kHighPriorityPid, resources, &result));
             verifyClients(true /* c1 */, false /* c2 */, false /* c3 */);
 
             // clean up client 3 which still left
@@ -587,8 +750,8 @@ protected:
     }
 
     void testGetLowestPriorityBiggestClient() {
-        MediaResource::Type type = MediaResource::kGraphicMemory;
-        sp<IResourceManagerClient> client;
+        MediaResource::Type type = MediaResource::Type::kGraphicMemory;
+        std::shared_ptr<IResourceManagerClient> client;
         EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, &client));
 
         addResource();
@@ -596,8 +759,8 @@ protected:
         EXPECT_FALSE(mService->getLowestPriorityBiggestClient_l(kLowPriorityPid, type, &client));
         EXPECT_TRUE(mService->getLowestPriorityBiggestClient_l(kHighPriorityPid, type, &client));
 
-        // kTestPid1 is the lowest priority process with MediaResource::kGraphicMemory.
-        // mTestClient1 has the largest MediaResource::kGraphicMemory within kTestPid1.
+        // kTestPid1 is the lowest priority process with MediaResource::Type::kGraphicMemory.
+        // mTestClient1 has the largest MediaResource::Type::kGraphicMemory within kTestPid1.
         EXPECT_EQ(mTestClient1, client);
     }
 
@@ -606,7 +769,7 @@ protected:
         int priority;
         TestProcessInfo processInfo;
 
-        MediaResource::Type type = MediaResource::kGraphicMemory;
+        MediaResource::Type type = MediaResource::Type::kGraphicMemory;
         EXPECT_FALSE(mService->getLowestPriorityPid_l(type, &pid, &priority));
 
         addResource();
@@ -617,7 +780,7 @@ protected:
         processInfo.getPriority(kTestPid1, &priority1);
         EXPECT_EQ(priority1, priority);
 
-        type = MediaResource::kNonSecureCodec;
+        type = MediaResource::Type::kNonSecureCodec;
         EXPECT_TRUE(mService->getLowestPriorityPid_l(type, &pid, &priority));
         EXPECT_EQ(kTestPid2, pid);
         int priority2;
@@ -626,8 +789,8 @@ protected:
     }
 
     void testGetBiggestClient() {
-        MediaResource::Type type = MediaResource::kGraphicMemory;
-        sp<IResourceManagerClient> client;
+        MediaResource::Type type = MediaResource::Type::kGraphicMemory;
+        std::shared_ptr<IResourceManagerClient> client;
         EXPECT_FALSE(mService->getBiggestClient_l(kTestPid2, type, &client));
 
         addResource();
@@ -648,8 +811,8 @@ protected:
         EXPECT_EQ(EventType::VIDEO_RESET, mSystemCB->lastEventType());
 
         // new client request should cause VIDEO_ON
-        Vector<MediaResource> resources1;
-        resources1.push_back(MediaResource(MediaResource::kBattery, MediaResource::kVideoCodec, 1));
+        std::vector<MediaResourceParcel> resources1;
+        resources1.push_back(MediaResource(MediaResource::Type::kBattery, MediaResource::SubType::kVideoCodec, 1));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
         EXPECT_EQ(2u, mSystemCB->eventCount());
         EXPECT_EQ(EventEntry({EventType::VIDEO_ON, kTestUid1}), mSystemCB->lastEvent());
@@ -659,8 +822,8 @@ protected:
         EXPECT_EQ(2u, mSystemCB->eventCount());
 
         // new client request should cause VIDEO_ON
-        Vector<MediaResource> resources2;
-        resources2.push_back(MediaResource(MediaResource::kBattery, MediaResource::kVideoCodec, 2));
+        std::vector<MediaResourceParcel> resources2;
+        resources2.push_back(MediaResource(MediaResource::Type::kBattery, MediaResource::SubType::kVideoCodec, 2));
         mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources2);
         EXPECT_EQ(3u, mSystemCB->eventCount());
         EXPECT_EQ(EventEntry({EventType::VIDEO_ON, kTestUid2}), mSystemCB->lastEvent());
@@ -687,8 +850,8 @@ protected:
         EXPECT_EQ(EventType::VIDEO_RESET, mSystemCB->lastEventType());
 
         // new client request should cause CPUSET_ENABLE
-        Vector<MediaResource> resources1;
-        resources1.push_back(MediaResource(MediaResource::kCpuBoost, 1));
+        std::vector<MediaResourceParcel> resources1;
+        resources1.push_back(MediaResource(MediaResource::Type::kCpuBoost, 1));
         mService->addResource(kTestPid1, kTestUid1, getId(mTestClient1), mTestClient1, resources1);
         EXPECT_EQ(2u, mSystemCB->eventCount());
         EXPECT_EQ(EventType::CPUSET_ENABLE, mSystemCB->lastEventType());
@@ -698,8 +861,8 @@ protected:
         EXPECT_EQ(2u, mSystemCB->eventCount());
 
         // new client request should cause CPUSET_ENABLE
-        Vector<MediaResource> resources2;
-        resources2.push_back(MediaResource(MediaResource::kCpuBoost, 2));
+        std::vector<MediaResourceParcel> resources2;
+        resources2.push_back(MediaResource(MediaResource::Type::kCpuBoost, 2));
         mService->addResource(kTestPid2, kTestUid2, getId(mTestClient2), mTestClient2, resources2);
         EXPECT_EQ(3u, mSystemCB->eventCount());
         EXPECT_EQ(EventType::CPUSET_ENABLE, mSystemCB->lastEventType());
@@ -720,10 +883,10 @@ protected:
     }
 
     sp<TestSystemCallback> mSystemCB;
-    sp<ResourceManagerService> mService;
-    sp<IResourceManagerClient> mTestClient1;
-    sp<IResourceManagerClient> mTestClient2;
-    sp<IResourceManagerClient> mTestClient3;
+    std::shared_ptr<ResourceManagerService> mService;
+    std::shared_ptr<IResourceManagerClient> mTestClient1;
+    std::shared_ptr<IResourceManagerClient> mTestClient2;
+    std::shared_ptr<IResourceManagerClient> mTestClient3;
 };
 
 TEST_F(ResourceManagerServiceTest, config) {
@@ -736,6 +899,10 @@ TEST_F(ResourceManagerServiceTest, addResource) {
 
 TEST_F(ResourceManagerServiceTest, combineResource) {
     testCombineResource();
+}
+
+TEST_F(ResourceManagerServiceTest, combineResourceNegative) {
+    testCombineResourceWithNegativeValues();
 }
 
 TEST_F(ResourceManagerServiceTest, removeResource) {
@@ -777,6 +944,14 @@ TEST_F(ResourceManagerServiceTest, testBatteryStats) {
 
 TEST_F(ResourceManagerServiceTest, testCpusetBoost) {
     testCpusetBoost();
+}
+
+TEST_F(ResourceManagerServiceTest, overridePid) {
+    testOverridePid();
+}
+
+TEST_F(ResourceManagerServiceTest, markClientForPendingRemoval) {
+    testMarkClientForPendingRemoval();
 }
 
 } // namespace android

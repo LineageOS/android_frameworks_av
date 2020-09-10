@@ -18,12 +18,16 @@
 #define LOG_TAG "Codec2Buffer"
 #include <utils/Log.h>
 
+#include <android/hardware/cas/native/1.0/types.h>
+#include <android/hardware/drm/1.0/types.h>
 #include <hidlmemory/FrameworkUtils.h>
 #include <media/hardware/HardwareAPI.h>
+#include <media/stagefright/CodecBase.h>
 #include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/foundation/AUtils.h>
+#include <mediadrm/ICrypto.h>
 #include <nativebase/nativebase.h>
 #include <ui/Fence.h>
 
@@ -110,7 +114,11 @@ DummyContainerBuffer::DummyContainerBuffer(
 }
 
 std::shared_ptr<C2Buffer> DummyContainerBuffer::asC2Buffer() {
-    return std::move(mBufferRef);
+    return mBufferRef;
+}
+
+void DummyContainerBuffer::clearC2BufferRefs() {
+    mBufferRef.reset();
 }
 
 bool DummyContainerBuffer::canCopy(const std::shared_ptr<C2Buffer> &) const {
@@ -186,7 +194,11 @@ ConstLinearBlockBuffer::ConstLinearBlockBuffer(
 }
 
 std::shared_ptr<C2Buffer> ConstLinearBlockBuffer::asC2Buffer() {
-    return std::move(mBufferRef);
+    return mBufferRef;
+}
+
+void ConstLinearBlockBuffer::clearC2BufferRefs() {
+    mBufferRef.reset();
 }
 
 // GraphicView2MediaImageConverter
@@ -688,8 +700,12 @@ ConstGraphicBlockBuffer::ConstGraphicBlockBuffer(
 }
 
 std::shared_ptr<C2Buffer> ConstGraphicBlockBuffer::asC2Buffer() {
+    return mBufferRef;
+}
+
+void ConstGraphicBlockBuffer::clearC2BufferRefs() {
     mView.reset();
-    return std::move(mBufferRef);
+    mBufferRef.reset();
 }
 
 bool ConstGraphicBlockBuffer::canCopy(const std::shared_ptr<C2Buffer> &buffer) const {
@@ -764,7 +780,11 @@ EncryptedLinearBlockBuffer::EncryptedLinearBlockBuffer(
         const std::shared_ptr<C2LinearBlock> &block,
         const sp<IMemory> &memory,
         int32_t heapSeqNum)
-    : Codec2Buffer(format, new ABuffer(memory->pointer(), memory->size())),
+    // TODO: Using unsecurePointer() has some associated security pitfalls
+    //       (see declaration for details).
+    //       Either document why it is safe in this case or address the
+    //       issue (e.g. by copying).
+    : Codec2Buffer(format, new ABuffer(memory->unsecurePointer(), memory->size())),
       mBlock(block),
       mMemory(memory),
       mHeapSeqNum(heapSeqNum) {
@@ -775,9 +795,8 @@ std::shared_ptr<C2Buffer> EncryptedLinearBlockBuffer::asC2Buffer() {
 }
 
 void EncryptedLinearBlockBuffer::fillSourceBuffer(
-        ICrypto::SourceBuffer *source) {
-    source->mSharedMemory = mMemory;
-    source->mHeapSeqNum = mHeapSeqNum;
+        hardware::drm::V1_0::SharedBuffer *source) {
+    BufferChannelBase::IMemoryToSharedBuffer(mMemory, mHeapSeqNum, source);
 }
 
 void EncryptedLinearBlockBuffer::fillSourceBuffer(
@@ -800,7 +819,7 @@ bool EncryptedLinearBlockBuffer::copyDecryptedContent(
     if (view.size() < length) {
         return false;
     }
-    memcpy(view.data(), decrypted->pointer(), length);
+    memcpy(view.data(), decrypted->unsecurePointer(), length);
     return true;
 }
 

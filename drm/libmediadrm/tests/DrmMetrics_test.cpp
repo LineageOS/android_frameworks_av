@@ -16,6 +16,7 @@
 
 #define LOG_TAG "DrmMetricsTest"
 #include "mediadrm/DrmMetrics.h"
+#include "mediadrm/DrmMetricsConsumer.h"
 
 #include <android/hardware/drm/1.0/types.h>
 #include <android/hardware/drm/1.1/types.h>
@@ -58,8 +59,9 @@ class FakeMediaDrmMetrics : public MediaDrmMetrics {
 TEST_F(MediaDrmMetricsTest, EmptySuccess) {
   MediaDrmMetrics metrics;
   PersistableBundle bundle;
+  DrmMetricsConsumer consumer(&bundle);
 
-  metrics.Export(&bundle);
+  consumer.consumeFrameworkMetrics(metrics);
   EXPECT_TRUE(bundle.empty());
 }
 
@@ -85,8 +87,9 @@ TEST_F(MediaDrmMetricsTest, AllValuesSuccessCounts) {
   metrics.mEventCounter.Increment(EventType::PROVISION_REQUIRED);
 
   PersistableBundle bundle;
+  DrmMetricsConsumer consumer(&bundle);
 
-  metrics.Export(&bundle);
+  consumer.consumeFrameworkMetrics(metrics);
   EXPECT_EQ(11U, bundle.size());
 
   // Verify the list of pairs of int64 metrics.
@@ -174,7 +177,8 @@ TEST_F(MediaDrmMetricsTest, AllValuesFull) {
   metrics.SetSessionEnd(sessionId1);
 
   PersistableBundle bundle;
-  metrics.Export(&bundle);
+  DrmMetricsConsumer consumer(&bundle);
+  consumer.consumeFrameworkMetrics(metrics);
   EXPECT_EQ(35U, bundle.size());
 
   // Verify the list of pairs of int64 metrics.
@@ -421,7 +425,7 @@ TEST_F(MediaDrmMetricsTest, HidlToBundleMetricsEmpty) {
   hidl_vec<DrmMetricGroup> hidlMetricGroups;
   PersistableBundle bundleMetricGroups;
 
-  ASSERT_EQ(OK, MediaDrmMetrics::HidlMetricsToBundle(hidlMetricGroups, &bundleMetricGroups));
+  ASSERT_EQ(OK, DrmMetricsConsumer::HidlMetricsToBundle(hidlMetricGroups, &bundleMetricGroups));
   ASSERT_EQ(0U, bundleMetricGroups.size());
 }
 
@@ -441,7 +445,7 @@ TEST_F(MediaDrmMetricsTest, HidlToBundleMetricsMultiple) {
           } } };
 
   PersistableBundle bundleMetricGroups;
-  ASSERT_EQ(OK, MediaDrmMetrics::HidlMetricsToBundle(hidl_vec<DrmMetricGroup>({hidlMetricGroup}),
+  ASSERT_EQ(OK, DrmMetricsConsumer::HidlMetricsToBundle(hidl_vec<DrmMetricGroup>({hidlMetricGroup}),
                                                      &bundleMetricGroups));
   ASSERT_EQ(1U, bundleMetricGroups.size());
   PersistableBundle bundleMetricGroup;

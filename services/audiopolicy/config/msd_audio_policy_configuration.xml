@@ -40,7 +40,7 @@
                      channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO,AUDIO_CHANNEL_OUT_5POINT1,AUDIO_CHANNEL_OUT_7POINT1"/>
         </mixPort>
         <!-- The HW AV Sync flag is not required, but is recommended -->
-        <mixPort name="ms12 output" role="sink" flags="AUDIO_INPUT_FLAG_HW_AV_SYNC">
+        <mixPort name="ms12 output" role="sink" flags="AUDIO_INPUT_FLAG_HW_AV_SYNC|AUDIO_INPUT_FLAG_DIRECT">
             <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
                      samplingRates="48000" channelMasks="AUDIO_CHANNEL_IN_STEREO"/>
             <profile name="" format="AUDIO_FORMAT_AC3"

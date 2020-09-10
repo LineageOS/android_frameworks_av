@@ -45,7 +45,7 @@ cc_test {
         "libstagefright_metadatautils",
 
         "libmedia_midiiowrapper",
-        "libsonivox",
+        "libsonivoxwithoutjet",
         "libvorbisidec",
         "libwebm",
         "libFLAC",

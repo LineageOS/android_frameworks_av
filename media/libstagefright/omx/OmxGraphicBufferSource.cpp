@@ -14,11 +14,17 @@
  * limitations under the License.
  */
 
+#ifdef __LP64__
+#define OMX_ANDROID_COMPILE_AS_32BIT_ON_64BIT_PLATFORMS
+#endif
+
 #include <inttypes.h>
 
 #define LOG_TAG "OmxGraphicBufferSource"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
+
+#include <media/openmax/OMX_Core.h>
 
 #include <media/stagefright/bqhelper/ComponentWrapper.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
@@ -59,15 +65,18 @@ private:
 }  // namespace
 
 Status OmxGraphicBufferSource::onOmxExecuting() {
-    return start();
+    status_t err = start();
+    return (OK == err) ? Status::ok() : Status::fromServiceSpecificError(err);
 }
 
 Status OmxGraphicBufferSource::onOmxIdle() {
-    return stop();
+    status_t err = stop();
+    return (OK == err) ? Status::ok() : Status::fromServiceSpecificError(err);
 }
 
 Status OmxGraphicBufferSource::onOmxLoaded(){
-    return release();
+    status_t err = release();
+    return (OK == err) ? Status::ok() : Status::fromServiceSpecificError(err);
 }
 
 status_t OmxGraphicBufferSource::configure(

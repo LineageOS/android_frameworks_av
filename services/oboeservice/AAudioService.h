@@ -55,6 +55,10 @@ public:
                                        aaudio::AAudioStreamConfiguration &configurationOutput)
                                        override;
 
+    /*
+     * This is called from Binder. It checks for permissions
+     * and converts the handle passed through Binder to a stream pointer.
+     */
     aaudio_result_t closeStream(aaudio::aaudio_handle_t streamHandle) override;
 
     aaudio_result_t getStreamDescription(
@@ -77,15 +81,30 @@ public:
                                                   pid_t tid) override;
 
     aaudio_result_t startClient(aaudio::aaudio_handle_t streamHandle,
-                                      const android::AudioClient& client,
-                                      audio_port_handle_t *clientHandle) override;
+                                const android::AudioClient& client,
+                                const audio_attributes_t *attr,
+                                audio_port_handle_t *clientHandle) override;
 
     aaudio_result_t stopClient(aaudio::aaudio_handle_t streamHandle,
                                        audio_port_handle_t clientHandle) override;
 
+ // ===============================================================================
+ // The following public methods are only called from the service and NOT by Binder.
+ // ===============================================================================
+
     aaudio_result_t disconnectStreamByPortHandle(audio_port_handle_t portHandle);
 
+    /*
+     * This is only called from within the Service.
+     * It bypasses the permission checks in closeStream(handle).
+     */
+    aaudio_result_t closeStream(sp<aaudio::AAudioServiceStreamBase> serviceStream);
+
 private:
+
+    /** @return true if the client is the audioserver
+     */
+    bool isCallerInService();
 
     /**
      * Lookup stream and then validate access to the stream.
@@ -95,20 +114,19 @@ private:
     sp<aaudio::AAudioServiceStreamBase> convertHandleToServiceStream(
             aaudio::aaudio_handle_t streamHandle);
 
-
-
-    bool releaseStream(const sp<aaudio::AAudioServiceStreamBase> &serviceStream);
-
-    aaudio_result_t checkForPendingClose(const sp<aaudio::AAudioServiceStreamBase> &serviceStream,
-                                         aaudio_result_t defaultResult);
-
     android::AudioClient            mAudioClient;
 
     aaudio::AAudioStreamTracker     mStreamTracker;
 
-    enum constants {
-        DEFAULT_AUDIO_PRIORITY = 2
-    };
+    // We use a lock to prevent thread A from reopening an exclusive stream
+    // after thread B steals thread A's exclusive MMAP resource stream.
+    std::recursive_mutex            mOpenLock;
+
+    // TODO  Extract the priority constants from services/audioflinger/Threads.cpp
+    // and share them with this code. Look for "kPriorityFastMixer".
+    static constexpr int32_t        kRealTimeAudioPriorityClient = 2;
+    static constexpr int32_t        kRealTimeAudioPriorityService = 3;
+
 };
 
 } /* namespace android */

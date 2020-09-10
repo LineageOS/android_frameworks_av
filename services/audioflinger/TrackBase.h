@@ -69,7 +69,8 @@ public:
                                 bool isOut,
                                 alloc_type alloc = ALLOC_CBLK,
                                 track_type type = TYPE_DEFAULT,
-                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
+                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
+                                std::string metricsId = {});
     virtual             ~TrackBase();
     virtual status_t    initCheck() const;
 
@@ -94,7 +95,11 @@ public:
             bool        isPatchTrack() const { return (mType == TYPE_PATCH); }
             bool        isExternalTrack() const { return !isOutputTrack() && !isPatchTrack(); }
 
-    virtual void        invalidate() { mIsInvalid = true; }
+    virtual void        invalidate() {
+                            if (mIsInvalid) return;
+                            mTrackMetrics.logInvalidate();
+                            mIsInvalid = true;
+                        }
             bool        isInvalid() const { return mIsInvalid; }
 
             void        terminate() { mTerminated = true; }
@@ -202,8 +207,64 @@ public:
            audio_format_t format() const { return mFormat; }
            int id() const { return mId; }
 
+    const char *getTrackStateAsString() const {
+        if (isTerminated()) {
+            return "TERMINATED";
+        }
+        switch (mState) {
+        case IDLE:
+            return "IDLE";
+        case STOPPING_1: // for Fast and Offload
+            return "STOPPING_1";
+        case STOPPING_2: // for Fast and Offload
+            return "STOPPING_2";
+        case STOPPED:
+            return "STOPPED";
+        case RESUMING:
+            return "RESUMING";
+        case ACTIVE:
+            return "ACTIVE";
+        case PAUSING:
+            return "PAUSING";
+        case PAUSED:
+            return "PAUSED";
+        case FLUSHED:
+            return "FLUSHED";
+        case STARTING_1: // for RecordTrack
+            return "STARTING_1";
+        case STARTING_2: // for RecordTrack
+            return "STARTING_2";
+        default:
+            return "UNKNOWN";
+        }
+    }
+
+    // Called by the PlaybackThread to indicate that the track is becoming active
+    // and a new interval should start with a given device list.
+    void logBeginInterval(const std::string& devices) {
+        mTrackMetrics.logBeginInterval(devices);
+    }
+
+    // Called by the PlaybackThread to indicate the track is no longer active.
+    void logEndInterval() {
+        mTrackMetrics.logEndInterval();
+    }
+
+    // Called to tally underrun frames in playback.
+    virtual void tallyUnderrunFrames(size_t /* frames */) {}
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
+
+    void releaseCblk() {
+        if (mCblk != nullptr) {
+            mCblk->~audio_track_cblk_t();   // destroy our shared-structure.
+            if (mClient == 0) {
+                free(mCblk);
+            }
+            mCblk = nullptr;
+        }
+    }
 
     // AudioBufferProvider interface
     virtual status_t getNextBuffer(AudioBufferProvider::Buffer* buffer) = 0;
@@ -238,7 +299,7 @@ protected:
 
     // Upper case characters are final states.
     // Lower case characters are transitory.
-    const char *getTrackStateString() const {
+    const char *getTrackStateAsCodedString() const {
         if (isTerminated()) {
             return "T ";
         }
@@ -310,6 +371,19 @@ protected:
     audio_io_handle_t   mThreadIoHandle; // I/O handle of the thread the track is attached to
     audio_port_handle_t mPortId; // unique ID for this track used by audio policy
     bool                mIsInvalid; // non-resettable latch, set by invalidate()
+
+    // It typically takes 5 threadloop mix iterations for latency to stabilize.
+    // However, this can be 12+ iterations for BT.
+    // To be sure, we wait for latency to dip (it usually increases at the start)
+    // to assess stability and then log to MediaMetrics.
+    // Rapid start / pause calls may cause inaccurate numbers.
+    static inline constexpr int32_t LOG_START_COUNTDOWN = 12;
+    int32_t             mLogStartCountdown = 0; // Mixer period countdown
+    int64_t             mLogStartTimeNs = 0;    // Monotonic time at start()
+    int64_t             mLogStartFrames = 0;    // Timestamp frames at start()
+    double              mLogLatencyMs = 0.;     // Track the last log latency
+
+    TrackMetrics        mTrackMetrics;
 
     bool                mServerLatencySupported = false;
     std::atomic<bool>   mServerLatencyFromTrack{}; // latency from track or server timestamp.

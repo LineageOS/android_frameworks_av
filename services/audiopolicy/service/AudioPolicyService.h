@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOPOLICYSERVICE_H
 #define ANDROID_AUDIOPOLICYSERVICE_H
 
+#include <android-base/thread_annotations.h>
 #include <cutils/misc.h>
 #include <cutils/config_utils.h>
 #include <cutils/compiler.h>
@@ -34,6 +35,7 @@
 #include <media/AudioPolicy.h>
 #include <mediautils/ServiceUtilities.h>
 #include "AudioPolicyEffects.h"
+#include "CaptureStateNotifier.h"
 #include <AudioPolicyInterface.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 
@@ -73,7 +75,7 @@ public:
                                               const char *device_address,
                                               const char *device_name,
                                               audio_format_t encodedFormat);
-    virtual status_t setPhoneState(audio_mode_t state);
+    virtual status_t setPhoneState(audio_mode_t state, uid_t uid);
     virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
     virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
     virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
@@ -128,6 +130,8 @@ public:
 
     virtual uint32_t getStrategyForStream(audio_stream_type_t stream);
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
+    virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
+                                             AudioDeviceTypeAddrVector *devices) const;
 
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc);
     virtual status_t registerEffect(const effect_descriptor_t *desc,
@@ -186,6 +190,7 @@ public:
                                      audio_io_handle_t output,
                                      int delayMs = 0);
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
+    status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages);
     status_t setAllowedCapturePolicy(uint_t uid, audio_flags_mask_t capturePolicy) override;
     virtual bool isOffloadSupported(const audio_offload_info_t &config);
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
@@ -233,6 +238,9 @@ public:
 
     virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    AudioDeviceTypeAddr &device);
+    virtual status_t setUserIdDeviceAffinities(int userId, const Vector<AudioDeviceTypeAddr>& devices);
+
+    virtual status_t removeUserIdDeviceAffinities(int userId);
 
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
@@ -255,6 +263,7 @@ public:
 
     virtual status_t setAssistantUid(uid_t uid);
     virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids);
+    virtual status_t setCurrentImeUid(uid_t uid);
 
     virtual bool     isHapticPlaybackSupported();
 
@@ -267,7 +276,13 @@ public:
     virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
                                                        volume_group_t &volumeGroup);
 
+    status_t registerSoundTriggerCaptureStateListener(
+        const sp<media::ICaptureStateListener>& listener,
+        bool* result) override;
+
     virtual status_t setRttEnabled(bool enabled);
+
+            bool isCallScreenModeSupported() override;
 
             void doOnNewAudioModulesAvailable();
             status_t doStopOutput(audio_port_handle_t portId);
@@ -316,13 +331,13 @@ private:
                         AudioPolicyService() ANDROID_API;
     virtual             ~AudioPolicyService();
 
-            status_t dumpInternals(int fd);
+            status_t dumpInternals(int fd) REQUIRES(mLock);
 
     // Handles binder shell commands
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
     // Sets whether the given UID records only silence
-    virtual void setAppState_l(uid_t uid, app_state_t state);
+    virtual void setAppState_l(audio_port_handle_t portId, app_state_t state) REQUIRES(mLock);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
@@ -342,12 +357,15 @@ private:
 
     app_state_t apmStatFromAmState(int amState);
 
+    bool isSupportedSystemUsage(audio_usage_t usage);
+    status_t validateUsage(audio_usage_t usage);
+    status_t validateUsage(audio_usage_t usage, pid_t pid, uid_t uid);
+
     void updateUidStates();
-    void updateUidStates_l();
+    void updateUidStates_l() REQUIRES(mLock);
 
-    void silenceAllRecordings_l();
+    void silenceAllRecordings_l() REQUIRES(mLock);
 
-    static bool isPrivacySensitiveSource(audio_source_t source);
     static bool isVirtualSource(audio_source_t source);
 
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
@@ -360,7 +378,7 @@ private:
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
                 : mService(service), mObserverRegistered(false),
-                  mAssistantUid(0), mRttEnabled(false) {}
+                  mAssistantUid(0), mCurrentImeUid(0), mRttEnabled(false) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -375,6 +393,8 @@ private:
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
+        void setCurrentImeUid(uid_t uid) { mCurrentImeUid = uid; }
+        bool isCurrentImeUid(uid_t uid) { return uid == mCurrentImeUid; }
         void setRttEnabled(bool enabled) { mRttEnabled = enabled; }
         bool isRttEnabled() { return mRttEnabled; }
 
@@ -382,7 +402,8 @@ private:
         void onUidActive(uid_t uid) override;
         void onUidGone(uid_t uid, bool disabled) override;
         void onUidIdle(uid_t uid, bool disabled) override;
-        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq);
+        void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
+                int32_t capability);
 
         void addOverrideUid(uid_t uid, bool active) { updateOverrideUid(uid, active, true); }
         void removeOverrideUid(uid_t uid) { updateOverrideUid(uid, false, false); }
@@ -400,12 +421,13 @@ private:
         wp<AudioPolicyService> mService;
         Mutex mLock;
         ActivityManager mAm;
-        bool mObserverRegistered;
+        bool mObserverRegistered = false;
         std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
-        uid_t mAssistantUid;
+        uid_t mAssistantUid = -1;
         std::vector<uid_t> mA11yUids;
-        bool mRttEnabled;
+        uid_t mCurrentImeUid = -1;
+        bool mRttEnabled = false;
     };
 
     // If sensor privacy is enabled then all apps, including those that are active, should be
@@ -426,7 +448,7 @@ private:
 
         private:
             wp<AudioPolicyService> mService;
-            std::atomic_bool mSensorPrivacyEnabled;
+            std::atomic_bool mSensorPrivacyEnabled = false;
     };
 
     // Thread used to send audio config commands to audio flinger
@@ -719,6 +741,8 @@ private:
 
         virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
 
+        void setSoundTriggerCaptureState(bool active) override;
+
      private:
         AudioPolicyService *mAudioPolicyService;
     };
@@ -771,9 +795,10 @@ private:
     public:
                 AudioClient(const audio_attributes_t attributes,
                             const audio_io_handle_t io, uid_t uid, pid_t pid,
-                            const audio_session_t session, const audio_port_handle_t deviceId) :
+                            const audio_session_t session,  audio_port_handle_t portId,
+                            const audio_port_handle_t deviceId) :
                                 attributes(attributes), io(io), uid(uid), pid(pid),
-                                session(session), deviceId(deviceId), active(false) {}
+                                session(session), portId(portId), deviceId(deviceId), active(false) {}
                 ~AudioClient() override = default;
 
 
@@ -782,6 +807,7 @@ private:
         const uid_t uid;                     // client UID
         const pid_t pid;                     // client PID
         const audio_session_t session;       // audio session ID
+        const audio_port_handle_t portId;
         const audio_port_handle_t deviceId;  // selected input device port ID
               bool active;                   // Playback/Capture is active or inactive
     };
@@ -793,10 +819,10 @@ private:
     public:
                 AudioRecordClient(const audio_attributes_t attributes,
                           const audio_io_handle_t io, uid_t uid, pid_t pid,
-                          const audio_session_t session, const audio_port_handle_t deviceId,
-                          const String16& opPackageName,
+                          const audio_session_t session, audio_port_handle_t portId,
+                          const audio_port_handle_t deviceId, const String16& opPackageName,
                           bool canCaptureOutput, bool canCaptureHotword) :
-                    AudioClient(attributes, io, uid, pid, session, deviceId),
+                    AudioClient(attributes, io, uid, pid, session, portId, deviceId),
                     opPackageName(opPackageName), startTimeNs(0),
                     canCaptureOutput(canCaptureOutput), canCaptureHotword(canCaptureHotword) {}
                 ~AudioRecordClient() override = default;
@@ -814,9 +840,9 @@ private:
     public:
                 AudioPlaybackClient(const audio_attributes_t attributes,
                       const audio_io_handle_t io, uid_t uid, pid_t pid,
-                            const audio_session_t session, audio_port_handle_t deviceId,
-                            audio_stream_type_t stream) :
-                    AudioClient(attributes, io, uid, pid, session, deviceId), stream(stream) {}
+                            const audio_session_t session, audio_port_handle_t portId,
+                            audio_port_handle_t deviceId, audio_stream_type_t stream) :
+                    AudioClient(attributes, io, uid, pid, session, portId, deviceId), stream(stream) {}
                 ~AudioPlaybackClient() override = default;
 
         const audio_stream_type_t stream;
@@ -855,26 +881,31 @@ private:
     // and possibly back in to audio policy service and acquire mEffectsLock.
     sp<AudioCommandThread> mAudioCommandThread;     // audio commands thread
     sp<AudioCommandThread> mOutputCommandThread;    // process stop and release output
-    struct audio_policy_device *mpAudioPolicyDev;
-    struct audio_policy *mpAudioPolicy;
     AudioPolicyInterface *mAudioPolicyManager;
     AudioPolicyClient *mAudioPolicyClient;
+    std::vector<audio_usage_t> mSupportedSystemUsages;
 
-    DefaultKeyedVector< int64_t, sp<NotificationClient> >    mNotificationClients;
-    Mutex mNotificationClientsLock;  // protects mNotificationClients
+    Mutex mNotificationClientsLock;
+    DefaultKeyedVector<int64_t, sp<NotificationClient>> mNotificationClients
+        GUARDED_BY(mNotificationClientsLock);
     // Manage all effects configured in audio_effects.conf
     // never hold AudioPolicyService::mLock when calling AudioPolicyEffects methods as
     // those can call back into AudioPolicyService methods and try to acquire the mutex
-    sp<AudioPolicyEffects> mAudioPolicyEffects;
-    audio_mode_t mPhoneState;
+    sp<AudioPolicyEffects> mAudioPolicyEffects GUARDED_BY(mLock);
+    audio_mode_t mPhoneState GUARDED_BY(mLock);
+    uid_t mPhoneStateOwnerUid GUARDED_BY(mLock);
 
-    sp<UidPolicy> mUidPolicy;
-    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy;
+    sp<UidPolicy> mUidPolicy GUARDED_BY(mLock);
+    sp<SensorPrivacyPolicy> mSensorPrivacyPolicy GUARDED_BY(mLock);
 
-    DefaultKeyedVector< audio_port_handle_t, sp<AudioRecordClient> >   mAudioRecordClients;
-    DefaultKeyedVector< audio_port_handle_t, sp<AudioPlaybackClient> >   mAudioPlaybackClients;
+    DefaultKeyedVector<audio_port_handle_t, sp<AudioRecordClient>> mAudioRecordClients
+        GUARDED_BY(mLock);
+    DefaultKeyedVector<audio_port_handle_t, sp<AudioPlaybackClient>> mAudioPlaybackClients
+        GUARDED_BY(mLock);
 
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
+
+    CaptureStateNotifier mCaptureStateNotifier;
 };
 
 } // namespace android

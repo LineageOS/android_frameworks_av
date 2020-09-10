@@ -15,13 +15,14 @@ cc_binary {
     srcs: ["main_mediaserver.cpp"],
 
     shared_libs: [
-        "libresourcemanagerservice",
+        "android.hardware.media.omx@1.0",
+        "libandroidicu",
+        "libbinder",
+        "libhidlbase",
         "liblog",
         "libmediaplayerservice",
+        "libresourcemanagerservice",
         "libutils",
-        "libbinder",
-        "libandroidicu",
-        "android.hardware.media.omx@1.0",
     ],
 
     static_libs: [

@@ -16,8 +16,10 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2Decoder"
+#include <log/log.h>
 
 #include "C2Decoder.h"
+#include <iostream>
 
 int32_t C2Decoder::createCodec2Component(string compName, AMediaFormat *format) {
     ALOGV("In %s", __func__);
@@ -87,7 +89,7 @@ int32_t C2Decoder::decodeFrames(uint8_t *inputBuffer, vector<AMediaCodecBufferIn
                 work.swap(mWorkQueue.front());
                 mWorkQueue.pop_front();
             } else {
-                cout << "Wait for generating C2Work exceeded timeout" << endl;
+                std::cout << "Wait for generating C2Work exceeded timeout" << std::endl;
                 return -1;
             }
         }
@@ -110,13 +112,13 @@ int32_t C2Decoder::decodeFrames(uint8_t *inputBuffer, vector<AMediaCodecBufferIn
             status = mLinearPool->fetchLinearBlock(
                     alignedSize, {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block);
             if (status != C2_OK || block == nullptr) {
-                cout << "C2LinearBlock::map() failed : " << status << endl;
+                std::cout << "C2LinearBlock::map() failed : " << status << std::endl;
                 return status;
             }
 
             C2WriteView view = block->map().get();
             if (view.error() != C2_OK) {
-                cout << "C2LinearBlock::map() failed : " << view.error() << endl;
+                std::cout << "C2LinearBlock::map() failed : " << view.error() << std::endl;
                 return view.error();
             }
             memcpy(view.base(), inputBuffer + mOffset, size);

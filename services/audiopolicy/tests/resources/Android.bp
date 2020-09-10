@@ -3,5 +3,6 @@ filegroup {
     srcs: [
         "test_audio_policy_configuration.xml",
         "test_audio_policy_primary_only_configuration.xml",
+        "test_tv_apm_configuration.xml",
     ],
 }

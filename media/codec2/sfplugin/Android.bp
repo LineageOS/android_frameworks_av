@@ -1,6 +1,8 @@
 cc_library_shared {
     name: "libsfplugin_ccodec",
 
+    export_include_dirs: ["include"],
+
     srcs: [
         "C2OMXNode.cpp",
         "CCodec.cpp",
@@ -9,10 +11,8 @@ cc_library_shared {
         "CCodecConfig.cpp",
         "Codec2Buffer.cpp",
         "Codec2InfoBuilder.cpp",
-        "Omx2IGraphicBufferSource.cpp",
         "PipelineWatcher.cpp",
         "ReflectedParamUpdater.cpp",
-        "SkipCutBuffer.cpp",
     ],
 
     cflags: [
@@ -23,12 +23,13 @@ cc_library_shared {
     header_libs: [
         "libcodec2_internal",
         "libmediadrm_headers",
+        "libmediametrics_headers",
         "media_ndk_headers",
     ],
 
     shared_libs: [
         "android.hardware.cas.native@1.0",
-        "android.hardware.graphics.bufferqueue@1.0",
+        "android.hardware.drm@1.0",
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "libbase",
@@ -48,10 +49,14 @@ cc_library_shared {
         "libstagefright_codecbase",
         "libstagefright_foundation",
         "libstagefright_omx",
-        "libstagefright_omx_utils",
         "libstagefright_xmlparser",
         "libui",
         "libutils",
+    ],
+
+    export_shared_lib_headers: [
+        "libcodec2",
+        "libcodec2_client",
     ],
 
     sanitize: {

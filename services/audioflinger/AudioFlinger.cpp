@@ -41,6 +41,7 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioParameter.h>
+#include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
@@ -66,10 +67,10 @@
 #include <powermanager/PowerManager.h>
 
 #include <media/IMediaLogService.h>
-#include <media/MemoryLeakTrackUtil.h>
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
 #include <mediautils/BatteryNotifier.h>
+#include <mediautils/MemoryLeakTrackUtil.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
 #include <private/android_filesystem_config.h>
@@ -212,6 +213,11 @@ AudioFlinger::AudioFlinger()
     std::vector<pid_t> halPids;
     mDevicesFactoryHal->getHalPids(&halPids);
     TimeCheck::setAudioHalPids(halPids);
+
+    // Notify that we have started (also called when audioserver service restarts)
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+        .record();
 }
 
 void AudioFlinger::onFirstRef()
@@ -365,6 +371,9 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         thread->configure(&localAttr, streamType, actualSessionId, callback, *deviceId, portId);
         *handle = portId;
         *sessionId = actualSessionId;
+        config->sample_rate = thread->sampleRate();
+        config->channel_mask = thread->channelMask();
+        config->format = thread->format();
     } else {
         if (direction == MmapStreamInterface::DIRECTION_OUTPUT) {
             AudioSystem::releaseOutput(portId);
@@ -461,31 +470,32 @@ AudioHwDevice* AudioFlinger::findSuitableHwDev_l(
 
 void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
 {
-    const size_t SIZE = 256;
-    char buffer[SIZE];
     String8 result;
 
     result.append("Clients:\n");
     for (size_t i = 0; i < mClients.size(); ++i) {
         sp<Client> client = mClients.valueAt(i).promote();
         if (client != 0) {
-            snprintf(buffer, SIZE, "  pid: %d\n", client->pid());
-            result.append(buffer);
+            result.appendFormat("  pid: %d\n", client->pid());
         }
     }
 
     result.append("Notification Clients:\n");
+    result.append("   pid    uid  name\n");
     for (size_t i = 0; i < mNotificationClients.size(); ++i) {
-        snprintf(buffer, SIZE, "  pid: %d\n", mNotificationClients.keyAt(i));
-        result.append(buffer);
+        const pid_t pid = mNotificationClients[i]->getPid();
+        const uid_t uid = mNotificationClients[i]->getUid();
+        const mediautils::UidInfo::Info info = mUidInfo.getInfo(uid);
+        result.appendFormat("%6d %6u  %s\n", pid, uid, info.package.c_str());
     }
 
     result.append("Global session refs:\n");
-    result.append("  session   pid count\n");
+    result.append("  session  cnt     pid    uid  name\n");
     for (size_t i = 0; i < mAudioSessionRefs.size(); i++) {
         AudioSessionRef *r = mAudioSessionRefs[i];
-        snprintf(buffer, SIZE, "  %7d %5d %5d\n", r->mSessionid, r->mPid, r->mCnt);
-        result.append(buffer);
+        const mediautils::UidInfo::Info info = mUidInfo.getInfo(r->mUid);
+        result.appendFormat("  %7d %4d %7d %6u  %s\n", r->mSessionid, r->mCnt, r->mPid,
+                r->mUid, info.package.c_str());
     }
     write(fd, result.string(), result.size());
 }
@@ -705,7 +715,7 @@ sp<NBLog::Writer> AudioFlinger::newWriter_l(size_t size, const char *name)
         return new NBLog::Writer();
     }
 success:
-    NBLog::Shared *sharedRawPtr = (NBLog::Shared *) shared->pointer();
+    NBLog::Shared *sharedRawPtr = (NBLog::Shared *) shared->unsecurePointer();
     new((void *) sharedRawPtr) NBLog::Shared(); // placement new here, but the corresponding
                                                 // explicit destructor not needed since it is POD
     sMediaLogService->registerWriter(shared, size, name);
@@ -842,7 +852,7 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                                       input.notificationsPerBuffer, input.speed,
                                       input.sharedBuffer, sessionId, &output.flags,
                                       callingPid, input.clientInfo.clientTid, clientUid,
-                                      &lStatus, portId);
+                                      &lStatus, portId, input.audioTrackCallback);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
 
@@ -1166,6 +1176,10 @@ status_t AudioFlinger::setMode(audio_mode_t mode)
             mPlaybackThreads.valueAt(i)->setMode(mode);
     }
 
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETMODE)
+        .set(AMEDIAMETRICS_PROP_AUDIOMODE, toString(mode))
+        .record();
     return ret;
 }
 
@@ -1226,16 +1240,16 @@ bool AudioFlinger::getMicMute() const
     return (ret == NO_ERROR) && state;
 }
 
-void AudioFlinger::setRecordSilenced(uid_t uid, bool silenced)
+void AudioFlinger::setRecordSilenced(audio_port_handle_t portId, bool silenced)
 {
-    ALOGV("AudioFlinger::setRecordSilenced(uid:%d, silenced:%d)", uid, silenced);
+    ALOGV("AudioFlinger::setRecordSilenced(portId:%d, silenced:%d)", portId, silenced);
 
     AutoMutex lock(mLock);
     for (size_t i = 0; i < mRecordThreads.size(); i++) {
-        mRecordThreads[i]->setRecordSilenced(uid, silenced);
+        mRecordThreads[i]->setRecordSilenced(portId, silenced);
     }
     for (size_t i = 0; i < mMmapThreads.size(); i++) {
-        mMmapThreads[i]->setRecordSilenced(uid, silenced);
+        mMmapThreads[i]->setRecordSilenced(portId, silenced);
     }
 }
 
@@ -1639,40 +1653,64 @@ size_t AudioFlinger::getInputBufferSize(uint32_t sampleRate, audio_format_t form
         return 0;
     }
     mHardwareStatus = AUDIO_HW_GET_INPUT_BUFFER_SIZE;
-    audio_config_t config, proposed;
-    memset(&proposed, 0, sizeof(proposed));
-    proposed.sample_rate = sampleRate;
-    proposed.channel_mask = channelMask;
-    proposed.format = format;
 
     sp<DeviceHalInterface> dev = mPrimaryHardwareDev->hwDevice();
-    size_t frames = 0;
-    for (;;) {
-        // Note: config is currently a const parameter for get_input_buffer_size()
-        // but we use a copy from proposed in case config changes from the call.
-        config = proposed;
-        status_t result = dev->getInputBufferSize(&config, &frames);
-        if (result == OK && frames != 0) {
-            break; // hal success, config is the result
-        }
-        // change one parameter of the configuration each iteration to a more "common" value
-        // to see if the device will support it.
-        if (proposed.format != AUDIO_FORMAT_PCM_16_BIT) {
-            proposed.format = AUDIO_FORMAT_PCM_16_BIT;
-        } else if (proposed.sample_rate != 44100) { // 44.1 is claimed as must in CDD as well as
-            proposed.sample_rate = 44100;           // legacy AudioRecord.java. TODO: Query hw?
-        } else {
-            ALOGW("getInputBufferSize failed with minimum buffer size sampleRate %u, "
-                    "format %#x, channelMask 0x%X",
-                    sampleRate, format, channelMask);
-            break; // retries failed, break out of loop with frames == 0.
-        }
-    }
+    std::vector<audio_channel_mask_t> channelMasks = {channelMask};
+    if (channelMask != AUDIO_CHANNEL_IN_MONO)
+        channelMasks.push_back(AUDIO_CHANNEL_IN_MONO);
+    if (channelMask != AUDIO_CHANNEL_IN_STEREO)
+        channelMasks.push_back(AUDIO_CHANNEL_IN_STEREO);
+
+    std::vector<audio_format_t> formats = {format};
+    if (format != AUDIO_FORMAT_PCM_16_BIT)
+        formats.push_back(AUDIO_FORMAT_PCM_16_BIT);
+
+    std::vector<uint32_t> sampleRates = {sampleRate};
+    static const uint32_t SR_44100 = 44100;
+    static const uint32_t SR_48000 = 48000;
+
+    if (sampleRate != SR_48000)
+        sampleRates.push_back(SR_48000);
+    if (sampleRate != SR_44100)
+        sampleRates.push_back(SR_44100);
+
     mHardwareStatus = AUDIO_HW_IDLE;
-    if (frames > 0 && config.sample_rate != sampleRate) {
-        frames = destinationFramesPossible(frames, sampleRate, config.sample_rate);
+
+    // Change parameters of the configuration each iteration until we find a
+    // configuration that the device will support.
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+    for (auto testChannelMask : channelMasks) {
+        config.channel_mask = testChannelMask;
+        for (auto testFormat : formats) {
+            config.format = testFormat;
+            for (auto testSampleRate : sampleRates) {
+                config.sample_rate = testSampleRate;
+
+                size_t bytes = 0;
+                status_t result = dev->getInputBufferSize(&config, &bytes);
+                if (result != OK || bytes == 0) {
+                    continue;
+                }
+
+                if (config.sample_rate != sampleRate || config.channel_mask != channelMask ||
+                    config.format != format) {
+                    uint32_t dstChannelCount = audio_channel_count_from_in_mask(channelMask);
+                    uint32_t srcChannelCount =
+                        audio_channel_count_from_in_mask(config.channel_mask);
+                    size_t srcFrames =
+                        bytes / audio_bytes_per_frame(srcChannelCount, config.format);
+                    size_t dstFrames = destinationFramesPossible(
+                        srcFrames, config.sample_rate, sampleRate);
+                    bytes = dstFrames * audio_bytes_per_frame(dstChannelCount, format);
+                }
+                return bytes;
+            }
+        }
     }
-    return frames; // may be converted to bytes at the Java level.
+
+    ALOGW("getInputBufferSize failed with minimum buffer size sampleRate %u, "
+              "format %#x, channelMask %#x",sampleRate, format, channelMask);
+    return 0;
 }
 
 uint32_t AudioFlinger::getInputFramesLost(audio_io_handle_t ioHandle) const
@@ -1707,6 +1745,10 @@ status_t AudioFlinger::setVoiceVolume(float value)
     ret = dev->setVoiceVolume(value);
     mHardwareStatus = AUDIO_HW_IDLE;
 
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME)
+        .set(AMEDIAMETRICS_PROP_VOICEVOLUME, (double)value)
+        .record();
     return ret;
 }
 
@@ -1730,13 +1772,16 @@ void AudioFlinger::registerClient(const sp<IAudioFlingerClient>& client)
         return;
     }
     pid_t pid = IPCThreadState::self()->getCallingPid();
+    const uid_t uid = IPCThreadState::self()->getCallingUid();
     {
         Mutex::Autolock _cl(mClientLock);
         if (mNotificationClients.indexOfKey(pid) < 0) {
             sp<NotificationClient> notificationClient = new NotificationClient(this,
                                                                                 client,
-                                                                                pid);
-            ALOGV("registerClient() client %p, pid %d", notificationClient.get(), pid);
+                                                                                pid,
+                                                                                uid);
+            ALOGV("registerClient() client %p, pid %d, uid %u",
+                    notificationClient.get(), pid, uid);
 
             mNotificationClients.add(pid, notificationClient);
 
@@ -1876,8 +1921,9 @@ sp<MemoryDealer> AudioFlinger::Client::heap() const
 
 AudioFlinger::NotificationClient::NotificationClient(const sp<AudioFlinger>& audioFlinger,
                                                      const sp<IAudioFlingerClient>& client,
-                                                     pid_t pid)
-    : mAudioFlinger(audioFlinger), mPid(pid), mAudioFlingerClient(client)
+                                                     pid_t pid,
+                                                     uid_t uid)
+    : mAudioFlinger(audioFlinger), mPid(pid), mUid(uid), mAudioFlingerClient(client)
 {
 }
 
@@ -2737,9 +2783,6 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         return 0;
     }
 
-    // Some flags are specific to framework and must not leak to the HAL.
-    flags = static_cast<audio_input_flags_t>(flags & ~AUDIO_INPUT_FRAMEWORK_FLAGS);
-
     // Audio Policy can request a specific handle for hardware hotword.
     // The goal here is not to re-open an already opened input.
     // It is to use a pre-assigned I/O handle.
@@ -2935,14 +2978,18 @@ audio_unique_id_t AudioFlinger::newAudioUniqueId(audio_unique_id_use_t use)
     return nextUniqueId(use);
 }
 
-void AudioFlinger::acquireAudioSessionId(audio_session_t audioSession, pid_t pid)
+void AudioFlinger::acquireAudioSessionId(
+        audio_session_t audioSession, pid_t pid, uid_t uid)
 {
     Mutex::Autolock _l(mLock);
     pid_t caller = IPCThreadState::self()->getCallingPid();
     ALOGV("acquiring %d from %d, for %d", audioSession, caller, pid);
     const uid_t callerUid = IPCThreadState::self()->getCallingUid();
-    if (pid != -1 && isAudioServerUid(callerUid)) { // check must match releaseAudioSessionId()
-        caller = pid;
+    if (pid != (pid_t)-1 && isAudioServerOrMediaServerUid(callerUid)) {
+        caller = pid;  // check must match releaseAudioSessionId()
+    }
+    if (uid == (uid_t)-1 || !isAudioServerOrMediaServerUid(callerUid)) {
+        uid = callerUid;
     }
 
     {
@@ -2966,7 +3013,7 @@ void AudioFlinger::acquireAudioSessionId(audio_session_t audioSession, pid_t pid
             return;
         }
     }
-    mAudioSessionRefs.push(new AudioSessionRef(audioSession, caller));
+    mAudioSessionRefs.push(new AudioSessionRef(audioSession, caller, uid));
     ALOGV(" added new entry for %d", audioSession);
 }
 
@@ -2978,8 +3025,8 @@ void AudioFlinger::releaseAudioSessionId(audio_session_t audioSession, pid_t pid
         pid_t caller = IPCThreadState::self()->getCallingPid();
         ALOGV("releasing %d from %d for %d", audioSession, caller, pid);
         const uid_t callerUid = IPCThreadState::self()->getCallingUid();
-        if (pid != -1 && isAudioServerUid(callerUid)) { // check must match acquireAudioSessionId()
-            caller = pid;
+        if (pid != (pid_t)-1 && isAudioServerOrMediaServerUid(callerUid)) {
+            caller = pid;  // check must match acquireAudioSessionId()
         }
         size_t num = mAudioSessionRefs.size();
         for (size_t i = 0; i < num; i++) {
@@ -3389,6 +3436,7 @@ sp<IEffect> AudioFlinger::createEffect(
         const AudioDeviceTypeAddr& device,
         const String16& opPackageName,
         pid_t pid,
+        bool probe,
         status_t *status,
         int *id,
         int *enabled)
@@ -3504,10 +3552,10 @@ sp<IEffect> AudioFlinger::createEffect(
 
         if (sessionId == AUDIO_SESSION_DEVICE) {
             sp<Client> client = registerPid(pid);
-            ALOGV("%s device type %d address %s", __func__, device.mType, device.getAddress());
+            ALOGV("%s device type %#x address %s", __func__, device.mType, device.getAddress());
             handle = mDeviceEffectManager.createEffect_l(
                     &desc, device, client, effectClient, mPatchPanel.patches_l(),
-                    enabled, &lStatus);
+                    enabled, &lStatus, probe);
             if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
                 // remove local strong reference to Client with mClientLock held
                 Mutex::Autolock _cl(mClientLock);
@@ -3602,7 +3650,7 @@ sp<IEffect> AudioFlinger::createEffect(
         // create effect on selected output thread
         bool pinned = !audio_is_global_session(sessionId) && isSessionAcquired_l(sessionId);
         handle = thread->createEffect_l(client, effectClient, priority, sessionId,
-                &desc, enabled, &lStatus, pinned);
+                &desc, enabled, &lStatus, pinned, probe);
         if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
             // remove local strong reference to Client with mClientLock held
             Mutex::Autolock _cl(mClientLock);
@@ -3614,7 +3662,7 @@ sp<IEffect> AudioFlinger::createEffect(
     }
 
 Register:
-    if (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS) {
+    if (!probe && (lStatus == NO_ERROR || lStatus == ALREADY_EXISTS)) {
         // Check CPU and memory usage
         sp<EffectBase> effect = handle->effect().promote();
         if (effect != nullptr) {

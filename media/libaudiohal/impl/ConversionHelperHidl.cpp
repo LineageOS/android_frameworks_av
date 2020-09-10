@@ -41,16 +41,25 @@ status_t ConversionHelperHidl::keysFromHal(const String8& keys, hidl_vec<hidl_st
     bool keepFormatValue = halKeys.size() == 2 &&
          (halKeys.get(String8(AudioParameter::keyStreamSupportedChannels), value) == NO_ERROR ||
          halKeys.get(String8(AudioParameter::keyStreamSupportedSamplingRates), value) == NO_ERROR);
+    // When querying encapsulation capabilities, "keyRouting=<value>" pair is used to identify
+    // the device. We need to transform it into a single key string so that it is carried over to
+    // the legacy HAL via HIDL.
+    bool keepRoutingValue =
+            halKeys.get(String8(AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_MODES),
+                        value) == NO_ERROR ||
+            halKeys.get(String8(AUDIO_PARAMETER_DEVICE_SUP_ENCAPSULATION_METADATA_TYPES),
+                        value) == NO_ERROR;
 
     for (size_t i = 0; i < halKeys.size(); ++i) {
         String8 key;
         status_t status = halKeys.getAt(i, key);
         if (status != OK) return status;
-        if (keepFormatValue && key == AudioParameter::keyFormat) {
-            AudioParameter formatParam;
+        if ((keepFormatValue && key == AudioParameter::keyFormat) ||
+            (keepRoutingValue && key == AudioParameter::keyRouting)) {
+            AudioParameter keepValueParam;
             halKeys.getAt(i, key, value);
-            formatParam.add(key, value);
-            key = formatParam.toString();
+            keepValueParam.add(key, value);
+            key = keepValueParam.toString();
         }
         (*hidlKeys)[i] = key.string();
     }

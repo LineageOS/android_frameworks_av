@@ -20,6 +20,8 @@
 #include <assert.h>
 #include <cctype>
 #include <errno.h>
+#include <iomanip>
+#include <iostream>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -33,7 +35,9 @@
 #include "AAudioSimplePlayer.h"
 #include "AAudioSimpleRecorder.h"
 #include "AAudioExampleUtils.h"
-#include "LoopbackAnalyzer.h"
+
+#include "analyzer/GlitchAnalyzer.h"
+#include "analyzer/LatencyAnalyzer.h"
 #include "../../utils/AAudioExampleUtils.h"
 
 // V0.4.00 = rectify and low-pass filter the echos, auto-correlate entire echo
@@ -41,7 +45,8 @@
 //           fix -n option to set output buffer for -tm
 //           plot first glitch
 // V0.4.02 = allow -n0 for minimal buffer size
-#define APP_VERSION             "0.4.02"
+// V0.5.00 = use latency analyzer from OboeTester, uses random noise for latency
+#define APP_VERSION             "0.5.00"
 
 // Tag for machine readable results as property = value pairs
 #define RESULT_TAG              "RESULT: "
@@ -56,6 +61,20 @@ constexpr int kNumCallbacksToNotRead = 0; // let input fill back up
 constexpr int kNumCallbacksToDiscard = 20;
 constexpr int kDefaultHangTimeMillis = 50;
 constexpr int kMaxGlitchEventsToSave = 32;
+
+static void printAudioScope(float sample) {
+    const int maxStars = 80; // arbitrary, fits on one line
+    char c = '*';
+    if (sample < -1.0) {
+        sample = -1.0;
+        c = '$';
+    } else if (sample > 1.0) {
+        sample = 1.0;
+        c = '$';
+    }
+    int numSpaces = (int) (((sample + 1.0) * 0.5) * maxStars);
+    printf("%*c%c\n", numSpaces, ' ', c);
+}
 
 struct LoopbackData {
     AAudioStream      *inputStream = nullptr;
@@ -83,8 +102,8 @@ struct LoopbackData {
     aaudio_result_t    inputError = AAUDIO_OK;
     aaudio_result_t    outputError = AAUDIO_OK;
 
-    SineAnalyzer       sineAnalyzer;
-    EchoAnalyzer       echoAnalyzer;
+    GlitchAnalyzer     sineAnalyzer;
+    PulseLatencyAnalyzer echoAnalyzer;
     AudioRecording     audioRecording;
     LoopbackProcessor *loopbackProcessor;
 
@@ -254,17 +273,18 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
             }
 
             // Analyze the data.
-            LoopbackProcessor::process_result procResult = myData->loopbackProcessor->process(myData->inputFloatData,
+            myData->loopbackProcessor->process(myData->inputFloatData,
                                                myData->actualInputChannelCount,
+                                               numFrames,
                                                outputData,
                                                myData->actualOutputChannelCount,
                                                numFrames);
-
-            if (procResult == LoopbackProcessor::PROCESS_RESULT_GLITCH) {
-                if (myData->numGlitchEvents < kMaxGlitchEventsToSave) {
-                    myData->glitchFrames[myData->numGlitchEvents++] = myData->audioRecording.size();
-                }
-            }
+//
+//            if (procResult == LoopbackProcessor::PROCESS_RESULT_GLITCH) {
+//                if (myData->numGlitchEvents < kMaxGlitchEventsToSave) {
+//                    myData->glitchFrames[myData->numGlitchEvents++] = myData->audioRecording.size();
+//                }
+//            }
 
             // Save for later.
             myData->audioRecording.write(myData->inputFloatData,
@@ -283,8 +303,8 @@ static aaudio_data_callback_result_t MyDataCallbackProc(
 }
 
 static void MyErrorCallbackProc(
-        AAudioStream *stream __unused,
-        void *userData __unused,
+        AAudioStream * /* stream */,
+        void * userData,
         aaudio_result_t error) {
     printf("Error Callback, error: %d\n",(int)error);
     LoopbackData *myData = (LoopbackData *) userData;
@@ -305,8 +325,8 @@ static void usage() {
     printf("          l for _LATENCY\n");
     printf("          p for _POWER_SAVING\n");
     printf("      -t{test}          select test mode\n");
-    printf("          m for sine magnitude\n");
-    printf("          e for echo latency (default)\n");
+    printf("          g for Glitch detection\n");
+    printf("          l for round trip Latency (default)\n");
     printf("          f for file latency, analyzes %s\n\n", FILENAME_ECHOS);
     printf("      -X  use EXCLUSIVE mode for input\n");
     printf("Example:  aaudio_loopback -n2 -pl -Pl -x\n");
@@ -333,20 +353,22 @@ static aaudio_performance_mode_t parsePerformanceMode(char c) {
 }
 
 enum {
-    TEST_SINE_MAGNITUDE = 0,
-    TEST_ECHO_LATENCY,
+    TEST_GLITCHES = 0,
+    TEST_LATENCY,
     TEST_FILE_LATENCY,
 };
 
 static int parseTestMode(char c) {
-    int testMode = TEST_ECHO_LATENCY;
+    int testMode = TEST_LATENCY;
     c = tolower(c);
     switch (c) {
-        case 'm':
-            testMode = TEST_SINE_MAGNITUDE;
+        case 'm': // deprecated
+        case 'g':
+            testMode = TEST_GLITCHES;
             break;
-        case 'e':
-            testMode = TEST_ECHO_LATENCY;
+        case 'e': // deprecated
+        case 'l':
+            testMode = TEST_LATENCY;
             break;
         case 'f':
             testMode = TEST_FILE_LATENCY;
@@ -408,9 +430,10 @@ int main(int argc, const char **argv)
     int32_t               actualSampleRate           = 0;
     int                   written                    = 0;
 
-    int                   testMode                   = TEST_ECHO_LATENCY;
+    int                   testMode                   = TEST_LATENCY;
     double                gain                       = 1.0;
     int                   hangTimeMillis             = 0;
+    std::string           report;
 
     // Make printf print immediately so that debug info is not stuck
     // in a buffer if we hang or crash.
@@ -488,22 +511,21 @@ int main(int argc, const char **argv)
     int32_t requestedOutputBursts = argParser.getNumberOfBursts();
 
     switch(testMode) {
-        case TEST_SINE_MAGNITUDE:
+        case TEST_GLITCHES:
             loopbackData.loopbackProcessor = &loopbackData.sineAnalyzer;
             break;
-        case TEST_ECHO_LATENCY:
-            loopbackData.echoAnalyzer.setGain(gain);
+        case TEST_LATENCY:
+            // TODO loopbackData.echoAnalyzer.setGain(gain);
             loopbackData.loopbackProcessor = &loopbackData.echoAnalyzer;
             break;
         case TEST_FILE_LATENCY: {
-            loopbackData.echoAnalyzer.setGain(gain);
-
+            // TODO loopbackData.echoAnalyzer.setGain(gain);
             loopbackData.loopbackProcessor = &loopbackData.echoAnalyzer;
             int read = loopbackData.loopbackProcessor->load(FILENAME_ECHOS);
             printf("main() read %d mono samples from %s on Android device, rate = %d\n",
                    read, FILENAME_ECHOS,
                    loopbackData.loopbackProcessor->getSampleRate());
-            loopbackData.loopbackProcessor->report();
+            std::cout << loopbackData.loopbackProcessor->analyze();
             goto report_result;
         }
             break;
@@ -557,7 +579,7 @@ int main(int argc, const char **argv)
         int32_t actualCapacity = AAudioStream_getBufferCapacityInFrames(inputStream);
         (void) AAudioStream_setBufferSizeInFrames(inputStream, actualCapacity);
 
-        if (testMode == TEST_SINE_MAGNITUDE
+        if (testMode == TEST_GLITCHES
                 && requestedOutputBursts == AAUDIO_UNSPECIFIED) {
             result = AAudioStream_setBufferSizeInFrames(outputStream, actualCapacity);
             if (result < 0) {
@@ -594,9 +616,9 @@ int main(int argc, const char **argv)
     loopbackData.inputFloatData = new float[loopbackData.inputFramesMaximum *
                                               loopbackData.actualInputChannelCount]{};
 
-    loopbackData.loopbackProcessor->reset();
-
     loopbackData.hangTimeMillis = hangTimeMillis;
+
+    loopbackData.loopbackProcessor->prepareToTest();
 
     // Start OUTPUT first so INPUT does not overflow.
     result = player.start();
@@ -669,7 +691,8 @@ int main(int argc, const char **argv)
 
     printf("input error = %d = %s\n",
            loopbackData.inputError, AAudio_convertResultToText(loopbackData.inputError));
-
+/*
+    // TODO Restore this code some day if we want to save files.
     written = loopbackData.loopbackProcessor->save(FILENAME_ECHOS);
     if (written > 0) {
         printf("main() wrote %8d mono samples to \"%s\" on Android device\n",
@@ -681,9 +704,9 @@ int main(int argc, const char **argv)
         printf("main() wrote %8d mono samples to \"%s\" on Android device\n",
                written, FILENAME_ALL);
     }
-
+*/
     if (loopbackData.inputError == AAUDIO_OK) {
-        if (testMode == TEST_SINE_MAGNITUDE) {
+        if (testMode == TEST_GLITCHES) {
             if (loopbackData.numGlitchEvents > 0) {
                 // Graph around the first glitch if there is one.
                 const int32_t start = loopbackData.glitchFrames[0] - 8;
@@ -697,7 +720,8 @@ int main(int argc, const char **argv)
             }
         }
 
-        loopbackData.loopbackProcessor->report();
+        std::cout << "Please wait several seconds for analysis to complete.\n";
+        std::cout << loopbackData.loopbackProcessor->analyze();
     }
 
     {

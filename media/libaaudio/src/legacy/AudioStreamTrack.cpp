@@ -173,13 +173,19 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             selectedDeviceId
     );
 
+    // Set it here so it can be logged by the destructor if the open failed.
+    mAudioTrack->setCallerName(kCallerName);
+
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
     if (status != NO_ERROR) {
-        close();
+        releaseCloseFinal();
         ALOGE("open(), initCheck() returned %d", status);
         return AAudioConvert_androidToAAudioResult(status);
     }
+
+    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
+            + std::to_string(mAudioTrack->getPortId());
 
     doSetVolume();
 
@@ -196,7 +202,10 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     // We may need to pass the data through a block size adapter to guarantee constant size.
     if (mCallbackBufferSize != AAUDIO_UNSPECIFIED) {
-        int callbackSizeBytes = getBytesPerFrame() * mCallbackBufferSize;
+        // This may need to change if we add format conversion before
+        // the block size adaptation.
+        mBlockAdapterBytesPerFrame = getBytesPerFrame();
+        int callbackSizeBytes = mBlockAdapterBytesPerFrame * mCallbackBufferSize;
         mFixedBlockReader.open(callbackSizeBytes);
         mBlockAdapter = &mFixedBlockReader;
     } else {
@@ -211,6 +220,9 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             ? AAUDIO_SESSION_ID_NONE
             : (aaudio_session_id_t) mAudioTrack->getSessionId();
     setSessionId(actualSessionId);
+
+    mInitialBufferCapacity = getBufferCapacity();
+    mInitialFramesPerBurst = getFramesPerBurst();
 
     mAudioTrack->addAudioDeviceCallback(mDeviceCallback);
 
@@ -239,14 +251,19 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::close()
-{
-    if (getState() != AAUDIO_STREAM_STATE_CLOSED) {
+aaudio_result_t AudioStreamTrack::release_l() {
+    if (getState() != AAUDIO_STREAM_STATE_CLOSING) {
         mAudioTrack->removeAudioDeviceCallback(mDeviceCallback);
-        setState(AAUDIO_STREAM_STATE_CLOSED);
+        logReleaseBufferState();
+        // TODO Investigate why clear() causes a hang in test_various.cpp
+        // if I call close() from a data callback.
+        // But the same thing in AudioRecord is OK!
+        // mAudioTrack.clear();
+        mFixedBlockReader.close();
+        return AudioStream::release_l();
+    } else {
+        return AAUDIO_OK; // already released
     }
-    mFixedBlockReader.close();
-    return AAUDIO_OK;
 }
 
 void AudioStreamTrack::processCallback(int event, void *info) {
@@ -258,7 +275,16 @@ void AudioStreamTrack::processCallback(int event, void *info) {
 
             // Stream got rerouted so we disconnect.
         case AudioTrack::EVENT_NEW_IAUDIOTRACK:
-            processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
+            // request stream disconnect if the restored AudioTrack has properties not matching
+            // what was requested initially
+            if (mAudioTrack->channelCount() != getSamplesPerFrame()
+                    || mAudioTrack->format() != getFormat()
+                    || mAudioTrack->getSampleRate() != getSampleRate()
+                    || mAudioTrack->getRoutedDeviceId() != getDeviceId()
+                    || getBufferCapacity() != mInitialBufferCapacity
+                    || getFramesPerBurst() != mInitialFramesPerBurst) {
+                processCallbackCommon(AAUDIO_CALLBACK_OPERATION_DISCONNECTED, info);
+            }
             break;
 
         default:
@@ -281,11 +307,15 @@ aaudio_result_t AudioStreamTrack::requestStart() {
     // Enable callback before starting AudioTrack to avoid shutting
     // down because of a race condition.
     mCallbackEnabled.store(true);
+    aaudio_stream_state_t originalState = getState();
+    // Set before starting the callback so that we are in the correct state
+    // before updateStateMachine() can be called by the callback.
+    setState(AAUDIO_STREAM_STATE_STARTING);
     err = mAudioTrack->start();
     if (err != OK) {
+        mCallbackEnabled.store(false);
+        setState(originalState);
         return AAudioConvert_androidToAAudioResult(err);
-    } else {
-        setState(AAUDIO_STREAM_STATE_STARTING);
     }
     return AAUDIO_OK;
 }

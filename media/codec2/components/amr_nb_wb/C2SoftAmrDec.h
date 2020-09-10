@@ -18,6 +18,8 @@
 #define ANDROID_C2_SOFT_AMR_DEC_H_
 
 #include <SimpleC2Component.h>
+#include "gsmamr_dec.h"
+#include "pvamrwbdecoder.h"
 
 
 namespace android {
@@ -51,6 +53,7 @@ private:
     void *mAmrHandle;
     void *mDecoderBuf;
     int16_t *mDecoderCookie;
+    RX_State_wb mRxState{};
 
     int16_t mInputSampleBuffer[477];
 

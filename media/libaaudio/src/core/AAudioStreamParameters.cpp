@@ -47,6 +47,7 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mContentType          = other.mContentType;
     mInputPreset          = other.mInputPreset;
     mAllowedCapturePolicy = other.mAllowedCapturePolicy;
+    mIsPrivacySensitive   = other.mIsPrivacySensitive;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -132,6 +133,10 @@ aaudio_result_t AAudioStreamParameters::validate() const {
         case AAUDIO_USAGE_ASSISTANCE_SONIFICATION:
         case AAUDIO_USAGE_GAME:
         case AAUDIO_USAGE_ASSISTANT:
+        case AAUDIO_SYSTEM_USAGE_EMERGENCY:
+        case AAUDIO_SYSTEM_USAGE_SAFETY:
+        case AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS:
+        case AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT:
             break; // valid
         default:
             ALOGD("usage not valid = %d", mUsage);
@@ -195,4 +200,5 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mContentType          = %6d", mContentType);
     ALOGD("mInputPreset          = %6d", mInputPreset);
     ALOGD("mAllowedCapturePolicy = %6d", mAllowedCapturePolicy);
+    ALOGD("mIsPrivacySensitive   = %s", mIsPrivacySensitive ? "true" : "false");
 }

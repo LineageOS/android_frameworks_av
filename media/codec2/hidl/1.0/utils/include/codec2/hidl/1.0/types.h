@@ -206,10 +206,23 @@ private:
     std::mutex mMutex;
     sp<ClientManager> mSenderManager;
     sp<IClientManager> mReceiverManager;
-    int64_t mReceiverConnectionId;
-    int64_t mSourceConnectionId;
-    std::chrono::steady_clock::time_point mLastSent;
     std::chrono::steady_clock::duration mRefreshInterval;
+
+    struct Connection {
+        int64_t receiverConnectionId;
+        std::chrono::steady_clock::time_point lastSent;
+        Connection(int64_t receiverConnectionId,
+                   std::chrono::steady_clock::time_point lastSent)
+              : receiverConnectionId(receiverConnectionId),
+                lastSent(lastSent) {
+        }
+    };
+
+    // Map of connections.
+    //
+    // The key is the connection id. One sender-receiver pair may have multiple
+    // connections.
+    std::map<int64_t, Connection> mConnections;
 };
 
 // std::list<std::unique_ptr<C2Work>> -> WorkBundle

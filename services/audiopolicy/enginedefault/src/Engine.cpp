@@ -54,9 +54,10 @@ static const std::vector<legacy_strategy_map>& getLegacyStrategy() {
         { "STRATEGY_ACCESSIBILITY", STRATEGY_ACCESSIBILITY },
         { "STRATEGY_REROUTING", STRATEGY_REROUTING },
         { "STRATEGY_PATCH", STRATEGY_REROUTING }, // boiler to manage stream patch volume
+        { "STRATEGY_CALL_ASSISTANT", STRATEGY_CALL_ASSISTANT },
     };
     return legacyStrategy;
-};
+}
 
 Engine::Engine()
 {
@@ -201,6 +202,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
             audio_devices_t txDevice = getDeviceForInputSource(
                     AUDIO_SOURCE_VOICE_COMMUNICATION)->type();
             sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
+            LOG_ALWAYS_FATAL_IF(primaryOutput == nullptr, "Primary output not found");
             DeviceVector availPrimaryInputDevices =
                     availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
 
@@ -446,6 +448,10 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         }
         } break;
 
+    case STRATEGY_CALL_ASSISTANT:
+        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_TELEPHONY_TX);
+        break;
+
     default:
         ALOGW("getDevicesForStrategy() unknown strategy: %d", strategy);
         break;
@@ -461,8 +467,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                  "getDevicesForStrategy() no default device defined");
     }
 
-    ALOGVV("getDevices"
-           "ForStrategy() strategy %d, device %x", strategy, devices.types());
+    ALOGVV("getDevices ForStrategy() strategy %d, device %s",
+           strategy, dumpDeviceTypes(devices.types()).c_str());
     return devices;
 }
 
@@ -474,8 +480,8 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     const SwAudioOutputCollection &outputs = getApmObserver()->getOutputs();
     DeviceVector availableDevices = availableInputDevices;
     sp<AudioOutputDescriptor> primaryOutput = outputs.getPrimaryOutput();
-    DeviceVector availablePrimaryDevices = availableInputDevices.getDevicesFromHwModule(
-            primaryOutput->getModuleHandle());
+    DeviceVector availablePrimaryDevices = primaryOutput == nullptr ? DeviceVector()
+            : availableInputDevices.getDevicesFromHwModule(primaryOutput->getModuleHandle());
     sp<DeviceDescriptor> device;
 
     // when a call is active, force device selection to match source VOICE_COMMUNICATION
@@ -518,6 +524,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         if ((getPhoneState() == AUDIO_MODE_IN_CALL) &&
                 (availableOutputDevices.getDevice(AUDIO_DEVICE_OUT_TELEPHONY_TX,
                         String8(""), AUDIO_FORMAT_DEFAULT)) == nullptr) {
+            LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
             availableDevices = availablePrimaryDevices;
         }
 
@@ -548,6 +555,9 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_UNPROCESSED:
     case AUDIO_SOURCE_HOTWORD:
         if (inputSource == AUDIO_SOURCE_HOTWORD) {
+            // We should not use primary output criteria for Hotword but rather limit
+            // to devices attached to the same HW module as the build in mic
+            LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
             availableDevices = availablePrimaryDevices;
         }
         if (getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) == AUDIO_POLICY_FORCE_BT_SCO) {
@@ -630,8 +640,9 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
                 String8(preferredStrategyDevice.mAddress.c_str()),
                 AUDIO_FORMAT_DEFAULT);
         if (preferredAvailableDevDescr != nullptr) {
-            ALOGVV("%s using pref device 0x%08x/%s for strategy %u", __FUNCTION__,
-                   preferredStrategyDevice.mType, preferredStrategyDevice.mAddress, strategy);
+            ALOGVV("%s using pref device 0x%08x/%s for strategy %u",
+                   __func__, preferredStrategyDevice.mType,
+                   preferredStrategyDevice.mAddress.c_str(), strategy);
             return DeviceVector(preferredAvailableDevDescr);
         }
     }

@@ -30,14 +30,15 @@ public:
         DUPLICATING,        // Thread class is DuplicatingThread
         RECORD,             // Thread class is RecordThread
         OFFLOAD,            // Thread class is OffloadThread
-        MMAP                // control thread for MMAP stream
+        MMAP_PLAYBACK,      // Thread class for MMAP playback stream
+        MMAP_CAPTURE,       // Thread class for MMAP capture stream
         // If you add any values here, also update ThreadBase::threadTypeToString()
     };
 
     static const char *threadTypeToString(type_t type);
 
     ThreadBase(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-               type_t type, bool systemReady);
+               type_t type, bool systemReady, bool isOut);
     virtual             ~ThreadBase();
 
     virtual status_t    readyToRun();
@@ -330,7 +331,18 @@ public:
                     return mInDeviceTypeAddr;
                 }
 
-    virtual     bool        isOutput() const = 0;
+                bool        isOutput() const { return mIsOut; }
+
+                bool        isOffloadOrMmap() const {
+                    switch (mType) {
+                    case OFFLOAD:
+                    case MMAP_PLAYBACK:
+                    case MMAP_CAPTURE:
+                        return true;
+                    default:
+                        return false;
+                    }
+                }
 
     virtual     sp<StreamHalInterface> stream() const = 0;
 
@@ -342,7 +354,8 @@ public:
                                     effect_descriptor_t *desc,
                                     int *enabled,
                                     status_t *status /*non-NULL*/,
-                                    bool pinned);
+                                    bool pinned,
+                                    bool probe);
 
                 // return values for hasAudioSession (bit field)
                 enum effect_state {
@@ -523,6 +536,8 @@ protected:
                 Condition               mWaitWorkCV;
 
                 const sp<AudioFlinger>  mAudioFlinger;
+                ThreadMetrics           mThreadMetrics;
+                const bool              mIsOut;
 
                 // updated by PlaybackThread::readOutputParameters_l() or
                 // RecordThread::readInputParameters_l()
@@ -719,7 +734,7 @@ class VolumeInterface {
 
 // --- PlaybackThread ---
 class PlaybackThread : public ThreadBase, public StreamOutHalInterfaceCallback,
-    public VolumeInterface {
+                       public VolumeInterface, public StreamOutHalInterfaceEventCallback {
 public:
 
 #include "PlaybackTracks.h"
@@ -795,6 +810,10 @@ protected:
     virtual     void        onAddNewTrack_l();
                 void        onAsyncError(); // error reported by AsyncCallbackThread
 
+    // StreamHalInterfaceCodecFormatCallback implementation
+                void        onCodecFormatChanged(
+                                const std::basic_string<uint8_t>& metadataBs) override;
+
     // ThreadBase virtuals
     virtual     void        preExit();
 
@@ -844,7 +863,8 @@ public:
                                 pid_t tid,
                                 uid_t uid,
                                 status_t *status /*non-NULL*/,
-                                audio_port_handle_t portId);
+                                audio_port_handle_t portId,
+                                const sp<media::IAudioTrackCallback>& callback);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -904,9 +924,6 @@ public:
 
                 // Return the asynchronous signal wait time.
     virtual     int64_t     computeWaitTimeNs_l() const { return INT64_MAX; }
-
-    virtual     bool        isOutput() const override { return true; }
-
                 // returns true if the track is allowed to be added to the thread.
     virtual     bool        isTrackAllowed_l(
                                     audio_channel_mask_t channelMask __unused,
@@ -1166,6 +1183,10 @@ private:
     // callbacks are ignored.
     uint32_t                        mDrainSequence;
     sp<AsyncCallbackThread>         mCallbackThread;
+
+    Mutex                                    mAudioTrackCbLock;
+    // Record of IAudioTrackCallback
+    std::set<sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
 private:
     // The HAL output sink is treated as non-blocking, but current implementation is blocking
@@ -1640,12 +1661,11 @@ public:
                             ThreadBase::acquireWakeLock_l();
                             mActiveTracks.updatePowerState(this, true /* force */);
                         }
-    virtual bool        isOutput() const override { return false; }
 
             void        checkBtNrec();
 
             // Sets the UID records silence
-            void        setRecordSilenced(uid_t uid, bool silenced);
+            void        setRecordSilenced(audio_port_handle_t portId, bool silenced);
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
@@ -1749,7 +1769,8 @@ class MmapThread : public ThreadBase
 #include "MmapTracks.h"
 
     MmapThread(const sp<AudioFlinger>& audioFlinger, audio_io_handle_t id,
-               AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady);
+               AudioHwDevice *hwDev, sp<StreamHalInterface> stream, bool systemReady,
+               bool isOut);
     virtual     ~MmapThread();
 
     virtual     void        configure(const audio_attributes_t *attr,
@@ -1765,7 +1786,9 @@ class MmapThread : public ThreadBase
     status_t createMmapBuffer(int32_t minSizeFrames,
                                       struct audio_mmap_buffer_info *info);
     status_t getMmapPosition(struct audio_mmap_position *position);
-    status_t start(const AudioClient& client, audio_port_handle_t *handle);
+    status_t start(const AudioClient& client,
+                   const audio_attributes_t *attr,
+                   audio_port_handle_t *handle);
     status_t stop(audio_port_handle_t handle);
     status_t standby();
 
@@ -1816,7 +1839,8 @@ class MmapThread : public ThreadBase
     virtual     void        invalidateTracks(audio_stream_type_t streamType __unused) {}
 
                 // Sets the UID records silence
-    virtual     void        setRecordSilenced(uid_t uid __unused, bool silenced __unused) {}
+    virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
+                                              bool silenced __unused) {}
 
  protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
@@ -1874,8 +1898,6 @@ public:
     virtual     void        checkSilentMode_l();
                 void        processVolume_l() override;
 
-    virtual     bool        isOutput() const override { return true; }
-
                 void        updateMetadata_l() override;
 
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
@@ -1902,11 +1924,11 @@ public:
                 AudioStreamIn* clearInput();
 
                 status_t       exitStandby() override;
-    virtual     bool           isOutput() const override { return false; }
 
                 void           updateMetadata_l() override;
                 void           processVolume_l() override;
-                void           setRecordSilenced(uid_t uid, bool silenced) override;
+                void           setRecordSilenced(audio_port_handle_t portId,
+                                                 bool silenced) override;
 
     virtual     void           toAudioPortConfig(struct audio_port_config *config);
 

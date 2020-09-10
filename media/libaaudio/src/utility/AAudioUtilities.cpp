@@ -183,6 +183,10 @@ audio_usage_t AAudioConvert_usageToInternal(aaudio_usage_t usage) {
     STATIC_ASSERT(AAUDIO_USAGE_ASSISTANCE_SONIFICATION == AUDIO_USAGE_ASSISTANCE_SONIFICATION);
     STATIC_ASSERT(AAUDIO_USAGE_GAME == AUDIO_USAGE_GAME);
     STATIC_ASSERT(AAUDIO_USAGE_ASSISTANT == AUDIO_USAGE_ASSISTANT);
+    STATIC_ASSERT(AAUDIO_SYSTEM_USAGE_EMERGENCY == AUDIO_USAGE_EMERGENCY);
+    STATIC_ASSERT(AAUDIO_SYSTEM_USAGE_SAFETY == AUDIO_USAGE_SAFETY);
+    STATIC_ASSERT(AAUDIO_SYSTEM_USAGE_VEHICLE_STATUS == AUDIO_USAGE_VEHICLE_STATUS);
+    STATIC_ASSERT(AAUDIO_SYSTEM_USAGE_ANNOUNCEMENT == AUDIO_USAGE_ANNOUNCEMENT);
     if (usage == AAUDIO_UNSPECIFIED) {
         usage = AAUDIO_USAGE_MEDIA;
     }
@@ -232,6 +236,11 @@ audio_flags_mask_t AAudioConvert_allowCapturePolicyToAudioFlagsMask(
             ALOGE("%s() 0x%08X unrecognized", __func__, policy);
             return AUDIO_FLAG_NONE; //
     }
+}
+
+audio_flags_mask_t AAudioConvert_privacySensitiveToAudioFlagsMask(
+        bool privacySensitive) {
+    return privacySensitive ? AUDIO_FLAG_CAPTURE_PRIVATE : AUDIO_FLAG_NONE;
 }
 
 int32_t AAudioConvert_framesToBytes(int32_t numFrames,
@@ -333,6 +342,34 @@ int32_t AAudioProperty_getHardwareBurstMinMicros() {
         prop = defaultMicros;
     }
     return prop;
+}
+
+static int32_t AAudioProperty_getMMapOffsetMicros(const char *functionName,
+        const char *propertyName) {
+    const int32_t minMicros = -20000; // arbitrary
+    const int32_t defaultMicros = 0;  // arbitrary
+    const int32_t maxMicros =  20000; // arbitrary
+    int32_t prop = property_get_int32(propertyName, defaultMicros);
+    if (prop < minMicros) {
+        ALOGW("%s: clipped %d to %d", functionName, prop, minMicros);
+        prop = minMicros;
+    } else if (prop > maxMicros) {
+        ALOGW("%s: clipped %d to %d", functionName, prop, minMicros);
+        prop = maxMicros;
+    }
+    return prop;
+}
+
+int32_t AAudioProperty_getInputMMapOffsetMicros() {
+    return AAudioProperty_getMMapOffsetMicros(__func__, AAUDIO_PROP_INPUT_MMAP_OFFSET_USEC);
+}
+
+int32_t AAudioProperty_getOutputMMapOffsetMicros() {
+    return AAudioProperty_getMMapOffsetMicros(__func__, AAUDIO_PROP_OUTPUT_MMAP_OFFSET_USEC);
+}
+
+int32_t AAudioProperty_getLogMask() {
+    return property_get_int32(AAUDIO_PROP_LOG_MASK, 0);
 }
 
 aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state) {

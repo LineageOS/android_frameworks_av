@@ -56,6 +56,8 @@ enum {
     SET_VIDEO_BUFFER_TARGET,
     RELEASE_RECORDING_FRAME_HANDLE,
     RELEASE_RECORDING_FRAME_HANDLE_BATCH,
+    SET_AUDIO_RESTRICTION,
+    GET_GLOBAL_AUDIO_RESTRICTION,
 };
 
 class BpCamera: public BpInterface<ICamera>
@@ -189,6 +191,21 @@ public:
             native_handle_close(handle);
             native_handle_delete(handle);
         }
+    }
+
+    status_t setAudioRestriction(int32_t mode) {
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        data.writeInt32(mode);
+        remote()->transact(SET_AUDIO_RESTRICTION, data, &reply);
+        return reply.readInt32();
+    }
+
+    int32_t getGlobalAudioRestriction() {
+        Parcel data, reply;
+        data.writeInterfaceToken(ICamera::getInterfaceDescriptor());
+        remote()->transact(GET_GLOBAL_AUDIO_RESTRICTION, data, &reply);
+        return reply.readInt32();
     }
 
     status_t setVideoBufferMode(int32_t videoBufferMode)
@@ -492,6 +509,17 @@ status_t BnCamera::onTransact(
             sp<IGraphicBufferProducer> st =
                 interface_cast<IGraphicBufferProducer>(data.readStrongBinder());
             reply->writeInt32(setVideoTarget(st));
+            return NO_ERROR;
+        } break;
+        case SET_AUDIO_RESTRICTION: {
+            CHECK_INTERFACE(ICamera, data, reply);
+            int32_t mode = data.readInt32();
+            reply->writeInt32(setAudioRestriction(mode));
+            return NO_ERROR;
+        } break;
+        case GET_GLOBAL_AUDIO_RESTRICTION: {
+            CHECK_INTERFACE(ICamera, data, reply);
+            reply->writeInt32(getGlobalAudioRestriction());
             return NO_ERROR;
         } break;
         default:

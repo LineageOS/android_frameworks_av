@@ -35,8 +35,6 @@
 #include <media/stagefright/Utils.h>
 #include <media/stagefright/FoundationUtils.h>
 
-#include <media/IMediaAnalyticsService.h>
-
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleepUs = 20000;
 
@@ -87,7 +85,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
       mMediaClock(new MediaClock),
       mPlayer(new NuPlayer(pid, mMediaClock)),
       mPlayerFlags(0),
-      mAnalyticsItem(NULL),
+      mMetricsItem(NULL),
       mClientUid(-1),
       mAtEOS(false),
       mLooping(false),
@@ -98,7 +96,7 @@ NuPlayerDriver::NuPlayerDriver(pid_t pid)
     mMediaClock->init();
 
     // set up an analytics record
-    mAnalyticsItem = MediaAnalyticsItem::create(kKeyPlayer);
+    mMetricsItem = mediametrics::Item::create(kKeyPlayer);
 
     mLooper->start(
             false, /* runOnCallingThread */
@@ -119,9 +117,9 @@ NuPlayerDriver::~NuPlayerDriver() {
     logMetrics("destructor");
 
     Mutex::Autolock autoLock(mMetricsLock);
-    if (mAnalyticsItem != NULL) {
-        delete mAnalyticsItem;
-        mAnalyticsItem = NULL;
+    if (mMetricsItem != NULL) {
+        delete mMetricsItem;
+        mMetricsItem = NULL;
     }
 }
 
@@ -134,8 +132,8 @@ status_t NuPlayerDriver::setUID(uid_t uid) {
     mClientUid = uid;
 
     Mutex::Autolock autoLock(mMetricsLock);
-    if (mAnalyticsItem) {
-        mAnalyticsItem->setUid(mClientUid);
+    if (mMetricsItem) {
+        mMetricsItem->setUid(mClientUid);
     }
 
     return OK;
@@ -547,14 +545,15 @@ void NuPlayerDriver::updateMetrics(const char *where) {
     }
     ALOGV("updateMetrics(%p) from %s at state %d", this, where, mState);
 
-    // gather the final track statistics for this record
+    // avoid nested locks by gathering our data outside of the metrics lock.
+
+    // final track statistics for this record
     Vector<sp<AMessage>> trackStats;
     mPlayer->getStats(&trackStats);
 
     // getDuration() uses mLock
     int duration_ms = -1;
     getDuration(&duration_ms);
-    mAnalyticsItem->setInt64(kPlayerDuration, duration_ms);
 
     mPlayer->updateInternalTimers();
 
@@ -571,21 +570,24 @@ void NuPlayerDriver::updateMetrics(const char *where) {
         rebufferingAtExit = mRebufferingAtExit;
     }
 
-    // finish the rest of the gathering holding mLock;
+    // finish the rest of the gathering under our mutex to avoid metrics races.
     // some of the fields we read are updated under mLock.
-    // we also avoid any races within mAnalyticsItem machinery
     Mutex::Autolock autoLock(mMetricsLock);
 
-    mAnalyticsItem->setInt64(kPlayerPlaying, (playingTimeUs+500)/1000 );
+    if (mMetricsItem == NULL) {
+        return;
+    }
 
-    if (mRebufferingEvents != 0) {
-        mAnalyticsItem->setInt64(kPlayerRebuffering, (rebufferingTimeUs+500)/1000 );
-        mAnalyticsItem->setInt32(kPlayerRebufferingCount, rebufferingEvents);
-        mAnalyticsItem->setInt32(kPlayerRebufferingAtExit, rebufferingAtExit);
+    mMetricsItem->setInt64(kPlayerDuration, duration_ms);
+    mMetricsItem->setInt64(kPlayerPlaying, (playingTimeUs+500)/1000 );
 
-     }
+    if (rebufferingEvents != 0) {
+        mMetricsItem->setInt64(kPlayerRebuffering, (rebufferingTimeUs+500)/1000 );
+        mMetricsItem->setInt32(kPlayerRebufferingCount, rebufferingEvents);
+        mMetricsItem->setInt32(kPlayerRebufferingAtExit, rebufferingAtExit);
+    }
 
-    mAnalyticsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
+    mMetricsItem->setCString(kPlayerDataSourceType, mPlayer->getDataSourceType());
 
     if (trackStats.size() > 0) {
         for (size_t i = 0; i < trackStats.size(); ++i) {
@@ -599,15 +601,15 @@ void NuPlayerDriver::updateMetrics(const char *where) {
 
             if (mime.startsWith("video/")) {
                 int32_t width, height;
-                mAnalyticsItem->setCString(kPlayerVMime, mime.c_str());
+                mMetricsItem->setCString(kPlayerVMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString(kPlayerVCodec, name.c_str());
+                    mMetricsItem->setCString(kPlayerVCodec, name.c_str());
                 }
 
                 if (stats->findInt32("width", &width)
                         && stats->findInt32("height", &height)) {
-                    mAnalyticsItem->setInt32(kPlayerWidth, width);
-                    mAnalyticsItem->setInt32(kPlayerHeight, height);
+                    mMetricsItem->setInt32(kPlayerWidth, width);
+                    mMetricsItem->setInt32(kPlayerHeight, height);
                 }
 
                 int64_t numFramesTotal = 0;
@@ -615,18 +617,18 @@ void NuPlayerDriver::updateMetrics(const char *where) {
                 stats->findInt64("frames-total", &numFramesTotal);
                 stats->findInt64("frames-dropped-output", &numFramesDropped);
 
-                mAnalyticsItem->setInt64(kPlayerFrames, numFramesTotal);
-                mAnalyticsItem->setInt64(kPlayerFramesDropped, numFramesDropped);
+                mMetricsItem->setInt64(kPlayerFrames, numFramesTotal);
+                mMetricsItem->setInt64(kPlayerFramesDropped, numFramesDropped);
 
                 float frameRate = 0;
                 if (stats->findFloat("frame-rate-total", &frameRate)) {
-                    mAnalyticsItem->setDouble(kPlayerFrameRate, (double) frameRate);
+                    mMetricsItem->setDouble(kPlayerFrameRate, (double) frameRate);
                 }
 
             } else if (mime.startsWith("audio/")) {
-                mAnalyticsItem->setCString(kPlayerAMime, mime.c_str());
+                mMetricsItem->setCString(kPlayerAMime, mime.c_str());
                 if (!name.empty()) {
-                    mAnalyticsItem->setCString(kPlayerACodec, name.c_str());
+                    mMetricsItem->setCString(kPlayerACodec, name.c_str());
                 }
             }
         }
@@ -640,10 +642,10 @@ void NuPlayerDriver::logMetrics(const char *where) {
     }
     ALOGV("logMetrics(%p) from %s at state %d", this, where, mState);
 
-    // make sure that the stats are stable while we're writing them.
+    // ensure mMetricsItem stability while we write it out
     Mutex::Autolock autoLock(mMetricsLock);
 
-    if (mAnalyticsItem == NULL || mAnalyticsItem->isEnabled() == false) {
+    if (mMetricsItem == NULL || mMetricsItem->isEnabled() == false) {
         return;
     }
 
@@ -652,18 +654,18 @@ void NuPlayerDriver::logMetrics(const char *where) {
     // and that always injects 3 fields (duration, playing time, and
     // datasource) into the record.
     // So the canonical "empty" record has 3 elements in it.
-    if (mAnalyticsItem->count() > 3) {
+    if (mMetricsItem->count() > 3) {
 
-        mAnalyticsItem->selfrecord();
+        mMetricsItem->selfrecord();
 
         // re-init in case we prepare() and start() again.
-        delete mAnalyticsItem ;
-        mAnalyticsItem = MediaAnalyticsItem::create(kKeyPlayer);
-        if (mAnalyticsItem) {
-            mAnalyticsItem->setUid(mClientUid);
+        delete mMetricsItem ;
+        mMetricsItem = mediametrics::Item::create(kKeyPlayer);
+        if (mMetricsItem) {
+            mMetricsItem->setUid(mClientUid);
         }
     } else {
-        ALOGV("nothing to record (only %d fields)", mAnalyticsItem->count());
+        ALOGV("nothing to record (only %zu fields)", mMetricsItem->count());
     }
 }
 
@@ -806,10 +808,10 @@ status_t NuPlayerDriver::getParameter(int key, Parcel *reply) {
         // gather current info all together, parcel it, and send it back
         updateMetrics("api");
 
-        // ensure mAnalyticsItem stability while writing to parcel
+        // ensure mMetricsItem stability while writing to parcel
         Mutex::Autolock autoLock(mMetricsLock);
-        if (mAnalyticsItem != NULL) {
-            mAnalyticsItem->writeToParcel(reply);
+        if (mMetricsItem != NULL) {
+            mMetricsItem->writeToParcel(reply);
         }
         return OK;
     }
@@ -1036,12 +1038,12 @@ void NuPlayerDriver::notifyListener_l(
             // [test against msg is due to fall through from previous switch value]
             if (msg == MEDIA_ERROR) {
                 Mutex::Autolock autoLock(mMetricsLock);
-                if (mAnalyticsItem != NULL) {
-                    mAnalyticsItem->setInt32(kPlayerError, ext1);
+                if (mMetricsItem != NULL) {
+                    mMetricsItem->setInt32(kPlayerError, ext1);
                     if (ext2 != 0) {
-                        mAnalyticsItem->setInt32(kPlayerErrorCode, ext2);
+                        mMetricsItem->setInt32(kPlayerErrorCode, ext2);
                     }
-                    mAnalyticsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
+                    mMetricsItem->setCString(kPlayerErrorState, stateString(mState).c_str());
                 }
             }
             mAtEOS = true;

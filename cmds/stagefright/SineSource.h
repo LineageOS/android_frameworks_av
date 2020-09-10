@@ -2,7 +2,7 @@
 
 #define SINE_SOURCE_H_
 
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <utils/Compat.h>
 
 namespace android {

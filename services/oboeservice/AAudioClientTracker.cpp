@@ -106,18 +106,9 @@ int32_t AAudioClientTracker::getStreamCount(pid_t pid) {
 
 aaudio_result_t
 AAudioClientTracker::registerClientStream(pid_t pid, sp<AAudioServiceStreamBase> serviceStream) {
-    aaudio_result_t result = AAUDIO_OK;
     ALOGV("registerClientStream(%d,)\n", pid);
     std::lock_guard<std::mutex> lock(mLock);
-    sp<NotificationClient> notificationClient = mNotificationClients[pid];
-    if (notificationClient == 0) {
-        // This will get called the first time the audio server registers an internal stream.
-        ALOGV("registerClientStream(%d,) unrecognized pid\n", pid);
-        notificationClient = new NotificationClient(pid, nullptr);
-        mNotificationClients[pid] = notificationClient;
-    }
-    notificationClient->registerClientStream(serviceStream);
-    return result;
+    return getNotificationClient_l(pid)->registerClientStream(serviceStream);
 }
 
 // Find the tracker for this process and remove it.
@@ -135,6 +126,33 @@ AAudioClientTracker::unregisterClientStream(pid_t pid,
     }
     return AAUDIO_OK;
 }
+
+void AAudioClientTracker::setExclusiveEnabled(pid_t pid, bool enabled) {
+    ALOGD("%s(%d, %d)\n", __func__, pid, enabled);
+    std::lock_guard<std::mutex> lock(mLock);
+    getNotificationClient_l(pid)->setExclusiveEnabled(enabled);
+}
+
+bool AAudioClientTracker::isExclusiveEnabled(pid_t pid) {
+    std::lock_guard<std::mutex> lock(mLock);
+    return getNotificationClient_l(pid)->isExclusiveEnabled();
+}
+
+sp<AAudioClientTracker::NotificationClient>
+        AAudioClientTracker::getNotificationClient_l(pid_t pid) {
+    sp<NotificationClient> notificationClient = mNotificationClients[pid];
+    if (notificationClient == nullptr) {
+        // This will get called the first time the audio server uses this PID.
+        ALOGV("%s(%d,) unrecognized PID\n", __func__, pid);
+        notificationClient = new AAudioClientTracker::NotificationClient(pid, nullptr);
+        mNotificationClients[pid] = notificationClient;
+    }
+    return notificationClient;
+}
+
+// =======================================
+// AAudioClientTracker::NotificationClient
+// =======================================
 
 AAudioClientTracker::NotificationClient::NotificationClient(pid_t pid, const sp<IBinder>& binder)
         : mProcessId(pid), mBinder(binder) {

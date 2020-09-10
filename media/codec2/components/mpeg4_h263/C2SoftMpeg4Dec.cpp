@@ -33,7 +33,7 @@
 #include "mp4dec_api.h"
 
 namespace android {
-
+constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
 #ifdef MPEG4
 constexpr char COMPONENT_NAME[] = "c2.android.mpeg4.decoder";
 #else
@@ -149,11 +149,7 @@ public:
 
         addParameter(
                 DefineParam(mMaxInputSize, C2_PARAMKEY_INPUT_MAX_BUFFER_SIZE)
-#ifdef MPEG4
-                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, 1920 * 1088 * 3 / 2))
-#else
-                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, 352 * 288 * 3 / 2))
-#endif
+                .withDefault(new C2StreamMaxBufferSizeInfo::input(0u, kMinInputBufferSize))
                 .withFields({
                     C2F(mMaxInputSize, value).any(),
                 })
@@ -218,7 +214,8 @@ public:
                                   const C2P<C2StreamMaxPictureSizeTuning::output> &maxSize) {
         (void)mayBlock;
         // assume compression ratio of 1
-        me.set().value = (((maxSize.v.width + 15) / 16) * ((maxSize.v.height + 15) / 16) * 384);
+        me.set().value = c2_max((((maxSize.v.width + 15) / 16)
+                * ((maxSize.v.height + 15) / 16) * 384), kMinInputBufferSize);
         return C2R::Ok();
     }
 

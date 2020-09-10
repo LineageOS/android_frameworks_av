@@ -168,6 +168,7 @@ status_t AudioFlinger::PatchPanel::createAudioPatch(const struct audio_patch *pa
                 if (hwDevice != 0) {
                     hwDevice->releaseAudioPatch(removedPatch.mHalHandle);
                 }
+                halHandle = removedPatch.mHalHandle;
             }
             erasePatch(*handle);
         }

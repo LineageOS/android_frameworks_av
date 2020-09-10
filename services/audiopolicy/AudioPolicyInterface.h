@@ -69,6 +69,14 @@ public:
         API_INPUT_TELEPHONY_RX, // used for capture from telephony RX path
     } input_type_t;
 
+    typedef enum {
+        API_OUTPUT_INVALID = -1,
+        API_OUTPUT_LEGACY  = 0,// e.g. audio playing to speaker
+        API_OUT_MIX_PLAYBACK,  // used for "remote submix" playback of audio from remote source
+                               // to local capture
+        API_OUTPUT_TELEPHONY_TX, // used for playback to telephony TX path
+    } output_type_t;
+
 public:
     virtual ~AudioPolicyInterface() {}
     //
@@ -119,7 +127,8 @@ public:
                                         audio_output_flags_t *flags,
                                         audio_port_handle_t *selectedDeviceId,
                                         audio_port_handle_t *portId,
-                                        std::vector<audio_io_handle_t> *secondaryOutputs) = 0;
+                                        std::vector<audio_io_handle_t> *secondaryOutputs,
+                                        output_type_t *outputType) = 0;
     // indicates to the audio policy manager that the output starts being used by corresponding stream.
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.
@@ -187,6 +196,10 @@ public:
     // return the enabled output devices for the given stream type
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream) = 0;
 
+    // retrieves the list of enabled output devices for the given audio attributes
+    virtual status_t getDevicesForAttributes(const audio_attributes_t &attr,
+                                             AudioDeviceTypeAddrVector *devices) = 0;
+
     // Audio effect management
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc) = 0;
     virtual status_t registerEffect(const effect_descriptor_t *desc,
@@ -241,6 +254,10 @@ public:
             = 0;
     virtual status_t removeUidDeviceAffinities(uid_t uid) = 0;
 
+    virtual status_t setUserIdDeviceAffinities(int userId,
+            const Vector<AudioDeviceTypeAddr>& devices) = 0;
+    virtual status_t removeUserIdDeviceAffinities(int userId) = 0;
+
     virtual status_t startAudioSource(const struct audio_port_config *source,
                                       const audio_attributes_t *attributes,
                                       audio_port_handle_t *portId,
@@ -264,7 +281,7 @@ public:
     virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
                 std::vector<audio_format_t> *formats) = 0;
 
-    virtual void     setAppState(uid_t uid, app_state_t state) = 0;
+    virtual void     setAppState(audio_port_handle_t portId, app_state_t state) = 0;
 
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
 
@@ -275,6 +292,8 @@ public:
 
     virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
                                                        volume_group_t &volumeGroup) = 0;
+
+    virtual bool     isCallScreenModeSupported() = 0;
 
     virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
                                                    const AudioDeviceTypeAddr &device) = 0;
@@ -396,6 +415,12 @@ public:
                                                 std::vector<effect_descriptor_t> effects,
                                                 audio_patch_handle_t patchHandle,
                                                 audio_source_t source) = 0;
+
+    // Used to notify the sound trigger module that an audio capture is about to
+    // take place. This should typically result in any active recognition
+    // sessions to be preempted on modules that do not support sound trigger
+    // recognition concurrently with audio capture.
+    virtual void setSoundTriggerCaptureState(bool active) = 0;
 };
 
 extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface);

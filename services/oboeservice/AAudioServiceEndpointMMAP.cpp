@@ -23,9 +23,9 @@
 #include <map>
 #include <mutex>
 #include <sstream>
+#include <thread>
 #include <utils/Singleton.h>
 #include <vector>
-
 
 #include "AAudioEndpointManager.h"
 #include "AAudioServiceEndpoint.h"
@@ -35,7 +35,6 @@
 #include "AAudioServiceStreamShared.h"
 #include "AAudioServiceEndpointPlay.h"
 #include "AAudioServiceEndpointMMAP.h"
-
 
 #define AAUDIO_BUFFER_CAPACITY_MIN    4 * 512
 #define AAUDIO_SAMPLE_RATE_DEFAULT    48000
@@ -47,7 +46,6 @@
 
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
-
 
 AAudioServiceEndpointMMAP::AAudioServiceEndpointMMAP(AAudioService &audioService)
         : mMmapStream(nullptr)
@@ -79,27 +77,7 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     copyFrom(request.getConstantConfiguration());
 
-    aaudio_direction_t direction = getDirection();
-
-    const audio_content_type_t contentType =
-            AAudioConvert_contentTypeToInternal(getContentType());
-    // Usage only used for OUTPUT
-    const audio_usage_t usage = (direction == AAUDIO_DIRECTION_OUTPUT)
-            ? AAudioConvert_usageToInternal(getUsage())
-            : AUDIO_USAGE_UNKNOWN;
-    const audio_source_t source = (direction == AAUDIO_DIRECTION_INPUT)
-            ? AAudioConvert_inputPresetToAudioSource(getInputPreset())
-            : AUDIO_SOURCE_DEFAULT;
-    const audio_flags_mask_t flags = AUDIO_FLAG_LOW_LATENCY |
-            AAudioConvert_allowCapturePolicyToAudioFlagsMask(getAllowedCapturePolicy());
-
-    const audio_attributes_t attributes = {
-            .content_type = contentType,
-            .usage = usage,
-            .source = source,
-            .flags = flags,
-            .tags = ""
-    };
+    const audio_attributes_t attributes = getAudioAttributesFrom(this);
 
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
@@ -121,6 +99,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
     config.sample_rate = aaudioSampleRate;
 
     int32_t aaudioSamplesPerFrame = getSamplesPerFrame();
+
+    const aaudio_direction_t direction = getDirection();
 
     if (direction == AAUDIO_DIRECTION_OUTPUT) {
         config.channel_mask = (aaudioSamplesPerFrame == AAUDIO_UNSPECIFIED)
@@ -247,7 +227,7 @@ error:
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::close() {
-    if (mMmapStream != 0) {
+    if (mMmapStream != nullptr) {
         // Needs to be explicitly cleared or CTS will fail but it is not clear why.
         mMmapStream.clear();
         // Apparently the above close is asynchronous. An attempt to open a new device
@@ -264,7 +244,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBas
     // Start the client on behalf of the AAudio service.
     // Use the port handle that was provided by openMmapStream().
     audio_port_handle_t tempHandle = mPortHandle;
-    aaudio_result_t result = startClient(mMmapClient, &tempHandle);
+    audio_attributes_t attr = {};
+    if (stream != nullptr) {
+        attr = getAudioAttributesFrom(stream.get());
+    }
+    aaudio_result_t result = startClient(
+            mMmapClient, stream == nullptr ? nullptr : &attr, &tempHandle);
     // When AudioFlinger is passed a valid port handle then it should not change it.
     LOG_ALWAYS_FATAL_IF(tempHandle != mPortHandle,
                         "%s() port handle not expected to change from %d to %d",
@@ -289,9 +274,10 @@ aaudio_result_t AAudioServiceEndpointMMAP::stopStream(sp<AAudioServiceStreamBase
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startClient(const android::AudioClient& client,
+                                                       const audio_attributes_t *attr,
                                                        audio_port_handle_t *clientHandle) {
     if (mMmapStream == nullptr) return AAUDIO_ERROR_NULL;
-    status_t status = mMmapStream->start(client, clientHandle);
+    status_t status = mMmapStream->start(client, attr, clientHandle);
     return AAudioConvert_androidToAAudioResult(status);
 }
 
@@ -330,9 +316,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::getTimestamp(int64_t *positionFrames,
     return 0; // TODO
 }
 
-// This is called by AudioFlinger when it wants to destroy a stream.
-void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
-    ALOGD("%s(portHandle = %d) called", __func__, portHandle);
+// This is called by onTearDown() in a separate thread to avoid deadlocks.
+void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHandle) {
     // Are we tearing down the EXCLUSIVE MMAP stream?
     if (isStreamRegistered(portHandle)) {
         ALOGD("%s(%d) tearing down this entire MMAP endpoint", __func__, portHandle);
@@ -344,6 +329,13 @@ void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
         ALOGD("%s(%d) disconnectStreamByPortHandle returned %d", __func__, portHandle, result);
     }
 };
+
+// This is called by AudioFlinger when it wants to destroy a stream.
+void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
+    ALOGD("%s(portHandle = %d) called", __func__, portHandle);
+    std::thread asyncTask(&AAudioServiceEndpointMMAP::handleTearDownAsync, this, portHandle);
+    asyncTask.detach();
+}
 
 void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
                                               android::Vector<float> values) {
@@ -357,12 +349,20 @@ void AAudioServiceEndpointMMAP::onVolumeChanged(audio_channel_mask_t channels,
     }
 };
 
-void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t deviceId) {
+void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle) {
+    const int32_t deviceId = static_cast<int32_t>(portHandle);
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
-    if (getDeviceId() != AUDIO_PORT_HANDLE_NONE  && getDeviceId() != deviceId) {
-        disconnectRegisteredStreams();
+    if (getDeviceId() != deviceId) {
+        if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
+            std::thread asyncTask([this, deviceId]() {
+                disconnectRegisteredStreams();
+                setDeviceId(deviceId);
+            });
+            asyncTask.detach();
+        } else {
+            setDeviceId(deviceId);
+        }
     }
-    setDeviceId(deviceId);
 };
 
 /**

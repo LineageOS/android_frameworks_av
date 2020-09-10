@@ -28,7 +28,7 @@ class AudioAttributes : public Parcelable
 {
 public:
     AudioAttributes() = default;
-    AudioAttributes(const audio_attributes_t &attributes) : mAttributes(attributes) {}
+    AudioAttributes(const audio_attributes_t &attributes) : mAttributes(attributes) {} // NOLINT
     AudioAttributes(volume_group_t groupId,
                     audio_stream_type_t stream,
                     const audio_attributes_t &attributes) :

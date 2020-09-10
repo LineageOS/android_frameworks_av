@@ -18,7 +18,6 @@
 #include <media/omx/1.0/WOmx.h>
 #include <media/omx/1.0/WOmxNode.h>
 #include <media/omx/1.0/WOmxObserver.h>
-#include <media/omx/1.0/WGraphicBufferSource.h>
 #include <media/omx/1.0/Conversion.h>
 
 namespace android {
@@ -70,7 +69,7 @@ status_t LWOmx::allocateNode(
 
 status_t LWOmx::createInputSurface(
         sp<::android::IGraphicBufferProducer>* bufferProducer,
-        sp<::android::IGraphicBufferSource>* bufferSource) {
+        sp<::android::hardware::media::omx::V1_0::IGraphicBufferSource>* bufferSource) {
     status_t fnStatus;
     status_t transStatus = toStatusT(mBase->createInputSurface(
             [&fnStatus, bufferProducer, bufferSource] (
@@ -79,7 +78,7 @@ status_t LWOmx::createInputSurface(
                     sp<IGraphicBufferSource> const& tSource) {
                 fnStatus = toStatusT(status);
                 *bufferProducer = new H2BGraphicBufferProducer(tProducer);
-                *bufferSource = new LWGraphicBufferSource(tSource);
+                *bufferSource = tSource;
             }));
     return transStatus == NO_ERROR ? fnStatus : transStatus;
 }

@@ -24,13 +24,13 @@
 
 #include "MPEG2TSExtractor.h"
 
-#include <media/DataSourceBase.h>
 #include <media/IStreamSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AUtils.h>
 #include <media/stagefright/foundation/MediaKeys.h>
+#include <media/stagefright/DataSourceBase.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/MetaData.h>

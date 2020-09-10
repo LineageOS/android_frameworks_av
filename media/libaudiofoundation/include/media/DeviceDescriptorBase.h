@@ -55,6 +55,9 @@ public:
     // AudioPort
     virtual void toAudioPort(struct audio_port *port) const;
 
+    status_t setEncapsulationModes(uint32_t encapsulationModes);
+    status_t setEncapsulationMetadataTypes(uint32_t encapsulationMetadataTypes);
+
     void dump(std::string *dst, int spaces, int index,
               const char* extraInfo = nullptr, bool verbose = true) const;
     void log() const;
@@ -67,6 +70,8 @@ public:
 
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
+    uint32_t mEncapsulationModes = 0;
+    uint32_t mEncapsulationMetadataTypes = 0;
 };
 
 using DeviceDescriptorBaseVector = std::vector<sp<DeviceDescriptorBase>>;
