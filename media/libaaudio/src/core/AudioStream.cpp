@@ -39,7 +39,7 @@ static aaudio_stream_id_t AAudio_getNextStreamId() {
 }
 
 AudioStream::AudioStream()
-        : mPlayerBase(new MyPlayerBase(this))
+        : mPlayerBase(new MyPlayerBase())
         , mStreamId(AAudio_getNextStreamId())
         {
     // mThread is a pthread_t of unknown size so we need memset.
@@ -48,6 +48,10 @@ AudioStream::AudioStream()
 }
 
 AudioStream::~AudioStream() {
+    // Please preserve this log because there have been several bugs related to
+    // AudioStream deletion and late callbacks.
+    ALOGD("%s(s#%u) mPlayerBase strongCount = %d",
+            __func__, getId(), mPlayerBase->getStrongCount());
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
@@ -55,8 +59,6 @@ AudioStream::~AudioStream() {
                           || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
                         "~AudioStream() - still in use, state = %s",
                         AudioGlobal_convertStreamStateToText(getState()));
-
-    mPlayerBase->clearParentReference(); // remove reference to this AudioStream
 }
 
 aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
@@ -301,16 +303,27 @@ aaudio_result_t AudioStream::safeStop() {
 }
 
 aaudio_result_t AudioStream::safeRelease() {
-    // This get temporarily unlocked in the release() when joining callback threads.
+    // This get temporarily unlocked in the MMAP release() when joining callback threads.
     std::lock_guard<std::mutex> lock(mStreamLock);
     if (collidesWithCallback()) {
         ALOGE("%s cannot be called from a callback!", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    if (getState() == AAUDIO_STREAM_STATE_CLOSING) {
+    if (getState() == AAUDIO_STREAM_STATE_CLOSING) { // already released?
         return AAUDIO_OK;
     }
     return release_l();
+}
+
+aaudio_result_t AudioStream::safeReleaseClose() {
+    // This get temporarily unlocked in the MMAP release() when joining callback threads.
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    releaseCloseFinal();
+    return AAUDIO_OK;
 }
 
 void AudioStream::setState(aaudio_stream_state_t state) {
@@ -520,11 +533,18 @@ bool AudioStream::collidesWithCallback() const {
 }
 
 #if AAUDIO_USE_VOLUME_SHAPER
-android::media::VolumeShaper::Status AudioStream::applyVolumeShaper(
-        const android::media::VolumeShaper::Configuration& configuration __unused,
-        const android::media::VolumeShaper::Operation& operation __unused) {
-    ALOGW("applyVolumeShaper() is not supported");
-    return android::media::VolumeShaper::Status::ok();
+::android::binder::Status AudioStream::MyPlayerBase::applyVolumeShaper(
+        const ::android::media::VolumeShaper::Configuration& configuration,
+        const ::android::media::VolumeShaper::Operation& operation) {
+    android::sp<AudioStream> audioStream;
+    {
+        std::lock_guard<std::mutex> lock(mParentLock);
+        audioStream = mParent.promote();
+    }
+    if (audioStream) {
+        return audioStream->applyVolumeShaper(configuration, operation);
+    }
+    return android::NO_ERROR;
 }
 #endif
 
@@ -534,24 +554,34 @@ void AudioStream::setDuckAndMuteVolume(float duckAndMuteVolume) {
     doSetVolume(); // apply this change
 }
 
-AudioStream::MyPlayerBase::MyPlayerBase(AudioStream *parent) : mParent(parent) {
-}
-
-AudioStream::MyPlayerBase::~MyPlayerBase() {
-}
-
-void AudioStream::MyPlayerBase::registerWithAudioManager() {
+void AudioStream::MyPlayerBase::registerWithAudioManager(const android::sp<AudioStream>& parent) {
+    std::lock_guard<std::mutex> lock(mParentLock);
+    mParent = parent;
     if (!mRegistered) {
-        init(android::PLAYER_TYPE_AAUDIO, AAudioConvert_usageToInternal(mParent->getUsage()));
+        init(android::PLAYER_TYPE_AAUDIO, AAudioConvert_usageToInternal(parent->getUsage()));
         mRegistered = true;
     }
 }
 
 void AudioStream::MyPlayerBase::unregisterWithAudioManager() {
+    std::lock_guard<std::mutex> lock(mParentLock);
     if (mRegistered) {
         baseDestroy();
         mRegistered = false;
     }
+}
+
+android::status_t AudioStream::MyPlayerBase::playerSetVolume() {
+    android::sp<AudioStream> audioStream;
+    {
+        std::lock_guard<std::mutex> lock(mParentLock);
+        audioStream = mParent.promote();
+    }
+    if (audioStream) {
+        // No pan and only left volume is taken into account from IPLayer interface
+        audioStream->setDuckAndMuteVolume(mVolumeMultiplierL  /* * mPanMultiplierL */);
+    }
+    return android::NO_ERROR;
 }
 
 void AudioStream::MyPlayerBase::destroy() {
