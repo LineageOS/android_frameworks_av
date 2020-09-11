@@ -111,6 +111,7 @@ Returns
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
 
+__attribute__((no_sanitize("integer")))
 void pvmp3_dct_6(int32 vec[])
 {
 
