@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-#define LOG_TAG (mInService ? "AudioStreamInternalPlay_Service" \
-                          : "AudioStreamInternalPlay_Client")
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 
@@ -25,6 +23,14 @@
 
 #include "client/AudioStreamInternalPlay.h"
 #include "utility/AudioClock.h"
+
+// We do this after the #includes because if a header uses ALOG.
+// it would fail on the reference to mInService.
+#undef LOG_TAG
+// This file is used in both client and server processes.
+// This is needed to make sense of the logs more easily.
+#define LOG_TAG (mInService ? "AudioStreamInternalPlay_Service" \
+                            : "AudioStreamInternalPlay_Client")
 
 using android::WrappingBuffer;
 

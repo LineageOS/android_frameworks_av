@@ -1035,6 +1035,11 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
  * but still allow queries to the stream to occur from other threads. This often
  * happens if you are monitoring stream progress from a UI thread.
  *
+ * NOTE: This function is only fully implemented for MMAP streams,
+ * which are low latency streams supported by some devices.
+ * On other "Legacy" streams some audio resources will still be in use
+ * and some callbacks may still be in process after this call.
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return {@link #AAUDIO_OK} or a negative error.
  */

@@ -47,7 +47,11 @@ public:
 
     virtual aaudio_result_t open(const aaudio::AAudioStreamRequest &request) = 0;
 
-    virtual aaudio_result_t close() = 0;
+    /*
+     * Perform any cleanup necessary before deleting the stream.
+     * This might include releasing and closing internal streams.
+     */
+    virtual void close() = 0;
 
     aaudio_result_t registerStream(android::sp<AAudioServiceStreamBase> stream);
 
