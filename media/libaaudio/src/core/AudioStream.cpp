@@ -301,16 +301,27 @@ aaudio_result_t AudioStream::safeStop() {
 }
 
 aaudio_result_t AudioStream::safeRelease() {
-    // This get temporarily unlocked in the release() when joining callback threads.
+    // This get temporarily unlocked in the MMAP release() when joining callback threads.
     std::lock_guard<std::mutex> lock(mStreamLock);
     if (collidesWithCallback()) {
         ALOGE("%s cannot be called from a callback!", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    if (getState() == AAUDIO_STREAM_STATE_CLOSING) {
+    if (getState() == AAUDIO_STREAM_STATE_CLOSING) { // already released?
         return AAUDIO_OK;
     }
     return release_l();
+}
+
+aaudio_result_t AudioStream::safeReleaseClose() {
+    // This get temporarily unlocked in the MMAP release() when joining callback threads.
+    std::lock_guard<std::mutex> lock(mStreamLock);
+    if (collidesWithCallback()) {
+        ALOGE("%s cannot be called from a callback!", __func__);
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    releaseCloseFinal();
+    return AAUDIO_OK;
 }
 
 void AudioStream::setState(aaudio_stream_state_t state) {
