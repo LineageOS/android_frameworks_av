@@ -446,15 +446,6 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
       return;
     }
 
-  } else {
-    const Libgav1StatusCode status = mCodecCtx->SignalEOS();
-    if (status != kLibgav1StatusOk) {
-      ALOGE("Failed to flush av1 decoder. status: %d.", status);
-      work->result = C2_CORRUPTED;
-      work->workletsProcessed = 1u;
-      mSignalledError = true;
-      return;
-    }
   }
 
   (void)outputBuffer(pool, work);
