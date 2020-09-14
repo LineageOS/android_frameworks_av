@@ -113,6 +113,9 @@ public:
     const sp<AudioPolicyMix> getPrimaryMix() const {
         return mPrimaryMix.promote();
     };
+    bool hasLostPrimaryMix() const {
+        return mPrimaryMix.unsafe_get() && !mPrimaryMix.promote();
+    }
 
     void setActive(bool active) override
     {
