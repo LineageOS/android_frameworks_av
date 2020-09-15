@@ -69,14 +69,10 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
         && (pNewParams->SampleRate != LVM_FS_88200) && (pNewParams->SampleRate != LVM_FS_96000)
         && (pNewParams->SampleRate != LVM_FS_176400) && (pNewParams->SampleRate != LVM_FS_192000)
         )
-#ifdef SUPPORT_MC
         || ((pNewParams->SourceFormat != LVM_STEREO)       &&
             (pNewParams->SourceFormat != LVM_MONOINSTEREO) &&
             (pNewParams->SourceFormat != LVM_MONO)         &&
             (pNewParams->SourceFormat != LVM_MULTICHANNEL)))
-#else
-        || ((pNewParams->SourceFormat != LVM_STEREO) && (pNewParams->SourceFormat != LVM_MONOINSTEREO) && (pNewParams->SourceFormat != LVM_MONO)) )
-#endif
     {
         return (LVREV_OUTOFRANGE);
     }

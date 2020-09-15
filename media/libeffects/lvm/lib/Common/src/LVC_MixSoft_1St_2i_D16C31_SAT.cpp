@@ -37,7 +37,6 @@
 /**********************************************************************************
    FUNCTION LVC_MixSoft_1St_2i_D16C31_SAT
 ***********************************************************************************/
-#ifdef SUPPORT_MC
 /* This threshold is used to decide on the processing to be applied on
  * front center and back center channels
  */
@@ -231,7 +230,6 @@ void LVC_MixSoft_1St_MC_float_SAT (LVMixer3_2St_FLOAT_st *ptrInstance,
         }
     }
 }
-#endif
 void LVC_MixSoft_1St_2i_D16C31_SAT( LVMixer3_2St_FLOAT_st *ptrInstance,
                                     const LVM_FLOAT             *src,
                                     LVM_FLOAT             *dst,

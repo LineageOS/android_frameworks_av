@@ -24,7 +24,6 @@
 ***********************************************************************************/
 typedef struct
 {
-#ifdef SUPPORT_MC
     /* The memory region created by this structure instance is typecast
      * into another structure containing a pointer and an array of filter
      * coefficients. In one case this memory region is used for storing
@@ -32,9 +31,6 @@ typedef struct
      */
     LVM_FLOAT *pStorage;
     LVM_FLOAT Storage[LVM_MAX_CHANNELS];
-#else
-    LVM_FLOAT Storage[6];
-#endif
 } Biquad_FLOAT_Instance_t;
 /**********************************************************************************
    COEFFICIENT TYPE DEFINITIONS
@@ -94,12 +90,8 @@ typedef struct
 
 typedef struct
 {
-#ifdef SUPPORT_MC
     /* LVM_MAX_CHANNELS channels, two taps of size LVM_FLOAT */
     LVM_FLOAT Storage[ (LVM_MAX_CHANNELS * 2) ];
-#else
-    LVM_FLOAT Storage[ (2 * 2) ];  /* Two channels, two taps of size LVM_FLOAT */
-#endif
 } Biquad_2I_Order1_FLOAT_Taps_t;
 
 /*** Types used for biquad, band pass and peaking filter **************************/
@@ -110,12 +102,8 @@ typedef struct
 
 typedef struct
 {
-#ifdef SUPPORT_MC
     /* LVM_MAX_CHANNELS, four taps of size LVM_FLOAT */
     LVM_FLOAT Storage[ (LVM_MAX_CHANNELS * 4) ];
-#else
-    LVM_FLOAT Storage[ (2 * 4) ];  /* Two channels, four taps of size LVM_FLOAT */
-#endif
 } Biquad_2I_Order2_FLOAT_Taps_t;
 /* The names of the functions are changed to satisfy QAC rules: Name should be Unique withing 16 characters*/
 #define BQ_2I_D32F32Cll_TRC_WRA_01_Init  Init_BQ_2I_D32F32Cll_TRC_WRA_01
@@ -185,13 +173,11 @@ void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t  *pInstance,
                                             LVM_FLOAT                    *pDataIn,
                                             LVM_FLOAT                    *pDataOut,
                                             LVM_INT16                 NrSamples);
-#ifdef SUPPORT_MC
 void BQ_MC_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t      *pInstance,
                                             LVM_FLOAT                    *pDataIn,
                                             LVM_FLOAT                    *pDataOut,
                                             LVM_INT16                    NrFrames,
                                             LVM_INT16                    NrChannels);
-#endif
 
 /**********************************************************************************
    FUNCTION PROTOTYPES: FIRST ORDER FILTERS
@@ -223,13 +209,11 @@ void FO_1I_D32F32C31_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
                                  LVM_FLOAT                     *pDataIn,
                                  LVM_FLOAT                     *pDataOut,
                                  LVM_INT16                     NrSamples);
-#ifdef SUPPORT_MC
 void FO_Mc_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t  *pInstance,
                                      LVM_FLOAT                *pDataIn,
                                      LVM_FLOAT                *pDataOut,
                                      LVM_INT16                NrFrames,
                                      LVM_INT16                NrChannels);
-#endif
 /**********************************************************************************
    FUNCTION PROTOTYPES: BAND PASS FILTERS
 ***********************************************************************************/
@@ -266,20 +250,17 @@ void PK_2I_D32F32C14G11_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
                                     LVM_FLOAT               *pDataIn,
                                     LVM_FLOAT               *pDataOut,
                                     LVM_INT16               NrSamples);
-#ifdef SUPPORT_MC
 void PK_Mc_D32F32C14G11_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
                                    LVM_FLOAT               *pDataIn,
                                    LVM_FLOAT               *pDataOut,
                                    LVM_INT16               NrFrames,
                                    LVM_INT16               NrChannels);
-#endif
 
 /**********************************************************************************
    FUNCTION PROTOTYPES: DC REMOVAL FILTERS
 ***********************************************************************************/
 
 /*** 16 bit data path STEREO ******************************************************/
-#ifdef SUPPORT_MC
 void DC_Mc_D16_TRC_WRA_01_Init     (        Biquad_FLOAT_Instance_t       *pInstance);
 
 void DC_Mc_D16_TRC_WRA_01          (        Biquad_FLOAT_Instance_t       *pInstance,
@@ -287,14 +268,6 @@ void DC_Mc_D16_TRC_WRA_01          (        Biquad_FLOAT_Instance_t       *pInst
                                             LVM_FLOAT               *pDataOut,
                                             LVM_INT16               NrFrames,
                                             LVM_INT16               NrChannels);
-#else
-void DC_2I_D16_TRC_WRA_01_Init     (        Biquad_FLOAT_Instance_t       *pInstance);
-
-void DC_2I_D16_TRC_WRA_01          (        Biquad_FLOAT_Instance_t       *pInstance,
-                                            LVM_FLOAT               *pDataIn,
-                                            LVM_FLOAT               *pDataOut,
-                                            LVM_INT16               NrSamples);
-#endif
 
 /**********************************************************************************/
 

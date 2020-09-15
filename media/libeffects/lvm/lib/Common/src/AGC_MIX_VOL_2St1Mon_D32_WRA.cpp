@@ -172,7 +172,6 @@ void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,     /*
 
     return;
 }
-#ifdef SUPPORT_MC
 /****************************************************************************************/
 /*                                                                                      */
 /* FUNCTION:                  AGC_MIX_VOL_Mc1Mon_D32_WRA                                */
@@ -314,4 +313,3 @@ void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,
 
     return;
 }
-#endif /*SUPPORT_MC*/
