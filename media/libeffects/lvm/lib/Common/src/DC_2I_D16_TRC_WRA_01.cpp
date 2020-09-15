@@ -61,7 +61,6 @@ void DC_2I_D16_TRC_WRA_01( Biquad_FLOAT_Instance_t       *pInstance,
         pBiquadState->RightDC = RightDC;
 
     }
-#ifdef SUPPORT_MC
 /*
  * FUNCTION:       DC_Mc_D16_TRC_WRA_01
  *
@@ -112,4 +111,3 @@ void DC_Mc_D16_TRC_WRA_01(Biquad_FLOAT_Instance_t       *pInstance,
         }
 
     }
-#endif

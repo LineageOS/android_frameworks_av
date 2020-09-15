@@ -239,9 +239,7 @@ typedef struct
     LVDBE_Volume_en         VolumeControl;
     LVM_INT16               VolumedB;
     LVM_INT16               HeadroomdB;
-#ifdef SUPPORT_MC
     LVM_INT16               NrChannels;
-#endif
 
 } LVDBE_Params_t;
 
