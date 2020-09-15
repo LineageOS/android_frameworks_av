@@ -102,11 +102,7 @@ typedef     float               LVM_FLOAT;          /* single precision floating
 typedef     float               effect_buffer_t;
 
 
-#ifdef SUPPORT_MC
 #define LVM_MAX_CHANNELS 8 // FCC_8
-#else
-#define LVM_MAX_CHANNELS 2 // FCC_2
-#endif
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -128,9 +124,7 @@ typedef enum
     LVM_STEREO          = 0,
     LVM_MONOINSTEREO    = 1,
     LVM_MONO            = 2,
-#ifdef SUPPORT_MC
     LVM_MULTICHANNEL    = 3,
-#endif
     LVM_SOURCE_DUMMY    = LVM_MAXENUM
 } LVM_Format_en;
 

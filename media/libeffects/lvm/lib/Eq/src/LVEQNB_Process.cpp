@@ -65,13 +65,9 @@ LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
 {                                     // updated to use samples = frames * channels.
     LVEQNB_Instance_t   *pInstance = (LVEQNB_Instance_t  *)hInstance;
 
-#ifdef SUPPORT_MC
     // Mono passed in as stereo
     const LVM_INT32 NrChannels = pInstance->Params.NrChannels == 1
         ? 2 : pInstance->Params.NrChannels;
-#else
-    const LVM_INT32 NrChannels = 2; // FCC_2
-#endif
     const LVM_INT32 NrSamples = NrChannels * NrFrames;
 
      /* Check for NULL pointers */
@@ -129,18 +125,11 @@ LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
                     {
                         case LVEQNB_SinglePrecision_Float:
                         {
-#ifdef SUPPORT_MC
                             PK_Mc_D32F32C14G11_TRC_WRA_01(pBiquad,
                                                           pScratch,
                                                           pScratch,
                                                           (LVM_INT16)NrFrames,
                                                           (LVM_INT16)NrChannels);
-#else
-                            PK_2I_D32F32C14G11_TRC_WRA_01(pBiquad,
-                                                          pScratch,
-                                                          pScratch,
-                                                          (LVM_INT16)NrFrames);
-#endif
                             break;
                         }
                         default:
@@ -151,20 +140,12 @@ LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
         }
 
         if(pInstance->bInOperatingModeTransition == LVM_TRUE){
-#ifdef SUPPORT_MC
             LVC_MixSoft_2Mc_D16C31_SAT(&pInstance->BypassMixer,
                                        pScratch,
                                        pInData,
                                        pScratch,
                                        (LVM_INT16)NrFrames,
                                        (LVM_INT16)NrChannels);
-#else
-            LVC_MixSoft_2St_D16C31_SAT(&pInstance->BypassMixer,
-                                       pScratch,
-                                       pInData,
-                                       pScratch,
-                                       (LVM_INT16)NrSamples);
-#endif
             // duplicate with else clause(s)
             Copy_Float(pScratch,                         /* Source */
                        pOutData,                         /* Destination */

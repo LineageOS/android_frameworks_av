@@ -13,7 +13,6 @@ cc_library_shared {
 
     cppflags: [
         "-fvisibility=hidden",
-        "-DSUPPORT_MC",
 
         "-Wall",
         "-Werror",
@@ -53,7 +52,6 @@ cc_library_shared {
 
     cppflags: [
         "-fvisibility=hidden",
-        "-DSUPPORT_MC",
 
         "-Wall",
         "-Werror",
