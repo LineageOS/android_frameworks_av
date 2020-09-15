@@ -642,11 +642,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t           *phInstance,
     /*
      * DC removal filter
      */
-#ifdef SUPPORT_MC
     DC_Mc_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
-#else
-    DC_2I_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
-#endif
 
     /*
      * Treble Enhancement
@@ -1063,11 +1059,7 @@ LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance)
     LVM_SetHeadroomParams(hInstance, &HeadroomParams);
 
     /* DC removal filter */
-#ifdef SUPPORT_MC
     DC_Mc_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
-#else
-    DC_2I_D16_TRC_WRA_01_Init(&pInstance->DC_RemovalInstance);
-#endif
 
     return LVM_SUCCESS;
 }

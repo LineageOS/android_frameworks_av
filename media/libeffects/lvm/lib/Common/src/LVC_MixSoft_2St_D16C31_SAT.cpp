@@ -67,7 +67,6 @@ void LVC_MixSoft_2St_D16C31_SAT(LVMixer3_2St_FLOAT_st *ptrInstance,
     }
 }
 
-#ifdef SUPPORT_MC
 /*
  * FUNCTION:       LVC_MixSoft_2Mc_D16C31_SAT
  *
@@ -128,6 +127,5 @@ void LVC_MixSoft_2Mc_D16C31_SAT(LVMixer3_2St_FLOAT_st *ptrInstance,
                                         src1, src2, dst, NrFrames * NrChannels);
     }
 }
-#endif
 
 /**********************************************************************************/

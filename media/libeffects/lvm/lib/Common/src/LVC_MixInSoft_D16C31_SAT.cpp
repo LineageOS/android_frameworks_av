@@ -105,7 +105,6 @@ void LVC_MixInSoft_D16C31_SAT(LVMixer3_1St_FLOAT_st *ptrInstance,
 
 }
 
-#ifdef SUPPORT_MC
 /*
  * FUNCTION:       LVC_MixInSoft_Mc_D16C31_SAT
  *
@@ -202,6 +201,5 @@ void LVC_MixInSoft_Mc_D16C31_SAT(LVMixer3_1St_FLOAT_st *ptrInstance,
     }
 
 }
-#endif
 
 /**********************************************************************************/
