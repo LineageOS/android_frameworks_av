@@ -2237,6 +2237,12 @@ status_t ACodec::configureCodec(
             }
             err = setupG711Codec(encoder, sampleRate, numChannels);
         }
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_OPUS)) {
+        int32_t numChannels = 1, sampleRate = 48000;
+        if (msg->findInt32("channel-count", &numChannels) &&
+            msg->findInt32("sample-rate", &sampleRate)) {
+            err = setupOpusCodec(encoder, sampleRate, numChannels);
+        }
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_FLAC)) {
         // numChannels needs to be set to properly communicate PCM values.
         int32_t numChannels = 2, sampleRate = 44100, compressionLevel = -1;
@@ -3108,6 +3114,26 @@ status_t ACodec::setupG711Codec(bool encoder, int32_t sampleRate, int32_t numCha
 
     return setupRawAudioFormat(
             kPortIndexInput, sampleRate, numChannels);
+}
+
+status_t ACodec::setupOpusCodec(bool encoder, int32_t sampleRate, int32_t numChannels) {
+    if (encoder) {
+        return INVALID_OPERATION;
+    }
+    OMX_AUDIO_PARAM_ANDROID_OPUSTYPE def;
+    InitOMXParams(&def);
+    def.nPortIndex = kPortIndexInput;
+    status_t err = mOMXNode->getParameter(
+            (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidOpus, &def, sizeof(def));
+    if (err != OK) {
+        ALOGE("setupOpusCodec(): Error %d getting OMX_IndexParamAudioAndroidOpus parameter", err);
+        return err;
+    }
+    def.nSampleRate = sampleRate;
+    def.nChannels = numChannels;
+    err = mOMXNode->setParameter(
+           (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidOpus, &def, sizeof(def));
+    return err;
 }
 
 status_t ACodec::setupFlacCodec(
