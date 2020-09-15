@@ -70,23 +70,17 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
      (pParams->SampleRate != LVM_FS_32000) && (pParams->SampleRate != LVM_FS_44100) && (pParams->SampleRate != LVM_FS_48000)      &&
      (pParams->SampleRate != LVM_FS_88200) && (pParams->SampleRate != LVM_FS_96000) &&
      (pParams->SampleRate != LVM_FS_176400) && (pParams->SampleRate != LVM_FS_192000))      ||
-#ifdef SUPPORT_MC
         ((pParams->SourceFormat != LVM_STEREO) &&
          (pParams->SourceFormat != LVM_MONOINSTEREO) &&
          (pParams->SourceFormat != LVM_MONO) &&
          (pParams->SourceFormat != LVM_MULTICHANNEL)) ||
-#else
-        ((pParams->SourceFormat != LVM_STEREO) && (pParams->SourceFormat != LVM_MONOINSTEREO) && (pParams->SourceFormat != LVM_MONO)) ||
-#endif
         (pParams->SpeakerType > LVM_EX_HEADPHONES))
     {
         return (LVM_OUTOFRANGE);
     }
 
-#ifdef SUPPORT_MC
     pInstance->Params.NrChannels = pParams->NrChannels;
     pInstance->Params.ChMask     = pParams->ChMask;
-#endif
     /*
      * Cinema Sound parameters
      */
@@ -528,10 +522,8 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
     } while ((pInstance->ControlPending != LVM_FALSE) &&
              (Count > 0));
 
-#ifdef SUPPORT_MC
     pInstance->NrChannels = LocalParams.NrChannels;
     pInstance->ChMask = LocalParams.ChMask;
-#endif
 
     /* Clear all internal data if format change*/
     if(LocalParams.SourceFormat != pInstance->Params.SourceFormat)
@@ -638,9 +630,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         DBE_Params.HeadroomdB       = 0;
         DBE_Params.VolumeControl    = LVDBE_VOLUME_OFF;
         DBE_Params.VolumedB         = 0;
-#ifdef SUPPORT_MC
         DBE_Params.NrChannels         = LocalParams.NrChannels;
-#endif
 
         /*
          * Make the changes
@@ -690,7 +680,6 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         {
             EQNB_Params.SourceFormat = LVEQNB_STEREO;
         }
-#ifdef SUPPORT_MC
         /* Note: Currently SourceFormat field of EQNB is not been
          *       used by the module.
          */
@@ -698,14 +687,11 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         {
             EQNB_Params.SourceFormat = LVEQNB_MULTICHANNEL;
         }
-#endif
         else
         {
             EQNB_Params.SourceFormat = LVEQNB_MONOINSTEREO;     /* Force to Mono-in-Stereo mode */
         }
-#ifdef SUPPORT_MC
         EQNB_Params.NrChannels         = LocalParams.NrChannels;
-#endif
 
         /*
          * Set the control flag
@@ -766,16 +752,12 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
             CS_Params.SpeakerType  = LVCS_HEADPHONES;
         }
 
-#ifdef SUPPORT_MC
         /* Concert sound module processes only the left and right channels
          * data. So the Source Format is set to LVCS_STEREO for multichannel
          * input also.
          */
         if (LocalParams.SourceFormat == LVM_STEREO ||
             LocalParams.SourceFormat == LVM_MULTICHANNEL)
-#else
-        if (LocalParams.SourceFormat == LVM_STEREO)    /* Mono format not supported */
-#endif
         {
             CS_Params.SourceFormat = LVCS_STEREO;
         }
@@ -786,9 +768,7 @@ LVM_ReturnStatus_en LVM_ApplyNewSettings(LVM_Handle_t   hInstance)
         CS_Params.SampleRate  = LocalParams.SampleRate;
         CS_Params.ReverbLevel = LocalParams.VirtualizerReverbLevel;
         CS_Params.EffectLevel = LocalParams.CS_EffectLevel;
-#ifdef SUPPORT_MC
         CS_Params.NrChannels  = LocalParams.NrChannels;
-#endif
 
         /*
          * Set the control flag
