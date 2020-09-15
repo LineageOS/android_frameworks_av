@@ -499,6 +499,7 @@ private:
     status_t setupAMRCodec(bool encoder, bool isWAMR, int32_t bitRate);
     status_t setupG711Codec(bool encoder, int32_t sampleRate, int32_t numChannels);
 
+    status_t setupOpusCodec(bool encoder, int32_t sampleRate, int32_t numChannels);
     status_t setupFlacCodec(
             bool encoder, int32_t numChannels, int32_t sampleRate, int32_t compressionLevel,
             AudioEncoding encoding);

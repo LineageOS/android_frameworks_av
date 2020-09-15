@@ -58,6 +58,8 @@ SoftOpus::SoftOpus(
       mInputBufferCount(0),
       mDecoder(NULL),
       mHeader(NULL),
+      mNumChannels(1),
+      mSamplingRate(kRate),
       mCodecDelay(0),
       mSeekPreRoll(0),
       mAnchorTimeUs(0),
@@ -169,11 +171,11 @@ OMX_ERRORTYPE SoftOpus::internalGetParameter(
             }
 
             opusParams->nAudioBandWidth = 0;
-            opusParams->nSampleRate = kRate;
+            opusParams->nSampleRate = mSamplingRate;
             opusParams->nBitRate = 0;
 
             if (!isConfigured()) {
-                opusParams->nChannels = 1;
+                opusParams->nChannels = mNumChannels;
             } else {
                 opusParams->nChannels = mHeader->channels;
             }
@@ -274,7 +276,8 @@ OMX_ERRORTYPE SoftOpus::internalSetParameter(
             if (opusParams->nPortIndex != 0) {
                 return OMX_ErrorUndefined;
             }
-
+            mNumChannels = opusParams->nChannels;
+            mSamplingRate = opusParams->nSampleRate;
             return OMX_ErrorNone;
         }
 
@@ -496,6 +499,8 @@ void SoftOpus::onQueueFilled(OMX_U32 /* portIndex */) {
                                    *(reinterpret_cast<int64_t*>(inHeader->pBuffer +
                                                                 inHeader->nOffset)),
                                    kRate);
+                mSamplingRate = kRate;
+                mNumChannels = mHeader->channels;
                 notify(OMX_EventPortSettingsChanged, 1, 0, NULL);
                 mOutputPortSettingsChange = AWAITING_DISABLED;
             }
