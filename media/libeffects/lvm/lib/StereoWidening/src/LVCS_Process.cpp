@@ -74,7 +74,6 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
     LVCS_Instance_t     *pInstance = (LVCS_Instance_t  *)hInstance;
     LVM_FLOAT           *pScratch;
     LVCS_ReturnStatus_en err;
-#ifdef SUPPORT_MC
     LVM_FLOAT           *pStIn;
     LVM_INT32           channels = pInstance->Params.NrChannels;
 #define NrFrames NumSamples  // alias for clarity
@@ -89,7 +88,6 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
     {
         channels = 2;
     }
-#endif
 
     pScratch  = (LVM_FLOAT *) \
                   pInstance->MemoryTable.Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress;
@@ -97,7 +95,6 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
     /*
      * Check if the processing is inplace
      */
-#ifdef SUPPORT_MC
     /*
      * The pInput buffer holds the first 2 (Left, Right) channels information.
      * Hence the memory required by this buffer is 2 * NumFrames.
@@ -115,35 +112,13 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
     Copy_Float((LVM_FLOAT *)pInput,
                (LVM_FLOAT *)pStIn,
                (LVM_INT16)(2 * NrFrames));
-#else
-    if (pInData == pOutData)
-    {
-        /* Processing inplace */
-        pInput = pScratch + (2 * NumSamples);
-        Copy_Float((LVM_FLOAT *)pInData,           /* Source */
-                   (LVM_FLOAT *)pInput,            /* Destination */
-                   (LVM_INT16)(2 * NumSamples));     /* Left and right */
-    }
-    else
-    {
-        /* Processing outplace */
-        pInput = pInData;
-    }
-#endif
     /*
      * Call the stereo enhancer
      */
-#ifdef SUPPORT_MC
     err = LVCS_StereoEnhancer(hInstance,              /* Instance handle */
                               pStIn,                  /* Pointer to the input data */
                               pOutData,               /* Pointer to the output data */
                               NrFrames);              /* Number of frames to process */
-#else
-    err = LVCS_StereoEnhancer(hInstance,              /* Instance handle */
-                              pInData,                    /* Pointer to the input data */
-                              pOutData,                   /* Pointer to the output data */
-                              NumSamples);                /* Number of samples to process */
-#endif
 
     /*
      * Call the reverb generator
@@ -210,7 +185,6 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
 
     LVCS_Instance_t *pInstance = (LVCS_Instance_t  *)hInstance;
     LVCS_ReturnStatus_en err;
-#ifdef SUPPORT_MC
     /*Extract number of Channels info*/
     LVM_INT32 channels = pInstance->Params.NrChannels;
 #define NrFrames NumSamples  // alias for clarity
@@ -218,7 +192,6 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
     {
         channels = 2;
     }
-#endif
     /*
      * Check the number of samples is not too large
      */
@@ -232,7 +205,6 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
      */
     if (pInstance->Params.OperatingMode != LVCS_OFF)
     {
-#ifdef SUPPORT_MC
         LVM_FLOAT *pStereoOut;
         /*
          * LVCS_Process_CS uses output buffer to store intermediate outputs of StereoEnhancer,
@@ -265,12 +237,6 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                                   pInData,
                                   pStereoOut,
                                   NrFrames);
-#else
-            err = LVCS_Process_CS(hInstance,
-                                  pInData,
-                                  pOutData,
-                                  NumSamples);
-#endif
 
         /*
          * Compress to reduce expansion effect of Concert Sound and correct volume
@@ -289,17 +255,10 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
 
             if(NumSamples < LVCS_COMPGAINFRAME)
             {
-#ifdef SUPPORT_MC
                 NonLinComp_Float(Gain,                    /* Compressor gain setting */
                                  pStereoOut,
                                  pStereoOut,
                                  (LVM_INT32)(2 * NrFrames));
-#else
-                NonLinComp_Float(Gain,                    /* Compressor gain setting */
-                                 pOutData,
-                                 pOutData,
-                                 (LVM_INT32)(2 * NumSamples));
-#endif
             }
             else
             {
@@ -328,11 +287,7 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
 
                 FinalGain = Gain;
                 Gain = pInstance->CompressGain;
-#ifdef SUPPORT_MC
                 pOutPtr = pStereoOut;
-#else
-                pOutPtr = pOutData;
-#endif
 
                 while(SampleToProcess > 0)
                 {
@@ -396,33 +351,22 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
                             (LVM_INT16)NumSamples);
             }
         }
-#ifdef SUPPORT_MC
         Copy_Float_Stereo_Mc(pInData,
                              pStereoOut,
                              pOutData,
                              NrFrames,
                              channels);
-#endif
     }
     else
     {
         if (pInData != pOutData)
         {
-#ifdef SUPPORT_MC
             /*
              * The algorithm is disabled so just copy the data
              */
             Copy_Float((LVM_FLOAT *)pInData,               /* Source */
                        (LVM_FLOAT *)pOutData,                  /* Destination */
                        (LVM_INT16)(channels * NrFrames));    /* All Channels*/
-#else
-            /*
-             * The algorithm is disabled so just copy the data
-             */
-            Copy_Float((LVM_FLOAT *)pInData,               /* Source */
-                       (LVM_FLOAT *)pOutData,                  /* Destination */
-                       (LVM_INT16)(2 * NumSamples));             /* Left and right */
-#endif
         }
     }
 

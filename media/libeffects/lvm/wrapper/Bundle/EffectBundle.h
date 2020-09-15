@@ -94,9 +94,7 @@ struct BundledEffectContext{
     int                             frameCount;
     int32_t                         bandGaindB[FIVEBAND_NUMBANDS];
     int                             volume;
-#ifdef SUPPORT_MC
     LVM_INT32                       ChMask;
-#endif
 
     /* Bitmask whether drain is in progress due to disabling the effect.
        The corresponding bit to an effect is set by 1 << lvm_effect_en. */

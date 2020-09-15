@@ -145,7 +145,6 @@ void LVC_Core_MixSoft_1St_2i_D16C31_WRA( LVMixer3_FLOAT_st        *ptrInstance1,
     pInstanceR->Current = CurrentR;
 
 }
-#ifdef SUPPORT_MC
 void LVC_Core_MixSoft_1St_MC_float_WRA (Mix_Private_FLOAT_st **ptrInstance,
                                          const LVM_FLOAT      *src,
                                          LVM_FLOAT            *dst,
@@ -189,5 +188,4 @@ void LVC_Core_MixSoft_1St_MC_float_WRA (Mix_Private_FLOAT_st **ptrInstance,
         ptrInstance[ch]->Current = tempCurrent[ch];
     }
 }
-#endif
 /**********************************************************************************/

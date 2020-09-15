@@ -117,7 +117,6 @@ void PK_2I_D32F32C14G11_TRC_WRA_01 ( Biquad_FLOAT_Instance_t       *pInstance,
 
     }
 
-#ifdef SUPPORT_MC
 /**************************************************************************
 DELAYS-
 pBiquadState->pDelays[0] to
@@ -189,4 +188,3 @@ void PK_Mc_D32F32C14G11_TRC_WRA_01 (Biquad_FLOAT_Instance_t       *pInstance,
         }
 
     }
-#endif
