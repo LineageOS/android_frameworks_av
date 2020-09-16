@@ -62,11 +62,13 @@ public:
     }
 
     virtual sp<IMediaPlayer> create(
-            const sp<IMediaPlayerClient>& client, audio_session_t audioSessionId) {
+            const sp<IMediaPlayerClient>& client, audio_session_t audioSessionId,
+            const std::string opPackageName) {
         Parcel data, reply;
         data.writeInterfaceToken(IMediaPlayerService::getInterfaceDescriptor());
         data.writeStrongBinder(IInterface::asBinder(client));
         data.writeInt32(audioSessionId);
+        data.writeCString(opPackageName.c_str());
 
         remote()->transact(CREATE, data, &reply);
         return interface_cast<IMediaPlayer>(reply.readStrongBinder());
@@ -127,7 +129,12 @@ status_t BnMediaPlayerService::onTransact(
             sp<IMediaPlayerClient> client =
                 interface_cast<IMediaPlayerClient>(data.readStrongBinder());
             audio_session_t audioSessionId = (audio_session_t) data.readInt32();
-            sp<IMediaPlayer> player = create(client, audioSessionId);
+            const char* opPackageName = data.readCString();
+            if (opPackageName == nullptr) {
+                return FAILED_TRANSACTION;
+            }
+            std::string opPackageNameStr(opPackageName);
+            sp<IMediaPlayer> player = create(client, audioSessionId, opPackageNameStr);
             reply->writeStrongBinder(IInterface::asBinder(player));
             return NO_ERROR;
         } break;
