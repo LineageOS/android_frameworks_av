@@ -72,6 +72,7 @@ cc_library_shared {
 
     static_libs: [
         "mediatranscoding_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk_platform",
     ],
 
     cflags: [

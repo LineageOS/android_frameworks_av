@@ -41,14 +41,49 @@
 
 namespace android {
 
+//static
+std::mutex ResourceManagerService::sCookieLock;
+//static
+uintptr_t ResourceManagerService::sCookieCounter = 0;
+//static
+std::map<uintptr_t, sp<DeathNotifier> > ResourceManagerService::sCookieToDeathNotifierMap;
+
+class DeathNotifier : public RefBase {
+public:
+    DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
+            int pid, int64_t clientId);
+
+    virtual ~DeathNotifier() {}
+
+    // Implement death recipient
+    static void BinderDiedCallback(void* cookie);
+    virtual void binderDied();
+
+protected:
+    std::weak_ptr<ResourceManagerService> mService;
+    int mPid;
+    int64_t mClientId;
+};
+
 DeathNotifier::DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
         int pid, int64_t clientId)
     : mService(service), mPid(pid), mClientId(clientId) {}
 
 //static
 void DeathNotifier::BinderDiedCallback(void* cookie) {
-    auto thiz = static_cast<DeathNotifier*>(cookie);
-    thiz->binderDied();
+    sp<DeathNotifier> notifier;
+    {
+        std::scoped_lock lock{ResourceManagerService::sCookieLock};
+        auto it = ResourceManagerService::sCookieToDeathNotifierMap.find(
+                reinterpret_cast<uintptr_t>(cookie));
+        if (it == ResourceManagerService::sCookieToDeathNotifierMap.end()) {
+            return;
+        }
+        notifier = it->second;
+    }
+    if (notifier.get() != nullptr) {
+        notifier->binderDied();
+    }
 }
 
 void DeathNotifier::binderDied() {
@@ -62,7 +97,27 @@ void DeathNotifier::binderDied() {
     service->overridePid(mPid, -1);
     // thiz is freed in the call below, so it must be last call referring thiz
     service->removeResource(mPid, mClientId, false);
+}
 
+class OverrideProcessInfoDeathNotifier : public DeathNotifier {
+public:
+    OverrideProcessInfoDeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
+            int pid) : DeathNotifier(service, pid, 0) {}
+
+    virtual ~OverrideProcessInfoDeathNotifier() {}
+
+    virtual void binderDied();
+};
+
+void OverrideProcessInfoDeathNotifier::binderDied() {
+    // Don't check for pid validity since we know it's already dead.
+    std::shared_ptr<ResourceManagerService> service = mService.lock();
+    if (service == nullptr) {
+        ALOGW("ResourceManagerService is dead as well.");
+        return;
+    }
+
+    service->removeProcessInfoOverride(mPid);
 }
 
 template <typename T>
@@ -117,6 +172,7 @@ static ResourceInfo& getResourceInfoForEdit(
         info.uid = uid;
         info.clientId = clientId;
         info.client = client;
+        info.cookie = 0;
         info.pendingRemoval = false;
 
         index = infos.add(clientId, info);
@@ -401,10 +457,9 @@ Status ResourceManagerService::addResource(
             mergeResources(it->second, res);
         }
     }
-    if (info.deathNotifier == nullptr && client != nullptr) {
-        info.deathNotifier = new DeathNotifier(ref<ResourceManagerService>(), pid, clientId);
-        AIBinder_linkToDeath(client->asBinder().get(),
-                mDeathRecipient.get(), info.deathNotifier.get());
+    if (info.cookie == 0 && client != nullptr) {
+        info.cookie = addCookieAndLink_l(client->asBinder(),
+                new DeathNotifier(ref<ResourceManagerService>(), pid, clientId));
     }
     if (mObserverService != nullptr && !resourceAdded.empty()) {
         mObserverService->onResourceAdded(uid, pid, resourceAdded);
@@ -509,8 +564,7 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
         onLastRemoved(it->second, info);
     }
 
-    AIBinder_unlinkToDeath(info.client->asBinder().get(),
-            mDeathRecipient.get(), info.deathNotifier.get());
+    removeCookieAndUnlink_l(info.client->asBinder(), info.cookie);
 
     if (mObserverService != nullptr && !info.resources.empty()) {
         mObserverService->onResourceRemoved(info.uid, pid, info.resources);
@@ -690,6 +744,83 @@ Status ResourceManagerService::overridePid(
     }
 
     return Status::ok();
+}
+
+Status ResourceManagerService::overrideProcessInfo(
+        const std::shared_ptr<IResourceManagerClient>& client,
+        int pid,
+        int procState,
+        int oomScore) {
+    String8 log = String8::format("overrideProcessInfo(pid %d, procState %d, oomScore %d)",
+            pid, procState, oomScore);
+    mServiceLog->add(log);
+
+    // Only allow the override if the caller already can access process state and oom scores.
+    int callingPid = AIBinder_getCallingPid();
+    if (callingPid != getpid() && (callingPid != pid || !checkCallingPermission(String16(
+            "android.permission.GET_PROCESS_STATE_AND_OOM_SCORE")))) {
+        ALOGE("Permission Denial: overrideProcessInfo method from pid=%d", callingPid);
+        return Status::fromServiceSpecificError(PERMISSION_DENIED);
+    }
+
+    if (client == nullptr) {
+        return Status::fromServiceSpecificError(BAD_VALUE);
+    }
+
+    Mutex::Autolock lock(mLock);
+    removeProcessInfoOverride_l(pid);
+
+    if (!mProcessInfo->overrideProcessInfo(pid, procState, oomScore)) {
+        // Override value is rejected by ProcessInfo.
+        return Status::fromServiceSpecificError(BAD_VALUE);
+    }
+
+    uintptr_t cookie = addCookieAndLink_l(client->asBinder(),
+            new OverrideProcessInfoDeathNotifier(ref<ResourceManagerService>(), pid));
+
+    mProcessInfoOverrideMap.emplace(pid, ProcessInfoOverride{cookie, client});
+
+    return Status::ok();
+}
+
+uintptr_t ResourceManagerService::addCookieAndLink_l(
+        ::ndk::SpAIBinder binder, const sp<DeathNotifier>& notifier) {
+    std::scoped_lock lock{sCookieLock};
+
+    uintptr_t cookie;
+    // Need to skip cookie 0 (if it wraps around). ResourceInfo has cookie initialized to 0
+    // indicating the death notifier is not created yet.
+    while ((cookie = ++sCookieCounter) == 0);
+    AIBinder_linkToDeath(binder.get(), mDeathRecipient.get(), (void*)cookie);
+    sCookieToDeathNotifierMap.emplace(cookie, notifier);
+
+    return cookie;
+}
+
+void ResourceManagerService::removeCookieAndUnlink_l(
+        ::ndk::SpAIBinder binder, uintptr_t cookie) {
+    std::scoped_lock lock{sCookieLock};
+    AIBinder_unlinkToDeath(binder.get(), mDeathRecipient.get(), (void*)cookie);
+    sCookieToDeathNotifierMap.erase(cookie);
+}
+
+void ResourceManagerService::removeProcessInfoOverride(int pid) {
+    Mutex::Autolock lock(mLock);
+
+    removeProcessInfoOverride_l(pid);
+}
+
+void ResourceManagerService::removeProcessInfoOverride_l(int pid) {
+    auto it = mProcessInfoOverrideMap.find(pid);
+    if (it == mProcessInfoOverrideMap.end()) {
+        return;
+    }
+
+    mProcessInfo->removeProcessInfoOverride(pid);
+
+    removeCookieAndUnlink_l(it->second.client->asBinder(), it->second.cookie);
+
+    mProcessInfoOverrideMap.erase(pid);
 }
 
 Status ResourceManagerService::markClientForPendingRemoval(int32_t pid, int64_t clientId) {
