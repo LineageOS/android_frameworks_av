@@ -56,7 +56,6 @@ void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_FLOAT_st        *ptrInstance1,
     }
 
 }
-#ifdef SUPPORT_MC
 void LVC_Core_MixHard_1St_MC_float_SAT (Mix_Private_FLOAT_st **ptrInstance,
                                          const LVM_FLOAT      *src,
                                          LVM_FLOAT            *dst,
@@ -80,5 +79,4 @@ void LVC_Core_MixHard_1St_MC_float_SAT (Mix_Private_FLOAT_st **ptrInstance,
         }
     }
 }
-#endif
 /**********************************************************************************/

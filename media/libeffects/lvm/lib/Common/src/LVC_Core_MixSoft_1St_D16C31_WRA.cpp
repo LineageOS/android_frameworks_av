@@ -105,7 +105,6 @@ void LVC_Core_MixSoft_1St_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
     pInstance->Current=Current;
 }
 
-#ifdef SUPPORT_MC
 /*
  * FUNCTION:       LVC_Core_MixSoft_Mc_D16C31_WRA
  *
@@ -214,6 +213,5 @@ void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
     }
     pInstance->Current=Current;
 }
-#endif
 
 /**********************************************************************************/

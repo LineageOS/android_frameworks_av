@@ -67,7 +67,6 @@ void From2iToMono_Float( const LVM_FLOAT *src,
 
     return;
 }
-#ifdef SUPPORT_MC
 /*
  * FUNCTION:       FromMcToMono_Float
  *
@@ -107,6 +106,5 @@ void FromMcToMono_Float(const LVM_FLOAT *src,
 
     return;
 }
-#endif
 
 /**********************************************************************************/

@@ -120,7 +120,6 @@ void BQ_2I_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t       *pInst
 
     }
 
-#ifdef SUPPORT_MC
 /**************************************************************************
  ASSUMPTIONS:
  COEFS-
@@ -197,5 +196,4 @@ void BQ_MC_D32F32C30_TRC_WRA_01 (           Biquad_FLOAT_Instance_t      *pInsta
         }
 
     }
-#endif /*SUPPORT_MC*/
 

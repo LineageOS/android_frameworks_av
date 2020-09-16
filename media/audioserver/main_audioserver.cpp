@@ -49,7 +49,12 @@ int main(int argc __unused, char **argv)
 
     signal(SIGPIPE, SIG_IGN);
 
+#if 1
+    // FIXME See bug 165702394 and bug 168511485
+    const bool doLog = false;
+#else
     bool doLog = (bool) property_get_bool("ro.test_harness", 0);
+#endif
 
     pid_t childPid;
     // FIXME The advantage of making the process containing media.log service the parent process of
