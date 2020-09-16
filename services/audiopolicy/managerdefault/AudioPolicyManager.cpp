@@ -5354,7 +5354,7 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             if (status != OK) {
                 continue;
             }
-            if (client->getPrimaryMix() != primaryMix) {
+            if (client->getPrimaryMix() != primaryMix || client->hasLostPrimaryMix()) {
                 invalidate = true;
                 if (desc->isStrategyActive(psId)) {
                     maxLatency = desc->latency();
