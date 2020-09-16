@@ -173,9 +173,7 @@ typedef enum
 {
     LVEQNB_STEREO       = 0,
     LVEQNB_MONOINSTEREO = 1,
-#ifdef SUPPORT_MC
     LVEQNB_MULTICHANNEL = 2,
-#endif
     LVEQNB_SOURCE_MAX   = LVM_MAXINT_32
 } LVEQNB_SourceFormat_en;
 
@@ -254,9 +252,7 @@ typedef struct
     /* Equaliser parameters */
     LVM_UINT16                  NBands;                 /* Number of bands */
     LVEQNB_BandDef_t            *pBandDefinition;       /* Pointer to equaliser definitions */
-#ifdef SUPPORT_MC
     LVM_INT16                   NrChannels;
-#endif
 } LVEQNB_Params_t;
 
 /* Capability structure */
