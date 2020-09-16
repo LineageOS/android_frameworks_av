@@ -45,6 +45,10 @@ static media_status_t translate_error(status_t err) {
         return AMEDIA_OK;
     } else if (err == -EAGAIN) {
         return (media_status_t) AMEDIACODEC_INFO_TRY_AGAIN_LATER;
+    } else if (err == NO_MEMORY) {
+        return AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE;
+    } else if (err == DEAD_OBJECT) {
+        return AMEDIACODEC_ERROR_RECLAIMED;
     }
     ALOGE("sf error code: %d", err);
     return AMEDIA_ERROR_UNKNOWN;
@@ -255,7 +259,7 @@ void CodecHandler::onMessageReceived(const sp<AMessage> &msg) {
                          break;
                      }
                      msg->findString("detail", &detail);
-                     ALOGE("Decoder reported error(0x%x), actionCode(%d), detail(%s)",
+                     ALOGE("Codec reported error(0x%x), actionCode(%d), detail(%s)",
                            err, actionCode, detail.c_str());
 
                      Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
