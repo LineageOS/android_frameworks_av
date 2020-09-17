@@ -91,7 +91,9 @@ void CCodecBuffers::handleImageData(const sp<Codec2Buffer> &buffer) {
             newFormat->setInt32(KEY_STRIDE, stride);
             ALOGD("[%s] updating stride = %d", mName, stride);
             if (img->mNumPlanes > 1 && stride > 0) {
-                int32_t vstride = (img->mPlane[1].mOffset - img->mPlane[0].mOffset) / stride;
+                int64_t offsetDelta =
+                    (int64_t)img->mPlane[1].mOffset - (int64_t)img->mPlane[0].mOffset;
+                int32_t vstride = int32_t(offsetDelta / stride);
                 newFormat->setInt32(KEY_SLICE_HEIGHT, vstride);
                 ALOGD("[%s] updating vstride = %d", mName, vstride);
             }
