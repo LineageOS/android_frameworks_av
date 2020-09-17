@@ -282,7 +282,7 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         format = std::shared_ptr<AMediaFormat>(mergedFormat, &AMediaFormat_delete);
     }
 
-    transcoder->configure(mSampleReader, trackIndex, format);
+    status = transcoder->configure(mSampleReader, trackIndex, format);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Configure track transcoder for track #" << trackIndex << " returned error "
                    << status;
