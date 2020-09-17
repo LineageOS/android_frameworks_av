@@ -36,6 +36,7 @@
 #include <unistd.h>
 
 #include "ResourceManagerService.h"
+#include "ResourceObserverService.h"
 #include "ServiceLog.h"
 
 namespace android {
@@ -267,6 +268,13 @@ void ResourceManagerService::instantiate() {
     if (status != STATUS_OK) {
         return;
     }
+
+    std::shared_ptr<ResourceObserverService> observerService =
+            ResourceObserverService::instantiate();
+
+    if (observerService != nullptr) {
+        service->setObserverService(observerService);
+    }
     // TODO: mediaserver main() is already starting the thread pool,
     // move this to mediaserver main() when other services in mediaserver
     // are converted to ndk-platform aidl.
@@ -274,6 +282,11 @@ void ResourceManagerService::instantiate() {
 }
 
 ResourceManagerService::~ResourceManagerService() {}
+
+void ResourceManagerService::setObserverService(
+        const std::shared_ptr<ResourceObserverService>& observerService) {
+    mObserverService = observerService;
+}
 
 Status ResourceManagerService::config(const std::vector<MediaResourcePolicyParcel>& policies) {
     String8 log = String8::format("config(%s)", getString(policies).string());
@@ -358,6 +371,7 @@ Status ResourceManagerService::addResource(
     }
     ResourceInfos& infos = getResourceInfosForEdit(pid, mMap);
     ResourceInfo& info = getResourceInfoForEdit(uid, clientId, client, infos);
+    ResourceList resourceAdded;
 
     for (size_t i = 0; i < resources.size(); ++i) {
         const auto &res = resources[i];
@@ -379,11 +393,21 @@ Status ResourceManagerService::addResource(
         } else {
             mergeResources(info.resources[resType], res);
         }
+        // Add it to the list of added resources for observers.
+        auto it = resourceAdded.find(resType);
+        if (it == resourceAdded.end()) {
+            resourceAdded[resType] = res;
+        } else {
+            mergeResources(it->second, res);
+        }
     }
     if (info.deathNotifier == nullptr && client != nullptr) {
         info.deathNotifier = new DeathNotifier(ref<ResourceManagerService>(), pid, clientId);
         AIBinder_linkToDeath(client->asBinder().get(),
                 mDeathRecipient.get(), info.deathNotifier.get());
+    }
+    if (mObserverService != nullptr && !resourceAdded.empty()) {
+        mObserverService->onResourceAdded(uid, pid, resourceAdded);
     }
     notifyResourceGranted(pid, resources);
     return Status::ok();
@@ -415,7 +439,7 @@ Status ResourceManagerService::removeResource(
     }
 
     ResourceInfo &info = infos.editValueAt(index);
-
+    ResourceList resourceRemoved;
     for (size_t i = 0; i < resources.size(); ++i) {
         const auto &res = resources[i];
         const auto resType = std::tuple(res.type, res.subType, res.id);
@@ -427,13 +451,26 @@ Status ResourceManagerService::removeResource(
         // ignore if we don't have it
         if (info.resources.find(resType) != info.resources.end()) {
             MediaResourceParcel &resource = info.resources[resType];
+            MediaResourceParcel actualRemoved = res;
             if (resource.value > res.value) {
                 resource.value -= res.value;
             } else {
                 onLastRemoved(res, info);
                 info.resources.erase(resType);
+                actualRemoved.value = resource.value;
+            }
+
+            // Add it to the list of removed resources for observers.
+            auto it = resourceRemoved.find(resType);
+            if (it == resourceRemoved.end()) {
+                resourceRemoved[resType] = actualRemoved;
+            } else {
+                mergeResources(it->second, actualRemoved);
             }
         }
+    }
+    if (mObserverService != nullptr && !resourceRemoved.empty()) {
+        mObserverService->onResourceRemoved(info.uid, pid, resourceRemoved);
     }
     return Status::ok();
 }
@@ -474,6 +511,10 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
 
     AIBinder_unlinkToDeath(info.client->asBinder().get(),
             mDeathRecipient.get(), info.deathNotifier.get());
+
+    if (mObserverService != nullptr && !info.resources.empty()) {
+        mObserverService->onResourceRemoved(info.uid, pid, info.resources);
+    }
 
     infos.removeItemsAt(index);
     return Status::ok();
