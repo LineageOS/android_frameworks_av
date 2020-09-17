@@ -26,7 +26,6 @@
 #include <media/TypeConverter.h>
 #include <mediautils/SchedulingPolicyService.h>
 
-#include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
 #include "core/AudioGlobal.h"
 #include "utility/AudioClock.h"

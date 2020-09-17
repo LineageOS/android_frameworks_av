@@ -24,7 +24,7 @@
 #include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
-#include "binding/IAAudioClient.h"
+#include <aaudio/IAAudioClient.h>
 #include "AAudioService.h"
 
 namespace aaudio {
@@ -46,7 +46,7 @@ public:
      */
     std::string dump() const;
 
-    aaudio_result_t registerClient(pid_t pid, const android::sp<android::IAAudioClient>& client);
+    aaudio_result_t registerClient(pid_t pid, const android::sp<IAAudioClient>& client);
 
     void unregisterClient(pid_t pid);
 

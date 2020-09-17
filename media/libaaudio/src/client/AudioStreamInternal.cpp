@@ -34,7 +34,6 @@
 #include "AudioEndpointParcelable.h"
 #include "binding/AAudioStreamRequest.h"
 #include "binding/AAudioStreamConfiguration.h"
-#include "binding/IAAudioService.h"
 #include "binding/AAudioServiceMessage.h"
 #include "core/AudioGlobal.h"
 #include "core/AudioStreamBuilder.h"

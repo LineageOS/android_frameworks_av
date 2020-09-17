@@ -20,7 +20,6 @@
 #include <stdint.h>
 #include <aaudio/AAudio.h>
 
-#include "binding/IAAudioService.h"
 #include "binding/AudioEndpointParcelable.h"
 #include "binding/AAudioServiceInterface.h"
 #include "client/IsochronousClockModel.h"
@@ -29,7 +28,6 @@
 #include "utility/AudioClock.h"
 
 using android::sp;
-using android::IAAudioService;
 
 namespace aaudio {
 

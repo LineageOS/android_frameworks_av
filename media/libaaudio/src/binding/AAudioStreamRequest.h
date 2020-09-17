@@ -20,21 +20,18 @@
 #include <stdint.h>
 
 #include <aaudio/AAudio.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
+#include <aaudio/StreamRequest.h>
 
 #include "binding/AAudioStreamConfiguration.h"
 
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
-
 namespace aaudio {
 
-class AAudioStreamRequest : public Parcelable {
+class AAudioStreamRequest {
 public:
-    AAudioStreamRequest();
-    virtual ~AAudioStreamRequest();
+    AAudioStreamRequest() = default;
+
+    // Construct based on a parcelable representation.
+    explicit AAudioStreamRequest(const StreamRequest& parcelable);
 
     uid_t getUserId() const {
         return mUserId;
@@ -76,15 +73,14 @@ public:
         mInService = inService;
     }
 
-    virtual status_t writeToParcel(Parcel* parcel) const override;
-
-    virtual status_t readFromParcel(const Parcel* parcel) override;
-
     aaudio_result_t validate() const;
 
     void dump() const;
 
-protected:
+    // Extract a parcelable representation of this object.
+    StreamRequest parcelable() const;
+
+private:
     AAudioStreamConfiguration  mConfiguration;
     uid_t                      mUserId = (uid_t) -1;
     pid_t                      mProcessId = (pid_t) -1;
