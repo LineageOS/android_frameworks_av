@@ -23,101 +23,66 @@
 #include <sys/mman.h>
 #include <aaudio/AAudio.h>
 
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
-
 #include "binding/AAudioStreamConfiguration.h"
-
-using android::NO_ERROR;
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
 
 using namespace aaudio;
 
-AAudioStreamConfiguration::AAudioStreamConfiguration() {}
-AAudioStreamConfiguration::~AAudioStreamConfiguration() {}
+using android::media::audio::common::AudioFormat;
 
-status_t AAudioStreamConfiguration::writeToParcel(Parcel* parcel) const {
-    status_t status;
-
-    status = parcel->writeInt32(getDeviceId());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32(getSampleRate());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32(getSamplesPerFrame());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) getSharingMode());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) getFormat());
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeInt32((int32_t) getDirection());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32(getBufferCapacity());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) getUsage());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) getContentType());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) getInputPreset());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32((int32_t) getAllowedCapturePolicy());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32(getSessionId());
-    if (status != NO_ERROR) goto error;
-    status = parcel->writeInt32(isPrivacySensitive() ? 1 : 0);
-    if (status != NO_ERROR) goto error;
-    return NO_ERROR;
-error:
-    ALOGE("%s(): write failed = %d", __func__, status);
-    return status;
+AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& parcelable) {
+    setSamplesPerFrame(parcelable.samplesPerFrame);
+    setSampleRate(parcelable.sampleRate);
+    setDeviceId(parcelable.deviceId);
+    static_assert(sizeof(aaudio_sharing_mode_t) == sizeof(parcelable.sharingMode));
+    setSharingMode(parcelable.sharingMode);
+    static_assert(sizeof(audio_format_t) == sizeof(parcelable.audioFormat));
+    setFormat(static_cast<audio_format_t>(parcelable.audioFormat));
+    static_assert(sizeof(aaudio_direction_t) == sizeof(parcelable.direction));
+    setDirection(parcelable.direction);
+    static_assert(sizeof(audio_usage_t) == sizeof(parcelable.usage));
+    setUsage(parcelable.usage);
+    static_assert(sizeof(aaudio_content_type_t) == sizeof(parcelable.contentType));
+    setContentType(parcelable.contentType);
+    static_assert(sizeof(aaudio_input_preset_t) == sizeof(parcelable.inputPreset));
+    setInputPreset(parcelable.inputPreset);
+    setBufferCapacity(parcelable.bufferCapacity);
+    static_assert(
+            sizeof(aaudio_allowed_capture_policy_t) == sizeof(parcelable.allowedCapturePolicy));
+    setAllowedCapturePolicy(parcelable.allowedCapturePolicy);
+    static_assert(sizeof(aaudio_session_id_t) == sizeof(parcelable.sessionId));
+    setSessionId(parcelable.sessionId);
+    setPrivacySensitive(parcelable.isPrivacySensitive);
 }
 
-status_t AAudioStreamConfiguration::readFromParcel(const Parcel* parcel) {
-    int32_t value;
-    status_t status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setDeviceId(value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setSampleRate(value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setSamplesPerFrame(value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setSharingMode((aaudio_sharing_mode_t) value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setFormat((audio_format_t) value);
+AAudioStreamConfiguration&
+AAudioStreamConfiguration::operator=(const StreamParameters& parcelable) {
+    this->~AAudioStreamConfiguration();
+    new (this) AAudioStreamConfiguration(parcelable);
+    return *this;
+}
 
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setDirection((aaudio_direction_t) value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setBufferCapacity(value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setUsage((aaudio_usage_t) value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setContentType((aaudio_content_type_t) value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setInputPreset((aaudio_input_preset_t) value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setAllowedCapturePolicy((aaudio_allowed_capture_policy_t) value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setSessionId(value);
-    status = parcel->readInt32(&value);
-    if (status != NO_ERROR) goto error;
-    setPrivacySensitive(value == 1);
-    return NO_ERROR;
-error:
-    ALOGE("%s(): read failed = %d", __func__, status);
-    return status;
+StreamParameters AAudioStreamConfiguration::parcelable() const {
+    StreamParameters result;
+    result.samplesPerFrame = getSamplesPerFrame();
+    result.sampleRate = getSampleRate();
+    result.deviceId = getDeviceId();
+    static_assert(sizeof(aaudio_sharing_mode_t) == sizeof(result.sharingMode));
+    result.sharingMode = getSharingMode();
+    static_assert(sizeof(audio_format_t) == sizeof(result.audioFormat));
+    result.audioFormat = static_cast<AudioFormat>(getFormat());
+    static_assert(sizeof(aaudio_direction_t) == sizeof(result.direction));
+    result.direction = getDirection();
+    static_assert(sizeof(audio_usage_t) == sizeof(result.usage));
+    result.usage = getUsage();
+    static_assert(sizeof(aaudio_content_type_t) == sizeof(result.contentType));
+    result.contentType = getContentType();
+    static_assert(sizeof(aaudio_input_preset_t) == sizeof(result.inputPreset));
+    result.inputPreset = getInputPreset();
+    result.bufferCapacity = getBufferCapacity();
+    static_assert(sizeof(aaudio_allowed_capture_policy_t) == sizeof(result.allowedCapturePolicy));
+    result.allowedCapturePolicy = getAllowedCapturePolicy();
+    static_assert(sizeof(aaudio_session_id_t) == sizeof(result.sessionId));
+    result.sessionId = getSessionId();
+    result.isPrivacySensitive = isPrivacySensitive();
+    return result;
 }

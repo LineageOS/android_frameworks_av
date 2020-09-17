@@ -23,7 +23,6 @@
 #include "client/AudioStreamInternal.h"
 
 using android::sp;
-using android::IAAudioService;
 
 namespace aaudio {
 

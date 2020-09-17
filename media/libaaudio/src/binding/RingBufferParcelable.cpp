@@ -29,8 +29,29 @@
 
 using namespace aaudio;
 
-RingBufferParcelable::RingBufferParcelable() {}
-RingBufferParcelable::~RingBufferParcelable() {}
+RingBufferParcelable::RingBufferParcelable(const RingBuffer& parcelable)
+        : mReadCounterParcelable(std::move(parcelable.readCounterParcelable)),
+          mWriteCounterParcelable(std::move(parcelable.writeCounterParcelable)),
+          mDataParcelable(std::move(parcelable.dataParcelable)),
+          mBytesPerFrame(parcelable.bytesPerFrame),
+          mFramesPerBurst(parcelable.framesPerBurst),
+          mCapacityInFrames(parcelable.capacityInFrames),
+          mFlags(static_cast<RingbufferFlags>(parcelable.flags)) {
+    static_assert(sizeof(mFlags) == sizeof(parcelable.flags));
+}
+
+RingBuffer RingBufferParcelable::parcelable() const {
+    RingBuffer result;
+    result.readCounterParcelable = std::move(mReadCounterParcelable).parcelable();
+    result.writeCounterParcelable = std::move(mWriteCounterParcelable).parcelable();
+    result.dataParcelable = std::move(mDataParcelable).parcelable();
+    result.bytesPerFrame = mBytesPerFrame;
+    result.framesPerBurst = mFramesPerBurst;
+    result.capacityInFrames = mCapacityInFrames;
+    static_assert(sizeof(mFlags) == sizeof(result.flags));
+    result.flags = static_cast<int32_t>(mFlags);
+    return result;
+}
 
 // TODO This assumes that all three use the same SharedMemoryParcelable
 void RingBufferParcelable::setupMemory(int32_t sharedMemoryIndex,
@@ -74,58 +95,6 @@ int32_t RingBufferParcelable::getCapacityInFrames() {
 
 void RingBufferParcelable::setCapacityInFrames(int32_t capacityInFrames) {
     mCapacityInFrames = capacityInFrames;
-}
-
-/**
- * The read and write must be symmetric.
- */
-status_t RingBufferParcelable::writeToParcel(Parcel* parcel) const {
-    status_t status = AAudioConvert_aaudioToAndroidStatus(validate());
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeInt32(mCapacityInFrames);
-    if (status != NO_ERROR) goto error;
-    if (mCapacityInFrames > 0) {
-        status = parcel->writeInt32(mBytesPerFrame);
-        if (status != NO_ERROR) goto error;
-        status = parcel->writeInt32(mFramesPerBurst);
-        if (status != NO_ERROR) goto error;
-        status = parcel->writeInt32(mFlags);
-        if (status != NO_ERROR) goto error;
-        status = mReadCounterParcelable.writeToParcel(parcel);
-        if (status != NO_ERROR) goto error;
-        status = mWriteCounterParcelable.writeToParcel(parcel);
-        if (status != NO_ERROR) goto error;
-        status = mDataParcelable.writeToParcel(parcel);
-        if (status != NO_ERROR) goto error;
-    }
-    return NO_ERROR;
-error:
-    ALOGE("%s returning %d", __func__, status);
-    return status;
-}
-
-status_t RingBufferParcelable::readFromParcel(const Parcel* parcel) {
-    status_t status = parcel->readInt32(&mCapacityInFrames);
-    if (status != NO_ERROR) goto error;
-    if (mCapacityInFrames > 0) {
-        status = parcel->readInt32(&mBytesPerFrame);
-        if (status != NO_ERROR) goto error;
-        status = parcel->readInt32(&mFramesPerBurst);
-        if (status != NO_ERROR) goto error;
-        status = parcel->readInt32((int32_t *)&mFlags);
-        if (status != NO_ERROR) goto error;
-        status = mReadCounterParcelable.readFromParcel(parcel);
-        if (status != NO_ERROR) goto error;
-        status = mWriteCounterParcelable.readFromParcel(parcel);
-        if (status != NO_ERROR) goto error;
-        status = mDataParcelable.readFromParcel(parcel);
-        if (status != NO_ERROR) goto error;
-    }
-    return AAudioConvert_aaudioToAndroidStatus(validate());
-error:
-    ALOGE("%s returning %d", __func__, status);
-    return status;
 }
 
 aaudio_result_t RingBufferParcelable::resolve(SharedMemoryParcelable *memoryParcels, RingBufferDescriptor *descriptor) {
