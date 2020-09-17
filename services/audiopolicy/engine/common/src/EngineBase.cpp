@@ -588,6 +588,45 @@ status_t EngineBase::getDevicesForRoleAndCapturePreset(audio_source_t audioSourc
     return NO_ERROR;
 }
 
+status_t EngineBase::getMediaDevicesForRole(device_role_t role,
+        const DeviceVector& availableDevices, DeviceVector& devices) const
+{
+    product_strategy_t strategy = getProductStrategyByName("STRATEGY_MEDIA" /*name*/);
+    if (strategy == PRODUCT_STRATEGY_NONE) {
+        strategy = getProductStrategyForStream(AUDIO_STREAM_MUSIC);
+    }
+    if (strategy == PRODUCT_STRATEGY_NONE) {
+        return NAME_NOT_FOUND;
+    }
+    AudioDeviceTypeAddrVector deviceAddrVec;
+    status_t status = getDevicesForRoleAndStrategy(strategy, role, deviceAddrVec);
+    if (status != NO_ERROR) {
+        return status;
+    }
+    devices = availableDevices.getDevicesFromDeviceTypeAddrVec(deviceAddrVec);
+    return deviceAddrVec.size() == devices.size() ? NO_ERROR : NOT_ENOUGH_DATA;
+}
+
+DeviceVector EngineBase::getActiveMediaDevices(const DeviceVector& availableDevices) const
+{
+    // The priority of active devices as follows:
+    // 1: the available preferred devices for media
+    // 2: the latest connected removable media device that is enabled
+    DeviceVector activeDevices;
+    if (getMediaDevicesForRole(
+            DEVICE_ROLE_PREFERRED, availableDevices, activeDevices) != NO_ERROR) {
+        activeDevices.clear();
+        DeviceVector disabledDevices;
+        getMediaDevicesForRole(DEVICE_ROLE_DISABLED, availableDevices, disabledDevices);
+        sp<DeviceDescriptor> device =
+                mLastRemovableMediaDevices.getLastRemovableMediaDevice(disabledDevices);
+        if (device != nullptr) {
+            activeDevices.add(device);
+        }
+    }
+    return activeDevices;
+}
+
 void EngineBase::dump(String8 *dst) const
 {
     mProductStrategies.dump(dst, 2);
