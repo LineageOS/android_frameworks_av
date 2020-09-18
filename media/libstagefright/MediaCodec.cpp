@@ -2926,7 +2926,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             int32_t reclaimed = 0;
             msg->findInt32("reclaimed", &reclaimed);
             if (reclaimed) {
-                mReleasedByResourceManager = true;
+                if (!mReleasedByResourceManager) {
+                    // notify the async client
+                    if (mFlags & kFlagIsAsync) {
+                        onError(DEAD_OBJECT, ACTION_CODE_FATAL);
+                    }
+                    mReleasedByResourceManager = true;
+                }
 
                 int32_t force = 0;
                 msg->findInt32("force", &force);
@@ -2938,10 +2944,6 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     response->setInt32("err", WOULD_BLOCK);
                     response->postReply(replyID);
 
-                    // notify the async client
-                    if (mFlags & kFlagIsAsync) {
-                        onError(DEAD_OBJECT, ACTION_CODE_FATAL);
-                    }
                     break;
                 }
             }
