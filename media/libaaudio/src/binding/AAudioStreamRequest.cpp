@@ -21,67 +21,32 @@
 #include <stdint.h>
 
 #include <sys/mman.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
 
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioStreamConfiguration.h"
 #include "binding/AAudioStreamRequest.h"
 
-using android::NO_ERROR;
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
-
 using namespace aaudio;
 
-AAudioStreamRequest::AAudioStreamRequest()
-    : mConfiguration()
-    {}
-
-AAudioStreamRequest::~AAudioStreamRequest() {}
-
-status_t AAudioStreamRequest::writeToParcel(Parcel* parcel) const {
-    status_t status = parcel->writeInt32((int32_t) mUserId);
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeBool(mSharingModeMatchRequired);
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->writeBool(mInService);
-    if (status != NO_ERROR) goto error;
-
-    status = mConfiguration.writeToParcel(parcel);
-    if (status != NO_ERROR) goto error;
-
-    return NO_ERROR;
-
-error:
-    ALOGE("writeToParcel(): write failed = %d", status);
-    return status;
+AAudioStreamRequest::AAudioStreamRequest(const StreamRequest& parcelable) :
+        mConfiguration(std::move(parcelable.params)),
+        mUserId(parcelable.userId),
+        mProcessId(parcelable.processId),
+        mSharingModeMatchRequired(parcelable.sharingModeMatchRequired),
+        mInService(parcelable.inService) {
+    static_assert(sizeof(mUserId) == sizeof(parcelable.userId));
+    static_assert(sizeof(mProcessId) == sizeof(parcelable.processId));
 }
 
-status_t AAudioStreamRequest::readFromParcel(const Parcel* parcel) {
-    int32_t temp;
-    status_t status = parcel->readInt32(&temp);
-    if (status != NO_ERROR) goto error;
-    mUserId = (uid_t) temp;
-
-    status = parcel->readBool(&mSharingModeMatchRequired);
-    if (status != NO_ERROR) goto error;
-
-    status = parcel->readBool(&mInService);
-    if (status != NO_ERROR) goto error;
-
-    status = mConfiguration.readFromParcel(parcel);
-    if (status != NO_ERROR) goto error;
-
-    return NO_ERROR;
-
-error:
-    ALOGE("readFromParcel(): read failed = %d", status);
-    return status;
+StreamRequest AAudioStreamRequest::parcelable() const {
+    StreamRequest result;
+    result.params = std::move(mConfiguration).parcelable();
+    result.userId = mUserId;
+    result.processId = mProcessId;
+    result.sharingModeMatchRequired = mSharingModeMatchRequired;
+    result.inService = mInService;
+    return result;
 }
 
 aaudio_result_t AAudioStreamRequest::validate() const {

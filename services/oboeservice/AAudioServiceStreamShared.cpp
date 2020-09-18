@@ -24,8 +24,6 @@
 
 #include <aaudio/AAudio.h>
 
-#include "binding/IAAudioService.h"
-
 #include "binding/AAudioServiceMessage.h"
 #include "AAudioServiceStreamBase.h"
 #include "AAudioServiceStreamShared.h"

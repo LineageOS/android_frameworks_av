@@ -20,28 +20,24 @@
 #include <stdint.h>
 
 #include <sys/mman.h>
-#include <binder/Parcelable.h>
 
 #include <aaudio/AAudio.h>
+#include <aaudio/SharedRegion.h>
 
 #include "binding/SharedMemoryParcelable.h"
 
 using android::status_t;
-using android::Parcel;
-using android::Parcelable;
 
 namespace aaudio {
 
-class SharedRegionParcelable : public Parcelable {
+class SharedRegionParcelable {
 public:
-    SharedRegionParcelable();
-    virtual ~SharedRegionParcelable();
+    SharedRegionParcelable() = default;
+
+    // Construct based on a parcelable representation.
+    explicit SharedRegionParcelable(const SharedRegion& parcelable);
 
     void setup(int32_t sharedMemoryIndex, int32_t offsetInBytes, int32_t sizeInBytes);
-
-    virtual status_t writeToParcel(Parcel* parcel) const override;
-
-    virtual status_t readFromParcel(const Parcel* parcel) override;
 
     aaudio_result_t resolve(SharedMemoryParcelable *memoryParcels, void **regionAddressPtr);
 
@@ -49,12 +45,14 @@ public:
 
     void dump();
 
-protected:
+    // Extract a parcelable representation of this object.
+    SharedRegion parcelable() const;
+
+private:
     int32_t mSharedMemoryIndex = -1;
     int32_t mOffsetInBytes     = 0;
     int32_t mSizeInBytes       = 0;
 
-private:
     aaudio_result_t validate() const;
 };
 
