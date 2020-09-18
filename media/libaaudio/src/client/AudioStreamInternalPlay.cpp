@@ -32,6 +32,7 @@
 #define LOG_TAG (mInService ? "AudioStreamInternalPlay_Service" \
                             : "AudioStreamInternalPlay_Client")
 
+using android::status_t;
 using android::WrappingBuffer;
 
 using namespace aaudio;

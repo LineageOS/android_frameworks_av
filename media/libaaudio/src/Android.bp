@@ -85,6 +85,7 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "aaudio-aidl-cpp",
     ],
 
     cflags: [
@@ -114,11 +115,10 @@ cc_library {
         "client/AudioStreamInternalPlay.cpp",
         "client/IsochronousClockModel.cpp",
         "binding/AudioEndpointParcelable.cpp",
+        "binding/AAudioBinderAdapter.cpp",
         "binding/AAudioBinderClient.cpp",
         "binding/AAudioStreamRequest.cpp",
         "binding/AAudioStreamConfiguration.cpp",
-        "binding/IAAudioClient.cpp",
-        "binding/IAAudioService.cpp",
         "binding/RingBufferParcelable.cpp",
         "binding/SharedMemoryParcelable.cpp",
         "binding/SharedRegionParcelable.cpp",
@@ -136,5 +136,35 @@ cc_library {
     sanitize: {
         integer_overflow: true,
         misc_undefined: ["bounds"],
+    },
+}
+
+aidl_interface {
+    name: "aaudio-aidl",
+    unstable: true,
+    local_include_dir: "binding/aidl",
+    srcs: [
+        "binding/aidl/aaudio/Endpoint.aidl",
+        "binding/aidl/aaudio/RingBuffer.aidl",
+        "binding/aidl/aaudio/SharedRegion.aidl",
+        "binding/aidl/aaudio/StreamParameters.aidl",
+        "binding/aidl/aaudio/StreamRequest.aidl",
+        "binding/aidl/aaudio/IAAudioClient.aidl",
+        "binding/aidl/aaudio/IAAudioService.aidl",
+    ],
+    imports: [
+        "audio_common-aidl",
+        "shared-file-region-aidl",
+    ],
+    backend:
+    {
+        cpp: {
+            enabled: true,
+        },
+        java: {
+            // TODO: need to have audio_common-aidl available in Java to enable
+            //       this.
+            enabled: false,
+        },
     },
 }
