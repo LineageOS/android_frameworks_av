@@ -69,9 +69,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory table*/
-#define LVDBE_NR_MEMORY_REGIONS        4                            /* Number of memory regions */
-
 /* Bass Enhancement effect level */
 #define LVDBE_EFFECT_03DB            3                              /* Effect defines for backwards compatibility */
 #define LVDBE_EFFECT_06DB            6
@@ -112,25 +109,12 @@ typedef enum
     LVDBE_VOLUME_MAX = LVM_MAXINT_32
 } LVDBE_Volume_en;
 
-/* Memory Types */
-typedef enum
-{
-    LVDBE_PERSISTENT      = 0,
-    LVDBE_PERSISTENT_DATA = 1,
-    LVDBE_PERSISTENT_COEF = 2,
-    LVDBE_SCRATCH         = 3,
-    LVDBE_MEMORY_MAX      = LVM_MAXINT_32
-
-} LVDBE_MemoryTypes_en;
-
 /* Function return status */
 typedef enum
 {
     LVDBE_SUCCESS        = 0,                        /* Successful return from a routine */
-    LVDBE_ALIGNMENTERROR = 1,                        /* Memory alignment error */
-    LVDBE_NULLADDRESS    = 2,                        /* NULL allocation address */
-    LVDBE_TOOMANYSAMPLES = 3,                        /* Maximum block size exceeded */
-    LVDBE_SIZEERROR      = 4,                        /* Incorrect structure size */
+    LVDBE_NULLADDRESS    = 1,                        /* NULL allocation address */
+    LVDBE_TOOMANYSAMPLES = 2,                        /* Maximum block size exceeded */
     LVDBE_STATUS_MAX     = LVM_MAXINT_32
 } LVDBE_ReturnStatus_en;
 
@@ -213,21 +197,6 @@ typedef enum
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory region definition */
-typedef struct
-{
-    LVM_UINT32                Size;                        /* Region size in bytes */
-    LVM_UINT16                Alignment;                  /* Region alignment in bytes */
-    LVDBE_MemoryTypes_en      Type;                       /* Region type */
-    void                      *pBaseAddress;              /* Pointer to the region base address */
-} LVDBE_MemoryRegion_t;
-
-/* Memory table containing the region definitions */
-typedef struct
-{
-    LVDBE_MemoryRegion_t    Region[LVDBE_NR_MEMORY_REGIONS];  /* One definition for each region */
-} LVDBE_MemTab_t;
-
 /* Parameter structure */
 typedef struct
 {
@@ -259,75 +228,40 @@ typedef struct
 
 /****************************************************************************************/
 /*                                                                                      */
-/* FUNCTION:                 LVDBE_Memory                                               */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*    This function is used for memory allocation and free. It can be called in         */
-/*    two ways:                                                                         */
-/*                                                                                      */
-/*        hInstance = NULL                Returns the memory requirements               */
-/*        hInstance = Instance handle        Returns the memory requirements and        */
-/*                                        allocated base addresses for the instance     */
-/*                                                                                      */
-/*    When this function is called for memory allocation (hInstance=NULL) the memory    */
-/*  base address pointers are NULL on return.                                           */
-/*                                                                                      */
-/*    When the function is called for free (hInstance = Instance Handle) the memory     */
-/*  table returns the allocated memory and base addresses used during initialisation.   */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance                Instance Handle                                            */
-/*  pMemoryTable             Pointer to an empty memory definition table                */
-/*    pCapabilities            Pointer to the default capabilites                       */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVDBE_SUCCESS            Succeeded                                                  */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*    1.    This function may be interrupted by the LVDBE_Process function              */
-/*                                                                                      */
-/****************************************************************************************/
-
-LVDBE_ReturnStatus_en LVDBE_Memory(LVDBE_Handle_t           hInstance,
-                                   LVDBE_MemTab_t           *pMemoryTable,
-                                   LVDBE_Capabilities_t     *pCapabilities);
-
-/****************************************************************************************/
-/*                                                                                      */
 /* FUNCTION:                 LVDBE_Init                                                 */
 /*                                                                                      */
 /* DESCRIPTION:                                                                         */
 /*    Create and initialisation function for the Bass Enhancement module                */
 /*                                                                                      */
-/*    This function can be used to create an algorithm instance by calling with         */
-/*    hInstance set to NULL. In this case the algorithm returns the new instance        */
-/*    handle.                                                                           */
-/*                                                                                      */
-/*    This function can be used to force a full re-initialisation of the algorithm      */
-/*    by calling with hInstance = Instance Handle. In this case the memory table        */
-/*    should be correct for the instance, this can be ensured by calling the function   */
-/*    LVDBE_Memory before calling this function.                                        */
-/*                                                                                      */
 /* PARAMETERS:                                                                          */
-/*  hInstance                  Instance handle                                          */
-/*  pMemoryTable             Pointer to the memory definition table                     */
+/*  phInstance               Pointer to instance handle                                 */
 /*  pCapabilities            Pointer to the initialisation capabilities                 */
+/*  pScratch                 Pointer to the bundle scratch buffer                       */
 /*                                                                                      */
 /* RETURNS:                                                                             */
-/*  LVDBE_SUCCESS                Initialisation succeeded                               */
-/*  LVDBE_ALIGNMENTERROR        Instance or scratch memory on incorrect alignment       */
-/*    LVDBE_NULLADDRESS            One or more memory has a NULL pointer                */
+/*  LVDBE_SUCCESS            Initialisation succeeded                                   */
+/*  LVDBE_NULLADDRESS        One or more memory has a NULL pointer - malloc failure     */
 /*                                                                                      */
 /* NOTES:                                                                               */
-/*  1.     The instance handle is the pointer to the base address of the first memory   */
-/*        region.                                                                       */
-/*    2.    This function must not be interrupted by the LVDBE_Process function         */
+/*  1.    This function must not be interrupted by the LVDBE_Process function           */
 /*                                                                                      */
 /****************************************************************************************/
+LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t           *phInstance,
+                                 LVDBE_Capabilities_t     *pCapabilities,
+                                 void                     *pScratch);
 
-LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t             *phInstance,
-                                   LVDBE_MemTab_t           *pMemoryTable,
-                                   LVDBE_Capabilities_t     *pCapabilities);
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                 LVDBE_DeInit                                               */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*    Free the memories created during LVDBE_Init including instance handle             */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  phInstance               Pointer to instance handle                                 */
+/*                                                                                      */
+/****************************************************************************************/
+void LVDBE_DeInit(LVDBE_Handle_t         *phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */

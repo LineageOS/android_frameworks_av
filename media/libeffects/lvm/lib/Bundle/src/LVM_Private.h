@@ -113,21 +113,6 @@
 /*                                                                                  */
 /************************************************************************************/
 
-/* Memory region definition */
-typedef struct
-{
-    LVM_UINT32              Size;               /* Region size in bytes */
-    LVM_UINT16              Alignment;          /* Byte alignment */
-    LVM_MemoryTypes_en      Type;               /* Region type */
-    void                    *pBaseAddress;      /* Pointer to the region base address */
-} LVM_IntMemoryRegion_t;
-
-/* Memory table containing the region definitions */
-typedef struct
-{
-    LVM_IntMemoryRegion_t   Region[LVM_NR_MEMORY_REGIONS];  /* One definition for each region */
-} LVM_IntMemTab_t;
-
 /* Buffer Management */
 typedef struct
 {
@@ -157,7 +142,6 @@ typedef struct
 typedef struct
 {
     /* Public parameters */
-    LVM_MemTab_t            MemoryTable;        /* Instance memory allocation table */
     LVM_ControlParams_t     Params;             /* Control parameters */
     LVM_InstParams_t        InstParams;         /* Instance parameters */
 
@@ -228,6 +212,7 @@ typedef struct
 
     LVM_INT16              NrChannels;
     LVM_INT32              ChMask;
+    void                   *pScratch;           /* Pointer to bundle scratch buffer*/
 
 } LVM_Instance_t;
 

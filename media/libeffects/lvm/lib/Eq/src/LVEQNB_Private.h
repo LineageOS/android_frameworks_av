@@ -36,15 +36,6 @@
 
 /* General */
 #define LVEQNB_INVALID              0xFFFF              /* Invalid init parameter */
-
-/* Memory */
-#define LVEQNB_INSTANCE_ALIGN       4                   /* 32-bit alignment for instance structures */
-#define LVEQNB_DATA_ALIGN           4                   /* 32-bit alignment for structures */
-#define LVEQNB_COEF_ALIGN           4                   /* 32-bit alignment for long words */
-/* Number of buffers required for inplace processing */
-#define LVEQNB_SCRATCHBUFFERS       (LVM_MAX_CHANNELS * 2)
-#define LVEQNB_SCRATCH_ALIGN        4                   /* 32-bit alignment for long data */
-
 #define LVEQNB_BYPASS_MIXER_TC      100                 /* Bypass Mixer TC */
 
 /****************************************************************************************/
@@ -73,7 +64,7 @@ typedef enum
 typedef struct
 {
     /* Public parameters */
-    LVEQNB_MemTab_t                 MemoryTable;        /* Instance memory allocation table */
+    void                            *pScratch;          /* Pointer to bundle scratch buffer */
     LVEQNB_Params_t                 Params;             /* Instance parameters */
     LVEQNB_Capabilities_t           Capabilities;       /* Instance capabilities */
 

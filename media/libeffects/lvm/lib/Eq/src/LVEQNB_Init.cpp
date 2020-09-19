@@ -21,6 +21,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
+#include <stdlib.h>
 #include "LVEQNB.h"
 #include "LVEQNB_Private.h"
 #include "InstAlloc.h"
@@ -28,255 +29,75 @@
 
 /****************************************************************************************/
 /*                                                                                      */
-/* FUNCTION:                LVEQNB_Memory                                               */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*  This function is used for memory allocation and free. It can be called in           */
-/*  two ways:                                                                           */
-/*                                                                                      */
-/*      hInstance = NULL                Returns the memory requirements                 */
-/*      hInstance = Instance handle     Returns the memory requirements and             */
-/*                                      allocated base addresses for the instance       */
-/*                                                                                      */
-/*  When this function is called for memory allocation (hInstance=NULL) the memory      */
-/*  base address pointers are NULL on return.                                           */
-/*                                                                                      */
-/*  When the function is called for free (hInstance = Instance Handle) the memory       */
-/*  table returns the allocated memory and base addresses used during initialisation.   */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance               Instance Handle                                             */
-/*  pMemoryTable            Pointer to an empty memory definition table                 */
-/*  pCapabilities           Pointer to the instance capabilities                        */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVEQNB_SUCCESS          Succeeded                                                   */
-/*  LVEQNB_NULLADDRESS      When any of pMemoryTable and pCapabilities is NULL address  */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*  1.  This function may be interrupted by the LVEQNB_Process function                 */
-/*                                                                                      */
-/****************************************************************************************/
-
-LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
-                                     LVEQNB_MemTab_t            *pMemoryTable,
-                                     LVEQNB_Capabilities_t      *pCapabilities)
-{
-
-    INST_ALLOC          AllocMem;
-    LVEQNB_Instance_t   *pInstance = (LVEQNB_Instance_t *)hInstance;
-
-    if((pMemoryTable == LVM_NULL)|| (pCapabilities == LVM_NULL))
-    {
-        return LVEQNB_NULLADDRESS;
-    }
-
-    /*
-     * Fill in the memory table
-     */
-    if (hInstance == LVM_NULL)
-    {
-        /*
-         * Instance memory
-         */
-        InstAlloc_Init(&AllocMem,
-                       LVM_NULL);
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            sizeof(LVEQNB_Instance_t));
-        pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].Size         = InstAlloc_GetTotal(&AllocMem);
-        pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].Alignment    = LVEQNB_INSTANCE_ALIGN;
-        pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].Type         = LVEQNB_PERSISTENT;
-        pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].pBaseAddress = LVM_NULL;
-
-        /*
-         * Persistant data memory
-         */
-        InstAlloc_Init(&AllocMem,
-                       LVM_NULL);
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            sizeof(Biquad_2I_Order2_FLOAT_Taps_t));
-        InstAlloc_AddMember(&AllocMem,                              /* High pass filter */
-                            sizeof(Biquad_2I_Order2_FLOAT_Taps_t));
-        /* Equaliser Biquad Taps */
-        InstAlloc_AddMember(&AllocMem,
-                            (pCapabilities->MaxBands * sizeof(Biquad_2I_Order2_FLOAT_Taps_t)));
-        /* Filter definitions */
-        InstAlloc_AddMember(&AllocMem,
-                            (pCapabilities->MaxBands * sizeof(LVEQNB_BandDef_t)));
-        /* Biquad types */
-        InstAlloc_AddMember(&AllocMem,
-                            (pCapabilities->MaxBands * sizeof(LVEQNB_BiquadType_en)));
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].Size         = InstAlloc_GetTotal(&AllocMem);
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].Alignment    = LVEQNB_DATA_ALIGN;
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].Type         = LVEQNB_PERSISTENT_DATA;
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].pBaseAddress = LVM_NULL;
-
-        /*
-         * Persistant coefficient memory
-         */
-        InstAlloc_Init(&AllocMem,
-                       LVM_NULL);
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            sizeof(Biquad_FLOAT_Instance_t));
-        InstAlloc_AddMember(&AllocMem,                              /* High pass filter */
-                            sizeof(Biquad_FLOAT_Instance_t));
-        /* Equaliser Biquad Instance */
-        InstAlloc_AddMember(&AllocMem,
-                            pCapabilities->MaxBands * sizeof(Biquad_FLOAT_Instance_t));
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Size         = InstAlloc_GetTotal(&AllocMem);
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Alignment    = LVEQNB_COEF_ALIGN;
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].Type         = LVEQNB_PERSISTENT_COEF;
-        pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].pBaseAddress = LVM_NULL;
-
-        /*
-         * Scratch memory
-         */
-        InstAlloc_Init(&AllocMem,
-                       LVM_NULL);
-        InstAlloc_AddMember(&AllocMem,                              /* Low pass filter */
-                            LVEQNB_SCRATCHBUFFERS * sizeof(LVM_FLOAT) * \
-                                             pCapabilities->MaxBlockSize);
-        pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].Size              = InstAlloc_GetTotal(&AllocMem);
-        pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].Alignment         = LVEQNB_SCRATCH_ALIGN;
-        pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].Type              = LVEQNB_SCRATCH;
-        pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].pBaseAddress      = LVM_NULL;
-    }
-    else
-    {
-        /* Read back memory allocation table */
-        *pMemoryTable = pInstance->MemoryTable;
-    }
-
-    return(LVEQNB_SUCCESS);
-}
-
-/****************************************************************************************/
-/*                                                                                      */
 /* FUNCTION:                LVEQNB_Init                                                 */
 /*                                                                                      */
 /* DESCRIPTION:                                                                         */
-/*  Create and initialisation function for the N-Band equaliser module                  */
-/*                                                                                      */
-/*  This function can be used to create an algorithm instance by calling with           */
-/*  hInstance set to NULL. In this case the algorithm returns the new instance          */
-/*  handle.                                                                             */
-/*                                                                                      */
-/*  This function can be used to force a full re-initialisation of the algorithm        */
-/*  by calling with hInstance = Instance Handle. In this case the memory table          */
-/*  should be correct for the instance, this can be ensured by calling the function     */
-/*  DBE_Memory before calling this function.                                            */
+/*  Create and initialisation function for the N-Band equaliser module.                 */
 /*                                                                                      */
 /* PARAMETERS:                                                                          */
-/*  hInstance               Instance handle                                             */
-/*  pMemoryTable            Pointer to the memory definition table                      */
-/*  pCapabilities           Pointer to the instance capabilities                        */
+/*  phInstance              Pointer to instance handle                                  */
+/*  pCapabilities           Pointer to the initialisation capabilities                  */
+/*  pScratch                Pointer to bundle scratch buffer                            */
 /*                                                                                      */
 /* RETURNS:                                                                             */
 /*  LVEQNB_SUCCESS          Initialisation succeeded                                    */
-/*  LVEQNB_NULLADDRESS        When pCapabilities or pMemoryTableis or phInstance are NULL */
-/*  LVEQNB_NULLADDRESS        One or more of the memory regions has a NULL base address   */
-/*                          pointer for a memory region with a non-zero size.           */
+/*  LVEQNB_NULLADDRESS      One or more memory has a NULL pointer - malloc failure      */
 /*                                                                                      */
 /* NOTES:                                                                               */
-/*  1.  The instance handle is the pointer to the base address of the first memory      */
-/*      region.                                                                         */
-/*  2.  This function must not be interrupted by the LVEQNB_Process function            */
+/*  1.  This function must not be interrupted by the LVEQNB_Process function            */
 /*                                                                                      */
 /****************************************************************************************/
 
 LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
-                                   LVEQNB_MemTab_t          *pMemoryTable,
-                                   LVEQNB_Capabilities_t    *pCapabilities)
+                                   LVEQNB_Capabilities_t    *pCapabilities,
+                                   void                     *pScratch)
 {
 
     LVEQNB_Instance_t   *pInstance;
-    LVM_UINT32          MemSize;
-    INST_ALLOC          AllocMem;
-    LVM_INT32           i;
 
-    /*
-     * Check for NULL pointers
-     */
-    if((phInstance == LVM_NULL) || (pMemoryTable == LVM_NULL) || (pCapabilities == LVM_NULL))
+    *phInstance = calloc(1, sizeof(*pInstance));
+    if (phInstance == LVM_NULL)
+    {
+        return LVEQNB_NULLADDRESS;
+    }
+    pInstance =(LVEQNB_Instance_t  *)*phInstance;
+
+    pInstance->Capabilities = *pCapabilities;
+    pInstance->pScratch = pScratch;
+
+    /* Equaliser Biquad Instance */
+    LVM_UINT32 MemSize = pCapabilities->MaxBands * sizeof(*(pInstance->pEQNB_FilterState_Float));
+    pInstance->pEQNB_FilterState_Float = (Biquad_FLOAT_Instance_t *)calloc(1, MemSize);
+    if (pInstance->pEQNB_FilterState_Float == LVM_NULL)
     {
         return LVEQNB_NULLADDRESS;
     }
 
-    /*
-     * Check the memory table for NULL pointers
-     */
-    for (i = 0; i < LVEQNB_NR_MEMORY_REGIONS; i++)
+    MemSize = (pCapabilities->MaxBands * sizeof(*(pInstance->pEQNB_Taps_Float)));
+    pInstance->pEQNB_Taps_Float = (Biquad_2I_Order2_FLOAT_Taps_t *)calloc(1, MemSize);
+    if (pInstance->pEQNB_Taps_Float == LVM_NULL)
     {
-        if (pMemoryTable->Region[i].Size!=0)
-        {
-            if (pMemoryTable->Region[i].pBaseAddress==LVM_NULL)
-            {
-                return(LVEQNB_NULLADDRESS);
-            }
-        }
+        return LVEQNB_NULLADDRESS;
     }
 
-    /*
-     * Set the instance handle if not already initialised
-     */
-
-    InstAlloc_Init(&AllocMem,  pMemoryTable->Region[LVEQNB_MEMREGION_INSTANCE].pBaseAddress);
-
-    if (*phInstance == LVM_NULL)
+    MemSize = (pCapabilities->MaxBands * sizeof(*(pInstance->pBandDefinitions)));
+    pInstance->pBandDefinitions  = (LVEQNB_BandDef_t *)calloc(1, MemSize);
+    if (pInstance->pBandDefinitions == LVM_NULL)
     {
-        *phInstance = InstAlloc_AddMember(&AllocMem, sizeof(LVEQNB_Instance_t));
+        return LVEQNB_NULLADDRESS;
     }
-    pInstance =(LVEQNB_Instance_t  *)*phInstance;
-
-    /*
-     * Save the memory table in the instance structure
-     */
-    pInstance->Capabilities = *pCapabilities;
-
-    /*
-     * Save the memory table in the instance structure and
-     * set the structure pointers
-     */
-    pInstance->MemoryTable       = *pMemoryTable;
-
-    /*
-     * Allocate coefficient memory
-     */
-    InstAlloc_Init(&AllocMem,
-                   pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_COEF].pBaseAddress);
-
-    /* Equaliser Biquad Instance */
-    pInstance->pEQNB_FilterState_Float = (Biquad_FLOAT_Instance_t *)
-        InstAlloc_AddMember(&AllocMem, pCapabilities->MaxBands * \
-                                                       sizeof(Biquad_FLOAT_Instance_t));
-
-    /*
-     * Allocate data memory
-     */
-    InstAlloc_Init(&AllocMem,
-                   pMemoryTable->Region[LVEQNB_MEMREGION_PERSISTENT_DATA].pBaseAddress);
-
-    MemSize = (pCapabilities->MaxBands * sizeof(Biquad_2I_Order2_FLOAT_Taps_t));
-    pInstance->pEQNB_Taps_Float = (Biquad_2I_Order2_FLOAT_Taps_t *)InstAlloc_AddMember(&AllocMem,
-                                                                                       MemSize);
-    MemSize = (pCapabilities->MaxBands * sizeof(LVEQNB_BandDef_t));
-    pInstance->pBandDefinitions  = (LVEQNB_BandDef_t *)InstAlloc_AddMember(&AllocMem,
-                                                                           MemSize);
     // clear all the bands, setting their gain to 0, otherwise when applying new params,
     // it will compare against uninitialized values
     memset(pInstance->pBandDefinitions, 0, MemSize);
-    MemSize = (pCapabilities->MaxBands * sizeof(LVEQNB_BiquadType_en));
-    pInstance->pBiquadType = (LVEQNB_BiquadType_en *)InstAlloc_AddMember(&AllocMem,
-                                                                         MemSize);
 
-    /*
-     * Internally map, structure and allign scratch memory
-     */
-    InstAlloc_Init(&AllocMem,
-                   pMemoryTable->Region[LVEQNB_MEMREGION_SCRATCH].pBaseAddress);
+    MemSize = (pCapabilities->MaxBands * sizeof(*(pInstance->pBiquadType)));
+    pInstance->pBiquadType = (LVEQNB_BiquadType_en *)calloc(1, MemSize);
+    if (pInstance->pBiquadType == LVM_NULL)
+    {
+        return LVEQNB_NULLADDRESS;
+    }
 
-    pInstance->pFastTemporary = (LVM_FLOAT *)InstAlloc_AddMember(&AllocMem,
-                                                                 sizeof(LVM_FLOAT));
+    pInstance->pFastTemporary = (LVM_FLOAT *)pScratch;
 
     /*
      * Update the instance parameters
@@ -318,5 +139,49 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     pInstance->bInOperatingModeTransition      = LVM_FALSE;
 
     return(LVEQNB_SUCCESS);
+}
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                LVEQNB_DeInit                                               */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*    Free the memories created during LVEQNB_Init including instance handle            */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  phInstance              Pointer to instance handle                                  */
+/*                                                                                      */
+/* NOTES:                                                                               */
+/*  1.  This function must not be interrupted by the LVEQNB_Process function            */
+/*                                                                                      */
+/****************************************************************************************/
+
+void LVEQNB_DeInit(LVEQNB_Handle_t          *phInstance)
+{
+
+    LVEQNB_Instance_t   *pInstance;
+    if (phInstance == LVM_NULL) {
+        return;
+    }
+    pInstance =(LVEQNB_Instance_t  *)*phInstance;
+
+    /* Equaliser Biquad Instance */
+    if (pInstance->pEQNB_FilterState_Float != LVM_NULL) {
+        free(pInstance->pEQNB_FilterState_Float);
+        pInstance->pEQNB_FilterState_Float = LVM_NULL;
+    }
+    if (pInstance->pEQNB_Taps_Float != LVM_NULL) {
+        free(pInstance->pEQNB_Taps_Float);
+        pInstance->pEQNB_Taps_Float = LVM_NULL;
+    }
+    if (pInstance->pBandDefinitions != LVM_NULL) {
+        free(pInstance->pBandDefinitions);
+        pInstance->pBandDefinitions = LVM_NULL;
+    }
+    if (pInstance->pBiquadType != LVM_NULL) {
+        free(pInstance->pBiquadType);
+        pInstance->pBiquadType = LVM_NULL;
+    }
+    free(pInstance);
+    *phInstance = LVM_NULL;
 }
 

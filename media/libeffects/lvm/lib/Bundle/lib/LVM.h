@@ -67,9 +67,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory table*/
-#define LVM_NR_MEMORY_REGIONS                 4     /* Number of memory regions */
-
 /* Concert Sound effect level presets */
 #define LVM_CS_EFFECT_NONE                    0     /* 0% effect, minimum value */
 #define LVM_CS_EFFECT_LOW                 16384     /* 50% effect */
@@ -225,12 +222,6 @@ typedef struct
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory table containing the region definitions */
-typedef struct
-{
-    LVM_MemoryRegion_st         Region[LVM_NR_MEMORY_REGIONS];  /* One definition for each region */
-} LVM_MemTab_t;
-
 /* N-Band equaliser band definition */
 typedef struct
 {
@@ -341,51 +332,14 @@ LVM_ReturnStatus_en LVM_GetVersionInfo(LVM_VersionInfo_st  *pVersion);
 
 /****************************************************************************************/
 /*                                                                                      */
-/* FUNCTION:                LVM_GetMemoryTable                                          */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*  This function is used for memory allocation and free. It can be called in           */
-/*  two ways:                                                                           */
-/*                                                                                      */
-/*      hInstance = NULL                Returns the memory requirements                 */
-/*      hInstance = Instance handle     Returns the memory requirements and             */
-/*                                      allocated base addresses for the instance       */
-/*                                                                                      */
-/*  When this function is called for memory allocation (hInstance=NULL) the memory      */
-/*  base address pointers are NULL on return.                                           */
-/*                                                                                      */
-/*  When the function is called for free (hInstance = Instance Handle) the memory       */
-/*  table returns the allocated memory and base addresses used during initialisation.   */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance               Instance Handle                                             */
-/*  pMemoryTable            Pointer to an empty memory definition table                 */
-/*  pInstParams             Pointer to the instance parameters                          */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVM_SUCCESS             Succeeded                                                   */
-/*  LVM_NULLADDRESS         When one of pMemoryTable or pInstParams is NULL             */
-/*  LVM_OUTOFRANGE          When any of the Instance parameters are out of range        */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*  1.  This function may be interrupted by the LVM_Process function                    */
-/*                                                                                      */
-/****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
-                                       LVM_MemTab_t         *pMemoryTable,
-                                       LVM_InstParams_t     *pInstParams);
-
-/****************************************************************************************/
-/*                                                                                      */
 /* FUNCTION:                LVM_GetInstanceHandle                                       */
 /*                                                                                      */
 /* DESCRIPTION:                                                                         */
-/*  This function is used to create a bundle instance. It returns the created instance  */
-/*  handle through phInstance. All parameters are set to their default, inactive state. */
+/*  This function is used to create a bundle instance.                                  */
+/*  All parameters are set to their default, inactive state.                            */
 /*                                                                                      */
 /* PARAMETERS:                                                                          */
-/*  phInstance              pointer to the instance handle                              */
-/*  pMemoryTable            Pointer to the memory definition table                      */
+/*  phInstance              Pointer to the instance handle                              */
 /*  pInstParams             Pointer to the instance parameters                          */
 /*                                                                                      */
 /* RETURNS:                                                                             */
@@ -398,8 +352,24 @@ LVM_ReturnStatus_en LVM_GetMemoryTable(LVM_Handle_t         hInstance,
 /*                                                                                      */
 /****************************************************************************************/
 LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t        *phInstance,
-                                          LVM_MemTab_t        *pMemoryTable,
                                           LVM_InstParams_t    *pInstParams);
+
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                LVM_DelInstanceHandle                                       */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*  This function is used to create a bundle instance. It returns the created instance  */
+/*  handle through phInstance. All parameters are set to their default, inactive state. */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  phInstance              Pointer to the instance handle                              */
+/*                                                                                      */
+/* NOTES:                                                                               */
+/*  1. This function must not be interrupted by the LVM_Process function                */
+/*                                                                                      */
+/****************************************************************************************/
+void LVM_DelInstanceHandle(LVM_Handle_t        *phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
