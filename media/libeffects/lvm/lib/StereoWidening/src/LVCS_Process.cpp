@@ -89,8 +89,7 @@ LVCS_ReturnStatus_en LVCS_Process_CS(LVCS_Handle_t              hInstance,
         channels = 2;
     }
 
-    pScratch  = (LVM_FLOAT *) \
-                  pInstance->MemoryTable.Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress;
+    pScratch  = (LVM_FLOAT *)pInstance->pScratch;
 
     /*
      * Check if the processing is inplace
@@ -220,10 +219,8 @@ LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
            * second and fourth are used as input buffers by pInput and pStIn in LVCS_Process_CS.
            * Hence, pStereoOut is pointed to use unused third portion of scratch memory.
            */
-            pStereoOut = (LVM_FLOAT *) \
-                          pInstance->MemoryTable. \
-                          Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress +
-                          ((LVCS_SCRATCHBUFFERS - 4) * NrFrames);
+            pStereoOut = (LVM_FLOAT *)pInstance->pScratch +
+                                     ((LVCS_SCRATCHBUFFERS - 4) * NrFrames);
         }
         else
         {
