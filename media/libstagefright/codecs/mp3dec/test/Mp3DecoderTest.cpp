@@ -185,6 +185,7 @@ TEST_P(Mp3DecoderTest, ResetDecoderTest) {
 INSTANTIATE_TEST_SUITE_P(Mp3DecoderTestAll, Mp3DecoderTest,
                          ::testing::Values(("bbb_44100hz_2ch_128kbps_mp3_30sec.mp3"),
                                            ("bbb_44100hz_2ch_128kbps_mp3_5mins.mp3"),
+                                           ("bug_136053885.mp3"),
                                            ("bbb_mp3_stereo_192kbps_48000hz.mp3")));
 
 int main(int argc, char **argv) {
