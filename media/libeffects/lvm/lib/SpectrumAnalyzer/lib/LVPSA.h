@@ -22,28 +22,9 @@
 
 /****************************************************************************************/
 /*                                                                                      */
-/*  CONSTANTS DEFINITIONS                                                               */
-/*                                                                                      */
-/****************************************************************************************/
-
-/* Memory table*/
-#define     LVPSA_NR_MEMORY_REGIONS                  4      /* Number of memory regions                                          */
-
-/****************************************************************************************/
-/*                                                                                      */
 /*  TYPES DEFINITIONS                                                                   */
 /*                                                                                      */
 /****************************************************************************************/
-/* Memory Types */
-typedef enum
-{
-    LVPSA_PERSISTENT      = LVM_PERSISTENT,
-    LVPSA_PERSISTENT_DATA = LVM_PERSISTENT_DATA,
-    LVPSA_PERSISTENT_COEF = LVM_PERSISTENT_COEF,
-    LVPSA_SCRATCH         = LVM_SCRATCH,
-    LVPSA_MEMORY_DUMMY = LVM_MAXINT_32                      /* Force 32 bits enum, don't use it!                                 */
-} LVPSA_MemoryTypes_en;
-
 /* Level detection speed control parameters */
 typedef enum
 {
@@ -80,20 +61,6 @@ typedef struct
 
 } LVPSA_ControlParams_t, *pLVPSA_ControlParams_t;
 
-/* Memory region definition */
-typedef struct
-{
-    LVM_UINT32                 Size;                        /* Region size in bytes                                              */
-    LVPSA_MemoryTypes_en       Type;                        /* Region type                                                       */
-    void                       *pBaseAddress;               /* Pointer to the region base address                                */
-} LVPSA_MemoryRegion_t;
-
-/* Memory table containing the region definitions */
-typedef struct
-{
-    LVPSA_MemoryRegion_t       Region[LVPSA_NR_MEMORY_REGIONS];/* One definition for each region                                 */
-} LVPSA_MemTab_t;
-
 /* Audio time type */
 typedef LVM_INT32 LVPSA_Time;
 
@@ -113,62 +80,43 @@ typedef enum
 /*********************************************************************************************************************************
    FUNCTIONS PROTOTYPE
 **********************************************************************************************************************************/
-/*********************************************************************************************************************************/
-/*                                                                                                                               */
-/* FUNCTION:            LVPSA_Memory                                                                                         */
-/*                                                                                                                               */
-/* DESCRIPTION:                                                                                                                  */
-/*  This function is used for memory allocation and free. It can be called in                                                    */
-/*  two ways:                                                                                                                    */
-/*                                                                                                                               */
-/*      hInstance = NULL                Returns the memory requirements                                                          */
-/*      hInstance = Instance handle     Returns the memory requirements and                                                      */
-/*                                      allocated base addresses for the instance                                                */
-/*                                                                                                                               */
-/*  When this function is called for memory allocation (hInstance=NULL) the memory                                               */
-/*  base address pointers are NULL on return.                                                                                    */
-/*                                                                                                                               */
-/*  When the function is called for free (hInstance = Instance Handle) the memory                                                */
-/*  table returns the allocated memory and base addresses used during initialisation.                                            */
-/*                                                                                                                               */
-/* PARAMETERS:                                                                                                                   */
-/*  hInstance           Instance Handle                                                                                          */
-/*  pMemoryTable        Pointer to an empty memory definition table                                                              */
-/*  pInitParams         Pointer to the instance init parameters                                                                  */
-/*                                                                                                                               */
-/* RETURNS:                                                                                                                      */
-/*  LVPSA_OK            Succeeds                                                                                                 */
-/*  otherwise           Error due to bad parameters                                                                              */
-/*                                                                                                                               */
-/*********************************************************************************************************************************/
-LVPSA_RETURN LVPSA_Memory            ( pLVPSA_Handle_t             hInstance,
-                                       LVPSA_MemTab_t             *pMemoryTable,
-                                       LVPSA_InitParams_t         *pInitParams    );
+/************************************************************************************/
+/*                                                                                  */
+/* FUNCTION:            LVPSA_Init                                                  */
+/*                                                                                  */
+/* DESCRIPTION:                                                                     */
+/*  Create and Initialize the LVPSA module including instance handle                */
+/*                                                                                  */
+/*                                                                                  */
+/* PARAMETERS:                                                                      */
+/*  phInstance          Pointer to the instance handle                              */
+/*  InitParams          Init parameters structure                                   */
+/*  ControlParams       Control parameters structure                                */
+/*  pScratch            Pointer to bundle scratch memory area                       */
+/*                                                                                  */
+/*                                                                                  */
+/* RETURNS:                                                                         */
+/*  LVPSA_OK            Succeeds                                                    */
+/*  otherwise           Error due to bad parameters                                 */
+/*                                                                                  */
+/************************************************************************************/
+LVPSA_RETURN LVPSA_Init(pLVPSA_Handle_t             *phInstance,
+                        LVPSA_InitParams_t          *pInitParams,
+                        LVPSA_ControlParams_t       *pControlParams,
+                        void                        *pScratch);
 
-/*********************************************************************************************************************************/
-/*                                                                                                                               */
-/* FUNCTION:            LVPSA_Init                                                                                               */
-/*                                                                                                                               */
-/* DESCRIPTION:                                                                                                                  */
-/*  Initializes the LVPSA module.                                                                                                */
-/*                                                                                                                               */
-/*                                                                                                                               */
-/* PARAMETERS:                                                                                                                   */
-/*  phInstance          Pointer to the instance Handle                                                                           */
-/*  pInitParams         Pointer to the instance init parameters                                                                  */
-/*  pControlParams      Pointer to the instance control parameters                                                               */
-/*  pMemoryTable        Pointer to the memory definition table                                                                   */
-/*                                                                                                                               */
-/*                                                                                                                               */
-/* RETURNS:                                                                                                                      */
-/*  LVPSA_OK            Succeeds                                                                                                 */
-/*  otherwise           Error due to bad parameters                                                                              */
-/*                                                                                                                               */
-/*********************************************************************************************************************************/
-LVPSA_RETURN LVPSA_Init              ( pLVPSA_Handle_t             *phInstance,
-                                       LVPSA_InitParams_t          *pInitParams,
-                                       LVPSA_ControlParams_t       *pControlParams,
-                                       LVPSA_MemTab_t              *pMemoryTable  );
+/************************************************************************************/
+/*                                                                                  */
+/* FUNCTION:            LVPSA_DeInit                                                */
+/*                                                                                  */
+/* DESCRIPTION:                                                                     */
+/*    Free the memories created in LVPSA_Init call including instance handle        */
+/*                                                                                  */
+/* PARAMETERS:                                                                      */
+/*  phInstance          Pointer to the instance handle                              */
+/*                                                                                  */
+/************************************************************************************/
+void LVPSA_DeInit(pLVPSA_Handle_t             *phInstance);
 
 /*********************************************************************************************************************************/
 /*                                                                                                                               */

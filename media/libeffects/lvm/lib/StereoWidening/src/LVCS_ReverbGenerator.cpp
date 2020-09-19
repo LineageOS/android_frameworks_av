@@ -20,7 +20,7 @@
 /*  Includes                                                                        */
 /*                                                                                  */
 /************************************************************************************/
-
+#include <stdlib.h>
 #include "LVCS.h"
 #include "LVCS_Private.h"
 #include "LVCS_ReverbGenerator.h"
@@ -70,11 +70,31 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t     hInstance,
     BQ_FLOAT_Coefs_t         Coeffs;
     const BiquadA012B12CoefsSP_t  *pReverbCoefTable;
 
-    pData = (LVCS_Data_t *) \
-                 pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_DATA].pBaseAddress;
-
-    pCoefficients = (LVCS_Coefficient_t *) \
-                 pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
+    if (pInstance->pData == LVM_NULL)
+    {
+        pInstance->pData = pData = (LVCS_Data_t *)calloc(1, sizeof(*pData));
+        if (pData == LVM_NULL)
+        {
+            return LVCS_NULLADDRESS;
+        }
+    }
+    else
+    {
+        pData = (LVCS_Data_t *)pInstance->pData;
+    }
+    if (pInstance->pCoeff == LVM_NULL)
+    {
+        pInstance->pCoeff = pCoefficients = (LVCS_Coefficient_t *)calloc(1, \
+                                                                          sizeof(*pCoefficients));
+        if (pCoefficients == LVM_NULL)
+        {
+            return LVCS_NULLADDRESS;
+        }
+    }
+    else
+    {
+        pCoefficients = (LVCS_Coefficient_t *)pInstance->pCoeff;
+    }
 
     /*
      * Initialise the delay and filters if:
@@ -192,11 +212,8 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t         hInstance,
     LVCS_Coefficient_t      *pCoefficients;
     LVM_FLOAT               *pScratch;
 
-    pCoefficients = (LVCS_Coefficient_t *)\
-                   pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
-
-    pScratch  = (LVM_FLOAT *)\
-                    pInstance->MemoryTable.Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress;
+    pCoefficients = (LVCS_Coefficient_t *)pInstance->pCoeff;
+    pScratch      = (LVM_FLOAT *)pInstance->pScratch;
 
     /*
      * Copy the data to the output in outplace processing

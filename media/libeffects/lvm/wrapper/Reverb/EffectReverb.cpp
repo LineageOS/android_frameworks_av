@@ -728,7 +728,7 @@ int Reverb_init(ReverbContext *pContext){
     /* Allocate memory */
     for (int i=0; i<LVM_NR_MEMORY_REGIONS; i++){
         if (MemTab.Region[i].Size != 0){
-            MemTab.Region[i].pBaseAddress = malloc(MemTab.Region[i].Size);
+            MemTab.Region[i].pBaseAddress = calloc(1, MemTab.Region[i].Size);
 
             if (MemTab.Region[i].pBaseAddress == LVM_NULL){
                 ALOGV("\tLVREV_ERROR :Reverb_init CreateInstance Failed to allocate %" PRIu32
