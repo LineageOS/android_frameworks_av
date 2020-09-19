@@ -20,176 +20,60 @@
 /*    Includes                                                                          */
 /*                                                                                      */
 /****************************************************************************************/
+#include <stdlib.h>
 
 #include "LVDBE.h"
 #include "LVDBE_Private.h"
 
 /****************************************************************************************/
 /*                                                                                      */
-/* FUNCTION:                 LVDBE_Memory                                               */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*    This function is used for memory allocation and free. It can be called in         */
-/*    two ways:                                                                         */
-/*                                                                                      */
-/*        hInstance = NULL                Returns the memory requirements               */
-/*        hInstance = Instance handle        Returns the memory requirements and        */
-/*                                        allocated base addresses for the instance     */
-/*                                                                                      */
-/*    When this function is called for memory allocation (hInstance=NULL) the memory    */
-/*  base address pointers are NULL on return.                                           */
-/*                                                                                      */
-/*    When the function is called for free (hInstance = Instance Handle) the memory     */
-/*  table returns the allocated memory and base addresses used during initialisation.   */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance                Instance Handle                                            */
-/*  pMemoryTable             Pointer to an empty memory definition table                */
-/*    pCapabilities           Pointer to the instance capabilities                      */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVDBE_SUCCESS            Succeeded                                                  */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*    1.    This function may be interrupted by the LVDBE_Process function              */
-/*                                                                                      */
-/****************************************************************************************/
-
-LVDBE_ReturnStatus_en LVDBE_Memory(LVDBE_Handle_t            hInstance,
-                                   LVDBE_MemTab_t            *pMemoryTable,
-                                   LVDBE_Capabilities_t      *pCapabilities)
-{
-
-    LVM_UINT32          ScratchSize;
-    LVDBE_Instance_t    *pInstance = (LVDBE_Instance_t *)hInstance;
-
-    /*
-     * Fill in the memory table
-     */
-    if (hInstance == LVM_NULL)
-    {
-        /*
-         * Instance memory
-         */
-        pMemoryTable->Region[LVDBE_MEMREGION_INSTANCE].Size         = sizeof(LVDBE_Instance_t);
-        pMemoryTable->Region[LVDBE_MEMREGION_INSTANCE].Alignment    = LVDBE_INSTANCE_ALIGN;
-        pMemoryTable->Region[LVDBE_MEMREGION_INSTANCE].Type         = LVDBE_PERSISTENT;
-        pMemoryTable->Region[LVDBE_MEMREGION_INSTANCE].pBaseAddress = LVM_NULL;
-
-        /*
-         * Data memory
-         */
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Size   = sizeof(LVDBE_Data_FLOAT_t);
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Alignment    = LVDBE_PERSISTENT_DATA_ALIGN;
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].Type         = LVDBE_PERSISTENT_DATA;
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].pBaseAddress = LVM_NULL;
-
-        /*
-         * Coef memory
-         */
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Size   = sizeof(LVDBE_Coef_FLOAT_t);
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Alignment    = LVDBE_PERSISTENT_COEF_ALIGN;
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].Type         = LVDBE_PERSISTENT_COEF;
-        pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].pBaseAddress = LVM_NULL;
-
-        /*
-         * Scratch memory
-         */
-        ScratchSize = (LVM_UINT32)(LVDBE_SCRATCHBUFFERS_INPLACE*sizeof(LVM_FLOAT) * \
-                                        pCapabilities->MaxBlockSize);
-        pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].Size         = ScratchSize;
-        pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].Alignment    = LVDBE_SCRATCH_ALIGN;
-        pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].Type         = LVDBE_SCRATCH;
-        pMemoryTable->Region[LVDBE_MEMREGION_SCRATCH].pBaseAddress = LVM_NULL;
-    }
-    else
-    {
-        /* Read back memory allocation table */
-        *pMemoryTable = pInstance->MemoryTable;
-    }
-
-    return(LVDBE_SUCCESS);
-}
-
-/****************************************************************************************/
-/*                                                                                      */
 /* FUNCTION:                 LVDBE_Init                                                 */
 /*                                                                                      */
 /* DESCRIPTION:                                                                         */
-/*    Create and initialisation function for the Dynamic Bass Enhancement module        */
-/*                                                                                      */
-/*    This function can be used to create an algorithm instance by calling with         */
-/*    hInstance set to NULL. In this case the algorithm returns the new instance        */
-/*    handle.                                                                           */
-/*                                                                                      */
-/*    This function can be used to force a full re-initialisation of the algorithm      */
-/*    by calling with hInstance = Instance Handle. In this case the memory table        */
-/*    should be correct for the instance, this can be ensured by calling the function   */
-/*    DBE_Memory before calling this function.                                          */
+/*    Create and initialisation function for the Bass Enhancement module                */
 /*                                                                                      */
 /* PARAMETERS:                                                                          */
-/*  hInstance                  Instance handle                                          */
-/*  pMemoryTable             Pointer to the memory definition table                     */
-/*  pCapabilities              Pointer to the instance capabilities                     */
+/*  phInstance               Pointer to instance handle                                 */
+/*  pCapabilities            Pointer to the initialisation capabilities                 */
+/*  pScratch                 Pointer to the bundle scratch buffer                       */
 /*                                                                                      */
 /* RETURNS:                                                                             */
 /*  LVDBE_SUCCESS            Initialisation succeeded                                   */
-/*  LVDBE_ALIGNMENTERROR    Instance or scratch memory on incorrect alignment           */
-/*    LVDBE_NULLADDRESS        Instance or scratch memory has a NULL pointer            */
+/*  LVDBE_NULLADDRESS        One or more memory has a NULL pointer - malloc failure     */
 /*                                                                                      */
 /* NOTES:                                                                               */
-/*  1.     The instance handle is the pointer to the base address of the first memory   */
-/*        region.                                                                       */
-/*    2.    This function must not be interrupted by the LVDBE_Process function         */
+/*  1.    This function must not be interrupted by the LVDBE_Process function           */
 /*                                                                                      */
 /****************************************************************************************/
-
-LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
-                                   LVDBE_MemTab_t       *pMemoryTable,
-                                   LVDBE_Capabilities_t *pCapabilities)
+LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
+                                 LVDBE_Capabilities_t *pCapabilities,
+                                 void                 *pScratch)
 {
 
     LVDBE_Instance_t      *pInstance;
-    LVMixer3_1St_FLOAT_st       *pMixer_Instance;
-    LVMixer3_2St_FLOAT_st       *pBypassMixer_Instance;
+    LVMixer3_1St_FLOAT_st *pMixer_Instance;
+    LVMixer3_2St_FLOAT_st *pBypassMixer_Instance;
     LVM_FLOAT             MixGain;
-    LVM_INT16             i;
 
     /*
-     * Set the instance handle if not already initialised
+     * Create the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL)
     {
-        *phInstance = (LVDBE_Handle_t)pMemoryTable->Region[LVDBE_MEMREGION_INSTANCE].pBaseAddress;
+        *phInstance = calloc(1, sizeof(*pInstance));
+    }
+    if (*phInstance == LVM_NULL)
+    {
+        return LVDBE_NULLADDRESS;
     }
     pInstance =(LVDBE_Instance_t  *)*phInstance;
-
-    /*
-     * Check the memory table for NULL pointers and incorrectly aligned data
-     */
-    for (i=0; i<LVDBE_NR_MEMORY_REGIONS; i++)
-    {
-        if (pMemoryTable->Region[i].Size!=0)
-        {
-            if (pMemoryTable->Region[i].pBaseAddress==LVM_NULL)
-            {
-                return(LVDBE_NULLADDRESS);
-            }
-            if (((uintptr_t)pMemoryTable->Region[i].pBaseAddress % pMemoryTable->Region[i].Alignment)!=0){
-                return(LVDBE_ALIGNMENTERROR);
-            }
-        }
-    }
 
     /*
      * Save the memory table in the instance structure
      */
     pInstance->Capabilities = *pCapabilities;
 
-    /*
-     * Save the memory table in the instance structure
-     */
-    pInstance->MemoryTable = *pMemoryTable;
+    pInstance->pScratch = pScratch;
 
     /*
      * Set the default instance parameters
@@ -204,12 +88,18 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
     pInstance->Params.VolumedB          =    0;
 
     /*
-     * Set pointer to data and coef memory
+     * Create pointer to data and coef memory
      */
-    pInstance->pData =
-         (LVDBE_Data_FLOAT_t *)pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_DATA].pBaseAddress;
-    pInstance->pCoef =
-         (LVDBE_Coef_FLOAT_t *)pMemoryTable->Region[LVDBE_MEMREGION_PERSISTENT_COEF].pBaseAddress;
+    pInstance->pData = (LVDBE_Data_FLOAT_t *)calloc(1, sizeof(*(pInstance->pData)));
+    if (pInstance->pData == NULL)
+    {
+        return LVDBE_NULLADDRESS;
+    }
+    pInstance->pCoef = (LVDBE_Coef_FLOAT_t *)calloc(1, sizeof(*(pInstance->pCoef)));
+    if (pInstance->pCoef == NULL)
+    {
+        return LVDBE_NULLADDRESS;
+    }
 
     /*
      * Initialise the filters
@@ -277,4 +167,33 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t         *phInstance,
         LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate, 2);
 
     return(LVDBE_SUCCESS);
+}
+
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                 LVDBE_DeInit                                               */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*    Free the memories created during LVDBE_Init including instance handle             */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  phInstance               Pointer to instance handle                                 */
+/*                                                                                      */
+/****************************************************************************************/
+void LVDBE_DeInit(LVDBE_Handle_t *phInstance)
+{
+    LVDBE_Instance_t *pInstance = (LVDBE_Instance_t *)*phInstance;
+    if (pInstance == LVM_NULL) {
+        return;
+    }
+    if (pInstance->pData != LVM_NULL) {
+        free(pInstance->pData);
+        pInstance->pData = LVM_NULL;
+    }
+    if (pInstance->pCoef != LVM_NULL) {
+        free(pInstance->pCoef);
+        pInstance->pCoef = LVM_NULL;
+    }
+    free(pInstance);
+    *phInstance = LVM_NULL;
 }

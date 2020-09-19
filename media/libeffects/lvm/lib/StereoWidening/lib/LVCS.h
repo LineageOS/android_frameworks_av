@@ -71,13 +71,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory table */
-#define LVCS_MEMREGION_PERSISTENT_SLOW_DATA    0    /* Offset to the instance memory region */
-#define LVCS_MEMREGION_PERSISTENT_FAST_DATA    1    /* Offset to the persistent data memory region */
-#define LVCS_MEMREGION_PERSISTENT_FAST_COEF    2    /* Offset to the persistent coefficient memory region */
-#define LVCS_MEMREGION_TEMPORARY_FAST          3    /* Offset to temporary memory region */
-#define LVCS_NR_MEMORY_REGIONS                 4    /* Number of memory regions */
-
 /* Effect Level */
 #define LVCS_EFFECT_LOW                    16384    /* Effect scaling 50% */
 #define LVCS_EFFECT_MEDIUM                 24576    /* Effect scaling 75% */
@@ -104,24 +97,12 @@ typedef enum
     LVCS_MAX = LVM_MAXENUM
 } LVCS_Modes_en;
 
-/* Memory Types */
-typedef enum
-{
-    LVCS_SCRATCH        = 0,
-    LVCS_DATA           = 1,
-    LVCS_COEFFICIENT    = 2,
-    LVCS_PERSISTENT     = 3,
-    LVCS_MEMORYTYPE_MAX = LVM_MAXENUM
-} LVCS_MemoryTypes_en;
-
 /* Function return status */
 typedef enum
 {
     LVCS_SUCCESS        = 0,                        /* Successful return from a routine */
-    LVCS_ALIGNMENTERROR = 1,                        /* Memory alignment error */
-    LVCS_NULLADDRESS    = 2,                        /* NULL allocation address */
-    LVCS_TOOMANYSAMPLES = 3,                        /* Maximum block size exceeded */
-    LVCS_INVALIDBUFFER  = 4,                        /* Invalid buffer processing request */
+    LVCS_NULLADDRESS    = 1,                        /* NULL allocation address */
+    LVCS_TOOMANYSAMPLES = 2,                        /* Maximum block size exceeded */
     LVCS_STATUSMAX      = LVM_MAXENUM
 } LVCS_ReturnStatus_en;
 
@@ -166,20 +147,6 @@ typedef struct
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory region definition */
-typedef struct
-{
-    LVM_UINT32              Size;                   /* Region size in bytes */
-    LVCS_MemoryTypes_en     Type;                   /* Region type */
-    void                    *pBaseAddress;          /* Pointer to the region base address */
-} LVCS_MemoryRegion_t;
-
-/* Memory table containing the region definitions */
-typedef struct
-{
-    LVCS_MemoryRegion_t Region[LVCS_NR_MEMORY_REGIONS]; /* One definition for each region */
-} LVCS_MemTab_t;
-
 /* Concert Sound parameter structure */
 typedef struct
 {
@@ -211,82 +178,45 @@ typedef struct
 /*                                                                                      */
 /****************************************************************************************/
 
-/****************************************************************************************/
-/*                                                                                      */
-/* FUNCTION:                LVCS_Memory                                                 */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*  This function is used for memory allocation and free. It can be called in           */
-/*  two ways:                                                                           */
-/*                                                                                      */
-/*      hInstance = NULL                Returns the memory requirements                 */
-/*      hInstance = Instance handle     Returns the memory requirements and             */
-/*                                      allocated base addresses for the instance       */
-/*                                                                                      */
-/*  When this function is called for memory allocation (hInstance=NULL) it is           */
-/*  passed the default capabilities, of these only the buffer processing setting is     */
-/*  used.                                                                               */
-/*                                                                                      */
-/*  When called for memory allocation the memory base address pointers are NULL on      */
-/*  return.                                                                             */
-/*                                                                                      */
-/*  When the function is called for free (hInstance = Instance Handle) the              */
-/*  capabilities are ignored and the memory table returns the allocated memory and      */
-/*  base addresses used during initialisation.                                          */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance               Instance Handle                                             */
-/*  pMemoryTable            Pointer to an empty memory definition table                 */
-/*  pCapabilities           Pointer to the default capabilites                          */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVCS_Success            Succeeded                                                   */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*  1.  This function may be interrupted by the LVCS_Process function                   */
-/*                                                                                      */
-/****************************************************************************************/
-
-LVCS_ReturnStatus_en LVCS_Memory(LVCS_Handle_t          hInstance,
-                                 LVCS_MemTab_t          *pMemoryTable,
-                                 LVCS_Capabilities_t    *pCapabilities);
-
-/****************************************************************************************/
-/*                                                                                      */
-/* FUNCTION:                LVCS_Init                                                   */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*  Create and initialisation function for the Concert Sound module                     */
-/*                                                                                      */
-/*  This function can be used to create an algorithm instance by calling with           */
-/*  hInstance set to NULL. In this case the algorithm returns the new instance          */
-/*  handle.                                                                             */
-/*                                                                                      */
-/*  This function can be used to force a full re-initialisation of the algorithm        */
-/*  by calling with hInstance = Instance Handle. In this case the memory table          */
-/*  should be correct for the instance, this can be ensured by calling the function     */
-/*  LVCS_Memory before calling this function.                                           */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance               Instance handle                                             */
-/*  pMemoryTable            Pointer to the memory definition table                      */
-/*  pCapabilities           Pointer to the initialisation capabilities                  */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVCS_Success            Initialisation succeeded                                    */
-/*  LVCS_AlignmentError     Instance or scratch memory on incorrect alignment           */
-/*  LVCS_NullAddress        Instance or scratch memory has a NULL pointer               */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*  1.  The instance handle is the pointer to the base address of the first memory      */
-/*      region.                                                                         */
-/*  2.  This function must not be interrupted by the LVCS_Process function              */
-/*                                                                                      */
-/****************************************************************************************/
-
+/************************************************************************************/
+/*                                                                                  */
+/* FUNCTION:                LVCS_Init                                               */
+/*                                                                                  */
+/* DESCRIPTION:                                                                     */
+/*  Create and initialisation function for the Concert Sound module                 */
+/*                                                                                  */
+/* PARAMETERS:                                                                      */
+/*  phInstance              Pointer to instance handle                              */
+/*  pCapabilities           Pointer to the capabilities structure                   */
+/*  pScratch                Pointer to the scratch buffer                           */
+/*                                                                                  */
+/* RETURNS:                                                                         */
+/*  LVCS_Success            Initialisation succeeded                                */
+/*  LVDBE_NULLADDRESS       One or more memory has a NULL pointer                   */
+/*                                                                                  */
+/* NOTES:                                                                           */
+/*  1.  This function must not be interrupted by the LVCS_Process function          */
+/*                                                                                  */
+/************************************************************************************/
 LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t            *phInstance,
-                               LVCS_MemTab_t            *pMemoryTable,
-                               LVCS_Capabilities_t      *pCapabilities);
+                               LVCS_Capabilities_t      *pCapabilities,
+                               void                     *pScratch);
+
+/************************************************************************************/
+/*                                                                                  */
+/* FUNCTION:                LVCS_DeInit                                             */
+/*                                                                                  */
+/* DESCRIPTION:                                                                     */
+/*  Free memories created during the LVCS_Init call including instance handle       */
+/*                                                                                  */
+/* PARAMETERS:                                                                      */
+/*  phInstance              Pointer to instance handle                              */
+/*                                                                                  */
+/* NOTES:                                                                           */
+/*  1.  This function must not be interrupted by the LVCS_Process function          */
+/*                                                                                  */
+/************************************************************************************/
+void LVCS_DeInit(LVCS_Handle_t          *phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
