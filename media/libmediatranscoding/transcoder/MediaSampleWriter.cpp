@@ -79,7 +79,7 @@ std::shared_ptr<MediaSampleWriter> MediaSampleWriter::Create() {
 
 MediaSampleWriter::~MediaSampleWriter() {
     if (mState == STARTED) {
-        stop();  // Join thread.
+        stop();
     }
 }
 
@@ -169,38 +169,41 @@ bool MediaSampleWriter::start() {
     }
 
     mState = STARTED;
-    mThread = std::thread([this] {
-        media_status_t status = writeSamples();
+    std::thread([this] {
+        bool wasStopped = false;
+        media_status_t status = writeSamples(&wasStopped);
         if (auto callbacks = mCallbacks.lock()) {
-            callbacks->onFinished(this, status);
+            if (wasStopped && status == AMEDIA_OK) {
+                callbacks->onStopped(this);
+            } else {
+                callbacks->onFinished(this, status);
+            }
         }
-    });
+    }).detach();
     return true;
 }
 
-bool MediaSampleWriter::stop() {
+void MediaSampleWriter::stop() {
     {
         std::scoped_lock lock(mMutex);
         if (mState != STARTED) {
             LOG(ERROR) << "Sample writer is not started.";
-            return false;
+            return;
         }
         mState = STOPPED;
     }
 
     mSampleSignal.notify_all();
-    mThread.join();
-    return true;
 }
 
-media_status_t MediaSampleWriter::writeSamples() {
+media_status_t MediaSampleWriter::writeSamples(bool* wasStopped) {
     media_status_t muxerStatus = mMuxer->start();
     if (muxerStatus != AMEDIA_OK) {
         LOG(ERROR) << "Error starting muxer: " << muxerStatus;
         return muxerStatus;
     }
 
-    media_status_t writeStatus = runWriterLoop();
+    media_status_t writeStatus = runWriterLoop(wasStopped);
     if (writeStatus != AMEDIA_OK) {
         LOG(ERROR) << "Error writing samples: " << writeStatus;
     }
@@ -213,7 +216,7 @@ media_status_t MediaSampleWriter::writeSamples() {
     return writeStatus != AMEDIA_OK ? writeStatus : muxerStatus;
 }
 
-media_status_t MediaSampleWriter::runWriterLoop() NO_THREAD_SAFETY_ANALYSIS {
+media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFETY_ANALYSIS {
     AMediaCodecBufferInfo bufferInfo;
     int32_t lastProgressUpdate = 0;
     int trackEosCount = 0;
@@ -242,8 +245,9 @@ media_status_t MediaSampleWriter::runWriterLoop() NO_THREAD_SAFETY_ANALYSIS {
                 mSampleSignal.wait(lock);
             }
 
-            if (mState != STARTED) {
-                return AMEDIA_ERROR_UNKNOWN;  // TODO(lnilsson): Custom error code.
+            if (mState == STOPPED) {
+                *wasStopped = true;
+                return AMEDIA_OK;
             }
 
             auto& topEntry = mSampleQueue.top();

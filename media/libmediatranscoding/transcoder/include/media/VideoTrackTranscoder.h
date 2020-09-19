@@ -65,7 +65,7 @@ private:
           : MediaTrackTranscoder(transcoderCallback){};
 
     // MediaTrackTranscoder
-    media_status_t runTranscodeLoop() override;
+    media_status_t runTranscodeLoop(bool* stopped) override;
     void abortTranscodeLoop() override;
     media_status_t configureDestinationFormat(
             const std::shared_ptr<AMediaFormat>& destinationFormat) override;
@@ -89,7 +89,7 @@ private:
     ANativeWindow* mSurface = nullptr;
     bool mEosFromSource = false;
     bool mEosFromEncoder = false;
-    bool mStopRequested = false;
+    bool mLastSampleWasSync = false;
     media_status_t mStatus = AMEDIA_OK;
     MediaSampleInfo mSampleInfo;
     BlockingQueue<std::function<void()>> mCodecMessageQueue;

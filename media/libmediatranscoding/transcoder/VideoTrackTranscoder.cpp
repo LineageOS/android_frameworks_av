@@ -156,11 +156,7 @@ struct AsyncCodecCallbackDispatch {
                 static_cast<VideoTrackTranscoder::CodecWrapper*>(userdata);
         if (auto transcoder = wrapper->getTranscoder()) {
             transcoder->mCodecMessageQueue.push(
-                    [transcoder, error] {
-                        transcoder->mStatus = error;
-                        transcoder->mStopRequested = true;
-                    },
-                    true);
+                    [transcoder, error] { transcoder->mStatus = error; }, true);
         }
     }
 };
@@ -404,6 +400,8 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
         sample->info.presentationTimeUs = bufferInfo.presentationTimeUs;
 
         onOutputSampleAvailable(sample);
+
+        mLastSampleWasSync = sample->info.flags & SAMPLE_FLAG_SYNC_SAMPLE;
     } else if (bufferIndex == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
         AMediaFormat* newFormat = AMediaCodec_getOutputFormat(mEncoder->getCodec());
         LOG(DEBUG) << "Encoder output format changed: " << AMediaFormat_toString(newFormat);
@@ -483,7 +481,7 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
     notifyTrackFormatAvailable();
 }
 
-media_status_t VideoTrackTranscoder::runTranscodeLoop() {
+media_status_t VideoTrackTranscoder::runTranscodeLoop(bool* stopped) {
     androidSetThreadPriority(0 /* tid (0 = current) */, ANDROID_PRIORITY_VIDEO);
 
     // Push start decoder and encoder as two messages, so that these are subject to the
@@ -507,25 +505,31 @@ media_status_t VideoTrackTranscoder::runTranscodeLoop() {
     });
 
     // Process codec events until EOS is reached, transcoding is stopped or an error occurs.
-    while (!mStopRequested && !mEosFromEncoder && mStatus == AMEDIA_OK) {
+    while (mStopRequest != STOP_NOW && !mEosFromEncoder && mStatus == AMEDIA_OK) {
         std::function<void()> message = mCodecMessageQueue.pop();
         message();
+
+        if (mStopRequest == STOP_ON_SYNC && mLastSampleWasSync) {
+            break;
+        }
     }
 
     mCodecMessageQueue.abort();
     AMediaCodec_stop(mDecoder);
 
-    // Return error if transcoding was stopped before it finished.
-    if (mStopRequested && !mEosFromEncoder && mStatus == AMEDIA_OK) {
-        mStatus = AMEDIA_ERROR_UNKNOWN;  // TODO: Define custom error codes?
+    // Signal if transcoding was stopped before it finished.
+    if (mStopRequest != NONE && !mEosFromEncoder && mStatus == AMEDIA_OK) {
+        *stopped = true;
     }
 
     return mStatus;
 }
 
 void VideoTrackTranscoder::abortTranscodeLoop() {
-    // Push abort message to the front of the codec event queue.
-    mCodecMessageQueue.push([this] { mStopRequested = true; }, true /* front */);
+    if (mStopRequest == STOP_NOW) {
+        // Wake up transcoder thread.
+        mCodecMessageQueue.push([] {}, true /* front */);
+    }
 }
 
 std::shared_ptr<AMediaFormat> VideoTrackTranscoder::getOutputFormat() const {

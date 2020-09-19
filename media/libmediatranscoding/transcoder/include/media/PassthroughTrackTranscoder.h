@@ -86,7 +86,7 @@ private:
     };
 
     // MediaTrackTranscoder
-    media_status_t runTranscodeLoop() override;
+    media_status_t runTranscodeLoop(bool* stopped) override;
     void abortTranscodeLoop() override;
     media_status_t configureDestinationFormat(
             const std::shared_ptr<AMediaFormat>& destinationFormat) override;
@@ -94,8 +94,6 @@ private:
     // ~MediaTrackTranscoder
 
     std::shared_ptr<BufferPool> mBufferPool;
-    bool mEosFromSource = false;
-    std::atomic_bool mStopRequested = false;
 };
 
 }  // namespace android

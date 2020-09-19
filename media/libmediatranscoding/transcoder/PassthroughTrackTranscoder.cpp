@@ -93,9 +93,10 @@ media_status_t PassthroughTrackTranscoder::configureDestinationFormat(
     return AMEDIA_OK;
 }
 
-media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
+media_status_t PassthroughTrackTranscoder::runTranscodeLoop(bool* stopped) {
     MediaSampleInfo info;
     std::shared_ptr<MediaSample> sample;
+    bool eosReached = false;
 
     // Notify the track format as soon as we start. It's same as the source format.
     notifyTrackFormatAvailable();
@@ -106,18 +107,18 @@ media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
             };
 
     // Move samples until EOS is reached or transcoding is stopped.
-    while (!mStopRequested && !mEosFromSource) {
+    while (mStopRequest != STOP_NOW && !eosReached) {
         media_status_t status = mMediaSampleReader->getSampleInfoForTrack(mTrackIndex, &info);
 
         if (status == AMEDIA_OK) {
             uint8_t* buffer = mBufferPool->getBufferWithSize(info.size);
             if (buffer == nullptr) {
-                if (mStopRequested) {
+                if (mStopRequest == STOP_NOW) {
                     break;
                 }
 
                 LOG(ERROR) << "Unable to get buffer from pool";
-                return AMEDIA_ERROR_IO;  // TODO: Custom error codes?
+                return AMEDIA_ERROR_UNKNOWN;
             }
 
             sample = MediaSample::createWithReleaseCallback(
@@ -131,7 +132,7 @@ media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
 
         } else if (status == AMEDIA_ERROR_END_OF_STREAM) {
             sample = std::make_shared<MediaSample>();
-            mEosFromSource = true;
+            eosReached = true;
         } else {
             LOG(ERROR) << "Unable to get next sample info. Aborting transcode.";
             return status;
@@ -139,17 +140,22 @@ media_status_t PassthroughTrackTranscoder::runTranscodeLoop() {
 
         sample->info = info;
         onOutputSampleAvailable(sample);
+
+        if (mStopRequest == STOP_ON_SYNC && info.flags & SAMPLE_FLAG_SYNC_SAMPLE) {
+            break;
+        }
     }
 
-    if (mStopRequested && !mEosFromSource) {
-        return AMEDIA_ERROR_UNKNOWN;  // TODO: Custom error codes?
+    if (mStopRequest != NONE && !eosReached) {
+        *stopped = true;
     }
     return AMEDIA_OK;
 }
 
 void PassthroughTrackTranscoder::abortTranscodeLoop() {
-    mStopRequested = true;
-    mBufferPool->abort();
+    if (mStopRequest == STOP_NOW) {
+        mBufferPool->abort();
+    }
 }
 
 std::shared_ptr<AMediaFormat> PassthroughTrackTranscoder::getOutputFormat() const {

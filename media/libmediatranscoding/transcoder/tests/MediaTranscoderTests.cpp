@@ -99,11 +99,11 @@ public:
         }
     }
     media_status_t mStatus = AMEDIA_OK;
+    bool mFinished = false;
 
 private:
     std::mutex mMutex;
     std::condition_variable mCondition;
-    bool mFinished = false;
     bool mProgressMade = false;
 };
 
@@ -145,6 +145,8 @@ public:
         kRunToCompletion,
         kCancelAfterProgress,
         kCancelAfterStart,
+        kPauseAfterProgress,
+        kPauseAfterStart,
     } TranscodeExecutionControl;
 
     using FormatConfigurationCallback = std::function<AMediaFormat*(AMediaFormat*)>;
@@ -181,13 +183,22 @@ public:
 
         media_status_t startStatus = transcoder->start();
         EXPECT_EQ(startStatus, AMEDIA_OK);
+
         if (startStatus == AMEDIA_OK) {
+            std::shared_ptr<ndk::ScopedAParcel> pausedState;
+
             switch (executionControl) {
             case kCancelAfterProgress:
                 mCallbacks->waitForProgressMade();
                 FALLTHROUGH_INTENDED;
             case kCancelAfterStart:
                 transcoder->cancel();
+                break;
+            case kPauseAfterProgress:
+                mCallbacks->waitForProgressMade();
+                FALLTHROUGH_INTENDED;
+            case kPauseAfterStart:
+                transcoder->pause(&pausedState);
                 break;
             case kRunToCompletion:
             default:
@@ -360,9 +371,10 @@ TEST_F(MediaTranscoderTests, TestCancelAfterProgress) {
     const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
     const char* destPath = "/data/local/tmp/MediaTranscoder_Cancel.MP4";
 
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < 20; ++i) {
         EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kCancelAfterProgress),
                   AMEDIA_OK);
+        EXPECT_FALSE(mCallbacks->mFinished);
         mCallbacks = std::make_shared<TestCallbacks>();
     }
 }
@@ -371,9 +383,34 @@ TEST_F(MediaTranscoderTests, TestCancelAfterStart) {
     const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
     const char* destPath = "/data/local/tmp/MediaTranscoder_Cancel.MP4";
 
-    for (int i = 0; i < 32; ++i) {
+    for (int i = 0; i < 20; ++i) {
         EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kCancelAfterStart),
                   AMEDIA_OK);
+        EXPECT_FALSE(mCallbacks->mFinished);
+        mCallbacks = std::make_shared<TestCallbacks>();
+    }
+}
+
+TEST_F(MediaTranscoderTests, TestPauseAfterProgress) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_Pause.MP4";
+
+    for (int i = 0; i < 20; ++i) {
+        EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kPauseAfterProgress),
+                  AMEDIA_OK);
+        EXPECT_FALSE(mCallbacks->mFinished);
+        mCallbacks = std::make_shared<TestCallbacks>();
+    }
+}
+
+TEST_F(MediaTranscoderTests, TestPauseAfterStart) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_Pause.MP4";
+
+    for (int i = 0; i < 20; ++i) {
+        EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kPauseAfterStart),
+                  AMEDIA_OK);
+        EXPECT_FALSE(mCallbacks->mFinished);
         mCallbacks = std::make_shared<TestCallbacks>();
     }
 }
