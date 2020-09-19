@@ -11,6 +11,19 @@ filegroup {
     path: "aidl",
 }
 
+filegroup {
+    name: "resourceobserver_aidl",
+    srcs: [
+        "aidl/android/media/IResourceObserver.aidl",
+        "aidl/android/media/IResourceObserverService.aidl",
+        "aidl/android/media/MediaObservableEvent.aidl",
+        "aidl/android/media/MediaObservableFilter.aidl",
+        "aidl/android/media/MediaObservableType.aidl",
+        "aidl/android/media/MediaObservableParcel.aidl",
+    ],
+    path: "aidl",
+}
+
 aidl_interface {
     name: "resourcemanager_aidl_interface",
     unstable: true,
@@ -20,11 +33,21 @@ aidl_interface {
     ],
 }
 
+aidl_interface {
+    name: "resourceobserver_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":resourceobserver_aidl",
+    ],
+}
+
 cc_library {
     name: "libresourcemanagerservice",
 
     srcs: [
         "ResourceManagerService.cpp",
+        "ResourceObserverService.cpp",
         "ServiceLog.cpp",
     ],
 
@@ -35,6 +58,7 @@ cc_library {
         "libbinder_ndk",
         "libutils",
         "liblog",
+        "resourceobserver_aidl_interface-ndk_platform",
     ],
 
     include_dirs: ["frameworks/av/include"],
