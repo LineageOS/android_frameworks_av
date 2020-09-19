@@ -410,12 +410,7 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
     if (sAllocator == nullptr)
         return nullptr;
 
-    bool isValidHandle = false;
-    if (sAllocator->getId() == android::C2PlatformAllocatorStore::BLOB) {
-        isValidHandle = C2AllocatorBlob::isValid(handle);
-    } else {
-        isValidHandle = C2AllocatorIon::isValid(handle);
-    }
+    bool isValidHandle = sAllocator->checkHandle(handle);
 
     std::shared_ptr<C2LinearAllocation> alloc;
     if (isValidHandle) {
@@ -445,12 +440,7 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
     if (sAllocator == nullptr)
         return nullptr;
 
-    bool isValidHandle = false;
-    if (sAllocator->getId() == android::C2PlatformAllocatorStore::BLOB) {
-        isValidHandle = C2AllocatorBlob::isValid(cHandle);
-    } else {
-        isValidHandle = C2AllocatorIon::isValid(cHandle);
-    }
+    bool isValidHandle = sAllocator->checkHandle(cHandle);
 
     std::shared_ptr<C2LinearAllocation> alloc;
     if (isValidHandle) {
@@ -1148,7 +1138,7 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
     static std::unique_ptr<C2AllocatorGralloc> sAllocator = std::make_unique<C2AllocatorGralloc>(0);
 
     std::shared_ptr<C2GraphicAllocation> alloc;
-    if (C2AllocatorGralloc::isValid(cHandle)) {
+    if (sAllocator->isValid(cHandle)) {
         c2_status_t err = sAllocator->priorGraphicAllocation(cHandle, &alloc);
         const std::shared_ptr<C2PooledBlockPoolData> poolData =
                 std::make_shared<C2PooledBlockPoolData>(data);
@@ -1330,4 +1320,3 @@ std::shared_ptr<C2Buffer> C2Buffer::CreateLinearBuffer(const C2ConstLinearBlock 
 std::shared_ptr<C2Buffer> C2Buffer::CreateGraphicBuffer(const C2ConstGraphicBlock &block) {
     return std::shared_ptr<C2Buffer>(new C2Buffer({ block }));
 }
-

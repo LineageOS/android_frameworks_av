@@ -734,6 +734,22 @@ public:
     }
 
     virtual ~C2Allocator() = default;
+
+    /**
+     * Returns a true if the handle looks valid for this allocator.
+     *
+     * It does not actually validate that the handle represents a valid allocation (by this
+     * allocator), only that the handle could have been returned by this allocator. As such,
+     * multiple allocators may return true for looksValid for the same handle.
+     *
+     * This method MUST be "non-blocking", MUST not access kernel and/or device drivers, and
+     * return within 1us.
+     *
+     * \param handle      the handle for an existing allocation (possibly from another
+     *                    allocator)
+     */
+    virtual bool checkHandle(const C2Handle *const handle) const = 0;
+
 protected:
     C2Allocator() = default;
 };
