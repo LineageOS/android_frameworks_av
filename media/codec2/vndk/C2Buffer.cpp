@@ -396,14 +396,11 @@ std::shared_ptr<_C2BlockPoolData> _C2BlockFactory::GetLinearBlockPoolData(
 std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
         const C2Handle *handle) {
     // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2Allocator> sAllocator = []{
-        std::unique_ptr<C2Allocator> allocator;
-        if (android::GetPreferredLinearAllocatorId(android::GetCodec2PoolMask()) ==
-                android::C2PlatformAllocatorStore::BLOB) {
-            allocator = std::make_unique<C2AllocatorBlob>(android::C2PlatformAllocatorStore::BLOB);
-        } else {
-            allocator = std::make_unique<C2AllocatorIon>(android::C2PlatformAllocatorStore::ION);
-        }
+    static std::shared_ptr<C2Allocator> sAllocator = []{
+        std::shared_ptr<C2Allocator> allocator;
+        std::shared_ptr<C2AllocatorStore> allocatorStore = android::GetCodec2PlatformAllocatorStore();
+        allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+
         return allocator;
     }();
 
@@ -426,14 +423,11 @@ std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
 std::shared_ptr<C2LinearBlock> _C2BlockFactory::CreateLinearBlock(
         const C2Handle *cHandle, const std::shared_ptr<BufferPoolData> &data) {
     // TODO: get proper allocator? and mutex?
-    static std::unique_ptr<C2Allocator> sAllocator = []{
-        std::unique_ptr<C2Allocator> allocator;
-        if (android::GetPreferredLinearAllocatorId(android::GetCodec2PoolMask()) ==
-                android::C2PlatformAllocatorStore::BLOB) {
-            allocator = std::make_unique<C2AllocatorBlob>(android::C2PlatformAllocatorStore::BLOB);
-        } else {
-            allocator = std::make_unique<C2AllocatorIon>(android::C2PlatformAllocatorStore::ION);
-        }
+    static std::shared_ptr<C2Allocator> sAllocator = []{
+        std::shared_ptr<C2Allocator> allocator;
+        std::shared_ptr<C2AllocatorStore> allocatorStore = android::GetCodec2PlatformAllocatorStore();
+        allocatorStore->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, &allocator);
+
         return allocator;
     }();
 
