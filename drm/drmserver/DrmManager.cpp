@@ -99,13 +99,13 @@ void DrmManager::onMessageReceived(const sp<AMessage> &msg) {
         }
         default:
         {
-            ALOGW("Unrecognized message type: %zd", msg->what());
+            ALOGW("Unrecognized message type: %u", msg->what());
         }
     }
 }
 
 int64_t DrmManager::getMetricsFlushPeriodUs() {
-    return 1000 * 1000 * std::max(1ll, property_get_int64("drmmanager.metrics.period", 86400));
+    return 1000 * 1000 * std::max(1ll, (long long)property_get_int64("drmmanager.metrics.period", 86400));
 }
 
 void DrmManager::recordEngineMetrics(
