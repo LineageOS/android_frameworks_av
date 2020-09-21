@@ -614,7 +614,10 @@ sp<PersistentSurface> MediaCodec::CreatePersistentInputSurface() {
     return new PersistentSurface(bufferProducer, bufferSource);
 }
 
-MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
+MediaCodec::MediaCodec(
+        const sp<ALooper> &looper, pid_t pid, uid_t uid,
+        std::function<sp<CodecBase>(const AString &, const char *)> getCodecBase,
+        std::function<status_t(const AString &, sp<MediaCodecInfo> *)> getCodecInfo)
     : mState(UNINITIALIZED),
       mReleasedByResourceManager(false),
       mLooper(looper),
@@ -639,7 +642,9 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
       mNumLowLatencyDisables(0),
       mIsLowLatencyModeOn(false),
       mIndexOfFirstFrameWhenLowLatencyOn(-1),
-      mInputBufferCounter(0) {
+      mInputBufferCounter(0),
+      mGetCodecBase(getCodecBase),
+      mGetCodecInfo(getCodecInfo) {
     if (uid == kNoUid) {
         mUid = AIBinder_getCallingUid();
     } else {
@@ -647,6 +652,33 @@ MediaCodec::MediaCodec(const sp<ALooper> &looper, pid_t pid, uid_t uid)
     }
     mResourceManagerProxy = new ResourceManagerServiceProxy(pid, mUid,
             ::ndk::SharedRefBase::make<ResourceManagerClient>(this));
+    if (!mGetCodecBase) {
+        mGetCodecBase = [](const AString &name, const char *owner) {
+            return GetCodecBase(name, owner);
+        };
+    }
+    if (!mGetCodecInfo) {
+        mGetCodecInfo = [](const AString &name, sp<MediaCodecInfo> *info) -> status_t {
+            *info = nullptr;
+            const sp<IMediaCodecList> mcl = MediaCodecList::getInstance();
+            if (!mcl) {
+                return NO_INIT;  // if called from Java should raise IOException
+            }
+            AString tmp = name;
+            if (tmp.endsWith(".secure")) {
+                tmp.erase(tmp.size() - 7, 7);
+            }
+            for (const AString &codecName : { name, tmp }) {
+                ssize_t codecIdx = mcl->findCodecByName(codecName.c_str());
+                if (codecIdx < 0) {
+                    continue;
+                }
+                *info = mcl->getCodecInfo(codecIdx);
+                return OK;
+            }
+            return NAME_NOT_FOUND;
+        };
+    }
 
     initMediametrics();
 }
@@ -1084,40 +1116,30 @@ status_t MediaCodec::init(const AString &name) {
     bool secureCodec = false;
     const char *owner = "";
     if (!name.startsWith("android.filter.")) {
-        AString tmp = name;
-        if (tmp.endsWith(".secure")) {
-            secureCodec = true;
-            tmp.erase(tmp.size() - 7, 7);
-        }
-        const sp<IMediaCodecList> mcl = MediaCodecList::getInstance();
-        if (mcl == NULL) {
+        status_t err = mGetCodecInfo(name, &mCodecInfo);
+        if (err != OK) {
             mCodec = NULL;  // remove the codec.
-            return NO_INIT; // if called from Java should raise IOException
-        }
-        for (const AString &codecName : { name, tmp }) {
-            ssize_t codecIdx = mcl->findCodecByName(codecName.c_str());
-            if (codecIdx < 0) {
-                continue;
-            }
-            mCodecInfo = mcl->getCodecInfo(codecIdx);
-            Vector<AString> mediaTypes;
-            mCodecInfo->getSupportedMediaTypes(&mediaTypes);
-            for (size_t i = 0; i < mediaTypes.size(); i++) {
-                if (mediaTypes[i].startsWith("video/")) {
-                    mIsVideo = true;
-                    break;
-                }
-            }
-            break;
+            return err;
         }
         if (mCodecInfo == nullptr) {
+            ALOGE("Getting codec info with name '%s' failed", name.c_str());
             return NAME_NOT_FOUND;
+        }
+        secureCodec = name.endsWith(".secure");
+        Vector<AString> mediaTypes;
+        mCodecInfo->getSupportedMediaTypes(&mediaTypes);
+        for (size_t i = 0; i < mediaTypes.size(); ++i) {
+            if (mediaTypes[i].startsWith("video/")) {
+                mIsVideo = true;
+                break;
+            }
         }
         owner = mCodecInfo->getOwnerName();
     }
 
-    mCodec = GetCodecBase(name, owner);
+    mCodec = mGetCodecBase(name, owner);
     if (mCodec == NULL) {
+        ALOGE("Getting codec base with name '%s' (owner='%s') failed", name.c_str(), owner);
         return NAME_NOT_FOUND;
     }
 
