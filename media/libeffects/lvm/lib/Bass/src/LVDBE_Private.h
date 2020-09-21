@@ -47,20 +47,6 @@
 /* General */
 #define    LVDBE_INVALID            0xFFFF        /* Invalid init parameter */
 
-/* Memory */
-#define LVDBE_MEMREGION_INSTANCE         0       /* Offset to the instance memory region */
-#define LVDBE_MEMREGION_PERSISTENT_DATA  1       /* Offset to persistent data memory region */
-#define LVDBE_MEMREGION_PERSISTENT_COEF  2       /* Offset to persistent coefficient region */
-#define LVDBE_MEMREGION_SCRATCH          3       /* Offset to data scratch memory region */
-
-#define LVDBE_INSTANCE_ALIGN             4       /* 32-bit alignment for structures */
-#define LVDBE_PERSISTENT_DATA_ALIGN      4       /* 32-bit alignment for data */
-#define LVDBE_PERSISTENT_COEF_ALIGN      4       /* 32-bit alignment for coef */
-#define LVDBE_SCRATCH_ALIGN              4       /* 32-bit alignment for long data */
-
-/* Number of buffers required for inplace processing */
-#define LVDBE_SCRATCHBUFFERS_INPLACE     (LVM_MAX_CHANNELS * 3)
-
 #define LVDBE_MIXER_TC                   5       /* Mixer time  */
 #define LVDBE_BYPASS_MIXER_TC            100     /* Bypass mixer time */
 
@@ -96,13 +82,13 @@ typedef struct
 typedef struct
 {
     /* Public parameters */
-    LVDBE_MemTab_t                MemoryTable;        /* Instance memory allocation table */
     LVDBE_Params_t                Params;             /* Instance parameters */
     LVDBE_Capabilities_t        Capabilities;         /* Instance capabilities */
 
     /* Data and coefficient pointers */
     LVDBE_Data_FLOAT_t                *pData;                /* Instance data */
     LVDBE_Coef_FLOAT_t                *pCoef;                /* Instance coefficients */
+    void                        *pScratch;             /* scratch pointer */
 } LVDBE_Instance_t;
 
 /****************************************************************************************/

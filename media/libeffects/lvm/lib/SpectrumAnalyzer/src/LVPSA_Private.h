@@ -27,16 +27,6 @@
    CONSTANT DEFINITIONS
 ***********************************************************************************/
 
-/* Memory */
-#define LVPSA_INSTANCE_ALIGN             4      /* 32-bit alignment for structures                                  */
-#define LVPSA_SCRATCH_ALIGN              4      /* 32-bit alignment for long data                                   */
-#define LVPSA_COEF_ALIGN                 4      /* 32-bit alignment for long words                                  */
-#define LVPSA_DATA_ALIGN                 4      /* 32-bit alignment for long data                                   */
-
-#define LVPSA_MEMREGION_INSTANCE         0      /* Offset to instance memory region in memory table                 */
-#define LVPSA_MEMREGION_PERSISTENT_COEF  1      /* Offset to persistent coefficients  memory region in memory table */
-#define LVPSA_MEMREGION_PERSISTENT_DATA  2      /* Offset to persistent taps  memory region in memory table         */
-#define LVPSA_MEMREGION_SCRATCH          3      /* Offset to scratch  memory region in memory table                 */
 #define LVPSA_NR_SUPPORTED_RATE          13      /* From 8000Hz to 192000Hz*/
 #define LVPSA_NR_SUPPORTED_SPEED         3      /* LOW, MEDIUM, HIGH                                                */
 
@@ -82,7 +72,8 @@ typedef struct
 
     LVPSA_ControlParams_t       CurrentParams;                      /* Current control parameters of the module                                                     */
     LVPSA_ControlParams_t       NewParams;                          /* New control parameters given by the user                                                     */
-    LVPSA_MemTab_t              MemoryTable;
+    void                        *pScratch;
+    /* Pointer to bundle scratch buffer */
 
     LVPSA_BPFilterPrecision_en *pBPFiltersPrecision;                /* Points a nBands elements array that contains the filter precision for each band              */
     Biquad_FLOAT_Instance_t          *pBP_Instances;
