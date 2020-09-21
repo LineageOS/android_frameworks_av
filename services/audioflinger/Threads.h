@@ -1187,7 +1187,7 @@ private:
 
     Mutex                                    mAudioTrackCbLock;
     // Record of IAudioTrackCallback
-    std::set<sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
+    std::map<sp<Track>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
 private:
     // The HAL output sink is treated as non-blocking, but current implementation is blocking

@@ -2362,7 +2362,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         {
             Mutex::Autolock _atCbL(mAudioTrackCbLock);
             if (callback.get() != nullptr) {
-                mAudioTrackCallbacks.emplace(callback);
+                mAudioTrackCallbacks.emplace(track, callback);
             }
         }
 
@@ -2590,6 +2590,10 @@ void AudioFlinger::PlaybackThread::removeTrack_l(const sp<Track>& track)
     mLocalLog.log("removeTrack_l (%p) %s", track.get(), result.string());
 
     mTracks.remove(track);
+    {
+        Mutex::Autolock _atCbL(mAudioTrackCbLock);
+        mAudioTrackCallbacks.erase(track);
+    }
     if (track->isFastTrack()) {
         int index = track->mFastIndex;
         ALOG_ASSERT(0 < index && index < (int)FastMixerState::sMaxFastTracks);
@@ -2685,8 +2689,8 @@ void AudioFlinger::PlaybackThread::onCodecFormatChanged(
                     audio_utils::metadata::byteStringFromData(metadata);
             std::vector metadataVec(metaDataStr.begin(), metaDataStr.end());
             Mutex::Autolock _l(mAudioTrackCbLock);
-            for (const auto& callback : mAudioTrackCallbacks) {
-                callback->onCodecFormatChanged(metadataVec);
+            for (const auto& callbackPair : mAudioTrackCallbacks) {
+                callbackPair.second->onCodecFormatChanged(metadataVec);
             }
     }).detach();
 }
