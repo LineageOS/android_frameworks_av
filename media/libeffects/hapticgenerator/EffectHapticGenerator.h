@@ -55,7 +55,7 @@ struct HapticGeneratorParam {
 
 // A structure to keep all shared pointers for all processors in HapticGenerator.
 struct HapticGeneratorProcessorsRecord {
-    std::vector<std::shared_ptr<BiquadFilter>> filters;
+    std::vector<std::shared_ptr<HapticBiquadFilter>> filters;
     std::vector<std::shared_ptr<Ramp>> ramps;
     std::vector<std::shared_ptr<SlowEnvelope>> slowEnvs;
 };
