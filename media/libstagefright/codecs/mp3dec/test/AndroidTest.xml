@@ -19,7 +19,7 @@
         <option name="cleanup" value="true" />
         <option name="push" value="Mp3DecoderTest->/data/local/tmp/Mp3DecoderTest" />
         <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/mp3dec/test/Mp3DecoderTest.zip?unzip=true"
+            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/mp3dec/test/Mp3DecoderTest-1.1.zip?unzip=true"
             value="/data/local/tmp/Mp3DecoderTestRes/" />
     </target_preparer>
 
