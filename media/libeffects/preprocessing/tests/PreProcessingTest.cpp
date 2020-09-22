@@ -14,23 +14,19 @@
  * limitations under the License.
  */
 
+#include <getopt.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/stat.h>
+#include <vector>
+
 #include <audio_effects/effect_aec.h>
 #include <audio_effects/effect_agc.h>
+#ifndef WEBRTC_LEGACY
+#include <audio_effects/effect_agc2.h>
+#endif
 #include <audio_effects/effect_ns.h>
-#include <audio_processing.h>
-#include <getopt.h>
-#include <hardware/audio_effect.h>
-#include <module_common_types.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <utils/Log.h>
-#include <utils/Timers.h>
-
-#include <audio_utils/channels.h>
-#include <audio_utils/primitives.h>
 #include <log/log.h>
-#include <system/audio.h>
 
 // This is the only symbol that needs to be imported
 extern audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM;
@@ -42,6 +38,9 @@ extern audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM;
 // types of pre processing modules
 enum PreProcId {
   PREPROC_AGC,  // Automatic Gain Control
+#ifndef WEBRTC_LEGACY
+  PREPROC_AGC2,  // Automatic Gain Control 2
+#endif
   PREPROC_AEC,  // Acoustic Echo Canceler
   PREPROC_NS,   // Noise Suppressor
   PREPROC_NUM_EFFECTS
@@ -58,6 +57,12 @@ enum PreProcParams {
   ARG_AGC_COMP_LVL,
   ARG_AEC_DELAY,
   ARG_NS_LVL,
+#ifndef WEBRTC_LEGACY
+  ARG_AEC_MOBILE,
+  ARG_AGC2_GAIN,
+  ARG_AGC2_LVL,
+  ARG_AGC2_SAT_MGN
+#endif
 };
 
 struct preProcConfigParams_t {
@@ -66,11 +71,19 @@ struct preProcConfigParams_t {
   int nsLevel = 0;         // a value between 0-3
   int agcTargetLevel = 3;  // in dB
   int agcCompLevel = 9;    // in dB
+#ifndef WEBRTC_LEGACY
+  float agc2Gain = 0.f;             // in dB
+  float agc2SaturationMargin = 2.f; // in dB
+  int agc2Level = 0;                // either kRms(0) or kPeak(1)
+#endif
   int aecDelay = 0;        // in ms
 };
 
 const effect_uuid_t kPreProcUuids[PREPROC_NUM_EFFECTS] = {
     {0xaa8130e0, 0x66fc, 0x11e0, 0xbad0, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},  // agc uuid
+#ifndef WEBRTC_LEGACY
+    {0x89f38e65, 0xd4d2, 0x4d64, 0xad0e, {0x2b, 0x3e, 0x79, 0x9e, 0xa8, 0x86}},  // agc2 uuid
+#endif
     {0xbb392ec0, 0x8d4d, 0x11e0, 0xa896, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},  // aec uuid
     {0xc06c8400, 0x8e06, 0x11e0, 0x9cb6, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},  // ns  uuid
 };
@@ -126,14 +139,30 @@ void printUsage() {
   printf("\n           Enable Noise Suppression, default disabled");
   printf("\n     --agc");
   printf("\n           Enable Gain Control, default disabled");
+#ifndef WEBRTC_LEGACY
+  printf("\n     --agc2");
+  printf("\n           Enable Gain Controller 2, default disabled");
+#endif
   printf("\n     --ns_lvl <ns_level>");
   printf("\n           Noise Suppression level in dB, default value 0dB");
   printf("\n     --agc_tgt_lvl <target_level>");
   printf("\n           AGC Target Level in dB, default value 3dB");
   printf("\n     --agc_comp_lvl <comp_level>");
   printf("\n           AGC Comp Level in dB, default value 9dB");
+#ifndef WEBRTC_LEGACY
+  printf("\n     --agc2_gain <fixed_digital_gain>");
+  printf("\n           AGC Fixed Digital Gain in dB, default value 0dB");
+  printf("\n     --agc2_lvl <level_estimator>");
+  printf("\n           AGC Adaptive Digital Level Estimator, default value kRms");
+  printf("\n     --agc2_sat_mgn <saturation_margin>");
+  printf("\n           AGC Adaptive Digital Saturation Margin in dB, default value 2dB");
+#endif
   printf("\n     --aec_delay <delay>");
   printf("\n           AEC delay value in ms, default value 0ms");
+#ifndef WEBRTC_LEGACY
+  printf("\n     --aec_mobile");
+  printf("\n           Enable mobile mode of echo canceller, default disabled");
+#endif
   printf("\n");
 }
 
@@ -184,6 +213,9 @@ int main(int argc, const char *argv[]) {
   const char *outputFile = nullptr;
   const char *farFile = nullptr;
   int effectEn[PREPROC_NUM_EFFECTS] = {0};
+#ifndef WEBRTC_LEGACY
+  int aecMobileMode = 0;
+#endif
 
   const option long_opts[] = {
       {"help", no_argument, nullptr, ARG_HELP},
@@ -194,11 +226,22 @@ int main(int argc, const char *argv[]) {
       {"ch_mask", required_argument, nullptr, ARG_CH_MASK},
       {"agc_tgt_lvl", required_argument, nullptr, ARG_AGC_TGT_LVL},
       {"agc_comp_lvl", required_argument, nullptr, ARG_AGC_COMP_LVL},
+#ifndef WEBRTC_LEGACY
+      {"agc2_gain", required_argument, nullptr, ARG_AGC2_GAIN},
+      {"agc2_lvl", required_argument, nullptr, ARG_AGC2_LVL},
+      {"agc2_sat_mgn", required_argument, nullptr, ARG_AGC2_SAT_MGN},
+#endif
       {"aec_delay", required_argument, nullptr, ARG_AEC_DELAY},
       {"ns_lvl", required_argument, nullptr, ARG_NS_LVL},
       {"aec", no_argument, &effectEn[PREPROC_AEC], 1},
       {"agc", no_argument, &effectEn[PREPROC_AGC], 1},
+#ifndef WEBRTC_LEGACY
+      {"agc2", no_argument, &effectEn[PREPROC_AGC2], 1},
+#endif
       {"ns", no_argument, &effectEn[PREPROC_NS], 1},
+#ifndef WEBRTC_LEGACY
+      {"aec_mobile", no_argument, &aecMobileMode, 1},
+#endif
       {nullptr, 0, nullptr, 0},
   };
   struct preProcConfigParams_t preProcCfgParams {};
@@ -246,6 +289,20 @@ int main(int argc, const char *argv[]) {
         preProcCfgParams.agcCompLevel = atoi(optarg);
         break;
       }
+#ifndef WEBRTC_LEGACY
+      case ARG_AGC2_GAIN: {
+        preProcCfgParams.agc2Gain = atof(optarg);
+        break;
+      }
+      case ARG_AGC2_LVL: {
+        preProcCfgParams.agc2Level = atoi(optarg);
+        break;
+      }
+      case ARG_AGC2_SAT_MGN: {
+        preProcCfgParams.agc2SaturationMargin = atof(optarg);
+        break;
+      }
+#endif
       case ARG_AEC_DELAY: {
         preProcCfgParams.aecDelay = atoi(optarg);
         break;
@@ -342,6 +399,31 @@ int main(int argc, const char *argv[]) {
       return EXIT_FAILURE;
     }
   }
+#ifndef WEBRTC_LEGACY
+  if (effectEn[PREPROC_AGC2]) {
+    if (int status = preProcSetConfigParam(AGC2_PARAM_FIXED_DIGITAL_GAIN,
+                                           (float)preProcCfgParams.agc2Gain,
+                                           effectHandle[PREPROC_AGC2]);
+        status != 0) {
+      ALOGE("Invalid AGC2 Fixed Digital Gain. Error %d\n", status);
+      return EXIT_FAILURE;
+    }
+    if (int status = preProcSetConfigParam(AGC2_PARAM_ADAPT_DIGI_LEVEL_ESTIMATOR,
+                                           (uint32_t)preProcCfgParams.agc2Level,
+                                           effectHandle[PREPROC_AGC2]);
+        status != 0) {
+      ALOGE("Invalid AGC2 Level Estimator. Error %d\n", status);
+      return EXIT_FAILURE;
+    }
+    if (int status = preProcSetConfigParam(AGC2_PARAM_ADAPT_DIGI_EXTRA_SATURATION_MARGIN,
+                                           (float)preProcCfgParams.agc2SaturationMargin,
+                                           effectHandle[PREPROC_AGC2]);
+        status != 0) {
+      ALOGE("Invalid AGC2 Saturation Margin. Error %d\n", status);
+      return EXIT_FAILURE;
+    }
+  }
+#endif
   if (effectEn[PREPROC_NS]) {
     if (int status = preProcSetConfigParam(NS_PARAM_LEVEL, (uint32_t)preProcCfgParams.nsLevel,
                                            effectHandle[PREPROC_NS]);
@@ -350,6 +432,16 @@ int main(int argc, const char *argv[]) {
       return EXIT_FAILURE;
     }
   }
+#ifndef WEBRTC_LEGACY
+  if (effectEn[PREPROC_AEC]) {
+    if (int status = preProcSetConfigParam(AEC_PARAM_MOBILE_MODE, (uint32_t)aecMobileMode,
+                                           effectHandle[PREPROC_AEC]);
+        status != 0) {
+      ALOGE("Invalid AEC mobile mode value %d\n", status);
+      return EXIT_FAILURE;
+    }
+  }
+#endif
 
   // Process Call
   const int frameLength = (int)(preProcCfgParams.samplingFreq * kTenMilliSecVal);
