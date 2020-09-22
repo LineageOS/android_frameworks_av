@@ -52,5 +52,6 @@ cc_library_shared {
         "liblog",
         "libusbhost",
     ],
+    header_libs: ["libcutils_headers"],
 }
 
