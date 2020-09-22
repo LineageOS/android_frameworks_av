@@ -37,6 +37,11 @@ adb shell kill -9 `pid media.transcoding`
 #adb shell /data/nativetest64/mediatranscodingservice_real_tests/mediatranscodingservice_real_tests
 adb shell /data/nativetest/mediatranscodingservice_real_tests/mediatranscodingservice_real_tests
 
+echo "[==========] running resource tests"
+adb shell kill -9 `pid media.transcoding`
+#adb shell /data/nativetest64/mediatranscodingservice_resource_tests/mediatranscodingservice_resource_tests
+adb shell /data/nativetest/mediatranscodingservice_resource_tests/mediatranscodingservice_resource_tests
+
 echo "[==========] removing debug properties"
 adb shell setprop debug.transcoding.simulated_transcoder \"\"
 adb shell kill -9 `pid media.transcoding`

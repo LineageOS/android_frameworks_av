@@ -32,6 +32,7 @@ class TranscodingClientManager;
 class TranscodingJobScheduler;
 class TranscoderInterface;
 class UidPolicyInterface;
+class ResourcePolicyInterface;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
@@ -60,6 +61,7 @@ private:
     mutable std::mutex mServiceLock;
 
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
+    std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
     std::shared_ptr<TranscodingJobScheduler> mJobScheduler;
     std::shared_ptr<TranscodingClientManager> mClientManager;
 };
