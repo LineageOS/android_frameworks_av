@@ -266,7 +266,7 @@ public:
                                     struct audio_port *ports);
 
     /* Get attributes for a given audio port */
-    virtual status_t getAudioPort(struct audio_port *port);
+    virtual status_t getAudioPort(struct audio_port_v7 *port);
 
     /* Create an audio patch between several source and sink ports */
     virtual status_t createAudioPatch(const struct audio_patch *patch,
