@@ -79,8 +79,7 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
     {
         return(LVPSA_ERROR_INVALIDPARAM);
     }
-
-    pScratch = (LVM_FLOAT*)pLVPSA_Inst->MemoryTable.Region[LVPSA_MEMREGION_SCRATCH].pBaseAddress;
+    pScratch = (LVM_FLOAT*)pLVPSA_Inst->pScratch;
     pWrite_Save = pLVPSA_Inst->pSpectralDataBufferWritePointer;
 
     /******************************************************************************

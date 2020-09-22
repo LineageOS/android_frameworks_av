@@ -86,13 +86,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory table */
-#define LVEQNB_MEMREGION_INSTANCE          0   /* Offset to the instance memory region */
-#define LVEQNB_MEMREGION_PERSISTENT_DATA   1   /* Offset to persistent data memory region */
-#define LVEQNB_MEMREGION_PERSISTENT_COEF   2   /* Offset to persistent coefficient region */
-#define LVEQNB_MEMREGION_SCRATCH           3   /* Offset to data scratch memory region */
-#define LVEQNB_NR_MEMORY_REGIONS           4   /* Number of memory regions */
-
 /* Callback events */
 #define LVEQNB_EVENT_NONE                   0x0000    /* Not a valid event */
 #define LVEQNB_EVENT_ALGOFF                 0x0001    /* EQNB has completed switch off */
@@ -121,16 +114,6 @@ typedef enum
     LVEQNB_FILTER_ON    = 1,
     LVEQNB_FILTER_DUMMY = LVM_MAXINT_32
 } LVEQNB_FilterMode_en;
-
-/* Memory Types */
-typedef enum
-{
-    LVEQNB_PERSISTENT      = 0,
-    LVEQNB_PERSISTENT_DATA = 1,
-    LVEQNB_PERSISTENT_COEF = 2,
-    LVEQNB_SCRATCH         = 3,
-    LVEQNB_MEMORY_MAX      = LVM_MAXINT_32
-} LVEQNB_MemoryTypes_en;
 
 /* Function return status */
 typedef enum
@@ -218,21 +201,6 @@ typedef enum
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory region definition */
-typedef struct
-{
-    LVM_UINT32                  Size;                   /* Region size in bytes */
-    LVM_UINT16                  Alignment;              /* Region alignment in bytes */
-    LVEQNB_MemoryTypes_en       Type;                   /* Region type */
-    void                        *pBaseAddress;          /* Pointer to the region base address */
-} LVEQNB_MemoryRegion_t;
-
-/* Memory table containing the region definitions */
-typedef struct
-{
-    LVEQNB_MemoryRegion_t       Region[LVEQNB_NR_MEMORY_REGIONS];  /* One definition for each region */
-} LVEQNB_MemTab_t;
-
 /* Equaliser band definition */
 typedef struct
 {
@@ -279,78 +247,44 @@ typedef struct
 
 /****************************************************************************************/
 /*                                                                                      */
-/* FUNCTION:                LVEQNB_Memory                                               */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*  This function is used for memory allocation and free. It can be called in           */
-/*  two ways:                                                                           */
-/*                                                                                      */
-/*      hInstance = NULL                Returns the memory requirements                 */
-/*      hInstance = Instance handle     Returns the memory requirements and             */
-/*                                      allocated base addresses for the instance       */
-/*                                                                                      */
-/*  When this function is called for memory allocation (hInstance=NULL) the memory      */
-/*  base address pointers are NULL on return.                                           */
-/*                                                                                      */
-/*  When the function is called for free (hInstance = Instance Handle) the memory       */
-/*  table returns the allocated memory and base addresses used during initialisation.   */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance               Instance Handle                                             */
-/*  pMemoryTable            Pointer to an empty memory definition table                 */
-/*  pCapabilities           Pointer to the default capabilities                         */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVEQNB_SUCCESS          Succeeded                                                   */
-/*  LVEQNB_NULLADDRESS      When any of pMemoryTable and pCapabilities is NULL address  */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*  1.  This function may be interrupted by the LVEQNB_Process function                 */
-/*                                                                                      */
-/****************************************************************************************/
-
-LVEQNB_ReturnStatus_en LVEQNB_Memory(LVEQNB_Handle_t            hInstance,
-                                     LVEQNB_MemTab_t            *pMemoryTable,
-                                     LVEQNB_Capabilities_t      *pCapabilities);
-
-/****************************************************************************************/
-/*                                                                                      */
 /* FUNCTION:                LVEQNB_Init                                                 */
 /*                                                                                      */
 /* DESCRIPTION:                                                                         */
-/*  Create and initialisation function for the N-Band equalliser module                 */
-/*                                                                                      */
-/*  This function can be used to create an algorithm instance by calling with           */
-/*  hInstance set to NULL. In this case the algorithm returns the new instance          */
-/*  handle.                                                                             */
-/*                                                                                      */
-/*  This function can be used to force a full re-initialisation of the algorithm        */
-/*  by calling with hInstance = Instance Handle. In this case the memory table          */
-/*  should be correct for the instance, this can be ensured by calling the function     */
-/*  LVEQNB_Memory before calling this function.                                         */
+/*  Create and initialisation function for the N-Band equaliser module.                 */
 /*                                                                                      */
 /* PARAMETERS:                                                                          */
-/*  hInstance               Instance handle                                             */
-/*  pMemoryTable            Pointer to the memory definition table                      */
+/*  phInstance              Pointer to instance handle                                  */
 /*  pCapabilities           Pointer to the initialisation capabilities                  */
+/*  pScratch                Pointer to bundle scratch buffer                            */
 /*                                                                                      */
 /* RETURNS:                                                                             */
 /*  LVEQNB_SUCCESS          Initialisation succeeded                                    */
-/*  LVEQNB_NULLADDRESS        When pCapabilities or pMemoryTableis or phInstance are NULL */
-/*  LVEQNB_NULLADDRESS        One or more of the memory regions has a NULL base address   */
-/*                          pointer for a memory region with a non-zero size.           */
-/*                                                                                      */
+/*  LVEQNB_NULLADDRESS      When pCapabilities or phInstance are NULL                   */
+/*  LVEQNB_NULLADDRESS      When allocated memory has a NULL base address               */
 /*                                                                                      */
 /* NOTES:                                                                               */
-/*  1.  The instance handle is the pointer to the base address of the first memory      */
-/*      region.                                                                         */
-/*  2.  This function must not be interrupted by the LVEQNB_Process function            */
+/*  1.  This function must not be interrupted by the LVEQNB_Process function            */
 /*                                                                                      */
 /****************************************************************************************/
-
 LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
-                                   LVEQNB_MemTab_t          *pMemoryTable,
-                                   LVEQNB_Capabilities_t    *pCapabilities);
+                                   LVEQNB_Capabilities_t    *pCapabilities,
+                                   void                     *pScratch);
+
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                LVEQNB_DeInit                                               */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*    Free the memories created during LVEQNB_Init including instance handle            */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  phInstance              Pointer to instance handle                                  */
+/*                                                                                      */
+/* NOTES:                                                                               */
+/*  1.  This function must not be interrupted by the LVEQNB_Process function            */
+/*                                                                                      */
+/****************************************************************************************/
+void LVEQNB_DeInit(LVEQNB_Handle_t        *phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */

@@ -65,11 +65,8 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t       hInstance,
     BQ_FLOAT_Coefs_t      Coeffs;
     const BiquadA012B12CoefsSP_t *pEqualiserCoefTable;
 
-    pData = (LVCS_Data_t *) \
-                pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_DATA].pBaseAddress;
-
-    pCoefficients = (LVCS_Coefficient_t *) \
-                pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
+    pData         = (LVCS_Data_t *)pInstance->pData;
+    pCoefficients = (LVCS_Coefficient_t *)pInstance->pCoeff;
     /*
      * If the sample rate changes re-initialise the filters
      */
@@ -144,8 +141,7 @@ LVCS_ReturnStatus_en LVCS_Equaliser(LVCS_Handle_t       hInstance,
     LVCS_Equaliser_t    *pConfig   = (LVCS_Equaliser_t  *)&pInstance->Equaliser;
     LVCS_Coefficient_t  *pCoefficients;
 
-    pCoefficients = (LVCS_Coefficient_t *) \
-                  pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
+    pCoefficients = (LVCS_Coefficient_t *)pInstance->pCoeff;
 
     /*
      * Check if the equaliser is required

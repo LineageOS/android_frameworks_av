@@ -182,49 +182,6 @@ void printUsage() {
   printf("\n           Enable Equalizer");
 }
 
-//----------------------------------------------------------------------------
-// LvmEffect_free()
-//----------------------------------------------------------------------------
-// Purpose: Free all memory associated with the Bundle.
-//
-// Inputs:
-//  pContext:   effect engine context
-//
-// Outputs:
-//
-//----------------------------------------------------------------------------
-
-void LvmEffect_free(struct EffectContext *pContext) {
-  LVM_ReturnStatus_en LvmStatus = LVM_SUCCESS; /* Function call status */
-  LVM_MemTab_t MemTab;
-
-  /* Free the algorithm memory */
-  LvmStatus = LVM_GetMemoryTable(pContext->pBundledContext->hInstance, &MemTab,
-                                 LVM_NULL);
-
-  LVM_ERROR_CHECK(LvmStatus, "LVM_GetMemoryTable", "LvmEffect_free")
-
-  for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
-    if (MemTab.Region[i].Size != 0) {
-      if (MemTab.Region[i].pBaseAddress != NULL) {
-        ALOGV("\tLvmEffect_free - START freeing %" PRIu32
-              " bytes for region %u at %p\n",
-              MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-
-        free(MemTab.Region[i].pBaseAddress);
-
-        ALOGV("\tLvmEffect_free - END   freeing %" PRIu32
-              " bytes for region %u at %p\n",
-              MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-      } else {
-        ALOGE(
-            "\tLVM_ERROR : LvmEffect_free - trying to free with NULL pointer "
-            "%" PRIu32 " bytes for region %u at %p ERROR\n",
-            MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-      }
-    }
-  }
-} /* end LvmEffect_free */
 
 //----------------------------------------------------------------------------
 // LvmBundle_init()
@@ -263,8 +220,7 @@ int LvmBundle_init(struct EffectContext *pContext, LVM_ControlParams_t *params) 
     ALOGV(
         "\tLvmBundle_init pContext->pBassBoost != NULL "
         "-> Calling pContext->pBassBoost->free()");
-
-    LvmEffect_free(pContext);
+    LVM_DelInstanceHandle(&pContext->pBundledContext->hInstance);
 
     ALOGV(
         "\tLvmBundle_init pContext->pBassBoost != NULL "
@@ -276,8 +232,6 @@ int LvmBundle_init(struct EffectContext *pContext, LVM_ControlParams_t *params) 
   LVM_EQNB_BandDef_t BandDefs[MAX_NUM_BANDS];  /* Equaliser band definitions */
   LVM_HeadroomParams_t HeadroomParams;         /* Headroom parameters */
   LVM_HeadroomBandDef_t HeadroomBandDef[LVM_HEADROOM_MAX_NBANDS];
-  LVM_MemTab_t MemTab; /* Memory allocation table */
-  bool bMallocFailure = LVM_FALSE;
 
   /* Set the capabilities */
   InstParams.BufferMode = LVM_UNMANAGED_BUFFERS;
@@ -285,63 +239,8 @@ int LvmBundle_init(struct EffectContext *pContext, LVM_ControlParams_t *params) 
   InstParams.EQNB_NumBands = MAX_NUM_BANDS;
   InstParams.PSA_Included = LVM_PSA_ON;
 
-  /* Allocate memory, forcing alignment */
-  LvmStatus = LVM_GetMemoryTable(LVM_NULL, &MemTab, &InstParams);
-
-  LVM_ERROR_CHECK(LvmStatus, "LVM_GetMemoryTable", "LvmBundle_init");
-  if (LvmStatus != LVM_SUCCESS) return -EINVAL;
-
-  ALOGV("\tCreateInstance Succesfully called LVM_GetMemoryTable\n");
-
-  /* Allocate memory */
-  for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
-    if (MemTab.Region[i].Size != 0) {
-      MemTab.Region[i].pBaseAddress = malloc(MemTab.Region[i].Size);
-
-      if (MemTab.Region[i].pBaseAddress == LVM_NULL) {
-        ALOGE(
-            "\tLVM_ERROR :LvmBundle_init CreateInstance Failed to allocate "
-            "%" PRIu32 " bytes for region %u\n",
-            MemTab.Region[i].Size, i);
-        bMallocFailure = LVM_TRUE;
-        break;
-      } else {
-        ALOGV("\tLvmBundle_init CreateInstance allocated %" PRIu32
-              " bytes for region %u at %p\n",
-              MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-      }
-    }
-  }
-
-  /* If one or more of the memory regions failed to allocate, free the regions
-   * that were
-   * succesfully allocated and return with an error
-   */
-  if (bMallocFailure == LVM_TRUE) {
-    for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
-      if (MemTab.Region[i].pBaseAddress == LVM_NULL) {
-        ALOGE(
-            "\tLVM_ERROR :LvmBundle_init CreateInstance Failed to allocate "
-            "%" PRIu32 " bytes for region %u Not freeing\n",
-            MemTab.Region[i].Size, i);
-      } else {
-        ALOGE(
-            "\tLVM_ERROR :LvmBundle_init CreateInstance Failed: but allocated "
-            "%" PRIu32 " bytes for region %u at %p- free\n",
-            MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-        free(MemTab.Region[i].pBaseAddress);
-      }
-    }
-    return -EINVAL;
-  }
-  ALOGV("\tLvmBundle_init CreateInstance Succesfully malloc'd memory\n");
-
-  /* Initialise */
-  pContext->pBundledContext->hInstance = LVM_NULL;
-
-  /* Init sets the instance handle */
   LvmStatus = LVM_GetInstanceHandle(&pContext->pBundledContext->hInstance,
-                                    &MemTab, &InstParams);
+                                    &InstParams);
 
   LVM_ERROR_CHECK(LvmStatus, "LVM_GetInstanceHandle", "LvmBundle_init");
   if (LvmStatus != LVM_SUCCESS) return -EINVAL;
@@ -812,7 +711,7 @@ int main(int argc, const char *argv[]) {
   /* Free the allocated buffers */
   if (context.pBundledContext != nullptr) {
     if (context.pBundledContext->hInstance != nullptr) {
-      LvmEffect_free(&context);
+      LVM_DelInstanceHandle(&context.pBundledContext->hInstance);
     }
     free(context.pBundledContext);
   }

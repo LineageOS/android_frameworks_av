@@ -87,8 +87,7 @@ LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t hInstance,
   const LVM_INT32 NrSamples = NrChannels * NrFrames;
 
   /* Space to store DBE path computation */
-  LVM_FLOAT * const pScratch =
-          (LVM_FLOAT *)pInstance->MemoryTable.Region[LVDBE_MEMREGION_SCRATCH].pBaseAddress;
+  LVM_FLOAT * const pScratch = (LVM_FLOAT *)pInstance->pScratch;
 
   /*
    * Scratch for Mono path starts at offset of
