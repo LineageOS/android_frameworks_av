@@ -62,11 +62,8 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t       hInstance,
     BQ_FLOAT_Coefs_t          CoeffsSide;
     const BiquadA012B12CoefsSP_t *pSESideCoefs;
 
-    pData     = (LVCS_Data_t *) \
-                  pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_DATA].pBaseAddress;
-
-    pCoefficient = (LVCS_Coefficient_t *) \
-                  pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
+    pData        = (LVCS_Data_t *)pInstance->pData;
+    pCoefficient = (LVCS_Coefficient_t *)pInstance->pCoeff;
 
     /*
      * If the sample rate or speaker type has changed update the filters
@@ -188,12 +185,8 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t          hInstance,
     LVCS_StereoEnhancer_t   *pConfig   = (LVCS_StereoEnhancer_t *)&pInstance->StereoEnhancer;
     LVCS_Coefficient_t      *pCoefficient;
     LVM_FLOAT               *pScratch;
-
-    pCoefficient = (LVCS_Coefficient_t *) \
-                   pInstance->MemoryTable.Region[LVCS_MEMREGION_PERSISTENT_FAST_COEF].pBaseAddress;
-
-    pScratch  = (LVM_FLOAT *) \
-                    pInstance->MemoryTable.Region[LVCS_MEMREGION_TEMPORARY_FAST].pBaseAddress;
+    pCoefficient = (LVCS_Coefficient_t *)pInstance->pCoeff;
+    pScratch     = (LVM_FLOAT *)pInstance->pScratch;
     /*
      * Check if the Stereo Enhancer is enabled
      */
