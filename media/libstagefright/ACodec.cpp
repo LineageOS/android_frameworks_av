@@ -279,6 +279,13 @@ protected:
 
     void postFillThisBuffer(BufferInfo *info);
 
+    void maybePostExtraOutputMetadataBufferRequest() {
+        if (!mPendingExtraOutputMetadataBufferRequest) {
+            (new AMessage(kWhatSubmitExtraOutputMetadataBuffer, mCodec))->post();
+            mPendingExtraOutputMetadataBufferRequest = true;
+        }
+    }
+
 private:
     // Handles an OMX message. Returns true iff message was handled.
     bool onOMXMessage(const sp<AMessage> &msg);
@@ -301,6 +308,8 @@ private:
     virtual bool onOMXFrameRendered(int64_t mediaTimeUs, nsecs_t systemNano);
 
     void getMoreInputDataIfPossible();
+
+    bool mPendingExtraOutputMetadataBufferRequest;
 
     DISALLOW_EVIL_CONSTRUCTORS(BaseState);
 };
@@ -555,6 +564,7 @@ ACodec::ACodec()
       mShutdownInProgress(false),
       mExplicitShutdown(false),
       mIsLegacyVP9Decoder(false),
+      mIsLowLatency(false),
       mEncoderDelay(0),
       mEncoderPadding(0),
       mRotationDegrees(0),
@@ -2415,6 +2425,7 @@ status_t ACodec::setLowLatency(int32_t lowLatency) {
     if (err != OK) {
         ALOGE("decoder can not set low-latency to %d (err %d)", lowLatency, err);
     }
+    mIsLowLatency = (lowLatency && err == OK);
     return err;
 }
 
@@ -5748,7 +5759,8 @@ status_t ACodec::requestIDRFrame() {
 
 ACodec::BaseState::BaseState(ACodec *codec, const sp<AState> &parentState)
     : AState(parentState),
-      mCodec(codec) {
+      mCodec(codec),
+      mPendingExtraOutputMetadataBufferRequest(false) {
 }
 
 ACodec::BaseState::PortMode ACodec::BaseState::getPortMode(
@@ -5846,6 +5858,21 @@ bool ACodec::BaseState::onMessageReceived(const sp<AMessage> &msg) {
 
         case kWhatCheckIfStuck: {
             ALOGV("No-op by default");
+            break;
+        }
+
+        case kWhatSubmitExtraOutputMetadataBuffer: {
+            mPendingExtraOutputMetadataBufferRequest = false;
+            if (getPortMode(kPortIndexOutput) == RESUBMIT_BUFFERS && mCodec->mIsLowLatency) {
+                // Decoders often need more than one output buffer to be
+                // submitted before processing a single input buffer.
+                // For low latency codecs, we don't want to wait for more input
+                // to be queued to get those output buffers submitted.
+                if (mCodec->submitOutputMetadataBuffer() == OK
+                        && mCodec->mMetadataBuffersToSubmit > 0) {
+                    maybePostExtraOutputMetadataBufferRequest();
+                }
+            }
             break;
         }
 
@@ -6205,7 +6232,12 @@ void ACodec::BaseState::onInputBufferFilled(const sp<AMessage> &msg) {
                             (outputMode == FREE_BUFFERS ? "FREE" :
                              outputMode == KEEP_BUFFERS ? "KEEP" : "RESUBMIT"));
                     if (outputMode == RESUBMIT_BUFFERS) {
-                        mCodec->submitOutputMetadataBuffer();
+                        status_t err = mCodec->submitOutputMetadataBuffer();
+                        if (mCodec->mIsLowLatency
+                                && err == OK
+                                && mCodec->mMetadataBuffersToSubmit > 0) {
+                            maybePostExtraOutputMetadataBufferRequest();
+                        }
                     }
                 }
                 info->checkReadFence("onInputBufferFilled");
@@ -7350,6 +7382,9 @@ void ACodec::ExecutingState::submitOutputMetaBuffers() {
             if (mCodec->submitOutputMetadataBuffer() != OK)
                 break;
         }
+    }
+    if (mCodec->mIsLowLatency) {
+        maybePostExtraOutputMetadataBufferRequest();
     }
 
     // *** NOTE: THE FOLLOWING WORKAROUND WILL BE REMOVED ***
