@@ -769,6 +769,7 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
         { "sei", kKeySEI },
         { "text-format-data", kKeyTextFormatData },
         { "thumbnail-csd-hevc", kKeyThumbnailHVCC },
+        { "slow-motion-markers", kKeySlowMotionMarkers },
     }
 };
 

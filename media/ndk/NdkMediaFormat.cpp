@@ -364,6 +364,7 @@ EXPORT const char* AMEDIAFORMAT_KEY_SAR_HEIGHT = "sar-height";
 EXPORT const char* AMEDIAFORMAT_KEY_SAR_WIDTH = "sar-width";
 EXPORT const char* AMEDIAFORMAT_KEY_SEI = "sei";
 EXPORT const char* AMEDIAFORMAT_KEY_SLICE_HEIGHT = "slice-height";
+EXPORT const char* AMEDIAFORMAT_KEY_SLOW_MOTION_MARKERS = "slow-motion-markers";
 EXPORT const char* AMEDIAFORMAT_KEY_STRIDE = "stride";
 EXPORT const char* AMEDIAFORMAT_KEY_TARGET_TIME = "target-time";
 EXPORT const char* AMEDIAFORMAT_KEY_TEMPORAL_LAYER_COUNT = "temporal-layer-count";

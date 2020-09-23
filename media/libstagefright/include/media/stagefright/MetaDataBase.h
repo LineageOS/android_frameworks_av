@@ -257,6 +257,10 @@ enum {
     kKeyRtpCvoDegrees    = 'cvod', // int32_t, rtp cvo degrees as per 3GPP 26.114.
     kKeyRtpDscp          = 'dscp', // int32_t, DSCP(Differentiated services codepoint) of RFC 2474.
     kKeySocketNetwork    = 'sNet', // int64_t, socket will be bound to network handle.
+
+    // Slow-motion markers
+    kKeySlowMotionMarkers = 'slmo', // raw data, byte array following spec for
+                                    // MediaFormat#KEY_SLOW_MOTION_MARKERS
 };
 
 enum {
