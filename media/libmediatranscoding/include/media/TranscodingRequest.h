@@ -36,7 +36,9 @@ public:
 private:
     void setTo(const TranscodingRequestParcel& parcel) {
         sourceFilePath = parcel.sourceFilePath;
+        sourceFd = parcel.sourceFd;
         destinationFilePath = parcel.destinationFilePath;
+        destinationFd = parcel.destinationFd;
         clientUid = parcel.clientUid;
         clientPid = parcel.clientPid;
         clientPackageName = parcel.clientPackageName;
