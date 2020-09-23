@@ -375,12 +375,7 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
         sample->info.flags = bufferInfo.flags;
         sample->info.presentationTimeUs = bufferInfo.presentationTimeUs;
 
-        const bool aborted = mOutputQueue->enqueue(sample);
-        if (aborted) {
-            LOG(ERROR) << "Output sample queue was aborted. Stopping transcode.";
-            mStatus = AMEDIA_ERROR_IO;  // TODO: Define custom error codes?
-            return;
-        }
+        onOutputSampleAvailable(sample);
     } else if (bufferIndex == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED) {
         AMediaFormat* newFormat = AMediaCodec_getOutputFormat(mEncoder->getCodec());
         LOG(DEBUG) << "Encoder output format changed: " << AMediaFormat_toString(newFormat);
