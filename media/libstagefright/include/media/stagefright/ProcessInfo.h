@@ -20,6 +20,9 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/ProcessInfoInterface.h>
+#include <map>
+#include <mutex>
+#include <utils/Condition.h>
 
 namespace android {
 
@@ -28,11 +31,20 @@ struct ProcessInfo : public ProcessInfoInterface {
 
     virtual bool getPriority(int pid, int* priority);
     virtual bool isValidPid(int pid);
+    virtual bool overrideProcessInfo(int pid, int procState, int oomScore);
+    virtual void removeProcessInfoOverride(int pid);
 
 protected:
     virtual ~ProcessInfo();
 
 private:
+    struct ProcessInfoOverride {
+        int procState;
+        int oomScore;
+    };
+    std::mutex mOverrideLock;
+    std::map<int, ProcessInfoOverride> mOverrideMap GUARDED_BY(mOverrideLock);
+
     DISALLOW_EVIL_CONSTRUCTORS(ProcessInfo);
 };
 

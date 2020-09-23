@@ -96,6 +96,28 @@ interface IResourceManagerService {
     void overridePid(int originalPid, int newPid);
 
     /**
+     * Override the process state and OOM score of the calling process with the
+     * the specified values. This is used by native service processes to specify
+     * these values for ResourceManagerService to use. ResourceManagerService usually
+     * gets these values from ActivityManagerService, however, ActivityManagerService
+     * doesn't track native service processes.
+     *
+     * @param client a token for the ResourceManagerService to link to the caller and
+     *              receive notification if it goes away. This is needed for clearing
+     *              the overrides.
+     * @param pid pid of the calling process.
+     * @param procState the process state value that ResourceManagerService should
+     *                  use for this pid.
+     * @param oomScore the oom score value that ResourceManagerService should
+     *                  use for this pid.
+     */
+    void overrideProcessInfo(
+            IResourceManagerClient client,
+            int pid,
+            int procState,
+            int oomScore);
+
+    /**
      * Mark a client for pending removal
      *
      * @param pid pid from which the client's resources will be removed.
