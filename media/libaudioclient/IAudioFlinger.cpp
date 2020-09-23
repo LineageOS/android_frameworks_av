@@ -24,6 +24,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
+#include <media/IAudioPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
 #include "IAudioFlinger.h"
@@ -1023,6 +1024,16 @@ status_t BnAudioFlinger::onTransact(
 
     std::string tag("IAudioFlinger command " + std::to_string(code));
     TimeCheck check(tag.c_str());
+
+    // Make sure we connect to Audio Policy Service before calling into AudioFlinger:
+    //  - AudioFlinger can call into Audio Policy Service with its global mutex held
+    //  - If this is the first time Audio Policy Service is queried from inside audioserver process
+    //  this will trigger Audio Policy Manager initialization.
+    //  - Audio Policy Manager initialization calls into AudioFlinger which will try to lock
+    //  its global mutex and a deadlock will occur.
+    if (IPCThreadState::self()->getCallingPid() != getpid()) {
+        AudioSystem::get_audio_policy_service();
+    }
 
     switch (code) {
         case CREATE_TRACK: {
