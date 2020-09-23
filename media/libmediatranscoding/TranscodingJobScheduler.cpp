@@ -38,8 +38,13 @@ String8 TranscodingJobScheduler::jobToString(const JobKeyType& jobKey) {
 
 TranscodingJobScheduler::TranscodingJobScheduler(
         const std::shared_ptr<TranscoderInterface>& transcoder,
-        const std::shared_ptr<UidPolicyInterface>& uidPolicy)
-      : mTranscoder(transcoder), mUidPolicy(uidPolicy), mCurrentJob(nullptr), mResourceLost(false) {
+        const std::shared_ptr<UidPolicyInterface>& uidPolicy,
+        const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy)
+      : mTranscoder(transcoder),
+        mUidPolicy(uidPolicy),
+        mResourcePolicy(resourcePolicy),
+        mCurrentJob(nullptr),
+        mResourceLost(false) {
     // Only push empty offline queue initially. Realtime queues are added when requests come in.
     mUidSortedList.push_back(OFFLINE_UID);
     mOfflineUidIterator = mUidSortedList.begin();
@@ -398,15 +403,24 @@ void TranscodingJobScheduler::onProgressUpdate(ClientIdType clientId, JobIdType 
 }
 
 void TranscodingJobScheduler::onResourceLost() {
-    ALOGV("%s", __FUNCTION__);
+    ALOGI("%s", __FUNCTION__);
 
     std::scoped_lock lock{mLock};
+
+    if (mResourceLost) {
+        return;
+    }
 
     // If we receive a resource loss event, the TranscoderLibrary already paused
     // the transcoding, so we don't need to call onPaused to notify it to pause.
     // Only need to update the job state here.
     if (mCurrentJob != nullptr && mCurrentJob->state == Job::RUNNING) {
         mCurrentJob->state = Job::PAUSED;
+        // Notify the client as a paused event.
+        auto clientCallback = mCurrentJob->callback.lock();
+        if (clientCallback != nullptr) {
+            clientCallback->onTranscodingPaused(mCurrentJob->key.second);
+        }
     }
     mResourceLost = true;
 
@@ -439,9 +453,13 @@ void TranscodingJobScheduler::onTopUidsChanged(const std::unordered_set<uid_t>& 
 }
 
 void TranscodingJobScheduler::onResourceAvailable() {
-    ALOGV("%s", __FUNCTION__);
-
     std::scoped_lock lock{mLock};
+
+    if (!mResourceLost) {
+        return;
+    }
+
+    ALOGI("%s", __FUNCTION__);
 
     mResourceLost = false;
     updateCurrentJob_l();

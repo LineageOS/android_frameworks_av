@@ -45,9 +45,11 @@ constexpr const char* kLongSrcPath = "/data/local/tmp/TranscodingTestAssets/long
 
 class MediaTranscodingServiceRealTest : public MediaTranscodingServiceTestBase {
 public:
-    MediaTranscodingServiceRealTest() {}
+    MediaTranscodingServiceRealTest() { ALOGI("MediaTranscodingServiceResourceTest created"); }
 
-    void deleteFile(const char* path) { unlink(path); }
+    virtual ~MediaTranscodingServiceRealTest() {
+        ALOGI("MediaTranscodingServiceResourceTest destroyed");
+    }
 };
 
 TEST_F(MediaTranscodingServiceRealTest, TestInvalidSource) {

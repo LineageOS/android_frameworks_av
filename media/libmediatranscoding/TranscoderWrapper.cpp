@@ -89,26 +89,40 @@ static AMediaFormat* getVideoFormat(
 }
 
 //static
-const char* TranscoderWrapper::toString(Event::Type type) {
-    switch (type) {
+std::string TranscoderWrapper::toString(const Event& event) {
+    std::string typeStr;
+    switch (event.type) {
     case Event::Start:
-        return "Start";
-    case Event::Pause:
-        return "Pause";
-    case Event::Resume:
-        return "Resume";
-    case Event::Stop:
-        return "Stop";
-    case Event::Finish:
-        return "Finish";
-    case Event::Error:
-        return "Error";
-    case Event::Progress:
-        return "Progress";
-    default:
+        typeStr = "Start";
         break;
+    case Event::Pause:
+        typeStr = "Pause";
+        break;
+    case Event::Resume:
+        typeStr = "Resume";
+        break;
+    case Event::Stop:
+        typeStr = "Stop";
+        break;
+    case Event::Finish:
+        typeStr = "Finish";
+        break;
+    case Event::Error:
+        typeStr = "Error";
+        break;
+    case Event::Progress:
+        typeStr = "Progress";
+        break;
+    default:
+        return "(unknown)";
     }
-    return "(unknown)";
+    std::string result;
+    result = "job {" + std::to_string(event.clientId) + "," + std::to_string(event.jobId) +
+             "}: " + typeStr;
+    if (event.type == Event::Error || event.type == Event::Progress) {
+        result += " " + std::to_string(event.arg);
+    }
+    return result;
 }
 
 class TranscoderWrapper::CallbackImpl : public MediaTranscoder::CallbackInterface {
@@ -128,7 +142,7 @@ public:
                          media_status_t error) override {
         auto owner = mOwner.lock();
         if (owner != nullptr) {
-            owner->onError(mClientId, mJobId, toTranscodingError(error));
+            owner->onError(mClientId, mJobId, error);
         }
     }
 
@@ -160,20 +174,41 @@ void TranscoderWrapper::setCallback(const std::shared_ptr<TranscoderCallbackInte
     mCallback = cb;
 }
 
+static bool isResourceError(media_status_t err) {
+    return err == AMEDIACODEC_ERROR_RECLAIMED || err == AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE;
+}
+
+void TranscoderWrapper::reportError(ClientIdType clientId, JobIdType jobId, media_status_t err) {
+    auto callback = mCallback.lock();
+    if (callback != nullptr) {
+        if (isResourceError(err)) {
+            // Add a placeholder pause state to mPausedStateMap. This is required when resuming.
+            // TODO: remove this when transcoder pause/resume logic is ready. New logic will
+            // no longer use the pause states.
+            auto it = mPausedStateMap.find(JobKeyType(clientId, jobId));
+            if (it == mPausedStateMap.end()) {
+                mPausedStateMap.emplace(JobKeyType(clientId, jobId),
+                                        std::shared_ptr<const Parcel>());
+            }
+
+            callback->onResourceLost();
+        } else {
+            callback->onError(clientId, jobId, toTranscodingError(err));
+        }
+    }
+}
+
 void TranscoderWrapper::start(ClientIdType clientId, JobIdType jobId,
                               const TranscodingRequestParcel& request,
                               const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     queueEvent(Event::Start, clientId, jobId, [=] {
-        TranscodingErrorCode err = handleStart(clientId, jobId, request, clientCb);
+        media_status_t err = handleStart(clientId, jobId, request, clientCb);
 
-        auto callback = mCallback.lock();
-        if (err != TranscodingErrorCode::kNoError) {
+        if (err != AMEDIA_OK) {
             cleanup();
-
-            if (callback != nullptr) {
-                callback->onError(clientId, jobId, err);
-            }
+            reportError(clientId, jobId, err);
         } else {
+            auto callback = mCallback.lock();
             if (callback != nullptr) {
                 callback->onStarted(clientId, jobId);
             }
@@ -183,15 +218,15 @@ void TranscoderWrapper::start(ClientIdType clientId, JobIdType jobId,
 
 void TranscoderWrapper::pause(ClientIdType clientId, JobIdType jobId) {
     queueEvent(Event::Pause, clientId, jobId, [=] {
-        TranscodingErrorCode err = handlePause(clientId, jobId);
+        media_status_t err = handlePause(clientId, jobId);
 
         cleanup();
 
-        auto callback = mCallback.lock();
-        if (callback != nullptr) {
-            if (err != TranscodingErrorCode::kNoError) {
-                callback->onError(clientId, jobId, err);
-            } else {
+        if (err != AMEDIA_OK) {
+            reportError(clientId, jobId, err);
+        } else {
+            auto callback = mCallback.lock();
+            if (callback != nullptr) {
                 callback->onPaused(clientId, jobId);
             }
         }
@@ -202,16 +237,13 @@ void TranscoderWrapper::resume(ClientIdType clientId, JobIdType jobId,
                                const TranscodingRequestParcel& request,
                                const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     queueEvent(Event::Resume, clientId, jobId, [=] {
-        TranscodingErrorCode err = handleResume(clientId, jobId, request, clientCb);
+        media_status_t err = handleResume(clientId, jobId, request, clientCb);
 
-        auto callback = mCallback.lock();
-        if (err != TranscodingErrorCode::kNoError) {
+        if (err != AMEDIA_OK) {
             cleanup();
-
-            if (callback != nullptr) {
-                callback->onError(clientId, jobId, err);
-            }
+            reportError(clientId, jobId, err);
         } else {
+            auto callback = mCallback.lock();
             if (callback != nullptr) {
                 callback->onResumed(clientId, jobId);
             }
@@ -225,7 +257,7 @@ void TranscoderWrapper::stop(ClientIdType clientId, JobIdType jobId) {
             // Cancelling the currently running job.
             media_status_t err = mTranscoder->cancel();
             if (err != AMEDIA_OK) {
-                ALOGE("failed to stop transcoder: %d", err);
+                ALOGW("failed to stop transcoder: %d", err);
             } else {
                 ALOGI("transcoder stopped");
             }
@@ -251,41 +283,43 @@ void TranscoderWrapper::onFinish(ClientIdType clientId, JobIdType jobId) {
     });
 }
 
-void TranscoderWrapper::onError(ClientIdType clientId, JobIdType jobId,
-                                TranscodingErrorCode error) {
-    queueEvent(Event::Error, clientId, jobId, [=] {
-        if (mTranscoder != nullptr && clientId == mCurrentClientId && jobId == mCurrentJobId) {
-            cleanup();
-        }
-
-        auto callback = mCallback.lock();
-        if (callback != nullptr) {
-            callback->onError(clientId, jobId, error);
-        }
-    });
+void TranscoderWrapper::onError(ClientIdType clientId, JobIdType jobId, media_status_t error) {
+    queueEvent(
+            Event::Error, clientId, jobId,
+            [=] {
+                if (mTranscoder != nullptr && clientId == mCurrentClientId &&
+                    jobId == mCurrentJobId) {
+                    cleanup();
+                }
+                reportError(clientId, jobId, error);
+            },
+            error);
 }
 
 void TranscoderWrapper::onProgress(ClientIdType clientId, JobIdType jobId, int32_t progress) {
-    queueEvent(Event::Progress, clientId, jobId, [=] {
-        auto callback = mCallback.lock();
-        if (callback != nullptr) {
-            callback->onProgressUpdate(clientId, jobId, progress);
-        }
-    });
+    queueEvent(
+            Event::Progress, clientId, jobId,
+            [=] {
+                auto callback = mCallback.lock();
+                if (callback != nullptr) {
+                    callback->onProgressUpdate(clientId, jobId, progress);
+                }
+            },
+            progress);
 }
 
-TranscodingErrorCode TranscoderWrapper::setupTranscoder(
+media_status_t TranscoderWrapper::setupTranscoder(
         ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& clientCb,
         const std::shared_ptr<const Parcel>& pausedState) {
     if (clientCb == nullptr) {
         ALOGE("client callback is null");
-        return TranscodingErrorCode::kInvalidParameter;
+        return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
     if (mTranscoder != nullptr) {
         ALOGE("transcoder already running");
-        return TranscodingErrorCode::kInvalidOperation;
+        return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
     Status status;
@@ -293,7 +327,7 @@ TranscodingErrorCode TranscoderWrapper::setupTranscoder(
     status = clientCb->openFileDescriptor(request.sourceFilePath, "r", &srcFd);
     if (!status.isOk() || srcFd.get() < 0) {
         ALOGE("failed to open source");
-        return TranscodingErrorCode::kErrorIO;
+        return AMEDIA_ERROR_IO;
     }
 
     // Open dest file with "rw", as the transcoder could potentially reuse part of it
@@ -302,7 +336,7 @@ TranscodingErrorCode TranscoderWrapper::setupTranscoder(
     status = clientCb->openFileDescriptor(request.destinationFilePath, "rw", &dstFd);
     if (!status.isOk() || dstFd.get() < 0) {
         ALOGE("failed to open destination");
-        return TranscodingErrorCode::kErrorIO;
+        return AMEDIA_ERROR_IO;
     }
 
     mCurrentClientId = clientId;
@@ -311,19 +345,19 @@ TranscodingErrorCode TranscoderWrapper::setupTranscoder(
     mTranscoder = MediaTranscoder::create(mTranscoderCb, pausedState);
     if (mTranscoder == nullptr) {
         ALOGE("failed to create transcoder");
-        return TranscodingErrorCode::kUnknown;
+        return AMEDIA_ERROR_UNKNOWN;
     }
 
     media_status_t err = mTranscoder->configureSource(srcFd.get());
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure source: %d", err);
-        return toTranscodingError(err);
+        return err;
     }
 
     std::vector<std::shared_ptr<AMediaFormat>> trackFormats = mTranscoder->getTrackFormats();
     if (trackFormats.size() == 0) {
         ALOGE("failed to get track formats!");
-        return TranscodingErrorCode::kMalformed;
+        return AMEDIA_ERROR_MALFORMED;
     }
 
     for (int i = 0; i < trackFormats.size(); ++i) {
@@ -341,43 +375,43 @@ TranscodingErrorCode TranscoderWrapper::setupTranscoder(
         }
         if (err != AMEDIA_OK) {
             ALOGE("failed to configure track format for track %d: %d", i, err);
-            return toTranscodingError(err);
+            return err;
         }
     }
 
     err = mTranscoder->configureDestination(dstFd.get());
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure dest: %d", err);
-        return toTranscodingError(err);
+        return err;
     }
 
-    return TranscodingErrorCode::kNoError;
+    return AMEDIA_OK;
 }
 
-TranscodingErrorCode TranscoderWrapper::handleStart(
+media_status_t TranscoderWrapper::handleStart(
         ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
-    ALOGI("setting up transcoder for start");
-    TranscodingErrorCode err = setupTranscoder(clientId, jobId, request, clientCb);
-    if (err != TranscodingErrorCode::kNoError) {
+    ALOGI("%s: setting up transcoder for start", __FUNCTION__);
+    media_status_t err = setupTranscoder(clientId, jobId, request, clientCb);
+    if (err != AMEDIA_OK) {
         ALOGI("%s: failed to setup transcoder", __FUNCTION__);
         return err;
     }
 
-    media_status_t status = mTranscoder->start();
-    if (status != AMEDIA_OK) {
+    err = mTranscoder->start();
+    if (err != AMEDIA_OK) {
         ALOGE("%s: failed to start transcoder: %d", __FUNCTION__, err);
-        return toTranscodingError(status);
+        return err;
     }
 
     ALOGI("%s: transcoder started", __FUNCTION__);
-    return TranscodingErrorCode::kNoError;
+    return AMEDIA_OK;
 }
 
-TranscodingErrorCode TranscoderWrapper::handlePause(ClientIdType clientId, JobIdType jobId) {
+media_status_t TranscoderWrapper::handlePause(ClientIdType clientId, JobIdType jobId) {
     if (mTranscoder == nullptr) {
         ALOGE("%s: transcoder is not running", __FUNCTION__);
-        return TranscodingErrorCode::kInvalidOperation;
+        return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
     if (clientId != mCurrentClientId || jobId != mCurrentJobId) {
@@ -385,19 +419,21 @@ TranscodingErrorCode TranscoderWrapper::handlePause(ClientIdType clientId, JobId
               (long long)clientId, jobId, (long long)mCurrentClientId, mCurrentJobId);
     }
 
+    ALOGI("%s: pausing transcoder", __FUNCTION__);
+
     std::shared_ptr<const Parcel> pauseStates;
     media_status_t err = mTranscoder->pause(&pauseStates);
     if (err != AMEDIA_OK) {
         ALOGE("%s: failed to pause transcoder: %d", __FUNCTION__, err);
-        return toTranscodingError(err);
+        return err;
     }
     mPausedStateMap[JobKeyType(clientId, jobId)] = pauseStates;
 
     ALOGI("%s: transcoder paused", __FUNCTION__);
-    return TranscodingErrorCode::kNoError;
+    return AMEDIA_OK;
 }
 
-TranscodingErrorCode TranscoderWrapper::handleResume(
+media_status_t TranscoderWrapper::handleResume(
         ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     std::shared_ptr<const Parcel> pausedState;
@@ -407,24 +443,24 @@ TranscodingErrorCode TranscoderWrapper::handleResume(
         mPausedStateMap.erase(it);
     } else {
         ALOGE("%s: can't find paused state", __FUNCTION__);
-        return TranscodingErrorCode::kInvalidOperation;
+        return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
-    ALOGI("setting up transcoder for resume");
-    TranscodingErrorCode err = setupTranscoder(clientId, jobId, request, clientCb, pausedState);
-    if (err != TranscodingErrorCode::kNoError) {
-        ALOGE("%s: failed to setup transcoder", __FUNCTION__);
+    ALOGI("%s: setting up transcoder for resume", __FUNCTION__);
+    media_status_t err = setupTranscoder(clientId, jobId, request, clientCb, pausedState);
+    if (err != AMEDIA_OK) {
+        ALOGE("%s: failed to setup transcoder: %d", __FUNCTION__, err);
         return err;
     }
 
-    media_status_t status = mTranscoder->resume();
-    if (status != AMEDIA_OK) {
+    err = mTranscoder->resume();
+    if (err != AMEDIA_OK) {
         ALOGE("%s: failed to resume transcoder: %d", __FUNCTION__, err);
-        return toTranscodingError(status);
+        return err;
     }
 
     ALOGI("%s: transcoder resumed", __FUNCTION__);
-    return TranscodingErrorCode::kNoError;
+    return AMEDIA_OK;
 }
 
 void TranscoderWrapper::cleanup() {
@@ -435,12 +471,10 @@ void TranscoderWrapper::cleanup() {
 }
 
 void TranscoderWrapper::queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
-                                   const std::function<void()> runnable) {
-    ALOGV("%s: job {%lld, %d}: %s", __FUNCTION__, (long long)clientId, jobId, toString(type));
-
+                                   const std::function<void()> runnable, int32_t arg) {
     std::scoped_lock lock{mLock};
 
-    mQueue.push_back({type, clientId, jobId, runnable});
+    mQueue.push_back({type, clientId, jobId, runnable, arg});
     mCondition.notify_one();
 }
 
@@ -457,8 +491,7 @@ void TranscoderWrapper::threadLoop() {
         Event event = *mQueue.begin();
         mQueue.pop_front();
 
-        ALOGD("%s: job {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId, event.jobId,
-              toString(event.type));
+        ALOGD("%s: %s", __FUNCTION__, toString(event).c_str());
 
         lock.unlock();
         event.runnable();

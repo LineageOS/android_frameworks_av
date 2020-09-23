@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
     // Called before subsequent visible lifetimes
     // for an activity process.
     @Override
-    public void onRestart(){
+    public void onRestart() {
         super.onRestart();
         // Load changes knowing that the Activity has already
         // been visible within this process.
@@ -54,14 +54,14 @@ public class MainActivity extends Activity {
 
     // Called at the start of the visible lifetime.
     @Override
-    public void onStart(){
+    public void onStart() {
         super.onStart();
         // Apply any required UI change now that the Activity is visible.
     }
 
     // Called at the start of the active lifetime.
     @Override
-    public void onResume(){
+    public void onResume() {
         super.onResume();
         // Resume any paused UI updates, threads, or processes required
         // by the Activity but suspended when it was inactive.
@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
 
     // Called at the end of the active lifetime.
     @Override
-    public void onPause(){
+    public void onPause() {
         // Suspend UI updates, threads, or CPU intensive processes
         // that don't need to be updated when the Activity isn't
         // the active foreground Activity.
@@ -89,7 +89,7 @@ public class MainActivity extends Activity {
 
     // Called at the end of the visible lifetime.
     @Override
-    public void onStop(){
+    public void onStop() {
         // Suspend remaining UI updates, threads, or processing
         // that aren't required when the Activity isn't visible.
         // Persist all edits or state changes
@@ -99,10 +99,9 @@ public class MainActivity extends Activity {
 
     // Sometimes called at the end of the full lifetime.
     @Override
-    public void onDestroy(){
+    public void onDestroy() {
         // Clean up any resources including ending threads,
         // closing database connections etc.
         super.onDestroy();
     }
-
 }

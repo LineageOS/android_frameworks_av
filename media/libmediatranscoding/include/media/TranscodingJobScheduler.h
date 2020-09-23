@@ -18,6 +18,7 @@
 #define ANDROID_MEDIA_TRANSCODING_JOB_SCHEDULER_H
 
 #include <aidl/android/media/TranscodingJobPriority.h>
+#include <media/ResourcePolicyInterface.h>
 #include <media/SchedulerClientInterface.h>
 #include <media/TranscoderInterface.h>
 #include <media/TranscodingRequest.h>
@@ -34,7 +35,8 @@ using ::aidl::android::media::TranscodingResultParcel;
 
 class TranscodingJobScheduler : public UidPolicyCallbackInterface,
                                 public SchedulerClientInterface,
-                                public TranscoderCallbackInterface {
+                                public TranscoderCallbackInterface,
+                                public ResourcePolicyCallbackInterface {
 public:
     virtual ~TranscodingJobScheduler();
 
@@ -58,8 +60,11 @@ public:
 
     // UidPolicyCallbackInterface
     void onTopUidsChanged(const std::unordered_set<uid_t>& uids) override;
-    void onResourceAvailable() override;
     // ~UidPolicyCallbackInterface
+
+    // ResourcePolicyCallbackInterface
+    void onResourceAvailable() override;
+    // ~ResourcePolicyCallbackInterface
 
 private:
     friend class MediaTranscodingService;
@@ -96,13 +101,15 @@ private:
 
     std::shared_ptr<TranscoderInterface> mTranscoder;
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
+    std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
 
     Job* mCurrentJob;
     bool mResourceLost;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
     TranscodingJobScheduler(const std::shared_ptr<TranscoderInterface>& transcoder,
-                            const std::shared_ptr<UidPolicyInterface>& uidPolicy);
+                            const std::shared_ptr<UidPolicyInterface>& uidPolicy,
+                            const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy);
 
     Job* getTopJob_l();
     void updateCurrentJob_l();

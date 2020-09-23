@@ -18,6 +18,7 @@
 #define ANDROID_TRANSCODER_WRAPPER_H
 
 #include <android-base/thread_annotations.h>
+#include <media/NdkMediaError.h>
 #include <media/TranscoderInterface.h>
 
 #include <list>
@@ -55,6 +56,7 @@ private:
         ClientIdType clientId;
         JobIdType jobId;
         std::function<void()> runnable;
+        int32_t arg;
     };
     using JobKeyType = std::pair<ClientIdType, JobIdType>;
 
@@ -68,26 +70,27 @@ private:
     ClientIdType mCurrentClientId;
     JobIdType mCurrentJobId;
 
-    static const char* toString(Event::Type type);
+    static std::string toString(const Event& event);
     void onFinish(ClientIdType clientId, JobIdType jobId);
-    void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode error);
+    void onError(ClientIdType clientId, JobIdType jobId, media_status_t status);
     void onProgress(ClientIdType clientId, JobIdType jobId, int32_t progress);
 
-    TranscodingErrorCode handleStart(ClientIdType clientId, JobIdType jobId,
-                                     const TranscodingRequestParcel& request,
-                                     const std::shared_ptr<ITranscodingClientCallback>& callback);
-    TranscodingErrorCode handlePause(ClientIdType clientId, JobIdType jobId);
-    TranscodingErrorCode handleResume(ClientIdType clientId, JobIdType jobId,
-                                      const TranscodingRequestParcel& request,
-                                      const std::shared_ptr<ITranscodingClientCallback>& callback);
-    TranscodingErrorCode setupTranscoder(
-            ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
-            const std::shared_ptr<ITranscodingClientCallback>& callback,
-            const std::shared_ptr<const Parcel>& pausedState = nullptr);
+    media_status_t handleStart(ClientIdType clientId, JobIdType jobId,
+                               const TranscodingRequestParcel& request,
+                               const std::shared_ptr<ITranscodingClientCallback>& callback);
+    media_status_t handlePause(ClientIdType clientId, JobIdType jobId);
+    media_status_t handleResume(ClientIdType clientId, JobIdType jobId,
+                                const TranscodingRequestParcel& request,
+                                const std::shared_ptr<ITranscodingClientCallback>& callback);
+    media_status_t setupTranscoder(ClientIdType clientId, JobIdType jobId,
+                                   const TranscodingRequestParcel& request,
+                                   const std::shared_ptr<ITranscodingClientCallback>& callback,
+                                   const std::shared_ptr<const Parcel>& pausedState = nullptr);
 
     void cleanup();
+    void reportError(ClientIdType clientId, JobIdType jobId, media_status_t err);
     void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
-                    const std::function<void()> runnable);
+                    const std::function<void()> runnable, int32_t arg = 0);
     void threadLoop();
 };
 

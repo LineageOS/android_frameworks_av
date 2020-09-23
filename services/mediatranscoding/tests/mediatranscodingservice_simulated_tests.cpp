@@ -59,7 +59,11 @@ constexpr const char* kClientOpPackageName = "TestClientPackage";
 
 class MediaTranscodingServiceSimulatedTest : public MediaTranscodingServiceTestBase {
 public:
-    MediaTranscodingServiceSimulatedTest() {}
+    MediaTranscodingServiceSimulatedTest() { ALOGI("MediaTranscodingServiceResourceTest created"); }
+
+    virtual ~MediaTranscodingServiceSimulatedTest() {
+        ALOGI("MediaTranscodingServiceResourceTest destroyed");
+    }
 };
 
 TEST_F(MediaTranscodingServiceSimulatedTest, TestRegisterNullClient) {
