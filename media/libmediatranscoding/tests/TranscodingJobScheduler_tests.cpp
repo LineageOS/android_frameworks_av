@@ -213,7 +213,8 @@ public:
         ALOGI("TranscodingJobSchedulerTest set up");
         mTranscoder.reset(new TestTranscoder());
         mUidPolicy.reset(new TestUidPolicy());
-        mScheduler.reset(new TranscodingJobScheduler(mTranscoder, mUidPolicy));
+        mScheduler.reset(
+                new TranscodingJobScheduler(mTranscoder, mUidPolicy, nullptr /*resourcePolicy*/));
         mUidPolicy->setCallback(mScheduler);
 
         // Set priority only, ignore other fields for now.

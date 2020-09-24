@@ -37,6 +37,8 @@ private:
     void setTo(const TranscodingRequestParcel& parcel) {
         sourceFilePath = parcel.sourceFilePath;
         destinationFilePath = parcel.destinationFilePath;
+        clientUid = parcel.clientUid;
+        clientPid = parcel.clientPid;
         transcodingType = parcel.transcodingType;
         requestedVideoTrackFormat = parcel.requestedVideoTrackFormat;
         priority = parcel.priority;
