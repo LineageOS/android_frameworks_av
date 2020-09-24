@@ -428,16 +428,17 @@ public:
     static bool     isHapticPlaybackSupported();
 
     static status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
-    static status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
-                                                        product_strategy_t &productStrategy);
+    static status_t getProductStrategyFromAudioAttributes(
+            const AudioAttributes &aa, product_strategy_t &productStrategy,
+            bool fallbackOnDefault = true);
 
     static audio_attributes_t streamTypeToAttributes(audio_stream_type_t stream);
     static audio_stream_type_t attributesToStreamType(const audio_attributes_t &attr);
 
     static status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups);
 
-    static status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
-                                                      volume_group_t &volumeGroup);
+    static status_t getVolumeGroupFromAudioAttributes(
+            const AudioAttributes &aa, volume_group_t &volumeGroup, bool fallbackOnDefault = true);
 
     static status_t setRttEnabled(bool enabled);
 

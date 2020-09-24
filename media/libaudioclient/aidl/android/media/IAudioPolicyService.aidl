@@ -296,10 +296,12 @@ interface IAudioPolicyService {
     boolean isHapticPlaybackSupported();
 
     AudioProductStrategy[] listAudioProductStrategies();
-    int /* product_strategy_t */ getProductStrategyFromAudioAttributes(in AudioAttributesEx aa);
+    int /* product_strategy_t */ getProductStrategyFromAudioAttributes(in AudioAttributesEx aa,
+                                                                       boolean fallbackOnDefault);
 
     AudioVolumeGroup[] listAudioVolumeGroups();
-    int /* volume_group_t */ getVolumeGroupFromAudioAttributes(in AudioAttributesEx aa);
+    int /* volume_group_t */ getVolumeGroupFromAudioAttributes(in AudioAttributesEx aa,
+                                                               boolean fallbackOnDefault);
 
     void setRttEnabled(boolean enabled);
 
