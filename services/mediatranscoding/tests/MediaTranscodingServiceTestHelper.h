@@ -168,6 +168,32 @@ struct EventTracker {
         return mPoppedEvent;
     }
 
+    bool waitForSpecificEventAndPop(const Event& target, std::list<Event>* outEvents,
+                                    int64_t timeoutUs = 0) {
+        std::unique_lock lock(mLock);
+
+        auto startTime = std::chrono::system_clock::now();
+
+        std::list<Event>::iterator it;
+        while (((it = std::find(mEventQueue.begin(), mEventQueue.end(), target)) ==
+                mEventQueue.end()) &&
+               timeoutUs > 0) {
+            std::cv_status status = mCondition.wait_for(lock, std::chrono::microseconds(timeoutUs));
+            if (status == std::cv_status::timeout) {
+                break;
+            }
+            std::chrono::microseconds elapsedTime = std::chrono::system_clock::now() - startTime;
+            timeoutUs -= elapsedTime.count();
+        }
+
+        if (it == mEventQueue.end()) {
+            return false;
+        }
+        *outEvents = std::list<Event>(mEventQueue.begin(), std::next(it));
+        mEventQueue.erase(mEventQueue.begin(), std::next(it));
+        return true;
+    }
+
     // Push 1 event to back.
     void append(const Event& event,
                 const TranscodingErrorCode err = TranscodingErrorCode::kNoError) {
@@ -186,7 +212,7 @@ struct EventTracker {
         mUpdateCount++;
     }
 
-    int getUpdateCount(int *lastProgress) {
+    int getUpdateCount(int* lastProgress) {
         std::unique_lock lock(mLock);
         *lastProgress = mLastProgress;
         return mUpdateCount;

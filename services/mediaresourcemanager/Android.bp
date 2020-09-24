@@ -58,6 +58,9 @@ cc_library {
         "libbinder_ndk",
         "libutils",
         "liblog",
+    ],
+
+    static_libs: [
         "resourceobserver_aidl_interface-ndk_platform",
     ],
 

@@ -25,6 +25,7 @@
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingJobScheduler.h>
+#include <media/TranscodingResourcePolicy.h>
 #include <media/TranscodingUidPolicy.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Log.h>
@@ -57,11 +58,13 @@ static bool isTrustedCallingUid(uid_t uid) {
 MediaTranscodingService::MediaTranscodingService(
         const std::shared_ptr<TranscoderInterface>& transcoder)
       : mUidPolicy(new TranscodingUidPolicy()),
-        mJobScheduler(new TranscodingJobScheduler(transcoder, mUidPolicy)),
+        mResourcePolicy(new TranscodingResourcePolicy()),
+        mJobScheduler(new TranscodingJobScheduler(transcoder, mUidPolicy, mResourcePolicy)),
         mClientManager(new TranscodingClientManager(mJobScheduler)) {
     ALOGV("MediaTranscodingService is created");
     transcoder->setCallback(mJobScheduler);
     mUidPolicy->setCallback(mJobScheduler);
+    mResourcePolicy->setCallback(mJobScheduler);
 }
 
 MediaTranscodingService::~MediaTranscodingService() {

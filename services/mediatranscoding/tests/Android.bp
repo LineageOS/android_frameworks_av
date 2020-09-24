@@ -25,14 +25,6 @@ cc_defaults {
     static_libs: [
         "mediatranscoding_aidl_interface-ndk_platform",
     ],
-}
-
-// MediaTranscodingService unit test using simulated transcoder
-cc_test {
-    name: "mediatranscodingservice_simulated_tests",
-    defaults: ["mediatranscodingservice_test_defaults"],
-
-    srcs: ["mediatranscodingservice_simulated_tests.cpp"],
 
     required: [
         "TranscodingUidPolicy_TestAppA",
@@ -41,10 +33,26 @@ cc_test {
     ],
 }
 
+// MediaTranscodingService unit test using simulated transcoder
+cc_test {
+    name: "mediatranscodingservice_simulated_tests",
+    defaults: ["mediatranscodingservice_test_defaults"],
+
+    srcs: ["mediatranscodingservice_simulated_tests.cpp"],
+}
+
 // MediaTranscodingService unit test using real transcoder
 cc_test {
     name: "mediatranscodingservice_real_tests",
     defaults: ["mediatranscodingservice_test_defaults"],
 
     srcs: ["mediatranscodingservice_real_tests.cpp"],
+}
+
+// MediaTranscodingService unit test related to resource management
+cc_test {
+    name: "mediatranscodingservice_resource_tests",
+    defaults: ["mediatranscodingservice_test_defaults"],
+
+    srcs: ["mediatranscodingservice_resource_tests.cpp"],
 }

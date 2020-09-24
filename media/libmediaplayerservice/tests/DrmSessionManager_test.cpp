@@ -65,6 +65,14 @@ struct FakeProcessInfo : public ProcessInfoInterface {
         return true;
     }
 
+    virtual bool overrideProcessInfo(
+            int /* pid */, int /* procState */, int /* oomScore */) {
+        return true;
+    }
+
+    virtual void removeProcessInfoOverride(int /* pid */) {
+    }
+
 private:
     DISALLOW_EVIL_CONSTRUCTORS(FakeProcessInfo);
 };

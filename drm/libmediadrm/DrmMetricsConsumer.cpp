@@ -37,8 +37,8 @@ template <typename T> std::string GetAttributeName(T type);
 template <> std::string GetAttributeName<KeyStatusType>(KeyStatusType type) {
     static const char *type_names[] = {"USABLE", "EXPIRED",
                                        "OUTPUT_NOT_ALLOWED", "STATUS_PENDING",
-                                       "INTERNAL_ERROR"};
-    if (((size_t)type) > arraysize(type_names)) {
+                                       "INTERNAL_ERROR", "USABLE_IN_FUTURE"};
+    if (((size_t)type) >= arraysize(type_names)) {
         return "UNKNOWN_TYPE";
     }
     return type_names[(size_t)type];
@@ -48,7 +48,7 @@ template <> std::string GetAttributeName<EventType>(EventType type) {
     static const char *type_names[] = {"PROVISION_REQUIRED", "KEY_NEEDED",
                                        "KEY_EXPIRED", "VENDOR_DEFINED",
                                        "SESSION_RECLAIMED"};
-    if (((size_t)type) > arraysize(type_names)) {
+    if (((size_t)type) >= arraysize(type_names)) {
         return "UNKNOWN_TYPE";
     }
     return type_names[(size_t)type];

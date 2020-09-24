@@ -39,6 +39,20 @@ parcelable TranscodingRequestParcel {
     @utf8InCpp String destinationFilePath;
 
     /**
+     * The UID of the client that this transcoding request is for. Only privileged caller could
+     * set this Uid as only they could do the transcoding on behalf of the client.
+     * -1 means not available.
+     */
+    int clientUid = -1;
+
+    /**
+     * The PID of the client that this transcoding request is for. Only privileged caller could
+     * set this Uid as only they could do the transcoding on behalf of the client.
+     * -1 means not available.
+     */
+    int clientPid = -1;
+
+    /**
      * Type of the transcoding.
      */
     TranscodingType transcodingType;

@@ -54,6 +54,7 @@ cc_library_shared {
     srcs: [
         "TranscodingClientManager.cpp",
         "TranscodingJobScheduler.cpp",
+        "TranscodingResourcePolicy.cpp",
         "TranscodingUidPolicy.cpp",
         "TranscoderWrapper.cpp",
     ],
@@ -67,11 +68,16 @@ cc_library_shared {
         "libbinder",
         "libmediandk",
     ],
+    export_shared_lib_headers: [
+        "libmediandk",
+    ],
 
     export_include_dirs: ["include"],
 
     static_libs: [
         "mediatranscoding_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk_platform",
+        "resourceobserver_aidl_interface-ndk_platform",
     ],
 
     cflags: [

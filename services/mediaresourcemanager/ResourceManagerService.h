@@ -19,6 +19,7 @@
 #define ANDROID_MEDIA_RESOURCEMANAGERSERVICE_H
 
 #include <map>
+#include <mutex>
 
 #include <aidl/android/media/BnResourceManagerService.h>
 #include <arpa/inet.h>
@@ -51,7 +52,7 @@ struct ResourceInfo {
     int64_t clientId;
     uid_t uid;
     std::shared_ptr<IResourceManagerClient> client;
-    sp<DeathNotifier> deathNotifier;
+    uintptr_t cookie{0};
     ResourceList resources;
     bool pendingRemoval{false};
 };
@@ -60,22 +61,6 @@ struct ResourceInfo {
 typedef KeyedVector<int64_t, ResourceInfo> ResourceInfos;
 typedef KeyedVector<int, ResourceInfos> PidResourceInfosMap;
 
-class DeathNotifier : public RefBase {
-public:
-    DeathNotifier(const std::shared_ptr<ResourceManagerService> &service,
-            int pid, int64_t clientId);
-
-    ~DeathNotifier() {}
-
-    // Implement death recipient
-    static void BinderDiedCallback(void* cookie);
-    void binderDied();
-
-private:
-    std::weak_ptr<ResourceManagerService> mService;
-    int mPid;
-    int64_t mClientId;
-};
 class ResourceManagerService : public BnResourceManagerService {
 public:
     struct SystemCallbackInterface : public RefBase {
@@ -128,12 +113,20 @@ public:
             int originalPid,
             int newPid) override;
 
+    Status overrideProcessInfo(
+            const std::shared_ptr<IResourceManagerClient>& client,
+            int pid,
+            int procState,
+            int oomScore) override;
+
     Status markClientForPendingRemoval(int32_t pid, int64_t clientId) override;
 
     Status removeResource(int pid, int64_t clientId, bool checkValid);
 
 private:
     friend class ResourceManagerServiceTest;
+    friend class DeathNotifier;
+    friend class OverrideProcessInfoDeathNotifier;
 
     // Gets the list of all the clients who own the specified resource type.
     // Returns false if any client belongs to a process with higher priority than the
@@ -173,6 +166,12 @@ private:
     // Get priority from process's pid
     bool getPriority_l(int pid, int* priority);
 
+    void removeProcessInfoOverride(int pid);
+
+    void removeProcessInfoOverride_l(int pid);
+    uintptr_t addCookieAndLink_l(::ndk::SpAIBinder binder, const sp<DeathNotifier>& notifier);
+    void removeCookieAndUnlink_l(::ndk::SpAIBinder binder, uintptr_t cookie);
+
     mutable Mutex mLock;
     sp<ProcessInfoInterface> mProcessInfo;
     sp<SystemCallbackInterface> mSystemCB;
@@ -182,7 +181,16 @@ private:
     bool mSupportsSecureWithNonSecureCodec;
     int32_t mCpuBoostCount;
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
+    struct ProcessInfoOverride {
+        uintptr_t cookie;
+        std::shared_ptr<IResourceManagerClient> client;
+    };
     std::map<int, int> mOverridePidMap;
+    std::map<pid_t, ProcessInfoOverride> mProcessInfoOverrideMap;
+    static std::mutex sCookieLock;
+    static uintptr_t sCookieCounter GUARDED_BY(sCookieLock);
+    static std::map<uintptr_t, sp<DeathNotifier> > sCookieToDeathNotifierMap
+            GUARDED_BY(sCookieLock);
     std::shared_ptr<ResourceObserverService> mObserverService;
 };
 
