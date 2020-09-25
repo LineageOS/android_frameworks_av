@@ -149,7 +149,7 @@ aaudio_result_t AudioStreamInternalCapture::processDataNow(void *buffer, int32_t
                 // Calculate frame position based off of the readCounter because
                 // the writeCounter might have just advanced in the background,
                 // causing us to sleep until a later burst.
-                int64_t nextPosition = mAudioEndpoint->getDataReadCounter() + mFramesPerBurst;
+                int64_t nextPosition = mAudioEndpoint->getDataReadCounter() + getFramesPerBurst();
                 wakeTime = mClockModel.convertPositionToLatestTime(nextPosition);
             }
                 break;

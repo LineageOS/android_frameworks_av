@@ -64,8 +64,6 @@ public:
 
     int32_t getBufferCapacity() const override;
 
-    int32_t getFramesPerBurst() const override;
-
     int32_t getXRunCount() const override {
         return mXRunCount;
     }
@@ -159,7 +157,6 @@ protected:
 
     aaudio_handle_t          mServiceStreamHandle; // opaque handle returned from service
 
-    int32_t                  mFramesPerBurst = MIN_FRAMES_PER_BURST; // frames per HAL transfer
     int32_t                  mXRunCount = 0;      // how many underrun events?
 
     // Offset from underlying frame position.
