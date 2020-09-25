@@ -26,6 +26,7 @@
 #include <gtest/gtest.h>
 #include <media/MediaSampleReaderNDK.h>
 #include <utils/Timers.h>
+
 #include <cmath>
 #include <mutex>
 #include <thread>

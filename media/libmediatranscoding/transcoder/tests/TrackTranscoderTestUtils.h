@@ -102,4 +102,25 @@ private:
     bool mTrackFormatAvailable = false;
 };
 
+class OneShotSemaphore {
+public:
+    void wait() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (!mSignaled) {
+            mCondition.wait(lock);
+        }
+    }
+
+    void signal() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mSignaled = true;
+        mCondition.notify_all();
+    }
+
+private:
+    std::mutex mMutex;
+    std::condition_variable mCondition;
+    bool mSignaled = false;
+};
+
 };  // namespace android
