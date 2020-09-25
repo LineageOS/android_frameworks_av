@@ -118,7 +118,7 @@ const int32 cosTerms_1_ov_cos_phi_N6[6] =
 ; FUNCTION CODE
 ----------------------------------------------------------------------------*/
 
-
+__attribute__((no_sanitize("integer")))
 void pvmp3_mdct_6(int32 vec[], int32 *history)
 {
     int32 i;
