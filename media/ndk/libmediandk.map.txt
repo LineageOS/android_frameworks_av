@@ -131,6 +131,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_SAR_WIDTH; # var introduced=29
     AMEDIAFORMAT_KEY_SEI; # var introduced=28
     AMEDIAFORMAT_KEY_SLICE_HEIGHT; # var introduced=28
+    AMEDIAFORMAT_KEY_SLOW_MOTION_MARKERS; # var introduced=31
     AMEDIAFORMAT_KEY_STRIDE; # var introduced=21
     AMEDIAFORMAT_KEY_TARGET_TIME; # var introduced=29
     AMEDIAFORMAT_KEY_TEMPORAL_LAYER_COUNT; # var introduced=29
