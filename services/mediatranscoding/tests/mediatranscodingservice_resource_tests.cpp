@@ -81,10 +81,10 @@ TEST_F(MediaTranscodingServiceResourceTest, TestResourceLost) {
 
     // Submit job to Client1.
     ALOGD("Submitting job to client1 (app A) ...");
-    EXPECT_TRUE(submit(mClient1, 0, srcPath0, dstPath0, TranscodingJobPriority::kNormal, kBitRate));
+    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingJobPriority::kNormal, kBitRate));
 
     // Client1's job should start immediately.
-    EXPECT_EQ(mClientCallback1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
 
     // Launch ResourcePolicyTestActivity, which will try to allocate up to 32
     // instances, which should trigger insufficient resources on most devices.
@@ -96,8 +96,8 @@ TEST_F(MediaTranscodingServiceResourceTest, TestResourceLost) {
     // The basic requirement is that the job should complete. Wait for finish
     // event to come and pop up all events received.
     std::list<EventTracker::Event> events;
-    EXPECT_TRUE(mClientCallback1->waitForSpecificEventAndPop(EventTracker::Finished(CLIENT(1), 0),
-                                                             &events, 15000000));
+    EXPECT_TRUE(mClient1->waitForSpecificEventAndPop(EventTracker::Finished(CLIENT(1), 0), &events,
+                                                     15000000));
 
     // If there is only 1 event, it must be finish (otherwise waitForSpecificEventAndPop
     // woudldn't pop up anything), and we're ok.
