@@ -28,6 +28,7 @@ class TranscodingRequest : public TranscodingRequestParcel {
 public:
     TranscodingRequest() = default;
     TranscodingRequest(const TranscodingRequestParcel& parcel) { setTo(parcel); }
+    TranscodingRequest(const TranscodingRequest& request) { setTo(request); }
     TranscodingRequest& operator=(const TranscodingRequest& request) {
         setTo(request);
         return *this;
@@ -36,9 +37,9 @@ public:
 private:
     void setTo(const TranscodingRequestParcel& parcel) {
         sourceFilePath = parcel.sourceFilePath;
-        sourceFd = parcel.sourceFd;
+        sourceFd = ndk::ScopedFileDescriptor(dup(parcel.sourceFd.get()));
         destinationFilePath = parcel.destinationFilePath;
-        destinationFd = parcel.destinationFd;
+        destinationFd = ndk::ScopedFileDescriptor(dup(parcel.destinationFd.get()));
         clientUid = parcel.clientUid;
         clientPid = parcel.clientPid;
         clientPackageName = parcel.clientPackageName;
