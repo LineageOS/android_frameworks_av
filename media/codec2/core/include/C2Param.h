@@ -508,6 +508,14 @@ protected:
         return _mIndex.setPort(output);
     }
 
+    /// sets the size of this parameter.
+    inline void setSize(size_t size) {
+        if (size < sizeof(C2Param)) {
+            size = 0;
+        }
+        _mSize = c2_min(size, _mSize);
+    }
+
 public:
     /// invalidate this parameter. There is no recovery from this call; e.g. parameter
     /// cannot be 'corrected' to be valid.
