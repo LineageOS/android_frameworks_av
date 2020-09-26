@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "0f44252a_dd01f95d",
+        "filename": "services/audiopolicy/enginedefault/src/Engine.cpp",
+        "patchSetId": 2
+      },
+      "lineNbr": 261,
+      "author": {
+        "id": 10258
+      },
+      "writtenOn": "2020-09-26T07:41:54Z",
+      "side": 1,
+      "message": "moved ahead after https://source.codeaurora.org/quic/la/platform/frameworks/av/commit/services/audiopolicy/enginedefault/src/Engine.cpp?h\u003dLA.QSSI.11.0.r1-06000-qssi.0\u0026id\u003d16009ef346808c94f3bc5d39478476cfddbc10fc",
+      "range": {
+        "startLine": 258,
+        "startChar": 0,
+        "endLine": 261,
+        "endChar": 13
+      },
+      "revId": "4a97bed4195d178d27f6e3f4b4614ff6924b5824",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
