@@ -8781,7 +8781,6 @@ AudioFlinger::MmapThread::MmapThread(
 
 AudioFlinger::MmapThread::~MmapThread()
 {
-    releaseWakeLock_l();
 }
 
 void AudioFlinger::MmapThread::onFirstRef()
@@ -8831,7 +8830,6 @@ status_t AudioFlinger::MmapThread::createMmapBuffer(int32_t minSizeFrames,
         return NO_INIT;
     }
     mStandby = true;
-    acquireWakeLock();
     return mHalStream->createMmapBuffer(minSizeFrames, info);
 }
 
@@ -8870,8 +8868,12 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     status_t ret;
 
     if (*handle == mPortId) {
-        // for the first track, reuse portId and session allocated when the stream was opened
-        return exitStandby();
+        // For the first track, reuse portId and session allocated when the stream was opened.
+        ret = exitStandby();
+        if (ret == NO_ERROR) {
+            acquireWakeLock();
+        }
+        return ret;
     }
 
     audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
@@ -8992,6 +8994,7 @@ status_t AudioFlinger::MmapThread::stop(audio_port_handle_t handle)
 
     if (handle == mPortId) {
         mHalStream->stop();
+        releaseWakeLock();
         return NO_ERROR;
     }
 
