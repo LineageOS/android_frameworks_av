@@ -20,6 +20,7 @@
 #define LOG_TAG "MediaTranscoderTests"
 
 #include <android-base/logging.h>
+#include <android/binder_process.h>
 #include <fcntl.h>
 #include <gtest/gtest.h>
 #include <media/MediaSampleReaderNDK.h>
@@ -72,7 +73,13 @@ public:
     }
 
     virtual void onProgressUpdate(const MediaTranscoder* transcoder __unused,
-                                  int32_t progress __unused) override {}
+                                  int32_t progress) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        if (progress > 0 && !mProgressMade) {
+            mProgressMade = true;
+            mCondition.notify_all();
+        }
+    }
 
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
                                      const std::shared_ptr<const Parcel>& pausedState
@@ -85,12 +92,19 @@ public:
         }
     }
 
+    void waitForProgressMade() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (!mProgressMade && !mFinished) {
+            mCondition.wait(lock);
+        }
+    }
     media_status_t mStatus = AMEDIA_OK;
 
 private:
     std::mutex mMutex;
     std::condition_variable mCondition;
     bool mFinished = false;
+    bool mProgressMade = false;
 };
 
 // Write-only, create file if non-existent, don't overwrite existing file.
@@ -106,6 +120,7 @@ public:
     void SetUp() override {
         LOG(DEBUG) << "MediaTranscoderTests set up";
         mCallbacks = std::make_shared<TestCallbacks>();
+        ABinderProcess_startThreadPool();
     }
 
     void TearDown() override {
@@ -126,9 +141,16 @@ public:
         return (float)diff * 100.0f / s1.st_size;
     }
 
+    typedef enum {
+        kRunToCompletion,
+        kCancelAfterProgress,
+        kCancelAfterStart,
+    } TranscodeExecutionControl;
+
     using FormatConfigurationCallback = std::function<AMediaFormat*(AMediaFormat*)>;
     media_status_t transcodeHelper(const char* srcPath, const char* destPath,
-                                   FormatConfigurationCallback formatCallback) {
+                                   FormatConfigurationCallback formatCallback,
+                                   TranscodeExecutionControl executionControl = kRunToCompletion) {
         auto transcoder = MediaTranscoder::create(mCallbacks, nullptr);
         EXPECT_NE(transcoder, nullptr);
 
@@ -160,7 +182,18 @@ public:
         media_status_t startStatus = transcoder->start();
         EXPECT_EQ(startStatus, AMEDIA_OK);
         if (startStatus == AMEDIA_OK) {
-            mCallbacks->waitForTranscodingFinished();
+            switch (executionControl) {
+            case kCancelAfterProgress:
+                mCallbacks->waitForProgressMade();
+                FALLTHROUGH_INTENDED;
+            case kCancelAfterStart:
+                transcoder->cancel();
+                break;
+            case kRunToCompletion:
+            default:
+                mCallbacks->waitForTranscodingFinished();
+                break;
+            }
         }
         close(srcFd);
         close(dstFd);
@@ -308,6 +341,41 @@ TEST_F(MediaTranscoderTests, TestCustomBitrate) {
     // The source asset is very short and heavily compressed from the beginning so don't expect the
     // requested bitrate to be exactly matched. However 40% difference seems reasonable.
     EXPECT_GT(getFileSizeDiffPercent(destPath1, destPath2), 40);
+}
+
+static AMediaFormat* getAVCVideoFormat(AMediaFormat* sourceFormat) {
+    AMediaFormat* format = nullptr;
+    const char* mime = nullptr;
+    AMediaFormat_getString(sourceFormat, AMEDIAFORMAT_KEY_MIME, &mime);
+
+    if (strncmp(mime, "video/", 6) == 0) {
+        format = AMediaFormat_new();
+        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_AVC);
+    }
+
+    return format;
+}
+
+TEST_F(MediaTranscoderTests, TestCancelAfterProgress) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_Cancel.MP4";
+
+    for (int i = 0; i < 32; ++i) {
+        EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kCancelAfterProgress),
+                  AMEDIA_OK);
+        mCallbacks = std::make_shared<TestCallbacks>();
+    }
+}
+
+TEST_F(MediaTranscoderTests, TestCancelAfterStart) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_Cancel.MP4";
+
+    for (int i = 0; i < 32; ++i) {
+        EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kCancelAfterStart),
+                  AMEDIA_OK);
+        mCallbacks = std::make_shared<TestCallbacks>();
+    }
 }
 
 }  // namespace android
