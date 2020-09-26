@@ -48,7 +48,6 @@ public:
 
     Status registerClient(const std::shared_ptr<ITranscodingClientCallback>& in_callback,
                           const std::string& in_clientName, const std::string& in_opPackageName,
-                          int32_t in_clientUid, int32_t in_clientPid,
                           std::shared_ptr<ITranscodingClient>* _aidl_return) override;
 
     Status getNumOfClients(int32_t* _aidl_return) override;

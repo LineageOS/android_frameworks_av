@@ -94,7 +94,10 @@ bool MediaTrackTranscoder::stop() {
         abortTranscodeLoop();
         mMediaSampleReader->setEnforceSequentialAccess(false);
         mTranscodingThread.join();
-        mOutputQueue->abort();  // Wake up any threads waiting for samples.
+        {
+            std::scoped_lock lock{mSampleMutex};
+            mSampleQueue.abort();  // Release any buffered samples.
+        }
         mState = STOPPED;
         return true;
     }
@@ -109,8 +112,24 @@ void MediaTrackTranscoder::notifyTrackFormatAvailable() {
     }
 }
 
-std::shared_ptr<MediaSampleQueue> MediaTrackTranscoder::getOutputQueue() const {
-    return mOutputQueue;
+void MediaTrackTranscoder::onOutputSampleAvailable(const std::shared_ptr<MediaSample>& sample) {
+    std::scoped_lock lock{mSampleMutex};
+    if (mSampleConsumer == nullptr) {
+        mSampleQueue.enqueue(sample);
+    } else {
+        mSampleConsumer(sample);
+    }
+}
+
+void MediaTrackTranscoder::setSampleConsumer(
+        const MediaSampleWriter::MediaSampleConsumerFunction& sampleConsumer) {
+    std::scoped_lock lock{mSampleMutex};
+    mSampleConsumer = sampleConsumer;
+
+    std::shared_ptr<MediaSample> sample;
+    while (!mSampleQueue.isEmpty() && !mSampleQueue.dequeue(&sample)) {
+        mSampleConsumer(sample);
+    }
 }
 
 }  // namespace android

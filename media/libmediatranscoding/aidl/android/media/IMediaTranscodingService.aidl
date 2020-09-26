@@ -58,17 +58,13 @@ interface IMediaTranscodingService {
      *        the client.
      * @param clientName name of the client.
      * @param opPackageName op package name of the client.
-     * @param clientUid user id of the client.
-     * @param clientPid process id of the client.
      * @return an ITranscodingClient interface object, with nullptr indicating
      *         failure to register.
      */
     ITranscodingClient registerClient(
             in ITranscodingClientCallback callback,
             in String clientName,
-            in String opPackageName,
-            in int clientUid,
-            in int clientPid);
+            in String opPackageName);
 
     /**
     * Returns the number of clients. This is used for debugging.

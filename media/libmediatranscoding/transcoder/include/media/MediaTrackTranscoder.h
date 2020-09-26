@@ -19,6 +19,7 @@
 
 #include <media/MediaSampleQueue.h>
 #include <media/MediaSampleReader.h>
+#include <media/MediaSampleWriter.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
 #include <utils/Mutex.h>
@@ -75,10 +76,13 @@ public:
     bool stop();
 
     /**
-     * Retrieves the track transcoder's output sample queue.
-     * @return The output sample queue.
+     * Set the sample consumer function. The MediaTrackTranscoder will deliver transcoded samples to
+     * this function. If the MediaTrackTranscoder is started before a consumer is set the transcoder
+     * will buffer a limited number of samples internally before stalling. Once a consumer has been
+     * set the internally buffered samples will be delivered to the consumer.
+     * @param sampleConsumer The sample consumer function.
      */
-    std::shared_ptr<MediaSampleQueue> getOutputQueue() const;
+    void setSampleConsumer(const MediaSampleWriter::MediaSampleConsumerFunction& sampleConsumer);
 
     /**
       * Retrieves the track transcoder's final output format. The output is available after the
@@ -91,11 +95,13 @@ public:
 
 protected:
     MediaTrackTranscoder(const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback)
-          : mOutputQueue(std::make_shared<MediaSampleQueue>()),
-            mTranscoderCallback(transcoderCallback){};
+          : mTranscoderCallback(transcoderCallback){};
 
     // Called by subclasses when the actual track format becomes available.
     void notifyTrackFormatAvailable();
+
+    // Called by subclasses when a transcoded sample is available.
+    void onOutputSampleAvailable(const std::shared_ptr<MediaSample>& sample);
 
     // configureDestinationFormat needs to be implemented by subclasses, and gets called on an
     // external thread before start.
@@ -110,12 +116,14 @@ protected:
     // be aborted as soon as possible. It should be safe to call abortTranscodeLoop multiple times.
     virtual void abortTranscodeLoop() = 0;
 
-    std::shared_ptr<MediaSampleQueue> mOutputQueue;
     std::shared_ptr<MediaSampleReader> mMediaSampleReader;
     int mTrackIndex;
     std::shared_ptr<AMediaFormat> mSourceFormat;
 
 private:
+    std::mutex mSampleMutex;
+    MediaSampleQueue mSampleQueue GUARDED_BY(mSampleMutex);
+    MediaSampleWriter::MediaSampleConsumerFunction mSampleConsumer GUARDED_BY(mSampleMutex);
     const std::weak_ptr<MediaTrackTranscoderCallback> mTranscoderCallback;
     std::mutex mStateMutex;
     std::thread mTranscodingThread GUARDED_BY(mStateMutex);
