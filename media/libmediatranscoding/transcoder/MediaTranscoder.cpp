@@ -155,7 +155,7 @@ void MediaTranscoder::onTrackFinished(const MediaTrackTranscoder* transcoder) {
 }
 
 void MediaTranscoder::onTrackError(const MediaTrackTranscoder* transcoder, media_status_t status) {
-    LOG(DEBUG) << "TrackTranscoder " << transcoder << " returned error " << status;
+    LOG(ERROR) << "TrackTranscoder " << transcoder << " returned error " << status;
     sendCallback(status);
 }
 
