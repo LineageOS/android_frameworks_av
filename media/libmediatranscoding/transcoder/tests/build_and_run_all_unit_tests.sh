@@ -25,22 +25,22 @@ fi
 echo "========================================"
 
 echo "testing MediaSampleReaderNDK"
-adb shell /data/nativetest64/MediaSampleReaderNDKTests/MediaSampleReaderNDKTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/MediaSampleReaderNDKTests/MediaSampleReaderNDKTests
 
 echo "testing MediaSampleQueue"
-adb shell /data/nativetest64/MediaSampleQueueTests/MediaSampleQueueTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/MediaSampleQueueTests/MediaSampleQueueTests
 
 echo "testing MediaTrackTranscoder"
-adb shell /data/nativetest64/MediaTrackTranscoderTests/MediaTrackTranscoderTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/MediaTrackTranscoderTests/MediaTrackTranscoderTests
 
 echo "testing VideoTrackTranscoder"
-adb shell /data/nativetest64/VideoTrackTranscoderTests/VideoTrackTranscoderTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/VideoTrackTranscoderTests/VideoTrackTranscoderTests
 
 echo "testing PassthroughTrackTranscoder"
-adb shell /data/nativetest64/PassthroughTrackTranscoderTests/PassthroughTrackTranscoderTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/PassthroughTrackTranscoderTests/PassthroughTrackTranscoderTests
 
 echo "testing MediaSampleWriter"
-adb shell /data/nativetest64/MediaSampleWriterTests/MediaSampleWriterTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/MediaSampleWriterTests/MediaSampleWriterTests
 
 echo "testing MediaTranscoder"
-adb shell /data/nativetest64/MediaTranscoderTests/MediaTranscoderTests
+adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/MediaTranscoderTests/MediaTranscoderTests
