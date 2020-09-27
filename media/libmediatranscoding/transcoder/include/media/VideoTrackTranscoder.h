@@ -51,11 +51,13 @@ private:
     public:
         void push(T const& value, bool front = false);
         T pop();
+        void abort();
 
     private:
         std::mutex mMutex;
         std::condition_variable mCondition;
         std::deque<T> mQueue;
+        bool mAborted = false;
     };
     class CodecWrapper;
 

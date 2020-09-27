@@ -17,17 +17,19 @@
 #ifndef ANDROID_MEDIA_SAMPLE_WRITER_H
 #define ANDROID_MEDIA_SAMPLE_WRITER_H
 
-#include <media/MediaSampleQueue.h>
+#include <media/MediaSample.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
 #include <utils/Mutex.h>
 
+#include <condition_variable>
 #include <functional>
 #include <memory>
 #include <mutex>
-#include <set>
+#include <queue>
 #include <thread>
+#include <unordered_map>
 
 namespace android {
 
@@ -62,18 +64,16 @@ public:
 };
 
 /**
- * MediaSampleWriter writes samples to a muxer while keeping its input sources synchronized. Each
- * source track have its own MediaSampleQueue from which samples are dequeued by the sample writer
- * and written to the muxer. The sample writer always prioritizes dequeueing samples from the source
- * track that is farthest behind by comparing sample timestamps. If the slowest track does not have
- * any samples pending the writer moves on to the next track but never allows tracks to diverge more
- * than a configurable duration of time. The default muxer interface implementation is based
+ * MediaSampleWriter is a wrapper around a muxer. The sample writer puts samples on a queue that
+ * is serviced by an internal thread to minimize blocking time for clients. MediaSampleWriter also
+ * provides progress reporting. The default muxer interface implementation is based
  * directly on AMediaMuxer.
  */
-class MediaSampleWriter {
+class MediaSampleWriter : public std::enable_shared_from_this<MediaSampleWriter> {
 public:
-    /** The default maximum track divergence in microseconds. */
-    static constexpr uint32_t kDefaultMaxTrackDivergenceUs = 1 * 1000 * 1000;  // 1 second.
+    /** Function prototype for delivering media samples to the writer. */
+    using MediaSampleConsumerFunction =
+            std::function<void(const std::shared_ptr<MediaSample>& sample)>;
 
     /** Callback interface. */
     class CallbackInterface {
@@ -90,18 +90,7 @@ public:
         virtual ~CallbackInterface() = default;
     };
 
-    /**
-     * Constructor with custom maximum track divergence.
-     * @param maxTrackDivergenceUs The maximum track divergence in microseconds.
-     */
-    MediaSampleWriter(uint32_t maxTrackDivergenceUs)
-          : mMaxTrackDivergenceUs(maxTrackDivergenceUs), mMuxer(nullptr), mState(UNINITIALIZED){};
-
-    /** Constructor using the default maximum track divergence. */
-    MediaSampleWriter() : MediaSampleWriter(kDefaultMaxTrackDivergenceUs){};
-
-    /** Destructor. */
-    ~MediaSampleWriter();
+    static std::shared_ptr<MediaSampleWriter> Create();
 
     /**
      * Initializes the sample writer with its default muxer implementation. MediaSampleWriter needs
@@ -125,12 +114,12 @@ public:
     /**
      * Adds a new track to the sample writer. Tracks must be added after the sample writer has been
      * initialized and before it is started.
-     * @param sampleQueue The MediaSampleQueue to pull samples from.
      * @param trackFormat The format of the track to add.
-     * @return True if the track was successfully added.
+     * @return A sample consumer to add samples to if the track was successfully added, or nullptr
+     * if the track could not be added.
      */
-    bool addTrack(const std::shared_ptr<MediaSampleQueue>& sampleQueue /* nonnull */,
-                  const std::shared_ptr<AMediaFormat>& trackFormat /* nonnull */);
+    MediaSampleConsumerFunction addTrack(
+            const std::shared_ptr<AMediaFormat>& trackFormat /* nonnull */);
 
     /**
      * Starts the sample writer. The sample writer will start processing samples and writing them to
@@ -150,51 +139,69 @@ public:
      */
     bool stop();
 
+    /** Destructor. */
+    ~MediaSampleWriter();
+
 private:
     struct TrackRecord {
-        TrackRecord(const std::shared_ptr<MediaSampleQueue>& sampleQueue, size_t trackIndex,
-                    int64_t durationUs)
-              : mSampleQueue(sampleQueue),
-                mTrackIndex(trackIndex),
-                mDurationUs(durationUs),
+        TrackRecord(int64_t durationUs)
+              : mDurationUs(durationUs),
                 mFirstSampleTimeUs(0),
                 mPrevSampleTimeUs(INT64_MIN),
                 mFirstSampleTimeSet(false),
-                mReachedEos(false) {}
+                mReachedEos(false){};
 
-        std::shared_ptr<MediaSampleQueue> mSampleQueue;
-        const size_t mTrackIndex;
+        TrackRecord() : TrackRecord(0){};
+
         int64_t mDurationUs;
         int64_t mFirstSampleTimeUs;
         int64_t mPrevSampleTimeUs;
         bool mFirstSampleTimeSet;
         bool mReachedEos;
-
-        struct compare {
-            bool operator()(const TrackRecord* lhs, const TrackRecord* rhs) const {
-                return lhs->mPrevSampleTimeUs < rhs->mPrevSampleTimeUs;
-            }
-        };
     };
 
-    const uint32_t mMaxTrackDivergenceUs;
+    // Track index and sample.
+    using SampleEntry = std::pair<size_t, std::shared_ptr<MediaSample>>;
+
+    struct SampleComparator {
+        // Return true if lhs should come after rhs in the sample queue.
+        bool operator()(const SampleEntry& lhs, const SampleEntry& rhs) {
+            const bool lhsEos = lhs.second->info.flags & SAMPLE_FLAG_END_OF_STREAM;
+            const bool rhsEos = rhs.second->info.flags & SAMPLE_FLAG_END_OF_STREAM;
+
+            if (lhsEos && !rhsEos) {
+                return true;
+            } else if (!lhsEos && rhsEos) {
+                return false;
+            } else if (lhsEos && rhsEos) {
+                return lhs.first > rhs.first;
+            }
+
+            return lhs.second->info.presentationTimeUs > rhs.second->info.presentationTimeUs;
+        }
+    };
+
     std::weak_ptr<CallbackInterface> mCallbacks;
     std::shared_ptr<MediaSampleWriterMuxerInterface> mMuxer;
-    std::vector<std::unique_ptr<TrackRecord>> mAllTracks;
-    std::multiset<TrackRecord*, TrackRecord::compare> mSortedTracks;
-    std::thread mThread;
 
-    std::mutex mStateMutex;
+    std::mutex mMutex;  // Protects sample queue and state.
+    std::condition_variable mSampleSignal;
+    std::thread mThread;
+    std::unordered_map<size_t, TrackRecord> mTracks;
+    std::priority_queue<SampleEntry, std::vector<SampleEntry>, SampleComparator> mSampleQueue
+            GUARDED_BY(mMutex);
+
     enum : int {
         UNINITIALIZED,
         INITIALIZED,
         STARTED,
         STOPPED,
-    } mState GUARDED_BY(mStateMutex);
+    } mState GUARDED_BY(mMutex);
 
+    MediaSampleWriter() : mState(UNINITIALIZED){};
+    void addSampleToTrack(size_t trackIndex, const std::shared_ptr<MediaSample>& sample);
     media_status_t writeSamples();
     media_status_t runWriterLoop();
-    std::multiset<TrackRecord*>::iterator getNextOutputTrack();
 };
 
 }  // namespace android

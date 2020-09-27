@@ -23,6 +23,7 @@
 #include <inttypes.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingRequest.h>
+#include <private/android_filesystem_config.h>
 #include <utils/Log.h>
 namespace android {
 
@@ -44,6 +45,26 @@ std::map<ClientIdType, std::shared_ptr<TranscodingClientManager::ClientImpl>>
         TranscodingClientManager::sCookie2Client;
 ///////////////////////////////////////////////////////////////////////////////
 
+// Convenience methods for constructing binder::Status objects for error returns
+#define STATUS_ERROR_FMT(errorCode, errorString, ...) \
+    Status::fromServiceSpecificErrorWithMessage(      \
+            errorCode,                                \
+            String8::format("%s:%d: " errorString, __FUNCTION__, __LINE__, ##__VA_ARGS__))
+
+// Can MediaTranscoding service trust the caller based on the calling UID?
+// TODO(hkuang): Add MediaProvider's UID.
+static bool isTrustedCallingUid(uid_t uid) {
+    switch (uid) {
+    case AID_ROOT:  // root user
+    case AID_SYSTEM:
+    case AID_SHELL:
+    case AID_MEDIA:  // mediaserver
+        return true;
+    default:
+        return false;
+    }
+}
+
 /**
  * ClientImpl implements a single client and contains all its information.
  */
@@ -60,8 +81,6 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
      * (casted to int64t_t) as the client id.
      */
     ClientIdType mClientId;
-    pid_t mClientPid;
-    uid_t mClientUid;
     std::string mClientName;
     std::string mClientOpPackageName;
 
@@ -72,7 +91,7 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     // Weak pointer to the client manager for this client.
     std::weak_ptr<TranscodingClientManager> mOwner;
 
-    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
+    ClientImpl(const std::shared_ptr<ITranscodingClientCallback>& callback,
                const std::string& clientName, const std::string& opPackageName,
                const std::weak_ptr<TranscodingClientManager>& owner);
 
@@ -88,14 +107,11 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
 };
 
 TranscodingClientManager::ClientImpl::ClientImpl(
-        const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
-        const std::string& clientName, const std::string& opPackageName,
-        const std::weak_ptr<TranscodingClientManager>& owner)
+        const std::shared_ptr<ITranscodingClientCallback>& callback, const std::string& clientName,
+        const std::string& opPackageName, const std::weak_ptr<TranscodingClientManager>& owner)
       : mClientBinder((callback != nullptr) ? callback->asBinder() : nullptr),
         mClientCallback(callback),
         mClientId(sCookieCounter.fetch_add(1, std::memory_order_relaxed)),
-        mClientPid(pid),
-        mClientUid(uid),
         mClientName(clientName),
         mClientOpPackageName(opPackageName),
         mNextJobId(0),
@@ -113,14 +129,52 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
     }
 
     if (in_request.sourceFilePath.empty() || in_request.destinationFilePath.empty()) {
-        // This is the only error we check for now.
         return Status::ok();
+    }
+
+    int32_t callingPid = AIBinder_getCallingPid();
+    int32_t callingUid = AIBinder_getCallingUid();
+    int32_t in_clientUid = in_request.clientUid;
+    int32_t in_clientPid = in_request.clientPid;
+
+    // Check if we can trust clientUid. Only privilege caller could forward the
+    // uid on app client's behalf.
+    if (in_clientUid == IMediaTranscodingService::USE_CALLING_UID) {
+        in_clientUid = callingUid;
+    } else if (in_clientUid < 0) {
+        return Status::ok();
+    } else if (in_clientUid != callingUid && !isTrustedCallingUid(callingUid)) {
+        ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+              "(don't trust callingUid %d)",
+              in_clientPid, in_clientUid, callingUid);
+        return STATUS_ERROR_FMT(
+                IMediaTranscodingService::ERROR_PERMISSION_DENIED,
+                "MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+                "(don't trust callingUid %d)",
+                in_clientPid, in_clientUid, callingUid);
+    }
+
+    // Check if we can trust clientPid. Only privilege caller could forward the
+    // pid on app client's behalf.
+    if (in_clientPid == IMediaTranscodingService::USE_CALLING_PID) {
+        in_clientPid = callingPid;
+    } else if (in_clientPid < 0) {
+        return Status::ok();
+    } else if (in_clientPid != callingPid && !isTrustedCallingUid(callingUid)) {
+        ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+              "(don't trust callingUid %d)",
+              in_clientPid, in_clientUid, callingUid);
+        return STATUS_ERROR_FMT(
+                IMediaTranscodingService::ERROR_PERMISSION_DENIED,
+                "MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+                "(don't trust callingUid %d)",
+                in_clientPid, in_clientUid, callingUid);
     }
 
     int32_t jobId = mNextJobId.fetch_add(1);
 
-    *_aidl_return =
-            owner->mJobScheduler->submit(mClientId, jobId, mClientUid, in_request, mClientCallback);
+    *_aidl_return = owner->mJobScheduler->submit(mClientId, jobId, in_clientUid, in_request,
+                                                 mClientCallback);
 
     if (*_aidl_return) {
         out_job->jobId = jobId;
@@ -246,11 +300,10 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
 }
 
 status_t TranscodingClientManager::addClient(
-        const std::shared_ptr<ITranscodingClientCallback>& callback, pid_t pid, uid_t uid,
-        const std::string& clientName, const std::string& opPackageName,
-        std::shared_ptr<ITranscodingClient>* outClient) {
+        const std::shared_ptr<ITranscodingClientCallback>& callback, const std::string& clientName,
+        const std::string& opPackageName, std::shared_ptr<ITranscodingClient>* outClient) {
     // Validate the client.
-    if (callback == nullptr || pid < 0 || clientName.empty() || opPackageName.empty()) {
+    if (callback == nullptr || clientName.empty() || opPackageName.empty()) {
         ALOGE("Invalid client");
         return IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT;
     }
@@ -264,12 +317,11 @@ status_t TranscodingClientManager::addClient(
         return IMediaTranscodingService::ERROR_ALREADY_EXISTS;
     }
 
-    // Creates the client and uses its process id as client id.
+    // Creates the client (with the id assigned by ClientImpl).
     std::shared_ptr<ClientImpl> client = ::ndk::SharedRefBase::make<ClientImpl>(
-            callback, pid, uid, clientName, opPackageName, shared_from_this());
+            callback, clientName, opPackageName, shared_from_this());
 
-    ALOGD("Adding client id %lld, pid %d, uid %d, name %s, package %s",
-          (long long)client->mClientId, client->mClientPid, client->mClientUid,
+    ALOGD("Adding client id %lld, name %s, package %s", (long long)client->mClientId,
           client->mClientName.c_str(), client->mClientOpPackageName.c_str());
 
     {

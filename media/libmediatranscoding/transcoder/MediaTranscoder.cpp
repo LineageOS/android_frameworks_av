@@ -123,13 +123,15 @@ void MediaTranscoder::onTrackFormatAvailable(const MediaTrackTranscoder* transco
     }
 
     // Add track to the writer.
-    const bool ok =
-            mSampleWriter->addTrack(transcoder->getOutputQueue(), transcoder->getOutputFormat());
-    if (!ok) {
+    auto consumer = mSampleWriter->addTrack(transcoder->getOutputFormat());
+    if (consumer == nullptr) {
         LOG(ERROR) << "Unable to add track to sample writer.";
         sendCallback(AMEDIA_ERROR_UNKNOWN);
         return;
     }
+
+    MediaTrackTranscoder* mutableTranscoder = const_cast<MediaTrackTranscoder*>(transcoder);
+    mutableTranscoder->setSampleConsumer(consumer);
 
     mTracksAdded.insert(transcoder);
     if (mTracksAdded.size() == mTrackTranscoders.size()) {
@@ -153,7 +155,7 @@ void MediaTranscoder::onTrackFinished(const MediaTrackTranscoder* transcoder) {
 }
 
 void MediaTranscoder::onTrackError(const MediaTrackTranscoder* transcoder, media_status_t status) {
-    LOG(DEBUG) << "TrackTranscoder " << transcoder << " returned error " << status;
+    LOG(ERROR) << "TrackTranscoder " << transcoder << " returned error " << status;
     sendCallback(status);
 }
 
@@ -304,7 +306,7 @@ media_status_t MediaTranscoder::configureDestination(int fd) {
         return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
-    mSampleWriter = std::make_unique<MediaSampleWriter>();
+    mSampleWriter = MediaSampleWriter::Create();
     const bool initOk = mSampleWriter->init(fd, shared_from_this());
 
     if (!initOk) {

@@ -92,7 +92,9 @@ ssize_t MediaMuxer::addTrack(const sp<AMessage> &format) {
     }
 
     sp<MetaData> trackMeta = new MetaData;
-    convertMessageToMetaData(format, trackMeta);
+    if (convertMessageToMetaData(format, trackMeta) != OK) {
+        return BAD_VALUE;
+    }
 
     sp<MediaAdapter> newTrack = new MediaAdapter(trackMeta);
     status_t result = mWriter->addSource(newTrack);

@@ -2328,6 +2328,17 @@ TEST_F(C2ParamTest, FlexParamOpsTest) {
         static_assert(std::is_same<decltype(blobValue->m.value), uint8_t[]>::value, "should be uint8_t[]");
         EXPECT_EQ(0, memcmp(blobValue->m.value, "ABCD\0", 6));
         EXPECT_EQ(6u, blobValue->flexCount());
+        blobValue->setFlexCount(7u); // increasing the count does not change it
+        EXPECT_EQ(6u, blobValue->flexCount());
+        blobValue->setFlexCount(2u); // decreasing the count changes it to it
+        EXPECT_EQ(2u, blobValue->flexCount());
+        blobValue->setFlexCount(0u); // can decrease to 0 and blob remains valid
+        EXPECT_EQ(0u, blobValue->flexCount());
+        EXPECT_TRUE(*blobValue);
+        blobValue->invalidate(); // flex params can be invalidated => results in 0 size
+        EXPECT_FALSE(*blobValue);
+        EXPECT_EQ(0u, blobValue->size());
+
         std::vector<C2FieldDescriptor> fields = blobValue->FieldList();
         EXPECT_EQ(1u, fields.size());
         EXPECT_EQ(FD::BLOB, fields.cbegin()->type());

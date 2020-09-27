@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-cc_library_shared {
-    name: "libmediatranscoder",
+cc_defaults {
+    name: "mediatranscoder_defaults",
 
     srcs: [
         "MediaSampleQueue.cpp",
@@ -58,5 +58,19 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
         cfi: true,
+    },
+}
+
+cc_library_shared {
+    name: "libmediatranscoder",
+    defaults: ["mediatranscoder_defaults"],
+}
+
+cc_library_shared {
+    name: "libmediatranscoder_asan",
+    defaults: ["mediatranscoder_defaults"],
+
+    sanitize: {
+        address: true,
     },
 }

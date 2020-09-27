@@ -58,7 +58,6 @@ public:
     virtual ~MediaSampleReaderNDK() override;
 
 private:
-
     /**
      * SamplePosition describes the position of a single sample in the media file using its
      * timestamp and index in the file.

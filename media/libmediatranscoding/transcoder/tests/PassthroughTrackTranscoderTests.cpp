@@ -165,21 +165,23 @@ TEST_F(PassthroughTrackTranscoderTests, SampleEquality) {
     ASSERT_TRUE(transcoder.start());
 
     // Pull transcoder's output samples and compare against input checksums.
+    bool eos = false;
     uint64_t sampleCount = 0;
-    std::shared_ptr<MediaSample> sample;
-    std::shared_ptr<MediaSampleQueue> outputQueue = transcoder.getOutputQueue();
-    while (!outputQueue->dequeue(&sample)) {
-        ASSERT_NE(sample, nullptr);
+    transcoder.setSampleConsumer(
+            [&sampleCount, &sampleChecksums, &eos](const std::shared_ptr<MediaSample>& sample) {
+                ASSERT_NE(sample, nullptr);
+                EXPECT_FALSE(eos);
 
-        if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {
-            break;
-        }
+                if (sample->info.flags & SAMPLE_FLAG_END_OF_STREAM) {
+                    eos = true;
+                } else {
+                    SampleID sampleId{sample->buffer, static_cast<ssize_t>(sample->info.size)};
+                    EXPECT_TRUE(sampleId == sampleChecksums[sampleCount]);
+                    ++sampleCount;
+                }
+            });
 
-        SampleID sampleId{sample->buffer, static_cast<ssize_t>(sample->info.size)};
-        EXPECT_TRUE(sampleId == sampleChecksums[sampleCount]);
-        ++sampleCount;
-    }
-
+    callback->waitUntilFinished();
     EXPECT_EQ(sampleCount, sampleChecksums.size());
     EXPECT_TRUE(transcoder.stop());
 }

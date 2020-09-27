@@ -138,7 +138,7 @@ private:
 
     std::shared_ptr<CallbackInterface> mCallbacks;
     std::shared_ptr<MediaSampleReader> mSampleReader;
-    std::unique_ptr<MediaSampleWriter> mSampleWriter;
+    std::shared_ptr<MediaSampleWriter> mSampleWriter;
     std::vector<std::shared_ptr<AMediaFormat>> mSourceTrackFormats;
     std::vector<std::shared_ptr<MediaTrackTranscoder>> mTrackTranscoders;
     std::mutex mTracksAddedMutex;

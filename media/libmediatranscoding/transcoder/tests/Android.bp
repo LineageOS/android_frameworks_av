@@ -17,7 +17,7 @@ cc_defaults {
         "libbase",
         "libcutils",
         "libmediandk",
-        "libmediatranscoder",
+        "libmediatranscoder_asan",
         "libutils",
     ],
 
@@ -25,6 +25,15 @@ cc_defaults {
         "-Werror",
         "-Wall",
     ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+        address: true,
+    },
 
     data: [":test_assets"],
     test_config_template: "AndroidTestTemplate.xml",
@@ -80,4 +89,5 @@ cc_test {
     name: "MediaTranscoderTests",
     defaults: ["testdefaults"],
     srcs: ["MediaTranscoderTests.cpp"],
+    shared_libs: ["libbinder_ndk"],
 }
