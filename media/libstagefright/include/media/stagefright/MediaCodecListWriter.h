@@ -19,7 +19,6 @@
 #define MEDIA_CODEC_LIST_WRITER_H_
 
 #include <media/stagefright/foundation/ABase.h>
-#include <media/stagefright/MediaCodecListWriter.h>
 #include <media/MediaCodecInfo.h>
 
 #include <utils/Errors.h>
@@ -65,6 +64,7 @@ private:
     std::vector<sp<MediaCodecInfo>> mCodecInfos;
 
     friend struct MediaCodecList;
+    friend class MediaTestHelper;
 };
 
 /**
