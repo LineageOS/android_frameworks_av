@@ -108,7 +108,7 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
 void addBiquadFilter(
         std::vector<std::function<void(float *, const float *, size_t)>> &processingChain,
         struct HapticGeneratorProcessorsRecord &processorsRecord,
-        std::shared_ptr<BiquadFilter> filter) {
+        std::shared_ptr<HapticBiquadFilter> filter) {
     // The process chain captures the shared pointer of the filter in lambda.
     // The process record will keep a shared pointer to the filter so that it is possible to access
     // the filter outside of the process chain.
