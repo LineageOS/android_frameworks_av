@@ -134,22 +134,22 @@ BiquadFilterCoefficients lpfCoefs(const float cornerFrequency, const float sampl
     return coefficient;
 }
 
-std::shared_ptr<BiquadFilter> createLPF(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createLPF(const float cornerFrequency,
                                         const float sampleRate,
                                         const size_t channelCount) {
     BiquadFilterCoefficients coefficient = lpfCoefs(cornerFrequency, sampleRate);
-    return std::make_shared<BiquadFilter>(channelCount, coefficient);
+    return std::make_shared<HapticBiquadFilter>(channelCount, coefficient);
 }
 
-std::shared_ptr<BiquadFilter> createLPF2(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createLPF2(const float cornerFrequency,
                                          const float sampleRate,
                                          const size_t channelCount) {
     BiquadFilterCoefficients coefficient = lpfCoefs(cornerFrequency, sampleRate);
-    return std::make_shared<BiquadFilter>(
+    return std::make_shared<HapticBiquadFilter>(
             channelCount, cascadeFirstOrderFilters(coefficient, coefficient));
 }
 
-std::shared_ptr<BiquadFilter> createHPF2(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createHPF2(const float cornerFrequency,
                                          const float sampleRate,
                                          const size_t channelCount) {
     BiquadFilterCoefficients coefficient;
@@ -162,7 +162,7 @@ std::shared_ptr<BiquadFilter> createHPF2(const float cornerFrequency,
     coefficient[2] = 0.0f;
     coefficient[3] = -realPoleZ;
     coefficient[4] = 0.0f;
-    return std::make_shared<BiquadFilter>(
+    return std::make_shared<HapticBiquadFilter>(
             channelCount, cascadeFirstOrderFilters(coefficient, coefficient));
 }
 
@@ -178,24 +178,24 @@ BiquadFilterCoefficients apfCoefs(const float cornerFrequency, const float sampl
     return coefficient;
 }
 
-std::shared_ptr<BiquadFilter> createAPF(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createAPF(const float cornerFrequency,
                                         const float sampleRate,
                                         const size_t channelCount) {
     BiquadFilterCoefficients coefficient = apfCoefs(cornerFrequency, sampleRate);
-    return std::make_shared<BiquadFilter>(channelCount, coefficient);
+    return std::make_shared<HapticBiquadFilter>(channelCount, coefficient);
 }
 
-std::shared_ptr<BiquadFilter> createAPF2(const float cornerFrequency1,
+std::shared_ptr<HapticBiquadFilter> createAPF2(const float cornerFrequency1,
                                          const float cornerFrequency2,
                                          const float sampleRate,
                                          const size_t channelCount) {
     BiquadFilterCoefficients coefs1 = apfCoefs(cornerFrequency1, sampleRate);
     BiquadFilterCoefficients coefs2 = apfCoefs(cornerFrequency2, sampleRate);
-    return std::make_shared<BiquadFilter>(
+    return std::make_shared<HapticBiquadFilter>(
             channelCount, cascadeFirstOrderFilters(coefs1, coefs2));
 }
 
-std::shared_ptr<BiquadFilter> createBPF(const float ringingFrequency,
+std::shared_ptr<HapticBiquadFilter> createBPF(const float ringingFrequency,
                                         const float q,
                                         const float sampleRate,
                                         const size_t channelCount) {
@@ -207,10 +207,10 @@ std::shared_ptr<BiquadFilter> createBPF(const float ringingFrequency,
     coefficient[2] = 0.0f;
     coefficient[3] = -2 * real;
     coefficient[4] = real * real + img * img;
-    return std::make_shared<BiquadFilter>(channelCount, coefficient);
+    return std::make_shared<HapticBiquadFilter>(channelCount, coefficient);
 }
 
-std::shared_ptr<BiquadFilter> createBSF(const float ringingFrequency,
+std::shared_ptr<HapticBiquadFilter> createBSF(const float ringingFrequency,
                                         const float zq,
                                         const float pq,
                                         const float sampleRate,
@@ -228,7 +228,7 @@ std::shared_ptr<BiquadFilter> createBSF(const float ringingFrequency,
     coefficient[2] = zeroCoeff2 * norm;
     coefficient[3] = poleCoeff1;
     coefficient[4] = poleCoeff2;
-    return std::make_shared<BiquadFilter>(channelCount, coefficient);
+    return std::make_shared<HapticBiquadFilter>(channelCount, coefficient);
 }
 
 } // namespace android::audio_effect::haptic_generator

@@ -24,7 +24,7 @@
 
 #include <audio_utils/BiquadFilter.h>
 
-using android::audio_utils::BiquadFilter;
+using HapticBiquadFilter = android::audio_utils::BiquadFilter<float>;
 using BiquadFilterCoefficients = std::array<float, android::audio_utils::kBiquadNumCoefs>;
 
 namespace android::audio_effect::haptic_generator {
@@ -51,7 +51,7 @@ public:
     void clear();
 
 private:
-    const std::shared_ptr<BiquadFilter> mLpf;
+    const std::shared_ptr<HapticBiquadFilter> mLpf;
     std::vector<float> mLpfInBuffer;
     std::vector<float> mLpfOutBuffer;
     const float mNormalizationPower;
@@ -64,36 +64,36 @@ private:
 BiquadFilterCoefficients cascadeFirstOrderFilters(const BiquadFilterCoefficients &coefs1,
                                                   const BiquadFilterCoefficients &coefs2);
 
-std::shared_ptr<BiquadFilter> createLPF(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createLPF(const float cornerFrequency,
                                         const float sampleRate,
                                         const size_t channelCount);
 
 // Create two cascaded LPF with same corner frequency.
-std::shared_ptr<BiquadFilter> createLPF2(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createLPF2(const float cornerFrequency,
                                          const float sampleRate,
                                          const size_t channelCount);
 
 // Create two cascaded HPF with same corner frequency.
-std::shared_ptr<BiquadFilter> createHPF2(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createHPF2(const float cornerFrequency,
                                          const float sampleRate,
                                          const size_t channelCount);
 
-std::shared_ptr<BiquadFilter> createAPF(const float cornerFrequency,
+std::shared_ptr<HapticBiquadFilter> createAPF(const float cornerFrequency,
                                         const float sampleRate,
                                         const size_t channelCount);
 
 // Create two cascaded APF with two different corner frequency.
-std::shared_ptr<BiquadFilter> createAPF2(const float cornerFrequency1,
+std::shared_ptr<HapticBiquadFilter> createAPF2(const float cornerFrequency1,
                                          const float cornerFrequency2,
                                          const float sampleRate,
                                          const size_t channelCount);
 
-std::shared_ptr<BiquadFilter> createBPF(const float ringingFrequency,
+std::shared_ptr<HapticBiquadFilter> createBPF(const float ringingFrequency,
                                         const float q,
                                         const float sampleRate,
                                         const size_t channelCount);
 
-std::shared_ptr<BiquadFilter> createBSF(const float ringingFrequency,
+std::shared_ptr<HapticBiquadFilter> createBSF(const float ringingFrequency,
                                         const float zq,
                                         const float pq,
                                         const float sampleRate,
