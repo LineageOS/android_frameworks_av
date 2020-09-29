@@ -378,3 +378,18 @@ aaudio_result_t AAudioServiceEndpointMMAP::getDownDataDescription(AudioEndpointP
     parcelable.mDownDataQueueParcelable.setCapacityInFrames(getBufferCapacity());
     return AAUDIO_OK;
 }
+
+aaudio_result_t AAudioServiceEndpointMMAP::getExternalPosition(uint64_t *positionFrames,
+                                                               int64_t *timeNanos)
+{
+    if (!mExternalPositionSupported) {
+        return AAUDIO_ERROR_INVALID_STATE;
+    }
+    status_t status = mMmapStream->getExternalPosition(positionFrames, timeNanos);
+    if (status == INVALID_OPERATION) {
+        // getExternalPosition is not supported. Set mExternalPositionSupported as false
+        // so that the call will not go to the HAL next time.
+        mExternalPositionSupported = false;
+    }
+    return AAudioConvert_androidToAAudioResult(status);
+}
