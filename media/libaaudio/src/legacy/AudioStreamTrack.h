@@ -69,8 +69,6 @@ public:
 
     aaudio_result_t setBufferSize(int32_t requestedFrames) override;
     int32_t getBufferSize() const override;
-    int32_t getBufferCapacity() const override;
-    int32_t getFramesPerBurst()const  override;
     int32_t getXRunCount() const override;
 
     int64_t getFramesRead() override;
@@ -96,6 +94,11 @@ public:
             const android::media::VolumeShaper::Operation& operation) override;
 #endif
 
+protected:
+
+    int32_t getFramesPerBurstFromDevice() const override;
+    int32_t getBufferCapacityFromDevice() const override;
+
 private:
 
     android::sp<android::AudioTrack> mAudioTrack;
@@ -105,10 +108,6 @@ private:
 
     // TODO add 64-bit position reporting to AudioTrack and use it.
     aaudio_wrapping_frames_t         mPositionWhenPausing = 0;
-
-    // initial AudioTrack frame count and notification period
-    int32_t mInitialBufferCapacity = 0;
-    int32_t mInitialFramesPerBurst = 0;
 };
 
 } /* namespace aaudio */

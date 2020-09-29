@@ -112,6 +112,18 @@ protected:
         return mFramesRead.increment(frames);
     }
 
+    /**
+     * Get the framesPerBurst from the underlying API.
+     * @return framesPerBurst
+     */
+    virtual int32_t getFramesPerBurstFromDevice() const = 0;
+
+    /**
+     * Get the bufferCapacity from the underlying API.
+     * @return bufferCapacity in frames
+     */
+    virtual int32_t getBufferCapacityFromDevice() const = 0;
+
     // This is used for exact matching by MediaMetrics. So do not change it.
     // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_AAUDIO
     static constexpr char     kCallerName[] = "aaudio";
