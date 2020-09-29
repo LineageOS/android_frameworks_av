@@ -900,11 +900,8 @@ size_t AudioTrackServerProxy::framesReady()
     }
     audio_track_cblk_t* cblk = mCblk;
 
-    int32_t flush = cblk->u.mStreaming.mFlush;
-    if (flush != mFlush) {
-        // FIXME should return an accurate value, but over-estimate is better than under-estimate
-        return mFrameCount;
-    }
+    flushBufferIfNeeded();
+
     const int32_t rear = getRear();
     ssize_t filled = audio_utils::safe_sub_overflow(rear, cblk->u.mStreaming.mFront);
     // pipe should not already be overfull
