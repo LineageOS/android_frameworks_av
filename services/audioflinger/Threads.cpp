@@ -8746,6 +8746,11 @@ status_t AudioFlinger::MmapThreadHandle::getMmapPosition(struct audio_mmap_posit
     return mThread->getMmapPosition(position);
 }
 
+status_t AudioFlinger::MmapThreadHandle::getExternalPosition(uint64_t *position,
+                                                             int64_t *timeNanos) {
+    return mThread->getExternalPosition(position, timeNanos);
+}
+
 status_t AudioFlinger::MmapThreadHandle::start(const AudioClient& client,
         const audio_attributes_t *attr, audio_port_handle_t *handle)
 
@@ -9703,6 +9708,20 @@ void AudioFlinger::MmapPlaybackThread::toAudioPortConfig(struct audio_port_confi
     }
 }
 
+status_t AudioFlinger::MmapPlaybackThread::getExternalPosition(uint64_t *position,
+                                                               int64_t *timeNanos)
+{
+    if (mOutput == nullptr) {
+        return NO_INIT;
+    }
+    struct timespec timestamp;
+    status_t status = mOutput->getPresentationPosition(position, &timestamp);
+    if (status == NO_ERROR) {
+        *timeNanos = timestamp.tv_sec * NANOS_PER_SECOND + timestamp.tv_nsec;
+    }
+    return status;
+}
+
 void AudioFlinger::MmapPlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     MmapThread::dumpInternals_l(fd, args);
@@ -9805,6 +9824,15 @@ void AudioFlinger::MmapCaptureThread::toAudioPortConfig(struct audio_port_config
         config->config_mask |= AUDIO_PORT_CONFIG_FLAGS;
         config->flags.input = mInput->flags;
     }
+}
+
+status_t AudioFlinger::MmapCaptureThread::getExternalPosition(
+        uint64_t *position, int64_t *timeNanos)
+{
+    if (mInput == nullptr) {
+        return NO_INIT;
+    }
+    return mInput->getCapturePosition((int64_t*)position, timeNanos);
 }
 
 } // namespace android

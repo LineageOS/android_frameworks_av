@@ -202,11 +202,11 @@ public:
     }
 
     virtual int32_t getBufferCapacity() const {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
+        return mBufferCapacity;
     }
 
     virtual int32_t getFramesPerBurst() const {
-        return AAUDIO_ERROR_UNIMPLEMENTED;
+        return mFramesPerBurst;
     }
 
     virtual int32_t getXRunCount() const {
@@ -498,30 +498,32 @@ protected:
         mSampleRate = sampleRate;
     }
 
-    /**
-     * This should not be called after the open() call.
-     */
+    // This should not be called after the open() call.
     void setSamplesPerFrame(int32_t samplesPerFrame) {
         mSamplesPerFrame = samplesPerFrame;
     }
 
-    /**
-     * This should not be called after the open() call.
-     */
+    // This should not be called after the open() call.
+    void setFramesPerBurst(int32_t framesPerBurst) {
+        mFramesPerBurst = framesPerBurst;
+    }
+
+    // This should not be called after the open() call.
+    void setBufferCapacity(int32_t bufferCapacity) {
+        mBufferCapacity = bufferCapacity;
+    }
+
+    // This should not be called after the open() call.
     void setSharingMode(aaudio_sharing_mode_t sharingMode) {
         mSharingMode = sharingMode;
     }
 
-    /**
-     * This should not be called after the open() call.
-     */
+    // This should not be called after the open() call.
     void setFormat(audio_format_t format) {
         mFormat = format;
     }
 
-    /**
-     * This should not be called after the open() call.
-     */
+    // This should not be called after the open() call.
     void setDeviceFormat(audio_format_t format) {
         mDeviceFormat = format;
     }
@@ -536,6 +538,7 @@ protected:
         mDeviceId = deviceId;
     }
 
+    // This should not be called after the open() call.
     void setSessionId(int32_t sessionId) {
         mSessionId = sessionId;
     }
@@ -623,6 +626,8 @@ private:
     audio_format_t              mFormat = AUDIO_FORMAT_DEFAULT;
     aaudio_stream_state_t       mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
     aaudio_performance_mode_t   mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
+    int32_t                     mFramesPerBurst = 0;
+    int32_t                     mBufferCapacity = 0;
 
     aaudio_usage_t              mUsage           = AAUDIO_UNSPECIFIED;
     aaudio_content_type_t       mContentType     = AAUDIO_UNSPECIFIED;

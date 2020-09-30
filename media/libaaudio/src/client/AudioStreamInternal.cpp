@@ -210,10 +210,10 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;
     }
-    mFramesPerBurst = framesPerBurst; // only save good value
+    setFramesPerBurst(framesPerBurst); // only save good value
 
     mBufferCapacityInFrames = mEndpointDescriptor.dataQueueDescriptor.capacityInFrames;
-    if (mBufferCapacityInFrames < mFramesPerBurst
+    if (mBufferCapacityInFrames < getFramesPerBurst()
             || mBufferCapacityInFrames > MAX_BUFFER_CAPACITY_IN_FRAMES) {
         ALOGE("%s - bufferCapacity out of range = %d", __func__, mBufferCapacityInFrames);
         result = AAUDIO_ERROR_OUT_OF_RANGE;
@@ -238,7 +238,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
         }
         if (mCallbackFrames == AAUDIO_UNSPECIFIED) {
-            mCallbackFrames = mFramesPerBurst;
+            mCallbackFrames = getFramesPerBurst();
         }
 
         const int32_t callbackBufferSize = mCallbackFrames * getBytesPerFrame();
@@ -756,9 +756,9 @@ void AudioStreamInternal::processTimestamp(uint64_t position, int64_t time) {
 
 aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
     int32_t adjustedFrames = requestedFrames;
-    const int32_t maximumSize = getBufferCapacity() - mFramesPerBurst;
+    const int32_t maximumSize = getBufferCapacity() - getFramesPerBurst();
     // Minimum size should be a multiple number of bursts.
-    const int32_t minimumSize = 1 * mFramesPerBurst;
+    const int32_t minimumSize = 1 * getFramesPerBurst();
 
     // Clip to minimum size so that rounding up will work better.
     adjustedFrames = std::max(minimumSize, adjustedFrames);
@@ -768,9 +768,9 @@ aaudio_result_t AudioStreamInternal::setBufferSize(int32_t requestedFrames) {
         adjustedFrames = maximumSize;
     } else {
         // Round to the next highest burst size.
-        int32_t numBursts = (adjustedFrames + mFramesPerBurst - 1) / mFramesPerBurst;
-        adjustedFrames = numBursts * mFramesPerBurst;
-        // Clip just in case maximumSize is not a multiple of mFramesPerBurst.
+        int32_t numBursts = (adjustedFrames + getFramesPerBurst() - 1) / getFramesPerBurst();
+        adjustedFrames = numBursts * getFramesPerBurst();
+        // Clip just in case maximumSize is not a multiple of getFramesPerBurst().
         adjustedFrames = std::min(maximumSize, adjustedFrames);
     }
 
@@ -803,10 +803,6 @@ int32_t AudioStreamInternal::getBufferSize() const {
 
 int32_t AudioStreamInternal::getBufferCapacity() const {
     return mBufferCapacityInFrames;
-}
-
-int32_t AudioStreamInternal::getFramesPerBurst() const {
-    return mFramesPerBurst;
 }
 
 // This must be called under mStreamLock.

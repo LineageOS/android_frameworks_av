@@ -1824,6 +1824,7 @@ class MmapThread : public ThreadBase
                    audio_port_handle_t *handle);
     status_t stop(audio_port_handle_t handle);
     status_t standby();
+    virtual status_t getExternalPosition(uint64_t *position, int64_t *timeNaos) = 0;
 
     // RefBase
     virtual     void        onFirstRef();
@@ -1935,6 +1936,8 @@ public:
 
     virtual     void        toAudioPortConfig(struct audio_port_config *config);
 
+                status_t    getExternalPosition(uint64_t *position, int64_t *timeNanos) override;
+
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
@@ -1964,6 +1967,8 @@ public:
                                                  bool silenced) override;
 
     virtual     void           toAudioPortConfig(struct audio_port_config *config);
+
+                status_t       getExternalPosition(uint64_t *position, int64_t *timeNanos) override;
 
 protected:
 
