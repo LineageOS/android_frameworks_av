@@ -270,6 +270,15 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     // Prevent decoder from overwriting frames that the encoder has not yet consumed.
     AMediaFormat_setInt32(decoderFormat.get(), TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP, 0);
 
+    // Copy over configurations that apply to both encoder and decoder.
+    static const AMediaFormatUtils::EntryCopier kEncoderEntriesToCopy[] = {
+            ENTRY_COPIER2(AMEDIAFORMAT_KEY_OPERATING_RATE, Float, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_PRIORITY, Int32),
+    };
+    const size_t entryCount = sizeof(kEncoderEntriesToCopy) / sizeof(kEncoderEntriesToCopy[0]);
+    AMediaFormatUtils::CopyFormatEntries(mDestinationFormat.get(), decoderFormat.get(),
+                                         kEncoderEntriesToCopy, entryCount);
+
     status = AMediaCodec_configure(mDecoder, decoderFormat.get(), mSurface, NULL /* crypto */,
                                    0 /* flags */);
     if (status != AMEDIA_OK) {
