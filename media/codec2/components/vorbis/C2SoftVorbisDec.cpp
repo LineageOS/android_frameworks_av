@@ -359,6 +359,10 @@ void C2SoftVorbisDec::process(
     }
     memcpy(&numPageFrames, data + inSize - sizeof(numPageFrames), sizeof(numPageFrames));
     inSize -= sizeof(numPageFrames);
+    if (inSize == 0) {
+        // empty buffer, ignore
+        return;
+    }
     if (numPageFrames >= 0) {
         mNumFramesLeftOnPage = numPageFrames;
     }
@@ -409,7 +413,7 @@ void C2SoftVorbisDec::process(
                 mState,  reinterpret_cast<int16_t *> (wView.data()),
                 kMaxNumSamplesPerChannel);
         if (numFrames < 0) {
-            ALOGD("vorbis_dsp_pcmout returned %d", numFrames);
+            ALOGD("vorbis_dsp_pcmout returned %d frames", numFrames);
             numFrames = 0;
         }
     }

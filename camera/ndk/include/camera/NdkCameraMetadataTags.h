@@ -1890,10 +1890,8 @@ typedef enum acamera_metadata_tag {
      *   <li>ACaptureRequest</li>
      * </ul></p>
      *
-     * <p>Instead of using ACAMERA_SCALER_CROP_REGION with dual purposes of crop and zoom, the
-     * application can now choose to use this tag to specify the desired zoom level. The
-     * ACAMERA_SCALER_CROP_REGION can still be used to specify the horizontal or vertical
-     * crop to achieve aspect ratios different than the native camera sensor.</p>
+     * <p>Instead of using ACAMERA_SCALER_CROP_REGION for zoom, the application can now choose to
+     * use this tag to specify the desired zoom level.</p>
      * <p>By using this control, the application gains a simpler way to control zoom, which can
      * be a combination of optical and digital zoom. For example, a multi-camera system may
      * contain more than one lens with different focal lengths, and the user can use optical
@@ -3413,16 +3411,24 @@ typedef enum acamera_metadata_tag {
      * respectively.</p>
      * <p>The camera device may adjust the crop region to account for rounding and other hardware
      * requirements; the final crop region used will be included in the output capture result.</p>
+     * <p>The camera sensor output aspect ratio depends on factors such as output stream
+     * combination and ACAMERA_CONTROL_AE_TARGET_FPS_RANGE, and shouldn't be adjusted by using
+     * this control. And the camera device will treat different camera sensor output sizes
+     * (potentially with in-sensor crop) as the same crop of
+     * ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE. As a result, the application shouldn't assume the
+     * maximum crop region always maps to the same aspect ratio or field of view for the
+     * sensor output.</p>
      * <p>Starting from API level 30, it's strongly recommended to use ACAMERA_CONTROL_ZOOM_RATIO
      * to take advantage of better support for zoom with logical multi-camera. The benefits
      * include better precision with optical-digital zoom combination, and ability to do
      * zoom-out from 1.0x. When using ACAMERA_CONTROL_ZOOM_RATIO for zoom, the crop region in
-     * the capture request must be either letterboxing or pillarboxing (but not both). The
+     * the capture request should be left as the default activeArray size. The
      * coordinate system is post-zoom, meaning that the activeArraySize or
      * preCorrectionActiveArraySize covers the camera device's field of view "after" zoom.  See
      * ACAMERA_CONTROL_ZOOM_RATIO for details.</p>
      * <p>The data representation is int[4], which maps to (left, top, width, height).</p>
      *
+     * @see ACAMERA_CONTROL_AE_TARGET_FPS_RANGE
      * @see ACAMERA_CONTROL_ZOOM_RATIO
      * @see ACAMERA_DISTORTION_CORRECTION_MODE
      * @see ACAMERA_SCALER_AVAILABLE_MAX_DIGITAL_ZOOM
