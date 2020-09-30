@@ -23,23 +23,12 @@
 #include <media/MediaSampleReaderNDK.h>
 #include <media/MediaSampleWriter.h>
 #include <media/MediaTranscoder.h>
+#include <media/NdkCommon.h>
 #include <media/PassthroughTrackTranscoder.h>
 #include <media/VideoTrackTranscoder.h>
 #include <unistd.h>
 
 namespace android {
-
-#define DEFINE_FORMAT_VALUE_COPY_FUNC(_type, _typeName)                                  \
-    static void copy##_typeName(const char* key, AMediaFormat* to, AMediaFormat* from) { \
-        _type value;                                                                     \
-        if (AMediaFormat_get##_typeName(from, key, &value)) {                            \
-            AMediaFormat_set##_typeName(to, key, value);                                 \
-        }                                                                                \
-    }
-
-DEFINE_FORMAT_VALUE_COPY_FUNC(const char*, String);
-DEFINE_FORMAT_VALUE_COPY_FUNC(int64_t, Int64);
-DEFINE_FORMAT_VALUE_COPY_FUNC(int32_t, Int32);
 
 static AMediaFormat* mergeMediaFormats(AMediaFormat* base, AMediaFormat* overlay) {
     if (base == nullptr || overlay == nullptr) {
@@ -58,29 +47,26 @@ static AMediaFormat* mergeMediaFormats(AMediaFormat* base, AMediaFormat* overlay
     // along with their value types and copy the ones that are present. A better solution would be
     // to either implement required functions in NDK or to parse the overlay format's string
     // representation and copy all existing keys.
-    static const struct {
-        const char* key;
-        void (*copyValue)(const char* key, AMediaFormat* to, AMediaFormat* from);
-    } kSupportedConfigs[] = {
-            {AMEDIAFORMAT_KEY_MIME, copyString},
-            {AMEDIAFORMAT_KEY_DURATION, copyInt64},
-            {AMEDIAFORMAT_KEY_WIDTH, copyInt32},
-            {AMEDIAFORMAT_KEY_HEIGHT, copyInt32},
-            {AMEDIAFORMAT_KEY_BIT_RATE, copyInt32},
-            {AMEDIAFORMAT_KEY_PROFILE, copyInt32},
-            {AMEDIAFORMAT_KEY_LEVEL, copyInt32},
-            {AMEDIAFORMAT_KEY_COLOR_FORMAT, copyInt32},
-            {AMEDIAFORMAT_KEY_COLOR_RANGE, copyInt32},
-            {AMEDIAFORMAT_KEY_COLOR_STANDARD, copyInt32},
-            {AMEDIAFORMAT_KEY_COLOR_TRANSFER, copyInt32},
-            {AMEDIAFORMAT_KEY_FRAME_RATE, copyInt32},
-            {AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, copyInt32},
+    static const AMediaFormatUtils::EntryCopier kSupportedFormatEntries[] = {
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_MIME, String),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_DURATION, Int64),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_WIDTH, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_HEIGHT, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_BIT_RATE, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_PROFILE, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_LEVEL, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_FORMAT, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_RANGE, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_STANDARD, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_TRANSFER, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_FRAME_RATE, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_PRIORITY, Int32),
+            ENTRY_COPIER2(AMEDIAFORMAT_KEY_OPERATING_RATE, Float, Int32),
     };
+    const size_t entryCount = sizeof(kSupportedFormatEntries) / sizeof(kSupportedFormatEntries[0]);
 
-    for (int i = 0; i < (sizeof(kSupportedConfigs) / sizeof(kSupportedConfigs[0])); ++i) {
-        kSupportedConfigs[i].copyValue(kSupportedConfigs[i].key, format, overlay);
-    }
-
+    AMediaFormatUtils::CopyFormatEntries(overlay, format, kSupportedFormatEntries, entryCount);
     return format;
 }
 
