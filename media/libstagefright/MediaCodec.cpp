@@ -241,6 +241,9 @@ void MediaCodec::ResourceManagerServiceProxy::init() {
     }
 
     AIBinder_linkToDeath(mService->asBinder().get(), mDeathRecipient.get(), this);
+
+    // Kill clients pending removal.
+    mService->reclaimResourcesFromClientsPendingRemoval(mPid);
 }
 
 //static
