@@ -1113,7 +1113,7 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
     if (mPrivacySensitive == PRIVACY_SENSITIVE_DEFAULT) {
         if (attr.source == AUDIO_SOURCE_VOICE_COMMUNICATION
                 || attr.source == AUDIO_SOURCE_CAMCORDER) {
-            attr.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+            attr.flags = static_cast<audio_flags_mask_t>(attr.flags | AUDIO_FLAG_CAPTURE_PRIVATE);
             mPrivacySensitive = PRIVACY_SENSITIVE_ENABLED;
         } else {
             mPrivacySensitive = PRIVACY_SENSITIVE_DISABLED;
@@ -1129,7 +1129,7 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
             return NULL;
         }
         if (mPrivacySensitive == PRIVACY_SENSITIVE_ENABLED) {
-            attr.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+            attr.flags = static_cast<audio_flags_mask_t>(attr.flags | AUDIO_FLAG_CAPTURE_PRIVATE);
         }
     }
 

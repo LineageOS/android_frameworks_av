@@ -39,7 +39,7 @@ SpdifStreamOut::SpdifStreamOut(AudioHwDevice *dev,
         , mSpdifEncoder(this, format)
         , mApplicationFormat(AUDIO_FORMAT_DEFAULT)
         , mApplicationSampleRate(0)
-        , mApplicationChannelMask(0)
+        , mApplicationChannelMask(AUDIO_CHANNEL_NONE)
 {
 }
 
