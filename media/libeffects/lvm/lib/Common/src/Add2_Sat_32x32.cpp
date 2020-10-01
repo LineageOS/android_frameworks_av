@@ -25,28 +25,21 @@
    FUNCTION ADD2_SAT_32X32
 ***********************************************************************************/
 
-void Add2_Sat_32x32( const LVM_INT32  *src,
-                           LVM_INT32  *dst,
-                           LVM_INT16  n )
-{
-    LVM_INT32 a,b,c;
+void Add2_Sat_32x32(const LVM_INT32* src, LVM_INT32* dst, LVM_INT16 n) {
+    LVM_INT32 a, b, c;
     LVM_INT16 ii;
-    for (ii = n; ii != 0; ii--)
-    {
-        a=*src;
+    for (ii = n; ii != 0; ii--) {
+        a = *src;
         src++;
 
-        b=*dst;
-        c=a+b;
-        if ((((c ^ a) & (c ^ b)) >> 31)!=0)     /* overflow / underflow */
+        b = *dst;
+        c = a + b;
+        if ((((c ^ a) & (c ^ b)) >> 31) != 0) /* overflow / underflow */
         {
-            if(a<0)
-            {
-                c=0x80000000L;
-            }
-            else
-            {
-                c=0x7FFFFFFFL;
+            if (a < 0) {
+                c = 0x80000000L;
+            } else {
+                c = 0x7FFFFFFFL;
             }
         }
 
@@ -56,27 +49,18 @@ void Add2_Sat_32x32( const LVM_INT32  *src,
     return;
 }
 
-void Add2_Sat_Float( const LVM_FLOAT  *src,
-                           LVM_FLOAT  *dst,
-                           LVM_INT16  n )
-{
+void Add2_Sat_Float(const LVM_FLOAT* src, LVM_FLOAT* dst, LVM_INT16 n) {
     LVM_FLOAT Temp;
     LVM_INT16 ii;
-    for (ii = n; ii != 0; ii--)
-    {
-        Temp = ((LVM_FLOAT) *src) + ((LVM_FLOAT) *dst);
+    for (ii = n; ii != 0; ii--) {
+        Temp = ((LVM_FLOAT)*src) + ((LVM_FLOAT)*dst);
         src++;
 
-        if (Temp > 1.000000f)
-        {
+        if (Temp > 1.000000f) {
             *dst = 1.000000f;
-        }
-        else if (Temp < -1.000000f)
-        {
+        } else if (Temp < -1.000000f) {
             *dst = -1.000000f;
-        }
-        else
-        {
+        } else {
             *dst = Temp;
         }
         dst++;

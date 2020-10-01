@@ -24,14 +24,10 @@
 /**********************************************************************************
    FUNCTION LoadConst_32
 ***********************************************************************************/
-void LoadConst_Float(const LVM_FLOAT   val,
-                     LVM_FLOAT  *dst,
-                     LVM_INT16 n )
-{
+void LoadConst_Float(const LVM_FLOAT val, LVM_FLOAT* dst, LVM_INT16 n) {
     LVM_INT16 ii;
 
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         *dst = val;
         dst++;
     }

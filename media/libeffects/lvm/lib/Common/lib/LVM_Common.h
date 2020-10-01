@@ -39,12 +39,11 @@
 /*                                                                                      */
 /****************************************************************************************/
 /* Algorithm identification */
-#define ALGORITHM_NONE_ID      0x0000
-#define ALGORITHM_CS_ID        0x0100
-#define ALGORITHM_EQNB_ID      0x0200
-#define ALGORITHM_DBE_ID       0x0300
-#define ALGORITHM_VC_ID        0x0500
-#define ALGORITHM_TE_ID        0x0600
+#define ALGORITHM_NONE_ID 0x0000
+#define ALGORITHM_CS_ID 0x0100
+#define ALGORITHM_EQNB_ID 0x0200
+#define ALGORITHM_DBE_ID 0x0300
+#define ALGORITHM_VC_ID 0x0500
+#define ALGORITHM_TE_ID 0x0600
 
-#endif      /* __LVM_COMMON_H__ */
-
+#endif /* __LVM_COMMON_H__ */

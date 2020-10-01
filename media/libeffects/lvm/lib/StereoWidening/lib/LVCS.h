@@ -72,13 +72,13 @@
 /****************************************************************************************/
 
 /* Effect Level */
-#define LVCS_EFFECT_LOW                    16384    /* Effect scaling 50% */
-#define LVCS_EFFECT_MEDIUM                 24576    /* Effect scaling 75% */
-#define LVCS_EFFECT_HIGH                   32767    /* Effect Scaling 100% */
+#define LVCS_EFFECT_LOW 16384    /* Effect scaling 50% */
+#define LVCS_EFFECT_MEDIUM 24576 /* Effect scaling 75% */
+#define LVCS_EFFECT_HIGH 32767   /* Effect Scaling 100% */
 
 /* Callback events */
-#define LVCS_EVENT_NONE                   0x0000    /* Not a valid event */
-#define LVCS_EVENT_ALGOFF                 0x0001    /* CS has completed switch off */
+#define LVCS_EVENT_NONE 0x0000   /* Not a valid event */
+#define LVCS_EVENT_ALGOFF 0x0001 /* CS has completed switch off */
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -87,58 +87,49 @@
 /****************************************************************************************/
 
 /* Instance handle */
-typedef void *LVCS_Handle_t;
+typedef void* LVCS_Handle_t;
 
 /* Operating modes */
-typedef enum
-{
-    LVCS_OFF = 0,
-    LVCS_ON  = 15,
-    LVCS_MAX = LVM_MAXENUM
-} LVCS_Modes_en;
+typedef enum { LVCS_OFF = 0, LVCS_ON = 15, LVCS_MAX = LVM_MAXENUM } LVCS_Modes_en;
 
 /* Function return status */
-typedef enum
-{
-    LVCS_SUCCESS        = 0,                        /* Successful return from a routine */
-    LVCS_NULLADDRESS    = 1,                        /* NULL allocation address */
-    LVCS_TOOMANYSAMPLES = 2,                        /* Maximum block size exceeded */
-    LVCS_STATUSMAX      = LVM_MAXENUM
+typedef enum {
+    LVCS_SUCCESS = 0,        /* Successful return from a routine */
+    LVCS_NULLADDRESS = 1,    /* NULL allocation address */
+    LVCS_TOOMANYSAMPLES = 2, /* Maximum block size exceeded */
+    LVCS_STATUSMAX = LVM_MAXENUM
 } LVCS_ReturnStatus_en;
 
 /*
  * Source data formats
  */
-typedef enum
-{
-    LVCS_STEREO       = 0,
+typedef enum {
+    LVCS_STEREO = 0,
     LVCS_MONOINSTEREO = 1,
-    LVCS_SOURCEMAX    = LVM_MAXENUM
+    LVCS_SOURCEMAX = LVM_MAXENUM
 } LVCS_SourceFormat_en;
 
 /*
  * Supported output devices
  */
-typedef enum
-{
-    LVCS_HEADPHONES             = 0,
-    LVCS_EX_HEADPHONES          = 1,
-    LVCS_SPEAKERTYPE_MAX        = LVM_MAXENUM
+typedef enum {
+    LVCS_HEADPHONES = 0,
+    LVCS_EX_HEADPHONES = 1,
+    LVCS_SPEAKERTYPE_MAX = LVM_MAXENUM
 } LVCS_SpeakerType_en;
 
 /*
  * Speaker Coefficients Table
  */
-typedef struct
-{
-    void    *pTable1;
-    void    *pTable2;
-    void    *pTable3;
-    void    *pTable4;
-    void    *pTable5;
-    void    *pTable6;
-    void    *pTable7;
-    void    *pTable8;
+typedef struct {
+    void* pTable1;
+    void* pTable2;
+    void* pTable3;
+    void* pTable4;
+    void* pTable5;
+    void* pTable6;
+    void* pTable7;
+    void* pTable8;
 } LVCS_CSMS_Coef_Tables_t;
 
 /****************************************************************************************/
@@ -148,27 +139,25 @@ typedef struct
 /****************************************************************************************/
 
 /* Concert Sound parameter structure */
-typedef struct
-{
-    LVCS_Modes_en           OperatingMode;          /* Algorithm mode */
-    LVCS_SpeakerType_en     SpeakerType;            /* Output device type */
-    LVCS_SourceFormat_en    SourceFormat;           /* Source data format */
-    LVM_Mode_en             CompressorMode;         /* Non-Linear Compressor Mode */
-    LVM_Fs_en               SampleRate;             /* Sampling rate */
-    LVM_INT16               EffectLevel;            /* Effect level */
-    LVM_UINT16              ReverbLevel;            /* Reverb level in % */
-    LVM_INT32               NrChannels;
+typedef struct {
+    LVCS_Modes_en OperatingMode;       /* Algorithm mode */
+    LVCS_SpeakerType_en SpeakerType;   /* Output device type */
+    LVCS_SourceFormat_en SourceFormat; /* Source data format */
+    LVM_Mode_en CompressorMode;        /* Non-Linear Compressor Mode */
+    LVM_Fs_en SampleRate;              /* Sampling rate */
+    LVM_INT16 EffectLevel;             /* Effect level */
+    LVM_UINT16 ReverbLevel;            /* Reverb level in % */
+    LVM_INT32 NrChannels;
 } LVCS_Params_t;
 
 /* Concert Sound Capability structure */
-typedef struct
-{
+typedef struct {
     /* General parameters */
-    LVM_UINT16              MaxBlockSize;           /* Maximum block size in sample pairs */
+    LVM_UINT16 MaxBlockSize; /* Maximum block size in sample pairs */
 
     /* Callback parameters */
-    LVM_Callback            CallBack;               /* Bundle callback */
-    void                    *pBundleInstance;       /* Bundle instance handle */
+    LVM_Callback CallBack; /* Bundle callback */
+    void* pBundleInstance; /* Bundle instance handle */
 
 } LVCS_Capabilities_t;
 
@@ -198,9 +187,8 @@ typedef struct
 /*  1.  This function must not be interrupted by the LVCS_Process function          */
 /*                                                                                  */
 /************************************************************************************/
-LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t            *phInstance,
-                               LVCS_Capabilities_t      *pCapabilities,
-                               void                     *pScratch);
+LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t* phInstance, LVCS_Capabilities_t* pCapabilities,
+                               void* pScratch);
 
 /************************************************************************************/
 /*                                                                                  */
@@ -216,7 +204,7 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t            *phInstance,
 /*  1.  This function must not be interrupted by the LVCS_Process function          */
 /*                                                                                  */
 /************************************************************************************/
-void LVCS_DeInit(LVCS_Handle_t          *phInstance);
+void LVCS_DeInit(LVCS_Handle_t* phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -238,8 +226,7 @@ void LVCS_DeInit(LVCS_Handle_t          *phInstance);
 /*                                                                                      */
 /****************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
-                                        LVCS_Params_t   *pParams);
+LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t hInstance, LVCS_Params_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -260,8 +247,7 @@ LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
 /*                                                                                      */
 /****************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t     hInstance,
-                                  LVCS_Params_t     *pParams);
+LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t hInstance, LVCS_Params_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -284,9 +270,7 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t     hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t             hInstance,
-                                  const LVM_FLOAT           *pInData,
-                                  LVM_FLOAT                 *pOutData,
-                                  LVM_UINT16                NumSamples);
+LVCS_ReturnStatus_en LVCS_Process(LVCS_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                  LVM_FLOAT* pOutData, LVM_UINT16 NumSamples);
 
-#endif  /* LVCS_H */
+#endif /* LVCS_H */

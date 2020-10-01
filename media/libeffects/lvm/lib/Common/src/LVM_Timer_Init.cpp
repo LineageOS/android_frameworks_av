@@ -33,20 +33,20 @@
 /*  INIT FUNCTION                                                                       */
 /****************************************************************************************/
 
-void LVM_Timer_Init (   LVM_Timer_Instance_t       *pInstance,
-                        LVM_Timer_Params_t         *pParams     ){
+void LVM_Timer_Init(LVM_Timer_Instance_t* pInstance, LVM_Timer_Params_t* pParams) {
+    LVM_Timer_Instance_Private_t* pInstancePr;
+    pInstancePr = (LVM_Timer_Instance_Private_t*)pInstance;
 
-    LVM_Timer_Instance_Private_t *pInstancePr;
-    pInstancePr = (LVM_Timer_Instance_Private_t *)pInstance;
-
-    pInstancePr->CallBackParam     = pParams->CallBackParam;
-    pInstancePr->pCallBackParams   = (LVM_INT32 *)pParams->pCallBackParams;
+    pInstancePr->CallBackParam = pParams->CallBackParam;
+    pInstancePr->pCallBackParams = (LVM_INT32*)pParams->pCallBackParams;
     pInstancePr->pCallbackInstance = pParams->pCallbackInstance;
-    pInstancePr->pCallBack         = pParams->pCallBack;
-    pInstancePr->TimerArmed        = 1;
+    pInstancePr->pCallBack = pParams->pCallBack;
+    pInstancePr->TimerArmed = 1;
 
-    MUL32x16INTO32(pParams->SamplingRate,OneOverThousandInQ24,pInstancePr->RemainingTimeInSamples,16);  /* (Q0 * Q24) >>16 into Q8*/
-    MUL32x16INTO32(pInstancePr->RemainingTimeInSamples,pParams->TimeInMs,pInstancePr->RemainingTimeInSamples,8);  /* (Q8 * Q0) >>8 into Q0*/
+    MUL32x16INTO32(pParams->SamplingRate, OneOverThousandInQ24, pInstancePr->RemainingTimeInSamples,
+                   16); /* (Q0 * Q24) >>16 into Q8*/
+    MUL32x16INTO32(pInstancePr->RemainingTimeInSamples, pParams->TimeInMs,
+                   pInstancePr->RemainingTimeInSamples, 8); /* (Q8 * Q0) >>8 into Q0*/
 }
 
 /****************************************************************************************/

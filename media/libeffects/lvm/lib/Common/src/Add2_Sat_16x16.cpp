@@ -25,27 +25,18 @@
    FUNCTION ADD2_SAT_16X16
 ***********************************************************************************/
 
-void Add2_Sat_16x16( const LVM_INT16 *src,
-                           LVM_INT16 *dst,
-                           LVM_INT16  n )
-{
+void Add2_Sat_16x16(const LVM_INT16* src, LVM_INT16* dst, LVM_INT16 n) {
     LVM_INT32 Temp;
     LVM_INT16 ii;
-    for (ii = n; ii != 0; ii--)
-    {
-        Temp = ((LVM_INT32) *src) + ((LVM_INT32) *dst);
+    for (ii = n; ii != 0; ii--) {
+        Temp = ((LVM_INT32)*src) + ((LVM_INT32)*dst);
         src++;
 
-        if (Temp > 0x00007FFF)
-        {
+        if (Temp > 0x00007FFF) {
             *dst = 0x7FFF;
-        }
-        else if (Temp < -0x00008000)
-        {
-            *dst = - 0x8000;
-        }
-        else
-        {
+        } else if (Temp < -0x00008000) {
+            *dst = -0x8000;
+        } else {
             *dst = (LVM_INT16)Temp;
         }
         dst++;
