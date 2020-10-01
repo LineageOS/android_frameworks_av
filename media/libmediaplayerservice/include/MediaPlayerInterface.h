@@ -60,7 +60,7 @@ enum player_type {
 #define DEFAULT_AUDIOSINK_SAMPLERATE 44100
 
 // when the channel mask isn't known, use the channel count to derive a mask in AudioSink::open()
-#define CHANNEL_MASK_USE_CHANNEL_ORDER 0
+#define CHANNEL_MASK_USE_CHANNEL_ORDER AUDIO_CHANNEL_NONE
 
 // duration below which we do not allow deep audio buffering
 #define AUDIO_SINK_MIN_DEEP_BUFFER_DURATION_US 5000000

@@ -1928,11 +1928,12 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
     int32_t numChannels;
     CHECK(format->findInt32("channel-count", &numChannels));
 
-    int32_t channelMask;
-    if (!format->findInt32("channel-mask", &channelMask)) {
-        // signal to the AudioSink to derive the mask from count.
-        channelMask = CHANNEL_MASK_USE_CHANNEL_ORDER;
-    }
+    int32_t rawChannelMask;
+    audio_channel_mask_t channelMask =
+            format->findInt32("channel-mask", &rawChannelMask) ?
+                    static_cast<audio_channel_mask_t>(rawChannelMask)
+                    // signal to the AudioSink to derive the mask from count.
+                    : CHANNEL_MASK_USE_CHANNEL_ORDER;
 
     int32_t sampleRate;
     CHECK(format->findInt32("sample-rate", &sampleRate));

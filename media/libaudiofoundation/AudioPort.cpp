@@ -268,12 +268,17 @@ status_t AudioPortConfig::readFromParcel(const Parcel *parcel)
     if ((status = parcel->readUint32(reinterpret_cast<uint32_t*>(&mFormat))) != NO_ERROR) {
         return status;
     }
-    if ((status = parcel->readUint32(&mChannelMask)) != NO_ERROR) return status;
+    uint32_t rawChannelMask;
+    if ((status = parcel->readUint32(&rawChannelMask)) != NO_ERROR) return status;
+    mChannelMask = static_cast<audio_channel_mask_t>(rawChannelMask);
     if ((status = parcel->readInt32(&mId)) != NO_ERROR) return status;
     // Read mGain from parcel.
     if ((status = parcel->readInt32(&mGain.index)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mGain.mode)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mGain.channel_mask)) != NO_ERROR) return status;
+    uint32_t rawGainMode;
+    if ((status = parcel->readUint32(&rawGainMode)) != NO_ERROR) return status;
+    mGain.mode = static_cast<audio_gain_mode_t>(rawGainMode);
+    if ((status = parcel->readUint32(&rawChannelMask)) != NO_ERROR) return status;
+    mGain.channel_mask = static_cast<audio_channel_mask_t>(rawChannelMask);
     if ((status = parcel->readUint32(&mGain.ramp_duration_ms)) != NO_ERROR) return status;
     std::vector<int> values;
     if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
