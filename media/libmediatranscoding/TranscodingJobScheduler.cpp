@@ -53,6 +53,38 @@ TranscodingJobScheduler::TranscodingJobScheduler(
 
 TranscodingJobScheduler::~TranscodingJobScheduler() {}
 
+void TranscodingJobScheduler::dumpAllJobs(int fd, const Vector<String16>& args __unused) {
+    String8 result;
+
+    const size_t SIZE = 256;
+    char buffer[SIZE];
+    std::scoped_lock lock{mLock};
+
+    snprintf(buffer, SIZE, " \n\n   Total num of Jobs: %zu\n", mJobMap.size());
+    result.append(buffer);
+
+    if (mJobMap.size() > 0) {
+        snprintf(buffer, SIZE, "========== Dumping all jobs =========\n");
+        result.append(buffer);
+    }
+
+    for (auto uidIt = mUidSortedList.begin(); uidIt != mUidSortedList.end(); uidIt++) {
+        for (auto jobIt = mJobQueues[*uidIt].begin(); jobIt != mJobQueues[*uidIt].end(); jobIt++) {
+            if (mJobMap.count(*jobIt) != 0) {
+                TranscodingRequestParcel& request = mJobMap[*jobIt].request;
+                snprintf(buffer, SIZE, "Job: %s Client: %d\n", request.sourceFilePath.c_str(),
+                         request.clientUid);
+
+            } else {
+                snprintf(buffer, SIZE, "Failed to look up Job %s  \n", jobToString(*jobIt).c_str());
+            }
+            result.append(buffer);
+        }
+    }
+
+    write(fd, result.string(), result.size());
+}
+
 TranscodingJobScheduler::Job* TranscodingJobScheduler::getTopJob_l() {
     if (mJobMap.empty()) {
         return nullptr;

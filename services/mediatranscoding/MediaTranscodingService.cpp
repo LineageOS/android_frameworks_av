@@ -78,6 +78,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
     Vector<String16> args;
     mClientManager->dumpAllClients(fd, args);
+    mJobScheduler->dumpAllJobs(fd, args);
     return OK;
 }
 
