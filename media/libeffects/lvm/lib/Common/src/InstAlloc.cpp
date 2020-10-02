@@ -26,9 +26,7 @@
  *  Remarks     :
  ****************************************************************************************/
 
-void    InstAlloc_Init( INST_ALLOC      *pms,
-                        void            *StartAddr )
-{
+void InstAlloc_Init(INST_ALLOC* pms, void* StartAddr) {
     pms->TotalSize = 3;
     pms->pNextMember = (((uintptr_t)StartAddr + 3) & (uintptr_t)~3);
 }
@@ -44,10 +42,8 @@ void    InstAlloc_Init( INST_ALLOC      *pms,
  *  Remarks     :
  ****************************************************************************************/
 
-void*   InstAlloc_AddMember( INST_ALLOC         *pms,
-                             LVM_UINT32           Size )
-{
-    void *NewMemberAddress; /* Variable to temporarily store the return value */
+void* InstAlloc_AddMember(INST_ALLOC* pms, LVM_UINT32 Size) {
+    void* NewMemberAddress; /* Variable to temporarily store the return value */
     NewMemberAddress = (void*)pms->pNextMember;
 
     Size = ((Size + 3) & (LVM_UINT32)~3); /* Ceil the size to a multiple of four */
@@ -55,7 +51,7 @@ void*   InstAlloc_AddMember( INST_ALLOC         *pms,
     pms->TotalSize += Size;
     pms->pNextMember += Size;
 
-    return(NewMemberAddress);
+    return (NewMemberAddress);
 }
 
 /****************************************************************************************
@@ -66,21 +62,15 @@ void*   InstAlloc_AddMember( INST_ALLOC         *pms,
  *  Remarks     :
  ****************************************************************************************/
 
-LVM_UINT32 InstAlloc_GetTotal( INST_ALLOC *pms)
-{
-    if (pms->TotalSize > 3)
-    {
-        return(pms->TotalSize);
-    }
-    else
-    {
-        return 0;           /* No memory added */
+LVM_UINT32 InstAlloc_GetTotal(INST_ALLOC* pms) {
+    if (pms->TotalSize > 3) {
+        return (pms->TotalSize);
+    } else {
+        return 0; /* No memory added */
     }
 }
 
-void    InstAlloc_InitAll( INST_ALLOC                      *pms,
-                           LVM_MemoryTable_st             *pMemoryTable)
-{
+void InstAlloc_InitAll(INST_ALLOC* pms, LVM_MemoryTable_st* pMemoryTable) {
     uintptr_t StartAddr;
 
     StartAddr = (uintptr_t)pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress;
@@ -102,7 +92,6 @@ void    InstAlloc_InitAll( INST_ALLOC                      *pms,
 
     pms[3].TotalSize = 3;
     pms[3].pNextMember = ((StartAddr + 3) & (uintptr_t)~3);
-
 }
 
 /****************************************************************************************
@@ -114,8 +103,7 @@ void    InstAlloc_InitAll( INST_ALLOC                      *pms,
  *  Remarks     :
  ****************************************************************************************/
 
-void    InstAlloc_InitAll_NULL( INST_ALLOC  *pms)
-{
+void InstAlloc_InitAll_NULL(INST_ALLOC* pms) {
     pms[0].TotalSize = 3;
     pms[0].pNextMember = 0;
 
@@ -127,47 +115,46 @@ void    InstAlloc_InitAll_NULL( INST_ALLOC  *pms)
 
     pms[3].TotalSize = 3;
     pms[3].pNextMember = 0;
-
 }
 
-void*   InstAlloc_AddMemberAll( INST_ALLOC                     *pms,
-                                 LVM_UINT32                   Size[],
-                                 LVM_MemoryTable_st           *pMemoryTable)
-{
-    void *NewMemberAddress; /* Variable to temporarily store the return value */
+void* InstAlloc_AddMemberAll(INST_ALLOC* pms, LVM_UINT32 Size[], LVM_MemoryTable_st* pMemoryTable) {
+    void* NewMemberAddress; /* Variable to temporarily store the return value */
 
     /* coverity[returned_pointer] Ignore coverity warning that ptr is not used */
-    NewMemberAddress = InstAlloc_AddMember(&pms[LVM_PERSISTENT_SLOW_DATA], Size[LVM_PERSISTENT_SLOW_DATA]);
+    NewMemberAddress =
+            InstAlloc_AddMember(&pms[LVM_PERSISTENT_SLOW_DATA], Size[LVM_PERSISTENT_SLOW_DATA]);
 
-    pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Size         = InstAlloc_GetTotal(&pms[LVM_PERSISTENT_SLOW_DATA]);
-    pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Type         = LVM_PERSISTENT_SLOW_DATA;
+    pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Size =
+            InstAlloc_GetTotal(&pms[LVM_PERSISTENT_SLOW_DATA]);
+    pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Type = LVM_PERSISTENT_SLOW_DATA;
     pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress = LVM_NULL;
 
-    NewMemberAddress = InstAlloc_AddMember(&pms[LVM_PERSISTENT_FAST_DATA], Size[LVM_PERSISTENT_FAST_DATA]);
+    NewMemberAddress =
+            InstAlloc_AddMember(&pms[LVM_PERSISTENT_FAST_DATA], Size[LVM_PERSISTENT_FAST_DATA]);
 
-    pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size         = InstAlloc_GetTotal(&pms[LVM_PERSISTENT_FAST_DATA]);
-    pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Type         = LVM_PERSISTENT_FAST_DATA;
+    pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size =
+            InstAlloc_GetTotal(&pms[LVM_PERSISTENT_FAST_DATA]);
+    pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Type = LVM_PERSISTENT_FAST_DATA;
     pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress = LVM_NULL;
 
-    NewMemberAddress = InstAlloc_AddMember(&pms[LVM_PERSISTENT_FAST_COEF], Size[LVM_PERSISTENT_FAST_COEF]);
+    NewMemberAddress =
+            InstAlloc_AddMember(&pms[LVM_PERSISTENT_FAST_COEF], Size[LVM_PERSISTENT_FAST_COEF]);
 
-    pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size         = InstAlloc_GetTotal(&pms[LVM_PERSISTENT_FAST_COEF]);
-    pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Type         = LVM_PERSISTENT_FAST_COEF;
+    pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size =
+            InstAlloc_GetTotal(&pms[LVM_PERSISTENT_FAST_COEF]);
+    pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Type = LVM_PERSISTENT_FAST_COEF;
     pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress = LVM_NULL;
 
     NewMemberAddress = InstAlloc_AddMember(&pms[LVM_TEMPORARY_FAST], Size[LVM_TEMPORARY_FAST]);
 
-    pMemoryTable->Region[LVM_TEMPORARY_FAST].Size                 = InstAlloc_GetTotal(&pms[LVM_TEMPORARY_FAST]);
-    pMemoryTable->Region[LVM_TEMPORARY_FAST].Type                 = LVM_TEMPORARY_FAST;
-    pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress         = LVM_NULL;
+    pMemoryTable->Region[LVM_TEMPORARY_FAST].Size = InstAlloc_GetTotal(&pms[LVM_TEMPORARY_FAST]);
+    pMemoryTable->Region[LVM_TEMPORARY_FAST].Type = LVM_TEMPORARY_FAST;
+    pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress = LVM_NULL;
 
-    return(NewMemberAddress);
+    return (NewMemberAddress);
 }
 
-void*   InstAlloc_AddMemberAllRet(     INST_ALLOC                 *pms,
-                                     LVM_UINT32               Size[],
-                                     void                    **ptr)
-{
+void* InstAlloc_AddMemberAllRet(INST_ALLOC* pms, LVM_UINT32 Size[], void** ptr) {
     ptr[0] = InstAlloc_AddMember(&pms[LVM_PERSISTENT_SLOW_DATA], Size[LVM_PERSISTENT_SLOW_DATA]);
     ptr[1] = InstAlloc_AddMember(&pms[LVM_PERSISTENT_FAST_DATA], Size[LVM_PERSISTENT_FAST_DATA]);
     ptr[2] = InstAlloc_AddMember(&pms[LVM_PERSISTENT_FAST_COEF], Size[LVM_PERSISTENT_FAST_COEF]);

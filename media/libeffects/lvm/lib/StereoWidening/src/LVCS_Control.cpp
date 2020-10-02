@@ -45,15 +45,12 @@
 /*                                                                                  */
 /************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
-                                        LVCS_Params_t   *pParams)
-{
-
-    LVCS_Instance_t     *pInstance =(LVCS_Instance_t  *)hInstance;
+LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t hInstance, LVCS_Params_t* pParams) {
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
 
     *pParams = pInstance->Params;
 
-    return(LVCS_SUCCESS);
+    return (LVCS_SUCCESS);
 }
 
 /************************************************************************************/
@@ -75,34 +72,29 @@ LVCS_ReturnStatus_en LVCS_GetParameters(LVCS_Handle_t   hInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
-                                  LVCS_Params_t      *pParams)
-{
-    LVM_INT16                   Offset;
-    LVCS_Instance_t             *pInstance =(LVCS_Instance_t  *)hInstance;
-    LVCS_ReturnStatus_en        err;
-    LVCS_Modes_en               OperatingModeSave = pInstance->Params.OperatingMode;
+LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t hInstance, LVCS_Params_t* pParams) {
+    LVM_INT16 Offset;
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
+    LVCS_ReturnStatus_en err;
+    LVCS_Modes_en OperatingModeSave = pInstance->Params.OperatingMode;
 
-    if (pParams->SampleRate != pInstance->Params.SampleRate)
-    {
+    if (pParams->SampleRate != pInstance->Params.SampleRate) {
         pInstance->TimerParams.SamplingRate = LVCS_SampleRateTable[pParams->SampleRate];
     }
 
     /*
      * If the reverb level has changed
      */
-    if(pInstance->Params.ReverbLevel != pParams->ReverbLevel)
-    {
-        err=LVCS_ReverbGeneratorInit(hInstance,pParams);
+    if (pInstance->Params.ReverbLevel != pParams->ReverbLevel) {
+        err = LVCS_ReverbGeneratorInit(hInstance, pParams);
     }
 
     /*
      * If the sample rate or speaker has changed then perform a full re-initialisation
      */
     if ((pInstance->Params.SampleRate != pParams->SampleRate) ||
-       (pInstance->Params.SpeakerType != pParams->SpeakerType))
-    {
-        const LVCS_VolCorrect_t *pLVCS_VolCorrectTable;
+        (pInstance->Params.SpeakerType != pParams->SpeakerType)) {
+        const LVCS_VolCorrect_t* pLVCS_VolCorrectTable;
 
         /*
          * Output device
@@ -114,15 +106,16 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
          */
         /* Use internal coefficient table */
         pLVCS_VolCorrectTable = (LVCS_VolCorrect_t*)&LVCS_VolCorrectTable[0];
-        Offset = (LVM_INT16)(pParams->SpeakerType + pParams->SourceFormat*(1+LVCS_EX_HEADPHONES));
+        Offset = (LVM_INT16)(pParams->SpeakerType +
+                             pParams->SourceFormat * (1 + LVCS_EX_HEADPHONES));
 
         pInstance->VolCorrect = pLVCS_VolCorrectTable[Offset];
 
         pInstance->CompressGain = pInstance->VolCorrect.CompMin;
         LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0], 0, 0);
         {
-            LVM_FLOAT          Gain;
-            const Gain_t        *pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
+            LVM_FLOAT Gain;
+            const Gain_t* pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
             Gain = (LVM_FLOAT)(pOutputGainTable[Offset].Loss);
             Gain = (LVM_FLOAT)pOutputGainTable[Offset].UnprocLoss * (Gain);
 
@@ -133,22 +126,18 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
 
             LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[1], 0, Gain);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],
-                    LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
+                                               LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
             LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],
-                    LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
+                                               LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
         }
 
-        err=LVCS_SEnhancerInit(hInstance,
-                           pParams);
+        err = LVCS_SEnhancerInit(hInstance, pParams);
 
-        err=LVCS_ReverbGeneratorInit(hInstance,
-                                 pParams);
+        err = LVCS_ReverbGeneratorInit(hInstance, pParams);
 
-        err=LVCS_EqualiserInit(hInstance,
-                           pParams);
+        err = LVCS_EqualiserInit(hInstance, pParams);
 
-        err=LVCS_BypassMixInit(hInstance,
-                           pParams);
+        err = LVCS_BypassMixInit(hInstance, pParams);
 
     }
 
@@ -156,30 +145,26 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
      * Check if the effect level or source format has changed
      */
     else if ((pInstance->Params.EffectLevel != pParams->EffectLevel) ||
-            (pInstance->Params.SourceFormat != pParams->SourceFormat))
-    {
-        const LVCS_VolCorrect_t *pLVCS_VolCorrectTable;
+             (pInstance->Params.SourceFormat != pParams->SourceFormat)) {
+        const LVCS_VolCorrect_t* pLVCS_VolCorrectTable;
 
         /*
          * Get the volume correction parameters
          */
         /* Use internal coefficient table */
         pLVCS_VolCorrectTable = (LVCS_VolCorrect_t*)&LVCS_VolCorrectTable[0];
-        Offset = (LVM_INT16)(pParams->SpeakerType + pParams->SourceFormat*(1+LVCS_EX_HEADPHONES));
+        Offset = (LVM_INT16)(pParams->SpeakerType +
+                             pParams->SourceFormat * (1 + LVCS_EX_HEADPHONES));
 
         pInstance->VolCorrect = pLVCS_VolCorrectTable[Offset];
 
         /* Update the effect level and alpha-mixer gains */
-        err=LVCS_BypassMixInit(hInstance,
-                           pParams);
+        err = LVCS_BypassMixInit(hInstance, pParams);
 
-        if(err != LVCS_SUCCESS)
-        {
+        if (err != LVCS_SUCCESS) {
             return err;
         }
-    }
-    else
-    {
+    } else {
         pInstance->Params = *pParams;
     }
 
@@ -189,40 +174,36 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
     pInstance->Params = *pParams;
 
     /* Stay on the current operating mode until the transition is done */
-    if((pParams->OperatingMode != OperatingModeSave) ||
-       (pInstance->bInOperatingModeTransition == LVM_TRUE)){
-
+    if ((pParams->OperatingMode != OperatingModeSave) ||
+        (pInstance->bInOperatingModeTransition == LVM_TRUE)) {
         /* Set the reverb delay timeout */
-        if(pInstance->bInOperatingModeTransition != LVM_TRUE){
+        if (pInstance->bInOperatingModeTransition != LVM_TRUE) {
             pInstance->bTimerDone = LVM_FALSE;
             pInstance->TimerParams.TimeInMs =
-            (LVM_INT16)(((pInstance->Reverberation.DelaySize << 2)
-            /pInstance->TimerParams.SamplingRate) + 1);
-            LVM_Timer_Init ( &pInstance->TimerInstance,
-                             &pInstance->TimerParams);
+                    (LVM_INT16)(((pInstance->Reverberation.DelaySize << 2) /
+                                 pInstance->TimerParams.SamplingRate) +
+                                1);
+            LVM_Timer_Init(&pInstance->TimerInstance, &pInstance->TimerParams);
         }
 
         /* Update the effect level and alpha-mixer gains */
-        err=LVCS_BypassMixInit(hInstance,
-                           pParams);
+        err = LVCS_BypassMixInit(hInstance, pParams);
 
         /* Change transition bypass mixer settings if needed depending on transition type */
-        if(pParams->OperatingMode != LVCS_OFF){
-            pInstance->MSTarget0=LVM_MAXINT_16;
-            pInstance->MSTarget1=0;
-        }
-        else
-        {
+        if (pParams->OperatingMode != LVCS_OFF) {
+            pInstance->MSTarget0 = LVM_MAXINT_16;
+            pInstance->MSTarget1 = 0;
+        } else {
             pInstance->Params.OperatingMode = OperatingModeSave;
-            pInstance->MSTarget1=LVM_MAXINT_16;
-            pInstance->MSTarget0=0;
+            pInstance->MSTarget1 = LVM_MAXINT_16;
+            pInstance->MSTarget0 = 0;
         }
 
         /* Set transition flag */
         pInstance->bInOperatingModeTransition = LVM_TRUE;
     }
 
-    return(LVCS_SUCCESS);
+    return (LVCS_SUCCESS);
 }
 
 /****************************************************************************************/
@@ -233,12 +214,11 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t      hInstance,
 /*  CallBack function of the Timer.                                                     */
 /*                                                                                      */
 /****************************************************************************************/
-void LVCS_TimerCallBack (void* hInstance, void* pCallBackParams, LVM_INT32 CallbackParam)
-{
-    LVCS_Instance_t     *pInstance  = (LVCS_Instance_t  *)hInstance;
+void LVCS_TimerCallBack(void* hInstance, void* pCallBackParams, LVM_INT32 CallbackParam) {
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
 
     /* Avoid warnings because pCallBackParams and CallbackParam are not used*/
-    if((pCallBackParams != LVM_NULL) || (CallbackParam != 0)){
+    if ((pCallBackParams != LVM_NULL) || (CallbackParam != 0)) {
         pCallBackParams = hInstance;
         CallbackParam = 0;
         return;
@@ -248,4 +228,3 @@ void LVCS_TimerCallBack (void* hInstance, void* pCallBackParams, LVM_INT32 Callb
 
     return;
 }
-

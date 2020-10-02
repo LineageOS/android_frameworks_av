@@ -37,8 +37,7 @@
 /*  TYPE DEFINITIONS                                                                    */
 /****************************************************************************************/
 
-typedef struct
-{
+typedef struct {
     /*
      * The memory area created using this structure is internally
      * typecast to LVM_Timer_Instance_Private_t and used.
@@ -51,14 +50,13 @@ typedef struct
 
 } LVM_Timer_Instance_t;
 
-typedef struct
-{
-    LVM_INT32  SamplingRate;
-    LVM_INT16  TimeInMs;
-    LVM_INT32  CallBackParam;
-    void       *pCallBackParams;
-    void       *pCallbackInstance;
-    void       (*pCallBack)(void*,void*,LVM_INT32);
+typedef struct {
+    LVM_INT32 SamplingRate;
+    LVM_INT16 TimeInMs;
+    LVM_INT32 CallBackParam;
+    void* pCallBackParams;
+    void* pCallbackInstance;
+    void (*pCallBack)(void*, void*, LVM_INT32);
 
 } LVM_Timer_Params_t;
 
@@ -66,14 +64,12 @@ typedef struct
 /*  FUNCTION PROTOTYPES                                                                 */
 /****************************************************************************************/
 
-void LVM_Timer_Init (   LVM_Timer_Instance_t       *pInstance,
-                        LVM_Timer_Params_t         *pParams     );
+void LVM_Timer_Init(LVM_Timer_Instance_t* pInstance, LVM_Timer_Params_t* pParams);
 
-void LVM_Timer      (   LVM_Timer_Instance_t       *pInstance,
-                        LVM_INT16                       BlockSize );
+void LVM_Timer(LVM_Timer_Instance_t* pInstance, LVM_INT16 BlockSize);
 
 /****************************************************************************************/
 /*  END OF HEADER                                                                       */
 /****************************************************************************************/
 
-#endif  /* __LVM_TIMER_H__ */
+#endif /* __LVM_TIMER_H__ */

@@ -25,29 +25,20 @@
    FUNCTION INT32RSHIFTTOINT16_SAT_32X16
 ***********************************************************************************/
 
-void Int32RShiftToInt16_Sat_32x16(const LVM_INT32  *src,
-                                  LVM_INT16 *dst,
-                                  LVM_INT16 n,
-                                  LVM_INT16 shift )
-{
+void Int32RShiftToInt16_Sat_32x16(const LVM_INT32* src, LVM_INT16* dst, LVM_INT16 n,
+                                  LVM_INT16 shift) {
     LVM_INT32 temp;
     LVM_INT16 ii;
 
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         temp = *src >> shift;
         src++;
 
-        if (temp > 0x00007FFF)
-        {
+        if (temp > 0x00007FFF) {
             *dst = 0x7FFF;
-        }
-        else if (temp < -0x00008000)
-        {
-            *dst = - 0x8000;
-        }
-        else
-        {
+        } else if (temp < -0x00008000) {
+            *dst = -0x8000;
+        } else {
             *dst = (LVM_INT16)temp;
         }
 

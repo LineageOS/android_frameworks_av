@@ -25,16 +25,11 @@
    FUNCTION MULT3S_16X16
 ***********************************************************************************/
 
-void Mult3s_16x16( const LVM_INT16 *src,
-                  const LVM_INT16 val,
-                  LVM_INT16 *dst,
-                  LVM_INT16 n)
-{
+void Mult3s_16x16(const LVM_INT16* src, const LVM_INT16 val, LVM_INT16* dst, LVM_INT16 n) {
     LVM_INT16 ii;
     LVM_INT32 temp;
 
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         temp = (LVM_INT32)(*src) * (LVM_INT32)val;
         src++;
 

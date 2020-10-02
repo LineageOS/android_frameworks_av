@@ -24,7 +24,7 @@
 /*                                                                                  */
 /************************************************************************************/
 
-#include "BIQUAD.h"                             /* Biquad definitions */
+#include "BIQUAD.h" /* Biquad definitions */
 
 /************************************************************************************/
 /*                                                                                  */
@@ -106,35 +106,34 @@ extern const LVM_INT16 LVCS_VolumeTCTable[];
 /*                                                                                  */
 /************************************************************************************/
 
-extern const LVM_INT32          LVCS_SampleRateTable[];
+extern const LVM_INT32 LVCS_SampleRateTable[];
 
 /*Speaker coeffient tables*/
-extern LVM_UINT16               LVCS_MS_Small_SEMiddleGainTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Small_SESideCoefTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Small_EqualiserCoefTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Small_ReverbCoefTable[] ;
-extern LVM_UINT16               LVCS_MS_Small_StereoDelayCS4MS[];
-extern Gain_t                   LVCS_MS_Small_OutputGainTable[];
-extern LVCS_VolCorrect_t        LVCS_MS_Small_VolCorrectTable[];
-extern LVM_UINT16               LVCS_MS_Small_ReverbGainTable[];
+extern LVM_UINT16 LVCS_MS_Small_SEMiddleGainTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Small_SESideCoefTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Small_EqualiserCoefTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Small_ReverbCoefTable[];
+extern LVM_UINT16 LVCS_MS_Small_StereoDelayCS4MS[];
+extern Gain_t LVCS_MS_Small_OutputGainTable[];
+extern LVCS_VolCorrect_t LVCS_MS_Small_VolCorrectTable[];
+extern LVM_UINT16 LVCS_MS_Small_ReverbGainTable[];
 
-extern LVM_UINT16               LVCS_MS_Medium_SEMiddleGainTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Medium_SESideCoefTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Medium_EqualiserCoefTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Medium_ReverbCoefTable[] ;
-extern LVM_UINT16               LVCS_MS_Medium_StereoDelayCS4MS[];
-extern Gain_t                   LVCS_MS_Medium_OutputGainTable[];
-extern LVCS_VolCorrect_t        LVCS_MS_Medium_VolCorrectTable[];
-extern LVM_UINT16               LVCS_MS_Medium_ReverbGainTable[];
+extern LVM_UINT16 LVCS_MS_Medium_SEMiddleGainTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Medium_SESideCoefTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Medium_EqualiserCoefTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Medium_ReverbCoefTable[];
+extern LVM_UINT16 LVCS_MS_Medium_StereoDelayCS4MS[];
+extern Gain_t LVCS_MS_Medium_OutputGainTable[];
+extern LVCS_VolCorrect_t LVCS_MS_Medium_VolCorrectTable[];
+extern LVM_UINT16 LVCS_MS_Medium_ReverbGainTable[];
 
-extern LVM_UINT16               LVCS_MS_Large_SEMiddleGainTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Large_SESideCoefTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Large_EqualiserCoefTable[];
-extern BiquadA012B12CoefsSP_t   LVCS_MS_Large_ReverbCoefTable[] ;
-extern LVM_UINT16               LVCS_MS_Large_StereoDelayCS4MS[];
-extern Gain_t                   LVCS_MS_Large_OutputGainTable[];
-extern LVCS_VolCorrect_t        LVCS_MS_Large_VolCorrectTable[];
-extern LVM_UINT16               LVCS_MS_Large_ReverbGainTable[];
+extern LVM_UINT16 LVCS_MS_Large_SEMiddleGainTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Large_SESideCoefTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Large_EqualiserCoefTable[];
+extern BiquadA012B12CoefsSP_t LVCS_MS_Large_ReverbCoefTable[];
+extern LVM_UINT16 LVCS_MS_Large_StereoDelayCS4MS[];
+extern Gain_t LVCS_MS_Large_OutputGainTable[];
+extern LVCS_VolCorrect_t LVCS_MS_Large_VolCorrectTable[];
+extern LVM_UINT16 LVCS_MS_Large_ReverbGainTable[];
 
 #endif /* __LVCS_TABLES_H__ */
-

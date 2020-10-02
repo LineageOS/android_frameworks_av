@@ -56,83 +56,37 @@
 /*  Alpha   - the filter coefficient Q31 format                         */
 /*                                                                      */
 /************************************************************************/
-LVM_FLOAT LVM_Mixer_TimeConstant(LVM_UINT32   tc,
-                                  LVM_UINT32   Fs,
-                                  LVM_UINT16   NumChannels)
-{
-
-    LVM_UINT32  Product;
-    LVM_FLOAT  ProductFloat;
-    LVM_INT16   InterpolateShort;
-    LVM_FLOAT   Interpolate;
-    LVM_UINT16  Shift;
-    LVM_FLOAT   Diff;
-    LVM_FLOAT  Table[] = {ALPHA_Float_0,             /* Log spaced look-up table */
-                          ALPHA_Float_1,
-                          ALPHA_Float_2,
-                          ALPHA_Float_3,
-                          ALPHA_Float_4,
-                          ALPHA_Float_5,
-                          ALPHA_Float_6,
-                          ALPHA_Float_7,
-                          ALPHA_Float_8,
-                          ALPHA_Float_9,
-                          ALPHA_Float_10,
-                          ALPHA_Float_11,
-                          ALPHA_Float_12,
-                          ALPHA_Float_13,
-                          ALPHA_Float_14,
-                          ALPHA_Float_15,
-                          ALPHA_Float_16,
-                          ALPHA_Float_17,
-                          ALPHA_Float_18,
-                          ALPHA_Float_19,
-                          ALPHA_Float_20,
-                          ALPHA_Float_21,
-                          ALPHA_Float_22,
-                          ALPHA_Float_23,
-                          ALPHA_Float_24,
-                          ALPHA_Float_25,
-                          ALPHA_Float_26,
-                          ALPHA_Float_27,
-                          ALPHA_Float_28,
-                          ALPHA_Float_29,
-                          ALPHA_Float_30,
-                          ALPHA_Float_31,
-                          ALPHA_Float_32,
-                          ALPHA_Float_33,
-                          ALPHA_Float_34,
-                          ALPHA_Float_35,
-                          ALPHA_Float_36,
-                          ALPHA_Float_37,
-                          ALPHA_Float_38,
-                          ALPHA_Float_39,
-                          ALPHA_Float_40,
-                          ALPHA_Float_41,
-                          ALPHA_Float_42,
-                          ALPHA_Float_43,
-                          ALPHA_Float_44,
-                          ALPHA_Float_45,
-                          ALPHA_Float_46,
-                          ALPHA_Float_47,
-                          ALPHA_Float_48,
-                          ALPHA_Float_49,
-                          ALPHA_Float_50};
+LVM_FLOAT LVM_Mixer_TimeConstant(LVM_UINT32 tc, LVM_UINT32 Fs, LVM_UINT16 NumChannels) {
+    LVM_UINT32 Product;
+    LVM_FLOAT ProductFloat;
+    LVM_INT16 InterpolateShort;
+    LVM_FLOAT Interpolate;
+    LVM_UINT16 Shift;
+    LVM_FLOAT Diff;
+    LVM_FLOAT Table[] = {
+            ALPHA_Float_0, /* Log spaced look-up table */
+            ALPHA_Float_1,  ALPHA_Float_2,  ALPHA_Float_3,  ALPHA_Float_4,  ALPHA_Float_5,
+            ALPHA_Float_6,  ALPHA_Float_7,  ALPHA_Float_8,  ALPHA_Float_9,  ALPHA_Float_10,
+            ALPHA_Float_11, ALPHA_Float_12, ALPHA_Float_13, ALPHA_Float_14, ALPHA_Float_15,
+            ALPHA_Float_16, ALPHA_Float_17, ALPHA_Float_18, ALPHA_Float_19, ALPHA_Float_20,
+            ALPHA_Float_21, ALPHA_Float_22, ALPHA_Float_23, ALPHA_Float_24, ALPHA_Float_25,
+            ALPHA_Float_26, ALPHA_Float_27, ALPHA_Float_28, ALPHA_Float_29, ALPHA_Float_30,
+            ALPHA_Float_31, ALPHA_Float_32, ALPHA_Float_33, ALPHA_Float_34, ALPHA_Float_35,
+            ALPHA_Float_36, ALPHA_Float_37, ALPHA_Float_38, ALPHA_Float_39, ALPHA_Float_40,
+            ALPHA_Float_41, ALPHA_Float_42, ALPHA_Float_43, ALPHA_Float_44, ALPHA_Float_45,
+            ALPHA_Float_46, ALPHA_Float_47, ALPHA_Float_48, ALPHA_Float_49, ALPHA_Float_50};
 
     /* Calculate the product of the time constant and the sample rate */
-    Product = ((tc >> 16) * (LVM_UINT32)Fs) << 13;  /* Stereo value */
+    Product = ((tc >> 16) * (LVM_UINT32)Fs) << 13; /* Stereo value */
     Product = Product + (((tc & 0x0000FFFF) * (LVM_UINT32)Fs) >> 3);
 
-    if (NumChannels == 1)
-    {
-        Product = Product >> 1;   /* Mono value */
+    if (NumChannels == 1) {
+        Product = Product >> 1; /* Mono value */
     }
 
     /* Normalize to get the table index and interpolation factor */
-    for (Shift = 0; Shift < ((Alpha_TableSize - 1) / 2); Shift++)
-    {
-        if ((Product & 0x80000000) != 0)
-        {
+    for (Shift = 0; Shift < ((Alpha_TableSize - 1) / 2); Shift++) {
+        if ((Product & 0x80000000) != 0) {
             break;
         }
 
@@ -140,8 +94,7 @@ LVM_FLOAT LVM_Mixer_TimeConstant(LVM_UINT32   tc,
     }
     Shift = (LVM_UINT16)((Shift << 1));
 
-    if ((Product & 0x40000000)==0)
-    {
+    if ((Product & 0x40000000) == 0) {
         Shift++;
     }
 

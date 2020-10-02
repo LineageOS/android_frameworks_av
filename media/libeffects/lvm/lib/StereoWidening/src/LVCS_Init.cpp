@@ -46,67 +46,62 @@
 /*                                                                                  */
 /************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t         *phInstance,
-                               LVCS_Capabilities_t   *pCapabilities,
-                               void                  *pScratch)
-{
-
-    LVCS_Instance_t    *pInstance;
-    LVCS_VolCorrect_t  *pLVCS_VolCorrectTable;
+LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t* phInstance, LVCS_Capabilities_t* pCapabilities,
+                               void* pScratch) {
+    LVCS_Instance_t* pInstance;
+    LVCS_VolCorrect_t* pLVCS_VolCorrectTable;
 
     /*
      * Create the instance handle if not already initialised
      */
-    if (*phInstance == LVM_NULL)
-    {
+    if (*phInstance == LVM_NULL) {
         *phInstance = calloc(1, sizeof(*pInstance));
     }
-    if (*phInstance == LVM_NULL)
-    {
+    if (*phInstance == LVM_NULL) {
         return LVCS_NULLADDRESS;
     }
-    pInstance =(LVCS_Instance_t  *)*phInstance;
+    pInstance = (LVCS_Instance_t*)*phInstance;
 
     /*
      * Save the capabilities in the instance structure
      */
     pInstance->Capabilities = *pCapabilities;
 
-    pInstance->pScratch     = pScratch;
+    pInstance->pScratch = pScratch;
 
     /*
      * Set all initial parameters to invalid to force a full initialisation
      */
-    pInstance->Params.OperatingMode  = LVCS_OFF;
-    pInstance->Params.SpeakerType    = LVCS_SPEAKERTYPE_MAX;
-    pInstance->OutputDevice          = LVCS_HEADPHONE;
-    pInstance->Params.SourceFormat   = LVCS_SOURCEMAX;
+    pInstance->Params.OperatingMode = LVCS_OFF;
+    pInstance->Params.SpeakerType = LVCS_SPEAKERTYPE_MAX;
+    pInstance->OutputDevice = LVCS_HEADPHONE;
+    pInstance->Params.SourceFormat = LVCS_SOURCEMAX;
     pInstance->Params.CompressorMode = LVM_MODE_OFF;
-    pInstance->Params.SampleRate     = LVM_FS_INVALID;
-    pInstance->Params.EffectLevel    = 0;
-    pInstance->Params.ReverbLevel    = (LVM_UINT16)0x8000;
-    pLVCS_VolCorrectTable            = (LVCS_VolCorrect_t*)&LVCS_VolCorrectTable[0];
-    pInstance->VolCorrect            = pLVCS_VolCorrectTable[0];
-    pInstance->TransitionGain        = 0;
+    pInstance->Params.SampleRate = LVM_FS_INVALID;
+    pInstance->Params.EffectLevel = 0;
+    pInstance->Params.ReverbLevel = (LVM_UINT16)0x8000;
+    pLVCS_VolCorrectTable = (LVCS_VolCorrect_t*)&LVCS_VolCorrectTable[0];
+    pInstance->VolCorrect = pLVCS_VolCorrectTable[0];
+    pInstance->TransitionGain = 0;
 
     /* These current and target values are intialized again in LVCS_Control.c */
-    LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0],0,0);
+    LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[0], 0, 0);
     /* These current and target values are intialized again in LVCS_Control.c */
-    LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[1],0,0);
+    LVC_Mixer_Init(&pInstance->BypassMix.Mixer_Instance.MixerStream[1], 0, 0);
 
     /*
      * Initialise the bypass variables
      */
-    pInstance->MSTarget0=0;
-    pInstance->MSTarget1=0;
-    pInstance->bInOperatingModeTransition          = LVM_FALSE;
-    pInstance->bTimerDone                        = LVM_FALSE;
-    pInstance->TimerParams.CallBackParam         = 0;
-    pInstance->TimerParams.pCallBack             = LVCS_TimerCallBack;
-    pInstance->TimerParams.pCallbackInstance     = pInstance;
-    pInstance->TimerParams.pCallBackParams       = LVM_NULL;
+    pInstance->MSTarget0 = 0;
+    pInstance->MSTarget1 = 0;
+    pInstance->bInOperatingModeTransition = LVM_FALSE;
+    pInstance->bTimerDone = LVM_FALSE;
+    pInstance->TimerParams.CallBackParam = 0;
+    pInstance->TimerParams.pCallBack = LVCS_TimerCallBack;
+    pInstance->TimerParams.pCallbackInstance = pInstance;
+    pInstance->TimerParams.pCallBackParams = LVM_NULL;
 
-    return(LVCS_SUCCESS);
+    return (LVCS_SUCCESS);
 }
 
 /************************************************************************************/
@@ -123,9 +118,8 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t         *phInstance,
 /*  1.  This function must not be interrupted by the LVCS_Process function          */
 /*                                                                                  */
 /************************************************************************************/
-void LVCS_DeInit(LVCS_Handle_t *phInstance)
-{
-    LVCS_Instance_t *pInstance = (LVCS_Instance_t *)*phInstance;
+void LVCS_DeInit(LVCS_Handle_t* phInstance) {
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)*phInstance;
     if (pInstance == LVM_NULL) {
         return;
     }

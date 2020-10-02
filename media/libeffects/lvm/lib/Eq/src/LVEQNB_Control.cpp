@@ -32,8 +32,8 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#define     LOW_FREQ            298             /* 32768/110 for low test frequency */
-#define     HIGH_FREQ           386             /* 32768/85 for high test frequency */
+#define LOW_FREQ 298  /* 32768/110 for low test frequency */
+#define HIGH_FREQ 386 /* 32768/85 for high test frequency */
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -56,23 +56,19 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_GetParameters(LVEQNB_Handle_t     hInstance,
-                                            LVEQNB_Params_t     *pParams)
-{
+LVEQNB_ReturnStatus_en LVEQNB_GetParameters(LVEQNB_Handle_t hInstance, LVEQNB_Params_t* pParams) {
+    LVEQNB_Instance_t* pInstance = (LVEQNB_Instance_t*)hInstance;
 
-    LVEQNB_Instance_t    *pInstance =(LVEQNB_Instance_t  *)hInstance;
-
-   /*
+    /*
      * Check for error conditions
      */
-    if((hInstance == LVM_NULL) || (pParams == LVM_NULL))
-    {
+    if ((hInstance == LVM_NULL) || (pParams == LVM_NULL)) {
         return LVEQNB_NULLADDRESS;
     }
 
     *pParams = pInstance->Params;
 
-    return(LVEQNB_SUCCESS);
+    return (LVEQNB_SUCCESS);
 }
 
 /************************************************************************************/
@@ -96,20 +92,17 @@ LVEQNB_ReturnStatus_en LVEQNB_GetParameters(LVEQNB_Handle_t     hInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t           hInstance,
-                                              LVEQNB_Capabilities_t     *pCapabilities)
-{
+LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t hInstance,
+                                              LVEQNB_Capabilities_t* pCapabilities) {
+    LVEQNB_Instance_t* pInstance = (LVEQNB_Instance_t*)hInstance;
 
-    LVEQNB_Instance_t    *pInstance =(LVEQNB_Instance_t  *)hInstance;
-
-    if((hInstance == LVM_NULL) || (pCapabilities == LVM_NULL))
-    {
+    if ((hInstance == LVM_NULL) || (pCapabilities == LVM_NULL)) {
         return LVEQNB_NULLADDRESS;
     }
 
     *pCapabilities = pInstance->Capabilities;
 
-    return(LVEQNB_SUCCESS);
+    return (LVEQNB_SUCCESS);
 }
 
 /************************************************************************************/
@@ -134,33 +127,30 @@ LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t           hInstanc
 /*                                                                                  */
 /************************************************************************************/
 
-void    LVEQNB_SetFilters(LVEQNB_Instance_t     *pInstance,
-                          LVEQNB_Params_t       *pParams)
-{
-    extern const LVM_UINT32   LVEQNB_SampleRateTab[];           /* Sample rate table */
+void LVEQNB_SetFilters(LVEQNB_Instance_t* pInstance, LVEQNB_Params_t* pParams) {
+    extern const LVM_UINT32 LVEQNB_SampleRateTab[]; /* Sample rate table */
 
-    LVM_UINT16          i;                                      /* Filter band index */
-    LVM_UINT32          fs = (LVM_UINT32)LVEQNB_SampleRateTab[(LVM_UINT16)pParams->SampleRate];  /* Sample rate */
-    LVM_UINT32          fc;                                     /* Filter centre frequency */
-    LVM_INT16           QFactor;                                /* Filter Q factor */
+    LVM_UINT16 i; /* Filter band index */
+    LVM_UINT32 fs =
+            (LVM_UINT32)LVEQNB_SampleRateTab[(LVM_UINT16)pParams->SampleRate]; /* Sample rate */
+    LVM_UINT32 fc;     /* Filter centre frequency */
+    LVM_INT16 QFactor; /* Filter Q factor */
 
     pInstance->NBands = pParams->NBands;
 
-    for (i=0; i<pParams->NBands; i++)
-    {
+    for (i = 0; i < pParams->NBands; i++) {
         /*
          * Get the filter settings
          */
-        fc = (LVM_UINT32)pParams->pBandDefinition[i].Frequency;     /* Get the band centre frequency */
-        QFactor = (LVM_INT16)pParams->pBandDefinition[i].QFactor;   /* Get the band Q factor */
+        fc = (LVM_UINT32)pParams->pBandDefinition[i].Frequency; /* Get the band centre frequency */
+        QFactor = (LVM_INT16)pParams->pBandDefinition[i].QFactor; /* Get the band Q factor */
 
         pInstance->pBiquadType[i] = LVEQNB_SinglePrecision_Float; /* Default to single precision */
 
         /*
          * Check for out of range frequencies
          */
-        if (fc > (fs >> 1))
-        {
+        if (fc > (fs >> 1)) {
             pInstance->pBiquadType[i] = LVEQNB_OutOfRange;
         }
 
@@ -168,7 +158,6 @@ void    LVEQNB_SetFilters(LVEQNB_Instance_t     *pInstance,
          * Copy the filter definition to persistant memory
          */
         pInstance->pBandDefinitions[i] = pParams->pBandDefinition[i];
-
     }
 }
 
@@ -186,46 +175,37 @@ void    LVEQNB_SetFilters(LVEQNB_Instance_t     *pInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-void    LVEQNB_SetCoefficients(LVEQNB_Instance_t     *pInstance)
-{
-
-    LVM_UINT16              i;                          /* Filter band index */
-    LVEQNB_BiquadType_en    BiquadType;                 /* Filter biquad type */
+void LVEQNB_SetCoefficients(LVEQNB_Instance_t* pInstance) {
+    LVM_UINT16 i;                    /* Filter band index */
+    LVEQNB_BiquadType_en BiquadType; /* Filter biquad type */
 
     /*
      * Set the coefficients for each band by the init function
      */
-    for (i=0; i<pInstance->Params.NBands; i++)
-    {
-
+    for (i = 0; i < pInstance->Params.NBands; i++) {
         /*
          * Check band type for correct initialisation method and recalculate the coefficients
          */
         BiquadType = pInstance->pBiquadType[i];
-        switch  (BiquadType)
-        {
-            case    LVEQNB_SinglePrecision_Float:
-            {
-                PK_FLOAT_Coefs_t      Coefficients;
+        switch (BiquadType) {
+            case LVEQNB_SinglePrecision_Float: {
+                PK_FLOAT_Coefs_t Coefficients;
                 /*
                  * Calculate the single precision coefficients
                  */
                 LVEQNB_SinglePrecCoefs((LVM_UINT16)pInstance->Params.SampleRate,
-                                       &pInstance->pBandDefinitions[i],
-                                       &Coefficients);
+                                       &pInstance->pBandDefinitions[i], &Coefficients);
                 /*
                  * Set the coefficients
                  */
                 PK_2I_D32F32CssGss_TRC_WRA_01_Init(&pInstance->pEQNB_FilterState_Float[i],
-                                                   &pInstance->pEQNB_Taps_Float[i],
-                                                   &Coefficients);
+                                                   &pInstance->pEQNB_Taps_Float[i], &Coefficients);
                 break;
             }
             default:
                 break;
         }
     }
-
 }
 
 /************************************************************************************/
@@ -239,20 +219,19 @@ void    LVEQNB_SetCoefficients(LVEQNB_Instance_t     *pInstance)
 /*  pInstance           Pointer to the instance                                     */
 /*                                                                                  */
 /************************************************************************************/
-void    LVEQNB_ClearFilterHistory(LVEQNB_Instance_t     *pInstance)
-{
-    LVM_FLOAT       *pTapAddress;
-    LVM_INT16       NumTaps;
+void LVEQNB_ClearFilterHistory(LVEQNB_Instance_t* pInstance) {
+    LVM_FLOAT* pTapAddress;
+    LVM_INT16 NumTaps;
 
-    pTapAddress = (LVM_FLOAT *)pInstance->pEQNB_Taps_Float;
-    NumTaps     = (LVM_INT16)((pInstance->Capabilities.MaxBands * \
-                                    sizeof(Biquad_2I_Order2_FLOAT_Taps_t)) / sizeof(LVM_FLOAT));
+    pTapAddress = (LVM_FLOAT*)pInstance->pEQNB_Taps_Float;
+    NumTaps =
+            (LVM_INT16)((pInstance->Capabilities.MaxBands * sizeof(Biquad_2I_Order2_FLOAT_Taps_t)) /
+                        sizeof(LVM_FLOAT));
 
-    if (NumTaps != 0)
-    {
-        LoadConst_Float(0,                                 /* Clear the history, value 0 */
-                        pTapAddress,                       /* Destination */
-                        NumTaps);                          /* Number of words */
+    if (NumTaps != 0) {
+        LoadConst_Float(0,           /* Clear the history, value 0 */
+                        pTapAddress, /* Destination */
+                        NumTaps);    /* Number of words */
     }
 }
 /****************************************************************************************/
@@ -277,56 +256,47 @@ void    LVEQNB_ClearFilterHistory(LVEQNB_Instance_t     *pInstance)
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
-                                      LVEQNB_Params_t        *pParams)
-{
-
-    LVEQNB_Instance_t    *pInstance = (LVEQNB_Instance_t  *)hInstance;
-    LVM_INT16            bChange    = LVM_FALSE;
-    LVM_INT16            i = 0;
-    LVEQNB_Mode_en       OperatingModeSave ;
+LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t hInstance, LVEQNB_Params_t* pParams) {
+    LVEQNB_Instance_t* pInstance = (LVEQNB_Instance_t*)hInstance;
+    LVM_INT16 bChange = LVM_FALSE;
+    LVM_INT16 i = 0;
+    LVEQNB_Mode_en OperatingModeSave;
 
     /*
      * Check for error conditions
      */
-    if((hInstance == LVM_NULL) || (pParams == LVM_NULL))
-    {
+    if ((hInstance == LVM_NULL) || (pParams == LVM_NULL)) {
         return LVEQNB_NULLADDRESS;
     }
 
-    if((pParams->NBands !=0) && (pParams->pBandDefinition==LVM_NULL))
-    {
+    if ((pParams->NBands != 0) && (pParams->pBandDefinition == LVM_NULL)) {
         return LVEQNB_NULLADDRESS;
     }
 
     OperatingModeSave = pInstance->Params.OperatingMode;
 
     /* Set the alpha factor of the mixer */
-    if (pParams->SampleRate != pInstance->Params.SampleRate)
-    {
-        LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],LVEQNB_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
-        LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1],LVEQNB_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
+    if (pParams->SampleRate != pInstance->Params.SampleRate) {
+        LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],
+                                           LVEQNB_BYPASS_MIXER_TC, (LVM_Fs_en)pParams->SampleRate,
+                                           2);
+        LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1],
+                                           LVEQNB_BYPASS_MIXER_TC, (LVM_Fs_en)pParams->SampleRate,
+                                           2);
     }
 
-    if( (pInstance->Params.NBands            !=  pParams->NBands          ) ||
-        (pInstance->Params.OperatingMode     !=  pParams->OperatingMode   ) ||
-        (pInstance->Params.pBandDefinition   !=  pParams->pBandDefinition ) ||
-        (pInstance->Params.SampleRate        !=  pParams->SampleRate      ) ||
-        (pInstance->Params.SourceFormat      !=  pParams->SourceFormat    ))
-    {
-
+    if ((pInstance->Params.NBands != pParams->NBands) ||
+        (pInstance->Params.OperatingMode != pParams->OperatingMode) ||
+        (pInstance->Params.pBandDefinition != pParams->pBandDefinition) ||
+        (pInstance->Params.SampleRate != pParams->SampleRate) ||
+        (pInstance->Params.SourceFormat != pParams->SourceFormat)) {
         bChange = LVM_TRUE;
-    }
-    else
-    {
-        for(i = 0; i < pParams->NBands; i++)
-        {
-
-            if((pInstance->pBandDefinitions[i].Frequency  != pParams->pBandDefinition[i].Frequency )||
-                (pInstance->pBandDefinitions[i].Gain       != pParams->pBandDefinition[i].Gain      )||
-                (pInstance->pBandDefinitions[i].QFactor    != pParams->pBandDefinition[i].QFactor   ))
-            {
-
+    } else {
+        for (i = 0; i < pParams->NBands; i++) {
+            if ((pInstance->pBandDefinitions[i].Frequency !=
+                 pParams->pBandDefinition[i].Frequency) ||
+                (pInstance->pBandDefinitions[i].Gain != pParams->pBandDefinition[i].Gain) ||
+                (pInstance->pBandDefinitions[i].QFactor != pParams->pBandDefinition[i].QFactor)) {
                 bChange = LVM_TRUE;
             }
         }
@@ -335,19 +305,17 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
     // During operating mode transition, there is a race condition where the mode
     // is still LVEQNB_ON, but the effect is considered disabled in the upper layers.
     // modeChange handles this special race condition.
-    const int /* bool */ modeChange = pParams->OperatingMode != OperatingModeSave
-            || (OperatingModeSave == LVEQNB_ON
-                    && pInstance->bInOperatingModeTransition
-                    && LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0);
+    const int /* bool */ modeChange =
+            pParams->OperatingMode != OperatingModeSave ||
+            (OperatingModeSave == LVEQNB_ON && pInstance->bInOperatingModeTransition &&
+             LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0);
 
     if (bChange || modeChange) {
-
         /*
          * If the sample rate has changed clear the history
          */
-        if (pInstance->Params.SampleRate != pParams->SampleRate)
-        {
-            LVEQNB_ClearFilterHistory(pInstance);           /* Clear the history */
+        if (pInstance->Params.SampleRate != pParams->SampleRate) {
+            LVEQNB_ClearFilterHistory(pInstance); /* Clear the history */
         }
 
         /*
@@ -358,45 +326,45 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
         /*
          * Reset the filters except if the algo is switched off
          */
-        if(pParams->OperatingMode != LVEQNB_BYPASS){
+        if (pParams->OperatingMode != LVEQNB_BYPASS) {
             /*
              * Reset the filters as all parameters could have changed
              */
-            LVEQNB_SetFilters(pInstance,                        /* Instance pointer */
-                              pParams);                         /* New parameters */
+            LVEQNB_SetFilters(pInstance, /* Instance pointer */
+                              pParams);  /* New parameters */
 
             /*
              * Update the filters
              */
-            LVEQNB_SetCoefficients(pInstance);                  /* Instance pointer */
+            LVEQNB_SetCoefficients(pInstance); /* Instance pointer */
         }
 
         if (modeChange) {
-            if(pParams->OperatingMode == LVEQNB_ON)
-            {
+            if (pParams->OperatingMode == LVEQNB_ON) {
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0], 1.0f);
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[1], 0.0f);
-                pInstance->BypassMixer.MixerStream[0].CallbackSet        = 1;
-                pInstance->BypassMixer.MixerStream[1].CallbackSet        = 1;
-            }
-            else
-            {
+                pInstance->BypassMixer.MixerStream[0].CallbackSet = 1;
+                pInstance->BypassMixer.MixerStream[1].CallbackSet = 1;
+            } else {
                 /* Stay on the ON operating mode until the transition is done */
                 // This may introduce a state race condition if the effect is enabled again
                 // while in transition.  This is fixed in the modeChange logic.
                 pInstance->Params.OperatingMode = LVEQNB_ON;
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[0], 0.0f);
                 LVC_Mixer_SetTarget(&pInstance->BypassMixer.MixerStream[1], 1.0f);
-                pInstance->BypassMixer.MixerStream[0].CallbackSet        = 1;
-                pInstance->BypassMixer.MixerStream[1].CallbackSet        = 1;
+                pInstance->BypassMixer.MixerStream[0].CallbackSet = 1;
+                pInstance->BypassMixer.MixerStream[1].CallbackSet = 1;
             }
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],LVEQNB_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
-            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1],LVEQNB_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate,2);
+            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],
+                                               LVEQNB_BYPASS_MIXER_TC,
+                                               (LVM_Fs_en)pParams->SampleRate, 2);
+            LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1],
+                                               LVEQNB_BYPASS_MIXER_TC,
+                                               (LVM_Fs_en)pParams->SampleRate, 2);
             pInstance->bInOperatingModeTransition = LVM_TRUE;
         }
-
     }
-    return(LVEQNB_SUCCESS);
+    return (LVEQNB_SUCCESS);
 }
 
 /****************************************************************************************/
@@ -408,23 +376,22 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t        hInstance,
 /*  transition                                                                          */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_INT32 LVEQNB_BypassMixerCallBack (void* hInstance,
-                                      void *pGeneralPurpose,
-                                      LVM_INT16 CallbackParam)
-{
-    LVEQNB_Instance_t      *pInstance =(LVEQNB_Instance_t  *)hInstance;
-    LVM_Callback            CallBack  = pInstance->Capabilities.CallBack;
+LVM_INT32 LVEQNB_BypassMixerCallBack(void* hInstance, void* pGeneralPurpose,
+                                     LVM_INT16 CallbackParam) {
+    LVEQNB_Instance_t* pInstance = (LVEQNB_Instance_t*)hInstance;
+    LVM_Callback CallBack = pInstance->Capabilities.CallBack;
 
-    (void) pGeneralPurpose;
+    (void)pGeneralPurpose;
 
-     /*
-      * Send an ALGOFF event if the ON->OFF switch transition is finished
-      */
-    if((LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0) &&
-       (CallbackParam == 0)){
+    /*
+     * Send an ALGOFF event if the ON->OFF switch transition is finished
+     */
+    if ((LVC_Mixer_GetTarget(&pInstance->BypassMixer.MixerStream[0]) == 0) &&
+        (CallbackParam == 0)) {
         pInstance->Params.OperatingMode = LVEQNB_BYPASS;
-        if (CallBack != LVM_NULL){
-            CallBack(pInstance->Capabilities.pBundleInstance, LVM_NULL, ALGORITHM_EQNB_ID|LVEQNB_EVENT_ALGOFF);
+        if (CallBack != LVM_NULL) {
+            CallBack(pInstance->Capabilities.pBundleInstance, LVM_NULL,
+                     ALGORITHM_EQNB_ID | LVEQNB_EVENT_ALGOFF);
         }
     }
 

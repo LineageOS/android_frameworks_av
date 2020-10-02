@@ -111,43 +111,37 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
-                                              LVEQNB_BandDef_t  *pFilterDefinition,
-                                              PK_FLOAT_Coefs_t  *pCoefficients)
-{
-
-    extern LVM_FLOAT    LVEQNB_GainTable[];
-    extern LVM_FLOAT    LVEQNB_TwoPiOnFsTable[];
-    extern LVM_FLOAT    LVEQNB_DTable[];
+LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16 Fs, LVEQNB_BandDef_t* pFilterDefinition,
+                                              PK_FLOAT_Coefs_t* pCoefficients) {
+    extern LVM_FLOAT LVEQNB_GainTable[];
+    extern LVM_FLOAT LVEQNB_TwoPiOnFsTable[];
+    extern LVM_FLOAT LVEQNB_DTable[];
 
     /*
      * Get the filter definition
      */
-    LVM_INT16           Gain        = pFilterDefinition->Gain;
-    LVM_UINT16          Frequency   = pFilterDefinition->Frequency;
+    LVM_INT16 Gain = pFilterDefinition->Gain;
+    LVM_UINT16 Frequency = pFilterDefinition->Frequency;
     /* As mentioned in effectbundle.h */
-    LVM_FLOAT           QFactor     = (LVM_FLOAT)pFilterDefinition->QFactor / 100.0f;
+    LVM_FLOAT QFactor = (LVM_FLOAT)pFilterDefinition->QFactor / 100.0f;
 
     /*
      * Intermediate variables and temporary values
      */
-    LVM_FLOAT           T0;
-    LVM_FLOAT           D;
-    LVM_FLOAT           A0;
-    LVM_FLOAT           B1;
-    LVM_FLOAT           B2;
+    LVM_FLOAT T0;
+    LVM_FLOAT D;
+    LVM_FLOAT A0;
+    LVM_FLOAT B1;
+    LVM_FLOAT B2;
 
     /*
      * Calculating the intermediate values
      */
-    T0 = Frequency * LVEQNB_TwoPiOnFsTable[Fs];        /* T0 = 2 * Pi * Fc / Fs */
-    if (Gain >= 0)
-    {
-        D = LVEQNB_DTable[15];                         /* D = 1            if GaindB >= 0 */
-    }
-    else
-    {
-        D = LVEQNB_DTable[Gain + 15];                    /* D = 1 / (1 + G)  if GaindB <  0 */
+    T0 = Frequency * LVEQNB_TwoPiOnFsTable[Fs]; /* T0 = 2 * Pi * Fc / Fs */
+    if (Gain >= 0) {
+        D = LVEQNB_DTable[15]; /* D = 1            if GaindB >= 0 */
+    } else {
+        D = LVEQNB_DTable[Gain + 15]; /* D = 1 / (1 + G)  if GaindB <  0 */
     }
 
     /*
@@ -164,7 +158,7 @@ LVEQNB_ReturnStatus_en LVEQNB_SinglePrecCoefs(LVM_UINT16        Fs,
     pCoefficients->A0 = 2 * A0;
     pCoefficients->B1 = 2 * B1;
     pCoefficients->B2 = 2 * B2;
-    pCoefficients->G  = LVEQNB_GainTable[Gain + 15];
+    pCoefficients->G = LVEQNB_GainTable[Gain + 15];
 
-    return(LVEQNB_SUCCESS);
+    return (LVEQNB_SUCCESS);
 }
