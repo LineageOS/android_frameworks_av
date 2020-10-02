@@ -27,54 +27,44 @@
    FUNCTION DelayAllPass_32x32
 ***********************************************************************************/
 
-void DelayAllPass_Sat_32x16To32(  LVM_INT32  *delay,                    /* Delay buffer */
-                                  LVM_UINT16 size,                      /* Delay size */
-                                  LVM_INT16 coeff,                      /* All pass filter coefficient */
-                                  LVM_UINT16 DelayOffset,               /* Simple delay offset */
-                                  LVM_UINT16 *pAllPassOffset,           /* All pass filter delay offset */
-                                  LVM_INT32  *dst,                      /* Source/destination */
-                                  LVM_INT16 n)                          /* Number of  samples */
+void DelayAllPass_Sat_32x16To32(LVM_INT32* delay,           /* Delay buffer */
+                                LVM_UINT16 size,            /* Delay size */
+                                LVM_INT16 coeff,            /* All pass filter coefficient */
+                                LVM_UINT16 DelayOffset,     /* Simple delay offset */
+                                LVM_UINT16* pAllPassOffset, /* All pass filter delay offset */
+                                LVM_INT32* dst,             /* Source/destination */
+                                LVM_INT16 n)                /* Number of  samples */
 {
-    LVM_INT16   i;
-    LVM_UINT16   AllPassOffset = *pAllPassOffset;
-    LVM_INT32    temp;
-    LVM_INT32    a,b,c;
+    LVM_INT16 i;
+    LVM_UINT16 AllPassOffset = *pAllPassOffset;
+    LVM_INT32 temp;
+    LVM_INT32 a, b, c;
 
-    for (i = 0; i < n; i++)
-    {
-
-        MUL32x16INTO32(delay[AllPassOffset], coeff, temp, 15)
-        a = temp;
+    for (i = 0; i < n; i++) {
+        MUL32x16INTO32(delay[AllPassOffset], coeff, temp, 15) a = temp;
         b = delay[DelayOffset];
         DelayOffset++;
 
         c = a + b;
-        if ((((c ^ a) & (c ^ b)) >> 31) != 0)  /* overflow / underflow */
+        if ((((c ^ a) & (c ^ b)) >> 31) != 0) /* overflow / underflow */
         {
-            if(a < 0)
-            {
+            if (a < 0) {
                 c = 0x80000000L;
-            }
-            else
-            {
+            } else {
                 c = 0x7FFFFFFFL;
             }
         }
         *dst = c;
         dst++;
 
-        MUL32x16INTO32(c, -coeff, temp, 15)
-        a = temp;
+        MUL32x16INTO32(c, -coeff, temp, 15) a = temp;
         b = delay[AllPassOffset];
         c = a + b;
-        if ((((c ^ a) & (c ^ b)) >> 31)!=0)  /* overflow / underflow */
+        if ((((c ^ a) & (c ^ b)) >> 31) != 0) /* overflow / underflow */
         {
-            if(a < 0)
-            {
+            if (a < 0) {
                 c = 0x80000000L;
-            }
-            else
-            {
+            } else {
                 c = 0x7FFFFFFFL;
             }
         }
@@ -82,13 +72,11 @@ void DelayAllPass_Sat_32x16To32(  LVM_INT32  *delay,                    /* Delay
         AllPassOffset++;
 
         /* Make the delay buffer a circular buffer */
-        if (DelayOffset >= size)
-        {
+        if (DelayOffset >= size) {
             DelayOffset = 0;
         }
 
-        if (AllPassOffset >= size)
-        {
+        if (AllPassOffset >= size) {
             AllPassOffset = 0;
         }
     }
@@ -100,4 +88,3 @@ void DelayAllPass_Sat_32x16To32(  LVM_INT32  *delay,                    /* Delay
 }
 
 /**********************************************************************************/
-

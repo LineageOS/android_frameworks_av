@@ -41,11 +41,11 @@
 /*                                                                                      */
 /****************************************************************************************/
 /* General */
-#define LVREV_BLOCKSIZE_MULTIPLE                1       /* Processing block size multiple */
-#define LVREV_MAX_T60                        7000       /* Maximum decay time is 7000ms */
+#define LVREV_BLOCKSIZE_MULTIPLE 1 /* Processing block size multiple */
+#define LVREV_MAX_T60 7000         /* Maximum decay time is 7000ms */
 
 /* Memory table*/
-#define LVREV_NR_MEMORY_REGIONS                 4       /* Number of memory regions */
+#define LVREV_NR_MEMORY_REGIONS 4 /* Number of memory regions */
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -53,24 +53,22 @@
 /*                                                                                      */
 /****************************************************************************************/
 /* Instance handle */
-typedef void *LVREV_Handle_t;
+typedef void* LVREV_Handle_t;
 
 /* Status return values */
-typedef enum
-{
-    LVREV_SUCCESS            = 0,                       /* Successful return from a routine */
-    LVREV_NULLADDRESS        = 1,                       /* NULL allocation address */
-    LVREV_OUTOFRANGE         = 2,                       /* Out of range control parameter */
-    LVREV_INVALIDNUMSAMPLES  = 3,                       /* Invalid number of samples */
+typedef enum {
+    LVREV_SUCCESS = 0,           /* Successful return from a routine */
+    LVREV_NULLADDRESS = 1,       /* NULL allocation address */
+    LVREV_OUTOFRANGE = 2,        /* Out of range control parameter */
+    LVREV_INVALIDNUMSAMPLES = 3, /* Invalid number of samples */
     LVREV_RETURNSTATUS_DUMMY = LVM_MAXENUM
 } LVREV_ReturnStatus_en;
 
 /* Reverb delay lines */
-typedef enum
-{
-    LVREV_DELAYLINES_1     = 1,                         /* One delay line */
-    LVREV_DELAYLINES_2     = 2,                         /* Two delay lines */
-    LVREV_DELAYLINES_4     = 4,                         /* Four delay lines */
+typedef enum {
+    LVREV_DELAYLINES_1 = 1, /* One delay line */
+    LVREV_DELAYLINES_2 = 2, /* Two delay lines */
+    LVREV_DELAYLINES_4 = 4, /* Four delay lines */
     LVREV_DELAYLINES_DUMMY = LVM_MAXENUM
 } LVREV_NumDelayLines_en;
 
@@ -81,40 +79,37 @@ typedef enum
 /****************************************************************************************/
 
 /* Memory table containing the region definitions */
-typedef struct
-{
-    LVM_MemoryRegion_st        Region[LVREV_NR_MEMORY_REGIONS];  /* One definition for each region */
+typedef struct {
+    LVM_MemoryRegion_st Region[LVREV_NR_MEMORY_REGIONS]; /* One definition for each region */
 } LVREV_MemoryTable_st;
 
 /* Control Parameter structure */
-typedef struct
-{
+typedef struct {
     /* General parameters */
-    LVM_Mode_en                 OperatingMode;          /* Operating mode */
-    LVM_Fs_en                   SampleRate;             /* Sample rate */
-    LVM_Format_en               SourceFormat;           /* Source data format */
+    LVM_Mode_en OperatingMode;  /* Operating mode */
+    LVM_Fs_en SampleRate;       /* Sample rate */
+    LVM_Format_en SourceFormat; /* Source data format */
 
     /* Parameters for REV */
-    LVM_UINT16                  Level;                  /* Level, 0 to 100 representing percentage of reverb */
-    LVM_UINT32                  LPF;                    /* Low pass filter, in Hz */
-    LVM_UINT32                  HPF;                    /* High pass filter, in Hz */
+    LVM_UINT16 Level; /* Level, 0 to 100 representing percentage of reverb */
+    LVM_UINT32 LPF;   /* Low pass filter, in Hz */
+    LVM_UINT32 HPF;   /* High pass filter, in Hz */
 
-    LVM_UINT16                  T60;                    /* Decay time constant, in ms */
-    LVM_UINT16                  Density;                /* Echo density, 0 to 100 for minimum to maximum density */
-    LVM_UINT16                  Damping;                /* Damping */
-    LVM_UINT16                  RoomSize;               /* Simulated room size, 1 to 100 for minimum to maximum size */
+    LVM_UINT16 T60;      /* Decay time constant, in ms */
+    LVM_UINT16 Density;  /* Echo density, 0 to 100 for minimum to maximum density */
+    LVM_UINT16 Damping;  /* Damping */
+    LVM_UINT16 RoomSize; /* Simulated room size, 1 to 100 for minimum to maximum size */
 
 } LVREV_ControlParams_st;
 
 /* Instance Parameter structure */
-typedef struct
-{
+typedef struct {
     /* General */
-    LVM_UINT16                  MaxBlockSize;           /* Maximum processing block size */
+    LVM_UINT16 MaxBlockSize; /* Maximum processing block size */
 
     /* Reverb */
-    LVM_Format_en               SourceFormat;           /* Source data formats to support */
-    LVREV_NumDelayLines_en      NumDelays;              /* The number of delay lines, 1, 2 or 4 */
+    LVM_Format_en SourceFormat;       /* Source data formats to support */
+    LVREV_NumDelayLines_en NumDelays; /* The number of delay lines, 1, 2 or 4 */
 
 } LVREV_InstanceParams_st;
 
@@ -160,9 +155,9 @@ typedef struct
 /*  1.  This function may be interrupted by the LVREV_Process function                  */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t           hInstance,
-                                           LVREV_MemoryTable_st     *pMemoryTable,
-                                           LVREV_InstanceParams_st  *pInstanceParams);
+LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
+                                           LVREV_MemoryTable_st* pMemoryTable,
+                                           LVREV_InstanceParams_st* pInstanceParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -190,9 +185,9 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t           hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInstance,
-                                              LVREV_MemoryTable_st      *pMemoryTable,
-                                              LVREV_InstanceParams_st   *pInstanceParams);
+LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
+                                              LVREV_MemoryTable_st* pMemoryTable,
+                                              LVREV_InstanceParams_st* pInstanceParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -214,8 +209,8 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t            *phInsta
 /*  1.  This function may be interrupted by the LVREV_Process function                  */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_GetControlParameters(LVREV_Handle_t           hInstance,
-                                                 LVREV_ControlParams_st   *pControlParams);
+LVREV_ReturnStatus_en LVREV_GetControlParameters(LVREV_Handle_t hInstance,
+                                                 LVREV_ControlParams_st* pControlParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -236,8 +231,8 @@ LVREV_ReturnStatus_en LVREV_GetControlParameters(LVREV_Handle_t           hInsta
 /*  1.  This function may be interrupted by the LVREV_Process function                  */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInstance,
-                                                 LVREV_ControlParams_st   *pNewParams);
+LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t hInstance,
+                                                 LVREV_ControlParams_st* pNewParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -257,7 +252,7 @@ LVREV_ReturnStatus_en LVREV_SetControlParameters(LVREV_Handle_t           hInsta
 /*  1. This function must not be interrupted by the LVREV_Process function              */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance);
+LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t hInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -280,11 +275,9 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t  hInstance);
 /*  1. The input and output buffers must be 32-bit aligned                              */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t      hInstance,
-                                    const LVM_FLOAT     *pInData,
-                                    LVM_FLOAT           *pOutData,
-                                    const LVM_UINT16          NumSamples);
+LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                    LVM_FLOAT* pOutData, const LVM_UINT16 NumSamples);
 
-#endif      /* __LVREV_H__ */
+#endif /* __LVREV_H__ */
 
 /* End of file */

@@ -70,11 +70,11 @@
 /****************************************************************************************/
 
 /* Bass Enhancement effect level */
-#define LVDBE_EFFECT_03DB            3                              /* Effect defines for backwards compatibility */
-#define LVDBE_EFFECT_06DB            6
-#define LVDBE_EFFECT_09DB            9
-#define LVDBE_EFFECT_12DB            12
-#define LVDBE_EFFECT_15DB            15
+#define LVDBE_EFFECT_03DB 3 /* Effect defines for backwards compatibility */
+#define LVDBE_EFFECT_06DB 6
+#define LVDBE_EFFECT_09DB 9
+#define LVDBE_EFFECT_12DB 12
+#define LVDBE_EFFECT_15DB 15
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -83,39 +83,31 @@
 /****************************************************************************************/
 
 /* Instance handle */
-typedef void    *LVDBE_Handle_t;
+typedef void* LVDBE_Handle_t;
 
 /* Operating modes */
-typedef enum
-{
-    LVDBE_OFF      = 0,
-    LVDBE_ON       = 1,
-    LVDBE_MODE_MAX = LVM_MAXINT_32
-} LVDBE_Mode_en;
+typedef enum { LVDBE_OFF = 0, LVDBE_ON = 1, LVDBE_MODE_MAX = LVM_MAXINT_32 } LVDBE_Mode_en;
 
 /* High pass filter */
-typedef enum
-{
+typedef enum {
     LVDBE_HPF_OFF = 0,
-    LVDBE_HPF_ON  = 1,
+    LVDBE_HPF_ON = 1,
     LVDBE_HPF_MAX = LVM_MAXINT_32
 } LVDBE_FilterSelect_en;
 
 /* Volume control */
-typedef enum
-{
+typedef enum {
     LVDBE_VOLUME_OFF = 0,
-    LVDBE_VOLUME_ON  = 1,
+    LVDBE_VOLUME_ON = 1,
     LVDBE_VOLUME_MAX = LVM_MAXINT_32
 } LVDBE_Volume_en;
 
 /* Function return status */
-typedef enum
-{
-    LVDBE_SUCCESS        = 0,                        /* Successful return from a routine */
-    LVDBE_NULLADDRESS    = 1,                        /* NULL allocation address */
-    LVDBE_TOOMANYSAMPLES = 2,                        /* Maximum block size exceeded */
-    LVDBE_STATUS_MAX     = LVM_MAXINT_32
+typedef enum {
+    LVDBE_SUCCESS = 0,        /* Successful return from a routine */
+    LVDBE_NULLADDRESS = 1,    /* NULL allocation address */
+    LVDBE_TOOMANYSAMPLES = 2, /* Maximum block size exceeded */
+    LVDBE_STATUS_MAX = LVM_MAXINT_32
 } LVDBE_ReturnStatus_en;
 
 /****************************************************************************************/
@@ -142,40 +134,38 @@ typedef enum
 /*
  * Bass Enhancement centre frequency
  */
-#define LVDBE_CAP_CENTRE_55Hz       1
-#define LVDBE_CAP_CENTRE_66Hz       2
-#define LVDBE_CAP_CENTRE_78Hz       4
-#define LVDBE_CAP_CENTRE_90Hz       8
+#define LVDBE_CAP_CENTRE_55Hz 1
+#define LVDBE_CAP_CENTRE_66Hz 2
+#define LVDBE_CAP_CENTRE_78Hz 4
+#define LVDBE_CAP_CENTRE_90Hz 8
 
-typedef enum
-{
+typedef enum {
     LVDBE_CENTRE_55HZ = 0,
     LVDBE_CENTRE_66HZ = 1,
     LVDBE_CENTRE_78HZ = 2,
     LVDBE_CENTRE_90HZ = 3,
-    LVDBE_CENTRE_MAX  = LVM_MAXINT_32
+    LVDBE_CENTRE_MAX = LVM_MAXINT_32
 } LVDBE_CentreFreq_en;
 
 /*
  * Supported sample rates in samples per second
  */
-#define LVDBE_CAP_FS_8000                1
-#define LVDBE_CAP_FS_11025               2
-#define LVDBE_CAP_FS_12000               4
-#define LVDBE_CAP_FS_16000               8
-#define LVDBE_CAP_FS_22050               16
-#define LVDBE_CAP_FS_24000               32
-#define LVDBE_CAP_FS_32000               64
-#define LVDBE_CAP_FS_44100               128
-#define LVDBE_CAP_FS_48000               256
-#define LVDBE_CAP_FS_88200               512
-#define LVDBE_CAP_FS_96000               1024
-#define LVDBE_CAP_FS_176400              2048
-#define LVDBE_CAP_FS_192000              4096
+#define LVDBE_CAP_FS_8000 1
+#define LVDBE_CAP_FS_11025 2
+#define LVDBE_CAP_FS_12000 4
+#define LVDBE_CAP_FS_16000 8
+#define LVDBE_CAP_FS_22050 16
+#define LVDBE_CAP_FS_24000 32
+#define LVDBE_CAP_FS_32000 64
+#define LVDBE_CAP_FS_44100 128
+#define LVDBE_CAP_FS_48000 256
+#define LVDBE_CAP_FS_88200 512
+#define LVDBE_CAP_FS_96000 1024
+#define LVDBE_CAP_FS_176400 2048
+#define LVDBE_CAP_FS_192000 4096
 
-typedef enum
-{
-    LVDBE_FS_8000  = 0,
+typedef enum {
+    LVDBE_FS_8000 = 0,
     LVDBE_FS_11025 = 1,
     LVDBE_FS_12000 = 2,
     LVDBE_FS_16000 = 3,
@@ -188,7 +178,7 @@ typedef enum
     LVDBE_FS_96000 = 10,
     LVDBE_FS_176400 = 11,
     LVDBE_FS_192000 = 12,
-    LVDBE_FS_MAX   = LVM_MAXINT_32
+    LVDBE_FS_MAX = LVM_MAXINT_32
 } LVDBE_Fs_en;
 
 /****************************************************************************************/
@@ -198,26 +188,24 @@ typedef enum
 /****************************************************************************************/
 
 /* Parameter structure */
-typedef struct
-{
-    LVDBE_Mode_en           OperatingMode;
-    LVDBE_Fs_en             SampleRate;
-    LVM_INT16               EffectLevel;
-    LVDBE_CentreFreq_en     CentreFrequency;
-    LVDBE_FilterSelect_en   HPFSelect;
-    LVDBE_Volume_en         VolumeControl;
-    LVM_INT16               VolumedB;
-    LVM_INT16               HeadroomdB;
-    LVM_INT16               NrChannels;
+typedef struct {
+    LVDBE_Mode_en OperatingMode;
+    LVDBE_Fs_en SampleRate;
+    LVM_INT16 EffectLevel;
+    LVDBE_CentreFreq_en CentreFrequency;
+    LVDBE_FilterSelect_en HPFSelect;
+    LVDBE_Volume_en VolumeControl;
+    LVM_INT16 VolumedB;
+    LVM_INT16 HeadroomdB;
+    LVM_INT16 NrChannels;
 
 } LVDBE_Params_t;
 
 /* Capability structure */
-typedef struct
-{
-      LVM_UINT16              SampleRate;               /* Sampling rate capabilities */
-      LVM_UINT16              CentreFrequency;          /* Centre frequency capabilities */
-      LVM_UINT16              MaxBlockSize;             /* Maximum block size in sample pairs */
+typedef struct {
+    LVM_UINT16 SampleRate;      /* Sampling rate capabilities */
+    LVM_UINT16 CentreFrequency; /* Centre frequency capabilities */
+    LVM_UINT16 MaxBlockSize;    /* Maximum block size in sample pairs */
 } LVDBE_Capabilities_t;
 
 /****************************************************************************************/
@@ -246,9 +234,8 @@ typedef struct
 /*  1.    This function must not be interrupted by the LVDBE_Process function           */
 /*                                                                                      */
 /****************************************************************************************/
-LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t           *phInstance,
-                                 LVDBE_Capabilities_t     *pCapabilities,
-                                 void                     *pScratch);
+LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_t* pCapabilities,
+                                 void* pScratch);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -261,7 +248,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t           *phInstance,
 /*  phInstance               Pointer to instance handle                                 */
 /*                                                                                      */
 /****************************************************************************************/
-void LVDBE_DeInit(LVDBE_Handle_t         *phInstance);
+void LVDBE_DeInit(LVDBE_Handle_t* phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -283,8 +270,7 @@ void LVDBE_DeInit(LVDBE_Handle_t         *phInstance);
 /*                                                                                      */
 /****************************************************************************************/
 
-LVDBE_ReturnStatus_en LVDBE_GetParameters(LVDBE_Handle_t        hInstance,
-                                            LVDBE_Params_t      *pParams);
+LVDBE_ReturnStatus_en LVDBE_GetParameters(LVDBE_Handle_t hInstance, LVDBE_Params_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -306,8 +292,8 @@ LVDBE_ReturnStatus_en LVDBE_GetParameters(LVDBE_Handle_t        hInstance,
 /*                                                                                      */
 /****************************************************************************************/
 
-LVDBE_ReturnStatus_en LVDBE_GetCapabilities(LVDBE_Handle_t            hInstance,
-                                              LVDBE_Capabilities_t    *pCapabilities);
+LVDBE_ReturnStatus_en LVDBE_GetCapabilities(LVDBE_Handle_t hInstance,
+                                            LVDBE_Capabilities_t* pCapabilities);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -346,8 +332,7 @@ LVDBE_ReturnStatus_en LVDBE_GetCapabilities(LVDBE_Handle_t            hInstance,
 /*                                                                                      */
 /****************************************************************************************/
 
-LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t      hInstance,
-                                      LVDBE_Params_t    *pParams);
+LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t hInstance, LVDBE_Params_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -369,9 +354,7 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t      hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t          hInstance,
-                                       const LVM_FLOAT      *pInData,
-                                       LVM_FLOAT            *pOutData,
-                                       LVM_UINT16           NumSamples);
+LVDBE_ReturnStatus_en LVDBE_Process(LVDBE_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                    LVM_FLOAT* pOutData, LVM_UINT16 NumSamples);
 
 #endif /* __LVDBE_H__ */

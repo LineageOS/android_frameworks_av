@@ -34,7 +34,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#define SHIFT       13
+#define SHIFT 13
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -58,76 +58,63 @@
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
-                                      const LVM_FLOAT       *pInData,
-                                      LVM_FLOAT             *pOutData,
-                                      const LVM_UINT16      NrFrames)
-{                                     // updated to use samples = frames * channels.
-    LVEQNB_Instance_t   *pInstance = (LVEQNB_Instance_t  *)hInstance;
+LVEQNB_ReturnStatus_en LVEQNB_Process(
+        LVEQNB_Handle_t hInstance, const LVM_FLOAT* pInData, LVM_FLOAT* pOutData,
+        const LVM_UINT16 NrFrames) {  // updated to use samples = frames * channels.
+    LVEQNB_Instance_t* pInstance = (LVEQNB_Instance_t*)hInstance;
 
     // Mono passed in as stereo
-    const LVM_INT32 NrChannels = pInstance->Params.NrChannels == 1
-        ? 2 : pInstance->Params.NrChannels;
+    const LVM_INT32 NrChannels =
+            pInstance->Params.NrChannels == 1 ? 2 : pInstance->Params.NrChannels;
     const LVM_INT32 NrSamples = NrChannels * NrFrames;
 
-     /* Check for NULL pointers */
-    if((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL))
-    {
+    /* Check for NULL pointers */
+    if ((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL)) {
         return LVEQNB_NULLADDRESS;
     }
 
     /* Check if the input and output data buffers are 32-bit aligned */
-    if ((((uintptr_t)pInData % 4) != 0) || (((uintptr_t)pOutData % 4) != 0))
-    {
+    if ((((uintptr_t)pInData % 4) != 0) || (((uintptr_t)pOutData % 4) != 0)) {
         return LVEQNB_ALIGNMENTERROR;
     }
 
-    LVM_FLOAT * const pScratch = (LVM_FLOAT *)pInstance->pFastTemporary;
+    LVM_FLOAT* const pScratch = (LVM_FLOAT*)pInstance->pFastTemporary;
 
     /*
-    * Check the number of frames is not too large
-    */
-    if (NrFrames > pInstance->Capabilities.MaxBlockSize)
-    {
+     * Check the number of frames is not too large
+     */
+    if (NrFrames > pInstance->Capabilities.MaxBlockSize) {
         return LVEQNB_TOOMANYSAMPLES;
     }
 
-    if (pInstance->Params.OperatingMode == LVEQNB_ON)
-    {
+    if (pInstance->Params.OperatingMode == LVEQNB_ON) {
         /*
          * Copy input data in to scratch buffer
          */
-        Copy_Float(pInData,     /* Source */
-                   pScratch,    /* Destination */
+        Copy_Float(pInData,  /* Source */
+                   pScratch, /* Destination */
                    (LVM_INT16)NrSamples);
 
         /*
          * For each section execte the filter unless the gain is 0dB
          */
-        if (pInstance->NBands != 0)
-        {
-            for (LVM_UINT16 i = 0; i < pInstance->NBands; i++)
-            {
+        if (pInstance->NBands != 0) {
+            for (LVM_UINT16 i = 0; i < pInstance->NBands; i++) {
                 /*
                  * Check if band is non-zero dB gain
                  */
-                if (pInstance->pBandDefinitions[i].Gain != 0)
-                {
+                if (pInstance->pBandDefinitions[i].Gain != 0) {
                     /*
                      * Get the address of the biquad instance
                      */
-                    Biquad_FLOAT_Instance_t *pBiquad = &pInstance->pEQNB_FilterState_Float[i];
+                    Biquad_FLOAT_Instance_t* pBiquad = &pInstance->pEQNB_FilterState_Float[i];
 
                     /*
                      * Select single or double precision as required
                      */
-                    switch (pInstance->pBiquadType[i])
-                    {
-                        case LVEQNB_SinglePrecision_Float:
-                        {
-                            PK_Mc_D32F32C14G11_TRC_WRA_01(pBiquad,
-                                                          pScratch,
-                                                          pScratch,
+                    switch (pInstance->pBiquadType[i]) {
+                        case LVEQNB_SinglePrecision_Float: {
+                            PK_Mc_D32F32C14G11_TRC_WRA_01(pBiquad, pScratch, pScratch,
                                                           (LVM_INT16)NrFrames,
                                                           (LVM_INT16)NrChannels);
                             break;
@@ -139,36 +126,27 @@ LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
             }
         }
 
-        if(pInstance->bInOperatingModeTransition == LVM_TRUE){
-            LVC_MixSoft_2Mc_D16C31_SAT(&pInstance->BypassMixer,
-                                       pScratch,
-                                       pInData,
-                                       pScratch,
-                                       (LVM_INT16)NrFrames,
-                                       (LVM_INT16)NrChannels);
+        if (pInstance->bInOperatingModeTransition == LVM_TRUE) {
+            LVC_MixSoft_2Mc_D16C31_SAT(&pInstance->BypassMixer, pScratch, pInData, pScratch,
+                                       (LVM_INT16)NrFrames, (LVM_INT16)NrChannels);
             // duplicate with else clause(s)
-            Copy_Float(pScratch,                         /* Source */
-                       pOutData,                         /* Destination */
-                       (LVM_INT16)NrSamples);            /* All channel samples */
-        }
-        else{
+            Copy_Float(pScratch,              /* Source */
+                       pOutData,              /* Destination */
+                       (LVM_INT16)NrSamples); /* All channel samples */
+        } else {
             Copy_Float(pScratch,              /* Source */
                        pOutData,              /* Destination */
                        (LVM_INT16)NrSamples); /* All channel samples */
         }
-    }
-    else
-    {
+    } else {
         /*
          * Mode is OFF so copy the data if necessary
          */
-        if (pInData != pOutData)
-        {
-            Copy_Float(pInData,                          /* Source */
-                       pOutData,                         /* Destination */
-                       (LVM_INT16)NrSamples);            /* All channel samples */
+        if (pInData != pOutData) {
+            Copy_Float(pInData,               /* Source */
+                       pOutData,              /* Destination */
+                       (LVM_INT16)NrSamples); /* All channel samples */
         }
     }
     return LVEQNB_SUCCESS;
-
 }

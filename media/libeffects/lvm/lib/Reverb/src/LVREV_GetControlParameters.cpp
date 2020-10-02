@@ -42,17 +42,14 @@
 /*  1.  This function may be interrupted by the LVREV_Process function                  */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_GetControlParameters(LVREV_Handle_t           hInstance,
-                                                 LVREV_ControlParams_st   *pControlParams)
-{
-
-    LVREV_Instance_st  *pLVREV_Private = (LVREV_Instance_st *)hInstance;
+LVREV_ReturnStatus_en LVREV_GetControlParameters(LVREV_Handle_t hInstance,
+                                                 LVREV_ControlParams_st* pControlParams) {
+    LVREV_Instance_st* pLVREV_Private = (LVREV_Instance_st*)hInstance;
 
     /*
      * Check for error conditions
      */
-    if((hInstance == LVM_NULL) || (pControlParams == LVM_NULL))
-    {
+    if ((hInstance == LVM_NULL) || (pControlParams == LVM_NULL)) {
         return LVREV_NULLADDRESS;
     }
 

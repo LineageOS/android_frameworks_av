@@ -25,14 +25,10 @@
    FUNCTION LoadConst_16
 ***********************************************************************************/
 
-void LoadConst_16(const LVM_INT16 val,
-                  LVM_INT16 *dst,
-                  LVM_INT16 n )
-{
+void LoadConst_16(const LVM_INT16 val, LVM_INT16* dst, LVM_INT16 n) {
     LVM_INT16 ii;
 
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         *dst = val;
         dst++;
     }

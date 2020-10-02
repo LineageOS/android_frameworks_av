@@ -51,73 +51,61 @@
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
-                                const LVM_FLOAT             *pInData,
-                                LVM_FLOAT                   *pOutData,
-                                LVM_UINT16                  NumSamples,
-                                LVM_UINT32                  AudioTime)
-{
-
-    LVM_Instance_t      *pInstance  = (LVM_Instance_t  *)hInstance;
-    LVM_UINT16          SampleCount = NumSamples;
-    LVM_FLOAT           *pInput     = (LVM_FLOAT *)pInData;
-    LVM_FLOAT           *pToProcess = (LVM_FLOAT *)pInData;
-    LVM_FLOAT           *pProcessed = pOutData;
-    LVM_ReturnStatus_en  Status;
-    LVM_INT32           NrChannels  = pInstance->NrChannels;
-    LVM_INT32           ChMask      = pInstance->ChMask;
+LVM_ReturnStatus_en LVM_Process(LVM_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                LVM_FLOAT* pOutData, LVM_UINT16 NumSamples, LVM_UINT32 AudioTime) {
+    LVM_Instance_t* pInstance = (LVM_Instance_t*)hInstance;
+    LVM_UINT16 SampleCount = NumSamples;
+    LVM_FLOAT* pInput = (LVM_FLOAT*)pInData;
+    LVM_FLOAT* pToProcess = (LVM_FLOAT*)pInData;
+    LVM_FLOAT* pProcessed = pOutData;
+    LVM_ReturnStatus_en Status;
+    LVM_INT32 NrChannels = pInstance->NrChannels;
+    LVM_INT32 ChMask = pInstance->ChMask;
 #define NrFrames SampleCount  // alias for clarity
 
     /*
      * Check if the number of samples is zero
      */
-    if (NumSamples == 0)
-    {
-        return(LVM_SUCCESS);
+    if (NumSamples == 0) {
+        return (LVM_SUCCESS);
     }
 
     /*
      * Check valid points have been given
      */
-    if ((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL))
-    {
+    if ((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL)) {
         return (LVM_NULLADDRESS);
     }
 
     /*
      * For unmanaged mode only
      */
-    if(pInstance->InstParams.BufferMode == LVM_UNMANAGED_BUFFERS)
-    {
-         /*
+    if (pInstance->InstParams.BufferMode == LVM_UNMANAGED_BUFFERS) {
+        /*
          * Check if the number of samples is a good multiple (unmanaged mode only)
          */
-        if((NumSamples % pInstance->BlickSizeMultiple) != 0)
-        {
-            return(LVM_INVALIDNUMSAMPLES);
+        if ((NumSamples % pInstance->BlickSizeMultiple) != 0) {
+            return (LVM_INVALIDNUMSAMPLES);
         }
 
         /*
          * Check the buffer alignment
          */
-        if((((uintptr_t)pInData % 4) != 0) || (((uintptr_t)pOutData % 4) != 0))
-        {
-            return(LVM_ALIGNMENTERROR);
+        if ((((uintptr_t)pInData % 4) != 0) || (((uintptr_t)pOutData % 4) != 0)) {
+            return (LVM_ALIGNMENTERROR);
         }
     }
 
     /*
      * Update new parameters if necessary
      */
-    if (pInstance->ControlPending == LVM_TRUE)
-    {
+    if (pInstance->ControlPending == LVM_TRUE) {
         Status = LVM_ApplyNewSettings(hInstance);
         /* Update the local variable NrChannels from pInstance->NrChannels value */
         NrChannels = pInstance->NrChannels;
-        ChMask     = pInstance->ChMask;
+        ChMask = pInstance->ChMask;
 
-        if(Status != LVM_SUCCESS)
-        {
+        if (Status != LVM_SUCCESS) {
             return Status;
         }
     }
@@ -125,156 +113,116 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
     /*
      * Convert from Mono if necessary
      */
-    if (pInstance->Params.SourceFormat == LVM_MONO)
-    {
-        MonoTo2I_Float(pInData,                                /* Source */
-                       pOutData,                               /* Destination */
-                       (LVM_INT16)NumSamples);                 /* Number of input samples */
-        pInput     = pOutData;
+    if (pInstance->Params.SourceFormat == LVM_MONO) {
+        MonoTo2I_Float(pInData,                /* Source */
+                       pOutData,               /* Destination */
+                       (LVM_INT16)NumSamples); /* Number of input samples */
+        pInput = pOutData;
         pToProcess = pOutData;
         NrChannels = 2;
-        ChMask     = AUDIO_CHANNEL_OUT_STEREO;
+        ChMask = AUDIO_CHANNEL_OUT_STEREO;
     }
 
     /*
      * Process the data with managed buffers
      */
-    while (SampleCount != 0)
-    {
+    while (SampleCount != 0) {
         /*
          * Manage the input buffer and frame processing
          */
-        LVM_BufferIn(hInstance,
-                     pInput,
-                     &pToProcess,
-                     &pProcessed,
-                     &SampleCount);
+        LVM_BufferIn(hInstance, pInput, &pToProcess, &pProcessed, &SampleCount);
 
         /*
          * Only process data when SampleCount is none zero, a zero count can occur when
          * the BufferIn routine is working in managed mode.
          */
-        if (SampleCount != 0)
-        {
+        if (SampleCount != 0) {
             /*
              * Apply ConcertSound if required
              */
-            if (pInstance->CS_Active == LVM_TRUE)
-            {
-                (void)LVCS_Process(pInstance->hCSInstance,     /* Concert Sound instance handle */
-                                   pToProcess,
-                                   pProcessed,
-                                   SampleCount);
+            if (pInstance->CS_Active == LVM_TRUE) {
+                (void)LVCS_Process(pInstance->hCSInstance, /* Concert Sound instance handle */
+                                   pToProcess, pProcessed, SampleCount);
                 pToProcess = pProcessed;
             }
 
             /*
              * Apply volume if required
              */
-            if (pInstance->VC_Active!=0)
-            {
-                LVC_MixSoft_Mc_D16C31_SAT(&pInstance->VC_Volume,
-                                       pToProcess,
-                                       pProcessed,
-                                       (LVM_INT16)(NrFrames),
-                                       NrChannels);
+            if (pInstance->VC_Active != 0) {
+                LVC_MixSoft_Mc_D16C31_SAT(&pInstance->VC_Volume, pToProcess, pProcessed,
+                                          (LVM_INT16)(NrFrames), NrChannels);
                 pToProcess = pProcessed;
             }
 
             /*
              * Call N-Band equaliser if enabled
              */
-            if (pInstance->EQNB_Active == LVM_TRUE)
-            {
-                LVEQNB_Process(pInstance->hEQNBInstance,    /* N-Band equaliser instance handle */
-                               pToProcess,
-                               pProcessed,
-                               SampleCount);
+            if (pInstance->EQNB_Active == LVM_TRUE) {
+                LVEQNB_Process(pInstance->hEQNBInstance, /* N-Band equaliser instance handle */
+                               pToProcess, pProcessed, SampleCount);
                 pToProcess = pProcessed;
             }
 
             /*
              * Call bass enhancement if enabled
              */
-            if (pInstance->DBE_Active == LVM_TRUE)
-            {
-                LVDBE_Process(pInstance->hDBEInstance,       /* Dynamic Bass Enhancement \
-                                                                instance handle */
-                              pToProcess,
-                              pProcessed,
-                              SampleCount);
+            if (pInstance->DBE_Active == LVM_TRUE) {
+                LVDBE_Process(pInstance->hDBEInstance, /* Dynamic Bass Enhancement \
+                                                          instance handle */
+                              pToProcess, pProcessed, SampleCount);
                 pToProcess = pProcessed;
             }
 
             /*
              * Bypass mode or everything off, so copy the input to the output
              */
-            if (pToProcess != pProcessed)
-            {
-                Copy_Float(pToProcess,                             /* Source */
-                           pProcessed,                             /* Destination */
-                           (LVM_INT16)(NrChannels * NrFrames));    /* Copy all samples */
+            if (pToProcess != pProcessed) {
+                Copy_Float(pToProcess,                          /* Source */
+                           pProcessed,                          /* Destination */
+                           (LVM_INT16)(NrChannels * NrFrames)); /* Copy all samples */
             }
 
             /*
              * Apply treble boost if required
              */
-            if (pInstance->TE_Active == LVM_TRUE)
-            {
+            if (pInstance->TE_Active == LVM_TRUE) {
                 /*
                  * Apply the filter
                  */
                 FO_Mc_D16F32C15_LShx_TRC_WRA_01(&pInstance->pTE_State->TrebleBoost_State,
-                                           pProcessed,
-                                           pProcessed,
-                                           (LVM_INT16)NrFrames,
-                                           (LVM_INT16)NrChannels);
-
+                                                pProcessed, pProcessed, (LVM_INT16)NrFrames,
+                                                (LVM_INT16)NrChannels);
             }
             /*
              * Volume balance
              */
-            LVC_MixSoft_1St_MC_float_SAT(&pInstance->VC_BalanceMix,
-                                          pProcessed,
-                                          pProcessed,
-                                          NrFrames,
-                                          NrChannels,
-                                          ChMask);
+            LVC_MixSoft_1St_MC_float_SAT(&pInstance->VC_BalanceMix, pProcessed, pProcessed,
+                                         NrFrames, NrChannels, ChMask);
 
             /*
              * Perform Parametric Spectum Analysis
              */
             if ((pInstance->Params.PSA_Enable == LVM_PSA_ON) &&
-                                            (pInstance->InstParams.PSA_Included == LVM_PSA_ON))
-            {
-                FromMcToMono_Float(pProcessed,
-                                   pInstance->pPSAInput,
-                                   (LVM_INT16)(NrFrames),
+                (pInstance->InstParams.PSA_Included == LVM_PSA_ON)) {
+                FromMcToMono_Float(pProcessed, pInstance->pPSAInput, (LVM_INT16)(NrFrames),
                                    NrChannels);
 
-                LVPSA_Process(pInstance->hPSAInstance,
-                        pInstance->pPSAInput,
-                        (LVM_UINT16)(SampleCount),
-                        AudioTime);
+                LVPSA_Process(pInstance->hPSAInstance, pInstance->pPSAInput,
+                              (LVM_UINT16)(SampleCount), AudioTime);
             }
 
             /*
              * DC removal
              */
-            DC_Mc_D16_TRC_WRA_01(&pInstance->DC_RemovalInstance,
-                                 pProcessed,
-                                 pProcessed,
-                                 (LVM_INT16)NrFrames,
-                                 NrChannels);
+            DC_Mc_D16_TRC_WRA_01(&pInstance->DC_RemovalInstance, pProcessed, pProcessed,
+                                 (LVM_INT16)NrFrames, NrChannels);
         }
         /*
          * Manage the output buffer
          */
-        LVM_BufferOut(hInstance,
-                      pOutData,
-                      &SampleCount);
-
+        LVM_BufferOut(hInstance, pOutData, &SampleCount);
     }
 
-    return(LVM_SUCCESS);
+    return (LVM_SUCCESS);
 }

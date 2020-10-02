@@ -15,23 +15,23 @@
  * limitations under the License.
  */
 
-#include    "LVPSA.h"
-#include    "LVPSA_Private.h"
-#include    "LVM_Macros.h"
-#include    "VectorArithmetic.h"
+#include "LVPSA.h"
+#include "LVPSA_Private.h"
+#include "LVM_Macros.h"
+#include "VectorArithmetic.h"
 
-#define LVM_MININT_32   0x80000000
+#define LVM_MININT_32 0x80000000
 
 static LVM_INT32 mult32x32in32_shiftr(LVM_INT32 a, LVM_INT32 b, LVM_INT32 c) {
-  LVM_INT64 result = ((LVM_INT64)a * b) >> c;
+    LVM_INT64 result = ((LVM_INT64)a * b) >> c;
 
-  if (result >= INT32_MAX) {
-    return INT32_MAX;
-  } else if (result <= INT32_MIN) {
-    return INT32_MIN;
-  } else {
-    return (LVM_INT32)result;
-  }
+    if (result >= INT32_MAX) {
+        return INT32_MAX;
+    } else if (result <= INT32_MIN) {
+        return INT32_MIN;
+    } else {
+        return (LVM_INT32)result;
+    }
 }
 
 /************************************************************************************/
@@ -54,30 +54,26 @@ static LVM_INT32 mult32x32in32_shiftr(LVM_INT32 a, LVM_INT32 b, LVM_INT32 c) {
 /*  otherwise           Error due to bad parameters                                 */
 /*                                                                                  */
 /************************************************************************************/
-LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
-                                       LVM_FLOAT           *pLVPSA_InputSamples,
-                                       LVM_UINT16           InputBlockSize,
-                                       LVPSA_Time           AudioTime            )
+LVPSA_RETURN LVPSA_Process(pLVPSA_Handle_t hInstance, LVM_FLOAT* pLVPSA_InputSamples,
+                           LVM_UINT16 InputBlockSize, LVPSA_Time AudioTime)
 
 {
-    LVPSA_InstancePr_t     *pLVPSA_Inst = (LVPSA_InstancePr_t*)hInstance;
-    LVM_FLOAT               *pScratch;
-    LVM_INT16               ii;
-    LVM_INT32               AudioTimeInc;
-    extern LVM_UINT32       LVPSA_SampleRateInvTab[];
-    LVM_UINT8               *pWrite_Save;         /* Position of the write pointer
-                                                     at the beginning of the process  */
+    LVPSA_InstancePr_t* pLVPSA_Inst = (LVPSA_InstancePr_t*)hInstance;
+    LVM_FLOAT* pScratch;
+    LVM_INT16 ii;
+    LVM_INT32 AudioTimeInc;
+    extern LVM_UINT32 LVPSA_SampleRateInvTab[];
+    LVM_UINT8* pWrite_Save; /* Position of the write pointer
+                               at the beginning of the process  */
 
     /******************************************************************************
        CHECK PARAMETERS
     *******************************************************************************/
-    if(hInstance == LVM_NULL || pLVPSA_InputSamples == LVM_NULL)
-    {
-        return(LVPSA_ERROR_NULLADDRESS);
+    if (hInstance == LVM_NULL || pLVPSA_InputSamples == LVM_NULL) {
+        return (LVPSA_ERROR_NULLADDRESS);
     }
-    if(InputBlockSize == 0 || InputBlockSize > pLVPSA_Inst->MaxInputBlockSize)
-    {
-        return(LVPSA_ERROR_INVALIDPARAM);
+    if (InputBlockSize == 0 || InputBlockSize > pLVPSA_Inst->MaxInputBlockSize) {
+        return (LVPSA_ERROR_INVALIDPARAM);
     }
     pScratch = (LVM_FLOAT*)pLVPSA_Inst->pScratch;
     pWrite_Save = pLVPSA_Inst->pSpectralDataBufferWritePointer;
@@ -85,10 +81,9 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
     /******************************************************************************
        APPLY NEW SETTINGS IF NEEDED
     *******************************************************************************/
-    if (pLVPSA_Inst->bControlPending == LVM_TRUE)
-    {
+    if (pLVPSA_Inst->bControlPending == LVM_TRUE) {
         pLVPSA_Inst->bControlPending = 0;
-        LVPSA_ApplyNewSettings( pLVPSA_Inst);
+        LVPSA_ApplyNewSettings(pLVPSA_Inst);
     }
 
     /******************************************************************************
@@ -98,39 +93,30 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
     Copy_Float(pLVPSA_InputSamples, pScratch, (LVM_INT16)InputBlockSize);
     Shift_Sat_Float(-1, pScratch, pScratch, (LVM_INT16)InputBlockSize);
 
-    for (ii = 0; ii < pLVPSA_Inst->nRelevantFilters; ii++)
-    {
-        switch(pLVPSA_Inst->pBPFiltersPrecision[ii])
-        {
+    for (ii = 0; ii < pLVPSA_Inst->nRelevantFilters; ii++) {
+        switch (pLVPSA_Inst->pBPFiltersPrecision[ii]) {
             case LVPSA_SimplePrecisionFilter:
-                BP_1I_D16F16C14_TRC_WRA_01  ( &pLVPSA_Inst->pBP_Instances[ii],
-                                              pScratch,
-                                              pScratch + InputBlockSize,
-                                              (LVM_INT16)InputBlockSize);
+                BP_1I_D16F16C14_TRC_WRA_01(&pLVPSA_Inst->pBP_Instances[ii], pScratch,
+                                           pScratch + InputBlockSize, (LVM_INT16)InputBlockSize);
                 break;
 
             case LVPSA_DoublePrecisionFilter:
-                BP_1I_D16F32C30_TRC_WRA_01  ( &pLVPSA_Inst->pBP_Instances[ii],
-                                              pScratch,
-                                              pScratch + InputBlockSize,
-                                              (LVM_INT16)InputBlockSize);
+                BP_1I_D16F32C30_TRC_WRA_01(&pLVPSA_Inst->pBP_Instances[ii], pScratch,
+                                           pScratch + InputBlockSize, (LVM_INT16)InputBlockSize);
                 break;
             default:
                 break;
         }
 
-        LVPSA_QPD_Process_Float   ( pLVPSA_Inst,
-                                    pScratch + InputBlockSize,
-                                    (LVM_INT16)InputBlockSize,
-                                    ii);
+        LVPSA_QPD_Process_Float(pLVPSA_Inst, pScratch + InputBlockSize, (LVM_INT16)InputBlockSize,
+                                ii);
     }
 
     /******************************************************************************
        UPDATE SpectralDataBufferAudioTime
     *******************************************************************************/
 
-    if(pLVPSA_Inst->pSpectralDataBufferWritePointer != pWrite_Save)
-    {
+    if (pLVPSA_Inst->pSpectralDataBufferWritePointer != pWrite_Save) {
         AudioTimeInc = mult32x32in32_shiftr(
                 (AudioTime + ((LVM_INT32)pLVPSA_Inst->LocalSamplesCount * 1000)),
                 (LVM_INT32)LVPSA_SampleRateInvTab[pLVPSA_Inst->CurrentParams.Fs],
@@ -138,7 +124,7 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
         pLVPSA_Inst->SpectralDataBufferAudioTime = AudioTime + AudioTimeInc;
     }
 
-    return(LVPSA_OK);
+    return (LVPSA_OK);
 }
 
 /************************************************************************************/
@@ -161,99 +147,95 @@ LVPSA_RETURN LVPSA_Process           ( pLVPSA_Handle_t      hInstance,
 /*  otherwise           Error due to bad parameters                                 */
 /*                                                                                  */
 /************************************************************************************/
-LVPSA_RETURN LVPSA_GetSpectrum       ( pLVPSA_Handle_t      hInstance,
-                                       LVPSA_Time           GetSpectrumAudioTime,
-                                       LVM_UINT8           *pCurrentValues,
-                                       LVM_UINT8           *pPeakValues           )
+LVPSA_RETURN LVPSA_GetSpectrum(pLVPSA_Handle_t hInstance, LVPSA_Time GetSpectrumAudioTime,
+                               LVM_UINT8* pCurrentValues, LVM_UINT8* pPeakValues)
 
 {
+    LVPSA_InstancePr_t* pLVPSA_Inst = (LVPSA_InstancePr_t*)hInstance;
+    LVM_INT32 StatusDelta, ii;
+    LVM_UINT8* pRead;
 
-    LVPSA_InstancePr_t      *pLVPSA_Inst = (LVPSA_InstancePr_t*)hInstance;
-    LVM_INT32               StatusDelta, ii;
-    LVM_UINT8               *pRead;
-
-    if(hInstance == LVM_NULL || pCurrentValues == LVM_NULL || pPeakValues == LVM_NULL)
-    {
-        return(LVPSA_ERROR_NULLADDRESS);
+    if (hInstance == LVM_NULL || pCurrentValues == LVM_NULL || pPeakValues == LVM_NULL) {
+        return (LVPSA_ERROR_NULLADDRESS);
     }
 
     /* First find the place where to look in the status buffer */
-    if(GetSpectrumAudioTime <= pLVPSA_Inst->SpectralDataBufferAudioTime)
-    {
-        MUL32x32INTO32((pLVPSA_Inst->SpectralDataBufferAudioTime - GetSpectrumAudioTime),LVPSA_InternalRefreshTimeInv,StatusDelta,LVPSA_InternalRefreshTimeShift);
-        if((StatusDelta * LVPSA_InternalRefreshTime) != (pLVPSA_Inst->SpectralDataBufferAudioTime - GetSpectrumAudioTime))
-        {
+    if (GetSpectrumAudioTime <= pLVPSA_Inst->SpectralDataBufferAudioTime) {
+        MUL32x32INTO32((pLVPSA_Inst->SpectralDataBufferAudioTime - GetSpectrumAudioTime),
+                       LVPSA_InternalRefreshTimeInv, StatusDelta, LVPSA_InternalRefreshTimeShift);
+        if ((StatusDelta * LVPSA_InternalRefreshTime) !=
+            (pLVPSA_Inst->SpectralDataBufferAudioTime - GetSpectrumAudioTime)) {
             StatusDelta += 1;
         }
-    }
-    else
-    {
+    } else {
         /* This part handles the wrap around */
-        MUL32x32INTO32(((pLVPSA_Inst->SpectralDataBufferAudioTime - (LVM_INT32)LVM_MININT_32) + ((LVM_INT32)LVM_MAXINT_32 - GetSpectrumAudioTime)),LVPSA_InternalRefreshTimeInv,StatusDelta,LVPSA_InternalRefreshTimeShift)
-        if(((LVM_INT32)(StatusDelta * LVPSA_InternalRefreshTime)) != ((LVM_INT32)((pLVPSA_Inst->SpectralDataBufferAudioTime - (LVM_INT32)LVM_MININT_32) + ((LVM_INT32)LVM_MAXINT_32 - GetSpectrumAudioTime))))
-        {
+        MUL32x32INTO32(
+                ((pLVPSA_Inst->SpectralDataBufferAudioTime - (LVM_INT32)LVM_MININT_32) +
+                 ((LVM_INT32)LVM_MAXINT_32 - GetSpectrumAudioTime)),
+                LVPSA_InternalRefreshTimeInv, StatusDelta,
+                LVPSA_InternalRefreshTimeShift) if (((LVM_INT32)(StatusDelta *
+                                                                 LVPSA_InternalRefreshTime)) !=
+                                                    ((LVM_INT32)(
+                                                            (pLVPSA_Inst
+                                                                     ->SpectralDataBufferAudioTime -
+                                                             (LVM_INT32)LVM_MININT_32) +
+                                                            ((LVM_INT32)LVM_MAXINT_32 -
+                                                             GetSpectrumAudioTime)))) {
             StatusDelta += 1;
         }
     }
     /* Check whether the desired level is not too "old" (see 2.10 in LVPSA_DesignNotes.doc)*/
-    if(
-        ((GetSpectrumAudioTime < pLVPSA_Inst->SpectralDataBufferAudioTime)&&
-         ((GetSpectrumAudioTime<0)&&(pLVPSA_Inst->SpectralDataBufferAudioTime>0))&&
-         (((LVM_INT32)(-GetSpectrumAudioTime + pLVPSA_Inst->SpectralDataBufferAudioTime))>LVM_MAXINT_32))||
+    if (((GetSpectrumAudioTime < pLVPSA_Inst->SpectralDataBufferAudioTime) &&
+         ((GetSpectrumAudioTime < 0) && (pLVPSA_Inst->SpectralDataBufferAudioTime > 0)) &&
+         (((LVM_INT32)(-GetSpectrumAudioTime + pLVPSA_Inst->SpectralDataBufferAudioTime)) >
+          LVM_MAXINT_32)) ||
 
-         ((GetSpectrumAudioTime > pLVPSA_Inst->SpectralDataBufferAudioTime)&&
-         (((GetSpectrumAudioTime>=0)&&(pLVPSA_Inst->SpectralDataBufferAudioTime>=0))||
-          ((GetSpectrumAudioTime<=0)&&(pLVPSA_Inst->SpectralDataBufferAudioTime<=0))||
-         (((GetSpectrumAudioTime>=0)&&(pLVPSA_Inst->SpectralDataBufferAudioTime<=0))&&
-         (((LVM_INT32)(GetSpectrumAudioTime - pLVPSA_Inst->SpectralDataBufferAudioTime))<LVM_MAXINT_32))))||
+        ((GetSpectrumAudioTime > pLVPSA_Inst->SpectralDataBufferAudioTime) &&
+         (((GetSpectrumAudioTime >= 0) && (pLVPSA_Inst->SpectralDataBufferAudioTime >= 0)) ||
+          ((GetSpectrumAudioTime <= 0) && (pLVPSA_Inst->SpectralDataBufferAudioTime <= 0)) ||
+          (((GetSpectrumAudioTime >= 0) && (pLVPSA_Inst->SpectralDataBufferAudioTime <= 0)) &&
+           (((LVM_INT32)(GetSpectrumAudioTime - pLVPSA_Inst->SpectralDataBufferAudioTime)) <
+            LVM_MAXINT_32)))) ||
 
-        (StatusDelta > (LVM_INT32)pLVPSA_Inst->SpectralDataBufferLength) ||
-        (!StatusDelta))
-    {
-        for(ii = 0; ii < pLVPSA_Inst->nBands; ii++)
-        {
-            pCurrentValues[ii]  = 0;
-            pPeakValues[ii]      = 0;
+        (StatusDelta > (LVM_INT32)pLVPSA_Inst->SpectralDataBufferLength) || (!StatusDelta)) {
+        for (ii = 0; ii < pLVPSA_Inst->nBands; ii++) {
+            pCurrentValues[ii] = 0;
+            pPeakValues[ii] = 0;
         }
-        return(LVPSA_OK);
+        return (LVPSA_OK);
     }
     /* Set the reading pointer */
-    if((LVM_INT32)(StatusDelta * pLVPSA_Inst->nBands) > (pLVPSA_Inst->pSpectralDataBufferWritePointer - pLVPSA_Inst->pSpectralDataBufferStart))
-    {
-        pRead = pLVPSA_Inst->pSpectralDataBufferWritePointer + (pLVPSA_Inst->SpectralDataBufferLength - (LVM_UINT32)StatusDelta) * pLVPSA_Inst->nBands;
-    }
-    else
-    {
-        pRead = pLVPSA_Inst->pSpectralDataBufferWritePointer  - StatusDelta * pLVPSA_Inst->nBands;
+    if ((LVM_INT32)(StatusDelta * pLVPSA_Inst->nBands) >
+        (pLVPSA_Inst->pSpectralDataBufferWritePointer - pLVPSA_Inst->pSpectralDataBufferStart)) {
+        pRead = pLVPSA_Inst->pSpectralDataBufferWritePointer +
+                (pLVPSA_Inst->SpectralDataBufferLength - (LVM_UINT32)StatusDelta) *
+                        pLVPSA_Inst->nBands;
+    } else {
+        pRead = pLVPSA_Inst->pSpectralDataBufferWritePointer - StatusDelta * pLVPSA_Inst->nBands;
     }
 
     /* Read the status buffer and fill the output buffers */
-    for(ii = 0; ii < pLVPSA_Inst->nBands; ii++)
-    {
+    for (ii = 0; ii < pLVPSA_Inst->nBands; ii++) {
         pCurrentValues[ii] = pRead[ii];
-        if(pLVPSA_Inst->pPreviousPeaks[ii] <= pRead[ii])
-        {
+        if (pLVPSA_Inst->pPreviousPeaks[ii] <= pRead[ii]) {
             pLVPSA_Inst->pPreviousPeaks[ii] = pRead[ii];
-        }
-        else if(pLVPSA_Inst->pPreviousPeaks[ii] != 0)
-        {
+        } else if (pLVPSA_Inst->pPreviousPeaks[ii] != 0) {
             LVM_INT32 temp;
             /*Re-compute max values for decay */
             temp = (LVM_INT32)(LVPSA_MAXUNSIGNEDCHAR - pLVPSA_Inst->pPreviousPeaks[ii]);
-            temp = ((temp * LVPSA_MAXLEVELDECAYFACTOR)>>LVPSA_MAXLEVELDECAYSHIFT);
+            temp = ((temp * LVPSA_MAXLEVELDECAYFACTOR) >> LVPSA_MAXLEVELDECAYSHIFT);
             /* If the gain has no effect, "help" the value to increase */
-            if(temp == (LVPSA_MAXUNSIGNEDCHAR - pLVPSA_Inst->pPreviousPeaks[ii]))
-            {
+            if (temp == (LVPSA_MAXUNSIGNEDCHAR - pLVPSA_Inst->pPreviousPeaks[ii])) {
                 temp += 1;
             }
             /* Saturate */
             temp = (temp > LVPSA_MAXUNSIGNEDCHAR) ? LVPSA_MAXUNSIGNEDCHAR : temp;
             /* Store new max level */
-            pLVPSA_Inst->pPreviousPeaks[ii] =  (LVM_UINT8)(LVPSA_MAXUNSIGNEDCHAR - temp);
+            pLVPSA_Inst->pPreviousPeaks[ii] = (LVM_UINT8)(LVPSA_MAXUNSIGNEDCHAR - temp);
         }
 
         pPeakValues[ii] = pLVPSA_Inst->pPreviousPeaks[ii];
     }
 
-    return(LVPSA_OK);
+    return (LVPSA_OK);
 }

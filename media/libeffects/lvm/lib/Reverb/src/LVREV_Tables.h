@@ -31,11 +31,11 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-extern const    LVM_UINT32  LVM_FsTable[];
-extern          LVM_UINT32  LVM_GetFsFromTable(LVM_Fs_en FsIndex);
+extern const LVM_UINT32 LVM_FsTable[];
+extern LVM_UINT32 LVM_GetFsFromTable(LVM_Fs_en FsIndex);
 
-extern const    LVM_FLOAT   LVREV_GainPolyTable[24][5];
+extern const LVM_FLOAT LVREV_GainPolyTable[24][5];
 
-#endif  /** _LVREV_TABLES_H_ **/
+#endif /** _LVREV_TABLES_H_ **/
 
 /* End of file */
