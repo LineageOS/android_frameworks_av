@@ -16,7 +16,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkCommon"
 
-#include <log/log.h>
+#include <android-base/logging.h>
 #include <media/NdkCommon.h>
 
 #include <cstdio>
@@ -39,3 +39,38 @@ const char* TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP = "allow-frame-drop";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES = "max-bframes";
+
+namespace AMediaFormatUtils {
+
+#define DEFINE_FORMAT_VALUE_COPY_FUNC(_type, _typeName)                                      \
+    bool CopyFormatEntry##_typeName(const char* key, AMediaFormat* from, AMediaFormat* to) { \
+        _type value;                                                                         \
+        if (AMediaFormat_get##_typeName(from, key, &value)) {                                \
+            AMediaFormat_set##_typeName(to, key, value);                                     \
+            return true;                                                                     \
+        }                                                                                    \
+        return false;                                                                        \
+    }
+
+DEFINE_FORMAT_VALUE_COPY_FUNC(const char*, String);
+DEFINE_FORMAT_VALUE_COPY_FUNC(int64_t, Int64);
+DEFINE_FORMAT_VALUE_COPY_FUNC(int32_t, Int32);
+DEFINE_FORMAT_VALUE_COPY_FUNC(float, Float);
+
+void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* entries,
+                       size_t entryCount) {
+    if (from == nullptr || to == nullptr) {
+        LOG(ERROR) << "Cannot copy null formats";
+        return;
+    } else if (entries == nullptr || entryCount < 1) {
+        LOG(WARNING) << "No entries to copy";
+        return;
+    }
+
+    for (size_t i = 0; i < entryCount; ++i) {
+        if (!entries[i].copy(entries[i].key, from, to) && entries[i].copy2 != nullptr) {
+            entries[i].copy2(entries[i].key, from, to);
+        }
+    }
+}
+}  // namespace AMediaFormatUtils
