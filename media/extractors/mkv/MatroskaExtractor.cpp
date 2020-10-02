@@ -840,7 +840,7 @@ media_status_t MatroskaSource::readBlock() {
         }
 
         if (err != OK) {
-            mPendingFrames.clear();
+            clearPendingFrames();
 
             mBlockIter.advance();
             mbuf->release();
