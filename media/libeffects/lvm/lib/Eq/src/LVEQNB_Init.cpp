@@ -48,42 +48,35 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
-                                   LVEQNB_Capabilities_t    *pCapabilities,
-                                   void                     *pScratch)
-{
-
-    LVEQNB_Instance_t   *pInstance;
+LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t* phInstance,
+                                   LVEQNB_Capabilities_t* pCapabilities, void* pScratch) {
+    LVEQNB_Instance_t* pInstance;
 
     *phInstance = calloc(1, sizeof(*pInstance));
-    if (phInstance == LVM_NULL)
-    {
+    if (phInstance == LVM_NULL) {
         return LVEQNB_NULLADDRESS;
     }
-    pInstance =(LVEQNB_Instance_t  *)*phInstance;
+    pInstance = (LVEQNB_Instance_t*)*phInstance;
 
     pInstance->Capabilities = *pCapabilities;
     pInstance->pScratch = pScratch;
 
     /* Equaliser Biquad Instance */
     LVM_UINT32 MemSize = pCapabilities->MaxBands * sizeof(*(pInstance->pEQNB_FilterState_Float));
-    pInstance->pEQNB_FilterState_Float = (Biquad_FLOAT_Instance_t *)calloc(1, MemSize);
-    if (pInstance->pEQNB_FilterState_Float == LVM_NULL)
-    {
+    pInstance->pEQNB_FilterState_Float = (Biquad_FLOAT_Instance_t*)calloc(1, MemSize);
+    if (pInstance->pEQNB_FilterState_Float == LVM_NULL) {
         return LVEQNB_NULLADDRESS;
     }
 
     MemSize = (pCapabilities->MaxBands * sizeof(*(pInstance->pEQNB_Taps_Float)));
-    pInstance->pEQNB_Taps_Float = (Biquad_2I_Order2_FLOAT_Taps_t *)calloc(1, MemSize);
-    if (pInstance->pEQNB_Taps_Float == LVM_NULL)
-    {
+    pInstance->pEQNB_Taps_Float = (Biquad_2I_Order2_FLOAT_Taps_t*)calloc(1, MemSize);
+    if (pInstance->pEQNB_Taps_Float == LVM_NULL) {
         return LVEQNB_NULLADDRESS;
     }
 
     MemSize = (pCapabilities->MaxBands * sizeof(*(pInstance->pBandDefinitions)));
-    pInstance->pBandDefinitions  = (LVEQNB_BandDef_t *)calloc(1, MemSize);
-    if (pInstance->pBandDefinitions == LVM_NULL)
-    {
+    pInstance->pBandDefinitions = (LVEQNB_BandDef_t*)calloc(1, MemSize);
+    if (pInstance->pBandDefinitions == LVM_NULL) {
         return LVEQNB_NULLADDRESS;
     }
     // clear all the bands, setting their gain to 0, otherwise when applying new params,
@@ -91,54 +84,53 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
     memset(pInstance->pBandDefinitions, 0, MemSize);
 
     MemSize = (pCapabilities->MaxBands * sizeof(*(pInstance->pBiquadType)));
-    pInstance->pBiquadType = (LVEQNB_BiquadType_en *)calloc(1, MemSize);
-    if (pInstance->pBiquadType == LVM_NULL)
-    {
+    pInstance->pBiquadType = (LVEQNB_BiquadType_en*)calloc(1, MemSize);
+    if (pInstance->pBiquadType == LVM_NULL) {
         return LVEQNB_NULLADDRESS;
     }
 
-    pInstance->pFastTemporary = (LVM_FLOAT *)pScratch;
+    pInstance->pFastTemporary = (LVM_FLOAT*)pScratch;
 
     /*
      * Update the instance parameters
      */
-    pInstance->Params.NBands          = 0;
-    pInstance->Params.OperatingMode   = LVEQNB_BYPASS;
+    pInstance->Params.NBands = 0;
+    pInstance->Params.OperatingMode = LVEQNB_BYPASS;
     pInstance->Params.pBandDefinition = LVM_NULL;
-    pInstance->Params.SampleRate      = LVEQNB_FS_8000;
-    pInstance->Params.SourceFormat    = LVEQNB_STEREO;
+    pInstance->Params.SampleRate = LVEQNB_FS_8000;
+    pInstance->Params.SourceFormat = LVEQNB_STEREO;
 
     /*
      * Initialise the filters
      */
-    LVEQNB_SetFilters(pInstance,                        /* Set the filter types */
+    LVEQNB_SetFilters(pInstance, /* Set the filter types */
                       &pInstance->Params);
 
-    LVEQNB_SetCoefficients(pInstance);                  /* Set the filter coefficients */
+    LVEQNB_SetCoefficients(pInstance); /* Set the filter coefficients */
 
-    LVEQNB_ClearFilterHistory(pInstance);               /* Clear the filter history */
+    LVEQNB_ClearFilterHistory(pInstance); /* Clear the filter history */
 
     /*
      * Initialise the bypass variables
      */
-    pInstance->BypassMixer.MixerStream[0].CallbackSet        = 0;
-    pInstance->BypassMixer.MixerStream[0].CallbackParam      = 0;
-    pInstance->BypassMixer.MixerStream[0].pCallbackHandle    = (void*)pInstance;
-    pInstance->BypassMixer.MixerStream[0].pCallBack          = LVEQNB_BypassMixerCallBack;
+    pInstance->BypassMixer.MixerStream[0].CallbackSet = 0;
+    pInstance->BypassMixer.MixerStream[0].CallbackParam = 0;
+    pInstance->BypassMixer.MixerStream[0].pCallbackHandle = (void*)pInstance;
+    pInstance->BypassMixer.MixerStream[0].pCallBack = LVEQNB_BypassMixerCallBack;
 
-    LVC_Mixer_Init(&pInstance->BypassMixer.MixerStream[0],0,0);
-    LVC_Mixer_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0],0,LVM_FS_8000,2);
+    LVC_Mixer_Init(&pInstance->BypassMixer.MixerStream[0], 0, 0);
+    LVC_Mixer_SetTimeConstant(&pInstance->BypassMixer.MixerStream[0], 0, LVM_FS_8000, 2);
 
-    pInstance->BypassMixer.MixerStream[1].CallbackSet        = 1;
-    pInstance->BypassMixer.MixerStream[1].CallbackParam      = 0;
-    pInstance->BypassMixer.MixerStream[1].pCallbackHandle    = LVM_NULL;
-    pInstance->BypassMixer.MixerStream[1].pCallBack          = LVM_NULL;
+    pInstance->BypassMixer.MixerStream[1].CallbackSet = 1;
+    pInstance->BypassMixer.MixerStream[1].CallbackParam = 0;
+    pInstance->BypassMixer.MixerStream[1].pCallbackHandle = LVM_NULL;
+    pInstance->BypassMixer.MixerStream[1].pCallBack = LVM_NULL;
     LVC_Mixer_Init(&pInstance->BypassMixer.MixerStream[1], 0, 1.0f);
     LVC_Mixer_SetTimeConstant(&pInstance->BypassMixer.MixerStream[1], 0, LVM_FS_8000, 2);
 
-    pInstance->bInOperatingModeTransition      = LVM_FALSE;
+    pInstance->bInOperatingModeTransition = LVM_FALSE;
 
-    return(LVEQNB_SUCCESS);
+    return (LVEQNB_SUCCESS);
 }
 /****************************************************************************************/
 /*                                                                                      */
@@ -155,14 +147,12 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
 /*                                                                                      */
 /****************************************************************************************/
 
-void LVEQNB_DeInit(LVEQNB_Handle_t          *phInstance)
-{
-
-    LVEQNB_Instance_t   *pInstance;
+void LVEQNB_DeInit(LVEQNB_Handle_t* phInstance) {
+    LVEQNB_Instance_t* pInstance;
     if (phInstance == LVM_NULL) {
         return;
     }
-    pInstance =(LVEQNB_Instance_t  *)*phInstance;
+    pInstance = (LVEQNB_Instance_t*)*phInstance;
 
     /* Equaliser Biquad Instance */
     if (pInstance->pEQNB_FilterState_Float != LVM_NULL) {
@@ -184,4 +174,3 @@ void LVEQNB_DeInit(LVEQNB_Handle_t          *phInstance)
     free(pInstance);
     *phInstance = LVM_NULL;
 }
-

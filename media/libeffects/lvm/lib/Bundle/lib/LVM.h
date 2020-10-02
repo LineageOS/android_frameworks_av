@@ -68,27 +68,27 @@
 /****************************************************************************************/
 
 /* Concert Sound effect level presets */
-#define LVM_CS_EFFECT_NONE                    0     /* 0% effect, minimum value */
-#define LVM_CS_EFFECT_LOW                 16384     /* 50% effect */
-#define LVM_CS_EFFECT_MED                 24576     /* 75% effect */
-#define LVM_CS_EFFECT_HIGH                32767     /* 100% effect, maximum value */
+#define LVM_CS_EFFECT_NONE 0     /* 0% effect, minimum value */
+#define LVM_CS_EFFECT_LOW 16384  /* 50% effect */
+#define LVM_CS_EFFECT_MED 24576  /* 75% effect */
+#define LVM_CS_EFFECT_HIGH 32767 /* 100% effect, maximum value */
 
 /* Treble enhancement */
-#define LVM_TE_LOW_MIPS                   32767
+#define LVM_TE_LOW_MIPS 32767
 
 /* Bass enhancement effect level presets */
-#define LVM_BE_0DB                            0     /* 0dB boost, no effect */
-#define LVM_BE_3DB                            3     /* +3dB boost */
-#define LVM_BE_6DB                            6     /* +6dB boost */
-#define LVM_BE_9DB                            9     /* +9dB boost */
-#define LVM_BE_12DB                          12     /* +12dB boost */
-#define LVM_BE_15DB                          15     /* +15dB boost */
+#define LVM_BE_0DB 0   /* 0dB boost, no effect */
+#define LVM_BE_3DB 3   /* +3dB boost */
+#define LVM_BE_6DB 6   /* +6dB boost */
+#define LVM_BE_9DB 9   /* +9dB boost */
+#define LVM_BE_12DB 12 /* +12dB boost */
+#define LVM_BE_15DB 15 /* +15dB boost */
 
 /* N-Band Equalizer */
-#define LVM_EQ_NBANDS                         5    /* Number of bands for equalizer */
+#define LVM_EQ_NBANDS 5 /* Number of bands for equalizer */
 
 /* Headroom management */
-#define LVM_HEADROOM_MAX_NBANDS               5
+#define LVM_HEADROOM_MAX_NBANDS 5
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -97,123 +97,89 @@
 /****************************************************************************************/
 
 /* Instance handle */
-typedef void *LVM_Handle_t;
+typedef void* LVM_Handle_t;
 
 /* Status return values */
-typedef enum
-{
-    LVM_SUCCESS            = 0,                     /* Successful return from a routine */
-    LVM_ALIGNMENTERROR     = 1,                     /* Memory alignment error */
-    LVM_NULLADDRESS        = 2,                     /* NULL allocation address */
-    LVM_OUTOFRANGE         = 3,                     /* Out of range control parameter */
-    LVM_INVALIDNUMSAMPLES  = 4,                     /* Invalid number of samples */
-    LVM_WRONGAUDIOTIME     = 5,                     /* Wrong time value for audio time*/
-    LVM_ALGORITHMDISABLED  = 6,                     /* Algorithm is disabled*/
-    LVM_ALGORITHMPSA       = 7,                     /* Algorithm PSA returns an error */
+typedef enum {
+    LVM_SUCCESS = 0,           /* Successful return from a routine */
+    LVM_ALIGNMENTERROR = 1,    /* Memory alignment error */
+    LVM_NULLADDRESS = 2,       /* NULL allocation address */
+    LVM_OUTOFRANGE = 3,        /* Out of range control parameter */
+    LVM_INVALIDNUMSAMPLES = 4, /* Invalid number of samples */
+    LVM_WRONGAUDIOTIME = 5,    /* Wrong time value for audio time*/
+    LVM_ALGORITHMDISABLED = 6, /* Algorithm is disabled*/
+    LVM_ALGORITHMPSA = 7,      /* Algorithm PSA returns an error */
     LVM_RETURNSTATUS_DUMMY = LVM_MAXENUM
 } LVM_ReturnStatus_en;
 
 /* Buffer Management mode */
-typedef enum
-{
-    LVM_MANAGED_BUFFERS   = 0,
+typedef enum {
+    LVM_MANAGED_BUFFERS = 0,
     LVM_UNMANAGED_BUFFERS = 1,
-    LVM_BUFFERS_DUMMY     = LVM_MAXENUM
+    LVM_BUFFERS_DUMMY = LVM_MAXENUM
 } LVM_BufferMode_en;
 
 /* Output device type */
-typedef enum
-{
-    LVM_HEADPHONES             = 0,
-    LVM_EX_HEADPHONES          = 1,
-    LVM_SPEAKERTYPE_MAX        = LVM_MAXENUM
+typedef enum {
+    LVM_HEADPHONES = 0,
+    LVM_EX_HEADPHONES = 1,
+    LVM_SPEAKERTYPE_MAX = LVM_MAXENUM
 } LVM_OutputDeviceType_en;
 
 /* Virtualizer mode selection*/
-typedef enum
-{
-    LVM_CONCERTSOUND       = 0,
-    LVM_VIRTUALIZERTYPE_DUMMY   = LVM_MAXENUM
+typedef enum {
+    LVM_CONCERTSOUND = 0,
+    LVM_VIRTUALIZERTYPE_DUMMY = LVM_MAXENUM
 } LVM_VirtualizerType_en;
 
 /* N-Band Equaliser operating mode */
-typedef enum
-{
-    LVM_EQNB_OFF   = 0,
-    LVM_EQNB_ON    = 1,
-    LVM_EQNB_DUMMY = LVM_MAXENUM
-} LVM_EQNB_Mode_en;
+typedef enum { LVM_EQNB_OFF = 0, LVM_EQNB_ON = 1, LVM_EQNB_DUMMY = LVM_MAXENUM } LVM_EQNB_Mode_en;
 
 /* Bass Enhancement operating mode */
-typedef enum
-{
-    LVM_BE_OFF   = 0,
-    LVM_BE_ON    = 1,
-    LVM_BE_DUMMY = LVM_MAXENUM
-} LVM_BE_Mode_en;
+typedef enum { LVM_BE_OFF = 0, LVM_BE_ON = 1, LVM_BE_DUMMY = LVM_MAXENUM } LVM_BE_Mode_en;
 
 /* Bass Enhancement centre frequency selection control */
-typedef enum
-{
-    LVM_BE_CENTRE_55Hz  = 0,
-    LVM_BE_CENTRE_66Hz  = 1,
-    LVM_BE_CENTRE_78Hz  = 2,
-    LVM_BE_CENTRE_90Hz  = 3,
+typedef enum {
+    LVM_BE_CENTRE_55Hz = 0,
+    LVM_BE_CENTRE_66Hz = 1,
+    LVM_BE_CENTRE_78Hz = 2,
+    LVM_BE_CENTRE_90Hz = 3,
     LVM_BE_CENTRE_DUMMY = LVM_MAXENUM
 } LVM_BE_CentreFreq_en;
 
 /* Bass Enhancement HPF selection control */
-typedef enum
-{
-    LVM_BE_HPF_OFF   = 0,
-    LVM_BE_HPF_ON    = 1,
+typedef enum {
+    LVM_BE_HPF_OFF = 0,
+    LVM_BE_HPF_ON = 1,
     LVM_BE_HPF_DUMMY = LVM_MAXENUM
 } LVM_BE_FilterSelect_en;
 
 /* Volume Control operating mode */
-typedef enum
-{
-    LVM_VC_OFF   = 0,
-    LVM_VC_ON    = 1,
-    LVM_VC_DUMMY = LVM_MAXENUM
-} LVM_VC_Mode_en;
+typedef enum { LVM_VC_OFF = 0, LVM_VC_ON = 1, LVM_VC_DUMMY = LVM_MAXENUM } LVM_VC_Mode_en;
 
 /* Treble Enhancement operating mode */
-typedef enum
-{
-    LVM_TE_OFF   = 0,
-    LVM_TE_ON    = 1,
-    LVM_TE_DUMMY = LVM_MAXENUM
-} LVM_TE_Mode_en;
+typedef enum { LVM_TE_OFF = 0, LVM_TE_ON = 1, LVM_TE_DUMMY = LVM_MAXENUM } LVM_TE_Mode_en;
 
 /* Headroom management operating mode */
-typedef enum
-{
-    LVM_HEADROOM_OFF   = 0,
-    LVM_HEADROOM_ON    = 1,
+typedef enum {
+    LVM_HEADROOM_OFF = 0,
+    LVM_HEADROOM_ON = 1,
     LVM_Headroom_DUMMY = LVM_MAXENUM
 } LVM_Headroom_Mode_en;
 
-typedef enum
-{
-    LVM_PSA_SPEED_SLOW,                                  /* Peak decaying at slow speed */
-    LVM_PSA_SPEED_MEDIUM,                                /* Peak decaying at medium speed */
-    LVM_PSA_SPEED_FAST,                                  /* Peak decaying at fast speed */
+typedef enum {
+    LVM_PSA_SPEED_SLOW,   /* Peak decaying at slow speed */
+    LVM_PSA_SPEED_MEDIUM, /* Peak decaying at medium speed */
+    LVM_PSA_SPEED_FAST,   /* Peak decaying at fast speed */
     LVM_PSA_SPEED_DUMMY = LVM_MAXENUM
 } LVM_PSA_DecaySpeed_en;
 
-typedef enum
-{
-    LVM_PSA_OFF   = 0,
-    LVM_PSA_ON    = 1,
-    LVM_PSA_DUMMY = LVM_MAXENUM
-} LVM_PSA_Mode_en;
+typedef enum { LVM_PSA_OFF = 0, LVM_PSA_ON = 1, LVM_PSA_DUMMY = LVM_MAXENUM } LVM_PSA_Mode_en;
 
 /* Version information */
-typedef struct
-{
-    LVM_CHAR                    *pVersionNumber;        /* Pointer to the version number in the format X.YY.ZZ */
-    LVM_CHAR                    *pPlatform;             /* Pointer to the library platform type */
+typedef struct {
+    LVM_CHAR* pVersionNumber; /* Pointer to the version number in the format X.YY.ZZ */
+    LVM_CHAR* pPlatform;      /* Pointer to the library platform type */
 } LVM_VersionInfo_st;
 
 /****************************************************************************************/
@@ -223,84 +189,79 @@ typedef struct
 /****************************************************************************************/
 
 /* N-Band equaliser band definition */
-typedef struct
-{
-    LVM_INT16                   Gain;                   /* Band gain in dB */
-    LVM_UINT16                  Frequency;              /* Band centre frequency in Hz */
-    LVM_UINT16                  QFactor;                /* Band quality factor (x100) */
+typedef struct {
+    LVM_INT16 Gain;       /* Band gain in dB */
+    LVM_UINT16 Frequency; /* Band centre frequency in Hz */
+    LVM_UINT16 QFactor;   /* Band quality factor (x100) */
 } LVM_EQNB_BandDef_t;
 
 /* Headroom band definition */
-typedef struct
-{
-    LVM_UINT16                  Limit_Low;              /* Low frequency limit of the band in Hertz */
-    LVM_UINT16                  Limit_High;             /* High frequency limit of the band in Hertz */
-    LVM_INT16                   Headroom_Offset;        /* Headroom = biggest band gain - Headroom_Offset */
+typedef struct {
+    LVM_UINT16 Limit_Low;      /* Low frequency limit of the band in Hertz */
+    LVM_UINT16 Limit_High;     /* High frequency limit of the band in Hertz */
+    LVM_INT16 Headroom_Offset; /* Headroom = biggest band gain - Headroom_Offset */
 } LVM_HeadroomBandDef_t;
 
 /* Control Parameter structure */
-typedef struct
-{
+typedef struct {
     /* General parameters */
-    LVM_Mode_en                 OperatingMode;          /* Bundle operating mode On/Bypass */
-    LVM_Fs_en                   SampleRate;             /* Sample rate */
-    LVM_Format_en               SourceFormat;           /* Input data format */
-    LVM_OutputDeviceType_en     SpeakerType;            /* Output device type */
+    LVM_Mode_en OperatingMode;           /* Bundle operating mode On/Bypass */
+    LVM_Fs_en SampleRate;                /* Sample rate */
+    LVM_Format_en SourceFormat;          /* Input data format */
+    LVM_OutputDeviceType_en SpeakerType; /* Output device type */
 
     /* Concert Sound Virtualizer parameters*/
-    LVM_Mode_en                 VirtualizerOperatingMode; /* Virtualizer operating mode On/Off */
-    LVM_VirtualizerType_en      VirtualizerType;          /* Virtualizer type: ConcertSound */
-    LVM_UINT16                  VirtualizerReverbLevel;   /* Virtualizer reverb level in % */
-    LVM_INT16                   CS_EffectLevel;           /* Concert Sound effect level */
+    LVM_Mode_en VirtualizerOperatingMode;   /* Virtualizer operating mode On/Off */
+    LVM_VirtualizerType_en VirtualizerType; /* Virtualizer type: ConcertSound */
+    LVM_UINT16 VirtualizerReverbLevel;      /* Virtualizer reverb level in % */
+    LVM_INT16 CS_EffectLevel;               /* Concert Sound effect level */
 
     /* N-Band Equaliser parameters */
-    LVM_EQNB_Mode_en            EQNB_OperatingMode;     /* N-Band Equaliser operating mode */
-    LVM_UINT16                  EQNB_NBands;            /* Number of bands */
-    LVM_EQNB_BandDef_t          *pEQNB_BandDefinition;  /* Pointer to equaliser definitions */
+    LVM_EQNB_Mode_en EQNB_OperatingMode;      /* N-Band Equaliser operating mode */
+    LVM_UINT16 EQNB_NBands;                   /* Number of bands */
+    LVM_EQNB_BandDef_t* pEQNB_BandDefinition; /* Pointer to equaliser definitions */
 
     /* Bass Enhancement parameters */
-    LVM_BE_Mode_en              BE_OperatingMode;       /* Bass Enhancement operating mode */
-    LVM_INT16                   BE_EffectLevel;         /* Bass Enhancement effect level */
-    LVM_BE_CentreFreq_en        BE_CentreFreq;          /* Bass Enhancement centre frequency */
-    LVM_BE_FilterSelect_en      BE_HPF;                 /* Bass Enhancement high pass filter selector */
+    LVM_BE_Mode_en BE_OperatingMode;    /* Bass Enhancement operating mode */
+    LVM_INT16 BE_EffectLevel;           /* Bass Enhancement effect level */
+    LVM_BE_CentreFreq_en BE_CentreFreq; /* Bass Enhancement centre frequency */
+    LVM_BE_FilterSelect_en BE_HPF;      /* Bass Enhancement high pass filter selector */
 
     /* Volume Control parameters */
-    LVM_INT16                   VC_EffectLevel;         /* Volume Control setting in dBs */
-    LVM_INT16                   VC_Balance;             /* Left Right Balance control in dB (-96 to 96 dB), -ve values reduce
-                                                           Right channel while +ve value reduces Left channel*/
+    LVM_INT16 VC_EffectLevel; /* Volume Control setting in dBs */
+    LVM_INT16 VC_Balance;     /* Left Right Balance control in dB (-96 to 96 dB), -ve values reduce
+                                 Right channel while +ve value reduces Left channel*/
 
     /* Treble Enhancement parameters */
-    LVM_TE_Mode_en              TE_OperatingMode;       /* Treble Enhancement On/Off */
-    LVM_INT16                   TE_EffectLevel;         /* Treble Enhancement gain dBs */
+    LVM_TE_Mode_en TE_OperatingMode; /* Treble Enhancement On/Off */
+    LVM_INT16 TE_EffectLevel;        /* Treble Enhancement gain dBs */
 
     /* Spectrum Analyzer parameters Control */
-    LVM_PSA_Mode_en             PSA_Enable;
-    LVM_PSA_DecaySpeed_en       PSA_PeakDecayRate;      /* Peak value decay rate*/
-    LVM_INT32                   NrChannels;
-    LVM_INT32                   ChMask;
+    LVM_PSA_Mode_en PSA_Enable;
+    LVM_PSA_DecaySpeed_en PSA_PeakDecayRate; /* Peak value decay rate*/
+    LVM_INT32 NrChannels;
+    LVM_INT32 ChMask;
 
 } LVM_ControlParams_t;
 
 /* Instance Parameter structure */
-typedef struct
-{
+typedef struct {
     /* General */
-    LVM_BufferMode_en           BufferMode;             /* Buffer management mode */
-    LVM_UINT16                  MaxBlockSize;           /* Maximum processing block size */
+    LVM_BufferMode_en BufferMode; /* Buffer management mode */
+    LVM_UINT16 MaxBlockSize;      /* Maximum processing block size */
 
     /* N-Band Equaliser */
-    LVM_UINT16                  EQNB_NumBands;          /* Maximum number of equaliser bands */
+    LVM_UINT16 EQNB_NumBands; /* Maximum number of equaliser bands */
 
     /* PSA */
-    LVM_PSA_Mode_en             PSA_Included;            /* Controls the instance memory allocation for PSA: ON/OFF */
+    LVM_PSA_Mode_en PSA_Included; /* Controls the instance memory allocation for PSA: ON/OFF */
 } LVM_InstParams_t;
 
 /* Headroom management parameter structure */
-typedef struct
-{
-    LVM_Headroom_Mode_en        Headroom_OperatingMode; /* Headroom Control On/Off */
-    LVM_HeadroomBandDef_t       *pHeadroomDefinition;   /* Pointer to headroom bands definition */
-    LVM_UINT16                  NHeadroomBands;         /* Number of headroom bands */
+typedef struct {
+    LVM_Headroom_Mode_en Headroom_OperatingMode; /* Headroom Control On/Off */
+    LVM_HeadroomBandDef_t* pHeadroomDefinition;  /* Pointer to headroom bands definition */
+    LVM_UINT16 NHeadroomBands;                   /* Number of headroom bands */
 
 } LVM_HeadroomParams_t;
 
@@ -328,7 +289,7 @@ typedef struct
 /*  1.  This function may be interrupted by the LVM_Process function                    */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetVersionInfo(LVM_VersionInfo_st  *pVersion);
+LVM_ReturnStatus_en LVM_GetVersionInfo(LVM_VersionInfo_st* pVersion);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -351,8 +312,7 @@ LVM_ReturnStatus_en LVM_GetVersionInfo(LVM_VersionInfo_st  *pVersion);
 /*  1. This function must not be interrupted by the LVM_Process function                */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t        *phInstance,
-                                          LVM_InstParams_t    *pInstParams);
+LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t* phInstance, LVM_InstParams_t* pInstParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -369,7 +329,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t        *phInstance,
 /*  1. This function must not be interrupted by the LVM_Process function                */
 /*                                                                                      */
 /****************************************************************************************/
-void LVM_DelInstanceHandle(LVM_Handle_t        *phInstance);
+void LVM_DelInstanceHandle(LVM_Handle_t* phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -389,7 +349,7 @@ void LVM_DelInstanceHandle(LVM_Handle_t        *phInstance);
 /*  1. This function must not be interrupted by the LVM_Process function                */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance);
+LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t hInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -411,8 +371,7 @@ LVM_ReturnStatus_en LVM_ClearAudioBuffers(LVM_Handle_t  hInstance);
 /*  1.  This function may be interrupted by the LVM_Process function                    */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetControlParameters(LVM_Handle_t           hInstance,
-                                             LVM_ControlParams_t    *pParams);
+LVM_ReturnStatus_en LVM_GetControlParameters(LVM_Handle_t hInstance, LVM_ControlParams_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -434,8 +393,7 @@ LVM_ReturnStatus_en LVM_GetControlParameters(LVM_Handle_t           hInstance,
 /*  1.  This function may be interrupted by the LVM_Process function                    */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
-                                             LVM_ControlParams_t    *pParams);
+LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t hInstance, LVM_ControlParams_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -467,11 +425,8 @@ LVM_ReturnStatus_en LVM_SetControlParameters(LVM_Handle_t           hInstance,
 /*      STEREO              the number of sample pairs in the block                     */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
-                                const LVM_FLOAT             *pInData,
-                                LVM_FLOAT                      *pOutData,
-                                LVM_UINT16                  NumSamples,
-                                LVM_UINT32                  AudioTime);
+LVM_ReturnStatus_en LVM_Process(LVM_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                LVM_FLOAT* pOutData, LVM_UINT16 NumSamples, LVM_UINT32 AudioTime);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -492,8 +447,8 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t                hInstance,
 /*  1.  This function may be interrupted by the LVM_Process function                    */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_SetHeadroomParams(  LVM_Handle_t            hInstance,
-                                            LVM_HeadroomParams_t    *pHeadroomParams);
+LVM_ReturnStatus_en LVM_SetHeadroomParams(LVM_Handle_t hInstance,
+                                          LVM_HeadroomParams_t* pHeadroomParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -514,8 +469,8 @@ LVM_ReturnStatus_en LVM_SetHeadroomParams(  LVM_Handle_t            hInstance,
 /*  1.  This function may be interrupted by the LVM_Process function                    */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetHeadroomParams(  LVM_Handle_t            hInstance,
-                                            LVM_HeadroomParams_t    *pHeadroomParams);
+LVM_ReturnStatus_en LVM_GetHeadroomParams(LVM_Handle_t hInstance,
+                                          LVM_HeadroomParams_t* pHeadroomParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -542,10 +497,8 @@ LVM_ReturnStatus_en LVM_GetHeadroomParams(  LVM_Handle_t            hInstance,
 /*  1. This function may be interrupted by the LVM_Process function                     */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetSpectrum( LVM_Handle_t            hInstance,
-                                     LVM_UINT8               *pCurrentPeaks,
-                                     LVM_UINT8               *pPastPeaks,
-                                     LVM_INT32               AudioTime);
+LVM_ReturnStatus_en LVM_GetSpectrum(LVM_Handle_t hInstance, LVM_UINT8* pCurrentPeaks,
+                                    LVM_UINT8* pPastPeaks, LVM_INT32 AudioTime);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -567,8 +520,6 @@ LVM_ReturnStatus_en LVM_GetSpectrum( LVM_Handle_t            hInstance,
 /*  1. This function may be interrupted by the LVM_Process function                     */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_SetVolumeNoSmoothing( LVM_Handle_t           hInstance,
-                                              LVM_ControlParams_t    *pParams);
+LVM_ReturnStatus_en LVM_SetVolumeNoSmoothing(LVM_Handle_t hInstance, LVM_ControlParams_t* pParams);
 
-#endif      /* __LVM_H__ */
-
+#endif /* __LVM_H__ */

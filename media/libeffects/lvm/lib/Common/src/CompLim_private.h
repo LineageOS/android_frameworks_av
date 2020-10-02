@@ -28,17 +28,16 @@
    DEFINITIONS
 ***********************************************************************************/
 
-#define FS_48K      48000
+#define FS_48K 48000
 
-#define INTEGER_16  0xFFFF /*   65535*/
-#define INTEGER_15  0x7FFF /*   32767*/
+#define INTEGER_16 0xFFFF /*   65535*/
+#define INTEGER_15 0x7FFF /*   32767*/
 
-#define GAIN_6DB    1
-#define GAIN_12DB   2
-#define GAIN_18DB   3
-#define GAIN_24DB   4
+#define GAIN_6DB 1
+#define GAIN_12DB 2
+#define GAIN_18DB 3
+#define GAIN_24DB 4
 
 #endif /* #ifndef _COMP_LIM_PRIVATE_ */
 
 /*** End of file ******************************************************************/
-

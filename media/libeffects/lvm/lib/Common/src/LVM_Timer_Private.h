@@ -24,14 +24,13 @@
 /*  TYPE DEFINITIONS                                                                    */
 /****************************************************************************************/
 
-typedef struct
-{
-    LVM_INT32  RemainingTimeInSamples;
-    LVM_INT32  CallBackParam;
-    LVM_INT32  *pCallBackParams;
-    void  *pCallbackInstance;
-    void  (*pCallBack)(void*,void*,LVM_INT32);
-    LVM_INT16 TimerArmed;                        /* Boolean, true between init and callback */
+typedef struct {
+    LVM_INT32 RemainingTimeInSamples;
+    LVM_INT32 CallBackParam;
+    LVM_INT32* pCallBackParams;
+    void* pCallbackInstance;
+    void (*pCallBack)(void*, void*, LVM_INT32);
+    LVM_INT16 TimerArmed; /* Boolean, true between init and callback */
 
 } LVM_Timer_Instance_Private_t;
 
@@ -39,4 +38,4 @@ typedef struct
 /*  END OF HEADER                                                                       */
 /****************************************************************************************/
 
-#endif  /* LVM_TIMER_PRIVATE_H */
+#endif /* LVM_TIMER_PRIVATE_H */

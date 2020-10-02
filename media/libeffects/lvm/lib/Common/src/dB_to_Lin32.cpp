@@ -57,17 +57,16 @@
  *
  ****************************************************************************************/
 
-#define FOUR_OVER_SIX    21846                  /* (4 / 6) * 2^15 */
-#define SIX_DB           96                     /* 6 * 16 or 6dB in Q11.4 format */
-#define FIRST_COEF_NEG   14884305
-#define FIRST_COEF_POS   7442152                /* FIRST_COEF_NEG / 2 */
-#define SECOND_COEF      38836
-#define MAX_VALUE        1536                   /* 96 * 16 */
+#define FOUR_OVER_SIX 21846 /* (4 / 6) * 2^15 */
+#define SIX_DB 96           /* 6 * 16 or 6dB in Q11.4 format */
+#define FIRST_COEF_NEG 14884305
+#define FIRST_COEF_POS 7442152 /* FIRST_COEF_NEG / 2 */
+#define SECOND_COEF 38836
+#define MAX_VALUE 1536 /* 96 * 16 */
 
-LVM_FLOAT   dB_to_LinFloat(LVM_INT16    db_fix)
-{
-    LVM_FLOAT    dB_Float;
-    LVM_FLOAT    LinFloat;
+LVM_FLOAT dB_to_LinFloat(LVM_INT16 db_fix) {
+    LVM_FLOAT dB_Float;
+    LVM_FLOAT LinFloat;
 
     dB_Float = (LVM_FLOAT)((LVM_FLOAT)db_fix / 16.0f);
     LinFloat = pow(10, dB_Float / 20.0);

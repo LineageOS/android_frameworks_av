@@ -26,50 +26,36 @@
 #include "VectorArithmetic.h"
 
 /* Instance parameter structure */
-typedef struct
-{
+typedef struct {
     /* General */
-    LVM_FLOAT                       Target;           /*number specifying value of Target Gain */
-    LVM_FLOAT                       Current;          /*number specifying value of Current Gain */
-    LVM_FLOAT                       Delta;            /*number specifying value of Delta Gain */
+    LVM_FLOAT Target;  /*number specifying value of Target Gain */
+    LVM_FLOAT Current; /*number specifying value of Current Gain */
+    LVM_FLOAT Delta;   /*number specifying value of Delta Gain */
 } Mix_Private_FLOAT_st;
 
 /**********************************************************************************
    DEFINITIONS
 ***********************************************************************************/
-#define LVCore_MixInSoft_D32C31_SAT    LVCore_InSoft_D32C31_SAT
-#define LVCore_MixSoft_1St_D32C31_WRA  LVCore_Soft_1St_D32C31_WRA
-#define LVCore_MixHard_2St_D32C31_SAT  LVCore_Hard_2St_D32C31_SAT
+#define LVCore_MixInSoft_D32C31_SAT LVCore_InSoft_D32C31_SAT
+#define LVCore_MixSoft_1St_D32C31_WRA LVCore_Soft_1St_D32C31_WRA
+#define LVCore_MixHard_2St_D32C31_SAT LVCore_Hard_2St_D32C31_SAT
 
 /**********************************************************************************
    FUNCTION PROTOTYPES (LOW LEVEL SUBFUNCTIONS)
 ***********************************************************************************/
 
 /*** 16 bit functions *************************************************************/
-void LVC_Core_MixInSoft_D16C31_SAT( LVMixer3_FLOAT_st *ptrInstance,
-                                    const LVM_FLOAT     *src,
-                                    LVM_FLOAT     *dst,
-                                    LVM_INT16     n);
-void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st *ptrInstance,
-                                    const LVM_FLOAT     *src,
-                                          LVM_FLOAT     *dst,
-                                          LVM_INT16     NrFrames,
-                                          LVM_INT16     NrChannels);
-void LVC_Core_MixSoft_1St_D16C31_WRA( LVMixer3_FLOAT_st *ptrInstance,
-                                      const LVM_FLOAT     *src,
-                                      LVM_FLOAT     *dst,
-                                      LVM_INT16     n);
-void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st *ptrInstance,
-                                    const LVM_FLOAT     *src,
-                                          LVM_FLOAT     *dst,
-                                          LVM_INT16     NrFrames,
-                                          LVM_INT16     NrChannels);
-void LVC_Core_MixHard_2St_D16C31_SAT( LVMixer3_FLOAT_st *pInstance1,
-                                      LVMixer3_FLOAT_st         *pInstance2,
-                                      const LVM_FLOAT     *src1,
-                                      const LVM_FLOAT     *src2,
-                                      LVM_FLOAT     *dst,
-                                      LVM_INT16     n);
+void LVC_Core_MixInSoft_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLOAT* src,
+                                   LVM_FLOAT* dst, LVM_INT16 n);
+void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLOAT* src,
+                                      LVM_FLOAT* dst, LVM_INT16 NrFrames, LVM_INT16 NrChannels);
+void LVC_Core_MixSoft_1St_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLOAT* src,
+                                     LVM_FLOAT* dst, LVM_INT16 n);
+void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLOAT* src,
+                                    LVM_FLOAT* dst, LVM_INT16 NrFrames, LVM_INT16 NrChannels);
+void LVC_Core_MixHard_2St_D16C31_SAT(LVMixer3_FLOAT_st* pInstance1, LVMixer3_FLOAT_st* pInstance2,
+                                     const LVM_FLOAT* src1, const LVM_FLOAT* src2, LVM_FLOAT* dst,
+                                     LVM_INT16 n);
 
 /**********************************************************************************/
 /* For applying different gains to Left and right chennals                        */
@@ -77,16 +63,11 @@ void LVC_Core_MixHard_2St_D16C31_SAT( LVMixer3_FLOAT_st *pInstance1,
 /* ptrInstance2 applies to Right channel                                          */
 /* Gain values should not be more that 1.0                                        */
 /**********************************************************************************/
-void LVC_Core_MixSoft_1St_MC_float_WRA(Mix_Private_FLOAT_st **ptrInstance,
-                                         const LVM_FLOAT      *src,
-                                         LVM_FLOAT            *dst,
-                                         LVM_INT16            NrFrames,
-                                         LVM_INT16            NrChannels);
-void LVC_Core_MixSoft_1St_2i_D16C31_WRA( LVMixer3_FLOAT_st        *ptrInstance1,
-                                         LVMixer3_FLOAT_st        *ptrInstance2,
-                                         const LVM_FLOAT    *src,
-                                         LVM_FLOAT          *dst,
-                                         LVM_INT16          n);
+void LVC_Core_MixSoft_1St_MC_float_WRA(Mix_Private_FLOAT_st** ptrInstance, const LVM_FLOAT* src,
+                                       LVM_FLOAT* dst, LVM_INT16 NrFrames, LVM_INT16 NrChannels);
+void LVC_Core_MixSoft_1St_2i_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance1,
+                                        LVMixer3_FLOAT_st* ptrInstance2, const LVM_FLOAT* src,
+                                        LVM_FLOAT* dst, LVM_INT16 n);
 
 /**********************************************************************************/
 /* For applying different gains to Left and right chennals                        */
@@ -94,19 +75,13 @@ void LVC_Core_MixSoft_1St_2i_D16C31_WRA( LVMixer3_FLOAT_st        *ptrInstance1,
 /* ptrInstance2 applies to Right channel                                          */
 /* Gain values should not be more that 1.0                                        */
 /**********************************************************************************/
-void LVC_Core_MixHard_1St_MC_float_SAT(Mix_Private_FLOAT_st **ptrInstance,
-                                         const LVM_FLOAT      *src,
-                                         LVM_FLOAT            *dst,
-                                         LVM_INT16            NrFrames,
-                                         LVM_INT16            NrChannels);
-void LVC_Core_MixHard_1St_2i_D16C31_SAT( LVMixer3_FLOAT_st        *ptrInstance1,
-                                         LVMixer3_FLOAT_st        *ptrInstance2,
-                                         const LVM_FLOAT    *src,
-                                         LVM_FLOAT          *dst,
-                                         LVM_INT16          n);
+void LVC_Core_MixHard_1St_MC_float_SAT(Mix_Private_FLOAT_st** ptrInstance, const LVM_FLOAT* src,
+                                       LVM_FLOAT* dst, LVM_INT16 NrFrames, LVM_INT16 NrChannels);
+void LVC_Core_MixHard_1St_2i_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance1,
+                                        LVMixer3_FLOAT_st* ptrInstance2, const LVM_FLOAT* src,
+                                        LVM_FLOAT* dst, LVM_INT16 n);
 
 /*** 32 bit functions *************************************************************/
 /**********************************************************************************/
 
-#endif //#ifndef __LVC_MIXER_PRIVATE_H__
-
+#endif  //#ifndef __LVC_MIXER_PRIVATE_H__
