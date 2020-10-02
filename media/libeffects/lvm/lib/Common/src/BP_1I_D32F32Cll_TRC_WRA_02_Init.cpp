@@ -37,12 +37,11 @@
 /* RETURNS:                                                                */
 /*   void return code                                                      */
 /*-------------------------------------------------------------------------*/
-void BP_1I_D32F32Cll_TRC_WRA_02_Init (   Biquad_FLOAT_Instance_t         *pInstance,
-                                         Biquad_1I_Order2_FLOAT_Taps_t   *pTaps,
-                                         BP_FLOAT_Coefs_t            *pCoef)
-{
-    PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT) pInstance;
-    pBiquadState->pDelays       =(LVM_FLOAT *) pTaps;
+void BP_1I_D32F32Cll_TRC_WRA_02_Init(Biquad_FLOAT_Instance_t* pInstance,
+                                     Biquad_1I_Order2_FLOAT_Taps_t* pTaps,
+                                     BP_FLOAT_Coefs_t* pCoef) {
+    PFilter_State_FLOAT pBiquadState = (PFilter_State_FLOAT)pInstance;
+    pBiquadState->pDelays = (LVM_FLOAT*)pTaps;
 
     pBiquadState->coefs[0] = pCoef->A0;
 
@@ -52,4 +51,3 @@ void BP_1I_D32F32Cll_TRC_WRA_02_Init (   Biquad_FLOAT_Instance_t         *pInsta
 }
 /*-------------------------------------------------------------------------*/
 /* End Of File: BP_1I_D32F32Cll_TRC_WRA_02_Init.c                              */
-

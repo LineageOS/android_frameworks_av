@@ -40,33 +40,25 @@
 /* RETURNS:                                                                */
 /*   The result of the polynomial expansion in Q1.31 format                */
 /*-------------------------------------------------------------------------*/
-LVM_FLOAT LVM_Polynomial(LVM_UINT16    N,
-                         LVM_FLOAT    *pCoefficients,
-                         LVM_FLOAT    X)
-{
+LVM_FLOAT LVM_Polynomial(LVM_UINT16 N, LVM_FLOAT* pCoefficients, LVM_FLOAT X) {
     LVM_INT32 i;
-    LVM_FLOAT Y,A,XTemp,Temp,sign;
+    LVM_FLOAT Y, A, XTemp, Temp, sign;
 
     Y = *pCoefficients; /* Y=A0*/
     pCoefficients++;
 
-    if(X == -1.0f)
-    {
+    if (X == -1.0f) {
         Temp = -1;
         sign = Temp;
-        for(i = 1; i <= N; i++)
-        {
+        for (i = 1; i <= N; i++) {
             Y += ((*pCoefficients) * sign);
             pCoefficients++;
             sign *= Temp;
         }
 
-    }
-    else
-    {
+    } else {
         XTemp = X;
-        for(i = N-1; i >= 0; i--)
-        {
+        for (i = N - 1; i >= 0; i--) {
             A = *pCoefficients;
             pCoefficients++;
 

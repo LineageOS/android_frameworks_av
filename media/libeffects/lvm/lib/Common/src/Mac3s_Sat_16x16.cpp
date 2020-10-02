@@ -35,36 +35,26 @@
    FUNCTION Mac3S_16X16
 ***********************************************************************************/
 
-void Mac3s_Sat_16x16( const LVM_INT16 *src,
-                     const LVM_INT16 val,
-                     LVM_INT16 *dst,
-                     LVM_INT16 n)
-{
+void Mac3s_Sat_16x16(const LVM_INT16* src, const LVM_INT16 val, LVM_INT16* dst, LVM_INT16 n) {
     LVM_INT16 ii;
     LVM_INT16 srcval;
-    LVM_INT32 Temp,dInVal;
+    LVM_INT32 Temp, dInVal;
 
-    for (ii = n; ii != 0; ii--)
-    {
-        srcval=*src;
+    for (ii = n; ii != 0; ii--) {
+        srcval = *src;
         src++;
 
-        Temp = (srcval *val)>>15;
+        Temp = (srcval * val) >> 15;
 
-        dInVal  = (LVM_INT32)*dst;
+        dInVal = (LVM_INT32)*dst;
 
         Temp = Temp + dInVal;
 
-        if (Temp > 0x00007FFF)
-        {
+        if (Temp > 0x00007FFF) {
             *dst = 0x7FFF;
-        }
-        else if (Temp < -0x00008000)
-        {
-            *dst = - 0x8000;
-        }
-        else
-        {
+        } else if (Temp < -0x00008000) {
+            *dst = -0x8000;
+        } else {
             *dst = (LVM_INT16)Temp;
         }
 
@@ -75,4 +65,3 @@ void Mac3s_Sat_16x16( const LVM_INT16 *src,
 }
 
 /**********************************************************************************/
-
