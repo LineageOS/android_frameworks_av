@@ -33,20 +33,18 @@
 /************************************************************************************/
 
 /* Bypass mixer structure */
-typedef struct
-{
+typedef struct {
     /* Mixer settings */
-    LVMixer3_2St_FLOAT_st   Mixer_Instance;             /* Mixer instance */
-    LVM_UINT16              Output_Shift;               /* Correcting gain output shift */
+    LVMixer3_2St_FLOAT_st Mixer_Instance; /* Mixer instance */
+    LVM_UINT16 Output_Shift;              /* Correcting gain output shift */
 
 } LVCS_BypassMix_t;
 
-typedef struct
-{
+typedef struct {
     /* Output gain settings, Gain = (Loss/32768) * 2^Shift */
-    LVM_UINT16             Shift;                      /* Left shifts required */
-    LVM_FLOAT              Loss;                       /* Loss required */
-    LVM_FLOAT              UnprocLoss;                 /* Unprocessed path loss */
+    LVM_UINT16 Shift;     /* Left shifts required */
+    LVM_FLOAT Loss;       /* Loss required */
+    LVM_FLOAT UnprocLoss; /* Unprocessed path loss */
 } Gain_t;
 /************************************************************************************/
 /*                                                                                    */
@@ -54,13 +52,10 @@ typedef struct
 /*                                                                                    */
 /************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
-                                           LVCS_Params_t    *pParams);
+LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t hInstance, LVCS_Params_t* pParams);
 
-LVCS_ReturnStatus_en LVCS_BypassMixer(LVCS_Handle_t         hInstance,
-                                      const LVM_FLOAT       *pProcessed,
-                                      const LVM_FLOAT       *unProcessed,
-                                      LVM_FLOAT       *pOutData,
-                                      LVM_UINT16      NumSamples);
+LVCS_ReturnStatus_en LVCS_BypassMixer(LVCS_Handle_t hInstance, const LVM_FLOAT* pProcessed,
+                                      const LVM_FLOAT* unProcessed, LVM_FLOAT* pOutData,
+                                      LVM_UINT16 NumSamples);
 
-#endif  /* BYPASSMIX_H */
+#endif /* BYPASSMIX_H */

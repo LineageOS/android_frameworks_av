@@ -25,19 +25,14 @@
    FUNCTION INT16LSHIFTTOINT32_16X32
 ***********************************************************************************/
 
-void Int16LShiftToInt32_16x32(const LVM_INT16   *src,
-                              LVM_INT32         *dst,
-                              LVM_INT16         n,
-                              LVM_INT16         shift )
-{
+void Int16LShiftToInt32_16x32(const LVM_INT16* src, LVM_INT32* dst, LVM_INT16 n, LVM_INT16 shift) {
     LVM_INT16 ii;
 
-    src += n-1;
-    dst += n-1;
+    src += n - 1;
+    dst += n - 1;
 
-    for (ii = n; ii != 0; ii--)
-    {
-        *dst = ( ((LVM_INT32)*src) << shift);
+    for (ii = n; ii != 0; ii--) {
+        *dst = (((LVM_INT32)*src) << shift);
         src--;
         dst--;
     }

@@ -25,15 +25,10 @@
    FUNCTION  From2iToMS_16x16
 ***********************************************************************************/
 
-void From2iToMS_16x16( const LVM_INT16  *src,
-                             LVM_INT16  *dstM,
-                             LVM_INT16  *dstS,
-                             LVM_INT16  n )
-{
-    LVM_INT32 temp1,left,right;
+void From2iToMS_16x16(const LVM_INT16* src, LVM_INT16* dstM, LVM_INT16* dstS, LVM_INT16 n) {
+    LVM_INT32 temp1, left, right;
     LVM_INT16 ii;
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         left = (LVM_INT32)*src;
         src++;
 
@@ -41,27 +36,22 @@ void From2iToMS_16x16( const LVM_INT16  *src,
         src++;
 
         /* Compute M signal*/
-        temp1 =  (left+right)>>1;
+        temp1 = (left + right) >> 1;
         *dstM = (LVM_INT16)temp1;
         dstM++;
 
         /* Compute S signal*/
-        temp1 =  (left-right)>>1;
+        temp1 = (left - right) >> 1;
         *dstS = (LVM_INT16)temp1;
         dstS++;
     }
 
     return;
 }
-void From2iToMS_Float( const LVM_FLOAT  *src,
-                             LVM_FLOAT  *dstM,
-                             LVM_FLOAT  *dstS,
-                             LVM_INT16  n )
-{
-    LVM_FLOAT temp1,left,right;
+void From2iToMS_Float(const LVM_FLOAT* src, LVM_FLOAT* dstM, LVM_FLOAT* dstS, LVM_INT16 n) {
+    LVM_FLOAT temp1, left, right;
     LVM_INT16 ii;
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         left = (LVM_FLOAT)*src;
         src++;
 
@@ -69,12 +59,12 @@ void From2iToMS_Float( const LVM_FLOAT  *src,
         src++;
 
         /* Compute M signal*/
-        temp1 =  (left + right) / 2.0f;
+        temp1 = (left + right) / 2.0f;
         *dstM = (LVM_FLOAT)temp1;
         dstM++;
 
         /* Compute S signal*/
-        temp1 =  (left - right) / 2.0f;
+        temp1 = (left - right) / 2.0f;
         *dstS = (LVM_FLOAT)temp1;
         dstS++;
     }

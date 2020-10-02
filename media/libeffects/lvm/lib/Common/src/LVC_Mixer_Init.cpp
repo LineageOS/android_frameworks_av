@@ -44,14 +44,10 @@
 /*  void                                                                */
 /*                                                                      */
 /************************************************************************/
-void LVC_Mixer_Init( LVMixer3_FLOAT_st *pStream,
-                     LVM_FLOAT           TargetGain,
-                     LVM_FLOAT           CurrentGain)
-{
+void LVC_Mixer_Init(LVMixer3_FLOAT_st* pStream, LVM_FLOAT TargetGain, LVM_FLOAT CurrentGain) {
     LVM_FLOAT MaxGain = TargetGain;
-    Mix_Private_FLOAT_st *pInstance = (Mix_Private_FLOAT_st *)pStream->PrivateParams;
-    if(CurrentGain > MaxGain)
-        MaxGain = CurrentGain;
-    pInstance->Target = TargetGain;   // Update fractional gain Target
-    pInstance->Current = CurrentGain; // Update fractional gain Current
+    Mix_Private_FLOAT_st* pInstance = (Mix_Private_FLOAT_st*)pStream->PrivateParams;
+    if (CurrentGain > MaxGain) MaxGain = CurrentGain;
+    pInstance->Target = TargetGain;    // Update fractional gain Target
+    pInstance->Current = CurrentGain;  // Update fractional gain Current
 }

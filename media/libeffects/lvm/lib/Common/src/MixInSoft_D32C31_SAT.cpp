@@ -26,33 +26,29 @@
    DEFINITIONS
 ***********************************************************************************/
 
-#define TRUE          1
-#define FALSE         0
+#define TRUE 1
+#define FALSE 0
 
 /**********************************************************************************
    FUNCTION MIXINSOFT_D32C31_SAT
 ***********************************************************************************/
-void MixInSoft_D32C31_SAT( Mix_1St_Cll_FLOAT_t        *pInstance,
-                           const LVM_FLOAT      *src,
-                           LVM_FLOAT      *dst,
-                           LVM_INT16      n)
-{
+void MixInSoft_D32C31_SAT(Mix_1St_Cll_FLOAT_t* pInstance, const LVM_FLOAT* src, LVM_FLOAT* dst,
+                          LVM_INT16 n) {
     char HardMixing = TRUE;
 
-    if(n <= 0)    return;
+    if (n <= 0) return;
 
     /******************************************************************************
        SOFT MIXING
     *******************************************************************************/
-    if (pInstance->Current != pInstance->Target)
-    {
-        if(pInstance->Alpha == 0){
+    if (pInstance->Current != pInstance->Target) {
+        if (pInstance->Alpha == 0) {
             pInstance->Current = pInstance->Target;
-        }else if ((pInstance->Current-pInstance->Target < POINT_ZERO_ONE_DB_FLOAT) &&
-                 (pInstance->Current-pInstance->Target > -POINT_ZERO_ONE_DB_FLOAT)){
+        } else if ((pInstance->Current - pInstance->Target < POINT_ZERO_ONE_DB_FLOAT) &&
+                   (pInstance->Current - pInstance->Target > -POINT_ZERO_ONE_DB_FLOAT)) {
             pInstance->Current = pInstance->Target; /* Difference is not significant anymore. \
                                                        Make them equal. */
-        }else{
+        } else {
             /* Soft mixing has to be applied */
             HardMixing = FALSE;
             Core_MixInSoft_D32C31_SAT(pInstance, src, dst, n);
@@ -63,11 +59,11 @@ void MixInSoft_D32C31_SAT( Mix_1St_Cll_FLOAT_t        *pInstance,
        HARD MIXING
     *******************************************************************************/
 
-    if (HardMixing){
-        if (pInstance->Target != 0){ /* Nothing to do in case Target = 0 */
+    if (HardMixing) {
+        if (pInstance->Target != 0) { /* Nothing to do in case Target = 0 */
             if ((pInstance->Target) == 1.0f)
                 Add2_Sat_Float(src, dst, n);
-            else{
+            else {
                 Core_MixInSoft_D32C31_SAT(pInstance, src, dst, n);
                 pInstance->Current = pInstance->Target; /* In case the core function would \
                                                            have changed the Current value */
@@ -81,16 +77,15 @@ void MixInSoft_D32C31_SAT( Mix_1St_Cll_FLOAT_t        *pInstance,
     /* Call back before the hard mixing, because in this case, hard mixing makes
        use of the core soft mix function which can change the Current value!      */
 
-    if (pInstance->CallbackSet){
+    if (pInstance->CallbackSet) {
         if ((pInstance->Current - pInstance->Target < POINT_ZERO_ONE_DB_FLOAT) &&
-            (pInstance->Current - pInstance->Target > -POINT_ZERO_ONE_DB_FLOAT)){
+            (pInstance->Current - pInstance->Target > -POINT_ZERO_ONE_DB_FLOAT)) {
             pInstance->Current = pInstance->Target; /* Difference is not significant anymore. \
                                                        Make them equal. */
             pInstance->CallbackSet = FALSE;
-            if (pInstance->pCallBack != 0){
-                (*pInstance->pCallBack) ( pInstance->pCallbackHandle,
-                                          pInstance->pGeneralPurpose,
-                                          pInstance->CallbackParam );
+            if (pInstance->pCallBack != 0) {
+                (*pInstance->pCallBack)(pInstance->pCallbackHandle, pInstance->pGeneralPurpose,
+                                        pInstance->CallbackParam);
             }
         }
     }
