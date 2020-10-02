@@ -22,11 +22,10 @@
 /*######################################################################################*/
 /*  Type declarations                                                                   */
 /*######################################################################################*/
-typedef struct
-{
-    LVM_UINT32              TotalSize;      /*  Accumulative total memory size                      */
-    uintptr_t               pNextMember;    /*  Pointer to the next instance member to be allocated */
-}   INST_ALLOC;
+typedef struct {
+    LVM_UINT32 TotalSize;  /*  Accumulative total memory size                      */
+    uintptr_t pNextMember; /*  Pointer to the next instance member to be allocated */
+} INST_ALLOC;
 
 /*######################################################################################*/
 /*  Function prototypes                                                          */
@@ -41,7 +40,7 @@ typedef struct
  *  Remarks     :
  ****************************************************************************************/
 
-void   InstAlloc_Init( INST_ALLOC *pms, void *StartAddr );
+void InstAlloc_Init(INST_ALLOC* pms, void* StartAddr);
 
 /****************************************************************************************
  *  Name        : InstAlloc_AddMember()
@@ -54,7 +53,7 @@ void   InstAlloc_Init( INST_ALLOC *pms, void *StartAddr );
  *  Remarks     :
  ****************************************************************************************/
 
-void* InstAlloc_AddMember( INST_ALLOC *pms, LVM_UINT32 Size );
+void* InstAlloc_AddMember(INST_ALLOC* pms, LVM_UINT32 Size);
 
 /****************************************************************************************
  *  Name        : InstAlloc_GetTotal()
@@ -64,19 +63,14 @@ void* InstAlloc_AddMember( INST_ALLOC *pms, LVM_UINT32 Size );
  *  Remarks     :
  ****************************************************************************************/
 
-LVM_UINT32 InstAlloc_GetTotal( INST_ALLOC *pms);
+LVM_UINT32 InstAlloc_GetTotal(INST_ALLOC* pms);
 
-void*   InstAlloc_AddMemberAllRet(     INST_ALLOC                 *pms,
-                                     LVM_UINT32               Size[],
-                                     void                    **ptr);
+void* InstAlloc_AddMemberAllRet(INST_ALLOC* pms, LVM_UINT32 Size[], void** ptr);
 
-void*   InstAlloc_AddMemberAll( INST_ALLOC                     *pms,
-                                 LVM_UINT32                   Size[],
-                                 LVM_MemoryTable_st           *pMemoryTable);
+void* InstAlloc_AddMemberAll(INST_ALLOC* pms, LVM_UINT32 Size[], LVM_MemoryTable_st* pMemoryTable);
 
-void    InstAlloc_InitAll( INST_ALLOC                      *pms,
-                           LVM_MemoryTable_st             *pMemoryTable);
+void InstAlloc_InitAll(INST_ALLOC* pms, LVM_MemoryTable_st* pMemoryTable);
 
-void    InstAlloc_InitAll_NULL( INST_ALLOC              *pms);
+void InstAlloc_InitAll_NULL(INST_ALLOC* pms);
 
 #endif /* __JBS_INSTALLOC_H__ */

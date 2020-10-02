@@ -31,16 +31,15 @@
 /*    Types                                                                       */
 /*                                                                                */
 /**********************************************************************************/
-typedef struct
-{
-    LVM_FLOAT  AGC_Gain;                        /* The current AGC gain */
-    LVM_FLOAT  AGC_MaxGain;                     /* The maximum AGC gain */
-    LVM_FLOAT  Volume;                          /* The current volume setting */
-    LVM_FLOAT  Target;                          /* The target volume setting */
-    LVM_FLOAT  AGC_Target;                      /* AGC target level */
-    LVM_FLOAT  AGC_Attack;                      /* AGC attack scaler */
-    LVM_FLOAT  AGC_Decay;                       /* AGC decay scaler */
-    LVM_FLOAT  VolumeTC;                        /* Volume update time constant */
+typedef struct {
+    LVM_FLOAT AGC_Gain;    /* The current AGC gain */
+    LVM_FLOAT AGC_MaxGain; /* The maximum AGC gain */
+    LVM_FLOAT Volume;      /* The current volume setting */
+    LVM_FLOAT Target;      /* The target volume setting */
+    LVM_FLOAT AGC_Target;  /* AGC target level */
+    LVM_FLOAT AGC_Attack;  /* AGC attack scaler */
+    LVM_FLOAT AGC_Decay;   /* AGC decay scaler */
+    LVM_FLOAT VolumeTC;    /* Volume update time constant */
 
 } AGC_MIX_VOL_2St1Mon_FLOAT_t;
 
@@ -49,17 +48,16 @@ typedef struct
 /*    Function Prototypes                                                              */
 /*                                                                                */
 /**********************************************************************************/
-void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,     /* Instance pointer */
-                                 const LVM_FLOAT            *pStSrc,        /* Stereo source */
-                                 const LVM_FLOAT            *pMonoSrc,      /* Mono source */
-                                 LVM_FLOAT                  *pDst,          /* Stereo destination */
-                                 LVM_UINT16                 n);             /* Number of samples */
-void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t  *pInstance,  /* Instance pointer */
-                                 const LVM_FLOAT            *pStSrc,      /* Source */
-                                 const LVM_FLOAT            *pMonoSrc,    /* Mono source */
-                                 LVM_FLOAT                  *pDst,        /* Destination */
-                                 LVM_UINT16                 NrFrames,     /* Number of frames */
-                                 LVM_UINT16                 NrChannels);  /* Number of channels */
+void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t* pInstance, /* Instance pointer */
+                                 const LVM_FLOAT* pStSrc,                /* Stereo source */
+                                 const LVM_FLOAT* pMonoSrc,              /* Mono source */
+                                 LVM_FLOAT* pDst,                        /* Stereo destination */
+                                 LVM_UINT16 n);                          /* Number of samples */
+void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t* pInstance,  /* Instance pointer */
+                                const LVM_FLOAT* pStSrc,                 /* Source */
+                                const LVM_FLOAT* pMonoSrc,               /* Mono source */
+                                LVM_FLOAT* pDst,                         /* Destination */
+                                LVM_UINT16 NrFrames,                     /* Number of frames */
+                                LVM_UINT16 NrChannels);                  /* Number of channels */
 
-#endif  /* __AGC_H__ */
-
+#endif /* __AGC_H__ */

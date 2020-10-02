@@ -45,28 +45,23 @@
 /*  1.    This function must not be interrupted by the LVDBE_Process function           */
 /*                                                                                      */
 /****************************************************************************************/
-LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
-                                 LVDBE_Capabilities_t *pCapabilities,
-                                 void                 *pScratch)
-{
-
-    LVDBE_Instance_t      *pInstance;
-    LVMixer3_1St_FLOAT_st *pMixer_Instance;
-    LVMixer3_2St_FLOAT_st *pBypassMixer_Instance;
-    LVM_FLOAT             MixGain;
+LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_t* pCapabilities,
+                                 void* pScratch) {
+    LVDBE_Instance_t* pInstance;
+    LVMixer3_1St_FLOAT_st* pMixer_Instance;
+    LVMixer3_2St_FLOAT_st* pBypassMixer_Instance;
+    LVM_FLOAT MixGain;
 
     /*
      * Create the instance handle if not already initialised
      */
-    if (*phInstance == LVM_NULL)
-    {
+    if (*phInstance == LVM_NULL) {
         *phInstance = calloc(1, sizeof(*pInstance));
     }
-    if (*phInstance == LVM_NULL)
-    {
+    if (*phInstance == LVM_NULL) {
         return LVDBE_NULLADDRESS;
     }
-    pInstance =(LVDBE_Instance_t  *)*phInstance;
+    pInstance = (LVDBE_Instance_t*)*phInstance;
 
     /*
      * Save the memory table in the instance structure
@@ -78,42 +73,40 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
     /*
      * Set the default instance parameters
      */
-    pInstance->Params.CentreFrequency   =    LVDBE_CENTRE_55HZ;
-    pInstance->Params.EffectLevel       =    0;
-    pInstance->Params.HeadroomdB        =    0;
-    pInstance->Params.HPFSelect         =    LVDBE_HPF_OFF;
-    pInstance->Params.OperatingMode     =    LVDBE_OFF;
-    pInstance->Params.SampleRate        =    LVDBE_FS_8000;
-    pInstance->Params.VolumeControl     =    LVDBE_VOLUME_OFF;
-    pInstance->Params.VolumedB          =    0;
+    pInstance->Params.CentreFrequency = LVDBE_CENTRE_55HZ;
+    pInstance->Params.EffectLevel = 0;
+    pInstance->Params.HeadroomdB = 0;
+    pInstance->Params.HPFSelect = LVDBE_HPF_OFF;
+    pInstance->Params.OperatingMode = LVDBE_OFF;
+    pInstance->Params.SampleRate = LVDBE_FS_8000;
+    pInstance->Params.VolumeControl = LVDBE_VOLUME_OFF;
+    pInstance->Params.VolumedB = 0;
 
     /*
      * Create pointer to data and coef memory
      */
-    pInstance->pData = (LVDBE_Data_FLOAT_t *)calloc(1, sizeof(*(pInstance->pData)));
-    if (pInstance->pData == NULL)
-    {
+    pInstance->pData = (LVDBE_Data_FLOAT_t*)calloc(1, sizeof(*(pInstance->pData)));
+    if (pInstance->pData == NULL) {
         return LVDBE_NULLADDRESS;
     }
-    pInstance->pCoef = (LVDBE_Coef_FLOAT_t *)calloc(1, sizeof(*(pInstance->pCoef)));
-    if (pInstance->pCoef == NULL)
-    {
+    pInstance->pCoef = (LVDBE_Coef_FLOAT_t*)calloc(1, sizeof(*(pInstance->pCoef)));
+    if (pInstance->pCoef == NULL) {
         return LVDBE_NULLADDRESS;
     }
 
     /*
      * Initialise the filters
      */
-    LVDBE_SetFilters(pInstance,                 /* Set the filter taps and coefficients */
+    LVDBE_SetFilters(pInstance, /* Set the filter taps and coefficients */
                      &pInstance->Params);
 
     /*
      * Initialise the AGC
      */
-    LVDBE_SetAGC(pInstance,                                     /* Set the AGC gain */
+    LVDBE_SetAGC(pInstance, /* Set the AGC gain */
                  &pInstance->Params);
     pInstance->pData->AGCInstance.AGC_Gain = pInstance->pData->AGCInstance.AGC_MaxGain;
-                                                /* Default to the bass boost setting */
+    /* Default to the bass boost setting */
 
     // initialize the mixer with some fixes values since otherwise LVDBE_SetVolume ends up
     // reading uninitialized data
@@ -123,11 +116,11 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
     /*
      * Initialise the volume
      */
-    LVDBE_SetVolume(pInstance,                                         /* Set the Volume */
+    LVDBE_SetVolume(pInstance, /* Set the Volume */
                     &pInstance->Params);
 
     pInstance->pData->AGCInstance.Volume = pInstance->pData->AGCInstance.Target;
-                                                /* Initialise as the target */
+    /* Initialise as the target */
     MixGain = LVC_Mixer_GetTarget(&pMixer_Instance->MixerStream[0]);
     LVC_Mixer_Init(&pMixer_Instance->MixerStream[0], MixGain, MixGain);
 
@@ -149,11 +142,11 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
     pBypassMixer_Instance->MixerStream[0].CallbackParam = 0;
     pBypassMixer_Instance->MixerStream[0].pCallbackHandle = LVM_NULL;
     pBypassMixer_Instance->MixerStream[0].pCallBack = LVM_NULL;
-    pBypassMixer_Instance->MixerStream[0].CallbackSet=0;
+    pBypassMixer_Instance->MixerStream[0].CallbackSet = 0;
 
-    LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[0],0,0);
-    LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0],
-        LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate,2);
+    LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[0], 0, 0);
+    LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0], LVDBE_BYPASS_MIXER_TC,
+                              (LVM_Fs_en)pInstance->Params.SampleRate, 2);
 
     /*
      * Setup the mixer gain for the unprocessed path
@@ -161,12 +154,12 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
     pBypassMixer_Instance->MixerStream[1].CallbackParam = 0;
     pBypassMixer_Instance->MixerStream[1].pCallbackHandle = LVM_NULL;
     pBypassMixer_Instance->MixerStream[1].pCallBack = LVM_NULL;
-    pBypassMixer_Instance->MixerStream[1].CallbackSet=0;
+    pBypassMixer_Instance->MixerStream[1].CallbackSet = 0;
     LVC_Mixer_Init(&pBypassMixer_Instance->MixerStream[1], 1.0, 1.0);
-    LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1],
-        LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pInstance->Params.SampleRate, 2);
+    LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1], LVDBE_BYPASS_MIXER_TC,
+                              (LVM_Fs_en)pInstance->Params.SampleRate, 2);
 
-    return(LVDBE_SUCCESS);
+    return (LVDBE_SUCCESS);
 }
 
 /****************************************************************************************/
@@ -180,9 +173,8 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t       *phInstance,
 /*  phInstance               Pointer to instance handle                                 */
 /*                                                                                      */
 /****************************************************************************************/
-void LVDBE_DeInit(LVDBE_Handle_t *phInstance)
-{
-    LVDBE_Instance_t *pInstance = (LVDBE_Instance_t *)*phInstance;
+void LVDBE_DeInit(LVDBE_Handle_t* phInstance) {
+    LVDBE_Instance_t* pInstance = (LVDBE_Instance_t*)*phInstance;
     if (pInstance == LVM_NULL) {
         return;
     }

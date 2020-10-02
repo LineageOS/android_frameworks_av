@@ -67,31 +67,19 @@
 /* RETURNS:                                                                */
 /*                                                                         */
 /*-------------------------------------------------------------------------*/
-LVM_FLOAT LVM_FO_HPF(   LVM_FLOAT       w,
-                        FO_FLOAT_Coefs_t  *pCoeffs)
-{
-    LVM_FLOAT Y,Coefficients[13] = {-0.999996f,
-                                    0.999801f,
-                                    -0.497824f,
-                                    0.322937f,
-                                    -0.180880f,
-                                    0.087658f,
-                                    -0.032102f,
-                                    0.008163f,
-                                    -0.001252f,
-                                    0.000089f,
-                                    0,
-                                    0,
-                                    0};
-    Y=LVM_Polynomial((LVM_UINT16)9, Coefficients, w);
+LVM_FLOAT LVM_FO_HPF(LVM_FLOAT w, FO_FLOAT_Coefs_t* pCoeffs) {
+    LVM_FLOAT Y, Coefficients[13] = {-0.999996f, 0.999801f,  -0.497824f, 0.322937f,  -0.180880f,
+                                     0.087658f,  -0.032102f, 0.008163f,  -0.001252f, 0.000089f,
+                                     0,          0,          0};
+    Y = LVM_Polynomial((LVM_UINT16)9, Coefficients, w);
 
-    pCoeffs->B1 = -Y;         /* Store -B1 in filter structure instead of B1!*/
-                            /* A0=(1-B1)/2= B1/2 - 0.5*/
-    Y = Y / 2.0f;                 /* A0=Y=B1/2*/
-    Y = Y - 0.5f;         /* A0=Y=(B1/2 - 0.5)*/
+    pCoeffs->B1 = -Y; /* Store -B1 in filter structure instead of B1!*/
+                      /* A0=(1-B1)/2= B1/2 - 0.5*/
+    Y = Y / 2.0f;     /* A0=Y=B1/2*/
+    Y = Y - 0.5f;     /* A0=Y=(B1/2 - 0.5)*/
 
-    pCoeffs->A0 = Y * FILTER_LOSS_FLOAT;                  /* Apply loss to avoid overflow*/
-    pCoeffs->A1 = -pCoeffs->A0;                           /* Store A1=-A0*/
+    pCoeffs->A0 = Y * FILTER_LOSS_FLOAT; /* Apply loss to avoid overflow*/
+    pCoeffs->A1 = -pCoeffs->A0;          /* Store A1=-A0*/
 
     return 1;
 }

@@ -27,7 +27,7 @@
  * Sample rate table for converting between the enumerated type and the actual
  * frequency
  */
-extern const LVM_UINT32    LVPSA_SampleRateTab[];
+extern const LVM_UINT32 LVPSA_SampleRateTab[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -39,7 +39,7 @@ extern const LVM_UINT32    LVPSA_SampleRateTab[];
  * Sample rate table for converting between the enumerated type and the actual
  * frequency
  */
-extern const LVM_UINT32    LVPSA_SampleRateInvTab[];
+extern const LVM_UINT32 LVPSA_SampleRateInvTab[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -51,7 +51,7 @@ extern const LVM_UINT32    LVPSA_SampleRateInvTab[];
  * Table for converting between the enumerated type and the number of samples
  * during 20ms
  */
-extern const LVM_UINT16    LVPSA_nSamplesBufferUpdate[];
+extern const LVM_UINT16 LVPSA_nSamplesBufferUpdate[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -62,7 +62,7 @@ extern const LVM_UINT16    LVPSA_nSamplesBufferUpdate[];
 /*
  * Table for converting between the enumerated type and the down sampling factor
  */
-extern const LVM_UINT16    LVPSA_DownSamplingFactor[];
+extern const LVM_UINT16 LVPSA_DownSamplingFactor[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -73,14 +73,14 @@ extern const LVM_UINT16    LVPSA_DownSamplingFactor[];
 /*
  * Table for 2 * Pi / Fs
  */
-extern const LVM_INT16     LVPSA_TwoPiOnFsTable[];
-extern const LVM_FLOAT     LVPSA_Float_TwoPiOnFsTable[];
+extern const LVM_INT16 LVPSA_TwoPiOnFsTable[];
+extern const LVM_FLOAT LVPSA_Float_TwoPiOnFsTable[];
 
 /*
  * Gain table
  */
-extern const LVM_INT16     LVPSA_GainTable[];
-extern const LVM_FLOAT     LVPSA_Float_GainTable[];
+extern const LVM_INT16 LVPSA_GainTable[];
+extern const LVM_FLOAT LVPSA_Float_GainTable[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -97,8 +97,8 @@ extern const LVM_FLOAT     LVPSA_Float_GainTable[];
  * a range of 0 to Pi. The output is in the range 32767 to -32768 representing the range
  * +1.0 to -1.0
  */
-extern const LVM_INT16     LVPSA_CosCoef[];
-extern const LVM_FLOAT     LVPSA_Float_CosCoef[];
+extern const LVM_INT16 LVPSA_CosCoef[];
+extern const LVM_FLOAT LVPSA_Float_CosCoef[];
 
 /*
  * Coefficients for calculating the cosine error with the equation:
@@ -114,15 +114,15 @@ extern const LVM_FLOAT     LVPSA_Float_CosCoef[];
  *
  * Cos(x) = 1.0 - CosErr(x)
  */
-extern const LVM_INT16     LVPSA_DPCosCoef[];
-extern const LVM_FLOAT    LVPSA_Float_DPCosCoef[];
+extern const LVM_INT16 LVPSA_DPCosCoef[];
+extern const LVM_FLOAT LVPSA_Float_DPCosCoef[];
 
 /************************************************************************************/
 /*                                                                                  */
 /*  Quasi peak filter coefficients table                                            */
 /*                                                                                  */
 /************************************************************************************/
-extern const QPD_C32_Coefs     LVPSA_QPD_Coefs[];
-extern const QPD_FLOAT_Coefs     LVPSA_QPD_Float_Coefs[];
+extern const QPD_C32_Coefs LVPSA_QPD_Coefs[];
+extern const QPD_FLOAT_Coefs LVPSA_QPD_Float_Coefs[];
 
 #endif /* __LVPSA_TABLES_H__ */

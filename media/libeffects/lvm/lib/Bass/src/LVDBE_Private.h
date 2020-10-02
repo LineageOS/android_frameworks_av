@@ -33,7 +33,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#include "LVDBE.h"                                /* Calling or Application layer definitions */
+#include "LVDBE.h" /* Calling or Application layer definitions */
 #include "BIQUAD.h"
 #include "LVC_Mixer.h"
 #include "AGC.h"
@@ -45,10 +45,10 @@
 /****************************************************************************************/
 
 /* General */
-#define    LVDBE_INVALID            0xFFFF        /* Invalid init parameter */
+#define LVDBE_INVALID 0xFFFF /* Invalid init parameter */
 
-#define LVDBE_MIXER_TC                   5       /* Mixer time  */
-#define LVDBE_BYPASS_MIXER_TC            100     /* Bypass mixer time */
+#define LVDBE_MIXER_TC 5          /* Mixer time  */
+#define LVDBE_BYPASS_MIXER_TC 100 /* Bypass mixer time */
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -58,37 +58,34 @@
 
 /* Data structure */
 /* Data structure */
-typedef struct
-{
+typedef struct {
     /* AGC parameters */
-    AGC_MIX_VOL_2St1Mon_FLOAT_t   AGCInstance;        /* AGC instance parameters */
+    AGC_MIX_VOL_2St1Mon_FLOAT_t AGCInstance; /* AGC instance parameters */
 
     /* Process variables */
-    Biquad_2I_Order2_FLOAT_Taps_t     HPFTaps;            /* High pass filter taps */
-    Biquad_1I_Order2_FLOAT_Taps_t     BPFTaps;            /* Band pass filter taps */
-    LVMixer3_1St_FLOAT_st             BypassVolume;       /* Bypass volume scaler */
-    LVMixer3_2St_FLOAT_st             BypassMixer;        /* Bypass Mixer for Click Removal */
+    Biquad_2I_Order2_FLOAT_Taps_t HPFTaps; /* High pass filter taps */
+    Biquad_1I_Order2_FLOAT_Taps_t BPFTaps; /* Band pass filter taps */
+    LVMixer3_1St_FLOAT_st BypassVolume;    /* Bypass volume scaler */
+    LVMixer3_2St_FLOAT_st BypassMixer;     /* Bypass Mixer for Click Removal */
 
 } LVDBE_Data_FLOAT_t;
 
 /* Coefs structure */
-typedef struct
-{
+typedef struct {
     /* Process variables */
-    Biquad_FLOAT_Instance_t           HPFInstance;        /* High pass filter instance */
-    Biquad_FLOAT_Instance_t           BPFInstance;        /* Band pass filter instance */
+    Biquad_FLOAT_Instance_t HPFInstance; /* High pass filter instance */
+    Biquad_FLOAT_Instance_t BPFInstance; /* Band pass filter instance */
 } LVDBE_Coef_FLOAT_t;
 /* Instance structure */
-typedef struct
-{
+typedef struct {
     /* Public parameters */
-    LVDBE_Params_t                Params;             /* Instance parameters */
-    LVDBE_Capabilities_t        Capabilities;         /* Instance capabilities */
+    LVDBE_Params_t Params;             /* Instance parameters */
+    LVDBE_Capabilities_t Capabilities; /* Instance capabilities */
 
     /* Data and coefficient pointers */
-    LVDBE_Data_FLOAT_t                *pData;                /* Instance data */
-    LVDBE_Coef_FLOAT_t                *pCoef;                /* Instance coefficients */
-    void                        *pScratch;             /* scratch pointer */
+    LVDBE_Data_FLOAT_t* pData; /* Instance data */
+    LVDBE_Coef_FLOAT_t* pCoef; /* Instance coefficients */
+    void* pScratch;            /* scratch pointer */
 } LVDBE_Instance_t;
 
 /****************************************************************************************/
@@ -97,13 +94,10 @@ typedef struct
 /*                                                                                      */
 /****************************************************************************************/
 
-void    LVDBE_SetAGC(LVDBE_Instance_t       *pInstance,
-                     LVDBE_Params_t         *pParams);
+void LVDBE_SetAGC(LVDBE_Instance_t* pInstance, LVDBE_Params_t* pParams);
 
-void    LVDBE_SetVolume(LVDBE_Instance_t    *pInstance,
-                        LVDBE_Params_t      *pParams);
+void LVDBE_SetVolume(LVDBE_Instance_t* pInstance, LVDBE_Params_t* pParams);
 
-void    LVDBE_SetFilters(LVDBE_Instance_t   *pInstance,
-                         LVDBE_Params_t     *pParams);
+void LVDBE_SetFilters(LVDBE_Instance_t* pInstance, LVDBE_Params_t* pParams);
 
-#endif      /* __LVDBE_PRIVATE_H__ */
+#endif /* __LVDBE_PRIVATE_H__ */
