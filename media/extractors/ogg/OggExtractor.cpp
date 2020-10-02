@@ -1304,8 +1304,8 @@ void MyOggExtractor::setChannelMask(int channelCount) {
                 || audioChannelCount <= 0 || audioChannelCount > FCC_8) {
             ALOGE("Invalid haptic channel count found in metadata: %d", mHapticChannelCount);
         } else {
-            const audio_channel_mask_t channelMask = audio_channel_out_mask_from_count(
-                    audioChannelCount) | hapticChannelMask;
+            const audio_channel_mask_t channelMask = static_cast<audio_channel_mask_t>(
+                    audio_channel_out_mask_from_count(audioChannelCount) | hapticChannelMask);
             AMediaFormat_setInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_MASK, channelMask);
             AMediaFormat_setInt32(
                     mMeta, AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT, mHapticChannelCount);
