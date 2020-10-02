@@ -27,7 +27,7 @@
  * Sample rate table for converting between the enumerated type and the actual
  * frequency
  */
-extern const LVM_UINT32    LVEQNB_SampleRateTab[];
+extern const LVM_UINT32 LVEQNB_SampleRateTab[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -38,17 +38,17 @@ extern const LVM_UINT32    LVEQNB_SampleRateTab[];
 /*
  * Table for 2 * Pi / Fs
  */
-extern const LVM_FLOAT     LVEQNB_TwoPiOnFsTable[];
+extern const LVM_FLOAT LVEQNB_TwoPiOnFsTable[];
 
 /*
  * Gain table
  */
-extern const LVM_FLOAT     LVEQNB_GainTable[];
+extern const LVM_FLOAT LVEQNB_GainTable[];
 
 /*
  * D table for 100 / (Gain + 1)
  */
-extern const LVM_FLOAT     LVEQNB_DTable[];
+extern const LVM_FLOAT LVEQNB_DTable[];
 
 /************************************************************************************/
 /*                                                                                  */
@@ -65,7 +65,7 @@ extern const LVM_FLOAT     LVEQNB_DTable[];
  * a range of 0 to Pi. The output is in the range 32767 to -32768 representing the range
  * +1.0 to -1.0
  */
-extern const LVM_INT16     LVEQNB_CosCoef[];
+extern const LVM_INT16 LVEQNB_CosCoef[];
 
 /*
  * Coefficients for calculating the cosine error with the equation:
@@ -81,6 +81,6 @@ extern const LVM_INT16     LVEQNB_CosCoef[];
  *
  * Cos(x) = 1.0 - CosErr(x)
  */
-extern const LVM_INT16     LVEQNB_DPCosCoef[];
+extern const LVM_INT16 LVEQNB_DPCosCoef[];
 
 #endif /* __LVEQNB_TABLES_H__ */

@@ -53,23 +53,10 @@
 /* RETURNS:                                                                */
 /*   The result of the 10x expansion in Q8.24 format                       */
 /*-------------------------------------------------------------------------*/
-LVM_FLOAT LVM_Power10(LVM_FLOAT     X)
-{
-    LVM_FLOAT Y,Coefficients[13]={0.999906f,
-                                  2.302475f,
-                                  2.652765f,
-                                  2.035494f,
-                                  1.165667f,
-                                  0.537676f,
-                                  0.213192f,
-                                  0.069603f,
-                                  0.016553f,
-                                  0.004373f,
-                                  0.001817f,
-                                  0.000367f,
-                                  0};
-    Y=LVM_Polynomial((LVM_UINT16)11,
-                     Coefficients,
-                     X);
+LVM_FLOAT LVM_Power10(LVM_FLOAT X) {
+    LVM_FLOAT Y, Coefficients[13] = {0.999906f, 2.302475f, 2.652765f, 2.035494f, 1.165667f,
+                                     0.537676f, 0.213192f, 0.069603f, 0.016553f, 0.004373f,
+                                     0.001817f, 0.000367f, 0};
+    Y = LVM_Polynomial((LVM_UINT16)11, Coefficients, X);
     return Y;
 }

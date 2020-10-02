@@ -132,7 +132,7 @@ cc_library_static {
         "liblog",
     ],
     header_libs: [
-        "libhardware_headers"
+        "libhardware_headers",
     ],
     cppflags: [
         "-fvisibility=hidden",

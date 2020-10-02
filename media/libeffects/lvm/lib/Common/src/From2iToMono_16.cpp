@@ -25,21 +25,17 @@
    FUNCTION From2iToMono_16
 ***********************************************************************************/
 
-void From2iToMono_16( const LVM_INT16 *src,
-                            LVM_INT16 *dst,
-                            LVM_INT16 n)
-{
+void From2iToMono_16(const LVM_INT16* src, LVM_INT16* dst, LVM_INT16 n) {
     LVM_INT16 ii;
     LVM_INT32 Temp;
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         Temp = (LVM_INT32)*src;
         src++;
 
         Temp += (LVM_INT32)*src;
         src++;
 
-        *dst  = (LVM_INT16)(Temp >>1);
+        *dst = (LVM_INT16)(Temp >> 1);
         dst++;
     }
 

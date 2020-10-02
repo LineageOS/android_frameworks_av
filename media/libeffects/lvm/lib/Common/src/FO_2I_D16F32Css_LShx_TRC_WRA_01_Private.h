@@ -20,11 +20,10 @@
 
 /* The internal state variables are implemented in a (for the user)  hidden structure */
 /* In this (private) file, the internal structure is declared fro private use.        */
-typedef struct _Filter_State_
-{
-    LVM_FLOAT     *pDelays;       /* pointer to the delayed samples (data of 32 bits)   */
-    LVM_FLOAT     coefs[3];       /* pointer to the filter coefficients */
-}Filter_Float_State;
+typedef struct _Filter_State_ {
+    LVM_FLOAT* pDelays; /* pointer to the delayed samples (data of 32 bits)   */
+    LVM_FLOAT coefs[3]; /* pointer to the filter coefficients */
+} Filter_Float_State;
 
-typedef Filter_Float_State * PFilter_Float_State ;
+typedef Filter_Float_State* PFilter_Float_State;
 #endif /* _FO_2I_D16F32CSS_LSHX_TRC_WRA_01_PRIVATE_H_ */

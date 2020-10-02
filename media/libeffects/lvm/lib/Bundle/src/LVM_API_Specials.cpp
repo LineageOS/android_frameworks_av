@@ -47,69 +47,52 @@
 /*  1. This function may be interrupted by the LVM_Process function                     */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_GetSpectrum(
-                                    LVM_Handle_t            hInstance,
-                                    LVM_UINT8               *pCurrentPeaks,
-                                    LVM_UINT8               *pPastPeaks,
-                                    LVM_INT32               AudioTime
-                                    )
-{
-    LVM_Instance_t           *pInstance   = (LVM_Instance_t  *)hInstance;
+LVM_ReturnStatus_en LVM_GetSpectrum(LVM_Handle_t hInstance, LVM_UINT8* pCurrentPeaks,
+                                    LVM_UINT8* pPastPeaks, LVM_INT32 AudioTime) {
+    LVM_Instance_t* pInstance = (LVM_Instance_t*)hInstance;
 
-    pLVPSA_Handle_t        *hPSAInstance;
-    LVPSA_RETURN           LVPSA_Status;
+    pLVPSA_Handle_t* hPSAInstance;
+    LVPSA_RETURN LVPSA_Status;
 
-    if(pInstance == LVM_NULL)
-    {
+    if (pInstance == LVM_NULL) {
         return LVM_NULLADDRESS;
     }
 
     /*If PSA is not included at the time of instance creation, return without any processing*/
-    if(pInstance->InstParams.PSA_Included!=LVM_PSA_ON)
-    {
+    if (pInstance->InstParams.PSA_Included != LVM_PSA_ON) {
         return LVM_SUCCESS;
     }
 
-    hPSAInstance = (pLVPSA_Handle_t *)pInstance->hPSAInstance;
+    hPSAInstance = (pLVPSA_Handle_t*)pInstance->hPSAInstance;
 
-    if((pCurrentPeaks == LVM_NULL) ||
-        (pPastPeaks == LVM_NULL))
-    {
+    if ((pCurrentPeaks == LVM_NULL) || (pPastPeaks == LVM_NULL)) {
         return LVM_NULLADDRESS;
     }
 
     /*
      * Update new parameters if necessary
      */
-    if (pInstance->ControlPending == LVM_TRUE)
-    {
+    if (pInstance->ControlPending == LVM_TRUE) {
         LVM_ApplyNewSettings(hInstance);
     }
 
     /* If PSA module is disabled, do nothing */
-    if(pInstance->Params.PSA_Enable==LVM_PSA_OFF)
-    {
+    if (pInstance->Params.PSA_Enable == LVM_PSA_OFF) {
         return LVM_ALGORITHMDISABLED;
     }
 
-    LVPSA_Status = LVPSA_GetSpectrum(hPSAInstance,
-                            (LVPSA_Time) (AudioTime),
-                            (LVM_UINT8*) pCurrentPeaks,
-                            (LVM_UINT8*) pPastPeaks );
+    LVPSA_Status = LVPSA_GetSpectrum(hPSAInstance, (LVPSA_Time)(AudioTime),
+                                     (LVM_UINT8*)pCurrentPeaks, (LVM_UINT8*)pPastPeaks);
 
-    if(LVPSA_Status != LVPSA_OK)
-    {
-        if(LVPSA_Status == LVPSA_ERROR_WRONGTIME)
-        {
-            return (LVM_ReturnStatus_en) LVM_WRONGAUDIOTIME;
-        }
-        else
-        {
-            return (LVM_ReturnStatus_en) LVM_NULLADDRESS;
+    if (LVPSA_Status != LVPSA_OK) {
+        if (LVPSA_Status == LVPSA_ERROR_WRONGTIME) {
+            return (LVM_ReturnStatus_en)LVM_WRONGAUDIOTIME;
+        } else {
+            return (LVM_ReturnStatus_en)LVM_NULLADDRESS;
         }
     }
 
-    return(LVM_SUCCESS);
+    return (LVM_SUCCESS);
 }
 
 /****************************************************************************************/
@@ -132,15 +115,12 @@ LVM_ReturnStatus_en LVM_GetSpectrum(
 /*  1. This function may be interrupted by the LVM_Process function                     */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_ReturnStatus_en LVM_SetVolumeNoSmoothing( LVM_Handle_t           hInstance,
-                                              LVM_ControlParams_t    *pParams)
-{
-    LVM_Instance_t      *pInstance =(LVM_Instance_t  *)hInstance;
+LVM_ReturnStatus_en LVM_SetVolumeNoSmoothing(LVM_Handle_t hInstance, LVM_ControlParams_t* pParams) {
+    LVM_Instance_t* pInstance = (LVM_Instance_t*)hInstance;
     LVM_ReturnStatus_en Error;
 
     /*Apply new controls*/
-    Error = LVM_SetControlParameters(hInstance,pParams);
+    Error = LVM_SetControlParameters(hInstance, pParams);
     pInstance->NoSmoothVolume = LVM_TRUE;
     return Error;
 }
-

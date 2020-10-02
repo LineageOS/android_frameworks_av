@@ -26,33 +26,25 @@
    FUNCTION MAC3S_16X16
 ***********************************************************************************/
 
-void Mac3s_Sat_32x16(  const LVM_INT32 *src,
-                     const LVM_INT16 val,
-                     LVM_INT32 *dst,
-                     LVM_INT16 n)
-{
+void Mac3s_Sat_32x16(const LVM_INT32* src, const LVM_INT16 val, LVM_INT32* dst, LVM_INT16 n) {
     LVM_INT16 ii;
-    LVM_INT32 srcval,temp, dInVal, dOutVal;
+    LVM_INT32 srcval, temp, dInVal, dOutVal;
 
-    for (ii = n; ii != 0; ii--)
-    {
-        srcval=*src;
+    for (ii = n; ii != 0; ii--) {
+        srcval = *src;
         src++;
 
-        MUL32x16INTO32(srcval,val,temp,15)
+        MUL32x16INTO32(srcval, val, temp, 15)
 
-            dInVal  = *dst;
+                dInVal = *dst;
         dOutVal = temp + dInVal;
 
-        if ((((dOutVal ^ temp) & (dOutVal ^ dInVal)) >> 31)!=0)     /* overflow / underflow */
+        if ((((dOutVal ^ temp) & (dOutVal ^ dInVal)) >> 31) != 0) /* overflow / underflow */
         {
-            if(temp<0)
-            {
-                dOutVal=0x80000000L;
-            }
-            else
-            {
-                dOutVal=0x7FFFFFFFL;
+            if (temp < 0) {
+                dOutVal = 0x80000000L;
+            } else {
+                dOutVal = 0x7FFFFFFFL;
             }
         }
 
@@ -62,35 +54,25 @@ void Mac3s_Sat_32x16(  const LVM_INT32 *src,
 
     return;
 }
-void Mac3s_Sat_Float(const LVM_FLOAT *src,
-                     const LVM_FLOAT val,
-                     LVM_FLOAT *dst,
-                     LVM_INT16 n)
-{
+void Mac3s_Sat_Float(const LVM_FLOAT* src, const LVM_FLOAT val, LVM_FLOAT* dst, LVM_INT16 n) {
     LVM_INT16 ii;
     LVM_FLOAT srcval;
-    LVM_FLOAT Temp,dInVal;
+    LVM_FLOAT Temp, dInVal;
 
-    for (ii = n; ii != 0; ii--)
-    {
+    for (ii = n; ii != 0; ii--) {
         srcval = *src;
         src++;
 
         Temp = srcval * val;
 
-        dInVal  = (LVM_FLOAT)*dst;
+        dInVal = (LVM_FLOAT)*dst;
         Temp = Temp + dInVal;
 
-        if (Temp > 1.000000f)
-        {
+        if (Temp > 1.000000f) {
             *dst = 1.000000f;
-        }
-        else if (Temp < -1.000000f)
-        {
+        } else if (Temp < -1.000000f) {
             *dst = -1.000000f;
-        }
-        else
-        {
+        } else {
             *dst = Temp;
         }
         dst++;
@@ -99,4 +81,3 @@ void Mac3s_Sat_Float(const LVM_FLOAT *src,
     return;
 }
 /**********************************************************************************/
-
