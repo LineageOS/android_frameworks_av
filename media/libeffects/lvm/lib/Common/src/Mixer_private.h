@@ -26,13 +26,13 @@
 
 #define POINT_ZERO_ONE_DB 2473805 /* 0.01 dB on a full scale signal = (10^(0.01/20) -1) * 2^31 */
 
-#define POINT_ZERO_ONE_DB_FLOAT 0.001152 /* 0.01 dB on a full scale \
-                                            signal = (10^(0.01/20) -1) * 2^31 */
+#define POINT_ZERO_ONE_DB_FLOAT         \
+    0.001152 /* 0.01 dB on a full scale \
+                signal = (10^(0.01/20) -1) * 2^31 */
 /**********************************************************************************
    DEFINITIONS
 ***********************************************************************************/
 
 /**********************************************************************************/
 
-#endif //#ifndef __MIXER_PRIVATE_H__
-
+#endif  //#ifndef __MIXER_PRIVATE_H__

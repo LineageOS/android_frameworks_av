@@ -32,9 +32,8 @@
 /*  Function Prototypes                                                                 */
 /*                                                                                      */
 /****************************************************************************************/
-LVM_INT32 LVCS_MixerCallback(   LVCS_Handle_t   hInstance,
-                                void            *pGeneralPurpose,
-                                LVM_INT16       CallbackParam);
+LVM_INT32 LVCS_MixerCallback(LVCS_Handle_t hInstance, void* pGeneralPurpose,
+                             LVM_INT16 CallbackParam);
 
 /************************************************************************************/
 /*                                                                                  */
@@ -65,29 +64,22 @@ LVM_INT32 LVCS_MixerCallback(   LVCS_Handle_t   hInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
-                                        LVCS_Params_t       *pParams)
-{
-
-    LVM_UINT16          Offset;
-    LVM_FLOAT           Gain;
-    LVM_FLOAT           Current;
-    LVCS_Instance_t     *pInstance = (LVCS_Instance_t  *)hInstance;
-    LVCS_BypassMix_t    *pConfig   = (LVCS_BypassMix_t *)&pInstance->BypassMix;
-    const Gain_t        *pOutputGainTable;
+LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t hInstance, LVCS_Params_t* pParams) {
+    LVM_UINT16 Offset;
+    LVM_FLOAT Gain;
+    LVM_FLOAT Current;
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
+    LVCS_BypassMix_t* pConfig = (LVCS_BypassMix_t*)&pInstance->BypassMix;
+    const Gain_t* pOutputGainTable;
 
     /*
      * Set the transition gain
      */
-    if ((pParams->OperatingMode == LVCS_ON) &&
-        (pInstance->bTimerDone == LVM_TRUE)
-        && (pInstance->MSTarget1 != 0x7FFF) /* this indicates an off->on transtion */
-        )
-    {
+    if ((pParams->OperatingMode == LVCS_ON) && (pInstance->bTimerDone == LVM_TRUE) &&
+        (pInstance->MSTarget1 != 0x7FFF) /* this indicates an off->on transition */
+    ) {
         pInstance->TransitionGain = ((LVM_FLOAT)pParams->EffectLevel / 32767);
-    }
-    else
-    {
+    } else {
         /* Select no effect level */
         pInstance->TransitionGain = 0;
     }
@@ -95,18 +87,19 @@ LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
     /*
      * Calculate the output gain table offset
      */
-    Offset = (LVM_UINT16)(pParams->SpeakerType + (pParams->SourceFormat*(1+LVCS_EX_HEADPHONES)));
+    Offset =
+            (LVM_UINT16)(pParams->SpeakerType + (pParams->SourceFormat * (1 + LVCS_EX_HEADPHONES)));
     pOutputGainTable = (Gain_t*)&LVCS_OutputGainTable[0];
 
     /*
      * Setup the mixer gain for the processed path
      */
-    Gain =  (LVM_FLOAT)(pOutputGainTable[Offset].Loss * pInstance->TransitionGain);
+    Gain = (LVM_FLOAT)(pOutputGainTable[Offset].Loss * pInstance->TransitionGain);
 
     pConfig->Mixer_Instance.MixerStream[0].CallbackParam = 0;
     pConfig->Mixer_Instance.MixerStream[0].pCallbackHandle = LVM_NULL;
     pConfig->Mixer_Instance.MixerStream[0].pCallBack = LVM_NULL;
-    pConfig->Mixer_Instance.MixerStream[0].CallbackSet=1;
+    pConfig->Mixer_Instance.MixerStream[0].CallbackSet = 1;
 
     Current = LVC_Mixer_GetCurrent(&pConfig->Mixer_Instance.MixerStream[0]);
     LVC_Mixer_Init(&pConfig->Mixer_Instance.MixerStream[0], (LVM_FLOAT)(Gain), Current);
@@ -116,8 +109,8 @@ LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
     /*
      * Setup the mixer gain for the unprocessed path
      */
-    Gain = (LVM_FLOAT)(pOutputGainTable[Offset].Loss * (1.0 - \
-                                    (LVM_FLOAT)pInstance->TransitionGain));
+    Gain = (LVM_FLOAT)(pOutputGainTable[Offset].Loss *
+                       (1.0 - (LVM_FLOAT)pInstance->TransitionGain));
     Gain = (LVM_FLOAT)pOutputGainTable[Offset].UnprocLoss * Gain;
     Current = LVC_Mixer_GetCurrent(&pConfig->Mixer_Instance.MixerStream[1]);
     LVC_Mixer_Init(&pConfig->Mixer_Instance.MixerStream[1], (LVM_FLOAT)(Gain), Current);
@@ -125,7 +118,7 @@ LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
                                        LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
     pConfig->Mixer_Instance.MixerStream[1].CallbackParam = 0;
     pConfig->Mixer_Instance.MixerStream[1].pCallbackHandle = hInstance;
-    pConfig->Mixer_Instance.MixerStream[1].CallbackSet=1;
+    pConfig->Mixer_Instance.MixerStream[1].CallbackSet = 1;
     pConfig->Mixer_Instance.MixerStream[1].pCallBack = LVCS_MixerCallback;
 
     /*
@@ -137,45 +130,42 @@ LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
      * Correct gain for the effect level
      */
     {
-        LVM_FLOAT           GainCorrect;
-        LVM_FLOAT           Gain1;
-        LVM_FLOAT           Gain2;
+        LVM_FLOAT GainCorrect;
+        LVM_FLOAT Gain1;
+        LVM_FLOAT Gain2;
 
         Gain1 = LVC_Mixer_GetTarget(&pConfig->Mixer_Instance.MixerStream[0]);
         Gain2 = LVC_Mixer_GetTarget(&pConfig->Mixer_Instance.MixerStream[1]);
         /*
          * Calculate the gain correction
          */
-        if (pInstance->Params.CompressorMode == LVM_MODE_ON)
-        {
-        GainCorrect = (LVM_FLOAT)(  pInstance->VolCorrect.GainMin
-                                    - (((LVM_FLOAT)pInstance->VolCorrect.GainMin * \
-                                                         ((LVM_FLOAT)pInstance->TransitionGain)))
-                                    + (((LVM_FLOAT)pInstance->VolCorrect.GainFull * \
-                                                        ((LVM_FLOAT)pInstance->TransitionGain))));
+        if (pInstance->Params.CompressorMode == LVM_MODE_ON) {
+            GainCorrect = (LVM_FLOAT)(pInstance->VolCorrect.GainMin -
+                                      (((LVM_FLOAT)pInstance->VolCorrect.GainMin *
+                                        ((LVM_FLOAT)pInstance->TransitionGain))) +
+                                      (((LVM_FLOAT)pInstance->VolCorrect.GainFull *
+                                        ((LVM_FLOAT)pInstance->TransitionGain))));
 
-        /*
-         * Apply the gain correction
-         */
-        Gain1 = (Gain1 * GainCorrect);
-        Gain2 = (Gain2 * GainCorrect);
-
+            /*
+             * Apply the gain correction
+             */
+            Gain1 = (Gain1 * GainCorrect);
+            Gain2 = (Gain2 * GainCorrect);
         }
 
         /*
          * Set the gain values
          */
         pConfig->Output_Shift = pConfig->Output_Shift;
-        LVC_Mixer_SetTarget(&pConfig->Mixer_Instance.MixerStream[0],Gain1);
+        LVC_Mixer_SetTarget(&pConfig->Mixer_Instance.MixerStream[0], Gain1);
         LVC_Mixer_VarSlope_SetTimeConstant(&pConfig->Mixer_Instance.MixerStream[0],
                                            LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
-        LVC_Mixer_SetTarget(&pConfig->Mixer_Instance.MixerStream[1],Gain2);
+        LVC_Mixer_SetTarget(&pConfig->Mixer_Instance.MixerStream[1], Gain2);
         LVC_Mixer_VarSlope_SetTimeConstant(&pConfig->Mixer_Instance.MixerStream[1],
                                            LVCS_BYPASS_MIXER_TC, pParams->SampleRate, 2);
     }
 
-    return(LVCS_SUCCESS);
-
+    return (LVCS_SUCCESS);
 }
 
 /************************************************************************************/
@@ -205,39 +195,29 @@ LVCS_ReturnStatus_en LVCS_BypassMixInit(LVCS_Handle_t       hInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-LVCS_ReturnStatus_en LVCS_BypassMixer(LVCS_Handle_t         hInstance,
-                                      const LVM_FLOAT       *pProcessed,
-                                      const LVM_FLOAT       *pUnprocessed,
-                                      LVM_FLOAT             *pOutData,
-                                      LVM_UINT16            NumSamples)
-{
-
-    LVCS_Instance_t     *pInstance      = (LVCS_Instance_t  *)hInstance;
-    LVCS_BypassMix_t    *pConfig        = (LVCS_BypassMix_t *)&pInstance->BypassMix;
+LVCS_ReturnStatus_en LVCS_BypassMixer(LVCS_Handle_t hInstance, const LVM_FLOAT* pProcessed,
+                                      const LVM_FLOAT* pUnprocessed, LVM_FLOAT* pOutData,
+                                      LVM_UINT16 NumSamples) {
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
+    LVCS_BypassMix_t* pConfig = (LVCS_BypassMix_t*)&pInstance->BypassMix;
 
     /*
      * Check if the bypass mixer is enabled
      */
-    if ((pInstance->Params.OperatingMode & LVCS_BYPASSMIXSWITCH) != 0)
-    {
+    if ((pInstance->Params.OperatingMode & LVCS_BYPASSMIXSWITCH) != 0) {
         /*
          * Apply the bypass mix
          */
-        LVC_MixSoft_2St_D16C31_SAT(&pConfig->Mixer_Instance,
-                                   pProcessed,
-                                   (LVM_FLOAT *) pUnprocessed,
-                                   pOutData,
-                                   (LVM_INT16)(2 * NumSamples));
+        LVC_MixSoft_2St_D16C31_SAT(&pConfig->Mixer_Instance, pProcessed, (LVM_FLOAT*)pUnprocessed,
+                                   pOutData, (LVM_INT16)(2 * NumSamples));
         /*
          * Apply output gain correction shift
          */
-        Shift_Sat_Float((LVM_INT16)pConfig->Output_Shift,
-                        (LVM_FLOAT*)pOutData,
-                        (LVM_FLOAT*)pOutData,
-                        (LVM_INT16)(2 * NumSamples));          /* Left and right*/
+        Shift_Sat_Float((LVM_INT16)pConfig->Output_Shift, (LVM_FLOAT*)pOutData,
+                        (LVM_FLOAT*)pOutData, (LVM_INT16)(2 * NumSamples)); /* Left and right*/
     }
 
-    return(LVCS_SUCCESS);
+    return (LVCS_SUCCESS);
 }
 
 /************************************************************************************/
@@ -245,22 +225,18 @@ LVCS_ReturnStatus_en LVCS_BypassMixer(LVCS_Handle_t         hInstance,
 /* FUNCTION:                LVCS_MixerCallback                                      */
 /*                                                                                  */
 /************************************************************************************/
-LVM_INT32 LVCS_MixerCallback(LVCS_Handle_t      hInstance,
-                            void                *pGeneralPurpose,
-                            LVM_INT16           CallbackParam)
-{
-    LVCS_Instance_t     *pInstance = (LVCS_Instance_t  *)hInstance;
+LVM_INT32 LVCS_MixerCallback(LVCS_Handle_t hInstance, void* pGeneralPurpose,
+                             LVM_INT16 CallbackParam) {
+    LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
 
-   (void)pGeneralPurpose;
+    (void)pGeneralPurpose;
 
     /*
      * Off transition has completed in Headphone mode
      */
-    if ((pInstance->OutputDevice == LVCS_HEADPHONE) &&
-        (pInstance->bInOperatingModeTransition)     &&
-        (pInstance->MSTarget0 == 0x0000)&&  /* this indicates an on->off transition */
-        (CallbackParam == 0))
-    {
+    if ((pInstance->OutputDevice == LVCS_HEADPHONE) && (pInstance->bInOperatingModeTransition) &&
+        (pInstance->MSTarget0 == 0x0000) && /* this indicates an on->off transition */
+        (CallbackParam == 0)) {
         /* Set operating mode to OFF */
         pInstance->Params.OperatingMode = LVCS_OFF;
 
@@ -268,21 +244,17 @@ LVM_INT32 LVCS_MixerCallback(LVCS_Handle_t      hInstance,
         pInstance->bInOperatingModeTransition = LVM_FALSE;
 
         /* Signal to the bundle */
-        if((*pInstance->Capabilities.CallBack) != LVM_NULL){
-            (*pInstance->Capabilities.CallBack)(pInstance->Capabilities.pBundleInstance,
-                                                LVM_NULL,
+        if ((*pInstance->Capabilities.CallBack) != LVM_NULL) {
+            (*pInstance->Capabilities.CallBack)(pInstance->Capabilities.pBundleInstance, LVM_NULL,
                                                 (ALGORITHM_CS_ID | LVCS_EVENT_ALGOFF));
         }
     }
 
-    if ((pInstance->OutputDevice == LVCS_HEADPHONE)  &&
-        (pInstance->MSTarget0 == 1) &&
-        (pInstance->bTimerDone == LVM_TRUE)){
-
+    if ((pInstance->OutputDevice == LVCS_HEADPHONE) && (pInstance->MSTarget0 == 1) &&
+        (pInstance->bTimerDone == LVM_TRUE)) {
         /* Exit transition state */
         pInstance->bInOperatingModeTransition = LVM_FALSE;
     }
 
     return 1;
 }
-

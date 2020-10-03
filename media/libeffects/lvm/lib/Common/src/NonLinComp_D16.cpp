@@ -61,22 +61,16 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-void NonLinComp_D16(LVM_INT16        Gain,
-                      LVM_INT16        *pDataIn,
-                    LVM_INT16        *pDataOut,
-                    LVM_INT32        BlockLength)
-{
-
-    LVM_INT16            Sample;                    /* Input samples */
-    LVM_INT32            SampleNo;                /* Sample index */
-    LVM_INT16            Temp;
+void NonLinComp_D16(LVM_INT16 Gain, LVM_INT16* pDataIn, LVM_INT16* pDataOut,
+                    LVM_INT32 BlockLength) {
+    LVM_INT16 Sample;   /* Input samples */
+    LVM_INT32 SampleNo; /* Sample index */
+    LVM_INT16 Temp;
 
     /*
      * Process a block of samples
      */
-    for(SampleNo = 0; SampleNo<BlockLength; SampleNo++)
-    {
-
+    for (SampleNo = 0; SampleNo < BlockLength; SampleNo++) {
         /*
          * Read the input
          */
@@ -88,15 +82,11 @@ void NonLinComp_D16(LVM_INT16        Gain,
          * harmonic distortion. The amount of compression is control by the
          * gain factor
          */
-        if ((LVM_INT32)Sample != -32768)
-        {
+        if ((LVM_INT32)Sample != -32768) {
             Temp = (LVM_INT16)((Sample * Sample) >> 15);
-            if(Sample >0)
-            {
+            if (Sample > 0) {
                 Sample = (LVM_INT16)(Sample + ((Gain * (Sample - Temp)) >> 15));
-            }
-            else
-            {
+            } else {
                 Sample = (LVM_INT16)(Sample + ((Gain * (Sample + Temp)) >> 15));
             }
         }
@@ -106,25 +96,18 @@ void NonLinComp_D16(LVM_INT16        Gain,
          */
         *pDataOut = Sample;
         pDataOut++;
-
     }
-
 }
-void NonLinComp_Float(LVM_FLOAT        Gain,
-                      LVM_FLOAT        *pDataIn,
-                      LVM_FLOAT        *pDataOut,
-                      LVM_INT32        BlockLength)
-{
-
-    LVM_FLOAT            Sample;                    /* Input samples */
-    LVM_INT32            SampleNo;                /* Sample index */
-    LVM_FLOAT            Temp;
+void NonLinComp_Float(LVM_FLOAT Gain, LVM_FLOAT* pDataIn, LVM_FLOAT* pDataOut,
+                      LVM_INT32 BlockLength) {
+    LVM_FLOAT Sample;   /* Input samples */
+    LVM_INT32 SampleNo; /* Sample index */
+    LVM_FLOAT Temp;
 
     /*
      * Process a block of samples
      */
-    for(SampleNo = 0; SampleNo < BlockLength; SampleNo++)
-    {
+    for (SampleNo = 0; SampleNo < BlockLength; SampleNo++) {
         /*
          * Read the input
          */
@@ -136,16 +119,12 @@ void NonLinComp_Float(LVM_FLOAT        Gain,
          * harmonic distortion. The amount of compression is control by the
          * gain factor
          */
-        if (Sample != -1.0f)
-        {
+        if (Sample != -1.0f) {
             Temp = ((Sample * Sample));
-            if(Sample > 0)
-            {
-                Sample = (Sample + ((Gain * (Sample - Temp)) ));
-            }
-            else
-            {
-                Sample = (Sample + ((Gain * (Sample + Temp)) ));
+            if (Sample > 0) {
+                Sample = (Sample + ((Gain * (Sample - Temp))));
+            } else {
+                Sample = (Sample + ((Gain * (Sample + Temp))));
             }
         }
 

@@ -25,24 +25,22 @@
    FUNCTION DelayMix_16x16
 ***********************************************************************************/
 
-void DelayWrite_32(const LVM_INT32  *src,               /* Source 1, to be delayed */
-                         LVM_INT32  *delay,             /* Delay buffer */
-                         LVM_UINT16 size,               /* Delay size */
-                         LVM_UINT16 *pOffset,           /* Delay offset */
-                         LVM_INT16  n)                  /* Number of samples */
+void DelayWrite_32(const LVM_INT32* src, /* Source 1, to be delayed */
+                   LVM_INT32* delay,     /* Delay buffer */
+                   LVM_UINT16 size,      /* Delay size */
+                   LVM_UINT16* pOffset,  /* Delay offset */
+                   LVM_INT16 n)          /* Number of samples */
 {
-    LVM_INT16   i;
-    LVM_INT16   Offset  = (LVM_INT16)*pOffset;
+    LVM_INT16 i;
+    LVM_INT16 Offset = (LVM_INT16)*pOffset;
 
-    for (i=0; i<n; i++)
-    {
+    for (i = 0; i < n; i++) {
         delay[Offset] = *src;
         Offset++;
         src++;
 
         /* Make the delay buffer a circular buffer */
-        if (Offset >= size)
-        {
+        if (Offset >= size) {
             Offset = 0;
         }
     }
@@ -54,4 +52,3 @@ void DelayWrite_32(const LVM_INT32  *src,               /* Source 1, to be delay
 }
 
 /**********************************************************************************/
-

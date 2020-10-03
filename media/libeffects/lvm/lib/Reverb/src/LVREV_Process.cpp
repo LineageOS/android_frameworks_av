@@ -45,43 +45,37 @@
 /*  1. The input and output buffers must be 32-bit aligned                              */
 /*                                                                                      */
 /****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t      hInstance,
-                                    const LVM_FLOAT     *pInData,
-                                    LVM_FLOAT           *pOutData,
-                                    const LVM_UINT16    NumSamples)
-{
-   LVREV_Instance_st     *pLVREV_Private = (LVREV_Instance_st *)hInstance;
-   LVM_FLOAT             *pInput  = (LVM_FLOAT *)pInData;
-   LVM_FLOAT             *pOutput = pOutData;
-   LVM_INT32             SamplesToProcess, RemainingSamples;
-   LVM_INT32             format = 1;
+LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                    LVM_FLOAT* pOutData, const LVM_UINT16 NumSamples) {
+    LVREV_Instance_st* pLVREV_Private = (LVREV_Instance_st*)hInstance;
+    LVM_FLOAT* pInput = (LVM_FLOAT*)pInData;
+    LVM_FLOAT* pOutput = pOutData;
+    LVM_INT32 SamplesToProcess, RemainingSamples;
+    LVM_INT32 format = 1;
 
     /*
      * Check for error conditions
      */
 
     /* Check for NULL pointers */
-    if((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL))
-    {
+    if ((hInstance == LVM_NULL) || (pInData == LVM_NULL) || (pOutData == LVM_NULL)) {
         return LVREV_NULLADDRESS;
     }
 
     /*
      * Apply the new controls settings if required
      */
-    if(pLVREV_Private->bControlPending == LVM_TRUE)
-    {
-        LVREV_ReturnStatus_en   errorCode;
+    if (pLVREV_Private->bControlPending == LVM_TRUE) {
+        LVREV_ReturnStatus_en errorCode;
 
         /*
          * Clear the pending flag and update the control settings
          */
         pLVREV_Private->bControlPending = LVM_FALSE;
 
-        errorCode = LVREV_ApplyNewSettings (pLVREV_Private);
+        errorCode = LVREV_ApplyNewSettings(pLVREV_Private);
 
-        if(errorCode != LVREV_SUCCESS)
-        {
+        if (errorCode != LVREV_SUCCESS) {
             return errorCode;
         }
     }
@@ -89,27 +83,23 @@ LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t      hInstance,
     /*
      * Trap the case where the number of samples is zero.
      */
-    if (NumSamples == 0)
-    {
+    if (NumSamples == 0) {
         return LVREV_SUCCESS;
     }
 
     /*
      * If OFF copy and reformat the data as necessary
      */
-    if (pLVREV_Private->CurrentParams.OperatingMode == LVM_MODE_OFF)
-    {
-        if(pInput != pOutput)
-        {
+    if (pLVREV_Private->CurrentParams.OperatingMode == LVM_MODE_OFF) {
+        if (pInput != pOutput) {
             /*
              * Copy the data to the output buffer, convert to stereo is required
              */
-            if(pLVREV_Private->CurrentParams.SourceFormat == LVM_MONO){
+            if (pLVREV_Private->CurrentParams.SourceFormat == LVM_MONO) {
                 MonoTo2I_Float(pInput, pOutput, NumSamples);
             } else {
-                Copy_Float(pInput,
-                           pOutput,
-                           (LVM_INT16)(NumSamples << 1)); // 32 bit data, stereo
+                Copy_Float(pInput, pOutput,
+                           (LVM_INT16)(NumSamples << 1));  // 32 bit data, stereo
             }
         }
 
@@ -118,31 +108,26 @@ LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t      hInstance,
 
     RemainingSamples = (LVM_INT32)NumSamples;
 
-    if (pLVREV_Private->CurrentParams.SourceFormat != LVM_MONO)
-    {
+    if (pLVREV_Private->CurrentParams.SourceFormat != LVM_MONO) {
         format = 2;
     }
 
-    while (RemainingSamples!=0)
-    {
+    while (RemainingSamples != 0) {
         /*
          * Process the data
          */
 
-        if(RemainingSamples >  pLVREV_Private->MaxBlkLen)
-        {
-            SamplesToProcess =  pLVREV_Private->MaxBlkLen;
+        if (RemainingSamples > pLVREV_Private->MaxBlkLen) {
+            SamplesToProcess = pLVREV_Private->MaxBlkLen;
             RemainingSamples = (LVM_INT16)(RemainingSamples - SamplesToProcess);
-        }
-        else
-        {
+        } else {
             SamplesToProcess = RemainingSamples;
             RemainingSamples = 0;
         }
 
         ReverbBlock(pInput, pOutput, pLVREV_Private, (LVM_UINT16)SamplesToProcess);
-        pInput  = (LVM_FLOAT *)(pInput + (SamplesToProcess * format));
-        pOutput = (LVM_FLOAT *)(pOutput + (SamplesToProcess * 2));      // Always stereo output
+        pInput = (LVM_FLOAT*)(pInput + (SamplesToProcess * format));
+        pOutput = (LVM_FLOAT*)(pOutput + (SamplesToProcess * 2));  // Always stereo output
     }
 
     return LVREV_SUCCESS;
@@ -170,16 +155,15 @@ LVREV_ReturnStatus_en LVREV_Process(LVREV_Handle_t      hInstance,
 /*  1. The input and output buffers must be 32-bit aligned                              */
 /*                                                                                      */
 /****************************************************************************************/
-void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
-                 LVREV_Instance_st *pPrivate, LVM_UINT16 NumSamples)
-{
-    LVM_INT16   j, size;
-    LVM_FLOAT   *pDelayLine;
-    LVM_FLOAT   *pDelayLineInput = pPrivate->pScratch;
-    LVM_FLOAT   *pScratch = pPrivate->pScratch;
-    LVM_FLOAT   *pIn;
-    LVM_FLOAT   *pTemp = pPrivate->pInputSave;
-    LVM_INT32   NumberOfDelayLines;
+void ReverbBlock(LVM_FLOAT* pInput, LVM_FLOAT* pOutput, LVREV_Instance_st* pPrivate,
+                 LVM_UINT16 NumSamples) {
+    LVM_INT16 j, size;
+    LVM_FLOAT* pDelayLine;
+    LVM_FLOAT* pDelayLineInput = pPrivate->pScratch;
+    LVM_FLOAT* pScratch = pPrivate->pScratch;
+    LVM_FLOAT* pIn;
+    LVM_FLOAT* pTemp = pPrivate->pInputSave;
+    LVM_INT32 NumberOfDelayLines;
 
     /******************************************************************************
      * All calculations will go into the buffer pointed to by pTemp, this will    *
@@ -196,85 +180,60 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
      * and the final output is converted to STEREO after the mixer                *
      ******************************************************************************/
 
-    if(pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_4)
-    {
+    if (pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_4) {
         NumberOfDelayLines = 4;
-    }
-    else if(pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_2)
-    {
+    } else if (pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_2) {
         NumberOfDelayLines = 2;
-    }
-    else
-    {
+    } else {
         NumberOfDelayLines = 1;
     }
 
-    if(pPrivate->CurrentParams.SourceFormat == LVM_MONO)
-    {
+    if (pPrivate->CurrentParams.SourceFormat == LVM_MONO) {
         pIn = pInput;
-    }
-    else
-    {
+    } else {
         /*
          *  Stereo to mono conversion
          */
 
-        From2iToMono_Float(pInput,
-                           pTemp,
-                           (LVM_INT16)NumSamples);
+        From2iToMono_Float(pInput, pTemp, (LVM_INT16)NumSamples);
         pIn = pTemp;
     }
 
-    Mult3s_Float(pIn,
-                 (LVM_FLOAT)LVREV_HEADROOM,
-                 pTemp,
-                 (LVM_INT16)NumSamples);
+    Mult3s_Float(pIn, (LVM_FLOAT)LVREV_HEADROOM, pTemp, (LVM_INT16)NumSamples);
 
     /*
      *  High pass filter
      */
-    FO_1I_D32F32C31_TRC_WRA_01(&pPrivate->pFastCoef->HPCoefs,
-                               pTemp,
-                               pTemp,
-                               (LVM_INT16)NumSamples);
+    FO_1I_D32F32C31_TRC_WRA_01(&pPrivate->pFastCoef->HPCoefs, pTemp, pTemp, (LVM_INT16)NumSamples);
     /*
      *  Low pass filter
      */
-    FO_1I_D32F32C31_TRC_WRA_01(&pPrivate->pFastCoef->LPCoefs,
-                               pTemp,
-                               pTemp,
-                               (LVM_INT16)NumSamples);
+    FO_1I_D32F32C31_TRC_WRA_01(&pPrivate->pFastCoef->LPCoefs, pTemp, pTemp, (LVM_INT16)NumSamples);
 
     /*
      *  Process all delay lines
      */
 
-    for(j = 0; j < NumberOfDelayLines; j++)
-    {
+    for (j = 0; j < NumberOfDelayLines; j++) {
         pDelayLine = pPrivate->pScratchDelayLine[j];
 
         /*
          * All-pass filter with pop and click suppression
          */
         /* Get the smoothed, delayed output. Put it in the output buffer */
-        MixSoft_2St_D32C31_SAT(&pPrivate->Mixer_APTaps[j],
-                               pPrivate->pOffsetA[j],
-                               pPrivate->pOffsetB[j],
-                               pDelayLine,
-                               (LVM_INT16)NumSamples);
+        MixSoft_2St_D32C31_SAT(&pPrivate->Mixer_APTaps[j], pPrivate->pOffsetA[j],
+                               pPrivate->pOffsetB[j], pDelayLine, (LVM_INT16)NumSamples);
         /* Re-align the all pass filter delay buffer and copying the fixed delay data \
            to the AP delay in the process */
-        Copy_Float(&pPrivate->pDelay_T[j][NumSamples],
-                   pPrivate->pDelay_T[j],
-                   (LVM_INT16)(pPrivate->T[j] - NumSamples));         /* 32-bit data */
+        Copy_Float(&pPrivate->pDelay_T[j][NumSamples], pPrivate->pDelay_T[j],
+                   (LVM_INT16)(pPrivate->T[j] - NumSamples)); /* 32-bit data */
         /* Apply the smoothed feedback and save to fixed delay input (currently empty) */
-        MixSoft_1St_D32C31_WRA(&pPrivate->Mixer_SGFeedback[j],
-                               pDelayLine,
+        MixSoft_1St_D32C31_WRA(&pPrivate->Mixer_SGFeedback[j], pDelayLine,
                                &pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples],
                                (LVM_INT16)NumSamples);
         /* Sum into the AP delay line */
         Mac3s_Sat_Float(&pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples],
-                        -1.0f,    /* Invert since the feedback coefficient is negative */
+                        -1.0f, /* Invert since the feedback coefficient is negative */
                         &pPrivate->pDelay_T[j][pPrivate->Delay_AP[j] - NumSamples],
                         (LVM_INT16)NumSamples);
         /* Apply smoothed feedforward sand save to fixed delay input (currently empty) */
@@ -283,9 +242,7 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
                                &pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples],
                                (LVM_INT16)NumSamples);
         /* Sum into the AP output */
-        Mac3s_Sat_Float(&pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples],
-                        1.0f,
-                        pDelayLine,
+        Mac3s_Sat_Float(&pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples], 1.0f, pDelayLine,
                         (LVM_INT16)NumSamples);
 
         /*
@@ -296,34 +253,27 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
         /*
          *  Low pass filter
          */
-        FO_1I_D32F32C31_TRC_WRA_01(&pPrivate->pFastCoef->RevLPCoefs[j],
-                                   pDelayLine,
-                                   pDelayLine,
+        FO_1I_D32F32C31_TRC_WRA_01(&pPrivate->pFastCoef->RevLPCoefs[j], pDelayLine, pDelayLine,
                                    (LVM_INT16)NumSamples);
     }
 
     /*
      *  Apply rotation matrix and delay samples
      */
-    for(j = 0; j < NumberOfDelayLines; j++)
-    {
-
-        Copy_Float(pTemp,
-                   pDelayLineInput,
-                   (LVM_INT16)(NumSamples));
+    for (j = 0; j < NumberOfDelayLines; j++) {
+        Copy_Float(pTemp, pDelayLineInput, (LVM_INT16)(NumSamples));
         /*
          *  Rotation matrix mix
          */
-        switch(j)
-        {
+        switch (j) {
             case 3:
                 /*
                  *  Add delay line 1 and 2 contribution
                  */
-                 Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f,
-                                 pDelayLineInput, (LVM_INT16)NumSamples);
-                 Mac3s_Sat_Float(pPrivate->pScratchDelayLine[2], -1.0f,
-                                 pDelayLineInput, (LVM_INT16)NumSamples);
+                Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f, pDelayLineInput,
+                                (LVM_INT16)NumSamples);
+                Mac3s_Sat_Float(pPrivate->pScratchDelayLine[2], -1.0f, pDelayLineInput,
+                                (LVM_INT16)NumSamples);
 
                 break;
             case 2:
@@ -331,61 +281,52 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
                 /*
                  *  Add delay line 0 and 3 contribution
                  */
-                 Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f,
-                                 pDelayLineInput, (LVM_INT16)NumSamples);
-                 Mac3s_Sat_Float(pPrivate->pScratchDelayLine[3], -1.0f,
-                                 pDelayLineInput, (LVM_INT16)NumSamples);
+                Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f, pDelayLineInput,
+                                (LVM_INT16)NumSamples);
+                Mac3s_Sat_Float(pPrivate->pScratchDelayLine[3], -1.0f, pDelayLineInput,
+                                (LVM_INT16)NumSamples);
 
                 break;
             case 1:
-                if(pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_4)
-                {
+                if (pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_4) {
                     /*
                      *  Add delay line 0 and 3 contribution
                      */
-                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f,
-                                    pDelayLineInput, (LVM_INT16)NumSamples);
+                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f, pDelayLineInput,
+                                    (LVM_INT16)NumSamples);
                     Add2_Sat_Float(pPrivate->pScratchDelayLine[3], pDelayLineInput,
                                    (LVM_INT16)NumSamples);
 
-                }
-                else
-                {
+                } else {
                     /*
                      *  Add delay line 0 and 1 contribution
                      */
-                     Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f,
-                                     pDelayLineInput, (LVM_INT16)NumSamples);
-                     Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f,
-                                     pDelayLineInput, (LVM_INT16)NumSamples);
-
+                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f, pDelayLineInput,
+                                    (LVM_INT16)NumSamples);
+                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f, pDelayLineInput,
+                                    (LVM_INT16)NumSamples);
                 }
                 break;
             case 0:
-                if(pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_4)
-                {
+                if (pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_4) {
                     /*
                      *  Add delay line 1 and 2 contribution
                      */
-                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f,
-                                    pDelayLineInput, (LVM_INT16)NumSamples);
+                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f, pDelayLineInput,
+                                    (LVM_INT16)NumSamples);
                     Add2_Sat_Float(pPrivate->pScratchDelayLine[2], pDelayLineInput,
                                    (LVM_INT16)NumSamples);
 
-                }
-                else if(pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_2)
-                {
+                } else if (pPrivate->InstanceParams.NumDelays == LVREV_DELAYLINES_2) {
                     /*
                      *  Add delay line 0 and 1 contribution
                      */
                     Add2_Sat_Float(pPrivate->pScratchDelayLine[0], pDelayLineInput,
                                    (LVM_INT16)NumSamples);
-                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f,
-                                    pDelayLineInput, (LVM_INT16)NumSamples);
+                    Mac3s_Sat_Float(pPrivate->pScratchDelayLine[1], -1.0f, pDelayLineInput,
+                                    (LVM_INT16)NumSamples);
 
-                }
-                else
-                {
+                } else {
                     /*
                      *  Add delay line 0 contribution
                      */
@@ -402,54 +343,37 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
         /*
          *  Delay samples
          */
-        Copy_Float(pDelayLineInput,
-                   &pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples],
-                   (LVM_INT16)(NumSamples));              /* 32-bit data */
+        Copy_Float(pDelayLineInput, &pPrivate->pDelay_T[j][pPrivate->T[j] - NumSamples],
+                   (LVM_INT16)(NumSamples)); /* 32-bit data */
     }
 
     /*
      *  Create stereo output
      */
-    switch(pPrivate->InstanceParams.NumDelays)
-    {
+    switch (pPrivate->InstanceParams.NumDelays) {
         case LVREV_DELAYLINES_4:
-             Add2_Sat_Float(pPrivate->pScratchDelayLine[3],
-                            pPrivate->pScratchDelayLine[0],
-                            (LVM_INT16)NumSamples);
-             Add2_Sat_Float(pPrivate->pScratchDelayLine[2],
-                            pPrivate->pScratchDelayLine[1],
-                            (LVM_INT16)NumSamples);
+            Add2_Sat_Float(pPrivate->pScratchDelayLine[3], pPrivate->pScratchDelayLine[0],
+                           (LVM_INT16)NumSamples);
+            Add2_Sat_Float(pPrivate->pScratchDelayLine[2], pPrivate->pScratchDelayLine[1],
+                           (LVM_INT16)NumSamples);
 
-            JoinTo2i_Float(pPrivate->pScratchDelayLine[0],
-                           pPrivate->pScratchDelayLine[1],
-                           pTemp,
+            JoinTo2i_Float(pPrivate->pScratchDelayLine[0], pPrivate->pScratchDelayLine[1], pTemp,
                            (LVM_INT16)NumSamples);
 
             break;
         case LVREV_DELAYLINES_2:
 
-             Copy_Float(pPrivate->pScratchDelayLine[1],
-                        pScratch,
-                        (LVM_INT16)(NumSamples));
+            Copy_Float(pPrivate->pScratchDelayLine[1], pScratch, (LVM_INT16)(NumSamples));
 
-             Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0],
-                            -1.0f,
-                            pScratch,
-                            (LVM_INT16)NumSamples);
+            Mac3s_Sat_Float(pPrivate->pScratchDelayLine[0], -1.0f, pScratch, (LVM_INT16)NumSamples);
 
-             Add2_Sat_Float(pPrivate->pScratchDelayLine[1],
-                            pPrivate->pScratchDelayLine[0],
-                            (LVM_INT16)NumSamples);
+            Add2_Sat_Float(pPrivate->pScratchDelayLine[1], pPrivate->pScratchDelayLine[0],
+                           (LVM_INT16)NumSamples);
 
-             JoinTo2i_Float(pPrivate->pScratchDelayLine[0],
-                            pScratch,
-                            pTemp,
-                            (LVM_INT16)NumSamples);
+            JoinTo2i_Float(pPrivate->pScratchDelayLine[0], pScratch, pTemp, (LVM_INT16)NumSamples);
             break;
         case LVREV_DELAYLINES_1:
-            MonoTo2I_Float(pPrivate->pScratchDelayLine[0],
-                           pTemp,
-                           (LVM_INT16)NumSamples);
+            MonoTo2I_Float(pPrivate->pScratchDelayLine[0], pTemp, (LVM_INT16)NumSamples);
             break;
         default:
             break;
@@ -460,25 +384,14 @@ void ReverbBlock(LVM_FLOAT *pInput, LVM_FLOAT *pOutput,
      */
 
     size = (LVM_INT16)(NumSamples << 1);
-    MixSoft_2St_D32C31_SAT(&pPrivate->BypassMixer,
-                           pTemp,
-                           pTemp,
-                           pOutput,
-                           size);
+    MixSoft_2St_D32C31_SAT(&pPrivate->BypassMixer, pTemp, pTemp, pOutput, size);
 
     /* Apply Gain*/
 
-    Shift_Sat_Float(LVREV_OUTPUTGAIN_SHIFT,
-                    pOutput,
-                    pOutput,
-                    size);
+    Shift_Sat_Float(LVREV_OUTPUTGAIN_SHIFT, pOutput, pOutput, size);
 
-    MixSoft_1St_D32C31_WRA(&pPrivate->GainMixer,
-                           pOutput,
-                           pOutput,
-                           size);
+    MixSoft_1St_D32C31_WRA(&pPrivate->GainMixer, pOutput, pOutput, size);
 
     return;
 }
 /* End of file */
-
