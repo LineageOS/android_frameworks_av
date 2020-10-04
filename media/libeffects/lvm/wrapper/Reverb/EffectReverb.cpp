@@ -18,7 +18,7 @@
 typedef float LVM_FLOAT;
 #endif
 #define LOG_TAG "Reverb"
-#define ARRAY_SIZE(array) (sizeof (array) / sizeof (array)[0])
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof(array)[0])
 //#define LOG_NDEBUG 0
 
 #include <assert.h>
@@ -37,19 +37,23 @@ typedef float LVM_FLOAT;
 // effect_handle_t interface implementation for reverb
 extern "C" const struct effect_interface_s gReverbInterface;
 
-#define LVM_ERROR_CHECK(LvmStatus, callingFunc, calledFunc){\
-        if ((LvmStatus) == LVREV_NULLADDRESS){\
-            ALOGV("\tLVREV_ERROR : Parameter error - "\
-                    "null pointer returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
-        }\
-        if ((LvmStatus) == LVREV_INVALIDNUMSAMPLES){\
-            ALOGV("\tLVREV_ERROR : Parameter error - "\
-                    "bad number of samples returned by %s in %s\n\n\n\n", callingFunc, calledFunc);\
-        }\
-        if ((LvmStatus) == LVREV_OUTOFRANGE){\
-            ALOGV("\tLVREV_ERROR : Parameter error - "\
-                    "out of range returned by %s in %s\n", callingFunc, calledFunc);\
-        }\
+#define LVM_ERROR_CHECK(LvmStatus, callingFunc, calledFunc)             \
+    {                                                                   \
+        if ((LvmStatus) == LVREV_NULLADDRESS) {                         \
+            ALOGV("\tLVREV_ERROR : Parameter error - "                  \
+                  "null pointer returned by %s in %s\n\n\n\n",          \
+                  callingFunc, calledFunc);                             \
+        }                                                               \
+        if ((LvmStatus) == LVREV_INVALIDNUMSAMPLES) {                   \
+            ALOGV("\tLVREV_ERROR : Parameter error - "                  \
+                  "bad number of samples returned by %s in %s\n\n\n\n", \
+                  callingFunc, calledFunc);                             \
+        }                                                               \
+        if ((LvmStatus) == LVREV_OUTOFRANGE) {                          \
+            ALOGV("\tLVREV_ERROR : Parameter error - "                  \
+                  "out of range returned by %s in %s\n",                \
+                  callingFunc, calledFunc);                             \
+        }                                                               \
     }
 
 // Namespaces
@@ -81,8 +85,8 @@ const static t_reverb_settings sReverbPresets[] = {
 
 // NXP SW auxiliary environmental reverb
 const effect_descriptor_t gAuxEnvReverbDescriptor = {
-        { 0xc2e5d5f0, 0x94bd, 0x4763, 0x9cac, { 0x4e, 0x23, 0x4d, 0x06, 0x83, 0x9e } },
-        { 0x4a387fc0, 0x8ab3, 0x11df, 0x8bad, { 0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b } },
+        {0xc2e5d5f0, 0x94bd, 0x4763, 0x9cac, {0x4e, 0x23, 0x4d, 0x06, 0x83, 0x9e}},
+        {0x4a387fc0, 0x8ab3, 0x11df, 0x8bad, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
         EFFECT_CONTROL_API_VERSION,
         EFFECT_FLAG_TYPE_AUXILIARY,
         LVREV_CUP_LOAD_ARM9E,
@@ -128,42 +132,39 @@ static const effect_descriptor_t gInsertPresetReverbDescriptor = {
 };
 
 // gDescriptors contains pointers to all defined effect descriptor in this library
-static const effect_descriptor_t * const gDescriptors[] = {
-        &gAuxEnvReverbDescriptor,
-        &gInsertEnvReverbDescriptor,
-        &gAuxPresetReverbDescriptor,
-        &gInsertPresetReverbDescriptor
-};
+static const effect_descriptor_t* const gDescriptors[] = {
+        &gAuxEnvReverbDescriptor, &gInsertEnvReverbDescriptor, &gAuxPresetReverbDescriptor,
+        &gInsertPresetReverbDescriptor};
 
-typedef     float               process_buffer_t; // process in float
+typedef float process_buffer_t;  // process in float
 
-struct ReverbContext{
-    const struct effect_interface_s *itfe;
-    effect_config_t                 config;
-    LVREV_Handle_t                  hInstance;
-    int16_t                         SavedRoomLevel;
-    int16_t                         SavedHfLevel;
-    int16_t                         SavedDecayTime;
-    int16_t                         SavedDecayHfRatio;
-    int16_t                         SavedReverbLevel;
-    int16_t                         SavedDiffusion;
-    int16_t                         SavedDensity;
-    bool                            bEnabled;
-    LVM_Fs_en                       SampleRate;
-    process_buffer_t                *InFrames;
-    process_buffer_t                *OutFrames;
-    size_t                          bufferSizeIn;
-    size_t                          bufferSizeOut;
-    bool                            auxiliary;
-    bool                            preset;
-    uint16_t                        curPreset;
-    uint16_t                        nextPreset;
-    int                             SamplesToExitCount;
-    LVM_INT16                       leftVolume;
-    LVM_INT16                       rightVolume;
-    LVM_INT16                       prevLeftVolume;
-    LVM_INT16                       prevRightVolume;
-    int                             volumeMode;
+struct ReverbContext {
+    const struct effect_interface_s* itfe;
+    effect_config_t config;
+    LVREV_Handle_t hInstance;
+    int16_t SavedRoomLevel;
+    int16_t SavedHfLevel;
+    int16_t SavedDecayTime;
+    int16_t SavedDecayHfRatio;
+    int16_t SavedReverbLevel;
+    int16_t SavedDiffusion;
+    int16_t SavedDensity;
+    bool bEnabled;
+    LVM_Fs_en SampleRate;
+    process_buffer_t* InFrames;
+    process_buffer_t* OutFrames;
+    size_t bufferSizeIn;
+    size_t bufferSizeOut;
+    bool auxiliary;
+    bool preset;
+    uint16_t curPreset;
+    uint16_t nextPreset;
+    int SamplesToExitCount;
+    LVM_INT16 leftVolume;
+    LVM_INT16 rightVolume;
+    LVM_INT16 prevLeftVolume;
+    LVM_INT16 prevRightVolume;
+    int volumeMode;
 };
 
 enum {
@@ -174,44 +175,38 @@ enum {
 
 #define REVERB_DEFAULT_PRESET REVERB_PRESET_NONE
 
-#define REVERB_SEND_LEVEL   0.75f // 0.75 in 4.12 format
-#define REVERB_UNIT_VOLUME  (0x1000) // 1.0 in 4.12 format
+#define REVERB_SEND_LEVEL 0.75f      // 0.75 in 4.12 format
+#define REVERB_UNIT_VOLUME (0x1000)  // 1.0 in 4.12 format
 
 //--- local function prototypes
-int  Reverb_init            (ReverbContext *pContext);
-void Reverb_free            (ReverbContext *pContext);
-int  Reverb_setConfig       (ReverbContext *pContext, effect_config_t *pConfig);
-void Reverb_getConfig       (ReverbContext *pContext, effect_config_t *pConfig);
-int  Reverb_setParameter    (ReverbContext *pContext, void *pParam, void *pValue, int vsize);
-int  Reverb_getParameter    (ReverbContext *pContext,
-                             void          *pParam,
-                             uint32_t      *pValueSize,
-                             void          *pValue);
-int Reverb_LoadPreset       (ReverbContext   *pContext);
-int Reverb_paramValueSize   (int32_t param);
+int Reverb_init(ReverbContext* pContext);
+void Reverb_free(ReverbContext* pContext);
+int Reverb_setConfig(ReverbContext* pContext, effect_config_t* pConfig);
+void Reverb_getConfig(ReverbContext* pContext, effect_config_t* pConfig);
+int Reverb_setParameter(ReverbContext* pContext, void* pParam, void* pValue, int vsize);
+int Reverb_getParameter(ReverbContext* pContext, void* pParam, uint32_t* pValueSize, void* pValue);
+int Reverb_LoadPreset(ReverbContext* pContext);
+int Reverb_paramValueSize(int32_t param);
 
 /* Effect Library Interface Implementation */
 
-extern "C" int EffectCreate(const effect_uuid_t *uuid,
-                            int32_t             sessionId __unused,
-                            int32_t             ioId __unused,
-                            effect_handle_t  *pHandle){
+extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t sessionId __unused,
+                            int32_t ioId __unused, effect_handle_t* pHandle) {
     int ret;
     int i;
-    int length = sizeof(gDescriptors) / sizeof(const effect_descriptor_t *);
-    const effect_descriptor_t *desc;
+    int length = sizeof(gDescriptors) / sizeof(const effect_descriptor_t*);
+    const effect_descriptor_t* desc;
 
     ALOGV("\t\nEffectCreate start");
 
-    if (pHandle == NULL || uuid == NULL){
+    if (pHandle == NULL || uuid == NULL) {
         ALOGV("\tLVM_ERROR : EffectCreate() called with NULL pointer");
         return -EINVAL;
     }
 
     for (i = 0; i < length; i++) {
         desc = gDescriptors[i];
-        if (memcmp(uuid, &desc->uuid, sizeof(effect_uuid_t))
-                == 0) {
+        if (memcmp(uuid, &desc->uuid, sizeof(effect_uuid_t)) == 0) {
             ALOGV("\tEffectCreate - UUID matched Reverb type %d, UUID = %x", i, desc->uuid.timeLow);
             break;
         }
@@ -221,16 +216,16 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
         return -ENOENT;
     }
 
-    ReverbContext *pContext = new ReverbContext;
+    ReverbContext* pContext = new ReverbContext;
 
-    pContext->itfe      = &gReverbInterface;
+    pContext->itfe = &gReverbInterface;
     pContext->hInstance = NULL;
 
     pContext->auxiliary = false;
-    if ((desc->flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY){
+    if ((desc->flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         pContext->auxiliary = true;
         ALOGV("\tEffectCreate - AUX");
-    }else{
+    } else {
         ALOGV("\tEffectCreate - INS");
     }
 
@@ -241,14 +236,14 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
         pContext->curPreset = REVERB_PRESET_LAST + 1;
         pContext->nextPreset = REVERB_DEFAULT_PRESET;
         ALOGV("\tEffectCreate - PRESET");
-    }else{
+    } else {
         ALOGV("\tEffectCreate - ENVIRONMENTAL");
     }
 
     ALOGV("\tEffectCreate - Calling Reverb_init");
     ret = Reverb_init(pContext);
 
-    if (ret < 0){
+    if (ret < 0) {
         ALOGV("\tLVM_ERROR : EffectCreate() init failed");
         delete pContext;
         return ret;
@@ -256,26 +251,25 @@ extern "C" int EffectCreate(const effect_uuid_t *uuid,
 
     *pHandle = (effect_handle_t)pContext;
 
-
     int channels = audio_channel_count_from_out_mask(pContext->config.inputCfg.channels);
 
-    channels = (pContext->auxiliary == true)? channels : FCC_2;
+    channels = (pContext->auxiliary == true) ? channels : FCC_2;
     // Allocate memory for reverb process (*2 is for STEREO)
     pContext->bufferSizeIn = LVREV_MAX_FRAME_SIZE * sizeof(process_buffer_t) * channels;
     pContext->bufferSizeOut = LVREV_MAX_FRAME_SIZE * sizeof(process_buffer_t) * FCC_2;
-    pContext->InFrames  = (process_buffer_t *)calloc(pContext->bufferSizeIn, 1 /* size */);
-    pContext->OutFrames = (process_buffer_t *)calloc(pContext->bufferSizeOut, 1 /* size */);
+    pContext->InFrames = (process_buffer_t*)calloc(pContext->bufferSizeIn, 1 /* size */);
+    pContext->OutFrames = (process_buffer_t*)calloc(pContext->bufferSizeOut, 1 /* size */);
 
     ALOGV("\tEffectCreate %p, size %zu", pContext, sizeof(ReverbContext));
     ALOGV("\tEffectCreate end\n");
     return 0;
 } /* end EffectCreate */
 
-extern "C" int EffectRelease(effect_handle_t handle){
-    ReverbContext * pContext = (ReverbContext *)handle;
+extern "C" int EffectRelease(effect_handle_t handle) {
+    ReverbContext* pContext = (ReverbContext*)handle;
 
     ALOGV("\tEffectRelease %p", handle);
-    if (pContext == NULL){
+    if (pContext == NULL) {
         ALOGV("\tLVM_ERROR : EffectRelease called with NULL pointer");
         return -EINVAL;
     }
@@ -289,12 +283,11 @@ extern "C" int EffectRelease(effect_handle_t handle){
     return 0;
 } /* end EffectRelease */
 
-extern "C" int EffectGetDescriptor(const effect_uuid_t *uuid,
-                                   effect_descriptor_t *pDescriptor) {
+extern "C" int EffectGetDescriptor(const effect_uuid_t* uuid, effect_descriptor_t* pDescriptor) {
     int i;
-    int length = sizeof(gDescriptors) / sizeof(const effect_descriptor_t *);
+    int length = sizeof(gDescriptors) / sizeof(const effect_descriptor_t*);
 
-    if (pDescriptor == NULL || uuid == NULL){
+    if (pDescriptor == NULL || uuid == NULL) {
         ALOGV("EffectGetDescriptor() called with NULL pointer");
         return -EINVAL;
     }
@@ -302,8 +295,8 @@ extern "C" int EffectGetDescriptor(const effect_uuid_t *uuid,
     for (i = 0; i < length; i++) {
         if (memcmp(uuid, &gDescriptors[i]->uuid, sizeof(effect_uuid_t)) == 0) {
             *pDescriptor = *gDescriptors[i];
-            ALOGV("EffectGetDescriptor - UUID matched Reverb type %d, UUID = %x",
-                 i, gDescriptors[i]->uuid.timeLow);
+            ALOGV("EffectGetDescriptor - UUID matched Reverb type %d, UUID = %x", i,
+                  gDescriptors[i]->uuid.timeLow);
             return 0;
         }
     }
@@ -312,12 +305,13 @@ extern "C" int EffectGetDescriptor(const effect_uuid_t *uuid,
 } /* end EffectGetDescriptor */
 
 /* local functions */
-#define CHECK_ARG(cond) {                     \
-    if (!(cond)) {                            \
-        ALOGV("\tLVM_ERROR : Invalid argument: "#cond);      \
-        return -EINVAL;                       \
-    }                                         \
-}
+#define CHECK_ARG(cond)                                      \
+    {                                                        \
+        if (!(cond)) {                                       \
+            ALOGV("\tLVM_ERROR : Invalid argument: " #cond); \
+            return -EINVAL;                                  \
+        }                                                    \
+    }
 
 //----------------------------------------------------------------------------
 // process()
@@ -336,13 +330,9 @@ extern "C" int EffectGetDescriptor(const effect_uuid_t *uuid,
 //  pOut:       pointer to updated stereo 16 bit output data
 //
 //----------------------------------------------------------------------------
-int process( effect_buffer_t   *pIn,
-             effect_buffer_t   *pOut,
-             int           frameCount,
-             ReverbContext *pContext){
-
+int process(effect_buffer_t* pIn, effect_buffer_t* pOut, int frameCount, ReverbContext* pContext) {
     int channels = audio_channel_count_from_out_mask(pContext->config.inputCfg.channels);
-    LVREV_ReturnStatus_en   LvmStatus = LVREV_SUCCESS;              /* Function call status */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     // Reverb only effects the stereo channels in multichannel source.
     if (channels < 1 || channels > LVM_MAX_CHANNELS) {
@@ -352,19 +342,16 @@ int process( effect_buffer_t   *pIn,
 
     size_t inSize = frameCount * sizeof(process_buffer_t) * channels;
     size_t outSize = frameCount * sizeof(process_buffer_t) * FCC_2;
-    if (pContext->InFrames == NULL ||
-            pContext->bufferSizeIn < inSize) {
+    if (pContext->InFrames == NULL || pContext->bufferSizeIn < inSize) {
         free(pContext->InFrames);
         pContext->bufferSizeIn = inSize;
-        pContext->InFrames = (process_buffer_t *)calloc(1, pContext->bufferSizeIn);
+        pContext->InFrames = (process_buffer_t*)calloc(1, pContext->bufferSizeIn);
     }
-    if (pContext->OutFrames == NULL ||
-            pContext->bufferSizeOut < outSize) {
+    if (pContext->OutFrames == NULL || pContext->bufferSizeOut < outSize) {
         free(pContext->OutFrames);
         pContext->bufferSizeOut = outSize;
-        pContext->OutFrames = (process_buffer_t *)calloc(1, pContext->bufferSizeOut);
+        pContext->OutFrames = (process_buffer_t*)calloc(1, pContext->bufferSizeOut);
     }
-
 
     // Check for NULL pointers
     if ((pContext->InFrames == NULL) || (pContext->OutFrames == NULL)) {
@@ -372,51 +359,49 @@ int process( effect_buffer_t   *pIn,
         return -EINVAL;
     }
 
-
     if (pContext->preset && pContext->nextPreset != pContext->curPreset) {
         Reverb_LoadPreset(pContext);
     }
 
     if (pContext->auxiliary) {
         static_assert(std::is_same<decltype(*pIn), decltype(*pContext->InFrames)>::value,
-                "pIn and InFrames must be same type");
+                      "pIn and InFrames must be same type");
         memcpy(pContext->InFrames, pIn, frameCount * channels * sizeof(*pIn));
     } else {
         // mono input is duplicated
         if (channels >= FCC_2) {
             for (int i = 0; i < frameCount; i++) {
                 pContext->InFrames[FCC_2 * i] =
-                            (process_buffer_t)pIn[channels * i] * REVERB_SEND_LEVEL;
+                        (process_buffer_t)pIn[channels * i] * REVERB_SEND_LEVEL;
                 pContext->InFrames[FCC_2 * i + 1] =
-                            (process_buffer_t)pIn[channels * i + 1] * REVERB_SEND_LEVEL;
+                        (process_buffer_t)pIn[channels * i + 1] * REVERB_SEND_LEVEL;
             }
         } else {
             for (int i = 0; i < frameCount; i++) {
                 pContext->InFrames[FCC_2 * i] = pContext->InFrames[FCC_2 * i + 1] =
-                            (process_buffer_t)pIn[i] * REVERB_SEND_LEVEL;
+                        (process_buffer_t)pIn[i] * REVERB_SEND_LEVEL;
             }
         }
     }
 
     if (pContext->preset && pContext->curPreset == REVERB_PRESET_NONE) {
         memset(pContext->OutFrames, 0,
-                frameCount * sizeof(*pContext->OutFrames) * FCC_2); //always stereo here
+               frameCount * sizeof(*pContext->OutFrames) * FCC_2);  // always stereo here
     } else {
-        if(pContext->bEnabled == LVM_FALSE && pContext->SamplesToExitCount > 0) {
-            memset(pContext->InFrames, 0,
-                    frameCount * sizeof(*pContext->OutFrames) * channels);
+        if (pContext->bEnabled == LVM_FALSE && pContext->SamplesToExitCount > 0) {
+            memset(pContext->InFrames, 0, frameCount * sizeof(*pContext->OutFrames) * channels);
             ALOGV("\tZeroing %d samples per frame at the end of call", channels);
         }
 
         /* Process the samples, producing a stereo output */
-        LvmStatus = LVREV_Process(pContext->hInstance,      /* Instance handle */
-                                  pContext->InFrames,     /* Input buffer */
-                                  pContext->OutFrames,    /* Output buffer */
-                                  frameCount);              /* Number of samples to read */
+        LvmStatus = LVREV_Process(pContext->hInstance, /* Instance handle */
+                                  pContext->InFrames,  /* Input buffer */
+                                  pContext->OutFrames, /* Output buffer */
+                                  frameCount);         /* Number of samples to read */
     }
 
     LVM_ERROR_CHECK(LvmStatus, "LVREV_Process", "process")
-    if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
+    if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
 
     // Convert to 16 bits
     if (pContext->auxiliary) {
@@ -437,8 +422,8 @@ int process( effect_buffer_t   *pIn,
         }
         // apply volume with ramp if needed
         if ((pContext->leftVolume != pContext->prevLeftVolume ||
-                pContext->rightVolume != pContext->prevRightVolume) &&
-                pContext->volumeMode == REVERB_VOLUME_RAMP) {
+             pContext->rightVolume != pContext->prevRightVolume) &&
+            pContext->volumeMode == REVERB_VOLUME_RAMP) {
             // FIXME: still using int16 volumes.
             // For reference: REVERB_UNIT_VOLUME  (0x1000) // 1.0 in 4.12 format
             float vl = (float)pContext->prevLeftVolume / 4096;
@@ -470,7 +455,7 @@ int process( effect_buffer_t   *pIn,
     }
 
     if (channels > 2) {
-        //Accumulate if required
+        // Accumulate if required
         if (pContext->config.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
             for (int i = 0; i < frameCount; i++) {
                 pOut[channels * i] += pContext->OutFrames[FCC_2 * i];
@@ -497,7 +482,7 @@ int process( effect_buffer_t   *pIn,
         }
     }
     return 0;
-}    /* end process */
+} /* end process */
 
 //----------------------------------------------------------------------------
 // Reverb_free()
@@ -511,30 +496,28 @@ int process( effect_buffer_t   *pIn,
 //
 //----------------------------------------------------------------------------
 
-void Reverb_free(ReverbContext *pContext){
-
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;         /* Function call status */
-    LVREV_MemoryTable_st      MemTab;
+void Reverb_free(ReverbContext* pContext) {
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVREV_MemoryTable_st MemTab;
 
     /* Free the algorithm memory */
-    LvmStatus = LVREV_GetMemoryTable(pContext->hInstance,
-                                   &MemTab,
-                                   LVM_NULL);
+    LvmStatus = LVREV_GetMemoryTable(pContext->hInstance, &MemTab, LVM_NULL);
 
     LVM_ERROR_CHECK(LvmStatus, "LVM_GetMemoryTable", "Reverb_free")
 
-    for (int i=0; i<LVM_NR_MEMORY_REGIONS; i++){
-        if (MemTab.Region[i].Size != 0){
-            if (MemTab.Region[i].pBaseAddress != NULL){
+    for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
+        if (MemTab.Region[i].Size != 0) {
+            if (MemTab.Region[i].pBaseAddress != NULL) {
                 free(MemTab.Region[i].pBaseAddress);
-            }else{
-                ALOGV("\tLVM_ERROR : free() - trying to free with NULL pointer %" PRIu32 " bytes "
-                        "for region %u at %p ERROR\n",
-                        MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
+            } else {
+                ALOGV("\tLVM_ERROR : free() - trying to free with NULL pointer %" PRIu32
+                      " bytes "
+                      "for region %u at %p ERROR\n",
+                      MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
             }
         }
     }
-}    /* end Reverb_free */
+} /* end Reverb_free */
 
 //----------------------------------------------------------------------------
 // Reverb_setConfig()
@@ -550,9 +533,9 @@ void Reverb_free(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
-    LVM_Fs_en   SampleRate;
-    //ALOGV("\tReverb_setConfig start");
+int Reverb_setConfig(ReverbContext* pContext, effect_config_t* pConfig) {
+    LVM_Fs_en SampleRate;
+    // ALOGV("\tReverb_setConfig start");
 
     CHECK_ARG(pContext != NULL);
     CHECK_ARG(pConfig != NULL);
@@ -561,81 +544,78 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
     CHECK_ARG(pConfig->inputCfg.format == pConfig->outputCfg.format);
     int inputChannels = audio_channel_count_from_out_mask(pConfig->inputCfg.channels);
     CHECK_ARG((pContext->auxiliary && pConfig->inputCfg.channels == AUDIO_CHANNEL_OUT_MONO) ||
-              ((!pContext->auxiliary) &&
-              (inputChannels <= LVM_MAX_CHANNELS)));
+              ((!pContext->auxiliary) && (inputChannels <= LVM_MAX_CHANNELS)));
     int outputChannels = audio_channel_count_from_out_mask(pConfig->outputCfg.channels);
     CHECK_ARG(outputChannels >= FCC_2 && outputChannels <= LVM_MAX_CHANNELS);
-    CHECK_ARG(pConfig->outputCfg.accessMode == EFFECT_BUFFER_ACCESS_WRITE
-              || pConfig->outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE);
+    CHECK_ARG(pConfig->outputCfg.accessMode == EFFECT_BUFFER_ACCESS_WRITE ||
+              pConfig->outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE);
     CHECK_ARG(pConfig->inputCfg.format == EFFECT_BUFFER_FORMAT);
-    //ALOGV("\tReverb_setConfig calling memcpy");
+    // ALOGV("\tReverb_setConfig calling memcpy");
     pContext->config = *pConfig;
 
     switch (pConfig->inputCfg.samplingRate) {
-    case 8000:
-        SampleRate = LVM_FS_8000;
-        break;
-    case 16000:
-        SampleRate = LVM_FS_16000;
-        break;
-    case 22050:
-        SampleRate = LVM_FS_22050;
-        break;
-    case 32000:
-        SampleRate = LVM_FS_32000;
-        break;
-    case 44100:
-        SampleRate = LVM_FS_44100;
-        break;
-    case 48000:
-        SampleRate = LVM_FS_48000;
-        break;
-    case 88200:
-        SampleRate = LVM_FS_88200;
-        break;
-    case 96000:
-        SampleRate = LVM_FS_96000;
-        break;
-    case 176400:
-        SampleRate = LVM_FS_176400;
-        break;
-    case 192000:
-        SampleRate = LVM_FS_192000;
-        break;
-    default:
-        ALOGV("\rReverb_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
-        return -EINVAL;
+        case 8000:
+            SampleRate = LVM_FS_8000;
+            break;
+        case 16000:
+            SampleRate = LVM_FS_16000;
+            break;
+        case 22050:
+            SampleRate = LVM_FS_22050;
+            break;
+        case 32000:
+            SampleRate = LVM_FS_32000;
+            break;
+        case 44100:
+            SampleRate = LVM_FS_44100;
+            break;
+        case 48000:
+            SampleRate = LVM_FS_48000;
+            break;
+        case 88200:
+            SampleRate = LVM_FS_88200;
+            break;
+        case 96000:
+            SampleRate = LVM_FS_96000;
+            break;
+        case 176400:
+            SampleRate = LVM_FS_176400;
+            break;
+        case 192000:
+            SampleRate = LVM_FS_192000;
+            break;
+        default:
+            ALOGV("\rReverb_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
+            return -EINVAL;
     }
 
     if (pContext->SampleRate != SampleRate) {
+        LVREV_ControlParams_st ActiveParams;
+        LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS;
 
-        LVREV_ControlParams_st    ActiveParams;
-        LVREV_ReturnStatus_en     LvmStatus = LVREV_SUCCESS;
-
-        //ALOGV("\tReverb_setConfig change sampling rate to %d", SampleRate);
+        // ALOGV("\tReverb_setConfig change sampling rate to %d", SampleRate);
 
         /* Get the current settings */
-        LvmStatus = LVREV_GetControlParameters(pContext->hInstance,
-                                         &ActiveParams);
+        LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
 
         LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "Reverb_setConfig")
-        if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
+        if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
 
         ActiveParams.SampleRate = SampleRate;
 
         LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
 
         LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "Reverb_setConfig")
-        if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
-        //ALOGV("\tReverb_setConfig Succesfully called LVREV_SetControlParameters\n");
+        if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
+        // ALOGV("\tReverb_setConfig Successfully called LVREV_SetControlParameters\n");
         pContext->SampleRate = SampleRate;
-    }else{
-        //ALOGV("\tReverb_setConfig keep sampling rate at %d", SampleRate);
+    } else {
+        // ALOGV("\tReverb_setConfig keep sampling rate at %d", SampleRate);
     }
 
-    //ALOGV("\tReverb_setConfig End");
+    // ALOGV("\tReverb_setConfig End");
     return 0;
-}   /* end Reverb_setConfig */
+} /* end Reverb_setConfig */
 
 //----------------------------------------------------------------------------
 // Reverb_getConfig()
@@ -651,10 +631,9 @@ int Reverb_setConfig(ReverbContext *pContext, effect_config_t *pConfig){
 //
 //----------------------------------------------------------------------------
 
-void Reverb_getConfig(ReverbContext *pContext, effect_config_t *pConfig)
-{
+void Reverb_getConfig(ReverbContext* pContext, effect_config_t* pConfig) {
     *pConfig = pContext->config;
-}   /* end Reverb_getConfig */
+} /* end Reverb_getConfig */
 
 //----------------------------------------------------------------------------
 // Reverb_init()
@@ -668,35 +647,35 @@ void Reverb_getConfig(ReverbContext *pContext, effect_config_t *pConfig)
 //
 //----------------------------------------------------------------------------
 
-int Reverb_init(ReverbContext *pContext){
+int Reverb_init(ReverbContext* pContext) {
     ALOGV("\tReverb_init start");
 
     CHECK_ARG(pContext != NULL);
 
-    if (pContext->hInstance != NULL){
+    if (pContext->hInstance != NULL) {
         Reverb_free(pContext);
     }
 
-    pContext->config.inputCfg.accessMode                    = EFFECT_BUFFER_ACCESS_READ;
+    pContext->config.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
     if (pContext->auxiliary) {
-        pContext->config.inputCfg.channels                  = AUDIO_CHANNEL_OUT_MONO;
+        pContext->config.inputCfg.channels = AUDIO_CHANNEL_OUT_MONO;
     } else {
-        pContext->config.inputCfg.channels                  = AUDIO_CHANNEL_OUT_STEREO;
+        pContext->config.inputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
     }
-    pContext->config.inputCfg.format                        = EFFECT_BUFFER_FORMAT;
-    pContext->config.inputCfg.samplingRate                  = 44100;
-    pContext->config.inputCfg.bufferProvider.getBuffer      = NULL;
-    pContext->config.inputCfg.bufferProvider.releaseBuffer  = NULL;
-    pContext->config.inputCfg.bufferProvider.cookie         = NULL;
-    pContext->config.inputCfg.mask                          = EFFECT_CONFIG_ALL;
-    pContext->config.outputCfg.accessMode                   = EFFECT_BUFFER_ACCESS_ACCUMULATE;
-    pContext->config.outputCfg.channels                     = AUDIO_CHANNEL_OUT_STEREO;
-    pContext->config.outputCfg.format                       = EFFECT_BUFFER_FORMAT;
-    pContext->config.outputCfg.samplingRate                 = 44100;
-    pContext->config.outputCfg.bufferProvider.getBuffer     = NULL;
+    pContext->config.inputCfg.format = EFFECT_BUFFER_FORMAT;
+    pContext->config.inputCfg.samplingRate = 44100;
+    pContext->config.inputCfg.bufferProvider.getBuffer = NULL;
+    pContext->config.inputCfg.bufferProvider.releaseBuffer = NULL;
+    pContext->config.inputCfg.bufferProvider.cookie = NULL;
+    pContext->config.inputCfg.mask = EFFECT_CONFIG_ALL;
+    pContext->config.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
+    pContext->config.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
+    pContext->config.outputCfg.format = EFFECT_BUFFER_FORMAT;
+    pContext->config.outputCfg.samplingRate = 44100;
+    pContext->config.outputCfg.bufferProvider.getBuffer = NULL;
     pContext->config.outputCfg.bufferProvider.releaseBuffer = NULL;
-    pContext->config.outputCfg.bufferProvider.cookie        = NULL;
-    pContext->config.outputCfg.mask                         = EFFECT_CONFIG_ALL;
+    pContext->config.outputCfg.bufferProvider.cookie = NULL;
+    pContext->config.outputCfg.mask = EFFECT_CONFIG_ALL;
 
     pContext->leftVolume = REVERB_UNIT_VOLUME;
     pContext->rightVolume = REVERB_UNIT_VOLUME;
@@ -704,40 +683,39 @@ int Reverb_init(ReverbContext *pContext){
     pContext->prevRightVolume = REVERB_UNIT_VOLUME;
     pContext->volumeMode = REVERB_VOLUME_FLAT;
 
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;        /* Function call status */
-    LVREV_ControlParams_st    params;                         /* Control Parameters */
-    LVREV_InstanceParams_st   InstParams;                     /* Instance parameters */
-    LVREV_MemoryTable_st      MemTab;                         /* Memory allocation table */
-    bool                      bMallocFailure = LVM_FALSE;
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVREV_ControlParams_st params;                   /* Control Parameters */
+    LVREV_InstanceParams_st InstParams;              /* Instance parameters */
+    LVREV_MemoryTable_st MemTab;                     /* Memory allocation table */
+    bool bMallocFailure = LVM_FALSE;
 
     /* Set the capabilities */
-    InstParams.MaxBlockSize  = MAX_CALL_SIZE;
-    InstParams.SourceFormat  = LVM_STEREO;          // Max format, could be mono during process
-    InstParams.NumDelays     = LVREV_DELAYLINES_4;
+    InstParams.MaxBlockSize = MAX_CALL_SIZE;
+    InstParams.SourceFormat = LVM_STEREO;  // Max format, could be mono during process
+    InstParams.NumDelays = LVREV_DELAYLINES_4;
 
     /* Allocate memory, forcing alignment */
-    LvmStatus = LVREV_GetMemoryTable(LVM_NULL,
-                                  &MemTab,
-                                  &InstParams);
+    LvmStatus = LVREV_GetMemoryTable(LVM_NULL, &MemTab, &InstParams);
 
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetMemoryTable", "Reverb_init")
-    if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
+    if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
 
-    ALOGV("\tCreateInstance Succesfully called LVM_GetMemoryTable\n");
+    ALOGV("\tCreateInstance Successfully called LVM_GetMemoryTable\n");
 
     /* Allocate memory */
-    for (int i=0; i<LVM_NR_MEMORY_REGIONS; i++){
-        if (MemTab.Region[i].Size != 0){
+    for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
+        if (MemTab.Region[i].Size != 0) {
             MemTab.Region[i].pBaseAddress = calloc(1, MemTab.Region[i].Size);
 
-            if (MemTab.Region[i].pBaseAddress == LVM_NULL){
+            if (MemTab.Region[i].pBaseAddress == LVM_NULL) {
                 ALOGV("\tLVREV_ERROR :Reverb_init CreateInstance Failed to allocate %" PRIu32
-                        " bytes for region %u\n", MemTab.Region[i].Size, i );
+                      " bytes for region %u\n",
+                      MemTab.Region[i].Size, i);
                 bMallocFailure = LVM_TRUE;
-            }else{
+            } else {
                 ALOGV("\tReverb_init CreateInstance allocate %" PRIu32
-                        " bytes for region %u at %p\n",
-                        MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
+                      " bytes for region %u at %p\n",
+                      MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
             }
         }
     }
@@ -745,85 +723,83 @@ int Reverb_init(ReverbContext *pContext){
     /* If one or more of the memory regions failed to allocate, free the regions that were
      * succesfully allocated and return with an error
      */
-    if(bMallocFailure == LVM_TRUE){
-        for (int i=0; i<LVM_NR_MEMORY_REGIONS; i++){
-            if (MemTab.Region[i].pBaseAddress == LVM_NULL){
+    if (bMallocFailure == LVM_TRUE) {
+        for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
+            if (MemTab.Region[i].pBaseAddress == LVM_NULL) {
                 ALOGV("\tLVM_ERROR :Reverb_init CreateInstance Failed to allocate %" PRIu32
-                        " bytes for region %u - Not freeing\n", MemTab.Region[i].Size, i );
-            }else{
+                      " bytes for region %u - Not freeing\n",
+                      MemTab.Region[i].Size, i);
+            } else {
                 ALOGV("\tLVM_ERROR :Reverb_init CreateInstance Failed: but allocated %" PRIu32
-                        " bytes for region %u at %p- free\n",
-                        MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
+                      " bytes for region %u at %p- free\n",
+                      MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
                 free(MemTab.Region[i].pBaseAddress);
             }
         }
         return -EINVAL;
     }
-    ALOGV("\tReverb_init CreateInstance Succesfully malloc'd memory\n");
+    ALOGV("\tReverb_init CreateInstance Successfully malloc'd memory\n");
 
     /* Initialise */
     pContext->hInstance = LVM_NULL;
 
     /* Init sets the instance handle */
-    LvmStatus = LVREV_GetInstanceHandle(&pContext->hInstance,
-                                        &MemTab,
-                                        &InstParams);
+    LvmStatus = LVREV_GetInstanceHandle(&pContext->hInstance, &MemTab, &InstParams);
 
     LVM_ERROR_CHECK(LvmStatus, "LVM_GetInstanceHandle", "Reverb_init")
-    if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
+    if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
 
-    ALOGV("\tReverb_init CreateInstance Succesfully called LVM_GetInstanceHandle\n");
+    ALOGV("\tReverb_init CreateInstance Successfully called LVM_GetInstanceHandle\n");
 
     /* Set the initial process parameters */
     /* General parameters */
-    params.OperatingMode  = LVM_MODE_ON;
-    params.SampleRate     = LVM_FS_44100;
-    pContext->SampleRate  = LVM_FS_44100;
+    params.OperatingMode = LVM_MODE_ON;
+    params.SampleRate = LVM_FS_44100;
+    pContext->SampleRate = LVM_FS_44100;
 
-    if(pContext->config.inputCfg.channels == AUDIO_CHANNEL_OUT_MONO){
-        params.SourceFormat   = LVM_MONO;
+    if (pContext->config.inputCfg.channels == AUDIO_CHANNEL_OUT_MONO) {
+        params.SourceFormat = LVM_MONO;
     } else {
-        params.SourceFormat   = LVM_STEREO;
+        params.SourceFormat = LVM_STEREO;
     }
 
     if ((pContext->auxiliary == false) && (params.SourceFormat == LVM_MONO)) {
-        params.SourceFormat   = LVM_STEREO;
+        params.SourceFormat = LVM_STEREO;
     }
     /* Reverb parameters */
-    params.Level          = 0;
-    params.LPF            = 23999;
-    params.HPF            = 50;
-    params.T60            = 1490;
-    params.Density        = 100;
-    params.Damping        = 21;
-    params.RoomSize       = 100;
+    params.Level = 0;
+    params.LPF = 23999;
+    params.HPF = 50;
+    params.T60 = 1490;
+    params.Density = 100;
+    params.Damping = 21;
+    params.RoomSize = 100;
 
-    pContext->SamplesToExitCount = (params.T60 * pContext->config.inputCfg.samplingRate)/1000;
+    pContext->SamplesToExitCount = (params.T60 * pContext->config.inputCfg.samplingRate) / 1000;
 
     /* Saved strength is used to return the exact strength that was used in the set to the get
      * because we map the original strength range of 0:1000 to 1:15, and this will avoid
      * quantisation like effect when returning
      */
-    pContext->SavedRoomLevel    = -6000;
-    pContext->SavedHfLevel      = 0;
-    pContext->bEnabled          = LVM_FALSE;
-    pContext->SavedDecayTime    = params.T60;
-    pContext->SavedDecayHfRatio = params.Damping*20;
-    pContext->SavedDensity      = params.RoomSize*10;
-    pContext->SavedDiffusion    = params.Density*10;
-    pContext->SavedReverbLevel  = -6000;
+    pContext->SavedRoomLevel = -6000;
+    pContext->SavedHfLevel = 0;
+    pContext->bEnabled = LVM_FALSE;
+    pContext->SavedDecayTime = params.T60;
+    pContext->SavedDecayHfRatio = params.Damping * 20;
+    pContext->SavedDensity = params.RoomSize * 10;
+    pContext->SavedDiffusion = params.Density * 10;
+    pContext->SavedReverbLevel = -6000;
 
     /* Activate the initial settings */
-    LvmStatus = LVREV_SetControlParameters(pContext->hInstance,
-                                         &params);
+    LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &params);
 
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "Reverb_init")
-    if(LvmStatus != LVREV_SUCCESS) return -EINVAL;
+    if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
 
-    ALOGV("\tReverb_init CreateInstance Succesfully called LVREV_SetControlParameters\n");
+    ALOGV("\tReverb_init CreateInstance Successfully called LVREV_SetControlParameters\n");
     ALOGV("\tReverb_init End");
     return 0;
-}   /* end Reverb_init */
+} /* end Reverb_init */
 
 //----------------------------------------------------------------------------
 // ReverbConvertLevel()
@@ -836,27 +812,21 @@ int Reverb_init(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-int16_t ReverbConvertLevel(int16_t level){
-    static int16_t LevelArray[101] =
-    {
-       -12000, -4000,  -3398,  -3046,  -2796,  -2603,  -2444,  -2310,  -2194,  -2092,
-       -2000,  -1918,  -1842,  -1773,  -1708,  -1648,  -1592,  -1540,  -1490,  -1443,
-       -1398,  -1356,  -1316,  -1277,  -1240,  -1205,  -1171,  -1138,  -1106,  -1076,
-       -1046,  -1018,  -990,   -963,   -938,   -912,   -888,   -864,   -841,   -818,
-       -796,   -775,   -754,   -734,   -714,   -694,   -675,   -656,   -638,   -620,
-       -603,   -585,   -568,   -552,   -536,   -520,   -504,   -489,   -474,   -459,
-       -444,   -430,   -416,   -402,   -388,   -375,   -361,   -348,   -335,   -323,
-       -310,   -298,   -286,   -274,   -262,   -250,   -239,   -228,   -216,   -205,
-       -194,   -184,   -173,   -162,   -152,   -142,   -132,   -121,   -112,   -102,
-       -92,    -82,    -73,    -64,    -54,    -45,    -36,    -27,    -18,    -9,
-       0
-    };
+int16_t ReverbConvertLevel(int16_t level) {
+    static int16_t LevelArray[101] = {
+            -12000, -4000, -3398, -3046, -2796, -2603, -2444, -2310, -2194, -2092, -2000, -1918,
+            -1842,  -1773, -1708, -1648, -1592, -1540, -1490, -1443, -1398, -1356, -1316, -1277,
+            -1240,  -1205, -1171, -1138, -1106, -1076, -1046, -1018, -990,  -963,  -938,  -912,
+            -888,   -864,  -841,  -818,  -796,  -775,  -754,  -734,  -714,  -694,  -675,  -656,
+            -638,   -620,  -603,  -585,  -568,  -552,  -536,  -520,  -504,  -489,  -474,  -459,
+            -444,   -430,  -416,  -402,  -388,  -375,  -361,  -348,  -335,  -323,  -310,  -298,
+            -286,   -274,  -262,  -250,  -239,  -228,  -216,  -205,  -194,  -184,  -173,  -162,
+            -152,   -142,  -132,  -121,  -112,  -102,  -92,   -82,   -73,   -64,   -54,   -45,
+            -36,    -27,   -18,   -9,    0};
     int16_t i;
 
-    for(i = 0; i < 101; i++)
-    {
-       if(level <= LevelArray[i])
-           break;
+    for (i = 0; i < 101; i++) {
+        if (level <= LevelArray[i]) break;
     }
     return i;
 }
@@ -872,37 +842,31 @@ int16_t ReverbConvertLevel(int16_t level){
 //
 //----------------------------------------------------------------------------
 
-int16_t ReverbConvertHfLevel(int16_t Hflevel){
+int16_t ReverbConvertHfLevel(int16_t Hflevel) {
     int16_t i;
 
-    static LPFPair_t LPFArray[97] =
-    {   // Limit range to 50 for LVREV parameter range
-        {-10000, 50}, { -5000, 50 }, { -4000, 50},  { -3000, 158}, { -2000, 502},
-        {-1000, 1666},{ -900, 1897}, { -800, 2169}, { -700, 2496}, { -600, 2895},
-        {-500, 3400}, { -400, 4066}, { -300, 5011}, { -200, 6537}, { -100,  9826},
-        {-99, 9881 }, { -98, 9937 }, { -97, 9994 }, { -96, 10052}, { -95, 10111},
-        {-94, 10171}, { -93, 10231}, { -92, 10293}, { -91, 10356}, { -90, 10419},
-        {-89, 10484}, { -88, 10549}, { -87, 10616}, { -86, 10684}, { -85, 10753},
-        {-84, 10823}, { -83, 10895}, { -82, 10968}, { -81, 11042}, { -80, 11117},
-        {-79, 11194}, { -78, 11272}, { -77, 11352}, { -76, 11433}, { -75, 11516},
-        {-74, 11600}, { -73, 11686}, { -72, 11774}, { -71, 11864}, { -70, 11955},
-        {-69, 12049}, { -68, 12144}, { -67, 12242}, { -66, 12341}, { -65, 12443},
-        {-64, 12548}, { -63, 12654}, { -62, 12763}, { -61, 12875}, { -60, 12990},
-        {-59, 13107}, { -58, 13227}, { -57, 13351}, { -56, 13477}, { -55, 13607},
-        {-54, 13741}, { -53, 13878}, { -52, 14019}, { -51, 14164}, { -50, 14313},
-        {-49, 14467}, { -48, 14626}, { -47, 14789}, { -46, 14958}, { -45, 15132},
-        {-44, 15312}, { -43, 15498}, { -42, 15691}, { -41, 15890}, { -40, 16097},
-        {-39, 16311}, { -38, 16534}, { -37, 16766}, { -36, 17007}, { -35, 17259},
-        {-34, 17521}, { -33, 17795}, { -32, 18081}, { -31, 18381}, { -30, 18696},
-        {-29, 19027}, { -28, 19375}, { -27, 19742}, { -26, 20129}, { -25, 20540},
-        {-24, 20976}, { -23, 21439}, { -22, 21934}, { -21, 22463}, { -20, 23031},
-        {-19, 23643}, { -18, 23999}
-    };
+    static LPFPair_t LPFArray[97] = {
+            // Limit range to 50 for LVREV parameter range
+            {-10000, 50}, {-5000, 50},  {-4000, 50},  {-3000, 158}, {-2000, 502}, {-1000, 1666},
+            {-900, 1897}, {-800, 2169}, {-700, 2496}, {-600, 2895}, {-500, 3400}, {-400, 4066},
+            {-300, 5011}, {-200, 6537}, {-100, 9826}, {-99, 9881},  {-98, 9937},  {-97, 9994},
+            {-96, 10052}, {-95, 10111}, {-94, 10171}, {-93, 10231}, {-92, 10293}, {-91, 10356},
+            {-90, 10419}, {-89, 10484}, {-88, 10549}, {-87, 10616}, {-86, 10684}, {-85, 10753},
+            {-84, 10823}, {-83, 10895}, {-82, 10968}, {-81, 11042}, {-80, 11117}, {-79, 11194},
+            {-78, 11272}, {-77, 11352}, {-76, 11433}, {-75, 11516}, {-74, 11600}, {-73, 11686},
+            {-72, 11774}, {-71, 11864}, {-70, 11955}, {-69, 12049}, {-68, 12144}, {-67, 12242},
+            {-66, 12341}, {-65, 12443}, {-64, 12548}, {-63, 12654}, {-62, 12763}, {-61, 12875},
+            {-60, 12990}, {-59, 13107}, {-58, 13227}, {-57, 13351}, {-56, 13477}, {-55, 13607},
+            {-54, 13741}, {-53, 13878}, {-52, 14019}, {-51, 14164}, {-50, 14313}, {-49, 14467},
+            {-48, 14626}, {-47, 14789}, {-46, 14958}, {-45, 15132}, {-44, 15312}, {-43, 15498},
+            {-42, 15691}, {-41, 15890}, {-40, 16097}, {-39, 16311}, {-38, 16534}, {-37, 16766},
+            {-36, 17007}, {-35, 17259}, {-34, 17521}, {-33, 17795}, {-32, 18081}, {-31, 18381},
+            {-30, 18696}, {-29, 19027}, {-28, 19375}, {-27, 19742}, {-26, 20129}, {-25, 20540},
+            {-24, 20976}, {-23, 21439}, {-22, 21934}, {-21, 22463}, {-20, 23031}, {-19, 23643},
+            {-18, 23999}};
 
-    for(i = 0; i < 96; i++)
-    {
-        if(Hflevel <= LPFArray[i].Room_HF)
-            break;
+    for (i = 0; i < 96; i++) {
+        if (Hflevel <= LPFArray[i].Room_HF) break;
     }
     return LPFArray[i].LPF;
 }
@@ -919,26 +883,26 @@ int16_t ReverbConvertHfLevel(int16_t Hflevel){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetRoomHfLevel(ReverbContext *pContext, int16_t level){
-    //ALOGV("\tReverbSetRoomHfLevel start (%d)", level);
+void ReverbSetRoomHfLevel(ReverbContext* pContext, int16_t level) {
+    // ALOGV("\tReverbSetRoomHfLevel start (%d)", level);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetRoomHfLevel")
-    //ALOGV("\tReverbSetRoomHfLevel Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetRoomHfLevel() just Got -> %d\n", ActiveParams.LPF);
+    // ALOGV("\tReverbSetRoomHfLevel Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetRoomHfLevel() just Got -> %d\n", ActiveParams.LPF);
 
     ActiveParams.LPF = ReverbConvertHfLevel(level);
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetRoomHfLevel")
-    //ALOGV("\tReverbSetRoomhfLevel() just Set -> %d\n", ActiveParams.LPF);
+    // ALOGV("\tReverbSetRoomhfLevel() just Set -> %d\n", ActiveParams.LPF);
     pContext->SavedHfLevel = level;
-    //ALOGV("\tReverbSetHfRoomLevel end.. saving %d", pContext->SavedHfLevel);
+    // ALOGV("\tReverbSetHfRoomLevel end.. saving %d", pContext->SavedHfLevel);
     return;
 }
 
@@ -953,30 +917,31 @@ void ReverbSetRoomHfLevel(ReverbContext *pContext, int16_t level){
 //
 //----------------------------------------------------------------------------
 
-int16_t ReverbGetRoomHfLevel(ReverbContext *pContext){
+int16_t ReverbGetRoomHfLevel(ReverbContext* pContext) {
     int16_t level;
-    //ALOGV("\tReverbGetRoomHfLevel start, saved level is %d", pContext->SavedHfLevel);
+    // ALOGV("\tReverbGetRoomHfLevel start, saved level is %d", pContext->SavedHfLevel);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetRoomHfLevel")
-    //ALOGV("\tReverbGetRoomHfLevel Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetRoomHfLevel() just Got -> %d\n", ActiveParams.LPF);
+    // ALOGV("\tReverbGetRoomHfLevel Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetRoomHfLevel() just Got -> %d\n", ActiveParams.LPF);
 
     level = ReverbConvertHfLevel(pContext->SavedHfLevel);
 
-    //ALOGV("\tReverbGetRoomHfLevel() ActiveParams.LPFL %d, pContext->SavedHfLevel: %d, "
+    // ALOGV("\tReverbGetRoomHfLevel() ActiveParams.LPFL %d, pContext->SavedHfLevel: %d, "
     //     "converted level: %d\n", ActiveParams.LPF, pContext->SavedHfLevel, level);
 
-    if((int16_t)ActiveParams.LPF != level){
-        ALOGV("\tLVM_ERROR : (ignore at start up) ReverbGetRoomHfLevel() has wrong level -> %d %d\n",
-               ActiveParams.Level, level);
+    if ((int16_t)ActiveParams.LPF != level) {
+        ALOGV("\tLVM_ERROR : (ignore at start up) ReverbGetRoomHfLevel() has wrong level -> %d "
+              "%d\n",
+              ActiveParams.Level, level);
     }
 
-    //ALOGV("\tReverbGetRoomHfLevel end");
+    // ALOGV("\tReverbGetRoomHfLevel end");
     return pContext->SavedHfLevel;
 }
 
@@ -992,35 +957,35 @@ int16_t ReverbGetRoomHfLevel(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetReverbLevel(ReverbContext *pContext, int16_t level){
-    //ALOGV("\n\tReverbSetReverbLevel start (%d)", level);
+void ReverbSetReverbLevel(ReverbContext* pContext, int16_t level) {
+    // ALOGV("\n\tReverbSetReverbLevel start (%d)", level);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-    LVM_INT32                 CombinedLevel;             // Sum of room and reverb level controls
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVM_INT32 CombinedLevel;                         // Sum of room and reverb level controls
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetReverbLevel")
-    //ALOGV("\tReverbSetReverbLevel Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetReverbLevel just Got -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbSetReverbLevel Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetReverbLevel just Got -> %d\n", ActiveParams.Level);
 
     // needs to subtract max levels for both RoomLevel and ReverbLevel
-    CombinedLevel = (level + pContext->SavedRoomLevel)-LVREV_MAX_REVERB_LEVEL;
-    //ALOGV("\tReverbSetReverbLevel() CombinedLevel is %d = %d + %d\n",
+    CombinedLevel = (level + pContext->SavedRoomLevel) - LVREV_MAX_REVERB_LEVEL;
+    // ALOGV("\tReverbSetReverbLevel() CombinedLevel is %d = %d + %d\n",
     //      CombinedLevel, level, pContext->SavedRoomLevel);
 
     ActiveParams.Level = ReverbConvertLevel(CombinedLevel);
 
-    //ALOGV("\tReverbSetReverbLevel() Trying to set -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbSetReverbLevel() Trying to set -> %d\n", ActiveParams.Level);
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetReverbLevel")
-    //ALOGV("\tReverbSetReverbLevel() just Set -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbSetReverbLevel() just Set -> %d\n", ActiveParams.Level);
 
     pContext->SavedReverbLevel = level;
-    //ALOGV("\tReverbSetReverbLevel end pContext->SavedReverbLevel is %d\n\n",
+    // ALOGV("\tReverbSetReverbLevel end pContext->SavedReverbLevel is %d\n\n",
     //     pContext->SavedReverbLevel);
     return;
 }
@@ -1036,37 +1001,40 @@ void ReverbSetReverbLevel(ReverbContext *pContext, int16_t level){
 //
 //----------------------------------------------------------------------------
 
-int16_t ReverbGetReverbLevel(ReverbContext *pContext){
+int16_t ReverbGetReverbLevel(ReverbContext* pContext) {
     int16_t level;
-    //ALOGV("\tReverbGetReverbLevel start");
+    // ALOGV("\tReverbGetReverbLevel start");
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-    LVM_INT32                 CombinedLevel;             // Sum of room and reverb level controls
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVM_INT32 CombinedLevel;                         // Sum of room and reverb level controls
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetReverbLevel")
-    //ALOGV("\tReverbGetReverbLevel Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetReverbLevel() just Got -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbGetReverbLevel Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetReverbLevel() just Got -> %d\n", ActiveParams.Level);
 
     // needs to subtract max levels for both RoomLevel and ReverbLevel
-    CombinedLevel = (pContext->SavedReverbLevel + pContext->SavedRoomLevel)-LVREV_MAX_REVERB_LEVEL;
+    CombinedLevel =
+            (pContext->SavedReverbLevel + pContext->SavedRoomLevel) - LVREV_MAX_REVERB_LEVEL;
 
-    //ALOGV("\tReverbGetReverbLevel() CombinedLevel is %d = %d + %d\n",
-    //CombinedLevel, pContext->SavedReverbLevel, pContext->SavedRoomLevel);
+    // ALOGV("\tReverbGetReverbLevel() CombinedLevel is %d = %d + %d\n",
+    // CombinedLevel, pContext->SavedReverbLevel, pContext->SavedRoomLevel);
     level = ReverbConvertLevel(CombinedLevel);
 
-    //ALOGV("\tReverbGetReverbLevel(): ActiveParams.Level: %d, pContext->SavedReverbLevel: %d, "
+    // ALOGV("\tReverbGetReverbLevel(): ActiveParams.Level: %d, pContext->SavedReverbLevel: %d, "
     //"pContext->SavedRoomLevel: %d, CombinedLevel: %d, converted level: %d\n",
-    //ActiveParams.Level, pContext->SavedReverbLevel,pContext->SavedRoomLevel, CombinedLevel,level);
+    // ActiveParams.Level, pContext->SavedReverbLevel,pContext->SavedRoomLevel,
+    // CombinedLevel,level);
 
-    if(ActiveParams.Level != level){
-        ALOGV("\tLVM_ERROR : (ignore at start up) ReverbGetReverbLevel() has wrong level -> %d %d\n",
-                ActiveParams.Level, level);
+    if (ActiveParams.Level != level) {
+        ALOGV("\tLVM_ERROR : (ignore at start up) ReverbGetReverbLevel() has wrong level -> %d "
+              "%d\n",
+              ActiveParams.Level, level);
     }
 
-    //ALOGV("\tReverbGetReverbLevel end\n");
+    // ALOGV("\tReverbGetReverbLevel end\n");
 
     return pContext->SavedReverbLevel;
 }
@@ -1083,30 +1051,30 @@ int16_t ReverbGetReverbLevel(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetRoomLevel(ReverbContext *pContext, int16_t level){
-    //ALOGV("\tReverbSetRoomLevel start (%d)", level);
+void ReverbSetRoomLevel(ReverbContext* pContext, int16_t level) {
+    // ALOGV("\tReverbSetRoomLevel start (%d)", level);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-    LVM_INT32                 CombinedLevel;             // Sum of room and reverb level controls
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVM_INT32 CombinedLevel;                         // Sum of room and reverb level controls
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetRoomLevel")
-    //ALOGV("\tReverbSetRoomLevel Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetRoomLevel() just Got -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbSetRoomLevel Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetRoomLevel() just Got -> %d\n", ActiveParams.Level);
 
     // needs to subtract max levels for both RoomLevel and ReverbLevel
-    CombinedLevel = (level + pContext->SavedReverbLevel)-LVREV_MAX_REVERB_LEVEL;
+    CombinedLevel = (level + pContext->SavedReverbLevel) - LVREV_MAX_REVERB_LEVEL;
     ActiveParams.Level = ReverbConvertLevel(CombinedLevel);
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetRoomLevel")
-    //ALOGV("\tReverbSetRoomLevel() just Set -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbSetRoomLevel() just Set -> %d\n", ActiveParams.Level);
 
     pContext->SavedRoomLevel = level;
-    //ALOGV("\tReverbSetRoomLevel end");
+    // ALOGV("\tReverbSetRoomLevel end");
     return;
 }
 
@@ -1121,35 +1089,36 @@ void ReverbSetRoomLevel(ReverbContext *pContext, int16_t level){
 //
 //----------------------------------------------------------------------------
 
-int16_t ReverbGetRoomLevel(ReverbContext *pContext){
+int16_t ReverbGetRoomLevel(ReverbContext* pContext) {
     int16_t level;
-    //ALOGV("\tReverbGetRoomLevel start");
+    // ALOGV("\tReverbGetRoomLevel start");
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-    LVM_INT32                 CombinedLevel;             // Sum of room and reverb level controls
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVM_INT32 CombinedLevel;                         // Sum of room and reverb level controls
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetRoomLevel")
-    //ALOGV("\tReverbGetRoomLevel Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetRoomLevel() just Got -> %d\n", ActiveParams.Level);
+    // ALOGV("\tReverbGetRoomLevel Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetRoomLevel() just Got -> %d\n", ActiveParams.Level);
 
     // needs to subtract max levels for both RoomLevel and ReverbLevel
-    CombinedLevel = (pContext->SavedRoomLevel + pContext->SavedReverbLevel-LVREV_MAX_REVERB_LEVEL);
+    CombinedLevel =
+            (pContext->SavedRoomLevel + pContext->SavedReverbLevel - LVREV_MAX_REVERB_LEVEL);
     level = ReverbConvertLevel(CombinedLevel);
 
-    //ALOGV("\tReverbGetRoomLevel, Level = %d, pContext->SavedRoomLevel = %d, "
+    // ALOGV("\tReverbGetRoomLevel, Level = %d, pContext->SavedRoomLevel = %d, "
     //     "pContext->SavedReverbLevel = %d, CombinedLevel = %d, level = %d",
     //     ActiveParams.Level, pContext->SavedRoomLevel,
     //     pContext->SavedReverbLevel, CombinedLevel, level);
 
-    if(ActiveParams.Level != level){
+    if (ActiveParams.Level != level) {
         ALOGV("\tLVM_ERROR : (ignore at start up) ReverbGetRoomLevel() has wrong level -> %d %d\n",
               ActiveParams.Level, level);
     }
 
-    //ALOGV("\tReverbGetRoomLevel end");
+    // ALOGV("\tReverbGetRoomLevel end");
     return pContext->SavedRoomLevel;
 }
 
@@ -1165,34 +1134,35 @@ int16_t ReverbGetRoomLevel(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetDecayTime(ReverbContext *pContext, uint32_t time){
-    //ALOGV("\tReverbSetDecayTime start (%d)", time);
+void ReverbSetDecayTime(ReverbContext* pContext, uint32_t time) {
+    // ALOGV("\tReverbSetDecayTime start (%d)", time);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetDecayTime")
-    //ALOGV("\tReverbSetDecayTime Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetDecayTime() just Got -> %d\n", ActiveParams.T60);
+    // ALOGV("\tReverbSetDecayTime Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetDecayTime() just Got -> %d\n", ActiveParams.T60);
 
     if (time <= LVREV_MAX_T60) {
         ActiveParams.T60 = (LVM_UINT16)time;
-    }
-    else {
+    } else {
         ActiveParams.T60 = LVREV_MAX_T60;
     }
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetDecayTime")
-    //ALOGV("\tReverbSetDecayTime() just Set -> %d\n", ActiveParams.T60);
+    // ALOGV("\tReverbSetDecayTime() just Set -> %d\n", ActiveParams.T60);
 
-    pContext->SamplesToExitCount = (ActiveParams.T60 * pContext->config.inputCfg.samplingRate)/1000;
-    //ALOGV("\tReverbSetDecayTime() just Set SamplesToExitCount-> %d\n",pContext->SamplesToExitCount);
+    pContext->SamplesToExitCount =
+            (ActiveParams.T60 * pContext->config.inputCfg.samplingRate) / 1000;
+    // ALOGV("\tReverbSetDecayTime() just Set SamplesToExitCount->
+    // %d\n",pContext->SamplesToExitCount);
     pContext->SavedDecayTime = (int16_t)time;
-    //ALOGV("\tReverbSetDecayTime end");
+    // ALOGV("\tReverbSetDecayTime end");
     return;
 }
 
@@ -1207,25 +1177,25 @@ void ReverbSetDecayTime(ReverbContext *pContext, uint32_t time){
 //
 //----------------------------------------------------------------------------
 
-uint32_t ReverbGetDecayTime(ReverbContext *pContext){
-    //ALOGV("\tReverbGetDecayTime start");
+uint32_t ReverbGetDecayTime(ReverbContext* pContext) {
+    // ALOGV("\tReverbGetDecayTime start");
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetDecayTime")
-    //ALOGV("\tReverbGetDecayTime Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetDecayTime() just Got -> %d\n", ActiveParams.T60);
+    // ALOGV("\tReverbGetDecayTime Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetDecayTime() just Got -> %d\n", ActiveParams.T60);
 
-    if(ActiveParams.T60 != pContext->SavedDecayTime){
+    if (ActiveParams.T60 != pContext->SavedDecayTime) {
         // This will fail if the decay time is set to more than 7000
-        ALOGV("\tLVM_ERROR : ReverbGetDecayTime() has wrong level -> %d %d\n",
-         ActiveParams.T60, pContext->SavedDecayTime);
+        ALOGV("\tLVM_ERROR : ReverbGetDecayTime() has wrong level -> %d %d\n", ActiveParams.T60,
+              pContext->SavedDecayTime);
     }
 
-    //ALOGV("\tReverbGetDecayTime end");
+    // ALOGV("\tReverbGetDecayTime end");
     return (uint32_t)ActiveParams.T60;
 }
 
@@ -1241,27 +1211,27 @@ uint32_t ReverbGetDecayTime(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetDecayHfRatio(ReverbContext *pContext, int16_t ratio){
-    //ALOGV("\tReverbSetDecayHfRatioe start (%d)", ratio);
+void ReverbSetDecayHfRatio(ReverbContext* pContext, int16_t ratio) {
+    // ALOGV("\tReverbSetDecayHfRatioe start (%d)", ratio);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;   /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetDecayHfRatio")
-    //ALOGV("\tReverbSetDecayHfRatio Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetDecayHfRatio() just Got -> %d\n", ActiveParams.Damping);
+    // ALOGV("\tReverbSetDecayHfRatio Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetDecayHfRatio() just Got -> %d\n", ActiveParams.Damping);
 
-    ActiveParams.Damping = (LVM_INT16)(ratio/20);
+    ActiveParams.Damping = (LVM_INT16)(ratio / 20);
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetDecayHfRatio")
-    //ALOGV("\tReverbSetDecayHfRatio() just Set -> %d\n", ActiveParams.Damping);
+    // ALOGV("\tReverbSetDecayHfRatio() just Set -> %d\n", ActiveParams.Damping);
 
     pContext->SavedDecayHfRatio = ratio;
-    //ALOGV("\tReverbSetDecayHfRatio end");
+    // ALOGV("\tReverbSetDecayHfRatio end");
     return;
 }
 
@@ -1276,24 +1246,24 @@ void ReverbSetDecayHfRatio(ReverbContext *pContext, int16_t ratio){
 //
 //----------------------------------------------------------------------------
 
-int32_t ReverbGetDecayHfRatio(ReverbContext *pContext){
-    //ALOGV("\tReverbGetDecayHfRatio start");
+int32_t ReverbGetDecayHfRatio(ReverbContext* pContext) {
+    // ALOGV("\tReverbGetDecayHfRatio start");
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;   /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetDecayHfRatio")
-    //ALOGV("\tReverbGetDecayHfRatio Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetDecayHfRatio() just Got -> %d\n", ActiveParams.Damping);
+    // ALOGV("\tReverbGetDecayHfRatio Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetDecayHfRatio() just Got -> %d\n", ActiveParams.Damping);
 
-    if(ActiveParams.Damping != (LVM_INT16)(pContext->SavedDecayHfRatio / 20)){
+    if (ActiveParams.Damping != (LVM_INT16)(pContext->SavedDecayHfRatio / 20)) {
         ALOGV("\tLVM_ERROR : ReverbGetDecayHfRatio() has wrong level -> %d %d\n",
-         ActiveParams.Damping, pContext->SavedDecayHfRatio);
+              ActiveParams.Damping, pContext->SavedDecayHfRatio);
     }
 
-    //ALOGV("\tReverbGetDecayHfRatio end");
+    // ALOGV("\tReverbGetDecayHfRatio end");
     return pContext->SavedDecayHfRatio;
 }
 
@@ -1309,27 +1279,27 @@ int32_t ReverbGetDecayHfRatio(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetDiffusion(ReverbContext *pContext, int16_t level){
-    //ALOGV("\tReverbSetDiffusion start (%d)", level);
+void ReverbSetDiffusion(ReverbContext* pContext, int16_t level) {
+    // ALOGV("\tReverbSetDiffusion start (%d)", level);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetDiffusion")
-    //ALOGV("\tReverbSetDiffusion Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetDiffusion() just Got -> %d\n", ActiveParams.Density);
+    // ALOGV("\tReverbSetDiffusion Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetDiffusion() just Got -> %d\n", ActiveParams.Density);
 
-    ActiveParams.Density = (LVM_INT16)(level/10);
+    ActiveParams.Density = (LVM_INT16)(level / 10);
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetDiffusion")
-    //ALOGV("\tReverbSetDiffusion() just Set -> %d\n", ActiveParams.Density);
+    // ALOGV("\tReverbSetDiffusion() just Set -> %d\n", ActiveParams.Density);
 
     pContext->SavedDiffusion = level;
-    //ALOGV("\tReverbSetDiffusion end");
+    // ALOGV("\tReverbSetDiffusion end");
     return;
 }
 
@@ -1344,26 +1314,26 @@ void ReverbSetDiffusion(ReverbContext *pContext, int16_t level){
 //
 //----------------------------------------------------------------------------
 
-int32_t ReverbGetDiffusion(ReverbContext *pContext){
-    //ALOGV("\tReverbGetDiffusion start");
+int32_t ReverbGetDiffusion(ReverbContext* pContext) {
+    // ALOGV("\tReverbGetDiffusion start");
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-    LVM_INT16                 Temp;
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVM_INT16 Temp;
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetDiffusion")
-    //ALOGV("\tReverbGetDiffusion Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetDiffusion just Got -> %d\n", ActiveParams.Density);
+    // ALOGV("\tReverbGetDiffusion Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetDiffusion just Got -> %d\n", ActiveParams.Density);
 
-    Temp = (LVM_INT16)(pContext->SavedDiffusion/10);
+    Temp = (LVM_INT16)(pContext->SavedDiffusion / 10);
 
-    if(ActiveParams.Density != Temp){
+    if (ActiveParams.Density != Temp) {
         ALOGV("\tLVM_ERROR : ReverbGetDiffusion invalid value %d %d", Temp, ActiveParams.Density);
     }
 
-    //ALOGV("\tReverbGetDiffusion end");
+    // ALOGV("\tReverbGetDiffusion end");
     return pContext->SavedDiffusion;
 }
 
@@ -1379,27 +1349,27 @@ int32_t ReverbGetDiffusion(ReverbContext *pContext){
 //
 //----------------------------------------------------------------------------
 
-void ReverbSetDensity(ReverbContext *pContext, int16_t level){
-    //ALOGV("\tReverbSetDensity start (%d)", level);
+void ReverbSetDensity(ReverbContext* pContext, int16_t level) {
+    // ALOGV("\tReverbSetDensity start (%d)", level);
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbSetDensity")
-    //ALOGV("\tReverbSetDensity Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbSetDensity just Got -> %d\n", ActiveParams.RoomSize);
+    // ALOGV("\tReverbSetDensity Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbSetDensity just Got -> %d\n", ActiveParams.RoomSize);
 
     ActiveParams.RoomSize = (LVM_INT16)(((level * 99) / 1000) + 1);
 
     /* Activate the initial settings */
     LvmStatus = LVREV_SetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_SetControlParameters", "ReverbSetDensity")
-    //ALOGV("\tReverbSetDensity just Set -> %d\n", ActiveParams.RoomSize);
+    // ALOGV("\tReverbSetDensity just Set -> %d\n", ActiveParams.RoomSize);
 
     pContext->SavedDensity = level;
-    //ALOGV("\tReverbSetDensity end");
+    // ALOGV("\tReverbSetDensity end");
     return;
 }
 
@@ -1414,25 +1384,25 @@ void ReverbSetDensity(ReverbContext *pContext, int16_t level){
 //
 //----------------------------------------------------------------------------
 
-int32_t ReverbGetDensity(ReverbContext *pContext){
-    //ALOGV("\tReverbGetDensity start");
+int32_t ReverbGetDensity(ReverbContext* pContext) {
+    // ALOGV("\tReverbGetDensity start");
 
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
-    LVM_INT16                 Temp;
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
+    LVM_INT16 Temp;
     /* Get the current settings */
     LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "ReverbGetDensity")
-    //ALOGV("\tReverbGetDensity Succesfully returned from LVM_GetControlParameters\n");
-    //ALOGV("\tReverbGetDensity() just Got -> %d\n", ActiveParams.RoomSize);
+    // ALOGV("\tReverbGetDensity Successfully returned from LVM_GetControlParameters\n");
+    // ALOGV("\tReverbGetDensity() just Got -> %d\n", ActiveParams.RoomSize);
 
     Temp = (LVM_INT16)(((pContext->SavedDensity * 99) / 1000) + 1);
 
-    if(Temp != ActiveParams.RoomSize){
+    if (Temp != ActiveParams.RoomSize) {
         ALOGV("\tLVM_ERROR : ReverbGetDensity invalid value %d %d", Temp, ActiveParams.RoomSize);
     }
 
-    //ALOGV("\tReverbGetDensity end");
+    // ALOGV("\tReverbGetDensity end");
     return pContext->SavedDensity;
 }
 
@@ -1450,20 +1420,19 @@ int32_t ReverbGetDensity(ReverbContext *pContext){
 // Side Effects:
 //
 //----------------------------------------------------------------------------
-int Reverb_LoadPreset(ReverbContext   *pContext)
-{
-    //TODO: add reflections delay, level and reverb delay when early reflections are
+int Reverb_LoadPreset(ReverbContext* pContext) {
+    // TODO: add reflections delay, level and reverb delay when early reflections are
     // implemented
     pContext->curPreset = pContext->nextPreset;
 
     if (pContext->curPreset != REVERB_PRESET_NONE) {
-        const t_reverb_settings *preset = &sReverbPresets[pContext->curPreset];
+        const t_reverb_settings* preset = &sReverbPresets[pContext->curPreset];
         ReverbSetRoomLevel(pContext, preset->roomLevel);
         ReverbSetRoomHfLevel(pContext, preset->roomHFLevel);
         ReverbSetDecayTime(pContext, preset->decayTime);
         ReverbSetDecayHfRatio(pContext, preset->decayHFRatio);
-        //reflectionsLevel
-        //reflectionsDelay
+        // reflectionsLevel
+        // reflectionsDelay
         ReverbSetReverbLevel(pContext, preset->reverbLevel);
         // reverbDelay
         ReverbSetDiffusion(pContext, preset->diffusion);
@@ -1494,99 +1463,96 @@ int Reverb_LoadPreset(ReverbContext   *pContext)
 //
 //----------------------------------------------------------------------------
 
-int Reverb_getParameter(ReverbContext *pContext,
-                        void          *pParam,
-                        uint32_t      *pValueSize,
-                        void          *pValue){
+int Reverb_getParameter(ReverbContext* pContext, void* pParam, uint32_t* pValueSize, void* pValue) {
     int status = 0;
-    int32_t *pParamTemp = (int32_t *)pParam;
+    int32_t* pParamTemp = (int32_t*)pParam;
     int32_t param = *pParamTemp++;
-    t_reverb_settings *pProperties;
+    t_reverb_settings* pProperties;
 
-    //ALOGV("\tReverb_getParameter start");
+    // ALOGV("\tReverb_getParameter start");
     if (pContext->preset) {
         if (param != REVERB_PARAM_PRESET || *pValueSize < sizeof(uint16_t)) {
             return -EINVAL;
         }
 
-        *(uint16_t *)pValue = pContext->nextPreset;
+        *(uint16_t*)pValue = pContext->nextPreset;
         ALOGV("get REVERB_PARAM_PRESET, preset %d", pContext->nextPreset);
         return 0;
     }
 
-    switch (param){
+    switch (param) {
         case REVERB_PARAM_ROOM_LEVEL:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize1 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_ROOM_HF_LEVEL:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize12 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_DECAY_TIME:
-            if (*pValueSize != sizeof(uint32_t)){
+            if (*pValueSize != sizeof(uint32_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize3 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(uint32_t);
             break;
         case REVERB_PARAM_DECAY_HF_RATIO:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize4 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_REFLECTIONS_LEVEL:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize5 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_REFLECTIONS_DELAY:
-            if (*pValueSize != sizeof(uint32_t)){
+            if (*pValueSize != sizeof(uint32_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize6 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(uint32_t);
             break;
         case REVERB_PARAM_REVERB_LEVEL:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize7 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_REVERB_DELAY:
-            if (*pValueSize != sizeof(uint32_t)){
+            if (*pValueSize != sizeof(uint32_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize8 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(uint32_t);
             break;
         case REVERB_PARAM_DIFFUSION:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize9 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_DENSITY:
-            if (*pValueSize != sizeof(int16_t)){
+            if (*pValueSize != sizeof(int16_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize10 %d", *pValueSize);
                 return -EINVAL;
             }
             *pValueSize = sizeof(int16_t);
             break;
         case REVERB_PARAM_PROPERTIES:
-            if (*pValueSize != sizeof(t_reverb_settings)){
+            if (*pValueSize != sizeof(t_reverb_settings)) {
                 ALOGV("\tLVM_ERROR : Reverb_getParameter() invalid pValueSize11 %d", *pValueSize);
                 return -EINVAL;
             }
@@ -1598,9 +1564,9 @@ int Reverb_getParameter(ReverbContext *pContext,
             return -EINVAL;
     }
 
-    pProperties = (t_reverb_settings *) pValue;
+    pProperties = (t_reverb_settings*)pValue;
 
-    switch (param){
+    switch (param) {
         case REVERB_PARAM_PROPERTIES:
             pProperties->roomLevel = ReverbGetRoomLevel(pContext);
             pProperties->roomHFLevel = ReverbGetRoomHfLevel(pContext);
@@ -1614,74 +1580,74 @@ int Reverb_getParameter(ReverbContext *pContext,
             pProperties->density = ReverbGetDensity(pContext);
 
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is roomLevel        %d",
-                pProperties->roomLevel);
+                  pProperties->roomLevel);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is roomHFLevel      %d",
-                pProperties->roomHFLevel);
+                  pProperties->roomHFLevel);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is decayTime        %d",
-                pProperties->decayTime);
+                  pProperties->decayTime);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is decayHFRatio     %d",
-                pProperties->decayHFRatio);
+                  pProperties->decayHFRatio);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is reflectionsLevel %d",
-                pProperties->reflectionsLevel);
+                  pProperties->reflectionsLevel);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is reflectionsDelay %d",
-                pProperties->reflectionsDelay);
+                  pProperties->reflectionsDelay);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is reverbDelay      %d",
-                pProperties->reverbDelay);
+                  pProperties->reverbDelay);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is reverbLevel      %d",
-                pProperties->reverbLevel);
+                  pProperties->reverbLevel);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is diffusion        %d",
-                pProperties->diffusion);
+                  pProperties->diffusion);
             ALOGV("\tReverb_getParameter() REVERB_PARAM_PROPERTIES Value is density          %d",
-                pProperties->density);
+                  pProperties->density);
             break;
 
         case REVERB_PARAM_ROOM_LEVEL:
-            *(int16_t *)pValue = ReverbGetRoomLevel(pContext);
+            *(int16_t*)pValue = ReverbGetRoomLevel(pContext);
 
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_ROOM_LEVEL Value is %d",
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_ROOM_LEVEL Value is %d",
             //        *(int16_t *)pValue);
             break;
         case REVERB_PARAM_ROOM_HF_LEVEL:
-            *(int16_t *)pValue = ReverbGetRoomHfLevel(pContext);
+            *(int16_t*)pValue = ReverbGetRoomHfLevel(pContext);
 
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_ROOM_HF_LEVEL Value is %d",
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_ROOM_HF_LEVEL Value is %d",
             //        *(int16_t *)pValue);
             break;
         case REVERB_PARAM_DECAY_TIME:
-            *(uint32_t *)pValue = ReverbGetDecayTime(pContext);
+            *(uint32_t*)pValue = ReverbGetDecayTime(pContext);
 
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_DECAY_TIME Value is %d",
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_DECAY_TIME Value is %d",
             //        *(int32_t *)pValue);
             break;
         case REVERB_PARAM_DECAY_HF_RATIO:
-            *(int16_t *)pValue = ReverbGetDecayHfRatio(pContext);
+            *(int16_t*)pValue = ReverbGetDecayHfRatio(pContext);
 
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_DECAY_HF_RATION Value is %d",
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_DECAY_HF_RATION Value is %d",
             //        *(int16_t *)pValue);
             break;
         case REVERB_PARAM_REVERB_LEVEL:
-             *(int16_t *)pValue = ReverbGetReverbLevel(pContext);
+            *(int16_t*)pValue = ReverbGetReverbLevel(pContext);
 
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_REVERB_LEVEL Value is %d",
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_REVERB_LEVEL Value is %d",
             //        *(int16_t *)pValue);
             break;
         case REVERB_PARAM_DIFFUSION:
-            *(int16_t *)pValue = ReverbGetDiffusion(pContext);
+            *(int16_t*)pValue = ReverbGetDiffusion(pContext);
 
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_DECAY_DIFFUSION Value is %d",
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_DECAY_DIFFUSION Value is %d",
             //        *(int16_t *)pValue);
             break;
         case REVERB_PARAM_DENSITY:
-            *(int16_t *)pValue = ReverbGetDensity(pContext);
-            //ALOGV("\tReverb_getParameter() REVERB_PARAM_DENSITY Value is %d",
+            *(int16_t*)pValue = ReverbGetDensity(pContext);
+            // ALOGV("\tReverb_getParameter() REVERB_PARAM_DENSITY Value is %d",
             //        *(uint32_t *)pValue);
             break;
         case REVERB_PARAM_REFLECTIONS_LEVEL:
-            *(uint16_t *)pValue = 0;
+            *(uint16_t*)pValue = 0;
             break;
         case REVERB_PARAM_REFLECTIONS_DELAY:
         case REVERB_PARAM_REVERB_DELAY:
-            *(uint32_t *)pValue = 0;
+            *(uint32_t*)pValue = 0;
             break;
 
         default:
@@ -1690,7 +1656,7 @@ int Reverb_getParameter(ReverbContext *pContext,
             break;
     }
 
-    //ALOGV("\tReverb_getParameter end");
+    // ALOGV("\tReverb_getParameter end");
     return status;
 } /* end Reverb_getParameter */
 
@@ -1710,16 +1676,16 @@ int Reverb_getParameter(ReverbContext *pContext,
 //
 //----------------------------------------------------------------------------
 
-int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, int vsize){
+int Reverb_setParameter(ReverbContext* pContext, void* pParam, void* pValue, int vsize) {
     int status = 0;
     int16_t level;
     int16_t ratio;
     uint32_t time;
-    t_reverb_settings *pProperties;
-    int32_t *pParamTemp = (int32_t *)pParam;
+    t_reverb_settings* pProperties;
+    int32_t* pParamTemp = (int32_t*)pParam;
     int32_t param = *pParamTemp++;
 
-    //ALOGV("\tReverb_setParameter start");
+    // ALOGV("\tReverb_setParameter start");
     if (pContext->preset) {
         if (param != REVERB_PARAM_PRESET) {
             return -EINVAL;
@@ -1729,7 +1695,7 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
             return -EINVAL;
         }
 
-        uint16_t preset = *(uint16_t *)pValue;
+        uint16_t preset = *(uint16_t*)pValue;
         ALOGV("set REVERB_PARAM_PRESET, preset %d", preset);
         if (preset > REVERB_PRESET_LAST) {
             return -EINVAL;
@@ -1743,10 +1709,10 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
         return -EINVAL;
     }
 
-    switch (param){
+    switch (param) {
         case REVERB_PARAM_PROPERTIES:
             ALOGV("\tReverb_setParameter() REVERB_PARAM_PROPERTIES");
-            pProperties = (t_reverb_settings *) pValue;
+            pProperties = (t_reverb_settings*)pValue;
             ReverbSetRoomLevel(pContext, pProperties->roomLevel);
             ReverbSetRoomHfLevel(pContext, pProperties->roomHFLevel);
             ReverbSetDecayTime(pContext, pProperties->decayTime);
@@ -1756,55 +1722,55 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
             ReverbSetDensity(pContext, pProperties->density);
             break;
         case REVERB_PARAM_ROOM_LEVEL:
-            level = *(int16_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_ROOM_LEVEL value is %d", level);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetRoomLevel");
+            level = *(int16_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_ROOM_LEVEL value is %d", level);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetRoomLevel");
             ReverbSetRoomLevel(pContext, level);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetRoomLevel");
-           break;
-        case REVERB_PARAM_ROOM_HF_LEVEL:
-            level = *(int16_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_ROOM_HF_LEVEL value is %d", level);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetRoomHfLevel");
-            ReverbSetRoomHfLevel(pContext, level);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetRoomHfLevel");
-           break;
-        case REVERB_PARAM_DECAY_TIME:
-            time = *(uint32_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_TIME value is %d", time);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetDecayTime");
-            ReverbSetDecayTime(pContext, time);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetDecayTime");
-           break;
-        case REVERB_PARAM_DECAY_HF_RATIO:
-            ratio = *(int16_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_HF_RATIO value is %d", ratio);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetDecayHfRatio");
-            ReverbSetDecayHfRatio(pContext, ratio);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetDecayHfRatio");
+            // ALOGV("\tReverb_setParameter() Called ReverbSetRoomLevel");
             break;
-         case REVERB_PARAM_REVERB_LEVEL:
-            level = *(int16_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_REVERB_LEVEL value is %d", level);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetReverbLevel");
+        case REVERB_PARAM_ROOM_HF_LEVEL:
+            level = *(int16_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_ROOM_HF_LEVEL value is %d", level);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetRoomHfLevel");
+            ReverbSetRoomHfLevel(pContext, level);
+            // ALOGV("\tReverb_setParameter() Called ReverbSetRoomHfLevel");
+            break;
+        case REVERB_PARAM_DECAY_TIME:
+            time = *(uint32_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_TIME value is %d", time);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetDecayTime");
+            ReverbSetDecayTime(pContext, time);
+            // ALOGV("\tReverb_setParameter() Called ReverbSetDecayTime");
+            break;
+        case REVERB_PARAM_DECAY_HF_RATIO:
+            ratio = *(int16_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_HF_RATIO value is %d", ratio);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetDecayHfRatio");
+            ReverbSetDecayHfRatio(pContext, ratio);
+            // ALOGV("\tReverb_setParameter() Called ReverbSetDecayHfRatio");
+            break;
+        case REVERB_PARAM_REVERB_LEVEL:
+            level = *(int16_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_REVERB_LEVEL value is %d", level);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetReverbLevel");
             ReverbSetReverbLevel(pContext, level);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetReverbLevel");
-           break;
+            // ALOGV("\tReverb_setParameter() Called ReverbSetReverbLevel");
+            break;
         case REVERB_PARAM_DIFFUSION:
-            ratio = *(int16_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_DIFFUSION value is %d", ratio);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetDiffusion");
+            ratio = *(int16_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_DIFFUSION value is %d", ratio);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetDiffusion");
             ReverbSetDiffusion(pContext, ratio);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetDiffusion");
+            // ALOGV("\tReverb_setParameter() Called ReverbSetDiffusion");
             break;
         case REVERB_PARAM_DENSITY:
-            ratio = *(int16_t *)pValue;
-            //ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_DENSITY value is %d", ratio);
-            //ALOGV("\tReverb_setParameter() Calling ReverbSetDensity");
+            ratio = *(int16_t*)pValue;
+            // ALOGV("\tReverb_setParameter() REVERB_PARAM_DECAY_DENSITY value is %d", ratio);
+            // ALOGV("\tReverb_setParameter() Calling ReverbSetDensity");
             ReverbSetDensity(pContext, ratio);
-            //ALOGV("\tReverb_setParameter() Called ReverbSetDensity");
+            // ALOGV("\tReverb_setParameter() Called ReverbSetDensity");
             break;
-           break;
+            break;
         case REVERB_PARAM_REFLECTIONS_LEVEL:
         case REVERB_PARAM_REFLECTIONS_DELAY:
         case REVERB_PARAM_REVERB_DELAY:
@@ -1814,7 +1780,7 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
             break;
     }
 
-    //ALOGV("\tReverb_setParameter end");
+    // ALOGV("\tReverb_setParameter end");
     return status;
 } /* end Reverb_setParameter */
 
@@ -1823,52 +1789,46 @@ int Reverb_setParameter (ReverbContext *pContext, void *pParam, void *pValue, in
  */
 int Reverb_paramValueSize(int32_t param) {
     switch (param) {
-    case REVERB_PARAM_ROOM_LEVEL:
-    case REVERB_PARAM_ROOM_HF_LEVEL:
-    case REVERB_PARAM_REFLECTIONS_LEVEL:
-    case REVERB_PARAM_REVERB_LEVEL:
-        return sizeof(int16_t); // millibel
-    case REVERB_PARAM_DECAY_TIME:
-    case REVERB_PARAM_REFLECTIONS_DELAY:
-    case REVERB_PARAM_REVERB_DELAY:
-        return sizeof(uint32_t); // milliseconds
-    case REVERB_PARAM_DECAY_HF_RATIO:
-    case REVERB_PARAM_DIFFUSION:
-    case REVERB_PARAM_DENSITY:
-        return sizeof(int16_t); // permille
-    case REVERB_PARAM_PROPERTIES:
-        return sizeof(s_reverb_settings); // struct of all reverb properties
+        case REVERB_PARAM_ROOM_LEVEL:
+        case REVERB_PARAM_ROOM_HF_LEVEL:
+        case REVERB_PARAM_REFLECTIONS_LEVEL:
+        case REVERB_PARAM_REVERB_LEVEL:
+            return sizeof(int16_t);  // millibel
+        case REVERB_PARAM_DECAY_TIME:
+        case REVERB_PARAM_REFLECTIONS_DELAY:
+        case REVERB_PARAM_REVERB_DELAY:
+            return sizeof(uint32_t);  // milliseconds
+        case REVERB_PARAM_DECAY_HF_RATIO:
+        case REVERB_PARAM_DIFFUSION:
+        case REVERB_PARAM_DENSITY:
+            return sizeof(int16_t);  // permille
+        case REVERB_PARAM_PROPERTIES:
+            return sizeof(s_reverb_settings);  // struct of all reverb properties
     }
     return sizeof(int32_t);
 }
 
-} // namespace
-} // namespace
+}  // namespace
+}  // namespace android
 
 extern "C" {
 /* Effect Control Interface Implementation: Process */
-int Reverb_process(effect_handle_t   self,
-                                 audio_buffer_t         *inBuffer,
-                                 audio_buffer_t         *outBuffer){
-    android::ReverbContext * pContext = (android::ReverbContext *) self;
-    int    status = 0;
+int Reverb_process(effect_handle_t self, audio_buffer_t* inBuffer, audio_buffer_t* outBuffer) {
+    android::ReverbContext* pContext = (android::ReverbContext*)self;
+    int status = 0;
 
-    if (pContext == NULL){
+    if (pContext == NULL) {
         ALOGV("\tLVM_ERROR : Reverb_process() ERROR pContext == NULL");
         return -EINVAL;
     }
-    if (inBuffer == NULL  || inBuffer->raw == NULL  ||
-            outBuffer == NULL || outBuffer->raw == NULL ||
-            inBuffer->frameCount != outBuffer->frameCount){
+    if (inBuffer == NULL || inBuffer->raw == NULL || outBuffer == NULL || outBuffer->raw == NULL ||
+        inBuffer->frameCount != outBuffer->frameCount) {
         ALOGV("\tLVM_ERROR : Reverb_process() ERROR NULL INPUT POINTER OR FRAME COUNT IS WRONG");
         return -EINVAL;
     }
-    //ALOGV("\tReverb_process() Calling process with %d frames", outBuffer->frameCount);
+    // ALOGV("\tReverb_process() Calling process with %d frames", outBuffer->frameCount);
     /* Process all the available frames, block processing is handled internalLY by the LVM bundle */
-    status = process(    inBuffer->f32,
-                         outBuffer->f32,
-                         outBuffer->frameCount,
-                         pContext);
+    status = process(inBuffer->f32, outBuffer->f32, outBuffer->frameCount, pContext);
 
     if (pContext->bEnabled == LVM_FALSE) {
         if (pContext->SamplesToExitCount > 0) {
@@ -1880,72 +1840,67 @@ int Reverb_process(effect_handle_t   self,
     }
 
     return status;
-}   /* end Reverb_process */
+} /* end Reverb_process */
 
 /* Effect Control Interface Implementation: Command */
-int Reverb_command(effect_handle_t  self,
-                              uint32_t            cmdCode,
-                              uint32_t            cmdSize,
-                              void                *pCmdData,
-                              uint32_t            *replySize,
-                              void                *pReplyData){
-    android::ReverbContext * pContext = (android::ReverbContext *) self;
-    LVREV_ControlParams_st    ActiveParams;              /* Current control Parameters */
-    LVREV_ReturnStatus_en     LvmStatus=LVREV_SUCCESS;     /* Function call status */
+int Reverb_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize, void* pCmdData,
+                   uint32_t* replySize, void* pReplyData) {
+    android::ReverbContext* pContext = (android::ReverbContext*)self;
+    LVREV_ControlParams_st ActiveParams;             /* Current control Parameters */
+    LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
 
-    if (pContext == NULL){
+    if (pContext == NULL) {
         ALOGV("\tLVM_ERROR : Reverb_command ERROR pContext == NULL");
         return -EINVAL;
     }
 
-    //ALOGV("\tReverb_command INPUTS are: command %d cmdSize %d",cmdCode, cmdSize);
+    // ALOGV("\tReverb_command INPUTS are: command %d cmdSize %d",cmdCode, cmdSize);
 
-    switch (cmdCode){
+    switch (cmdCode) {
         case EFFECT_CMD_INIT:
-            //ALOGV("\tReverb_command cmdCode Case: "
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_INIT start");
 
-            if (pReplyData == NULL || replySize == NULL || *replySize != sizeof(int)){
+            if (pReplyData == NULL || replySize == NULL || *replySize != sizeof(int)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_INIT: ERROR");
+                      "EFFECT_CMD_INIT: ERROR");
                 return -EINVAL;
             }
-            *(int *) pReplyData = 0;
+            *(int*)pReplyData = 0;
             break;
 
         case EFFECT_CMD_SET_CONFIG:
-            //ALOGV("\tReverb_command cmdCode Case: "
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_SET_CONFIG start");
-            if (pCmdData == NULL || cmdSize != sizeof(effect_config_t) ||
-                    pReplyData == NULL || replySize == NULL || *replySize != sizeof(int)) {
+            if (pCmdData == NULL || cmdSize != sizeof(effect_config_t) || pReplyData == NULL ||
+                replySize == NULL || *replySize != sizeof(int)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_SET_CONFIG: ERROR");
+                      "EFFECT_CMD_SET_CONFIG: ERROR");
                 return -EINVAL;
             }
-            *(int *) pReplyData = android::Reverb_setConfig(pContext,
-                                                            (effect_config_t *) pCmdData);
+            *(int*)pReplyData = android::Reverb_setConfig(pContext, (effect_config_t*)pCmdData);
             break;
 
         case EFFECT_CMD_GET_CONFIG:
             if (pReplyData == NULL || replySize == NULL || *replySize != sizeof(effect_config_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_GET_CONFIG: ERROR");
+                      "EFFECT_CMD_GET_CONFIG: ERROR");
                 return -EINVAL;
             }
 
-            android::Reverb_getConfig(pContext, (effect_config_t *)pReplyData);
+            android::Reverb_getConfig(pContext, (effect_config_t*)pReplyData);
             break;
 
         case EFFECT_CMD_RESET:
-            //ALOGV("\tReverb_command cmdCode Case: "
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_RESET start");
             Reverb_setConfig(pContext, &pContext->config);
             break;
 
-        case EFFECT_CMD_GET_PARAM:{
-            //ALOGV("\tReverb_command cmdCode Case: "
+        case EFFECT_CMD_GET_PARAM: {
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_GET_PARAM start");
-            effect_param_t *p = (effect_param_t *)pCmdData;
+            effect_param_t* p = (effect_param_t*)pCmdData;
             if (pCmdData == nullptr) {
                 ALOGW("\tLVM_ERROR : pCmdData is NULL");
                 return -EINVAL;
@@ -1954,163 +1909,156 @@ int Reverb_command(effect_handle_t  self,
                 android_errorWriteLog(0x534e4554, "26347509");
                 return -EINVAL;
             }
-            if (cmdSize < sizeof(effect_param_t) ||
-                    cmdSize < (sizeof(effect_param_t) + p->psize) ||
-                    pReplyData == NULL || replySize == NULL ||
-                    *replySize < (sizeof(effect_param_t) + p->psize)) {
+            if (cmdSize < sizeof(effect_param_t) || cmdSize < (sizeof(effect_param_t) + p->psize) ||
+                pReplyData == NULL || replySize == NULL ||
+                *replySize < (sizeof(effect_param_t) + p->psize)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_GET_PARAM: ERROR");
+                      "EFFECT_CMD_GET_PARAM: ERROR");
                 return -EINVAL;
             }
 
             memcpy(pReplyData, pCmdData, sizeof(effect_param_t) + p->psize);
 
-            p = (effect_param_t *)pReplyData;
+            p = (effect_param_t*)pReplyData;
 
             int voffset = ((p->psize - 1) / sizeof(int32_t) + 1) * sizeof(int32_t);
 
-            p->status = android::Reverb_getParameter(pContext,
-                                                         (void *)p->data,
-                                                          &p->vsize,
-                                                          p->data + voffset);
+            p->status = android::Reverb_getParameter(pContext, (void*)p->data, &p->vsize,
+                                                     p->data + voffset);
 
             *replySize = sizeof(effect_param_t) + voffset + p->vsize;
 
-            //ALOGV("\tReverb_command EFFECT_CMD_GET_PARAM "
+            // ALOGV("\tReverb_command EFFECT_CMD_GET_PARAM "
             //        "*pCmdData %d, *replySize %d, *pReplyData %d ",
             //        *(int32_t *)((char *)pCmdData + sizeof(effect_param_t)),
             //        *replySize,
             //        *(int16_t *)((char *)pReplyData + sizeof(effect_param_t) + voffset));
 
         } break;
-        case EFFECT_CMD_SET_PARAM:{
-
-            //ALOGV("\tReverb_command cmdCode Case: "
+        case EFFECT_CMD_SET_PARAM: {
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_SET_PARAM start");
-            //ALOGV("\tReverb_command EFFECT_CMD_SET_PARAM param %d, *replySize %d, value %d ",
+            // ALOGV("\tReverb_command EFFECT_CMD_SET_PARAM param %d, *replySize %d, value %d ",
             //        *(int32_t *)((char *)pCmdData + sizeof(effect_param_t)),
             //        *replySize,
             //        *(int16_t *)((char *)pCmdData + sizeof(effect_param_t) + sizeof(int32_t)));
 
             if (pCmdData == NULL || (cmdSize < (sizeof(effect_param_t) + sizeof(int32_t))) ||
-                    pReplyData == NULL ||  replySize == NULL || *replySize != sizeof(int32_t)) {
+                pReplyData == NULL || replySize == NULL || *replySize != sizeof(int32_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_SET_PARAM: ERROR");
+                      "EFFECT_CMD_SET_PARAM: ERROR");
                 return -EINVAL;
             }
 
-            effect_param_t *p = (effect_param_t *) pCmdData;
+            effect_param_t* p = (effect_param_t*)pCmdData;
 
-            if (p->psize != sizeof(int32_t)){
+            if (p->psize != sizeof(int32_t)) {
                 ALOGV("\t4LVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_SET_PARAM: ERROR, psize is not sizeof(int32_t)");
+                      "EFFECT_CMD_SET_PARAM: ERROR, psize is not sizeof(int32_t)");
                 return -EINVAL;
             }
 
-            //ALOGV("\tn5Reverb_command cmdSize is %d\n"
+            // ALOGV("\tn5Reverb_command cmdSize is %d\n"
             //        "\tsizeof(effect_param_t) is  %d\n"
             //        "\tp->psize is %d\n"
             //        "\tp->vsize is %d"
             //        "\n",
             //        cmdSize, sizeof(effect_param_t), p->psize, p->vsize );
 
-            *(int *)pReplyData = android::Reverb_setParameter(pContext,
-                                                             (void *)p->data,
-                                                              p->data + p->psize,
-                                                              p->vsize);
+            *(int*)pReplyData = android::Reverb_setParameter(pContext, (void*)p->data,
+                                                             p->data + p->psize, p->vsize);
         } break;
 
         case EFFECT_CMD_ENABLE:
-            //ALOGV("\tReverb_command cmdCode Case: "
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_ENABLE start");
 
-            if (pReplyData == NULL || *replySize != sizeof(int)){
+            if (pReplyData == NULL || *replySize != sizeof(int)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_ENABLE: ERROR");
+                      "EFFECT_CMD_ENABLE: ERROR");
                 return -EINVAL;
             }
-            if(pContext->bEnabled == LVM_TRUE){
-                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                         "EFFECT_CMD_ENABLE: ERROR-Effect is already enabled");
-                 return -EINVAL;
-             }
-            *(int *)pReplyData = 0;
+            if (pContext->bEnabled == LVM_TRUE) {
+                ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
+                      "EFFECT_CMD_ENABLE: ERROR-Effect is already enabled");
+                return -EINVAL;
+            }
+            *(int*)pReplyData = 0;
             pContext->bEnabled = LVM_TRUE;
             /* Get the current settings */
             LvmStatus = LVREV_GetControlParameters(pContext->hInstance, &ActiveParams);
             LVM_ERROR_CHECK(LvmStatus, "LVREV_GetControlParameters", "EFFECT_CMD_ENABLE")
             pContext->SamplesToExitCount =
-                    (ActiveParams.T60 * pContext->config.inputCfg.samplingRate)/1000;
+                    (ActiveParams.T60 * pContext->config.inputCfg.samplingRate) / 1000;
             // force no volume ramp for first buffer processed after enabling the effect
             pContext->volumeMode = android::REVERB_VOLUME_FLAT;
-            //ALOGV("\tEFFECT_CMD_ENABLE SamplesToExitCount = %d", pContext->SamplesToExitCount);
+            // ALOGV("\tEFFECT_CMD_ENABLE SamplesToExitCount = %d", pContext->SamplesToExitCount);
             break;
         case EFFECT_CMD_DISABLE:
-            //ALOGV("\tReverb_command cmdCode Case: "
+            // ALOGV("\tReverb_command cmdCode Case: "
             //        "EFFECT_CMD_DISABLE start");
 
-            if (pReplyData == NULL || *replySize != sizeof(int)){
+            if (pReplyData == NULL || *replySize != sizeof(int)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_DISABLE: ERROR");
+                      "EFFECT_CMD_DISABLE: ERROR");
                 return -EINVAL;
             }
-            if(pContext->bEnabled == LVM_FALSE){
-                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                         "EFFECT_CMD_DISABLE: ERROR-Effect is not yet enabled");
-                 return -EINVAL;
-             }
-            *(int *)pReplyData = 0;
+            if (pContext->bEnabled == LVM_FALSE) {
+                ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
+                      "EFFECT_CMD_DISABLE: ERROR-Effect is not yet enabled");
+                return -EINVAL;
+            }
+            *(int*)pReplyData = 0;
             pContext->bEnabled = LVM_FALSE;
             break;
 
         case EFFECT_CMD_SET_VOLUME:
-            if (pCmdData == NULL ||
-                cmdSize != 2 * sizeof(uint32_t)) {
+            if (pCmdData == NULL || cmdSize != 2 * sizeof(uint32_t)) {
                 ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                        "EFFECT_CMD_SET_VOLUME: ERROR");
+                      "EFFECT_CMD_SET_VOLUME: ERROR");
                 return -EINVAL;
             }
 
-            if (pReplyData != NULL) { // we have volume control
-                pContext->leftVolume = (LVM_INT16)((*(uint32_t *)pCmdData + (1 << 11)) >> 12);
-                pContext->rightVolume = (LVM_INT16)((*((uint32_t *)pCmdData + 1) + (1 << 11)) >> 12);
-                *(uint32_t *)pReplyData = (1 << 24);
-                *((uint32_t *)pReplyData + 1) = (1 << 24);
+            if (pReplyData != NULL) {  // we have volume control
+                pContext->leftVolume = (LVM_INT16)((*(uint32_t*)pCmdData + (1 << 11)) >> 12);
+                pContext->rightVolume = (LVM_INT16)((*((uint32_t*)pCmdData + 1) + (1 << 11)) >> 12);
+                *(uint32_t*)pReplyData = (1 << 24);
+                *((uint32_t*)pReplyData + 1) = (1 << 24);
                 if (pContext->volumeMode == android::REVERB_VOLUME_OFF) {
                     // force no volume ramp for first buffer processed after getting volume control
                     pContext->volumeMode = android::REVERB_VOLUME_FLAT;
                 }
-            } else { // we don't have volume control
+            } else {  // we don't have volume control
                 pContext->leftVolume = REVERB_UNIT_VOLUME;
                 pContext->rightVolume = REVERB_UNIT_VOLUME;
                 pContext->volumeMode = android::REVERB_VOLUME_OFF;
             }
-            ALOGV("EFFECT_CMD_SET_VOLUME left %d, right %d mode %d",
-                    pContext->leftVolume, pContext->rightVolume,  pContext->volumeMode);
+            ALOGV("EFFECT_CMD_SET_VOLUME left %d, right %d mode %d", pContext->leftVolume,
+                  pContext->rightVolume, pContext->volumeMode);
             break;
 
         case EFFECT_CMD_SET_DEVICE:
         case EFFECT_CMD_SET_AUDIO_MODE:
-        //ALOGV("\tReverb_command cmdCode Case: "
-        //        "EFFECT_CMD_SET_DEVICE/EFFECT_CMD_SET_VOLUME/EFFECT_CMD_SET_AUDIO_MODE start");
+            // ALOGV("\tReverb_command cmdCode Case: "
+            //        "EFFECT_CMD_SET_DEVICE/EFFECT_CMD_SET_VOLUME/EFFECT_CMD_SET_AUDIO_MODE
+            //        start");
             break;
 
         default:
             ALOGV("\tLVM_ERROR : Reverb_command cmdCode Case: "
-                    "DEFAULT start %d ERROR",cmdCode);
+                  "DEFAULT start %d ERROR",
+                  cmdCode);
             return -EINVAL;
     }
 
-    //ALOGV("\tReverb_command end\n\n");
+    // ALOGV("\tReverb_command end\n\n");
     return 0;
-}    /* end Reverb_command */
+} /* end Reverb_command */
 
 /* Effect Control Interface Implementation: get_descriptor */
-int Reverb_getDescriptor(effect_handle_t   self,
-                                    effect_descriptor_t *pDescriptor)
-{
-    android::ReverbContext * pContext = (android::ReverbContext *)self;
-    const effect_descriptor_t *desc;
+int Reverb_getDescriptor(effect_handle_t self, effect_descriptor_t* pDescriptor) {
+    android::ReverbContext* pContext = (android::ReverbContext*)self;
+    const effect_descriptor_t* desc;
 
     if (pContext == NULL || pDescriptor == NULL) {
         ALOGV("Reverb_getDescriptor() invalid param");
@@ -2134,26 +2082,24 @@ int Reverb_getDescriptor(effect_handle_t   self,
     *pDescriptor = *desc;
 
     return 0;
-}   /* end Reverb_getDescriptor */
+} /* end Reverb_getDescriptor */
 
 // effect_handle_t interface implementation for Reverb effect
 const struct effect_interface_s gReverbInterface = {
-    Reverb_process,
-    Reverb_command,
-    Reverb_getDescriptor,
-    NULL,
-};    /* end gReverbInterface */
+        Reverb_process,
+        Reverb_command,
+        Reverb_getDescriptor,
+        NULL,
+}; /* end gReverbInterface */
 
 // This is the only symbol that needs to be exported
-__attribute__ ((visibility ("default")))
-audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
-    .tag = AUDIO_EFFECT_LIBRARY_TAG,
-    .version = EFFECT_LIBRARY_API_VERSION,
-    .name = "Reverb Library",
-    .implementor = "NXP Software Ltd.",
-    .create_effect = android::EffectCreate,
-    .release_effect = android::EffectRelease,
-    .get_descriptor = android::EffectGetDescriptor,
+__attribute__((visibility("default"))) audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
+        .tag = AUDIO_EFFECT_LIBRARY_TAG,
+        .version = EFFECT_LIBRARY_API_VERSION,
+        .name = "Reverb Library",
+        .implementor = "NXP Software Ltd.",
+        .create_effect = android::EffectCreate,
+        .release_effect = android::EffectRelease,
+        .get_descriptor = android::EffectGetDescriptor,
 };
-
 }

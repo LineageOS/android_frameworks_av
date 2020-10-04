@@ -47,15 +47,12 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-LVDBE_ReturnStatus_en LVDBE_GetParameters(LVDBE_Handle_t        hInstance,
-                                            LVDBE_Params_t        *pParams)
-{
-
-    LVDBE_Instance_t    *pInstance =(LVDBE_Instance_t  *)hInstance;
+LVDBE_ReturnStatus_en LVDBE_GetParameters(LVDBE_Handle_t hInstance, LVDBE_Params_t* pParams) {
+    LVDBE_Instance_t* pInstance = (LVDBE_Instance_t*)hInstance;
 
     *pParams = pInstance->Params;
 
-    return(LVDBE_SUCCESS);
+    return (LVDBE_SUCCESS);
 }
 
 /************************************************************************************/
@@ -77,15 +74,13 @@ LVDBE_ReturnStatus_en LVDBE_GetParameters(LVDBE_Handle_t        hInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-LVDBE_ReturnStatus_en LVDBE_GetCapabilities(LVDBE_Handle_t            hInstance,
-                                              LVDBE_Capabilities_t    *pCapabilities)
-{
-
-    LVDBE_Instance_t    *pInstance =(LVDBE_Instance_t  *)hInstance;
+LVDBE_ReturnStatus_en LVDBE_GetCapabilities(LVDBE_Handle_t hInstance,
+                                            LVDBE_Capabilities_t* pCapabilities) {
+    LVDBE_Instance_t* pInstance = (LVDBE_Instance_t*)hInstance;
 
     *pCapabilities = pInstance->Capabilities;
 
-    return(LVDBE_SUCCESS);
+    return (LVDBE_SUCCESS);
 }
 
 /************************************************************************************/
@@ -101,35 +96,33 @@ LVDBE_ReturnStatus_en LVDBE_GetCapabilities(LVDBE_Handle_t            hInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
-                         LVDBE_Params_t       *pParams)
-{
-
+void LVDBE_SetFilters(LVDBE_Instance_t* pInstance, LVDBE_Params_t* pParams) {
     /*
      * Calculate the table offsets
      */
-    LVM_UINT16 Offset = (LVM_UINT16)((LVM_UINT16)pParams->SampleRate + \
-                                    (LVM_UINT16)(pParams->CentreFrequency * (1+LVDBE_FS_192000)));
+    LVM_UINT16 Offset =
+            (LVM_UINT16)((LVM_UINT16)pParams->SampleRate +
+                         (LVM_UINT16)(pParams->CentreFrequency * (1 + LVDBE_FS_192000)));
 
     /*
      * Setup the high pass filter
      */
-    LoadConst_Float(0,                                          /* Clear the history, value 0 */
-                   (LVM_FLOAT *)&pInstance->pData->HPFTaps,     /* Destination */
+    LoadConst_Float(0,                                      /* Clear the history, value 0 */
+                    (LVM_FLOAT*)&pInstance->pData->HPFTaps, /* Destination */
                     sizeof(pInstance->pData->HPFTaps) / sizeof(LVM_FLOAT)); /* Number of words */
-    BQ_2I_D32F32Cll_TRC_WRA_01_Init(&pInstance->pCoef->HPFInstance,    /* Initialise the filter */
+    BQ_2I_D32F32Cll_TRC_WRA_01_Init(&pInstance->pCoef->HPFInstance, /* Initialise the filter */
                                     &pInstance->pData->HPFTaps,
-                                    (BQ_FLOAT_Coefs_t *)&LVDBE_HPF_Table[Offset]);
+                                    (BQ_FLOAT_Coefs_t*)&LVDBE_HPF_Table[Offset]);
 
     /*
      * Setup the band pass filter
      */
-    LoadConst_Float(0,                                           /* Clear the history, value 0 */
-                 (LVM_FLOAT *)&pInstance->pData->BPFTaps,        /* Destination */
-                 sizeof(pInstance->pData->BPFTaps) / sizeof(LVM_FLOAT));   /* Number of words */
-    BP_1I_D32F32Cll_TRC_WRA_02_Init(&pInstance->pCoef->BPFInstance,    /* Initialise the filter */
+    LoadConst_Float(0,                                      /* Clear the history, value 0 */
+                    (LVM_FLOAT*)&pInstance->pData->BPFTaps, /* Destination */
+                    sizeof(pInstance->pData->BPFTaps) / sizeof(LVM_FLOAT)); /* Number of words */
+    BP_1I_D32F32Cll_TRC_WRA_02_Init(&pInstance->pCoef->BPFInstance, /* Initialise the filter */
                                     &pInstance->pData->BPFTaps,
-                                    (BP_FLOAT_Coefs_t *)&LVDBE_BPF_Table[Offset]);
+                                    (BP_FLOAT_Coefs_t*)&LVDBE_BPF_Table[Offset]);
 }
 
 /************************************************************************************/
@@ -145,29 +138,26 @@ void    LVDBE_SetFilters(LVDBE_Instance_t     *pInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-void    LVDBE_SetAGC(LVDBE_Instance_t     *pInstance,
-                     LVDBE_Params_t       *pParams)
-{
-
+void LVDBE_SetAGC(LVDBE_Instance_t* pInstance, LVDBE_Params_t* pParams) {
     /*
      * Get the attack and decay time constants
      */
-    pInstance->pData->AGCInstance.AGC_Attack = LVDBE_AGC_ATTACK_Table[(LVM_UINT16)pParams->SampleRate];  /* Attack multiplier */
-    pInstance->pData->AGCInstance.AGC_Decay  = LVDBE_AGC_DECAY_Table[(LVM_UINT16)pParams->SampleRate];   /* Decay multipler */
+    pInstance->pData->AGCInstance.AGC_Attack =
+            LVDBE_AGC_ATTACK_Table[(LVM_UINT16)pParams->SampleRate]; /* Attack multiplier */
+    pInstance->pData->AGCInstance.AGC_Decay =
+            LVDBE_AGC_DECAY_Table[(LVM_UINT16)pParams->SampleRate]; /* Decay multipler */
 
     /*
      * Get the boost gain
      */
-    if (pParams->HPFSelect == LVDBE_HPF_ON)
-    {
-        pInstance->pData->AGCInstance.AGC_MaxGain   = LVDBE_AGC_HPFGAIN_Table[(LVM_UINT16)pParams->EffectLevel];  /* High pass filter on */
-    }
-    else
-    {
-        pInstance->pData->AGCInstance.AGC_MaxGain   = LVDBE_AGC_GAIN_Table[(LVM_UINT16)pParams->EffectLevel];     /* High pass filter off */
+    if (pParams->HPFSelect == LVDBE_HPF_ON) {
+        pInstance->pData->AGCInstance.AGC_MaxGain =
+                LVDBE_AGC_HPFGAIN_Table[(LVM_UINT16)pParams->EffectLevel]; /* High pass filter on */
+    } else {
+        pInstance->pData->AGCInstance.AGC_MaxGain =
+                LVDBE_AGC_GAIN_Table[(LVM_UINT16)pParams->EffectLevel]; /* High pass filter off */
     }
     pInstance->pData->AGCInstance.AGC_Target = AGC_TARGETLEVEL;
-
 }
 
 /************************************************************************************/
@@ -193,29 +183,22 @@ void    LVDBE_SetAGC(LVDBE_Instance_t     *pInstance,
 /*                                                                                  */
 /************************************************************************************/
 
-void    LVDBE_SetVolume(LVDBE_Instance_t     *pInstance,
-                        LVDBE_Params_t       *pParams)
-{
+void LVDBE_SetVolume(LVDBE_Instance_t* pInstance, LVDBE_Params_t* pParams) {
+    LVM_UINT16 dBShifts;  /* 6dB shifts */
+    LVM_UINT16 dBOffset;  /* Table offset */
+    LVM_INT16 Volume = 0; /* Required volume in dBs */
 
-    LVM_UINT16      dBShifts;                                   /* 6dB shifts */
-    LVM_UINT16      dBOffset;                                   /* Table offset */
-    LVM_INT16       Volume = 0;                                 /* Required volume in dBs */
-
-    LVM_FLOAT        dBShifts_fac;
+    LVM_FLOAT dBShifts_fac;
     /*
      * Apply the volume if enabled
      */
-    if (pParams->VolumeControl == LVDBE_VOLUME_ON)
-    {
+    if (pParams->VolumeControl == LVDBE_VOLUME_ON) {
         /*
          * Limit the gain to the maximum allowed
          */
-        if  (pParams->VolumedB > VOLUME_MAX)
-        {
+        if (pParams->VolumedB > VOLUME_MAX) {
             Volume = VOLUME_MAX;
-        }
-        else
-        {
+        } else {
             Volume = pParams->VolumedB;
         }
     }
@@ -223,8 +206,8 @@ void    LVDBE_SetVolume(LVDBE_Instance_t     *pInstance,
     /*
      * Calculate the required gain and shifts
      */
-    dBOffset = (LVM_UINT16)(6 + Volume % 6);                    /* Get the dBs 0-5 */
-    dBShifts = (LVM_UINT16)(Volume / -6);                       /* Get the 6dB shifts */
+    dBOffset = (LVM_UINT16)(6 + Volume % 6); /* Get the dBs 0-5 */
+    dBShifts = (LVM_UINT16)(Volume / -6);    /* Get the 6dB shifts */
 
     dBShifts_fac = (LVM_FLOAT)(1 << dBShifts);
     /*
@@ -232,27 +215,23 @@ void    LVDBE_SetVolume(LVDBE_Instance_t     *pInstance,
      */
     pInstance->pData->AGCInstance.Target = (LVDBE_VolumeTable[dBOffset]);
     pInstance->pData->AGCInstance.Target = pInstance->pData->AGCInstance.Target / dBShifts_fac;
-    pInstance->pData->AGCInstance.VolumeTC    = LVDBE_VolumeTCTable[(LVM_UINT16)pParams->SampleRate];   /* Volume update time constant */
+    pInstance->pData->AGCInstance.VolumeTC =
+            LVDBE_VolumeTCTable[(LVM_UINT16)pParams->SampleRate]; /* Volume update time constant */
 
     /*
      * When DBE is disabled use the bypass volume control
      */
-    if(dBShifts > 0)
-    {
+    if (dBShifts > 0) {
         LVC_Mixer_SetTarget(&pInstance->pData->BypassVolume.MixerStream[0],
                             LVDBE_VolumeTable[dBOffset] / dBShifts_fac);
-    }
-    else
-    {
+    } else {
         LVC_Mixer_SetTarget(&pInstance->pData->BypassVolume.MixerStream[0],
                             LVDBE_VolumeTable[dBOffset]);
     }
 
     pInstance->pData->BypassVolume.MixerStream[0].CallbackSet = 1;
     LVC_Mixer_VarSlope_SetTimeConstant(&pInstance->pData->BypassVolume.MixerStream[0],
-                                LVDBE_MIXER_TC,
-                                (LVM_Fs_en)pInstance->Params.SampleRate,
-                                2);
+                                       LVDBE_MIXER_TC, (LVM_Fs_en)pInstance->Params.SampleRate, 2);
 }
 
 /****************************************************************************************/
@@ -292,21 +271,17 @@ void    LVDBE_SetVolume(LVDBE_Instance_t     *pInstance,
 /*                                                                                      */
 /****************************************************************************************/
 
-LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t         hInstance,
-                                      LVDBE_Params_t         *pParams)
-{
-
-    LVDBE_Instance_t    *pInstance =(LVDBE_Instance_t  *)hInstance;
-    LVMixer3_2St_FLOAT_st     *pBypassMixer_Instance = &pInstance->pData->BypassMixer;
+LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t hInstance, LVDBE_Params_t* pParams) {
+    LVDBE_Instance_t* pInstance = (LVDBE_Instance_t*)hInstance;
+    LVMixer3_2St_FLOAT_st* pBypassMixer_Instance = &pInstance->pData->BypassMixer;
 
     /*
      * Update the filters
      */
     if ((pInstance->Params.SampleRate != pParams->SampleRate) ||
-        (pInstance->Params.CentreFrequency != pParams->CentreFrequency))
-    {
-        LVDBE_SetFilters(pInstance,                     /* Instance pointer */
-                         pParams);                      /* New parameters */
+        (pInstance->Params.CentreFrequency != pParams->CentreFrequency)) {
+        LVDBE_SetFilters(pInstance, /* Instance pointer */
+                         pParams);  /* New parameters */
     }
 
     /*
@@ -314,16 +289,14 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t         hInstance,
      */
     if ((pInstance->Params.SampleRate != pParams->SampleRate) ||
         (pInstance->Params.EffectLevel != pParams->EffectLevel) ||
-        (pInstance->Params.HPFSelect != pParams->HPFSelect))
-    {
-        LVDBE_SetAGC(pInstance,                         /* Instance pointer */
-                     pParams);                          /* New parameters */
-        LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0],
-            LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate, 2);
+        (pInstance->Params.HPFSelect != pParams->HPFSelect)) {
+        LVDBE_SetAGC(pInstance, /* Instance pointer */
+                     pParams);  /* New parameters */
+        LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[0], LVDBE_BYPASS_MIXER_TC,
+                                  (LVM_Fs_en)pParams->SampleRate, 2);
 
-        LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1],
-            LVDBE_BYPASS_MIXER_TC,(LVM_Fs_en)pParams->SampleRate, 2);
-
+        LVC_Mixer_SetTimeConstant(&pBypassMixer_Instance->MixerStream[1], LVDBE_BYPASS_MIXER_TC,
+                                  (LVM_Fs_en)pParams->SampleRate, 2);
     }
 
     /*
@@ -332,19 +305,16 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t         hInstance,
     if ((pInstance->Params.VolumedB != pParams->VolumedB) ||
         (pInstance->Params.SampleRate != pParams->SampleRate) ||
         (pInstance->Params.HeadroomdB != pParams->HeadroomdB) ||
-        (pInstance->Params.VolumeControl != pParams->VolumeControl))
-    {
-        LVDBE_SetVolume(pInstance,                      /* Instance pointer */
-                       pParams);                        /* New parameters */
+        (pInstance->Params.VolumeControl != pParams->VolumeControl)) {
+        LVDBE_SetVolume(pInstance, /* Instance pointer */
+                        pParams);  /* New parameters */
     }
 
-    if (pInstance->Params.OperatingMode==LVDBE_ON && pParams->OperatingMode==LVDBE_OFF)
-    {
+    if (pInstance->Params.OperatingMode == LVDBE_ON && pParams->OperatingMode == LVDBE_OFF) {
         LVC_Mixer_SetTarget(&pInstance->pData->BypassMixer.MixerStream[0], 0);
         LVC_Mixer_SetTarget(&pInstance->pData->BypassMixer.MixerStream[1], 1.0f);
     }
-    if (pInstance->Params.OperatingMode==LVDBE_OFF && pParams->OperatingMode==LVDBE_ON)
-    {
+    if (pInstance->Params.OperatingMode == LVDBE_OFF && pParams->OperatingMode == LVDBE_ON) {
         LVC_Mixer_SetTarget(&pInstance->pData->BypassMixer.MixerStream[0], 1.0f);
         LVC_Mixer_SetTarget(&pInstance->pData->BypassMixer.MixerStream[1], 0);
     }
@@ -354,5 +324,5 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t         hInstance,
      */
     pInstance->Params = *pParams;
 
-    return(LVDBE_SUCCESS);
+    return (LVDBE_SUCCESS);
 }

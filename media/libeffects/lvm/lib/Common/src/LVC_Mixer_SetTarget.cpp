@@ -43,9 +43,7 @@
 /*  void                                                                */
 /*                                                                      */
 /************************************************************************/
-void LVC_Mixer_SetTarget(LVMixer3_FLOAT_st *pStream,
-                         LVM_FLOAT         TargetGain)
-{
-    Mix_Private_FLOAT_st *pInstance = (Mix_Private_FLOAT_st *)pStream->PrivateParams;
-    pInstance->Target = TargetGain;               // Update gain Target
+void LVC_Mixer_SetTarget(LVMixer3_FLOAT_st* pStream, LVM_FLOAT TargetGain) {
+    Mix_Private_FLOAT_st* pInstance = (Mix_Private_FLOAT_st*)pStream->PrivateParams;
+    pInstance->Target = TargetGain;  // Update gain Target
 }

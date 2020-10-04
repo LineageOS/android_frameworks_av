@@ -87,8 +87,8 @@
 /****************************************************************************************/
 
 /* Callback events */
-#define LVEQNB_EVENT_NONE                   0x0000    /* Not a valid event */
-#define LVEQNB_EVENT_ALGOFF                 0x0001    /* EQNB has completed switch off */
+#define LVEQNB_EVENT_NONE 0x0000   /* Not a valid event */
+#define LVEQNB_EVENT_ALGOFF 0x0001 /* EQNB has completed switch off */
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -97,32 +97,25 @@
 /****************************************************************************************/
 
 /* Instance handle */
-typedef void *LVEQNB_Handle_t;
+typedef void* LVEQNB_Handle_t;
 
 /* Operating modes */
-typedef enum
-{
-    LVEQNB_BYPASS   = 0,
-    LVEQNB_ON       = 1,
-    LVEQNB_MODE_MAX = LVM_MAXINT_32
-} LVEQNB_Mode_en;
+typedef enum { LVEQNB_BYPASS = 0, LVEQNB_ON = 1, LVEQNB_MODE_MAX = LVM_MAXINT_32 } LVEQNB_Mode_en;
 
 /* Filter mode control */
-typedef enum
-{
-    LVEQNB_FILTER_OFF   = 0,
-    LVEQNB_FILTER_ON    = 1,
+typedef enum {
+    LVEQNB_FILTER_OFF = 0,
+    LVEQNB_FILTER_ON = 1,
     LVEQNB_FILTER_DUMMY = LVM_MAXINT_32
 } LVEQNB_FilterMode_en;
 
 /* Function return status */
-typedef enum
-{
-    LVEQNB_SUCCESS        = 0,                          /* Successful return from a routine */
-    LVEQNB_ALIGNMENTERROR = 1,                          /* Memory alignment error */
-    LVEQNB_NULLADDRESS    = 2,                          /* NULL allocation address */
-    LVEQNB_TOOMANYSAMPLES = 3,                          /* Maximum block size exceeded */
-    LVEQNB_STATUS_MAX     = LVM_MAXINT_32
+typedef enum {
+    LVEQNB_SUCCESS = 0,        /* Successful return from a routine */
+    LVEQNB_ALIGNMENTERROR = 1, /* Memory alignment error */
+    LVEQNB_NULLADDRESS = 2,    /* NULL allocation address */
+    LVEQNB_TOOMANYSAMPLES = 3, /* Maximum block size exceeded */
+    LVEQNB_STATUS_MAX = LVM_MAXINT_32
 } LVEQNB_ReturnStatus_en;
 
 /****************************************************************************************/
@@ -149,37 +142,35 @@ typedef enum
 /*
  * Supported source data formats
  */
-#define LVEQNB_CAP_STEREO                  1
-#define LVEQNB_CAP_MONOINSTEREO            2
+#define LVEQNB_CAP_STEREO 1
+#define LVEQNB_CAP_MONOINSTEREO 2
 
-typedef enum
-{
-    LVEQNB_STEREO       = 0,
+typedef enum {
+    LVEQNB_STEREO = 0,
     LVEQNB_MONOINSTEREO = 1,
     LVEQNB_MULTICHANNEL = 2,
-    LVEQNB_SOURCE_MAX   = LVM_MAXINT_32
+    LVEQNB_SOURCE_MAX = LVM_MAXINT_32
 } LVEQNB_SourceFormat_en;
 
 /*
  * Supported sample rates in samples per second
  */
-#define LVEQNB_CAP_FS_8000                 1
-#define LVEQNB_CAP_FS_11025                2
-#define LVEQNB_CAP_FS_12000                4
-#define LVEQNB_CAP_FS_16000                8
-#define LVEQNB_CAP_FS_22050                16
-#define LVEQNB_CAP_FS_24000                32
-#define LVEQNB_CAP_FS_32000                64
-#define LVEQNB_CAP_FS_44100                128
-#define LVEQNB_CAP_FS_48000                256
-#define LVEQNB_CAP_FS_88200                512
-#define LVEQNB_CAP_FS_96000                1024
-#define LVEQNB_CAP_FS_176400               2048
-#define LVEQNB_CAP_FS_192000               4096
+#define LVEQNB_CAP_FS_8000 1
+#define LVEQNB_CAP_FS_11025 2
+#define LVEQNB_CAP_FS_12000 4
+#define LVEQNB_CAP_FS_16000 8
+#define LVEQNB_CAP_FS_22050 16
+#define LVEQNB_CAP_FS_24000 32
+#define LVEQNB_CAP_FS_32000 64
+#define LVEQNB_CAP_FS_44100 128
+#define LVEQNB_CAP_FS_48000 256
+#define LVEQNB_CAP_FS_88200 512
+#define LVEQNB_CAP_FS_96000 1024
+#define LVEQNB_CAP_FS_176400 2048
+#define LVEQNB_CAP_FS_192000 4096
 
-typedef enum
-{
-    LVEQNB_FS_8000  = 0,
+typedef enum {
+    LVEQNB_FS_8000 = 0,
     LVEQNB_FS_11025 = 1,
     LVEQNB_FS_12000 = 2,
     LVEQNB_FS_16000 = 3,
@@ -192,7 +183,7 @@ typedef enum
     LVEQNB_FS_96000 = 10,
     LVEQNB_FS_176400 = 11,
     LVEQNB_FS_192000 = 12,
-    LVEQNB_FS_MAX   = LVM_MAXINT_32
+    LVEQNB_FS_MAX = LVM_MAXINT_32
 } LVEQNB_Fs_en;
 
 /****************************************************************************************/
@@ -202,40 +193,37 @@ typedef enum
 /****************************************************************************************/
 
 /* Equaliser band definition */
-typedef struct
-{
-    LVM_INT16                   Gain;                   /* Band gain in dB */
-    LVM_UINT16                  Frequency;              /* Band centre frequency in Hz */
-    LVM_UINT16                  QFactor;                /* Band quality factor */
+typedef struct {
+    LVM_INT16 Gain;       /* Band gain in dB */
+    LVM_UINT16 Frequency; /* Band centre frequency in Hz */
+    LVM_UINT16 QFactor;   /* Band quality factor */
 } LVEQNB_BandDef_t;
 
 /* Parameter structure */
-typedef struct
-{
+typedef struct {
     /* General parameters */
-    LVEQNB_Mode_en              OperatingMode;
-    LVEQNB_Fs_en                SampleRate;
-    LVEQNB_SourceFormat_en      SourceFormat;
+    LVEQNB_Mode_en OperatingMode;
+    LVEQNB_Fs_en SampleRate;
+    LVEQNB_SourceFormat_en SourceFormat;
 
     /* Equaliser parameters */
-    LVM_UINT16                  NBands;                 /* Number of bands */
-    LVEQNB_BandDef_t            *pBandDefinition;       /* Pointer to equaliser definitions */
-    LVM_INT16                   NrChannels;
+    LVM_UINT16 NBands;                 /* Number of bands */
+    LVEQNB_BandDef_t* pBandDefinition; /* Pointer to equaliser definitions */
+    LVM_INT16 NrChannels;
 } LVEQNB_Params_t;
 
 /* Capability structure */
-typedef struct
-{
+typedef struct {
     /* General parameters */
-    LVM_UINT16                  SampleRate;
+    LVM_UINT16 SampleRate;
 
-    LVM_UINT16                  SourceFormat;
-    LVM_UINT16                  MaxBlockSize;
-    LVM_UINT16                  MaxBands;
+    LVM_UINT16 SourceFormat;
+    LVM_UINT16 MaxBlockSize;
+    LVM_UINT16 MaxBands;
 
     /* Callback parameters */
-    LVM_Callback                CallBack;               /* Bundle callback */
-    void                        *pBundleInstance;       /* Bundle instance handle */
+    LVM_Callback CallBack; /* Bundle callback */
+    void* pBundleInstance; /* Bundle instance handle */
 
 } LVEQNB_Capabilities_t;
 
@@ -266,9 +254,8 @@ typedef struct
 /*  1.  This function must not be interrupted by the LVEQNB_Process function            */
 /*                                                                                      */
 /****************************************************************************************/
-LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
-                                   LVEQNB_Capabilities_t    *pCapabilities,
-                                   void                     *pScratch);
+LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t* phInstance,
+                                   LVEQNB_Capabilities_t* pCapabilities, void* pScratch);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -284,7 +271,7 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t          *phInstance,
 /*  1.  This function must not be interrupted by the LVEQNB_Process function            */
 /*                                                                                      */
 /****************************************************************************************/
-void LVEQNB_DeInit(LVEQNB_Handle_t        *phInstance);
+void LVEQNB_DeInit(LVEQNB_Handle_t* phInstance);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -307,8 +294,7 @@ void LVEQNB_DeInit(LVEQNB_Handle_t        *phInstance);
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_GetParameters(LVEQNB_Handle_t     hInstance,
-                                            LVEQNB_Params_t     *pParams);
+LVEQNB_ReturnStatus_en LVEQNB_GetParameters(LVEQNB_Handle_t hInstance, LVEQNB_Params_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -331,8 +317,8 @@ LVEQNB_ReturnStatus_en LVEQNB_GetParameters(LVEQNB_Handle_t     hInstance,
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t           hInstance,
-                                              LVEQNB_Capabilities_t     *pCapabilities);
+LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t hInstance,
+                                              LVEQNB_Capabilities_t* pCapabilities);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -356,8 +342,7 @@ LVEQNB_ReturnStatus_en LVEQNB_GetCapabilities(LVEQNB_Handle_t           hInstanc
 /*                                                                                      */
 /****************************************************************************************/
 
-LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t       hInstance,
-                                      LVEQNB_Params_t       *pParams);
+LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t hInstance, LVEQNB_Params_t* pParams);
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -381,10 +366,7 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t       hInstance,
 /* NOTES:                                                                               */
 /*                                                                                      */
 /****************************************************************************************/
-LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t       hInstance,
-                                      const LVM_FLOAT       *pInData,
-                                      LVM_FLOAT             *pOutData,
-                                      LVM_UINT16            NumSamples);
+LVEQNB_ReturnStatus_en LVEQNB_Process(LVEQNB_Handle_t hInstance, const LVM_FLOAT* pInData,
+                                      LVM_FLOAT* pOutData, LVM_UINT16 NumSamples);
 
-#endif      /* __LVEQNB__ */
-
+#endif /* __LVEQNB__ */

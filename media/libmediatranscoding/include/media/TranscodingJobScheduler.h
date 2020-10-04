@@ -24,6 +24,7 @@
 #include <media/TranscodingRequest.h>
 #include <media/UidPolicyInterface.h>
 #include <utils/String8.h>
+#include <utils/Vector.h>
 
 #include <list>
 #include <map>
@@ -65,6 +66,11 @@ public:
     // ResourcePolicyCallbackInterface
     void onResourceAvailable() override;
     // ~ResourcePolicyCallbackInterface
+
+    /**
+     * Dump all the job information to the fd.
+     */
+    void dumpAllJobs(int fd, const Vector<String16>& args);
 
 private:
     friend class MediaTranscodingService;

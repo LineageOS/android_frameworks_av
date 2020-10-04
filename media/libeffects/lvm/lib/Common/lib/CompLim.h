@@ -35,21 +35,21 @@
 typedef struct /* Compressor state */
 {
     /* Normaliser */
-    LVM_INT16   Norm_Attack;        /* Attack time constant of the Normaliser integrator */
-    LVM_INT16   Norm_Decay;         /* Decay time constant of the Normaliser integrator */
-    LVM_INT32   NormInt;            /* Normaliser integrator current value */
-    LVM_INT16   Shift;              /* Shift gain */
-    LVM_INT16   Threshold;          /* Target threshold */
+    LVM_INT16 Norm_Attack; /* Attack time constant of the Normaliser integrator */
+    LVM_INT16 Norm_Decay;  /* Decay time constant of the Normaliser integrator */
+    LVM_INT32 NormInt;     /* Normaliser integrator current value */
+    LVM_INT16 Shift;       /* Shift gain */
+    LVM_INT16 Threshold;   /* Target threshold */
 
     /* Compressor */
-    LVM_INT16   Comp_Atten;         /* Attenuation applied before soft knee compressor */
-    LVM_INT16   Comp_Attack_S;      /* Attack time constant of the slow integrator */
-    LVM_INT16   Comp_Decay_S;       /* Decay time constant of slow the integrator */
-    LVM_INT16   Comp_Attack_F;      /* Attack time constant of fast the integrator */
-    LVM_INT16   Comp_Decay_F;       /* Decay time constant of fast the integrator */
-    LVM_INT16   SoftClipGain;       /* Soft clip gain control */
-    LVM_INT32   CompIntSlow;        /* Compressor slow integrator current value */
-    LVM_INT32   CompIntFast;        /* Compressor fast integrator current value */
+    LVM_INT16 Comp_Atten;    /* Attenuation applied before soft knee compressor */
+    LVM_INT16 Comp_Attack_S; /* Attack time constant of the slow integrator */
+    LVM_INT16 Comp_Decay_S;  /* Decay time constant of slow the integrator */
+    LVM_INT16 Comp_Attack_F; /* Attack time constant of fast the integrator */
+    LVM_INT16 Comp_Decay_F;  /* Decay time constant of fast the integrator */
+    LVM_INT16 SoftClipGain;  /* Soft clip gain control */
+    LVM_INT32 CompIntSlow;   /* Compressor slow integrator current value */
+    LVM_INT32 CompIntFast;   /* Compressor fast integrator current value */
 
 } CompLim_Instance_t;
 
@@ -58,10 +58,7 @@ typedef struct /* Compressor state */
 /*  Function Prototypes                                                             */
 /*                                                                                  */
 /************************************************************************************/
-void NonLinComp_Float(LVM_FLOAT        Gain,
-                      LVM_FLOAT        *pDataIn,
-                      LVM_FLOAT        *pDataOut,
-                      LVM_INT32        BlockLength);
+void NonLinComp_Float(LVM_FLOAT Gain, LVM_FLOAT* pDataIn, LVM_FLOAT* pDataOut,
+                      LVM_INT32 BlockLength);
 
 #endif /* #ifndef _COMP_LIM_H */
-
