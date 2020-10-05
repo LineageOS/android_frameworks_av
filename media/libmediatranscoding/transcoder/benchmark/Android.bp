@@ -1,14 +1,23 @@
+cc_defaults {
+    name: "benchmarkdefaults",
+    shared_libs: ["libmediatranscoder", "libmediandk", "libbase"],
+    static_libs: ["libgoogle-benchmark"],
+}
+
 cc_test {
     name: "MediaTranscoderBenchmark",
     srcs: ["MediaTranscoderBenchmark.cpp"],
-    shared_libs: ["libmediatranscoder", "libmediandk"],
-    static_libs: ["libgoogle-benchmark"],
+    defaults: ["benchmarkdefaults"],
 }
 
 cc_test {
     name: "MediaSampleReaderBenchmark",
     srcs: ["MediaSampleReaderBenchmark.cpp"],
-    shared_libs: ["libmediatranscoder", "libmediandk", "libbase"],
-    static_libs: ["libgoogle-benchmark"],
+    defaults: ["benchmarkdefaults"],
 }
 
+cc_test {
+    name: "MediaTrackTranscoderBenchmark",
+    srcs: ["MediaTrackTranscoderBenchmark.cpp"],
+    defaults: ["benchmarkdefaults"],
+}
