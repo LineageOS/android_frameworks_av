@@ -21,6 +21,7 @@
 
 #include <inttypes.h>
 #include <media/TranscodingJobScheduler.h>
+#include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
 
 #include <utility>
@@ -34,6 +35,21 @@ constexpr static uid_t OFFLINE_UID = -1;
 //static
 String8 TranscodingJobScheduler::jobToString(const JobKeyType& jobKey) {
     return String8::format("{client:%lld, job:%d}", (long long)jobKey.first, jobKey.second);
+}
+
+//static
+const char* TranscodingJobScheduler::jobStateToString(const Job::State jobState) {
+    switch (jobState) {
+    case Job::State::NOT_STARTED:
+        return "NOT_STARTED";
+    case Job::State::RUNNING:
+        return "RUNNING";
+    case Job::State::PAUSED:
+        return "PAUSED";
+    default:
+        break;
+    }
+    return "(unknown)";
 }
 
 TranscodingJobScheduler::TranscodingJobScheduler(
@@ -60,24 +76,46 @@ void TranscodingJobScheduler::dumpAllJobs(int fd, const Vector<String16>& args _
     char buffer[SIZE];
     std::scoped_lock lock{mLock};
 
-    snprintf(buffer, SIZE, " \n\n   Total num of Jobs: %zu\n", mJobMap.size());
+    snprintf(buffer, SIZE, "\n========== Dumping all jobs queues =========\n");
+    result.append(buffer);
+    snprintf(buffer, SIZE, "  Total num of Jobs: %zu\n", mJobMap.size());
     result.append(buffer);
 
-    if (mJobMap.size() > 0) {
-        snprintf(buffer, SIZE, "========== Dumping all jobs =========\n");
-        result.append(buffer);
+    std::vector<int32_t> uids(mUidSortedList.begin(), mUidSortedList.end());
+    // Exclude last uid, which is for offline queue
+    uids.pop_back();
+    std::vector<std::string> packageNames;
+    if (TranscodingUidPolicy::getNamesForUids(uids, &packageNames)) {
+        uids.push_back(OFFLINE_UID);
+        packageNames.push_back("(offline)");
     }
 
-    for (auto uidIt = mUidSortedList.begin(); uidIt != mUidSortedList.end(); uidIt++) {
-        for (auto jobIt = mJobQueues[*uidIt].begin(); jobIt != mJobQueues[*uidIt].end(); jobIt++) {
-            if (mJobMap.count(*jobIt) != 0) {
-                TranscodingRequestParcel& request = mJobMap[*jobIt].request;
-                snprintf(buffer, SIZE, "Job: %s Client: %d\n", request.sourceFilePath.c_str(),
-                         request.clientUid);
+    for (int32_t i = 0; i < uids.size(); i++) {
+        const uid_t uid = uids[i];
 
-            } else {
-                snprintf(buffer, SIZE, "Failed to look up Job %s  \n", jobToString(*jobIt).c_str());
+        if (mJobQueues[uid].empty()) {
+            continue;
+        }
+        snprintf(buffer, SIZE, "    Uid: %d, pkg: %s\n", uid,
+                 packageNames.empty() ? "(unknown)" : packageNames[i].c_str());
+        result.append(buffer);
+        snprintf(buffer, SIZE, "      Num of jobs: %zu\n", mJobQueues[uid].size());
+        result.append(buffer);
+        for (auto& jobKey : mJobQueues[uid]) {
+            auto jobIt = mJobMap.find(jobKey);
+            if (jobIt == mJobMap.end()) {
+                snprintf(buffer, SIZE, "Failed to look up Job %s  \n", jobToString(jobKey).c_str());
+                result.append(buffer);
+                continue;
             }
+            Job& job = jobIt->second;
+            TranscodingRequestParcel& request = job.request;
+            snprintf(buffer, SIZE, "      Job: %s, %s, %d%%\n", jobToString(jobKey).c_str(),
+                     jobStateToString(job.state), job.lastProgress);
+            result.append(buffer);
+            snprintf(buffer, SIZE, "        Src: %s\n", request.sourceFilePath.c_str());
+            result.append(buffer);
+            snprintf(buffer, SIZE, "        Dst: %s\n", request.destinationFilePath.c_str());
             result.append(buffer);
         }
     }
@@ -240,6 +278,7 @@ bool TranscodingJobScheduler::submit(ClientIdType clientId, JobIdType jobId, uid
     mJobMap[jobKey].key = jobKey;
     mJobMap[jobKey].uid = uid;
     mJobMap[jobKey].state = Job::NOT_STARTED;
+    mJobMap[jobKey].lastProgress = 0;
     mJobMap[jobKey].request = request;
     mJobMap[jobKey].callback = callback;
 
@@ -431,6 +470,7 @@ void TranscodingJobScheduler::onProgressUpdate(ClientIdType clientId, JobIdType 
         if (callback != nullptr) {
             callback->onProgressUpdate(jobId, progress);
         }
+        mJobMap[jobKey].lastProgress = progress;
     });
 }
 
@@ -509,15 +549,15 @@ void TranscodingJobScheduler::validateState_l() {
                         "mUidList and mJobQueues size mismatch");
 
     int32_t totalJobs = 0;
-    for (auto uidIt = mUidSortedList.begin(); uidIt != mUidSortedList.end(); uidIt++) {
-        LOG_ALWAYS_FATAL_IF(mJobQueues.count(*uidIt) != 1, "mJobQueues count for uid %d is not 1",
-                            *uidIt);
-        for (auto jobIt = mJobQueues[*uidIt].begin(); jobIt != mJobQueues[*uidIt].end(); jobIt++) {
-            LOG_ALWAYS_FATAL_IF(mJobMap.count(*jobIt) != 1, "mJobs count for job %s is not 1",
-                                jobToString(*jobIt).c_str());
+    for (auto uid : mUidSortedList) {
+        LOG_ALWAYS_FATAL_IF(mJobQueues.count(uid) != 1, "mJobQueues count for uid %d is not 1",
+                            uid);
+        for (auto& jobKey : mJobQueues[uid]) {
+            LOG_ALWAYS_FATAL_IF(mJobMap.count(jobKey) != 1, "mJobs count for job %s is not 1",
+                                jobToString(jobKey).c_str());
         }
 
-        totalJobs += mJobQueues[*uidIt].size();
+        totalJobs += mJobQueues[uid].size();
     }
     LOG_ALWAYS_FATAL_IF(mJobMap.size() != totalJobs,
                         "mJobs size doesn't match total jobs counted from uid queues");

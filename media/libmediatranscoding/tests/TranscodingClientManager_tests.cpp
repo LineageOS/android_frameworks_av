@@ -235,19 +235,19 @@ public:
     ~TranscodingClientManagerTest() { ALOGD("TranscodingClientManagerTest destroyed"); }
 
     void addMultipleClients() {
-        EXPECT_EQ(mClientManager->addClient(mClientCallback1, kClientName,
-                                            kClientPackage, &mClient1),
-                  OK);
+        EXPECT_EQ(
+                mClientManager->addClient(mClientCallback1, kClientName, kClientPackage, &mClient1),
+                OK);
         EXPECT_NE(mClient1, nullptr);
 
-        EXPECT_EQ(mClientManager->addClient(mClientCallback2, kClientName,
-                                            kClientPackage, &mClient2),
-                  OK);
+        EXPECT_EQ(
+                mClientManager->addClient(mClientCallback2, kClientName, kClientPackage, &mClient2),
+                OK);
         EXPECT_NE(mClient2, nullptr);
 
-        EXPECT_EQ(mClientManager->addClient(mClientCallback3, kClientName,
-                                            kClientPackage, &mClient3),
-                  OK);
+        EXPECT_EQ(
+                mClientManager->addClient(mClientCallback3, kClientName, kClientPackage, &mClient3),
+                OK);
         EXPECT_NE(mClient3, nullptr);
 
         EXPECT_EQ(mClientManager->getNumOfClients(), 3);
@@ -273,8 +273,7 @@ public:
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientCallback) {
     // Add a client with null callback and expect failure.
     std::shared_ptr<ITranscodingClient> client;
-    status_t err = mClientManager->addClient(nullptr, kClientName,
-                                             kClientPackage, &client);
+    status_t err = mClientManager->addClient(nullptr, kClientName, kClientPackage, &client);
     EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 //
@@ -289,24 +288,24 @@ TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientCallback) {
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientName) {
     // Add a client with invalid name and expect failure.
     std::shared_ptr<ITranscodingClient> client;
-    status_t err = mClientManager->addClient(mClientCallback1,
-                                             kInvalidClientName, kClientPackage, &client);
+    status_t err = mClientManager->addClient(mClientCallback1, kInvalidClientName, kClientPackage,
+                                             &client);
     EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingWithInvalidClientPackageName) {
     // Add a client with invalid packagename and expect failure.
     std::shared_ptr<ITranscodingClient> client;
-    status_t err = mClientManager->addClient(mClientCallback1, kClientName,
-                                             kInvalidClientPackage, &client);
+    status_t err = mClientManager->addClient(mClientCallback1, kClientName, kInvalidClientPackage,
+                                             &client);
     EXPECT_EQ(err, IMediaTranscodingService::ERROR_ILLEGAL_ARGUMENT);
 }
 
 TEST_F(TranscodingClientManagerTest, TestAddingValidClient) {
     // Add a valid client, should succeed.
     std::shared_ptr<ITranscodingClient> client;
-    status_t err = mClientManager->addClient(mClientCallback1, kClientName,
-                                             kClientPackage, &client);
+    status_t err =
+            mClientManager->addClient(mClientCallback1, kClientName, kClientPackage, &client);
     EXPECT_EQ(err, OK);
     EXPECT_NE(client.get(), nullptr);
     EXPECT_EQ(mClientManager->getNumOfClients(), 1);
@@ -319,15 +318,14 @@ TEST_F(TranscodingClientManagerTest, TestAddingValidClient) {
 
 TEST_F(TranscodingClientManagerTest, TestAddingDupliacteClient) {
     std::shared_ptr<ITranscodingClient> client;
-    status_t err = mClientManager->addClient(mClientCallback1, kClientName,
-                                             kClientPackage, &client);
+    status_t err =
+            mClientManager->addClient(mClientCallback1, kClientName, kClientPackage, &client);
     EXPECT_EQ(err, OK);
     EXPECT_NE(client.get(), nullptr);
     EXPECT_EQ(mClientManager->getNumOfClients(), 1);
 
     std::shared_ptr<ITranscodingClient> dupClient;
-    err = mClientManager->addClient(mClientCallback1, "dupClient",
-                                    "dupPackage", &dupClient);
+    err = mClientManager->addClient(mClientCallback1, "dupClient", "dupPackage", &dupClient);
     EXPECT_EQ(err, IMediaTranscodingService::ERROR_ALREADY_EXISTS);
     EXPECT_EQ(dupClient.get(), nullptr);
     EXPECT_EQ(mClientManager->getNumOfClients(), 1);
@@ -474,8 +472,8 @@ TEST_F(TranscodingClientManagerTest, TestClientCallback) {
 TEST_F(TranscodingClientManagerTest, TestUseAfterUnregister) {
     // Add a client.
     std::shared_ptr<ITranscodingClient> client;
-    status_t err = mClientManager->addClient(mClientCallback1, kClientName,
-                                             kClientPackage, &client);
+    status_t err =
+            mClientManager->addClient(mClientCallback1, kClientName, kClientPackage, &client);
     EXPECT_EQ(err, OK);
     EXPECT_NE(client.get(), nullptr);
 
