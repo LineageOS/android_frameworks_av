@@ -102,4 +102,11 @@ interface IResourceManagerService {
      * @param clientId clientId within the pid that will be removed.
      */
     void markClientForPendingRemoval(int pid, long clientId);
+
+    /**
+     * Reclaim resources from clients pending removal, if any.
+     *
+     * @param pid pid from which resources will be reclaimed.
+     */
+    void reclaimResourcesFromClientsPendingRemoval(int pid);
 }
