@@ -156,8 +156,8 @@ extern "C"
 
 
     /* for error concealment & soft-decoding */
-    void PVLocateM4VFrameBoundary(BitstreamDecVideo *stream);
-    void PVSearchH263FrameBoundary(BitstreamDecVideo *stream);
+    PV_STATUS PVLocateM4VFrameBoundary(BitstreamDecVideo *stream);
+    PV_STATUS PVSearchH263FrameBoundary(BitstreamDecVideo *stream);
 
     PV_STATUS quickSearchMotionMarker(BitstreamDecVideo *stream);
     PV_STATUS quickSearchDCM(BitstreamDecVideo *stream);
