@@ -144,6 +144,7 @@ private:
     bool mIsHeif;
     bool mHasMoovBox;
     bool mPreferHeif;
+    bool mIsAvif;
 
     Track *mFirstTrack, *mLastTrack;
 
