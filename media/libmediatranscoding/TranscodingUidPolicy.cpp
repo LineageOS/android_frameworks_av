@@ -21,7 +21,9 @@
 #include <aidl/android/media/IResourceManagerService.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
+#include <android/content/pm/IPackageManagerNative.h>
 #include <binder/ActivityManager.h>
+#include <binder/IServiceManager.h>
 #include <cutils/misc.h>  // FIRST_APPLICATION_UID
 #include <inttypes.h>
 #include <media/TranscodingUidPolicy.h>
@@ -108,6 +110,28 @@ void TranscodingUidPolicy::UidObserver::binderDied(const wp<IBinder>& /*who*/) {
 }
 
 ////////////////////////////////////////////////////////////////////////////
+
+//static
+bool TranscodingUidPolicy::getNamesForUids(const std::vector<int32_t>& uids,
+                                           std::vector<std::string>* names) {
+    names->clear();
+    sp<IServiceManager> sm(defaultServiceManager());
+    sp<IBinder> binder(sm->getService(String16("package_native")));
+    if (binder == nullptr) {
+        ALOGE("getService package_native failed");
+        return false;
+    }
+
+    sp<content::pm::IPackageManagerNative> packageMgr =
+            interface_cast<content::pm::IPackageManagerNative>(binder);
+    binder::Status status = packageMgr->getNamesForUids(uids, names);
+
+    if (!status.isOk() || names->size() != uids.size()) {
+        names->clear();
+        return false;
+    }
+    return true;
+}
 
 TranscodingUidPolicy::TranscodingUidPolicy()
       : mAm(std::make_shared<ActivityManager>()),

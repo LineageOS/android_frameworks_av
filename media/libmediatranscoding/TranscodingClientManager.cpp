@@ -282,16 +282,16 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
     char buffer[SIZE];
     std::scoped_lock lock{mLock};
 
-    snprintf(buffer, SIZE, "    Total num of Clients: %zu\n", mClientIdToClientMap.size());
-    result.append(buffer);
-
     if (mClientIdToClientMap.size() > 0) {
-        snprintf(buffer, SIZE, "========== Dumping all clients =========\n");
+        snprintf(buffer, SIZE, "\n========== Dumping all clients =========\n");
         result.append(buffer);
     }
 
+    snprintf(buffer, SIZE, "  Total num of Clients: %zu\n", mClientIdToClientMap.size());
+    result.append(buffer);
+
     for (const auto& iter : mClientIdToClientMap) {
-        snprintf(buffer, SIZE, "    -- Client id: %lld  name: %s\n", (long long)iter.first,
+        snprintf(buffer, SIZE, "    Client %lld:  pkg: %s\n", (long long)iter.first,
                  iter.second->mClientName.c_str());
         result.append(buffer);
     }
