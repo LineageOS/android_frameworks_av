@@ -197,7 +197,12 @@ AudioFlinger::AudioFlinger()
         mNextUniqueIds[use] = AUDIO_UNIQUE_ID_USE_MAX;
     }
 
+#if 1
+    // FIXME See bug 165702394 and bug 168511485
+    const bool doLog = false;
+#else
     const bool doLog = property_get_bool("ro.test_harness", false);
+#endif
     if (doLog) {
         mLogMemoryDealer = new MemoryDealer(kLogMemorySize, "LogWriters",
                 MemoryHeapBase::READ_ONLY);
