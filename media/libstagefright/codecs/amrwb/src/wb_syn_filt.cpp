@@ -273,9 +273,10 @@ void Syn_filt_32(
 
         L_tmp1 >>= 11;      /* -4 : sig_lo[i] << 4 */
 
-        L_tmp1 += (int32)exc[(i<<1)] << a0;
+        int64 sig_tmp;
+        sig_tmp = (int64)L_tmp1 + (int32)(exc[(i<<1)] << a0);
+        L_tmp1 = (int32)(sig_tmp - (L_tmp2 << 1));
 
-        L_tmp1 -= (L_tmp2 << 1);
         /* sig_hi = bit16 to bit31 of synthesis */
         L_tmp1 = shl_int32(L_tmp1, 3);           /* ai in Q12 */
 
@@ -290,9 +291,8 @@ void Syn_filt_32(
         L_tmp3 = fxp_mac_16by16(sig_lo[(i<<1)], a[1], L_tmp3);
         L_tmp3 = -L_tmp3 >> 11;
 
-        L_tmp3 += (int32)exc[(i<<1)+1] << a0;
-
-        L_tmp3 -= (L_tmp4 << 1);
+        sig_tmp = (int64)L_tmp3 + (int32)(exc[(i<<1)+1] << a0);
+        L_tmp3 = (int32)(sig_tmp - (L_tmp4 << 1));
         /* sig_hi = bit16 to bit31 of synthesis */
         L_tmp3 = shl_int32(L_tmp3, 3);           /* ai in Q12 */
         sig_hi[(i<<1)+1] = (int16)(L_tmp3 >> 16);
