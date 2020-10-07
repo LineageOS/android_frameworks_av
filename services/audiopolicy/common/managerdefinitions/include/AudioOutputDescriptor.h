@@ -498,11 +498,6 @@ public:
      */
     bool isA2dpOffloadedOnPrimary() const;
 
-    /**
-     * returns true if A2DP is supported (either via hardware offload or software encoding)
-     */
-    bool isA2dpSupported() const;
-
     sp<SwAudioOutputDescriptor> getOutputFromId(audio_port_handle_t id) const;
 
     sp<SwAudioOutputDescriptor> getPrimaryOutput() const;
