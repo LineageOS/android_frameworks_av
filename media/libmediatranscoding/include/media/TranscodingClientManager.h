@@ -86,6 +86,9 @@ private:
     // Only allow MediaTranscodingService and unit tests to instantiate.
     TranscodingClientManager(const std::shared_ptr<SchedulerClientInterface>& scheduler);
 
+    // Checks if a user is trusted (and allowed to submit jobs on behalf of other uids)
+    bool isTrustedCallingUid(uid_t uid);
+
     /**
      * Removes an existing client from the manager.
      *
@@ -106,6 +109,7 @@ private:
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
     std::shared_ptr<SchedulerClientInterface> mJobScheduler;
+    uid_t mMediaProviderUid;
 
     static std::atomic<ClientIdType> sCookieCounter;
     static std::mutex sCookie2ClientLock;
