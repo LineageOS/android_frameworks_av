@@ -50,6 +50,7 @@ public:
     // ~UidPolicyInterface
 
     static bool getNamesForUids(const std::vector<int32_t>& uids, std::vector<std::string>* names);
+    static status_t getUidForPackage(String16 packageName, /*inout*/ uid_t& uid);
 
 private:
     void onUidStateChanged(uid_t uid, int32_t procState);
