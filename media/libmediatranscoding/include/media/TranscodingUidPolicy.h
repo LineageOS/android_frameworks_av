@@ -47,6 +47,9 @@ public:
     void unregisterMonitorUid(uid_t uid) override;
     std::unordered_set<uid_t> getTopUids() const override;
     void setCallback(const std::shared_ptr<UidPolicyCallbackInterface>& cb) override;
+    // ~UidPolicyInterface
+
+    static bool getNamesForUids(const std::vector<int32_t>& uids, std::vector<std::string>* names);
 
 private:
     void onUidStateChanged(uid_t uid, int32_t procState);

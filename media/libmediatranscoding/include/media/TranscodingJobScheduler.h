@@ -82,11 +82,12 @@ private:
     struct Job {
         JobKeyType key;
         uid_t uid;
-        enum JobState {
+        enum State {
             NOT_STARTED,
             RUNNING,
             PAUSED,
         } state;
+        int32_t lastProgress;
         TranscodingRequest request;
         std::weak_ptr<ITranscodingClientCallback> callback;
     };
@@ -127,6 +128,7 @@ private:
     void validateState_l();
 
     static String8 jobToString(const JobKeyType& jobKey);
+    static const char* jobStateToString(const Job::State jobState);
 };
 
 }  // namespace android
