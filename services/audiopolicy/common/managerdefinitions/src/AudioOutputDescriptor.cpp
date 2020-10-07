@@ -764,11 +764,6 @@ bool SwAudioOutputCollection::isA2dpOffloadedOnPrimary() const
     return false;
 }
 
-bool SwAudioOutputCollection::isA2dpSupported() const
-{
-    return (isA2dpOffloadedOnPrimary() || (getA2dpOutput() != 0));
-}
-
 sp<SwAudioOutputDescriptor> SwAudioOutputCollection::getPrimaryOutput() const
 {
     for (size_t i = 0; i < size(); i++) {
