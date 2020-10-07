@@ -96,7 +96,7 @@ struct C2SizeStruct {
     const static std::vector<C2FieldDescriptor> _FIELD_LIST;
     static const std::vector<C2FieldDescriptor> FieldList();  // <= needed for C2FieldDescriptor
     const static FD::type_t TYPE = (FD::type_t)(CORE_INDEX | FD::STRUCT_FLAG);
-};
+} C2_PACK;
 
 DEFINE_NO_NAMED_VALUES_FOR(C2SizeStruct)
 
@@ -111,11 +111,13 @@ bool operator==(const C2FieldDescriptor &a, const C2FieldDescriptor &b) {
 
 struct C2TestStruct_A {
     int32_t signed32;
+    // 4-byte padding
     int64_t signed64[2];
     uint32_t unsigned32[1];
+    // 4-byte padding
     uint64_t unsigned64;
     float fp32;
-    C2SizeStruct sz[3];
+    C2SizeStruct sz[3]; // 8-byte structure, but 4-byte aligned
     uint8_t blob[100];
     char string[100];
     bool yesNo[100];
@@ -124,21 +126,21 @@ struct C2TestStruct_A {
     static const std::vector<C2FieldDescriptor> FieldList();
     // enum : uint32_t { CORE_INDEX = kParamIndexTest };
     // typedef C2TestStruct_A _type;
-} __attribute__((packed));
+} __attribute__((aligned(4)));
 
 const std::vector<C2FieldDescriptor> C2TestStruct_A::FieldList() {
     return _FIELD_LIST;
 }
 const std::vector<C2FieldDescriptor> C2TestStruct_A::_FIELD_LIST =
     { { FD::INT32,    1, "s32",   0, 4 },
-      { FD::INT64,    2, "s64",   4, 8 },
-      { FD::UINT32,   1, "u32",  20, 4 },
-      { FD::UINT64,   1, "u64",  24, 8 },
-      { FD::FLOAT,    1, "fp",   32, 4 },
-      { C2SizeStruct::TYPE, 3, "size", 36, 8 },
-      { FD::BLOB,   100, "blob", 60, 1 },
-      { FD::STRING, 100, "str", 160, 1 },
-      { FD::BLOB,   100, "y-n", 260, 1 } };
+      { FD::INT64,    2, "s64",   8, 8 },
+      { FD::UINT32,   1, "u32",  24, 4 },
+      { FD::UINT64,   1, "u64",  32, 8 },
+      { FD::FLOAT,    1, "fp",   40, 4 },
+      { C2SizeStruct::TYPE, 3, "size", 44, 8 },
+      { FD::BLOB,   100, "blob", 68, 1 },
+      { FD::STRING, 100, "str", 168, 1 },
+      { FD::BLOB,   100, "y-n", 268, 1 } };
 
 TEST_P(C2ParamTest_ParamFieldList, VerifyStruct) {
     std::vector<C2FieldDescriptor> fields = GetParam(), expected = C2TestStruct_A::_FIELD_LIST;
@@ -198,11 +200,13 @@ INSTANTIATE_TEST_CASE_P(MemberPointerConstructor, C2ParamTest_ParamFieldList, ::
 
 struct C2TestAStruct {
     int32_t signed32;
+    // 4-byte padding
     int64_t signed64[2];
     uint32_t unsigned32[1];
+    // 4-byte padding
     uint64_t unsigned64;
     float fp32;
-    C2SizeStruct sz[3];
+    C2SizeStruct sz[3]; // 8-byte structure, but 4-byte aligned
     uint8_t blob[100];
     char string[100];
     bool yesNo[100];
@@ -229,11 +233,13 @@ INSTANTIATE_TEST_CASE_P(DescribeStruct2Step, C2ParamTest_ParamFieldList, ::testi
 
 struct C2TestBStruct {
     int32_t signed32;
+    // 4-byte padding
     int64_t signed64[2];
     uint32_t unsigned32[1];
+    // 4-byte padding
     uint64_t unsigned64;
     float fp32;
-    C2SizeStruct sz[3];
+    C2SizeStruct sz[3]; // 8-byte structure, but 4-byte aligned
     uint8_t blob[100];
     char string[100];
     bool yesNo[100];
@@ -286,7 +292,7 @@ TYPED_TEST(C2ParamTest_FlexParamFieldList, VerifyStruct) {
         if (fields.size() > 1) {
             EXPECT_EQ(2u, fields.size());
             EXPECT_EQ(C2FieldDescriptor(FD::INT32, 1, "s32", 0, 4), fields[0]);
-            EXPECT_EQ(C2FieldDescriptor(this->FlexType, 0, "flex", 4, this->FLEX_SIZE),
+            EXPECT_EQ(C2FieldDescriptor(this->FlexType, 0, "flex", alignof(TypeParam) /* offset */, this->FLEX_SIZE),
                       fields[1]);
         } else {
             EXPECT_EQ(1u, fields.size());
@@ -392,6 +398,7 @@ const std::vector<C2FieldDescriptor> C2TestStruct_FlexS64::_FIELD_LIST = {
 
 struct C2TestStruct_FlexEndS64 {
     int32_t signed32;
+    // 4-byte padding
     int64_t mSigned64Flex[];
 
     const static std::vector<C2FieldDescriptor> _FIELD_LIST;
@@ -406,7 +413,7 @@ const std::vector<C2FieldDescriptor> C2TestStruct_FlexEndS64::FieldList() {
 }
 const std::vector<C2FieldDescriptor> C2TestStruct_FlexEndS64::_FIELD_LIST = {
     { FD::INT32, 1, "s32", 0, 4 },
-    { FD::INT64, 0, "flex", 4, 8 },
+    { FD::INT64, 0, "flex", 8, 8 },
 };
 
 struct C2TestFlexS64Struct {
@@ -419,6 +426,7 @@ struct C2TestFlexS64Struct {
 
 struct C2TestFlexEndS64Struct {
     int32_t signed32;
+    // 4-byte padding
     int64_t mFlexSigned64[];
     C2TestFlexEndS64Struct() {}
 
@@ -468,7 +476,7 @@ struct C2TestStruct_FlexEndSize {
     // enum : uint32_t { CORE_INDEX = C2TestStruct_FlexEndSize, FLEX_SIZE = 8 };
     // typedef C2TestStruct_FlexEndSize _type;
     // typedef C2SizeStruct FlexType;
-};
+} __attribute__((aligned(4)));
 
 const std::vector<C2FieldDescriptor> C2TestStruct_FlexEndSize::FieldList() {
     return _FIELD_LIST;
@@ -539,14 +547,14 @@ C2ParamTest_FlexParamFieldList<C2SizeStruct>::GetLists() {
 TEST_F(C2ParamTest, FieldId) {
     // pointer constructor
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&((C2TestStruct_A*)0)->signed32));
-    EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&((C2TestStruct_A*)0)->signed64));
-    EXPECT_EQ(_C2FieldId(20, 4), _C2FieldId(&((C2TestStruct_A*)0)->unsigned32));
-    EXPECT_EQ(_C2FieldId(24, 8), _C2FieldId(&((C2TestStruct_A*)0)->unsigned64));
-    EXPECT_EQ(_C2FieldId(32, 4), _C2FieldId(&((C2TestStruct_A*)0)->fp32));
-    EXPECT_EQ(_C2FieldId(36, 8), _C2FieldId(&((C2TestStruct_A*)0)->sz));
-    EXPECT_EQ(_C2FieldId(60, 1), _C2FieldId(&((C2TestStruct_A*)0)->blob));
-    EXPECT_EQ(_C2FieldId(160, 1), _C2FieldId(&((C2TestStruct_A*)0)->string));
-    EXPECT_EQ(_C2FieldId(260, 1), _C2FieldId(&((C2TestStruct_A*)0)->yesNo));
+    EXPECT_EQ(_C2FieldId(8, 8), _C2FieldId(&((C2TestStruct_A*)0)->signed64));
+    EXPECT_EQ(_C2FieldId(24, 4), _C2FieldId(&((C2TestStruct_A*)0)->unsigned32));
+    EXPECT_EQ(_C2FieldId(32, 8), _C2FieldId(&((C2TestStruct_A*)0)->unsigned64));
+    EXPECT_EQ(_C2FieldId(40, 4), _C2FieldId(&((C2TestStruct_A*)0)->fp32));
+    EXPECT_EQ(_C2FieldId(44, 8), _C2FieldId(&((C2TestStruct_A*)0)->sz));
+    EXPECT_EQ(_C2FieldId(68, 1), _C2FieldId(&((C2TestStruct_A*)0)->blob));
+    EXPECT_EQ(_C2FieldId(168, 1), _C2FieldId(&((C2TestStruct_A*)0)->string));
+    EXPECT_EQ(_C2FieldId(268, 1), _C2FieldId(&((C2TestStruct_A*)0)->yesNo));
 
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&((C2TestFlexEndSizeStruct*)0)->signed32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&((C2TestFlexEndSizeStruct*)0)->mFlexSize));
@@ -556,14 +564,14 @@ TEST_F(C2ParamTest, FieldId) {
 
     // member pointer constructor
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::signed32));
-    EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::signed64));
-    EXPECT_EQ(_C2FieldId(20, 4), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::unsigned32));
-    EXPECT_EQ(_C2FieldId(24, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::unsigned64));
-    EXPECT_EQ(_C2FieldId(32, 4), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::fp32));
-    EXPECT_EQ(_C2FieldId(36, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::sz));
-    EXPECT_EQ(_C2FieldId(60, 1), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::blob));
-    EXPECT_EQ(_C2FieldId(160, 1), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::string));
-    EXPECT_EQ(_C2FieldId(260, 1), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::yesNo));
+    EXPECT_EQ(_C2FieldId(8, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::signed64));
+    EXPECT_EQ(_C2FieldId(24, 4), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::unsigned32));
+    EXPECT_EQ(_C2FieldId(32, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::unsigned64));
+    EXPECT_EQ(_C2FieldId(40, 4), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::fp32));
+    EXPECT_EQ(_C2FieldId(44, 8), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::sz));
+    EXPECT_EQ(_C2FieldId(68, 1), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::blob));
+    EXPECT_EQ(_C2FieldId(168, 1), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::string));
+    EXPECT_EQ(_C2FieldId(268, 1), _C2FieldId((C2TestStruct_A*)0, &C2TestStruct_A::yesNo));
 
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId((C2TestFlexEndSizeStruct*)0, &C2TestFlexEndSizeStruct::signed32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId((C2TestFlexEndSizeStruct*)0, &C2TestFlexEndSizeStruct::mFlexSize));
@@ -573,14 +581,14 @@ TEST_F(C2ParamTest, FieldId) {
 
     // member pointer sans type pointer
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&C2TestStruct_A::signed32));
-    EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&C2TestStruct_A::signed64));
-    EXPECT_EQ(_C2FieldId(20, 4), _C2FieldId(&C2TestStruct_A::unsigned32));
-    EXPECT_EQ(_C2FieldId(24, 8), _C2FieldId(&C2TestStruct_A::unsigned64));
-    EXPECT_EQ(_C2FieldId(32, 4), _C2FieldId(&C2TestStruct_A::fp32));
-    EXPECT_EQ(_C2FieldId(36, 8), _C2FieldId(&C2TestStruct_A::sz));
-    EXPECT_EQ(_C2FieldId(60, 1), _C2FieldId(&C2TestStruct_A::blob));
-    EXPECT_EQ(_C2FieldId(160, 1), _C2FieldId(&C2TestStruct_A::string));
-    EXPECT_EQ(_C2FieldId(260, 1), _C2FieldId(&C2TestStruct_A::yesNo));
+    EXPECT_EQ(_C2FieldId(8, 8), _C2FieldId(&C2TestStruct_A::signed64));
+    EXPECT_EQ(_C2FieldId(24, 4), _C2FieldId(&C2TestStruct_A::unsigned32));
+    EXPECT_EQ(_C2FieldId(32, 8), _C2FieldId(&C2TestStruct_A::unsigned64));
+    EXPECT_EQ(_C2FieldId(40, 4), _C2FieldId(&C2TestStruct_A::fp32));
+    EXPECT_EQ(_C2FieldId(44, 8), _C2FieldId(&C2TestStruct_A::sz));
+    EXPECT_EQ(_C2FieldId(68, 1), _C2FieldId(&C2TestStruct_A::blob));
+    EXPECT_EQ(_C2FieldId(168, 1), _C2FieldId(&C2TestStruct_A::string));
+    EXPECT_EQ(_C2FieldId(268, 1), _C2FieldId(&C2TestStruct_A::yesNo));
 
     EXPECT_EQ(_C2FieldId(0, 4), _C2FieldId(&C2TestFlexEndSizeStruct::signed32));
     EXPECT_EQ(_C2FieldId(4, 8), _C2FieldId(&C2TestFlexEndSizeStruct::mFlexSize));
@@ -594,14 +602,14 @@ TEST_F(C2ParamTest, FieldId) {
 
     // pointer constructor in C2Param
     EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&((C2TestAInfo*)0)->signed32));
-    EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId(&((C2TestAInfo*)0)->signed64));
-    EXPECT_EQ(_C2FieldId(28, 4), _C2FieldId(&((C2TestAInfo*)0)->unsigned32));
-    EXPECT_EQ(_C2FieldId(32, 8), _C2FieldId(&((C2TestAInfo*)0)->unsigned64));
-    EXPECT_EQ(_C2FieldId(40, 4), _C2FieldId(&((C2TestAInfo*)0)->fp32));
-    EXPECT_EQ(_C2FieldId(44, 8), _C2FieldId(&((C2TestAInfo*)0)->sz));
-    EXPECT_EQ(_C2FieldId(68, 1), _C2FieldId(&((C2TestAInfo*)0)->blob));
-    EXPECT_EQ(_C2FieldId(168, 1), _C2FieldId(&((C2TestAInfo*)0)->string));
-    EXPECT_EQ(_C2FieldId(268, 1), _C2FieldId(&((C2TestAInfo*)0)->yesNo));
+    EXPECT_EQ(_C2FieldId(16, 8), _C2FieldId(&((C2TestAInfo*)0)->signed64));
+    EXPECT_EQ(_C2FieldId(32, 4), _C2FieldId(&((C2TestAInfo*)0)->unsigned32));
+    EXPECT_EQ(_C2FieldId(40, 8), _C2FieldId(&((C2TestAInfo*)0)->unsigned64));
+    EXPECT_EQ(_C2FieldId(48, 4), _C2FieldId(&((C2TestAInfo*)0)->fp32));
+    EXPECT_EQ(_C2FieldId(52, 8), _C2FieldId(&((C2TestAInfo*)0)->sz));
+    EXPECT_EQ(_C2FieldId(76, 1), _C2FieldId(&((C2TestAInfo*)0)->blob));
+    EXPECT_EQ(_C2FieldId(176, 1), _C2FieldId(&((C2TestAInfo*)0)->string));
+    EXPECT_EQ(_C2FieldId(276, 1), _C2FieldId(&((C2TestAInfo*)0)->yesNo));
 
     EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&((C2TestFlexEndSizeInfo*)0)->m.signed32));
     EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId(&((C2TestFlexEndSizeInfo*)0)->m.mFlexSize));
@@ -611,14 +619,14 @@ TEST_F(C2ParamTest, FieldId) {
 
     // member pointer in C2Param
     EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::signed32));
-    EXPECT_EQ(_C2FieldId(12, 8), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::signed64));
-    EXPECT_EQ(_C2FieldId(28, 4), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::unsigned32));
-    EXPECT_EQ(_C2FieldId(32, 8), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::unsigned64));
-    EXPECT_EQ(_C2FieldId(40, 4), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::fp32));
-    EXPECT_EQ(_C2FieldId(44, 8), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::sz));
-    EXPECT_EQ(_C2FieldId(68, 1), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::blob));
-    EXPECT_EQ(_C2FieldId(168, 1), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::string));
-    EXPECT_EQ(_C2FieldId(268, 1), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::yesNo));
+    EXPECT_EQ(_C2FieldId(16, 8), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::signed64));
+    EXPECT_EQ(_C2FieldId(32, 4), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::unsigned32));
+    EXPECT_EQ(_C2FieldId(40, 8), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::unsigned64));
+    EXPECT_EQ(_C2FieldId(48, 4), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::fp32));
+    EXPECT_EQ(_C2FieldId(52, 8), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::sz));
+    EXPECT_EQ(_C2FieldId(76, 1), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::blob));
+    EXPECT_EQ(_C2FieldId(176, 1), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::string));
+    EXPECT_EQ(_C2FieldId(276, 1), _C2FieldId((C2TestAInfo*)0, &C2TestAInfo::yesNo));
 
     // NOTE: cannot use a member pointer for flex params due to introduction of 'm'
     // EXPECT_EQ(_C2FieldId(8, 4), _C2FieldId(&C2TestFlexEndSizeInfo::m.signed32));
