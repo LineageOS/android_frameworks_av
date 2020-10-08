@@ -439,6 +439,7 @@ public:
             ALOGE("Failed to connect to the media.trascoding service.");
             return;
         }
+
         mClient1 = ::ndk::SharedRefBase::make<TestClientCallback>(kClientPackageA, 1);
         mClient2 = ::ndk::SharedRefBase::make<TestClientCallback>(kClientPackageB, 2);
         mClient3 = ::ndk::SharedRefBase::make<TestClientCallback>(kClientPackageC, 3);
@@ -469,7 +470,7 @@ public:
         int32_t numOfClients;
         Status status = mService->getNumOfClients(&numOfClients);
         EXPECT_TRUE(status.isOk());
-        EXPECT_EQ(3, numOfClients);
+        EXPECT_GE(numOfClients, 3);
     }
 
     void unregisterMultipleClients() {
@@ -477,12 +478,6 @@ public:
         EXPECT_TRUE(mClient1->unregisterClient().isOk());
         EXPECT_TRUE(mClient2->unregisterClient().isOk());
         EXPECT_TRUE(mClient3->unregisterClient().isOk());
-
-        // Check the number of clients.
-        int32_t numOfClients;
-        Status status = mService->getNumOfClients(&numOfClients);
-        EXPECT_TRUE(status.isOk());
-        EXPECT_EQ(0, numOfClients);
     }
 
     void deleteFile(const char* path) { unlink(path); }
