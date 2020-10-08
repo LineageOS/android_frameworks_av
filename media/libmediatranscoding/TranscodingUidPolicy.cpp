@@ -21,8 +21,12 @@
 #include <aidl/android/media/IResourceManagerService.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
+#include <android/content/pm/IPackageManagerNative.h>
 #include <binder/ActivityManager.h>
+#include <binder/IServiceManager.h>
+#include <binder/PermissionController.h>
 #include <cutils/misc.h>  // FIRST_APPLICATION_UID
+#include <cutils/multiuser.h>
 #include <inttypes.h>
 #include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
@@ -108,6 +112,41 @@ void TranscodingUidPolicy::UidObserver::binderDied(const wp<IBinder>& /*who*/) {
 }
 
 ////////////////////////////////////////////////////////////////////////////
+
+//static
+bool TranscodingUidPolicy::getNamesForUids(const std::vector<int32_t>& uids,
+                                           std::vector<std::string>* names) {
+    names->clear();
+    sp<IServiceManager> sm(defaultServiceManager());
+    sp<IBinder> binder(sm->getService(String16("package_native")));
+    if (binder == nullptr) {
+        ALOGE("getService package_native failed");
+        return false;
+    }
+
+    sp<content::pm::IPackageManagerNative> packageMgr =
+            interface_cast<content::pm::IPackageManagerNative>(binder);
+    binder::Status status = packageMgr->getNamesForUids(uids, names);
+
+    if (!status.isOk() || names->size() != uids.size()) {
+        names->clear();
+        return false;
+    }
+    return true;
+}
+
+//static
+status_t TranscodingUidPolicy::getUidForPackage(String16 packageName, /*inout*/ uid_t& uid) {
+    PermissionController pc;
+    uid = pc.getPackageUid(packageName, 0);
+    if (uid <= 0) {
+        ALOGE("Unknown package: '%s'", String8(packageName).string());
+        return BAD_VALUE;
+    }
+
+    uid = multiuser_get_uid(0 /*userId*/, uid);
+    return NO_ERROR;
+}
 
 TranscodingUidPolicy::TranscodingUidPolicy()
       : mAm(std::make_shared<ActivityManager>()),

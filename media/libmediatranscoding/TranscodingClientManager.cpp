@@ -23,11 +23,15 @@
 #include <inttypes.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingRequest.h>
+#include <media/TranscodingUidPolicy.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Log.h>
+#include <utils/String16.h>
 namespace android {
 
 static_assert(sizeof(ClientIdType) == sizeof(void*), "ClientIdType should be pointer-sized");
+
+static constexpr const char* MEDIA_PROVIDER_PKG_NAME = "com.google.android.providers.media.module";
 
 using ::aidl::android::media::BnTranscodingClient;
 using ::aidl::android::media::IMediaTranscodingService;  // For service error codes
@@ -50,20 +54,6 @@ std::map<ClientIdType, std::shared_ptr<TranscodingClientManager::ClientImpl>>
     Status::fromServiceSpecificErrorWithMessage(      \
             errorCode,                                \
             String8::format("%s:%d: " errorString, __FUNCTION__, __LINE__, ##__VA_ARGS__))
-
-// Can MediaTranscoding service trust the caller based on the calling UID?
-// TODO(hkuang): Add MediaProvider's UID.
-static bool isTrustedCallingUid(uid_t uid) {
-    switch (uid) {
-    case AID_ROOT:  // root user
-    case AID_SYSTEM:
-    case AID_SHELL:
-    case AID_MEDIA:  // mediaserver
-        return true;
-    default:
-        return false;
-    }
-}
 
 /**
  * ClientImpl implements a single client and contains all its information.
@@ -143,7 +133,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         in_clientUid = callingUid;
     } else if (in_clientUid < 0) {
         return Status::ok();
-    } else if (in_clientUid != callingUid && !isTrustedCallingUid(callingUid)) {
+    } else if (in_clientUid != callingUid && !owner->isTrustedCallingUid(callingUid)) {
         ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
@@ -160,7 +150,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         in_clientPid = callingPid;
     } else if (in_clientPid < 0) {
         return Status::ok();
-    } else if (in_clientPid != callingPid && !isTrustedCallingUid(callingUid)) {
+    } else if (in_clientPid != callingPid && !owner->isTrustedCallingUid(callingUid)) {
         ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
@@ -267,8 +257,18 @@ void TranscodingClientManager::BinderDiedCallback(void* cookie) {
 
 TranscodingClientManager::TranscodingClientManager(
         const std::shared_ptr<SchedulerClientInterface>& scheduler)
-      : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)), mJobScheduler(scheduler) {
+      : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
+        mJobScheduler(scheduler),
+        mMediaProviderUid(-1) {
     ALOGD("TranscodingClientManager started");
+    uid_t mpuid;
+    if (TranscodingUidPolicy::getUidForPackage(String16(MEDIA_PROVIDER_PKG_NAME), mpuid) ==
+        NO_ERROR) {
+        ALOGI("Found MediaProvider uid: %d", mpuid);
+        mMediaProviderUid = mpuid;
+    } else {
+        ALOGW("Couldn't get uid for MediaProvider.");
+    }
 }
 
 TranscodingClientManager::~TranscodingClientManager() {
@@ -282,21 +282,37 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
     char buffer[SIZE];
     std::scoped_lock lock{mLock};
 
-    snprintf(buffer, SIZE, "    Total num of Clients: %zu\n", mClientIdToClientMap.size());
-    result.append(buffer);
-
     if (mClientIdToClientMap.size() > 0) {
-        snprintf(buffer, SIZE, "========== Dumping all clients =========\n");
+        snprintf(buffer, SIZE, "\n========== Dumping all clients =========\n");
         result.append(buffer);
     }
 
+    snprintf(buffer, SIZE, "  Total num of Clients: %zu\n", mClientIdToClientMap.size());
+    result.append(buffer);
+
     for (const auto& iter : mClientIdToClientMap) {
-        snprintf(buffer, SIZE, "    -- Client id: %lld  name: %s\n", (long long)iter.first,
+        snprintf(buffer, SIZE, "    Client %lld:  pkg: %s\n", (long long)iter.first,
                  iter.second->mClientName.c_str());
         result.append(buffer);
     }
 
     write(fd, result.string(), result.size());
+}
+
+bool TranscodingClientManager::isTrustedCallingUid(uid_t uid) {
+    if (uid > 0 && uid == mMediaProviderUid) {
+        return true;
+    }
+
+    switch (uid) {
+    case AID_ROOT:  // root user
+    case AID_SYSTEM:
+    case AID_SHELL:
+    case AID_MEDIA:  // mediaserver
+        return true;
+    default:
+        return false;
+    }
 }
 
 status_t TranscodingClientManager::addClient(
