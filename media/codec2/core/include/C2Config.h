@@ -249,6 +249,11 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     // low latency mode
     kParamIndexLowLatencyMode, // bool
+
+    // tunneled codec
+    kParamIndexTunneledMode, // struct
+    kParamIndexTunnelHandle, // int32[]
+    kParamIndexTunnelSystemTime, // int64
 };
 
 }
@@ -2181,6 +2186,79 @@ inline C2TimestampGapAdjustmentStruct::C2TimestampGapAdjustmentStruct()
 
 typedef C2PortParam<C2Tuning, C2TimestampGapAdjustmentStruct> C2PortTimestampGapTuning;
 constexpr char C2_PARAMKEY_INPUT_SURFACE_TIMESTAMP_ADJUSTMENT[] = "input-surface.timestamp-adjustment";
+
+/* ===================================== TUNNELED CODEC ==================================== */
+
+/**
+ * Tunneled codec control.
+ */
+struct C2TunneledModeStruct {
+    /// mode
+    enum mode_t : uint32_t;
+    /// sync type
+    enum sync_type_t : uint32_t;
+
+    inline C2TunneledModeStruct() = default;
+
+    inline C2TunneledModeStruct(
+            size_t flexCount, mode_t mode_, sync_type_t type, std::vector<int32_t> id)
+        : mode(mode_), syncType(type) {
+        memcpy(&syncId, &id[0], c2_min(id.size(), flexCount) * FLEX_SIZE);
+    }
+
+    inline C2TunneledModeStruct(size_t flexCount, mode_t mode_, sync_type_t type, int32_t id)
+        : mode(mode_), syncType(type) {
+        if (flexCount >= 1) {
+            syncId[0] = id;
+        }
+    }
+
+    mode_t mode;          ///< tunneled mode
+    sync_type_t syncType; ///< type of sync used for tunneled mode
+    int32_t syncId[];     ///< sync id
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(TunneledMode, syncId)
+    C2FIELD(mode, "mode")
+    C2FIELD(syncType, "sync-type")
+    C2FIELD(syncId, "sync-id")
+
+};
+
+C2ENUM(C2TunneledModeStruct::mode_t, uint32_t,
+    NONE,
+    SIDEBAND,
+);
+
+
+C2ENUM(C2TunneledModeStruct::sync_type_t, uint32_t,
+    REALTIME,
+    AUDIO_HW_SYNC,
+    HW_AV_SYNC,
+);
+
+/**
+ * Configure tunneled mode
+ */
+typedef C2PortParam<C2Setting, C2TunneledModeStruct, kParamIndexTunneledMode>
+        C2PortTunneledModeSetting;
+constexpr char C2_PARAMKEY_TUNNELED_RENDER[] = "output.tunneled-render";
+
+/**
+ * Tunneled mode handle. The meaning of this is depends on the
+ * tunneled mode. If the tunneled mode is SIDEBAND, this is the
+ * sideband handle.
+ */
+typedef C2PortParam<C2Setting, C2Int32Array, kParamIndexTunnelHandle> C2PortTunnelHandleSetting;
+constexpr char C2_PARAMKEY_OUTPUT_TUNNEL_HANDLE[] = "output.tunnel-handle";
+
+/**
+ * The system time using CLOCK_MONOTONIC in nanoseconds at the tunnel endpoint.
+ * For decoders this is the render time for the output frame and
+ * this corresponds to the media timestamp of the output frame.
+ */
+typedef C2PortParam<C2Info, C2SimpleValueStruct<int64_t>, kParamIndexTunnelSystemTime>
+        C2PortTunnelSystemTime;
+constexpr char C2_PARAMKEY_OUTPUT_RENDER_TIME[] = "output.render-time";
 
 /// @}
 
