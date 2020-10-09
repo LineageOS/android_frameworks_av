@@ -1,6 +1,6 @@
 cc_defaults {
     name: "benchmarkdefaults",
-    shared_libs: ["libmediatranscoder", "libmediandk", "libbase"],
+    shared_libs: ["libmediatranscoder", "libmediandk", "libbase", "libbinder_ndk"],
     static_libs: ["libgoogle-benchmark"],
 }
 
