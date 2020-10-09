@@ -163,7 +163,8 @@ binder_status_t ResourceObserverService::dump(
 Status ResourceObserverService::registerObserver(
         const std::shared_ptr<IResourceObserver>& in_observer,
         const std::vector<MediaObservableFilter>& in_filters) {
-    if (checkCallingPermission(
+    if ((getpid() != AIBinder_getCallingPid()) &&
+            checkCallingPermission(
             String16("android.permission.REGISTER_MEDIA_RESOURCE_OBSERVER")) == false) {
         ALOGE("Permission Denial: "
                 "can't registerObserver from pid=%d, uid=%d\n",
@@ -217,7 +218,8 @@ Status ResourceObserverService::registerObserver(
 
 Status ResourceObserverService::unregisterObserver(
         const std::shared_ptr<IResourceObserver>& in_observer) {
-    if (checkCallingPermission(
+    if ((getpid() != AIBinder_getCallingPid()) &&
+            checkCallingPermission(
             String16("android.permission.REGISTER_MEDIA_RESOURCE_OBSERVER")) == false) {
         ALOGE("Permission Denial: "
                 "can't unregisterObserver from pid=%d, uid=%d\n",
