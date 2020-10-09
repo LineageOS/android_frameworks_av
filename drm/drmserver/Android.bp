@@ -31,11 +31,10 @@ cc_binary {
         "liblog",
         "libbinder",
         "libdl",
+        "libdrmframeworkcommon",
         "libselinux",
         "libstagefright_foundation",
     ],
-
-    static_libs: ["libdrmframeworkcommon"],
 
     cflags: [
         "-Wall",
