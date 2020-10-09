@@ -200,6 +200,34 @@ bool AudioPowerUsage::saveAsItem_l(
     return true;
 }
 
+bool AudioPowerUsage::saveAsItems_l(
+        int32_t device, int64_t duration_ns, int32_t type, double average_vol)
+{
+    ALOGV("%s: (%#x, %d, %lld, %f)", __func__, device, type,
+                                   (long long)duration_ns, average_vol );
+    if (duration_ns == 0) {
+        return true; // skip duration 0 usage
+    }
+    if (device == 0) {
+        return true; //ignore unknown device
+    }
+
+    bool ret = false;
+    const int32_t input_bit = device & INPUT_DEVICE_BIT;
+    int32_t device_bits = device ^ input_bit;
+
+    while (device_bits != 0) {
+        int32_t tmp_device = device_bits & -device_bits; // get lowest bit
+        device_bits ^= tmp_device;  // clear lowest bit
+        tmp_device |= input_bit;    // restore input bit
+        ret = saveAsItem_l(tmp_device, duration_ns, type, average_vol);
+
+        ALOGV("%s: device %#x recorded, remaining device_bits = %#x", __func__,
+            tmp_device, device_bits);
+    }
+    return ret;
+}
+
 void AudioPowerUsage::checkTrackRecord(
         const std::shared_ptr<const mediametrics::Item>& item, bool isTrack)
 {
@@ -245,7 +273,7 @@ void AudioPowerUsage::checkTrackRecord(
         ALOGV("device = %s => %d", device_strings.c_str(), device);
     }
     std::lock_guard l(mLock);
-    saveAsItem_l(device, deviceTimeNs, type, deviceVolume);
+    saveAsItems_l(device, deviceTimeNs, type, deviceVolume);
 }
 
 void AudioPowerUsage::checkMode(const std::shared_ptr<const mediametrics::Item>& item)
@@ -262,7 +290,7 @@ void AudioPowerUsage::checkMode(const std::shared_ptr<const mediametrics::Item>&
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
                     mVoiceVolume * double(endCallNs - mVolumeTimeNs)) / durationNs;
-            saveAsItem_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
+            saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
         }
     } else if (mode == "AUDIO_MODE_IN_CALL") { // entering call mode
         mStartCallNs = item->getTimestamp(); // advisory only
@@ -321,7 +349,7 @@ void AudioPowerUsage::checkCreatePatch(const std::shared_ptr<const mediametrics:
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
                     mVoiceVolume * double(endDeviceNs - mVolumeTimeNs)) / durationNs;
-            saveAsItem_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
+            saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
         }
         // reset statistics
         mDeviceVolume = 0;

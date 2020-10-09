@@ -85,6 +85,8 @@ private:
          REQUIRES(mLock);
     static void sendItem(const std::shared_ptr<const mediametrics::Item>& item);
     void collect();
+    bool saveAsItems_l(int32_t device, int64_t duration, int32_t type, double average_vol)
+         REQUIRES(mLock);
 
     AudioAnalytics * const mAudioAnalytics;
     const bool mDisabled;
