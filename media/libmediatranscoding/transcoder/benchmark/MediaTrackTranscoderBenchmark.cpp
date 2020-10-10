@@ -216,7 +216,8 @@ private:
 };
 
 static std::shared_ptr<AMediaFormat> GetDefaultTrackFormat(MediaType mediaType,
-                                                           AMediaFormat* sourceFormat) {
+                                                           AMediaFormat* sourceFormat,
+                                                           bool maxOperatingRate) {
     // Default video config.
     static constexpr int32_t kVideoBitRate = 20 * 1000 * 1000;  // 20 mbps
     static constexpr float kVideoFrameRate = 30.0f;             // 30 fps
@@ -229,6 +230,11 @@ static std::shared_ptr<AMediaFormat> GetDefaultTrackFormat(MediaType mediaType,
         AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_AVC);
         AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, kVideoBitRate);
         AMediaFormat_setFloat(format, AMEDIAFORMAT_KEY_FRAME_RATE, kVideoFrameRate);
+
+        if (maxOperatingRate) {
+            AMediaFormat_setFloat(format, AMEDIAFORMAT_KEY_OPERATING_RATE, INT32_MAX);
+            AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_PRIORITY, 1);
+        }
     }
     // nothing for audio.
 
@@ -282,7 +288,7 @@ static void ConfigureEmptySampleConsumer(const std::shared_ptr<MediaTrackTransco
  */
 static bool ConfigureSampleReader(const std::shared_ptr<MediaTrackTranscoder>& transcoder,
                                   const std::shared_ptr<MediaSampleReader>& sampleReader,
-                                  MediaType mediaType) {
+                                  MediaType mediaType, bool maxOperatingRate) {
     int srcTrackIndex = -1;
     std::shared_ptr<AMediaFormat> srcTrackFormat = nullptr;
 
@@ -312,7 +318,8 @@ static bool ConfigureSampleReader(const std::shared_ptr<MediaTrackTranscoder>& t
         return false;
     }
 
-    auto destinationFormat = GetDefaultTrackFormat(mediaType, srcTrackFormat.get());
+    auto destinationFormat =
+            GetDefaultTrackFormat(mediaType, srcTrackFormat.get(), maxOperatingRate);
     status = transcoder->configure(sampleReader, srcTrackIndex, destinationFormat);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "transcoder configure returned " << status;
@@ -323,7 +330,7 @@ static bool ConfigureSampleReader(const std::shared_ptr<MediaTrackTranscoder>& t
 }
 
 static void BenchmarkTranscoder(benchmark::State& state, const std::string& srcFileName,
-                                bool mockReader, MediaType mediaType) {
+                                bool mockReader, MediaType mediaType, bool maxOperatingRate) {
     for (auto _ : state) {
         std::shared_ptr<TrackTranscoderCallbacks> callbacks =
                 std::make_shared<TrackTranscoderCallbacks>();
@@ -341,7 +348,7 @@ static void BenchmarkTranscoder(benchmark::State& state, const std::string& srcF
             return;
         }
 
-        if (!ConfigureSampleReader(transcoder, sampleReader, mediaType)) {
+        if (!ConfigureSampleReader(transcoder, sampleReader, mediaType, maxOperatingRate)) {
             state.SkipWithError("Unable to configure the transcoder");
             return;
         }
@@ -367,33 +374,72 @@ static void BenchmarkTranscoder(benchmark::State& state, const std::string& srcF
     }
 }
 
-// Benchmark registration wrapper for transcoding.
-#define TRANSCODER_BENCHMARK(func) \
-    BENCHMARK(func)->UseRealTime()->MeasureProcessCPUTime()->Unit(benchmark::kMillisecond)
+//-------------------------------- AVC to AVC Benchmarks -------------------------------------------
 
 static void BM_VideoTranscode_AVC2AVC_NoMuxer(benchmark::State& state) {
     const char* srcFile = "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4";
-    BenchmarkTranscoder(state, srcFile, false /* mockReader */, kVideo);
+    BenchmarkTranscoder(state, srcFile, false /* mockReader */, kVideo,
+                        false /* maxOperatingRate */);
 }
 
 static void BM_VideoTranscode_AVC2AVC_NoMuxer_NoExtractor(benchmark::State& state) {
     const char* srcFile = "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4";
-    BenchmarkTranscoder(state, srcFile, true /* mockReader */, kVideo);
+    BenchmarkTranscoder(state, srcFile, true /* mockReader */, kVideo,
+                        false /* maxOperatingRate */);
 }
+
+static void BM_VideoTranscode_AVC2AVC_NoMuxer_MaxOperatingRate(benchmark::State& state) {
+    const char* srcFile = "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4";
+    BenchmarkTranscoder(state, srcFile, false /* mockReader */, kVideo,
+                        true /* maxOperatingRate */);
+}
+
+static void BM_VideoTranscode_AVC2AVC_NoMuxer_NoExtractor_MaxOperatingRate(
+        benchmark::State& state) {
+    const char* srcFile = "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4";
+    BenchmarkTranscoder(state, srcFile, true /* mockReader */, kVideo, true /* maxOperatingRate */);
+}
+
+//-------------------------------- HEVC to AVC Benchmarks ------------------------------------------
 
 static void BM_VideoTranscode_HEVC2AVC_NoMuxer(benchmark::State& state) {
     const char* srcFile = "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac.mp4";
-    BenchmarkTranscoder(state, srcFile, false /* mockReader */, kVideo);
+    BenchmarkTranscoder(state, srcFile, false /* mockReader */, kVideo,
+                        false /* maxOperatingRate */);
 }
 
 static void BM_VideoTranscode_HEVC2AVC_NoMuxer_NoExtractor(benchmark::State& state) {
     const char* srcFile = "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac.mp4";
-    BenchmarkTranscoder(state, srcFile, true /* mockReader */, kVideo);
+    BenchmarkTranscoder(state, srcFile, true /* mockReader */, kVideo,
+                        false /* maxOperatingRate */);
 }
+
+static void BM_VideoTranscode_HEVC2AVC_NoMuxer_MaxOperatingRate(benchmark::State& state) {
+    const char* srcFile = "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac.mp4";
+    BenchmarkTranscoder(state, srcFile, false /* mockReader */, kVideo,
+                        true /* maxOperatingRate */);
+}
+
+static void BM_VideoTranscode_HEVC2AVC_NoMuxer_NoExtractor_MaxOperatingRate(
+        benchmark::State& state) {
+    const char* srcFile = "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac.mp4";
+    BenchmarkTranscoder(state, srcFile, true /* mockReader */, kVideo, true /* maxOperatingRate */);
+}
+
+//-------------------------------- Benchmark Registration ------------------------------------------
+
+// Benchmark registration wrapper for transcoding.
+#define TRANSCODER_BENCHMARK(func) \
+    BENCHMARK(func)->UseRealTime()->MeasureProcessCPUTime()->Unit(benchmark::kMillisecond)
 
 TRANSCODER_BENCHMARK(BM_VideoTranscode_AVC2AVC_NoMuxer);
 TRANSCODER_BENCHMARK(BM_VideoTranscode_AVC2AVC_NoMuxer_NoExtractor);
+TRANSCODER_BENCHMARK(BM_VideoTranscode_AVC2AVC_NoMuxer_MaxOperatingRate);
+TRANSCODER_BENCHMARK(BM_VideoTranscode_AVC2AVC_NoMuxer_NoExtractor_MaxOperatingRate);
+
 TRANSCODER_BENCHMARK(BM_VideoTranscode_HEVC2AVC_NoMuxer);
 TRANSCODER_BENCHMARK(BM_VideoTranscode_HEVC2AVC_NoMuxer_NoExtractor);
+TRANSCODER_BENCHMARK(BM_VideoTranscode_HEVC2AVC_NoMuxer_MaxOperatingRate);
+TRANSCODER_BENCHMARK(BM_VideoTranscode_HEVC2AVC_NoMuxer_NoExtractor_MaxOperatingRate);
 
 BENCHMARK_MAIN();
