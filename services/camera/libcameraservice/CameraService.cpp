@@ -1024,6 +1024,7 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
                 clientName8.string(), clientUid, clientPid, cameraId.string(),
                 callingUid, procState);
     }
+#endif
 
     // If sensor privacy is enabled then prevent access to the camera
     if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
@@ -1032,7 +1033,6 @@ Status CameraService::validateClientPermissionsLocked(const String8& cameraId,
                 "Caller \"%s\" (PID %d, UID %d) cannot open camera \"%s\" when sensor privacy "
                 "is enabled", clientName8.string(), clientUid, clientPid, cameraId.string());
     }
-#endif
 
     // Only use passed in clientPid to check permission. Use calling PID as the client PID that's
     // connected to camera service directly.
