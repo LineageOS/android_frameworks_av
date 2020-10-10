@@ -106,6 +106,7 @@ class GraphicBlockBuddy : public C2GraphicBlock {
 class BufferDataBuddy : public C2BufferData {
     using C2BufferData::C2BufferData;
     friend class ::C2Buffer;
+    friend class ::C2InfoBuffer;
 };
 
 }  // namespace
@@ -1185,6 +1186,7 @@ private:
     type_t mType;
     std::vector<C2ConstLinearBlock> mLinearBlocks;
     std::vector<C2ConstGraphicBlock> mGraphicBlocks;
+    friend class C2InfoBuffer;
 };
 
 C2BufferData::C2BufferData(const std::vector<C2ConstLinearBlock> &blocks) : mImpl(new Impl(blocks)) {}
@@ -1198,6 +1200,35 @@ const std::vector<C2ConstLinearBlock> C2BufferData::linearBlocks() const {
 
 const std::vector<C2ConstGraphicBlock> C2BufferData::graphicBlocks() const {
     return mImpl->graphicBlocks();
+}
+
+C2InfoBuffer::C2InfoBuffer(
+    C2Param::Index index, const std::vector<C2ConstLinearBlock> &blocks)
+    : mIndex(index), mData(BufferDataBuddy(blocks)) {
+}
+
+C2InfoBuffer::C2InfoBuffer(
+    C2Param::Index index, const std::vector<C2ConstGraphicBlock> &blocks)
+    : mIndex(index), mData(BufferDataBuddy(blocks)) {
+}
+
+C2InfoBuffer::C2InfoBuffer(
+    C2Param::Index index, const C2BufferData &data)
+    : mIndex(index), mData(data) {
+}
+
+// static
+C2InfoBuffer C2InfoBuffer::CreateLinearBuffer(
+        C2Param::CoreIndex index, const C2ConstLinearBlock &block) {
+    return C2InfoBuffer(index.coreIndex() | C2Param::Index::KIND_INFO | C2Param::Index::DIR_GLOBAL,
+                        { block });
+}
+
+// static
+C2InfoBuffer C2InfoBuffer::CreateGraphicBuffer(
+        C2Param::CoreIndex index, const C2ConstGraphicBlock &block) {
+    return C2InfoBuffer(index.coreIndex() | C2Param::Index::KIND_INFO | C2Param::Index::DIR_GLOBAL,
+                        { block });
 }
 
 class C2Buffer::Impl {
