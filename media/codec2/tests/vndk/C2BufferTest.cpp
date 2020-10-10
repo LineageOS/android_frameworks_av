@@ -765,4 +765,54 @@ TEST_F(C2BufferTest, MultipleLinearMapTest) {
     }
 }
 
+TEST_F(C2BufferTest, InfoBufferTest) {
+    constexpr size_t kCapacity = 524288u;
+
+    // allocate a linear block
+    std::shared_ptr<C2BlockPool> linearPool(makeLinearBlockPool());
+    std::shared_ptr<C2LinearBlock> linearBlock;
+    ASSERT_EQ(C2_OK, linearPool->fetchLinearBlock(
+            kCapacity,
+            { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE },
+            &linearBlock));
+
+    C2InfoBuffer info = C2InfoBuffer::CreateLinearBuffer(
+            kParamIndexNumber1, linearBlock->share(1024, kCapacity / 2, C2Fence()));
+    std::shared_ptr<C2InfoBuffer> spInfo(new C2InfoBuffer(info));
+    ASSERT_EQ(kParamIndexNumber1, spInfo->index().coreIndex());
+    ASSERT_TRUE(spInfo->index().isGlobal());
+    ASSERT_EQ(C2Param::INFO, spInfo->index().kind());
+    ASSERT_EQ(C2BufferData::LINEAR, spInfo->data().type());
+    ASSERT_EQ(1024, spInfo->data().linearBlocks()[0].offset());
+    ASSERT_EQ(kCapacity / 2, spInfo->data().linearBlocks()[0].size());
+    // handles must actually be identical after sharing into an info buffer
+    ASSERT_EQ(linearBlock->handle(), spInfo->data().linearBlocks()[0].handle());
+    ASSERT_EQ(linearPool->getAllocatorId(), spInfo->data().linearBlocks()[0].getAllocatorId());
+
+    C2InfoBuffer streamInfo = info.asStream(false /* output */,  1u);
+    ASSERT_EQ(kParamIndexNumber1, streamInfo.index().coreIndex());
+    ASSERT_TRUE(streamInfo.index().forStream());
+    ASSERT_TRUE(streamInfo.index().forInput());
+    ASSERT_EQ(1u, streamInfo.index().stream());
+    ASSERT_EQ(C2Param::INFO, streamInfo.index().kind());
+    ASSERT_EQ(C2BufferData::LINEAR, streamInfo.data().type());
+    ASSERT_EQ(1024, streamInfo.data().linearBlocks()[0].offset());
+    ASSERT_EQ(kCapacity / 2, streamInfo.data().linearBlocks()[0].size());
+    // handles must actually be identical after sharing into an info buffer
+    ASSERT_EQ(linearBlock->handle(), streamInfo.data().linearBlocks()[0].handle());
+    ASSERT_EQ(linearPool->getAllocatorId(), streamInfo.data().linearBlocks()[0].getAllocatorId());
+
+    C2InfoBuffer portInfo = streamInfo.asPort(true /* output */);
+    ASSERT_EQ(kParamIndexNumber1, portInfo.index().coreIndex());
+    ASSERT_TRUE(portInfo.index().forPort());
+    ASSERT_TRUE(portInfo.index().forOutput());
+    ASSERT_EQ(C2Param::INFO, portInfo.index().kind());
+    ASSERT_EQ(C2BufferData::LINEAR, portInfo.data().type());
+    ASSERT_EQ(1024, portInfo.data().linearBlocks()[0].offset());
+    ASSERT_EQ(kCapacity / 2, portInfo.data().linearBlocks()[0].size());
+    // handles must actually be identical after sharing into an info buffer
+    ASSERT_EQ(linearBlock->handle(), portInfo.data().linearBlocks()[0].handle());
+    ASSERT_EQ(linearPool->getAllocatorId(), portInfo.data().linearBlocks()[0].getAllocatorId());
+}
+
 } // namespace android
