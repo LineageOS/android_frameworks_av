@@ -317,7 +317,8 @@ public:
         DEFINE_FIELD_BASED_COMPARISON_OPERATORS(Index, mIndex)
 
     private:
-        friend struct C2Param;           // for setStream, MakeStreamId, isValid
+        friend class C2InfoBuffer;       // for convertTo*
+        friend struct C2Param;           // for setStream, MakeStreamId, isValid, convertTo*
         friend struct _C2ParamInspector; // for testing
 
         /**
