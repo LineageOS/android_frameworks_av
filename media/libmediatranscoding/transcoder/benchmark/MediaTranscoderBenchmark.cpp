@@ -191,14 +191,24 @@ exit:
     if (dstFd > 0) close(dstFd);
 }
 
+/**
+ * Callback to edit track format for transcoding.
+ * @param dstFormat The default track format for the track type.
+ */
+using TrackFormatEditCallback = std::function<void(AMediaFormat* dstFormat)>;
+
 static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFileName,
                                const std::string& dstFileName, bool includeAudio,
-                               bool transcodeVideo) {
+                               bool transcodeVideo,
+                               const TrackFormatEditCallback& videoFormatEditor = nullptr) {
     TranscodeMediaFile(state, srcFileName, dstFileName,
                        [=](const char* mime, AMediaFormat** dstFormatOut) -> bool {
                            *dstFormatOut = nullptr;
                            if (strncmp(mime, "video/", 6) == 0 && transcodeVideo) {
                                *dstFormatOut = CreateDefaultVideoFormat();
+                               if (videoFormatEditor != nullptr) {
+                                   videoFormatEditor(*dstFormatOut);
+                               }
                            } else if (strncmp(mime, "audio/", 6) == 0 && !includeAudio) {
                                return false;
                            }
@@ -206,20 +216,17 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
                        });
 }
 
-// Benchmark registration wrapper for transcoding.
-#define TRANSCODER_BENCHMARK(func) \
-    BENCHMARK(func)->UseRealTime()->MeasureProcessCPUTime()->Unit(benchmark::kMillisecond)
+static void SetMaxOperatingRate(AMediaFormat* format) {
+    AMediaFormat_setFloat(format, AMEDIAFORMAT_KEY_OPERATING_RATE, INT32_MAX);
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_PRIORITY, 1);
+}
+
+//-------------------------------- AVC to AVC Benchmarks -------------------------------------------
 
 static void BM_TranscodeAvc2AvcAudioVideo2AudioVideo(benchmark::State& state) {
     TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
                        "video_1920x1080_3648frame_h264_22Mbps_30fps_aac_transcoded_AV.mp4",
                        true /* includeAudio */, true /* transcodeVideo */);
-}
-
-static void BM_TranscodeAvc2AvcAudioVideo2Video(benchmark::State& state) {
-    TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
-                       "video_1920x1080_3648frame_h264_22Mbps_30fps_aac_transcoded_V.mp4",
-                       false /* includeAudio */, true /* transcodeVideo */);
 }
 
 static void BM_TranscodeAvc2AvcVideo2Video(benchmark::State& state) {
@@ -231,34 +238,42 @@ static void BM_TranscodeAvc2AvcVideo2Video(benchmark::State& state) {
 static void BM_TranscodeAvc2AvcAV2AVMaxOperatingRate(benchmark::State& state) {
     TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
                        "video_1920x1080_3648frame_h264_22Mbps_30fps_aac_transcoded_AV.mp4",
-                       [](const char* mime, AMediaFormat** dstFormatOut) -> bool {
-                           AMediaFormat* dstFormat = nullptr;
-                           if (strncmp(mime, "video/", 6) == 0) {
-                               dstFormat = CreateDefaultVideoFormat();
-                               AMediaFormat_setFloat(dstFormat, AMEDIAFORMAT_KEY_OPERATING_RATE,
-                                                     INT32_MAX);
-                               AMediaFormat_setInt32(dstFormat, AMEDIAFORMAT_KEY_PRIORITY, 1);
-                           }
-                           *dstFormatOut = dstFormat;
-                           return true;
-                       });
+                       true /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
 }
 
 static void BM_TranscodeAvc2AvcV2VMaxOperatingRate(benchmark::State& state) {
     TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps.mp4",
                        "video_1920x1080_3648frame_h264_22Mbps_30fps_transcoded_V.mp4",
-                       [](const char* mime, AMediaFormat** dstFormatOut) -> bool {
-                           if (strncmp(mime, "video/", 6) == 0) {
-                               AMediaFormat* dstFormat = CreateDefaultVideoFormat();
-                               AMediaFormat_setFloat(dstFormat, AMEDIAFORMAT_KEY_OPERATING_RATE,
-                                                     INT32_MAX);
-                               AMediaFormat_setInt32(dstFormat, AMEDIAFORMAT_KEY_PRIORITY, 1);
-                               *dstFormatOut = dstFormat;
-                               return true;
-                           }
-                           return false;
-                       });
+                       false /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
 }
+
+//-------------------------------- HEVC to AVC Benchmarks ------------------------------------------
+
+static void BM_TranscodeHevc2AvcAudioVideo2AudioVideo(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac.mp4",
+                       "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac_transcoded_AV.mp4",
+                       true /* includeAudio */, true /* transcodeVideo */);
+}
+
+static void BM_TranscodeHevc2AvcVideo2Video(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1920x1080_3863frame_hevc_4Mbps_30fps.mp4",
+                       "video_1920x1080_3863frame_hevc_4Mbps_30fps_transcoded_V.mp4",
+                       false /* includeAudio */, true /* transcodeVideo */);
+}
+
+static void BM_TranscodeHevc2AvcAV2AVMaxOperatingRate(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac.mp4",
+                       "video_1920x1080_3863frame_hevc_4Mbps_30fps_aac_transcoded_AV.mp4",
+                       true /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
+}
+
+static void BM_TranscodeHevc2AvcV2VMaxOperatingRate(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1920x1080_3863frame_hevc_4Mbps_30fps.mp4",
+                       "video_1920x1080_3863frame_hevc_4Mbps_30fps_transcoded_V.mp4",
+                       false /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
+}
+
+//-------------------------------- Passthrough Benchmarks ------------------------------------------
 
 static void BM_TranscodeAudioVideoPassthrough(benchmark::State& state) {
     TranscodeMediaFile(state, "video_1920x1080_3648frame_h264_22Mbps_30fps_aac.mp4",
@@ -271,11 +286,22 @@ static void BM_TranscodeVideoPassthrough(benchmark::State& state) {
                        false /* includeAudio */, false /* transcodeVideo */);
 }
 
+//-------------------------------- Benchmark Registration ------------------------------------------
+
+// Benchmark registration wrapper for transcoding.
+#define TRANSCODER_BENCHMARK(func) \
+    BENCHMARK(func)->UseRealTime()->MeasureProcessCPUTime()->Unit(benchmark::kMillisecond)
+
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAudioVideo2AudioVideo);
-TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAudioVideo2Video);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcVideo2Video);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAV2AVMaxOperatingRate);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcV2VMaxOperatingRate);
+
+TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAudioVideo2AudioVideo);
+TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcVideo2Video);
+TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAV2AVMaxOperatingRate);
+TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcV2VMaxOperatingRate);
+
 TRANSCODER_BENCHMARK(BM_TranscodeAudioVideoPassthrough);
 TRANSCODER_BENCHMARK(BM_TranscodeVideoPassthrough);
 
