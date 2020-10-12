@@ -943,14 +943,9 @@ bool objcpy(FrameData* d, const C2FrameData& s,
 
     d->infoBuffers.resize(s.infoBuffers.size());
     i = 0;
-    for (const std::shared_ptr<C2InfoBuffer>& sInfoBuffer : s.infoBuffers) {
+    for (const C2InfoBuffer& sInfoBuffer : s.infoBuffers) {
         InfoBuffer& dInfoBuffer = d->infoBuffers[i++];
-        if (!sInfoBuffer) {
-            LOG(ERROR) << "Null C2FrameData::infoBuffers["
-                       << i - 1 << "].";
-            return false;
-        }
-        if (!objcpy(&dInfoBuffer, *sInfoBuffer,
+        if (!objcpy(&dInfoBuffer, sInfoBuffer,
                 bufferPoolSender, baseBlocks, baseBlockIndices)) {
             LOG(ERROR) << "Invalid C2FrameData::infoBuffers["
                        << i - 1 << "].";
