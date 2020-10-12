@@ -23,7 +23,12 @@ cc_test {
         "MediaTestHelper.cpp",
     ],
 
+    header_libs: [
+        "libmediadrm_headers",
+    ],
+
     shared_libs: [
+        "libgui",
         "libmedia",
         "libmedia_codeclist",
         "libmediametrics",
