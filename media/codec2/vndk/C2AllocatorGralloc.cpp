@@ -103,7 +103,7 @@ private:
     const static uint32_t MAGIC = '\xc2gr\x00';
 
     static
-    const ExtraData* getExtraData(const C2Handle *const handle) {
+    const ExtraData* GetExtraData(const C2Handle *const handle) {
         if (handle == nullptr
                 || native_handle_is_invalid(handle)
                 || handle->numInts < NUM_INTS) {
@@ -114,23 +114,23 @@ private:
     }
 
     static
-    ExtraData *getExtraData(C2Handle *const handle) {
-        return const_cast<ExtraData *>(getExtraData(const_cast<const C2Handle *const>(handle)));
+    ExtraData *GetExtraData(C2Handle *const handle) {
+        return const_cast<ExtraData *>(GetExtraData(const_cast<const C2Handle *const>(handle)));
     }
 
 public:
     void getIgbpData(uint32_t *generation, uint64_t *igbp_id, uint32_t *igbp_slot) const {
-        const ExtraData *ed = getExtraData(this);
+        const ExtraData *ed = GetExtraData(this);
         *generation = ed->generation;
         *igbp_id = unsigned(ed->igbp_id_lo) | uint64_t(unsigned(ed->igbp_id_hi)) << 32;
         *igbp_slot = ed->igbp_slot;
     }
 
-    static bool isValid(const C2Handle *const o) {
+    static bool IsValid(const C2Handle *const o) {
         if (o == nullptr) { // null handle is always valid
             return true;
         }
-        const ExtraData *xd = getExtraData(o);
+        const ExtraData *xd = GetExtraData(o);
         // we cannot validate width/height/format/usage without accessing gralloc driver
         return xd != nullptr && xd->magic == MAGIC;
     }
@@ -152,7 +152,7 @@ public:
         native_handle_t *res = native_handle_create(handle->numFds, handle->numInts + NUM_INTS);
         if (res != nullptr) {
             memcpy(&res->data, &handle->data, sizeof(int) * (handle->numFds + handle->numInts));
-            *getExtraData(res) = xd;
+            *GetExtraData(res) = xd;
         }
         return reinterpret_cast<C2HandleGralloc *>(res);
     }
@@ -180,10 +180,10 @@ public:
     static bool MigrateNativeHandle(
             native_handle_t *handle,
             uint32_t generation, uint64_t igbp_id, uint32_t igbp_slot) {
-        if (handle == nullptr || !isValid(handle)) {
+        if (handle == nullptr || !IsValid(handle)) {
             return false;
         }
-        ExtraData *ed = getExtraData(handle);
+        ExtraData *ed = GetExtraData(handle);
         if (!ed) return false;
         ed->generation = generation;
         ed->igbp_id_lo = uint32_t(igbp_id & 0xFFFFFFFF);
@@ -195,7 +195,7 @@ public:
 
     static native_handle_t* UnwrapNativeHandle(
             const C2Handle *const handle) {
-        const ExtraData *xd = getExtraData(handle);
+        const ExtraData *xd = GetExtraData(handle);
         if (xd == nullptr || xd->magic != MAGIC) {
             return nullptr;
         }
@@ -211,7 +211,7 @@ public:
             uint32_t *width, uint32_t *height, uint32_t *format,
             uint64_t *usage, uint32_t *stride,
             uint32_t *generation, uint64_t *igbp_id, uint32_t *igbp_slot) {
-        const ExtraData *xd = getExtraData(handle);
+        const ExtraData *xd = GetExtraData(handle);
         if (xd == nullptr) {
             return nullptr;
         }
@@ -784,8 +784,9 @@ c2_status_t C2AllocatorGralloc::status() const {
     return mImpl->status();
 }
 
-bool C2AllocatorGralloc::isValid(const C2Handle* const o) {
-    return C2HandleGralloc::isValid(o);
+// static
+bool C2AllocatorGralloc::CheckHandle(const C2Handle* const o) {
+    return C2HandleGralloc::IsValid(o);
 }
 
 } // namespace android
