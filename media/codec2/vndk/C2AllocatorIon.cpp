@@ -73,7 +73,7 @@ const C2Handle C2HandleIon::cHeader = {
 };
 
 // static
-bool C2HandleIon::isValid(const C2Handle * const o) {
+bool C2HandleIon::IsValid(const C2Handle * const o) {
     if (!o || memcmp(o, &cHeader, sizeof(cHeader))) {
         return false;
     }
@@ -579,7 +579,7 @@ c2_status_t C2AllocatorIon::priorLinearAllocation(
         return mInit;
     }
 
-    if (!C2HandleIon::isValid(handle)) {
+    if (!C2HandleIon::IsValid(handle)) {
         return C2_BAD_VALUE;
     }
 
@@ -596,9 +596,8 @@ c2_status_t C2AllocatorIon::priorLinearAllocation(
     return ret;
 }
 
-bool C2AllocatorIon::isValid(const C2Handle* const o) {
-    return C2HandleIon::isValid(o);
+bool C2AllocatorIon::CheckHandle(const C2Handle* const o) {
+    return C2HandleIon::IsValid(o);
 }
 
 } // namespace android
-

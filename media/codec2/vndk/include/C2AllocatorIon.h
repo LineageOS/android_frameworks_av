@@ -57,7 +57,12 @@ public:
 
     virtual ~C2AllocatorIon() override;
 
-    static bool isValid(const C2Handle* const o);
+    virtual bool checkHandle(const C2Handle* const o) const override { return CheckHandle(o); }
+
+    static bool CheckHandle(const C2Handle* const o);
+
+    // deprecated
+    static bool isValid(const C2Handle* const o) { return CheckHandle(o); }
 
     /**
      * Updates the usage mapper for subsequent new allocations, as well as the supported
