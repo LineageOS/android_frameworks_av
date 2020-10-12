@@ -161,7 +161,7 @@ struct C2FrameData {
     //< for initial work item, these may also come from the parser - if provided
     //< for output buffers, these are the responses to requestedInfos
     std::vector<std::unique_ptr<C2Param>>      configUpdate;
-    std::vector<std::shared_ptr<C2InfoBuffer>> infoBuffers;
+    std::vector<C2InfoBuffer> infoBuffers;
 };
 
 struct C2Worklet {
