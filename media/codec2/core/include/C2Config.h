@@ -2239,8 +2239,8 @@ C2ENUM(C2TunneledModeStruct::sync_type_t, uint32_t,
 /**
  * Configure tunneled mode
  */
-typedef C2PortParam<C2Setting, C2TunneledModeStruct, kParamIndexTunneledMode>
-        C2PortTunneledModeSetting;
+typedef C2PortParam<C2Tuning, C2TunneledModeStruct, kParamIndexTunneledMode>
+        C2PortTunneledModeTuning;
 constexpr char C2_PARAMKEY_TUNNELED_RENDER[] = "output.tunneled-render";
 
 /**
@@ -2248,7 +2248,7 @@ constexpr char C2_PARAMKEY_TUNNELED_RENDER[] = "output.tunneled-render";
  * tunneled mode. If the tunneled mode is SIDEBAND, this is the
  * sideband handle.
  */
-typedef C2PortParam<C2Setting, C2Int32Array, kParamIndexTunnelHandle> C2PortTunnelHandleSetting;
+typedef C2PortParam<C2Tuning, C2Int32Array, kParamIndexTunnelHandle> C2PortTunnelHandleTuning;
 constexpr char C2_PARAMKEY_OUTPUT_TUNNEL_HANDLE[] = "output.tunnel-handle";
 
 /**
