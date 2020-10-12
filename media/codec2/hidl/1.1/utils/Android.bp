@@ -44,6 +44,12 @@ cc_library {
         "libstagefright_bufferpool@2.0.1",
         "libui",
     ],
+
+    // Device does not boot when global ThinLTO is enabled for this library.
+    // http://b/170595429
+    lto: {
+        never: true,
+    },
 }
 
 
