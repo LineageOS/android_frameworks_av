@@ -3394,8 +3394,8 @@ int Effect_command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize, voi
                 return -EINVAL;
             }
 
-            uint32_t device = *(uint32_t*)pCmdData;
-            pContext->pBundledContext->nOutputDevice = (audio_devices_t)device;
+            audio_devices_t device = *(audio_devices_t *)pCmdData;
+            pContext->pBundledContext->nOutputDevice = device;
 
             if (pContext->EffectType == LVM_BASS_BOOST) {
                 if ((device == AUDIO_DEVICE_OUT_SPEAKER) ||
