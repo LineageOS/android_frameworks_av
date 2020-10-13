@@ -538,7 +538,7 @@ void StagefrightMetadataRetriever::parseMetaData() {
 
     // The overall duration is the duration of the longest track.
     int64_t maxDurationUs = 0;
-    String8 timedTextLang;
+    String8 timedTextLang, videoMime;
     for (size_t i = 0; i < numTracks; ++i) {
         sp<MetaData> trackMeta = mExtractor->getTrackMetaData(i);
         if (!trackMeta) {
@@ -575,6 +575,7 @@ void StagefrightMetadataRetriever::parseMetaData() {
                 }
             } else if (!hasVideo && !strncasecmp("video/", mime, 6)) {
                 hasVideo = true;
+                videoMime = String8(mime);
 
                 CHECK(trackMeta->findInt32(kKeyWidth, &videoWidth));
                 CHECK(trackMeta->findInt32(kKeyHeight, &videoHeight));
@@ -636,6 +637,8 @@ void StagefrightMetadataRetriever::parseMetaData() {
 
         sprintf(tmp, "%d", rotationAngle);
         mMetaData.add(METADATA_KEY_VIDEO_ROTATION, String8(tmp));
+
+        mMetaData.add(METADATA_KEY_VIDEO_CODEC_MIME_TYPE, videoMime);
 
         if (videoFrameCount > 0) {
             sprintf(tmp, "%d", videoFrameCount);

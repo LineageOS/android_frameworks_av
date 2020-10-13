@@ -28,7 +28,10 @@ struct C2HandleIon : public C2Handle {
           mFds{ bufferFd },
           mInts{ int(size & 0xFFFFFFFF), int((uint64_t(size) >> 32) & 0xFFFFFFFF), kMagic } { }
 
-    static bool isValid(const C2Handle * const o);
+    static bool IsValid(const C2Handle * const o);
+
+    // deprecated
+    static bool isValid(const C2Handle * const o) { return IsValid(o); }
 
     int bufferFd() const { return mFds.mBuffer; }
     size_t size() const {
