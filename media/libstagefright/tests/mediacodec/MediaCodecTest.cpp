@@ -20,6 +20,8 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include <gui/Surface.h>
+#include <mediadrm/ICrypto.h>
 #include <media/stagefright/CodecBase.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecListWriter.h>
@@ -152,6 +154,37 @@ private:
 using namespace android;
 using ::testing::_;
 
+static sp<MediaCodec> SetupMediaCodec(
+        const AString &owner,
+        const AString &codecName,
+        const AString &mediaType,
+        const sp<ALooper> &looper,
+        std::function<sp<CodecBase>(const AString &name, const char *owner)> getCodecBase) {
+    std::shared_ptr<MediaCodecListWriter> listWriter =
+        MediaTestHelper::CreateCodecListWriter();
+    std::unique_ptr<MediaCodecInfoWriter> infoWriter = listWriter->addMediaCodecInfo();
+    infoWriter->setName(codecName.c_str());
+    infoWriter->setOwner(owner.c_str());
+    infoWriter->addMediaType(mediaType.c_str());
+    std::vector<sp<MediaCodecInfo>> codecInfos;
+    MediaTestHelper::WriteCodecInfos(listWriter, &codecInfos);
+    std::function<status_t(const AString &, sp<MediaCodecInfo> *)> getCodecInfo =
+        [codecInfos](const AString &name, sp<MediaCodecInfo> *info) -> status_t {
+            auto it = std::find_if(
+                    codecInfos.begin(), codecInfos.end(),
+                    [&name](const sp<MediaCodecInfo> &info) {
+                        return name.equalsIgnoreCase(info->getCodecName());
+                    });
+
+            *info = (it == codecInfos.end()) ? nullptr : *it;
+            return (*info) ? OK : NAME_NOT_FOUND;
+        };
+
+    looper->start();
+    return MediaTestHelper::CreateCodec(
+            codecName, looper, getCodecBase, getCodecInfo);
+}
+
 TEST(MediaCodecTest, ReclaimReleaseRace) {
     // Test scenario:
     //
@@ -202,30 +235,9 @@ TEST(MediaCodecTest, ReclaimReleaseRace) {
             return mockCodec;
         };
 
-    std::shared_ptr<MediaCodecListWriter> listWriter =
-        MediaTestHelper::CreateCodecListWriter();
-    std::unique_ptr<MediaCodecInfoWriter> infoWriter = listWriter->addMediaCodecInfo();
-    infoWriter->setName(kCodecName.c_str());
-    infoWriter->setOwner(kCodecOwner.c_str());
-    infoWriter->addMediaType(kMediaType.c_str());
-    std::vector<sp<MediaCodecInfo>> codecInfos;
-    MediaTestHelper::WriteCodecInfos(listWriter, &codecInfos);
-    std::function<status_t(const AString &, sp<MediaCodecInfo> *)> getCodecInfo =
-        [codecInfos](const AString &name, sp<MediaCodecInfo> *info) -> status_t {
-            auto it = std::find_if(
-                    codecInfos.begin(), codecInfos.end(),
-                    [&name](const sp<MediaCodecInfo> &info) {
-                        return name.equalsIgnoreCase(info->getCodecName());
-                    });
-
-            *info = (it == codecInfos.end()) ? nullptr : *it;
-            return (*info) ? OK : NAME_NOT_FOUND;
-        };
-
     sp<ALooper> looper{new ALooper};
-    looper->start();
-    sp<MediaCodec> codec = MediaTestHelper::CreateCodec(
-            kCodecName, looper, getCodecBase, getCodecInfo);
+    sp<MediaCodec> codec = SetupMediaCodec(
+            kCodecOwner, kCodecName, kMediaType, looper, getCodecBase);
     ASSERT_NE(nullptr, codec) << "Codec must not be null";
     ASSERT_NE(nullptr, mockCodec) << "MockCodec must not be null";
     std::promise<void> reclaimCompleted;
@@ -264,5 +276,75 @@ TEST(MediaCodecTest, ReclaimReleaseRace) {
             std::future_status::ready,
             releaseCompleted.get_future().wait_for(std::chrono::seconds(5)))
         << "release timed out";
+    looper->stop();
+}
+
+TEST(MediaCodecTest, ErrorWhileStopping) {
+    // Test scenario:
+    //
+    // 1) Client thread calls stop(); MediaCodec looper thread calls
+    //    initiateShutdown(); shutdown is being handled at the component thread.
+    // 2) Error occurred, but the shutdown operation is still being done.
+    // 3) MediaCodec looper thread handles the error.
+    // 4) Component thread completes shutdown and posts onStopCompleted()
+
+    static const AString kCodecName{"test.codec"};
+    static const AString kCodecOwner{"nobody"};
+    static const AString kMediaType{"video/x-test"};
+
+    std::promise<void> errorOccurred;
+    sp<MockCodec> mockCodec;
+    std::function<sp<CodecBase>(const AString &name, const char *owner)> getCodecBase =
+        [&mockCodec, &errorOccurred](const AString &, const char *) {
+            mockCodec = new MockCodec([](const std::shared_ptr<MockBufferChannel> &) {
+                // No mock setup, as we don't expect any buffer operations
+                // in this scenario.
+            });
+            ON_CALL(*mockCodec, initiateAllocateComponent(_))
+                .WillByDefault([mockCodec](const sp<AMessage> &) {
+                    mockCodec->callback()->onComponentAllocated(kCodecName.c_str());
+                });
+            ON_CALL(*mockCodec, initiateConfigureComponent(_))
+                .WillByDefault([mockCodec](const sp<AMessage> &msg) {
+                    mockCodec->callback()->onComponentConfigured(
+                            msg->dup(), msg->dup());
+                });
+            ON_CALL(*mockCodec, initiateStart())
+                .WillByDefault([mockCodec]() {
+                    mockCodec->callback()->onStartCompleted();
+                });
+            ON_CALL(*mockCodec, initiateShutdown(true))
+                .WillByDefault([mockCodec, &errorOccurred](bool) {
+                    mockCodec->callback()->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+                    // Mark that 1) and 2) are complete.
+                    errorOccurred.set_value();
+                });
+            ON_CALL(*mockCodec, initiateShutdown(false))
+                .WillByDefault([mockCodec](bool) {
+                    mockCodec->callback()->onReleaseCompleted();
+                });
+            return mockCodec;
+        };
+
+    sp<ALooper> looper{new ALooper};
+    sp<MediaCodec> codec = SetupMediaCodec(
+            kCodecOwner, kCodecName, kMediaType, looper, getCodecBase);
+    ASSERT_NE(nullptr, codec) << "Codec must not be null";
+    ASSERT_NE(nullptr, mockCodec) << "MockCodec must not be null";
+
+    std::thread([mockCodec, &errorOccurred]{
+        // Simulate component thread that handles stop()
+        errorOccurred.get_future().wait();
+        // Error occurred but shutdown request still got processed.
+        mockCodec->callback()->onStopCompleted();
+    }).detach();
+
+    codec->configure(new AMessage, nullptr, nullptr, 0);
+    codec->start();
+    codec->stop();
+    // Sleep here to give time for the MediaCodec looper thread
+    // to process the messages.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    codec->release();
     looper->stop();
 }
