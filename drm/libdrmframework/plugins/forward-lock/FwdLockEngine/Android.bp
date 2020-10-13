@@ -36,11 +36,11 @@ cc_library_shared {
         "libcrypto",
         "libssl",
         "libdrmframework",
+        "libdrmframeworkcommon",
     ],
 
     static_libs: [
         "libdrmutility",
-        "libdrmframeworkcommon",
         "libfwdlock-common",
         "libfwdlock-converter",
         "libfwdlock-decoder",
