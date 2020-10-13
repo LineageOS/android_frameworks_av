@@ -2138,6 +2138,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     }
 
                     bool sendErrorResponse = true;
+                    std::string origin{"kWhatError:"};
+                    origin += stateString(mState);
 
                     switch (mState) {
                         case INITIALIZING:
@@ -2189,14 +2191,14 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 // be a shutdown complete notification after
                                 // all.
 
-                                // note that we're directly going from
+                                // note that we may be directly going from
                                 // STOPPING->UNINITIALIZED, instead of the
                                 // usual STOPPING->INITIALIZED state.
                                 setState(UNINITIALIZED);
                                 if (mState == RELEASING) {
                                     mComponentName.clear();
                                 }
-                                postPendingRepliesAndDeferredMessages();
+                                postPendingRepliesAndDeferredMessages(origin + ":dead");
                                 sendErrorResponse = false;
                             }
                             break;
@@ -2287,7 +2289,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                             // released by ResourceManager.
                             finalErr = DEAD_OBJECT;
                         }
-                        postPendingRepliesAndDeferredMessages(finalErr);
+                        postPendingRepliesAndDeferredMessages(origin, finalErr);
                     }
                     break;
                 }
@@ -2335,7 +2337,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 MediaResource::CodecResource(mFlags & kFlagIsSecure, mIsVideo));
                     }
 
-                    postPendingRepliesAndDeferredMessages();
+                    postPendingRepliesAndDeferredMessages("kWhatComponentAllocated");
                     break;
                 }
 
@@ -2374,7 +2376,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mFlags |= kFlagUsesSoftwareRenderer;
                     }
                     setState(CONFIGURED);
-                    postPendingRepliesAndDeferredMessages();
+                    postPendingRepliesAndDeferredMessages("kWhatComponentConfigured");
 
                     // augment our media metrics info, now that we know more things
                     // such as what the codec extracted from any CSD passed in.
@@ -2443,7 +2445,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     } else {
                         response->setInt32("err", err);
                     }
-                    postPendingRepliesAndDeferredMessages(response);
+                    postPendingRepliesAndDeferredMessages("kWhatInputSurfaceCreated", response);
                     break;
                 }
 
@@ -2465,7 +2467,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     } else {
                         response->setInt32("err", err);
                     }
-                    postPendingRepliesAndDeferredMessages(response);
+                    postPendingRepliesAndDeferredMessages("kWhatInputSurfaceAccepted", response);
                     break;
                 }
 
@@ -2483,7 +2485,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (msg->findInt32("err", &err)) {
                         response->setInt32("err", err);
                     }
-                    postPendingRepliesAndDeferredMessages(response);
+                    postPendingRepliesAndDeferredMessages("kWhatSignaledInputEOS", response);
                     break;
                 }
 
@@ -2503,7 +2505,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 MediaResource::GraphicMemoryResource(getGraphicBufferSize()));
                     }
                     setState(STARTED);
-                    postPendingRepliesAndDeferredMessages();
+                    postPendingRepliesAndDeferredMessages("kWhatStartCompleted");
                     break;
                 }
 
@@ -2640,7 +2642,13 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         break;
                     }
                     setState(INITIALIZED);
-                    postPendingRepliesAndDeferredMessages();
+                    if (mReplyID) {
+                        postPendingRepliesAndDeferredMessages("kWhatStopCompleted");
+                    } else {
+                        ALOGW("kWhatStopCompleted: presumably an error occurred earlier, "
+                              "but the operation completed anyway. (last reply origin=%s)",
+                              mLastReplyOrigin.c_str());
+                    }
                     break;
                 }
 
@@ -2665,7 +2673,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     mReleaseSurface.reset();
 
                     if (mReplyID != nullptr) {
-                        postPendingRepliesAndDeferredMessages();
+                        postPendingRepliesAndDeferredMessages("kWhatReleaseCompleted");
                     }
                     if (mAsyncReleaseCompleteNotification != nullptr) {
                         flushMediametrics();
@@ -2690,7 +2698,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         mCodec->signalResume();
                     }
 
-                    postPendingRepliesAndDeferredMessages();
+                    postPendingRepliesAndDeferredMessages("kWhatFlushCompleted");
                     break;
                 }
 
@@ -3081,7 +3089,8 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             if (mState == FLUSHING || mState == STOPPING
                     || mState == CONFIGURING || mState == STARTING) {
                 // mReply is always set if in these states.
-                postPendingRepliesAndDeferredMessages();
+                postPendingRepliesAndDeferredMessages(
+                        std::string("kWhatRelease:") + stateString(mState));
             }
 
             if (mFlags & kFlagSawMediaServerDie) {
@@ -3134,7 +3143,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 // State transition replies are handled above, so this reply
                 // would not be related to state transition. As we are
                 // shutting down the component, just fail the operation.
-                postPendingRepliesAndDeferredMessages(UNKNOWN_ERROR);
+                postPendingRepliesAndDeferredMessages("kWhatRelease:reply", UNKNOWN_ERROR);
             }
             mReplyID = replyID;
             setState(msg->what() == kWhatStop ? STOPPING : RELEASING);
@@ -3150,7 +3159,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             if (asyncNotify != nullptr) {
                 mResourceManagerProxy->markClientForPendingRemoval();
-                postPendingRepliesAndDeferredMessages();
+                postPendingRepliesAndDeferredMessages("kWhatRelease:async");
                 asyncNotifyPost.clear();
                 mAsyncReleaseCompleteNotification = asyncNotify;
             }
@@ -4337,16 +4346,23 @@ status_t MediaCodec::amendOutputFormatWithCodecSpecificData(
     return OK;
 }
 
-void MediaCodec::postPendingRepliesAndDeferredMessages(status_t err /* = OK */) {
+void MediaCodec::postPendingRepliesAndDeferredMessages(
+        std::string origin, status_t err /* = OK */) {
     sp<AMessage> response{new AMessage};
     if (err != OK) {
         response->setInt32("err", err);
     }
-    postPendingRepliesAndDeferredMessages(response);
+    postPendingRepliesAndDeferredMessages(origin, response);
 }
 
-void MediaCodec::postPendingRepliesAndDeferredMessages(const sp<AMessage> &response) {
-    CHECK(mReplyID);
+void MediaCodec::postPendingRepliesAndDeferredMessages(
+        std::string origin, const sp<AMessage> &response) {
+    LOG_ALWAYS_FATAL_IF(
+            !mReplyID,
+            "postPendingRepliesAndDeferredMessages: mReplyID == null, from %s following %s",
+            origin.c_str(),
+            mLastReplyOrigin.c_str());
+    mLastReplyOrigin = origin;
     response->postReply(mReplyID);
     mReplyID.clear();
     ALOGV_IF(!mDeferredMessages.empty(),
