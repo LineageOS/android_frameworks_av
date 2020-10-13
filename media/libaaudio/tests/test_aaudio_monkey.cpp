@@ -46,11 +46,10 @@ aaudio_data_callback_result_t AAudioMonkeyDataCallback(
         int32_t numFrames);
 
 void AAudioMonkeyErrorCallbackProc(
-        AAudioStream *stream __unused,
-        void *userData __unused,
-        aaudio_result_t error) {
-    printf("Error Callback, error: %d\n",(int)error);
-}
+        AAudioStream * /* stream */,
+        void *userData,
+        aaudio_result_t error);
+
 
 // This function is not thread safe. Only use this from a single thread.
 double nextRandomDouble() {
@@ -99,6 +98,10 @@ public:
         aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
         aaudio_result_t result = AAudioStream_waitForStateChange(getStream(),
             AAUDIO_STREAM_STATE_UNKNOWN, &state, 0);
+        if (result == AAUDIO_ERROR_DISCONNECTED) {
+            printf("WARNING - AAudioStream_waitForStateChange returned DISCONNECTED\n");
+            return true; // OK
+        }
         if (result != AAUDIO_OK) {
             printf("ERROR - AAudioStream_waitForStateChange returned %d\n", result);
             return false;
@@ -114,7 +117,7 @@ public:
                (unsigned long long) framesRead,
                xRuns);
 
-        if (framesWritten < framesRead) {
+        if (state != AAUDIO_STREAM_STATE_STARTING && framesWritten < framesRead) {
             printf("WARNING - UNDERFLOW - diff = %d !!!!!!!!!!!!\n",
                    (int) (framesWritten - framesRead));
         }
@@ -132,8 +135,23 @@ public:
             return -1;
         }
 
+        // update and query stream state
+        aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
+        state = AAudioStream_getState(getStream());
+        if (state < 0) {
+            printf("ERROR - AAudioStream_getState returned %d\n", state);
+            return state;
+        }
+
+        if (state == AAUDIO_STREAM_STATE_DISCONNECTED) {
+            printf("#%d, Closing disconnected stream.\n", getIndex());
+            result = close();
+            return result;
+        }
+
         double dice = nextRandomDouble();
         // Select an action based on a weighted probability.
+        printf("    "); // indent action
         if (dice < PROB_START) {
             printf("start\n");
             result = AAudioStream_requestStart(getStream());
@@ -200,6 +218,10 @@ public:
         return AAUDIO_CALLBACK_RESULT_CONTINUE;
     }
 
+    int getIndex() const {
+        return mIndex;
+    }
+
 private:
     const AAudioArgsParser  *mArgParser;
     const int                mIndex;
@@ -223,6 +245,13 @@ aaudio_data_callback_result_t AAudioMonkeyDataCallback(
     return monkey->renderAudio(stream, audioData, numFrames);
 }
 
+void AAudioMonkeyErrorCallbackProc(
+        AAudioStream * /* stream */,
+        void *userData,
+        aaudio_result_t error) {
+    AAudioMonkey *monkey = (AAudioMonkey *) userData;
+    printf("#%d, Error Callback, error: %d\n", monkey->getIndex(), (int)error);
+}
 
 static void usage() {
     AAudioArgsParser::usage();
