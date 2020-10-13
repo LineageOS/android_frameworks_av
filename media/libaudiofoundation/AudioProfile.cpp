@@ -157,7 +157,9 @@ status_t AudioProfile::readFromParcel(const Parcel *parcel)
     std::vector<int> values;
     if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
     mChannelMasks.clear();
-    mChannelMasks.insert(values.begin(), values.end());
+    for (auto raw : values) {
+        mChannelMasks.insert(static_cast<audio_channel_mask_t>(raw));
+    }
     values.clear();
     if ((status = parcel->readInt32Vector(&values)) != NO_ERROR) return status;
     mSamplingRates.clear();
