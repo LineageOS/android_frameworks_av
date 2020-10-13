@@ -2168,15 +2168,17 @@ status_t CCodec::CanFetchLinearBlock(
             return OK;
         }
     }
-    uint64_t minUsage = usage.expected;
-    uint64_t maxUsage = ~0ull;
     std::set<C2Allocator::id_t> allocators;
     GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
     if (allocators.empty()) {
         *isCompatible = false;
         return OK;
     }
+
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
     CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    minUsage |= usage.expected;
     *isCompatible = ((maxUsage & minUsage) == minUsage);
     return OK;
 }
@@ -2203,14 +2205,16 @@ static std::shared_ptr<C2BlockPool> GetPool(C2Allocator::id_t allocId) {
 // static
 std::shared_ptr<C2LinearBlock> CCodec::FetchLinearBlock(
         size_t capacity, const C2MemoryUsage &usage, const std::vector<std::string> &names) {
-    uint64_t minUsage = usage.expected;
-    uint64_t maxUsage = ~0ull;
     std::set<C2Allocator::id_t> allocators;
     GetCommonAllocatorIds(names, C2Allocator::LINEAR, &allocators);
     if (allocators.empty()) {
         allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
     }
+
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = ~0ull;
     CalculateMinMaxUsage(names, &minUsage, &maxUsage);
+    minUsage |= usage.expected;
     if ((maxUsage & minUsage) != minUsage) {
         allocators.clear();
         allocators.insert(C2PlatformAllocatorStore::DEFAULT_LINEAR);
