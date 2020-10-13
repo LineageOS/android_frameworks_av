@@ -366,6 +366,7 @@ private:
     AString mOwnerName;
     sp<MediaCodecInfo> mCodecInfo;
     sp<AReplyToken> mReplyID;
+    std::string mLastReplyOrigin;
     std::vector<sp<AMessage>> mDeferredMessages;
     uint32_t mFlags;
     status_t mStickyError;
@@ -489,8 +490,8 @@ private:
     bool hasPendingBuffer(int portIndex);
     bool hasPendingBuffer();
 
-    void postPendingRepliesAndDeferredMessages(status_t err = OK);
-    void postPendingRepliesAndDeferredMessages(const sp<AMessage> &response);
+    void postPendingRepliesAndDeferredMessages(std::string origin, status_t err = OK);
+    void postPendingRepliesAndDeferredMessages(std::string origin, const sp<AMessage> &response);
 
     /* called to get the last codec error when the sticky flag is set.
      * if no such codec error is found, returns UNKNOWN_ERROR.
