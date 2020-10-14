@@ -55,13 +55,13 @@ public:
 /**
  * Basic testing for handling resource lost.
  *
- * This test starts a transcoding job (that's somewhat long and takes several seconds),
+ * This test starts a transcoding session (that's somewhat long and takes several seconds),
  * then launches an activity that allocates video codec instances until it hits insufficient
  * resource error. Because the activity is running in foreground,
  * ResourceManager would reclaim codecs from transcoding service which should
- * cause the job to be paused. The activity will hold the codecs for a few seconds
+ * cause the session to be paused. The activity will hold the codecs for a few seconds
  * before releasing them, and the transcoding service should be able to resume
- * and complete the job.
+ * and complete the session.
  */
 TEST_F(MediaTranscodingServiceResourceTest, TestResourceLost) {
     ALOGD("TestResourceLost starting...");
@@ -79,21 +79,22 @@ TEST_F(MediaTranscodingServiceResourceTest, TestResourceLost) {
     ALOGD("Moving app A to top...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
 
-    // Submit job to Client1.
-    ALOGD("Submitting job to client1 (app A) ...");
-    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit session to Client1.
+    ALOGD("Submitting session to client1 (app A) ...");
+    EXPECT_TRUE(
+            mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
 
-    // Client1's job should start immediately.
+    // Client1's session should start immediately.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
 
     // Launch ResourcePolicyTestActivity, which will try to allocate up to 32
     // instances, which should trigger insufficient resources on most devices.
     // (Note that it's possible that the device supports a very high number of
-    // resource instances, in which case we'll simply require that the job completes.)
+    // resource instances, in which case we'll simply require that the session completes.)
     ALOGD("Launch ResourcePolicyTestActivity...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kResourcePolicyTestActivity));
 
-    // The basic requirement is that the job should complete. Wait for finish
+    // The basic requirement is that the session should complete. Wait for finish
     // event to come and pop up all events received.
     std::list<EventTracker::Event> events;
     EXPECT_TRUE(mClient1->waitForSpecificEventAndPop(EventTracker::Finished(CLIENT(1), 0), &events,

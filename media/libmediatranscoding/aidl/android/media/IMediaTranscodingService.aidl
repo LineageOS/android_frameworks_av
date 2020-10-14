@@ -18,7 +18,7 @@ package android.media;
 
 import android.media.ITranscodingClient;
 import android.media.ITranscodingClientCallback;
-import android.media.TranscodingJobParcel;
+import android.media.TranscodingSessionParcel;
 import android.media.TranscodingRequestParcel;
 
 /**

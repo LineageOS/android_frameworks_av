@@ -34,7 +34,7 @@ namespace android {
 namespace media {
 
 constexpr int64_t kPaddingUs = 400000;
-constexpr int64_t kJobWithPaddingUs = 10000000 + kPaddingUs;
+constexpr int64_t kSessionWithPaddingUs = 10000000 + kPaddingUs;
 constexpr int32_t kBitRate = 8 * 1000 * 1000;  // 8Mbs
 
 constexpr const char* kShortSrcPath =
@@ -59,8 +59,9 @@ TEST_F(MediaTranscodingServiceRealTest, TestInvalidSource) {
     const char* dstPath = OUTPATH(TestInvalidSource);
     deleteFile(dstPath);
 
-    // Submit one job.
-    EXPECT_TRUE(mClient1->submit(0, srcPath, dstPath, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit one session.
+    EXPECT_TRUE(
+            mClient1->submit(0, srcPath, dstPath, TranscodingSessionPriority::kNormal, kBitRate));
 
     // Check expected error.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Failed(CLIENT(1), 0));
@@ -75,12 +76,12 @@ TEST_F(MediaTranscodingServiceRealTest, TestPassthru) {
     const char* dstPath = OUTPATH(TestPassthru);
     deleteFile(dstPath);
 
-    // Submit one job.
+    // Submit one session.
     EXPECT_TRUE(mClient1->submit(0, kShortSrcPath, dstPath));
 
-    // Wait for job to finish.
+    // Wait for session to finish.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
 
     unregisterMultipleClients();
 }
@@ -91,13 +92,13 @@ TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideo) {
     const char* dstPath = OUTPATH(TestTranscodeVideo);
     deleteFile(dstPath);
 
-    // Submit one job.
-    EXPECT_TRUE(
-            mClient1->submit(0, kShortSrcPath, dstPath, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit one session.
+    EXPECT_TRUE(mClient1->submit(0, kShortSrcPath, dstPath, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
 
-    // Wait for job to finish.
+    // Wait for session to finish.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
 
     unregisterMultipleClients();
 }
@@ -108,13 +109,13 @@ TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideoProgress) {
     const char* dstPath = OUTPATH(TestTranscodeVideoProgress);
     deleteFile(dstPath);
 
-    // Submit one job.
-    EXPECT_TRUE(
-            mClient1->submit(0, kLongSrcPath, dstPath, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit one session.
+    EXPECT_TRUE(mClient1->submit(0, kLongSrcPath, dstPath, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
 
-    // Wait for job to finish.
+    // Wait for session to finish.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
 
     // Check the progress update messages are received. For this clip (around ~15 second long),
     // expect at least 10 updates, and the last update should be 100.
@@ -133,24 +134,26 @@ TEST_F(MediaTranscodingServiceRealTest, TestCancelImmediately) {
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestCancelImmediately_Job0);
-    const char* dstPath1 = OUTPATH(TestCancelImmediately_Job1);
+    const char* dstPath0 = OUTPATH(TestCancelImmediately_Session0);
+    const char* dstPath1 = OUTPATH(TestCancelImmediately_Session1);
 
     deleteFile(dstPath0);
     deleteFile(dstPath1);
-    // Submit one job, should start immediately.
-    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit one session, should start immediately.
+    EXPECT_TRUE(
+            mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_TRUE(mClient1->getJob(0, srcPath0, dstPath0));
+    EXPECT_TRUE(mClient1->getSession(0, srcPath0, dstPath0));
 
-    // Test cancel job immediately, getJob should fail after cancel.
+    // Test cancel session immediately, getSession should fail after cancel.
     EXPECT_TRUE(mClient1->cancel(0));
-    EXPECT_TRUE(mClient1->getJob<fail>(0, "", ""));
+    EXPECT_TRUE(mClient1->getSession<fail>(0, "", ""));
 
-    // Submit new job, new job should start immediately and finish.
-    EXPECT_TRUE(mClient1->submit(1, srcPath1, dstPath1, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit new session, new session should start immediately and finish.
+    EXPECT_TRUE(
+            mClient1->submit(1, srcPath1, dstPath1, TranscodingSessionPriority::kNormal, kBitRate));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
 
     unregisterMultipleClients();
 }
@@ -163,26 +166,28 @@ TEST_F(MediaTranscodingServiceRealTest, TestCancelWhileRunning) {
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestCancelWhileRunning_Job0);
-    const char* dstPath1 = OUTPATH(TestCancelWhileRunning_Job1);
+    const char* dstPath0 = OUTPATH(TestCancelWhileRunning_Session0);
+    const char* dstPath1 = OUTPATH(TestCancelWhileRunning_Session1);
 
     deleteFile(dstPath0);
     deleteFile(dstPath1);
-    // Submit two jobs, job 0 should start immediately, job 1 should be queued.
-    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingJobPriority::kNormal, kBitRate));
-    EXPECT_TRUE(mClient1->submit(1, srcPath1, dstPath1, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit two sessions, session 0 should start immediately, session 1 should be queued.
+    EXPECT_TRUE(
+            mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
+    EXPECT_TRUE(
+            mClient1->submit(1, srcPath1, dstPath1, TranscodingSessionPriority::kNormal, kBitRate));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_TRUE(mClient1->getJob(0, srcPath0, dstPath0));
-    EXPECT_TRUE(mClient1->getJob(1, srcPath1, dstPath1));
+    EXPECT_TRUE(mClient1->getSession(0, srcPath0, dstPath0));
+    EXPECT_TRUE(mClient1->getSession(1, srcPath1, dstPath1));
 
-    // Job 0 (longtest) shouldn't finish in 1 seconds.
+    // Session 0 (longtest) shouldn't finish in 1 seconds.
     EXPECT_EQ(mClient1->pop(1000000), EventTracker::NoEvent);
 
-    // Now cancel job 0. Job 1 should start immediately and finish.
+    // Now cancel session 0. Session 1 should start immediately and finish.
     EXPECT_TRUE(mClient1->cancel(0));
-    EXPECT_TRUE(mClient1->getJob<fail>(0, "", ""));
+    EXPECT_TRUE(mClient1->getSession<fail>(0, "", ""));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
 
     unregisterMultipleClients();
 }
@@ -192,48 +197,49 @@ TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeSingleClient) {
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestPauseResumeSingleClient_Job0);
-    const char* dstPath1 = OUTPATH(TestPauseResumeSingleClient_Job1);
+    const char* dstPath0 = OUTPATH(TestPauseResumeSingleClient_Session0);
+    const char* dstPath1 = OUTPATH(TestPauseResumeSingleClient_Session1);
     deleteFile(dstPath0);
     deleteFile(dstPath1);
 
-    // Submit one offline job, should start immediately.
-    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingJobPriority::kUnspecified,
+    // Submit one offline session, should start immediately.
+    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kUnspecified,
                                  kBitRate));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    // Test get job after starts.
-    EXPECT_TRUE(mClient1->getJob(0, srcPath0, dstPath0));
+    // Test get session after starts.
+    EXPECT_TRUE(mClient1->getSession(0, srcPath0, dstPath0));
 
-    // Submit one realtime job.
-    EXPECT_TRUE(mClient1->submit(1, srcPath1, dstPath1, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit one realtime session.
+    EXPECT_TRUE(
+            mClient1->submit(1, srcPath1, dstPath1, TranscodingSessionPriority::kNormal, kBitRate));
 
-    // Offline job should pause.
+    // Offline session should pause.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Pause(CLIENT(1), 0));
-    EXPECT_TRUE(mClient1->getJob(0, srcPath0, dstPath0));
+    EXPECT_TRUE(mClient1->getSession(0, srcPath0, dstPath0));
 
-    // Realtime job should start immediately, and run to finish.
+    // Realtime session should start immediately, and run to finish.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
 
-    // Test get job after finish fails.
-    EXPECT_TRUE(mClient1->getJob<fail>(1, "", ""));
+    // Test get session after finish fails.
+    EXPECT_TRUE(mClient1->getSession<fail>(1, "", ""));
 
-    // Then offline job should resume.
+    // Then offline session should resume.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Resume(CLIENT(1), 0));
-    // Test get job after resume.
-    EXPECT_TRUE(mClient1->getJob(0, srcPath0, dstPath0));
+    // Test get session after resume.
+    EXPECT_TRUE(mClient1->getSession(0, srcPath0, dstPath0));
 
-    // Offline job should finish.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
-    // Test get job after finish fails.
-    EXPECT_TRUE(mClient1->getJob<fail>(0, "", ""));
+    // Offline session should finish.
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    // Test get session after finish fails.
+    EXPECT_TRUE(mClient1->getSession<fail>(0, "", ""));
 
     unregisterMultipleClients();
 }
 
 /*
- * Basic test for pause/resume with two clients, with one job each.
- * Top app's job should preempt the other app's job.
+ * Basic test for pause/resume with two clients, with one session each.
+ * Top app's session should preempt the other app's session.
  */
 TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeMultiClients) {
     ALOGD("TestPauseResumeMultiClients starting...");
@@ -256,33 +262,35 @@ TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeMultiClients) {
     ALOGD("Moving app A to top...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
 
-    // Submit job to Client1.
-    ALOGD("Submitting job to client1 (app A) ...");
-    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit session to Client1.
+    ALOGD("Submitting session to client1 (app A) ...");
+    EXPECT_TRUE(
+            mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
 
-    // Client1's job should start immediately.
+    // Client1's session should start immediately.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
 
     ALOGD("Moving app B to top...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageB, kTestActivityName));
 
-    // Client1's job should continue to run, since Client2 (app B) doesn't have any job.
+    // Client1's session should continue to run, since Client2 (app B) doesn't have any session.
     EXPECT_EQ(mClient1->pop(1000000), EventTracker::NoEvent);
 
-    // Submit job to Client2.
-    ALOGD("Submitting job to client2 (app B) ...");
-    EXPECT_TRUE(mClient2->submit(0, srcPath1, dstPath1, TranscodingJobPriority::kNormal, kBitRate));
+    // Submit session to Client2.
+    ALOGD("Submitting session to client2 (app B) ...");
+    EXPECT_TRUE(
+            mClient2->submit(0, srcPath1, dstPath1, TranscodingSessionPriority::kNormal, kBitRate));
 
-    // Client1's job should pause, client2's job should start.
+    // Client1's session should pause, client2's session should start.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Pause(CLIENT(1), 0));
     EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 0));
 
-    // Client2's job should finish, then Client1's job should resume.
-    EXPECT_EQ(mClient2->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(2), 0));
+    // Client2's session should finish, then Client1's session should resume.
+    EXPECT_EQ(mClient2->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(2), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Resume(CLIENT(1), 0));
 
-    // Client1's job should finish.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    // Client1's session should finish.
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
 
     unregisterMultipleClients();
 

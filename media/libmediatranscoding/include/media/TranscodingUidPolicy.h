@@ -35,7 +35,7 @@ namespace android {
 
 class ActivityManager;
 // Observer for UID lifecycle and provide information about the uid's app
-// priority used by the job scheduler.
+// priority used by the session controller.
 class TranscodingUidPolicy : public UidPolicyInterface {
 public:
     explicit TranscodingUidPolicy();

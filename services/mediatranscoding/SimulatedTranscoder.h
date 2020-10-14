@@ -32,8 +32,8 @@ namespace android {
  * SimulatedTranscoder is used when useSimulatedTranscoder in TranscodingTestConfig
  * is set to true.
  *
- * SimulatedTranscoder simulates job execution by reporting finish after kJobDurationUs.
- * Job lifecycle events are reported via progress updates with special progress
+ * SimulatedTranscoder simulates session execution by reporting finish after kSessionDurationUs.
+ * Session lifecycle events are reported via progress updates with special progress
  * numbers (equal to the Event's type).
  */
 class SimulatedTranscoder : public TranscoderInterface {
@@ -41,22 +41,24 @@ public:
     struct Event {
         enum Type { NoEvent, Start, Pause, Resume, Stop, Finished, Failed } type;
         ClientIdType clientId;
-        JobIdType jobId;
+        SessionIdType sessionId;
         std::function<void()> runnable;
     };
 
-    static constexpr int64_t kJobDurationUs = 1000000;
+    static constexpr int64_t kSessionDurationUs = 1000000;
 
     SimulatedTranscoder();
 
     // TranscoderInterface
     void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) override;
-    void start(ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
+    void start(ClientIdType clientId, SessionIdType sessionId,
+               const TranscodingRequestParcel& request,
                const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
-    void pause(ClientIdType clientId, JobIdType jobId) override;
-    void resume(ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
+    void pause(ClientIdType clientId, SessionIdType sessionId) override;
+    void resume(ClientIdType clientId, SessionIdType sessionId,
+                const TranscodingRequestParcel& request,
                 const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
-    void stop(ClientIdType clientId, JobIdType jobId) override;
+    void stop(ClientIdType clientId, SessionIdType sessionId) override;
     // ~TranscoderInterface
 
 private:
@@ -66,10 +68,10 @@ private:
     std::list<Event> mQueue GUARDED_BY(mLock);
 
     // Minimum time spent on transcode the video. This is used just for testing.
-    int64_t mJobProcessingTimeMs = kJobDurationUs / 1000;
+    int64_t mSessionProcessingTimeMs = kSessionDurationUs / 1000;
 
     static const char* toString(Event::Type type);
-    void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
+    void queueEvent(Event::Type type, ClientIdType clientId, SessionIdType sessionId,
                     std::function<void()> runnable);
     void threadLoop();
 };

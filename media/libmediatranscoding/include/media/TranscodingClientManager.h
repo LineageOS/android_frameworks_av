@@ -29,7 +29,7 @@
 #include <unordered_map>
 #include <unordered_set>
 
-#include "SchedulerClientInterface.h"
+#include "ControllerClientInterface.h"
 
 namespace android {
 
@@ -84,9 +84,9 @@ private:
     struct ClientImpl;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
-    TranscodingClientManager(const std::shared_ptr<SchedulerClientInterface>& scheduler);
+    TranscodingClientManager(const std::shared_ptr<ControllerClientInterface>& controller);
 
-    // Checks if a user is trusted (and allowed to submit jobs on behalf of other uids)
+    // Checks if a user is trusted (and allowed to submit sessions on behalf of other uids)
     bool isTrustedCallingUid(uid_t uid);
 
     /**
@@ -108,7 +108,7 @@ private:
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
-    std::shared_ptr<SchedulerClientInterface> mJobScheduler;
+    std::shared_ptr<ControllerClientInterface> mSessionController;
     uid_t mMediaProviderUid;
 
     static std::atomic<ClientIdType> sCookieCounter;

@@ -32,7 +32,7 @@ class Parcelable;
 
 /*
  * Wrapper class around MediaTranscoder.
- * Implements TranscoderInterface for TranscodingJobScheduler to use.
+ * Implements TranscoderInterface for TranscodingSessionController to use.
  */
 class TranscoderWrapper : public TranscoderInterface,
                           public std::enable_shared_from_this<TranscoderWrapper> {
@@ -40,25 +40,25 @@ public:
     TranscoderWrapper();
 
     virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) override;
-    virtual void start(ClientIdType clientId, JobIdType jobId,
+    virtual void start(ClientIdType clientId, SessionIdType sessionId,
                        const TranscodingRequestParcel& request,
                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
-    virtual void pause(ClientIdType clientId, JobIdType jobId) override;
-    virtual void resume(ClientIdType clientId, JobIdType jobId,
+    virtual void pause(ClientIdType clientId, SessionIdType sessionId) override;
+    virtual void resume(ClientIdType clientId, SessionIdType sessionId,
                         const TranscodingRequestParcel& request,
                         const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
-    virtual void stop(ClientIdType clientId, JobIdType jobId) override;
+    virtual void stop(ClientIdType clientId, SessionIdType sessionId) override;
 
 private:
     class CallbackImpl;
     struct Event {
         enum Type { NoEvent, Start, Pause, Resume, Stop, Finish, Error, Progress } type;
         ClientIdType clientId;
-        JobIdType jobId;
+        SessionIdType sessionId;
         std::function<void()> runnable;
         int32_t arg;
     };
-    using JobKeyType = std::pair<ClientIdType, JobIdType>;
+    using SessionKeyType = std::pair<ClientIdType, SessionIdType>;
 
     std::shared_ptr<CallbackImpl> mTranscoderCb;
     std::shared_ptr<MediaTranscoder> mTranscoder;
@@ -66,30 +66,30 @@ private:
     std::mutex mLock;
     std::condition_variable mCondition;
     std::list<Event> mQueue;  // GUARDED_BY(mLock);
-    std::map<JobKeyType, std::shared_ptr<const Parcel>> mPausedStateMap;
+    std::map<SessionKeyType, std::shared_ptr<const Parcel>> mPausedStateMap;
     ClientIdType mCurrentClientId;
-    JobIdType mCurrentJobId;
+    SessionIdType mCurrentSessionId;
 
     static std::string toString(const Event& event);
-    void onFinish(ClientIdType clientId, JobIdType jobId);
-    void onError(ClientIdType clientId, JobIdType jobId, media_status_t status);
-    void onProgress(ClientIdType clientId, JobIdType jobId, int32_t progress);
+    void onFinish(ClientIdType clientId, SessionIdType sessionId);
+    void onError(ClientIdType clientId, SessionIdType sessionId, media_status_t status);
+    void onProgress(ClientIdType clientId, SessionIdType sessionId, int32_t progress);
 
-    media_status_t handleStart(ClientIdType clientId, JobIdType jobId,
+    media_status_t handleStart(ClientIdType clientId, SessionIdType sessionId,
                                const TranscodingRequestParcel& request,
                                const std::shared_ptr<ITranscodingClientCallback>& callback);
-    media_status_t handlePause(ClientIdType clientId, JobIdType jobId);
-    media_status_t handleResume(ClientIdType clientId, JobIdType jobId,
+    media_status_t handlePause(ClientIdType clientId, SessionIdType sessionId);
+    media_status_t handleResume(ClientIdType clientId, SessionIdType sessionId,
                                 const TranscodingRequestParcel& request,
                                 const std::shared_ptr<ITranscodingClientCallback>& callback);
-    media_status_t setupTranscoder(ClientIdType clientId, JobIdType jobId,
+    media_status_t setupTranscoder(ClientIdType clientId, SessionIdType sessionId,
                                    const TranscodingRequestParcel& request,
                                    const std::shared_ptr<ITranscodingClientCallback>& callback,
                                    const std::shared_ptr<const Parcel>& pausedState = nullptr);
 
     void cleanup();
-    void reportError(ClientIdType clientId, JobIdType jobId, media_status_t err);
-    void queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
+    void reportError(ClientIdType clientId, SessionIdType sessionId, media_status_t err);
+    void queueEvent(Event::Type type, ClientIdType clientId, SessionIdType sessionId,
                     const std::function<void()> runnable, int32_t arg = 0);
     void threadLoop();
 };

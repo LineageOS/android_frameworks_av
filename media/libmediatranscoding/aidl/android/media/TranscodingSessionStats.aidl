@@ -17,21 +17,29 @@
 package android.media;
 
 /**
- * Priority of a transcoding job.
+ * TranscodingSessionStats encapsulated the stats of the a TranscodingSession.
  *
  * {@hide}
  */
-@Backing(type="int")
-enum TranscodingJobPriority {
-    // TODO(hkuang): define what each priority level actually mean.
-    kUnspecified = 0,
-    kLow = 1,
+parcelable TranscodingSessionStats {
     /**
-     * 2 ~ 20 is reserved for future use.
+     * System time of when the session is created.
      */
-    kNormal = 21,
+    long sessionCreatedTimeUs;
+
     /**
-     * 22 ~ 30 is reserved for future use.
+     * System time of when the session is finished.
      */
-    kHigh = 31,
+    long sessionFinishedTimeUs;
+
+    /**
+     * Total time spend on transcoding, exclude the time in pause.
+     */
+    long totalProcessingTimeUs;
+
+    /**
+     * Total time spend on handling the session, include the time in pause.
+     * The totaltimeUs is actually the same as sessionFinishedTimeUs - sessionCreatedTimeUs.
+     */
+    long totalTimeUs;
 }
