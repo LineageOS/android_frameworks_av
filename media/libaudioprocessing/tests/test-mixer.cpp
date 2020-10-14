@@ -241,7 +241,8 @@ int main(int argc, char* argv[]) {
     // set up the tracks.
     for (size_t i = 0; i < providers.size(); ++i) {
         //printf("track %d out of %d\n", i, providers.size());
-        uint32_t channelMask = audio_channel_out_mask_from_count(providers[i].getNumChannels());
+        audio_channel_mask_t channelMask =
+                audio_channel_out_mask_from_count(providers[i].getNumChannels());
         const int name = i;
         const status_t status = mixer->create(
                 name, channelMask, formats[i], AUDIO_SESSION_OUTPUT_MIX);

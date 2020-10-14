@@ -152,8 +152,12 @@ status_t AudioGain::readFromParcel(const android::Parcel *parcel)
     if ((status = parcel->readInt32(&mIndex)) != NO_ERROR) return status;
     if ((status = parcel->readBool(&mUseInChannelMask)) != NO_ERROR) return status;
     if ((status = parcel->readBool(&mUseForVolume)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mGain.mode)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mGain.channel_mask)) != NO_ERROR) return status;
+    uint32_t rawGainMode;
+    if ((status = parcel->readUint32(&rawGainMode)) != NO_ERROR) return status;
+    mGain.mode = static_cast<audio_gain_mode_t>(rawGainMode);
+    uint32_t rawChannelMask;
+    if ((status = parcel->readUint32(&rawChannelMask)) != NO_ERROR) return status;
+    mGain.channel_mask = static_cast<audio_channel_mask_t>(rawChannelMask);
     if ((status = parcel->readInt32(&mGain.min_value)) != NO_ERROR) return status;
     if ((status = parcel->readInt32(&mGain.max_value)) != NO_ERROR) return status;
     if ((status = parcel->readInt32(&mGain.default_value)) != NO_ERROR) return status;

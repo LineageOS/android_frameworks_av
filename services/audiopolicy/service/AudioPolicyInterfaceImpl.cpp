@@ -244,11 +244,12 @@ status_t AudioPolicyService::getOutputForAttr(audio_attributes_t *attr,
         uid = callingUid;
     }
     if (!mPackageManager.allowPlaybackCapture(uid)) {
-        attr->flags |= AUDIO_FLAG_NO_MEDIA_PROJECTION;
+        attr->flags = static_cast<audio_flags_mask_t>(attr->flags | AUDIO_FLAG_NO_MEDIA_PROJECTION);
     }
     if (((attr->flags & (AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE)) != 0)
             && !bypassInterruptionPolicyAllowed(pid, uid)) {
-        attr->flags &= ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE);
+        attr->flags = static_cast<audio_flags_mask_t>(
+                attr->flags & ~(AUDIO_FLAG_BYPASS_INTERRUPTION_POLICY|AUDIO_FLAG_BYPASS_MUTE));
     }
     AutoCallerClear acc;
     AudioPolicyInterface::output_type_t outputType;

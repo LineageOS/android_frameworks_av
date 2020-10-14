@@ -227,7 +227,7 @@ AudioTrack::AudioTrack(const std::string& opPackageName)
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
     mAttributes.usage = AUDIO_USAGE_UNKNOWN;
-    mAttributes.flags = 0x0;
+    mAttributes.flags = AUDIO_FLAG_NONE;
     strcpy(mAttributes.tags, "");
 }
 
@@ -467,7 +467,7 @@ status_t AudioTrack::set(
     if (format == AUDIO_FORMAT_DEFAULT) {
         format = AUDIO_FORMAT_PCM_16_BIT;
     } else if (format == AUDIO_FORMAT_IEC61937) { // HDMI pass-through?
-        mAttributes.flags |= AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO;
+        flags = static_cast<audio_output_flags_t>(flags | AUDIO_OUTPUT_FLAG_IEC958_NONAUDIO);
     }
 
     // validate parameters
@@ -642,6 +642,36 @@ status_t AudioTrack::set(
 exit:
     mStatus = status;
     return status;
+}
+
+
+status_t AudioTrack::set(
+        audio_stream_type_t streamType,
+        uint32_t sampleRate,
+        audio_format_t format,
+        uint32_t channelMask,
+        size_t frameCount,
+        audio_output_flags_t flags,
+        callback_t cbf,
+        void* user,
+        int32_t notificationFrames,
+        const sp<IMemory>& sharedBuffer,
+        bool threadCanCallJava,
+        audio_session_t sessionId,
+        transfer_type transferType,
+        const audio_offload_info_t *offloadInfo,
+        uid_t uid,
+        pid_t pid,
+        const audio_attributes_t* pAttributes,
+        bool doNotReconnect,
+        float maxRequiredSpeed,
+        audio_port_handle_t selectedDeviceId)
+{
+    return set(streamType, sampleRate, format,
+            static_cast<audio_channel_mask_t>(channelMask),
+            frameCount, flags, cbf, user, notificationFrames, sharedBuffer,
+            threadCanCallJava, sessionId, transferType, offloadInfo, uid, pid,
+            pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
 // -------------------------------------------------------------------------
