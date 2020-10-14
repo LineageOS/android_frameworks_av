@@ -556,6 +556,15 @@ protected:
          */
         void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0);
 
+        bool isCallRxAudioSource(const sp<SourceClientDescriptor> &source) {
+            return mCallRxSourceClientPort != AUDIO_PORT_HANDLE_NONE
+                && source == mAudioSources.valueFor(mCallRxSourceClientPort);
+        }
+
+        void connectTelephonyRxAudioSource();
+
+        void disconnectTelephonyRxAudioSource();
+
         /**
          * @brief updates routing for all inputs.
          */
@@ -796,7 +805,6 @@ protected:
         SoundTriggerSessionCollection mSoundTriggerSessions;
 
         sp<AudioPatch> mCallTxPatch;
-        sp<AudioPatch> mCallRxPatch;
 
         HwAudioOutputCollection mHwOutputs;
         SourceClientCollection mAudioSources;
@@ -831,6 +839,10 @@ protected:
 
         // Cached product strategy ID corresponding to legacy strategy STRATEGY_PHONE
         product_strategy_t mCommunnicationStrategy;
+
+        // The port handle of the hardware audio source created internally for the Call RX audio
+        // end point.
+        audio_port_handle_t mCallRxSourceClientPort = AUDIO_PORT_HANDLE_NONE;
 
 private:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
