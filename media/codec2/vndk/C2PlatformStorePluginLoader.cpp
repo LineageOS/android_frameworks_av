@@ -33,7 +33,8 @@ constexpr const char kStorePluginPath[] = "libc2plugin_store.so";
 }  // unnamed
 
 C2PlatformStorePluginLoader::C2PlatformStorePluginLoader(const char *libPath)
-    : mCreateBlockPool(nullptr) {
+    : mCreateBlockPool(nullptr),
+      mCreateAllocator(nullptr) {
     mLibHandle = dlopen(libPath, RTLD_NOW | RTLD_NODELETE);
     if (mLibHandle == nullptr) {
         ALOGD("Failed to load library: %s (%s)", libPath, dlerror());
