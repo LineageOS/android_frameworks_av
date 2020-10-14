@@ -904,7 +904,8 @@ status_t AudioPolicyManager::getAudioAttributes(audio_attributes_t *dstAttr,
     // Only honor audibility enforced when required. The client will be
     // forced to reconnect if the forced usage changes.
     if (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_SYSTEM) != AUDIO_POLICY_FORCE_SYSTEM_ENFORCED) {
-        dstAttr->flags &= ~AUDIO_FLAG_AUDIBILITY_ENFORCED;
+        dstAttr->flags = static_cast<audio_flags_mask_t>(
+                dstAttr->flags & ~AUDIO_FLAG_AUDIBILITY_ENFORCED);
     }
 
     return NO_ERROR;
@@ -936,7 +937,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         return status;
     }
     if (auto it = mAllowedCapturePolicies.find(uid); it != end(mAllowedCapturePolicies)) {
-        resultAttr->flags |= it->second;
+        resultAttr->flags = static_cast<audio_flags_mask_t>(resultAttr->flags | it->second);
     }
     *stream = mEngine->getStreamTypeForAttributes(*resultAttr);
 
@@ -1254,7 +1255,8 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
 
     // Discard haptic channel mask when forcing muting haptic channels.
     audio_channel_mask_t channelMask = forceMutingHaptic
-            ? (config->channel_mask & ~AUDIO_CHANNEL_HAPTIC_ALL) : config->channel_mask;
+            ? static_cast<audio_channel_mask_t>(config->channel_mask & ~AUDIO_CHANNEL_HAPTIC_ALL)
+            : config->channel_mask;
 
     // open a direct output if required by specified parameters
     //force direct flag if offload flag is set: offloading implies a direct output stream
@@ -3233,7 +3235,7 @@ status_t AudioPolicyManager::setDevicesRoleForCapturePreset(
     ALOGV("%s() audioSource=%d role=%d %s", __func__, audioSource, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_is_input_device, __func__)) {
+    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
         return BAD_VALUE;
     }
     status_t status = mEngine->setDevicesRoleForCapturePreset(audioSource, role, devices);
@@ -3249,7 +3251,7 @@ status_t AudioPolicyManager::addDevicesRoleForCapturePreset(
     ALOGV("%s() audioSource=%d role=%d %s", __func__, audioSource, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_is_input_device, __func__)) {
+    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
         return BAD_VALUE;
     }
     status_t status = mEngine->addDevicesRoleForCapturePreset(audioSource, role, devices);
@@ -3266,7 +3268,7 @@ status_t AudioPolicyManager::removeDevicesRoleForCapturePreset(
     ALOGV("%s() audioSource=%d role=%d devices=%s", __func__, audioSource, role,
             dumpAudioDeviceTypeAddrVector(devices).c_str());
 
-    if (!areAllDevicesSupported(devices, audio_is_input_device, __func__)) {
+    if (!areAllDevicesSupported(devices, audio_call_is_input_device, __func__)) {
         return BAD_VALUE;
     }
 

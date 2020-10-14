@@ -96,7 +96,7 @@ static inline void resetDeviceTypes(DeviceTypeSet& deviceTypes, audio_devices_t 
 static inline audio_devices_t deviceTypesToBitMask(const DeviceTypeSet& deviceTypes) {
     audio_devices_t types = AUDIO_DEVICE_NONE;
     for (auto deviceType : deviceTypes) {
-        types |= deviceType;
+        types = static_cast<audio_devices_t>(types | deviceType);
     }
     return types;
 }

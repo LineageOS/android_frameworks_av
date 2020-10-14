@@ -223,7 +223,7 @@ std::shared_ptr<C2GraphicBlock> _C2BlockFactory::CreateGraphicBlock(
     static std::unique_ptr<C2AllocatorGralloc> sAllocator = std::make_unique<C2AllocatorGralloc>(0);
 
     std::shared_ptr<C2GraphicAllocation> alloc;
-    if (C2AllocatorGralloc::isValid(handle)) {
+    if (C2AllocatorGralloc::CheckHandle(handle)) {
         uint32_t width;
         uint32_t height;
         uint32_t format;
