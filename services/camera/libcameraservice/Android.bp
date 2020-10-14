@@ -16,8 +16,17 @@
 // libcameraservice
 //
 
+soong_config_module_type_import {
+    from: "vendor/lineage/build/soong/Android.bp",
+    module_types: ["qti_camera_device_defaults"],
+}
+
 cc_library_shared {
     name: "libcameraservice",
+    defaults: [
+        "qti_camera_device",
+        "has_legacy_camera_hal1",
+    ],
 
     // Camera service source
 
@@ -127,7 +136,7 @@ cc_library_shared {
         "android.hardware.camera.device@3.3",
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.5",
-        "android.hardware.camera.device@3.6"
+        "android.hardware.camera.device@3.6",
     ],
 
     static_libs: [
@@ -158,17 +167,4 @@ cc_library_shared {
         "-Wno-ignored-qualifiers",
     ],
 
-    product_variables: {
-        lineage: {
-            uses_qti_camera_device: {
-                cppflags: ["-DQTI_CAMERA_DEVICE"],
-                shared_libs: ["vendor.qti.hardware.camera.device@1.0"],
-            },
-            has_legacy_camera_hal1: {
-                cflags: ["-DNO_CAMERA_SERVER"],
-            }
-        },
-    },
-
 }
-
