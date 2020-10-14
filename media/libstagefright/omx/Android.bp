@@ -1,5 +1,11 @@
+soong_config_module_type_import {
+    from: "vendor/lineage/build/soong/Android.bp",
+    module_types: ["uses_qcom_bsp_legacy_defaults"],
+}
+
 cc_library_shared {
     name: "libstagefright_omx",
+    defaults: ["uses_qcom_bsp_legacy"],
     vendor_available: true,
     vndk: {
         enabled: true,
@@ -63,14 +69,6 @@ cc_library_shared {
         "-Wno-unused-parameter",
         "-Wno-documentation",
     ],
-
-    product_variables: {
-        lineage: {
-            uses_qcom_bsp_legacy: {
-                cppflags: ["-DQCOM_BSP_LEGACY"],
-            },
-        },
-    },
 
     sanitize: {
         misc_undefined: [
