@@ -12,8 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+soong_config_module_type_import {
+    from: "vendor/lineage/build/soong/Android.bp",
+    module_types: ["uses_camera_parameter_library_defaults"],
+}
+
 cc_library_shared {
     name: "libcamera_client",
+    defaults: ["uses_camera_parameter_library"],
 
     aidl: {
         export_aidl_headers: true,
@@ -32,7 +38,6 @@ cc_library_shared {
         // Source for camera interface parcelables, and manually-written interfaces
         "Camera.cpp",
         "CameraMetadata.cpp",
-        "CameraParameters.cpp",
         "CaptureResult.cpp",
         "CameraParameters2.cpp",
         "ICamera.cpp",
@@ -64,16 +69,27 @@ cc_library_shared {
         "frameworks/native/include/media/openmax",
     ],
     export_include_dirs: [
-         "include",
-         "include/camera"
+        "include",
+        "include/camera",
     ],
-    export_shared_lib_headers: ["libcamera_metadata", "libnativewindow", "libgui"],
+    export_shared_lib_headers: [
+        "libcamera_metadata",
+        "libnativewindow",
+        "libgui",
+    ],
 
     cflags: [
         "-Werror",
         "-Wall",
         "-Wextra",
     ],
+
+}
+
+cc_library_static {
+    name: "libcamera_parameters",
+
+    srcs: ["CameraParameters.cpp"],
 
 }
 
