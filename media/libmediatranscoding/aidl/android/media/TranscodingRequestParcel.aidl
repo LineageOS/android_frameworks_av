@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.TranscodingJobPriority;
+import android.media.TranscodingSessionPriority;
 import android.media.TranscodingTestConfig;
 import android.media.TranscodingType;
 import android.media.TranscodingVideoTrackFormat;
@@ -61,26 +61,26 @@ parcelable TranscodingRequestParcel {
      * Requested video track format for the transcoding.
      * Note that the transcoding service will try to fulfill the requested format as much as
      * possbile, while subject to hardware and software limitation. The final video track format
-     * will be available in the TranscodingJobParcel when the job is finished.
+     * will be available in the TranscodingSessionParcel when the session is finished.
      */
     @nullable TranscodingVideoTrackFormat requestedVideoTrackFormat;
 
     /**
      * Priority of this transcoding. Service will schedule the transcoding based on the priority.
      */
-    TranscodingJobPriority priority;
+    TranscodingSessionPriority priority;
 
     /**
-     * Whether to receive update on progress and change of awaitNumJobs.
+     * Whether to receive update on progress and change of awaitNumSessions.
      * Default to false.
      */
     boolean requestProgressUpdate = false;
 
     /**
-     * Whether to receive update on job's start/stop/pause/resume.
+     * Whether to receive update on session's start/stop/pause/resume.
      * Default to false.
      */
-    boolean requestJobEventUpdate = false;
+    boolean requestSessionEventUpdate = false;
 
     /**
      * Whether this request is for testing.
@@ -94,7 +94,7 @@ parcelable TranscodingRequestParcel {
 
      /**
       * Whether to get the stats of the transcoding.
-      * If this is enabled, the TranscodingJobStats will be returned in TranscodingResultParcel
+      * If this is enabled, the TranscodingSessionStats will be returned in TranscodingResultParcel
       * upon transcoding finishes.
       */
     boolean enableStats = false;

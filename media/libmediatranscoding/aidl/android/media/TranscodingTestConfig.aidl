@@ -24,7 +24,7 @@
 parcelable TranscodingTestConfig {
     /**
      * Whether to use SimulatedTranscoder for testing. Note that SimulatedTranscoder does not send
-     * transcoding jobs to real MediaTranscoder.
+     * transcoding sessions to real MediaTranscoder.
      */
     boolean useSimulatedTranscoder = false;
 
@@ -35,9 +35,10 @@ parcelable TranscodingTestConfig {
     boolean passThroughMode = false;
 
     /**
-     * Time of processing the job in milliseconds. Service will return the job result at least after
-     * processingTotalTimeMs from the time it starts to process the job. Note that if service uses
-     * real MediaTranscoder to do transcoding, the time spent on transcoding may be more than that.
+     * Time of processing the session in milliseconds. Service will return the session result at
+     * least after processingTotalTimeMs from the time it starts to process the session. Note that
+     * if service uses real MediaTranscoder to do transcoding, the time spent on transcoding may be
+     * more than that.
      */
     int processingTotalTimeMs = 0;
 }

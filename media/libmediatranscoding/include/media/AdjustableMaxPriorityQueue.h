@@ -26,7 +26,7 @@
 namespace android {
 
 /*
- * AdjustableMaxPriorityQueue is a custom max priority queue that helps managing jobs for
+ * AdjustableMaxPriorityQueue is a custom max priority queue that helps managing sessions for
  * MediaTranscodingService.
  *
  * AdjustableMaxPriorityQueue is a wrapper template around the STL's *_heap() functions.

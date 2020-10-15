@@ -23,9 +23,9 @@
 #include <aidl/android/media/IMediaTranscodingService.h>
 #include <aidl/android/media/ITranscodingClient.h>
 #include <aidl/android/media/ITranscodingClientCallback.h>
-#include <aidl/android/media/TranscodingJobParcel.h>
-#include <aidl/android/media/TranscodingJobPriority.h>
 #include <aidl/android/media/TranscodingRequestParcel.h>
+#include <aidl/android/media/TranscodingSessionParcel.h>
+#include <aidl/android/media/TranscodingSessionPriority.h>
 #include <android-base/logging.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
@@ -44,15 +44,15 @@ namespace android {
 
 namespace media {
 
-// Note that -1 is valid and means using calling pid/uid for the service. But only privilege caller could
-// use them. This test is not a privilege caller.
+// Note that -1 is valid and means using calling pid/uid for the service. But only privilege caller
+// could use them. This test is not a privilege caller.
 constexpr int32_t kInvalidClientPid = -5;
 constexpr int32_t kInvalidClientUid = -10;
 constexpr const char* kInvalidClientName = "";
 constexpr const char* kInvalidClientOpPackageName = "";
 
 constexpr int64_t kPaddingUs = 1000000;
-constexpr int64_t kJobWithPaddingUs = SimulatedTranscoder::kJobDurationUs + kPaddingUs;
+constexpr int64_t kSessionWithPaddingUs = SimulatedTranscoder::kSessionDurationUs + kPaddingUs;
 
 constexpr const char* kClientOpPackageName = "TestClientPackage";
 
@@ -135,18 +135,18 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestRegisterMultipleClients) {
     unregisterMultipleClients();
 }
 
-TEST_F(MediaTranscodingServiceSimulatedTest, TestJobIdIndependence) {
+TEST_F(MediaTranscodingServiceSimulatedTest, TestSessionIdIndependence) {
     registerMultipleClients();
 
     // Submit 2 requests on client1 first.
     EXPECT_TRUE(mClient1->submit(0, "test_source_file", "test_destination_file"));
     EXPECT_TRUE(mClient1->submit(1, "test_source_file", "test_destination_file"));
 
-    // Submit 2 requests on client2, jobId should be independent for each client.
+    // Submit 2 requests on client2, sessionId should be independent for each client.
     EXPECT_TRUE(mClient2->submit(0, "test_source_file", "test_destination_file"));
     EXPECT_TRUE(mClient2->submit(1, "test_source_file", "test_destination_file"));
 
-    // Cancel all jobs.
+    // Cancel all sessions.
     EXPECT_TRUE(mClient1->cancel(0));
     EXPECT_TRUE(mClient1->cancel(1));
     EXPECT_TRUE(mClient2->cancel(0));
@@ -155,10 +155,10 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestJobIdIndependence) {
     unregisterMultipleClients();
 }
 
-TEST_F(MediaTranscodingServiceSimulatedTest, TestSubmitCancelJobs) {
+TEST_F(MediaTranscodingServiceSimulatedTest, TestSubmitCancelSessions) {
     registerMultipleClients();
 
-    // Test jobId assignment.
+    // Test sessionId assignment.
     EXPECT_TRUE(mClient1->submit(0, "test_source_file_0", "test_destination_file"));
     EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file"));
     EXPECT_TRUE(mClient1->submit(2, "test_source_file_2", "test_destination_file"));
@@ -167,33 +167,33 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestSubmitCancelJobs) {
     EXPECT_TRUE(mClient1->submit<fail>(0, "", ""));
 
     // Test submit bad request (no valid sourceFilePath) fails.
-    EXPECT_TRUE(mClient1->submit<fail>(0, "src", "dst", TranscodingJobPriority::kNormal, 1000000,
-                                       kInvalidClientPid, kInvalidClientUid));
+    EXPECT_TRUE(mClient1->submit<fail>(0, "src", "dst", TranscodingSessionPriority::kNormal,
+                                       1000000, kInvalidClientPid, kInvalidClientUid));
 
-    // Test cancel non-existent job fails.
+    // Test cancel non-existent session fails.
     EXPECT_TRUE(mClient1->cancel<fail>(100));
 
-    // Job 0 should start immediately and finish in 2 seconds, followed by Job 1 start.
+    // Session 0 should start immediately and finish in 2 seconds, followed by Session 1 start.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
 
-    // Test cancel valid jobId in random order.
-    // Test cancel finished job fails.
+    // Test cancel valid sessionId in random order.
+    // Test cancel finished session fails.
     EXPECT_TRUE(mClient1->cancel(2));
     EXPECT_TRUE(mClient1->cancel<fail>(0));
     EXPECT_TRUE(mClient1->cancel(1));
 
-    // Test cancel job again fails.
+    // Test cancel session again fails.
     EXPECT_TRUE(mClient1->cancel<fail>(1));
 
     // Test no more events arriving after cancel.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::NoEvent);
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::NoEvent);
 
     unregisterMultipleClients();
 }
 
-TEST_F(MediaTranscodingServiceSimulatedTest, TestGetJobs) {
+TEST_F(MediaTranscodingServiceSimulatedTest, TestGetSessions) {
     registerMultipleClients();
 
     // Submit 3 requests.
@@ -201,69 +201,69 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestGetJobs) {
     EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file_1"));
     EXPECT_TRUE(mClient1->submit(2, "test_source_file_2", "test_destination_file_2"));
 
-    // Test get jobs by id.
-    EXPECT_TRUE(mClient1->getJob(2, "test_source_file_2", "test_destination_file_2"));
-    EXPECT_TRUE(mClient1->getJob(1, "test_source_file_1", "test_destination_file_1"));
-    EXPECT_TRUE(mClient1->getJob(0, "test_source_file_0", "test_destination_file_0"));
+    // Test get sessions by id.
+    EXPECT_TRUE(mClient1->getSession(2, "test_source_file_2", "test_destination_file_2"));
+    EXPECT_TRUE(mClient1->getSession(1, "test_source_file_1", "test_destination_file_1"));
+    EXPECT_TRUE(mClient1->getSession(0, "test_source_file_0", "test_destination_file_0"));
 
-    // Test get job by invalid id fails.
-    EXPECT_TRUE(mClient1->getJob<fail>(100, "", ""));
-    EXPECT_TRUE(mClient1->getJob<fail>(-1, "", ""));
+    // Test get session by invalid id fails.
+    EXPECT_TRUE(mClient1->getSession<fail>(100, "", ""));
+    EXPECT_TRUE(mClient1->getSession<fail>(-1, "", ""));
 
-    // Test get job after cancel fails.
+    // Test get session after cancel fails.
     EXPECT_TRUE(mClient1->cancel(2));
-    EXPECT_TRUE(mClient1->getJob<fail>(2, "", ""));
+    EXPECT_TRUE(mClient1->getSession<fail>(2, "", ""));
 
-    // Job 0 should start immediately and finish in 2 seconds, followed by Job 1 start.
+    // Session 0 should start immediately and finish in 2 seconds, followed by Session 1 start.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
 
-    // Test get job after finish fails.
-    EXPECT_TRUE(mClient1->getJob<fail>(0, "", ""));
+    // Test get session after finish fails.
+    EXPECT_TRUE(mClient1->getSession<fail>(0, "", ""));
 
-    // Test get the remaining job 1.
-    EXPECT_TRUE(mClient1->getJob(1, "test_source_file_1", "test_destination_file_1"));
+    // Test get the remaining session 1.
+    EXPECT_TRUE(mClient1->getSession(1, "test_source_file_1", "test_destination_file_1"));
 
-    // Cancel remaining job 1.
+    // Cancel remaining session 1.
     EXPECT_TRUE(mClient1->cancel(1));
 
     unregisterMultipleClients();
 }
 
-TEST_F(MediaTranscodingServiceSimulatedTest, TestSubmitCancelWithOfflineJobs) {
+TEST_F(MediaTranscodingServiceSimulatedTest, TestSubmitCancelWithOfflineSessions) {
     registerMultipleClients();
 
-    // Submit some offline jobs first.
+    // Submit some offline sessions first.
     EXPECT_TRUE(mClient1->submit(0, "test_source_file_0", "test_destination_file_0",
-                                 TranscodingJobPriority::kUnspecified));
+                                 TranscodingSessionPriority::kUnspecified));
     EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file_1",
-                                 TranscodingJobPriority::kUnspecified));
+                                 TranscodingSessionPriority::kUnspecified));
 
-    // Job 0 should start immediately.
+    // Session 0 should start immediately.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
 
-    // Submit more real-time jobs.
+    // Submit more real-time sessions.
     EXPECT_TRUE(mClient1->submit(2, "test_source_file_2", "test_destination_file_2"));
     EXPECT_TRUE(mClient1->submit(3, "test_source_file_3", "test_destination_file_3"));
 
-    // Job 0 should pause immediately and job 2 should start.
+    // Session 0 should pause immediately and session 2 should start.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Pause(CLIENT(1), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 2));
 
-    // Job 2 should finish in 2 seconds and job 3 should start.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 2));
+    // Session 2 should finish in 2 seconds and session 3 should start.
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 2));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 3));
 
-    // Cancel job 3 now
+    // Cancel session 3 now
     EXPECT_TRUE(mClient1->cancel(3));
 
-    // Job 0 should resume and finish in 2 seconds, followed by job 1 start.
+    // Session 0 should resume and finish in 2 seconds, followed by session 1 start.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Resume(CLIENT(1), 0));
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
 
-    // Cancel remaining job 1.
+    // Cancel remaining session 1.
     EXPECT_TRUE(mClient1->cancel(1));
 
     unregisterMultipleClients();
@@ -280,16 +280,16 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestClientUseAfterUnregister) {
     EXPECT_TRUE(status.isOk());
 
     // Test various operations on the client, should fail with ERROR_DISCONNECTED.
-    TranscodingJobParcel job;
+    TranscodingSessionParcel session;
     bool result;
-    status = client->getJobWithId(0, &job, &result);
+    status = client->getSessionWithId(0, &session, &result);
     EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
 
-    status = client->cancelJob(0, &result);
+    status = client->cancelSession(0, &result);
     EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
 
     TranscodingRequestParcel request;
-    status = client->submitRequest(request, &job, &result);
+    status = client->submitRequest(request, &session, &result);
     EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
 }
 
@@ -308,41 +308,41 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingUidPolicy) {
     EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
 
     // Submit 3 requests.
-    ALOGD("Submitting job to client1 (app A) ...");
+    ALOGD("Submitting session to client1 (app A) ...");
     EXPECT_TRUE(mClient1->submit(0, "test_source_file_0", "test_destination_file_0"));
     EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file_1"));
     EXPECT_TRUE(mClient1->submit(2, "test_source_file_2", "test_destination_file_2"));
 
-    // Job 0 should start immediately.
+    // Session 0 should start immediately.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
 
     ALOGD("Moving app B to top...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageB, kTestActivityName));
 
-    // Job 0 should continue and finish in 2 seconds, then job 1 should start.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+    // Session 0 should continue and finish in 2 seconds, then session 1 should start.
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
 
-    ALOGD("Submitting job to client2 (app B) ...");
+    ALOGD("Submitting session to client2 (app B) ...");
     EXPECT_TRUE(mClient2->submit(0, "test_source_file_0", "test_destination_file_0"));
 
-    // Client1's job should pause, client2's job should start.
+    // Client1's session should pause, client2's session should start.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Pause(CLIENT(1), 1));
     EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 0));
 
     ALOGD("Moving app A back to top...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
 
-    // Client2's job should pause, client1's job 1 should resume.
+    // Client2's session should pause, client1's session 1 should resume.
     EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Pause(CLIENT(2), 0));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Resume(CLIENT(1), 1));
 
-    // Client2's job 1 should finish in 2 seconds, then its job 2 should start.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
+    // Client2's session 1 should finish in 2 seconds, then its session 2 should start.
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 2));
 
-    // After client2's jobs finish, client1's job should resume.
-    EXPECT_EQ(mClient1->pop(kJobWithPaddingUs), EventTracker::Finished(CLIENT(1), 2));
+    // After client2's sessions finish, client1's session should resume.
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 2));
     EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Resume(CLIENT(2), 0));
 
     unregisterMultipleClients();

@@ -38,13 +38,13 @@ cc_test {
 }
 
 //
-// TranscodingJobScheduler unit test
+// TranscodingSessionController unit test
 //
 cc_test {
-    name: "TranscodingJobScheduler_tests",
+    name: "TranscodingSessionController_tests",
     defaults: ["libmediatranscoding_test_defaults"],
 
-    srcs: ["TranscodingJobScheduler_tests.cpp"],
+    srcs: ["TranscodingSessionController_tests.cpp"],
 }
 
 //
