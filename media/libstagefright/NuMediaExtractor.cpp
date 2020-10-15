@@ -312,6 +312,27 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
         (*format)->setBuffer("pssh", buf);
     }
 
+    // Copy over the slow-motion related metadata
+    const void *slomoMarkers;
+    size_t slomoMarkersSize;
+    if (meta->findData(kKeySlowMotionMarkers, &type, &slomoMarkers, &slomoMarkersSize)
+            && slomoMarkersSize > 0) {
+        sp<ABuffer> buf = new ABuffer(slomoMarkersSize);
+        memcpy(buf->data(), slomoMarkers, slomoMarkersSize);
+        (*format)->setBuffer("slow-motion-markers", buf);
+    }
+
+    int32_t temporalLayerCount;
+    if (meta->findInt32(kKeyTemporalLayerCount, &temporalLayerCount)
+            && temporalLayerCount > 0) {
+        (*format)->setInt32("temporal-layer-count", temporalLayerCount);
+    }
+
+    float captureFps;
+    if (meta->findFloat(kKeyCaptureFramerate, &captureFps) && captureFps > 0.0f) {
+        (*format)->setFloat("capture-rate", captureFps);
+    }
+
     return OK;
 }
 
