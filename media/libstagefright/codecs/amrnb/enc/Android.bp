@@ -81,6 +81,13 @@ cc_library_static {
     //},
 
     shared_libs: ["libstagefright_amrnb_common"],
+
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 //###############################################################################
