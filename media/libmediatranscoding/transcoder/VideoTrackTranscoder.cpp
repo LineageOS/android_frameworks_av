@@ -22,6 +22,8 @@
 #include <media/VideoTrackTranscoder.h>
 #include <utils/AndroidThreads.h>
 
+using namespace AMediaFormatUtils;
+
 namespace android {
 
 // Check that the codec sample flags have the expected NDK meaning.
@@ -36,6 +38,12 @@ static_assert(SAMPLE_FLAG_PARTIAL_FRAME == AMEDIACODEC_BUFFER_FLAG_PARTIAL_FRAME
 static constexpr int32_t kColorFormatSurface = 0x7f000789;
 // Default key frame interval in seconds.
 static constexpr float kDefaultKeyFrameIntervalSeconds = 1.0f;
+// Default codec operating rate.
+static constexpr int32_t kDefaultCodecOperatingRate = 240;
+// Default codec priority.
+static constexpr int32_t kDefaultCodecPriority = 1;
+// Default bitrate, in case source estimation fails.
+static constexpr int32_t kDefaultBitrateMbps = 10 * 1000 * 1000;
 
 template <typename T>
 void VideoTrackTranscoder::BlockingQueue<T>::push(T const& value, bool front) {
@@ -176,8 +184,6 @@ VideoTrackTranscoder::~VideoTrackTranscoder() {
 // Creates and configures the codecs.
 media_status_t VideoTrackTranscoder::configureDestinationFormat(
         const std::shared_ptr<AMediaFormat>& destinationFormat) {
-    static constexpr int32_t kDefaultBitrateMbps = 10 * 1000 * 1000;
-
     media_status_t status = AMEDIA_OK;
 
     if (destinationFormat == nullptr) {
@@ -203,11 +209,12 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, bitrate);
     }
 
-    float tmp;
-    if (!AMediaFormat_getFloat(encoderFormat, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, &tmp)) {
-        AMediaFormat_setFloat(encoderFormat, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
-                              kDefaultKeyFrameIntervalSeconds);
-    }
+    SetDefaultFormatValueFloat(AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, encoderFormat,
+                               kDefaultKeyFrameIntervalSeconds);
+    SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_OPERATING_RATE, encoderFormat,
+                               kDefaultCodecOperatingRate);
+    SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_PRIORITY, encoderFormat, kDefaultCodecPriority);
+
     AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT, kColorFormatSurface);
 
     // Always encode without rotation. The rotation degree will be transferred directly to
@@ -271,13 +278,13 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     AMediaFormat_setInt32(decoderFormat.get(), TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP, 0);
 
     // Copy over configurations that apply to both encoder and decoder.
-    static const AMediaFormatUtils::EntryCopier kEncoderEntriesToCopy[] = {
+    static const EntryCopier kEncoderEntriesToCopy[] = {
             ENTRY_COPIER2(AMEDIAFORMAT_KEY_OPERATING_RATE, Float, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_PRIORITY, Int32),
     };
     const size_t entryCount = sizeof(kEncoderEntriesToCopy) / sizeof(kEncoderEntriesToCopy[0]);
-    AMediaFormatUtils::CopyFormatEntries(mDestinationFormat.get(), decoderFormat.get(),
-                                         kEncoderEntriesToCopy, entryCount);
+    CopyFormatEntries(mDestinationFormat.get(), decoderFormat.get(), kEncoderEntriesToCopy,
+                      entryCount);
 
     status = AMediaCodec_configure(mDecoder, decoderFormat.get(), mSurface, NULL /* crypto */,
                                    0 /* flags */);
