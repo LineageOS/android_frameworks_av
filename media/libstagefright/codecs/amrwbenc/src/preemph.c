@@ -24,6 +24,7 @@
 
 #include "typedef.h"
 #include "basic_op.h"
+#include <stdint.h>
 
 void Preemph(
         Word16 x[],                           /* (i/o)   : input signal overwritten by the output */
