@@ -17,7 +17,10 @@ apex_test {
     manifest: "test_manifest.json",
     file_contexts: ":com.android.media-file_contexts",
     defaults: ["com.android.media-defaults"],
-    prebuilts: ["sdkinfo_45"],
+    prebuilts: [
+        "sdkinfo_45",
+        "media-linker-config",
+    ],
     installable: false,
 }
 
