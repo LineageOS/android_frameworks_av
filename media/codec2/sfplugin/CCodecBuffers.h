@@ -1139,6 +1139,14 @@ public:
     std::function<sp<Codec2Buffer>()> getAlloc() override;
 };
 
+class LinearMetadataOutputBuffers : public LinearOutputBuffers {
+ public:
+    LinearMetadataOutputBuffers(const char *componentName, const char *name = "1D-Meta-Output")
+        : LinearOutputBuffers(componentName, name) { }
+
+    std::function<sp<Codec2Buffer>()> getAlloc() override;
+};
+
 class GraphicOutputBuffers : public FlexOutputBuffers {
 public:
     GraphicOutputBuffers(const char *componentName, const char *name = "2D-Output")

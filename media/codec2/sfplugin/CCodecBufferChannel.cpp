@@ -1383,7 +1383,14 @@ status_t CCodecBufferChannel::start(
                 output->buffers.reset(new RawGraphicOutputBuffers(mName));
             }
         } else {
-            output->buffers.reset(new LinearOutputBuffers(mName));
+            // TODO(PC): do this decision based on the secure_mode config being SM_PROTECTED?
+            bool secure = mComponent->getName().find(".secure") != std::string::npos;
+            if (secure) {
+                ALOGD("[%s] Enabling metadata output for secure encoder", mName);
+                output->buffers.reset(new LinearMetadataOutputBuffers(mName));
+            } else {
+                output->buffers.reset(new LinearOutputBuffers(mName));
+            }
         }
         output->buffers->setFormat(outputFormat);
 
