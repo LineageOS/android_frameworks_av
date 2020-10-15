@@ -1,0 +1,50 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e1616b6e_f9c52b52",
+        "filename": "media/mediaserver/Android.bp",
+        "patchSetId": 6
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-10-15T16:11:56Z",
+      "side": 1,
+      "message": "has_legacy_camera_hal1_defaults",
+      "range": {
+        "startLine": 15,
+        "startChar": 9,
+        "endLine": 15,
+        "endChar": 31
+      },
+      "revId": "21e015dadcd5cc40fc5949fb5959e6418bf0420e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    },
+    {
+      "key": {
+        "uuid": "857fde39_19f7cddd",
+        "filename": "services/camera/libcameraservice/Android.bp",
+        "patchSetId": 6
+      },
+      "lineNbr": 22,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-10-15T16:11:56Z",
+      "side": 1,
+      "message": "has_legacy_camera_hal1_defaults",
+      "range": {
+        "startLine": 22,
+        "startChar": 9,
+        "endLine": 22,
+        "endChar": 31
+      },
+      "revId": "21e015dadcd5cc40fc5949fb5959e6418bf0420e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
