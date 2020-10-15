@@ -178,7 +178,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     // Did we get a valid track?
     status_t status = mAudioTrack->initCheck();
     if (status != NO_ERROR) {
-        releaseCloseFinal();
+        safeReleaseClose();
         ALOGE("open(), initCheck() returned %d", status);
         return AAudioConvert_androidToAAudioResult(status);
     }
@@ -293,7 +293,7 @@ void AudioStreamTrack::processCallback(int event, void *info) {
     return;
 }
 
-aaudio_result_t AudioStreamTrack::requestStart() {
+aaudio_result_t AudioStreamTrack::requestStart_l() {
     if (mAudioTrack.get() == nullptr) {
         ALOGE("requestStart() no AudioTrack");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -320,7 +320,7 @@ aaudio_result_t AudioStreamTrack::requestStart() {
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::requestPause() {
+aaudio_result_t AudioStreamTrack::requestPause_l() {
     if (mAudioTrack.get() == nullptr) {
         ALOGE("%s() no AudioTrack", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
@@ -336,7 +336,7 @@ aaudio_result_t AudioStreamTrack::requestPause() {
     return checkForDisconnectRequest(false);
 }
 
-aaudio_result_t AudioStreamTrack::requestFlush() {
+aaudio_result_t AudioStreamTrack::requestFlush_l() {
     if (mAudioTrack.get() == nullptr) {
         ALOGE("%s() no AudioTrack", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
@@ -350,7 +350,7 @@ aaudio_result_t AudioStreamTrack::requestFlush() {
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamTrack::requestStop() {
+aaudio_result_t AudioStreamTrack::requestStop_l() {
     if (mAudioTrack.get() == nullptr) {
         ALOGE("%s() no AudioTrack", __func__);
         return AAUDIO_ERROR_INVALID_STATE;

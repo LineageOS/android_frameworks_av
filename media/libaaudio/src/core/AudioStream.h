@@ -60,7 +60,7 @@ protected:
     /* Asynchronous requests.
      * Use waitForStateChange() to wait for completion.
      */
-    virtual aaudio_result_t requestStart() = 0;
+    virtual aaudio_result_t requestStart_l() = 0;
 
     /**
      * Check the state to see if Pause is currently legal.
@@ -80,18 +80,17 @@ protected:
         return false;
     }
 
-    virtual aaudio_result_t requestPause()
-    {
+    virtual aaudio_result_t requestPause_l() {
         // Only implement this for OUTPUT streams.
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_result_t requestFlush() {
+    virtual aaudio_result_t requestFlush_l() {
         // Only implement this for OUTPUT streams.
         return AAUDIO_ERROR_UNIMPLEMENTED;
     }
 
-    virtual aaudio_result_t requestStop() = 0;
+    virtual aaudio_result_t requestStop_l() = 0;
 
 public:
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
@@ -152,17 +151,6 @@ public:
         setState(AAUDIO_STREAM_STATE_CLOSED);
     }
 
-    /**
-     * Release then close the stream.
-     */
-    void releaseCloseFinal() {
-        if (getState() != AAUDIO_STREAM_STATE_CLOSING) { // not already released?
-            // Ignore result and keep closing.
-            (void) release_l();
-        }
-        close_l();
-    }
-
     // This is only used to identify a stream in the logs without
     // revealing any pointers.
     aaudio_stream_id_t getId() {
@@ -171,9 +159,9 @@ public:
 
     virtual aaudio_result_t setBufferSize(int32_t requestedFrames) = 0;
 
-    virtual aaudio_result_t createThread(int64_t periodNanoseconds,
-                                       aaudio_audio_thread_proc_t threadProc,
-                                       void *threadArg);
+    virtual aaudio_result_t createThread_l(int64_t periodNanoseconds,
+                                           aaudio_audio_thread_proc_t threadProc,
+                                           void *threadArg);
 
     aaudio_result_t joinThread(void **returnArg, int64_t timeoutNanoseconds);
 
@@ -432,6 +420,8 @@ public:
      */
     aaudio_result_t safeReleaseClose();
 
+    aaudio_result_t safeReleaseCloseFromCallback();
+
 protected:
 
     // PlayerBase allows the system to control the stream volume.
@@ -543,6 +533,8 @@ protected:
         mSessionId = sessionId;
     }
 
+    aaudio_result_t joinThread_l(void **returnArg, int64_t timeoutNanoseconds);
+
     std::atomic<bool>    mCallbackEnabled{false};
 
     float                mDuckAndMuteVolume = 1.0f;
@@ -613,6 +605,17 @@ private:
 
     aaudio_result_t safeStop();
 
+    /**
+     * Release then close the stream.
+     */
+    void releaseCloseFinal_l() {
+        if (getState() != AAUDIO_STREAM_STATE_CLOSING) { // not already released?
+            // Ignore result and keep closing.
+            (void) release_l();
+        }
+        close_l();
+    }
+
     std::mutex                 mStreamLock;
 
     const android::sp<MyPlayerBase>   mPlayerBase;
@@ -654,7 +657,7 @@ private:
 
     // background thread ----------------------------------
     bool                        mHasThread = false;
-    pthread_t                   mThread; // initialized in constructor
+    pthread_t                   mThread = {};
 
     // These are set by the application thread and then read by the audio pthread.
     std::atomic<int64_t>        mPeriodNanoseconds; // for tuning SCHED_FIFO threads
