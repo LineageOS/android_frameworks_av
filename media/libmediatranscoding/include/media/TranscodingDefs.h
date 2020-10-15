@@ -23,7 +23,7 @@
 namespace android {
 
 using ClientIdType = uintptr_t;
-using JobIdType = int32_t;
+using SessionIdType = int32_t;
 
 }  // namespace android
 #endif  // ANDROID_MEDIA_TRANSCODING_DEFS_H

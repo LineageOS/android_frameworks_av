@@ -29,39 +29,41 @@ using ::aidl::android::media::TranscodingErrorCode;
 using ::aidl::android::media::TranscodingRequestParcel;
 class TranscoderCallbackInterface;
 
-// Interface for the scheduler to call the transcoder to take actions.
+// Interface for the controller to call the transcoder to take actions.
 class TranscoderInterface {
 public:
     virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) = 0;
-    virtual void start(ClientIdType clientId, JobIdType jobId,
+    virtual void start(ClientIdType clientId, SessionIdType sessionId,
                        const TranscodingRequestParcel& request,
                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
-    virtual void pause(ClientIdType clientId, JobIdType jobId) = 0;
-    virtual void resume(ClientIdType clientId, JobIdType jobId,
+    virtual void pause(ClientIdType clientId, SessionIdType sessionId) = 0;
+    virtual void resume(ClientIdType clientId, SessionIdType sessionId,
                         const TranscodingRequestParcel& request,
                         const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
-    virtual void stop(ClientIdType clientId, JobIdType jobId) = 0;
+    virtual void stop(ClientIdType clientId, SessionIdType sessionId) = 0;
 
 protected:
     virtual ~TranscoderInterface() = default;
 };
 
-// Interface for the transcoder to notify the scheduler of the status of
-// the currently running job, or temporary loss of transcoding resources.
+// Interface for the transcoder to notify the controller of the status of
+// the currently running session, or temporary loss of transcoding resources.
 class TranscoderCallbackInterface {
 public:
     // TODO(chz): determine what parameters are needed here.
-    virtual void onStarted(ClientIdType clientId, JobIdType jobId) = 0;
-    virtual void onPaused(ClientIdType clientId, JobIdType jobId) = 0;
-    virtual void onResumed(ClientIdType clientId, JobIdType jobId) = 0;
-    virtual void onFinish(ClientIdType clientId, JobIdType jobId) = 0;
-    virtual void onError(ClientIdType clientId, JobIdType jobId, TranscodingErrorCode err) = 0;
-    virtual void onProgressUpdate(ClientIdType clientId, JobIdType jobId, int32_t progress) = 0;
+    virtual void onStarted(ClientIdType clientId, SessionIdType sessionId) = 0;
+    virtual void onPaused(ClientIdType clientId, SessionIdType sessionId) = 0;
+    virtual void onResumed(ClientIdType clientId, SessionIdType sessionId) = 0;
+    virtual void onFinish(ClientIdType clientId, SessionIdType sessionId) = 0;
+    virtual void onError(ClientIdType clientId, SessionIdType sessionId,
+                         TranscodingErrorCode err) = 0;
+    virtual void onProgressUpdate(ClientIdType clientId, SessionIdType sessionId,
+                                  int32_t progress) = 0;
 
     // Called when transcoding becomes temporarily inaccessible due to loss of resource.
-    // If there is any job currently running, it will be paused. When resource contention
-    // is solved, the scheduler should call TranscoderInterface's to either start a new job,
-    // or resume a paused job.
+    // If there is any session currently running, it will be paused. When resource contention
+    // is solved, the controller should call TranscoderInterface's to either start a new session,
+    // or resume a paused session.
     virtual void onResourceLost() = 0;
 
 protected:
