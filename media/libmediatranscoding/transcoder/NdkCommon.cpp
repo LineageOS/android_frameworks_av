@@ -73,4 +73,18 @@ void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* 
         }
     }
 }
+
+#define DEFINE_SET_DEFAULT_FORMAT_VALUE_FUNC(_type, _typeName)                                  \
+    bool SetDefaultFormatValue##_typeName(const char* key, AMediaFormat* format, _type value) { \
+        _type tmp;                                                                              \
+        if (!AMediaFormat_get##_typeName(format, key, &tmp)) {                                  \
+            AMediaFormat_set##_typeName(format, key, value);                                    \
+            return true;                                                                        \
+        }                                                                                       \
+        return false;                                                                           \
+    }
+
+DEFINE_SET_DEFAULT_FORMAT_VALUE_FUNC(float, Float);
+DEFINE_SET_DEFAULT_FORMAT_VALUE_FUNC(int32_t, Int32);
+
 }  // namespace AMediaFormatUtils
