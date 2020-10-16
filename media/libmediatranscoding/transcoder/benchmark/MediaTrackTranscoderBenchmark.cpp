@@ -192,7 +192,7 @@ public:
         auto& p = mSamples[mCurrentSampleIndex % mSamples.size()];
 
         if (bufferSize < p.second.size) return AMEDIA_ERROR_INVALID_PARAMETER;
-        memcpy(buffer, p.first.get(), bufferSize);
+        memcpy(buffer, p.first.get(), p.second.size);
 
         advanceTrack(trackIndex);
         return AMEDIA_OK;

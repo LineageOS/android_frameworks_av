@@ -29,6 +29,6 @@ echo "testing AdjustableMaxPriorityQueue"
 #adb shell /data/nativetest64/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorityQueue_tests
 adb shell /data/nativetest/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorityQueue_tests
 
-echo "testing TranscodingJobScheduler"
-#adb shell /data/nativetest64/TranscodingJobScheduler_tests/TranscodingJobScheduler_tests
-adb shell /data/nativetest/TranscodingJobScheduler_tests/TranscodingJobScheduler_tests
+echo "testing TranscodingSessionController"
+#adb shell /data/nativetest64/TranscodingSessionController_tests/TranscodingSessionController_tests
+adb shell /data/nativetest/TranscodingSessionController_tests/TranscodingSessionController_tests

@@ -24,8 +24,8 @@
 #include <cutils/properties.h>
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
-#include <media/TranscodingJobScheduler.h>
 #include <media/TranscodingResourcePolicy.h>
+#include <media/TranscodingSessionController.h>
 #include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
@@ -44,12 +44,13 @@ MediaTranscodingService::MediaTranscodingService(
         const std::shared_ptr<TranscoderInterface>& transcoder)
       : mUidPolicy(new TranscodingUidPolicy()),
         mResourcePolicy(new TranscodingResourcePolicy()),
-        mJobScheduler(new TranscodingJobScheduler(transcoder, mUidPolicy, mResourcePolicy)),
-        mClientManager(new TranscodingClientManager(mJobScheduler)) {
+        mSessionController(
+                new TranscodingSessionController(transcoder, mUidPolicy, mResourcePolicy)),
+        mClientManager(new TranscodingClientManager(mSessionController)) {
     ALOGV("MediaTranscodingService is created");
-    transcoder->setCallback(mJobScheduler);
-    mUidPolicy->setCallback(mJobScheduler);
-    mResourcePolicy->setCallback(mJobScheduler);
+    transcoder->setCallback(mSessionController);
+    mUidPolicy->setCallback(mSessionController);
+    mResourcePolicy->setCallback(mSessionController);
 }
 
 MediaTranscodingService::~MediaTranscodingService() {
@@ -78,7 +79,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
     Vector<String16> args;
     mClientManager->dumpAllClients(fd, args);
-    mJobScheduler->dumpAllJobs(fd, args);
+    mSessionController->dumpAllSessions(fd, args);
     return OK;
 }
 

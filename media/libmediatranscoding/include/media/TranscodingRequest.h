@@ -43,7 +43,7 @@ private:
         requestedVideoTrackFormat = parcel.requestedVideoTrackFormat;
         priority = parcel.priority;
         requestProgressUpdate = parcel.requestProgressUpdate;
-        requestJobEventUpdate = parcel.requestJobEventUpdate;
+        requestSessionEventUpdate = parcel.requestSessionEventUpdate;
         isForTesting = parcel.isForTesting;
         testConfig = parcel.testConfig;
     }

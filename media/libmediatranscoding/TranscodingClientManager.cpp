@@ -35,8 +35,8 @@ static constexpr const char* MEDIA_PROVIDER_PKG_NAME = "com.google.android.provi
 
 using ::aidl::android::media::BnTranscodingClient;
 using ::aidl::android::media::IMediaTranscodingService;  // For service error codes
-using ::aidl::android::media::TranscodingJobParcel;
 using ::aidl::android::media::TranscodingRequestParcel;
+using ::aidl::android::media::TranscodingSessionParcel;
 using Status = ::ndk::ScopedAStatus;
 using ::ndk::SpAIBinder;
 
@@ -74,8 +74,8 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     std::string mClientName;
     std::string mClientOpPackageName;
 
-    // Next jobId to assign.
-    std::atomic<int32_t> mNextJobId;
+    // Next sessionId to assign.
+    std::atomic<int32_t> mNextSessionId;
     // Whether this client has been unregistered already.
     std::atomic<bool> mAbandoned;
     // Weak pointer to the client manager for this client.
@@ -86,12 +86,13 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
                const std::weak_ptr<TranscodingClientManager>& owner);
 
     Status submitRequest(const TranscodingRequestParcel& /*in_request*/,
-                         TranscodingJobParcel* /*out_job*/, bool* /*_aidl_return*/) override;
+                         TranscodingSessionParcel* /*out_session*/,
+                         bool* /*_aidl_return*/) override;
 
-    Status cancelJob(int32_t /*in_jobId*/, bool* /*_aidl_return*/) override;
+    Status cancelSession(int32_t /*in_sessionId*/, bool* /*_aidl_return*/) override;
 
-    Status getJobWithId(int32_t /*in_jobId*/, TranscodingJobParcel* /*out_job*/,
-                        bool* /*_aidl_return*/) override;
+    Status getSessionWithId(int32_t /*in_sessionId*/, TranscodingSessionParcel* /*out_session*/,
+                            bool* /*_aidl_return*/) override;
 
     Status unregister() override;
 };
@@ -104,12 +105,12 @@ TranscodingClientManager::ClientImpl::ClientImpl(
         mClientId(sCookieCounter.fetch_add(1, std::memory_order_relaxed)),
         mClientName(clientName),
         mClientOpPackageName(opPackageName),
-        mNextJobId(0),
+        mNextSessionId(0),
         mAbandoned(false),
         mOwner(owner) {}
 
 Status TranscodingClientManager::ClientImpl::submitRequest(
-        const TranscodingRequestParcel& in_request, TranscodingJobParcel* out_job,
+        const TranscodingRequestParcel& in_request, TranscodingSessionParcel* out_session,
         bool* _aidl_return) {
     *_aidl_return = false;
 
@@ -161,23 +162,24 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
                 in_clientPid, in_clientUid, callingUid);
     }
 
-    int32_t jobId = mNextJobId.fetch_add(1);
+    int32_t sessionId = mNextSessionId.fetch_add(1);
 
-    *_aidl_return = owner->mJobScheduler->submit(mClientId, jobId, in_clientUid, in_request,
-                                                 mClientCallback);
+    *_aidl_return = owner->mSessionController->submit(mClientId, sessionId, in_clientUid,
+                                                      in_request, mClientCallback);
 
     if (*_aidl_return) {
-        out_job->jobId = jobId;
+        out_session->sessionId = sessionId;
 
-        // TODO(chz): is some of this coming from JobScheduler?
-        *(TranscodingRequest*)&out_job->request = in_request;
-        out_job->awaitNumberOfJobs = 0;
+        // TODO(chz): is some of this coming from SessionController?
+        *(TranscodingRequest*)&out_session->request = in_request;
+        out_session->awaitNumberOfSessions = 0;
     }
 
     return Status::ok();
 }
 
-Status TranscodingClientManager::ClientImpl::cancelJob(int32_t in_jobId, bool* _aidl_return) {
+Status TranscodingClientManager::ClientImpl::cancelSession(int32_t in_sessionId,
+                                                           bool* _aidl_return) {
     *_aidl_return = false;
 
     std::shared_ptr<TranscodingClientManager> owner;
@@ -185,17 +187,17 @@ Status TranscodingClientManager::ClientImpl::cancelJob(int32_t in_jobId, bool* _
         return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
     }
 
-    if (in_jobId < 0) {
+    if (in_sessionId < 0) {
         return Status::ok();
     }
 
-    *_aidl_return = owner->mJobScheduler->cancel(mClientId, in_jobId);
+    *_aidl_return = owner->mSessionController->cancel(mClientId, in_sessionId);
     return Status::ok();
 }
 
-Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t in_jobId,
-                                                          TranscodingJobParcel* out_job,
-                                                          bool* _aidl_return) {
+Status TranscodingClientManager::ClientImpl::getSessionWithId(int32_t in_sessionId,
+                                                              TranscodingSessionParcel* out_session,
+                                                              bool* _aidl_return) {
     *_aidl_return = false;
 
     std::shared_ptr<TranscodingClientManager> owner;
@@ -203,15 +205,16 @@ Status TranscodingClientManager::ClientImpl::getJobWithId(int32_t in_jobId,
         return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
     }
 
-    if (in_jobId < 0) {
+    if (in_sessionId < 0) {
         return Status::ok();
     }
 
-    *_aidl_return = owner->mJobScheduler->getJob(mClientId, in_jobId, &out_job->request);
+    *_aidl_return =
+            owner->mSessionController->getSession(mClientId, in_sessionId, &out_session->request);
 
     if (*_aidl_return) {
-        out_job->jobId = in_jobId;
-        out_job->awaitNumberOfJobs = 0;
+        out_session->sessionId = in_sessionId;
+        out_session->awaitNumberOfSessions = 0;
     }
     return Status::ok();
 }
@@ -224,8 +227,8 @@ Status TranscodingClientManager::ClientImpl::unregister() {
         return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
     }
 
-    // Use jobId == -1 to cancel all realtime jobs for this client with the scheduler.
-    owner->mJobScheduler->cancel(mClientId, -1);
+    // Use sessionId == -1 to cancel all realtime sessions for this client with the controller.
+    owner->mSessionController->cancel(mClientId, -1);
     owner->removeClient(mClientId);
 
     return Status::ok();
@@ -256,9 +259,9 @@ void TranscodingClientManager::BinderDiedCallback(void* cookie) {
 }
 
 TranscodingClientManager::TranscodingClientManager(
-        const std::shared_ptr<SchedulerClientInterface>& scheduler)
+        const std::shared_ptr<ControllerClientInterface>& controller)
       : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
-        mJobScheduler(scheduler),
+        mSessionController(controller),
         mMediaProviderUid(-1) {
     ALOGD("TranscodingClientManager started");
     uid_t mpuid;
