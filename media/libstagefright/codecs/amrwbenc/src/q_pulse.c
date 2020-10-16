@@ -27,6 +27,7 @@
 #include "q_pulse.h"
 
 #define NB_POS 16                          /* pos in track, mask for sign bit */
+#define UNUSED_VAR __attribute__((unused))
 
 Word32 quant_1p_N1(                        /* (o) return N+1 bits             */
         Word16 pos,                        /* (i) position of the pulse       */
@@ -188,7 +189,7 @@ Word32 quant_4p_4N(                        /* (o) return 4*N bits             */
         Word16 pos[],                         /* (i) position of the pulse 1..4  */
         Word16 N)                             /* (i) number of bits for position */
 {
-    Word16 nb_pos, mask __unused, n_1, tmp;
+    Word16 nb_pos, mask UNUSED_VAR, n_1, tmp;
     Word16 posA[4], posB[4];
     Word32 i, j, k, index;
 
