@@ -78,5 +78,8 @@ bool CopyFormatEntryFloat(const char* key, AMediaFormat* from, AMediaFormat* to)
 void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* entries,
                        size_t entryCount);
 
+bool SetDefaultFormatValueFloat(const char* key, AMediaFormat* format, float value);
+bool SetDefaultFormatValueInt32(const char* key, AMediaFormat* format, int32_t value);
+
 }  // namespace AMediaFormatUtils
 #endif  // ANDROID_MEDIA_TRANSCODING_NDK_COMMON_H
