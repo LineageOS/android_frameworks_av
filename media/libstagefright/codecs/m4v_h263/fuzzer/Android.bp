@@ -70,3 +70,49 @@ cc_fuzz {
         componentid: 155276,
     },
 }
+
+cc_defaults {
+    name: "mpeg4_h263_enc_fuzz_defaults",
+
+    host_supported: true,
+
+    srcs: ["mpeg4_h263_enc_fuzzer.cpp"],
+
+    shared_libs: [
+        "libutils",
+        "liblog",
+    ],
+
+    static_libs: [
+        "libstagefright_m4vh263enc",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
+}
+
+cc_fuzz {
+    name: "mpeg4_enc_fuzzer",
+
+    defaults: [
+        "mpeg4_h263_enc_fuzz_defaults",
+    ],
+
+    cflags: ["-DMPEG4"],
+}
+
+cc_fuzz {
+    name: "h263_enc_fuzzer",
+
+    defaults: [
+        "mpeg4_h263_enc_fuzz_defaults",
+    ],
+}
