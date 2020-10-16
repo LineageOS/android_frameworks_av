@@ -48,58 +48,59 @@ void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackIn
 }
 
 void SimulatedTranscoder::start(
-        ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& request,
+        ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     if (request.testConfig.has_value() && request.testConfig->processingTotalTimeMs > 0) {
-        mJobProcessingTimeMs = request.testConfig->processingTotalTimeMs;
+        mSessionProcessingTimeMs = request.testConfig->processingTotalTimeMs;
     }
-    ALOGV("%s: job {%d}: processingTime: %lld", __FUNCTION__, jobId,
-          (long long)mJobProcessingTimeMs);
-    queueEvent(Event::Start, clientId, jobId, [=] {
+    ALOGV("%s: session {%d}: processingTime: %lld", __FUNCTION__, sessionId,
+          (long long)mSessionProcessingTimeMs);
+    queueEvent(Event::Start, clientId, sessionId, [=] {
         auto callback = mCallback.lock();
         if (callback != nullptr) {
-            callback->onStarted(clientId, jobId);
+            callback->onStarted(clientId, sessionId);
         }
     });
 }
 
-void SimulatedTranscoder::pause(ClientIdType clientId, JobIdType jobId) {
-    queueEvent(Event::Pause, clientId, jobId, [=] {
+void SimulatedTranscoder::pause(ClientIdType clientId, SessionIdType sessionId) {
+    queueEvent(Event::Pause, clientId, sessionId, [=] {
         auto callback = mCallback.lock();
         if (callback != nullptr) {
-            callback->onPaused(clientId, jobId);
+            callback->onPaused(clientId, sessionId);
         }
     });
 }
 
 void SimulatedTranscoder::resume(
-        ClientIdType clientId, JobIdType jobId, const TranscodingRequestParcel& /*request*/,
+        ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& /*request*/,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
-    queueEvent(Event::Resume, clientId, jobId, [=] {
+    queueEvent(Event::Resume, clientId, sessionId, [=] {
         auto callback = mCallback.lock();
         if (callback != nullptr) {
-            callback->onResumed(clientId, jobId);
+            callback->onResumed(clientId, sessionId);
         }
     });
 }
 
-void SimulatedTranscoder::stop(ClientIdType clientId, JobIdType jobId) {
-    queueEvent(Event::Stop, clientId, jobId, nullptr);
+void SimulatedTranscoder::stop(ClientIdType clientId, SessionIdType sessionId) {
+    queueEvent(Event::Stop, clientId, sessionId, nullptr);
 }
 
-void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId, JobIdType jobId,
-                                     std::function<void()> runnable) {
-    ALOGV("%s: job {%lld, %d}: %s", __FUNCTION__, (long long)clientId, jobId, toString(type));
+void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId,
+                                     SessionIdType sessionId, std::function<void()> runnable) {
+    ALOGV("%s: session {%lld, %d}: %s", __FUNCTION__, (long long)clientId, sessionId,
+          toString(type));
 
     auto lock = std::scoped_lock(mLock);
 
-    mQueue.push_back({type, clientId, jobId, runnable});
+    mQueue.push_back({type, clientId, sessionId, runnable});
     mCondition.notify_one();
 }
 
 void SimulatedTranscoder::threadLoop() {
     bool running = false;
-    std::chrono::microseconds remainingUs(kJobDurationUs);
+    std::chrono::microseconds remainingUs(kSessionDurationUs);
     std::chrono::system_clock::time_point lastRunningTime;
     Event lastRunningEvent;
 
@@ -113,7 +114,7 @@ void SimulatedTranscoder::threadLoop() {
                 mCondition.wait(lock);
                 continue;
             }
-            // If running, wait for the remaining life of this job. Report finish if timed out.
+            // If running, wait for the remaining life of this session. Report finish if timed out.
             std::cv_status status = mCondition.wait_for(lock, remainingUs);
             if (status == std::cv_status::timeout) {
                 running = false;
@@ -121,7 +122,7 @@ void SimulatedTranscoder::threadLoop() {
                 auto callback = mCallback.lock();
                 if (callback != nullptr) {
                     lock.unlock();
-                    callback->onFinish(lastRunningEvent.clientId, lastRunningEvent.jobId);
+                    callback->onFinish(lastRunningEvent.clientId, lastRunningEvent.sessionId);
                     lock.lock();
                 }
             } else {
@@ -139,22 +140,22 @@ void SimulatedTranscoder::threadLoop() {
             Event event = *mQueue.begin();
             mQueue.pop_front();
 
-            ALOGV("%s: job {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId, event.jobId,
-                  toString(event.type));
+            ALOGV("%s: session {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId,
+                  event.sessionId, toString(event.type));
 
             if (!running && (event.type == Event::Start || event.type == Event::Resume)) {
                 running = true;
                 lastRunningTime = std::chrono::system_clock::now();
                 lastRunningEvent = event;
                 if (event.type == Event::Start) {
-                    remainingUs = std::chrono::milliseconds(mJobProcessingTimeMs);
+                    remainingUs = std::chrono::milliseconds(mSessionProcessingTimeMs);
                 }
             } else if (running && (event.type == Event::Pause || event.type == Event::Stop)) {
                 running = false;
                 remainingUs -= (std::chrono::system_clock::now() - lastRunningTime);
             } else {
-                ALOGW("%s: discarding bad event: job {%lld, %d}: %s", __FUNCTION__,
-                      (long long)event.clientId, event.jobId, toString(event.type));
+                ALOGW("%s: discarding bad event: session {%lld, %d}: %s", __FUNCTION__,
+                      (long long)event.clientId, event.sessionId, toString(event.type));
                 continue;
             }
 

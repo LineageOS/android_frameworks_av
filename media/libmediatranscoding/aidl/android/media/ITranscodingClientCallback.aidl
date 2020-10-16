@@ -17,7 +17,7 @@
 package android.media;
 
 import android.media.TranscodingErrorCode;
-import android.media.TranscodingJobParcel;
+import android.media.TranscodingSessionParcel;
 import android.media.TranscodingResultParcel;
 import android.os.ParcelFileDescriptor;
 
@@ -40,68 +40,68 @@ interface ITranscodingClientCallback {
                                             in @utf8InCpp String mode);
 
     /**
-    * Called when the transcoding associated with the jobId finished.
-    * This will only be called if client request to get all the status of the job.
+    * Called when the transcoding associated with the sessionId finished.
+    * This will only be called if client request to get all the status of the session.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
     */
-    oneway void onTranscodingStarted(in int jobId);
+    oneway void onTranscodingStarted(in int sessionId);
 
     /**
-    * Called when the transcoding associated with the jobId is paused.
-    * This will only be called if client request to get all the status of the job.
+    * Called when the transcoding associated with the sessionId is paused.
+    * This will only be called if client request to get all the status of the session.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
     */
-    oneway void onTranscodingPaused(in int jobId);
+    oneway void onTranscodingPaused(in int sessionId);
 
     /**
-    * Called when the transcoding associated with the jobId is resumed.
-    * This will only be called if client request to get all the status of the job.
+    * Called when the transcoding associated with the sessionId is resumed.
+    * This will only be called if client request to get all the status of the session.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
     */
-    oneway void onTranscodingResumed(in int jobId);
+    oneway void onTranscodingResumed(in int sessionId);
 
     /**
-    * Called when the transcoding associated with the jobId finished.
+    * Called when the transcoding associated with the sessionId finished.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
     * @param result contains the transcoded file stats and other transcoding metrics if requested.
     */
-    oneway void onTranscodingFinished(in int jobId, in TranscodingResultParcel result);
+    oneway void onTranscodingFinished(in int sessionId, in TranscodingResultParcel result);
 
     /**
-    * Called when the transcoding associated with the jobId failed.
+    * Called when the transcoding associated with the sessionId failed.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
     * @param errorCode error code that indicates the error.
     */
-    oneway void onTranscodingFailed(in int jobId, in TranscodingErrorCode errorCode);
+    oneway void onTranscodingFailed(in int sessionId, in TranscodingErrorCode errorCode);
 
     /**
-    * Called when the transcoding configuration associated with the jobId gets updated, i.e. wait
-    * number in the job queue.
+    * Called when the transcoding configuration associated with the sessionId gets updated, i.e. wait
+    * number in the session queue.
     *
     * <p> This will only be called if client set requestUpdate to be true in the TranscodingRequest
     * submitted to the MediaTranscodingService.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
-    * @param oldAwaitNumber previous number of jobs ahead of current job.
-    * @param newAwaitNumber updated number of jobs ahead of current job.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
+    * @param oldAwaitNumber previous number of sessions ahead of current session.
+    * @param newAwaitNumber updated number of sessions ahead of current session.
     */
-    oneway void onAwaitNumberOfJobsChanged(in int jobId,
+    oneway void onAwaitNumberOfSessionsChanged(in int sessionId,
                                            in int oldAwaitNumber,
                                            in int newAwaitNumber);
 
     /**
-    * Called when there is an update on the progress of the TranscodingJob.
+    * Called when there is an update on the progress of the TranscodingSession.
     *
     * <p> This will only be called if client set requestUpdate to be true in the TranscodingRequest
     * submitted to the MediaTranscodingService.
     *
-    * @param jobId jobId assigned by the MediaTranscodingService upon receiving request.
+    * @param sessionId sessionId assigned by the MediaTranscodingService upon receiving request.
     * @param progress an integer number ranging from 0 ~ 100 inclusive.
     */
-    oneway void onProgressUpdate(in int jobId, in int progress);
+    oneway void onProgressUpdate(in int sessionId, in int progress);
 }

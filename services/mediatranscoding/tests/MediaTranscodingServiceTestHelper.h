@@ -20,9 +20,9 @@
 #include <aidl/android/media/IMediaTranscodingService.h>
 #include <aidl/android/media/ITranscodingClient.h>
 #include <aidl/android/media/ITranscodingClientCallback.h>
-#include <aidl/android/media/TranscodingJobParcel.h>
-#include <aidl/android/media/TranscodingJobPriority.h>
 #include <aidl/android/media/TranscodingRequestParcel.h>
+#include <aidl/android/media/TranscodingSessionParcel.h>
+#include <aidl/android/media/TranscodingSessionPriority.h>
 #include <android-base/logging.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
@@ -48,9 +48,9 @@ using aidl::android::media::BnTranscodingClientCallback;
 using aidl::android::media::IMediaTranscodingService;
 using aidl::android::media::ITranscodingClient;
 using aidl::android::media::ITranscodingClientCallback;
-using aidl::android::media::TranscodingJobParcel;
-using aidl::android::media::TranscodingJobPriority;
 using aidl::android::media::TranscodingRequestParcel;
+using aidl::android::media::TranscodingSessionParcel;
+using aidl::android::media::TranscodingSessionPriority;
 using aidl::android::media::TranscodingVideoTrackFormat;
 
 constexpr int32_t kClientUseCallingPid = IMediaTranscodingService::USE_CALLING_PID;
@@ -112,12 +112,12 @@ struct EventTracker {
     struct Event {
         enum { NoEvent, Start, Pause, Resume, Finished, Failed } type;
         int64_t clientId;
-        int32_t jobId;
+        int32_t sessionId;
     };
 
-#define DECLARE_EVENT(action)                              \
-    static Event action(int32_t clientId, int32_t jobId) { \
-        return {Event::action, clientId, jobId};           \
+#define DECLARE_EVENT(action)                                  \
+    static Event action(int32_t clientId, int32_t sessionId) { \
+        return {Event::action, clientId, sessionId};           \
     }
 
     DECLARE_EVENT(Start);
@@ -149,8 +149,8 @@ struct EventTracker {
         default:
             return "NoEvent";
         }
-        return "job {" + std::to_string(event.clientId) + ", " + std::to_string(event.jobId) +
-               "}: " + eventStr;
+        return "session {" + std::to_string(event.clientId) + ", " +
+               std::to_string(event.sessionId) + "}: " + eventStr;
     }
 
     // Pop 1 event from front, wait for up to timeoutUs if empty.
@@ -238,7 +238,7 @@ private:
 
 // Operators for GTest macros.
 bool operator==(const EventTracker::Event& lhs, const EventTracker::Event& rhs) {
-    return lhs.type == rhs.type && lhs.clientId == rhs.clientId && lhs.jobId == rhs.jobId;
+    return lhs.type == rhs.type && lhs.clientId == rhs.clientId && lhs.sessionId == rhs.sessionId;
 }
 
 std::ostream& operator<<(std::ostream& str, const EventTracker::Event& v) {
@@ -288,40 +288,41 @@ struct TestClientCallback : public BnTranscodingClientCallback,
         return Status::ok();
     }
 
-    Status onTranscodingStarted(int32_t in_jobId) override {
-        append(EventTracker::Start(mClientId, in_jobId));
+    Status onTranscodingStarted(int32_t in_sessionId) override {
+        append(EventTracker::Start(mClientId, in_sessionId));
         return Status::ok();
     }
 
-    Status onTranscodingPaused(int32_t in_jobId) override {
-        append(EventTracker::Pause(mClientId, in_jobId));
+    Status onTranscodingPaused(int32_t in_sessionId) override {
+        append(EventTracker::Pause(mClientId, in_sessionId));
         return Status::ok();
     }
 
-    Status onTranscodingResumed(int32_t in_jobId) override {
-        append(EventTracker::Resume(mClientId, in_jobId));
+    Status onTranscodingResumed(int32_t in_sessionId) override {
+        append(EventTracker::Resume(mClientId, in_sessionId));
         return Status::ok();
     }
 
     Status onTranscodingFinished(
-            int32_t in_jobId,
+            int32_t in_sessionId,
             const ::aidl::android::media::TranscodingResultParcel& /* in_result */) override {
-        append(Finished(mClientId, in_jobId));
+        append(Finished(mClientId, in_sessionId));
         return Status::ok();
     }
 
-    Status onTranscodingFailed(int32_t in_jobId,
+    Status onTranscodingFailed(int32_t in_sessionId,
                                ::aidl::android::media::TranscodingErrorCode in_errorCode) override {
-        append(Failed(mClientId, in_jobId), in_errorCode);
+        append(Failed(mClientId, in_sessionId), in_errorCode);
         return Status::ok();
     }
 
-    Status onAwaitNumberOfJobsChanged(int32_t /* in_jobId */, int32_t /* in_oldAwaitNumber */,
-                                      int32_t /* in_newAwaitNumber */) override {
+    Status onAwaitNumberOfSessionsChanged(int32_t /* in_sessionId */,
+                                          int32_t /* in_oldAwaitNumber */,
+                                          int32_t /* in_newAwaitNumber */) override {
         return Status::ok();
     }
 
-    Status onProgressUpdate(int32_t /* in_jobId */, int32_t in_progress) override {
+    Status onProgressUpdate(int32_t /* in_sessionId */, int32_t in_progress) override {
         updateProgress(in_progress);
         return Status::ok();
     }
@@ -354,13 +355,13 @@ struct TestClientCallback : public BnTranscodingClientCallback,
     }
 
     template <bool expectation = success>
-    bool submit(int32_t jobId, const char* sourceFilePath, const char* destinationFilePath,
-                TranscodingJobPriority priority = TranscodingJobPriority::kNormal,
+    bool submit(int32_t sessionId, const char* sourceFilePath, const char* destinationFilePath,
+                TranscodingSessionPriority priority = TranscodingSessionPriority::kNormal,
                 int bitrateBps = -1, int overridePid = -1, int overrideUid = -1) {
         constexpr bool shouldSucceed = (expectation == success);
         bool result;
         TranscodingRequestParcel request;
-        TranscodingJobParcel job;
+        TranscodingSessionParcel session;
 
         request.sourceFilePath = sourceFilePath;
         request.destinationFilePath = destinationFilePath;
@@ -371,22 +372,23 @@ struct TestClientCallback : public BnTranscodingClientCallback,
             request.requestedVideoTrackFormat.emplace(TranscodingVideoTrackFormat());
             request.requestedVideoTrackFormat->bitrateBps = bitrateBps;
         }
-        Status status = mClient->submitRequest(request, &job, &result);
+        Status status = mClient->submitRequest(request, &session, &result);
 
         EXPECT_TRUE(status.isOk());
         EXPECT_EQ(result, shouldSucceed);
         if (shouldSucceed) {
-            EXPECT_EQ(job.jobId, jobId);
+            EXPECT_EQ(session.sessionId, sessionId);
         }
 
-        return status.isOk() && (result == shouldSucceed) && (!shouldSucceed || job.jobId == jobId);
+        return status.isOk() && (result == shouldSucceed) &&
+               (!shouldSucceed || session.sessionId == sessionId);
     }
 
     template <bool expectation = success>
-    bool cancel(int32_t jobId) {
+    bool cancel(int32_t sessionId) {
         constexpr bool shouldSucceed = (expectation == success);
         bool result;
-        Status status = mClient->cancelJob(jobId, &result);
+        Status status = mClient->cancelSession(sessionId, &result);
 
         EXPECT_TRUE(status.isOk());
         EXPECT_EQ(result, shouldSucceed);
@@ -395,23 +397,24 @@ struct TestClientCallback : public BnTranscodingClientCallback,
     }
 
     template <bool expectation = success>
-    bool getJob(int32_t jobId, const char* sourceFilePath, const char* destinationFilePath) {
+    bool getSession(int32_t sessionId, const char* sourceFilePath,
+                    const char* destinationFilePath) {
         constexpr bool shouldSucceed = (expectation == success);
         bool result;
-        TranscodingJobParcel job;
-        Status status = mClient->getJobWithId(jobId, &job, &result);
+        TranscodingSessionParcel session;
+        Status status = mClient->getSessionWithId(sessionId, &session, &result);
 
         EXPECT_TRUE(status.isOk());
         EXPECT_EQ(result, shouldSucceed);
         if (shouldSucceed) {
-            EXPECT_EQ(job.jobId, jobId);
-            EXPECT_EQ(job.request.sourceFilePath, sourceFilePath);
+            EXPECT_EQ(session.sessionId, sessionId);
+            EXPECT_EQ(session.request.sourceFilePath, sourceFilePath);
         }
 
         return status.isOk() && (result == shouldSucceed) &&
-               (!shouldSucceed ||
-                (job.jobId == jobId && job.request.sourceFilePath == sourceFilePath &&
-                 job.request.destinationFilePath == destinationFilePath));
+               (!shouldSucceed || (session.sessionId == sessionId &&
+                                   session.request.sourceFilePath == sourceFilePath &&
+                                   session.request.destinationFilePath == destinationFilePath));
     }
 
     int32_t mClientId;

@@ -26,17 +26,17 @@ using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::BnMediaTranscodingService;
 using ::aidl::android::media::ITranscodingClient;
 using ::aidl::android::media::ITranscodingClientCallback;
-using ::aidl::android::media::TranscodingJobParcel;
 using ::aidl::android::media::TranscodingRequestParcel;
+using ::aidl::android::media::TranscodingSessionParcel;
 class TranscodingClientManager;
-class TranscodingJobScheduler;
+class TranscodingSessionController;
 class TranscoderInterface;
 class UidPolicyInterface;
 class ResourcePolicyInterface;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
-    static constexpr int32_t kInvalidJobId = -1;
+    static constexpr int32_t kInvalidSessionId = -1;
     static constexpr int32_t kInvalidClientId = -1;
 
     MediaTranscodingService(const std::shared_ptr<TranscoderInterface>& transcoder);
@@ -61,7 +61,7 @@ private:
 
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
     std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
-    std::shared_ptr<TranscodingJobScheduler> mJobScheduler;
+    std::shared_ptr<TranscodingSessionController> mSessionController;
     std::shared_ptr<TranscodingClientManager> mClientManager;
 };
 

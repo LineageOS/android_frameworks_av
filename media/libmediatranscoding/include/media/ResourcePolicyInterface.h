@@ -21,7 +21,7 @@ namespace android {
 
 class ResourcePolicyCallbackInterface;
 
-// Interface for the JobScheduler to control the resource status updates.
+// Interface for the SessionController to control the resource status updates.
 class ResourcePolicyInterface {
 public:
     // Set the associated callback interface to send the events when resource
@@ -32,11 +32,11 @@ protected:
     virtual ~ResourcePolicyInterface() = default;
 };
 
-// Interface for notifying the JobScheduler of a change in resource status.
+// Interface for notifying the SessionController of a change in resource status.
 class ResourcePolicyCallbackInterface {
 public:
-    // Called when codec resources become available. The scheduler may use this
-    // as a signal to attempt restart transcoding jobs that were previously
+    // Called when codec resources become available. The controller may use this
+    // as a signal to attempt restart transcoding sessions that were previously
     // paused due to temporary resource loss.
     virtual void onResourceAvailable() = 0;
 
