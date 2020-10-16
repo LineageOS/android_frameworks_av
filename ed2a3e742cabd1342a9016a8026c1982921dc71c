@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "e172f627_d82c2dbd",
+        "filename": "camera/Android.bp",
+        "patchSetId": 8
+      },
+      "lineNbr": 46,
+      "author": {
+        "id": 13648
+      },
+      "writtenOn": "2020-10-16T23:33:05Z",
+      "side": 1,
+      "message": "Must be removed.",
+      "range": {
+        "startLine": 46,
+        "startChar": 8,
+        "endLine": 46,
+        "endChar": 31
+      },
+      "revId": "ed2a3e742cabd1342a9016a8026c1982921dc71c",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
