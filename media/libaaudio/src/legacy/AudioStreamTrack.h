@@ -44,11 +44,13 @@ public:
     aaudio_result_t release_l() override;
     void close_l() override;
 
-    aaudio_result_t requestStart_l() override;
-    aaudio_result_t requestPause_l() override;
-    aaudio_result_t requestFlush_l() override;
-    aaudio_result_t requestStop_l() override;
+protected:
+    aaudio_result_t requestStart_l() REQUIRES(mStreamLock)  override;
+    aaudio_result_t requestPause_l() REQUIRES(mStreamLock) override;
+    aaudio_result_t requestFlush_l() REQUIRES(mStreamLock) override;
+    aaudio_result_t requestStop_l() REQUIRES(mStreamLock) override;
 
+public:
     bool isFlushSupported() const override {
         // Only implement FLUSH for OUTPUT streams.
         return true;
