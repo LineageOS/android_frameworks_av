@@ -25,6 +25,7 @@
 #include <hardware/gralloc.h>
 #include <ui/GraphicBufferAllocator.h>
 #include <ui/GraphicBufferMapper.h>
+#include <ui/Rect.h>
 
 #include <C2AllocatorGralloc.h>
 #include <C2Buffer.h>
@@ -253,7 +254,7 @@ public:
     virtual ~C2AllocationGralloc() override;
 
     virtual c2_status_t map(
-            C2Rect rect, C2MemoryUsage usage, C2Fence *fence,
+            C2Rect c2Rect, C2MemoryUsage usage, C2Fence *fence,
             C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) override;
     virtual c2_status_t unmap(
             uint8_t **addr /* nonnull */, C2Rect rect, C2Fence *fence /* nullable */) override;
@@ -336,8 +337,12 @@ C2AllocationGralloc::~C2AllocationGralloc() {
 }
 
 c2_status_t C2AllocationGralloc::map(
-        C2Rect rect, C2MemoryUsage usage, C2Fence *fence,
+        C2Rect c2Rect, C2MemoryUsage usage, C2Fence *fence,
         C2PlanarLayout *layout /* nonnull */, uint8_t **addr /* nonnull */) {
+    const Rect rect{(int32_t)c2Rect.left, (int32_t)c2Rect.top,
+                    (int32_t)(c2Rect.left + c2Rect.width) /* right */,
+                    (int32_t)(c2Rect.top + c2Rect.height) /* bottom */};
+
     uint64_t grallocUsage = static_cast<C2AndroidMemoryUsage>(usage).asGrallocUsage();
     ALOGV("mapping buffer with usage %#llx => %#llx",
           (long long)usage.expected, (long long)grallocUsage);
@@ -386,10 +391,7 @@ c2_status_t C2AllocationGralloc::map(
             void *pointer = nullptr;
             // TODO: fence
             status_t err = GraphicBufferMapper::get().lock(
-                                const_cast<native_handle_t *>(mBuffer), grallocUsage,
-                                { (int32_t)rect.left, (int32_t)rect.top,
-                                  (int32_t)rect.width, (int32_t)rect.height },
-                                &pointer);
+                    const_cast<native_handle_t *>(mBuffer), grallocUsage, rect, &pointer);
             if (err) {
                 ALOGE("failed transaction: lock(RGBA_1010102)");
                 return C2_CORRUPTED;
@@ -464,10 +466,7 @@ c2_status_t C2AllocationGralloc::map(
             void *pointer = nullptr;
             // TODO: fence
             status_t err = GraphicBufferMapper::get().lock(
-                                const_cast<native_handle_t*>(mBuffer), grallocUsage,
-                                { (int32_t)rect.left, (int32_t)rect.top,
-                                  (int32_t)rect.width, (int32_t)rect.height },
-                                &pointer);
+                    const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, &pointer);
             if (err) {
                 ALOGE("failed transaction: lock(RGBA_8888)");
                 return C2_CORRUPTED;
@@ -524,10 +523,7 @@ c2_status_t C2AllocationGralloc::map(
             void *pointer = nullptr;
             // TODO: fence
             status_t err = GraphicBufferMapper::get().lock(
-                                const_cast<native_handle_t*>(mBuffer), grallocUsage,
-                                { (int32_t)rect.left, (int32_t)rect.top,
-                                  (int32_t)rect.width, (int32_t)rect.height },
-                                &pointer);
+                    const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, &pointer);
             if (err) {
                 ALOGE("failed transaction: lock(BLOB)");
                 return C2_CORRUPTED;
@@ -544,10 +540,7 @@ c2_status_t C2AllocationGralloc::map(
             android_ycbcr ycbcrLayout;
 
             status_t err = GraphicBufferMapper::get().lockYCbCr(
-                        const_cast<native_handle_t*>(mBuffer), grallocUsage,
-                        { (int32_t)rect.left, (int32_t)rect.top,
-                          (int32_t)rect.width, (int32_t)rect.height },
-                        &ycbcrLayout);
+                    const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, &ycbcrLayout);
             if (err) {
                 ALOGE("failed transaction: lockYCbCr");
                 return C2_CORRUPTED;
