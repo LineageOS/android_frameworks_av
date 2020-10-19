@@ -65,7 +65,9 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         result = getStreamInternal()->read(mDistributionBuffer.get(),
                 getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
-            ALOGV("%s() read() returned AAUDIO_ERROR_DISCONNECTED, break", __func__);
+            ALOGD("%s() read() returned AAUDIO_ERROR_DISCONNECTED", __func__);
+            // We do not need the returned vector.
+            (void) AAudioServiceEndpointShared::disconnectRegisteredStreams();
             break;
         } else if (result != getFramesPerBurst()) {
             ALOGW("callbackLoop() read %d / %d",
