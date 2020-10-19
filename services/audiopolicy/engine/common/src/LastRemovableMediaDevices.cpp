@@ -69,6 +69,11 @@ device_out_group_t LastRemovableMediaDevices::getDeviceOutGroup(audio_devices_t 
     case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP:
     case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES:
     case AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER:
+    // TODO (b/122931261): remove when preferred device for strategy media will be used instead of
+    //  AUDIO_POLICY_FORCE_NO_BT_A2DP.
+    case AUDIO_DEVICE_OUT_HEARING_AID:
+    case AUDIO_DEVICE_OUT_BLE_HEADSET:
+    case AUDIO_DEVICE_OUT_BLE_SPEAKER:
         return GROUP_BT_A2DP;
     default:
         return GROUP_NONE;
