@@ -538,6 +538,7 @@ status_t AudioTrack::set(
     } else {
         mOffloadInfo = NULL;
         memset(&mOffloadInfoCopy, 0, sizeof(audio_offload_info_t));
+        mOffloadInfoCopy = AUDIO_INFO_INITIALIZER;
     }
 
     mVolume[AUDIO_INTERLEAVE_LEFT] = 1.0f;
