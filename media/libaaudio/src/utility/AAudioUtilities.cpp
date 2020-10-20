@@ -27,7 +27,7 @@
 #include "core/AudioGlobal.h"
 #include <aaudio/AAudioTesting.h>
 #include <math.h>
-#include <system/audio.h>
+#include <system/audio-base.h>
 #include <assert.h>
 
 #include "utility/AAudioUtilities.h"
