@@ -28,7 +28,7 @@
 #include <cutils/properties.h>
 #include <statslog.h>
 #include <sys/timerfd.h>
-#include <system/audio-base.h>
+#include <system/audio.h>
 
 // property to disable audio power use metrics feature, default is enabled
 #define PROP_AUDIO_METRICS_DISABLED "persist.media.audio_metrics.power_usage_disabled"
