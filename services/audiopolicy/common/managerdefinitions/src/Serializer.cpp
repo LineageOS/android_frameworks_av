@@ -253,9 +253,8 @@ template <class T>
 constexpr void (*xmlDeleter)(T* t);
 template <>
 constexpr auto xmlDeleter<xmlDoc> = xmlFreeDoc;
-// http://b/111067277 - Add back constexpr when we switch to C++17.
 template <>
-auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
+constexpr auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
 
 /** @return a unique_ptr with the correct deleter for the libxml2 object. */
 template <class T>
@@ -841,7 +840,9 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
 status_t deserializeAudioPolicyFile(const char *fileName, AudioPolicyConfig *config)
 {
     PolicySerializer serializer;
-    return serializer.deserialize(fileName, config);
+    status_t status = serializer.deserialize(fileName, config);
+    if (status != OK) config->clear();
+    return status;
 }
 
 } // namespace android
