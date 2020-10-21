@@ -22,6 +22,13 @@
 // Define AUDIO_ARRAYS_STATIC_CHECK to check all audio arrays are correct
 #define AUDIO_ARRAYS_STATIC_CHECK 1
 
+#define VALUE_OR_FATAL(result) \
+    ({ auto _tmp = (result); \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(), \
+                           "Failed result (%d)", \
+                           _tmp.error()); \
+       _tmp.value(); })
+
 #include "Configuration.h"
 #include <dirent.h>
 #include <math.h>
@@ -68,6 +75,7 @@
 #include <powermanager/PowerManager.h>
 
 #include <media/IMediaLogService.h>
+#include <media/AidlConversion.h>
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
 #include <mediautils/BatteryNotifier.h>
@@ -1774,7 +1782,7 @@ status_t AudioFlinger::getRenderPosition(uint32_t *halFrames, uint32_t *dspFrame
     return BAD_VALUE;
 }
 
-void AudioFlinger::registerClient(const sp<IAudioFlingerClient>& client)
+void AudioFlinger::registerClient(const sp<media::IAudioFlingerClient>& client)
 {
     Mutex::Autolock _l(mLock);
     if (client == 0) {
@@ -1849,13 +1857,18 @@ void AudioFlinger::removeNotificationClient(pid_t pid)
 
 void AudioFlinger::ioConfigChanged(audio_io_config_event event,
                                    const sp<AudioIoDescriptor>& ioDesc,
-                                   pid_t pid)
-{
+                                   pid_t pid) {
+    media::AudioIoDescriptor descAidl = VALUE_OR_FATAL(
+            legacy2aidl_AudioIoDescriptor_AudioIoDescriptor(ioDesc));
+    media::AudioIoConfigEvent eventAidl = VALUE_OR_FATAL(
+            legacy2aidl_audio_io_config_event_AudioIoConfigEvent(event));
+
     Mutex::Autolock _l(mClientLock);
     size_t size = mNotificationClients.size();
     for (size_t i = 0; i < size; i++) {
         if ((pid == 0) || (mNotificationClients.keyAt(i) == pid)) {
-            mNotificationClients.valueAt(i)->audioFlingerClient()->ioConfigChanged(event, ioDesc);
+            mNotificationClients.valueAt(i)->audioFlingerClient()->ioConfigChanged(eventAidl,
+                                                                                   descAidl);
         }
     }
 }
@@ -1929,7 +1942,7 @@ sp<MemoryDealer> AudioFlinger::Client::heap() const
 // ----------------------------------------------------------------------------
 
 AudioFlinger::NotificationClient::NotificationClient(const sp<AudioFlinger>& audioFlinger,
-                                                     const sp<IAudioFlingerClient>& client,
+                                                     const sp<media::IAudioFlingerClient>& client,
                                                      pid_t pid,
                                                      uid_t uid)
     : mAudioFlinger(audioFlinger), mPid(pid), mUid(uid), mAudioFlingerClient(client)
