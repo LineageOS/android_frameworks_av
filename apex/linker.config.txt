@@ -1,7 +1,0 @@
-# Extra linker configurations for media APEX
-# See https://android.googlesource.com/platform/system/linkerconfig/+/master/README.md#apex_etc_linker_config_txt
-
-[properties]
-
-# Set media APEX as force visible so media APEX namespace is accessible via android_get_exported_namespace
-visible = true
