@@ -18,7 +18,6 @@
 #define LOG_TAG "mediaserver"
 //#define LOG_NDEBUG 0
 
-#include <aicu/AIcu.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
@@ -39,7 +38,6 @@ int main(int argc __unused, char **argv __unused)
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm(defaultServiceManager());
     ALOGI("ServiceManager: %p", sm.get());
-    AIcu_initializeIcuOrDie();
     MediaPlayerService::instantiate();
     ResourceManagerService::instantiate();
     registerExtensions();
