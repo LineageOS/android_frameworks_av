@@ -44,10 +44,10 @@ public:
     aaudio_result_t release_l() override;
     void close_l() override;
 
-    aaudio_result_t requestStart() override;
-    aaudio_result_t requestPause() override;
-    aaudio_result_t requestFlush() override;
-    aaudio_result_t requestStop() override;
+    aaudio_result_t requestStart_l() override;
+    aaudio_result_t requestPause_l() override;
+    aaudio_result_t requestFlush_l() override;
+    aaudio_result_t requestStop_l() override;
 
     bool isFlushSupported() const override {
         // Only implement FLUSH for OUTPUT streams.

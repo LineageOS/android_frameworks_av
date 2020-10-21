@@ -88,23 +88,30 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
 }
 
 void AAudioServiceEndpointShared::close() {
-    getStreamInternal()->releaseCloseFinal();
+    stopSharingThread();
+    getStreamInternal()->safeReleaseClose();
 }
 
 // Glue between C and C++ callbacks.
 static void *aaudio_endpoint_thread_proc(void *arg) {
     assert(arg != nullptr);
+    ALOGD("%s() called", __func__);
 
-    // The caller passed in a smart pointer to prevent the endpoint from getting deleted
-    // while the thread was launching.
-    sp<AAudioServiceEndpointShared> *endpointForThread =
-            static_cast<sp<AAudioServiceEndpointShared> *>(arg);
-    sp<AAudioServiceEndpointShared> endpoint = *endpointForThread;
-    delete endpointForThread; // Just use scoped smart pointer. Don't need this anymore.
+    // Prevent the stream from being deleted while being used.
+    // This is just for extra safety. It is probably not needed because
+    // this callback should be joined before the stream is closed.
+    AAudioServiceEndpointShared *endpointPtr =
+        static_cast<AAudioServiceEndpointShared *>(arg);
+    android::sp<AAudioServiceEndpointShared> endpoint(endpointPtr);
+    // Balance the incStrong() in startSharingThread_l().
+    endpoint->decStrong(nullptr);
+
     void *result = endpoint->callbackLoop();
     // Close now so that the HW resource is freed and we can open a new device.
     if (!endpoint->isConnected()) {
-        endpoint->close();
+        ALOGD("%s() call safeReleaseCloseFromCallback()", __func__);
+        // Release and close under a lock with no check for callback collisions.
+        endpoint->getStreamInternal()->safeReleaseCloseFromCallback();
     }
 
     return result;
@@ -116,14 +123,14 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
                           * AAUDIO_NANOS_PER_SECOND
                           / getSampleRate();
     mCallbackEnabled.store(true);
-    // Pass a smart pointer so the thread can hold a reference.
-    sp<AAudioServiceEndpointShared> *endpointForThread = new sp<AAudioServiceEndpointShared>(this);
-    aaudio_result_t result = getStreamInternal()->createThread(periodNanos,
-                                                               aaudio_endpoint_thread_proc,
-                                                               endpointForThread);
+    // Prevent this object from getting deleted before the thread has a chance to create
+    // its strong pointer. Assume the thread will call decStrong().
+    this->incStrong(nullptr);
+    aaudio_result_t result = getStreamInternal()->createThread_l(periodNanos,
+                                                                 aaudio_endpoint_thread_proc,
+                                                                 this);
     if (result != AAUDIO_OK) {
-        // The thread can't delete it so we have to do it here.
-        delete endpointForThread;
+        this->decStrong(nullptr); // Because the thread won't do it.
     }
     return result;
 }
@@ -141,13 +148,13 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
     {
         std::lock_guard<std::mutex> lock(mLockStreams);
         if (++mRunningStreamCount == 1) { // atomic
-            result = getStreamInternal()->requestStart();
+            result = getStreamInternal()->requestStart_l();
             if (result != AAUDIO_OK) {
                 --mRunningStreamCount;
             } else {
                 result = startSharingThread_l();
                 if (result != AAUDIO_OK) {
-                    getStreamInternal()->requestStop();
+                    getStreamInternal()->requestStop_l();
                     --mRunningStreamCount;
                 }
             }
@@ -161,7 +168,7 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
         if (result != AAUDIO_OK) {
             if (--mRunningStreamCount == 0) { // atomic
                 stopSharingThread();
-                getStreamInternal()->requestStop();
+                getStreamInternal()->requestStop_l();
             }
         }
     }
@@ -176,7 +183,7 @@ aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBa
 
     if (--mRunningStreamCount == 0) { // atomic
         stopSharingThread(); // the sharing thread locks mLockStreams
-        getStreamInternal()->requestStop();
+        getStreamInternal()->requestStop_l();
     }
     return AAUDIO_OK;
 }

@@ -226,7 +226,7 @@ void AudioStreamLegacy::onAudioDeviceUpdate(audio_io_handle_t /* audioIo */,
             ALOGD("%s() request DISCONNECT in data callback, device %d => %d",
                   __func__, (int) getDeviceId(), (int) deviceId);
             // If the stream is stopped before the data callback has a chance to handle the
-            // request then the requestStop() and requestPause() methods will handle it after
+            // request then the requestStop_l() and requestPause() methods will handle it after
             // the callback has stopped.
             mRequestDisconnect.request();
         } else {
