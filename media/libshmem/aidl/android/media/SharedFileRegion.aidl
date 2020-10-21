@@ -20,13 +20,15 @@ package android.media;
  * A shared file region.
  *
  * This type contains the required information to share a region of a file between processes over
- * AIDL. An invalid (null) region may be represented using a negative file descriptor.
+ * AIDL.
+ * An instance of this type represents a valid FD. For representing a null SharedFileRegion, use a
+ * @nullable SharedFileRegion.
  * Primarily, this is intended for shared memory blocks.
  *
  * @hide
  */
 parcelable SharedFileRegion {
-    /** File descriptor of the region. */
+    /** File descriptor of the region. Must be valid. */
     ParcelFileDescriptor fd;
     /** Offset, in bytes within the file of the start of the region. Must be non-negative. */
     long offset;
