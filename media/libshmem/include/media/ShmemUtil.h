@@ -25,7 +25,6 @@ namespace media {
 
 /**
  * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
- * A null SharedFileRegion (having a negative FD) is considered valid.
  */
 bool validateSharedFileRegion(const SharedFileRegion& shmem);
 
