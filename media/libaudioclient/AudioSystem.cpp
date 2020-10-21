@@ -23,6 +23,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/ProcessState.h>
 #include <binder/IPCThreadState.h>
+#include <media/AidlConversion.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/IAudioFlinger.h>
@@ -32,9 +33,16 @@
 
 #include <system/audio.h>
 
+#define VALUE_OR_RETURN(x) \
+    ({ auto _tmp = (x); \
+       if (!_tmp.ok()) return Status::fromStatusT(_tmp.error()); \
+       _tmp.value(); })
+
 // ----------------------------------------------------------------------------
 
 namespace android {
+
+using binder::Status;
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
@@ -521,11 +529,17 @@ void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused
     ALOGW("AudioFlinger server died!");
 }
 
-void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event event,
-                                                      const sp<AudioIoDescriptor>& ioDesc) {
+Status AudioSystem::AudioFlingerClient::ioConfigChanged(
+        media::AudioIoConfigEvent _event,
+        const media::AudioIoDescriptor& _ioDesc) {
+    audio_io_config_event event = VALUE_OR_RETURN(
+            aidl2legacy_AudioIoConfigEvent_audio_io_config_event(_event));
+    sp<AudioIoDescriptor> ioDesc(
+            VALUE_OR_RETURN(aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(_ioDesc)));
+
     ALOGV("ioConfigChanged() event %d", event);
 
-    if (ioDesc == 0 || ioDesc->mIoHandle == AUDIO_IO_HANDLE_NONE) return;
+    if (ioDesc->mIoHandle == AUDIO_IO_HANDLE_NONE) return Status::ok();
 
     audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
     std::vector<sp<AudioDeviceCallback>> callbacksToCall;
@@ -640,6 +654,8 @@ void AudioSystem::AudioFlingerClient::ioConfigChanged(audio_io_config_event even
         // If callbacksToCall is not empty, it implies ioDesc->mIoHandle and deviceId are valid
         cb->onAudioDeviceUpdate(ioDesc->mIoHandle, deviceId);
     }
+
+    return Status::ok();
 }
 
 status_t AudioSystem::AudioFlingerClient::getInputBufferSize(
