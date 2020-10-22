@@ -19,6 +19,11 @@ namespace android {
 namespace media {
 
 bool validateSharedFileRegion(const SharedFileRegion& shmem) {
+    // FD must be valid.
+    if (shmem.fd.get() < 0) {
+        return false;
+    }
+
     // Size and offset must be non-negative.
     if (shmem.size < 0 || shmem.offset < 0) {
         return false;

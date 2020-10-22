@@ -14,19 +14,13 @@
  * limitations under the License.
  */
 
-#pragma once
+package android.media;
 
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
+import android.media.AudioSessionType;
 
 /**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
+ * {@hide}
  */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+parcelable AudioPortConfigSessionExt {
+    AudioSessionType session;
+}

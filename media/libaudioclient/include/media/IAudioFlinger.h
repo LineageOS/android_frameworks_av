@@ -29,7 +29,6 @@
 #include <media/AudioClient.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/IAudioTrack.h>
-#include <media/IAudioFlingerClient.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
@@ -39,6 +38,7 @@
 #include <vector>
 
 #include "android/media/IAudioRecord.h"
+#include "android/media/IAudioFlingerClient.h"
 #include "android/media/IAudioTrackCallback.h"
 #include "android/media/IEffect.h"
 #include "android/media/IEffectClient.h"
@@ -420,7 +420,7 @@ public:
     // Register an object to receive audio input/output change and track notifications.
     // For a given calling pid, AudioFlinger disregards any registrations after the first.
     // Thus the IAudioFlingerClient must be a singleton per process.
-    virtual void registerClient(const sp<IAudioFlingerClient>& client) = 0;
+    virtual void registerClient(const sp<media::IAudioFlingerClient>& client) = 0;
 
     // retrieve the audio recording buffer size in bytes
     // FIXME This API assumes a route, and so should be deprecated.

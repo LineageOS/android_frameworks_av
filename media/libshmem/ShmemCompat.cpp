@@ -24,13 +24,10 @@ namespace media {
 
 bool convertSharedFileRegionToIMemory(const SharedFileRegion& shmem,
                                       sp<IMemory>* result) {
+    assert(result != nullptr);
+
     if (!validateSharedFileRegion(shmem)) {
         return false;
-    }
-
-    if (shmem.fd.get() < 0) {
-        *result = nullptr;
-        return true;
     }
 
     // Heap offset and size must be page aligned.
@@ -62,16 +59,19 @@ bool convertSharedFileRegionToIMemory(const SharedFileRegion& shmem,
 
 bool convertIMemoryToSharedFileRegion(const sp<IMemory>& mem,
                                       SharedFileRegion* result) {
+    assert(mem != nullptr);
+    assert(result != nullptr);
+
     *result = SharedFileRegion();
-    if (mem == nullptr) {
-        return true;
-    }
 
     ssize_t offset;
     size_t size;
 
     sp<IMemoryHeap> heap = mem->getMemory(&offset, &size);
-    if (heap != nullptr) {
+    if (size > 0) {
+        if (heap == nullptr) {
+            return false;
+        }
         // Make sure the offset and size do not overflow from int64 boundaries.
         if (size > std::numeric_limits<int64_t>::max() ||
                 offset > std::numeric_limits<int64_t>::max() ||
@@ -90,8 +90,32 @@ bool convertIMemoryToSharedFileRegion(const sp<IMemory>& mem,
         result->size = size;
         result->offset = heap->getOffset() + offset;
     }
-
     return true;
+}
+
+bool convertNullableSharedFileRegionToIMemory(const std::optional<SharedFileRegion>& shmem,
+                                              sp<IMemory>* result) {
+    assert(result != nullptr);
+
+    if (!shmem.has_value()) {
+        result->clear();
+        return true;
+    }
+
+    return convertSharedFileRegionToIMemory(shmem.value(), result);
+}
+
+bool convertNullableIMemoryToSharedFileRegion(const sp<IMemory>& mem,
+                                              std::optional<SharedFileRegion>* result) {
+    assert(result != nullptr);
+
+    if (mem == nullptr) {
+        result->reset();
+        return true;
+    }
+
+    result->emplace();
+    return convertIMemoryToSharedFileRegion(mem, &result->value());
 }
 
 }  // namespace media

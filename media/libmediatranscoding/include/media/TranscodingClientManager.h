@@ -109,7 +109,7 @@ private:
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
     std::shared_ptr<ControllerClientInterface> mSessionController;
-    uid_t mMediaProviderUid;
+    std::unordered_set<uid_t> mMediaProviderUid;
 
     static std::atomic<ClientIdType> sCookieCounter;
     static std::mutex sCookie2ClientLock;

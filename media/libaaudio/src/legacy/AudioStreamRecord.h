@@ -41,8 +41,8 @@ public:
     aaudio_result_t release_l() override;
     void close_l() override;
 
-    aaudio_result_t requestStart() override;
-    aaudio_result_t requestStop() override;
+    aaudio_result_t requestStart_l() override;
+    aaudio_result_t requestStop_l() override;
 
     virtual aaudio_result_t getTimestamp(clockid_t clockId,
                                          int64_t *framePosition,

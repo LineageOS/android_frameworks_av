@@ -14,19 +14,23 @@
  * limitations under the License.
  */
 
-#pragma once
-
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
+package android.media;
 
 /**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
+ * {@hide}
  */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+parcelable AudioPortConfigDeviceExt {
+    /**
+     * Module the device is attached to.
+     * Interpreted as audio_module_handle_t.
+     */
+    int hwModule;
+    /**
+     * Device type (e.g AUDIO_DEVICE_OUT_SPEAKER).
+     * Interpreted as audio_devices_t.
+     * TODO: Convert to a standalone AIDL representation.
+     */
+    int type;
+    /** Device address. "" if N/A. */
+    @utf8InCpp String address;
+}
