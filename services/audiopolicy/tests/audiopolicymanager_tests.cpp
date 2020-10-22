@@ -1184,6 +1184,34 @@ TEST_F(AudioPolicyManagerTestDeviceConnection, Dump) {
     dumpToLog();
 }
 
+TEST_F(AudioPolicyManagerTestDeviceConnection, RoutingUpdate) {
+    mClient->resetRoutingUpdatedCounter();
+    // Connecting a valid output device with valid parameters should trigger a routing update
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            "a", "b", AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(1, mClient->getRoutingUpdatedCounter());
+
+    // Disconnecting a connected device should succeed and trigger a routing update
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "a", "b", AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(2, mClient->getRoutingUpdatedCounter());
+
+    // Disconnecting a disconnected device should fail and not trigger a routing update
+    ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "a", "b",  AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(2, mClient->getRoutingUpdatedCounter());
+
+    // Changing force use should trigger an update
+    auto config = mManager->getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA);
+    auto newConfig = config == AUDIO_POLICY_FORCE_BT_A2DP ?
+            AUDIO_POLICY_FORCE_NONE : AUDIO_POLICY_FORCE_BT_A2DP;
+    mManager->setForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA, newConfig);
+    ASSERT_EQ(3, mClient->getRoutingUpdatedCounter());
+}
+
 TEST_P(AudioPolicyManagerTestDeviceConnection, SetDeviceConnectionState) {
     const audio_devices_t type = std::get<0>(GetParam());
     const std::string name = std::get<1>(GetParam());

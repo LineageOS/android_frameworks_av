@@ -65,6 +65,7 @@ typedef void (*record_config_callback)(int event,
                                        std::vector<effect_descriptor_t> effects,
                                        audio_patch_handle_t patchHandle,
                                        audio_source_t source);
+typedef void (*routing_callback)();
 
 class IAudioFlinger;
 class IAudioPolicyService;
@@ -138,6 +139,7 @@ public:
 
     static void setDynPolicyCallback(dynamic_policy_callback cb);
     static void setRecordConfigCallback(record_config_callback);
+    static void setRoutingCallback(routing_callback cb);
 
     // helper function to obtain AudioFlinger service handle
     static const sp<IAudioFlinger> get_audio_flinger();
@@ -630,6 +632,7 @@ private:
                 const std::vector<media::EffectDescriptor>& effects,
                 int32_t patchHandle,
                 media::AudioSourceType source) override;
+        binder::Status onRoutingUpdated();
 
     private:
         Mutex                               mLock;
@@ -656,6 +659,7 @@ private:
     static std::set<audio_error_callback> gAudioErrorCallbacks;
     static dynamic_policy_callback gDynPolicyCallback;
     static record_config_callback gRecordConfigCallback;
+    static routing_callback gRoutingCallback;
 
     static size_t gInBuffSize;
     // previous parameters for recording buffer size queries
