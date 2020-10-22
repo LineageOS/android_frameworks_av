@@ -14,19 +14,17 @@
  * limitations under the License.
  */
 
-#pragma once
-
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
+package android.media;
 
 /**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
+ * {@hide}
  */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+// TODO(b/150948558): This should be a union. In the meantime, we require
+// that exactly one of the below arrays has a single element and the rest
+// are empty.
+parcelable AudioIoFlags {
+    /** Bitmask indexed by AudioInputFlags. */
+    int[] input;
+    /** Bitmask indexed by AudioOutputFlags. */
+    int[] output;
+}

@@ -13,20 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package android.media;
 
-#pragma once
-
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
-
-/**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
- */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+@Backing(type="int")
+enum AudioStreamType {
+    DEFAULT = -1,
+    VOICE_CALL = 0,
+    SYSTEM = 1,
+    RING = 2,
+    MUSIC = 3,
+    ALARM = 4,
+    NOTIFICATION = 5,
+    BLUETOOTH_SCO = 6,
+    ENFORCED_AUDIBLE = 7,
+    DTMF = 8,
+    TTS = 9,
+    ACCESSIBILITY = 10,
+    ASSISTANT = 11,
+    /** For dynamic policy output mixes. Only used by the audio policy */
+    REROUTING = 12,
+    /** For audio flinger tracks volume. Only used by the audioflinger */
+    PATCH = 13,
+    /** stream for corresponding to AUDIO_USAGE_CALL_ASSISTANT */
+    CALL_ASSISTANT = 14,
+}

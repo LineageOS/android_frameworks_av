@@ -185,7 +185,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         // Did we get a valid track?
         status_t status = mAudioRecord->initCheck();
         if (status != OK) {
-            releaseCloseFinal();
+            safeReleaseClose();
             ALOGE("open(), initCheck() returned %d", status);
             return AAudioConvert_androidToAAudioResult(status);
         }
@@ -341,7 +341,7 @@ void AudioStreamRecord::processCallback(int event, void *info) {
     return;
 }
 
-aaudio_result_t AudioStreamRecord::requestStart()
+aaudio_result_t AudioStreamRecord::requestStart_l()
 {
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
@@ -365,7 +365,7 @@ aaudio_result_t AudioStreamRecord::requestStart()
     return AAUDIO_OK;
 }
 
-aaudio_result_t AudioStreamRecord::requestStop() {
+aaudio_result_t AudioStreamRecord::requestStop_l() {
     if (mAudioRecord.get() == nullptr) {
         return AAUDIO_ERROR_INVALID_STATE;
     }

@@ -37,6 +37,8 @@ class AAudioServiceEndpointShared : public AAudioServiceEndpoint {
 public:
     explicit AAudioServiceEndpointShared(AudioStreamInternal *streamInternal);
 
+    virtual ~AAudioServiceEndpointShared() = default;
+
     std::string dump() const override;
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
@@ -55,11 +57,11 @@ public:
 
     virtual void   *callbackLoop() = 0;
 
-protected:
-
     AudioStreamInternal *getStreamInternal() const {
         return mStreamInternal.get();
     };
+
+protected:
 
     aaudio_result_t          startSharingThread_l();
 

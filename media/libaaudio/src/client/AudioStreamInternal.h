@@ -44,9 +44,9 @@ public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
     virtual ~AudioStreamInternal();
 
-    aaudio_result_t requestStart() override;
+    aaudio_result_t requestStart_l() override;
 
-    aaudio_result_t requestStop() override;
+    aaudio_result_t requestStop_l() override;
 
     aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
@@ -117,7 +117,9 @@ protected:
 
     aaudio_result_t processCommands();
 
-    aaudio_result_t stopCallback();
+    aaudio_result_t stopCallback_l();
+
+    aaudio_result_t joinThread_l(void** returnArg);
 
     virtual void prepareBuffersForStart() {}
 

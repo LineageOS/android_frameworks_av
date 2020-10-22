@@ -373,7 +373,7 @@ public:
         return reply.readString8();
     }
 
-    virtual void registerClient(const sp<IAudioFlingerClient>& client)
+    virtual void registerClient(const sp<media::IAudioFlingerClient>& client)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
@@ -1213,7 +1213,7 @@ status_t BnAudioFlinger::onTransact(
 
         case REGISTER_CLIENT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            sp<IAudioFlingerClient> client = interface_cast<IAudioFlingerClient>(
+            sp<media::IAudioFlingerClient> client = interface_cast<media::IAudioFlingerClient>(
                     data.readStrongBinder());
             registerClient(client);
             return NO_ERROR;

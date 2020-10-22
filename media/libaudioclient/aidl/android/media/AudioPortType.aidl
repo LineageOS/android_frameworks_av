@@ -13,20 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package android.media;
 
-#pragma once
-
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
-
-/**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
- */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+@Backing(type="int")
+enum AudioPortType {
+    NONE = 0,
+    DEVICE = 1,
+    MIX = 2,
+    SESSION = 3,
+}

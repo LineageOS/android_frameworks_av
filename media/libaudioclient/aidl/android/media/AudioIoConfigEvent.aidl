@@ -14,19 +14,20 @@
  * limitations under the License.
  */
 
-#pragma once
-
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
+package android.media;
 
 /**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
+ * {@hide}
  */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+@Backing(type="int")
+enum AudioIoConfigEvent {
+    OUTPUT_REGISTERED = 0,
+    OUTPUT_OPENED = 1,
+    OUTPUT_CLOSED = 2,
+    OUTPUT_CONFIG_CHANGED = 3,
+    INPUT_REGISTERED = 4,
+    INPUT_OPENED = 5,
+    INPUT_CLOSED = 6,
+    INPUT_CONFIG_CHANGED = 7,
+    CLIENT_STARTED = 8,
+}

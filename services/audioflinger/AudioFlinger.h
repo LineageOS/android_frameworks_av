@@ -33,16 +33,16 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/media/IAudioFlingerClient.h>
 #include <android/media/IAudioTrackCallback.h>
 #include <android/os/BnExternalVibrationController.h>
-#include <android-base/macros.h>
 
+#include <android-base/macros.h>
 #include <cutils/atomic.h>
 #include <cutils/compiler.h>
-#include <cutils/properties.h>
 
+#include <cutils/properties.h>
 #include <media/IAudioFlinger.h>
-#include <media/IAudioFlingerClient.h>
 #include <media/IAudioTrack.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
@@ -177,7 +177,7 @@ public:
     virtual     status_t    setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs);
     virtual     String8     getParameters(audio_io_handle_t ioHandle, const String8& keys) const;
 
-    virtual     void        registerClient(const sp<IAudioFlingerClient>& client);
+    virtual     void        registerClient(const sp<media::IAudioFlingerClient>& client);
 
     virtual     size_t      getInputBufferSize(uint32_t sampleRate, audio_format_t format,
                                                audio_channel_mask_t channelMask) const;
@@ -490,12 +490,12 @@ private:
     class NotificationClient : public IBinder::DeathRecipient {
     public:
                             NotificationClient(const sp<AudioFlinger>& audioFlinger,
-                                                const sp<IAudioFlingerClient>& client,
+                                                const sp<media::IAudioFlingerClient>& client,
                                                 pid_t pid,
                                                 uid_t uid);
         virtual             ~NotificationClient();
 
-                sp<IAudioFlingerClient> audioFlingerClient() const { return mAudioFlingerClient; }
+                sp<media::IAudioFlingerClient> audioFlingerClient() const { return mAudioFlingerClient; }
                 pid_t getPid() const { return mPid; }
                 uid_t getUid() const { return mUid; }
 
@@ -508,7 +508,7 @@ private:
         const sp<AudioFlinger>  mAudioFlinger;
         const pid_t             mPid;
         const uid_t             mUid;
-        const sp<IAudioFlingerClient> mAudioFlingerClient;
+        const sp<media::IAudioFlingerClient> mAudioFlingerClient;
     };
 
     // --- MediaLogNotifier ---

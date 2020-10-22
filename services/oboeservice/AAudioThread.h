@@ -46,7 +46,7 @@ public:
 
     explicit AAudioThread(const char *prefix);
 
-    virtual ~AAudioThread() = default;
+    virtual ~AAudioThread();
 
     /**
      * Start the thread running.
@@ -73,7 +73,7 @@ private:
 
     Runnable    *mRunnable = nullptr;
     bool         mHasThread = false;
-    pthread_t    mThread; // initialized in constructor
+    pthread_t    mThread = {};
 
     static std::atomic<uint32_t> mNextThreadIndex;
     char         mName[16]; // max length for a pthread_name

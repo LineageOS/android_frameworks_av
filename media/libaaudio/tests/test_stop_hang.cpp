@@ -45,7 +45,7 @@ struct AudioEngine {
                 {
                     // Will block if the thread is running.
                     // This mutex is used to close() immediately after the callback returns
-                    // and before the requestStop() is called.
+                    // and before the requestStop_l() is called.
                     std::lock_guard<std::mutex> lock(doneLock);
                     if (done) break;
                 }

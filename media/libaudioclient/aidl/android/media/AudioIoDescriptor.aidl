@@ -14,19 +14,29 @@
  * limitations under the License.
  */
 
-#pragma once
+package android.media;
 
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
+import android.media.AudioPatch;
+import android.media.audio.common.AudioFormat;
 
 /**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
+ * {@hide}
  */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+parcelable AudioIoDescriptor {
+    /** Interpreted as audio_io_handle_t. */
+    int ioHandle;
+    AudioPatch patch;
+    int samplingRate;
+    AudioFormat format;
+    /** Interpreted as audio_channel_mask_t. */
+    int channelMask;
+    long frameCount;
+    long frameCountHAL;
+    /** Only valid for output. */
+    int latency;
+    /**
+     * Interpreted as audio_port_handle_t.
+     * valid for event AUDIO_CLIENT_STARTED.
+     */
+    int portId;
+}

@@ -19,12 +19,12 @@
 
 #include <sys/types.h>
 
+#include <android/media/BnAudioFlingerClient.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
-#include <media/IAudioFlingerClient.h>
 #include <media/IAudioPolicyServiceClient.h>
 #include <media/MicrophoneInfo.h>
 #include <set>
@@ -531,7 +531,7 @@ public:
 
 private:
 
-    class AudioFlingerClient: public IBinder::DeathRecipient, public BnAudioFlingerClient
+    class AudioFlingerClient: public IBinder::DeathRecipient, public media::BnAudioFlingerClient
     {
     public:
         AudioFlingerClient() :
@@ -551,9 +551,9 @@ private:
 
         // indicate a change in the configuration of an output or input: keeps the cached
         // values for output/input parameters up-to-date in client process
-        virtual void ioConfigChanged(audio_io_config_event event,
-                                     const sp<AudioIoDescriptor>& ioDesc);
-
+        binder::Status ioConfigChanged(
+                media::AudioIoConfigEvent event,
+                const media::AudioIoDescriptor& ioDesc) override;
 
         status_t addAudioDeviceCallback(const wp<AudioDeviceCallback>& callback,
                                                audio_io_handle_t audioIo,

@@ -14,19 +14,24 @@
  * limitations under the License.
  */
 
-#pragma once
+package android.media;
 
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
+import android.media.AudioPortConfigDeviceExt;
+import android.media.AudioPortConfigMixExt;
+import android.media.AudioPortConfigSessionExt;
 
 /**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
+ * {@hide}
  */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
+parcelable AudioPortConfigExt {
+    // TODO(b/150948558): This should be a union. In the meantime, we require
+    // that exactly one of the below arrays has a single element and the rest
+    // are empty.
 
-}  // namespace media
-}  // namespace android
+    /** Device specific info. */
+    AudioPortConfigDeviceExt[] device;
+    /** Mix specific info. */
+    AudioPortConfigMixExt[] mix;
+    /** Session specific info. */
+    AudioPortConfigSessionExt[] session;
+}

@@ -31,7 +31,10 @@ namespace android {
 
 static_assert(sizeof(ClientIdType) == sizeof(void*), "ClientIdType should be pointer-sized");
 
-static constexpr const char* MEDIA_PROVIDER_PKG_NAME = "com.google.android.providers.media.module";
+static constexpr const char* MEDIA_PROVIDER_PKG_NAMES[] = {
+        "com.android.providers.media.module",
+        "com.google.android.providers.media.module",
+};
 
 using ::aidl::android::media::BnTranscodingClient;
 using ::aidl::android::media::IMediaTranscodingService;  // For service error codes
@@ -261,16 +264,16 @@ void TranscodingClientManager::BinderDiedCallback(void* cookie) {
 TranscodingClientManager::TranscodingClientManager(
         const std::shared_ptr<ControllerClientInterface>& controller)
       : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
-        mSessionController(controller),
-        mMediaProviderUid(-1) {
+        mSessionController(controller) {
     ALOGD("TranscodingClientManager started");
     uid_t mpuid;
-    if (TranscodingUidPolicy::getUidForPackage(String16(MEDIA_PROVIDER_PKG_NAME), mpuid) ==
-        NO_ERROR) {
-        ALOGI("Found MediaProvider uid: %d", mpuid);
-        mMediaProviderUid = mpuid;
-    } else {
-        ALOGW("Couldn't get uid for MediaProvider.");
+    for (const char* pkgName : MEDIA_PROVIDER_PKG_NAMES) {
+        if (TranscodingUidPolicy::getUidForPackage(String16(pkgName), mpuid) == NO_ERROR) {
+            ALOGI("Found %s's uid: %d", pkgName, mpuid);
+            mMediaProviderUid.insert(mpuid);
+        } else {
+            ALOGW("Couldn't get uid for %s.", pkgName);
+        }
     }
 }
 
@@ -303,7 +306,7 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
 }
 
 bool TranscodingClientManager::isTrustedCallingUid(uid_t uid) {
-    if (uid > 0 && uid == mMediaProviderUid) {
+    if (uid > 0 && mMediaProviderUid.count(uid) > 0) {
         return true;
     }
 

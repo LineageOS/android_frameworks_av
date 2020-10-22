@@ -13,20 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package android.media;
 
-#pragma once
-
-// This module contains utilities for working with android.os.SharedFileRegion.
-
-#include "android/media/SharedFileRegion.h"
-
-namespace android {
-namespace media {
-
-/**
- * Checks whether a SharedFileRegion instance is valid (all the fields have sane values).
- */
-bool validateSharedFileRegion(const SharedFileRegion& shmem);
-
-}  // namespace media
-}  // namespace android
+@Backing(type="int")
+enum AudioSourceType {
+    DEFAULT = 0,
+    MIC = 1,
+    VOICE_UPLINK = 2,
+    VOICE_DOWNLINK = 3,
+    VOICE_CALL = 4,
+    CAMCORDER = 5,
+    VOICE_RECOGNITION = 6,
+    VOICE_COMMUNICATION = 7,
+    REMOTE_SUBMIX = 8,
+    UNPROCESSED = 9,
+    VOICE_PERFORMANCE = 10,
+    ECHO_REFERENCE = 1997,
+    FM_TUNER = 1998,
+    /**
+     * A low-priority, preemptible audio source for for background software
+     * hotword detection. Same tuning as VOICE_RECOGNITION.
+     * Used only internally by the framework.
+     */
+    HOTWORD = 1999,
+}
