@@ -37,6 +37,7 @@ void idctcol0(int16 *)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctrow1(int16 *blk, uint8 *pred, uint8 *dst, int width)
 {
     /* shortcut */
@@ -156,6 +157,7 @@ void idctrow2(int16 *blk, uint8 *pred, uint8 *dst, int width)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctcol2(int16 *blk)
 {
     int32 x0, x1, x3, x5, x7;//, x8;
@@ -256,6 +258,7 @@ void idctrow3(int16 *blk, uint8 *pred, uint8 *dst, int width)
     return ;
 }
 
+__attribute__((no_sanitize("signed-integer-overflow")))
 void idctcol3(int16 *blk)
 {
     int32 x0, x1, x2, x3, x4, x5, x6, x7, x8;
