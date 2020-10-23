@@ -18,7 +18,6 @@
 #define LOG_TAG "MediaTranscoder"
 
 #include <android-base/logging.h>
-#include <binder/Parcel.h>
 #include <fcntl.h>
 #include <media/MediaSampleReaderNDK.h>
 #include <media/MediaSampleWriter.h>
@@ -160,7 +159,7 @@ MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callb
 
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         const std::shared_ptr<CallbackInterface>& callbacks,
-        const std::shared_ptr<const Parcel>& pausedState) {
+        const std::shared_ptr<ndk::ScopedAParcel>& pausedState) {
     if (pausedState != nullptr) {
         LOG(INFO) << "Initializing from paused state.";
     }
@@ -325,9 +324,9 @@ media_status_t MediaTranscoder::start() {
     return AMEDIA_OK;
 }
 
-media_status_t MediaTranscoder::pause(std::shared_ptr<const Parcel>* pausedState) {
+media_status_t MediaTranscoder::pause(std::shared_ptr<ndk::ScopedAParcel>* pausedState) {
     // TODO: write internal states to parcel.
-    *pausedState = std::make_shared<Parcel>();
+    *pausedState = std::shared_ptr<::ndk::ScopedAParcel>(new ::ndk::ScopedAParcel());
     return cancel();
 }
 

@@ -34,8 +34,7 @@ cc_defaults {
         "libmediandk",
         "libnativewindow",
         "libutils",
-        // TODO: Use libbinder_ndk
-        "libbinder",
+        "libbinder_ndk",
     ],
 
     export_include_dirs: [
