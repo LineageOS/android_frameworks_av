@@ -66,7 +66,7 @@ private:
     std::mutex mLock;
     std::condition_variable mCondition;
     std::list<Event> mQueue;  // GUARDED_BY(mLock);
-    std::map<SessionKeyType, std::shared_ptr<const Parcel>> mPausedStateMap;
+    std::map<SessionKeyType, std::shared_ptr<ndk::ScopedAParcel>> mPausedStateMap;
     ClientIdType mCurrentClientId;
     SessionIdType mCurrentSessionId;
 
@@ -82,10 +82,10 @@ private:
     media_status_t handleResume(ClientIdType clientId, SessionIdType sessionId,
                                 const TranscodingRequestParcel& request,
                                 const std::shared_ptr<ITranscodingClientCallback>& callback);
-    media_status_t setupTranscoder(ClientIdType clientId, SessionIdType sessionId,
-                                   const TranscodingRequestParcel& request,
-                                   const std::shared_ptr<ITranscodingClientCallback>& callback,
-                                   const std::shared_ptr<const Parcel>& pausedState = nullptr);
+    media_status_t setupTranscoder(
+            ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
+            const std::shared_ptr<ITranscodingClientCallback>& callback,
+            const std::shared_ptr<ndk::ScopedAParcel>& pausedState = nullptr);
 
     void cleanup();
     void reportError(ClientIdType clientId, SessionIdType sessionId, media_status_t err);

@@ -155,7 +155,7 @@ public:
     }
 
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
-                                     const std::shared_ptr<const Parcel>& pausedState
+                                     const std::shared_ptr<ndk::ScopedAParcel>& pausedState
                                              __unused) override {
         ALOGV("%s: session {%lld, %d}", __FUNCTION__, (long long)mClientId, mSessionId);
     }
@@ -189,7 +189,7 @@ void TranscoderWrapper::reportError(ClientIdType clientId, SessionIdType session
             auto it = mPausedStateMap.find(SessionKeyType(clientId, sessionId));
             if (it == mPausedStateMap.end()) {
                 mPausedStateMap.emplace(SessionKeyType(clientId, sessionId),
-                                        std::shared_ptr<const Parcel>());
+                                        new ndk::ScopedAParcel());
             }
 
             callback->onResourceLost();
@@ -316,7 +316,7 @@ void TranscoderWrapper::onProgress(ClientIdType clientId, SessionIdType sessionI
 media_status_t TranscoderWrapper::setupTranscoder(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& clientCb,
-        const std::shared_ptr<const Parcel>& pausedState) {
+        const std::shared_ptr<ndk::ScopedAParcel>& pausedState) {
     if (clientCb == nullptr) {
         ALOGE("client callback is null");
         return AMEDIA_ERROR_INVALID_PARAMETER;
@@ -426,7 +426,7 @@ media_status_t TranscoderWrapper::handlePause(ClientIdType clientId, SessionIdTy
 
     ALOGI("%s: pausing transcoder", __FUNCTION__);
 
-    std::shared_ptr<const Parcel> pauseStates;
+    std::shared_ptr<ndk::ScopedAParcel> pauseStates;
     media_status_t err = mTranscoder->pause(&pauseStates);
     if (err != AMEDIA_OK) {
         ALOGE("%s: failed to pause transcoder: %d", __FUNCTION__, err);
@@ -441,7 +441,7 @@ media_status_t TranscoderWrapper::handlePause(ClientIdType clientId, SessionIdTy
 media_status_t TranscoderWrapper::handleResume(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
-    std::shared_ptr<const Parcel> pausedState;
+    std::shared_ptr<ndk::ScopedAParcel> pausedState;
     auto it = mPausedStateMap.find(SessionKeyType(clientId, sessionId));
     if (it != mPausedStateMap.end()) {
         pausedState = it->second;
