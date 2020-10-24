@@ -82,7 +82,7 @@ public:
     }
 
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
-                                     const std::shared_ptr<const Parcel>& pausedState
+                                     const std::shared_ptr<ndk::ScopedAParcel>& pausedState
                                              __unused) override {}
 
     void waitForTranscodingFinished() {
