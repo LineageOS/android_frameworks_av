@@ -103,6 +103,8 @@ cc_library_shared {
         "-Werror",
         "-Wall",
         "-Wextra",
+        "-Wno-unused-parameter",
+        "-Wno-error",
     ],
 
 }
