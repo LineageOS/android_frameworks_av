@@ -426,6 +426,7 @@ ACameraMetadata::getTags(/*out*/int32_t* numTags,
             camera_metadata_ro_entry_t entry;
             int ret = get_camera_metadata_ro_entry(rawMetadata, i, &entry);
             if (ret != 0) {
+                mData->unlock(rawMetadata);
                 ALOGE("%s: error reading metadata index %zu", __FUNCTION__, i);
                 return ACAMERA_ERROR_UNKNOWN;
             }
