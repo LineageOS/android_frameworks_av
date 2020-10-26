@@ -1,0 +1,33 @@
+cc_fuzz {
+    name: "media_log_fuzzer",
+    static_libs: [
+        "libmedialogservice",
+    ],
+    srcs: [
+        "media_log_fuzzer.cpp",
+    ],
+    header_libs: [
+        "libmedia_headers",
+    ],
+    shared_libs: [
+        "libaudioutils",
+        "libbinder",
+        "liblog",
+        "libmediautils",
+        "libnblog",
+        "libutils",
+    ],
+    include_dirs: [
+        "frameworks/av/services/medialog",
+    ],
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
+}
