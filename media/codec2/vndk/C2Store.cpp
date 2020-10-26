@@ -21,6 +21,7 @@
 #include <C2AllocatorBlob.h>
 #include <C2AllocatorGralloc.h>
 #include <C2AllocatorIon.h>
+#include <C2DmaBufAllocator.h>
 #include <C2BufferPriv.h>
 #include <C2BqBufferPriv.h>
 #include <C2Component.h>
@@ -82,6 +83,7 @@ private:
 
     /// returns a shared-singleton ion allocator
     std::shared_ptr<C2Allocator> fetchIonAllocator();
+    std::shared_ptr<C2Allocator> fetchDmaBufAllocator();
 
     /// returns a shared-singleton gralloc allocator
     std::shared_ptr<C2Allocator> fetchGrallocAllocator();
@@ -99,6 +101,20 @@ private:
 C2PlatformAllocatorStoreImpl::C2PlatformAllocatorStoreImpl() {
 }
 
+static bool using_ion(void) {
+    static int cached_result = -1;
+
+    if (cached_result == -1) {
+        struct stat buffer;
+        cached_result = (stat("/dev/ion", &buffer) == 0);
+        if (cached_result)
+            ALOGD("Using ION\n");
+        else
+            ALOGD("Using DMABUF Heaps\n");
+    }
+    return (cached_result == 1);
+}
+
 c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
         id_t id, std::shared_ptr<C2Allocator> *const allocator) {
     allocator->reset();
@@ -107,8 +123,11 @@ c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
     }
     switch (id) {
     // TODO: should we implement a generic registry for all, and use that?
-    case C2PlatformAllocatorStore::ION:
-        *allocator = fetchIonAllocator();
+    case C2PlatformAllocatorStore::ION: /* also ::DMABUFHEAP */
+        if (using_ion())
+            *allocator = fetchIonAllocator();
+        else
+            *allocator = fetchDmaBufAllocator();
         break;
 
     case C2PlatformAllocatorStore::GRALLOC:
@@ -142,7 +161,9 @@ c2_status_t C2PlatformAllocatorStoreImpl::fetchAllocator(
 namespace {
 
 std::mutex gIonAllocatorMutex;
+std::mutex gDmaBufAllocatorMutex;
 std::weak_ptr<C2AllocatorIon> gIonAllocator;
+std::weak_ptr<C2DmaBufAllocator> gDmaBufAllocator;
 
 void UseComponentStoreForIonAllocator(
         const std::shared_ptr<C2AllocatorIon> allocator,
@@ -197,6 +218,65 @@ void UseComponentStoreForIonAllocator(
     allocator->setUsageMapper(mapper, minUsage, maxUsage, blockSize);
 }
 
+void UseComponentStoreForDmaBufAllocator(const std::shared_ptr<C2DmaBufAllocator> allocator,
+                                         std::shared_ptr<C2ComponentStore> store) {
+    C2DmaBufAllocator::UsageMapperFn mapper;
+    const size_t maxHeapNameLen = 128;
+    uint64_t minUsage = 0;
+    uint64_t maxUsage = C2MemoryUsage(C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE).expected;
+    size_t blockSize = getpagesize();
+
+    // query min and max usage as well as block size via supported values
+    std::unique_ptr<C2StoreDmaBufUsageInfo> usageInfo;
+    usageInfo = C2StoreDmaBufUsageInfo::AllocUnique(maxHeapNameLen);
+
+    std::vector<C2FieldSupportedValuesQuery> query = {
+            C2FieldSupportedValuesQuery::Possible(C2ParamField::Make(*usageInfo, usageInfo->m.usage)),
+            C2FieldSupportedValuesQuery::Possible(
+                    C2ParamField::Make(*usageInfo, usageInfo->m.capacity)),
+    };
+    c2_status_t res = store->querySupportedValues_sm(query);
+    if (res == C2_OK) {
+        if (query[0].status == C2_OK) {
+            const C2FieldSupportedValues& fsv = query[0].values;
+            if (fsv.type == C2FieldSupportedValues::FLAGS && !fsv.values.empty()) {
+                minUsage = fsv.values[0].u64;
+                maxUsage = 0;
+                for (C2Value::Primitive v : fsv.values) {
+                    maxUsage |= v.u64;
+                }
+            }
+        }
+        if (query[1].status == C2_OK) {
+            const C2FieldSupportedValues& fsv = query[1].values;
+            if (fsv.type == C2FieldSupportedValues::RANGE && fsv.range.step.u32 > 0) {
+                blockSize = fsv.range.step.u32;
+            }
+        }
+
+        mapper = [store](C2MemoryUsage usage, size_t capacity, C2String* heapName,
+                         unsigned* flags) -> c2_status_t {
+            if (capacity > UINT32_MAX) {
+                return C2_BAD_VALUE;
+            }
+
+            std::unique_ptr<C2StoreDmaBufUsageInfo> usageInfo;
+            usageInfo = C2StoreDmaBufUsageInfo::AllocUnique(maxHeapNameLen, usage.expected, capacity);
+            std::vector<std::unique_ptr<C2SettingResult>> failures;  // TODO: remove
+
+            c2_status_t res = store->config_sm({&*usageInfo}, &failures);
+            if (res == C2_OK) {
+                *heapName = C2String(usageInfo->m.heapName);
+                *flags = usageInfo->m.allocFlags;
+            }
+
+            return res;
+        };
+    }
+
+    allocator->setUsageMapper(mapper, minUsage, maxUsage, blockSize);
+}
+
 }
 
 void C2PlatformAllocatorStoreImpl::setComponentStore(std::shared_ptr<C2ComponentStore> store) {
@@ -229,6 +309,22 @@ std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchIonAllocator() {
         allocator = std::make_shared<C2AllocatorIon>(C2PlatformAllocatorStore::ION);
         UseComponentStoreForIonAllocator(allocator, componentStore);
         gIonAllocator = allocator;
+    }
+    return allocator;
+}
+
+std::shared_ptr<C2Allocator> C2PlatformAllocatorStoreImpl::fetchDmaBufAllocator() {
+    std::lock_guard<std::mutex> lock(gDmaBufAllocatorMutex);
+    std::shared_ptr<C2DmaBufAllocator> allocator = gDmaBufAllocator.lock();
+    if (allocator == nullptr) {
+        std::shared_ptr<C2ComponentStore> componentStore;
+        {
+            std::lock_guard<std::mutex> lock(_mComponentStoreReadLock);
+            componentStore = _mComponentStore;
+        }
+        allocator = std::make_shared<C2DmaBufAllocator>(C2PlatformAllocatorStore::DMABUFHEAP);
+        UseComponentStoreForDmaBufAllocator(allocator, componentStore);
+        gDmaBufAllocator = allocator;
     }
     return allocator;
 }
@@ -347,7 +443,7 @@ public:
             allocatorId = GetPreferredLinearAllocatorId(GetCodec2PoolMask());
         }
         switch(allocatorId) {
-            case C2PlatformAllocatorStore::ION:
+            case C2PlatformAllocatorStore::ION: /* also ::DMABUFHEAP */
                 res = allocatorStore->fetchAllocator(
                         C2PlatformAllocatorStore::ION, &allocator);
                 if (res == C2_OK) {
@@ -645,6 +741,7 @@ private:
 
     struct Interface : public C2InterfaceHelper {
         std::shared_ptr<C2StoreIonUsageInfo> mIonUsageInfo;
+        std::shared_ptr<C2StoreDmaBufUsageInfo> mDmaBufUsageInfo;
 
         Interface(std::shared_ptr<C2ReflectorHelper> reflector)
             : C2InterfaceHelper(reflector) {
@@ -680,7 +777,13 @@ private:
                     me.set().minAlignment = 0;
 #endif
                     return C2R::Ok();
-                }
+                };
+
+                static C2R setDmaBufUsage(bool /* mayBlock */, C2P<C2StoreDmaBufUsageInfo> &me) {
+                    strncpy(me.set().m.heapName, "system", me.v.flexCount());
+                    me.set().m.allocFlags = 0;
+                    return C2R::Ok();
+                };
             };
 
             addParameter(
@@ -694,6 +797,18 @@ private:
                     C2F(mIonUsageInfo, minAlignment).equalTo(0)
                 })
                 .withSetter(Setter::setIonUsage)
+                .build());
+
+            addParameter(
+                DefineParam(mDmaBufUsageInfo, "dmabuf-usage")
+                .withDefault(C2StoreDmaBufUsageInfo::AllocShared(0))
+                .withFields({
+                    C2F(mDmaBufUsageInfo, m.usage).flags({C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE}),
+                    C2F(mDmaBufUsageInfo, m.capacity).inRange(0, UINT32_MAX, 1024),
+                    C2F(mDmaBufUsageInfo, m.allocFlags).flags({}),
+                    C2F(mDmaBufUsageInfo, m.heapName).any(),
+                })
+                .withSetter(Setter::setDmaBufUsage)
                 .build());
         }
     };
