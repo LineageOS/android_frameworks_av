@@ -254,6 +254,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTunneledMode, // struct
     kParamIndexTunnelHandle, // int32[]
     kParamIndexTunnelSystemTime, // int64
+
+    kParamIndexStoreDmaBufUsage,  // store, struct
 };
 
 }
@@ -2039,6 +2041,33 @@ struct C2StoreIonUsageStruct {
 // store, private
 typedef C2GlobalParam<C2Info, C2StoreIonUsageStruct, kParamIndexStoreIonUsage>
         C2StoreIonUsageInfo;
+
+/**
+ * This structure describes the preferred DMA-Buf allocation parameters for a given memory usage.
+ */
+struct C2StoreDmaBufUsageStruct {
+    inline C2StoreDmaBufUsageStruct() { memset(this, 0, sizeof(*this)); }
+
+    inline C2StoreDmaBufUsageStruct(size_t flexCount, uint64_t usage_, uint32_t capacity_)
+        : usage(usage_), capacity(capacity_), allocFlags(0) {
+        memset(heapName, 0, flexCount);
+    }
+
+    uint64_t usage;                         ///< C2MemoryUsage
+    uint32_t capacity;                      ///< capacity
+    int32_t allocFlags;                     ///< ion allocation flags
+    char heapName[];                        ///< dmabuf heap name
+
+    DEFINE_AND_DESCRIBE_FLEX_C2STRUCT(StoreDmaBufUsage, heapName)
+    C2FIELD(usage, "usage")
+    C2FIELD(capacity, "capacity")
+    C2FIELD(allocFlags, "alloc-flags")
+    C2FIELD(heapName, "heap-name")
+};
+
+// store, private
+typedef C2GlobalParam<C2Info, C2StoreDmaBufUsageStruct, kParamIndexStoreDmaBufUsage>
+        C2StoreDmaBufUsageInfo;
 
 /**
  * Flexible pixel format descriptors
