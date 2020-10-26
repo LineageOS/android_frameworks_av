@@ -4875,7 +4875,7 @@ typedef enum acamera_metadata_tag {
      * rectangle, and cropping to the rectangle given in ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE.</p>
      * <p>E.g. to calculate position of a pixel, (x,y), in a processed YUV output image with the
      * dimensions in ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE given the position of a pixel,
-     * (x', y'), in the raw pixel array with dimensions give in
+     * (x', y'), in the raw pixel array with dimensions given in
      * ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE:</p>
      * <ol>
      * <li>Choose a pixel (x', y') within the active array region of the raw buffer given in
