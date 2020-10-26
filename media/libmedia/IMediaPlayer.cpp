@@ -958,7 +958,7 @@ status_t BnMediaPlayer::onTransact(
         case PREPARE_DRM: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
 
-            uint8_t uuid[16];
+            uint8_t uuid[16] = {};
             data.read(uuid, sizeof(uuid));
             Vector<uint8_t> drmSessionId;
             readVector(data, drmSessionId);
