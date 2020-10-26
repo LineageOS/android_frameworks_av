@@ -336,7 +336,7 @@ Return<AudioGainTraits::Element> AudioGainTraits::deserialize(const xmlNode *cur
 
     std::string mode = getXmlAttribute(cur, Attributes::mode);
     if (!mode.empty()) {
-        gain->setMode(static_cast<audio_gain_mode_t>(GainModeConverter::maskFromString(mode)));
+        gain->setMode(GainModeConverter::maskFromString(mode, " "));
     }
 
     std::string channelsLiteral = getXmlAttribute(cur, Attributes::channelMask);
@@ -500,7 +500,7 @@ Return<DevicePortTraits::Element> DevicePortTraits::deserialize(const xmlNode *c
                 AUDIO_PORT_ROLE_SOURCE : AUDIO_PORT_ROLE_SINK;
 
     audio_devices_t type = AUDIO_DEVICE_NONE;
-    if (!deviceFromString(typeName, type) ||
+    if (!DeviceConverter::fromString(typeName, type) ||
             (!audio_is_input_device(type) && portRole == AUDIO_PORT_ROLE_SOURCE) ||
             (!audio_is_output_devices(type) && portRole == AUDIO_PORT_ROLE_SINK)) {
         ALOGW("%s: bad type %08x", __func__, type);

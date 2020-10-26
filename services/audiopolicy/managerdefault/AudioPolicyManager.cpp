@@ -5611,8 +5611,8 @@ audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stre
     }
     DeviceVector activeDevices;
     DeviceVector devices;
-    for (audio_stream_type_t curStream = AUDIO_STREAM_MIN; curStream < AUDIO_STREAM_PUBLIC_CNT;
-         curStream = (audio_stream_type_t) (curStream + 1)) {
+    for (int i = AUDIO_STREAM_MIN; i < AUDIO_STREAM_PUBLIC_CNT; ++i) {
+        const audio_stream_type_t curStream{static_cast<audio_stream_type_t>(i)};
         if (!streamsMatchForvolume(stream, curStream)) {
             continue;
         }
