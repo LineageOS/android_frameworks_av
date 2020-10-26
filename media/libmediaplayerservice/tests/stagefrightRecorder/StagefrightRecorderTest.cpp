@@ -29,7 +29,7 @@
 #include <MediaPlayerService.h>
 #include <media/NdkMediaExtractor.h>
 #include <media/stagefright/MediaCodec.h>
-#include <system/audio-base.h>
+#include <system/audio.h>
 
 #include "StagefrightRecorder.h"
 
