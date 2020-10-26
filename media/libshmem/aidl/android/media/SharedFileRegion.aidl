@@ -34,4 +34,6 @@ parcelable SharedFileRegion {
     long offset;
     /** Size, in bytes of the memory region. Must be non-negative. */
     long size;
+    /** Whether the region is writeable. */
+    boolean writeable;
 }
