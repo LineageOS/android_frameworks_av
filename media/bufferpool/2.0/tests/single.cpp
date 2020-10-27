@@ -102,6 +102,10 @@ TEST_F(BufferpoolSingleTest, AllocateBuffer) {
   for (int i = 0; i < kNumAllocationTest; ++i) {
     status = mManager->allocate(mConnectionId, vecParams, &allocHandle, &buffer[i]);
     ASSERT_TRUE(status == ResultStatus::OK);
+    if (allocHandle) {
+      native_handle_close(allocHandle);
+      native_handle_delete(allocHandle);
+    }
   }
   for (int i = 0; i < kNumAllocationTest; ++i) {
     for (int j = i + 1; j < kNumAllocationTest; ++j) {
@@ -125,6 +129,10 @@ TEST_F(BufferpoolSingleTest, RecycleBuffer) {
     status = mManager->allocate(mConnectionId, vecParams, &allocHandle, &buffer);
     ASSERT_TRUE(status == ResultStatus::OK);
     bid[i] = buffer->mId;
+    if (allocHandle) {
+      native_handle_close(allocHandle);
+      native_handle_delete(allocHandle);
+    }
   }
   for (int i = 1; i < kNumRecycleTest; ++i) {
     ASSERT_TRUE(bid[i - 1] == bid[i]);
@@ -154,6 +162,15 @@ TEST_F(BufferpoolSingleTest, TransferBuffer) {
                              &recvHandle, &rbuffer);
   EXPECT_TRUE(status == ResultStatus::OK);
   ASSERT_TRUE(TestBufferPoolAllocator::Verify(recvHandle, 0x77));
+
+  if (allocHandle) {
+    native_handle_close(allocHandle);
+    native_handle_delete(allocHandle);
+  }
+  if (recvHandle) {
+    native_handle_close(recvHandle);
+    native_handle_delete(recvHandle);
+  }
 }
 
 }  // anonymous namespace
