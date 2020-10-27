@@ -1905,7 +1905,8 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
             meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
-        } else if (mime == MEDIA_MIMETYPE_VIDEO_AV1) {
+        } else if (mime == MEDIA_MIMETYPE_VIDEO_AV1 ||
+                   mime == MEDIA_MIMETYPE_IMAGE_AVIF) {
             meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
             if (msg->findBuffer("csd-2", &csd2)) {
