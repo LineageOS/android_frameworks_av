@@ -1,0 +1,53 @@
+cc_defaults {
+    name: "libstagefright_fuzzer_defaults",
+    cflags: [
+        "-Wno-multichar",
+        "-Werror",
+        "-Wno-error=deprecated-declarations",
+        "-Wall",
+    ],
+    shared_libs: [
+        "libstagefright",
+	"libstagefright_codecbase",
+        "libutils",
+        "libstagefright_foundation",
+        "libmedia",
+        "libaudioclient",
+        "libmedia_omx",
+        "libgui",
+        "libbinder",
+        "libcutils",
+    ],
+}
+
+cc_fuzz {
+    name: "libstagefright_mediaclock_fuzzer",
+    srcs: [
+        "MediaClockFuzzer.cpp",
+    ],
+    defaults: ["libstagefright_fuzzer_defaults"],
+}
+
+cc_fuzz {
+    name: "libstagefright_mediascanner_fuzzer",
+    srcs: [
+        "StagefrightMediaScannerFuzzer.cpp",
+    ],
+    defaults: ["libstagefright_fuzzer_defaults"],
+}
+
+cc_fuzz {
+    name: "libstagefright_skipcutbuffer_fuzzer",
+    srcs: [
+        "SkipCutBufferFuzzer.cpp",
+    ],
+    defaults: ["libstagefright_fuzzer_defaults"],
+}
+
+cc_fuzz {
+    name: "libstagefright_mediamuxer_fuzzer",
+    srcs: [
+        "MediaMuxerFuzzer.cpp",
+    ],
+    defaults: ["libstagefright_fuzzer_defaults"],
+}
