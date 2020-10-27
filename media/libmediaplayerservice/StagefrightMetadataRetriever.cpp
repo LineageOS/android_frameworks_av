@@ -215,6 +215,10 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         mime = MEDIA_MIMETYPE_VIDEO_HEVC;
         trackMeta = new MetaData(*trackMeta);
         trackMeta->setCString(kKeyMIMEType, mime);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF)) {
+        mime = MEDIA_MIMETYPE_VIDEO_AV1;
+        trackMeta = new MetaData(*trackMeta);
+        trackMeta->setCString(kKeyMIMEType, mime);
     }
 
     bool preferhw = property_get_bool(
