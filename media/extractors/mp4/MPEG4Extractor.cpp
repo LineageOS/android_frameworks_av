@@ -202,8 +202,8 @@ private:
         uint32_t duration;
         int32_t compositionOffset;
         uint8_t iv[16];
-        Vector<size_t> clearsizes;
-        Vector<size_t> encryptedsizes;
+        Vector<uint32_t> clearsizes;
+        Vector<uint32_t> encryptedsizes;
     };
     Vector<Sample> mCurrentSamples;
     std::map<off64_t, uint32_t> mDrmOffsets;
@@ -6504,9 +6504,9 @@ media_status_t MPEG4Source::fragmentedRead(
     if (smpl->encryptedsizes.size()) {
         // store clear/encrypted lengths in metadata
         AMediaFormat_setBuffer(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_PLAIN_SIZES,
-                smpl->clearsizes.array(), smpl->clearsizes.size() * 4);
+                smpl->clearsizes.array(), smpl->clearsizes.size() * sizeof(uint32_t));
         AMediaFormat_setBuffer(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_ENCRYPTED_SIZES,
-                smpl->encryptedsizes.array(), smpl->encryptedsizes.size() * 4);
+                smpl->encryptedsizes.array(), smpl->encryptedsizes.size() * sizeof(uint32_t));
         AMediaFormat_setInt32(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_DEFAULT_IV_SIZE, mDefaultIVSize);
         AMediaFormat_setInt32(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_MODE, mCryptoMode);
         AMediaFormat_setBuffer(bufmeta, AMEDIAFORMAT_KEY_CRYPTO_KEY, mCryptoKey, 16);
