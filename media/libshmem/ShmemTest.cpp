@@ -44,10 +44,11 @@ SharedFileRegion makeInvalidSharedFileRegion(int64_t offset, int64_t size) {
     return shmem;
 }
 
-sp<IMemory> makeIMemory(const std::vector<uint8_t>& content) {
+sp<IMemory> makeIMemory(const std::vector<uint8_t>& content, bool writeable = true) {
     constexpr size_t kOffset = 19;
 
-    sp<MemoryHeapBase> heap = new MemoryHeapBase(content.size());
+    sp<MemoryHeapBase> heap = new MemoryHeapBase(content.size(),
+                                                 !writeable ? IMemoryHeap::READ_ONLY : 0);
     sp<IMemory> result = sp<MemoryBase>::make(heap, kOffset, content.size());
     memcpy(result->unsecurePointer(), content.data(), content.size());
     return result;
@@ -69,9 +70,31 @@ TEST(ShmemTest, Conversion) {
         ASSERT_TRUE(convertIMemoryToSharedFileRegion(imem, &shmem));
         ASSERT_EQ(3, shmem.size);
         ASSERT_GE(shmem.fd.get(), 0);
+        ASSERT_TRUE(shmem.writeable);
         ASSERT_TRUE(convertSharedFileRegionToIMemory(shmem, &reconstructed));
     }
     ASSERT_EQ(3, reconstructed->size());
+    ASSERT_EQ(reconstructed->getMemory()->getFlags() & IMemoryHeap::READ_ONLY,  0);
+    const uint8_t* p =
+            reinterpret_cast<const uint8_t*>(reconstructed->unsecurePointer());
+    EXPECT_EQ(6, p[0]);
+    EXPECT_EQ(5, p[1]);
+    EXPECT_EQ(3, p[2]);
+}
+
+TEST(ShmemTest, ConversionReadOnly) {
+    sp<IMemory> reconstructed;
+    {
+        SharedFileRegion shmem;
+        sp<IMemory> imem = makeIMemory({6, 5, 3}, false);
+        ASSERT_TRUE(convertIMemoryToSharedFileRegion(imem, &shmem));
+        ASSERT_EQ(3, shmem.size);
+        ASSERT_GE(shmem.fd.get(), 0);
+        ASSERT_FALSE(shmem.writeable);
+        ASSERT_TRUE(convertSharedFileRegionToIMemory(shmem, &reconstructed));
+    }
+    ASSERT_EQ(3, reconstructed->size());
+    ASSERT_NE(reconstructed->getMemory()->getFlags() & IMemoryHeap::READ_ONLY,  0);
     const uint8_t* p =
             reinterpret_cast<const uint8_t*>(reconstructed->unsecurePointer());
     EXPECT_EQ(6, p[0]);
