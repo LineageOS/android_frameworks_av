@@ -76,6 +76,7 @@ struct ImageItem {
     size_t size;
     sp<ABuffer> hvcc;
     sp<ABuffer> icc;
+    sp<ABuffer> av1c;
 
     Vector<uint32_t> thumbnails;
     Vector<uint32_t> dimgRefs;
@@ -764,6 +765,39 @@ status_t HvccBox::parse(off64_t offset, size_t size) {
     return OK;
 }
 
+struct Av1cBox : public Box, public ItemProperty {
+    Av1cBox(DataSourceHelper *source) :
+        Box(source, FOURCC("av1C")) {}
+
+    status_t parse(off64_t offset, size_t size) override;
+
+    void attachTo(ImageItem &image) const override {
+        image.av1c = mAv1c;
+    }
+
+private:
+    sp<ABuffer> mAv1c;
+};
+
+status_t Av1cBox::parse(off64_t offset, size_t size) {
+    ALOGV("%s: offset %lld, size %zu", __FUNCTION__, (long long)offset, size);
+
+    mAv1c = new ABuffer(size);
+
+    if (mAv1c->data() == NULL) {
+        ALOGE("b/28471206");
+        return NO_MEMORY;
+    }
+
+    if (source()->readAt(offset, mAv1c->data(), size) < (ssize_t)size) {
+        return ERROR_IO;
+    }
+
+    ALOGV("property av1C");
+
+    return OK;
+}
+
 struct IrotBox : public Box, public ItemProperty {
     IrotBox(DataSourceHelper *source) :
         Box(source, FOURCC("irot")), mAngle(0) {}
@@ -955,6 +989,11 @@ status_t IpcoBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
         case FOURCC("colr"):
         {
             itemProperty = new ColrBox(source());
+            break;
+        }
+        case FOURCC("av1C"):
+        {
+            itemProperty = new Av1cBox(source());
             break;
         }
         default:
@@ -1203,8 +1242,9 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
 
 //////////////////////////////////////////////////////////////////
 
-ItemTable::ItemTable(DataSourceHelper *source)
+ItemTable::ItemTable(DataSourceHelper *source, bool isHeif)
     : mDataSource(source),
+      mIsHeif(isHeif),
       mPrimaryItemId(0),
       mIdatOffset(0),
       mIdatSize(0),
@@ -1363,7 +1403,8 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
         //   'Exif': EXIF metadata
         if (info.itemType != FOURCC("grid") &&
             info.itemType != FOURCC("hvc1") &&
-            info.itemType != FOURCC("Exif")) {
+            info.itemType != FOURCC("Exif") &&
+            info.itemType != FOURCC("av01")) {
             continue;
         }
 
@@ -1509,7 +1550,9 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
     }
 
     AMediaFormat *meta = AMediaFormat_new();
-    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
+    AMediaFormat_setString(
+        meta, AMEDIAFORMAT_KEY_MIME,
+        mIsHeif ? MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC : MEDIA_MIMETYPE_IMAGE_AVIF);
 
     if (image->itemId == mPrimaryItemId) {
         AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_DEFAULT, 1);
@@ -1539,7 +1582,7 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
         ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);
         if (thumbItemIndex >= 0) {
             const ImageItem &thumbnail = mItemIdToItemMap[thumbItemIndex];
-
+            // TODO(vigneshv): Handle thumbnail for AVIF.
             if (thumbnail.hvcc != NULL) {
                 AMediaFormat_setInt32(meta,
                         AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH, thumbnail.width);
@@ -1574,12 +1617,21 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
                 AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 3 / 2);
     }
 
-    if (image->hvcc == NULL) {
-        ALOGE("%s: hvcc is missing for image[%u]!", __FUNCTION__, imageIndex);
-        return NULL;
+    if (mIsHeif) {
+        if (image->hvcc == NULL) {
+            ALOGE("%s: hvcc is missing for image[%u]!", __FUNCTION__, imageIndex);
+            return NULL;
+        }
+        AMediaFormat_setBuffer(meta,
+                AMEDIAFORMAT_KEY_CSD_HEVC, image->hvcc->data(), image->hvcc->size());
+    } else {
+        if (image->av1c == NULL) {
+            ALOGE("%s: av1c is missing for image[%u]!", __FUNCTION__, imageIndex);
+            return NULL;
+        }
+        AMediaFormat_setBuffer(meta,
+                AMEDIAFORMAT_KEY_CSD_0, image->av1c->data(), image->av1c->size());
     }
-    AMediaFormat_setBuffer(meta,
-            AMEDIAFORMAT_KEY_CSD_HEVC, image->hvcc->data(), image->hvcc->size());
 
     if (image->icc != NULL) {
         AMediaFormat_setBuffer(meta,
