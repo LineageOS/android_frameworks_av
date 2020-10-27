@@ -922,6 +922,11 @@ size_t NuPlayer::Renderer::fillAudioBuffer(void *buffer, size_t size) {
             firstEntry = false;
             int64_t mediaTimeUs;
             CHECK(entry->mBuffer->meta()->findInt64("timeUs", &mediaTimeUs));
+            if (mediaTimeUs < 0) {
+                ALOGD("fillAudioBuffer: reset negative media time %.2f secs to zero",
+                       mediaTimeUs / 1E6);
+                mediaTimeUs = 0;
+            }
             ALOGV("fillAudioBuffer: rendering audio at media time %.2f secs", mediaTimeUs / 1E6);
             setAudioFirstAnchorTimeIfNeeded_l(mediaTimeUs);
         }
