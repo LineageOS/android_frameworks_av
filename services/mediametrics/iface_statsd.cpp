@@ -64,6 +64,7 @@ static constexpr struct statsd_hooks statsd_handlers[] =
     { "drmmanager", statsd_drmmanager },
     { "extractor", statsd_extractor },
     { "mediadrm", statsd_mediadrm },
+    { "mediaparser", statsd_mediaparser },
     { "nuplayer", statsd_nuplayer },
     { "nuplayer2", statsd_nuplayer },
     { "recorder", statsd_recorder },
