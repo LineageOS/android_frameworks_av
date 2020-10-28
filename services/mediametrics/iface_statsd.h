@@ -25,6 +25,7 @@ extern bool statsd_audiothread(const mediametrics::Item *);
 extern bool statsd_audiotrack(const mediametrics::Item *);
 extern bool statsd_codec(const mediametrics::Item *);
 extern bool statsd_extractor(const mediametrics::Item *);
+extern bool statsd_mediaparser(const mediametrics::Item *);
 extern bool statsd_nuplayer(const mediametrics::Item *);
 extern bool statsd_recorder(const mediametrics::Item *);
 
