@@ -22,13 +22,16 @@ import android.media.AudioStreamType;
 /**
  * {@hide}
  */
-parcelable AudioPortConfigMixExtUseCase {
-    // TODO(b/150948558): This should be a union. In the meantime, we require
-    // that exactly one of the below arrays has a single element and the rest
-    // are empty.
-
+union AudioPortConfigMixExtUseCase {
+    /**
+     * This to be set if the containing config has the AudioPortRole::NONE role.
+     * This represents an empty value (value is ignored).
+     * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
+     *             established.
+     */
+    boolean nothing;
     /** This to be set if the containing config has the AudioPortRole::SOURCE role. */
-    AudioStreamType[] stream;
+    AudioStreamType stream;
     /** This to be set if the containing config has the AudioPortRole::SINK role. */
-    AudioSourceType[] source;
+    AudioSourceType source;
 }

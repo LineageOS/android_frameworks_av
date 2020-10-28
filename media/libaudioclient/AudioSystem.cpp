@@ -36,7 +36,7 @@
 #define VALUE_OR_RETURN_STATUS(x) \
     ({ auto _tmp = (x); \
        if (!_tmp.ok()) return Status::fromStatusT(_tmp.error()); \
-       _tmp.value(); })
+       std::move(_tmp.value()); })
 
 // ----------------------------------------------------------------------------
 
