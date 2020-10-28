@@ -49,8 +49,10 @@ bool convertSharedFileRegionToIMemory(const SharedFileRegion& shmem,
         return false;
     }
 
+    uint32_t flags = !shmem.writeable ? IMemoryHeap::READ_ONLY : 0;
+
     const sp<MemoryHeapBase> heap =
-            new MemoryHeapBase(shmem.fd.get(), heapSize, 0, heapStartOffset);
+            new MemoryHeapBase(shmem.fd.get(), heapSize, flags, heapStartOffset);
     *result = sp<MemoryBase>::make(heap,
                                    shmem.offset - heapStartOffset,
                                    shmem.size);
@@ -89,6 +91,7 @@ bool convertIMemoryToSharedFileRegion(const sp<IMemory>& mem,
         result->fd.reset(base::unique_fd(fd));
         result->size = size;
         result->offset = heap->getOffset() + offset;
+        result->writeable = (heap->getFlags() & IMemoryHeap::READ_ONLY) == 0;
     }
     return true;
 }

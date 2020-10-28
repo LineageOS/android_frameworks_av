@@ -131,6 +131,7 @@ cc_library_shared {
         "statsd_codec.cpp",
         "statsd_drm.cpp",
         "statsd_extractor.cpp",
+        "statsd_mediaparser.cpp",
         "statsd_nuplayer.cpp",
         "statsd_recorder.cpp",
         "StringUtils.cpp"
