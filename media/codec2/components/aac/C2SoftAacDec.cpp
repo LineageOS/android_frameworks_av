@@ -877,11 +877,6 @@ void C2SoftAacDec::process(
             work->worklets.front()->output.configUpdate.push_back(
                     C2Param::Copy(currentBoostFactor));
 
-            C2StreamDrcCompressionModeTuning::input currentCompressMode(0u,
-                    (C2Config::drc_compression_mode_t) compressMode);
-            work->worklets.front()->output.configUpdate.push_back(
-                    C2Param::Copy(currentCompressMode));
-
             C2StreamDrcEncodedTargetLevelTuning::input currentEncodedTargetLevel(0u,
                     (C2FloatValue) (encTargetLevel*-0.25));
             work->worklets.front()->output.configUpdate.push_back(
