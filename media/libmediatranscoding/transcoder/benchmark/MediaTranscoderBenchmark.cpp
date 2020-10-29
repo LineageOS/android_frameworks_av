@@ -247,6 +247,17 @@ static void BM_TranscodeAvc2AvcV2VMaxOperatingRate(benchmark::State& state) {
                        false /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
 }
 
+static void BM_TranscodeAvc2AvcAV2AV720P(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1280x720_3648frame_h264_16Mbps_30fps_aac.mp4",
+                       "video_1280x720_3648frame_h264_16Mbps_30fps_aac_transcoded_AV.mp4",
+                       true /* includeAudio */, true /* transcodeVideo */);
+}
+
+static void BM_TranscodeAvc2AvcAV2AV720PMaxOperatingRate(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1280x720_3648frame_h264_16Mbps_30fps_aac.mp4",
+                       "video_1280x720_3648frame_h264_16Mbps_30fps_aac_transcoded_AV.mp4",
+                       true /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
+}
 //-------------------------------- HEVC to AVC Benchmarks ------------------------------------------
 
 static void BM_TranscodeHevc2AvcAudioVideo2AudioVideo(benchmark::State& state) {
@@ -273,6 +284,18 @@ static void BM_TranscodeHevc2AvcV2VMaxOperatingRate(benchmark::State& state) {
                        false /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
 }
 
+static void BM_TranscodeHevc2AvcAV2AV720P(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1280x720_3863frame_hevc_16Mbps_30fps_aac.mp4",
+                       "video_1280x720_3863frame_hevc_16Mbps_30fps_aac_transcoded_AV.mp4",
+                       true /* includeAudio */, true /* transcodeVideo */);
+}
+
+static void BM_TranscodeHevc2AvcAV2AV720PMaxOperatingRate(benchmark::State& state) {
+    TranscodeMediaFile(state, "video_1280x720_3863frame_hevc_16Mbps_30fps_aac.mp4",
+                       "video_1280x720_3863frame_hevc_16Mbps_30fps_aac_transcoded_AV.mp4",
+                       true /* includeAudio */, true /* transcodeVideo */, SetMaxOperatingRate);
+}
+
 //-------------------------------- Passthrough Benchmarks ------------------------------------------
 
 static void BM_TranscodeAudioVideoPassthrough(benchmark::State& state) {
@@ -296,11 +319,15 @@ TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAudioVideo2AudioVideo);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcVideo2Video);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAV2AVMaxOperatingRate);
 TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcV2VMaxOperatingRate);
+TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAV2AV720P);
+TRANSCODER_BENCHMARK(BM_TranscodeAvc2AvcAV2AV720PMaxOperatingRate);
 
 TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAudioVideo2AudioVideo);
 TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcVideo2Video);
 TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAV2AVMaxOperatingRate);
 TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcV2VMaxOperatingRate);
+TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAV2AV720P);
+TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAV2AV720PMaxOperatingRate);
 
 TRANSCODER_BENCHMARK(BM_TranscodeAudioVideoPassthrough);
 TRANSCODER_BENCHMARK(BM_TranscodeVideoPassthrough);
