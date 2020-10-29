@@ -1,0 +1,6 @@
+// test_mapping for frameworks/av/media/libmedia
+{
+  "presubmit": [
+    { "name": "CodecListTest" }
+  ]
+}
