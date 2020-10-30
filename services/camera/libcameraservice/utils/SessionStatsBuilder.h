@@ -19,22 +19,38 @@
 
 #include <utils/Errors.h>
 
-#include <mutex>
+#include <array>
 #include <map>
+#include <mutex>
 
 namespace android {
 
 // Helper class to build stream stats
 struct StreamStats {
+    // Fields for buffer drop
     int64_t mRequestedFrameCount;
     int64_t mDroppedFrameCount;
     bool mCounterStopped;
+
+    // Fields for stream startup latency
     int32_t mStartLatencyMs;
+
+    // Fields for capture latency measurement
+    const static int LATENCY_BIN_COUNT = 10;
+    // Boundary values separating between adjacent bins, excluding 0 and
+    // infinity.
+    const static std::array<int32_t, LATENCY_BIN_COUNT-1> mCaptureLatencyBins;
+    // Counter values for all histogram bins. One more entry than mCaptureLatencyBins.
+    std::array<int64_t, LATENCY_BIN_COUNT> mCaptureLatencyHistogram;
 
     StreamStats() : mRequestedFrameCount(0),
                      mDroppedFrameCount(0),
                      mCounterStopped(false),
-                     mStartLatencyMs(0) {}
+                     mStartLatencyMs(0),
+                     mCaptureLatencyHistogram{}
+                  {}
+
+    void updateLatencyHistogram(int32_t latencyMs);
 };
 
 // Helper class to build session stats
