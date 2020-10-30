@@ -53,6 +53,11 @@ parcelable TranscodingRequestParcel {
     int clientPid = -1;
 
     /**
+     * The package name of the client whom this transcoding request is for.
+     */
+    @utf8InCpp String clientPackageName;
+
+    /**
      * Type of the transcoding.
      */
     TranscodingType transcodingType;
