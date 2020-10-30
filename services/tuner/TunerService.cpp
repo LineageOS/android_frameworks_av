@@ -18,6 +18,7 @@
 
 #include <android/binder_manager.h>
 #include <utils/Log.h>
+#include "TunerFrontend.h"
 #include "TunerService.h"
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAnalogCapabilities;
@@ -46,17 +47,17 @@ void TunerService::instantiate() {
     std::shared_ptr<TunerService> service =
             ::ndk::SharedRefBase::make<TunerService>();
     AServiceManager_addService(service->asBinder().get(), getServiceName());
+    mTuner = ITuner::getService();
+    if (mTuner == nullptr) {
+        ALOGE("Failed to get ITuner service.");
+    }
 }
 
 Status TunerService::getFrontendIds(std::vector<int32_t>* ids, int32_t* /* _aidl_return */) {
     if (mTuner == nullptr) {
-        // TODO: create a method for init.
-        mTuner = ITuner::getService();
-        if (mTuner == nullptr) {
-            ALOGE("Failed to get ITuner service.");
-            return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                    static_cast<int32_t>(Result::UNAVAILABLE));
-        }
+        ALOGE("ITuner service is not init.");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
     hidl_vec<FrontendId> feIds;
     Result res;
@@ -70,19 +71,15 @@ Status TunerService::getFrontendIds(std::vector<int32_t>* ids, int32_t* /* _aidl
     ids->resize(feIds.size());
     std::copy(feIds.begin(), feIds.end(), ids->begin());
 
-    return ::ndk::ScopedAStatus::ok();
+    return Status::ok();
 }
 
 Status TunerService::getFrontendInfo(
         int32_t frontendHandle, TunerServiceFrontendInfo* _aidl_return) {
     if (mTuner == nullptr) {
-        // TODO: create a method for init.
-        mTuner = ITuner::getService();
-        if (mTuner == nullptr) {
-            ALOGE("Failed to get ITuner service.");
-            return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                    static_cast<int32_t>(Result::UNAVAILABLE));
-        }
+        ALOGE("ITuner service is not init.");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
     Result res;
@@ -93,12 +90,24 @@ Status TunerService::getFrontendInfo(
         res = r;
     });
     if (res != Result::SUCCESS) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
 
     TunerServiceFrontendInfo tunerInfo = convertToAidlFrontendInfo(feId, info);
     *_aidl_return = tunerInfo;
-    return ::ndk::ScopedAStatus::ok();
+    return Status::ok();
+}
+
+Status TunerService::openFrontend(
+        int32_t frontendHandle, std::shared_ptr<ITunerFrontend>* _aidl_return) {
+    if (mTuner == nullptr) {
+        ALOGE("ITuner service is not init.");
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+                static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(mTuner, frontendHandle);
+    return Status::ok();
 }
 
 TunerServiceFrontendInfo TunerService::convertToAidlFrontendInfo(int feId, FrontendInfo halInfo) {
@@ -211,9 +220,5 @@ TunerServiceFrontendInfo TunerService::convertToAidlFrontendInfo(int feId, Front
 
     info.caps = caps;
     return info;
-}
-
-int TunerService::getResourceIdFromHandle(int resourceHandle) {
-    return (resourceHandle & 0x00ff0000) >> 16;
 }
 } // namespace android
