@@ -1,5 +1,5 @@
 // music bundle wrapper
-cc_library_shared {
+cc_library {
     name: "libbundlewrapper",
 
     arch: {
