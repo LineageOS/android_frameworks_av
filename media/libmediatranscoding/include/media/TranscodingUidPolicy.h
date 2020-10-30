@@ -49,7 +49,6 @@ public:
     void setCallback(const std::shared_ptr<UidPolicyCallbackInterface>& cb) override;
     // ~UidPolicyInterface
 
-    static bool getNamesForUids(const std::vector<int32_t>& uids, std::vector<std::string>* names);
     static status_t getUidForPackage(String16 packageName, /*inout*/ uid_t& uid);
 
 private:
