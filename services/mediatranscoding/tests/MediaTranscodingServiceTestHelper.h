@@ -368,6 +368,7 @@ struct TestClientCallback : public BnTranscodingClientCallback,
         request.priority = priority;
         request.clientPid = (overridePid == -1) ? mClientPid : overridePid;
         request.clientUid = (overrideUid == -1) ? mClientUid : overrideUid;
+        request.clientPackageName = (overrideUid == -1) ? mPackageName : "";
         if (bitrateBps > 0) {
             request.requestedVideoTrackFormat.emplace(TranscodingVideoTrackFormat());
             request.requestedVideoTrackFormat->bitrateBps = bitrateBps;
