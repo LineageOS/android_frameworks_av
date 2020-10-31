@@ -107,6 +107,7 @@ private:
     // previous top app, etc.
     std::list<uid_t> mUidSortedList;
     std::list<uid_t>::iterator mOfflineUidIterator;
+    std::map<uid_t, std::string> mUidPackageNames;
 
     std::shared_ptr<TranscoderInterface> mTranscoder;
     std::shared_ptr<UidPolicyInterface> mUidPolicy;

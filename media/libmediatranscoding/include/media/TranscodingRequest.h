@@ -39,6 +39,7 @@ private:
         destinationFilePath = parcel.destinationFilePath;
         clientUid = parcel.clientUid;
         clientPid = parcel.clientPid;
+        clientPackageName = parcel.clientPackageName;
         transcodingType = parcel.transcodingType;
         requestedVideoTrackFormat = parcel.requestedVideoTrackFormat;
         priority = parcel.priority;
