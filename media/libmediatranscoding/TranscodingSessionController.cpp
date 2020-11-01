@@ -66,6 +66,7 @@ TranscodingSessionController::TranscodingSessionController(
     mUidSortedList.push_back(OFFLINE_UID);
     mOfflineUidIterator = mUidSortedList.begin();
     mSessionQueues.emplace(OFFLINE_UID, SessionQueueType());
+    mUidPackageNames[OFFLINE_UID] = "(offline)";
 }
 
 TranscodingSessionController::~TranscodingSessionController() {}
@@ -83,13 +84,6 @@ void TranscodingSessionController::dumpAllSessions(int fd, const Vector<String16
     result.append(buffer);
 
     std::vector<int32_t> uids(mUidSortedList.begin(), mUidSortedList.end());
-    // Exclude last uid, which is for offline queue
-    uids.pop_back();
-    std::vector<std::string> packageNames;
-    if (TranscodingUidPolicy::getNamesForUids(uids, &packageNames)) {
-        uids.push_back(OFFLINE_UID);
-        packageNames.push_back("(offline)");
-    }
 
     for (int32_t i = 0; i < uids.size(); i++) {
         const uid_t uid = uids[i];
@@ -98,7 +92,7 @@ void TranscodingSessionController::dumpAllSessions(int fd, const Vector<String16
             continue;
         }
         snprintf(buffer, SIZE, "    Uid: %d, pkg: %s\n", uid,
-                 packageNames.empty() ? "(unknown)" : packageNames[i].c_str());
+                 mUidPackageNames.count(uid) > 0 ? mUidPackageNames[uid].c_str() : "(unknown)");
         result.append(buffer);
         snprintf(buffer, SIZE, "      Num of sessions: %zu\n", mSessionQueues[uid].size());
         result.append(buffer);
@@ -120,6 +114,12 @@ void TranscodingSessionController::dumpAllSessions(int fd, const Vector<String16
             result.append(buffer);
             snprintf(buffer, SIZE, "        Dst: %s\n", request.destinationFilePath.c_str());
             result.append(buffer);
+            // For the offline queue, print out the original client.
+            if (uid == OFFLINE_UID) {
+                snprintf(buffer, SIZE, "        Original Client: %s\n",
+                         request.clientPackageName.c_str());
+                result.append(buffer);
+            }
         }
     }
 
@@ -272,6 +272,11 @@ bool TranscodingSessionController::submit(
     if (mSessionMap.count(sessionKey) > 0) {
         ALOGE("session %s already exists", sessionToString(sessionKey).c_str());
         return false;
+    }
+
+    // Add the uid package name to the store of package names we already know.
+    if (mUidPackageNames.count(uid) == 0) {
+        mUidPackageNames.emplace(uid, request.clientPackageName);
     }
 
     // TODO(chz): only support offline vs real-time for now. All kUnspecified sessions
