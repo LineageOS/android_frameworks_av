@@ -24,7 +24,7 @@
 
 #include <cutils/properties.h>
 #include <gui/Surface.h>
-#include <media/ICrypto.h>
+#include <mediadrm/ICrypto.h>
 #include <media/MediaCodecBuffer.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>

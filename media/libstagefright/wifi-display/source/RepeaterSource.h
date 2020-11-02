@@ -4,7 +4,7 @@
 
 #include <media/stagefright/foundation/ABase.h>
 #include <media/stagefright/foundation/AHandlerReflector.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 
 #define SUSPEND_VIDEO_IF_IDLE   0
 

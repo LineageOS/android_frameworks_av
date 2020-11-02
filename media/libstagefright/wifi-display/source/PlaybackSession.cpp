@@ -38,7 +38,7 @@
 #include <media/stagefright/AudioSource.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/stagefright/SurfaceMediaSource.h>
@@ -1070,8 +1070,11 @@ status_t WifiDisplaySource::PlaybackSession::addVideoSource(
 }
 
 status_t WifiDisplaySource::PlaybackSession::addAudioSource(bool usePCMAudio) {
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = AUDIO_SOURCE_REMOTE_SUBMIX;
+
     sp<AudioSource> audioSource = new AudioSource(
-            AUDIO_SOURCE_REMOTE_SUBMIX,
+            &attr,
             mOpPackageName,
             48000 /* sampleRate */,
             2 /* channelCount */);

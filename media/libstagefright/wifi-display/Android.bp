@@ -34,6 +34,11 @@ cc_library_shared {
         "libutils",
     ],
 
+    header_libs: [
+        "libmediadrm_headers",
+        "libmediametrics_headers",
+    ],
+
     cflags: [
         "-Wno-multichar",
         "-Werror",
