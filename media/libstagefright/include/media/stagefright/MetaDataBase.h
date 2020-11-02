@@ -62,6 +62,7 @@ enum {
     kKeyDVCC              = 'dvcc',  // raw data
     kKeyAV1C              = 'av1c',  // raw data
     kKeyThumbnailHVCC     = 'thvc',  // raw data
+    kKeyThumbnailAV1C     = 'tav1',  // raw data
     kKeyD263              = 'd263',  // raw data
     kKeyOpusHeader        = 'ohdr',  // raw data
     kKeyOpusCodecDelay    = 'ocod',  // uint64_t (codec delay in ns)
