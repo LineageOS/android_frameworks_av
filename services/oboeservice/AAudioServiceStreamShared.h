@@ -52,22 +52,15 @@ public:
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
-    /**
-     * This must be locked when calling getAudioDataQueue_l() and while
-     * using the FifoBuffer it contains.
-     */
-    std::mutex &getAudioDataQueueLock() {
-        return mAudioDataQueueLock;
-    }
-
     void writeDataIfRoom(int64_t mmapFramesRead, const void *buffer, int32_t numFrames);
 
     /**
      * This must only be called under getAudioDataQueueLock().
      * @return
      */
-    std::shared_ptr<SharedRingBuffer> getAudioDataQueue_l() {
-      return mAudioDataQueue;
+    std::shared_ptr<SharedRingBuffer> getAudioDataQueue_l()
+            REQUIRES(audioDataQueueLock) {
+        return mAudioDataQueue;
     }
 
     /* Keep a record of when a buffer transfer completed.
@@ -89,6 +82,10 @@ public:
 
     const char *getTypeText() const override { return "Shared"; }
 
+    // This is public so that the thread safety annotation, GUARDED_BY(),
+    // Can work when another object takes the lock.
+    mutable std::mutex   audioDataQueueLock;
+
 protected:
 
     aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) override;
@@ -107,8 +104,7 @@ protected:
 
 private:
 
-    std::shared_ptr<SharedRingBuffer> mAudioDataQueue; // protected by mAudioDataQueueLock
-    std::mutex               mAudioDataQueueLock;
+    std::shared_ptr<SharedRingBuffer> mAudioDataQueue GUARDED_BY(audioDataQueueLock);
 
     std::atomic<int64_t>     mTimestampPositionOffset;
     std::atomic<int32_t>     mXRunCount;

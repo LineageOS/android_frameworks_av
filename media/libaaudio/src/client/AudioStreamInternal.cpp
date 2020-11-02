@@ -418,7 +418,6 @@ aaudio_result_t AudioStreamInternal::stopCallback_l()
     }
 }
 
-// This must be called under mStreamLock.
 aaudio_result_t AudioStreamInternal::requestStop_l() {
     aaudio_result_t result = stopCallback_l();
     if (result != AAUDIO_OK) {
@@ -428,7 +427,7 @@ aaudio_result_t AudioStreamInternal::requestStop_l() {
     // The stream may have been unlocked temporarily to let a callback finish
     // and the callback may have stopped the stream.
     // Check to make sure the stream still needs to be stopped.
-    // See also AudioStream::safeStop().
+    // See also AudioStream::safeStop_l().
     if (!(isActive() || getState() == AAUDIO_STREAM_STATE_DISCONNECTED)) {
         ALOGD("%s() returning early, not active or disconnected", __func__);
         return AAUDIO_OK;
@@ -808,15 +807,6 @@ int32_t AudioStreamInternal::getBufferSize() const {
 
 int32_t AudioStreamInternal::getBufferCapacity() const {
     return mBufferCapacityInFrames;
-}
-
-aaudio_result_t AudioStreamInternal::joinThread(void** returnArg) {
-    return AudioStream::joinThread(returnArg, calculateReasonableTimeout(getFramesPerBurst()));
-}
-
-// This must be called under mStreamLock.
-aaudio_result_t AudioStreamInternal::joinThread_l(void** returnArg) {
-    return AudioStream::joinThread_l(returnArg, calculateReasonableTimeout(getFramesPerBurst()));
 }
 
 bool AudioStreamInternal::isClockModelInControl() const {
