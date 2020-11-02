@@ -35,6 +35,15 @@
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
+#define VALUE_OR_FATAL(result)                   \
+    ({                                           \
+       auto _tmp = (result);                     \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
+                           "Failed result (%d)", \
+                           _tmp.error());        \
+       std::move(_tmp.value());                  \
+     })
+
 #define WAIT_PERIOD_MS          10
 
 namespace android {
@@ -807,7 +816,9 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     originalSessionId = mSessionId;
 
     do {
-        record = audioFlinger->createRecord(input, output, &status);
+        media::CreateRecordResponse response;
+        record = audioFlinger->createRecord(VALUE_OR_FATAL(input.toAidl()), response, &status);
+        output = VALUE_OR_FATAL(IAudioFlinger::CreateRecordOutput::fromAidl(response));
         if (status == NO_ERROR) {
             break;
         }

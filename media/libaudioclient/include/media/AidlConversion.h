@@ -21,7 +21,13 @@
 
 #include <system/audio.h>
 
-#include <android-base/result.h>
+#include <android-base/expected.h>
+
+#include <android/media/AudioAttributesInternal.h>
+#include <android/media/AudioClient.h>
+#include <android/media/AudioConfig.h>
+#include <android/media/AudioConfigBase.h>
+#include <android/media/AudioFlag.h>
 #include <android/media/AudioGainMode.h>
 #include <android/media/AudioInputFlags.h>
 #include <android/media/AudioIoConfigEvent.h>
@@ -29,12 +35,29 @@
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPortConfigType.h>
 
+#include <android/media/SharedFileRegion.h>
+
+#include <binder/IMemory.h>
+#include <media/AudioClient.h>
 #include <media/AudioIoDescriptor.h>
 
 namespace android {
 
 template <typename T>
 using ConversionResult = base::expected<T, status_t>;
+
+// Convenience macros for working with ConversionResult, useful for writing converted for aggregate
+// types.
+
+#define VALUE_OR_RETURN(result)                                \
+    ({                                                         \
+        auto _tmp = (result);                                  \
+        if (!_tmp.ok()) return base::unexpected(_tmp.error()); \
+        std::move(_tmp.value());                               \
+    })
+
+#define RETURN_IF_ERROR(result) \
+    if (status_t _tmp = (result); _tmp != OK) return base::unexpected(_tmp);
 
 /**
  * A generic template to safely cast between integral types, respecting limits of the destination
@@ -77,6 +100,9 @@ ConversionResult<int32_t> legacy2aidl_audio_port_handle_t_int32_t(audio_port_han
 ConversionResult<audio_patch_handle_t> aidl2legacy_int32_t_audio_patch_handle_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_patch_handle_t_int32_t(audio_patch_handle_t legacy);
 
+ConversionResult<audio_unique_id_t> aidl2legacy_int32_t_audio_unique_id_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_unique_id_t_int32_t(audio_unique_id_t legacy);
+
 // The legacy enum is unnamed. Thus, we use int.
 ConversionResult<int> aidl2legacy_AudioPortConfigType(media::AudioPortConfigType aidl);
 // The legacy enum is unnamed. Thus, we use int.
@@ -87,6 +113,15 @@ ConversionResult<int32_t> legacy2aidl_config_mask_int32_t(unsigned int legacy);
 
 ConversionResult<audio_channel_mask_t> aidl2legacy_int32_t_audio_channel_mask_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_channel_mask_t_int32_t(audio_channel_mask_t legacy);
+
+ConversionResult<pid_t> aidl2legacy_int32_t_pid_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_pid_t_int32_t(pid_t legacy);
+
+ConversionResult<uid_t> aidl2legacy_int32_t_uid_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_uid_t_int32_t(uid_t legacy);
+
+ConversionResult<String16> aidl2legacy_string_view_String16(std::string_view aidl);
+ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy);
 
 ConversionResult<audio_io_config_event> aidl2legacy_AudioIoConfigEvent_audio_io_config_event(
         media::AudioIoConfigEvent aidl);
@@ -158,10 +193,8 @@ ConversionResult<audio_source_t> aidl2legacy_AudioSourceType_audio_source_t(
 ConversionResult<media::AudioSourceType> legacy2aidl_audio_source_t_AudioSourceType(
         audio_source_t legacy);
 
-ConversionResult<audio_session_t> aidl2legacy_AudioSessionType_audio_session_t(
-        media::AudioSessionType aidl);
-ConversionResult<media::AudioSessionType> legacy2aidl_audio_session_t_AudioSessionType(
-        audio_session_t legacy);
+ConversionResult<audio_session_t> aidl2legacy_int32_t_audio_session_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_session_t_int32_t(audio_session_t legacy);
 
 ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortConfigMixExt(
         const media::AudioPortConfigMixExt& aidl, media::AudioPortRole role);
@@ -185,7 +218,66 @@ ConversionResult<media::AudioPatch> legacy2aidl_audio_patch_AudioPatch(
 
 ConversionResult<sp<AudioIoDescriptor>> aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(
         const media::AudioIoDescriptor& aidl);
+
 ConversionResult<media::AudioIoDescriptor> legacy2aidl_AudioIoDescriptor_AudioIoDescriptor(
         const sp<AudioIoDescriptor>& legacy);
+
+ConversionResult<AudioClient> aidl2legacy_AudioClient(const media::AudioClient& aidl);
+ConversionResult<media::AudioClient> legacy2aidl_AudioClient(const AudioClient& legacy);
+
+ConversionResult<audio_content_type_t>
+aidl2legacy_AudioContentType_audio_content_type_t(media::AudioContentType aidl);
+ConversionResult<media::AudioContentType>
+legacy2aidl_audio_content_type_t_AudioContentType(audio_content_type_t legacy);
+
+ConversionResult<audio_usage_t>
+aidl2legacy_AudioUsage_audio_usage_t(media::AudioUsage aidl);
+ConversionResult<media::AudioUsage>
+legacy2aidl_audio_usage_t_AudioUsage(audio_usage_t legacy);
+
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_AudioFlag_audio_flags_mask_t(media::AudioFlag aidl);
+ConversionResult<media::AudioFlag>
+legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy);
+
+ConversionResult<audio_flags_mask_t>
+aidl2legacy_int32_t_audio_flags_mask_t_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy);
+
+ConversionResult<audio_attributes_t>
+aidl2legacy_AudioAttributesInternal_audio_attributes_t(const media::AudioAttributesInternal& aidl);
+ConversionResult<media::AudioAttributesInternal>
+legacy2aidl_audio_attributes_t_AudioAttributesInternal(const audio_attributes_t& legacy);
+
+ConversionResult<audio_encapsulation_mode_t>
+aidl2legacy_audio_encapsulation_mode_t_AudioEncapsulationMode(media::AudioEncapsulationMode aidl);
+ConversionResult<media::AudioEncapsulationMode>
+legacy2aidl_AudioEncapsulationMode_audio_encapsulation_mode_t(audio_encapsulation_mode_t legacy);
+
+ConversionResult<audio_offload_info_t>
+aidl2legacy_AudioOffloadInfo_audio_offload_info_t(const media::AudioOffloadInfo& aidl);
+ConversionResult<media::AudioOffloadInfo>
+legacy2aidl_audio_offload_info_t_AudioOffloadInfo(const audio_offload_info_t& legacy);
+
+ConversionResult<audio_config_t>
+aidl2legacy_AudioConfig_audio_config_t(const media::AudioConfig& aidl);
+ConversionResult<media::AudioConfig>
+legacy2aidl_audio_config_t_AudioConfig(const audio_config_t& legacy);
+
+ConversionResult<audio_config_base_t>
+aidl2legacy_AudioConfigBase_audio_config_base_t(const media::AudioConfigBase& aidl);
+ConversionResult<media::AudioConfigBase>
+legacy2aidl_audio_config_base_t_AudioConfigBase(const audio_config_base_t& legacy);
+
+ConversionResult<sp<IMemory>>
+aidl2legacy_SharedFileRegion_IMemory(const media::SharedFileRegion& aidl);
+ConversionResult<media::SharedFileRegion>
+legacy2aidl_IMemory_SharedFileRegion(const sp<IMemory>& legacy);
+
+ConversionResult<sp<IMemory>>
+aidl2legacy_NullableSharedFileRegion_IMemory(const std::optional<media::SharedFileRegion>& aidl);
+ConversionResult<std::optional<media::SharedFileRegion>>
+legacy2aidl_NullableIMemory_SharedFileRegion(const sp<IMemory>& legacy);
 
 }  // namespace android
