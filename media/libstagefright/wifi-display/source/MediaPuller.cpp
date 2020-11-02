@@ -25,7 +25,7 @@
 #include <media/stagefright/foundation/AMessage.h>
 #include <media/stagefright/MediaBufferBase.h>
 #include <media/MediaBufferHolder.h>
-#include <media/MediaSource.h>
+#include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 
 namespace android {
