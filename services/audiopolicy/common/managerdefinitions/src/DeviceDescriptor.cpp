@@ -160,8 +160,12 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
 {
     ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
-    DeviceDescriptorBase::toAudioPort(port);
-    port->ext.device.hw_module = getModuleHandle();
+    toAudioPortInternal(port);
+}
+
+void DeviceDescriptor::toAudioPort(struct audio_port_v7 *port) const {
+    ALOGV("DeviceDescriptor::toAudioPort() v7 handle %d type %08x", mId, mDeviceTypeAddr.mType);
+    toAudioPortInternal(port);
 }
 
 void DeviceDescriptor::importAudioPortAndPickAudioProfile(
