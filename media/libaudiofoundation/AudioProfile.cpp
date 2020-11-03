@@ -260,16 +260,6 @@ bool AudioProfileVector::hasDynamicRateFor(audio_format_t format) const
     return false;
 }
 
-bool AudioProfileVector::contains(const sp<AudioProfile> profile) const
-{
-    for (const auto& audioProfile : *this) {
-        if (audioProfile->equals(profile)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void AudioProfileVector::dump(std::string *dst, int spaces) const
 {
     dst->append(base::StringPrintf("%*s- Profiles:\n", spaces, ""));
