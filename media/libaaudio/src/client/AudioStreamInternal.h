@@ -44,10 +44,6 @@ public:
     AudioStreamInternal(AAudioServiceInterface  &serviceInterface, bool inService);
     virtual ~AudioStreamInternal();
 
-    aaudio_result_t requestStart_l() override;
-
-    aaudio_result_t requestStop_l() override;
-
     aaudio_result_t getTimestamp(clockid_t clockId,
                                        int64_t *framePosition,
                                        int64_t *timeNanoseconds) override;
@@ -55,8 +51,6 @@ public:
     virtual aaudio_result_t updateStateMachine() override;
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
-
-    aaudio_result_t release_l() override;
 
     aaudio_result_t setBufferSize(int32_t requestedFrames) override;
 
@@ -72,11 +66,8 @@ public:
 
     aaudio_result_t unregisterThread() override;
 
-    aaudio_result_t joinThread(void** returnArg);
-
     // Called internally from 'C'
     virtual void *callbackLoop() = 0;
-
 
     bool isMMap() override {
         return true;
@@ -96,6 +87,10 @@ public:
     }
 
 protected:
+    aaudio_result_t requestStart_l() REQUIRES(mStreamLock) override;
+    aaudio_result_t requestStop_l() REQUIRES(mStreamLock) override;
+
+    aaudio_result_t release_l() REQUIRES(mStreamLock) override;
 
     aaudio_result_t processData(void *buffer,
                          int32_t numFrames,
@@ -118,8 +113,6 @@ protected:
     aaudio_result_t processCommands();
 
     aaudio_result_t stopCallback_l();
-
-    aaudio_result_t joinThread_l(void** returnArg);
 
     virtual void prepareBuffersForStart() {}
 

@@ -98,7 +98,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
 
                 {
                     // Lock the AudioFifo to protect against close.
-                    std::lock_guard <std::mutex> lock(streamShared->getAudioDataQueueLock());
+                    std::lock_guard <std::mutex> lock(streamShared->audioDataQueueLock);
                     std::shared_ptr<SharedRingBuffer> audioDataQueue
                             = streamShared->getAudioDataQueue_l();
                     std::shared_ptr<FifoBuffer> fifo;

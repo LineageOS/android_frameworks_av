@@ -37,6 +37,7 @@ cc_library_shared {
     ],
 
     cflags: [
+        "-Wthread-safety",
         "-Wno-unused-parameter",
         "-Wall",
         "-Werror",

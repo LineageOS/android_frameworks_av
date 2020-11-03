@@ -248,7 +248,7 @@ aaudio_result_t AudioStream::safeFlush() {
 
 aaudio_result_t AudioStream::systemStopFromCallback() {
     std::lock_guard<std::mutex> lock(mStreamLock);
-    aaudio_result_t result = safeStop();
+    aaudio_result_t result = safeStop_l();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
         (void) mPlayerBase->stop();
@@ -262,7 +262,7 @@ aaudio_result_t AudioStream::systemStopFromApp() {
         ALOGE("stream cannot be stopped by calling from a callback!");
         return AAUDIO_ERROR_INVALID_STATE;
     }
-    aaudio_result_t result = safeStop();
+    aaudio_result_t result = safeStop_l();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
         (void) mPlayerBase->stop();
@@ -270,8 +270,7 @@ aaudio_result_t AudioStream::systemStopFromApp() {
     return result;
 }
 
-// This must be called under mStreamLock.
-aaudio_result_t AudioStream::safeStop() {
+aaudio_result_t AudioStream::safeStop_l() {
 
     switch (getState()) {
         // Proceed with stopping.
@@ -472,15 +471,14 @@ aaudio_result_t AudioStream::createThread_l(int64_t periodNanoseconds,
     }
 }
 
-aaudio_result_t AudioStream::joinThread(void** returnArg, int64_t timeoutNanoseconds) {
+aaudio_result_t AudioStream::joinThread(void** returnArg) {
     // This may get temporarily unlocked in the MMAP release() when joining callback threads.
     std::lock_guard<std::mutex> lock(mStreamLock);
-    return joinThread_l(returnArg, timeoutNanoseconds);
+    return joinThread_l(returnArg);
 }
 
 // This must be called under mStreamLock.
-aaudio_result_t AudioStream::joinThread_l(void** returnArg, int64_t /* timeoutNanoseconds */)
-{
+aaudio_result_t AudioStream::joinThread_l(void** returnArg) {
     if (!mHasThread) {
         ALOGD("joinThread() - but has no thread");
         return AAUDIO_ERROR_INVALID_STATE;
@@ -492,13 +490,7 @@ aaudio_result_t AudioStream::joinThread_l(void** returnArg, int64_t /* timeoutNa
         // Called from an app thread. Not the callback.
         // Unlock because the callback may be trying to stop the stream but is blocked.
         mStreamLock.unlock();
-#if 0
-        // TODO implement equivalent of pthread_timedjoin_np()
-        struct timespec abstime;
-        int err = pthread_timedjoin_np(mThread, returnArg, &abstime);
-#else
         int err = pthread_join(mThread, returnArg);
-#endif
         mStreamLock.lock();
         if (err) {
             ALOGE("%s() pthread_join() returns err = %d", __func__, err);
@@ -614,7 +606,7 @@ android::status_t AudioStream::MyPlayerBase::playerSetVolume() {
     }
     if (audioStream) {
         // No pan and only left volume is taken into account from IPLayer interface
-        audioStream->setDuckAndMuteVolume(mVolumeMultiplierL  /* * mPanMultiplierL */);
+        audioStream->setDuckAndMuteVolume(mVolumeMultiplierL  /* mPanMultiplierL */);
     }
     return android::NO_ERROR;
 }

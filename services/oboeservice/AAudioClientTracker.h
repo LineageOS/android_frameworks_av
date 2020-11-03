@@ -21,6 +21,7 @@
 #include <mutex>
 #include <set>
 
+#include <android-base/thread_annotations.h>
 #include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
@@ -114,10 +115,12 @@ private:
     };
 
     // This must be called under mLock
-    android::sp<NotificationClient> getNotificationClient_l(pid_t pid);
+    android::sp<NotificationClient> getNotificationClient_l(pid_t pid)
+            REQUIRES(mLock);
 
     mutable std::mutex                               mLock;
-    std::map<pid_t, android::sp<NotificationClient>> mNotificationClients;
+    std::map<pid_t, android::sp<NotificationClient>> mNotificationClients
+            GUARDED_BY(mLock);
     android::AAudioService                          *mAAudioService = nullptr;
 };
 
