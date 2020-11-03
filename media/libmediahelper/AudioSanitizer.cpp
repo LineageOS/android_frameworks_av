@@ -69,15 +69,16 @@ status_t AudioSanitizer::sanitizeAudioPortConfig(
     return safetyNetLog(status, bugNumber);
 }
 
-/** returns BAD_VALUE if sanitization was required. */
-status_t AudioSanitizer::sanitizeAudioPort(
-        struct audio_port *port, const char *bugNumber)
-{
+namespace {
+
+template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
+                                    || std::is_same<T, struct audio_port_v7>::value, int> = 0>
+static status_t sanitizeAudioPortInternal(T *port, const char *bugNumber = nullptr) {
     status_t status = NO_ERROR;
     if (preventStringOverflow(port->name)) {
         status = BAD_VALUE;
     }
-    if (sanitizeAudioPortConfig(&port->active_config) != NO_ERROR) {
+    if (AudioSanitizer::sanitizeAudioPortConfig(&port->active_config) != NO_ERROR) {
         status = BAD_VALUE;
     }
     if (port->type == AUDIO_PORT_TYPE_DEVICE &&
@@ -85,6 +86,22 @@ status_t AudioSanitizer::sanitizeAudioPort(
         status = BAD_VALUE;
     }
     return safetyNetLog(status, bugNumber);
+}
+
+} // namespace
+
+/** returns BAD_VALUE if sanitization was required. */
+status_t AudioSanitizer::sanitizeAudioPort(
+        struct audio_port *port, const char *bugNumber)
+{
+    return sanitizeAudioPortInternal(port, bugNumber);
+}
+
+/** returns BAD_VALUE if sanitization was required. */
+status_t AudioSanitizer::sanitizeAudioPort(
+        struct audio_port_v7 *port, const char *bugNumber)
+{
+    return sanitizeAudioPortInternal(port, bugNumber);
 }
 
 /** returns BAD_VALUE if sanitization was required. */

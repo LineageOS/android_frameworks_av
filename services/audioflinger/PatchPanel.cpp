@@ -55,8 +55,7 @@ status_t AudioFlinger::listAudioPorts(unsigned int *num_ports,
 }
 
 /* Get supported attributes for a given audio port */
-status_t AudioFlinger::getAudioPort(struct audio_port *port)
-{
+status_t AudioFlinger::getAudioPort(struct audio_port_v7 *port) {
     Mutex::Autolock _l(mLock);
     return mPatchPanel.getAudioPort(port);
 }
@@ -103,10 +102,18 @@ status_t AudioFlinger::PatchPanel::listAudioPorts(unsigned int *num_ports __unus
 }
 
 /* Get supported attributes for a given audio port */
-status_t AudioFlinger::PatchPanel::getAudioPort(struct audio_port *port __unused)
+status_t AudioFlinger::PatchPanel::getAudioPort(struct audio_port_v7 *port)
 {
-    ALOGV(__func__);
-    return NO_ERROR;
+    if (port->type != AUDIO_PORT_TYPE_DEVICE) {
+        // Only query the HAL when the port is a device.
+        return NO_ERROR;
+    }
+    AudioHwDevice* hwDevice = findAudioHwDeviceByModule(port->ext.device.hw_module);
+    if (hwDevice == nullptr) {
+        ALOGW("%s cannot find hw module %d", __func__, port->ext.device.hw_module);
+        return BAD_VALUE;
+    }
+    return hwDevice->getAudioPort(port);
 }
 
 /* Connect a patch between several source and sink ports */
