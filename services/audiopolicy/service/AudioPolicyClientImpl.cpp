@@ -246,14 +246,4 @@ void AudioPolicyService::AudioPolicyClient::setSoundTriggerCaptureState(bool act
     mAudioPolicyService->mCaptureStateNotifier.setCaptureState(active);
 }
 
-status_t AudioPolicyService::AudioPolicyClient::getAudioPort(struct audio_port_v7 *port)
-{
-    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
-    if (af == 0) {
-        ALOGW("%s: could not get AudioFlinger", __func__);
-        return PERMISSION_DENIED;
-    }
-    return af->getAudioPort(port);
-}
-
 } // namespace android
