@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,4 +16,24 @@
 
 package android.media;
 
-parcelable MicrophoneInfo cpp_header "media/MicrophoneInfo.h";
+/**
+ * {@hide}
+ */
+parcelable MicrophoneInfoData {
+    @utf8InCpp String deviceId;
+    int portId;
+    int type;
+    @utf8InCpp String address;
+    int deviceLocation;
+    int deviceGroup;
+    int indexInTheGroup;
+    float[] geometricLocation;
+    float[] orientation;
+    float[] frequencies;
+    float[] frequencyResponses;
+    int[] channelMapping;
+    float sensitivity;
+    float maxSpl;
+    float minSpl;
+    int directionality;
+}

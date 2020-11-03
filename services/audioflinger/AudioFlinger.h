@@ -664,7 +664,7 @@ using effect_buffer_t = int16_t;
                 int /*audio_session_t*/ triggerSession);
         virtual binder::Status   stop();
         virtual binder::Status   getActiveMicrophones(
-                std::vector<media::MicrophoneInfo>* activeMicrophones);
+                std::vector<media::MicrophoneInfoData>* activeMicrophones);
         virtual binder::Status   setPreferredMicrophoneDirection(
                 int /*audio_microphone_direction_t*/ direction);
         virtual binder::Status   setPreferredMicrophoneFieldDimension(float zoom);

@@ -135,12 +135,6 @@ ConversionResult<UnionFieldType<T, tag>> unionGetField(const T& u) {
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
-template<typename To, typename From>
-ConversionResult<To> convertReinterpret(From from) {
-    static_assert(sizeof(From) == sizeof(To));
-    return static_cast<To>(from);
-}
-
 enum class Direction {
     INPUT, OUTPUT
 };

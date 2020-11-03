@@ -85,6 +85,16 @@ ConversionResult<To> convertIntegral(From from) {
     return static_cast<To>(from);
 }
 
+/**
+ * A generic template to safely cast between types, that are intended to be the same size, but
+ * interpreted differently.
+ */
+template<typename To, typename From>
+ConversionResult<To> convertReinterpret(From from) {
+    static_assert(sizeof(From) == sizeof(To));
+    return static_cast<To>(from);
+}
+
 // maxSize is the size of the C-string buffer (including the 0-terminator), NOT the max length of
 // the string.
 status_t aidl2legacy_string(std::string_view aidl, char* dest, size_t maxSize);

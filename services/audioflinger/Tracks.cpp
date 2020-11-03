@@ -2147,10 +2147,15 @@ void AudioFlinger::RecordHandle::stop_nonvirtual() {
 }
 
 binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+        std::vector<media::MicrophoneInfoData>* activeMicrophones) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(
-            mRecordTrack->getActiveMicrophones(activeMicrophones));
+    std::vector<media::MicrophoneInfo> mics;
+    status_t status = mRecordTrack->getActiveMicrophones(&mics);
+    activeMicrophones->resize(mics.size());
+    for (size_t i = 0; status == OK && i < mics.size(); ++i) {
+       status = mics[i].writeToParcelable(&activeMicrophones->at(i));
+    }
+    return binder::Status::fromStatusT(status);
 }
 
 binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneDirection(

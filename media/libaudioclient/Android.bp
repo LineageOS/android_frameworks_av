@@ -73,7 +73,6 @@ cc_library_shared {
         // AIDL files for audioclient interfaces
         // The headers for these interfaces will be available to any modules that
         // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
-        ":libaudioclient_aidl_private",
         ":libaudioclient_aidl",
 
         "AudioEffect.cpp",
@@ -154,10 +153,14 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libaudioclient_aidl_conversion",
     srcs: ["AidlConversion.cpp"],
-    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
     shared_libs: [
         "audioclient-types-aidl-unstable-cpp",
         "libbase",
@@ -183,6 +186,12 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
     },
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth.updatable",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
 }
 
 // AIDL interface between libaudioclient and framework.jar
@@ -190,16 +199,6 @@ filegroup {
     name: "libaudioclient_aidl",
     srcs: [
         "aidl/android/media/IPlayer.aidl",
-    ],
-    path: "aidl",
-}
-
-// Used to strip the "aidl/" from the path, so the build system can predict the
-// output filename.
-filegroup {
-    name: "libaudioclient_aidl_private",
-    srcs: [
-        "aidl/android/media/IAudioRecord.aidl",
     ],
     path: "aidl",
 }
@@ -263,7 +262,7 @@ aidl_interface {
         "aidl/android/media/AudioStreamType.aidl",
         "aidl/android/media/AudioTimestampInternal.aidl",
         "aidl/android/media/AudioUsage.aidl",
-     ],
+    ],
     imports: [
         "audio_common-aidl",
     ],
@@ -291,6 +290,7 @@ aidl_interface {
         "aidl/android/media/CreateTrackResponse.aidl",
 
         "aidl/android/media/IAudioFlingerClient.aidl",
+        "aidl/android/media/IAudioRecord.aidl",
         "aidl/android/media/IAudioTrack.aidl",
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],

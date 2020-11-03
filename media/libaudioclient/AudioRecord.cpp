@@ -1531,7 +1531,13 @@ void AudioRecord::onAudioDeviceUpdate(audio_io_handle_t audioIo,
 status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
 {
     AutoMutex lock(mLock);
-    return mAudioRecord->getActiveMicrophones(activeMicrophones).transactionError();
+    std::vector<media::MicrophoneInfoData> mics;
+    status_t status = mAudioRecord->getActiveMicrophones(&mics).transactionError();
+    activeMicrophones->resize(mics.size());
+    for (size_t i = 0; status == OK && i < mics.size(); ++i) {
+        status = activeMicrophones->at(i).readFromParcelable(mics[i]);
+    }
+    return status;
 }
 
 status_t AudioRecord::setPreferredMicrophoneDirection(audio_microphone_direction_t direction)
