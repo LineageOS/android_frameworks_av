@@ -4386,7 +4386,7 @@ MediaTrackHelper *MPEG4Extractor::getTrack(size_t index) {
 
         const uint8_t *ptr = (const uint8_t *)data;
 
-        if (size < 5 || ptr[0] != 0x81) {  // configurationVersion == 1
+        if (size < 4 || ptr[0] != 0x81) {  // configurationVersion == 1
             return NULL;
         }
         if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF)) {
