@@ -1683,4 +1683,22 @@ legacy2aidl_NullableIMemory_SharedFileRegion(const sp<IMemory>& legacy) {
     return aidl;
 }
 
+ConversionResult<AudioTimestamp>
+aidl2legacy_AudioTimestamp(const media::AudioTimestampInternal& aidl) {
+    AudioTimestamp legacy;
+    legacy.mPosition = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.position));
+    legacy.mTime.tv_sec = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.sec));
+    legacy.mTime.tv_nsec = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.nsec));
+    return legacy;
+}
+
+ConversionResult<media::AudioTimestampInternal>
+legacy2aidl_AudioTimestamp(const AudioTimestamp& legacy) {
+    media::AudioTimestampInternal aidl;
+    aidl.position = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mPosition));
+    aidl.sec = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mTime.tv_sec));
+    aidl.nsec = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mTime.tv_nsec));
+    return aidl;
+}
+
 }  // namespace android

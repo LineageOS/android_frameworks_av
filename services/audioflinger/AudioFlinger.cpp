@@ -757,9 +757,9 @@ void AudioFlinger::unregisterWriter(const sp<NBLog::Writer>& writer)
 
 // IAudioFlinger interface
 
-sp<IAudioTrack> AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
-                                          media::CreateTrackResponse& _output,
-                                          status_t* status)
+sp<media::IAudioTrack> AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
+                                                 media::CreateTrackResponse& _output,
+                                                 status_t* status)
 {
     // Local version of VALUE_OR_RETURN, specific to this method's calling conventions.
 #define VALUE_OR_EXIT(expr)         \

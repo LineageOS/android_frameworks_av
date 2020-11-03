@@ -256,12 +256,12 @@ public:
     {
     }
 
-    virtual sp<IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                        media::CreateTrackResponse& output,
-                                        status_t* status)
+    virtual sp<media::IAudioTrack> createTrack(const media::CreateTrackRequest& input,
+                                               media::CreateTrackResponse& output,
+                                               status_t* status)
     {
         Parcel data, reply;
-        sp<IAudioTrack> track;
+        sp<media::IAudioTrack> track;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
 
         if (status == nullptr) {
@@ -281,7 +281,7 @@ public:
             ALOGE("createTrack returned error %d", *status);
             return track;
         }
-        track = interface_cast<IAudioTrack>(reply.readStrongBinder());
+        track = interface_cast<media::IAudioTrack>(reply.readStrongBinder());
         if (track == 0) {
             ALOGE("createTrack returned an NULL IAudioTrack with status OK");
             *status = DEAD_OBJECT;
@@ -1199,9 +1199,9 @@ status_t BnAudioFlinger::onTransact(
             status_t status;
             media::CreateTrackResponse output;
 
-            sp<IAudioTrack> track= createTrack(input,
-                                               output,
-                                               &status);
+            sp<media::IAudioTrack> track= createTrack(input,
+                                                      output,
+                                                      &status);
 
             LOG_ALWAYS_FATAL_IF((track != 0) != (status == NO_ERROR));
             reply->writeInt32(status);

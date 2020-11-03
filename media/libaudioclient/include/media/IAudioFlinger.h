@@ -29,7 +29,6 @@
 #include <media/AidlConversion.h>
 #include <media/AudioClient.h>
 #include <media/DeviceDescriptorBase.h>
-#include <media/IAudioTrack.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
@@ -44,6 +43,7 @@
 #include "android/media/CreateTrackResponse.h"
 #include "android/media/IAudioRecord.h"
 #include "android/media/IAudioFlingerClient.h"
+#include "android/media/IAudioTrack.h"
 #include "android/media/IAudioTrackCallback.h"
 #include "android/media/IEffect.h"
 #include "android/media/IEffectClient.h"
@@ -163,9 +163,9 @@ public:
     /* create an audio track and registers it with AudioFlinger.
      * return null if the track cannot be created.
      */
-    virtual sp<IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                        media::CreateTrackResponse& output,
-                                        status_t* status) = 0;
+    virtual sp<media::IAudioTrack> createTrack(const media::CreateTrackRequest& input,
+                                               media::CreateTrackResponse& output,
+                                               status_t* status) = 0;
 
     virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
                                                  media::CreateRecordResponse& output,

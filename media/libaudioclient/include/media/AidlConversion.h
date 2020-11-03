@@ -34,12 +34,14 @@
 #include <android/media/AudioIoDescriptor.h>
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPortConfigType.h>
+#include <android/media/AudioTimestampInternal.h>
 
 #include <android/media/SharedFileRegion.h>
 
 #include <binder/IMemory.h>
 #include <media/AudioClient.h>
 #include <media/AudioIoDescriptor.h>
+#include <media/AudioTimestamp.h>
 
 namespace android {
 
@@ -279,5 +281,10 @@ ConversionResult<sp<IMemory>>
 aidl2legacy_NullableSharedFileRegion_IMemory(const std::optional<media::SharedFileRegion>& aidl);
 ConversionResult<std::optional<media::SharedFileRegion>>
 legacy2aidl_NullableIMemory_SharedFileRegion(const sp<IMemory>& legacy);
+
+ConversionResult<AudioTimestamp>
+aidl2legacy_AudioTimestamp(const media::AudioTimestampInternal& aidl);
+ConversionResult<media::AudioTimestampInternal>
+legacy2aidl_AudioTimestamp(const AudioTimestamp& legacy);
 
 }  // namespace android

@@ -84,7 +84,6 @@ cc_library_shared {
         "IAudioFlinger.cpp",
         "IAudioPolicyService.cpp",
         "IAudioPolicyServiceClient.cpp",
-        "IAudioTrack.cpp",
         "ToneGenerator.cpp",
         "PlayerBase.cpp",
         "RecordingActivityTracker.cpp",
@@ -262,6 +261,7 @@ aidl_interface {
         "aidl/android/media/AudioPortType.aidl",
         "aidl/android/media/AudioSourceType.aidl",
         "aidl/android/media/AudioStreamType.aidl",
+        "aidl/android/media/AudioTimestampInternal.aidl",
         "aidl/android/media/AudioUsage.aidl",
      ],
     imports: [
@@ -291,10 +291,12 @@ aidl_interface {
         "aidl/android/media/CreateTrackResponse.aidl",
 
         "aidl/android/media/IAudioFlingerClient.aidl",
+        "aidl/android/media/IAudioTrack.aidl",
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     imports: [
         "audioclient-types-aidl",
+        "av-types-aidl",
         "shared-file-region-aidl",
     ],
     double_loadable: true,

@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/media/BnAudioTrack.h>
 #include <android/media/IAudioFlingerClient.h>
 #include <android/media/IAudioTrackCallback.h>
 #include <android/os/BnExternalVibrationController.h>
@@ -43,7 +44,6 @@
 
 #include <cutils/properties.h>
 #include <media/IAudioFlinger.h>
-#include <media/IAudioTrack.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
 #include <media/MmapStreamInterface.h>
@@ -135,9 +135,9 @@ public:
     virtual     status_t    dump(int fd, const Vector<String16>& args);
 
     // IAudioFlinger interface, in binder opcode order
-    virtual sp<IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                        media::CreateTrackResponse& output,
-                                        status_t* status) override;
+    virtual sp<media::IAudioTrack> createTrack(const media::CreateTrackRequest& input,
+                                               media::CreateTrackResponse& output,
+                                               status_t* status) override;
 
     virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
                                                  media::CreateRecordResponse& output,
@@ -626,27 +626,30 @@ using effect_buffer_t = int16_t;
     }
 
     // server side of the client's IAudioTrack
-    class TrackHandle : public android::BnAudioTrack {
+    class TrackHandle : public android::media::BnAudioTrack {
     public:
         explicit            TrackHandle(const sp<PlaybackThread::Track>& track);
         virtual             ~TrackHandle();
-        virtual sp<IMemory> getCblk() const;
-        virtual status_t    start();
-        virtual void        stop();
-        virtual void        flush();
-        virtual void        pause();
-        virtual status_t    attachAuxEffect(int effectId);
-        virtual status_t    setParameters(const String8& keyValuePairs);
-        virtual status_t    selectPresentation(int presentationId, int programId);
-        virtual media::VolumeShaper::Status applyVolumeShaper(
-                const sp<media::VolumeShaper::Configuration>& configuration,
-                const sp<media::VolumeShaper::Operation>& operation) override;
-        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
-        virtual status_t    getTimestamp(AudioTimestamp& timestamp);
-        virtual void        signal(); // signal playback thread for a change in control block
 
-        virtual status_t onTransact(
-            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
+        binder::Status getCblk(std::optional<media::SharedFileRegion>* _aidl_return) override;
+        binder::Status start(int32_t* _aidl_return) override;
+        binder::Status stop() override;
+        binder::Status flush() override;
+        binder::Status pause() override;
+        binder::Status attachAuxEffect(int32_t effectId, int32_t* _aidl_return) override;
+        binder::Status setParameters(const std::string& keyValuePairs,
+                                     int32_t* _aidl_return) override;
+        binder::Status selectPresentation(int32_t presentationId, int32_t programId,
+                                          int32_t* _aidl_return) override;
+        binder::Status getTimestamp(media::AudioTimestampInternal* timestamp,
+                                    int32_t* _aidl_return) override;
+        binder::Status signal() override;
+        binder::Status applyVolumeShaper(const media::VolumeShaperConfiguration& configuration,
+                                         const media::VolumeShaperOperation& operation,
+                                         int32_t* _aidl_return) override;
+        binder::Status getVolumeShaperState(
+                int32_t id,
+                std::optional<media::VolumeShaperState>* _aidl_return) override;
 
     private:
         const sp<PlaybackThread::Track> mTrack;
