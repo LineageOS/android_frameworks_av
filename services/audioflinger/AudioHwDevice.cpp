@@ -98,9 +98,5 @@ bool AudioHwDevice::supportsAudioPatches() const {
     return mHwDevice->supportsAudioPatches(&result) == OK ? result : false;
 }
 
-status_t AudioHwDevice::getAudioPort(struct audio_port_v7 *port) const {
-    return mHwDevice->getAudioPort(port);
-}
-
 
 }; // namespace android

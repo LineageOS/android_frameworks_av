@@ -80,12 +80,13 @@ void DeviceDescriptorBase::toAudioPortConfig(struct audio_port_config *dstConfig
 void DeviceDescriptorBase::toAudioPort(struct audio_port *port) const
 {
     ALOGV("DeviceDescriptorBase::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
-    toAudioPortInternal(port);
-}
-
-void DeviceDescriptorBase::toAudioPort(struct audio_port_v7 *port) const {
-    ALOGV("DeviceDescriptorBase::toAudioPort() v7 handle %d type %08x", mId, mDeviceTypeAddr.mType);
-    toAudioPortInternal(port);
+    AudioPort::toAudioPort(port);
+    toAudioPortConfig(&port->active_config);
+    port->id = mId;
+    port->ext.device.type = mDeviceTypeAddr.mType;
+    port->ext.device.encapsulation_modes = mEncapsulationModes;
+    port->ext.device.encapsulation_metadata_types = mEncapsulationMetadataTypes;
+    (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mDeviceTypeAddr.getAddress());
 }
 
 status_t DeviceDescriptorBase::setEncapsulationModes(uint32_t encapsulationModes) {
