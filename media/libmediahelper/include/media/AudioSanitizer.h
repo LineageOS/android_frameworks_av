@@ -38,9 +38,6 @@ public:
     static status_t sanitizeAudioPort(
             struct audio_port *port, const char *bugNumber = nullptr);
 
-    static status_t sanitizeAudioPort(
-            struct audio_port_v7 *port, const char *bugNumber = nullptr);
-
     static status_t sanitizeAudioPatch(
             struct audio_patch *patch, const char *bugNumber = nullptr);
 };

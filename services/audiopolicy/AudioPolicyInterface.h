@@ -444,8 +444,6 @@ public:
     // sessions to be preempted on modules that do not support sound trigger
     // recognition concurrently with audio capture.
     virtual void setSoundTriggerCaptureState(bool active) = 0;
-
-    virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
 };
 
 extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface);
