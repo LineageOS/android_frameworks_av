@@ -60,7 +60,7 @@ struct WAVSource : public MediaSource {
             const sp<DataSource> &dataSource,
             const sp<MetaData> &meta,
             uint16_t waveFormat,
-            int32_t bitsPerSample,
+            uint32_t bitsPerSample,
             off64_t offset, size_t size);
 
     virtual status_t start(MetaData *params = NULL);
@@ -81,9 +81,9 @@ private:
     sp<DataSource> mDataSource;
     sp<MetaData> mMeta;
     uint16_t mWaveFormat;
-    int32_t mSampleRate;
-    int32_t mNumChannels;
-    int32_t mBitsPerSample;
+    uint32_t mSampleRate;
+    uint32_t mNumChannels;
+    uint32_t mBitsPerSample;
     off64_t mOffset;
     size_t mSize;
     bool mStarted;
@@ -351,7 +351,7 @@ WAVSource::WAVSource(
         const sp<DataSource> &dataSource,
         const sp<MetaData> &meta,
         uint16_t waveFormat,
-        int32_t bitsPerSample,
+        uint32_t bitsPerSample,
         off64_t offset, size_t size)
     : mDataSource(dataSource),
       mMeta(meta),
@@ -363,8 +363,8 @@ WAVSource::WAVSource(
       mSize(size),
       mStarted(false),
       mGroup(NULL) {
-    CHECK(mMeta->findInt32(kKeySampleRate, &mSampleRate));
-    CHECK(mMeta->findInt32(kKeyChannelCount, &mNumChannels));
+    CHECK(mMeta->findInt32(kKeySampleRate, (int32_t*) &mSampleRate));
+    CHECK(mMeta->findInt32(kKeyChannelCount, (int32_t*) &mNumChannels));
 
     mMeta->setInt32(kKeyMaxInputSize, kMaxFrameSize);
 }
@@ -452,8 +452,8 @@ status_t WAVSource::read(
         mBitsPerSample == 8 ? kMaxFrameSize / 2 : 
         (mBitsPerSample == 24 ? 3*(kMaxFrameSize/3): kMaxFrameSize);
 
-    size_t maxBytesAvailable =
-        (mCurrentPos - mOffset >= (off64_t)mSize)
+    const size_t maxBytesAvailable =
+        (mCurrentPos < mOffset || mCurrentPos - mOffset >= (off64_t)mSize)
             ? 0 : mSize - (mCurrentPos - mOffset);
 
     if (maxBytesToRead > maxBytesAvailable) {
