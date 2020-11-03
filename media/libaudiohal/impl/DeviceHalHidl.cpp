@@ -388,6 +388,34 @@ status_t DeviceHalHidl::getAudioPort(struct audio_port *port) {
     return processReturn("getAudioPort", ret, retval);
 }
 
+status_t DeviceHalHidl::getAudioPort(struct audio_port_v7 *port) {
+    if (mDevice == 0) return NO_INIT;
+    AudioPort hidlPort;
+#if MAJOR_VERSION >= 7
+    HidlUtils::audioPortFromHal(*port, &hidlPort);
+#else
+    struct audio_port audioPort = {};
+    audio_populate_audio_port(port, &audioPort);
+    HidlUtils::audioPortFromHal(audioPort, &hidlPort);
+#endif
+    Result retval;
+    Return<void> ret = mDevice->getAudioPort(
+            hidlPort,
+            [&](Result r, const AudioPort& p) {
+                retval = r;
+                if (retval == Result::OK) {
+#if MAJOR_VERSION >= 7
+                    HidlUtils::audioPortToHal(p, port);
+#else
+                    struct audio_port audioPort = {};
+                    HidlUtils::audioPortToHal(p, &audioPort);
+                    audio_populate_audio_port_v7(&audioPort, port);
+#endif
+                }
+            });
+    return processReturn("getAudioPort", ret, retval);
+}
+
 status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *config) {
     if (mDevice == 0) return NO_INIT;
     AudioPortConfig hidlConfig;

@@ -796,14 +796,14 @@ public:
         reply.read(ports, *num_ports * sizeof(struct audio_port));
         return status;
     }
-    virtual status_t getAudioPort(struct audio_port *port)
+    virtual status_t getAudioPort(struct audio_port_v7 *port)
     {
-        if (port == NULL) {
+        if (port == nullptr) {
             return BAD_VALUE;
         }
         Parcel data, reply;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.write(port, sizeof(struct audio_port));
+        data.write(port, sizeof(struct audio_port_v7));
         status_t status = remote()->transact(GET_AUDIO_PORT, data, &reply);
         if (status != NO_ERROR ||
                 (status = (status_t)reply.readInt32()) != NO_ERROR) {
@@ -1495,7 +1495,7 @@ status_t BnAudioFlinger::onTransact(
         } break;
         case GET_AUDIO_PORT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            struct audio_port port = {};
+            struct audio_port_v7 port = {};
             status_t status = data.read(&port, sizeof(struct audio_port));
             if (status != NO_ERROR) {
                 ALOGE("b/23905951");
@@ -1507,7 +1507,7 @@ status_t BnAudioFlinger::onTransact(
             }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
-                reply->write(&port, sizeof(struct audio_port));
+                reply->write(&port, sizeof(struct audio_port_v7));
             }
             return NO_ERROR;
         } break;

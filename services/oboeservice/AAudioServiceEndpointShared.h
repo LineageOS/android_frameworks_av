@@ -20,6 +20,8 @@
 #include <atomic>
 #include <mutex>
 
+#include <android-base/thread_annotations.h>
+
 #include "AAudioServiceEndpoint.h"
 #include "client/AudioStreamInternal.h"
 #include "client/AudioStreamInternalPlay.h"
@@ -63,7 +65,7 @@ public:
 
 protected:
 
-    aaudio_result_t          startSharingThread_l();
+    aaudio_result_t          startSharingThread_l() REQUIRES(mLockStreams);
 
     aaudio_result_t          stopSharingThread();
 
