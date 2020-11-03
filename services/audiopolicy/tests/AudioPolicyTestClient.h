@@ -87,9 +87,6 @@ public:
                             audio_session_t sessionId __unused,
                             bool suspended __unused) {}
     void setSoundTriggerCaptureState(bool active __unused) override {};
-    status_t getAudioPort(struct audio_port_v7 *port __unused) override {
-        return INVALID_OPERATION;
-    };
 };
 
 } // namespace android

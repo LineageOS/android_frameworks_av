@@ -17,7 +17,6 @@
 #pragma once
 
 #include <string>
-#include <type_traits>
 
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
@@ -49,8 +48,6 @@ public:
 
     virtual void toAudioPort(struct audio_port *port) const;
 
-    virtual void toAudioPort(struct audio_port_v7 *port) const;
-
     virtual void addAudioProfile(const sp<AudioProfile> &profile) {
         mProfiles.add(profile);
     }
@@ -66,8 +63,6 @@ public:
     AudioProfileVector &getAudioProfiles() { return mProfiles; }
 
     virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
-
-    virtual void importAudioPort(const audio_port_v7& port);
 
     status_t checkGain(const struct audio_gain_config *gainConfig, int index) const {
         if (index < 0 || (size_t)index >= mGains.size()) {
@@ -97,18 +92,6 @@ protected:
     audio_port_type_t mType;
     audio_port_role_t mRole;
     AudioProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
-private:
-    template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
-                                        || std::is_same<T, struct audio_port_v7>::value, int> = 0>
-    void toAudioPortBase(T* port) const {
-        port->role = mRole;
-        port->type = mType;
-        strlcpy(port->name, mName.c_str(), AUDIO_PORT_MAX_NAME_LEN);
-        port->num_gains = std::min(mGains.size(), (size_t) AUDIO_PORT_MAX_GAINS);
-        for (size_t i = 0; i < port->num_gains; i++) {
-            port->gains[i] = mGains[i]->getGain();
-        }
-    }
 };
 
 
