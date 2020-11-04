@@ -17,13 +17,13 @@
 #ifndef AAUDIO_AAUDIO_STREAM_TRACKER_H
 #define AAUDIO_AAUDIO_STREAM_TRACKER_H
 
+#include <mutex>
 #include <time.h>
-#include <pthread.h>
 
+#include <android-base/thread_annotations.h>
 #include <aaudio/AAudio.h>
 
 #include "binding/AAudioCommon.h"
-
 #include "AAudioServiceStreamBase.h"
 
 namespace aaudio {
@@ -75,11 +75,10 @@ private:
     static aaudio_handle_t bumpHandle(aaudio_handle_t handle);
 
     // Track stream using a unique handle that wraps. Only use positive half.
-    mutable std::mutex                mHandleLock;
-    // protected by mHandleLock
-    aaudio_handle_t                   mPreviousHandle = 0;
-    // protected by mHandleLock
-    std::map<aaudio_handle_t, android::sp<aaudio::AAudioServiceStreamBase>> mStreamsByHandle;
+    mutable std::mutex            mHandleLock;
+    aaudio_handle_t               mPreviousHandle GUARDED_BY(mHandleLock) = 0;
+    std::map<aaudio_handle_t, android::sp<aaudio::AAudioServiceStreamBase>>
+            mStreamsByHandle GUARDED_BY(mHandleLock);
 };
 
 

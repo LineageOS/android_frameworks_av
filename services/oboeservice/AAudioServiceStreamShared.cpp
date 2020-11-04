@@ -52,13 +52,25 @@ std::string AAudioServiceStreamShared::dumpHeader() {
     return result.str();
 }
 
-std::string AAudioServiceStreamShared::dump() const {
+std::string AAudioServiceStreamShared::dump() const NO_THREAD_SAFETY_ANALYSIS {
     std::stringstream result;
+
+    const bool isLocked = AAudio_tryUntilTrue(
+            [this]()->bool { return audioDataQueueLock.try_lock(); } /* f */,
+            50 /* times */,
+            20 /* sleepMs */);
+    if (!isLocked) {
+        result << "AAudioServiceStreamShared may be deadlocked\n";
+    }
 
     result << AAudioServiceStreamBase::dump();
 
     result << mAudioDataQueue->dump();
     result << std::setw(8) << getXRunCount();
+
+    if (isLocked) {
+        audioDataQueueLock.unlock();
+    }
 
     return result.str();
 }
@@ -171,7 +183,7 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
     }
 
     {
-        std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
+        std::lock_guard<std::mutex> lock(audioDataQueueLock);
         // Create audio data shared memory buffer for client.
         mAudioDataQueue = std::make_shared<SharedRingBuffer>();
         result = mAudioDataQueue->allocate(calculateBytesPerFrame(), getBufferCapacity());
@@ -202,7 +214,7 @@ error:
 aaudio_result_t AAudioServiceStreamShared::getAudioDataDescription(
         AudioEndpointParcelable &parcelable)
 {
-    std::lock_guard<std::mutex> lock(mAudioDataQueueLock);
+    std::lock_guard<std::mutex> lock(audioDataQueueLock);
     if (mAudioDataQueue == nullptr) {
         ALOGW("%s(): mUpMessageQueue null! - stream not open", __func__);
         return AAUDIO_ERROR_NULL;
@@ -260,7 +272,7 @@ void AAudioServiceStreamShared::writeDataIfRoom(int64_t mmapFramesRead,
     int64_t clientFramesWritten = 0;
 
     // Lock the AudioFifo to protect against close.
-    std::lock_guard <std::mutex> lock(mAudioDataQueueLock);
+    std::lock_guard <std::mutex> lock(audioDataQueueLock);
 
     if (mAudioDataQueue != nullptr) {
         std::shared_ptr<FifoBuffer> fifo = mAudioDataQueue->getFifoBuffer();

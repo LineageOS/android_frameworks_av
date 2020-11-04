@@ -43,7 +43,7 @@ AAudioEndpointManager::AAudioEndpointManager()
         , mExclusiveStreams() {
 }
 
-std::string AAudioEndpointManager::dump() const {
+std::string AAudioEndpointManager::dump() const NO_THREAD_SAFETY_ANALYSIS {
     std::stringstream result;
     int index = 0;
 

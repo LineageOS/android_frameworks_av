@@ -137,24 +137,25 @@ aaudio_result_t aaudio::AAudioServiceEndpointShared::startSharingThread_l() {
 
 aaudio_result_t aaudio::AAudioServiceEndpointShared::stopSharingThread() {
     mCallbackEnabled.store(false);
-    aaudio_result_t result = getStreamInternal()->joinThread(NULL);
-    return result;
+    return getStreamInternal()->joinThread(NULL);
 }
 
-aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamBase> sharedStream,
-                                                         audio_port_handle_t *clientHandle) {
+aaudio_result_t AAudioServiceEndpointShared::startStream(
+        sp<AAudioServiceStreamBase> sharedStream,
+        audio_port_handle_t *clientHandle)
+        NO_THREAD_SAFETY_ANALYSIS {
     aaudio_result_t result = AAUDIO_OK;
 
     {
         std::lock_guard<std::mutex> lock(mLockStreams);
         if (++mRunningStreamCount == 1) { // atomic
-            result = getStreamInternal()->requestStart_l();
+            result = getStreamInternal()->systemStart();
             if (result != AAUDIO_OK) {
                 --mRunningStreamCount;
             } else {
                 result = startSharingThread_l();
                 if (result != AAUDIO_OK) {
-                    getStreamInternal()->requestStop_l();
+                    getStreamInternal()->systemStopFromApp();
                     --mRunningStreamCount;
                 }
             }
@@ -168,7 +169,7 @@ aaudio_result_t AAudioServiceEndpointShared::startStream(sp<AAudioServiceStreamB
         if (result != AAUDIO_OK) {
             if (--mRunningStreamCount == 0) { // atomic
                 stopSharingThread();
-                getStreamInternal()->requestStop_l();
+                getStreamInternal()->systemStopFromApp();
             }
         }
     }
@@ -183,7 +184,7 @@ aaudio_result_t AAudioServiceEndpointShared::stopStream(sp<AAudioServiceStreamBa
 
     if (--mRunningStreamCount == 0) { // atomic
         stopSharingThread(); // the sharing thread locks mLockStreams
-        getStreamInternal()->requestStop_l();
+        getStreamInternal()->systemStopFromApp();
     }
     return AAUDIO_OK;
 }
