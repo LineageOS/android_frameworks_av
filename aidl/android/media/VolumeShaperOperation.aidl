@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,14 @@
 
 package android.media;
 
-import android.media.VolumeShaperConfiguration;
-import android.media.VolumeShaperOperation;
-
 /**
- * @hide
+ * {@hide}
  */
-interface IPlayer {
-    oneway void start();
-    oneway void pause();
-    oneway void stop();
-    oneway void setVolume(float vol);
-    oneway void setPan(float pan);
-    oneway void setStartDelayMs(int delayMs);
-    oneway void applyVolumeShaper(in VolumeShaperConfiguration configuration,
-                                  in VolumeShaperOperation operation);
+parcelable VolumeShaperOperation {
+    /** Operations to do. Bitmask of VolumeShaperOperationFlag. */
+    int flags;
+    /** If >= 0 the id to remove in a replace operation. */
+    int replaceId;
+    /** Position in the curve to set if a valid number (not nan). */
+    float xOffset;
 }

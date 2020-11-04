@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,20 @@
  * limitations under the License.
  */
 
-package android.media.VolumeShaper;
+package android.media;
 
-parcelable State cpp_header "media/VolumeShaper.h";
+import android.media.InterpolatorConfig;
+import android.media.VolumeShaperConfigurationOptionFlag;
+import android.media.VolumeShaperConfigurationType;
+
+/**
+ * {@hide}
+ */
+parcelable VolumeShaperConfiguration {
+    VolumeShaperConfigurationType type;
+    int id;
+    /** Bitmask, indexed by VolumeShaperConfigurationOptionFlag. */
+    int optionFlags;
+    double durationMs;
+    InterpolatorConfig interpolatorConfig;
+}

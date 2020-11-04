@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +14,14 @@
  * limitations under the License.
  */
 
-package android.media.VolumeShaper;
+package android.media;
 
-parcelable Operation cpp_header "media/VolumeShaper.h";
+/**
+ * {@hide}
+ */
+parcelable VolumeShaperState {
+    /** Linear volume in the range MIN_LINEAR_VOLUME to MAX_LINEAR_VOLUME. */
+    float volume;
+    /** Position on curve expressed from MIN_CURVE_TIME to MAX_CURVE_TIME. */
+    float xOffset;
+}

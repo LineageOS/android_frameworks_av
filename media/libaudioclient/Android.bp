@@ -15,9 +15,11 @@ cc_library_headers {
     ],
     static_libs: [
         "audioflinger-aidl-unstable-cpp",
+        "av-types-aidl-unstable-cpp",
     ],
     export_static_lib_headers: [
         "audioflinger-aidl-unstable-cpp",
+        "av-types-aidl-unstable-cpp",
     ],
     target: {
         darwin: {
@@ -63,7 +65,7 @@ cc_library_shared {
         export_aidl_headers: true,
         local_include_dirs: ["aidl"],
         include_dirs: [
-            "frameworks/av/media/libaudioclient/aidl",
+            "frameworks/av/aidl",
         ],
     },
 
@@ -91,6 +93,7 @@ cc_library_shared {
     shared_libs: [
         "audioclient-types-aidl-unstable-cpp",
         "audioflinger-aidl-unstable-cpp",
+        "av-types-aidl-unstable-cpp",
         "capture_state_listener-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
@@ -260,10 +263,19 @@ aidl_interface {
         "aidl/android/media/AudioSourceType.aidl",
         "aidl/android/media/AudioStreamType.aidl",
         "aidl/android/media/AudioUsage.aidl",
-    ],
+     ],
     imports: [
         "audio_common-aidl",
     ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+            ],
+        },
+    },
 }
 
 aidl_interface {
