@@ -16,6 +16,9 @@
 
 #pragma once
 
+#include <limits>
+#include <type_traits>
+
 #include <system/audio.h>
 
 #include <android-base/result.h>
@@ -32,6 +35,47 @@ namespace android {
 
 template <typename T>
 using ConversionResult = base::expected<T, status_t>;
+
+/**
+ * A generic template to safely cast between integral types, respecting limits of the destination
+ * type.
+ */
+template<typename To, typename From>
+ConversionResult<To> convertIntegral(From from) {
+    // Special handling is required for signed / vs. unsigned comparisons, since otherwise we may
+    // have the signed converted to unsigned and produce wrong results.
+    if (std::is_signed_v<From> && !std::is_signed_v<To>) {
+        if (from < 0 || from > std::numeric_limits<To>::max()) {
+            return base::unexpected(BAD_VALUE);
+        }
+    } else if (std::is_signed_v<To> && !std::is_signed_v<From>) {
+        if (from > std::numeric_limits<To>::max()) {
+            return base::unexpected(BAD_VALUE);
+        }
+    } else {
+        if (from < std::numeric_limits<To>::min() || from > std::numeric_limits<To>::max()) {
+            return base::unexpected(BAD_VALUE);
+        }
+    }
+    return static_cast<To>(from);
+}
+
+// maxSize is the size of the C-string buffer (including the 0-terminator), NOT the max length of
+// the string.
+status_t aidl2legacy_string(std::string_view aidl, char* dest, size_t maxSize);
+ConversionResult<std::string> legacy2aidl_string(const char* legacy, size_t maxSize);
+
+ConversionResult<audio_module_handle_t> aidl2legacy_int32_t_audio_module_handle_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_module_handle_t_int32_t(audio_module_handle_t legacy);
+
+ConversionResult<audio_io_handle_t> aidl2legacy_int32_t_audio_io_handle_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_io_handle_t_int32_t(audio_io_handle_t legacy);
+
+ConversionResult<audio_port_handle_t> aidl2legacy_int32_t_audio_port_handle_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_port_handle_t_int32_t(audio_port_handle_t legacy);
+
+ConversionResult<audio_patch_handle_t> aidl2legacy_int32_t_audio_patch_handle_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_patch_handle_t_int32_t(audio_patch_handle_t legacy);
 
 // The legacy enum is unnamed. Thus, we use int.
 ConversionResult<int> aidl2legacy_AudioPortConfigType(media::AudioPortConfigType aidl);
