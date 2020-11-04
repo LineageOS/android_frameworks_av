@@ -94,12 +94,12 @@ status_t CaptureRequest::readFromParcel(const android::Parcel* parcel) {
     // Do not distinguish null arrays from 0-sized arrays.
     for (int32_t i = 0; i < size; ++i) {
         // Parcel.writeParcelableArray
-        size_t len;
-        const char16_t* className = parcel->readString16Inplace(&len);
+        std::optional<std::string> className;
+        parcel->readUtf8FromUtf16(&className);
         ALOGV("%s: Read surface class = %s", __FUNCTION__,
-              className != NULL ? String8(className).string() : "<null>");
+              className.value_or("<null>").c_str());
 
-        if (className == NULL) {
+        if (className == std::nullopt) {
             continue;
         }
 
