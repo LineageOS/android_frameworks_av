@@ -88,7 +88,6 @@ public:
 
     // AudioPort
     virtual void toAudioPort(struct audio_port *port) const;
-    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
     void importAudioPortAndPickAudioProfile(const sp<PolicyAudioPort>& policyPort,
                                             bool force = false);
@@ -98,13 +97,6 @@ public:
     void dump(String8 *dst, int spaces, int index, bool verbose = true) const;
 
 private:
-    template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
-                                        || std::is_same<T, struct audio_port_v7>::value, int> = 0>
-    void toAudioPortInternal(T* port) const {
-        DeviceDescriptorBase::toAudioPort(port);
-        port->ext.device.hw_module = getModuleHandle();
-    }
-
     std::string mTagName; // Unique human readable identifier for a device port found in conf file.
     FormatVector        mEncodedFormats;
     audio_format_t      mCurrentEncodedFormat;
