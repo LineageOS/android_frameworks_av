@@ -231,19 +231,8 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *descriptor) const;
 
-    virtual sp<media::IEffect> createEffect(
-                        effect_descriptor_t *pDesc,
-                        const sp<media::IEffectClient>& effectClient,
-                        int32_t priority,
-                        audio_io_handle_t io,
-                        audio_session_t sessionId,
-                        const AudioDeviceTypeAddr& device,
-                        const String16& opPackageName,
-                        pid_t pid,
-                        bool probe,
-                        status_t *status /*non-NULL*/,
-                        int *id,
-                        int *enabled);
+    virtual status_t createEffect(const media::CreateEffectRequest& request,
+                                  media::CreateEffectResponse* response);
 
     virtual status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,
                         audio_io_handle_t dstOutput);

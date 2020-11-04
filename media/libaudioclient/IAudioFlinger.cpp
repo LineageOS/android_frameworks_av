@@ -792,66 +792,25 @@ public:
         return NO_ERROR;
     }
 
-    virtual sp<media::IEffect> createEffect(
-                                    effect_descriptor_t *pDesc,
-                                    const sp<media::IEffectClient>& client,
-                                    int32_t priority,
-                                    audio_io_handle_t output,
-                                    audio_session_t sessionId,
-                                    const AudioDeviceTypeAddr& device,
-                                    const String16& opPackageName,
-                                    pid_t pid,
-                                    bool probe,
-                                    status_t *status,
-                                    int *id,
-                                    int *enabled)
+    virtual status_t createEffect(const media::CreateEffectRequest& request,
+                                  media::CreateEffectResponse* response)
     {
         Parcel data, reply;
         sp<media::IEffect> effect;
-        if (pDesc == NULL) {
-            if (status != NULL) {
-                *status = BAD_VALUE;
-            }
-            return nullptr;
+        if (response == nullptr) {
+            return BAD_VALUE;
         }
-
-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.write(pDesc, sizeof(effect_descriptor_t));
-        data.writeStrongBinder(IInterface::asBinder(client));
-        data.writeInt32(priority);
-        data.writeInt32((int32_t) output);
-        data.writeInt32(sessionId);
-        if (data.writeParcelable(device) != NO_ERROR) {
-            if (status != NULL) {
-                *status = NO_INIT;
-            }
-            return nullptr;
-        }
-        data.writeString16(opPackageName);
-        data.writeInt32((int32_t) pid);
-        data.writeInt32(probe ? 1 : 0);
-
-        status_t lStatus = remote()->transact(CREATE_EFFECT, data, &reply);
+        status_t status;
+        status_t lStatus = data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor())
+                           ?: data.writeParcelable(request)
+                           ?: remote()->transact(CREATE_EFFECT, data, &reply)
+                           ?: reply.readInt32(&status)
+                           ?: reply.readParcelable(response)
+                           ?: status;
         if (lStatus != NO_ERROR) {
             ALOGE("createEffect error: %s", strerror(-lStatus));
-        } else {
-            lStatus = reply.readInt32();
-            int tmp = reply.readInt32();
-            if (id != NULL) {
-                *id = tmp;
-            }
-            tmp = reply.readInt32();
-            if (enabled != NULL) {
-                *enabled = tmp;
-            }
-            effect = interface_cast<media::IEffect>(reply.readStrongBinder());
-            reply.read(pDesc, sizeof(effect_descriptor_t));
         }
-        if (status != NULL) {
-            *status = lStatus;
-        }
-
-        return effect;
+        return lStatus;
     }
 
     virtual status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
@@ -1525,35 +1484,13 @@ status_t BnAudioFlinger::onTransact(
         }
         case CREATE_EFFECT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            effect_descriptor_t desc = {};
-            if (data.read(&desc, sizeof(effect_descriptor_t)) != NO_ERROR) {
-                ALOGE("b/23905951");
-            }
-            sp<media::IEffectClient> client =
-                    interface_cast<media::IEffectClient>(data.readStrongBinder());
-            int32_t priority = data.readInt32();
-            audio_io_handle_t output = (audio_io_handle_t) data.readInt32();
-            audio_session_t sessionId = (audio_session_t) data.readInt32();
-            AudioDeviceTypeAddr device;
-            status_t status = NO_ERROR;
-            if ((status = data.readParcelable(&device)) != NO_ERROR) {
-                return status;
-            }
-            const String16 opPackageName = data.readString16();
-            pid_t pid = (pid_t)data.readInt32();
-            bool probe = data.readInt32() == 1;
 
-            int id = 0;
-            int enabled = 0;
+            media::CreateEffectRequest request;
+            media::CreateEffectResponse response;
 
-            sp<media::IEffect> effect = createEffect(&desc, client, priority, output, sessionId,
-                    device, opPackageName, pid, probe, &status, &id, &enabled);
-            reply->writeInt32(status);
-            reply->writeInt32(id);
-            reply->writeInt32(enabled);
-            reply->writeStrongBinder(IInterface::asBinder(effect));
-            reply->write(&desc, sizeof(effect_descriptor_t));
-            return NO_ERROR;
+            return data.readParcelable(&request)
+                ?: reply->writeInt32(createEffect(request, &response))
+                ?: reply->writeParcelable(response);
         } break;
         case MOVE_EFFECTS: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);

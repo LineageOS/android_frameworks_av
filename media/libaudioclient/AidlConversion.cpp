@@ -284,6 +284,14 @@ ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy
     return std::string(String8(legacy).c_str());
 }
 
+ConversionResult<String8> aidl2legacy_string_view_String8(std::string_view aidl) {
+    return String8(aidl.data(), aidl.size());
+}
+
+ConversionResult<std::string> legacy2aidl_String8_string(const String8& legacy) {
+    return std::string(legacy.c_str());
+}
+
 // The legacy enum is unnamed. Thus, we use int.
 ConversionResult<int> aidl2legacy_AudioPortConfigType(media::AudioPortConfigType aidl) {
     switch (aidl) {
@@ -1692,6 +1700,61 @@ legacy2aidl_AudioTimestamp(const AudioTimestamp& legacy) {
     aidl.position = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mPosition));
     aidl.sec = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mTime.tv_sec));
     aidl.nsec = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mTime.tv_nsec));
+    return aidl;
+}
+
+ConversionResult<audio_uuid_t>
+aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl) {
+    audio_uuid_t legacy;
+    legacy.timeLow = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.timeLow));
+    legacy.timeMid = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.timeMid));
+    legacy.timeHiAndVersion = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.timeHiAndVersion));
+    legacy.clockSeq = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.clockSeq));
+    if (aidl.node.size() != std::size(legacy.node)) {
+        return unexpected(BAD_VALUE);
+    }
+    std::copy(aidl.node.begin(), aidl.node.end(), legacy.node);
+    return legacy;
+}
+
+ConversionResult<media::AudioUuid>
+legacy2aidl_audio_uuid_t_AudioUuid(const audio_uuid_t& legacy) {
+    media::AudioUuid aidl;
+    aidl.timeLow = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.timeLow));
+    aidl.timeMid = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.timeMid));
+    aidl.timeHiAndVersion = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.timeHiAndVersion));
+    aidl.clockSeq = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.clockSeq));
+    std::copy(legacy.node, legacy.node + std::size(legacy.node), std::back_inserter(aidl.node));
+    return aidl;
+}
+
+ConversionResult<effect_descriptor_t>
+aidl2legacy_EffectDescriptor_effect_descriptor_t(const media::EffectDescriptor& aidl) {
+    effect_descriptor_t legacy;
+    legacy.type = VALUE_OR_RETURN(aidl2legacy_AudioUuid_audio_uuid_t(aidl.type));
+    legacy.uuid = VALUE_OR_RETURN(aidl2legacy_AudioUuid_audio_uuid_t(aidl.uuid));
+    legacy.apiVersion = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.apiVersion));
+    legacy.flags = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.flags));
+    legacy.cpuLoad = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.cpuLoad));
+    legacy.memoryUsage = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.memoryUsage));
+    RETURN_IF_ERROR(aidl2legacy_string(aidl.name, legacy.name, sizeof(legacy.name)));
+    RETURN_IF_ERROR(
+            aidl2legacy_string(aidl.implementor, legacy.implementor, sizeof(legacy.implementor)));
+    return legacy;
+}
+
+ConversionResult<media::EffectDescriptor>
+legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& legacy) {
+    media::EffectDescriptor aidl;
+    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_uuid_t_AudioUuid(legacy.type));
+    aidl.uuid = VALUE_OR_RETURN(legacy2aidl_audio_uuid_t_AudioUuid(legacy.uuid));
+    aidl.apiVersion = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.apiVersion));
+    aidl.flags = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.flags));
+    aidl.cpuLoad = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.cpuLoad));
+    aidl.memoryUsage = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.memoryUsage));
+    aidl.name = VALUE_OR_RETURN(legacy2aidl_string(legacy.name, sizeof(legacy.name)));
+    aidl.implementor = VALUE_OR_RETURN(
+            legacy2aidl_string(legacy.implementor, sizeof(legacy.implementor)));
     return aidl;
 }
 

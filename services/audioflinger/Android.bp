@@ -38,6 +38,7 @@ cc_library_shared {
         "audioflinger-aidl-unstable-cpp",
         "audioclient-types-aidl-unstable-cpp",
         "av-types-aidl-unstable-cpp",
+        "effect-aidl-unstable-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libaudiohal",

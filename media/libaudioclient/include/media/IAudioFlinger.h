@@ -37,6 +37,8 @@
 #include <string>
 #include <vector>
 
+#include "android/media/CreateEffectRequest.h"
+#include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
 #include "android/media/CreateRecordResponse.h"
 #include "android/media/CreateTrackRequest.h"
@@ -278,20 +280,8 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *pDescriptor) const = 0;
 
-    virtual sp<media::IEffect> createEffect(
-                                    effect_descriptor_t *pDesc,
-                                    const sp<media::IEffectClient>& client,
-                                    int32_t priority,
-                                    // AudioFlinger doesn't take over handle reference from client
-                                    audio_io_handle_t output,
-                                    audio_session_t sessionId,
-                                    const AudioDeviceTypeAddr& device,
-                                    const String16& callingPackage,
-                                    pid_t pid,
-                                    bool probe,
-                                    status_t *status,
-                                    int *id,
-                                    int *enabled) = 0;
+    virtual status_t createEffect(const media::CreateEffectRequest& request,
+                                  media::CreateEffectResponse* response) = 0;
 
     virtual status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
                                     audio_io_handle_t dstOutput) = 0;

@@ -3474,23 +3474,28 @@ status_t AudioFlinger::getEffectDescriptor(const effect_uuid_t *pUuid,
     return status;
 }
 
-sp<media::IEffect> AudioFlinger::createEffect(
-        effect_descriptor_t *pDesc,
-        const sp<IEffectClient>& effectClient,
-        int32_t priority,
-        audio_io_handle_t io,
-        audio_session_t sessionId,
-        const AudioDeviceTypeAddr& device,
-        const String16& opPackageName,
-        pid_t pid,
-        bool probe,
-        status_t *status,
-        int *id,
-        int *enabled)
-{
-    status_t lStatus = NO_ERROR;
+status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
+                                    media::CreateEffectResponse* response) {
+    const sp<IEffectClient>& effectClient = request.client;
+    const int32_t priority = request.priority;
+    const AudioDeviceTypeAddr device = VALUE_OR_EXIT(
+            aidl2legacy_AudioDeviceTypeAddress(request.device));
+    const String16 opPackageName = VALUE_OR_EXIT(
+            aidl2legacy_string_view_String16(request.opPackageName));
+    pid_t pid = VALUE_OR_EXIT(aidl2legacy_int32_t_pid_t(request.pid));
+    const audio_session_t sessionId = VALUE_OR_EXIT(
+            aidl2legacy_int32_t_audio_session_t(request.sessionId));
+    audio_io_handle_t io = VALUE_OR_EXIT(aidl2legacy_int32_t_audio_io_handle_t(request.output));
+    const effect_descriptor_t descIn = VALUE_OR_EXIT(
+            aidl2legacy_EffectDescriptor_effect_descriptor_t(request.desc));
+    const bool probe = request.probe;
+
     sp<EffectHandle> handle;
-    effect_descriptor_t desc;
+    effect_descriptor_t descOut;
+    int enabledOut = 0;
+    int idOut = -1;
+
+    status_t lStatus = NO_ERROR;
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     if (pid == -1 || !isAudioServerOrMediaServerUid(callingUid)) {
@@ -3502,12 +3507,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
     }
 
     ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
-            pid, effectClient.get(), priority, sessionId, io, mEffectsFactoryHal.get());
-
-    if (pDesc == NULL) {
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
+          pid, effectClient.get(), priority, sessionId, io, mEffectsFactoryHal.get());
 
     if (mEffectsFactoryHal == 0) {
         ALOGE("%s: no effects factory hal", __func__);
@@ -3564,7 +3564,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
         // otherwise no preference.
         uint32_t preferredType = (sessionId == AUDIO_SESSION_OUTPUT_MIX ?
                                   EFFECT_FLAG_TYPE_AUXILIARY : EFFECT_FLAG_TYPE_MASK);
-        lStatus = getEffectDescriptor(&pDesc->uuid, &pDesc->type, preferredType, &desc);
+        lStatus = getEffectDescriptor(&descIn.uuid, &descIn.type, preferredType, &descOut);
         if (lStatus < 0) {
             ALOGW("createEffect() error %d from getEffectDescriptor", lStatus);
             goto Exit;
@@ -3572,20 +3572,20 @@ sp<media::IEffect> AudioFlinger::createEffect(
 
         // Do not allow auxiliary effects on a session different from 0 (output mix)
         if (sessionId != AUDIO_SESSION_OUTPUT_MIX &&
-             (desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
+             (descOut.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
             lStatus = INVALID_OPERATION;
             goto Exit;
         }
 
         // check recording permission for visualizer
-        if ((memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
+        if ((memcmp(&descOut.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
             // TODO: Do we need to start/stop op - i.e. is there recording being performed?
             !recordingAllowed(opPackageName, pid, callingUid)) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
         }
 
-        const bool hapticPlaybackRequired = EffectModule::isHapticGenerator(&desc.type);
+        const bool hapticPlaybackRequired = EffectModule::isHapticGenerator(&descOut.type);
         if (hapticPlaybackRequired
                 && (sessionId == AUDIO_SESSION_DEVICE
                         || sessionId == AUDIO_SESSION_OUTPUT_MIX
@@ -3595,13 +3595,11 @@ sp<media::IEffect> AudioFlinger::createEffect(
             goto Exit;
         }
 
-        // return effect descriptor
-        *pDesc = desc;
         if (io == AUDIO_IO_HANDLE_NONE && sessionId == AUDIO_SESSION_OUTPUT_MIX) {
             // if the output returned by getOutputForEffect() is removed before we lock the
             // mutex below, the call to checkPlaybackThread_l(io) below will detect it
             // and we will exit safely
-            io = AudioSystem::getOutputForEffect(&desc);
+            io = AudioSystem::getOutputForEffect(&descOut);
             ALOGV("createEffect got output %d", io);
         }
 
@@ -3611,15 +3609,15 @@ sp<media::IEffect> AudioFlinger::createEffect(
             sp<Client> client = registerPid(pid);
             ALOGV("%s device type %#x address %s", __func__, device.mType, device.getAddress());
             handle = mDeviceEffectManager.createEffect_l(
-                    &desc, device, client, effectClient, mPatchPanel.patches_l(),
-                    enabled, &lStatus, probe);
+                    &descOut, device, client, effectClient, mPatchPanel.patches_l(),
+                    &enabledOut, &lStatus, probe);
             if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
                 // remove local strong reference to Client with mClientLock held
                 Mutex::Autolock _cl(mClientLock);
                 client.clear();
             } else {
                 // handle must be valid here, but check again to be safe.
-                if (handle.get() != nullptr && id != nullptr) *id = handle->id();
+                if (handle.get() != nullptr) idOut = handle->id();
             }
             goto Register;
         }
@@ -3649,8 +3647,8 @@ sp<media::IEffect> AudioFlinger::createEffect(
             // Detect if the effect is created after an AudioRecord is destroyed.
             if (getOrphanEffectChain_l(sessionId).get() != nullptr) {
                 ALOGE("%s: effect %s with no specified io handle is denied because the AudioRecord"
-                        " for session %d no longer exists",
-                         __func__, desc.name, sessionId);
+                      " for session %d no longer exists",
+                      __func__, descOut.name, sessionId);
                 lStatus = PERMISSION_DENIED;
                 goto Exit;
             }
@@ -3664,7 +3662,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
             if (io == AUDIO_IO_HANDLE_NONE && mPlaybackThreads.size() > 0) {
                 io = mPlaybackThreads.keyAt(0);
             }
-            ALOGV("createEffect() got io %d for effect %s", io, desc.name);
+            ALOGV("createEffect() got io %d for effect %s", io, descOut.name);
         } else if (checkPlaybackThread_l(io) != nullptr) {
             // allow only one effect chain per sessionId on mPlaybackThreads.
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
@@ -3684,7 +3682,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
                         mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
                 if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
                     ALOGE("%s: effect %s io %d denied because session %d effect exists on io %d",
-                            __func__, desc.name, (int)io, (int)sessionId, (int)checkIo);
+                          __func__, descOut.name, (int) io, (int) sessionId, (int) checkIo);
                     android_errorWriteLog(0x534e4554, "123237974");
                     lStatus = BAD_VALUE;
                     goto Exit;
@@ -3731,14 +3729,14 @@ sp<media::IEffect> AudioFlinger::createEffect(
             }
         }
         handle = thread->createEffect_l(client, effectClient, priority, sessionId,
-                &desc, enabled, &lStatus, pinned, probe);
+                                        &descOut, &enabledOut, &lStatus, pinned, probe);
         if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
             // remove local strong reference to Client with mClientLock held
             Mutex::Autolock _cl(mClientLock);
             client.clear();
         } else {
             // handle must be valid here, but check again to be safe.
-            if (handle.get() != nullptr && id != nullptr) *id = handle->id();
+            if (handle.get() != nullptr) idOut = handle->id();
             // Invalidate audio session when haptic playback is created.
             if (hapticPlaybackRequired && oriThread != nullptr) {
                 // invalidateTracksForAudioSession will trigger locking the thread.
@@ -3761,9 +3759,13 @@ Register:
         handle.clear();
     }
 
+    response->id = idOut;
+    response->enabled = enabledOut != 0;
+    response->effect = handle;
+    response->desc = VALUE_OR_EXIT(legacy2aidl_effect_descriptor_t_EffectDescriptor(descOut));
+
 Exit:
-    *status = lStatus;
-    return handle;
+    return lStatus;
 }
 
 status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,

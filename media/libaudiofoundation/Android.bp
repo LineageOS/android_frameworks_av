@@ -12,6 +12,14 @@ cc_library_headers {
         "libaudio_system_headers",
         "libmedia_helper_headers",
     ],
+    static_libs: [
+        "audioclient-types-aidl-unstable-cpp",
+        "libaudioclient_aidl_conversion",
+    ],
+    export_static_lib_headers: [
+        "audioclient-types-aidl-unstable-cpp",
+        "libaudioclient_aidl_conversion",
+    ],
     host_supported: true,
     target: {
         darwin: {
@@ -35,6 +43,8 @@ cc_library {
     ],
 
     shared_libs: [
+        "audioclient-types-aidl-unstable-cpp",
+        "libaudioclient_aidl_conversion",
         "libaudioutils",
         "libbase",
         "libbinder",

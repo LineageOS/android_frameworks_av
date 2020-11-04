@@ -35,13 +35,14 @@
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPortConfigType.h>
 #include <android/media/AudioTimestampInternal.h>
+#include <android/media/EffectDescriptor.h>
 
 #include <android/media/SharedFileRegion.h>
-
 #include <binder/IMemory.h>
 #include <media/AudioClient.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/AudioTimestamp.h>
+#include <system/audio_effect.h>
 
 namespace android {
 
@@ -131,6 +132,9 @@ ConversionResult<int32_t> legacy2aidl_pid_t_int32_t(pid_t legacy);
 
 ConversionResult<uid_t> aidl2legacy_int32_t_uid_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_uid_t_int32_t(uid_t legacy);
+
+ConversionResult<String8> aidl2legacy_string_view_String8(std::string_view aidl);
+ConversionResult<std::string> legacy2aidl_String8_string(const String8& legacy);
 
 ConversionResult<String16> aidl2legacy_string_view_String16(std::string_view aidl);
 ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy);
@@ -296,5 +300,15 @@ ConversionResult<AudioTimestamp>
 aidl2legacy_AudioTimestamp(const media::AudioTimestampInternal& aidl);
 ConversionResult<media::AudioTimestampInternal>
 legacy2aidl_AudioTimestamp(const AudioTimestamp& legacy);
+
+ConversionResult<audio_uuid_t>
+aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl);
+ConversionResult<media::AudioUuid>
+legacy2aidl_audio_uuid_t_AudioUuid(const audio_uuid_t& legacy);
+
+ConversionResult<effect_descriptor_t>
+aidl2legacy_EffectDescriptor_effect_descriptor_t(const media::EffectDescriptor& aidl);
+ConversionResult<media::EffectDescriptor>
+legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& legacy);
 
 }  // namespace android
