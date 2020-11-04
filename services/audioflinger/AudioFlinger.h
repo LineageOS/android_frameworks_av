@@ -135,13 +135,11 @@ public:
     virtual     status_t    dump(int fd, const Vector<String16>& args);
 
     // IAudioFlinger interface, in binder opcode order
-    virtual sp<media::IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                               media::CreateTrackResponse& output,
-                                               status_t* status) override;
+    status_t createTrack(const media::CreateTrackRequest& input,
+                         media::CreateTrackResponse& output) override;
 
-    virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
-                                                 media::CreateRecordResponse& output,
-                                                 status_t* status) override;
+    status_t createRecord(const media::CreateRecordRequest& input,
+                          media::CreateRecordResponse& output) override;
 
     virtual     uint32_t    sampleRate(audio_io_handle_t ioHandle) const;
     virtual     audio_format_t format(audio_io_handle_t output) const;

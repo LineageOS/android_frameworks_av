@@ -748,7 +748,6 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     IAudioFlinger::CreateRecordInput input;
     IAudioFlinger::CreateRecordOutput output;
     audio_session_t originalSessionId;
-    sp<media::IAudioRecord> record;
     void *iMemPointer;
     audio_track_cblk_t* cblk;
     status_t status;
@@ -817,7 +816,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
 
     do {
         media::CreateRecordResponse response;
-        record = audioFlinger->createRecord(VALUE_OR_FATAL(input.toAidl()), response, &status);
+        status = audioFlinger->createRecord(VALUE_OR_FATAL(input.toAidl()), response);
         output = VALUE_OR_FATAL(IAudioFlinger::CreateRecordOutput::fromAidl(response));
         if (status == NO_ERROR) {
             break;
@@ -893,7 +892,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
         IInterface::asBinder(mAudioRecord)->unlinkToDeath(mDeathNotifier, this);
         mDeathNotifier.clear();
     }
-    mAudioRecord = record;
+    mAudioRecord = output.audioRecord;
     mCblkMemory = output.cblk;
     mBufferMemory = output.buffers;
     IPCThreadState::self()->flushCommands();

@@ -1608,9 +1608,7 @@ status_t AudioTrack::createTrack_l()
     input.opPackageName = mOpPackageName;
 
     media::CreateTrackResponse response;
-    sp<media::IAudioTrack> track = audioFlinger->createTrack(VALUE_OR_FATAL(input.toAidl()),
-                                                             response,
-                                                             &status);
+    status = audioFlinger->createTrack(VALUE_OR_FATAL(input.toAidl()), response);
     IAudioFlinger::CreateTrackOutput output = VALUE_OR_FATAL(
             IAudioFlinger::CreateTrackOutput::fromAidl(
                     response));
@@ -1623,7 +1621,7 @@ status_t AudioTrack::createTrack_l()
         }
         goto exit;
     }
-    ALOG_ASSERT(track != 0);
+    ALOG_ASSERT(output.audioTrack != 0);
 
     mFrameCount = output.frameCount;
     mNotificationFramesAct = (uint32_t)output.notificationFrameCount;
@@ -1646,7 +1644,7 @@ status_t AudioTrack::createTrack_l()
 
     // FIXME compare to AudioRecord
     std::optional<media::SharedFileRegion> sfr;
-    track->getCblk(&sfr);
+    output.audioTrack->getCblk(&sfr);
     sp<IMemory> iMem = VALUE_OR_FATAL(aidl2legacy_NullableSharedFileRegion_IMemory(sfr));
     if (iMem == 0) {
         ALOGE("%s(%d): Could not get control block", __func__, mPortId);
@@ -1668,7 +1666,7 @@ status_t AudioTrack::createTrack_l()
         IInterface::asBinder(mAudioTrack)->unlinkToDeath(mDeathNotifier, this);
         mDeathNotifier.clear();
     }
-    mAudioTrack = track;
+    mAudioTrack = output.audioTrack;
     mCblkMemory = iMem;
     IPCThreadState::self()->flushCommands();
 

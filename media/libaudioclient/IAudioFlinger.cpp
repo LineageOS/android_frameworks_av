@@ -153,6 +153,7 @@ IAudioFlinger::CreateTrackOutput::toAidl() const {
     aidl.afLatencyMs = VALUE_OR_RETURN(convertIntegral<int32_t>(afLatencyMs));
     aidl.outputId = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(outputId));
     aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(portId));
+    aidl.audioTrack = audioTrack;
     return aidl;
 }
 
@@ -173,6 +174,7 @@ IAudioFlinger::CreateTrackOutput::fromAidl(
     legacy.afLatencyMs = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afLatencyMs));
     legacy.outputId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_io_handle_t(aidl.outputId));
     legacy.portId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
+    legacy.audioTrack = aidl.audioTrack;
     return legacy;
 }
 
@@ -226,6 +228,7 @@ IAudioFlinger::CreateRecordOutput::toAidl() const {
     aidl.cblk = VALUE_OR_RETURN(legacy2aidl_NullableIMemory_SharedFileRegion(cblk));
     aidl.buffers = VALUE_OR_RETURN(legacy2aidl_NullableIMemory_SharedFileRegion(buffers));
     aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(portId));
+    aidl.audioRecord = audioRecord;
     return aidl;
 }
 
@@ -245,6 +248,7 @@ IAudioFlinger::CreateRecordOutput::fromAidl(
     legacy.cblk = VALUE_OR_RETURN(aidl2legacy_NullableSharedFileRegion_IMemory(aidl.cblk));
     legacy.buffers = VALUE_OR_RETURN(aidl2legacy_NullableSharedFileRegion_IMemory(aidl.buffers));
     legacy.portId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
+    legacy.audioRecord = aidl.audioRecord;
     return legacy;
 }
 
@@ -256,75 +260,58 @@ public:
     {
     }
 
-    virtual sp<media::IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                               media::CreateTrackResponse& output,
-                                               status_t* status)
+    virtual status_t createTrack(const media::CreateTrackRequest& input,
+                                 media::CreateTrackResponse& output)
     {
         Parcel data, reply;
-        sp<media::IAudioTrack> track;
+        status_t status;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-
-        if (status == nullptr) {
-            return track;
-        }
-
         data.writeParcelable(input);
 
         status_t lStatus = remote()->transact(CREATE_TRACK, data, &reply);
         if (lStatus != NO_ERROR) {
             ALOGE("createTrack transaction error %d", lStatus);
-            *status = DEAD_OBJECT;
-            return track;
+            return DEAD_OBJECT;
         }
-        *status = reply.readInt32();
-        if (*status != NO_ERROR) {
-            ALOGE("createTrack returned error %d", *status);
-            return track;
-        }
-        track = interface_cast<media::IAudioTrack>(reply.readStrongBinder());
-        if (track == 0) {
-            ALOGE("createTrack returned an NULL IAudioTrack with status OK");
-            *status = DEAD_OBJECT;
-            return track;
+        status = reply.readInt32();
+        if (status != NO_ERROR) {
+            ALOGE("createTrack returned error %d", status);
+            return status;
         }
         output.readFromParcel(&reply);
-        return track;
+        if (output.audioTrack == 0) {
+            ALOGE("createTrack returned an NULL IAudioTrack with status OK");
+            return DEAD_OBJECT;
+        }
+        return OK;
     }
 
-    virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
-                                                 media::CreateRecordResponse& output,
-                                                 status_t* status)
+    virtual status_t createRecord(const media::CreateRecordRequest& input,
+                                  media::CreateRecordResponse& output)
     {
         Parcel data, reply;
-        sp<media::IAudioRecord> record;
+        status_t status;
         data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-
-        if (status == nullptr) {
-            return record;
-        }
 
         data.writeParcelable(input);
 
         status_t lStatus = remote()->transact(CREATE_RECORD, data, &reply);
         if (lStatus != NO_ERROR) {
             ALOGE("createRecord transaction error %d", lStatus);
-            *status = DEAD_OBJECT;
-            return record;
+            return DEAD_OBJECT;
         }
-        *status = reply.readInt32();
-        if (*status != NO_ERROR) {
-            ALOGE("createRecord returned error %d", *status);
-            return record;
+        status = reply.readInt32();
+        if (status != NO_ERROR) {
+            ALOGE("createRecord returned error %d", status);
+            return status;
         }
 
-        record = interface_cast<media::IAudioRecord>(reply.readStrongBinder());
-        if (record == 0) {
-            ALOGE("createRecord returned a NULL IAudioRecord with status OK");
-            *status = DEAD_OBJECT;
-            return record;
-        }
         output.readFromParcel(&reply);
-        return record;
+        if (output.audioRecord == 0) {
+            ALOGE("createRecord returned a NULL IAudioRecord with status OK");
+            return DEAD_OBJECT;
+        }
+        return OK;
     }
 
     virtual uint32_t sampleRate(audio_io_handle_t ioHandle) const
@@ -1199,16 +1186,13 @@ status_t BnAudioFlinger::onTransact(
             status_t status;
             media::CreateTrackResponse output;
 
-            sp<media::IAudioTrack> track= createTrack(input,
-                                                      output,
-                                                      &status);
+            status = createTrack(input, output);
 
-            LOG_ALWAYS_FATAL_IF((track != 0) != (status == NO_ERROR));
+            LOG_ALWAYS_FATAL_IF((output.audioTrack != 0) != (status == NO_ERROR));
             reply->writeInt32(status);
             if (status != NO_ERROR) {
                 return NO_ERROR;
             }
-            reply->writeStrongBinder(IInterface::asBinder(track));
             output.writeToParcel(reply);
             return NO_ERROR;
         } break;
@@ -1224,16 +1208,13 @@ status_t BnAudioFlinger::onTransact(
             status_t status;
             media::CreateRecordResponse output;
 
-            sp<media::IAudioRecord> record = createRecord(input,
-                                                          output,
-                                                          &status);
+            status = createRecord(input, output);
 
-            LOG_ALWAYS_FATAL_IF((record != 0) != (status == NO_ERROR));
+            LOG_ALWAYS_FATAL_IF((output.audioRecord != 0) != (status == NO_ERROR));
             reply->writeInt32(status);
             if (status != NO_ERROR) {
                 return NO_ERROR;
             }
-            reply->writeStrongBinder(IInterface::asBinder(record));
             output.writeToParcel(reply);
             return NO_ERROR;
         } break;

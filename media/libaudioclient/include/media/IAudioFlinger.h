@@ -104,6 +104,7 @@ public:
         uint32_t afLatencyMs;
         audio_io_handle_t outputId;
         audio_port_handle_t portId;
+        sp<media::IAudioTrack> audioTrack;
 
         ConversionResult<media::CreateTrackResponse> toAidl() const;
         static ConversionResult<CreateTrackOutput> fromAidl(const media::CreateTrackResponse& aidl);
@@ -152,24 +153,25 @@ public:
         sp<IMemory> cblk;
         sp<IMemory> buffers;
         audio_port_handle_t portId;
+        sp<media::IAudioRecord> audioRecord;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
         static ConversionResult<CreateRecordOutput> fromAidl(const media::CreateRecordResponse& aidl);
     };
 
-    // invariant on exit for all APIs that return an sp<>:
-    //   (return value != 0) == (*status == NO_ERROR)
-
     /* create an audio track and registers it with AudioFlinger.
-     * return null if the track cannot be created.
+     * The audioTrack field will be null if the track cannot be created and the status will reflect
+     * failure.
      */
-    virtual sp<media::IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                               media::CreateTrackResponse& output,
-                                               status_t* status) = 0;
+    virtual status_t createTrack(const media::CreateTrackRequest& input,
+                                 media::CreateTrackResponse& output) = 0;
 
-    virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
-                                                 media::CreateRecordResponse& output,
-                                                 status_t* status) = 0;
+    /* create an audio record and registers it with AudioFlinger.
+     * The audioRecord field will be null if the track cannot be created and the status will reflect
+     * failure.
+     */
+    virtual status_t createRecord(const media::CreateRecordRequest& input,
+                                  media::CreateRecordResponse& output) = 0;
 
     // FIXME Surprisingly, format/latency don't work for input handles
 
