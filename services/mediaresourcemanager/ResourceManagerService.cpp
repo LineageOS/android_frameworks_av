@@ -511,8 +511,8 @@ Status ResourceManagerService::removeResource(
                 resource.value -= res.value;
             } else {
                 onLastRemoved(res, info);
-                info.resources.erase(resType);
                 actualRemoved.value = resource.value;
+                info.resources.erase(resType);
             }
 
             // Add it to the list of removed resources for observers.
