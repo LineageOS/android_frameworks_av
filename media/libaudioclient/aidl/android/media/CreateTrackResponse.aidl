@@ -17,8 +17,26 @@
 package android.media;
 
 /**
+ * CreateTrackOutput contains all output arguments returned by AudioFlinger to AudioTrack
+ * when calling createTrack() including arguments that were passed as I/O for update by
+ * CreateTrackRequest.
+ *
  * {@hide}
  */
-parcelable AudioPortConfigSessionExt {
-    int session;
+parcelable CreateTrackResponse {
+    /** Bitmask, indexed by AudioOutputFlags. */
+    int flags;
+    long frameCount;
+    long notificationFrameCount;
+    /** Interpreted as audio_port_handle_t. */
+    int selectedDeviceId;
+    int sessionId;
+    int sampleRate;
+    long afFrameCount;
+    int afSampleRate;
+    int afLatencyMs;
+    /** Interpreted as audio_io_handle_t. */
+    int outputId;
+    /** Interpreted as audio_port_handle_t. */
+    int portId;
 }

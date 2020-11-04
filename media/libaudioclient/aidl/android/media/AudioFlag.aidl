@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,27 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package android.media;
 
-
-#ifndef ANDROID_AUDIO_CLIENT_H
-#define ANDROID_AUDIO_CLIENT_H
-
-#include <sys/types.h>
-#include <utils/String16.h>
-
-namespace android {
-
-class AudioClient {
- public:
-    AudioClient() :
-        clientUid(-1), clientPid(-1), clientTid(-1), packageName("") {}
-
-    uid_t clientUid;
-    pid_t clientPid;
-    pid_t clientTid;
-    String16 packageName;
-};
-
-}; // namespace android
-
-#endif  // ANDROID_AUDIO_CLIENT_H
+@Backing(type="int")
+enum AudioFlag {
+    AUDIBILITY_ENFORCED = 0,
+    SECURE = 1,
+    SCO = 2,
+    BEACON = 3,
+    HW_AV_SYNC = 4,
+    HW_HOTWORD = 5,
+    BYPASS_INTERRUPTION_POLICY = 6,
+    BYPASS_MUTE = 7,
+    LOW_LATENCY = 8,
+    DEEP_BUFFER = 9,
+    NO_MEDIA_PROJECTION = 10,
+    MUTE_HAPTIC = 11,
+    NO_SYSTEM_CAPTURE = 12,
+    CAPTURE_PRIVATE = 13,
+}
