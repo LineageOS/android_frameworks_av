@@ -16,24 +16,27 @@
 
 package android.media;
 
-import android.media.AudioPortConfigDeviceExt;
-import android.media.AudioPortConfigMixExt;
-import android.media.AudioPortConfigSessionExt;
-
 /**
+ * CreateTrackOutput contains all output arguments returned by AudioFlinger to AudioTrack
+ * when calling createTrack() including arguments that were passed as I/O for update by
+ * CreateTrackRequest.
+ *
  * {@hide}
  */
-union AudioPortConfigExt {
-    /**
-     * This represents an empty union. Value is ignored.
-     * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
-     *             established.
-     */
-    boolean nothing;
-    /** Device specific info. */
-    AudioPortConfigDeviceExt device;
-    /** Mix specific info. */
-    AudioPortConfigMixExt mix;
-    /** Session specific info. */
-    AudioPortConfigSessionExt session;
+parcelable CreateTrackResponse {
+    /** Bitmask, indexed by AudioOutputFlags. */
+    int flags;
+    long frameCount;
+    long notificationFrameCount;
+    /** Interpreted as audio_port_handle_t. */
+    int selectedDeviceId;
+    int sessionId;
+    int sampleRate;
+    long afFrameCount;
+    int afSampleRate;
+    int afLatencyMs;
+    /** Interpreted as audio_io_handle_t. */
+    int outputId;
+    /** Interpreted as audio_port_handle_t. */
+    int portId;
 }

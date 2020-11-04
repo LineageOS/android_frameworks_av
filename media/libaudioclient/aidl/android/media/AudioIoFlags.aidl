@@ -19,12 +19,9 @@ package android.media;
 /**
  * {@hide}
  */
-// TODO(b/150948558): This should be a union. In the meantime, we require
-// that exactly one of the below arrays has a single element and the rest
-// are empty.
-parcelable AudioIoFlags {
+union AudioIoFlags {
     /** Bitmask indexed by AudioInputFlags. */
-    int[] input;
+    int input;
     /** Bitmask indexed by AudioOutputFlags. */
-    int[] output;
+    int output;
 }

@@ -19,6 +19,7 @@
 
 #include <audiomanager/AudioManager.h>
 #include <audiomanager/IAudioManager.h>
+#include <utils/Mutex.h>
 
 #include "android/media/BnPlayer.h"
 
@@ -40,8 +41,8 @@ public:
     virtual binder::Status setPan(float pan) override;
     virtual binder::Status setStartDelayMs(int32_t delayMs) override;
     virtual binder::Status applyVolumeShaper(
-            const media::VolumeShaper::Configuration& configuration,
-            const media::VolumeShaper::Operation& operation) override;
+            const media::VolumeShaperConfiguration& configuration,
+            const media::VolumeShaperOperation& operation) override;
 
             status_t startWithStatus();
             status_t pauseWithStatus();

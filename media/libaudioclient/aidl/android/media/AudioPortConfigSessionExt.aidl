@@ -16,11 +16,9 @@
 
 package android.media;
 
-import android.media.AudioSessionType;
-
 /**
  * {@hide}
  */
 parcelable AudioPortConfigSessionExt {
-    AudioSessionType session;
+    int session;
 }

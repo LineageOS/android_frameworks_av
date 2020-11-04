@@ -15,9 +15,11 @@ cc_library_headers {
     ],
     static_libs: [
         "audioflinger-aidl-unstable-cpp",
+        "av-types-aidl-unstable-cpp",
     ],
     export_static_lib_headers: [
         "audioflinger-aidl-unstable-cpp",
+        "av-types-aidl-unstable-cpp",
     ],
     target: {
         darwin: {
@@ -63,7 +65,7 @@ cc_library_shared {
         export_aidl_headers: true,
         local_include_dirs: ["aidl"],
         include_dirs: [
-            "frameworks/av/media/libaudioclient/aidl",
+            "frameworks/av/aidl",
         ],
     },
 
@@ -71,7 +73,6 @@ cc_library_shared {
         // AIDL files for audioclient interfaces
         // The headers for these interfaces will be available to any modules that
         // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
-        ":libaudioclient_aidl_callback",
         ":libaudioclient_aidl_private",
         ":libaudioclient_aidl",
 
@@ -90,7 +91,9 @@ cc_library_shared {
         "TrackPlayerBase.cpp",
     ],
     shared_libs: [
+        "audioclient-types-aidl-unstable-cpp",
         "audioflinger-aidl-unstable-cpp",
+        "av-types-aidl-unstable-cpp",
         "capture_state_listener-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
@@ -159,11 +162,16 @@ cc_library_shared {
     shared_libs: [
         "audioclient-types-aidl-unstable-cpp",
         "libbase",
+        "libbinder",
         "liblog",
+        "libshmemcompat",
         "libutils",
+        "shared-file-region-aidl-unstable-cpp",
     ],
     export_shared_lib_headers: [
         "audioclient-types-aidl-unstable-cpp",
+        "libbase",
+        "shared-file-region-aidl-unstable-cpp",
     ],
     cflags: [
         "-Wall",
@@ -193,15 +201,6 @@ filegroup {
     name: "libaudioclient_aidl_private",
     srcs: [
         "aidl/android/media/IAudioRecord.aidl",
-    ],
-    path: "aidl",
-}
-
-// AIDL interface for audio track callback
-filegroup {
-    name: "libaudioclient_aidl_callback",
-    srcs: [
-        "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     path: "aidl",
 }
@@ -236,12 +235,20 @@ aidl_interface {
     double_loadable: true,
     local_include_dir: "aidl",
     srcs: [
+        "aidl/android/media/AudioAttributesInternal.aidl",
+        "aidl/android/media/AudioClient.aidl",
+        "aidl/android/media/AudioConfig.aidl",
+        "aidl/android/media/AudioConfigBase.aidl",
+        "aidl/android/media/AudioContentType.aidl",
+        "aidl/android/media/AudioEncapsulationMode.aidl",
+        "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGainConfig.aidl",
         "aidl/android/media/AudioGainMode.aidl",
         "aidl/android/media/AudioInputFlags.aidl",
         "aidl/android/media/AudioIoConfigEvent.aidl",
         "aidl/android/media/AudioIoDescriptor.aidl",
         "aidl/android/media/AudioIoFlags.aidl",
+        "aidl/android/media/AudioOffloadInfo.aidl",
         "aidl/android/media/AudioOutputFlags.aidl",
         "aidl/android/media/AudioPatch.aidl",
         "aidl/android/media/AudioPortConfig.aidl",
@@ -253,13 +260,22 @@ aidl_interface {
         "aidl/android/media/AudioPortConfigSessionExt.aidl",
         "aidl/android/media/AudioPortRole.aidl",
         "aidl/android/media/AudioPortType.aidl",
-        "aidl/android/media/AudioSessionType.aidl",
         "aidl/android/media/AudioSourceType.aidl",
         "aidl/android/media/AudioStreamType.aidl",
-    ],
+        "aidl/android/media/AudioUsage.aidl",
+     ],
     imports: [
         "audio_common-aidl",
     ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+            ],
+        },
+    },
 }
 
 aidl_interface {
@@ -269,10 +285,17 @@ aidl_interface {
     host_supported: true,
     vendor_available: true,
     srcs: [
+        "aidl/android/media/CreateRecordRequest.aidl",
+        "aidl/android/media/CreateRecordResponse.aidl",
+        "aidl/android/media/CreateTrackRequest.aidl",
+        "aidl/android/media/CreateTrackResponse.aidl",
+
         "aidl/android/media/IAudioFlingerClient.aidl",
+        "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     imports: [
         "audioclient-types-aidl",
+        "shared-file-region-aidl",
     ],
     double_loadable: true,
     backend: {

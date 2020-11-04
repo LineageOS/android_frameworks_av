@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,16 @@
  * limitations under the License.
  */
 
+package android.media;
 
-#ifndef ANDROID_AUDIO_CLIENT_H
-#define ANDROID_AUDIO_CLIENT_H
-
-#include <sys/types.h>
-#include <utils/String16.h>
-
-namespace android {
-
-class AudioClient {
- public:
-    AudioClient() :
-        clientUid(-1), clientPid(-1), clientTid(-1), packageName("") {}
-
-    uid_t clientUid;
-    pid_t clientPid;
-    pid_t clientTid;
-    String16 packageName;
-};
-
-}; // namespace android
-
-#endif  // ANDROID_AUDIO_CLIENT_H
+/**
+ * {@hide}
+ */
+parcelable VolumeShaperOperation {
+    /** Operations to do. Bitmask of VolumeShaperOperationFlag. */
+    int flags;
+    /** If >= 0 the id to remove in a replace operation. */
+    int replaceId;
+    /** Position in the curve to set if a valid number (not nan). */
+    float xOffset;
+}
