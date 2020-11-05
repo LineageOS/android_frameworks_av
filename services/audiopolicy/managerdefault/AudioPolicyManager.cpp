@@ -206,6 +206,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             // Reset active device codec
             device->setEncodedFormat(AUDIO_FORMAT_DEFAULT);
 
+            // remove device from mReportedFormatsMap cache
+            mReportedFormatsMap.erase(device);
+
             } break;
 
         default:
@@ -334,6 +337,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
             mAvailableInputDevices.remove(device);
 
             checkInputsForDevice(device, state);
+
+            // remove device from mReportedFormatsMap cache
+            mReportedFormatsMap.erase(device);
         } break;
 
         default:
@@ -4328,14 +4334,28 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
         // checkOutputsForDevice().
         for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
             sp<DeviceDescriptor> device = mAvailableOutputDevices[i];
-            FormatVector supportedFormats =
-                    device->getAudioPort()->getAudioProfiles().getSupportedFormats();
-            for (size_t j = 0; j < supportedFormats.size(); j++) {
-                if (mConfig.getSurroundFormats().count(supportedFormats[j]) != 0) {
-                    formats.insert(supportedFormats[j]);
+            audio_devices_t deviceType = device->type();
+            // Enabling/disabling formats are applied to only HDMI devices. So, this function
+            // returns formats reported by HDMI devices.
+            if (deviceType != AUDIO_DEVICE_OUT_HDMI) {
+                continue;
+            }
+            // Formats reported by sink devices
+            std::unordered_set<audio_format_t> formatset;
+            if (auto it = mReportedFormatsMap.find(device); it != mReportedFormatsMap.end()) {
+                formatset.insert(it->second.begin(), it->second.end());
+            }
+
+            // Formats hard-coded in the in policy configuration file (if any).
+            FormatVector encodedFormats = device->encodedFormats();
+            formatset.insert(encodedFormats.begin(), encodedFormats.end());
+            // Filter the formats which are supported by the vendor hardware.
+            for (auto it = formatset.begin(); it != formatset.end(); ++it) {
+                if (mConfig.getSurroundFormats().count(*it) != 0) {
+                    formats.insert(*it);
                 } else {
                     for (const auto& pair : mConfig.getSurroundFormats()) {
-                        if (pair.second.count(supportedFormats[j]) != 0) {
+                        if (pair.second.count(*it) != 0) {
                             formats.insert(pair.first);
                             break;
                         }
@@ -6527,6 +6547,7 @@ void AudioPolicyManager::updateAudioProfiles(const sp<DeviceDescriptor>& devDesc
             return;
         }
         FormatVector formats = formatsFromString(reply.string());
+        mReportedFormatsMap[devDesc] = formats;
         if (device == AUDIO_DEVICE_OUT_HDMI
                 || isDeviceOfModule(devDesc, AUDIO_HARDWARE_MODULE_ID_MSD)) {
             modifySurroundFormats(devDesc, &formats);

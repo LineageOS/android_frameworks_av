@@ -33,6 +33,7 @@
 
 #include "AudioPolicyInterface.h"
 #include "AudioPolicyManagerTestClient.h"
+#include "AudioPolicyManagerTestClientForHdmi.h"
 #include "AudioPolicyTestClient.h"
 #include "AudioPolicyTestManager.h"
 
@@ -139,13 +140,14 @@ class AudioPolicyManagerTest : public testing::Test {
     bool findDevicePort(audio_port_role_t role, audio_devices_t deviceType,
             const std::string &address, audio_port *foundPort);
     static audio_port_handle_t getDeviceIdFromPatch(const struct audio_patch* patch);
+    virtual AudioPolicyManagerTestClient* getClient() { return new AudioPolicyManagerTestClient; }
 
     std::unique_ptr<AudioPolicyManagerTestClient> mClient;
     std::unique_ptr<AudioPolicyTestManager> mManager;
 };
 
 void AudioPolicyManagerTest::SetUp() {
-    mClient.reset(new AudioPolicyManagerTestClient);
+    mClient.reset(getClient());
     mManager.reset(new AudioPolicyTestManager(mClient.get()));
     SetUpManagerConfig();  // Subclasses may want to customize the config.
     ASSERT_EQ(NO_ERROR, mManager->initialize());
@@ -666,6 +668,163 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, UnregisterPolicyMixes) {
     // the same policy mixes as they are not registered.
     ret = mManager->unregisterPolicyMixes(mAudioMixes);
     ASSERT_EQ(INVALID_OPERATION, ret);
+}
+
+class AudioPolicyManagerTestForHdmi
+        : public AudioPolicyManagerTestWithConfigurationFile {
+protected:
+    void SetUp() override;
+    std::string getConfigFile() override { return sTvConfig; }
+    std::map<audio_format_t, bool> getSurroundFormatsHelper(bool reported);
+    std::unordered_set<audio_format_t> getFormatsFromPorts();
+    AudioPolicyManagerTestClient* getClient() override {
+        return new AudioPolicyManagerTestClientForHdmi;
+    }
+    void TearDown() override;
+
+    static const std::string sTvConfig;
+
+};
+
+const std::string AudioPolicyManagerTestForHdmi::sTvConfig =
+        AudioPolicyManagerTestForHdmi::sExecutableDir +
+        "test_settop_box_surround_configuration.xml";
+
+void AudioPolicyManagerTestForHdmi::SetUp() {
+    AudioPolicyManagerTest::SetUp();
+    mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
+    mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT);
+}
+
+void AudioPolicyManagerTestForHdmi::TearDown() {
+    mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT);
+    AudioPolicyManagerTest::TearDown();
+}
+
+std::map<audio_format_t, bool>
+        AudioPolicyManagerTestForHdmi::getSurroundFormatsHelper(bool reported) {
+    unsigned int numSurroundFormats = 0;
+    std::map<audio_format_t, bool> surroundFormatsMap;
+    status_t ret = mManager->getSurroundFormats(
+            &numSurroundFormats, nullptr /* surroundFormats */,
+            nullptr /* surroundFormatsEnabled */, reported);
+    EXPECT_EQ(NO_ERROR, ret);
+    if (ret != NO_ERROR) {
+        return surroundFormatsMap;
+    }
+    audio_format_t surroundFormats[numSurroundFormats];
+    memset(surroundFormats, 0, sizeof(audio_format_t) * numSurroundFormats);
+    bool surroundFormatsEnabled[numSurroundFormats];
+    memset(surroundFormatsEnabled, 0, sizeof(bool) * numSurroundFormats);
+    ret = mManager->getSurroundFormats(
+            &numSurroundFormats, surroundFormats, surroundFormatsEnabled, reported);
+    EXPECT_EQ(NO_ERROR, ret);
+    if (ret != NO_ERROR) {
+        return surroundFormatsMap;
+    }
+    for (int i = 0; i< numSurroundFormats; i++) {
+        surroundFormatsMap[surroundFormats[i]] = surroundFormatsEnabled[i];
+    }
+    return surroundFormatsMap;
+}
+
+std::unordered_set<audio_format_t>
+        AudioPolicyManagerTestForHdmi::getFormatsFromPorts() {
+    uint32_t numPorts = 0;
+    uint32_t generation1;
+    status_t ret;
+    std::unordered_set<audio_format_t> formats;
+    ret = mManager->listAudioPorts(
+            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1);
+    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
+    if (ret != NO_ERROR) {
+        return formats;
+    }
+    struct audio_port ports[numPorts];
+    ret = mManager->listAudioPorts(
+            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation1);
+    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
+    if (ret != NO_ERROR) {
+        return formats;
+    }
+    for (const auto &port : ports) {
+        formats.insert(port.formats, port.formats + port.num_formats);
+    }
+    return formats;
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi, GetSurroundFormatsReturnsSupportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
+    auto surroundFormats = getSurroundFormatsHelper(false /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        GetSurroundFormatsReturnsManipulatedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
+
+    status_t ret =
+            mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    auto surroundFormats = getSurroundFormatsHelper(false /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_FALSE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+
+    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    surroundFormats = getSurroundFormatsHelper(false /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_TRUE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+
+    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    surroundFormats = getSurroundFormatsHelper(false /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_FALSE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        ListAudioPortsReturnManipulatedHdmiFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
+
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/));
+    auto formats = getFormatsFromPorts();
+    ASSERT_EQ(0, formats.count(AUDIO_FORMAT_E_AC3));
+
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/));
+    formats = getFormatsFromPorts();
+    ASSERT_EQ(1, formats.count(AUDIO_FORMAT_E_AC3));
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        GetReportedSurroundFormatsReturnsHdmiReportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
+    auto surroundFormats = getSurroundFormatsHelper(true /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        GetReportedSurroundFormatsReturnsNonManipulatedHdmiReportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
+
+    status_t ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    auto surroundFormats = getSurroundFormatsHelper(true /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+
+    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    surroundFormats = getSurroundFormatsHelper(true /*reported*/);
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
 }
 
 class AudioPolicyManagerTestDPNoRemoteSubmixModule : public AudioPolicyManagerTestDynamicPolicy {

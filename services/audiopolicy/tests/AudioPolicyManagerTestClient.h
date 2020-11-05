@@ -121,6 +121,8 @@ public:
 
     size_t getAudioPortListUpdateCount() const { return mAudioPortListUpdateCount; }
 
+    virtual void addSupportedFormat(audio_format_t /* format */) {}
+
 private:
     audio_module_handle_t mNextModuleHandle = AUDIO_MODULE_HANDLE_NONE + 1;
     audio_io_handle_t mNextIoHandle = AUDIO_IO_HANDLE_NONE + 1;
