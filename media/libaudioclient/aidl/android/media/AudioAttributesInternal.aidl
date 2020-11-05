@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,26 +14,22 @@
  * limitations under the License.
  */
 
+package android.media;
 
-#ifndef ANDROID_AUDIO_CLIENT_H
-#define ANDROID_AUDIO_CLIENT_H
+import android.media.AudioContentType;
+import android.media.AudioSourceType;
+import android.media.AudioUsage;
 
-#include <sys/types.h>
-#include <utils/String16.h>
-
-namespace android {
-
-class AudioClient {
- public:
-    AudioClient() :
-        clientUid(-1), clientPid(-1), clientTid(-1), packageName("") {}
-
-    uid_t clientUid;
-    pid_t clientPid;
-    pid_t clientTid;
-    String16 packageName;
-};
-
-}; // namespace android
-
-#endif  // ANDROID_AUDIO_CLIENT_H
+/**
+ * The "Internal" suffix of this type name is to disambiguate it from the
+ * android.media.AudioAttributes SDK type.
+ * {@hide}
+ */
+parcelable AudioAttributesInternal {
+    AudioContentType contentType;
+    AudioUsage usage;
+    AudioSourceType source;
+    // Bitmask, indexed by AudioFlag.
+    int flags;
+    @utf8InCpp String tags; /* UTF8 */
+}

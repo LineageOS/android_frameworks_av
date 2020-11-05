@@ -38,6 +38,15 @@
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
+#define VALUE_OR_FATAL(result)                   \
+    ({                                           \
+       auto _tmp = (result);                     \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
+                           "Failed result (%d)", \
+                           _tmp.error());        \
+       std::move(_tmp.value());                  \
+     })
+
 #define WAIT_PERIOD_MS                  10
 #define WAIT_STREAM_END_TIMEOUT_SEC     120
 static const int kMaxLoopCountNotifications = 32;
@@ -538,6 +547,7 @@ status_t AudioTrack::set(
     } else {
         mOffloadInfo = NULL;
         memset(&mOffloadInfoCopy, 0, sizeof(audio_offload_info_t));
+        mOffloadInfoCopy = AUDIO_INFO_INITIALIZER;
     }
 
     mVolume[AUDIO_INTERLEAVE_LEFT] = 1.0f;
@@ -1596,11 +1606,13 @@ status_t AudioTrack::createTrack_l()
     input.audioTrackCallback = mAudioTrackCallback;
     input.opPackageName = mOpPackageName;
 
-    IAudioFlinger::CreateTrackOutput output;
-
-    sp<IAudioTrack> track = audioFlinger->createTrack(input,
-                                                      output,
+    media::CreateTrackResponse response;
+    sp<IAudioTrack> track = audioFlinger->createTrack(VALUE_OR_FATAL(input.toAidl()),
+                                                      response,
                                                       &status);
+    IAudioFlinger::CreateTrackOutput output = VALUE_OR_FATAL(
+            IAudioFlinger::CreateTrackOutput::fromAidl(
+                    response));
 
     if (status != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
         ALOGE("%s(%d): AudioFlinger could not create track, status: %d output %d",

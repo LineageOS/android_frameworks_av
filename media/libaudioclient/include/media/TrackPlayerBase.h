@@ -33,8 +33,8 @@ public:
 
     //IPlayer implementation
     virtual binder::Status applyVolumeShaper(
-            const media::VolumeShaper::Configuration& configuration,
-            const media::VolumeShaper::Operation& operation);
+            const media::VolumeShaperConfiguration& configuration,
+            const media::VolumeShaperOperation& operation);
 
     //FIXME move to protected field, so far made public to minimize changes to AudioTrack logic
     sp<AudioTrack> mAudioTrack;

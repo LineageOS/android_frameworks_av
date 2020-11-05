@@ -106,11 +106,17 @@ status_t TrackPlayerBase::doSetVolume() {
 
 
 binder::Status TrackPlayerBase::applyVolumeShaper(
-        const VolumeShaper::Configuration& configuration,
-        const VolumeShaper::Operation& operation) {
+        const media::VolumeShaperConfiguration& configuration,
+        const media::VolumeShaperOperation& operation) {
 
-    sp<VolumeShaper::Configuration> spConfiguration = new VolumeShaper::Configuration(configuration);
-    sp<VolumeShaper::Operation> spOperation = new VolumeShaper::Operation(operation);
+    sp<VolumeShaper::Configuration> spConfiguration = new VolumeShaper::Configuration();
+    sp<VolumeShaper::Operation> spOperation = new VolumeShaper::Operation();
+
+    status_t s = spConfiguration->readFromParcelable(configuration)
+            ?: spOperation->readFromParcelable(operation);
+    if (s != OK) {
+        return binder::Status::fromStatusT(s);
+    }
 
     if (mAudioTrack != 0) {
         ALOGD("TrackPlayerBase::applyVolumeShaper() from IPlayer");

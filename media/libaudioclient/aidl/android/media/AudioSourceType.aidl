@@ -17,6 +17,7 @@ package android.media;
 
 @Backing(type="int")
 enum AudioSourceType {
+    INVALID = -1,
     DEFAULT = 0,
     MIC = 1,
     VOICE_UPLINK = 2,
