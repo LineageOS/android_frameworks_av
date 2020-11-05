@@ -22,12 +22,14 @@
 // Define AUDIO_ARRAYS_STATIC_CHECK to check all audio arrays are correct
 #define AUDIO_ARRAYS_STATIC_CHECK 1
 
-#define VALUE_OR_FATAL(result) \
-    ({ auto _tmp = (result); \
-       LOG_ALWAYS_FATAL_IF(!_tmp.ok(), \
+#define VALUE_OR_FATAL(result)                   \
+    ({                                           \
+       auto _tmp = (result);                     \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
                            "Failed result (%d)", \
-                           _tmp.error()); \
-       _tmp.value(); })
+                           _tmp.error());        \
+       std::move(_tmp.value());                  \
+     })
 
 #include "Configuration.h"
 #include <dirent.h>
@@ -755,10 +757,27 @@ void AudioFlinger::unregisterWriter(const sp<NBLog::Writer>& writer)
 
 // IAudioFlinger interface
 
-sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
-                                          CreateTrackOutput& output,
-                                          status_t *status)
+sp<IAudioTrack> AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
+                                          media::CreateTrackResponse& _output,
+                                          status_t* status)
 {
+    // Local version of VALUE_OR_RETURN, specific to this method's calling conventions.
+#define VALUE_OR_EXIT(expr)         \
+    ({                              \
+        auto _tmp = (expr);         \
+        if (!_tmp.ok()) {           \
+            *status = _tmp.error(); \
+            return nullptr;         \
+        }                           \
+        std::move(_tmp.value());    \
+    })
+
+    CreateTrackInput input = VALUE_OR_EXIT(CreateTrackInput::fromAidl(_input));
+
+#undef VALUE_OR_EXIT
+
+    CreateTrackOutput output;
+
     sp<PlaybackThread::Track> track;
     sp<TrackHandle> trackHandle;
     sp<Client> client;
@@ -1014,6 +1033,8 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
     if (effectThreadId != AUDIO_IO_HANDLE_NONE) {
         AudioSystem::moveEffectsToIo(effectIds, effectThreadId);
     }
+
+    _output = VALUE_OR_FATAL(output.toAidl());
 
     // return handle to client
     trackHandle = new TrackHandle(track);
@@ -1997,10 +2018,26 @@ void AudioFlinger::requestLogMerge() {
 
 // ----------------------------------------------------------------------------
 
-sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& input,
-                                                   CreateRecordOutput& output,
-                                                   status_t *status)
+sp<media::IAudioRecord> AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
+                                                   media::CreateRecordResponse& _output,
+                                                   status_t* status)
 {
+    // Local version of VALUE_OR_RETURN, specific to this method's calling conventions.
+#define VALUE_OR_EXIT(expr)         \
+    ({                              \
+        auto _tmp = (expr);         \
+        if (!_tmp.ok()) {           \
+            *status = _tmp.error(); \
+            return nullptr;         \
+        }                           \
+        std::move(_tmp.value());    \
+    })
+
+    CreateRecordInput input = VALUE_OR_EXIT(CreateRecordInput::fromAidl(_input));
+
+#undef VALUE_OR_EXIT
+    CreateRecordOutput output;
+
     sp<RecordThread::RecordTrack> recordTrack;
     sp<RecordHandle> recordHandle;
     sp<Client> client;
@@ -2137,6 +2174,8 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const CreateRecordInput& inpu
     output.cblk = recordTrack->getCblk();
     output.buffers = recordTrack->getBuffers();
     output.portId = portId;
+
+    _output = VALUE_OR_FATAL(output.toAidl());
 
     // return handle to client
     recordHandle = new RecordHandle(recordTrack);

@@ -22,7 +22,8 @@
 
 namespace android {
 
-using media::VolumeShaper;
+using media::VolumeShaperConfiguration;
+using media::VolumeShaperOperation;
 
 //--------------------------------------------------------------------------------------------------
 PlayerBase::PlayerBase() : BnPlayer(),
@@ -178,8 +179,8 @@ binder::Status PlayerBase::setStartDelayMs(int32_t delayMs __unused) {
 }
 
 binder::Status PlayerBase::applyVolumeShaper(
-            const VolumeShaper::Configuration& configuration __unused,
-            const VolumeShaper::Operation& operation __unused) {
+            const VolumeShaperConfiguration& configuration __unused,
+            const VolumeShaperOperation& operation __unused) {
     ALOGW("applyVolumeShaper() is not supported");
     return binder::Status::ok();
 }
