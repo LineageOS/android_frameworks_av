@@ -196,13 +196,8 @@ public:
 
     virtual status_t restoreOutput(audio_io_handle_t output);
 
-    virtual status_t openInput(audio_module_handle_t module,
-                               audio_io_handle_t *input,
-                               audio_config_t *config,
-                               audio_devices_t *device,
-                               const String8& address,
-                               audio_source_t source,
-                               audio_input_flags_t flags);
+    virtual status_t openInput(const media::OpenInputRequest& request,
+                               media::OpenInputResponse* response);
 
     virtual status_t closeInput(audio_io_handle_t input);
 
@@ -697,7 +692,7 @@ using effect_buffer_t = int16_t;
                                            audio_io_handle_t *input,
                                            audio_config_t *config,
                                            audio_devices_t device,
-                                           const String8& address,
+                                           const char* address,
                                            audio_source_t source,
                                            audio_input_flags_t flags,
                                            audio_devices_t outputDevice,

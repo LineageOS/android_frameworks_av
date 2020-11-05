@@ -601,40 +601,17 @@ public:
         return reply.readInt32();
     }
 
-    virtual status_t openInput(audio_module_handle_t module,
-                               audio_io_handle_t *input,
-                               audio_config_t *config,
-                               audio_devices_t *device,
-                               const String8& address,
-                               audio_source_t source,
-                               audio_input_flags_t flags)
+    virtual status_t openInput(const media::OpenInputRequest& request,
+                               media::OpenInputResponse* response)
     {
-        if (input == NULL || config == NULL || device == NULL) {
-            return BAD_VALUE;
-        }
         Parcel data, reply;
-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32(module);
-        data.writeInt32(*input);
-        data.write(config, sizeof(audio_config_t));
-        data.writeInt32(*device);
-        data.writeString8(address);
-        data.writeInt32(source);
-        data.writeInt32(flags);
-        status_t status = remote()->transact(OPEN_INPUT, data, &reply);
-        if (status != NO_ERROR) {
-            *input = AUDIO_IO_HANDLE_NONE;
-            return status;
-        }
-        status = (status_t)reply.readInt32();
-        if (status != NO_ERROR) {
-            *input = AUDIO_IO_HANDLE_NONE;
-            return status;
-        }
-        *input = (audio_io_handle_t)reply.readInt32();
-        reply.read(config, sizeof(audio_config_t));
-        *device = (audio_devices_t)reply.readInt32();
-        return NO_ERROR;
+        status_t status;
+        return data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor())
+            ?: data.writeParcelable(request)
+            ?: remote()->transact(OPEN_INPUT, data, &reply)
+            ?: reply.readInt32(&status)
+            ?: status
+            ?: reply.readParcelable(response);
     }
 
     virtual status_t closeInput(int input)
@@ -1366,26 +1343,13 @@ status_t BnAudioFlinger::onTransact(
         } break;
         case OPEN_INPUT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            audio_module_handle_t module = (audio_module_handle_t)data.readInt32();
-            audio_io_handle_t input = (audio_io_handle_t)data.readInt32();
-            audio_config_t config = {};
-            if (data.read(&config, sizeof(audio_config_t)) != NO_ERROR) {
-                ALOGE("b/23905951");
-            }
-            audio_devices_t device = (audio_devices_t)data.readInt32();
-            String8 address(data.readString8());
-            audio_source_t source = (audio_source_t)data.readInt32();
-            audio_input_flags_t flags = (audio_input_flags_t) data.readInt32();
-
-            status_t status = openInput(module, &input, &config,
-                                        &device, address, source, flags);
-            reply->writeInt32((int32_t) status);
-            if (status == NO_ERROR) {
-                reply->writeInt32((int32_t) input);
-                reply->write(&config, sizeof(audio_config_t));
-                reply->writeInt32(device);
-            }
-            return NO_ERROR;
+            media::OpenInputRequest request;
+            media::OpenInputResponse response;
+            status_t status;
+            return data.readParcelable(&request)
+                ?: (status = openInput(request, &response), OK)
+                ?: reply->writeInt32(status)
+                ?: reply->writeParcelable(response);
         } break;
         case CLOSE_INPUT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);

@@ -49,6 +49,8 @@
 #include "android/media/IAudioTrackCallback.h"
 #include "android/media/IEffect.h"
 #include "android/media/IEffectClient.h"
+#include "android/media/OpenInputRequest.h"
+#include "android/media/OpenInputResponse.h"
 
 namespace android {
 
@@ -248,13 +250,9 @@ public:
     virtual status_t suspendOutput(audio_io_handle_t output) = 0;
     virtual status_t restoreOutput(audio_io_handle_t output) = 0;
 
-    virtual status_t openInput(audio_module_handle_t module,
-                               audio_io_handle_t *input,
-                               audio_config_t *config,
-                               audio_devices_t *device,
-                               const String8& address,
-                               audio_source_t source,
-                               audio_input_flags_t flags) = 0;
+    virtual status_t openInput(const media::OpenInputRequest& request,
+                               media::OpenInputResponse* response) = 0;
+
     virtual status_t closeInput(audio_io_handle_t input) = 0;
 
     virtual status_t invalidateStream(audio_stream_type_t stream) = 0;

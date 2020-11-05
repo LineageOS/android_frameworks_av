@@ -23,6 +23,13 @@
 
 #include "BinderProxy.h"
 
+#define VALUE_OR_RETURN_STATUS(exp)          \
+    ({                                       \
+        auto _tmp = (exp);                   \
+        if (!_tmp.ok()) return _tmp.error(); \
+        std::move(_tmp.value());             \
+    })
+
 namespace android {
 
 /* implementation of the client interface from the policy manager */
@@ -111,7 +118,22 @@ status_t AudioPolicyService::AudioPolicyClient::openInput(audio_module_handle_t 
         return PERMISSION_DENIED;
     }
 
-    return af->openInput(module, input, config, device, address, source, flags);
+    AudioDeviceTypeAddr deviceTypeAddr(*device, address.c_str());
+
+    media::OpenInputRequest request;
+    request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
+    request.input = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(*input));
+    request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(*config));
+    request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(deviceTypeAddr));
+    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSourceType(source));
+    request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_mask(flags));
+
+    media::OpenInputResponse response;
+    status_t status = af->openInput(request, &response);
+    if (status == OK) {
+        *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_module_handle_t(response.input));
+    }
+    return status;
 }
 
 status_t AudioPolicyService::AudioPolicyClient::closeInput(audio_io_handle_t input)

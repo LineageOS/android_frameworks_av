@@ -298,6 +298,8 @@ aidl_interface {
         "aidl/android/media/CreateRecordResponse.aidl",
         "aidl/android/media/CreateTrackRequest.aidl",
         "aidl/android/media/CreateTrackResponse.aidl",
+        "aidl/android/media/OpenInputRequest.aidl",
+        "aidl/android/media/OpenInputResponse.aidl",
 
         "aidl/android/media/IAudioFlingerClient.aidl",
         "aidl/android/media/IAudioRecord.aidl",

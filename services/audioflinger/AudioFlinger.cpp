@@ -22,24 +22,6 @@
 // Define AUDIO_ARRAYS_STATIC_CHECK to check all audio arrays are correct
 #define AUDIO_ARRAYS_STATIC_CHECK 1
 
-#define VALUE_OR_FATAL(result)                   \
-    ({                                           \
-       auto _tmp = (result);                     \
-       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
-                           "Failed result (%d)", \
-                           _tmp.error());        \
-       std::move(_tmp.value());                  \
-     })
-
-#define VALUE_OR_EXIT(expr)         \
-    ({                              \
-        auto _tmp = (expr);         \
-        if (!_tmp.ok()) {           \
-            return _tmp.error();    \
-        }                           \
-        std::move(_tmp.value());    \
-    })
-
 #include "Configuration.h"
 #include <dirent.h>
 #include <math.h>
@@ -99,6 +81,20 @@
 #include <BufLog.h>
 
 #include "TypedLogger.h"
+
+#define VALUE_OR_FATAL(result)                   \
+    ({                                           \
+       auto _tmp = (result);                     \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
+                           "Failed result (%d)", \
+                           _tmp.error());        \
+       std::move(_tmp.value());                  \
+     })
+
+#define VALUE_OR_RETURN_STATUS(x)           \
+    ({ auto _tmp = (x);                     \
+       if (!_tmp.ok()) return _tmp.error(); \
+       std::move(_tmp.value()); })
 
 // ----------------------------------------------------------------------------
 
@@ -770,7 +766,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                                    media::CreateTrackResponse& _output)
 {
     // Local version of VALUE_OR_RETURN, specific to this method's calling conventions.
-    CreateTrackInput input = VALUE_OR_EXIT(CreateTrackInput::fromAidl(_input));
+    CreateTrackInput input = VALUE_OR_RETURN_STATUS(CreateTrackInput::fromAidl(_input));
     CreateTrackOutput output;
 
     sp<PlaybackThread::Track> track;
@@ -2013,7 +2009,7 @@ void AudioFlinger::requestLogMerge() {
 status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                                     media::CreateRecordResponse& _output)
 {
-    CreateRecordInput input = VALUE_OR_EXIT(CreateRecordInput::fromAidl(_input));
+    CreateRecordInput input = VALUE_OR_RETURN_STATUS(CreateRecordInput::fromAidl(_input));
     CreateRecordOutput output;
 
     sp<RecordThread::RecordTrack> recordTrack;
@@ -2778,22 +2774,36 @@ status_t AudioFlinger::restoreOutput(audio_io_handle_t output)
     return NO_ERROR;
 }
 
-status_t AudioFlinger::openInput(audio_module_handle_t module,
-                                          audio_io_handle_t *input,
-                                          audio_config_t *config,
-                                          audio_devices_t *devices,
-                                          const String8& address,
-                                          audio_source_t source,
-                                          audio_input_flags_t flags)
+status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
+                                 media::OpenInputResponse* response)
 {
     Mutex::Autolock _l(mLock);
 
-    if (*devices == AUDIO_DEVICE_NONE) {
+    if (request.device.type == AUDIO_DEVICE_NONE) {
         return BAD_VALUE;
     }
 
+    audio_io_handle_t input = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_io_handle_t(request.input));
+    audio_config_t config = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioConfig_audio_config_t(request.config));
+    AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceTypeAddress(request.device));
+
     sp<ThreadBase> thread = openInput_l(
-            module, input, config, *devices, address, source, flags, AUDIO_DEVICE_NONE, String8{});
+            VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_module_handle_t(request.module)),
+            &input,
+            &config,
+            device.mType,
+            device.address().c_str(),
+            VALUE_OR_RETURN_STATUS(aidl2legacy_AudioSourceType_audio_source_t(request.source)),
+            VALUE_OR_RETURN_STATUS(aidl2legacy_audio_input_flags_mask(request.flags)),
+            AUDIO_DEVICE_NONE,
+            String8{});
+
+    response->input = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(input));
+    response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+    response->device = request.device;
 
     if (thread != 0) {
         // notify client processes of the new input creation
@@ -2807,7 +2817,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
                                                          audio_io_handle_t *input,
                                                          audio_config_t *config,
                                                          audio_devices_t devices,
-                                                         const String8& address,
+                                                         const char* address,
                                                          audio_source_t source,
                                                          audio_input_flags_t flags,
                                                          audio_devices_t outputDevice,
@@ -2837,7 +2847,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
     sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
     sp<StreamInHalInterface> inStream;
     status_t status = inHwHal->openInputStream(
-            *input, devices, &halconfig, flags, address.string(), source,
+            *input, devices, &halconfig, flags, address, source,
             outputDevice, outputDeviceAddress, &inStream);
     ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
            ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
@@ -2847,7 +2857,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
             halconfig.format,
             halconfig.channel_mask,
             flags,
-            status, address.string());
+            status, address);
 
     // If the input could not be opened with the requested parameters and we can handle the
     // conversion internally, try to open again with the proposed parameters.
@@ -2861,7 +2871,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
         inStream.clear();
         status = inHwHal->openInputStream(
-                *input, devices, &halconfig, flags, address.string(), source,
+                *input, devices, &halconfig, flags, address, source,
                 outputDevice, outputDeviceAddress, &inStream);
         // FIXME log this new status; HAL should not propose any further changes
     }
@@ -3478,15 +3488,16 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
                                     media::CreateEffectResponse* response) {
     const sp<IEffectClient>& effectClient = request.client;
     const int32_t priority = request.priority;
-    const AudioDeviceTypeAddr device = VALUE_OR_EXIT(
+    const AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioDeviceTypeAddress(request.device));
-    const String16 opPackageName = VALUE_OR_EXIT(
+    const String16 opPackageName = VALUE_OR_RETURN_STATUS(
             aidl2legacy_string_view_String16(request.opPackageName));
-    pid_t pid = VALUE_OR_EXIT(aidl2legacy_int32_t_pid_t(request.pid));
-    const audio_session_t sessionId = VALUE_OR_EXIT(
+    pid_t pid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(request.pid));
+    const audio_session_t sessionId = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_session_t(request.sessionId));
-    audio_io_handle_t io = VALUE_OR_EXIT(aidl2legacy_int32_t_audio_io_handle_t(request.output));
-    const effect_descriptor_t descIn = VALUE_OR_EXIT(
+    audio_io_handle_t io = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_io_handle_t(request.output));
+    const effect_descriptor_t descIn = VALUE_OR_RETURN_STATUS(
             aidl2legacy_EffectDescriptor_effect_descriptor_t(request.desc));
     const bool probe = request.probe;
 
@@ -3762,7 +3773,8 @@ Register:
     response->id = idOut;
     response->enabled = enabledOut != 0;
     response->effect = handle;
-    response->desc = VALUE_OR_EXIT(legacy2aidl_effect_descriptor_t_EffectDescriptor(descOut));
+    response->desc = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_effect_descriptor_t_EffectDescriptor(descOut));
 
 Exit:
     return lStatus;
