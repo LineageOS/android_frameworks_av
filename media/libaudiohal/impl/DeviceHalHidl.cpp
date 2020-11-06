@@ -19,22 +19,24 @@
 #define LOG_TAG "DeviceHalHidl"
 //#define LOG_NDEBUG 0
 
-#include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
 #include <cutils/native_handle.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioContainers.h>
 #include <utils/Log.h>
 
+#include PATH(android/hardware/audio/FILE_VERSION/IPrimaryDevice.h)
+#include <HidlUtils.h>
 #include <common/all-versions/VersionUtils.h>
+#include <util/CoreUtils.h>
 
 #include "DeviceHalHidl.h"
 #include "EffectHalHidl.h"
-#include "HidlUtils.h"
+#include "ParameterUtils.h"
 #include "StreamHalHidl.h"
-#include "VersionUtils.h"
 
 using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
+using ::android::hardware::audio::CPP_VERSION::implementation::CoreUtils;
 using ::android::hardware::hidl_string;
 using ::android::hardware::hidl_vec;
 
@@ -45,47 +47,6 @@ using namespace ::android::hardware::audio::common::CPP_VERSION;
 using namespace ::android::hardware::audio::CPP_VERSION;
 
 using EffectHalHidl = ::android::effect::CPP_VERSION::EffectHalHidl;
-
-namespace {
-
-status_t deviceAddressFromHal(
-        audio_devices_t device, const char* halAddress, DeviceAddress* address) {
-    address->device = AudioDevice(device);
-
-    if (halAddress == nullptr || strnlen(halAddress, AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0) {
-        return OK;
-    }
-    if (getAudioDeviceOutAllA2dpSet().count(device) > 0
-            || device == AUDIO_DEVICE_IN_BLUETOOTH_A2DP) {
-        int status = sscanf(halAddress,
-                "%hhX:%hhX:%hhX:%hhX:%hhX:%hhX",
-                &address->address.mac[0], &address->address.mac[1], &address->address.mac[2],
-                &address->address.mac[3], &address->address.mac[4], &address->address.mac[5]);
-        return status == 6 ? OK : BAD_VALUE;
-    } else if (device == AUDIO_DEVICE_OUT_IP || device == AUDIO_DEVICE_IN_IP) {
-        int status = sscanf(halAddress,
-                "%hhu.%hhu.%hhu.%hhu",
-                &address->address.ipv4[0], &address->address.ipv4[1],
-                &address->address.ipv4[2], &address->address.ipv4[3]);
-        return status == 4 ? OK : BAD_VALUE;
-    } else if (getAudioDeviceOutAllUsbSet().count(device) > 0
-            || getAudioDeviceInAllUsbSet().count(device) > 0) {
-        int status = sscanf(halAddress,
-                "card=%d;device=%d",
-                &address->address.alsa.card, &address->address.alsa.device);
-        return status == 2 ? OK : BAD_VALUE;
-    } else if (device == AUDIO_DEVICE_OUT_BUS || device == AUDIO_DEVICE_IN_BUS) {
-        address->busAddress = halAddress;
-        return OK;
-    } else if (device == AUDIO_DEVICE_OUT_REMOTE_SUBMIX
-            || device == AUDIO_DEVICE_IN_REMOTE_SUBMIX) {
-        address->rSubmixAddress = halAddress;
-        return OK;
-    }
-    return OK;
-}
-
-}  // namespace
 
 DeviceHalHidl::DeviceHalHidl(const sp<IDevice>& device)
         : ConversionHelperHidl("Device"), mDevice(device),
@@ -234,16 +195,22 @@ status_t DeviceHalHidl::openOutputStream(
         sp<StreamOutHalInterface> *outStream) {
     if (mDevice == 0) return NO_INIT;
     DeviceAddress hidlDevice;
-    status_t status = deviceAddressFromHal(deviceType, address, &hidlDevice);
-    if (status != OK) return status;
+    if (status_t status = CoreUtils::deviceAddressFromHal(deviceType, address, &hidlDevice);
+            status != OK) {
+        return status;
+    }
     AudioConfig hidlConfig;
-    HidlUtils::audioConfigFromHal(*config, false /*isInput*/, &hidlConfig);
+    if (status_t status = HidlUtils::audioConfigFromHal(*config, false /*isInput*/, &hidlConfig);
+            status != OK) {
+        return status;
+    }
+    CoreUtils::AudioOutputFlags hidlFlags;
+    if (status_t status = CoreUtils::audioOutputFlagsFromHal(flags, &hidlFlags); status != OK) {
+        return status;
+    }
     Result retval = Result::NOT_INITIALIZED;
     Return<void> ret = mDevice->openOutputStream(
-            handle,
-            hidlDevice,
-            hidlConfig,
-            EnumBitfield<AudioOutputFlag>(flags),
+            handle, hidlDevice, hidlConfig, hidlFlags,
 #if MAJOR_VERSION >= 4
             {} /* metadata */,
 #endif
@@ -269,17 +236,30 @@ status_t DeviceHalHidl::openInputStream(
         sp<StreamInHalInterface> *inStream) {
     if (mDevice == 0) return NO_INIT;
     DeviceAddress hidlDevice;
-    status_t status = deviceAddressFromHal(devices, address, &hidlDevice);
-    if (status != OK) return status;
+    if (status_t status = CoreUtils::deviceAddressFromHal(devices, address, &hidlDevice);
+            status != OK) {
+        return status;
+    }
     AudioConfig hidlConfig;
-    HidlUtils::audioConfigFromHal(*config, true /*isInput*/, &hidlConfig);
+    if (status_t status = HidlUtils::audioConfigFromHal(*config, true /*isInput*/, &hidlConfig);
+            status != OK) {
+        return status;
+    }
+    CoreUtils::AudioInputFlags hidlFlags;
+    if (status_t status = CoreUtils::audioInputFlagsFromHal(flags, &hidlFlags); status != OK) {
+        return status;
+    }
     Result retval = Result::NOT_INITIALIZED;
 #if MAJOR_VERSION == 2
     auto sinkMetadata = AudioSource(source);
 #elif MAJOR_VERSION >= 4
     // TODO: correctly propagate the tracks sources and volume
     //       for now, only send the main source at 1dbfs
-    SinkMetadata sinkMetadata = {{{ .source = AudioSource(source), .gain = 1 }}};
+    AudioSource hidlSource;
+    if (status_t status = HidlUtils::audioSourceFromHal(source, &hidlSource); status != OK) {
+        return status;
+    }
+    SinkMetadata sinkMetadata = {{{ .source = std::move(hidlSource), .gain = 1 }}};
 #endif
 #if MAJOR_VERSION < 5
     (void)outputDevice;
@@ -287,8 +267,10 @@ status_t DeviceHalHidl::openInputStream(
 #else
     if (outputDevice != AUDIO_DEVICE_NONE) {
         DeviceAddress hidlOutputDevice;
-        status = deviceAddressFromHal(outputDevice, outputDeviceAddress, &hidlOutputDevice);
-        if (status != OK) return status;
+        if (status_t status = CoreUtils::deviceAddressFromHal(
+                        outputDevice, outputDeviceAddress, &hidlOutputDevice); status != OK) {
+            return status;
+        }
         sinkMetadata.tracks[0].destination.device(std::move(hidlOutputDevice));
     }
 #endif
@@ -297,11 +279,7 @@ status_t DeviceHalHidl::openInputStream(
     flags = static_cast<audio_input_flags_t>(flags & ~AUDIO_INPUT_FLAG_DIRECT);
 #endif
     Return<void> ret = mDevice->openInputStream(
-            handle,
-            hidlDevice,
-            hidlConfig,
-            EnumBitfield<AudioInputFlag>(flags),
-            sinkMetadata,
+            handle, hidlDevice, hidlConfig, hidlFlags, sinkMetadata,
             [&](Result r, const sp<IStreamIn>& result, const AudioConfig& suggestedConfig) {
                 retval = r;
                 if (retval == Result::OK) {
@@ -411,7 +389,7 @@ status_t DeviceHalHidl::getMicrophones(std::vector<media::MicrophoneInfo> *micro
         for (size_t k = 0; k < micArrayHal.size(); k++) {
             audio_microphone_characteristic_t dst;
             //convert
-            microphoneInfoToHal(micArrayHal[k], &dst);
+            (void)CoreUtils::microphoneInfoToHal(micArrayHal[k], &dst);
             media::MicrophoneInfo microphone = media::MicrophoneInfo(dst);
             microphonesInfo->push_back(microphone);
         }

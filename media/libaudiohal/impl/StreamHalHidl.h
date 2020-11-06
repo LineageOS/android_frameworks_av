@@ -105,6 +105,8 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
 
     status_t getCachedBufferSize(size_t *size);
 
+    status_t getHalPid(pid_t *pid);
+
     bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
 
     // mStreamPowerLog is used for audio signal power logging.
