@@ -91,11 +91,6 @@
        std::move(_tmp.value());                  \
      })
 
-#define VALUE_OR_RETURN_STATUS(x)           \
-    ({ auto _tmp = (x);                     \
-       if (!_tmp.ok()) return _tmp.error(); \
-       std::move(_tmp.value()); })
-
 // ----------------------------------------------------------------------------
 
 // Note: the following macro is used for extremely verbose logging message.  In

@@ -29,13 +29,6 @@
 #include <private/media/AudioEffectShared.h>
 #include <utils/Log.h>
 
-#define VALUE_OR_RETURN_STATUS(exp)          \
-    ({                                       \
-        auto _tmp = (exp);                   \
-        if (!_tmp.ok()) return _tmp.error(); \
-        std::move(_tmp.value());             \
-    })
-
 namespace android {
 
 using binder::Status;

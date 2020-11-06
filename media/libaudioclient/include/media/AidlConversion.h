@@ -62,6 +62,13 @@ using ConversionResult = base::expected<T, status_t>;
 #define RETURN_IF_ERROR(result) \
     if (status_t _tmp = (result); _tmp != OK) return base::unexpected(_tmp);
 
+#define VALUE_OR_RETURN_STATUS(x)           \
+    ({                                      \
+       auto _tmp = (x);                     \
+       if (!_tmp.ok()) return _tmp.error(); \
+       std::move(_tmp.value());             \
+     })
+
 /**
  * A generic template to safely cast between integral types, respecting limits of the destination
  * type.

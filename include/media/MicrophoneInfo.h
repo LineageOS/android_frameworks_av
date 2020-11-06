@@ -26,13 +26,6 @@
 namespace android {
 namespace media {
 
-#define VALUE_OR_RETURN_STATUS(exp)          \
-    ({                                       \
-        auto _tmp = (exp);                   \
-        if (!_tmp.ok()) return _tmp.error(); \
-        std::move(_tmp.value());             \
-    })
-
 class MicrophoneInfo : public Parcelable {
 public:
     MicrophoneInfo() = default;
@@ -214,8 +207,6 @@ private:
     float mMinSpl;
     int32_t mDirectionality;
 };
-
-#undef VALUE_OR_RETURN_STATUS
 
 } // namespace media
 } // namespace android

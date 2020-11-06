@@ -23,13 +23,6 @@
 
 #include "BinderProxy.h"
 
-#define VALUE_OR_RETURN_STATUS(exp)          \
-    ({                                       \
-        auto _tmp = (exp);                   \
-        if (!_tmp.ok()) return _tmp.error(); \
-        std::move(_tmp.value());             \
-    })
-
 namespace android {
 
 /* implementation of the client interface from the policy manager */
