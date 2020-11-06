@@ -18,7 +18,11 @@ package android.media;
 
 import android.media.MicrophoneInfoData;
 
-/* Native code must specify namespace media (media::IAudioRecord) when referring to this class */
+/**
+ * Native code must specify namespace media (media::IAudioRecord) when referring to this class.
+ *
+ * {@hide}
+ */
 interface IAudioRecord {
 
   /* After it's created the track is not active. Call start() to

@@ -15,6 +15,9 @@
  */
 package android.media;
 
+/**
+ * {@hide}
+ */
 parcelable AudioUuid {
     int timeLow;
     int timeMid;
