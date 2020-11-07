@@ -18,25 +18,24 @@
  * Originally developed and contributed by Ittiam Systems Pvt. Ltd, Bangalore
  */
 
-cc_fuzz {
-    name: "mpeg4_dec_fuzzer",
+cc_defaults {
+    name: "mpeg4_h263_dec_fuzz_defaults",
+
     host_supported: true,
+
     srcs: [
         "mpeg4_h263_dec_fuzzer.cpp",
     ],
+
     static_libs: [
         "libstagefright_m4vh263dec",
         "liblog",
     ],
+
     cflags: [
         "-DOSCL_IMPORT_REF=",
-        "-DMPEG4",
     ],
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
+
     fuzz_config: {
         cc: [
             "android-media-fuzzing-reports@google.com",
@@ -46,27 +45,67 @@ cc_fuzz {
 }
 
 cc_fuzz {
-    name: "h263_dec_fuzzer",
-    host_supported: true,
-    srcs: [
-        "mpeg4_h263_dec_fuzzer.cpp",
+    name: "mpeg4_dec_fuzzer",
+
+    defaults: [
+        "mpeg4_h263_dec_fuzz_defaults",
     ],
-    static_libs: [
-        "libstagefright_m4vh263dec",
+
+    cflags: [
+        "-DMPEG4",
+    ],
+}
+
+cc_fuzz {
+    name: "h263_dec_fuzzer",
+
+    defaults: [
+        "mpeg4_h263_dec_fuzz_defaults",
+    ],
+}
+
+cc_defaults {
+    name: "mpeg4_h263_enc_fuzz_defaults",
+
+    host_supported: true,
+
+    srcs: ["mpeg4_h263_enc_fuzzer.cpp"],
+
+    shared_libs: [
+        "libutils",
         "liblog",
     ],
-    cflags: [
-        "-DOSCL_IMPORT_REF=",
+
+    static_libs: [
+        "libstagefright_m4vh263enc",
     ],
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
     fuzz_config: {
         cc: [
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
     },
+}
+
+cc_fuzz {
+    name: "mpeg4_enc_fuzzer",
+
+    defaults: [
+        "mpeg4_h263_enc_fuzz_defaults",
+    ],
+
+    cflags: ["-DMPEG4"],
+}
+
+cc_fuzz {
+    name: "h263_enc_fuzzer",
+
+    defaults: [
+        "mpeg4_h263_enc_fuzz_defaults",
+    ],
 }
