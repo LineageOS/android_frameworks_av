@@ -625,21 +625,19 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
         Mutexed<Output>::Locked output(mOutput);
         if (!output->buffers ||
                 output->buffers->hasPending() ||
-                output->buffers->numClientBuffers() >= output->numSlots) {
+                output->buffers->numActiveSlots() >= output->numSlots) {
             return;
         }
     }
-    size_t numInputSlots = mInput.lock()->numSlots;
-    for (size_t i = 0; i < numInputSlots; ++i) {
-        if (mPipelineWatcher.lock()->pipelineFull()) {
-            return;
-        }
+    size_t numActiveSlots = 0;
+    while (!mPipelineWatcher.lock()->pipelineFull()) {
         sp<MediaCodecBuffer> inBuffer;
         size_t index;
         {
             Mutexed<Input>::Locked input(mInput);
-            if (input->buffers->numClientBuffers() >= input->numSlots) {
-                return;
+            numActiveSlots = input->buffers->numActiveSlots();
+            if (numActiveSlots >= input->numSlots) {
+                break;
             }
             if (!input->buffers->requestNewBuffer(&index, &inBuffer)) {
                 ALOGV("[%s] no new buffer available", mName);
@@ -649,6 +647,7 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
         ALOGV("[%s] new input index = %zu [%p]", mName, index, inBuffer.get());
         mCallback->onInputBufferAvailable(index, inBuffer);
     }
+    ALOGV("[%s] # active slots after feedInputBufferIfAvailable = %zu", mName, numActiveSlots);
 }
 
 status_t CCodecBufferChannel::renderOutputBuffer(
