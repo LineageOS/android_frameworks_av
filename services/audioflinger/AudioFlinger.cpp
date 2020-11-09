@@ -3141,7 +3141,8 @@ std::vector<sp<AudioFlinger::EffectModule>> AudioFlinger::purgeStaleEffects_l() 
 // dumpToThreadLog_l() must be called with AudioFlinger::mLock held
 void AudioFlinger::dumpToThreadLog_l(const sp<ThreadBase> &thread)
 {
-    audio_utils::FdToString fdToString;
+    constexpr int THREAD_DUMP_TIMEOUT_MS = 2;
+    audio_utils::FdToString fdToString("- ", THREAD_DUMP_TIMEOUT_MS);
     const int fd = fdToString.fd();
     if (fd >= 0) {
         thread->dump(fd, {} /* args */);
