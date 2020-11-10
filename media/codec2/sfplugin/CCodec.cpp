@@ -487,6 +487,31 @@ public:
     }
 };
 
+void RevertOutputFormatIfNeeded(
+        const sp<AMessage> &oldFormat, sp<AMessage> &currentFormat) {
+    // We used to not report changes to these keys to the client.
+    const static std::set<std::string> sIgnoredKeys({
+            KEY_BIT_RATE,
+            KEY_MAX_BIT_RATE,
+            "csd-0",
+            "csd-1",
+            "csd-2",
+    });
+    if (currentFormat == oldFormat) {
+        return;
+    }
+    sp<AMessage> diff = currentFormat->changesFrom(oldFormat);
+    AMessage::Type type;
+    for (size_t i = diff->countEntries(); i > 0; --i) {
+        if (sIgnoredKeys.count(diff->getEntryNameAt(i - 1, &type)) > 0) {
+            diff->removeEntryAt(i - 1);
+        }
+    }
+    if (diff->countEntries() == 0) {
+        currentFormat = oldFormat;
+    }
+}
+
 }  // namespace
 
 // CCodec::ClientListener
@@ -1685,7 +1710,9 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
                     || comp->getName().find("c2.android.") == 0)) {
         mChannel->setParameters(configUpdate);
     } else {
+        sp<AMessage> outputFormat = config->mOutputFormat;
         (void)config->setParameters(comp, configUpdate, C2_MAY_BLOCK);
+        RevertOutputFormatIfNeeded(outputFormat, config->mOutputFormat);
     }
 }
 
@@ -1810,7 +1837,6 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             // handle configuration changes in work done
             Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
             const std::unique_ptr<Config> &config = *configLocked;
-            bool changed = false;
             Config::Watcher<C2StreamInitDataInfo::output> initData =
                 config->watch<C2StreamInitDataInfo::output>();
             if (!work->worklets.empty()
@@ -1845,9 +1871,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ++stream;
                 }
 
-                if (config->updateConfiguration(updates, config->mOutputDomain)) {
-                    changed = true;
-                }
+                sp<AMessage> outputFormat = config->mOutputFormat;
+                config->updateConfiguration(updates, config->mOutputDomain);
+                RevertOutputFormatIfNeeded(outputFormat, config->mOutputFormat);
 
                 // copy standard infos to graphic buffers if not already present (otherwise, we
                 // may overwrite the actual intermediate value with a final value)
@@ -1881,7 +1907,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
             }
             mChannel->onWorkDone(
-                    std::move(work), changed ? config->mOutputFormat->dup() : nullptr,
+                    std::move(work), config->mOutputFormat,
                     initData.hasChanged() ? initData.update().get() : nullptr);
             break;
         }
