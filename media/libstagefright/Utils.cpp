@@ -770,6 +770,7 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
         { "text-format-data", kKeyTextFormatData },
         { "thumbnail-csd-hevc", kKeyThumbnailHVCC },
         { "slow-motion-markers", kKeySlowMotionMarkers },
+        { "thumbnail-csd-av1c", kKeyThumbnailAV1C },
     }
 };
 
