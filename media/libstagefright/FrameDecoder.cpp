@@ -121,15 +121,23 @@ sp<IMemory> allocMetaFrame(const sp<MetaData>& trackMeta,
             false /*allocRotated*/, true /*metaOnly*/);
 }
 
+bool isAvif(const sp<MetaData> &trackMeta) {
+    const char *mime;
+    return trackMeta->findCString(kKeyMIMEType, &mime)
+        && (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AV1)
+            || !strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF));
+}
+
 bool findThumbnailInfo(
         const sp<MetaData> &trackMeta, int32_t *width, int32_t *height,
         uint32_t *type = NULL, const void **data = NULL, size_t *size = NULL) {
     uint32_t dummyType;
     const void *dummyData;
     size_t dummySize;
+    int codecConfigKey = isAvif(trackMeta) ? kKeyThumbnailAV1C : kKeyThumbnailHVCC;
     return trackMeta->findInt32(kKeyThumbnailWidth, width)
         && trackMeta->findInt32(kKeyThumbnailHeight, height)
-        && trackMeta->findData(kKeyThumbnailHVCC,
+        && trackMeta->findData(codecConfigKey,
                 type ?: &dummyType, data ?: &dummyData, size ?: &dummySize);
 }
 
@@ -752,7 +760,10 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
         overrideMeta->remove(kKeyDisplayHeight);
         overrideMeta->setInt32(kKeyWidth, mWidth);
         overrideMeta->setInt32(kKeyHeight, mHeight);
-        overrideMeta->setData(kKeyHVCC, type, data, size);
+        // The AV1 codec configuration data is passed via CSD0 to the AV1
+        // decoder.
+        const int codecConfigKey = isAvif(trackMeta()) ? kKeyOpaqueCSD0 : kKeyHVCC;
+        overrideMeta->setData(codecConfigKey, type, data, size);
         options->setSeekTo(-1);
     } else {
         CHECK(trackMeta()->findInt32(kKeyWidth, &mWidth));

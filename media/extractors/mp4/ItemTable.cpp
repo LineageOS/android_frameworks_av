@@ -1582,15 +1582,24 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
         ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);
         if (thumbItemIndex >= 0) {
             const ImageItem &thumbnail = mItemIdToItemMap[thumbItemIndex];
-            // TODO(vigneshv): Handle thumbnail for AVIF.
-            if (thumbnail.hvcc != NULL) {
+            if (thumbnail.hvcc != NULL || thumbnail.av1c != NULL) {
                 AMediaFormat_setInt32(meta,
                         AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH, thumbnail.width);
                 AMediaFormat_setInt32(meta,
                         AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT, thumbnail.height);
-                AMediaFormat_setBuffer(meta,
-                        AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC,
-                        thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                if (thumbnail.hvcc != NULL) {
+                    AMediaFormat_setBuffer(meta,
+                            AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC,
+                            thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                } else {
+                    // We use a hard-coded string here instead of
+                    // AMEDIAFORMAT_KEY_THUMBNAIL_CSD_AV1C. The key is available only from SDK 31.
+                    // The mp4 extractor is part of mainline and builds against SDK 29 as of
+                    // writing. This hard-coded string can be replaced with the named constant once
+                    // the mp4 extractor is built against SDK >= 31.
+                    AMediaFormat_setBuffer(meta,
+                            "thumbnail-csd-av1c", thumbnail.av1c->data(), thumbnail.av1c->size());
+                }
                 ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
                         imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
             } else {
