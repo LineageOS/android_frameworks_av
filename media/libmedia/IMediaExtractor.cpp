@@ -38,7 +38,8 @@ enum {
     FLAGS,
     SETMEDIACAS,
     NAME,
-    GETMETRICS
+    GETMETRICS,
+    SETENTRYPOINT
 };
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
@@ -142,6 +143,13 @@ public:
         }
         return nm;
     }
+
+    virtual status_t setEntryPoint(EntryPoint entryPoint) {
+        Parcel data, reply;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        data.writeInt32(static_cast<int32_t>(entryPoint));
+        return remote()->transact(SETENTRYPOINT, data, &reply);
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaExtractor, "android.media.IMediaExtractor");
@@ -231,6 +239,16 @@ status_t BnMediaExtractor::onTransact(
             String8 nm = name();
             reply->writeString8(nm);
             return NO_ERROR;
+        }
+        case SETENTRYPOINT: {
+            ALOGV("setEntryPoint");
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+            int32_t entryPoint;
+            status_t err = data.readInt32(&entryPoint);
+            if (err == OK) {
+                setEntryPoint(EntryPoint(entryPoint));
+            }
+            return err;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);
