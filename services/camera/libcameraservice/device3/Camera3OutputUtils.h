@@ -72,8 +72,8 @@ namespace camera3 {
         const String8& cameraId;
         std::mutex& inflightLock;
         int64_t& lastCompletedRegularFrameNumber;
-        int64_t& lastCompletedZslFrameNumber;
         int64_t& lastCompletedReprocessFrameNumber;
+        int64_t& lastCompletedZslFrameNumber;
         InFlightRequestMap& inflightMap; // end of inflightLock scope
         std::mutex& outputLock;
         std::list<CaptureResult>& resultQueue;
