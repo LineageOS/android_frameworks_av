@@ -34,6 +34,8 @@
 #include <unistd.h>
 #include <utils/Vector.h>
 
+#include "libaudioprocessing_fuzz_utils.h"
+
 #include <memory>
 
 using namespace android;
@@ -51,46 +53,6 @@ const AudioResampler::src_quality qualities[] = {
     AudioResampler::DYN_LOW_QUALITY,
     AudioResampler::DYN_MED_QUALITY,
     AudioResampler::DYN_HIGH_QUALITY,
-};
-
-class Provider : public AudioBufferProvider {
-  const void* mAddr;        // base address
-  const size_t mNumFrames;  // total frames
-  const size_t mFrameSize;  // size of each frame in bytes
-  size_t mNextFrame;        // index of next frame to provide
-  size_t mUnrel;            // number of frames not yet released
- public:
-  Provider(const void* addr, size_t frames, size_t frameSize)
-      : mAddr(addr),
-        mNumFrames(frames),
-        mFrameSize(frameSize),
-        mNextFrame(0),
-        mUnrel(0) {}
-  status_t getNextBuffer(Buffer* buffer) override {
-    if (buffer->frameCount > mNumFrames - mNextFrame) {
-      buffer->frameCount = mNumFrames - mNextFrame;
-    }
-    mUnrel = buffer->frameCount;
-    if (buffer->frameCount > 0) {
-      buffer->raw = (char*)mAddr + mFrameSize * mNextFrame;
-      return NO_ERROR;
-    } else {
-      buffer->raw = nullptr;
-      return NOT_ENOUGH_DATA;
-    }
-  }
-  virtual void releaseBuffer(Buffer* buffer) {
-    if (buffer->frameCount > mUnrel) {
-      mNextFrame += mUnrel;
-      mUnrel = 0;
-    } else {
-      mNextFrame += buffer->frameCount;
-      mUnrel -= buffer->frameCount;
-    }
-    buffer->frameCount = 0;
-    buffer->raw = nullptr;
-  }
-  void reset() { mNextFrame = 0; }
 };
 
 audio_format_t chooseFormat(AudioResampler::src_quality quality,
