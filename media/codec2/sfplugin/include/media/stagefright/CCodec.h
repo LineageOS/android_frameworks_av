@@ -193,7 +193,6 @@ private:
 
     Mutexed<std::unique_ptr<CCodecConfig>> mConfig;
     Mutexed<std::list<std::unique_ptr<C2Work>>> mWorkDoneQueue;
-    std::atomic_flag mSentConfigAfterResume;
 
     friend class CCodecCallbackImpl;
 
