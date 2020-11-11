@@ -95,9 +95,9 @@ private:
     AMediaFormat *mMeta;
     uint16_t mWaveFormat;
     const bool mOutputFloat;
-    int32_t mSampleRate;
-    int32_t mNumChannels;
-    int32_t mBitsPerSample;
+    uint32_t mSampleRate;
+    uint32_t mNumChannels;
+    uint32_t mBitsPerSample;
     off64_t mOffset;
     size_t mSize;
     bool mStarted;
@@ -379,9 +379,9 @@ WAVSource::WAVSource(
       mOffset(offset),
       mSize(size),
       mStarted(false) {
-    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, &mSampleRate));
-    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, &mNumChannels));
-    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, &mBitsPerSample));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_SAMPLE_RATE, (int32_t*) &mSampleRate));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_CHANNEL_COUNT, (int32_t*) &mNumChannels));
+    CHECK(AMediaFormat_getInt32(mMeta, AMEDIAFORMAT_KEY_BITS_PER_SAMPLE, (int32_t*) &mBitsPerSample));
 }
 
 WAVSource::~WAVSource() {
@@ -472,7 +472,7 @@ media_status_t WAVSource::read(
     }
 
     const size_t maxBytesAvailable =
-        (mCurrentPos - mOffset >= (off64_t)mSize)
+        (mCurrentPos < mOffset || mCurrentPos - mOffset >= (off64_t)mSize)
             ? 0 : mSize - (mCurrentPos - mOffset);
 
     if (maxBytesToRead > maxBytesAvailable) {
