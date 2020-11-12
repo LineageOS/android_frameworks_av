@@ -31,7 +31,7 @@
 #include "AAudioSimplePlayer.h"
 #include "AAudioArgsParser.h"
 
-#define APP_VERSION  "0.1.7"
+#define APP_VERSION  "0.1.8"
 
 constexpr int32_t kDefaultHangTimeMSec = 10;
 
