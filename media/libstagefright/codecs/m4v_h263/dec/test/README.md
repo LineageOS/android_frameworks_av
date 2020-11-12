@@ -22,7 +22,8 @@ To test 32-bit binary push binaries from nativetest.
 adb push ${OUT}/data/nativetest/Mpeg4H263DecoderTest/Mpeg4H263DecoderTest /data/local/tmp/
 ```
 
-The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/dec/test/Mpeg4H263Decoder.zip). Download, unzip and push these files into device for testing.
+The resource file for the tests is taken from [here](https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/dec/test/Mpeg4H263Decoder-1.1.zip).
+Download, unzip and push these files into device for testing.
 
 ```
 adb push Mpeg4H263Decoder /data/local/tmp/
