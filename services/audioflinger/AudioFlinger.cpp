@@ -2568,20 +2568,28 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
     return 0;
 }
 
-status_t AudioFlinger::openOutput(audio_module_handle_t module,
-                                  audio_io_handle_t *output,
-                                  audio_config_t *config,
-                                  const sp<DeviceDescriptorBase>& device,
-                                  uint32_t *latencyMs,
-                                  audio_output_flags_t flags)
+status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response)
 {
+    audio_module_handle_t module = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_module_handle_t(request.module));
+    audio_config_t config = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioConfig_audio_config_t(request.config));
+    sp<DeviceDescriptorBase> device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_DeviceDescriptorBase(request.device));
+    audio_output_flags_t flags = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_audio_output_flags_mask(request.flags));
+
+    audio_io_handle_t output;
+    uint32_t latencyMs;
+
     ALOGI("openOutput() this %p, module %d Device %s, SamplingRate %d, Format %#08x, "
               "Channels %#x, flags %#x",
               this, module,
               device->toString().c_str(),
-              config->sample_rate,
-              config->format,
-              config->channel_mask,
+              config.sample_rate,
+              config.format,
+              config.channel_mask,
               flags);
 
     audio_devices_t deviceType = device->type();
@@ -2593,11 +2601,11 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
 
     Mutex::Autolock _l(mLock);
 
-    sp<ThreadBase> thread = openOutput_l(module, output, config, deviceType, address, flags);
+    sp<ThreadBase> thread = openOutput_l(module, &output, &config, deviceType, address, flags);
     if (thread != 0) {
         if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == 0) {
             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
-            *latencyMs = playbackThread->latency();
+            latencyMs = playbackThread->latency();
 
             // notify client processes of the new output creation
             playbackThread->ioConfigChanged(AUDIO_OUTPUT_OPENED);
@@ -2617,6 +2625,10 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
             MmapThread *mmapThread = (MmapThread *)thread.get();
             mmapThread->ioConfigChanged(AUDIO_OUTPUT_OPENED);
         }
+        response->output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
+        response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+        response->latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(latencyMs));
+        response->flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_mask(flags));
         return NO_ERROR;
     }
 

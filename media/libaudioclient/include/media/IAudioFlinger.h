@@ -51,6 +51,8 @@
 #include "android/media/IEffectClient.h"
 #include "android/media/OpenInputRequest.h"
 #include "android/media/OpenInputResponse.h"
+#include "android/media/OpenOutputRequest.h"
+#include "android/media/OpenOutputResponse.h"
 
 namespace android {
 
@@ -238,12 +240,8 @@ public:
     virtual size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
             audio_channel_mask_t channelMask) const = 0;
 
-    virtual status_t openOutput(audio_module_handle_t module,
-                                audio_io_handle_t *output,
-                                audio_config_t *config,
-                                const sp<DeviceDescriptorBase>& device,
-                                uint32_t *latencyMs,
-                                audio_output_flags_t flags) = 0;
+    virtual status_t openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response) = 0;
     virtual audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
                                     audio_io_handle_t output2) = 0;
     virtual status_t closeOutput(audio_io_handle_t output) = 0;

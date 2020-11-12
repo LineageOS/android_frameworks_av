@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include <android/media/DeviceDescriptorBase.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioContainers.h>
@@ -76,6 +77,9 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    status_t writeToParcelable(media::DeviceDescriptorBase* parcelable) const;
+    status_t readFromParcelable(const media::DeviceDescriptorBase& parcelable);
+
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
     uint32_t mEncapsulationModes = 0;
@@ -106,5 +110,11 @@ std::string toString(const DeviceDescriptorBaseVector& devices);
  * Return a set of device types and addresses from collection of DeviceDescriptorBase.
  */
 AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorBaseVector& devices);
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<sp<DeviceDescriptorBase>>
+aidl2legacy_DeviceDescriptorBase(const media::DeviceDescriptorBase& aidl);
+ConversionResult<media::DeviceDescriptorBase>
+legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy);
 
 } // namespace android

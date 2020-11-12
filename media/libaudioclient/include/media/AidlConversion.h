@@ -27,6 +27,8 @@
 #include <android/media/AudioClient.h>
 #include <android/media/AudioConfig.h>
 #include <android/media/AudioConfigBase.h>
+#include <android/media/AudioEncapsulationMode.h>
+#include <android/media/AudioEncapsulationMetadataType.h>
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioGainMode.h>
 #include <android/media/AudioInputFlags.h>
@@ -101,6 +103,20 @@ template<typename To, typename From>
 ConversionResult<To> convertReinterpret(From from) {
     static_assert(sizeof(From) == sizeof(To));
     return static_cast<To>(from);
+}
+
+/**
+ * A generic template that helps convert containers of convertible types.
+ */
+template<typename OutputContainer, typename InputContainer, typename Func>
+ConversionResult<OutputContainer>
+convertContainer(const InputContainer& input, const Func& itemConversion) {
+    OutputContainer output;
+    auto ins = std::inserter(output, output.begin());
+    for (const auto& item : input) {
+        *ins = VALUE_OR_RETURN(itemConversion(item));
+    }
+    return output;
 }
 
 // maxSize is the size of the C-string buffer (including the 0-terminator), NOT the max length of
@@ -274,9 +290,9 @@ ConversionResult<media::AudioAttributesInternal>
 legacy2aidl_audio_attributes_t_AudioAttributesInternal(const audio_attributes_t& legacy);
 
 ConversionResult<audio_encapsulation_mode_t>
-aidl2legacy_audio_encapsulation_mode_t_AudioEncapsulationMode(media::AudioEncapsulationMode aidl);
+aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t(media::AudioEncapsulationMode aidl);
 ConversionResult<media::AudioEncapsulationMode>
-legacy2aidl_AudioEncapsulationMode_audio_encapsulation_mode_t(audio_encapsulation_mode_t legacy);
+legacy2aidl_audio_encapsulation_mode_t_AudioEncapsulationMode(audio_encapsulation_mode_t legacy);
 
 ConversionResult<audio_offload_info_t>
 aidl2legacy_AudioOffloadInfo_audio_offload_info_t(const media::AudioOffloadInfo& aidl);
@@ -317,5 +333,22 @@ ConversionResult<effect_descriptor_t>
 aidl2legacy_EffectDescriptor_effect_descriptor_t(const media::EffectDescriptor& aidl);
 ConversionResult<media::EffectDescriptor>
 legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& legacy);
+
+ConversionResult<audio_encapsulation_metadata_type_t>
+aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t(
+        media::AudioEncapsulationMetadataType aidl);
+ConversionResult<media::AudioEncapsulationMetadataType>
+legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
+        audio_encapsulation_metadata_type_t legacy);
+
+ConversionResult<uint32_t>
+aidl2legacy_AudioEncapsulationMode_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_AudioEncapsulationMode_mask(uint32_t legacy);
+
+ConversionResult<uint32_t>
+aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy);
 
 }  // namespace android

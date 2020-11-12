@@ -530,37 +530,16 @@ public:
         return reply.readInt64();
     }
 
-    virtual status_t openOutput(audio_module_handle_t module,
-                                audio_io_handle_t *output,
-                                audio_config_t *config,
-                                const sp<DeviceDescriptorBase>& device,
-                                uint32_t *latencyMs,
-                                audio_output_flags_t flags)
+    virtual status_t openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response)
     {
-        if (output == nullptr || config == nullptr || device == nullptr || latencyMs == nullptr) {
-            return BAD_VALUE;
-        }
+        status_t status;
         Parcel data, reply;
-        data.writeInterfaceToken(IAudioFlinger::getInterfaceDescriptor());
-        data.writeInt32(module);
-        data.write(config, sizeof(audio_config_t));
-        data.writeParcelable(*device);
-        data.writeInt32((int32_t) flags);
-        status_t status = remote()->transact(OPEN_OUTPUT, data, &reply);
-        if (status != NO_ERROR) {
-            *output = AUDIO_IO_HANDLE_NONE;
-            return status;
-        }
-        status = (status_t)reply.readInt32();
-        if (status != NO_ERROR) {
-            *output = AUDIO_IO_HANDLE_NONE;
-            return status;
-        }
-        *output = (audio_io_handle_t)reply.readInt32();
-        ALOGV("openOutput() returned output, %d", *output);
-        reply.read(config, sizeof(audio_config_t));
-        *latencyMs = reply.readInt32();
-        return NO_ERROR;
+        return data.writeParcelable(request)
+                ?: remote()->transact(OPEN_OUTPUT, data, &reply)
+                ?: data.readInt32(&status)
+                ?: status
+                ?: data.readParcelable(response);
     }
 
     virtual audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
@@ -1295,29 +1274,13 @@ status_t BnAudioFlinger::onTransact(
         } break;
         case OPEN_OUTPUT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
-            audio_module_handle_t module = (audio_module_handle_t)data.readInt32();
-            audio_config_t config = {};
-            if (data.read(&config, sizeof(audio_config_t)) != NO_ERROR) {
-                ALOGE("b/23905951");
-            }
-            sp<DeviceDescriptorBase> device = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
-            status_t status = NO_ERROR;
-            if ((status = data.readParcelable(device.get())) != NO_ERROR) {
-                reply->writeInt32((int32_t)status);
-                return NO_ERROR;
-            }
-            audio_output_flags_t flags = (audio_output_flags_t) data.readInt32();
-            uint32_t latencyMs = 0;
-            audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status = openOutput(module, &output, &config, device, &latencyMs, flags);
-            ALOGV("OPEN_OUTPUT output, %d", output);
-            reply->writeInt32((int32_t)status);
-            if (status == NO_ERROR) {
-                reply->writeInt32((int32_t)output);
-                reply->write(&config, sizeof(audio_config_t));
-                reply->writeInt32(latencyMs);
-            }
-            return NO_ERROR;
+            status_t status;
+            media::OpenOutputRequest request;
+            media::OpenOutputResponse response;
+            return data.readParcelable(&request)
+                ?: (status = openOutput(request, &response), OK)
+                ?: reply->writeInt32(status)
+                ?: reply->writeParcelable(response);
         } break;
         case OPEN_DUPLICATE_OUTPUT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);

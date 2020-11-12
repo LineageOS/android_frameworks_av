@@ -50,7 +50,22 @@ status_t AudioPolicyService::AudioPolicyClient::openOutput(audio_module_handle_t
         ALOGW("%s: could not get AudioFlinger", __func__);
         return PERMISSION_DENIED;
     }
-    return af->openOutput(module, output, config, device, latencyMs, flags);
+
+    media::OpenOutputRequest request;
+    media::OpenOutputResponse response;
+
+    request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
+    request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(*config));
+    request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_DeviceDescriptorBase(device));
+    request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_mask(flags));
+
+    status_t status = af->openOutput(request, &response);
+    if (status == OK) {
+        *output = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.output));
+        *config = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioConfig_audio_config_t(response.config));
+        *latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<uint32_t>(response.latencyMs));
+    }
+    return status;
 }
 
 audio_io_handle_t AudioPolicyService::AudioPolicyClient::openDuplicateOutput(
