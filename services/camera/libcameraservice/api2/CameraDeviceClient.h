@@ -189,6 +189,9 @@ public:
 
     virtual status_t      setRotateAndCropOverride(uint8_t rotateAndCrop) override;
 
+    virtual bool          supportsCameraMute();
+    virtual status_t      setCameraMute(bool enabled);
+
     virtual status_t      dump(int fd, const Vector<String16>& args);
 
     virtual status_t      dumpClient(int fd, const Vector<String16>& args);

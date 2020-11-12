@@ -1532,6 +1532,14 @@ status_t CameraDeviceClient::setRotateAndCropOverride(uint8_t rotateAndCrop) {
         static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
 }
 
+bool CameraDeviceClient::supportsCameraMute() {
+    return mDevice->supportsCameraMute();
+}
+
+status_t CameraDeviceClient::setCameraMute(bool enabled) {
+    return mDevice->setCameraMute(enabled);
+}
+
 binder::Status CameraDeviceClient::switchToOffline(
         const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb,
         const std::vector<int>& offlineOutputIds,
