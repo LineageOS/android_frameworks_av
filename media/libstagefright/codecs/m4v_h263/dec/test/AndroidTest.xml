@@ -19,7 +19,7 @@
         <option name="cleanup" value="true" />
         <option name="push" value="Mpeg4H263DecoderTest->/data/local/tmp/Mpeg4H263DecoderTest" />
         <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/dec/test/Mpeg4H263Decoder.zip?unzip=true"
+            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/dec/test/Mpeg4H263Decoder-1.1.zip?unzip=true"
             value="/data/local/tmp/Mpeg4H263DecoderTestRes/" />
     </target_preparer>
 
