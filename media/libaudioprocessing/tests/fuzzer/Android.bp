@@ -8,3 +8,14 @@ cc_fuzz {
     "libsndfile",
   ],
 }
+
+cc_fuzz {
+  name: "libaudioprocessing_record_buffer_converter_fuzzer",
+  srcs: [
+    "libaudioprocessing_record_buffer_converter_fuzzer.cpp",
+  ],
+  defaults: ["libaudioprocessing_test_defaults"],
+  static_libs: [
+    "libsndfile",
+  ],
+}

@@ -816,6 +816,9 @@ status_t CCodecBufferChannel::renderOutputBuffer(
     status_t result = mComponent->queueToOutputSurface(block, qbi, &qbo);
     if (result != OK) {
         ALOGI("[%s] queueBuffer failed: %d", mName, result);
+        if (result == NO_INIT) {
+            mCCodecCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+        }
         return result;
     }
     ALOGV("[%s] queue buffer successful", mName);
