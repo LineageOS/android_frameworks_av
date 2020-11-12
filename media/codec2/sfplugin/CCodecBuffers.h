@@ -215,10 +215,8 @@ public:
 
     /**
      * Update SkipCutBuffer from format. The @p format must not be null.
-     * @p notify determines whether the format comes with a buffer that should
-     * be reported to the client or not.
      */
-    void updateSkipCutBuffer(const sp<AMessage> &format, bool notify = true);
+    void updateSkipCutBuffer(const sp<AMessage> &format);
 
     /**
      * Output Stash
@@ -391,9 +389,6 @@ private:
     void setSkipCutBuffer(int32_t skip, int32_t cut);
 
     // Output stash
-
-    // Output format that has not been made available to the client.
-    sp<AMessage> mUnreportedFormat;
 
     // Struct for an entry in the output stash (mPending and mReorderStash)
     struct StashEntry {
