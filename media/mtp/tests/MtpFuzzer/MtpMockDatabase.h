@@ -90,6 +90,8 @@ public:
     MtpResponseCode getObjectFilePath(MtpObjectHandle handle, MtpStringBuffer& outFilePath,
                                       int64_t& outFileLength, MtpObjectFormat& outFormat);
 
+    int openFilePath(const char* path, bool transcode);
+
     MtpResponseCode beginDeleteObject(MtpObjectHandle handle);
     void endDeleteObject(MtpObjectHandle handle, bool succeeded);
 

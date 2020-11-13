@@ -252,6 +252,11 @@ MtpResponseCode MtpMockDatabase::getObjectFilePath(MtpObjectHandle handle,
     return MTP_RESPONSE_OK;
 }
 
+int MtpMockDatabase::openFilePath(const char* path, bool transcode) {
+    ALOGD("MockDatabase %s: filePath=%s transcode=%d\n", __func__, path, transcode);
+    return 0;
+}
+
 MtpResponseCode MtpMockDatabase::beginDeleteObject(MtpObjectHandle handle) {
     ALOGD("MockDatabase %s: ohandle=%u\n", __func__, handle);
     return MTP_RESPONSE_OK;
