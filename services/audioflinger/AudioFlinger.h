@@ -787,7 +787,7 @@ using effect_buffer_t = int16_t;
 
                 std::vector< sp<EffectModule> > purgeStaleEffects_l();
 
-                void broacastParametersToRecordThreads_l(const String8& keyValuePairs);
+                void broadcastParametersToRecordThreads_l(const String8& keyValuePairs);
                 void updateOutDevicesForRecordThreads_l(const DeviceDescriptorBaseVector& devices);
                 void forwardParametersToDownstreamPatches_l(
                         audio_io_handle_t upStream, const String8& keyValuePairs,

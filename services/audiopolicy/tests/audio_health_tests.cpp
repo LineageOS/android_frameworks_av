@@ -16,6 +16,7 @@
 
 #define LOG_TAG "AudioPolicy_Boot_Test"
 
+#include <string>
 #include <unordered_set>
 
 #include <gtest/gtest.h>
@@ -72,5 +73,45 @@ TEST(AudioHealthTest, AttachedDeviceFound) {
     }
     for (auto desc : manager.getConfig().getOutputDevices()) {
         ASSERT_NE(attachedDevices.end(), attachedDevices.find(desc->type()));
+    }
+}
+
+TEST(AudioHealthTest, ConnectSupportedDevice) {
+    AudioPolicyManagerTestClient client;
+    AudioPolicyTestManager manager(&client);
+    manager.loadConfig();
+    ASSERT_NE("AudioPolicyConfig::setDefault", manager.getConfig().getSource());
+
+    DeviceVector devices;
+    for (const auto& hwModule : manager.getConfig().getHwModules()) {
+        for (const auto& profile : hwModule->getOutputProfiles()) {
+            devices.merge(profile->getSupportedDevices());
+        }
+        for (const auto& profile : hwModule->getInputProfiles()) {
+            devices.merge(profile->getSupportedDevices());
+        }
+    }
+    for (const auto& device : devices) {
+        if (!audio_is_bluetooth_out_sco_device(device->type()) &&
+            !audio_is_bluetooth_in_sco_device(device->type())) {
+            // There are two reasons to only test connecting BT devices.
+            // 1) It is easier to construct a fake address.
+            // 2) This test will be run in presubmit. In that case, it makes sense to make the test
+            //    processing time short.
+            continue;
+        }
+        std::string address = "11:22:33:44:55:66";
+        ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                AudioSystem::getDeviceConnectionState(device->type(), address.c_str()));
+        ASSERT_EQ(NO_ERROR, AudioSystem::setDeviceConnectionState(
+                device->type(), AUDIO_POLICY_DEVICE_STATE_AVAILABLE, address.c_str(),
+                "" /*device_name*/, AUDIO_FORMAT_DEFAULT));
+        ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+                AudioSystem::getDeviceConnectionState(device->type(), address.c_str()));
+        ASSERT_EQ(NO_ERROR, AudioSystem::setDeviceConnectionState(
+                device->type(), AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE, address.c_str(),
+                "" /*device_name*/, AUDIO_FORMAT_DEFAULT));
+        ASSERT_EQ(AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+                AudioSystem::getDeviceConnectionState(device->type(), address.c_str()));
     }
 }

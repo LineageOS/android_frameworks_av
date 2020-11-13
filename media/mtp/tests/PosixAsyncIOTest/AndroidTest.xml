@@ -13,19 +13,14 @@
      See the License for the specific language governing permissions and
      limitations under the License.
 -->
-<configuration description="Test module config for Mpeg4H263 Decoder unit tests">
-    <option name="test-suite-tag" value="Mpeg4H263DecoderTest" />
+<configuration description="Config for posix_async_io_test">
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="true" />
-        <option name="push" value="Mpeg4H263DecoderTest->/data/local/tmp/Mpeg4H263DecoderTest" />
-        <option name="push-file"
-            key="https://storage.googleapis.com/android_media/frameworks/av/media/libstagefright/codecs/m4v_h263/dec/test/Mpeg4H263Decoder-1.1.zip?unzip=true"
-            value="/data/local/tmp/Mpeg4H263DecoderTestRes/" />
+        <option name="push" value="posix_async_io_test->/data/local/tmp/posix_async_io_test" />
     </target_preparer>
-
+    <option name="test-suite-tag" value="apct" />
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
-        <option name="module-name" value="Mpeg4H263DecoderTest" />
-        <option name="native-test-flag" value="-P /data/local/tmp/Mpeg4H263DecoderTestRes/" />
+        <option name="module-name" value="posix_async_io_test" />
     </test>
 </configuration>
