@@ -22,3 +22,14 @@ cc_fuzz {
         "libcamera_client",
     ],
 }
+
+cc_fuzz {
+    name: "libcameraservice_depth_processor_fuzzer",
+    srcs: [
+        "DepthProcessorFuzzer.cpp",
+    ],
+    shared_libs: [
+        "libcameraservice",
+    ],
+    corpus: ["corpus/*.jpg"],
+}
