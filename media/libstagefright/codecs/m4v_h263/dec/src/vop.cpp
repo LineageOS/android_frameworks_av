@@ -24,7 +24,6 @@
 
 #define OSCL_DISABLE_WARNING_CONV_POSSIBLE_LOSS_OF_DATA
 
-#ifdef PV_SUPPORT_MAIN_PROFILE
 /* INTRA */
 const static int mpeg_iqmat_def[NCOEFF_BLOCK] =
 {
@@ -50,7 +49,6 @@ const static int mpeg_nqmat_def[64]  =
     22, 23, 24, 26, 27, 28, 30, 31,
     23, 24, 25, 27, 28, 30, 31, 33
 };
-#endif
 
 /* ======================================================================== */
 /*  Function : CalcNumBits()                                                */
@@ -86,9 +84,7 @@ PV_STATUS DecodeVOLHeader(VideoDecData *video, int layer)
     BitstreamDecVideo *stream;
     uint32 tmpvar, vol_shape;
     uint32 startCode;
-#ifdef PV_SUPPORT_MAIN_PROFILE
     int *qmat, i, j;
-#endif
     int version_id = 1;
 #ifdef PV_TOLERATE_VOL_ERRORS
     uint32 profile = 0x01;
@@ -317,7 +313,8 @@ decode_vol:
         }
         else
         {
-            if (tmpvar != 0x01) return PV_FAIL;
+            // Simple and advanced simple (for quant-type 1)
+            if (tmpvar != 0x01 && tmpvar != 0x11) return PV_FAIL;
         }
 
         /* version id specified? */
@@ -486,7 +483,6 @@ decode_vol:
         currVol->quantType = BitstreamRead1Bits(stream);
         if (currVol->quantType)
         {
-#ifdef PV_SUPPORT_MAIN_PROFILE
             /* load quantization matrices.   5/22/2000 */
             /* load_intra_quant_mat (1 bit) */
             qmat = currVol->iqmat;
@@ -531,9 +527,6 @@ decode_vol:
             {
                 oscl_memcpy(qmat, mpeg_nqmat_def, 64*sizeof(int));
             }
-#else
-            return PV_FAIL;
-#endif
         }
 
         if (version_id != 1)
