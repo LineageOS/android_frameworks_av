@@ -12,8 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+cc_defaults {
+    name: "libcameraservice_fuzz_defaults",
+    fuzz_config: {
+        componentid: 41727
+    },
+}
+
 cc_fuzz {
     name: "libcameraservice_distortion_mapper_fuzzer",
+    defaults: ["libcameraservice_fuzz_defaults"],
     srcs: [
         "DistortionMapperFuzzer.cpp",
     ],
@@ -25,6 +33,7 @@ cc_fuzz {
 
 cc_fuzz {
     name: "libcameraservice_depth_processor_fuzzer",
+    defaults: ["libcameraservice_fuzz_defaults"],
     srcs: [
         "DepthProcessorFuzzer.cpp",
     ],
