@@ -158,7 +158,8 @@ void OutputBuffers::updateSkipCutBuffer(int32_t sampleRate, int32_t channelCount
     setSkipCutBuffer(delay, padding);
 }
 
-void OutputBuffers::updateSkipCutBuffer(const sp<AMessage> &format) {
+void OutputBuffers::updateSkipCutBuffer(
+        const sp<AMessage> &format, bool notify) {
     AString mediaType;
     if (format->findString(KEY_MIME, &mediaType)
             && mediaType == MIMETYPE_AUDIO_RAW) {
@@ -168,6 +169,9 @@ void OutputBuffers::updateSkipCutBuffer(const sp<AMessage> &format) {
                 && format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
             updateSkipCutBuffer(sampleRate, channelCount);
         }
+    }
+    if (notify) {
+        mUnreportedFormat = nullptr;
     }
 }
 
@@ -192,6 +196,7 @@ void OutputBuffers::clearStash() {
     mReorderStash.clear();
     mDepth = 0;
     mKey = C2Config::ORDINAL;
+    mUnreportedFormat = nullptr;
 }
 
 void OutputBuffers::flushStash() {
@@ -267,25 +272,25 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     *c2Buffer = entry.buffer;
     sp<AMessage> outputFormat = entry.format;
 
-    if (entry.notify && mFormat != outputFormat) {
-        updateSkipCutBuffer(outputFormat);
-        sp<ABuffer> imageData;
-        if (mFormat->findBuffer("image-data", &imageData)) {
-            outputFormat->setBuffer("image-data", imageData);
+    // The output format can be processed without a registered slot.
+    if (outputFormat) {
+        updateSkipCutBuffer(outputFormat, entry.notify);
+    }
+
+    if (entry.notify) {
+        if (outputFormat) {
+            setFormat(outputFormat);
+        } else if (mUnreportedFormat) {
+            outputFormat = mUnreportedFormat;
+            setFormat(outputFormat);
         }
-        int32_t stride;
-        if (mFormat->findInt32(KEY_STRIDE, &stride)) {
-            outputFormat->setInt32(KEY_STRIDE, stride);
+        mUnreportedFormat = nullptr;
+    } else {
+        if (outputFormat) {
+            mUnreportedFormat = outputFormat;
+        } else if (!mUnreportedFormat) {
+            mUnreportedFormat = mFormat;
         }
-        int32_t sliceHeight;
-        if (mFormat->findInt32(KEY_SLICE_HEIGHT, &sliceHeight)) {
-            outputFormat->setInt32(KEY_SLICE_HEIGHT, sliceHeight);
-        }
-        ALOGV("[%s] popFromStashAndRegister: output format reference changed: %p -> %p",
-                mName, mFormat.get(), outputFormat.get());
-        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
-                mName, outputFormat->debugString().c_str());
-        setFormat(outputFormat);
     }
 
     // Flushing mReorderStash because no other buffers should come after output
@@ -296,6 +301,10 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     }
 
     if (!entry.notify) {
+        if (outputFormat) {
+            ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
+                    mName, outputFormat->debugString().c_str());
+        }
         mPending.pop_front();
         return DISCARD;
     }
@@ -312,6 +321,10 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     // Append information from the front stash entry to outBuffer.
     (*outBuffer)->meta()->setInt64("timeUs", entry.timestamp);
     (*outBuffer)->meta()->setInt32("flags", entry.flags);
+    if (outputFormat) {
+        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
+                mName, outputFormat->debugString().c_str());
+    }
     ALOGV("[%s] popFromStashAndRegister: "
           "out buffer index = %zu [%p] => %p + %zu (%lld)",
           mName, *index, outBuffer->get(),
@@ -1163,6 +1176,7 @@ void OutputBuffersArray::grow(size_t newSize) {
 void OutputBuffersArray::transferFrom(OutputBuffers* source) {
     mFormat = source->mFormat;
     mSkipCutBuffer = source->mSkipCutBuffer;
+    mUnreportedFormat = source->mUnreportedFormat;
     mPending = std::move(source->mPending);
     mReorderStash = std::move(source->mReorderStash);
     mDepth = source->mDepth;
