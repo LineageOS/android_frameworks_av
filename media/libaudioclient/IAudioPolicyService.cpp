@@ -1591,6 +1591,7 @@ status_t BnAudioPolicyService::onTransact(
         case REGISTER_EFFECT:
         case UNREGISTER_EFFECT:
         case SET_EFFECT_ENABLED:
+        case GET_STRATEGY_FOR_STREAM:
         case GET_OUTPUT_FOR_ATTR:
         case MOVE_EFFECTS_TO_IO:
             ALOGW("%s: transaction %d received from PID %d",
@@ -1619,6 +1620,14 @@ status_t BnAudioPolicyService::onTransact(
         case INIT_STREAM_VOLUME:
         case SET_STREAM_VOLUME:
         case SET_VOLUME_ATTRIBUTES:
+        case GET_STREAM_VOLUME:
+        case GET_VOLUME_ATTRIBUTES:
+        case GET_MIN_VOLUME_FOR_ATTRIBUTES:
+        case GET_MAX_VOLUME_FOR_ATTRIBUTES:
+        case IS_STREAM_ACTIVE:
+        case IS_STREAM_ACTIVE_REMOTELY:
+        case IS_SOURCE_ACTIVE:
+        case GET_DEVICES_FOR_STREAM:
         case REGISTER_POLICY_MIXES:
         case SET_MASTER_MONO:
         case GET_SURROUND_FORMATS:
