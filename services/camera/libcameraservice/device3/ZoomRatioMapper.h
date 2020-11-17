@@ -33,7 +33,7 @@ namespace camera3 {
  * - HAL supports zoomRatio and the application uses cropRegion, or
  * - HAL doesn't support zoomRatio, but the application uses zoomRatio
  */
-class ZoomRatioMapper : private CoordinateMapper {
+class ZoomRatioMapper : public CoordinateMapper {
   public:
     ZoomRatioMapper() = default;
     ZoomRatioMapper(const CameraMetadata *deviceInfo,
@@ -41,7 +41,9 @@ class ZoomRatioMapper : private CoordinateMapper {
     ZoomRatioMapper(const ZoomRatioMapper& other) :
             mHalSupportsZoomRatio(other.mHalSupportsZoomRatio),
             mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight),
-            mIsValid(other.mIsValid) {}
+            mIsValid(other.mIsValid) { initRemappedKeys(); }
+
+    void initRemappedKeys() override;
 
     /**
      * Initialize request template with valid zoomRatio if necessary.
