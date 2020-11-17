@@ -29,6 +29,20 @@ namespace camera3 {
 
 
 DistortionMapper::DistortionMapper() : mValidMapping(false), mValidGrids(false) {
+    initRemappedKeys();
+}
+
+void DistortionMapper::initRemappedKeys() {
+    mRemappedKeys.insert(
+            kMeteringRegionsToCorrect.begin(),
+            kMeteringRegionsToCorrect.end());
+    mRemappedKeys.insert(
+            kRectsToCorrect.begin(),
+            kRectsToCorrect.end());
+    mRemappedKeys.insert(
+            kResultPointsToCorrectNoClamp.begin(),
+            kResultPointsToCorrectNoClamp.end());
+    mRemappedKeys.insert(ANDROID_DISTORTION_CORRECTION_MODE);
 }
 
 bool DistortionMapper::isDistortionSupported(const CameraMetadata &deviceInfo) {

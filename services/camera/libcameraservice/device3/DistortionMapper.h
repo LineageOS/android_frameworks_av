@@ -32,7 +32,7 @@ namespace camera3 {
  * Utilities to transform between raw (distorted) and warped (corrected) coordinate systems
  * for cameras that support geometric distortion
  */
-class DistortionMapper : private CoordinateMapper {
+class DistortionMapper : public CoordinateMapper {
   public:
     DistortionMapper();
 
@@ -43,7 +43,10 @@ class DistortionMapper : private CoordinateMapper {
             mArrayWidth(other.mArrayWidth), mArrayHeight(other.mArrayHeight),
             mActiveWidth(other.mActiveWidth), mActiveHeight(other.mActiveHeight),
             mArrayDiffX(other.mArrayDiffX), mArrayDiffY(other.mArrayDiffY),
-            mCorrectedGrid(other.mCorrectedGrid), mDistortedGrid(other.mDistortedGrid) {}
+            mCorrectedGrid(other.mCorrectedGrid), mDistortedGrid(other.mDistortedGrid) {
+            initRemappedKeys(); }
+
+    void initRemappedKeys() override;
 
     /**
      * Check whether distortion correction is supported by the camera HAL

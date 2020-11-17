@@ -36,7 +36,6 @@
 #include "device3/RotateAndCropMapper.h"
 #include "device3/ZoomRatioMapper.h"
 #include "utils/TagMonitor.h"
-#include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
 
 namespace android {

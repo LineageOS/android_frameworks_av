@@ -1614,6 +1614,7 @@ status_t BnAudioPolicyService::onTransact(
 //      case SET_FORCE_USE:
         case INIT_STREAM_VOLUME:
         case SET_STREAM_VOLUME:
+        case SET_VOLUME_ATTRIBUTES:
         case REGISTER_POLICY_MIXES:
         case SET_MASTER_MONO:
         case GET_SURROUND_FORMATS:

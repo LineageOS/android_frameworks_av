@@ -25,6 +25,19 @@ namespace android {
 
 namespace camera3 {
 
+void ZoomRatioMapper::initRemappedKeys() {
+    mRemappedKeys.insert(
+            kMeteringRegionsToCorrect.begin(),
+            kMeteringRegionsToCorrect.end());
+    mRemappedKeys.insert(
+            kRectsToCorrect.begin(),
+            kRectsToCorrect.end());
+    mRemappedKeys.insert(
+            kResultPointsToCorrectNoClamp.begin(),
+            kResultPointsToCorrectNoClamp.end());
+
+    mRemappedKeys.insert(ANDROID_CONTROL_ZOOM_RATIO);
+}
 
 status_t ZoomRatioMapper::initZoomRatioInTemplate(CameraMetadata *request) {
     camera_metadata_entry_t entry;
@@ -117,6 +130,8 @@ status_t ZoomRatioMapper::overrideZoomRatioTags(
 
 ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
         bool supportNativeZoomRatio, bool usePrecorrectArray) {
+    initRemappedKeys();
+
     camera_metadata_ro_entry_t entry;
 
     entry = deviceInfo->find(ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE);
