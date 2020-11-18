@@ -504,6 +504,7 @@ void TranscodingSessionController::onResourceLost() {
         if (clientCallback != nullptr) {
             clientCallback->onTranscodingPaused(mCurrentSession->key.second);
         }
+        mResourcePolicy->setPidResourceLost(mCurrentSession->request.clientPid);
     }
     mResourceLost = true;
 

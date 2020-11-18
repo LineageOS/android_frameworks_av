@@ -17,7 +17,11 @@
 // Unit Test for MediaTranscodingService.
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "MediaTranscodingServiceRealTest"
+#define LOG_TAG "MediaTranscodingServiceResourceTest"
+
+#include <aidl/android/media/BnResourceManagerClient.h>
+#include <aidl/android/media/IResourceManagerService.h>
+#include <binder/ActivityManager.h>
 
 #include "MediaTranscodingServiceTestHelper.h"
 
@@ -43,6 +47,60 @@ constexpr const char* kResourcePolicyTestActivity =
 
 #define OUTPATH(name) "/data/local/tmp/MediaTranscodingService_" #name ".MP4"
 
+/*
+ * The OOM score we're going to ask ResourceManager to use for our native transcoding
+ * service. ResourceManager issues reclaims based on these scores. It gets the scores
+ * from ActivityManagerService, which doesn't track native services. The values of the
+ * OOM scores are defined in:
+ * frameworks/base/services/core/java/com/android/server/am/ProcessList.java
+ * We use SERVICE_ADJ which is lower priority than an app possibly visible to the
+ * user, but higher priority than a cached app (which could be killed without disruption
+ * to the user).
+ */
+constexpr static int32_t SERVICE_ADJ = 500;
+
+using Status = ::ndk::ScopedAStatus;
+using aidl::android::media::BnResourceManagerClient;
+using aidl::android::media::IResourceManagerService;
+
+/*
+ * Placeholder ResourceManagerClient for registering process info override
+ * with the IResourceManagerService. This is only used as a token by the service
+ * to get notifications about binder death, not used for reclaiming resources.
+ */
+struct ResourceManagerClient : public BnResourceManagerClient {
+    explicit ResourceManagerClient() = default;
+
+    Status reclaimResource(bool* _aidl_return) override {
+        *_aidl_return = false;
+        return Status::ok();
+    }
+
+    Status getName(::std::string* _aidl_return) override {
+        _aidl_return->clear();
+        return Status::ok();
+    }
+
+    virtual ~ResourceManagerClient() = default;
+};
+
+static std::shared_ptr<ResourceManagerClient> gResourceManagerClient =
+        ::ndk::SharedRefBase::make<ResourceManagerClient>();
+
+void TranscodingHelper_setProcessInfoOverride(int32_t procState, int32_t oomScore) {
+    ::ndk::SpAIBinder binder(AServiceManager_getService("media.resource_manager"));
+    std::shared_ptr<IResourceManagerService> service = IResourceManagerService::fromBinder(binder);
+    if (service == nullptr) {
+        ALOGE("Failed to get IResourceManagerService");
+        return;
+    }
+    Status status =
+            service->overrideProcessInfo(gResourceManagerClient, getpid(), procState, oomScore);
+    if (!status.isOk()) {
+        ALOGW("Failed to setProcessInfoOverride.");
+    }
+}
+
 class MediaTranscodingServiceResourceTest : public MediaTranscodingServiceTestBase {
 public:
     MediaTranscodingServiceResourceTest() { ALOGI("MediaTranscodingServiceResourceTest created"); }
@@ -62,9 +120,20 @@ public:
  * cause the session to be paused. The activity will hold the codecs for a few seconds
  * before releasing them, and the transcoding service should be able to resume
  * and complete the session.
+ *
+ * Note that this test must run as root. We need to simulate submitting a request for a
+ * client {uid,pid} running at lower priority. As a cmd line test, it's not easy to get the
+ * pid of a living app, so we use our own {uid,pid} to submit. However, since we're a native
+ * process, RM doesn't have our proc info and the reclaim will fail. So we need to use
+ * RM's setProcessInfoOverride to override our proc info, which requires permission (unless root).
  */
 TEST_F(MediaTranscodingServiceResourceTest, TestResourceLost) {
-    ALOGD("TestResourceLost starting...");
+    ALOGD("TestResourceLost starting..., pid %d", ::getpid());
+
+    // We're going to submit the request using our own {uid,pid}. Since we're a native
+    // process, RM doesn't have our proc info and the reclaim will fail. So we need to use
+    // RM's setProcessInfoOverride to override our proc info.
+    TranscodingHelper_setProcessInfoOverride(ActivityManager::PROCESS_STATE_SERVICE, SERVICE_ADJ);
 
     EXPECT_TRUE(ShellHelper::RunCmd("input keyevent KEYCODE_WAKEUP"));
     EXPECT_TRUE(ShellHelper::RunCmd("wm dismiss-keyguard"));
@@ -81,8 +150,8 @@ TEST_F(MediaTranscodingServiceResourceTest, TestResourceLost) {
 
     // Submit session to Client1.
     ALOGD("Submitting session to client1 (app A) ...");
-    EXPECT_TRUE(
-            mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
+    EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal,
+                                 kBitRate, ::getpid(), ::getuid()));
 
     // Client1's session should start immediately.
     EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));

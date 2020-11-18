@@ -347,7 +347,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
     mCurrentClientId = clientId;
     mCurrentSessionId = sessionId;
     mTranscoderCb = std::make_shared<CallbackImpl>(shared_from_this(), clientId, sessionId);
-    mTranscoder = MediaTranscoder::create(mTranscoderCb, pausedState);
+    mTranscoder = MediaTranscoder::create(mTranscoderCb, request.clientPid, request.clientUid,
+                                          pausedState);
     if (mTranscoder == nullptr) {
         ALOGE("failed to create transcoder");
         return AMEDIA_ERROR_UNKNOWN;
