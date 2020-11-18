@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, The Android Open Source Project
+ * Copyright 2020, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,24 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerServiceFrontendInfo;
-
 /**
- * TunerService interface handles tuner related operations.
+ * Cable(DVBC) Frontend Capabilities interface.
  *
  * {@hide}
  */
-interface ITunerService {
+parcelable TunerFrontendCableCapabilities {
+    /**
+     * Modulation capability
+     */
+    int modulationCap;
 
     /**
-     * Gets frontend IDs.
-     *
-     * @return the result code of the operation.
+     * Code Rate capability
      */
-    int getFrontendIds(out int[] ids);
+    int codeRateCap; // inner FEC will converge to codeRate
 
     /**
-     * Retrieve the frontend's information.
-     *
-     * @param frontendHandle the handle of the frontend granted by TRM.
-     * @return the information for the frontend.
+     * Annex capability
      */
-    TunerServiceFrontendInfo getFrontendInfo(in int frontendHandle);
+    int annexCap;
 }
