@@ -205,11 +205,11 @@ public:
 private:
     status_t readFloatVector(
             const Parcel* parcel, Vector<float> *vectorPtr, size_t defaultLength) {
-        std::unique_ptr<std::vector<float>> v;
+        std::optional<std::vector<float>> v;
         status_t result = parcel->readFloatVector(&v);
         if (result != OK) return result;
         vectorPtr->clear();
-        if (v.get() != nullptr) {
+        if (v) {
             for (const auto& iter : *v) {
                 vectorPtr->push_back(iter);
             }
