@@ -60,6 +60,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libandroid",
         "libbinder_ndk",
         "libcutils",
         "liblog",

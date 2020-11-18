@@ -87,7 +87,7 @@ private:
     TranscodingClientManager(const std::shared_ptr<ControllerClientInterface>& controller);
 
     // Checks if a user is trusted (and allowed to submit sessions on behalf of other uids)
-    bool isTrustedCallingUid(uid_t uid);
+    bool isTrustedCaller(pid_t pid, uid_t uid);
 
     /**
      * Removes an existing client from the manager.
@@ -109,7 +109,7 @@ private:
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
     std::shared_ptr<ControllerClientInterface> mSessionController;
-    std::unordered_set<uid_t> mMediaProviderUid;
+    std::unordered_set<uid_t> mTrustedUids;
 
     static std::atomic<ClientIdType> sCookieCounter;
     static std::mutex sCookie2ClientLock;
