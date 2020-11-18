@@ -1,10 +1,4 @@
 // Unit tests for libmediatranscoder.
-
-filegroup {
-    name: "test_assets",
-    srcs: ["assets/*"],
-}
-
 cc_defaults {
     name: "testdefaults",
 
