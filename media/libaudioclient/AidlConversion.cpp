@@ -16,7 +16,6 @@
 
 #define LOG_TAG "AidlConversion"
 //#define LOG_NDEBUG 0
-#include <system/audio.h>
 #include <utils/Log.h>
 
 #include "media/AidlConversion.h"

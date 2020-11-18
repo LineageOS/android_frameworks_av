@@ -161,6 +161,9 @@ cc_library {
     vendor_available: true,
     double_loadable: true,
     min_sdk_version: "29",
+    header_libs: [
+        "libaudio_system_headers",
+    ],
     shared_libs: [
         "audioclient-types-aidl-unstable-cpp",
         "libbase",
