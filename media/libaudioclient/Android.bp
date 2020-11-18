@@ -153,6 +153,31 @@ cc_library_shared {
     },
 }
 
+// This is intended for clients needing to include AidlConversionUtil.h, without dragging in a lot of extra
+// dependencies.
+cc_library_headers {
+    name: "libaudioclient_aidl_conversion_util",
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "libbase_headers",
+    ],
+    export_header_lib_headers: [
+        "libbase_headers",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth.updatable",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+}
+
 cc_library {
     name: "libaudioclient_aidl_conversion",
     srcs: ["AidlConversion.cpp"],
@@ -162,7 +187,11 @@ cc_library {
     double_loadable: true,
     min_sdk_version: "29",
     header_libs: [
+        "libaudioclient_aidl_conversion_util",
         "libaudio_system_headers",
+    ],
+    export_header_lib_headers: [
+        "libaudioclient_aidl_conversion_util",
     ],
     shared_libs: [
         "audioclient-types-aidl-unstable-cpp",
@@ -189,12 +218,6 @@ cc_library {
             "signed-integer-overflow",
         ],
     },
-    apex_available: [
-        "//apex_available:platform",
-        "com.android.bluetooth.updatable",
-        "com.android.media",
-        "com.android.media.swcodec",
-    ],
 }
 
 // AIDL interface between libaudioclient and framework.jar

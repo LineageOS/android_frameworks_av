@@ -20,7 +20,7 @@
 #include <android/media/MicrophoneInfoData.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
-#include <media/AidlConversion.h>
+#include <media/AidlConversionUtil.h>
 #include <system/audio.h>
 
 namespace android {

@@ -21,8 +21,6 @@
 
 #include <system/audio.h>
 
-#include <android-base/expected.h>
-
 #include <android/media/AudioAttributesInternal.h>
 #include <android/media/AudioClient.h>
 #include <android/media/AudioConfig.h>
@@ -41,83 +39,13 @@
 
 #include <android/media/SharedFileRegion.h>
 #include <binder/IMemory.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioClient.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/AudioTimestamp.h>
 #include <system/audio_effect.h>
 
 namespace android {
-
-template <typename T>
-using ConversionResult = base::expected<T, status_t>;
-
-// Convenience macros for working with ConversionResult, useful for writing converted for aggregate
-// types.
-
-#define VALUE_OR_RETURN(result)                                \
-    ({                                                         \
-        auto _tmp = (result);                                  \
-        if (!_tmp.ok()) return base::unexpected(_tmp.error()); \
-        std::move(_tmp.value());                               \
-    })
-
-#define RETURN_IF_ERROR(result) \
-    if (status_t _tmp = (result); _tmp != OK) return base::unexpected(_tmp);
-
-#define VALUE_OR_RETURN_STATUS(x)           \
-    ({                                      \
-       auto _tmp = (x);                     \
-       if (!_tmp.ok()) return _tmp.error(); \
-       std::move(_tmp.value());             \
-     })
-
-/**
- * A generic template to safely cast between integral types, respecting limits of the destination
- * type.
- */
-template<typename To, typename From>
-ConversionResult<To> convertIntegral(From from) {
-    // Special handling is required for signed / vs. unsigned comparisons, since otherwise we may
-    // have the signed converted to unsigned and produce wrong results.
-    if (std::is_signed_v<From> && !std::is_signed_v<To>) {
-        if (from < 0 || from > std::numeric_limits<To>::max()) {
-            return base::unexpected(BAD_VALUE);
-        }
-    } else if (std::is_signed_v<To> && !std::is_signed_v<From>) {
-        if (from > std::numeric_limits<To>::max()) {
-            return base::unexpected(BAD_VALUE);
-        }
-    } else {
-        if (from < std::numeric_limits<To>::min() || from > std::numeric_limits<To>::max()) {
-            return base::unexpected(BAD_VALUE);
-        }
-    }
-    return static_cast<To>(from);
-}
-
-/**
- * A generic template to safely cast between types, that are intended to be the same size, but
- * interpreted differently.
- */
-template<typename To, typename From>
-ConversionResult<To> convertReinterpret(From from) {
-    static_assert(sizeof(From) == sizeof(To));
-    return static_cast<To>(from);
-}
-
-/**
- * A generic template that helps convert containers of convertible types.
- */
-template<typename OutputContainer, typename InputContainer, typename Func>
-ConversionResult<OutputContainer>
-convertContainer(const InputContainer& input, const Func& itemConversion) {
-    OutputContainer output;
-    auto ins = std::inserter(output, output.begin());
-    for (const auto& item : input) {
-        *ins = VALUE_OR_RETURN(itemConversion(item));
-    }
-    return output;
-}
 
 // maxSize is the size of the C-string buffer (including the 0-terminator), NOT the max length of
 // the string.

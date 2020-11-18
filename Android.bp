@@ -34,11 +34,15 @@ cc_library_headers {
     export_include_dirs: ["include"],
     static_libs: [
         "av-types-aidl-unstable-cpp",
-        "libaudioclient_aidl_conversion",
     ],
     export_static_lib_headers: [
         "av-types-aidl-unstable-cpp",
-        "libaudioclient_aidl_conversion",
+    ],
+    header_libs: [
+        "libaudioclient_aidl_conversion_util",
+    ],
+    export_header_lib_headers: [
+        "libaudioclient_aidl_conversion_util",
     ],
     host_supported: true,
     vendor_available: true,
