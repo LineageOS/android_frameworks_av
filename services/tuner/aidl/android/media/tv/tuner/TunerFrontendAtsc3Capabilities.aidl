@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, The Android Open Source Project
+ * Copyright 2020, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,27 +16,39 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerServiceFrontendInfo;
-
 /**
- * TunerService interface handles tuner related operations.
+ * ATSC3 Frontend Capabilities interface.
  *
  * {@hide}
  */
-interface ITunerService {
+parcelable TunerFrontendAtsc3Capabilities {
+    /**
+     * Bandwidth capability
+     */
+    int bandwidthCap;
 
     /**
-     * Gets frontend IDs.
-     *
-     * @return the result code of the operation.
+     * Modulation capability
      */
-    int getFrontendIds(out int[] ids);
+    int modulationCap;
 
     /**
-     * Retrieve the frontend's information.
-     *
-     * @param frontendHandle the handle of the frontend granted by TRM.
-     * @return the information for the frontend.
+     * TimeInterleaveMode capability
      */
-    TunerServiceFrontendInfo getFrontendInfo(in int frontendHandle);
+    int timeInterleaveModeCap;
+
+    /**
+     * CodeRate capability
+     */
+    int codeRateCap;
+
+    /**
+     * FEC capability
+     */
+    int fecCap;
+
+    /**
+     * Demodulator Output Format capability
+     */
+    int demodOutputFormatCap;
 }

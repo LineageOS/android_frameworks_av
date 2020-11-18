@@ -18,10 +18,13 @@
 #define ANDROID_MEDIA_TUNERSERVICE_H
 
 #include <aidl/android/media/tv/tuner/BnTunerService.h>
+#include <aidl/android/media/tv/tuner/TunerServiceFrontendInfo.h>
 #include <android/hardware/tv/tuner/1.0/ITuner.h>
 
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::tv::tuner::BnTunerService;
+using ::aidl::android::media::tv::tuner::TunerServiceFrontendInfo;
+using ::android::hardware::tv::tuner::V1_0::FrontendInfo;
 using ::android::hardware::tv::tuner::V1_0::ITuner;
 
 namespace android {
@@ -34,9 +37,13 @@ public:
     TunerService();
     virtual ~TunerService();
     Status getFrontendIds(std::vector<int32_t>* ids, int32_t* _aidl_return) override;
+    Status getFrontendInfo(int32_t frontendHandle, TunerServiceFrontendInfo* _aidl_return) override;
 
 private:
     static sp<ITuner> mTuner;
+
+    int getResourceIdFromHandle(int resourceHandle);
+    TunerServiceFrontendInfo convertToAidlFrontendInfo(int feId, FrontendInfo halInfo);
 };
 
 } // namespace android
