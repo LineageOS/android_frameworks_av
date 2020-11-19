@@ -152,6 +152,10 @@ const String8& Camera3Stream::physicalCameraId() const {
     return mPhysicalCameraId;
 }
 
+int Camera3Stream::getMaxHalBuffers() const {
+    return camera3_stream::max_buffers;
+}
+
 void Camera3Stream::setOfflineProcessingSupport(bool support) {
     mSupportOfflineProcessing = support;
 }

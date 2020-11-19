@@ -115,6 +115,9 @@ struct InFlightRequest {
     // Requested camera ids (both logical and physical) with zoomRatio != 1.0f
     std::set<std::string> cameraIdsWithZoom;
 
+    // Time of capture request (from systemTime) in Ns
+    nsecs_t requestTimeNs;
+
     // What shared surfaces an output should go to
     SurfaceMap outputSurfaces;
 
@@ -135,14 +138,15 @@ struct InFlightRequest {
             errorBufStrategy(ERROR_BUF_CACHE),
             stillCapture(false),
             zslCapture(false),
-            rotateAndCropAuto(false) {
+            rotateAndCropAuto(false),
+            requestTimeNs(0) {
     }
 
     InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
             bool hasAppCallback, nsecs_t maxDuration,
             const std::set<String8>& physicalCameraIdSet, bool isStillCapture,
             bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& idsWithZoom,
-            const SurfaceMap& outSurfaces = SurfaceMap{}) :
+            nsecs_t requestNs, const SurfaceMap& outSurfaces = SurfaceMap{}) :
             shutterTimestamp(0),
             sensorTimestamp(0),
             requestStatus(OK),
@@ -159,6 +163,7 @@ struct InFlightRequest {
             zslCapture(isZslCapture),
             rotateAndCropAuto(rotateAndCropAuto),
             cameraIdsWithZoom(idsWithZoom),
+            requestTimeNs(requestNs),
             outputSurfaces(outSurfaces) {
     }
 };

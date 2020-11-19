@@ -517,7 +517,7 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         CameraMetadata sessionParams;
         std::vector<int> offlineStreamIds;
         res = device->endConfigure(/*isConstrainedHighSpeed*/ false, sessionParams,
-                &offlineStreamIds);
+                ns2ms(systemTime()), &offlineStreamIds);
         EXPECT_TRUE(res.isOk()) << res;
         EXPECT_FALSE(callbacks->hadError());
 
@@ -629,7 +629,7 @@ TEST_F(CameraClientBinderTest, CheckBinderCameraDeviceUser) {
         res = device->deleteStream(streamId);
         EXPECT_TRUE(res.isOk()) << res;
         res = device->endConfigure(/*isConstrainedHighSpeed*/ false, sessionParams,
-                &offlineStreamIds);
+                ns2ms(systemTime()), &offlineStreamIds);
         EXPECT_TRUE(res.isOk()) << res;
 
         sleep(/*second*/1); // allow some time for errors to show up, if any

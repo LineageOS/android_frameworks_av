@@ -471,6 +471,8 @@ class Camera3Device :
 
     camera3::StreamSet         mOutputStreams;
     sp<camera3::Camera3Stream> mInputStream;
+    SessionStatsBuilder        mSessionStatsBuilder;
+
     int                        mNextStreamId;
     bool                       mNeedConfig;
 
@@ -520,6 +522,8 @@ class Camera3Device :
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
         bool                                mZoomRatioIs1x;
+        // The systemTime timestamp when the request is created.
+        nsecs_t                             mRequestTimeNs;
 
 
         // Whether this capture request's distortion correction update has
@@ -538,7 +542,7 @@ class Camera3Device :
     status_t convertMetadataListToRequestListLocked(
             const List<const PhysicalCameraSettingsList> &metadataList,
             const std::list<const SurfaceMap> &surfaceMaps,
-            bool repeating,
+            bool repeating, nsecs_t requestTimeNs,
             /*out*/
             RequestList *requestList);
 
@@ -961,6 +965,7 @@ class Camera3Device :
         Condition          mRequestSubmittedSignal;
         RequestList        mRequestQueue;
         RequestList        mRepeatingRequests;
+        bool               mFirstRepeating;
         // The next batch of requests being prepped for submission to the HAL, no longer
         // on the request queue. Read-only even with mRequestLock held, outside
         // of threadLoop
@@ -1035,7 +1040,8 @@ class Camera3Device :
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
             bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
             bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
-            const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces);
+            const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces,
+            nsecs_t requestTimeNs);
 
     /**
      * Tracking for idle detection

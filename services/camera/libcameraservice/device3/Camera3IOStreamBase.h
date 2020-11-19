@@ -48,6 +48,7 @@ class Camera3IOStreamBase :
 
     virtual void     dump(int fd, const Vector<String16> &args) const;
 
+    int              getMaxTotalBuffers() const { return mTotalBufferCount; }
   protected:
     size_t            mTotalBufferCount;
     // sum of input and output buffers that are currently acquired by HAL

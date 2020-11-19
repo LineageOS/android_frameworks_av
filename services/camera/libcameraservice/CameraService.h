@@ -20,7 +20,6 @@
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
-#include <android/hardware/ICameraServiceProxy.h>
 
 #include <cutils/multiuser.h>
 #include <utils/Vector.h>
@@ -211,16 +210,6 @@ public:
     void                loadSoundLocked(sound_kind kind);
     void                decreaseSoundRef();
     void                increaseSoundRef();
-    /**
-     * Update the state of a given camera device (open/close/active/idle) with
-     * the camera proxy service in the system service
-     */
-    static void         updateProxyDeviceState(
-            int newState,
-            const String8& cameraId,
-            int facing,
-            const String16& clientName,
-            int apiLevel);
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
@@ -1069,13 +1058,6 @@ private:
     static StatusInternal mapToInternal(hardware::camera::common::V1_0::CameraDeviceStatus status);
     static int32_t mapToInterface(StatusInternal status);
 
-    // Guard mCameraServiceProxy
-    static Mutex sProxyMutex;
-    // Cached interface to the camera service proxy in system service
-    static sp<hardware::ICameraServiceProxy> sCameraServiceProxy;
-
-    static sp<hardware::ICameraServiceProxy> getCameraServiceProxy();
-    static void pingCameraServiceProxy();
 
     void broadcastTorchModeStatus(const String8& cameraId,
             hardware::camera::common::V1_0::TorchModeStatus status);

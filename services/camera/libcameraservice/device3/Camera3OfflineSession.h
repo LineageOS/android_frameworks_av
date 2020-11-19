@@ -208,6 +208,7 @@ class Camera3OfflineSession :
     sp<camera3::Camera3Stream> mInputStream;
     camera3::StreamSet mOutputStreams;
     camera3::BufferRecords mBufferRecords;
+    SessionStatsBuilder mSessionStatsBuilder;
 
     std::mutex mOfflineReqsLock;
     camera3::InFlightRequestMap mOfflineReqs;
