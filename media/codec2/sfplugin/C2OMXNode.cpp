@@ -25,6 +25,7 @@
 #include <C2AllocatorGralloc.h>
 #include <C2BlockInternal.h>
 #include <C2Component.h>
+#include <C2Config.h>
 #include <C2PlatformSupport.h>
 
 #include <OMX_Component.h>
@@ -43,6 +44,8 @@
 namespace android {
 
 namespace {
+
+constexpr OMX_U32 kPortIndexInput = 0;
 
 class Buffer2D : public C2Buffer {
 public:
@@ -200,11 +203,27 @@ status_t C2OMXNode::getParameter(OMX_INDEXTYPE index, void *params, size_t size)
                 return BAD_VALUE;
             }
             OMX_PARAM_PORTDEFINITIONTYPE *pDef = (OMX_PARAM_PORTDEFINITIONTYPE *)params;
-            // TODO: read these from intf()
+            if (pDef->nPortIndex != kPortIndexInput) {
+                break;
+            }
+
             pDef->nBufferCountActual = 16;
+
+            std::shared_ptr<Codec2Client::Component> comp = mComp.lock();
+            C2PortActualDelayTuning::input inputDelay(0);
+            C2ActualPipelineDelayTuning pipelineDelay(0);
+            c2_status_t c2err = comp->query(
+                    {&inputDelay, &pipelineDelay}, {}, C2_DONT_BLOCK, nullptr);
+            if (c2err == C2_OK || c2err == C2_BAD_INDEX) {
+                pDef->nBufferCountActual = 4;
+                pDef->nBufferCountActual += (inputDelay ? inputDelay.value : 0u);
+                pDef->nBufferCountActual += (pipelineDelay ? pipelineDelay.value : 0u);
+            }
+
             pDef->eDomain = OMX_PortDomainVideo;
             pDef->format.video.nFrameWidth = mWidth;
             pDef->format.video.nFrameHeight = mHeight;
+            pDef->format.video.eColorFormat = OMX_COLOR_FormatAndroidOpaque;
             err = OK;
             break;
         }
