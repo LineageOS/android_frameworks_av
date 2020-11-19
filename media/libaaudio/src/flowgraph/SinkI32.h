@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FLOWGRAPH_SOURCE_I24_H
-#define FLOWGRAPH_SOURCE_I24_H
+#ifndef FLOWGRAPH_SINK_I32_H
+#define FLOWGRAPH_SINK_I32_H
 
 #include <stdint.h>
 
@@ -23,13 +23,14 @@
 
 namespace flowgraph {
 
-class SourceI24 : public AudioSource {
+class SinkI32 : public AudioSink {
 public:
-    explicit SourceI24(int32_t channelCount);
+    explicit SinkI32(int32_t channelCount);
+    ~SinkI32() override = default;
 
-    int32_t onProcess(int64_t framePosition, int32_t numFrames) override;
+    int32_t read(void *data, int32_t numFrames) override;
 };
 
 } /* namespace flowgraph */
 
-#endif //FLOWGRAPH_SOURCE_I24_H
+#endif //FLOWGRAPH_SINK_I32_H

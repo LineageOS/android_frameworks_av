@@ -104,7 +104,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     if (getFormat() == AUDIO_FORMAT_DEFAULT) {
         setFormat(AUDIO_FORMAT_PCM_FLOAT);
     }
-    // Request FLOAT for the shared mixer.
+    // Request FLOAT for the shared mixer or the device.
     request.getConfiguration().setFormat(AUDIO_FORMAT_PCM_FLOAT);
 
     // Build the request to send to the server.

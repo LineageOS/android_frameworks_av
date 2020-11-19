@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef FLOWGRAPH_SOURCE_I24_H
-#define FLOWGRAPH_SOURCE_I24_H
+#ifndef FLOWGRAPH_SOURCE_I32_H
+#define FLOWGRAPH_SOURCE_I32_H
 
 #include <stdint.h>
 
@@ -23,13 +23,17 @@
 
 namespace flowgraph {
 
-class SourceI24 : public AudioSource {
+class SourceI32 : public AudioSource {
 public:
-    explicit SourceI24(int32_t channelCount);
+    explicit SourceI32(int32_t channelCount);
+    ~SourceI32() override = default;
 
     int32_t onProcess(int64_t framePosition, int32_t numFrames) override;
+
+private:
+    static constexpr float kScale = 1.0 / (1UL << 31);
 };
 
 } /* namespace flowgraph */
 
-#endif //FLOWGRAPH_SOURCE_I24_H
+#endif //FLOWGRAPH_SOURCE_I32_H
