@@ -169,6 +169,18 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
     return OK;
 }
 
+const int CameraSessionStats::CAMERA_STATE_OPEN = 0;
+const int CameraSessionStats::CAMERA_STATE_ACTIVE = 1;
+const int CameraSessionStats::CAMERA_STATE_IDLE = 2;
+const int CameraSessionStats::CAMERA_STATE_CLOSED = 3;
+
+const int CameraSessionStats::CAMERA_FACING_BACK = 0;
+const int CameraSessionStats::CAMERA_FACING_FRONT = 1;
+const int CameraSessionStats::CAMERA_FACING_EXTERNAL = 2;
+
+const int CameraSessionStats::CAMERA_API_LEVEL_1 = 1;
+const int CameraSessionStats::CAMERA_API_LEVEL_2 = 2;
+
 CameraSessionStats::CameraSessionStats() :
         mFacing(CAMERA_FACING_BACK),
         mNewCameraState(CAMERA_STATE_CLOSED),
