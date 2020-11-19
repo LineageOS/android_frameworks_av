@@ -843,6 +843,11 @@ std::shared_ptr<C2ParamReflector>
                             return;
                         }
                     });
+            if (!transStatus.isOk()) {
+                LOG(DEBUG) << "SimpleParamReflector -- transaction failed: "
+                           << transStatus.description();
+                descriptor.reset();
+            }
             return descriptor;
         }
 
