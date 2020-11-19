@@ -8,8 +8,8 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libandroid",
         "libbase",
-        "libbinder",
         "libbinder_ndk",
         "libcutils",
         "liblog",
@@ -40,8 +40,7 @@ cc_binary {
 
     shared_libs: [
         "libbase",
-        // TODO(hkuang): Use libbinder_ndk
-        "libbinder",
+        "libbinder_ndk",
         "libutils",
         "liblog",
         "libbase",
