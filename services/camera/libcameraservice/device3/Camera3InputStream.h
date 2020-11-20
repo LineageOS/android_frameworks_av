@@ -70,7 +70,7 @@ class Camera3InputStream : public Camera3IOStreamBase,
      * Camera3Stream interface
      */
 
-    virtual status_t getInputBufferLocked(camera_stream_buffer *buffer);
+    virtual status_t getInputBufferLocked(camera_stream_buffer *buffer, Size *size);
     virtual status_t returnInputBufferLocked(
             const camera_stream_buffer &buffer);
     virtual status_t getInputBufferProducerLocked(

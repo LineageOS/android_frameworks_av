@@ -237,7 +237,7 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
     if (mInputStreamId == NO_STREAM) {
         res = device->createInputStream(params.fastInfo.maxZslSize.width,
             params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
-            &mInputStreamId);
+            /*isMultiResolution*/false, &mInputStreamId);
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create input stream: "
                     "%s (%d)", __FUNCTION__, client->getCameraId(),
