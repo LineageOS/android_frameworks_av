@@ -403,6 +403,12 @@ public:
     virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
             device_role_t role, AudioDeviceTypeAddrVector &devices) const = 0;
 
+    /**
+     * @brief getActiveMediaDevices returns which devices will most likely to be used for media
+     * @param availableDevices all available devices
+     * @return collection of active devices
+     */
+    virtual DeviceVector getActiveMediaDevices(const DeviceVector& availableDevices) const = 0;
 
     virtual void dump(String8 *dst) const = 0;
 

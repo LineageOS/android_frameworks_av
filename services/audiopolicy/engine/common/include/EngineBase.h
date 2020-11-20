@@ -151,7 +151,23 @@ public:
     status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
             device_role_t role, AudioDeviceTypeAddrVector &devices) const override;
 
+    DeviceVector getActiveMediaDevices(const DeviceVector& availableDevices) const override;
+
 private:
+    /**
+     * Get media devices as the given role
+     *
+     * @param role the audio devices role
+     * @param availableDevices all available devices
+     * @param devices the DeviceVector to store devices as the given role
+     * @return NO_ERROR if all devices associated to the given role are present in available devices
+     *         NAME_NO_FOUND if there is no strategy for media or there are no devices associate to
+     *         the given role
+     *         NOT_ENOUGH_DATA if not all devices as given role are present in available devices
+     */
+    status_t getMediaDevicesForRole(device_role_t role, const DeviceVector& availableDevices,
+            DeviceVector& devices) const;
+
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
