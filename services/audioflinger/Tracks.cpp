@@ -1266,11 +1266,15 @@ void AudioFlinger::PlaybackThread::Track::setFinalVolume(float volume)
 
 void AudioFlinger::PlaybackThread::Track::copyMetadataTo(MetadataInserter& backInserter) const
 {
-    *backInserter++ = {
+    playback_track_metadata_v7_t metadata;
+    metadata.base = {
             .usage = mAttr.usage,
             .content_type = mAttr.content_type,
             .gain = mFinalVolume,
     };
+    metadata.channel_mask = mChannelMask,
+    strncpy(metadata.tags, mAttr.tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+    *backInserter++ = metadata;
 }
 
 void AudioFlinger::PlaybackThread::Track::setTeePatches(TeePatches teePatches) {
