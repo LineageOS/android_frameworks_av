@@ -8097,10 +8097,15 @@ void AudioFlinger::RecordThread::updateMetadata_l()
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<RecordTrack> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        metadata.tracks.push_back({
+        record_track_metadata_v7_t trackMetadata;
+        trackMetadata.base = {
                 .source = track->attributes().source,
                 .gain = 1, // capture tracks do not have volumes
-        });
+        };
+        trackMetadata.channel_mask = track->channelMask(),
+        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+
+        metadata.tracks.push_back(trackMetadata);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }
@@ -9675,11 +9680,15 @@ void AudioFlinger::MmapPlaybackThread::updateMetadata_l()
     StreamOutHalInterface::SourceMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        metadata.tracks.push_back({
+        playback_track_metadata_v7_t trackMetadata;
+        trackMetadata.base = {
                 .usage = track->attributes().usage,
                 .content_type = track->attributes().content_type,
                 .gain = mHalVolFloat, // TODO: propagate from aaudio pre-mix volume
-        });
+        };
+        trackMetadata.channel_mask = track->channelMask(),
+        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+        metadata.tracks.push_back(trackMetadata);
     }
     mOutput->stream->updateSourceMetadata(metadata);
 }
@@ -9800,10 +9809,14 @@ void AudioFlinger::MmapCaptureThread::updateMetadata_l()
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        metadata.tracks.push_back({
+        record_track_metadata_v7_t trackMetadata;
+        trackMetadata.base = {
                 .source = track->attributes().source,
                 .gain = 1, // capture tracks do not have volumes
-        });
+        };
+        trackMetadata.channel_mask = track->channelMask(),
+        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+        metadata.tracks.push_back(trackMetadata);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }

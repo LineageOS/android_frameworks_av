@@ -158,7 +158,7 @@ class StreamOutHalInterface : public virtual StreamHalInterface {
     virtual status_t getPresentationPosition(uint64_t *frames, struct timespec *timestamp) = 0;
 
     struct SourceMetadata {
-        std::vector<playback_track_metadata_t> tracks;
+        std::vector<playback_track_metadata_v7_t> tracks;
     };
     /**
      * Called when the metadata of the stream's source has been changed.
@@ -197,7 +197,7 @@ class StreamInHalInterface : public virtual StreamHalInterface {
     virtual status_t setPreferredMicrophoneFieldDimension(float zoom) = 0;
 
     struct SinkMetadata {
-        std::vector<record_track_metadata_t> tracks;
+        std::vector<record_track_metadata_v7_t> tracks;
     };
     /**
      * Called when the metadata of the stream's sink has been changed.
