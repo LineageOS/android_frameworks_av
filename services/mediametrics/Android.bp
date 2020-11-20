@@ -111,7 +111,7 @@ cc_binary {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libmediametricsservice",
     defaults: [
         "mediametrics_flags_defaults",
