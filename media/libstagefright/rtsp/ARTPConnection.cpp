@@ -121,7 +121,7 @@ void ARTPConnection::MakePortPair(
     unsigned start = (unsigned)((rand()* 1000LL)/RAND_MAX) + 15550;
     start &= ~1;
 
-    for (unsigned port = start; port < 65536; port += 2) {
+    for (unsigned port = start; port < 65535; port += 2) {
         struct sockaddr_in addr;
         memset(addr.sin_zero, 0, sizeof(addr.sin_zero));
         addr.sin_family = AF_INET;
@@ -139,6 +139,13 @@ void ARTPConnection::MakePortPair(
                  (const struct sockaddr *)&addr, sizeof(addr)) == 0) {
             *rtpPort = port;
             return;
+        } else {
+            // we should recreate a RTP socket to avoid bind other port in same RTP socket
+            close(*rtpSocket);
+
+            *rtpSocket = socket(AF_INET, SOCK_DGRAM, 0);
+            CHECK_GE(*rtpSocket, 0);
+            bumpSocketBufferSize(*rtpSocket);
         }
     }
 
