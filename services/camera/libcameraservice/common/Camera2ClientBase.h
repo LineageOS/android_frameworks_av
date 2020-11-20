@@ -66,7 +66,9 @@ public:
 
     virtual void          notifyError(int32_t errorCode,
                                       const CaptureResultExtras& resultExtras);
-    virtual void          notifyIdle();
+    virtual void          notifyIdle(int64_t requestCount, int64_t resultErrorCount,
+                                     bool deviceError,
+                                     const std::vector<hardware::CameraStreamStats>& streamStats);
     virtual void          notifyShutter(const CaptureResultExtras& resultExtras,
                                         nsecs_t timestamp);
     virtual void          notifyAutoFocus(uint8_t newState, int triggerId);

@@ -72,24 +72,46 @@ std::string AAudioServiceEndpointMMAP::dump() const {
 
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
-    audio_config_base_t config;
-    audio_port_handle_t deviceId;
-
     copyFrom(request.getConstantConfiguration());
-
-    const audio_attributes_t attributes = getAudioAttributesFrom(this);
-
     mMmapClient.clientUid = request.getUserId();
     mMmapClient.clientPid = request.getProcessId();
     mMmapClient.packageName.setTo(String16(""));
 
+    audio_format_t audioFormat = getFormat();
+
+    // FLOAT is not directly supported by the HAL so ask for a 24-bit.
+    bool isHighResRequested = audioFormat == AUDIO_FORMAT_PCM_FLOAT
+            || audioFormat == AUDIO_FORMAT_PCM_32_BIT;
+    if (isHighResRequested) {
+        // TODO remove these logs when finished debugging.
+        ALOGD("%s() change format from %d to 24_BIT_PACKED", __func__, audioFormat);
+        audioFormat = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+    }
+
+    result = openWithFormat(audioFormat);
+    if (result == AAUDIO_OK) return result;
+
+    // TODO The HAL and AudioFlinger should be recommending a format if the open fails.
+    //      But that recommendation is not propagating back from the HAL.
+    //      So for now just try something very likely to work.
+    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_24_BIT_PACKED) {
+        ALOGD("%s() 24_BIT failed, perhaps due to format. Try again with 16_BIT", __func__);
+        audioFormat = AUDIO_FORMAT_PCM_16_BIT;
+        result = openWithFormat(audioFormat);
+    }
+    return result;
+}
+
+aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFormat) {
+    aaudio_result_t result = AAUDIO_OK;
+    audio_config_base_t config;
+    audio_port_handle_t deviceId;
+
+    const audio_attributes_t attributes = getAudioAttributesFrom(this);
+
     mRequestedDeviceId = deviceId = getDeviceId();
 
     // Fill in config
-    audio_format_t audioFormat = getFormat();
-    if (audioFormat == AUDIO_FORMAT_DEFAULT || audioFormat == AUDIO_FORMAT_PCM_FLOAT) {
-        audioFormat = AUDIO_FORMAT_PCM_16_BIT;
-    }
     config.format = audioFormat;
 
     int32_t aaudioSampleRate = getSampleRate();

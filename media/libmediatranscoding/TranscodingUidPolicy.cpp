@@ -21,10 +21,7 @@
 #include <aidl/android/media/IResourceManagerService.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
-#include <android/content/pm/IPackageManagerNative.h>
 #include <binder/ActivityManager.h>
-#include <binder/IServiceManager.h>
-#include <binder/PermissionController.h>
 #include <cutils/misc.h>  // FIRST_APPLICATION_UID
 #include <cutils/multiuser.h>
 #include <inttypes.h>
@@ -112,19 +109,6 @@ void TranscodingUidPolicy::UidObserver::binderDied(const wp<IBinder>& /*who*/) {
 }
 
 ////////////////////////////////////////////////////////////////////////////
-
-//static
-status_t TranscodingUidPolicy::getUidForPackage(String16 packageName, /*inout*/ uid_t& uid) {
-    PermissionController pc;
-    uid = pc.getPackageUid(packageName, 0);
-    if (uid <= 0) {
-        ALOGE("Unknown package: '%s'", String8(packageName).string());
-        return BAD_VALUE;
-    }
-
-    uid = multiuser_get_uid(0 /*userId*/, uid);
-    return NO_ERROR;
-}
 
 TranscodingUidPolicy::TranscodingUidPolicy()
       : mAm(std::make_shared<ActivityManager>()),

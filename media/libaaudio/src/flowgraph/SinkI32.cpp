@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,23 +14,21 @@
  * limitations under the License.
  */
 
-#include <algorithm>
-#include <stdint.h>
-
 #ifdef __ANDROID__
 #include <audio_utils/primitives.h>
 #endif
 
 #include "AudioProcessorBase.h"
-#include "SinkI24.h"
+#include "FlowgraphUtilities.h"
+#include "SinkI32.h"
 
 using namespace flowgraph;
 
-SinkI24::SinkI24(int32_t channelCount)
+SinkI32::SinkI32(int32_t channelCount)
         : AudioSink(channelCount) {}
 
-int32_t SinkI24::read(void *data, int32_t numFrames) {
-    uint8_t *byteData = (uint8_t *) data;
+int32_t SinkI32::read(void *data, int32_t numFrames) {
+    int32_t *intData = (int32_t *) data;
     const int32_t channelCount = input.getSamplesPerFrame();
 
     int32_t framesLeft = numFrames;
@@ -40,23 +38,15 @@ int32_t SinkI24::read(void *data, int32_t numFrames) {
         if (framesRead <= 0) {
             break;
         }
-        const float *floatData = input.getBlock();
+        const float *signal = input.getBlock();
         int32_t numSamples = framesRead * channelCount;
 #ifdef __ANDROID__
-        memcpy_to_p24_from_float(byteData, floatData, numSamples);
-        static const int kBytesPerI24Packed = 3;
-        byteData += numSamples * kBytesPerI24Packed;
-        floatData += numSamples;
+        memcpy_to_i32_from_float(intData, signal, numSamples);
+        intData += numSamples;
+        signal += numSamples;
 #else
-        const int32_t kI24PackedMax = 0x007FFFFF;
-        const int32_t kI24PackedMin = 0xFF800000;
         for (int i = 0; i < numSamples; i++) {
-            int32_t n = (int32_t) (*floatData++ * 0x00800000);
-            n = std::min(kI24PackedMax, std::max(kI24PackedMin, n)); // clip
-            // Write as a packed 24-bit integer in Little Endian format.
-            *byteData++ = (uint8_t) n;
-            *byteData++ = (uint8_t) (n >> 8);
-            *byteData++ = (uint8_t) (n >> 16);
+            *intData++ = FlowgraphUtilities::clamp32FromFloat(*signal++);
         }
 #endif
         framesLeft -= framesRead;

@@ -20,6 +20,7 @@
 #include <aidl/android/media/BnTranscodingClient.h>
 #include <aidl/android/media/IMediaTranscodingService.h>
 #include <android/binder_ibinder.h>
+#include <android/permission_manager.h>
 #include <inttypes.h>
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingRequest.h>
@@ -27,14 +28,10 @@
 #include <private/android_filesystem_config.h>
 #include <utils/Log.h>
 #include <utils/String16.h>
+
 namespace android {
 
 static_assert(sizeof(ClientIdType) == sizeof(void*), "ClientIdType should be pointer-sized");
-
-static constexpr const char* MEDIA_PROVIDER_PKG_NAMES[] = {
-        "com.android.providers.media.module",
-        "com.google.android.providers.media.module",
-};
 
 using ::aidl::android::media::BnTranscodingClient;
 using ::aidl::android::media::IMediaTranscodingService;  // For service error codes
@@ -137,7 +134,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         in_clientUid = callingUid;
     } else if (in_clientUid < 0) {
         return Status::ok();
-    } else if (in_clientUid != callingUid && !owner->isTrustedCallingUid(callingUid)) {
+    } else if (in_clientUid != callingUid && !owner->isTrustedCaller(callingPid, callingUid)) {
         ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
@@ -154,7 +151,7 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         in_clientPid = callingPid;
     } else if (in_clientPid < 0) {
         return Status::ok();
-    } else if (in_clientPid != callingPid && !owner->isTrustedCallingUid(callingUid)) {
+    } else if (in_clientPid != callingPid && !owner->isTrustedCaller(callingPid, callingUid)) {
         ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
@@ -266,14 +263,8 @@ TranscodingClientManager::TranscodingClientManager(
       : mDeathRecipient(AIBinder_DeathRecipient_new(BinderDiedCallback)),
         mSessionController(controller) {
     ALOGD("TranscodingClientManager started");
-    uid_t mpuid;
-    for (const char* pkgName : MEDIA_PROVIDER_PKG_NAMES) {
-        if (TranscodingUidPolicy::getUidForPackage(String16(pkgName), mpuid) == NO_ERROR) {
-            ALOGI("Found %s's uid: %d", pkgName, mpuid);
-            mMediaProviderUid.insert(mpuid);
-        } else {
-            ALOGW("Couldn't get uid for %s.", pkgName);
-        }
+    for (uid_t uid : {AID_ROOT, AID_SYSTEM, AID_SHELL, AID_MEDIA}) {
+        mTrustedUids.insert(uid);
     }
 }
 
@@ -305,20 +296,20 @@ void TranscodingClientManager::dumpAllClients(int fd, const Vector<String16>& ar
     write(fd, result.string(), result.size());
 }
 
-bool TranscodingClientManager::isTrustedCallingUid(uid_t uid) {
-    if (uid > 0 && mMediaProviderUid.count(uid) > 0) {
+bool TranscodingClientManager::isTrustedCaller(pid_t pid, uid_t uid) {
+    if (uid > 0 && mTrustedUids.count(uid) > 0) {
         return true;
     }
 
-    switch (uid) {
-    case AID_ROOT:  // root user
-    case AID_SYSTEM:
-    case AID_SHELL:
-    case AID_MEDIA:  // mediaserver
+    int32_t result;
+    if (APermissionManager_checkPermission("android.permission.WRITE_MEDIA_STORAGE", pid, uid,
+                                           &result) == PERMISSION_MANAGER_STATUS_OK &&
+        result == PERMISSION_MANAGER_PERMISSION_GRANTED) {
+        mTrustedUids.insert(uid);
         return true;
-    default:
-        return false;
     }
+
+    return false;
 }
 
 status_t TranscodingClientManager::addClient(

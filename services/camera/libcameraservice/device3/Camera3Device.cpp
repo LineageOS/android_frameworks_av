@@ -61,6 +61,7 @@
 #include "CameraService.h"
 #include "utils/CameraThreadState.h"
 #include "utils/TraceHFR.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 #include <algorithm>
 #include <tuple>
@@ -867,7 +868,7 @@ status_t Camera3Device::checkStatusOkToCaptureLocked() {
 status_t Camera3Device::convertMetadataListToRequestListLocked(
         const List<const PhysicalCameraSettingsList> &metadataList,
         const std::list<const SurfaceMap> &surfaceMaps,
-        bool repeating,
+        bool repeating, nsecs_t requestTimeNs,
         RequestList *requestList) {
     if (requestList == NULL) {
         CLOGE("requestList cannot be NULL.");
@@ -886,6 +887,7 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
         }
 
         newRequest->mRepeating = repeating;
+        newRequest->mRequestTimeNs = requestTimeNs;
 
         // Setup burst Id and request Id
         newRequest->mResultExtras.burstId = burstId++;
@@ -953,6 +955,8 @@ status_t Camera3Device::submitRequestsHelper(
         /*out*/
         int64_t *lastFrameNumber) {
     ATRACE_CALL();
+    nsecs_t requestTimeNs = systemTime();
+
     Mutex::Autolock il(mInterfaceLock);
     Mutex::Autolock l(mLock);
 
@@ -965,7 +969,7 @@ status_t Camera3Device::submitRequestsHelper(
     RequestList requestList;
 
     res = convertMetadataListToRequestListLocked(requests, surfaceMaps,
-            repeating, /*out*/&requestList);
+            repeating, requestTimeNs, /*out*/&requestList);
     if (res != OK) {
         // error logged by previous call
         return res;
@@ -997,7 +1001,7 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
         const hardware::hidl_vec<hardware::camera::device::V3_5::BufferRequest>& bufReqs,
         requestStreamBuffers_cb _hidl_cb) {
     RequestBufferStates states {
-        mId, mRequestBufferInterfaceLock, mUseHalBufManager, mOutputStreams,
+        mId, mRequestBufferInterfaceLock, mUseHalBufManager, mOutputStreams, mSessionStatsBuilder,
         *this, *mInterface, *this};
     camera3::requestStreamBuffers(states, bufReqs, _hidl_cb);
     return hardware::Void();
@@ -1006,7 +1010,7 @@ hardware::Return<void> Camera3Device::requestStreamBuffers(
 hardware::Return<void> Camera3Device::returnStreamBuffers(
         const hardware::hidl_vec<hardware::camera::device::V3_2::StreamBuffer>& buffers) {
     ReturnBufferStates states {
-        mId, mUseHalBufManager, mOutputStreams, *mInterface};
+        mId, mUseHalBufManager, mOutputStreams, mSessionStatsBuilder, *mInterface};
     camera3::returnStreamBuffers(states, buffers);
     return hardware::Void();
 }
@@ -1054,7 +1058,8 @@ hardware::Return<void> Camera3Device::processCaptureResult_3_4(
         mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
-        mTagMonitor, mInputStream, mOutputStreams, listener, *this, *this, *mInterface
+        mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
+        *mInterface
     };
 
     for (const auto& result : results) {
@@ -1112,7 +1117,8 @@ hardware::Return<void> Camera3Device::processCaptureResult(
         mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
-        mTagMonitor, mInputStream, mOutputStreams, listener, *this, *this, *mInterface
+        mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
+        *mInterface
     };
 
     for (const auto& result : results) {
@@ -1152,7 +1158,8 @@ hardware::Return<void> Camera3Device::notify(
         mUseHalBufManager, mUsePartialResult, mNeedFixupMonochromeTags,
         mNumPartialResults, mVendorTagId, mDeviceInfo, mPhysicalDeviceInfoMap,
         mResultMetadataQueue, mDistortionMappers, mZoomRatioMappers, mRotateAndCropMappers,
-        mTagMonitor, mInputStream, mOutputStreams, listener, *this, *this, *mInterface
+        mTagMonitor, mInputStream, mOutputStreams, mSessionStatsBuilder, listener, *this, *this,
+        *mInterface
     };
     for (const auto& msg : msgs) {
         camera3::notify(states, msg);
@@ -1455,6 +1462,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         return res;
     }
 
+    mSessionStatsBuilder.addStream(mNextStreamId);
+
     *id = mNextStreamId++;
     mNeedConfig = true;
 
@@ -1578,6 +1587,7 @@ status_t Camera3Device::deleteStream(int id) {
             CLOGE("Stream %d does not exist", id);
             return BAD_VALUE;
         }
+        mSessionStatsBuilder.removeStream(id);
     }
 
     // Delete output stream or the output part of a bi-directional stream.
@@ -2010,6 +2020,9 @@ status_t Camera3Device::flush(int64_t *frameNumber) {
         }
 
         mRequestThread->clear(/*out*/frameNumber);
+
+        // Stop session and stream counter
+        mSessionStatsBuilder.stopCounter();
     }
 
     return mRequestThread->flush();
@@ -2087,6 +2100,9 @@ status_t Camera3Device::addBufferListenerForStream(int streamId,
 
 void Camera3Device::notifyStatus(bool idle) {
     ATRACE_CALL();
+    std::vector<int> streamIds;
+    std::vector<hardware::CameraStreamStats> streamStats;
+
     {
         // Need mLock to safely update state and synchronize to current
         // state of methods in flight.
@@ -2104,6 +2120,24 @@ void Camera3Device::notifyStatus(bool idle) {
         // Skip notifying listener if we're doing some user-transparent
         // state changes
         if (mPauseStateNotify) return;
+
+        // Populate stream statistics in case of Idle
+        if (idle) {
+            for (size_t i = 0; i < mOutputStreams.size(); i++) {
+                auto stream = mOutputStreams[i];
+                if (stream.get() == nullptr) continue;
+                streamIds.push_back(stream->getId());
+                Camera3Stream* camera3Stream = Camera3Stream::cast(stream->asHalStream());
+                int64_t usage = 0LL;
+                if (camera3Stream != nullptr) {
+                    usage = camera3Stream->getUsage();
+                }
+                streamStats.emplace_back(stream->getWidth(), stream->getHeight(),
+                    stream->getFormat(), stream->getDataSpace(), usage,
+                    stream->getMaxHalBuffers(),
+                    stream->getMaxTotalBuffers() - stream->getMaxHalBuffers());
+            }
+        }
     }
 
     sp<NotificationListener> listener;
@@ -2112,7 +2146,22 @@ void Camera3Device::notifyStatus(bool idle) {
         listener = mListener.promote();
     }
     if (idle && listener != NULL) {
-        listener->notifyIdle();
+        // Get session stats from the builder, and notify the listener.
+        int64_t requestCount, resultErrorCount;
+        bool deviceError;
+        std::map<int, StreamStats> streamStatsMap;
+        mSessionStatsBuilder.buildAndReset(&requestCount, &resultErrorCount,
+                &deviceError, &streamStatsMap);
+        for (size_t i = 0; i < streamIds.size(); i++) {
+            int streamId = streamIds[i];
+            auto stats = streamStatsMap.find(streamId);
+            if (stats != streamStatsMap.end()) {
+                streamStats[i].mRequestCount = stats->second.mRequestedFrameCount;
+                streamStats[i].mErrorCount = stats->second.mDroppedFrameCount;
+                streamStats[i].mStartLatencyMs = stats->second.mStartLatencyMs;
+            }
+        }
+        listener->notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
     }
 }
 
@@ -2221,6 +2270,12 @@ status_t Camera3Device::dropStreamBuffers(bool dropping, int streamId) {
     if (stream == nullptr) {
         ALOGE("%s: Stream %d is not found.", __FUNCTION__, streamId);
         return BAD_VALUE;
+    }
+
+    if (dropping) {
+        mSessionStatsBuilder.stopCounter(streamId);
+    } else {
+        mSessionStatsBuilder.startCounter(streamId);
     }
     return stream->dropBuffers(dropping);
 }
@@ -2376,6 +2431,8 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     ATRACE_CALL();
     bool ret = false;
 
+    nsecs_t startTime = systemTime();
+
     Mutex::Autolock il(mInterfaceLock);
     nsecs_t maxExpectedDuration = getExpectedInFlightDuration();
 
@@ -2422,6 +2479,9 @@ bool Camera3Device::reconfigureCamera(const CameraMetadata& sessionParams, int c
     } else {
         ALOGE("%s: Failed to pause streaming: %d", __FUNCTION__, rc);
     }
+
+    CameraServiceProxyWrapper::logStreamConfigured(mId, mOperatingMode, true /*internalReconfig*/,
+        ns2ms(systemTime() - startTime));
 
     if (markClientActive) {
         mStatusTracker->markComponentActive(clientStatusId);
@@ -2776,6 +2836,7 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
     if (listener != NULL) {
         listener->notifyError(hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE,
                 CaptureResultExtras());
+        mSessionStatsBuilder.onDeviceError();
     }
 
     // Save stack trace. View by dumping it later.
@@ -2792,14 +2853,14 @@ status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         bool hasAppCallback, nsecs_t maxExpectedDuration,
         std::set<String8>& physicalCameraIds, bool isStillCapture,
         bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& cameraIdsWithZoom,
-        const SurfaceMap& outputSurfaces) {
+        const SurfaceMap& outputSurfaces, nsecs_t requestTimeNs) {
     ATRACE_CALL();
     std::lock_guard<std::mutex> l(mInFlightLock);
 
     ssize_t res;
     res = mInFlightMap.add(frameNumber, InFlightRequest(numBuffers, resultExtras, hasInput,
             hasAppCallback, maxExpectedDuration, physicalCameraIds, isStillCapture, isZslCapture,
-            rotateAndCropAuto, cameraIdsWithZoom, outputSurfaces));
+            rotateAndCropAuto, cameraIdsWithZoom, requestTimeNs, outputSurfaces));
     if (res < 0) return res;
 
     if (mInFlightMap.size() == 1) {
@@ -2869,7 +2930,7 @@ void Camera3Device::flushInflightRequests() {
 
     FlushInflightReqStates states {
         mId, mInFlightLock, mInFlightMap, mUseHalBufManager,
-        listener, *this, *mInterface, *this};
+        listener, *this, *mInterface, *this, mSessionStatsBuilder};
 
     camera3::flushInflightRequests(states);
 }
@@ -3778,6 +3839,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mInterface(interface),
         mListener(nullptr),
         mId(getId(parent)),
+        mFirstRepeating(false),
         mReconfigured(false),
         mDoPause(false),
         mPaused(true),
@@ -3908,6 +3970,7 @@ status_t Camera3Device::RequestThread::setRepeatingRequests(
         *lastFrameNumber = mRepeatingLastFrameNumber;
     }
     mRepeatingRequests.clear();
+    mFirstRepeating = true;
     mRepeatingRequests.insert(mRepeatingRequests.begin(),
             requests.begin(), requests.end());
 
@@ -4697,7 +4760,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 requestedPhysicalCameras, isStillCapture, isZslCapture,
                 captureRequest->mRotateAndCropAuto, mPrevCameraIdsWithZoom,
                 (mUseHalBufManager) ? uniqueSurfaceIdMap :
-                                      SurfaceMap{});
+                                      SurfaceMap{}, captureRequest->mRequestTimeNs);
         ALOGVV("%s: registered in flight requestId = %" PRId32 ", frameNumber = %" PRId64
                ", burstId = %" PRId32 ".",
                 __FUNCTION__,
@@ -5019,6 +5082,17 @@ sp<Camera3Device::CaptureRequest>
             // list. Guarantees a complete in-sequence set of captures to
             // application.
             const RequestList &requests = mRepeatingRequests;
+            if (mFirstRepeating) {
+                mFirstRepeating = false;
+            } else {
+                for (auto& request : requests) {
+                    // For repeating requests, override timestamp request using
+                    // the time a request is inserted into the request queue,
+                    // because the original repeating request will have an old
+                    // fixed timestamp.
+                    request->mRequestTimeNs = systemTime();
+                }
+            }
             RequestList::const_iterator firstRequest =
                     requests.begin();
             nextRequest = *firstRequest;

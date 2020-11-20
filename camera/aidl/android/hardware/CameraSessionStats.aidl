@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,7 @@
  * limitations under the License.
  */
 
-#include <android-base/logging.h>
-#include <android/binder_process.h>
+package android.hardware;
 
-#include "MediaTranscodingService.h"
-
-using namespace android;
-
-int main(int argc __unused, char** argv) {
-    LOG(INFO) << "media transcoding service starting";
-
-    strcpy(argv[0], "media.transcoding");
-    android::MediaTranscodingService::instantiate();
-
-    ABinderProcess_startThreadPool();
-    ABinderProcess_joinThreadPool();
-}
+/** @hide */
+parcelable CameraSessionStats cpp_header "camera/CameraSessionStats.h";

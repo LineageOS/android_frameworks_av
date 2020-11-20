@@ -20,7 +20,7 @@
 
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
-#include <binder/IServiceManager.h>
+#include <android/permission_manager.h>
 #include <cutils/properties.h>
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
@@ -60,8 +60,12 @@ MediaTranscodingService::~MediaTranscodingService() {
 binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uint32_t /*numArgs*/) {
     String8 result;
 
-    // TODO(b/161549994): Remove libbinder dependencies for mainline.
-    if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
+    uid_t callingUid = AIBinder_getCallingUid();
+    pid_t callingPid = AIBinder_getCallingPid();
+    int32_t permissionResult;
+    if (APermissionManager_checkPermission("android.permission.DUMP", callingPid, callingUid,
+                                           &permissionResult) != PERMISSION_MANAGER_STATUS_OK ||
+        permissionResult != PERMISSION_MANAGER_PERMISSION_GRANTED) {
         result.format(
                 "Permission Denial: "
                 "can't dump MediaTranscodingService from pid=%d, uid=%d\n",

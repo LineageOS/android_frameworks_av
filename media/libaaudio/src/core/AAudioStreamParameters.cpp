@@ -54,7 +54,9 @@ static aaudio_result_t isFormatValid(audio_format_t format) {
     switch (format) {
         case AUDIO_FORMAT_DEFAULT:
         case AUDIO_FORMAT_PCM_16_BIT:
+        case AUDIO_FORMAT_PCM_32_BIT:
         case AUDIO_FORMAT_PCM_FLOAT:
+        case AUDIO_FORMAT_PCM_24_BIT_PACKED:
             break; // valid
         default:
             ALOGD("audioFormat not valid, audio_format_t = 0x%08x", format);

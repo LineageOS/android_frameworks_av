@@ -165,6 +165,7 @@ class Camera3Stream :
     void              setDataSpaceOverride(bool dataSpaceOverriden);
     bool              isDataSpaceOverridden() const;
     android_dataspace getOriginalDataSpace() const;
+    int               getMaxHalBuffers() const;
     const String8&    physicalCameraId() const;
 
     void              setOfflineProcessingSupport(bool) override;

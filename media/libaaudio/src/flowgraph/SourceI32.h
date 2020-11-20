@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2019 The Android Open Source Project
+ * Copyright 2018 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,19 +14,26 @@
  * limitations under the License.
  */
 
-#include <android-base/logging.h>
-#include <android/binder_process.h>
+#ifndef FLOWGRAPH_SOURCE_I32_H
+#define FLOWGRAPH_SOURCE_I32_H
 
-#include "MediaTranscodingService.h"
+#include <stdint.h>
 
-using namespace android;
+#include "AudioProcessorBase.h"
 
-int main(int argc __unused, char** argv) {
-    LOG(INFO) << "media transcoding service starting";
+namespace flowgraph {
 
-    strcpy(argv[0], "media.transcoding");
-    android::MediaTranscodingService::instantiate();
+class SourceI32 : public AudioSource {
+public:
+    explicit SourceI32(int32_t channelCount);
+    ~SourceI32() override = default;
 
-    ABinderProcess_startThreadPool();
-    ABinderProcess_joinThreadPool();
-}
+    int32_t onProcess(int64_t framePosition, int32_t numFrames) override;
+
+private:
+    static constexpr float kScale = 1.0 / (1UL << 31);
+};
+
+} /* namespace flowgraph */
+
+#endif //FLOWGRAPH_SOURCE_I32_H

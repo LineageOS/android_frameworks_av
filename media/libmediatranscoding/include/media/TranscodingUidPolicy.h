@@ -49,8 +49,6 @@ public:
     void setCallback(const std::shared_ptr<UidPolicyCallbackInterface>& cb) override;
     // ~UidPolicyInterface
 
-    static status_t getUidForPackage(String16 packageName, /*inout*/ uid_t& uid);
-
 private:
     void onUidStateChanged(uid_t uid, int32_t procState);
     void setUidObserverRegistered(bool registerd);
