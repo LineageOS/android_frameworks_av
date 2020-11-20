@@ -95,6 +95,7 @@ public:
 
     virtual binder::Status endConfigure(int operatingMode,
             const hardware::camera2::impl::CameraMetadataNative& sessionParams,
+            int64_t startTimeMs,
             /*out*/
             std::vector<int>* offlineStreamIds) override;
 
@@ -196,7 +197,8 @@ public:
      * Device listener interface
      */
 
-    virtual void notifyIdle();
+    virtual void notifyIdle(int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+                            const std::vector<hardware::CameraStreamStats>& streamStats);
     virtual void notifyError(int32_t errorCode,
                              const CaptureResultExtras& resultExtras);
     virtual void notifyShutter(const CaptureResultExtras& resultExtras, nsecs_t timestamp);

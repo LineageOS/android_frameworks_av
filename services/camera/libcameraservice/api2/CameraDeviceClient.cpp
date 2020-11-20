@@ -31,6 +31,7 @@
 #include "device3/Camera3Device.h"
 #include "device3/Camera3OutputStream.h"
 #include "api2/CameraDeviceClient.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 #include <camera_metadata_hidden.h>
 
@@ -471,7 +472,7 @@ binder::Status CameraDeviceClient::beginConfigure() {
 }
 
 binder::Status CameraDeviceClient::endConfigure(int operatingMode,
-        const hardware::camera2::impl::CameraMetadataNative& sessionParams,
+        const hardware::camera2::impl::CameraMetadataNative& sessionParams, int64_t startTimeMs,
         std::vector<int>* offlineStreamIds /*out*/) {
     ATRACE_CALL();
     ALOGV("%s: ending configure (%d input stream, %zu output surfaces)",
@@ -547,6 +548,11 @@ binder::Status CameraDeviceClient::endConfigure(int operatingMode,
         for (const auto& offlineStreamId : *offlineStreamIds) {
             mStreamInfoMap[offlineStreamId].supportsOffline = true;
         }
+
+        nsecs_t configureEnd = systemTime();
+        int32_t configureDurationMs = ns2ms(configureEnd) - startTimeMs;
+        CameraServiceProxyWrapper::logStreamConfigured(mCameraIdStr, operatingMode,
+                false /*internalReconfig*/, configureDurationMs);
     }
 
     return res;
@@ -1708,14 +1714,16 @@ void CameraDeviceClient::notifyRepeatingRequestError(long lastFrameNumber) {
     mStreamingRequestId = REQUEST_ID_NONE;
 }
 
-void CameraDeviceClient::notifyIdle() {
+void CameraDeviceClient::notifyIdle(
+        int64_t requestCount, int64_t resultErrorCount, bool deviceError,
+        const std::vector<hardware::CameraStreamStats>& streamStats) {
     // Thread safe. Don't bother locking.
     sp<hardware::camera2::ICameraDeviceCallbacks> remoteCb = getRemoteCallback();
 
     if (remoteCb != 0) {
         remoteCb->onDeviceIdle();
     }
-    Camera2ClientBase::notifyIdle();
+    Camera2ClientBase::notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
 }
 
 void CameraDeviceClient::notifyShutter(const CaptureResultExtras& resultExtras,
@@ -1751,6 +1759,7 @@ void CameraDeviceClient::notifyRequestQueueEmpty() {
 void CameraDeviceClient::detachDevice() {
     if (mDevice == 0) return;
 
+    nsecs_t startTime = systemTime();
     ALOGV("Camera %s: Stopping processors", mCameraIdStr.string());
 
     mFrameProcessor->removeListener(camera2::FrameProcessorBase::FRAME_PROCESSOR_LISTENER_MIN_ID,
@@ -1785,6 +1794,9 @@ void CameraDeviceClient::detachDevice() {
     mCompositeStreamMap.clear();
 
     Camera2ClientBase::detachDevice();
+
+    int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
+    CameraServiceProxyWrapper::logClose(mCameraIdStr, closeLatencyMs);
 }
 
 /** Device-related methods */

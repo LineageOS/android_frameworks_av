@@ -33,6 +33,7 @@
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3Stream.h"
 #include "device3/Camera3OutputStreamInterface.h"
+#include "utils/SessionStatsBuilder.h"
 #include "utils/TagMonitor.h"
 
 namespace android {
@@ -51,7 +52,8 @@ namespace camera3 {
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
             const camera3_stream_buffer_t *outputBuffers,
-            size_t numBuffers, nsecs_t timestamp, bool timestampIncreasing = true,
+            size_t numBuffers, nsecs_t timestamp, bool requested, nsecs_t requestTimeNs,
+            SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing = true,
             // The following arguments are only meant for surface sharing use case
             const SurfaceMap& outputSurfaces = SurfaceMap{},
             // Used to send buffer error callback when failing to return buffer
@@ -64,7 +66,7 @@ namespace camera3 {
     void returnAndRemovePendingOutputBuffers(
             bool useHalBufManager,
             sp<NotificationListener> listener, // Only needed when outputSurfaces is not empty
-            InFlightRequest& request);
+            InFlightRequest& request, SessionStatsBuilder& sessionStatsBuilder);
 
     // Camera3Device/Camera3OfflineSession internal states used in notify/processCaptureResult
     // callbacks
@@ -98,6 +100,7 @@ namespace camera3 {
         TagMonitor& tagMonitor;
         sp<Camera3Stream> inputStream;
         StreamSet& outputStreams;
+        SessionStatsBuilder& sessionStatsBuilder;
         sp<NotificationListener> listener;
         SetErrorInterface& setErrIntf;
         InflightRequestUpdateInterface& inflightIntf;
@@ -121,6 +124,7 @@ namespace camera3 {
         std::mutex& reqBufferLock; // lock to serialize request buffer calls
         const bool useHalBufManager;
         StreamSet& outputStreams;
+        SessionStatsBuilder& sessionStatsBuilder;
         SetErrorInterface& setErrIntf;
         BufferRecordsInterface& bufferRecordsIntf;
         RequestBufferInterface& reqBufferIntf;
@@ -134,6 +138,7 @@ namespace camera3 {
         const String8& cameraId;
         const bool useHalBufManager;
         StreamSet& outputStreams;
+        SessionStatsBuilder& sessionStatsBuilder;
         BufferRecordsInterface& bufferRecordsIntf;
     };
 
@@ -149,6 +154,7 @@ namespace camera3 {
         InflightRequestUpdateInterface& inflightIntf;
         BufferRecordsInterface& bufferRecordsIntf;
         FlushBufferInterface& flushBufferIntf;
+        SessionStatsBuilder& sessionStatsBuilder;
     };
 
     void flushInflightRequests(FlushInflightReqStates& states);

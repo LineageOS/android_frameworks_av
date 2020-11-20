@@ -265,7 +265,9 @@ void CameraOfflineSessionClient::notifyShutter(const CaptureResultExtras& result
     }
 }
 
-void CameraOfflineSessionClient::notifyIdle() {
+void CameraOfflineSessionClient::notifyIdle(
+        int64_t /*requestCount*/, int64_t /*resultErrorCount*/, bool /*deviceError*/,
+        const std::vector<hardware::CameraStreamStats>& /*streamStats*/) {
     if (mRemoteCallback.get() != nullptr) {
         mRemoteCallback->onDeviceIdle();
     }

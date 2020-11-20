@@ -22,6 +22,7 @@
 #include <android-base/parseint.h>
 #include <android/frameworks/cameraservice/service/2.0/ICameraService.h>
 #include <android/frameworks/cameraservice/service/2.1/ICameraService.h>
+#include <android/frameworks/cameraservice/service/2.2/ICameraService.h>
 #include <android/frameworks/cameraservice/service/2.1/ICameraServiceListener.h>
 
 #include <CameraMetadata.h>
@@ -38,7 +39,7 @@
 namespace android {
 namespace acam {
 
-using ICameraService = frameworks::cameraservice::service::V2_1::ICameraService;
+using ICameraService = frameworks::cameraservice::service::V2_2::ICameraService;
 using CameraDeviceStatus = frameworks::cameraservice::service::V2_0::CameraDeviceStatus;
 using ICameraServiceListener = frameworks::cameraservice::service::V2_1::ICameraServiceListener;
 using PhysicalCameraStatusAndId = frameworks::cameraservice::service::V2_1::PhysicalCameraStatusAndId;

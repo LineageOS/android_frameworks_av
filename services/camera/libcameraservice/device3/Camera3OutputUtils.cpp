@@ -423,6 +423,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
     InFlightRequestMap& inflightMap = states.inflightMap;
     const InFlightRequest &request = inflightMap.valueAt(idx);
     const uint32_t frameNumber = inflightMap.keyAt(idx);
+    SessionStatsBuilder& sessionStatsBuilder = states.sessionStatsBuilder;
 
     nsecs_t sensorTimestamp = request.sensorTimestamp;
     nsecs_t shutterTimestamp = request.shutterTimestamp;
@@ -459,7 +460,9 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
         returnOutputBuffers(
             states.useHalBufManager, states.listener,
             request.pendingOutputBuffers.array(),
-            request.pendingOutputBuffers.size(), 0, /*timestampIncreasing*/true,
+            request.pendingOutputBuffers.size(), 0,
+            /*requested*/true, request.requestTimeNs, states.sessionStatsBuilder,
+            /*timestampIncreasing*/true,
             request.outputSurfaces, request.resultExtras,
             request.errorBufStrategy);
 
@@ -471,6 +474,8 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
         } else {
             states.lastCompletedRegularFrameNumber = frameNumber;
         }
+
+        sessionStatsBuilder.incResultCounter(request.skipResultMetadata);
 
         removeInFlightMapEntryLocked(states, idx);
         ALOGVV("%s: removed frame %d from InFlightMap", __FUNCTION__, frameNumber);
@@ -628,7 +633,7 @@ void processCaptureResult(CaptureOutputStates& states, const camera3_capture_res
         if (shutterTimestamp != 0) {
             returnAndRemovePendingOutputBuffers(
                 states.useHalBufManager, states.listener,
-                request);
+                request, states.sessionStatsBuilder);
         }
 
         if (result->result != NULL && !isPartialResult) {
@@ -825,7 +830,8 @@ void returnOutputBuffers(
         bool useHalBufManager,
         sp<NotificationListener> listener,
         const camera3_stream_buffer_t *outputBuffers, size_t numBuffers,
-        nsecs_t timestamp, bool timestampIncreasing,
+        nsecs_t timestamp, bool requested, nsecs_t requestTimeNs,
+        SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing,
         const SurfaceMap& outputSurfaces,
         const CaptureResultExtras &inResultExtras,
         ERROR_BUF_STRATEGY errorBufStrategy) {
@@ -853,6 +859,10 @@ void returnOutputBuffers(
                 // has not got a output buffer handle filled yet. This is though illegal if HAL
                 // buffer management API is not being used.
                 ALOGE("%s: cannot return a null buffer!", __FUNCTION__);
+            } else {
+                if (requested) {
+                    sessionStatsBuilder.incCounter(streamId, /*dropped*/true, 0);
+                }
             }
             continue;
         }
@@ -876,10 +886,22 @@ void returnOutputBuffers(
         }
         // Note: stream may be deallocated at this point, if this buffer was
         // the last reference to it.
+        bool dropped = false;
         if (res == NO_INIT || res == DEAD_OBJECT) {
             ALOGV("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
+            sessionStatsBuilder.stopCounter(streamId);
         } else if (res != OK) {
             ALOGE("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
+            dropped = true;
+        } else {
+            if (outputBuffers[i].status == CAMERA3_BUFFER_STATUS_ERROR || timestamp == 0) {
+                dropped = true;
+            }
+        }
+        if (requested) {
+            nsecs_t bufferTimeNs = systemTime();
+            int32_t captureLatencyMs = ns2ms(bufferTimeNs - requestTimeNs);
+            sessionStatsBuilder.incCounter(streamId, dropped, captureLatencyMs);
         }
 
         // Long processing consumers can cause returnBuffer timeout for shared stream
@@ -889,7 +911,8 @@ void returnOutputBuffers(
             // cancel the buffer
             camera3_stream_buffer_t sb = outputBuffers[i];
             sb.status = CAMERA3_BUFFER_STATUS_ERROR;
-            stream->returnBuffer(sb, /*timestamp*/0, timestampIncreasing, std::vector<size_t> (),
+            stream->returnBuffer(sb, /*timestamp*/0,
+                    timestampIncreasing, std::vector<size_t> (),
                     inResultExtras.frameNumber);
 
             if (listener != nullptr) {
@@ -904,12 +927,14 @@ void returnOutputBuffers(
 }
 
 void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
-        sp<NotificationListener> listener, InFlightRequest& request) {
+        sp<NotificationListener> listener, InFlightRequest& request,
+        SessionStatsBuilder& sessionStatsBuilder) {
     bool timestampIncreasing = !(request.zslCapture || request.hasInputBuffer);
     returnOutputBuffers(useHalBufManager, listener,
             request.pendingOutputBuffers.array(),
             request.pendingOutputBuffers.size(),
-            request.shutterTimestamp, timestampIncreasing,
+            request.shutterTimestamp, /*requested*/true,
+            request.requestTimeNs, sessionStatsBuilder, timestampIncreasing,
             request.outputSurfaces, request.resultExtras,
             request.errorBufStrategy);
 
@@ -992,7 +1017,7 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
                     r.rotateAndCropAuto, r.cameraIdsWithZoom, r.physicalMetadatas);
             }
             returnAndRemovePendingOutputBuffers(
-                    states.useHalBufManager, states.listener, r);
+                    states.useHalBufManager, states.listener, r, states.sessionStatsBuilder);
 
             removeInFlightRequestIfReadyLocked(states, idx);
         }
@@ -1281,6 +1306,7 @@ void requestStreamBuffers(RequestBufferStates& states,
                     ALOGV("%s: Can't get output buffer for stream %d: %s (%d)",
                             __FUNCTION__, streamId, strerror(-res), res);
                     bufRet.val.error(StreamBufferRequestError::STREAM_DISCONNECTED);
+                    states.sessionStatsBuilder.stopCounter(streamId);
                 } else {
                     ALOGE("%s: Can't get output buffer for stream %d: %s (%d)",
                             __FUNCTION__, streamId, strerror(-res), res);
@@ -1346,7 +1372,8 @@ void requestStreamBuffers(RequestBufferStates& states,
                 sb.status = CAMERA3_BUFFER_STATUS_ERROR;
             }
             returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
-                    streamBuffers.data(), numAllocatedBuffers, 0);
+                    streamBuffers.data(), numAllocatedBuffers, 0, /*requested*/false,
+                    /*requestTimeNs*/0, states.sessionStatsBuilder);
         }
     }
 
@@ -1403,22 +1430,23 @@ void returnStreamBuffers(ReturnBufferStates& states,
         }
         streamBuffer.stream = stream->asHalStream();
         returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
-                &streamBuffer, /*size*/1, /*timestamp*/ 0);
+                &streamBuffer, /*size*/1, /*timestamp*/ 0, /*requested*/false,
+                /*requestTimeNs*/0, states.sessionStatsBuilder);
     }
 }
 
 void flushInflightRequests(FlushInflightReqStates& states) {
     ATRACE_CALL();
-    { // First return buffers cached in mInFlightMap
+    { // First return buffers cached in inFlightMap
         std::lock_guard<std::mutex> l(states.inflightLock);
         for (size_t idx = 0; idx < states.inflightMap.size(); idx++) {
             const InFlightRequest &request = states.inflightMap.valueAt(idx);
             returnOutputBuffers(
                 states.useHalBufManager, states.listener,
                 request.pendingOutputBuffers.array(),
-                request.pendingOutputBuffers.size(), 0,
-                /*timestampIncreasing*/true, request.outputSurfaces,
-                request.resultExtras, request.errorBufStrategy);
+                request.pendingOutputBuffers.size(), 0, /*requested*/true,
+                request.requestTimeNs, states.sessionStatsBuilder, /*timestampIncreasing*/true,
+                request.outputSurfaces, request.resultExtras, request.errorBufStrategy);
             ALOGW("%s: Frame %d |  Timestamp: %" PRId64 ", metadata"
                     " arrived: %s, buffers left: %d.\n", __FUNCTION__,
                     states.inflightMap.keyAt(idx), request.shutterTimestamp,
@@ -1490,7 +1518,8 @@ void flushInflightRequests(FlushInflightReqStates& states) {
                 switch (halStream->stream_type) {
                     case CAMERA3_STREAM_OUTPUT:
                         res = stream->returnBuffer(streamBuffer, /*timestamp*/ 0,
-                                /*timestampIncreasing*/true, std::vector<size_t> (), frameNumber);
+                                /*timestampIncreasing*/true,
+                                std::vector<size_t> (), frameNumber);
                         if (res != OK) {
                             ALOGE("%s: Can't return output buffer for frame %d to"
                                   " stream %d: %s (%d)",  __FUNCTION__,

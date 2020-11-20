@@ -34,6 +34,7 @@
 #include "api1/client2/CallbackProcessor.h"
 #include "api1/client2/ZslProcessor.h"
 #include "utils/CameraThreadState.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define ALOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);
@@ -396,6 +397,7 @@ status_t Camera2Client::dumpClient(int fd, const Vector<String16>& args) {
 
 binder::Status Camera2Client::disconnect() {
     ATRACE_CALL();
+    nsecs_t startTime = systemTime();
     Mutex::Autolock icl(mBinderSerializationLock);
 
     binder::Status res = binder::Status::ok();
@@ -456,6 +458,9 @@ binder::Status Camera2Client::disconnect() {
     mDevice->disconnect();
 
     CameraService::Client::disconnect();
+
+    int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
+    CameraServiceProxyWrapper::logClose(mCameraIdStr, closeLatencyMs);
 
     return res;
 }

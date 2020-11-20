@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,24 +15,22 @@
  */
 
 #include <algorithm>
-#include <stdint.h>
+#include <unistd.h>
 
 #ifdef __ANDROID__
 #include <audio_utils/primitives.h>
 #endif
 
 #include "AudioProcessorBase.h"
-#include "SourceI24.h"
+#include "SourceI32.h"
 
 using namespace flowgraph;
 
-constexpr int kBytesPerI24Packed = 3;
-
-SourceI24::SourceI24(int32_t channelCount)
+SourceI32::SourceI32(int32_t channelCount)
         : AudioSource(channelCount) {
 }
 
-int32_t SourceI24::onProcess(int64_t framePosition, int32_t numFrames) {
+int32_t SourceI32::onProcess(int64_t framePosition, int32_t numFrames) {
     float *floatData = output.getBlock();
     int32_t channelCount = output.getSamplesPerFrame();
 
@@ -40,23 +38,14 @@ int32_t SourceI24::onProcess(int64_t framePosition, int32_t numFrames) {
     int32_t framesToProcess = std::min(numFrames, framesLeft);
     int32_t numSamples = framesToProcess * channelCount;
 
-    const uint8_t *byteBase = (uint8_t *) mData;
-    const uint8_t *byteData = &byteBase[mFrameIndex * channelCount * kBytesPerI24Packed];
+    const int32_t *intBase = static_cast<const int32_t *>(mData);
+    const int32_t *intData = &intBase[mFrameIndex * channelCount];
 
 #ifdef __ANDROID__
-    memcpy_to_float_from_p24(floatData, byteData, numSamples);
+    memcpy_to_float_from_i32(floatData, intData, numSamples);
 #else
-    static const float scale = 1. / (float)(1UL << 31);
     for (int i = 0; i < numSamples; i++) {
-        // Assemble the data assuming Little Endian format.
-        int32_t pad = byteData[2];
-        pad <<= 8;
-        pad |= byteData[1];
-        pad <<= 8;
-        pad |= byteData[0];
-        pad <<= 8; // Shift to 32 bit data so the sign is correct.
-        byteData += kBytesPerI24Packed;
-        *floatData++ = pad * scale; // scale to range -1.0 to 1.0
+        *floatData++ = *intData++ * kScale;
     }
 #endif
 
