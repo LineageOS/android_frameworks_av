@@ -17,6 +17,9 @@
           "exclude-filter": "android.media.cts.AudioRecordTest"
         }
       ]
+    },
+    {
+      "name": "mediacodecTest"
     }
   ],
   "postsubmit": [
