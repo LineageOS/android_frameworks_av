@@ -4833,7 +4833,15 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
     }
 
     if (state == AUDIO_POLICY_DEVICE_STATE_AVAILABLE) {
-        // first list already open outputs that can be routed to this device
+        // first call getAudioPort to get the supported attributes from the HAL
+        struct audio_port_v7 port = {};
+        device->toAudioPort(&port);
+        status_t status = mpClientInterface->getAudioPort(&port);
+        if (status == NO_ERROR) {
+            device->importAudioPort(port);
+        }
+
+        // then list already open outputs that can be routed to this device
         for (size_t i = 0; i < mOutputs.size(); i++) {
             desc = mOutputs.valueAt(i);
             if (!desc->isDuplicated() && desc->supportsDevice(device)
@@ -4895,8 +4903,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                   deviceType, address.string(), profile.get(), profile->getName().c_str());
             desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = desc->open(nullptr, DeviceVector(device),
-                                         AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
+            status = desc->open(nullptr, DeviceVector(device),
+                                AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
 
             if (status == NO_ERROR) {
                 // Here is where the out_set_parameters() for card & device gets called
@@ -4920,9 +4928,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                     config.offload_info.channel_mask = config.channel_mask;
                     config.offload_info.format = config.format;
 
-                    status_t status = desc->open(&config, DeviceVector(device),
-                                                 AUDIO_STREAM_DEFAULT,
-                                                 AUDIO_OUTPUT_FLAG_NONE, &output);
+                    status = desc->open(&config, DeviceVector(device),
+                                        AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
                     if (status != NO_ERROR) {
                         output = AUDIO_IO_HANDLE_NONE;
                     }
@@ -4952,8 +4959,8 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                         // open a duplicating output thread for the new output and the primary output
                         sp<SwAudioOutputDescriptor> dupOutputDesc =
                                 new SwAudioOutputDescriptor(NULL, mpClientInterface);
-                        status_t status = dupOutputDesc->openDuplicating(mPrimaryOutput, desc,
-                                                                         &duplicatedOutput);
+                        status = dupOutputDesc->openDuplicating(mPrimaryOutput, desc,
+                                                                &duplicatedOutput);
                         if (status == NO_ERROR) {
                             // add duplicated output descriptor
                             addOutput(duplicatedOutput, dupOutputDesc);
