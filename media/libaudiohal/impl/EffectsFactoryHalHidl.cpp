@@ -23,9 +23,9 @@
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
 #include "EffectsFactoryHalHidl.h"
-#include "HidlUtils.h"
+#include "UuidUtils.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
+using ::android::hardware::audio::common::CPP_VERSION::implementation::UuidUtils;
 using ::android::hardware::Return;
 
 namespace android {
@@ -85,7 +85,7 @@ status_t EffectsFactoryHalHidl::getDescriptor(
     // TODO: check for nullptr
     if (mEffectsFactory == 0) return NO_INIT;
     Uuid hidlUuid;
-    HidlUtils::uuidFromHal(*pEffectUuid, &hidlUuid);
+    UuidUtils::uuidFromHal(*pEffectUuid, &hidlUuid);
     Result retval = Result::NOT_INITIALIZED;
     Return<void> ret = mEffectsFactory->getDescriptor(hidlUuid,
             [&](Result r, const EffectDescriptor& result) {
@@ -107,7 +107,7 @@ status_t EffectsFactoryHalHidl::createEffect(
         int32_t deviceId __unused, sp<EffectHalInterface> *effect) {
     if (mEffectsFactory == 0) return NO_INIT;
     Uuid hidlUuid;
-    HidlUtils::uuidFromHal(*pEffectUuid, &hidlUuid);
+    UuidUtils::uuidFromHal(*pEffectUuid, &hidlUuid);
     Result retval = Result::NOT_INITIALIZED;
     Return<void> ret;
 #if MAJOR_VERSION >= 6
