@@ -105,6 +105,8 @@ public:
     bool hasDynamicProfile() const;
     bool hasDynamicRateFor(audio_format_t format) const;
 
+    bool contains(const sp<AudioProfile>& profile) const;
+
     virtual void dump(std::string *dst, int spaces) const;
 
     bool equals(const AudioProfileVector& other) const;

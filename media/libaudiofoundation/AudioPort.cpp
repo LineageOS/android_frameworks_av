@@ -38,6 +38,21 @@ void AudioPort::importAudioPort(const sp<AudioPort>& port, bool force __unused)
     }
 }
 
+void AudioPort::importAudioPort(const audio_port_v7 &port) {
+    for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+        sp<AudioProfile> profile = new AudioProfile(port.audio_profiles[i].format,
+                ChannelMaskSet(port.audio_profiles[i].channel_masks,
+                        port.audio_profiles[i].channel_masks +
+                        port.audio_profiles->num_channel_masks),
+                SampleRateSet(port.audio_profiles[i].sample_rates,
+                        port.audio_profiles[i].sample_rates +
+                        port.audio_profiles[i].num_sample_rates));
+        if (!mProfiles.contains(profile)) {
+            addAudioProfile(profile);
+        }
+    }
+}
+
 void AudioPort::toAudioPort(struct audio_port *port) const {
     // TODO: update this function once audio_port structure reflects the new profile definition.
     // For compatibility reason: flatening the AudioProfile into audio_port structure.
@@ -62,21 +77,39 @@ void AudioPort::toAudioPort(struct audio_port *port) const {
             }
         }
     }
-    port->role = mRole;
-    port->type = mType;
-    strlcpy(port->name, mName.c_str(), AUDIO_PORT_MAX_NAME_LEN);
+    toAudioPortBase(port);
     port->num_sample_rates = flatenedRates.size();
     port->num_channel_masks = flatenedChannels.size();
     port->num_formats = flatenedFormats.size();
     std::copy(flatenedRates.begin(), flatenedRates.end(), port->sample_rates);
     std::copy(flatenedChannels.begin(), flatenedChannels.end(), port->channel_masks);
     std::copy(flatenedFormats.begin(), flatenedFormats.end(), port->formats);
+}
 
-    ALOGV("AudioPort::toAudioPort() num gains %zu", mGains.size());
+void AudioPort::toAudioPort(struct audio_port_v7 *port) const {
+    toAudioPortBase(port);
+    port->num_audio_profiles = 0;
+    for (const auto& profile : mProfiles) {
+        if (profile->isValid()) {
+            const SampleRateSet &sampleRates = profile->getSampleRates();
+            const ChannelMaskSet &channelMasks = profile->getChannels();
 
-    port->num_gains = std::min(mGains.size(), (size_t) AUDIO_PORT_MAX_GAINS);
-    for (size_t i = 0; i < port->num_gains; i++) {
-        port->gains[i] = mGains[i]->getGain();
+            if (sampleRates.size() > AUDIO_PORT_MAX_SAMPLING_RATES ||
+                    channelMasks.size() > AUDIO_PORT_MAX_CHANNEL_MASKS ||
+                    port->num_audio_profiles >= AUDIO_PORT_MAX_AUDIO_PROFILES) {
+                ALOGE("%s: bailing out: cannot export profiles to port config", __func__);
+                return;
+            }
+
+            auto& dstProfile = port->audio_profiles[port->num_audio_profiles++];
+            dstProfile.format = profile->getFormat();
+            dstProfile.num_sample_rates = sampleRates.size();
+            std::copy(sampleRates.begin(), sampleRates.end(),
+                    std::begin(dstProfile.sample_rates));
+            dstProfile.num_channel_masks = channelMasks.size();
+            std::copy(channelMasks.begin(), channelMasks.end(),
+                    std::begin(dstProfile.channel_masks));
+        }
     }
 }
 

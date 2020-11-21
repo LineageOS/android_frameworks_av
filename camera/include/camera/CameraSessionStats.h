@@ -69,23 +69,23 @@ public:
     /**
      * Values for notifyCameraState newCameraState
      */
-    static const int CAMERA_STATE_OPEN = 0;
-    static const int CAMERA_STATE_ACTIVE = 1;
-    static const int CAMERA_STATE_IDLE = 2;
-    static const int CAMERA_STATE_CLOSED = 3;
+    static const int CAMERA_STATE_OPEN;
+    static const int CAMERA_STATE_ACTIVE;
+    static const int CAMERA_STATE_IDLE;
+    static const int CAMERA_STATE_CLOSED;
 
     /**
      * Values for notifyCameraState facing
      */
-    static const int CAMERA_FACING_BACK = 0;
-    static const int CAMERA_FACING_FRONT = 1;
-    static const int CAMERA_FACING_EXTERNAL = 2;
+    static const int CAMERA_FACING_BACK;
+    static const int CAMERA_FACING_FRONT;
+    static const int CAMERA_FACING_EXTERNAL;
 
     /**
      * Values for notifyCameraState api level
      */
-    static const int CAMERA_API_LEVEL_1 = 1;
-    static const int CAMERA_API_LEVEL_2 = 2;
+    static const int CAMERA_API_LEVEL_1;
+    static const int CAMERA_API_LEVEL_2;
 
     String16 mCameraId;
     int mFacing;

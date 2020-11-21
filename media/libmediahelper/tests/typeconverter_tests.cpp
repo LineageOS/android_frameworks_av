@@ -33,7 +33,8 @@ TEST(TypeConverter, ParseChannelMasks) {
     for (const auto enumVal : xsdc_enum_range<xsd::AudioChannelMask>{}) {
         const std::string stringVal = toString(enumVal);
         audio_channel_mask_t channelMask = channelMaskFromString(stringVal);
-        EXPECT_EQ(stringVal != "AUDIO_CHANNEL_NONE", audio_channel_mask_is_valid(channelMask))
+        EXPECT_EQ(enumVal != xsd::AudioChannelMask::AUDIO_CHANNEL_NONE,
+                audio_channel_mask_is_valid(channelMask))
                 << "Validity of \"" << stringVal << "\" is not as expected";
     }
 }
@@ -67,7 +68,7 @@ TEST(TypeConverter, ParseInputOutputIndexChannelMask) {
             EXPECT_TRUE(ChannelIndexConverter::toString(channelMask, stringValBack))
                     << "Conversion of indexed channel mask " << channelMask << " failed";
             EXPECT_EQ(stringVal, stringValBack);
-        } else if (stringVal == "AUDIO_CHANNEL_NONE") {
+        } else if (stringVal == toString(xsd::AudioChannelMask::AUDIO_CHANNEL_NONE)) {
             EXPECT_FALSE(InputChannelConverter::fromString(stringVal, channelMask))
                     << "Conversion of \"" << stringVal << "\" succeeded (as input channel mask)";
             EXPECT_FALSE(OutputChannelConverter::fromString(stringVal, channelMask))
@@ -86,6 +87,8 @@ TEST(TypeConverter, ParseInputOutputIndexChannelMask) {
             EXPECT_TRUE(ChannelIndexConverter::toString(channelMask, stringValBack))
                     << "Conversion of indexed channel mask " << channelMask << " failed";
             EXPECT_EQ(stringVal, stringValBack);
+        } else {
+            FAIL() << "Unrecognized channel mask \"" << stringVal << "\"";
         }
     }
 }
@@ -107,7 +110,7 @@ TEST(TypeConverter, ParseDevices) {
         std::string stringValBack;
         EXPECT_TRUE(DeviceConverter::fromString(stringVal, device))
                 << "Conversion of \"" << stringVal << "\" failed";
-        if (stringVal != "AUDIO_DEVICE_NONE") {
+        if (enumVal != xsd::AudioDevice::AUDIO_DEVICE_NONE) {
             EXPECT_TRUE(audio_is_input_device(device) || audio_is_output_device(device))
                     << "Device \"" << stringVal << "\" is neither input, nor output device";
         } else {
@@ -144,17 +147,19 @@ TEST(TypeConverter, ParseInOutDevices) {
             EXPECT_TRUE(OutputDeviceConverter::fromString(stringValBack, deviceBack))
                     << "Conversion of \"" << stringValBack << "\" failed";
             EXPECT_EQ(device, deviceBack);
-        } else if (stringVal == "AUDIO_DEVICE_NONE") {
+        } else if (stringVal == toString(xsd::AudioDevice::AUDIO_DEVICE_NONE)) {
             EXPECT_FALSE(InputDeviceConverter::fromString(stringVal, device))
                     << "Conversion of \"" << stringVal << "\" succeeded (as input device)";
             EXPECT_FALSE(OutputDeviceConverter::fromString(stringVal, device))
                     << "Conversion of \"" << stringVal << "\" succeeded (as output device)";
             EXPECT_EQ(stringVal, toString(device));
+        } else {
+            FAIL() << "Unrecognized audio device \"" << stringVal << "\"";
         }
     }
 }
 
-TEST (TypeConverter, ParseInOutFlags) {
+TEST(TypeConverter, ParseInOutFlags) {
     for (const auto enumVal : xsdc_enum_range<xsd::AudioInOutFlag>{}) {
         const std::string stringVal = toString(enumVal);
         if (stringVal.find("_INPUT_FLAG_") != std::string::npos) {

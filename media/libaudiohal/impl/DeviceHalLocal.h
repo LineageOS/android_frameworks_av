@@ -100,6 +100,9 @@ class DeviceHalLocal : public DeviceHalInterface
     // Fills the list of supported attributes for a given audio port.
     virtual status_t getAudioPort(struct audio_port *port);
 
+    // Fills the list of supported attributes for a given audio port.
+    virtual status_t getAudioPort(struct audio_port_v7 *port);
+
     // Set audio port configuration.
     virtual status_t setAudioPortConfig(const struct audio_port_config *config);
 

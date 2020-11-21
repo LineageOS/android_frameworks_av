@@ -23,6 +23,7 @@
 
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::tv::tuner::BnTunerService;
+using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::TunerServiceFrontendInfo;
 using ::android::hardware::tv::tuner::V1_0::FrontendInfo;
 using ::android::hardware::tv::tuner::V1_0::ITuner;
@@ -36,13 +37,19 @@ public:
     static void instantiate();
     TunerService();
     virtual ~TunerService();
+
+    static int getResourceIdFromHandle(int resourceHandle) {
+        return (resourceHandle & 0x00ff0000) >> 16;
+    }
+
     Status getFrontendIds(std::vector<int32_t>* ids, int32_t* _aidl_return) override;
     Status getFrontendInfo(int32_t frontendHandle, TunerServiceFrontendInfo* _aidl_return) override;
+    Status openFrontend(
+            int32_t frontendHandle, std::shared_ptr<ITunerFrontend>* _aidl_return) override;
 
 private:
     static sp<ITuner> mTuner;
 
-    int getResourceIdFromHandle(int resourceHandle);
     TunerServiceFrontendInfo convertToAidlFrontendInfo(int feId, FrontendInfo halInfo);
 };
 
