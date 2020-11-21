@@ -137,7 +137,8 @@ void Codec::deInitEncoder() {
 void Codec::encodeFrames(const uint8_t *data, size_t size) {
     size_t inputBufferSize = (mFrameWidth * mFrameHeight * 3) / 2;
     size_t outputBufferSize = inputBufferSize * 2;
-    uint8_t outputBuffer[outputBufferSize];
+    uint8_t *outputBuffer = new uint8_t[outputBufferSize];
+    uint8_t *inputBuffer = new uint8_t[inputBufferSize];
 
     // Get VOL header.
     int32_t sizeOutputBuffer = outputBufferSize;
@@ -146,7 +147,6 @@ void Codec::encodeFrames(const uint8_t *data, size_t size) {
     size_t numFrame = 0;
     while (size > 0) {
         size_t bytesConsumed = std::min(size, inputBufferSize);
-        uint8_t inputBuffer[inputBufferSize];
         memcpy(inputBuffer, data, bytesConsumed);
         if (bytesConsumed < sizeof(inputBuffer)) {
             memset(inputBuffer + bytesConsumed, data[0], sizeof(inputBuffer) - bytesConsumed);
@@ -170,6 +170,8 @@ void Codec::encodeFrames(const uint8_t *data, size_t size) {
         data += bytesConsumed;
         size -= bytesConsumed;
     }
+    delete[] inputBuffer;
+    delete[] outputBuffer;
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
