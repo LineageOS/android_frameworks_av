@@ -299,11 +299,12 @@ ConversionResult<int> aidl2legacy_AudioPortConfigType(media::AudioPortConfigType
             return AUDIO_PORT_CONFIG_CHANNEL_MASK;
         case media::AudioPortConfigType::FORMAT:
             return AUDIO_PORT_CONFIG_FORMAT;
+        case media::AudioPortConfigType::GAIN:
+            return AUDIO_PORT_CONFIG_GAIN;
         case media::AudioPortConfigType::FLAGS:
             return AUDIO_PORT_CONFIG_FLAGS;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 // The legacy enum is unnamed. Thus, we use int.
@@ -315,11 +316,12 @@ ConversionResult<media::AudioPortConfigType> legacy2aidl_AudioPortConfigType(int
             return media::AudioPortConfigType::CHANNEL_MASK;
         case AUDIO_PORT_CONFIG_FORMAT:
             return media::AudioPortConfigType::FORMAT;
+        case AUDIO_PORT_CONFIG_GAIN:
+            return media::AudioPortConfigType::GAIN;
         case AUDIO_PORT_CONFIG_FLAGS:
             return media::AudioPortConfigType::FLAGS;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<unsigned int> aidl2legacy_int32_t_config_mask(int32_t aidl) {
