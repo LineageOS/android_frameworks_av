@@ -110,29 +110,6 @@ bool bitmaskIsSet(Mask mask, Enum index) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-// Utilities for working with AIDL unions.
-// UNION_GET(obj, fieldname) returns a ConversionResult<T> containing either the strongly-typed
-//   value of the respective field, or BAD_VALUE if the union is not set to the requested field.
-// UNION_SET(obj, fieldname, value) sets the requested field to the given value.
-
-template<typename T, typename T::Tag tag>
-using UnionFieldType = std::decay_t<decltype(std::declval<T>().template get<tag>())>;
-
-template<typename T, typename T::Tag tag>
-ConversionResult<UnionFieldType<T, tag>> unionGetField(const T& u) {
-    if (u.getTag() != tag) {
-        return unexpected(BAD_VALUE);
-    }
-    return u.template get<tag>();
-}
-
-#define UNION_GET(u, field) \
-    unionGetField<std::decay_t<decltype(u)>, std::decay_t<decltype(u)>::Tag::field>(u)
-
-#define UNION_SET(u, field, value) \
-    (u).set<std::decay_t<decltype(u)>::Tag::field>(value)
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
 
 enum class Direction {
     INPUT, OUTPUT
