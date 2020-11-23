@@ -82,6 +82,20 @@ ConversionResult<To> convertReinterpret(From from) {
 }
 
 /**
+ * A generic template that helps convert containers of convertible types, using iterators.
+ */
+template<typename InputIterator, typename OutputIterator, typename Func>
+status_t convertRange(InputIterator start,
+                      InputIterator end,
+                      OutputIterator out,
+                      const Func& itemConversion) {
+    for (InputIterator iter = start; iter != end; ++iter, ++out) {
+        *out = VALUE_OR_RETURN_STATUS(itemConversion(*iter));
+    }
+    return OK;
+}
+
+/**
  * A generic template that helps convert containers of convertible types.
  */
 template<typename OutputContainer, typename InputContainer, typename Func>

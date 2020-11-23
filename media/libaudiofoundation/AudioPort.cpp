@@ -291,7 +291,7 @@ status_t AudioPortConfig::writeToParcelable(media::AudioPortConfig* parcelable) 
     parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
     parcelable->gain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.index));
     parcelable->gain.mode = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_gain_mode_t_int32_t(mGain.mode));
+            legacy2aidl_audio_gain_mode_t_mask_int32_t(mGain.mode));
     parcelable->gain.channelMask = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
     parcelable->gain.rampDurationMs = VALUE_OR_RETURN_STATUS(
@@ -315,7 +315,7 @@ status_t AudioPortConfig::readFromParcelable(const media::AudioPortConfig& parce
     mId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(parcelable.id));
     mGain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.gain.index));
     mGain.mode = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_int32_t_audio_gain_mode_t(parcelable.gain.mode));
+            aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.gain.mode));
     mGain.channel_mask = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_channel_mask_t(parcelable.gain.channelMask));
     mGain.ramp_duration_ms = VALUE_OR_RETURN_STATUS(

@@ -16,14 +16,14 @@
 
 package android.media;
 
-import android.media.AudioPortConfigDeviceExt;
-import android.media.AudioPortConfigMixExt;
-import android.media.AudioPortConfigSessionExt;
+import android.media.AudioPortDeviceExt;
+import android.media.AudioPortMixExt;
+import android.media.AudioPortSessionExt;
 
 /**
  * {@hide}
  */
-union AudioPortConfigExt {
+union AudioPortExt {
     /**
      * This represents an empty union. Value is ignored.
      * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
@@ -31,9 +31,9 @@ union AudioPortConfigExt {
      */
     boolean unspecified;
     /** Device specific info. */
-    AudioPortConfigDeviceExt device;
+    AudioPortDeviceExt device;
     /** Mix specific info. */
-    AudioPortConfigMixExt mix;
+    AudioPortMixExt mix;
     /** Session specific info. */
-    AudioPortConfigSessionExt session;
+    AudioPortSessionExt session;
 }

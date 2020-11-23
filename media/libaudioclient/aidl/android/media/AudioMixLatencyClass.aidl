@@ -13,27 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package android.media;
-
-import android.media.AudioPortConfigDeviceExt;
-import android.media.AudioPortConfigMixExt;
-import android.media.AudioPortConfigSessionExt;
 
 /**
  * {@hide}
  */
-union AudioPortConfigExt {
-    /**
-     * This represents an empty union. Value is ignored.
-     * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
-     *             established.
-     */
-    boolean unspecified;
-    /** Device specific info. */
-    AudioPortConfigDeviceExt device;
-    /** Mix specific info. */
-    AudioPortConfigMixExt mix;
-    /** Session specific info. */
-    AudioPortConfigSessionExt session;
+@Backing(type="int")
+enum AudioMixLatencyClass {
+    LOW = 0,
+    NORMAL = 1,
 }
