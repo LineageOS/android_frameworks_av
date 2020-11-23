@@ -314,7 +314,6 @@ aidl_interface {
         "aidl/android/media/AudioUniqueIdUse.aidl",
         "aidl/android/media/AudioUsage.aidl",
         "aidl/android/media/AudioUuid.aidl",
-        "aidl/android/media/DeviceDescriptorBase.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
     ],
     imports: [
