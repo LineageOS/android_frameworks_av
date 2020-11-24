@@ -70,6 +70,8 @@ struct ARTPConnection::StreamInfo {
 
     bool mIsInjected;
 
+    // A place to save time when it polls
+    int64_t mLastPollTimeUs;
     // RTCP Extension for CVO
     int mCVOExtMap; // will be set to 0 if cvo is not negotiated in sdp
 };
@@ -80,7 +82,7 @@ ARTPConnection::ARTPConnection(uint32_t flags)
       mLastReceiverReportTimeUs(-1),
       mLastBitrateReportTimeUs(-1),
       mTargetBitrate(-1),
-      mJbTimeMs(300) {
+      mStaticJitterTimeMs(kStaticJitterTimeMs) {
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -416,6 +418,7 @@ void ARTPConnection::onPollStreams() {
         return;
     }
 
+    int64_t nowUs = ALooper::GetNowUs();
     int res = select(maxSocket + 1, &rs, NULL, NULL, &tv);
 
     if (res > 0) {
@@ -425,6 +428,7 @@ void ARTPConnection::onPollStreams() {
                 ++it;
                 continue;
             }
+            it->mLastPollTimeUs = nowUs;
 
             status_t err = OK;
             if (FD_ISSET(it->mRTPSocket, &rs)) {
@@ -486,7 +490,6 @@ void ARTPConnection::onPollStreams() {
         }
     }
 
-    int64_t nowUs = ALooper::GetNowUs();
     checkRxBitrate(nowUs);
 
     if (mLastReceiverReportTimeUs <= 0
@@ -720,6 +723,7 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
     buffer->setInt32Data(u16at(&data[2]));
     buffer->setRange(payloadOffset, size - payloadOffset);
 
+    source->putDynamicJitterData(rtpTime, s->mLastPollTimeUs);
     source->processRTPPacket(buffer);
 
     return OK;
@@ -1066,7 +1070,7 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
         }
 
         source->setSelfID(mSelfID);
-        source->setJbTime(mJbTimeMs > 0 ? mJbTimeMs : 300);
+        source->setStaticJitterTimeMs(mStaticJitterTimeMs);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -1086,8 +1090,8 @@ void ARTPConnection::setSelfID(const uint32_t selfID) {
     mSelfID = selfID;
 }
 
-void ARTPConnection::setJbTime(const uint32_t jbTimeMs) {
-    mJbTimeMs = jbTimeMs;
+void ARTPConnection::setStaticJitterTimeMs(const uint32_t jbTimeMs) {
+    mStaticJitterTimeMs = jbTimeMs;
 }
 
 void ARTPConnection::setTargetBitrate(int32_t targetBitrate) {
