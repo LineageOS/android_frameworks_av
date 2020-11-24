@@ -185,9 +185,15 @@ std::string formatToString(audio_format_t format) {
 
 // ----------------------------------------------------------------------------
 
+void AudioFlinger::instantiate() {
+    sp<IServiceManager> sm(defaultServiceManager());
+    sm->addService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME),
+                   new AudioFlingerServerAdapter(new AudioFlinger()), false,
+                   IServiceManager::DUMP_FLAG_PRIORITY_DEFAULT);
+}
+
 AudioFlinger::AudioFlinger()
-    : BnAudioFlinger(),
-      mMediaLogNotifier(new AudioFlinger::MediaLogNotifier()),
+    : mMediaLogNotifier(new AudioFlinger::MediaLogNotifier()),
       mPrimaryHardwareDev(NULL),
       mAudioHwDevs(NULL),
       mHardwareStatus(AUDIO_HW_IDLE),
@@ -4042,42 +4048,40 @@ bool AudioFlinger::updateOrphanEffectChains(const sp<AudioFlinger::EffectModule>
 
 // ----------------------------------------------------------------------------
 
-status_t AudioFlinger::onTransact(
-        uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
+status_t AudioFlinger::onPreTransact(
+        TransactionCode code, const Parcel& /* data */, uint32_t /* flags */)
 {
     // make sure transactions reserved to AudioPolicyManager do not come from other processes
     switch (code) {
-        case SET_STREAM_VOLUME:
-        case SET_STREAM_MUTE:
-        case OPEN_OUTPUT:
-        case OPEN_DUPLICATE_OUTPUT:
-        case CLOSE_OUTPUT:
-        case SUSPEND_OUTPUT:
-        case RESTORE_OUTPUT:
-        case OPEN_INPUT:
-        case CLOSE_INPUT:
-        case INVALIDATE_STREAM:
-        case SET_VOICE_VOLUME:
-        case MOVE_EFFECTS:
-        case SET_EFFECT_SUSPENDED:
-        case LOAD_HW_MODULE:
-        case LIST_AUDIO_PORTS:
-        case GET_AUDIO_PORT:
-        case CREATE_AUDIO_PATCH:
-        case RELEASE_AUDIO_PATCH:
-        case LIST_AUDIO_PATCHES:
-        case SET_AUDIO_PORT_CONFIG:
-        case SET_RECORD_SILENCED:
+        case TransactionCode::SET_STREAM_VOLUME:
+        case TransactionCode::SET_STREAM_MUTE:
+        case TransactionCode::OPEN_OUTPUT:
+        case TransactionCode::OPEN_DUPLICATE_OUTPUT:
+        case TransactionCode::CLOSE_OUTPUT:
+        case TransactionCode::SUSPEND_OUTPUT:
+        case TransactionCode::RESTORE_OUTPUT:
+        case TransactionCode::OPEN_INPUT:
+        case TransactionCode::CLOSE_INPUT:
+        case TransactionCode::INVALIDATE_STREAM:
+        case TransactionCode::SET_VOICE_VOLUME:
+        case TransactionCode::MOVE_EFFECTS:
+        case TransactionCode::SET_EFFECT_SUSPENDED:
+        case TransactionCode::LOAD_HW_MODULE:
+        case TransactionCode::GET_AUDIO_PORT:
+        case TransactionCode::CREATE_AUDIO_PATCH:
+        case TransactionCode::RELEASE_AUDIO_PATCH:
+        case TransactionCode::LIST_AUDIO_PATCHES:
+        case TransactionCode::SET_AUDIO_PORT_CONFIG:
+        case TransactionCode::SET_RECORD_SILENCED:
             ALOGW("%s: transaction %d received from PID %d",
                   __func__, code, IPCThreadState::self()->getCallingPid());
             // return status only for non void methods
             switch (code) {
-                case SET_RECORD_SILENCED:
-                case SET_EFFECT_SUSPENDED:
+                case TransactionCode::SET_RECORD_SILENCED:
+                case TransactionCode::SET_EFFECT_SUSPENDED:
                     break;
                 default:
-                    reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
-                    break;
+                    return INVALID_OPERATION;
             }
             return OK;
         default:
@@ -4086,24 +4090,23 @@ status_t AudioFlinger::onTransact(
 
     // make sure the following transactions come from system components
     switch (code) {
-        case SET_MASTER_VOLUME:
-        case SET_MASTER_MUTE:
-        case SET_MODE:
-        case SET_MIC_MUTE:
-        case SET_LOW_RAM_DEVICE:
-        case SYSTEM_READY:
-        case SET_AUDIO_HAL_PIDS: {
+        case TransactionCode::SET_MASTER_VOLUME:
+        case TransactionCode::SET_MASTER_MUTE:
+        case TransactionCode::SET_MODE:
+        case TransactionCode::SET_MIC_MUTE:
+        case TransactionCode::SET_LOW_RAM_DEVICE:
+        case TransactionCode::SYSTEM_READY:
+        case TransactionCode::SET_AUDIO_HAL_PIDS: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
                       IPCThreadState::self()->getCallingUid());
                 // return status only for non void methods
                 switch (code) {
-                    case SYSTEM_READY:
+                    case TransactionCode::SYSTEM_READY:
                         break;
                     default:
-                        reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
-                        break;
+                        return INVALID_OPERATION;
                 }
                 return OK;
             }
@@ -4117,14 +4120,14 @@ status_t AudioFlinger::onTransact(
     // most relevant events.
     // TODO should select more wisely the items from the list
     switch (code) {
-        case CREATE_TRACK:
-        case CREATE_RECORD:
-        case SET_MASTER_VOLUME:
-        case SET_MASTER_MUTE:
-        case SET_MIC_MUTE:
-        case SET_PARAMETERS:
-        case CREATE_EFFECT:
-        case SYSTEM_READY: {
+        case TransactionCode::CREATE_TRACK:
+        case TransactionCode::CREATE_RECORD:
+        case TransactionCode::SET_MASTER_VOLUME:
+        case TransactionCode::SET_MASTER_MUTE:
+        case TransactionCode::SET_MIC_MUTE:
+        case TransactionCode::SET_PARAMETERS:
+        case TransactionCode::CREATE_EFFECT:
+        case TransactionCode::SYSTEM_READY: {
             requestLogMerge();
             break;
         }
@@ -4132,7 +4135,8 @@ status_t AudioFlinger::onTransact(
             break;
     }
 
-    std::string tag("IAudioFlinger command " + std::to_string(code));
+    std::string tag("IAudioFlinger command " +
+                    std::to_string(static_cast<std::underlying_type_t<TransactionCode>>(code)));
     TimeCheck check(tag.c_str());
 
     // Make sure we connect to Audio Policy Service before calling into AudioFlinger:
@@ -4145,7 +4149,7 @@ status_t AudioFlinger::onTransact(
         AudioSystem::get_audio_policy_service();
     }
 
-    return BnAudioFlinger::onTransact(code, data, reply, flags);
+    return OK;
 }
 
 } // namespace android
