@@ -331,11 +331,11 @@ public:
     static status_t listAudioPorts(audio_port_role_t role,
                                    audio_port_type_t type,
                                    unsigned int *num_ports,
-                                   struct audio_port *ports,
+                                   struct audio_port_v7 *ports,
                                    unsigned int *generation);
 
     /* Get attributes for a given audio port */
-    static status_t getAudioPort(struct audio_port *port);
+    static status_t getAudioPort(struct audio_port_v7 *port);
 
     /* Create an audio patch between several source and sink ports */
     static status_t createAudioPatch(const struct audio_patch *patch,

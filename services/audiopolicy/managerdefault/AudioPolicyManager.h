@@ -233,9 +233,9 @@ public:
         virtual status_t listAudioPorts(audio_port_role_t role,
                                         audio_port_type_t type,
                                         unsigned int *num_ports,
-                                        struct audio_port *ports,
+                                        struct audio_port_v7 *ports,
                                         unsigned int *generation);
-        virtual status_t getAudioPort(struct audio_port *port);
+        virtual status_t getAudioPort(struct audio_port_v7 *port);
         virtual status_t createAudioPatch(const struct audio_patch *patch,
                                            audio_patch_handle_t *handle,
                                            uid_t uid) {

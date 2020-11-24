@@ -215,7 +215,7 @@ void AudioOutputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfi
     dstConfig->ext.mix.usecase.stream = AUDIO_STREAM_DEFAULT;
 }
 
-void AudioOutputDescriptor::toAudioPort(struct audio_port *port) const
+void AudioOutputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     // Should not be called for duplicated ports, see SwAudioOutputDescriptor::toAudioPortConfig.
     mPolicyAudioPort->asAudioPort()->toAudioPort(port);
@@ -406,8 +406,7 @@ void SwAudioOutputDescriptor::toAudioPortConfig(
     dstConfig->ext.mix.handle = mIoHandle;
 }
 
-void SwAudioOutputDescriptor::toAudioPort(
-                                                    struct audio_port *port) const
+void SwAudioOutputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     ALOG_ASSERT(!isDuplicated(), "toAudioPort() called on duplicated output %d", mIoHandle);
 
@@ -654,8 +653,7 @@ void HwAudioOutputDescriptor::toAudioPortConfig(
     mSource->srcDevice()->toAudioPortConfig(dstConfig, srcConfig);
 }
 
-void HwAudioOutputDescriptor::toAudioPort(
-                                                    struct audio_port *port) const
+void HwAudioOutputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     mSource->srcDevice()->toAudioPort(port);
 }

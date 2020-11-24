@@ -547,7 +547,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
 }
 
 std::string AudioPolicyService::getDeviceTypeStrForPortId(audio_port_handle_t portId) {
-    struct audio_port port = {};
+    struct audio_port_v7 port = {};
     port.id = portId;
     status_t status = mAudioPolicyManager->getAudioPort(&port);
     if (status == NO_ERROR && port.type == AUDIO_PORT_TYPE_DEVICE) {
@@ -1117,7 +1117,7 @@ bool AudioPolicyService::isDirectOutputSupported(const audio_config_base_t& conf
 status_t AudioPolicyService::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
                                             unsigned int *num_ports,
-                                            struct audio_port *ports,
+                                            struct audio_port_v7 *ports,
                                             unsigned int *generation)
 {
     Mutex::Autolock _l(mLock);
@@ -1128,7 +1128,7 @@ status_t AudioPolicyService::listAudioPorts(audio_port_role_t role,
     return mAudioPolicyManager->listAudioPorts(role, type, num_ports, ports, generation);
 }
 
-status_t AudioPolicyService::getAudioPort(struct audio_port *port)
+status_t AudioPolicyService::getAudioPort(struct audio_port_v7 *port)
 {
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {

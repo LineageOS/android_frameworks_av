@@ -3490,15 +3490,15 @@ bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& conf
 status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
                                             unsigned int *num_ports,
-                                            struct audio_port *ports,
+                                            struct audio_port_v7 *ports,
                                             unsigned int *generation)
 {
-    if (num_ports == NULL || (*num_ports != 0 && ports == NULL) ||
-            generation == NULL) {
+    if (num_ports == nullptr || (*num_ports != 0 && ports == nullptr) ||
+            generation == nullptr) {
         return BAD_VALUE;
     }
     ALOGV("listAudioPorts() role %d type %d num_ports %d ports %p", role, type, *num_ports, ports);
-    if (ports == NULL) {
+    if (ports == nullptr) {
         *num_ports = 0;
     }
 
@@ -3556,7 +3556,7 @@ status_t AudioPolicyManager::listAudioPorts(audio_port_role_t role,
     return NO_ERROR;
 }
 
-status_t AudioPolicyManager::getAudioPort(struct audio_port *port)
+status_t AudioPolicyManager::getAudioPort(struct audio_port_v7 *port)
 {
     if (port == nullptr || port->id == AUDIO_PORT_HANDLE_NONE) {
         return BAD_VALUE;
