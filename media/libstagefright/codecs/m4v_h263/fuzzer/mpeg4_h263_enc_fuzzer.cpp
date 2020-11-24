@@ -148,8 +148,8 @@ void Codec::encodeFrames(const uint8_t *data, size_t size) {
     while (size > 0) {
         size_t bytesConsumed = std::min(size, inputBufferSize);
         memcpy(inputBuffer, data, bytesConsumed);
-        if (bytesConsumed < sizeof(inputBuffer)) {
-            memset(inputBuffer + bytesConsumed, data[0], sizeof(inputBuffer) - bytesConsumed);
+        if (bytesConsumed < inputBufferSize) {
+            memset(inputBuffer + bytesConsumed, data[0], inputBufferSize - bytesConsumed);
         }
         VideoEncFrameIO videoIn{}, videoOut{};
         videoIn.height = mFrameHeight;
