@@ -54,6 +54,24 @@ OmxStore::OmxStore(
         });
     }
 
+    if (!nodes.empty()) {
+        auto anyNode = nodes.cbegin();
+        std::string::const_iterator first = anyNode->cbegin();
+        std::string::const_iterator last = anyNode->cend();
+        for (const std::string &name : nodes) {
+            std::string::const_iterator it1 = first;
+            for (std::string::const_iterator it2 = name.cbegin();
+                    it1 != last && it2 != name.cend() && tolower(*it1) == tolower(*it2);
+                    ++it1, ++it2) {
+            }
+            last = it1;
+        }
+        mPrefix = std::string(first, last);
+        LOG(INFO) << "omx common prefix: '" << mPrefix.c_str() << "'";
+    } else {
+        LOG(INFO) << "omx common prefix: no nodes";
+    }
+
     MediaCodecsXmlParser parser;
     parser.parseXmlFilesInSearchDirs(xmlNames, searchDirs);
     if (profilingResultsXmlPath != nullptr) {
@@ -112,8 +130,6 @@ OmxStore::OmxStore(
         mRoleList[i] = std::move(role);
         ++i;
     }
-
-    mPrefix = parser.getCommonPrefix();
 }
 
 OmxStore::~OmxStore() {
