@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">SampleVideoEncoder</string>
+    <string name="media_recorder">MediaRecorder</string>
+    <string name="media_codec">MediaCodec</string>
+    <string name="start_button">Start</string>
+    <string name="stop">Stop</string>
+    <string name="start">Start</string>
+    <string name="avc">AVC</string>
+    <string name="hevc">HEVC</string>
+    <string name="hardware">H/W</string>
+    <string name="software">S/W</string>
+
+</resources>
