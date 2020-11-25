@@ -24,7 +24,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
-#include <media/AudioSanitizer.h>
+#include <media/AudioValidator.h>
 #include <media/IAudioPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
@@ -1651,7 +1651,7 @@ status_t BnAudioFlinger::onTransact(
                 ALOGE("b/23905951");
                 return status;
             }
-            status = AudioSanitizer::sanitizeAudioPort(&port);
+            status = AudioValidator::validateAudioPort(port);
             if (status == NO_ERROR) {
                 status = getAudioPort(&port);
             }
@@ -1674,7 +1674,7 @@ status_t BnAudioFlinger::onTransact(
                 ALOGE("b/23905951");
                 return status;
             }
-            status = AudioSanitizer::sanitizeAudioPatch(&patch);
+            status = AudioValidator::validateAudioPatch(patch);
             if (status == NO_ERROR) {
                 status = createAudioPatch(&patch, &handle);
             }
@@ -1726,7 +1726,7 @@ status_t BnAudioFlinger::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
-            status = AudioSanitizer::sanitizeAudioPortConfig(&config);
+            status = AudioValidator::validateAudioPortConfig(config);
             if (status == NO_ERROR) {
                 status = setAudioPortConfig(&config);
             }

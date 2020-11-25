@@ -26,7 +26,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <media/AudioEffect.h>
-#include <media/AudioSanitizer.h>
+#include <media/AudioValidator.h>
 #include <media/IAudioPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
@@ -529,7 +529,11 @@ public:
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.write(desc, sizeof(effect_descriptor_t));
-        remote()->transact(GET_OUTPUT_FOR_EFFECT, data, &reply);
+        status_t status = remote()->transact(GET_OUTPUT_FOR_EFFECT, data, &reply);
+        if (status != NO_ERROR ||
+                (status = (status_t)reply.readInt32()) != NO_ERROR) {
+            return AUDIO_IO_HANDLE_NONE;
+        }
         return static_cast <audio_io_handle_t> (reply.readInt32());
     }
 
@@ -1779,13 +1783,15 @@ status_t BnAudioPolicyService::onTransact(
             audio_io_handle_t output = 0;
             std::vector<audio_io_handle_t> secondaryOutputs;
 
-            status = AudioSanitizer::sanitizeAudioAttributes(&attr, "68953950");
-            if (status == NO_ERROR) {
-                status = getOutputForAttr(&attr,
-                                          &output, session, &stream, pid, uid,
-                                          &config,
-                                          flags, &selectedDeviceId, &portId, &secondaryOutputs);
+            status = AudioValidator::validateAudioAttributes(attr, "68953950");
+            if (status != NO_ERROR) {
+                reply->writeInt32(status);
+                return NO_ERROR;
             }
+            status = getOutputForAttr(&attr,
+                                      &output, session, &stream, pid, uid,
+                                      &config,
+                                      flags, &selectedDeviceId, &portId, &secondaryOutputs);
             reply->writeInt32(status);
             status = reply->write(&attr, sizeof(audio_attributes_t));
             if (status != NO_ERROR) {
@@ -1842,7 +1848,7 @@ status_t BnAudioPolicyService::onTransact(
             audio_port_handle_t selectedDeviceId = (audio_port_handle_t) data.readInt32();
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
 
-            status = AudioSanitizer::sanitizeAudioAttributes(&attr, "68953950");
+            status = AudioValidator::validateAudioAttributes(attr, "68953950");
             if (status == NO_ERROR) {
                 status = getInputForAttr(&attr, &input, riid, session, pid, uid,
                                          opPackageName, &config,
@@ -1932,7 +1938,7 @@ status_t BnAudioPolicyService::onTransact(
             int index = data.readInt32();
             audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
 
-            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            status = AudioValidator::validateAudioAttributes(attributes, "169572641");
             if (status == NO_ERROR) {
                 status = setVolumeIndexForAttributes(attributes, index, device);
             }
@@ -1950,7 +1956,7 @@ status_t BnAudioPolicyService::onTransact(
             audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
 
             int index = 0;
-            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            status = AudioValidator::validateAudioAttributes(attributes, "169572641");
             if (status == NO_ERROR) {
                 status = getVolumeIndexForAttributes(attributes, index, device);
             }
@@ -1970,7 +1976,7 @@ status_t BnAudioPolicyService::onTransact(
             }
 
             int index = 0;
-            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            status = AudioValidator::validateAudioAttributes(attributes, "169572641");
             if (status == NO_ERROR) {
                 status = getMinVolumeIndexForAttributes(attributes, index);
             }
@@ -1990,7 +1996,7 @@ status_t BnAudioPolicyService::onTransact(
             }
 
             int index = 0;
-            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            status = AudioValidator::validateAudioAttributes(attributes, "169572641");
             if (status == NO_ERROR) {
                 status = getMaxVolumeIndexForAttributes(attributes, index);
             }
@@ -2017,12 +2023,12 @@ status_t BnAudioPolicyService::onTransact(
                 android_errorWriteLog(0x534e4554, "73126106");
                 return status;
             }
-            audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status = AudioSanitizer::sanitizeEffectDescriptor(&desc, "73126106");
+            status = AudioValidator::validateEffectDescriptor(desc, "73126106");
+            reply->writeInt32(status);
             if (status == NO_ERROR) {
-                output = getOutputForEffect(&desc);
+                audio_io_handle_t output = getOutputForEffect(&desc);
+                reply->writeInt32(static_cast <int32_t>(output));
             }
-            reply->writeInt32(static_cast <int32_t>(output));
             return NO_ERROR;
         } break;
 
@@ -2038,7 +2044,7 @@ status_t BnAudioPolicyService::onTransact(
             uint32_t strategy = data.readInt32();
             audio_session_t session = (audio_session_t) data.readInt32();
             int id = data.readInt32();
-            status = AudioSanitizer::sanitizeEffectDescriptor(&desc, "73126106");
+            status = AudioValidator::validateEffectDescriptor(desc, "73126106");
             if (status == NO_ERROR) {
                 status = registerEffect(&desc, io, strategy, session, id);
             }
@@ -2151,7 +2157,7 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) return status;
             status = data.read(&attributes, sizeof(audio_attributes_t));
             if (status != NO_ERROR) return status;
-            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            status = AudioValidator::validateAudioAttributes(attributes, "169572641");
             if (status == NO_ERROR) {
                 status = isDirectOutputSupported(config, attributes);
             }
@@ -2199,7 +2205,7 @@ status_t BnAudioPolicyService::onTransact(
                 ALOGE("b/23912202");
                 return status;
             }
-            status = AudioSanitizer::sanitizeAudioPort(&port);
+            status = AudioValidator::validateAudioPort(port);
             if (status == NO_ERROR) {
                 status = getAudioPort(&port);
             }
@@ -2223,7 +2229,7 @@ status_t BnAudioPolicyService::onTransact(
                 ALOGE("b/23912202");
                 return status;
             }
-            status = AudioSanitizer::sanitizeAudioPatch(&patch);
+            status = AudioValidator::validateAudioPatch(patch);
             if (status == NO_ERROR) {
                 status = createAudioPatch(&patch, &handle);
             }
@@ -2280,8 +2286,10 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
-            (void)AudioSanitizer::sanitizeAudioPortConfig(&config);
-            status = setAudioPortConfig(&config);
+            status = AudioValidator::validateAudioPortConfig(config);
+            if (status == NO_ERROR) {
+                status = setAudioPortConfig(&config);
+            }
             reply->writeInt32(status);
             return NO_ERROR;
         }
@@ -2366,11 +2374,11 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
-            status = AudioSanitizer::sanitizeAudioPortConfig(&source);
+            status = AudioValidator::validateAudioPortConfig(source);
             if (status == NO_ERROR) {
                 // OK to not always sanitize attributes as startAudioSource() is not called if
                 // the port config is invalid.
-                status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "68953950");
+                status = AudioValidator::validateAudioAttributes(attributes, "68953950");
             }
             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
             if (status == NO_ERROR) {
