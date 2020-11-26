@@ -319,9 +319,10 @@ public:
 
     static status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags);
 
-    // Check if hw offload is possible for given format, stream type, sample rate,
-    // bit rate, duration, video and streaming or offload property is enabled
-    static bool isOffloadSupported(const audio_offload_info_t& info);
+    // Indicate if hw offload is possible for given format, stream type, sample rate,
+    // bit rate, duration, video and streaming or offload property is enabled and when possible
+    // if gapless transitions are supported.
+    static audio_offload_mode_t getOffloadSupport(const audio_offload_info_t& info);
 
     // check presence of audio flinger service.
     // returns NO_ERROR if binding to service succeeds, DEAD_OBJECT otherwise

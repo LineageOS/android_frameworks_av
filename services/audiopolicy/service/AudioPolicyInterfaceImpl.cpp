@@ -1086,15 +1086,15 @@ status_t AudioPolicyService::setAllowedCapturePolicy(uid_t uid, audio_flags_mask
     return mAudioPolicyManager->setAllowedCapturePolicy(uid, capturePolicy);
 }
 
-bool AudioPolicyService::isOffloadSupported(const audio_offload_info_t& info)
+audio_offload_mode_t AudioPolicyService::getOffloadSupport(const audio_offload_info_t& info)
 {
     if (mAudioPolicyManager == NULL) {
         ALOGV("mAudioPolicyManager == NULL");
-        return false;
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
-    return mAudioPolicyManager->isOffloadSupported(info);
+    return mAudioPolicyManager->getOffloadSupport(info);
 }
 
 bool AudioPolicyService::isDirectOutputSupported(const audio_config_base_t& config,

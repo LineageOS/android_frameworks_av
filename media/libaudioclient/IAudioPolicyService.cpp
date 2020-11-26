@@ -69,7 +69,7 @@ enum {
     QUERY_DEFAULT_PRE_PROCESSING,
     SET_EFFECT_ENABLED,
     IS_STREAM_ACTIVE_REMOTELY,
-    IS_OFFLOAD_SUPPORTED,
+    GET_OFFLOAD_MODE_SUPPORTED,
     IS_DIRECT_OUTPUT_SUPPORTED,
     LIST_AUDIO_PORTS,
     GET_AUDIO_PORT,
@@ -666,13 +666,13 @@ public:
         return reply.readInt32();
     }
 
-    virtual bool isOffloadSupported(const audio_offload_info_t& info)
+    virtual audio_offload_mode_t getOffloadSupport(const audio_offload_info_t& info)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.write(&info, sizeof(audio_offload_info_t));
-        remote()->transact(IS_OFFLOAD_SUPPORTED, data, &reply);
-        return reply.readInt32();
+        remote()->transact(GET_OFFLOAD_MODE_SUPPORTED, data, &reply);
+        return static_cast<audio_offload_mode_t>(reply.readInt32());
     }
 
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
@@ -2140,12 +2140,11 @@ status_t BnAudioPolicyService::onTransact(
             return status;
         }
 
-        case IS_OFFLOAD_SUPPORTED: {
+        case GET_OFFLOAD_MODE_SUPPORTED: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_offload_info_t info = {};
             data.read(&info, sizeof(audio_offload_info_t));
-            bool isSupported = isOffloadSupported(info);
-            reply->writeInt32(isSupported);
+            reply->writeInt32(static_cast<int32_t>(getOffloadSupport(info)));
             return NO_ERROR;
         }
 

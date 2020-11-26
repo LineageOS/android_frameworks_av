@@ -3389,38 +3389,38 @@ status_t AudioPolicyManager::setAllowedCapturePolicy(uid_t uid, audio_flags_mask
 // This function checks for the parameters which can be offloaded.
 // This can be enhanced depending on the capability of the DSP and policy
 // of the system.
-bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadInfo)
+audio_offload_mode_t AudioPolicyManager::getOffloadSupport(const audio_offload_info_t& offloadInfo)
 {
-    ALOGV("isOffloadSupported: SR=%u, CM=0x%x, Format=0x%x, StreamType=%d,"
+    ALOGV("%s: SR=%u, CM=0x%x, Format=0x%x, StreamType=%d,"
      " BitRate=%u, duration=%" PRId64 " us, has_video=%d",
-     offloadInfo.sample_rate, offloadInfo.channel_mask,
+     __func__, offloadInfo.sample_rate, offloadInfo.channel_mask,
      offloadInfo.format,
      offloadInfo.stream_type, offloadInfo.bit_rate, offloadInfo.duration_us,
      offloadInfo.has_video);
 
     if (mMasterMono) {
-        return false; // no offloading if mono is set.
+        return AUDIO_OFFLOAD_NOT_SUPPORTED; // no offloading if mono is set.
     }
 
     // Check if offload has been disabled
     if (property_get_bool("audio.offload.disable", false /* default_value */)) {
-        ALOGV("offload disabled by audio.offload.disable");
-        return false;
+        ALOGV("%s: offload disabled by audio.offload.disable", __func__);
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
 
     // Check if stream type is music, then only allow offload as of now.
     if (offloadInfo.stream_type != AUDIO_STREAM_MUSIC)
     {
-        ALOGV("isOffloadSupported: stream_type != MUSIC, returning false");
-        return false;
+        ALOGV("%s: stream_type != MUSIC, returning false", __func__);
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
 
     //TODO: enable audio offloading with video when ready
     const bool allowOffloadWithVideo =
             property_get_bool("audio.offload.video", false /* default_value */);
     if (offloadInfo.has_video && !allowOffloadWithVideo) {
-        ALOGV("isOffloadSupported: has_video == true, returning false");
-        return false;
+        ALOGV("%s: has_video == true, returning false", __func__);
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
 
     //If duration is less than minimum value defined in property, return false
@@ -3428,13 +3428,14 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
             "audio.offload.min.duration.secs", -1 /* default_value */);
     if (min_duration_secs >= 0) {
         if (offloadInfo.duration_us < min_duration_secs * 1000000LL) {
-            ALOGV("Offload denied by duration < audio.offload.min.duration.secs(=%d)",
-                    min_duration_secs);
-            return false;
+            ALOGV("%s: Offload denied by duration < audio.offload.min.duration.secs(=%d)",
+                    __func__, min_duration_secs);
+            return AUDIO_OFFLOAD_NOT_SUPPORTED;
         }
     } else if (offloadInfo.duration_us < OFFLOAD_DEFAULT_MIN_DURATION_SECS * 1000000) {
-        ALOGV("Offload denied by duration < default min(=%u)", OFFLOAD_DEFAULT_MIN_DURATION_SECS);
-        return false;
+        ALOGV("%s: Offload denied by duration < default min(=%u)",
+                __func__, OFFLOAD_DEFAULT_MIN_DURATION_SECS);
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
 
     // Do not allow offloading if one non offloadable effect is enabled. This prevents from
@@ -3444,7 +3445,7 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
     // This may prevent offloading in rare situations where effects are left active by apps
     // in the background.
     if (mEffects.isNonOffloadableEffectEnabled()) {
-        return false;
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
 
     // See if there is a profile to support this.
@@ -3455,8 +3456,14 @@ bool AudioPolicyManager::isOffloadSupported(const audio_offload_info_t& offloadI
                                             offloadInfo.channel_mask,
                                             AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
                                             true /* directOnly */);
-    ALOGV("isOffloadSupported() profile %sfound", profile != 0 ? "" : "NOT ");
-    return (profile != 0);
+    ALOGV("%s: profile %sfound", __func__, profile != 0 ? "" : "NOT ");
+    if (profile == nullptr) {
+        return AUDIO_OFFLOAD_NOT_SUPPORTED;
+    }
+    if ((profile->getFlags() & AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD) != 0) {
+        return AUDIO_OFFLOAD_GAPLESS_SUPPORTED;
+    }
+    return AUDIO_OFFLOAD_SUPPORTED;
 }
 
 bool AudioPolicyManager::isDirectOutputSupported(const audio_config_base_t& config,

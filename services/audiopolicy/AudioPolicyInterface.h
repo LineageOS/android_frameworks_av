@@ -220,7 +220,7 @@ public:
     virtual status_t    dump(int fd) = 0;
 
     virtual status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) = 0;
-    virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo) = 0;
+    virtual audio_offload_mode_t getOffloadSupport(const audio_offload_info_t& offloadInfo) = 0;
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes) = 0;
 
