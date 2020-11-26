@@ -775,7 +775,7 @@ int  AecInit (preproc_effect_t *effect)
 #else
     effect->session->config =
         effect->session->apm->GetConfig() ;
-    effect->session->config.echo_canceller.mobile_mode = false;
+    effect->session->config.echo_canceller.mobile_mode = true;
     effect->session->apm->ApplyConfig(effect->session->config);
 #endif
     return 0;
