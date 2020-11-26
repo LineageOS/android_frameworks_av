@@ -182,6 +182,7 @@ public:
      * Active ref count of the client will be incremented/decremented through setActive API
      */
     virtual void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
+    bool isClientActive(const sp<TrackClientDescriptor>& client);
 
     bool isActive(uint32_t inPastMs) const;
     bool isActive(VolumeSource volumeSource = VOLUME_SOURCE_NONE,
