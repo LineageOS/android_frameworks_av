@@ -920,8 +920,9 @@ typedef aaudio_data_callback_result_t (*AAudioStream_dataCallback)(
  * It will stop being called after AAudioStream_requestPause() or
  * AAudioStream_requestStop() is called.
  *
- * This callback function will be called on a real-time thread owned by AAudio. See
- * {@link #AAudioStream_dataCallback} for more information.
+ * This callback function will be called on a real-time thread owned by AAudio.
+ * The low latency streams may have callback threads with higher priority than normal streams.
+ * See {@link #AAudioStream_dataCallback} for more information.
  *
  * Note that the AAudio callbacks will never be called simultaneously from multiple threads.
  *
