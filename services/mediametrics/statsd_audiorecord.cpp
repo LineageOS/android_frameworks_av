@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/base/core/proto/android/stats/mediametrics/mediametrics.pb.h"
+#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
