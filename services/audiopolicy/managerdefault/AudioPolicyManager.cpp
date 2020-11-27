@@ -3304,6 +3304,11 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
 
 void AudioPolicyManager::updateInputRouting() {
     for (const auto& activeDesc : mInputs.getActiveInputs()) {
+        // Skip for hotword recording as the input device switch
+        // is handled within sound trigger HAL
+        if (activeDesc->isSoundTrigger() && activeDesc->source() == AUDIO_SOURCE_HOTWORD) {
+            continue;
+        }
         auto newDevice = getNewInputDevice(activeDesc);
         // Force new input selection if the new device can not be reached via current input
         if (activeDesc->mProfile->getSupportedDevices().contains(newDevice)) {
