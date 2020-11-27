@@ -1,6 +1,6 @@
 cc_defaults {
     name: "libstagefright_bufferqueue-defaults",
-    defaults: ["qcom_bsp_legacy_defaults"],
+    defaults: ["stagefright_qcom_legacy_defaults"],
     double_loadable: true,
 
     srcs: [
