@@ -20,7 +20,7 @@ cc_library {
     double_loadable: true,
     srcs: [
         "AudioParameter.cpp",
-        "AudioSanitizer.cpp",
+        "AudioValidator.cpp",
         "TypeConverter.cpp",
     ],
     cflags: [
