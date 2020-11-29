@@ -1,0 +1,75 @@
+cc_library_static {
+    name: "libstagefright_m4vh263enc",
+    vendor_available: true,
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+    host_supported: true,
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+
+    srcs: [
+        "src/bitstream_io.cpp",
+        "src/combined_encode.cpp", "src/datapart_encode.cpp",
+        "src/dct.cpp",
+        "src/findhalfpel.cpp",
+        "src/fastcodemb.cpp",
+        "src/fastidct.cpp",
+        "src/fastquant.cpp",
+        "src/me_utils.cpp",
+        "src/mp4enc_api.cpp",
+        "src/rate_control.cpp",
+        "src/motion_est.cpp",
+        "src/motion_comp.cpp",
+        "src/sad.cpp",
+        "src/sad_halfpel.cpp",
+        "src/vlc_encode.cpp",
+        "src/vop.cpp",
+    ],
+
+    cflags: [
+        "-DBX_RC",
+        "-Werror",
+    ],
+
+    local_include_dirs: ["src"],
+    export_include_dirs: ["include"],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
+
+//###############################################################################
+
+cc_test {
+    name: "libstagefright_m4vh263enc_test",
+    gtest: false,
+
+    srcs: ["test/m4v_h263_enc_test.cpp"],
+
+    local_include_dirs: ["src"],
+
+    cflags: [
+        "-DBX_RC",
+        "-Wall",
+        "-Werror",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+
+    static_libs: ["libstagefright_m4vh263enc"],
+}
