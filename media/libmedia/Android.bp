@@ -5,12 +5,14 @@ cc_library_headers {
 
     export_include_dirs: ["include"],
     header_libs: [
+        "av-headers",
         "libbase_headers",
         "libgui_headers",
         "libstagefright_headers",
         "media_plugin_headers",
     ],
     export_header_lib_headers: [
+        "av-headers",
         "libgui_headers",
         "libstagefright_headers",
         "media_plugin_headers",

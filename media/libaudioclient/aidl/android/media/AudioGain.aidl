@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,4 +16,21 @@
 
 package android.media;
 
-parcelable MicrophoneInfo cpp_header "media/MicrophoneInfo.h";
+/**
+ * {@hide}
+ */
+parcelable AudioGain {
+    int index;
+    boolean useInChannelMask;
+    boolean useForVolume;
+    /** Bitmask, indexed by AudioGainMode. */
+    int mode;
+    /** Interpreted as audio_channel_mask_t. */
+    int channelMask;
+    int minValue;
+    int maxValue;
+    int defaultValue;
+    int stepValue;
+    int minRampMs;
+    int maxRampMs;
+}

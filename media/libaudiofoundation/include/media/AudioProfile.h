@@ -19,8 +19,10 @@
 #include <string>
 #include <vector>
 
+#include <android/media/AudioProfile.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
+#include <media/AidlConversion.h>
 #include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/RefBase.h>
@@ -73,6 +75,9 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    ConversionResult<media::AudioProfile> toParcelable() const;
+    static ConversionResult<sp<AudioProfile>> fromParcelable(const media::AudioProfile& parcelable);
+
 private:
     std::string  mName;
     audio_format_t mFormat; // The format for an audio profile should only be set when initialized.
@@ -82,7 +87,16 @@ private:
     bool mIsDynamicFormat = false;
     bool mIsDynamicChannels = false;
     bool mIsDynamicRate = false;
+
+    AudioProfile() = default;
+    AudioProfile& operator=(const AudioProfile& other);
 };
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<sp<AudioProfile>>
+aidl2legacy_AudioProfile(const media::AudioProfile& aidl);
+ConversionResult<media::AudioProfile>
+legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy);
 
 class AudioProfileVector : public std::vector<sp<AudioProfile>>, public Parcelable
 {
@@ -116,5 +130,12 @@ public:
 };
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<AudioProfileVector>
+aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl);
+ConversionResult<std::vector<media::AudioProfile>>
+legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy);
+
 
 } // namespace android

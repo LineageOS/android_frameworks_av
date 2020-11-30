@@ -22,15 +22,6 @@
 // Define AUDIO_ARRAYS_STATIC_CHECK to check all audio arrays are correct
 #define AUDIO_ARRAYS_STATIC_CHECK 1
 
-#define VALUE_OR_FATAL(result)                   \
-    ({                                           \
-       auto _tmp = (result);                     \
-       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
-                           "Failed result (%d)", \
-                           _tmp.error());        \
-       std::move(_tmp.value());                  \
-     })
-
 #include "Configuration.h"
 #include <dirent.h>
 #include <math.h>
@@ -90,6 +81,15 @@
 #include <BufLog.h>
 
 #include "TypedLogger.h"
+
+#define VALUE_OR_FATAL(result)                   \
+    ({                                           \
+       auto _tmp = (result);                     \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
+                           "Failed result (%d)", \
+                           _tmp.error());        \
+       std::move(_tmp.value());                  \
+     })
 
 // ----------------------------------------------------------------------------
 
@@ -757,25 +757,11 @@ void AudioFlinger::unregisterWriter(const sp<NBLog::Writer>& writer)
 
 // IAudioFlinger interface
 
-sp<IAudioTrack> AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
-                                          media::CreateTrackResponse& _output,
-                                          status_t* status)
+status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
+                                   media::CreateTrackResponse& _output)
 {
     // Local version of VALUE_OR_RETURN, specific to this method's calling conventions.
-#define VALUE_OR_EXIT(expr)         \
-    ({                              \
-        auto _tmp = (expr);         \
-        if (!_tmp.ok()) {           \
-            *status = _tmp.error(); \
-            return nullptr;         \
-        }                           \
-        std::move(_tmp.value());    \
-    })
-
-    CreateTrackInput input = VALUE_OR_EXIT(CreateTrackInput::fromAidl(_input));
-
-#undef VALUE_OR_EXIT
-
+    CreateTrackInput input = VALUE_OR_RETURN_STATUS(CreateTrackInput::fromAidl(_input));
     CreateTrackOutput output;
 
     sp<PlaybackThread::Track> track;
@@ -1034,17 +1020,14 @@ sp<IAudioTrack> AudioFlinger::createTrack(const media::CreateTrackRequest& _inpu
         AudioSystem::moveEffectsToIo(effectIds, effectThreadId);
     }
 
+    output.audioTrack = new TrackHandle(track);
     _output = VALUE_OR_FATAL(output.toAidl());
-
-    // return handle to client
-    trackHandle = new TrackHandle(track);
 
 Exit:
     if (lStatus != NO_ERROR && output.outputId != AUDIO_IO_HANDLE_NONE) {
         AudioSystem::releaseOutput(portId);
     }
-    *status = lStatus;
-    return trackHandle;
+    return lStatus;
 }
 
 uint32_t AudioFlinger::sampleRate(audio_io_handle_t ioHandle) const
@@ -2018,24 +2001,10 @@ void AudioFlinger::requestLogMerge() {
 
 // ----------------------------------------------------------------------------
 
-sp<media::IAudioRecord> AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
-                                                   media::CreateRecordResponse& _output,
-                                                   status_t* status)
+status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
+                                    media::CreateRecordResponse& _output)
 {
-    // Local version of VALUE_OR_RETURN, specific to this method's calling conventions.
-#define VALUE_OR_EXIT(expr)         \
-    ({                              \
-        auto _tmp = (expr);         \
-        if (!_tmp.ok()) {           \
-            *status = _tmp.error(); \
-            return nullptr;         \
-        }                           \
-        std::move(_tmp.value());    \
-    })
-
-    CreateRecordInput input = VALUE_OR_EXIT(CreateRecordInput::fromAidl(_input));
-
-#undef VALUE_OR_EXIT
+    CreateRecordInput input = VALUE_OR_RETURN_STATUS(CreateRecordInput::fromAidl(_input));
     CreateRecordOutput output;
 
     sp<RecordThread::RecordTrack> recordTrack;
@@ -2175,10 +2144,8 @@ sp<media::IAudioRecord> AudioFlinger::createRecord(const media::CreateRecordRequ
     output.buffers = recordTrack->getBuffers();
     output.portId = portId;
 
+    output.audioRecord = new RecordHandle(recordTrack);
     _output = VALUE_OR_FATAL(output.toAidl());
-
-    // return handle to client
-    recordHandle = new RecordHandle(recordTrack);
 
 Exit:
     if (lStatus != NO_ERROR) {
@@ -2196,8 +2163,7 @@ Exit:
         }
     }
 
-    *status = lStatus;
-    return recordHandle;
+    return lStatus;
 }
 
 
@@ -2602,20 +2568,28 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
     return 0;
 }
 
-status_t AudioFlinger::openOutput(audio_module_handle_t module,
-                                  audio_io_handle_t *output,
-                                  audio_config_t *config,
-                                  const sp<DeviceDescriptorBase>& device,
-                                  uint32_t *latencyMs,
-                                  audio_output_flags_t flags)
+status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response)
 {
+    audio_module_handle_t module = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_module_handle_t(request.module));
+    audio_config_t config = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioConfig_audio_config_t(request.config));
+    sp<DeviceDescriptorBase> device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_DeviceDescriptorBase(request.device));
+    audio_output_flags_t flags = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_audio_output_flags_mask(request.flags));
+
+    audio_io_handle_t output;
+    uint32_t latencyMs;
+
     ALOGI("openOutput() this %p, module %d Device %s, SamplingRate %d, Format %#08x, "
               "Channels %#x, flags %#x",
               this, module,
               device->toString().c_str(),
-              config->sample_rate,
-              config->format,
-              config->channel_mask,
+              config.sample_rate,
+              config.format,
+              config.channel_mask,
               flags);
 
     audio_devices_t deviceType = device->type();
@@ -2627,11 +2601,11 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
 
     Mutex::Autolock _l(mLock);
 
-    sp<ThreadBase> thread = openOutput_l(module, output, config, deviceType, address, flags);
+    sp<ThreadBase> thread = openOutput_l(module, &output, &config, deviceType, address, flags);
     if (thread != 0) {
         if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == 0) {
             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
-            *latencyMs = playbackThread->latency();
+            latencyMs = playbackThread->latency();
 
             // notify client processes of the new output creation
             playbackThread->ioConfigChanged(AUDIO_OUTPUT_OPENED);
@@ -2651,6 +2625,10 @@ status_t AudioFlinger::openOutput(audio_module_handle_t module,
             MmapThread *mmapThread = (MmapThread *)thread.get();
             mmapThread->ioConfigChanged(AUDIO_OUTPUT_OPENED);
         }
+        response->output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
+        response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+        response->latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(latencyMs));
+        response->flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_mask(flags));
         return NO_ERROR;
     }
 
@@ -2803,22 +2781,36 @@ status_t AudioFlinger::restoreOutput(audio_io_handle_t output)
     return NO_ERROR;
 }
 
-status_t AudioFlinger::openInput(audio_module_handle_t module,
-                                          audio_io_handle_t *input,
-                                          audio_config_t *config,
-                                          audio_devices_t *devices,
-                                          const String8& address,
-                                          audio_source_t source,
-                                          audio_input_flags_t flags)
+status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
+                                 media::OpenInputResponse* response)
 {
     Mutex::Autolock _l(mLock);
 
-    if (*devices == AUDIO_DEVICE_NONE) {
+    if (request.device.type == AUDIO_DEVICE_NONE) {
         return BAD_VALUE;
     }
 
+    audio_io_handle_t input = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_io_handle_t(request.input));
+    audio_config_t config = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioConfig_audio_config_t(request.config));
+    AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceTypeAddress(request.device));
+
     sp<ThreadBase> thread = openInput_l(
-            module, input, config, *devices, address, source, flags, AUDIO_DEVICE_NONE, String8{});
+            VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_module_handle_t(request.module)),
+            &input,
+            &config,
+            device.mType,
+            device.address().c_str(),
+            VALUE_OR_RETURN_STATUS(aidl2legacy_AudioSourceType_audio_source_t(request.source)),
+            VALUE_OR_RETURN_STATUS(aidl2legacy_audio_input_flags_mask(request.flags)),
+            AUDIO_DEVICE_NONE,
+            String8{});
+
+    response->input = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(input));
+    response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+    response->device = request.device;
 
     if (thread != 0) {
         // notify client processes of the new input creation
@@ -2832,7 +2824,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
                                                          audio_io_handle_t *input,
                                                          audio_config_t *config,
                                                          audio_devices_t devices,
-                                                         const String8& address,
+                                                         const char* address,
                                                          audio_source_t source,
                                                          audio_input_flags_t flags,
                                                          audio_devices_t outputDevice,
@@ -2862,7 +2854,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
     sp<DeviceHalInterface> inHwHal = inHwDev->hwDevice();
     sp<StreamInHalInterface> inStream;
     status_t status = inHwHal->openInputStream(
-            *input, devices, &halconfig, flags, address.string(), source,
+            *input, devices, &halconfig, flags, address, source,
             outputDevice, outputDeviceAddress, &inStream);
     ALOGV("openInput_l() openInputStream returned input %p, devices %#x, SamplingRate %d"
            ", Format %#x, Channels %#x, flags %#x, status %d addr %s",
@@ -2872,7 +2864,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
             halconfig.format,
             halconfig.channel_mask,
             flags,
-            status, address.string());
+            status, address);
 
     // If the input could not be opened with the requested parameters and we can handle the
     // conversion internally, try to open again with the proposed parameters.
@@ -2886,7 +2878,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
         inStream.clear();
         status = inHwHal->openInputStream(
-                *input, devices, &halconfig, flags, address.string(), source,
+                *input, devices, &halconfig, flags, address, source,
                 outputDevice, outputDeviceAddress, &inStream);
         // FIXME log this new status; HAL should not propose any further changes
     }
@@ -3499,23 +3491,29 @@ status_t AudioFlinger::getEffectDescriptor(const effect_uuid_t *pUuid,
     return status;
 }
 
-sp<media::IEffect> AudioFlinger::createEffect(
-        effect_descriptor_t *pDesc,
-        const sp<IEffectClient>& effectClient,
-        int32_t priority,
-        audio_io_handle_t io,
-        audio_session_t sessionId,
-        const AudioDeviceTypeAddr& device,
-        const String16& opPackageName,
-        pid_t pid,
-        bool probe,
-        status_t *status,
-        int *id,
-        int *enabled)
-{
-    status_t lStatus = NO_ERROR;
+status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
+                                    media::CreateEffectResponse* response) {
+    const sp<IEffectClient>& effectClient = request.client;
+    const int32_t priority = request.priority;
+    const AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceTypeAddress(request.device));
+    const String16 opPackageName = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_string_view_String16(request.opPackageName));
+    pid_t pid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(request.pid));
+    const audio_session_t sessionId = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_session_t(request.sessionId));
+    audio_io_handle_t io = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_io_handle_t(request.output));
+    const effect_descriptor_t descIn = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_EffectDescriptor_effect_descriptor_t(request.desc));
+    const bool probe = request.probe;
+
     sp<EffectHandle> handle;
-    effect_descriptor_t desc;
+    effect_descriptor_t descOut;
+    int enabledOut = 0;
+    int idOut = -1;
+
+    status_t lStatus = NO_ERROR;
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     if (pid == -1 || !isAudioServerOrMediaServerUid(callingUid)) {
@@ -3527,12 +3525,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
     }
 
     ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
-            pid, effectClient.get(), priority, sessionId, io, mEffectsFactoryHal.get());
-
-    if (pDesc == NULL) {
-        lStatus = BAD_VALUE;
-        goto Exit;
-    }
+          pid, effectClient.get(), priority, sessionId, io, mEffectsFactoryHal.get());
 
     if (mEffectsFactoryHal == 0) {
         ALOGE("%s: no effects factory hal", __func__);
@@ -3589,7 +3582,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
         // otherwise no preference.
         uint32_t preferredType = (sessionId == AUDIO_SESSION_OUTPUT_MIX ?
                                   EFFECT_FLAG_TYPE_AUXILIARY : EFFECT_FLAG_TYPE_MASK);
-        lStatus = getEffectDescriptor(&pDesc->uuid, &pDesc->type, preferredType, &desc);
+        lStatus = getEffectDescriptor(&descIn.uuid, &descIn.type, preferredType, &descOut);
         if (lStatus < 0) {
             ALOGW("createEffect() error %d from getEffectDescriptor", lStatus);
             goto Exit;
@@ -3597,20 +3590,20 @@ sp<media::IEffect> AudioFlinger::createEffect(
 
         // Do not allow auxiliary effects on a session different from 0 (output mix)
         if (sessionId != AUDIO_SESSION_OUTPUT_MIX &&
-             (desc.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
+             (descOut.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
             lStatus = INVALID_OPERATION;
             goto Exit;
         }
 
         // check recording permission for visualizer
-        if ((memcmp(&desc.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
+        if ((memcmp(&descOut.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
             // TODO: Do we need to start/stop op - i.e. is there recording being performed?
             !recordingAllowed(opPackageName, pid, callingUid)) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
         }
 
-        const bool hapticPlaybackRequired = EffectModule::isHapticGenerator(&desc.type);
+        const bool hapticPlaybackRequired = EffectModule::isHapticGenerator(&descOut.type);
         if (hapticPlaybackRequired
                 && (sessionId == AUDIO_SESSION_DEVICE
                         || sessionId == AUDIO_SESSION_OUTPUT_MIX
@@ -3620,13 +3613,11 @@ sp<media::IEffect> AudioFlinger::createEffect(
             goto Exit;
         }
 
-        // return effect descriptor
-        *pDesc = desc;
         if (io == AUDIO_IO_HANDLE_NONE && sessionId == AUDIO_SESSION_OUTPUT_MIX) {
             // if the output returned by getOutputForEffect() is removed before we lock the
             // mutex below, the call to checkPlaybackThread_l(io) below will detect it
             // and we will exit safely
-            io = AudioSystem::getOutputForEffect(&desc);
+            io = AudioSystem::getOutputForEffect(&descOut);
             ALOGV("createEffect got output %d", io);
         }
 
@@ -3636,15 +3627,15 @@ sp<media::IEffect> AudioFlinger::createEffect(
             sp<Client> client = registerPid(pid);
             ALOGV("%s device type %#x address %s", __func__, device.mType, device.getAddress());
             handle = mDeviceEffectManager.createEffect_l(
-                    &desc, device, client, effectClient, mPatchPanel.patches_l(),
-                    enabled, &lStatus, probe);
+                    &descOut, device, client, effectClient, mPatchPanel.patches_l(),
+                    &enabledOut, &lStatus, probe);
             if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
                 // remove local strong reference to Client with mClientLock held
                 Mutex::Autolock _cl(mClientLock);
                 client.clear();
             } else {
                 // handle must be valid here, but check again to be safe.
-                if (handle.get() != nullptr && id != nullptr) *id = handle->id();
+                if (handle.get() != nullptr) idOut = handle->id();
             }
             goto Register;
         }
@@ -3674,8 +3665,8 @@ sp<media::IEffect> AudioFlinger::createEffect(
             // Detect if the effect is created after an AudioRecord is destroyed.
             if (getOrphanEffectChain_l(sessionId).get() != nullptr) {
                 ALOGE("%s: effect %s with no specified io handle is denied because the AudioRecord"
-                        " for session %d no longer exists",
-                         __func__, desc.name, sessionId);
+                      " for session %d no longer exists",
+                      __func__, descOut.name, sessionId);
                 lStatus = PERMISSION_DENIED;
                 goto Exit;
             }
@@ -3689,7 +3680,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
             if (io == AUDIO_IO_HANDLE_NONE && mPlaybackThreads.size() > 0) {
                 io = mPlaybackThreads.keyAt(0);
             }
-            ALOGV("createEffect() got io %d for effect %s", io, desc.name);
+            ALOGV("createEffect() got io %d for effect %s", io, descOut.name);
         } else if (checkPlaybackThread_l(io) != nullptr) {
             // allow only one effect chain per sessionId on mPlaybackThreads.
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
@@ -3709,7 +3700,7 @@ sp<media::IEffect> AudioFlinger::createEffect(
                         mPlaybackThreads.valueAt(i)->hasAudioSession(sessionId);
                 if ((sessionType & ThreadBase::EFFECT_SESSION) != 0) {
                     ALOGE("%s: effect %s io %d denied because session %d effect exists on io %d",
-                            __func__, desc.name, (int)io, (int)sessionId, (int)checkIo);
+                          __func__, descOut.name, (int) io, (int) sessionId, (int) checkIo);
                     android_errorWriteLog(0x534e4554, "123237974");
                     lStatus = BAD_VALUE;
                     goto Exit;
@@ -3756,14 +3747,14 @@ sp<media::IEffect> AudioFlinger::createEffect(
             }
         }
         handle = thread->createEffect_l(client, effectClient, priority, sessionId,
-                &desc, enabled, &lStatus, pinned, probe);
+                                        &descOut, &enabledOut, &lStatus, pinned, probe);
         if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
             // remove local strong reference to Client with mClientLock held
             Mutex::Autolock _cl(mClientLock);
             client.clear();
         } else {
             // handle must be valid here, but check again to be safe.
-            if (handle.get() != nullptr && id != nullptr) *id = handle->id();
+            if (handle.get() != nullptr) idOut = handle->id();
             // Invalidate audio session when haptic playback is created.
             if (hapticPlaybackRequired && oriThread != nullptr) {
                 // invalidateTracksForAudioSession will trigger locking the thread.
@@ -3786,9 +3777,14 @@ Register:
         handle.clear();
     }
 
+    response->id = idOut;
+    response->enabled = enabledOut != 0;
+    response->effect = handle;
+    response->desc = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_effect_descriptor_t_EffectDescriptor(descOut));
+
 Exit:
-    *status = lStatus;
-    return handle;
+    return lStatus;
 }
 
 status_t AudioFlinger::moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,

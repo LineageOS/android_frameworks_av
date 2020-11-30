@@ -21,12 +21,12 @@
 
 #include <system/audio.h>
 
-#include <android-base/expected.h>
-
 #include <android/media/AudioAttributesInternal.h>
 #include <android/media/AudioClient.h>
 #include <android/media/AudioConfig.h>
 #include <android/media/AudioConfigBase.h>
+#include <android/media/AudioEncapsulationMode.h>
+#include <android/media/AudioEncapsulationMetadataType.h>
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioGainMode.h>
 #include <android/media/AudioInputFlags.h>
@@ -34,54 +34,18 @@
 #include <android/media/AudioIoDescriptor.h>
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPortConfigType.h>
+#include <android/media/AudioTimestampInternal.h>
+#include <android/media/EffectDescriptor.h>
 
 #include <android/media/SharedFileRegion.h>
-
 #include <binder/IMemory.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioClient.h>
 #include <media/AudioIoDescriptor.h>
+#include <media/AudioTimestamp.h>
+#include <system/audio_effect.h>
 
 namespace android {
-
-template <typename T>
-using ConversionResult = base::expected<T, status_t>;
-
-// Convenience macros for working with ConversionResult, useful for writing converted for aggregate
-// types.
-
-#define VALUE_OR_RETURN(result)                                \
-    ({                                                         \
-        auto _tmp = (result);                                  \
-        if (!_tmp.ok()) return base::unexpected(_tmp.error()); \
-        std::move(_tmp.value());                               \
-    })
-
-#define RETURN_IF_ERROR(result) \
-    if (status_t _tmp = (result); _tmp != OK) return base::unexpected(_tmp);
-
-/**
- * A generic template to safely cast between integral types, respecting limits of the destination
- * type.
- */
-template<typename To, typename From>
-ConversionResult<To> convertIntegral(From from) {
-    // Special handling is required for signed / vs. unsigned comparisons, since otherwise we may
-    // have the signed converted to unsigned and produce wrong results.
-    if (std::is_signed_v<From> && !std::is_signed_v<To>) {
-        if (from < 0 || from > std::numeric_limits<To>::max()) {
-            return base::unexpected(BAD_VALUE);
-        }
-    } else if (std::is_signed_v<To> && !std::is_signed_v<From>) {
-        if (from > std::numeric_limits<To>::max()) {
-            return base::unexpected(BAD_VALUE);
-        }
-    } else {
-        if (from < std::numeric_limits<To>::min() || from > std::numeric_limits<To>::max()) {
-            return base::unexpected(BAD_VALUE);
-        }
-    }
-    return static_cast<To>(from);
-}
 
 // maxSize is the size of the C-string buffer (including the 0-terminator), NOT the max length of
 // the string.
@@ -119,6 +83,9 @@ ConversionResult<int32_t> legacy2aidl_pid_t_int32_t(pid_t legacy);
 
 ConversionResult<uid_t> aidl2legacy_int32_t_uid_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_uid_t_int32_t(uid_t legacy);
+
+ConversionResult<String8> aidl2legacy_string_view_String8(std::string_view aidl);
+ConversionResult<std::string> legacy2aidl_String8_string(const String8& legacy);
 
 ConversionResult<String16> aidl2legacy_string_view_String16(std::string_view aidl);
 ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy);
@@ -251,9 +218,9 @@ ConversionResult<media::AudioAttributesInternal>
 legacy2aidl_audio_attributes_t_AudioAttributesInternal(const audio_attributes_t& legacy);
 
 ConversionResult<audio_encapsulation_mode_t>
-aidl2legacy_audio_encapsulation_mode_t_AudioEncapsulationMode(media::AudioEncapsulationMode aidl);
+aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t(media::AudioEncapsulationMode aidl);
 ConversionResult<media::AudioEncapsulationMode>
-legacy2aidl_AudioEncapsulationMode_audio_encapsulation_mode_t(audio_encapsulation_mode_t legacy);
+legacy2aidl_audio_encapsulation_mode_t_AudioEncapsulationMode(audio_encapsulation_mode_t legacy);
 
 ConversionResult<audio_offload_info_t>
 aidl2legacy_AudioOffloadInfo_audio_offload_info_t(const media::AudioOffloadInfo& aidl);
@@ -279,5 +246,37 @@ ConversionResult<sp<IMemory>>
 aidl2legacy_NullableSharedFileRegion_IMemory(const std::optional<media::SharedFileRegion>& aidl);
 ConversionResult<std::optional<media::SharedFileRegion>>
 legacy2aidl_NullableIMemory_SharedFileRegion(const sp<IMemory>& legacy);
+
+ConversionResult<AudioTimestamp>
+aidl2legacy_AudioTimestamp(const media::AudioTimestampInternal& aidl);
+ConversionResult<media::AudioTimestampInternal>
+legacy2aidl_AudioTimestamp(const AudioTimestamp& legacy);
+
+ConversionResult<audio_uuid_t>
+aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl);
+ConversionResult<media::AudioUuid>
+legacy2aidl_audio_uuid_t_AudioUuid(const audio_uuid_t& legacy);
+
+ConversionResult<effect_descriptor_t>
+aidl2legacy_EffectDescriptor_effect_descriptor_t(const media::EffectDescriptor& aidl);
+ConversionResult<media::EffectDescriptor>
+legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& legacy);
+
+ConversionResult<audio_encapsulation_metadata_type_t>
+aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t(
+        media::AudioEncapsulationMetadataType aidl);
+ConversionResult<media::AudioEncapsulationMetadataType>
+legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
+        audio_encapsulation_metadata_type_t legacy);
+
+ConversionResult<uint32_t>
+aidl2legacy_AudioEncapsulationMode_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_AudioEncapsulationMode_mask(uint32_t legacy);
+
+ConversionResult<uint32_t>
+aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy);
 
 }  // namespace android

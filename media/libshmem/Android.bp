@@ -14,6 +14,9 @@ cc_library {
     name: "libshmemcompat",
     export_include_dirs: ["include"],
     srcs: ["ShmemCompat.cpp"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
     shared_libs: [
         "libbinder",
         "libshmemutil",
@@ -31,6 +34,9 @@ cc_library {
     name: "libshmemutil",
     export_include_dirs: ["include"],
     srcs: ["ShmemUtil.cpp"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
     shared_libs: [
         "shared-file-region-aidl-unstable-cpp",
     ],
