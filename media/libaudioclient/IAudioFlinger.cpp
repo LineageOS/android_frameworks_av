@@ -24,76 +24,9 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
-#include <media/AudioValidator.h>
-#include <media/IAudioPolicyService.h>
-#include <mediautils/ServiceUtilities.h>
-#include <mediautils/TimeCheck.h>
 #include "IAudioFlinger.h"
 
 namespace android {
-
-enum {
-    CREATE_TRACK = IBinder::FIRST_CALL_TRANSACTION,
-    CREATE_RECORD,
-    SAMPLE_RATE,
-    RESERVED,   // obsolete, was CHANNEL_COUNT
-    FORMAT,
-    FRAME_COUNT,
-    LATENCY,
-    SET_MASTER_VOLUME,
-    SET_MASTER_MUTE,
-    MASTER_VOLUME,
-    MASTER_MUTE,
-    SET_STREAM_VOLUME,
-    SET_STREAM_MUTE,
-    STREAM_VOLUME,
-    STREAM_MUTE,
-    SET_MODE,
-    SET_MIC_MUTE,
-    GET_MIC_MUTE,
-    SET_RECORD_SILENCED,
-    SET_PARAMETERS,
-    GET_PARAMETERS,
-    REGISTER_CLIENT,
-    GET_INPUTBUFFERSIZE,
-    OPEN_OUTPUT,
-    OPEN_DUPLICATE_OUTPUT,
-    CLOSE_OUTPUT,
-    SUSPEND_OUTPUT,
-    RESTORE_OUTPUT,
-    OPEN_INPUT,
-    CLOSE_INPUT,
-    INVALIDATE_STREAM,
-    SET_VOICE_VOLUME,
-    GET_RENDER_POSITION,
-    GET_INPUT_FRAMES_LOST,
-    NEW_AUDIO_UNIQUE_ID,
-    ACQUIRE_AUDIO_SESSION_ID,
-    RELEASE_AUDIO_SESSION_ID,
-    QUERY_NUM_EFFECTS,
-    QUERY_EFFECT,
-    GET_EFFECT_DESCRIPTOR,
-    CREATE_EFFECT,
-    MOVE_EFFECTS,
-    LOAD_HW_MODULE,
-    GET_PRIMARY_OUTPUT_SAMPLING_RATE,
-    GET_PRIMARY_OUTPUT_FRAME_COUNT,
-    SET_LOW_RAM_DEVICE,
-    LIST_AUDIO_PORTS,
-    GET_AUDIO_PORT,
-    CREATE_AUDIO_PATCH,
-    RELEASE_AUDIO_PATCH,
-    LIST_AUDIO_PATCHES,
-    SET_AUDIO_PORT_CONFIG,
-    GET_AUDIO_HW_SYNC_FOR_SESSION,
-    SYSTEM_READY,
-    FRAME_COUNT_HAL,
-    GET_MICROPHONES,
-    SET_MASTER_BALANCE,
-    GET_MASTER_BALANCE,
-    SET_EFFECT_SUSPENDED,
-    SET_AUDIO_HAL_PIDS
-};
 
 #define MAX_ITEMS_PER_LIST 1024
 
@@ -988,106 +921,6 @@ IMPLEMENT_META_INTERFACE(AudioFlinger, "android.media.IAudioFlinger");
 status_t BnAudioFlinger::onTransact(
     uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
-    // make sure transactions reserved to AudioPolicyManager do not come from other processes
-    switch (code) {
-        case SET_STREAM_VOLUME:
-        case SET_STREAM_MUTE:
-        case OPEN_OUTPUT:
-        case OPEN_DUPLICATE_OUTPUT:
-        case CLOSE_OUTPUT:
-        case SUSPEND_OUTPUT:
-        case RESTORE_OUTPUT:
-        case OPEN_INPUT:
-        case CLOSE_INPUT:
-        case INVALIDATE_STREAM:
-        case SET_VOICE_VOLUME:
-        case MOVE_EFFECTS:
-        case SET_EFFECT_SUSPENDED:
-        case LOAD_HW_MODULE:
-        case LIST_AUDIO_PORTS:
-        case GET_AUDIO_PORT:
-        case CREATE_AUDIO_PATCH:
-        case RELEASE_AUDIO_PATCH:
-        case LIST_AUDIO_PATCHES:
-        case SET_AUDIO_PORT_CONFIG:
-        case SET_RECORD_SILENCED:
-            ALOGW("%s: transaction %d received from PID %d",
-                  __func__, code, IPCThreadState::self()->getCallingPid());
-            // return status only for non void methods
-            switch (code) {
-                case SET_RECORD_SILENCED:
-                case SET_EFFECT_SUSPENDED:
-                    break;
-                default:
-                    reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
-                    break;
-            }
-            return OK;
-        default:
-            break;
-    }
-
-    // make sure the following transactions come from system components
-    switch (code) {
-        case SET_MASTER_VOLUME:
-        case SET_MASTER_MUTE:
-        case SET_MODE:
-        case SET_MIC_MUTE:
-        case SET_LOW_RAM_DEVICE:
-        case SYSTEM_READY:
-        case SET_AUDIO_HAL_PIDS: {
-            if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
-                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
-                      __func__, code, IPCThreadState::self()->getCallingPid(),
-                      IPCThreadState::self()->getCallingUid());
-                // return status only for non void methods
-                switch (code) {
-                    case SYSTEM_READY:
-                        break;
-                    default:
-                        reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
-                        break;
-                }
-                return OK;
-            }
-        } break;
-        default:
-            break;
-    }
-
-    // List of relevant events that trigger log merging.
-    // Log merging should activate during audio activity of any kind. This are considered the
-    // most relevant events.
-    // TODO should select more wisely the items from the list
-    switch (code) {
-        case CREATE_TRACK:
-        case CREATE_RECORD:
-        case SET_MASTER_VOLUME:
-        case SET_MASTER_MUTE:
-        case SET_MIC_MUTE:
-        case SET_PARAMETERS:
-        case CREATE_EFFECT:
-        case SYSTEM_READY: {
-            requestLogMerge();
-            break;
-        }
-        default:
-            break;
-    }
-
-    std::string tag("IAudioFlinger command " + std::to_string(code));
-    TimeCheck check(tag.c_str());
-
-    // Make sure we connect to Audio Policy Service before calling into AudioFlinger:
-    //  - AudioFlinger can call into Audio Policy Service with its global mutex held
-    //  - If this is the first time Audio Policy Service is queried from inside audioserver process
-    //  this will trigger Audio Policy Manager initialization.
-    //  - Audio Policy Manager initialization calls into AudioFlinger which will try to lock
-    //  its global mutex and a deadlock will occur.
-    if (IPCThreadState::self()->getCallingPid() != getpid()) {
-        AudioSystem::get_audio_policy_service();
-    }
-
     switch (code) {
         case CREATE_TRACK: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
@@ -1496,10 +1329,6 @@ status_t BnAudioFlinger::onTransact(
                 ALOGE("b/23905951");
                 return status;
             }
-            status = AudioValidator::validateAudioPort(port);
-            if (status == NO_ERROR) {
-                status = getAudioPort(&port);
-            }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&port, sizeof(struct audio_port_v7));
@@ -1518,10 +1347,6 @@ status_t BnAudioFlinger::onTransact(
             if (status != NO_ERROR) {
                 ALOGE("b/23905951");
                 return status;
-            }
-            status = AudioValidator::validateAudioPatch(patch);
-            if (status == NO_ERROR) {
-                status = createAudioPatch(&patch, &handle);
             }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
@@ -1570,10 +1395,6 @@ status_t BnAudioFlinger::onTransact(
             status_t status = data.read(&config, sizeof(struct audio_port_config));
             if (status != NO_ERROR) {
                 return status;
-            }
-            status = AudioValidator::validateAudioPortConfig(config);
-            if (status == NO_ERROR) {
-                status = setAudioPortConfig(&config);
             }
             reply->writeInt32(status);
             return NO_ERROR;

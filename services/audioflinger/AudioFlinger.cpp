@@ -31,6 +31,7 @@
 #include <sys/resource.h>
 #include <thread>
 
+
 #include <android/os/IExternalVibratorService.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -41,8 +42,10 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioParameter.h>
+#include <media/IAudioPolicyService.h>
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
+#include <mediautils/TimeCheck.h>
 #include <memunreachable/memunreachable.h>
 #include <utils/String16.h>
 #include <utils/threads.h>
@@ -69,6 +72,7 @@
 
 #include <media/IMediaLogService.h>
 #include <media/AidlConversion.h>
+#include <media/AudioValidator.h>
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
 #include <mediautils/BatteryNotifier.h>
@@ -2335,6 +2339,11 @@ status_t AudioFlinger::setAudioPortConfig(const struct audio_port_config *config
 {
     ALOGV(__func__);
 
+    status_t status = AudioValidator::validateAudioPortConfig(*config);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
     audio_module_handle_t module;
     if (config->type == AUDIO_PORT_TYPE_DEVICE) {
         module = config->ext.device.hw_module;
@@ -4036,6 +4045,106 @@ bool AudioFlinger::updateOrphanEffectChains(const sp<AudioFlinger::EffectModule>
 status_t AudioFlinger::onTransact(
         uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
 {
+    // make sure transactions reserved to AudioPolicyManager do not come from other processes
+    switch (code) {
+        case SET_STREAM_VOLUME:
+        case SET_STREAM_MUTE:
+        case OPEN_OUTPUT:
+        case OPEN_DUPLICATE_OUTPUT:
+        case CLOSE_OUTPUT:
+        case SUSPEND_OUTPUT:
+        case RESTORE_OUTPUT:
+        case OPEN_INPUT:
+        case CLOSE_INPUT:
+        case INVALIDATE_STREAM:
+        case SET_VOICE_VOLUME:
+        case MOVE_EFFECTS:
+        case SET_EFFECT_SUSPENDED:
+        case LOAD_HW_MODULE:
+        case LIST_AUDIO_PORTS:
+        case GET_AUDIO_PORT:
+        case CREATE_AUDIO_PATCH:
+        case RELEASE_AUDIO_PATCH:
+        case LIST_AUDIO_PATCHES:
+        case SET_AUDIO_PORT_CONFIG:
+        case SET_RECORD_SILENCED:
+            ALOGW("%s: transaction %d received from PID %d",
+                  __func__, code, IPCThreadState::self()->getCallingPid());
+            // return status only for non void methods
+            switch (code) {
+                case SET_RECORD_SILENCED:
+                case SET_EFFECT_SUSPENDED:
+                    break;
+                default:
+                    reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
+                    break;
+            }
+            return OK;
+        default:
+            break;
+    }
+
+    // make sure the following transactions come from system components
+    switch (code) {
+        case SET_MASTER_VOLUME:
+        case SET_MASTER_MUTE:
+        case SET_MODE:
+        case SET_MIC_MUTE:
+        case SET_LOW_RAM_DEVICE:
+        case SYSTEM_READY:
+        case SET_AUDIO_HAL_PIDS: {
+            if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
+                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                // return status only for non void methods
+                switch (code) {
+                    case SYSTEM_READY:
+                        break;
+                    default:
+                        reply->writeInt32(static_cast<int32_t> (INVALID_OPERATION));
+                        break;
+                }
+                return OK;
+            }
+        } break;
+        default:
+            break;
+    }
+
+    // List of relevant events that trigger log merging.
+    // Log merging should activate during audio activity of any kind. This are considered the
+    // most relevant events.
+    // TODO should select more wisely the items from the list
+    switch (code) {
+        case CREATE_TRACK:
+        case CREATE_RECORD:
+        case SET_MASTER_VOLUME:
+        case SET_MASTER_MUTE:
+        case SET_MIC_MUTE:
+        case SET_PARAMETERS:
+        case CREATE_EFFECT:
+        case SYSTEM_READY: {
+            requestLogMerge();
+            break;
+        }
+        default:
+            break;
+    }
+
+    std::string tag("IAudioFlinger command " + std::to_string(code));
+    TimeCheck check(tag.c_str());
+
+    // Make sure we connect to Audio Policy Service before calling into AudioFlinger:
+    //  - AudioFlinger can call into Audio Policy Service with its global mutex held
+    //  - If this is the first time Audio Policy Service is queried from inside audioserver process
+    //  this will trigger Audio Policy Manager initialization.
+    //  - Audio Policy Manager initialization calls into AudioFlinger which will try to lock
+    //  its global mutex and a deadlock will occur.
+    if (IPCThreadState::self()->getCallingPid() != getpid()) {
+        AudioSystem::get_audio_policy_service();
+    }
+
     return BnAudioFlinger::onTransact(code, data, reply, flags);
 }
 

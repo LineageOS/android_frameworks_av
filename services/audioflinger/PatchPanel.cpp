@@ -25,6 +25,7 @@
 
 #include "AudioFlinger.h"
 #include <media/AudioParameter.h>
+#include <media/AudioValidator.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/PatchBuilder.h>
 #include <mediautils/ServiceUtilities.h>
@@ -56,6 +57,11 @@ status_t AudioFlinger::listAudioPorts(unsigned int *num_ports,
 
 /* Get supported attributes for a given audio port */
 status_t AudioFlinger::getAudioPort(struct audio_port_v7 *port) {
+    status_t status = AudioValidator::validateAudioPort(*port);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
     Mutex::Autolock _l(mLock);
     return mPatchPanel.getAudioPort(port);
 }
@@ -64,6 +70,11 @@ status_t AudioFlinger::getAudioPort(struct audio_port_v7 *port) {
 status_t AudioFlinger::createAudioPatch(const struct audio_patch *patch,
                                    audio_patch_handle_t *handle)
 {
+    status_t status = AudioValidator::validateAudioPatch(*patch);
+    if (status != NO_ERROR) {
+        return status;
+    }
+
     Mutex::Autolock _l(mLock);
     return mPatchPanel.createAudioPatch(patch, handle);
 }

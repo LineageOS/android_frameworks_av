@@ -333,6 +333,70 @@ public:
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids) = 0;
+
+protected:
+    enum {
+        CREATE_TRACK = IBinder::FIRST_CALL_TRANSACTION,
+        CREATE_RECORD,
+        SAMPLE_RATE,
+        RESERVED,   // obsolete, was CHANNEL_COUNT
+        FORMAT,
+        FRAME_COUNT,
+        LATENCY,
+        SET_MASTER_VOLUME,
+        SET_MASTER_MUTE,
+        MASTER_VOLUME,
+        MASTER_MUTE,
+        SET_STREAM_VOLUME,
+        SET_STREAM_MUTE,
+        STREAM_VOLUME,
+        STREAM_MUTE,
+        SET_MODE,
+        SET_MIC_MUTE,
+        GET_MIC_MUTE,
+        SET_RECORD_SILENCED,
+        SET_PARAMETERS,
+        GET_PARAMETERS,
+        REGISTER_CLIENT,
+        GET_INPUTBUFFERSIZE,
+        OPEN_OUTPUT,
+        OPEN_DUPLICATE_OUTPUT,
+        CLOSE_OUTPUT,
+        SUSPEND_OUTPUT,
+        RESTORE_OUTPUT,
+        OPEN_INPUT,
+        CLOSE_INPUT,
+        INVALIDATE_STREAM,
+        SET_VOICE_VOLUME,
+        GET_RENDER_POSITION,
+        GET_INPUT_FRAMES_LOST,
+        NEW_AUDIO_UNIQUE_ID,
+        ACQUIRE_AUDIO_SESSION_ID,
+        RELEASE_AUDIO_SESSION_ID,
+        QUERY_NUM_EFFECTS,
+        QUERY_EFFECT,
+        GET_EFFECT_DESCRIPTOR,
+        CREATE_EFFECT,
+        MOVE_EFFECTS,
+        LOAD_HW_MODULE,
+        GET_PRIMARY_OUTPUT_SAMPLING_RATE,
+        GET_PRIMARY_OUTPUT_FRAME_COUNT,
+        SET_LOW_RAM_DEVICE,
+        LIST_AUDIO_PORTS,
+        GET_AUDIO_PORT,
+        CREATE_AUDIO_PATCH,
+        RELEASE_AUDIO_PATCH,
+        LIST_AUDIO_PATCHES,
+        SET_AUDIO_PORT_CONFIG,
+        GET_AUDIO_HW_SYNC_FOR_SESSION,
+        SYSTEM_READY,
+        FRAME_COUNT_HAL,
+        GET_MICROPHONES,
+        SET_MASTER_BALANCE,
+        GET_MASTER_BALANCE,
+        SET_EFFECT_SUSPENDED,
+        SET_AUDIO_HAL_PIDS
+    };
 };
 
 
@@ -345,9 +409,6 @@ public:
                                     const Parcel& data,
                                     Parcel* reply,
                                     uint32_t flags = 0);
-
-    // Requests media.log to start merging log buffers
-    virtual void requestLogMerge() = 0;
 };
 
 // ----------------------------------------------------------------------------
