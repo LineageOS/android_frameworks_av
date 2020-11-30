@@ -28,6 +28,11 @@ cc_library {
         "libutils",
         "shared-file-region-aidl-unstable-cpp",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library {
@@ -43,6 +48,11 @@ cc_library {
     export_shared_lib_headers: [
         "shared-file-region-aidl-unstable-cpp",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_test {

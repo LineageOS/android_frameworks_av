@@ -176,6 +176,11 @@ cc_library_headers {
         "com.android.media",
         "com.android.media.swcodec",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_library {
@@ -217,6 +222,11 @@ cc_library {
             "unsigned-integer-overflow",
             "signed-integer-overflow",
         ],
+    },
+    target: {
+        darwin: {
+            enabled: false,
+        },
     },
 }
 
