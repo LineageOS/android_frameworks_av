@@ -17,18 +17,20 @@
 #ifndef ANDROID_AUDIOTRACK_H
 #define ANDROID_AUDIOTRACK_H
 
+#include <binder/IMemory.h>
 #include <cutils/sched_policy.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTimestamp.h>
-#include <media/IAudioTrack.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/MediaMetricsItem.h>
 #include <media/Modulo.h>
+#include <media/VolumeShaper.h>
 #include <utils/threads.h>
 
 #include <string>
 
 #include "android/media/BnAudioTrackCallback.h"
+#include "android/media/IAudioTrack.h"
 #include "android/media/IAudioTrackCallback.h"
 
 namespace android {
@@ -1071,7 +1073,7 @@ public:
             void     updateRoutedDeviceId_l();
 
     // Next 4 fields may be changed if IAudioTrack is re-created, but always != 0
-    sp<IAudioTrack>         mAudioTrack;
+    sp<media::IAudioTrack>  mAudioTrack;
     sp<IMemory>             mCblkMemory;
     audio_track_cblk_t*     mCblk;                  // re-load after mLock.unlock()
     audio_io_handle_t       mOutput = AUDIO_IO_HANDLE_NONE; // from AudioSystem::getOutputForAttr()

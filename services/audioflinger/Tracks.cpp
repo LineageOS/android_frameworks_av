@@ -54,6 +54,7 @@
 
 namespace android {
 
+using binder::Status;
 using media::VolumeShaper;
 // ----------------------------------------------------------------------------
 //      TrackBase
@@ -319,64 +320,98 @@ AudioFlinger::TrackHandle::~TrackHandle() {
     mTrack->destroy();
 }
 
-sp<IMemory> AudioFlinger::TrackHandle::getCblk() const {
-    return mTrack->getCblk();
+Status AudioFlinger::TrackHandle::getCblk(
+        std::optional<media::SharedFileRegion>* _aidl_return) {
+    *_aidl_return = legacy2aidl_NullableIMemory_SharedFileRegion(mTrack->getCblk()).value();
+    return Status::ok();
 }
 
-status_t AudioFlinger::TrackHandle::start() {
-    return mTrack->start();
+Status AudioFlinger::TrackHandle::start(int32_t* _aidl_return) {
+    *_aidl_return = mTrack->start();
+    return Status::ok();
 }
 
-void AudioFlinger::TrackHandle::stop() {
+Status AudioFlinger::TrackHandle::stop() {
     mTrack->stop();
+    return Status::ok();
 }
 
-void AudioFlinger::TrackHandle::flush() {
+Status AudioFlinger::TrackHandle::flush() {
     mTrack->flush();
+    return Status::ok();
 }
 
-void AudioFlinger::TrackHandle::pause() {
+Status AudioFlinger::TrackHandle::pause() {
     mTrack->pause();
+    return Status::ok();
 }
 
-status_t AudioFlinger::TrackHandle::attachAuxEffect(int EffectId)
-{
-    return mTrack->attachAuxEffect(EffectId);
+Status AudioFlinger::TrackHandle::attachAuxEffect(int32_t effectId,
+                                                  int32_t* _aidl_return) {
+    *_aidl_return = mTrack->attachAuxEffect(effectId);
+    return Status::ok();
 }
 
-status_t AudioFlinger::TrackHandle::setParameters(const String8& keyValuePairs) {
-    return mTrack->setParameters(keyValuePairs);
+Status AudioFlinger::TrackHandle::setParameters(const std::string& keyValuePairs,
+                                                int32_t* _aidl_return) {
+    *_aidl_return = mTrack->setParameters(String8(keyValuePairs.c_str()));
+    return Status::ok();
 }
 
-status_t AudioFlinger::TrackHandle::selectPresentation(int presentationId, int programId) {
-    return mTrack->selectPresentation(presentationId, programId);
+Status AudioFlinger::TrackHandle::selectPresentation(int32_t presentationId, int32_t programId,
+                                                     int32_t* _aidl_return) {
+    *_aidl_return = mTrack->selectPresentation(presentationId, programId);
+    return Status::ok();
 }
 
-VolumeShaper::Status AudioFlinger::TrackHandle::applyVolumeShaper(
-        const sp<VolumeShaper::Configuration>& configuration,
-        const sp<VolumeShaper::Operation>& operation) {
-    return mTrack->applyVolumeShaper(configuration, operation);
+Status AudioFlinger::TrackHandle::getTimestamp(media::AudioTimestampInternal* timestamp,
+                                               int32_t* _aidl_return) {
+    AudioTimestamp legacy;
+    *_aidl_return = mTrack->getTimestamp(legacy);
+    if (*_aidl_return != OK) {
+        return Status::ok();
+    }
+    *timestamp = legacy2aidl_AudioTimestamp(legacy).value();
+    return Status::ok();
 }
 
-sp<VolumeShaper::State> AudioFlinger::TrackHandle::getVolumeShaperState(int id) {
-    return mTrack->getVolumeShaperState(id);
+Status AudioFlinger::TrackHandle::signal() {
+    mTrack->signal();
+    return Status::ok();
 }
 
-status_t AudioFlinger::TrackHandle::getTimestamp(AudioTimestamp& timestamp)
-{
-    return mTrack->getTimestamp(timestamp);
+Status AudioFlinger::TrackHandle::applyVolumeShaper(
+        const media::VolumeShaperConfiguration& configuration,
+        const media::VolumeShaperOperation& operation,
+        int32_t* _aidl_return) {
+    sp<VolumeShaper::Configuration> conf = new VolumeShaper::Configuration();
+    *_aidl_return = conf->readFromParcelable(configuration);
+    if (*_aidl_return != OK) {
+        return Status::ok();
+    }
+
+    sp<VolumeShaper::Operation> op = new VolumeShaper::Operation();
+    *_aidl_return = op->readFromParcelable(operation);
+    if (*_aidl_return != OK) {
+        return Status::ok();
+    }
+
+    *_aidl_return = mTrack->applyVolumeShaper(conf, op);
+    return Status::ok();
 }
 
-
-void AudioFlinger::TrackHandle::signal()
-{
-    return mTrack->signal();
-}
-
-status_t AudioFlinger::TrackHandle::onTransact(
-    uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags)
-{
-    return BnAudioTrack::onTransact(code, data, reply, flags);
+Status AudioFlinger::TrackHandle::getVolumeShaperState(
+        int32_t id,
+        std::optional<media::VolumeShaperState>* _aidl_return) {
+    sp<VolumeShaper::State> legacy = mTrack->getVolumeShaperState(id);
+    if (legacy == nullptr) {
+        _aidl_return->reset();
+        return Status::ok();
+    }
+    media::VolumeShaperState aidl;
+    legacy->writeToParcelable(&aidl);
+    *_aidl_return = aidl;
+    return Status::ok();
 }
 
 // ----------------------------------------------------------------------------
@@ -2112,10 +2147,15 @@ void AudioFlinger::RecordHandle::stop_nonvirtual() {
 }
 
 binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
-        std::vector<media::MicrophoneInfo>* activeMicrophones) {
+        std::vector<media::MicrophoneInfoData>* activeMicrophones) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(
-            mRecordTrack->getActiveMicrophones(activeMicrophones));
+    std::vector<media::MicrophoneInfo> mics;
+    status_t status = mRecordTrack->getActiveMicrophones(&mics);
+    activeMicrophones->resize(mics.size());
+    for (size_t i = 0; status == OK && i < mics.size(); ++i) {
+       status = mics[i].writeToParcelable(&activeMicrophones->at(i));
+    }
+    return binder::Status::fromStatusT(status);
 }
 
 binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneDirection(

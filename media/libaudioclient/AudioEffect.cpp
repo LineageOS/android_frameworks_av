@@ -101,9 +101,29 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mClientPid = IPCThreadState::self()->getCallingPid();
     mClientUid = IPCThreadState::self()->getCallingUid();
 
-    iEffect = audioFlinger->createEffect((effect_descriptor_t *)&mDescriptor,
-            mIEffectClient, priority, io, mSessionId, device, mOpPackageName, mClientPid,
-            probe, &mStatus, &mId, &enabled);
+    media::CreateEffectRequest request;
+    request.desc = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_effect_descriptor_t_EffectDescriptor(mDescriptor));
+    request.client = mIEffectClient;
+    request.priority = priority;
+    request.output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(io));
+    request.sessionId = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(mSessionId));
+    request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(device));
+    request.opPackageName = VALUE_OR_RETURN_STATUS(legacy2aidl_String16_string(mOpPackageName));
+    request.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(mClientPid));
+    request.probe = probe;
+
+    media::CreateEffectResponse response;
+
+    mStatus = audioFlinger->createEffect(request, &response);
+
+    if (mStatus == OK) {
+        mId = response.id;
+        enabled = response.enabled;
+        iEffect = response.effect;
+        mDescriptor = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_EffectDescriptor_effect_descriptor_t(response.desc));
+    }
 
     // In probe mode, we stop here and return the status: the IEffect interface to
     // audio flinger will not be retained. initCheck() will return the creation status

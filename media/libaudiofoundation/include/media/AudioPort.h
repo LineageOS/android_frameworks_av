@@ -19,6 +19,8 @@
 #include <string>
 #include <type_traits>
 
+#include <android/media/AudioPort.h>
+#include <android/media/AudioPortConfig.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioGain.h>
@@ -91,6 +93,9 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    status_t writeToParcelable(media::AudioPort* parcelable) const;
+    status_t readFromParcelable(const media::AudioPort& parcelable);
+
     AudioGains mGains; // gain controllers
 protected:
     std::string  mName;
@@ -136,6 +141,8 @@ public:
 
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
+    status_t writeToParcelable(media::AudioPortConfig* parcelable) const;
+    status_t readFromParcelable(const media::AudioPortConfig& parcelable);
 
 protected:
     unsigned int mSamplingRate = 0u;

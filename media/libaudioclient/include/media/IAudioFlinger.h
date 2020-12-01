@@ -29,7 +29,6 @@
 #include <media/AidlConversion.h>
 #include <media/AudioClient.h>
 #include <media/DeviceDescriptorBase.h>
-#include <media/IAudioTrack.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
@@ -38,15 +37,22 @@
 #include <string>
 #include <vector>
 
+#include "android/media/CreateEffectRequest.h"
+#include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
 #include "android/media/CreateRecordResponse.h"
 #include "android/media/CreateTrackRequest.h"
 #include "android/media/CreateTrackResponse.h"
 #include "android/media/IAudioRecord.h"
 #include "android/media/IAudioFlingerClient.h"
+#include "android/media/IAudioTrack.h"
 #include "android/media/IAudioTrackCallback.h"
 #include "android/media/IEffect.h"
 #include "android/media/IEffectClient.h"
+#include "android/media/OpenInputRequest.h"
+#include "android/media/OpenInputResponse.h"
+#include "android/media/OpenOutputRequest.h"
+#include "android/media/OpenOutputResponse.h"
 
 namespace android {
 
@@ -104,6 +110,7 @@ public:
         uint32_t afLatencyMs;
         audio_io_handle_t outputId;
         audio_port_handle_t portId;
+        sp<media::IAudioTrack> audioTrack;
 
         ConversionResult<media::CreateTrackResponse> toAidl() const;
         static ConversionResult<CreateTrackOutput> fromAidl(const media::CreateTrackResponse& aidl);
@@ -152,24 +159,25 @@ public:
         sp<IMemory> cblk;
         sp<IMemory> buffers;
         audio_port_handle_t portId;
+        sp<media::IAudioRecord> audioRecord;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
         static ConversionResult<CreateRecordOutput> fromAidl(const media::CreateRecordResponse& aidl);
     };
 
-    // invariant on exit for all APIs that return an sp<>:
-    //   (return value != 0) == (*status == NO_ERROR)
-
     /* create an audio track and registers it with AudioFlinger.
-     * return null if the track cannot be created.
+     * The audioTrack field will be null if the track cannot be created and the status will reflect
+     * failure.
      */
-    virtual sp<IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                        media::CreateTrackResponse& output,
-                                        status_t* status) = 0;
+    virtual status_t createTrack(const media::CreateTrackRequest& input,
+                                 media::CreateTrackResponse& output) = 0;
 
-    virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
-                                                 media::CreateRecordResponse& output,
-                                                 status_t* status) = 0;
+    /* create an audio record and registers it with AudioFlinger.
+     * The audioRecord field will be null if the track cannot be created and the status will reflect
+     * failure.
+     */
+    virtual status_t createRecord(const media::CreateRecordRequest& input,
+                                  media::CreateRecordResponse& output) = 0;
 
     // FIXME Surprisingly, format/latency don't work for input handles
 
@@ -232,25 +240,17 @@ public:
     virtual size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
             audio_channel_mask_t channelMask) const = 0;
 
-    virtual status_t openOutput(audio_module_handle_t module,
-                                audio_io_handle_t *output,
-                                audio_config_t *config,
-                                const sp<DeviceDescriptorBase>& device,
-                                uint32_t *latencyMs,
-                                audio_output_flags_t flags) = 0;
+    virtual status_t openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response) = 0;
     virtual audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
                                     audio_io_handle_t output2) = 0;
     virtual status_t closeOutput(audio_io_handle_t output) = 0;
     virtual status_t suspendOutput(audio_io_handle_t output) = 0;
     virtual status_t restoreOutput(audio_io_handle_t output) = 0;
 
-    virtual status_t openInput(audio_module_handle_t module,
-                               audio_io_handle_t *input,
-                               audio_config_t *config,
-                               audio_devices_t *device,
-                               const String8& address,
-                               audio_source_t source,
-                               audio_input_flags_t flags) = 0;
+    virtual status_t openInput(const media::OpenInputRequest& request,
+                               media::OpenInputResponse* response) = 0;
+
     virtual status_t closeInput(audio_io_handle_t input) = 0;
 
     virtual status_t invalidateStream(audio_stream_type_t stream) = 0;
@@ -276,20 +276,8 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *pDescriptor) const = 0;
 
-    virtual sp<media::IEffect> createEffect(
-                                    effect_descriptor_t *pDesc,
-                                    const sp<media::IEffectClient>& client,
-                                    int32_t priority,
-                                    // AudioFlinger doesn't take over handle reference from client
-                                    audio_io_handle_t output,
-                                    audio_session_t sessionId,
-                                    const AudioDeviceTypeAddr& device,
-                                    const String16& callingPackage,
-                                    pid_t pid,
-                                    bool probe,
-                                    status_t *status,
-                                    int *id,
-                                    int *enabled) = 0;
+    virtual status_t createEffect(const media::CreateEffectRequest& request,
+                                  media::CreateEffectResponse* response) = 0;
 
     virtual status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
                                     audio_io_handle_t dstOutput) = 0;

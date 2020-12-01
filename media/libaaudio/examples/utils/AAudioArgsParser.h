@@ -421,7 +421,9 @@ public:
         printf("      -f{0|1|2} set format\n");
         printf("          0 = UNSPECIFIED\n");
         printf("          1 = PCM_I16\n");
-        printf("          2 = FLOAT\n");
+        printf("          2 = PCM_FLOAT\n");
+        printf("          3 = PCM_I24_PACKED\n");
+        printf("          4 = PCM_I32\n");
         printf("      -i{inputPreset} eg. 5 for AAUDIO_INPUT_PRESET_CAMCORDER\n");
         printf("      -m{0|1|2|3} set MMAP policy\n");
         printf("          0 = _UNSPECIFIED, use aaudio.mmap_policy system property, default\n");

@@ -19,6 +19,7 @@
 
 #include <android-base/stringprintf.h>
 #include <audio_utils/string.h>
+#include <media/AidlConversion.h>
 #include <media/DeviceDescriptorBase.h>
 #include <media/TypeConverter.h>
 
@@ -155,26 +156,45 @@ bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
            mDeviceTypeAddr.equals(other->mDeviceTypeAddr);
 }
 
+
 status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
 {
-    status_t status = NO_ERROR;
-    if ((status = AudioPort::writeToParcel(parcel)) != NO_ERROR) return status;
-    if ((status = AudioPortConfig::writeToParcel(parcel)) != NO_ERROR) return status;
-    if ((status = parcel->writeParcelable(mDeviceTypeAddr)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mEncapsulationModes)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mEncapsulationMetadataTypes)) != NO_ERROR) return status;
-    return status;
+    media::DeviceDescriptorBase parcelable;
+    return writeToParcelable(&parcelable)
+        ?: parcelable.writeToParcel(parcel);
 }
 
-status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel)
-{
-    status_t status = NO_ERROR;
-    if ((status = AudioPort::readFromParcel(parcel)) != NO_ERROR) return status;
-    if ((status = AudioPortConfig::readFromParcel(parcel)) != NO_ERROR) return status;
-    if ((status = parcel->readParcelable(&mDeviceTypeAddr)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mEncapsulationModes)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mEncapsulationMetadataTypes)) != NO_ERROR) return status;
-    return status;
+status_t DeviceDescriptorBase::writeToParcelable(media::DeviceDescriptorBase* parcelable) const {
+    AudioPort::writeToParcelable(&parcelable->port);
+    AudioPortConfig::writeToParcelable(&parcelable->portConfig);
+    parcelable->device = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioDeviceTypeAddress(mDeviceTypeAddr));
+    parcelable->encapsulationModes = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
+    parcelable->encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
+    return OK;
+}
+
+status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel) {
+    media::DeviceDescriptorBase parcelable;
+    return parcelable.readFromParcel(parcel)
+        ?: readFromParcelable(parcelable);
+}
+
+status_t DeviceDescriptorBase::readFromParcelable(const media::DeviceDescriptorBase& parcelable) {
+    status_t status = AudioPort::readFromParcelable(parcelable.port)
+                      ?: AudioPortConfig::readFromParcelable(parcelable.portConfig);
+    if (status != OK) {
+        return status;
+    }
+    mDeviceTypeAddr = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceTypeAddress(parcelable.device));
+    mEncapsulationModes = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioEncapsulationMode_mask(parcelable.encapsulationModes));
+    mEncapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioEncapsulationMetadataType_mask(parcelable.encapsulationMetadataTypes));
+    return OK;
 }
 
 std::string toString(const DeviceDescriptorBaseVector& devices)
@@ -196,6 +216,26 @@ AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorB
         deviceTypeAddrs.push_back(device->getDeviceTypeAddr());
     }
     return deviceTypeAddrs;
+}
+
+ConversionResult<sp<DeviceDescriptorBase>>
+aidl2legacy_DeviceDescriptorBase(const media::DeviceDescriptorBase& aidl) {
+    sp<DeviceDescriptorBase> result = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
+    status_t status = result->readFromParcelable(aidl);
+    if (status != OK) {
+        return base::unexpected(status);
+    }
+    return result;
+}
+
+ConversionResult<media::DeviceDescriptorBase>
+legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy) {
+    media::DeviceDescriptorBase aidl;
+    status_t status = legacy->writeToParcelable(&aidl);
+    if (status != OK) {
+        return base::unexpected(status);
+    }
+    return aidl;
 }
 
 } // namespace android

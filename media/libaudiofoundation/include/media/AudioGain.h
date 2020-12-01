@@ -16,8 +16,10 @@
 
 #pragma once
 
+#include <android/media/AudioGain.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
+#include <media/AidlConversion.h>
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <system/audio.h>
@@ -72,12 +74,21 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    status_t writeToParcelable(media::AudioGain* parcelable) const;
+    status_t readFromParcelable(const media::AudioGain& parcelable);
+
 private:
     int               mIndex;
     struct audio_gain mGain;
     bool              mUseInChannelMask;
     bool              mUseForVolume = false;
 };
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<sp<AudioGain>>
+aidl2legacy_AudioGain(const media::AudioGain& aidl);
+ConversionResult<media::AudioGain>
+legacy2aidl_AudioGain(const sp<AudioGain>& legacy);
 
 class AudioGains : public std::vector<sp<AudioGain> >, public Parcelable
 {
@@ -103,5 +114,11 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 };
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<AudioGains>
+aidl2legacy_AudioGains(const std::vector<media::AudioGain>& aidl);
+ConversionResult<std::vector<media::AudioGain>>
+legacy2aidl_AudioGains(const AudioGains& legacy);
 
 } // namespace android

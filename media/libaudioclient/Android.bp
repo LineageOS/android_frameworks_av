@@ -73,7 +73,6 @@ cc_library_shared {
         // AIDL files for audioclient interfaces
         // The headers for these interfaces will be available to any modules that
         // include libaudioclient, at the path "aidl/package/path/BnFoo.h"
-        ":libaudioclient_aidl_private",
         ":libaudioclient_aidl",
 
         "AudioEffect.cpp",
@@ -84,7 +83,6 @@ cc_library_shared {
         "IAudioFlinger.cpp",
         "IAudioPolicyService.cpp",
         "IAudioPolicyServiceClient.cpp",
-        "IAudioTrack.cpp",
         "ToneGenerator.cpp",
         "PlayerBase.cpp",
         "RecordingActivityTracker.cpp",
@@ -132,12 +130,12 @@ cc_library_shared {
     ],
     export_header_lib_headers: ["libaudioclient_headers"],
     export_static_lib_headers: [
-        "effect-aidl-cpp",
+        "effect-aidl-unstable-cpp",
         "shared-file-region-aidl-unstable-cpp",
     ],
 
     static_libs: [
-        "effect-aidl-cpp",
+        "effect-aidl-unstable-cpp",
         // for memory heap analysis
         "libc_malloc_debug_backtrace",
         "shared-file-region-aidl-unstable-cpp",
@@ -155,10 +153,46 @@ cc_library_shared {
     },
 }
 
-cc_library_shared {
+// This is intended for clients needing to include AidlConversionUtil.h, without dragging in a lot of extra
+// dependencies.
+cc_library_headers {
+    name: "libaudioclient_aidl_conversion_util",
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "libbase_headers",
+    ],
+    export_header_lib_headers: [
+        "libbase_headers",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth.updatable",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+}
+
+cc_library {
     name: "libaudioclient_aidl_conversion",
     srcs: ["AidlConversion.cpp"],
-    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    header_libs: [
+        "libaudioclient_aidl_conversion_util",
+        "libaudio_system_headers",
+    ],
+    export_header_lib_headers: [
+        "libaudioclient_aidl_conversion_util",
+    ],
     shared_libs: [
         "audioclient-types-aidl-unstable-cpp",
         "libbase",
@@ -195,16 +229,6 @@ filegroup {
     path: "aidl",
 }
 
-// Used to strip the "aidl/" from the path, so the build system can predict the
-// output filename.
-filegroup {
-    name: "libaudioclient_aidl_private",
-    srcs: [
-        "aidl/android/media/IAudioRecord.aidl",
-    ],
-    path: "aidl",
-}
-
 aidl_interface {
     name: "capture_state_listener-aidl",
     unstable: true,
@@ -218,6 +242,9 @@ aidl_interface {
     name: "effect-aidl",
     unstable: true,
     local_include_dir: "aidl",
+    host_supported: true,
+    double_loadable: true,
+    vendor_available: true,
     srcs: [
         "aidl/android/media/IEffect.aidl",
         "aidl/android/media/IEffectClient.aidl",
@@ -240,17 +267,22 @@ aidl_interface {
         "aidl/android/media/AudioConfig.aidl",
         "aidl/android/media/AudioConfigBase.aidl",
         "aidl/android/media/AudioContentType.aidl",
+        "aidl/android/media/AudioDevice.aidl",
         "aidl/android/media/AudioEncapsulationMode.aidl",
+        "aidl/android/media/AudioEncapsulationMetadataType.aidl",
         "aidl/android/media/AudioFlag.aidl",
+        "aidl/android/media/AudioGain.aidl",
         "aidl/android/media/AudioGainConfig.aidl",
         "aidl/android/media/AudioGainMode.aidl",
         "aidl/android/media/AudioInputFlags.aidl",
         "aidl/android/media/AudioIoConfigEvent.aidl",
         "aidl/android/media/AudioIoDescriptor.aidl",
         "aidl/android/media/AudioIoFlags.aidl",
+        "aidl/android/media/AudioMode.aidl",
         "aidl/android/media/AudioOffloadInfo.aidl",
         "aidl/android/media/AudioOutputFlags.aidl",
         "aidl/android/media/AudioPatch.aidl",
+        "aidl/android/media/AudioPort.aidl",
         "aidl/android/media/AudioPortConfig.aidl",
         "aidl/android/media/AudioPortConfigType.aidl",
         "aidl/android/media/AudioPortConfigDeviceExt.aidl",
@@ -260,10 +292,16 @@ aidl_interface {
         "aidl/android/media/AudioPortConfigSessionExt.aidl",
         "aidl/android/media/AudioPortRole.aidl",
         "aidl/android/media/AudioPortType.aidl",
+        "aidl/android/media/AudioProfile.aidl",
         "aidl/android/media/AudioSourceType.aidl",
         "aidl/android/media/AudioStreamType.aidl",
+        "aidl/android/media/AudioTimestampInternal.aidl",
+        "aidl/android/media/AudioUniqueIdUse.aidl",
         "aidl/android/media/AudioUsage.aidl",
-     ],
+        "aidl/android/media/AudioUuid.aidl",
+        "aidl/android/media/DeviceDescriptorBase.aidl",
+        "aidl/android/media/EffectDescriptor.aidl",
+    ],
     imports: [
         "audio_common-aidl",
     ],
@@ -285,16 +323,27 @@ aidl_interface {
     host_supported: true,
     vendor_available: true,
     srcs: [
+        "aidl/android/media/CreateEffectRequest.aidl",
+        "aidl/android/media/CreateEffectResponse.aidl",
         "aidl/android/media/CreateRecordRequest.aidl",
         "aidl/android/media/CreateRecordResponse.aidl",
         "aidl/android/media/CreateTrackRequest.aidl",
         "aidl/android/media/CreateTrackResponse.aidl",
+        "aidl/android/media/OpenInputRequest.aidl",
+        "aidl/android/media/OpenInputResponse.aidl",
+        "aidl/android/media/OpenOutputRequest.aidl",
+        "aidl/android/media/OpenOutputResponse.aidl",
 
         "aidl/android/media/IAudioFlingerClient.aidl",
+        "aidl/android/media/IAudioRecord.aidl",
+        "aidl/android/media/IAudioTrack.aidl",
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     imports: [
+        "audio_common-aidl",
         "audioclient-types-aidl",
+        "av-types-aidl",
+        "effect-aidl",
         "shared-file-region-aidl",
     ],
     double_loadable: true,

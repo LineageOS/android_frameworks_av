@@ -748,7 +748,6 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
     IAudioFlinger::CreateRecordInput input;
     IAudioFlinger::CreateRecordOutput output;
     audio_session_t originalSessionId;
-    sp<media::IAudioRecord> record;
     void *iMemPointer;
     audio_track_cblk_t* cblk;
     status_t status;
@@ -817,7 +816,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
 
     do {
         media::CreateRecordResponse response;
-        record = audioFlinger->createRecord(VALUE_OR_FATAL(input.toAidl()), response, &status);
+        status = audioFlinger->createRecord(VALUE_OR_FATAL(input.toAidl()), response);
         output = VALUE_OR_FATAL(IAudioFlinger::CreateRecordOutput::fromAidl(response));
         if (status == NO_ERROR) {
             break;
@@ -893,7 +892,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
         IInterface::asBinder(mAudioRecord)->unlinkToDeath(mDeathNotifier, this);
         mDeathNotifier.clear();
     }
-    mAudioRecord = record;
+    mAudioRecord = output.audioRecord;
     mCblkMemory = output.cblk;
     mBufferMemory = output.buffers;
     IPCThreadState::self()->flushCommands();
@@ -1531,7 +1530,13 @@ void AudioRecord::onAudioDeviceUpdate(audio_io_handle_t audioIo,
 status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones)
 {
     AutoMutex lock(mLock);
-    return mAudioRecord->getActiveMicrophones(activeMicrophones).transactionError();
+    std::vector<media::MicrophoneInfoData> mics;
+    status_t status = mAudioRecord->getActiveMicrophones(&mics).transactionError();
+    activeMicrophones->resize(mics.size());
+    for (size_t i = 0; status == OK && i < mics.size(); ++i) {
+        status = activeMicrophones->at(i).readFromParcelable(mics[i]);
+    }
+    return status;
 }
 
 status_t AudioRecord::setPreferredMicrophoneDirection(audio_microphone_direction_t direction)

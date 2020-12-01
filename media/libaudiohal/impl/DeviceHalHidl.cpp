@@ -48,6 +48,9 @@ using EffectHalHidl = ::android::effect::CPP_VERSION::EffectHalHidl;
 
 namespace {
 
+using ::android::hardware::audio::common::CPP_VERSION::AudioPort;
+using ::android::hardware::audio::common::CPP_VERSION::AudioPortConfig;
+
 status_t deviceAddressFromHal(
         audio_devices_t device, const char* halAddress, DeviceAddress* address) {
     address->device = AudioDevice(device);

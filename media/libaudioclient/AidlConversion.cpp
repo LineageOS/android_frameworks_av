@@ -16,7 +16,6 @@
 
 #define LOG_TAG "AidlConversion"
 //#define LOG_NDEBUG 0
-#include <system/audio.h>
 #include <utils/Log.h>
 
 #include "media/AidlConversion.h"
@@ -134,12 +133,6 @@ ConversionResult<UnionFieldType<T, tag>> unionGetField(const T& u) {
     (u).set<std::decay_t<decltype(u)>::Tag::field>(value)
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
-
-template<typename To, typename From>
-ConversionResult<To> convertReinterpret(From from) {
-    static_assert(sizeof(From) == sizeof(To));
-    return static_cast<To>(from);
-}
 
 enum class Direction {
     INPUT, OUTPUT
@@ -288,6 +281,14 @@ ConversionResult<String16> aidl2legacy_string_view_String16(std::string_view aid
 
 ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy) {
     return std::string(String8(legacy).c_str());
+}
+
+ConversionResult<String8> aidl2legacy_string_view_String8(std::string_view aidl) {
+    return String8(aidl.data(), aidl.size());
+}
+
+ConversionResult<std::string> legacy2aidl_String8_string(const String8& legacy) {
+    return std::string(legacy.c_str());
 }
 
 // The legacy enum is unnamed. Thus, we use int.
@@ -1513,7 +1514,7 @@ legacy2aidl_audio_attributes_t_AudioAttributesInternal(const audio_attributes_t&
 }
 
 ConversionResult<audio_encapsulation_mode_t>
-aidl2legacy_audio_encapsulation_mode_t_AudioEncapsulationMode(media::AudioEncapsulationMode aidl) {
+aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t(media::AudioEncapsulationMode aidl) {
     switch (aidl) {
         case media::AudioEncapsulationMode::NONE:
             return AUDIO_ENCAPSULATION_MODE_NONE;
@@ -1526,7 +1527,7 @@ aidl2legacy_audio_encapsulation_mode_t_AudioEncapsulationMode(media::AudioEncaps
 }
 
 ConversionResult<media::AudioEncapsulationMode>
-legacy2aidl_AudioEncapsulationMode_audio_encapsulation_mode_t(audio_encapsulation_mode_t legacy) {
+legacy2aidl_audio_encapsulation_mode_t_AudioEncapsulationMode(audio_encapsulation_mode_t legacy) {
     switch (legacy) {
         case AUDIO_ENCAPSULATION_MODE_NONE:
             return media::AudioEncapsulationMode::NONE;
@@ -1558,7 +1559,7 @@ aidl2legacy_AudioOffloadInfo_audio_offload_info_t(const media::AudioOffloadInfo&
     legacy.offload_buffer_size = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.offloadBufferSize));
     legacy.usage = VALUE_OR_RETURN(aidl2legacy_AudioUsage_audio_usage_t(aidl.usage));
     legacy.encapsulation_mode = VALUE_OR_RETURN(
-            aidl2legacy_audio_encapsulation_mode_t_AudioEncapsulationMode(aidl.encapsulationMode));
+            aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t(aidl.encapsulationMode));
     legacy.content_id = VALUE_OR_RETURN(convertReinterpret<int32_t>(aidl.contentId));
     legacy.sync_id = VALUE_OR_RETURN(convertReinterpret<int32_t>(aidl.syncId));
     return legacy;
@@ -1593,7 +1594,7 @@ legacy2aidl_audio_offload_info_t_AudioOffloadInfo(const audio_offload_info_t& le
             return unexpected(BAD_VALUE);
         }
         aidl.encapsulationMode = VALUE_OR_RETURN(
-                legacy2aidl_AudioEncapsulationMode_audio_encapsulation_mode_t(
+                legacy2aidl_audio_encapsulation_mode_t_AudioEncapsulationMode(
                         legacy.encapsulation_mode));
         aidl.contentId = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.content_id));
         aidl.syncId = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.sync_id));
@@ -1681,6 +1682,151 @@ legacy2aidl_NullableIMemory_SharedFileRegion(const sp<IMemory>& legacy) {
         return unexpected(BAD_VALUE);
     }
     return aidl;
+}
+
+ConversionResult<AudioTimestamp>
+aidl2legacy_AudioTimestamp(const media::AudioTimestampInternal& aidl) {
+    AudioTimestamp legacy;
+    legacy.mPosition = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.position));
+    legacy.mTime.tv_sec = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.sec));
+    legacy.mTime.tv_nsec = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.nsec));
+    return legacy;
+}
+
+ConversionResult<media::AudioTimestampInternal>
+legacy2aidl_AudioTimestamp(const AudioTimestamp& legacy) {
+    media::AudioTimestampInternal aidl;
+    aidl.position = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mPosition));
+    aidl.sec = VALUE_OR_RETURN(convertIntegral<int64_t>(legacy.mTime.tv_sec));
+    aidl.nsec = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.mTime.tv_nsec));
+    return aidl;
+}
+
+ConversionResult<audio_uuid_t>
+aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl) {
+    audio_uuid_t legacy;
+    legacy.timeLow = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.timeLow));
+    legacy.timeMid = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.timeMid));
+    legacy.timeHiAndVersion = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.timeHiAndVersion));
+    legacy.clockSeq = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.clockSeq));
+    if (aidl.node.size() != std::size(legacy.node)) {
+        return unexpected(BAD_VALUE);
+    }
+    std::copy(aidl.node.begin(), aidl.node.end(), legacy.node);
+    return legacy;
+}
+
+ConversionResult<media::AudioUuid>
+legacy2aidl_audio_uuid_t_AudioUuid(const audio_uuid_t& legacy) {
+    media::AudioUuid aidl;
+    aidl.timeLow = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.timeLow));
+    aidl.timeMid = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.timeMid));
+    aidl.timeHiAndVersion = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.timeHiAndVersion));
+    aidl.clockSeq = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.clockSeq));
+    std::copy(legacy.node, legacy.node + std::size(legacy.node), std::back_inserter(aidl.node));
+    return aidl;
+}
+
+ConversionResult<effect_descriptor_t>
+aidl2legacy_EffectDescriptor_effect_descriptor_t(const media::EffectDescriptor& aidl) {
+    effect_descriptor_t legacy;
+    legacy.type = VALUE_OR_RETURN(aidl2legacy_AudioUuid_audio_uuid_t(aidl.type));
+    legacy.uuid = VALUE_OR_RETURN(aidl2legacy_AudioUuid_audio_uuid_t(aidl.uuid));
+    legacy.apiVersion = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.apiVersion));
+    legacy.flags = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.flags));
+    legacy.cpuLoad = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.cpuLoad));
+    legacy.memoryUsage = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.memoryUsage));
+    RETURN_IF_ERROR(aidl2legacy_string(aidl.name, legacy.name, sizeof(legacy.name)));
+    RETURN_IF_ERROR(
+            aidl2legacy_string(aidl.implementor, legacy.implementor, sizeof(legacy.implementor)));
+    return legacy;
+}
+
+ConversionResult<media::EffectDescriptor>
+legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& legacy) {
+    media::EffectDescriptor aidl;
+    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_uuid_t_AudioUuid(legacy.type));
+    aidl.uuid = VALUE_OR_RETURN(legacy2aidl_audio_uuid_t_AudioUuid(legacy.uuid));
+    aidl.apiVersion = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.apiVersion));
+    aidl.flags = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.flags));
+    aidl.cpuLoad = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.cpuLoad));
+    aidl.memoryUsage = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.memoryUsage));
+    aidl.name = VALUE_OR_RETURN(legacy2aidl_string(legacy.name, sizeof(legacy.name)));
+    aidl.implementor = VALUE_OR_RETURN(
+            legacy2aidl_string(legacy.implementor, sizeof(legacy.implementor)));
+    return aidl;
+}
+
+ConversionResult<audio_encapsulation_metadata_type_t>
+aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t(
+        media::AudioEncapsulationMetadataType aidl) {
+    switch (aidl) {
+        case media::AudioEncapsulationMetadataType::NONE:
+            return AUDIO_ENCAPSULATION_METADATA_TYPE_NONE;
+        case media::AudioEncapsulationMetadataType::FRAMEWORK_TUNER:
+            return AUDIO_ENCAPSULATION_METADATA_TYPE_FRAMEWORK_TUNER;
+        case media::AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR:
+            return AUDIO_ENCAPSULATION_METADATA_TYPE_DVB_AD_DESCRIPTOR;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioEncapsulationMetadataType>
+legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
+        audio_encapsulation_metadata_type_t legacy) {
+    switch (legacy) {
+        case AUDIO_ENCAPSULATION_METADATA_TYPE_NONE:
+            return media::AudioEncapsulationMetadataType::NONE;
+        case AUDIO_ENCAPSULATION_METADATA_TYPE_FRAMEWORK_TUNER:
+            return media::AudioEncapsulationMetadataType::FRAMEWORK_TUNER;
+        case AUDIO_ENCAPSULATION_METADATA_TYPE_DVB_AD_DESCRIPTOR:
+            return media::AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<uint32_t>
+aidl2legacy_AudioEncapsulationMode_mask(int32_t aidl) {
+    return convertBitmask<uint32_t,
+                          int32_t,
+                          audio_encapsulation_mode_t,
+                          media::AudioEncapsulationMode>(
+            aidl, aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t,
+            index2enum_index<media::AudioEncapsulationMode>,
+            enumToMask_index<uint32_t, audio_encapsulation_mode_t>);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_AudioEncapsulationMode_mask(uint32_t legacy) {
+    return convertBitmask<int32_t,
+                          uint32_t,
+                          media::AudioEncapsulationMode,
+                          audio_encapsulation_mode_t>(
+            legacy, legacy2aidl_audio_encapsulation_mode_t_AudioEncapsulationMode,
+            index2enum_index<audio_encapsulation_mode_t>,
+            enumToMask_index<int32_t, media::AudioEncapsulationMode>);
+}
+
+ConversionResult<uint32_t>
+aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl) {
+    return convertBitmask<uint32_t,
+                          int32_t,
+                          audio_encapsulation_metadata_type_t,
+                          media::AudioEncapsulationMetadataType>(
+            aidl, aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t,
+            index2enum_index<media::AudioEncapsulationMetadataType>,
+            enumToMask_index<uint32_t, audio_encapsulation_metadata_type_t>);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy) {
+    return convertBitmask<int32_t,
+                          uint32_t,
+                          media::AudioEncapsulationMetadataType,
+                          audio_encapsulation_metadata_type_t>(
+            legacy, legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType,
+            index2enum_index<audio_encapsulation_metadata_type_t>,
+            enumToMask_index<int32_t, media::AudioEncapsulationMetadataType>);
 }
 
 }  // namespace android
