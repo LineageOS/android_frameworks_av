@@ -41,20 +41,54 @@ public:
         }
     }
 
+    float next() {
+        float value = sinf(mPhase) * mAmplitude;
+        advancePhase();
+        return value;
+    }
+
     void render(int16_t *buffer, int32_t channelStride, int32_t numFrames) {
         int sampleIndex = 0;
         for (int i = 0; i < numFrames; i++) {
-            buffer[sampleIndex] = (int16_t) (INT16_MAX * sin(mPhase) * mAmplitude);
+            buffer[sampleIndex] = (int16_t) (INT16_MAX * next());
             sampleIndex += channelStride;
-            advancePhase();
         }
     }
+
     void render(float *buffer, int32_t channelStride, int32_t numFrames) {
         int sampleIndex = 0;
         for (int i = 0; i < numFrames; i++) {
-            buffer[sampleIndex] = sin(mPhase) * mAmplitude;
+            buffer[sampleIndex] = next();
             sampleIndex += channelStride;
-            advancePhase();
+        }
+    }
+
+    void render(int32_t *buffer, int32_t channelStride, int32_t numFrames) {
+        int sampleIndex = 0;
+        for (int i = 0; i < numFrames; i++) {
+            buffer[sampleIndex] = (int32_t) (INT32_MAX * next());
+            sampleIndex += channelStride;
+        }
+    }
+
+    void render24(uint8_t *buffer, int32_t channelStride, int32_t numFrames) {
+        int sampleIndex = 0;
+        constexpr int32_t INT24_MAX = (1 << 23) - 1;
+        constexpr int bytesPerSample = getBytesPerSample(AAUDIO_FORMAT_PCM_I24_PACKED);
+        const bool isLittleEndian = isNativeLittleEndian();
+        for (int i = 0; i < numFrames; i++) {
+            int32_t sample = (int32_t) (INT24_MAX * next());
+            uint32_t usample = (uint32_t) sample;
+            if (isLittleEndian) {
+                buffer[sampleIndex] = usample; // little end first
+                buffer[sampleIndex + 1] = usample >> 8;
+                buffer[sampleIndex + 2] = usample >> 16;
+            } else {
+                buffer[sampleIndex] = usample >> 16; // big end first
+                buffer[sampleIndex + 1] = usample >> 8;
+                buffer[sampleIndex + 2] = usample;
+            }
+            sampleIndex += channelStride * bytesPerSample;
         }
     }
 
@@ -100,4 +134,3 @@ private:
 };
 
 #endif /* SINE_GENERATOR_H */
-

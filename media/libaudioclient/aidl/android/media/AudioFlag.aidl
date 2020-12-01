@@ -15,6 +15,9 @@
  */
 package android.media;
 
+/**
+ * {@hide}
+ */
 @Backing(type="int")
 enum AudioFlag {
     AUDIBILITY_ENFORCED = 0,

@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/media/BnAudioTrack.h>
 #include <android/media/IAudioFlingerClient.h>
 #include <android/media/IAudioTrackCallback.h>
 #include <android/os/BnExternalVibrationController.h>
@@ -43,7 +44,6 @@
 
 #include <cutils/properties.h>
 #include <media/IAudioFlinger.h>
-#include <media/IAudioTrack.h>
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
 #include <media/MmapStreamInterface.h>
@@ -135,13 +135,11 @@ public:
     virtual     status_t    dump(int fd, const Vector<String16>& args);
 
     // IAudioFlinger interface, in binder opcode order
-    virtual sp<IAudioTrack> createTrack(const media::CreateTrackRequest& input,
-                                        media::CreateTrackResponse& output,
-                                        status_t* status) override;
+    status_t createTrack(const media::CreateTrackRequest& input,
+                         media::CreateTrackResponse& output) override;
 
-    virtual sp<media::IAudioRecord> createRecord(const media::CreateRecordRequest& input,
-                                                 media::CreateRecordResponse& output,
-                                                 status_t* status) override;
+    status_t createRecord(const media::CreateRecordRequest& input,
+                          media::CreateRecordResponse& output) override;
 
     virtual     uint32_t    sampleRate(audio_io_handle_t ioHandle) const;
     virtual     audio_format_t format(audio_io_handle_t output) const;
@@ -182,12 +180,8 @@ public:
     virtual     size_t      getInputBufferSize(uint32_t sampleRate, audio_format_t format,
                                                audio_channel_mask_t channelMask) const;
 
-    virtual status_t openOutput(audio_module_handle_t module,
-                                audio_io_handle_t *output,
-                                audio_config_t *config,
-                                const sp<DeviceDescriptorBase>& device,
-                                uint32_t *latencyMs,
-                                audio_output_flags_t flags);
+    virtual status_t openOutput(const media::OpenOutputRequest& request,
+                                media::OpenOutputResponse* response);
 
     virtual audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
                                                   audio_io_handle_t output2);
@@ -198,13 +192,8 @@ public:
 
     virtual status_t restoreOutput(audio_io_handle_t output);
 
-    virtual status_t openInput(audio_module_handle_t module,
-                               audio_io_handle_t *input,
-                               audio_config_t *config,
-                               audio_devices_t *device,
-                               const String8& address,
-                               audio_source_t source,
-                               audio_input_flags_t flags);
+    virtual status_t openInput(const media::OpenInputRequest& request,
+                               media::OpenInputResponse* response);
 
     virtual status_t closeInput(audio_io_handle_t input);
 
@@ -233,19 +222,8 @@ public:
                                          uint32_t preferredTypeFlag,
                                          effect_descriptor_t *descriptor) const;
 
-    virtual sp<media::IEffect> createEffect(
-                        effect_descriptor_t *pDesc,
-                        const sp<media::IEffectClient>& effectClient,
-                        int32_t priority,
-                        audio_io_handle_t io,
-                        audio_session_t sessionId,
-                        const AudioDeviceTypeAddr& device,
-                        const String16& opPackageName,
-                        pid_t pid,
-                        bool probe,
-                        status_t *status /*non-NULL*/,
-                        int *id,
-                        int *enabled);
+    virtual status_t createEffect(const media::CreateEffectRequest& request,
+                                  media::CreateEffectResponse* response);
 
     virtual status_t moveEffects(audio_session_t sessionId, audio_io_handle_t srcOutput,
                         audio_io_handle_t dstOutput);
@@ -626,27 +604,30 @@ using effect_buffer_t = int16_t;
     }
 
     // server side of the client's IAudioTrack
-    class TrackHandle : public android::BnAudioTrack {
+    class TrackHandle : public android::media::BnAudioTrack {
     public:
         explicit            TrackHandle(const sp<PlaybackThread::Track>& track);
         virtual             ~TrackHandle();
-        virtual sp<IMemory> getCblk() const;
-        virtual status_t    start();
-        virtual void        stop();
-        virtual void        flush();
-        virtual void        pause();
-        virtual status_t    attachAuxEffect(int effectId);
-        virtual status_t    setParameters(const String8& keyValuePairs);
-        virtual status_t    selectPresentation(int presentationId, int programId);
-        virtual media::VolumeShaper::Status applyVolumeShaper(
-                const sp<media::VolumeShaper::Configuration>& configuration,
-                const sp<media::VolumeShaper::Operation>& operation) override;
-        virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) override;
-        virtual status_t    getTimestamp(AudioTimestamp& timestamp);
-        virtual void        signal(); // signal playback thread for a change in control block
 
-        virtual status_t onTransact(
-            uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags);
+        binder::Status getCblk(std::optional<media::SharedFileRegion>* _aidl_return) override;
+        binder::Status start(int32_t* _aidl_return) override;
+        binder::Status stop() override;
+        binder::Status flush() override;
+        binder::Status pause() override;
+        binder::Status attachAuxEffect(int32_t effectId, int32_t* _aidl_return) override;
+        binder::Status setParameters(const std::string& keyValuePairs,
+                                     int32_t* _aidl_return) override;
+        binder::Status selectPresentation(int32_t presentationId, int32_t programId,
+                                          int32_t* _aidl_return) override;
+        binder::Status getTimestamp(media::AudioTimestampInternal* timestamp,
+                                    int32_t* _aidl_return) override;
+        binder::Status signal() override;
+        binder::Status applyVolumeShaper(const media::VolumeShaperConfiguration& configuration,
+                                         const media::VolumeShaperOperation& operation,
+                                         int32_t* _aidl_return) override;
+        binder::Status getVolumeShaperState(
+                int32_t id,
+                std::optional<media::VolumeShaperState>* _aidl_return) override;
 
     private:
         const sp<PlaybackThread::Track> mTrack;
@@ -661,7 +642,7 @@ using effect_buffer_t = int16_t;
                 int /*audio_session_t*/ triggerSession);
         virtual binder::Status   stop();
         virtual binder::Status   getActiveMicrophones(
-                std::vector<media::MicrophoneInfo>* activeMicrophones);
+                std::vector<media::MicrophoneInfoData>* activeMicrophones);
         virtual binder::Status   setPreferredMicrophoneDirection(
                 int /*audio_microphone_direction_t*/ direction);
         virtual binder::Status   setPreferredMicrophoneFieldDimension(float zoom);
@@ -707,7 +688,7 @@ using effect_buffer_t = int16_t;
                                            audio_io_handle_t *input,
                                            audio_config_t *config,
                                            audio_devices_t device,
-                                           const String8& address,
+                                           const char* address,
                                            audio_source_t source,
                                            audio_input_flags_t flags,
                                            audio_devices_t outputDevice,

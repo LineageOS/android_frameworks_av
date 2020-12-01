@@ -8,6 +8,7 @@ aidl_interface {
     srcs: [
         "aidl/android/media/InterpolatorConfig.aidl",
         "aidl/android/media/InterpolatorType.aidl",
+        "aidl/android/media/MicrophoneInfoData.aidl",
         "aidl/android/media/VolumeShaperConfiguration.aidl",
         "aidl/android/media/VolumeShaperConfigurationOptionFlag.aidl",
         "aidl/android/media/VolumeShaperConfigurationType.aidl",
@@ -20,8 +21,37 @@ aidl_interface {
             min_sdk_version: "29",
             apex_available: [
                 "//apex_available:platform",
+                "com.android.bluetooth.updatable",
                 "com.android.media",
+                "com.android.media.swcodec",
             ],
         },
     },
+}
+
+cc_library_headers {
+    name: "av-headers",
+    export_include_dirs: ["include"],
+    static_libs: [
+        "av-types-aidl-unstable-cpp",
+    ],
+    export_static_lib_headers: [
+        "av-types-aidl-unstable-cpp",
+    ],
+    header_libs: [
+        "libaudioclient_aidl_conversion_util",
+    ],
+    export_header_lib_headers: [
+        "libaudioclient_aidl_conversion_util",
+    ],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth.updatable",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
 }

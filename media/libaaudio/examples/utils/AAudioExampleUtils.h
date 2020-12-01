@@ -32,6 +32,7 @@
 #define NANOS_PER_MILLISECOND (NANOS_PER_MICROSECOND * 1000)
 #define NANOS_PER_SECOND      (NANOS_PER_MILLISECOND * 1000)
 
+// Use template functions to avoid warning of unused static functions.
 template <class T = aaudio_sharing_mode_t>
 const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     const char *text = "unknown";
@@ -48,6 +49,7 @@ const char *getSharingModeText(aaudio_sharing_mode_t mode) {
     return text;
 }
 
+template <class T = aaudio_performance_mode_t>
 const char *getPerformanceModeText(aaudio_performance_mode_t mode) {
     const char *text = "unknown";
     switch (mode) {
@@ -66,6 +68,7 @@ const char *getPerformanceModeText(aaudio_performance_mode_t mode) {
     return text;
 }
 
+template <class T = aaudio_direction_t>
 const char *getDirectionText(aaudio_direction_t direction) {
     const char *text = "unknown";
     switch (direction) {
@@ -79,6 +82,29 @@ const char *getDirectionText(aaudio_direction_t direction) {
             break;
     }
     return text;
+}
+
+template <class T = aaudio_direction_t>
+constexpr int32_t getBytesPerSample(aaudio_format_t format) {
+    switch (format) {
+        case AAUDIO_FORMAT_PCM_I16:
+            return 2;
+        case AAUDIO_FORMAT_PCM_FLOAT:
+            return 4;
+        case AAUDIO_FORMAT_PCM_I24_PACKED:
+            return 3;
+        case AAUDIO_FORMAT_PCM_I32:
+            return 4;
+        default:
+            return -1;
+    }
+}
+
+// Return true if CPU is native Little Endian
+inline bool isNativeLittleEndian() {
+    // If the first byte of the data word in memory is 1 then Little Endian.
+    constexpr union { unsigned u; unsigned char c[sizeof(unsigned)]; } one = {1};
+    return one.c[0] != 0;
 }
 
 template <class T = int64_t>

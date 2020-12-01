@@ -33,7 +33,7 @@
 
 #include <system/audio.h>
 
-#define VALUE_OR_RETURN_STATUS(x) \
+#define VALUE_OR_RETURN_BINDER_STATUS(x) \
     ({ auto _tmp = (x); \
        if (!_tmp.ok()) return Status::fromStatusT(_tmp.error()); \
        std::move(_tmp.value()); })
@@ -532,10 +532,10 @@ void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused
 Status AudioSystem::AudioFlingerClient::ioConfigChanged(
         media::AudioIoConfigEvent _event,
         const media::AudioIoDescriptor& _ioDesc) {
-    audio_io_config_event event = VALUE_OR_RETURN_STATUS(
+    audio_io_config_event event = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioIoConfigEvent_audio_io_config_event(_event));
     sp<AudioIoDescriptor> ioDesc(
-            VALUE_OR_RETURN_STATUS(aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(_ioDesc)));
+            VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(_ioDesc)));
 
     ALOGV("ioConfigChanged() event %d", event);
 
