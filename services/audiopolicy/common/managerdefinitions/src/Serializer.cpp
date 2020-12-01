@@ -337,7 +337,7 @@ Return<AudioGainTraits::Element> AudioGainTraits::deserialize(const xmlNode *cur
 
     std::string mode = getXmlAttribute(cur, Attributes::mode);
     if (!mode.empty()) {
-        gain->setMode(GainModeConverter::maskFromString(mode));
+        gain->setMode(static_cast<audio_gain_mode_t>(GainModeConverter::maskFromString(mode)));
     }
 
     std::string channelsLiteral = getXmlAttribute(cur, Attributes::channelMask);
