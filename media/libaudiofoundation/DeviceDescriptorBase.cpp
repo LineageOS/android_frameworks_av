@@ -159,41 +159,49 @@ bool DeviceDescriptorBase::equals(const sp<DeviceDescriptorBase> &other) const
 
 status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
 {
-    media::DeviceDescriptorBase parcelable;
+    media::AudioPort parcelable;
     return writeToParcelable(&parcelable)
         ?: parcelable.writeToParcel(parcel);
 }
 
-status_t DeviceDescriptorBase::writeToParcelable(media::DeviceDescriptorBase* parcelable) const {
-    AudioPort::writeToParcelable(&parcelable->port);
-    AudioPortConfig::writeToParcelable(&parcelable->portConfig);
-    parcelable->device = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_AudioDeviceTypeAddress(mDeviceTypeAddr));
-    parcelable->encapsulationModes = VALUE_OR_RETURN_STATUS(
+status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
+    AudioPort::writeToParcelable(parcelable);
+    AudioPortConfig::writeToParcelable(&parcelable->activeConfig);
+    parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
+
+    media::AudioPortDeviceExt ext;
+    ext.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(mDeviceTypeAddr));
+    ext.encapsulationModes = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioEncapsulationMode_mask(mEncapsulationModes));
-    parcelable->encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
+    ext.encapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
             legacy2aidl_AudioEncapsulationMetadataType_mask(mEncapsulationMetadataTypes));
+    UNION_SET(parcelable->ext, device, std::move(ext));
     return OK;
 }
 
 status_t DeviceDescriptorBase::readFromParcel(const Parcel *parcel) {
-    media::DeviceDescriptorBase parcelable;
+    media::AudioPort parcelable;
     return parcelable.readFromParcel(parcel)
         ?: readFromParcelable(parcelable);
 }
 
-status_t DeviceDescriptorBase::readFromParcelable(const media::DeviceDescriptorBase& parcelable) {
-    status_t status = AudioPort::readFromParcelable(parcelable.port)
-                      ?: AudioPortConfig::readFromParcelable(parcelable.portConfig);
+status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcelable) {
+    if (parcelable.type != media::AudioPortType::DEVICE) {
+        return BAD_VALUE;
+    }
+    status_t status = AudioPort::readFromParcelable(parcelable)
+                      ?: AudioPortConfig::readFromParcelable(parcelable.activeConfig);
     if (status != OK) {
         return status;
     }
+
+    media::AudioPortDeviceExt ext = VALUE_OR_RETURN_STATUS(UNION_GET(parcelable.ext, device));
     mDeviceTypeAddr = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioDeviceTypeAddress(parcelable.device));
+            aidl2legacy_AudioDeviceTypeAddress(ext.device));
     mEncapsulationModes = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioEncapsulationMode_mask(parcelable.encapsulationModes));
+            aidl2legacy_AudioEncapsulationMode_mask(ext.encapsulationModes));
     mEncapsulationMetadataTypes = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioEncapsulationMetadataType_mask(parcelable.encapsulationMetadataTypes));
+            aidl2legacy_AudioEncapsulationMetadataType_mask(ext.encapsulationMetadataTypes));
     return OK;
 }
 
@@ -219,7 +227,7 @@ AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorB
 }
 
 ConversionResult<sp<DeviceDescriptorBase>>
-aidl2legacy_DeviceDescriptorBase(const media::DeviceDescriptorBase& aidl) {
+aidl2legacy_DeviceDescriptorBase(const media::AudioPort& aidl) {
     sp<DeviceDescriptorBase> result = new DeviceDescriptorBase(AUDIO_DEVICE_NONE);
     status_t status = result->readFromParcelable(aidl);
     if (status != OK) {
@@ -228,9 +236,9 @@ aidl2legacy_DeviceDescriptorBase(const media::DeviceDescriptorBase& aidl) {
     return result;
 }
 
-ConversionResult<media::DeviceDescriptorBase>
+ConversionResult<media::AudioPort>
 legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy) {
-    media::DeviceDescriptorBase aidl;
+    media::AudioPort aidl;
     status_t status = legacy->writeToParcelable(&aidl);
     if (status != OK) {
         return base::unexpected(status);
