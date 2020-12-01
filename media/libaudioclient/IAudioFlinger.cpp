@@ -1210,7 +1210,7 @@ status_t BnAudioFlinger::onTransact(
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             uint32_t sampleRate = data.readInt32();
             audio_format_t format = (audio_format_t) data.readInt32();
-            audio_channel_mask_t channelMask = data.readInt32();
+            audio_channel_mask_t channelMask = (audio_channel_mask_t) data.readInt32();
             reply->writeInt64( getInputBufferSize(sampleRate, format, channelMask) );
             return NO_ERROR;
         } break;

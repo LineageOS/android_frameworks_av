@@ -2142,8 +2142,10 @@ status_t getAudioOffloadInfo(const sp<MetaData>& meta, bool hasVideo,
     }
     info->sample_rate = srate;
 
-    int32_t cmask = 0;
-    if (!meta->findInt32(kKeyChannelMask, &cmask) || cmask == CHANNEL_MASK_USE_CHANNEL_ORDER) {
+    int32_t rawChannelMask;
+    audio_channel_mask_t cmask = meta->findInt32(kKeyChannelMask, &rawChannelMask) ?
+            static_cast<audio_channel_mask_t>(rawChannelMask) : CHANNEL_MASK_USE_CHANNEL_ORDER;
+    if (cmask == CHANNEL_MASK_USE_CHANNEL_ORDER) {
         ALOGV("track of type '%s' does not publish channel mask", mime);
 
         // Try a channel count instead

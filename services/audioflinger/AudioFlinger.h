@@ -405,7 +405,7 @@ private:
         case AUDIO_CHANNEL_REPRESENTATION_POSITION: {
             // Haptic channel mask is only applicable for channel position mask.
             const uint32_t channelCount = audio_channel_count_from_out_mask(
-                    channelMask & ~AUDIO_CHANNEL_HAPTIC_ALL);
+                    static_cast<audio_channel_mask_t>(channelMask & ~AUDIO_CHANNEL_HAPTIC_ALL));
             const uint32_t maxChannelCount = kEnableExtendedChannels
                     ? AudioMixer::MAX_NUM_CHANNELS : FCC_2;
             if (channelCount < FCC_2 // mono is not supported at this time
