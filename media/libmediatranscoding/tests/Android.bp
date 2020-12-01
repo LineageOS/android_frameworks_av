@@ -1,4 +1,10 @@
 // Build the unit tests for libmediatranscoding.
+filegroup {
+    name: "test_assets",
+    path: "assets",
+    srcs: ["assets/**/*"],
+}
+
 cc_defaults {
     name: "libmediatranscoding_test_defaults",
 

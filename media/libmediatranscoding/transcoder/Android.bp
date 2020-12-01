@@ -60,16 +60,8 @@ cc_defaults {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libmediatranscoder",
     defaults: ["mediatranscoder_defaults"],
 }
 
-cc_library_shared {
-    name: "libmediatranscoder_asan",
-    defaults: ["mediatranscoder_defaults"],
-
-    sanitize: {
-        address: true,
-    },
-}

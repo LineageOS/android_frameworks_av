@@ -17,12 +17,12 @@
     <option name="test-suite-tag" value="TranscoderTests" />
     <target_preparer class="com.android.tradefed.targetprep.PushFilePreparer">
         <option name="cleanup" value="false" />
-        <option name="push-file"
-            key="assets"
-            value="/data/local/tmp/TranscodingTestAssets" />
+        <option name="push-file" key="TranscodingTestAssets" value="/data/local/tmp/TranscodingTestAssets" />
+        <option name="push-file" key="{MODULE}" value="/data/local/tmp/{MODULE}" />
     </target_preparer>
 
     <test class="com.android.tradefed.testtype.GTest" >
+        <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="{MODULE}" />
     </test>
 </configuration>
