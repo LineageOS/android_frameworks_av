@@ -151,7 +151,7 @@ public:
     media_status_t transcodeHelper(const char* srcPath, const char* destPath,
                                    FormatConfigurationCallback formatCallback,
                                    TranscodeExecutionControl executionControl = kRunToCompletion) {
-        auto transcoder = MediaTranscoder::create(mCallbacks, nullptr);
+        auto transcoder = MediaTranscoder::create(mCallbacks);
         EXPECT_NE(transcoder, nullptr);
 
         const int srcFd = open(srcPath, O_RDONLY);

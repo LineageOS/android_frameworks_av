@@ -167,8 +167,10 @@ struct AsyncCodecCallbackDispatch {
 
 // static
 std::shared_ptr<VideoTrackTranscoder> VideoTrackTranscoder::create(
-        const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback) {
-    return std::shared_ptr<VideoTrackTranscoder>(new VideoTrackTranscoder(transcoderCallback));
+        const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback, pid_t pid,
+        uid_t uid) {
+    return std::shared_ptr<VideoTrackTranscoder>(
+            new VideoTrackTranscoder(transcoderCallback, pid, uid));
 }
 
 VideoTrackTranscoder::~VideoTrackTranscoder() {
@@ -232,7 +234,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    AMediaCodec* encoder = AMediaCodec_createEncoderByType(destinationMime);
+    AMediaCodec* encoder = AMediaCodec_createEncoderByTypeForClient(destinationMime, mPid, mUid);
     if (encoder == nullptr) {
         LOG(ERROR) << "Unable to create encoder for type " << destinationMime;
         return AMEDIA_ERROR_UNSUPPORTED;
@@ -261,7 +263,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    mDecoder = AMediaCodec_createDecoderByType(sourceMime);
+    mDecoder = AMediaCodec_createDecoderByTypeForClient(sourceMime, mPid, mUid);
     if (mDecoder == nullptr) {
         LOG(ERROR) << "Unable to create decoder for type " << sourceMime;
         return AMEDIA_ERROR_UNSUPPORTED;

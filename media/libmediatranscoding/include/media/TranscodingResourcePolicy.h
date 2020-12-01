@@ -40,6 +40,7 @@ public:
     ~TranscodingResourcePolicy();
 
     void setCallback(const std::shared_ptr<ResourcePolicyCallbackInterface>& cb) override;
+    void setPidResourceLost(pid_t pid) override;
 
 private:
     struct ResourceObserver;
@@ -51,6 +52,7 @@ private:
     mutable std::mutex mCallbackLock;
     std::weak_ptr<ResourcePolicyCallbackInterface> mResourcePolicyCallback
             GUARDED_BY(mCallbackLock);
+    pid_t mResourceLostPid GUARDED_BY(mCallbackLock);
 
     ::ndk::ScopedAIBinder_DeathRecipient mDeathRecipient;
 
@@ -58,7 +60,7 @@ private:
 
     void registerSelf();
     void unregisterSelf();
-    void onResourceAvailable();
+    void onResourceAvailable(pid_t pid);
 };  // class TranscodingUidPolicy
 
 }  // namespace android

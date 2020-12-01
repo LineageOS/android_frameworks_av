@@ -123,7 +123,7 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     }
 
     for (auto _ : state) {
-        auto transcoder = MediaTranscoder::create(callbacks, nullptr);
+        auto transcoder = MediaTranscoder::create(callbacks);
 
         status = transcoder->configureSource(srcFd);
         if (status != AMEDIA_OK) {
