@@ -380,7 +380,7 @@ sp<DeviceDescriptor> DeviceVector::getDeviceForOpening() const
     if (isEmpty()) {
         // Return nullptr if this collection is empty.
         return nullptr;
-    } else if (areAllOfSameDeviceType(types(), audio_is_input_device)) {
+    } else if (areAllOfSameDeviceType(types(), audio_call_is_input_device)) {
         // For input case, return the first one when there is only one device.
         return size() > 1 ? nullptr : *begin();
     } else if (areAllOfSameDeviceType(types(), audio_is_output_device)) {

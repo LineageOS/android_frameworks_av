@@ -2628,7 +2628,7 @@ status_t BnAudioPolicyService::onTransact(
         case SET_ALLOWED_CAPTURE_POLICY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             uid_t uid = data.readInt32();
-            audio_flags_mask_t flags = data.readInt32();
+            audio_flags_mask_t flags = static_cast<audio_flags_mask_t>(data.readInt32());
             status_t status = setAllowedCapturePolicy(uid, flags);
             reply->writeInt32(status);
             return NO_ERROR;

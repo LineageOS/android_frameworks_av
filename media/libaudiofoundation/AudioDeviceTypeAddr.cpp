@@ -43,7 +43,9 @@ void AudioDeviceTypeAddr::reset() {
 
 status_t AudioDeviceTypeAddr::readFromParcel(const Parcel *parcel) {
     status_t status;
-    if ((status = parcel->readUint32(&mType)) != NO_ERROR) return status;
+    uint32_t rawDeviceType;
+    if ((status = parcel->readUint32(&rawDeviceType)) != NO_ERROR) return status;
+    mType = static_cast<audio_devices_t>(rawDeviceType);
     status = parcel->readUtf8FromUtf16(&mAddress);
     return status;
 }

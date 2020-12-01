@@ -279,7 +279,8 @@ status_t AudioRecord::set(
         mAttributes.source = inputSource;
         if (inputSource == AUDIO_SOURCE_VOICE_COMMUNICATION
                 || inputSource == AUDIO_SOURCE_CAMCORDER) {
-            mAttributes.flags |= AUDIO_FLAG_CAPTURE_PRIVATE;
+            mAttributes.flags = static_cast<audio_flags_mask_t>(
+                    mAttributes.flags | AUDIO_FLAG_CAPTURE_PRIVATE);
         }
     } else {
         // stream type shouldn't be looked at, this track has audio attributes
