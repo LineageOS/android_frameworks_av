@@ -38,6 +38,7 @@
 #define DRC_DEFAULT_MOBILE_DRC_HEAVY 1   /* switch for heavy compression for mobile conf */
 #define DRC_DEFAULT_MOBILE_DRC_EFFECT 3  /* MPEG-D DRC effect type; 3 => Limited playback range */
 #define DRC_DEFAULT_MOBILE_DRC_ALBUM 0  /* MPEG-D DRC album mode; 0 => album mode is disabled, 1 => album mode is enabled */
+#define DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS -1 /* decoder output loudness; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define DRC_DEFAULT_MOBILE_ENC_LEVEL (-1) /* encoder target level; -1 => the value is unknown, otherwise dB step value (e.g. 64 for -16 dB) */
 #define MAX_CHANNEL_COUNT            8  /* maximum number of audio channels that can be decoded */
 // names of properties that can be used to override the default DRC settings
@@ -230,6 +231,15 @@ status_t SoftAAC2::initDecoder() {
     // For seven and eight channel input streams, enable 6.1 and 7.1 channel output
     aacDecoder_SetParam(mAACDecoder, AAC_PCM_MAX_OUTPUT_CHANNELS, -1);
 
+    mDrcCompressMode = DRC_DEFAULT_MOBILE_DRC_HEAVY;
+    mDrcTargetRefLevel = DRC_DEFAULT_MOBILE_REF_LEVEL;
+    mDrcEncTargetLevel = DRC_DEFAULT_MOBILE_ENC_LEVEL;
+    mDrcBoostFactor = DRC_DEFAULT_MOBILE_DRC_BOOST;
+    mDrcAttenuationFactor = DRC_DEFAULT_MOBILE_DRC_CUT;
+    mDrcEffectType = DRC_DEFAULT_MOBILE_DRC_EFFECT;
+    mDrcAlbumMode = DRC_DEFAULT_MOBILE_DRC_ALBUM;
+    mDrcOutputLoudness = DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS;
+
     return status;
 }
 
@@ -358,6 +368,27 @@ OMX_ERRORTYPE SoftAAC2::internalGetParameter(
             return OMX_ErrorNone;
         }
 
+        case OMX_IndexParamAudioAndroidAacDrcPresentation:
+        {
+             OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *aacPresParams =
+                    (OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *)params;
+
+            ALOGD("get OMX_IndexParamAudioAndroidAacDrcPresentation");
+
+            if (!isValidOMXParam(aacPresParams)) {
+                return OMX_ErrorBadParameter;
+            }
+            aacPresParams->nDrcEffectType = mDrcEffectType;
+            aacPresParams->nDrcAlbumMode = mDrcAlbumMode;
+            aacPresParams->nDrcBoost =  mDrcBoostFactor;
+            aacPresParams->nDrcCut = mDrcAttenuationFactor;
+            aacPresParams->nHeavyCompression = mDrcCompressMode;
+            aacPresParams->nTargetReferenceLevel = mDrcTargetRefLevel;
+            aacPresParams->nEncodedTargetLevel = mDrcEncTargetLevel;
+            aacPresParams ->nDrcOutputLoudness = mDrcOutputLoudness;
+            return OMX_ErrorNone;
+        }
+
         default:
             return SimpleSoftOMXComponent::internalGetParameter(index, params);
     }
@@ -464,11 +495,13 @@ OMX_ERRORTYPE SoftAAC2::internalSetParameter(
             if (aacPresParams->nDrcEffectType >= -1) {
                 ALOGV("set nDrcEffectType=%d", aacPresParams->nDrcEffectType);
                 aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_SET_EFFECT, aacPresParams->nDrcEffectType);
+                mDrcEffectType = aacPresParams->nDrcEffectType;
             }
             if (aacPresParams->nDrcAlbumMode >= -1) {
                 ALOGV("set nDrcAlbumMode=%d", aacPresParams->nDrcAlbumMode);
                 aacDecoder_SetParam(mAACDecoder, AAC_UNIDRC_ALBUM_MODE,
                         aacPresParams->nDrcAlbumMode);
+                mDrcAlbumMode = aacPresParams->nDrcAlbumMode;
             }
             bool updateDrcWrapper = false;
             if (aacPresParams->nDrcBoost >= 0) {
@@ -476,33 +509,41 @@ OMX_ERRORTYPE SoftAAC2::internalSetParameter(
                 mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_BOOST_FACTOR,
                         aacPresParams->nDrcBoost);
                 updateDrcWrapper = true;
+                mDrcBoostFactor = aacPresParams->nDrcBoost;
             }
             if (aacPresParams->nDrcCut >= 0) {
                 ALOGV("set nDrcCut=%d", aacPresParams->nDrcCut);
                 mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_ATT_FACTOR, aacPresParams->nDrcCut);
                 updateDrcWrapper = true;
+                mDrcAttenuationFactor = aacPresParams->nDrcCut;
             }
             if (aacPresParams->nHeavyCompression >= 0) {
                 ALOGV("set nHeavyCompression=%d", aacPresParams->nHeavyCompression);
                 mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_HEAVY,
                         aacPresParams->nHeavyCompression);
                 updateDrcWrapper = true;
+                mDrcCompressMode = aacPresParams->nHeavyCompression;
             }
             if (aacPresParams->nTargetReferenceLevel >= -1) {
                 ALOGV("set nTargetReferenceLevel=%d", aacPresParams->nTargetReferenceLevel);
                 mDrcWrap.setParam(DRC_PRES_MODE_WRAP_DESIRED_TARGET,
                         aacPresParams->nTargetReferenceLevel);
                 updateDrcWrapper = true;
+                mDrcTargetRefLevel = aacPresParams->nTargetReferenceLevel;
             }
             if (aacPresParams->nEncodedTargetLevel >= 0) {
                 ALOGV("set nEncodedTargetLevel=%d", aacPresParams->nEncodedTargetLevel);
                 mDrcWrap.setParam(DRC_PRES_MODE_WRAP_ENCODER_TARGET,
                         aacPresParams->nEncodedTargetLevel);
                 updateDrcWrapper = true;
+                mDrcEncTargetLevel = aacPresParams->nEncodedTargetLevel;
             }
             if (aacPresParams->nPCMLimiterEnable >= 0) {
                 aacDecoder_SetParam(mAACDecoder, AAC_PCM_LIMITER_ENABLE,
                         (aacPresParams->nPCMLimiterEnable != 0));
+            }
+            if (aacPresParams ->nDrcOutputLoudness != DRC_DEFAULT_MOBILE_OUTPUT_LOUDNESS) {
+                mDrcOutputLoudness = aacPresParams ->nDrcOutputLoudness;
             }
             if (updateDrcWrapper) {
                 mDrcWrap.update();
@@ -852,6 +893,11 @@ void SoftAAC2::onQueueFilled(OMX_U32 /* portIndex */) {
                     mBufferSizes.add(n);
 
                     // fall through
+                }
+
+                if ( mDrcOutputLoudness != mStreamInfo->outputLoudness) {
+                    ALOGD("update Loudness, before = %d, now = %d", mDrcOutputLoudness, mStreamInfo->outputLoudness);
+                    mDrcOutputLoudness = mStreamInfo->outputLoudness;
                 }
 
                 /*
