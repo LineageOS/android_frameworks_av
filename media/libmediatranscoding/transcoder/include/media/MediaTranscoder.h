@@ -20,6 +20,7 @@
 #include <android/binder_auto_utils.h>
 #include <media/MediaSampleWriter.h>
 #include <media/MediaTrackTranscoderCallback.h>
+#include <media/NdkMediaCodecPlatform.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormat.h>
 #include <utils/Mutex.h>
@@ -70,6 +71,7 @@ public:
      */
     static std::shared_ptr<MediaTranscoder> create(
             const std::shared_ptr<CallbackInterface>& callbacks,
+            pid_t pid = AMEDIACODEC_CALLING_PID, uid_t uid = AMEDIACODEC_CALLING_UID,
             const std::shared_ptr<ndk::ScopedAParcel>& pausedState = nullptr);
 
     /** Configures source from path fd. */
@@ -116,7 +118,7 @@ public:
     virtual ~MediaTranscoder() = default;
 
 private:
-    MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks);
+    MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks, pid_t pid, uid_t uid);
 
     // MediaTrackTranscoderCallback
     virtual void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder) override;
@@ -140,6 +142,8 @@ private:
     std::vector<std::shared_ptr<MediaTrackTranscoder>> mTrackTranscoders;
     std::mutex mTracksAddedMutex;
     std::unordered_set<const MediaTrackTranscoder*> mTracksAdded GUARDED_BY(mTracksAddedMutex);
+    pid_t mPid;
+    uid_t mUid;
 
     std::atomic_bool mCallbackSent = false;
     std::atomic_bool mCancelled = false;

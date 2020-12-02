@@ -19,7 +19,7 @@
 
 #include <android/native_window.h>
 #include <media/MediaTrackTranscoder.h>
-#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaCodecPlatform.h>
 #include <media/NdkMediaFormat.h>
 
 #include <condition_variable>
@@ -38,7 +38,8 @@ class VideoTrackTranscoder : public std::enable_shared_from_this<VideoTrackTrans
                              public MediaTrackTranscoder {
 public:
     static std::shared_ptr<VideoTrackTranscoder> create(
-            const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback);
+            const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback,
+            pid_t pid = AMEDIACODEC_CALLING_PID, uid_t uid = AMEDIACODEC_CALLING_UID);
 
     virtual ~VideoTrackTranscoder() override;
 
@@ -61,8 +62,9 @@ private:
     };
     class CodecWrapper;
 
-    VideoTrackTranscoder(const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback)
-          : MediaTrackTranscoder(transcoderCallback){};
+    VideoTrackTranscoder(const std::weak_ptr<MediaTrackTranscoderCallback>& transcoderCallback,
+                         pid_t pid, uid_t uid)
+          : MediaTrackTranscoder(transcoderCallback), mPid(pid), mUid(uid){};
 
     // MediaTrackTranscoder
     media_status_t runTranscodeLoop() override;
@@ -95,6 +97,8 @@ private:
     BlockingQueue<std::function<void()>> mCodecMessageQueue;
     std::shared_ptr<AMediaFormat> mDestinationFormat;
     std::shared_ptr<AMediaFormat> mActualOutputFormat;
+    pid_t mPid;
+    uid_t mUid;
 };
 
 }  // namespace android

@@ -519,6 +519,7 @@ private:
     const sp<MediaLogNotifier> mMediaLogNotifier;
 
     // This is a helper that is called during incoming binder calls.
+    // Requests media.log to start merging log buffers
     void requestLogMerge();
 
     class TrackHandle;

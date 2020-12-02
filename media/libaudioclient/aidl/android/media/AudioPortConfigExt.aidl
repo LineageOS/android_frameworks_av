@@ -29,7 +29,7 @@ union AudioPortConfigExt {
      * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
      *             established.
      */
-    boolean nothing;
+    boolean unspecified;
     /** Device specific info. */
     AudioPortConfigDeviceExt device;
     /** Mix specific info. */

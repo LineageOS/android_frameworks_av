@@ -27,6 +27,7 @@ public:
     // Set the associated callback interface to send the events when resource
     // status changes. (Set to nullptr will stop the updates.)
     virtual void setCallback(const std::shared_ptr<ResourcePolicyCallbackInterface>& cb) = 0;
+    virtual void setPidResourceLost(pid_t pid) = 0;
 
 protected:
     virtual ~ResourcePolicyInterface() = default;

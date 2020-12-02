@@ -1,10 +1,4 @@
 // Unit tests for libmediatranscoder.
-
-filegroup {
-    name: "test_assets",
-    srcs: ["assets/*"],
-}
-
 cc_defaults {
     name: "testdefaults",
 
@@ -13,11 +7,14 @@ cc_defaults {
         "libmedia_headers",
     ],
 
+    static_libs: [
+        "libmediatranscoder",
+    ],
     shared_libs: [
         "libbase",
         "libcutils",
         "libmediandk",
-        "libmediatranscoder_asan",
+        "libnativewindow",
         "libutils",
     ],
 
@@ -32,7 +29,6 @@ cc_defaults {
             "signed-integer-overflow",
         ],
         cfi: true,
-        address: true,
     },
 
     data: [":test_assets"],

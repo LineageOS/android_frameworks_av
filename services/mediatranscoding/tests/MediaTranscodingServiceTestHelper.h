@@ -176,17 +176,19 @@ struct EventTracker {
         std::unique_lock lock(mLock);
 
         auto startTime = std::chrono::system_clock::now();
+        int64_t remainingUs = timeoutUs;
 
         std::list<Event>::iterator it;
         while (((it = std::find(mEventQueue.begin(), mEventQueue.end(), target)) ==
                 mEventQueue.end()) &&
-               timeoutUs > 0) {
-            std::cv_status status = mCondition.wait_for(lock, std::chrono::microseconds(timeoutUs));
+               remainingUs > 0) {
+            std::cv_status status =
+                    mCondition.wait_for(lock, std::chrono::microseconds(remainingUs));
             if (status == std::cv_status::timeout) {
                 break;
             }
             std::chrono::microseconds elapsedTime = std::chrono::system_clock::now() - startTime;
-            timeoutUs -= elapsedTime.count();
+            remainingUs = timeoutUs - elapsedTime.count();
         }
 
         if (it == mEventQueue.end()) {

@@ -29,7 +29,7 @@ union AudioPortConfigMixExtUseCase {
      * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
      *             established.
      */
-    boolean nothing;
+    boolean unspecified;
     /** This to be set if the containing config has the AudioPortRole::SOURCE role. */
     AudioStreamType stream;
     /** This to be set if the containing config has the AudioPortRole::SINK role. */

@@ -23,7 +23,7 @@ echo "Copying files to device"
 
 adb shell mkdir -p /data/local/tmp/TranscodingTestAssets
 
-FILES=$ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/*
+FILES=$ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/TranscodingTestAssets/*
 for file in $FILES
 do 
 adb push --sync $file /data/local/tmp/TranscodingTestAssets
