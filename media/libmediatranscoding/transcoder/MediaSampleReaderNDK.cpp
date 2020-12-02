@@ -181,6 +181,11 @@ media_status_t MediaSampleReaderNDK::waitForTrack_l(int trackIndex,
     if (mEosReached) {
         return AMEDIA_ERROR_END_OF_STREAM;
     }
+
+    if (!mEnforceSequentialAccess) {
+        return moveToTrack_l(trackIndex);
+    }
+
     return AMEDIA_OK;
 }
 

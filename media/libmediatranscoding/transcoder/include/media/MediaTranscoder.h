@@ -96,23 +96,25 @@ public:
     media_status_t start();
 
     /**
-     * Pauses transcoding. The transcoder's paused state is returned through pausedState. The
-     * paused state is only needed for resuming transcoding with a new MediaTranscoder instance. The
-     * caller can resume transcoding with the current MediaTranscoder instance at any time by
-     * calling resume(). It is not required to cancel a paused transcoder. The paused state is
-     * independent and the caller can always initialize a new transcoder instance with the same
-     * paused state. If the caller wishes to abandon a paused transcoder's operation they can
-     * release the transcoder instance, clear the paused state and delete the partial destination
-     * file. The caller can optionally call cancel to let the transcoder clean up the partial
-     * destination file.
+     * Pauses transcoding and finalizes the partial transcoded file to disk. Pause is a synchronous
+     * operation and will wait until all internal components are done. Once this method returns it
+     * is safe to release the transcoder instance. No callback will be called if the transcoder was
+     * paused successfully. But if the transcoding finishes or encountered an error during pause,
+     * the corresponding callback will be called.
      */
     media_status_t pause(std::shared_ptr<ndk::ScopedAParcel>* pausedState);
 
     /** Resumes a paused transcoding. */
     media_status_t resume();
 
-    /** Cancels the transcoding. Once canceled the transcoding can not be restarted. Client
-     * will be responsible for cleaning up the abandoned file. */
+    /**
+     * Cancels the transcoding. Once canceled the transcoding can not be restarted. Client
+     * will be responsible for cleaning up the abandoned file. Cancel is a synchronous operation and
+     * will wait until all internal components are done. Once this method returns it is safe to
+     * release the transcoder instance. Normally no callback will be called when the transcoder is
+     * cancelled. But if the transcoding finishes or encountered an error during cancel, the
+     * corresponding callback will be called.
+     */
     media_status_t cancel();
 
     virtual ~MediaTranscoder() = default;
@@ -123,17 +125,20 @@ private:
     // MediaTrackTranscoderCallback
     virtual void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder) override;
     virtual void onTrackFinished(const MediaTrackTranscoder* transcoder) override;
+    virtual void onTrackStopped(const MediaTrackTranscoder* transcoder) override;
     virtual void onTrackError(const MediaTrackTranscoder* transcoder,
                               media_status_t status) override;
     // ~MediaTrackTranscoderCallback
 
     // MediaSampleWriter::CallbackInterface
     virtual void onFinished(const MediaSampleWriter* writer, media_status_t status) override;
+    virtual void onStopped(const MediaSampleWriter* writer) override;
     virtual void onProgressUpdate(const MediaSampleWriter* writer, int32_t progress) override;
     // ~MediaSampleWriter::CallbackInterface
 
-    void onSampleWriterFinished(media_status_t status);
-    void sendCallback(media_status_t status);
+    void onThreadFinished(const void* thread, media_status_t threadStatus, bool threadStopped);
+    media_status_t requestStop(bool stopOnSync);
+    void waitForThreads();
 
     std::shared_ptr<CallbackInterface> mCallbacks;
     std::shared_ptr<MediaSampleReader> mSampleReader;
@@ -145,7 +150,20 @@ private:
     pid_t mPid;
     uid_t mUid;
 
-    std::atomic_bool mCallbackSent = false;
+    enum ThreadState {
+        PENDING = 0,  // Not yet started.
+        RUNNING,      // Currently running.
+        DONE,         // Done running (can be finished, stopped or error).
+    };
+    std::mutex mThreadStateMutex;
+    std::condition_variable mThreadsDoneSignal;
+    std::unordered_map<const void*, ThreadState> mThreadStates GUARDED_BY(mThreadStateMutex);
+    media_status_t mTranscoderStatus GUARDED_BY(mThreadStateMutex) = AMEDIA_OK;
+    bool mTranscoderStopped GUARDED_BY(mThreadStateMutex) = false;
+    bool mThreadsDone GUARDED_BY(mThreadStateMutex) = false;
+    bool mCallbackSent GUARDED_BY(mThreadStateMutex) = false;
+    bool mSampleWriterStopped GUARDED_BY(mThreadStateMutex) = false;
+
     std::atomic_bool mCancelled = false;
 };
 

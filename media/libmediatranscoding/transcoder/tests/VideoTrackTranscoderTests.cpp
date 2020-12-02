@@ -135,7 +135,6 @@ TEST_F(VideoTrackTranscoderTests, SampleSoundness) {
     });
 
     EXPECT_EQ(callback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(transcoder->stop());
 }
 
 TEST_F(VideoTrackTranscoderTests, PreserveBitrate) {
@@ -160,7 +159,8 @@ TEST_F(VideoTrackTranscoderTests, PreserveBitrate) {
     auto outputFormat = transcoder->getOutputFormat();
     ASSERT_NE(outputFormat, nullptr);
 
-    ASSERT_TRUE(transcoder->stop());
+    transcoder->stop();
+    EXPECT_EQ(callback->waitUntilFinished(), AMEDIA_OK);
 
     int32_t outBitrate;
     EXPECT_TRUE(AMediaFormat_getInt32(outputFormat.get(), AMEDIAFORMAT_KEY_BIT_RATE, &outBitrate));
@@ -205,7 +205,8 @@ TEST_F(VideoTrackTranscoderTests, LingeringEncoder) {
     // Wait for the encoder to output samples before stopping and releasing the transcoder.
     semaphore.wait();
 
-    EXPECT_TRUE(transcoder->stop());
+    transcoder->stop();
+    EXPECT_EQ(callback->waitUntilFinished(), AMEDIA_OK);
     transcoder.reset();
 
     // Return buffers to the codec so that it can resume processing, but keep one buffer to avoid
