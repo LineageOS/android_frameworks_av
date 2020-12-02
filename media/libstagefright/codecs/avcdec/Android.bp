@@ -16,6 +16,12 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
         cfi: true,
+        diag: {
+            cfi: true,
+        },
+        config: {
+            cfi_assembly_support: true,
+        },
     },
 
     ldflags: ["-Wl,-Bsymbolic"],
