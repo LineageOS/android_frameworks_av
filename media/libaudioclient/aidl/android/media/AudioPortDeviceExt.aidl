@@ -16,18 +16,17 @@
 
 package android.media;
 
-import android.media.AudioConfig;
-import android.media.AudioPort;
+import android.media.AudioDevice;
 
 /**
  * {@hide}
  */
-parcelable OpenOutputRequest {
-    /** Interpreted as audio_module_handle_t. */
-    int module;
-    AudioConfig config;
-    /** Type must be DEVICE. */
-    AudioPort device;
-    /** Bitmask, indexed by AudioOutputFlag. */
-    int flags;
+parcelable AudioPortDeviceExt {
+    /** Module the device is attached to. Interpreted as audio_module_handle_t. */
+    int hwModule;
+    AudioDevice device;
+    /** Bitmask, indexed by AudioEncapsulationMode. */
+    int encapsulationModes;
+    /** Bitmask, indexed by AudioEncapsulationMetadataType. */
+    int encapsulationMetadataTypes;
 }

@@ -17,8 +17,6 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingUidPolicy"
 
-#include <aidl/android/media/BnResourceManagerClient.h>
-#include <aidl/android/media/IResourceManagerService.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include <binder/ActivityManager.h>
@@ -34,43 +32,6 @@ namespace android {
 
 constexpr static uid_t OFFLINE_UID = -1;
 constexpr static const char* kTranscodingTag = "transcoding";
-
-/*
- * The OOM score we're going to ask ResourceManager to use for our native transcoding
- * service. ResourceManager issues reclaims based on these scores. It gets the scores
- * from ActivityManagerService, which doesn't track native services. The values of the
- * OOM scores are defined in:
- * frameworks/base/services/core/java/com/android/server/am/ProcessList.java
- * We use SERVICE_ADJ which is lower priority than an app possibly visible to the
- * user, but higher priority than a cached app (which could be killed without disruption
- * to the user).
- */
-constexpr static int32_t SERVICE_ADJ = 500;
-
-using Status = ::ndk::ScopedAStatus;
-using aidl::android::media::BnResourceManagerClient;
-using aidl::android::media::IResourceManagerService;
-
-/*
- * Placeholder ResourceManagerClient for registering process info override
- * with the IResourceManagerService. This is only used as a token by the service
- * to get notifications about binder death, not used for reclaiming resources.
- */
-struct TranscodingUidPolicy::ResourceManagerClient : public BnResourceManagerClient {
-    explicit ResourceManagerClient() = default;
-
-    Status reclaimResource(bool* _aidl_return) override {
-        *_aidl_return = false;
-        return Status::ok();
-    }
-
-    Status getName(::std::string* _aidl_return) override {
-        _aidl_return->clear();
-        return Status::ok();
-    }
-
-    virtual ~ResourceManagerClient() = default;
-};
 
 struct TranscodingUidPolicy::UidObserver : public BnUidObserver,
                                            public virtual IBinder::DeathRecipient {
@@ -116,7 +77,6 @@ TranscodingUidPolicy::TranscodingUidPolicy()
         mRegistered(false),
         mTopUidState(ActivityManager::PROCESS_STATE_UNKNOWN) {
     registerSelf();
-    setProcessInfoOverride();
 }
 
 TranscodingUidPolicy::~TranscodingUidPolicy() {
@@ -150,22 +110,6 @@ void TranscodingUidPolicy::unregisterSelf() {
     mRegistered = false;
 
     ALOGI("TranscodingUidPolicy: Unregistered with ActivityManager");
-}
-
-void TranscodingUidPolicy::setProcessInfoOverride() {
-    ::ndk::SpAIBinder binder(AServiceManager_getService("media.resource_manager"));
-    std::shared_ptr<IResourceManagerService> service = IResourceManagerService::fromBinder(binder);
-    if (service == nullptr) {
-        ALOGE("Failed to get IResourceManagerService");
-        return;
-    }
-
-    mProcInfoOverrideClient = ::ndk::SharedRefBase::make<ResourceManagerClient>();
-    Status status = service->overrideProcessInfo(
-            mProcInfoOverrideClient, getpid(), ActivityManager::PROCESS_STATE_SERVICE, SERVICE_ADJ);
-    if (!status.isOk()) {
-        ALOGW("Failed to setProcessInfoOverride.");
-    }
 }
 
 void TranscodingUidPolicy::setUidObserverRegistered(bool registered) {

@@ -13,21 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 package android.media;
-
-import android.media.AudioConfig;
-import android.media.AudioPort;
 
 /**
  * {@hide}
  */
-parcelable OpenOutputRequest {
-    /** Interpreted as audio_module_handle_t. */
-    int module;
-    AudioConfig config;
-    /** Type must be DEVICE. */
-    AudioPort device;
-    /** Bitmask, indexed by AudioOutputFlag. */
-    int flags;
+@Backing(type="int")
+enum AudioMixLatencyClass {
+    LOW = 0,
+    NORMAL = 1,
 }

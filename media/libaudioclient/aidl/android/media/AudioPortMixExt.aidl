@@ -16,18 +16,16 @@
 
 package android.media;
 
-import android.media.AudioConfig;
-import android.media.AudioPort;
+import android.media.AudioMixLatencyClass;
 
 /**
  * {@hide}
  */
-parcelable OpenOutputRequest {
-    /** Interpreted as audio_module_handle_t. */
-    int module;
-    AudioConfig config;
-    /** Type must be DEVICE. */
-    AudioPort device;
-    /** Bitmask, indexed by AudioOutputFlag. */
-    int flags;
+parcelable AudioPortMixExt {
+    /** Module the stream is attached to. Interpreted as audio_module_handle_t. */
+    int hwModule;
+    /** I/O handle of the input/output stream. Interpreted as audio_io_handle_t. */
+    int handle;
+    /** Latency class */
+    AudioMixLatencyClass latencyClass;
 }

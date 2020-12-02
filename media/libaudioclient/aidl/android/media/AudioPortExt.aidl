@@ -16,19 +16,24 @@
 
 package android.media;
 
-import android.media.AudioPort;
-import android.media.AudioPortConfig;
-import android.media.AudioDevice;
+import android.media.AudioPortDeviceExt;
+import android.media.AudioPortMixExt;
+import android.media.AudioPortSessionExt;
 
 /**
  * {@hide}
  */
-parcelable DeviceDescriptorBase {
-    AudioPort port;
-    AudioPortConfig portConfig;
-    AudioDevice device;
-    /** Bitmask, indexed by AudioEncapsulationMode. */
-    int encapsulationModes;
-    /** Bitmask, indexed by AudioEncapsulationMetadataType. */
-    int encapsulationMetadataTypes;
+union AudioPortExt {
+    /**
+     * This represents an empty union. Value is ignored.
+     * TODO(ytai): replace with the canonical representation for an empty union, as soon as it is
+     *             established.
+     */
+    boolean unspecified;
+    /** Device specific info. */
+    AudioPortDeviceExt device;
+    /** Mix specific info. */
+    AudioPortMixExt mix;
+    /** Session specific info. */
+    AudioPortSessionExt session;
 }

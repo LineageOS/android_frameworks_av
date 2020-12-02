@@ -18,7 +18,7 @@
 
 #include <vector>
 
-#include <android/media/DeviceDescriptorBase.h>
+#include <android/media/AudioPort.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioContainers.h>
@@ -77,8 +77,8 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
-    status_t writeToParcelable(media::DeviceDescriptorBase* parcelable) const;
-    status_t readFromParcelable(const media::DeviceDescriptorBase& parcelable);
+    status_t writeToParcelable(media::AudioPort* parcelable) const;
+    status_t readFromParcelable(const media::AudioPort& parcelable);
 
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
@@ -113,8 +113,8 @@ AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorB
 
 // Conversion routines, according to AidlConversion.h conventions.
 ConversionResult<sp<DeviceDescriptorBase>>
-aidl2legacy_DeviceDescriptorBase(const media::DeviceDescriptorBase& aidl);
-ConversionResult<media::DeviceDescriptorBase>
+aidl2legacy_DeviceDescriptorBase(const media::AudioPort& aidl);
+ConversionResult<media::AudioPort>
 legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy);
 
 } // namespace android

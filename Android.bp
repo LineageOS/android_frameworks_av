@@ -54,4 +54,9 @@ cc_library_headers {
         "com.android.media",
         "com.android.media.swcodec",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }

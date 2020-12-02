@@ -17,6 +17,8 @@
 package android.media;
 
 import android.media.AudioGain;
+import android.media.AudioPortConfig;
+import android.media.AudioPortExt;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProfile;
@@ -25,11 +27,18 @@ import android.media.AudioProfile;
  * {@hide}
  */
 parcelable AudioPort {
-    /** Gain controllers. */
-    AudioGain[] gains;
-    @utf8InCpp String name;
-    AudioPortType type;
+    /** Port unique ID. Interpreted as audio_port_handle_t. */
+    int id;
+    /** Sink or source. */
     AudioPortRole role;
+    /** Device, mix ... */
+    AudioPortType type;
+    @utf8InCpp String name;
     /** AudioProfiles supported by this port (format, Rates, Channels). */
     AudioProfile[] profiles;
+    /** Gain controllers. */
+    AudioGain[] gains;
+    /** Current audio port configuration. */
+    AudioPortConfig activeConfig;
+    AudioPortExt ext;
 }

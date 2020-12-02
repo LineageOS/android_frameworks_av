@@ -154,11 +154,12 @@ void MediaTranscoder::onProgressUpdate(const MediaSampleWriter* writer __unused,
     mCallbacks->onProgressUpdate(this, progress);
 }
 
-MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks)
-      : mCallbacks(callbacks) {}
+MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks, pid_t pid,
+                                 uid_t uid)
+      : mCallbacks(callbacks), mPid(pid), mUid(uid) {}
 
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
-        const std::shared_ptr<CallbackInterface>& callbacks,
+        const std::shared_ptr<CallbackInterface>& callbacks, pid_t pid, uid_t uid,
         const std::shared_ptr<ndk::ScopedAParcel>& pausedState) {
     if (pausedState != nullptr) {
         LOG(INFO) << "Initializing from paused state.";
@@ -168,7 +169,7 @@ std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         return nullptr;
     }
 
-    return std::shared_ptr<MediaTranscoder>(new MediaTranscoder(callbacks));
+    return std::shared_ptr<MediaTranscoder>(new MediaTranscoder(callbacks, pid, uid));
 }
 
 media_status_t MediaTranscoder::configureSource(int fd) {
@@ -257,7 +258,7 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
             }
         }
 
-        transcoder = VideoTrackTranscoder::create(shared_from_this());
+        transcoder = VideoTrackTranscoder::create(shared_from_this(), mPid, mUid);
 
         AMediaFormat* mergedFormat =
                 mergeMediaFormats(mSourceTrackFormats[trackIndex].get(), trackFormat);

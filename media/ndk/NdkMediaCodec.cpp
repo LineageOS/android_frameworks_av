@@ -19,7 +19,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaCodec"
 
-#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaCodecPlatform.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormatPriv.h>
 #include "NdkMediaCryptoPriv.h"
@@ -312,7 +312,11 @@ static void requestActivityNotification(AMediaCodec *codec) {
 
 extern "C" {
 
-static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool encoder) {
+static AMediaCodec * createAMediaCodec(const char *name,
+                                       bool name_is_type,
+                                       bool encoder,
+                                       pid_t pid = android::MediaCodec::kNoPid,
+                                       uid_t uid = android::MediaCodec::kNoUid) {
     AMediaCodec *mData = new AMediaCodec();
     mData->mLooper = new ALooper;
     mData->mLooper->setName("NDK MediaCodec_looper");
@@ -326,9 +330,20 @@ static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool
         return NULL;
     }
     if (name_is_type) {
-        mData->mCodec = android::MediaCodec::CreateByType(mData->mLooper, name, encoder);
+        mData->mCodec = android::MediaCodec::CreateByType(
+                mData->mLooper,
+                name,
+                encoder,
+                nullptr /* err */,
+                pid,
+                uid);
     } else {
-        mData->mCodec = android::MediaCodec::CreateByComponentName(mData->mLooper, name);
+        mData->mCodec = android::MediaCodec::CreateByComponentName(
+                mData->mLooper,
+                name,
+                nullptr /* err */,
+                pid,
+                uid);
     }
     if (mData->mCodec == NULL) {  // failed to create codec
         AMediaCodec_delete(mData);
@@ -348,17 +363,38 @@ static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool
 
 EXPORT
 AMediaCodec* AMediaCodec_createCodecByName(const char *name) {
-    return createAMediaCodec(name, false, false);
+    return createAMediaCodec(name, false /* name_is_type */, false /* encoder */);
 }
 
 EXPORT
 AMediaCodec* AMediaCodec_createDecoderByType(const char *mime_type) {
-    return createAMediaCodec(mime_type, true, false);
+    return createAMediaCodec(mime_type, true /* name_is_type */, false /* encoder */);
 }
 
 EXPORT
 AMediaCodec* AMediaCodec_createEncoderByType(const char *name) {
-    return createAMediaCodec(name, true, true);
+    return createAMediaCodec(name, true /* name_is_type */, true /* encoder */);
+}
+
+EXPORT
+AMediaCodec* AMediaCodec_createCodecByNameForClient(const char *name,
+                                                    pid_t pid,
+                                                    uid_t uid) {
+    return createAMediaCodec(name, false /* name_is_type */, false /* encoder */, pid, uid);
+}
+
+EXPORT
+AMediaCodec* AMediaCodec_createDecoderByTypeForClient(const char *mime_type,
+                                                      pid_t pid,
+                                                      uid_t uid) {
+    return createAMediaCodec(mime_type, true /* name_is_type */, false /* encoder */, pid, uid);
+}
+
+EXPORT
+AMediaCodec* AMediaCodec_createEncoderByTypeForClient(const char *name,
+                                                      pid_t pid,
+                                                      uid_t uid) {
+    return createAMediaCodec(name, true /* name_is_type */, true /* encoder */, pid, uid);
 }
 
 EXPORT
