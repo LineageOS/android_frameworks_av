@@ -487,7 +487,8 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             break;
         case AUDIO_DEVICE_OUT_SPEAKER:
             device = availableDevices.getFirstExistingDevice({
-                    AUDIO_DEVICE_IN_BACK_MIC, AUDIO_DEVICE_IN_BUILTIN_MIC});
+                    AUDIO_DEVICE_IN_BACK_MIC, AUDIO_DEVICE_IN_BUILTIN_MIC,
+                    AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_USB_HEADSET});
             break;
         default:    // FORCE_NONE
             device = availableDevices.getFirstExistingDevice({
