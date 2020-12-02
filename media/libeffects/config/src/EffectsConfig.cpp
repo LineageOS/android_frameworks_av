@@ -138,7 +138,7 @@ bool stringToStreamType(const char *streamName, Type* type)
 
 template <>
 bool stringToStreamType(const char *streamName, audio_devices_t* type) {
-    return deviceFromString(streamName, *type);
+    return DeviceConverter::fromString(streamName, *type);
 }
 
 /** Parse a library xml note and push the result in libraries or return false on failure. */
