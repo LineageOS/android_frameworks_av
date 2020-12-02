@@ -79,6 +79,15 @@ public:
     std::weak_ptr<UidPolicyCallbackInterface> mUidPolicyCallback;
 };
 
+class TestResourcePolicy : public ResourcePolicyInterface {
+public:
+    TestResourcePolicy() = default;
+    virtual ~TestResourcePolicy() = default;
+
+    void setCallback(const std::shared_ptr<ResourcePolicyCallbackInterface>& /*cb*/) override {}
+    void setPidResourceLost(pid_t /*pid*/) override {}
+};
+
 class TestTranscoder : public TranscoderInterface {
 public:
     TestTranscoder() : mLastError(TranscodingErrorCode::kUnknown) {}
@@ -216,8 +225,9 @@ public:
         ALOGI("TranscodingSessionControllerTest set up");
         mTranscoder.reset(new TestTranscoder());
         mUidPolicy.reset(new TestUidPolicy());
-        mController.reset(new TranscodingSessionController(mTranscoder, mUidPolicy,
-                                                           nullptr /*resourcePolicy*/));
+        mResourcePolicy.reset(new TestResourcePolicy());
+        mController.reset(
+                new TranscodingSessionController(mTranscoder, mUidPolicy, mResourcePolicy));
         mUidPolicy->setCallback(mController);
 
         // Set priority only, ignore other fields for now.
@@ -239,6 +249,7 @@ public:
 
     std::shared_ptr<TestTranscoder> mTranscoder;
     std::shared_ptr<TestUidPolicy> mUidPolicy;
+    std::shared_ptr<TestResourcePolicy> mResourcePolicy;
     std::shared_ptr<TranscodingSessionController> mController;
     TranscodingRequestParcel mOfflineRequest;
     TranscodingRequestParcel mRealtimeRequest;
