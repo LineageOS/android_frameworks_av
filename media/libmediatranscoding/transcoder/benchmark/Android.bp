@@ -2,6 +2,8 @@ cc_defaults {
     name: "benchmarkdefaults",
     shared_libs: ["libmediatranscoder", "libmediandk", "libbase", "libbinder_ndk"],
     static_libs: ["libgoogle-benchmark"],
+    test_config_template: "AndroidTestTemplate.xml",
+    test_suites: ["device-tests", "TranscoderBenchmarks"],
 }
 
 cc_test {
