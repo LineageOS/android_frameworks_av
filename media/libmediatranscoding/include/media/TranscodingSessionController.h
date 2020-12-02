@@ -58,7 +58,7 @@ public:
     void onError(ClientIdType clientId, SessionIdType sessionId, TranscodingErrorCode err) override;
     void onProgressUpdate(ClientIdType clientId, SessionIdType sessionId,
                           int32_t progress) override;
-    void onResourceLost() override;
+    void onResourceLost(ClientIdType clientId, SessionIdType sessionId) override;
     // ~TranscoderCallbackInterface
 
     // UidPolicyCallbackInterface
