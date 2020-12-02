@@ -864,7 +864,8 @@ public:
                                 uid_t uid,
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
-                                const sp<media::IAudioTrackCallback>& callback);
+                                const sp<media::IAudioTrackCallback>& callback,
+                                const std::string& opPackageName);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -1186,7 +1187,7 @@ private:
 
     Mutex                                    mAudioTrackCbLock;
     // Record of IAudioTrackCallback
-    std::set<sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
+    std::map<sp<Track>, sp<media::IAudioTrackCallback>> mAudioTrackCallbacks;
 
 private:
     // The HAL output sink is treated as non-blocking, but current implementation is blocking

@@ -18,8 +18,8 @@
 #define ANDROID_C2_SOFT_GAV1_DEC_H_
 
 #include <SimpleC2Component.h>
-#include "libgav1/src/decoder.h"
-#include "libgav1/src/decoder_settings.h"
+#include "libgav1/src/gav1/decoder.h"
+#include "libgav1/src/gav1/decoder_settings.h"
 
 #define GETTIME(a, b) gettimeofday(a, b);
 #define TIME_DIFF(start, end, diff)     \

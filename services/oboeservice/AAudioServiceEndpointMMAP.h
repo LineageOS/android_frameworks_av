@@ -50,7 +50,7 @@ public:
 
     aaudio_result_t open(const aaudio::AAudioStreamRequest &request) override;
 
-    aaudio_result_t close() override;
+    void close() override;
 
     aaudio_result_t startStream(android::sp<AAudioServiceStreamBase> stream,
                                 audio_port_handle_t *clientHandle) override;

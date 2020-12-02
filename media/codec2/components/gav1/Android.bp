@@ -13,8 +13,4 @@ cc_library_shared {
 
     srcs: ["C2SoftGav1Dec.cpp"],
     static_libs: ["libgav1"],
-
-    include_dirs: [
-        "external/libgav1/libgav1/",
-    ],
 }
