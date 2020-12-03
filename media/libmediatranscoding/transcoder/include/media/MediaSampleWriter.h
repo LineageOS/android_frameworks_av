@@ -84,6 +84,9 @@ public:
          */
         virtual void onFinished(const MediaSampleWriter* writer, media_status_t status) = 0;
 
+        /** Sample writer was stopped before it was finished. */
+        virtual void onStopped(const MediaSampleWriter* writer) = 0;
+
         /** Sample writer progress update in percent. */
         virtual void onProgressUpdate(const MediaSampleWriter* writer, int32_t progress) = 0;
 
@@ -129,15 +132,14 @@ public:
     bool start();
 
     /**
-     * Stops the sample writer. If the sample writer is not yet finished its operation will be
-     * aborted and an error value will be returned to the client in the callback supplied to
-     * {@link #start}. If the sample writer has already finished and the client callback has fired
-     * the writer has already automatically stopped and there is no need to call stop manually. Once
-     * the sample writer has been stopped it cannot be restarted.
-     * @return True if the sample writer was successfully stopped on this call. False if the sample
-     *         writer was already stopped or was never started.
+     * Stops the sample writer. If the sample writer is not yet finished, its operation will be
+     * aborted and the onStopped callback will fire. If the sample writer has already finished and
+     * the onFinished callback has fired the writer has already automatically stopped and there is
+     * no need to call stop manually. Once the sample writer has been stopped it cannot be
+     * restarted. This method is asynchronous and will not wait for the sample writer to stop before
+     * returning.
      */
-    bool stop();
+    void stop();
 
     /** Destructor. */
     ~MediaSampleWriter();
@@ -186,7 +188,6 @@ private:
 
     std::mutex mMutex;  // Protects sample queue and state.
     std::condition_variable mSampleSignal;
-    std::thread mThread;
     std::unordered_map<size_t, TrackRecord> mTracks;
     std::priority_queue<SampleEntry, std::vector<SampleEntry>, SampleComparator> mSampleQueue
             GUARDED_BY(mMutex);
@@ -200,8 +201,8 @@ private:
 
     MediaSampleWriter() : mState(UNINITIALIZED){};
     void addSampleToTrack(size_t trackIndex, const std::shared_ptr<MediaSample>& sample);
-    media_status_t writeSamples();
-    media_status_t runWriterLoop();
+    media_status_t writeSamples(bool* wasStopped);
+    media_status_t runWriterLoop(bool* wasStopped);
 };
 
 }  // namespace android

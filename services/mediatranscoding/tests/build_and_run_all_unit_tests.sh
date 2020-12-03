@@ -14,7 +14,7 @@ fi
 mm
 
 # Push the files onto the device.
-. $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/assets/push_assets.sh
+. $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/push_assets.sh
 
 echo "[==========] installing test apps"
 adb root

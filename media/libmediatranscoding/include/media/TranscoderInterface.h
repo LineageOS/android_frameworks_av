@@ -64,7 +64,7 @@ public:
     // If there is any session currently running, it will be paused. When resource contention
     // is solved, the controller should call TranscoderInterface's to either start a new session,
     // or resume a paused session.
-    virtual void onResourceLost() = 0;
+    virtual void onResourceLost(ClientIdType clientId, SessionIdType sessionId) = 0;
 
 protected:
     virtual ~TranscoderCallbackInterface() = default;

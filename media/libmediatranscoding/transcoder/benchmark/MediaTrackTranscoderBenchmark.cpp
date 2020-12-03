@@ -61,6 +61,12 @@ public:
         mCondition.notify_all();
     }
 
+    virtual void onTrackStopped(const MediaTrackTranscoder* transcoder __unused) override {
+        std::unique_lock lock(mMutex);
+        mFinished = true;
+        mCondition.notify_all();
+    }
+
     virtual void onTrackError(const MediaTrackTranscoder* transcoder __unused,
                               media_status_t status) override {
         std::unique_lock lock(mMutex);

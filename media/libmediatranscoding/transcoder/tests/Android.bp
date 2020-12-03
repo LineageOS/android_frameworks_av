@@ -12,6 +12,8 @@ cc_defaults {
     ],
     shared_libs: [
         "libbase",
+        "libbinder_ndk",
+        "libcrypto",
         "libcutils",
         "libmediandk",
         "libnativewindow",
@@ -55,7 +57,6 @@ cc_test {
     name: "MediaTrackTranscoderTests",
     defaults: ["testdefaults"],
     srcs: ["MediaTrackTranscoderTests.cpp"],
-    shared_libs: ["libbinder_ndk"],
 }
 
 // VideoTrackTranscoder unit test
@@ -70,7 +71,6 @@ cc_test {
     name: "PassthroughTrackTranscoderTests",
     defaults: ["testdefaults"],
     srcs: ["PassthroughTrackTranscoderTests.cpp"],
-    shared_libs: ["libcrypto"],
 }
 
 // MediaSampleWriter unit test
@@ -85,5 +85,4 @@ cc_test {
     name: "MediaTranscoderTests",
     defaults: ["testdefaults"],
     srcs: ["MediaTranscoderTests.cpp"],
-    shared_libs: ["libbinder_ndk"],
 }

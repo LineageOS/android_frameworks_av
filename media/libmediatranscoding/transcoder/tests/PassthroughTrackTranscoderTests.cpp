@@ -183,7 +183,6 @@ TEST_F(PassthroughTrackTranscoderTests, SampleEquality) {
 
     callback->waitUntilFinished();
     EXPECT_EQ(sampleCount, sampleChecksums.size());
-    EXPECT_TRUE(transcoder.stop());
 }
 
 /** Class for testing PassthroughTrackTranscoder's built in buffer pool. */

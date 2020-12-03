@@ -192,7 +192,7 @@ void TranscoderWrapper::reportError(ClientIdType clientId, SessionIdType session
                                         new ndk::ScopedAParcel());
             }
 
-            callback->onResourceLost();
+            callback->onResourceLost(clientId, sessionId);
         } else {
             callback->onError(clientId, sessionId, toTranscodingError(err));
         }
