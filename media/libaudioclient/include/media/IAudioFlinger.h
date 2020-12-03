@@ -24,8 +24,6 @@
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
 #include <binder/IInterface.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
 #include <media/AidlConversion.h>
 #include <media/AudioClient.h>
 #include <media/DeviceDescriptorBase.h>
@@ -37,6 +35,8 @@
 #include <string>
 #include <vector>
 
+#include <android/media/BnAudioFlingerService.h>
+#include <android/media/BpAudioFlingerService.h>
 #include "android/media/CreateEffectRequest.h"
 #include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
@@ -58,10 +58,11 @@ namespace android {
 
 // ----------------------------------------------------------------------------
 
-class IAudioFlinger : public IInterface
-{
+class IAudioFlinger : public RefBase {
 public:
-    DECLARE_META_INTERFACE(AudioFlinger);
+    static constexpr char DEFAULT_SERVICE_NAME[] = "media.audio_flinger";
+
+    virtual ~IAudioFlinger() = default;
 
     /* CreateTrackInput contains all input arguments sent by AudioTrack to AudioFlinger
      * when calling createTrack() including arguments that will be updated by AudioFlinger
@@ -162,7 +163,8 @@ public:
         sp<media::IAudioRecord> audioRecord;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
-        static ConversionResult<CreateRecordOutput> fromAidl(const media::CreateRecordResponse& aidl);
+        static ConversionResult<CreateRecordOutput>
+        fromAidl(const media::CreateRecordResponse& aidl);
     };
 
     /* create an audio track and registers it with AudioFlinger.
@@ -300,10 +302,6 @@ public:
     // is obtained from android.app.ActivityManager.MemoryInfo.totalMem.
     virtual status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) = 0;
 
-    /* List available audio ports and their attributes */
-    virtual status_t listAudioPorts(unsigned int *num_ports,
-                                    struct audio_port *ports) = 0;
-
     /* Get attributes for a given audio port */
     virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
 
@@ -333,85 +331,284 @@ public:
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids) = 0;
-
-protected:
-    enum {
-        CREATE_TRACK = IBinder::FIRST_CALL_TRANSACTION,
-        CREATE_RECORD,
-        SAMPLE_RATE,
-        RESERVED,   // obsolete, was CHANNEL_COUNT
-        FORMAT,
-        FRAME_COUNT,
-        LATENCY,
-        SET_MASTER_VOLUME,
-        SET_MASTER_MUTE,
-        MASTER_VOLUME,
-        MASTER_MUTE,
-        SET_STREAM_VOLUME,
-        SET_STREAM_MUTE,
-        STREAM_VOLUME,
-        STREAM_MUTE,
-        SET_MODE,
-        SET_MIC_MUTE,
-        GET_MIC_MUTE,
-        SET_RECORD_SILENCED,
-        SET_PARAMETERS,
-        GET_PARAMETERS,
-        REGISTER_CLIENT,
-        GET_INPUTBUFFERSIZE,
-        OPEN_OUTPUT,
-        OPEN_DUPLICATE_OUTPUT,
-        CLOSE_OUTPUT,
-        SUSPEND_OUTPUT,
-        RESTORE_OUTPUT,
-        OPEN_INPUT,
-        CLOSE_INPUT,
-        INVALIDATE_STREAM,
-        SET_VOICE_VOLUME,
-        GET_RENDER_POSITION,
-        GET_INPUT_FRAMES_LOST,
-        NEW_AUDIO_UNIQUE_ID,
-        ACQUIRE_AUDIO_SESSION_ID,
-        RELEASE_AUDIO_SESSION_ID,
-        QUERY_NUM_EFFECTS,
-        QUERY_EFFECT,
-        GET_EFFECT_DESCRIPTOR,
-        CREATE_EFFECT,
-        MOVE_EFFECTS,
-        LOAD_HW_MODULE,
-        GET_PRIMARY_OUTPUT_SAMPLING_RATE,
-        GET_PRIMARY_OUTPUT_FRAME_COUNT,
-        SET_LOW_RAM_DEVICE,
-        LIST_AUDIO_PORTS,
-        GET_AUDIO_PORT,
-        CREATE_AUDIO_PATCH,
-        RELEASE_AUDIO_PATCH,
-        LIST_AUDIO_PATCHES,
-        SET_AUDIO_PORT_CONFIG,
-        GET_AUDIO_HW_SYNC_FOR_SESSION,
-        SYSTEM_READY,
-        FRAME_COUNT_HAL,
-        GET_MICROPHONES,
-        SET_MASTER_BALANCE,
-        GET_MASTER_BALANCE,
-        SET_EFFECT_SUSPENDED,
-        SET_AUDIO_HAL_PIDS
-    };
 };
 
-
-// ----------------------------------------------------------------------------
-
-class BnAudioFlinger : public BnInterface<IAudioFlinger>
-{
+/**
+ * A client-side adapter, wrapping an IAudioFlingerService instance and presenting it as an
+ * IAudioFlinger. Intended to be used by legacy client code that was written against IAudioFlinger,
+ * before IAudioFlingerService was introduced as an AIDL service.
+ * New clients should not use this adapter, but rather IAudioFlingerService directly, via
+ * BpAudioFlingerService.
+ */
+class AudioFlingerClientAdapter : public IAudioFlinger {
 public:
-    virtual status_t    onTransact( uint32_t code,
-                                    const Parcel& data,
-                                    Parcel* reply,
-                                    uint32_t flags = 0);
+    explicit AudioFlingerClientAdapter(const sp<media::IAudioFlingerService> delegate);
+
+    status_t createTrack(const media::CreateTrackRequest& input,
+                         media::CreateTrackResponse& output) override;
+    status_t createRecord(const media::CreateRecordRequest& input,
+                          media::CreateRecordResponse& output) override;
+    uint32_t sampleRate(audio_io_handle_t ioHandle) const override;
+    audio_format_t format(audio_io_handle_t output) const override;
+    size_t frameCount(audio_io_handle_t ioHandle) const override;
+    uint32_t latency(audio_io_handle_t output) const override;
+    status_t setMasterVolume(float value) override;
+    status_t setMasterMute(bool muted) override;
+    float masterVolume() const override;
+    bool masterMute() const override;
+    status_t setMasterBalance(float balance) override;
+    status_t getMasterBalance(float* balance) const override;
+    status_t setStreamVolume(audio_stream_type_t stream, float value,
+                             audio_io_handle_t output) override;
+    status_t setStreamMute(audio_stream_type_t stream, bool muted) override;
+    float streamVolume(audio_stream_type_t stream,
+                       audio_io_handle_t output) const override;
+    bool streamMute(audio_stream_type_t stream) const override;
+    status_t setMode(audio_mode_t mode) override;
+    status_t setMicMute(bool state) override;
+    bool getMicMute() const override;
+    void setRecordSilenced(audio_port_handle_t portId, bool silenced) override;
+    status_t setParameters(audio_io_handle_t ioHandle,
+                           const String8& keyValuePairs) override;
+    String8 getParameters(audio_io_handle_t ioHandle, const String8& keys)
+    const override;
+    void registerClient(const sp<media::IAudioFlingerClient>& client) override;
+    size_t getInputBufferSize(uint32_t sampleRate, audio_format_t format,
+                              audio_channel_mask_t channelMask) const override;
+    status_t openOutput(const media::OpenOutputRequest& request,
+                        media::OpenOutputResponse* response) override;
+    audio_io_handle_t openDuplicateOutput(audio_io_handle_t output1,
+                                          audio_io_handle_t output2) override;
+    status_t closeOutput(audio_io_handle_t output) override;
+    status_t suspendOutput(audio_io_handle_t output) override;
+    status_t restoreOutput(audio_io_handle_t output) override;
+    status_t openInput(const media::OpenInputRequest& request,
+                       media::OpenInputResponse* response) override;
+    status_t closeInput(audio_io_handle_t input) override;
+    status_t invalidateStream(audio_stream_type_t stream) override;
+    status_t setVoiceVolume(float volume) override;
+    status_t getRenderPosition(uint32_t* halFrames, uint32_t* dspFrames,
+                               audio_io_handle_t output) const override;
+    uint32_t getInputFramesLost(audio_io_handle_t ioHandle) const override;
+    audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use) override;
+    void acquireAudioSessionId(audio_session_t audioSession, pid_t pid, uid_t uid) override;
+    void releaseAudioSessionId(audio_session_t audioSession, pid_t pid) override;
+    status_t queryNumberEffects(uint32_t* numEffects) const override;
+    status_t queryEffect(uint32_t index, effect_descriptor_t* pDescriptor) const override;
+    status_t getEffectDescriptor(const effect_uuid_t* pEffectUUID,
+                                 const effect_uuid_t* pTypeUUID,
+                                 uint32_t preferredTypeFlag,
+                                 effect_descriptor_t* pDescriptor) const override;
+    status_t createEffect(const media::CreateEffectRequest& request,
+                          media::CreateEffectResponse* response) override;
+    status_t moveEffects(audio_session_t session, audio_io_handle_t srcOutput,
+                         audio_io_handle_t dstOutput) override;
+    void setEffectSuspended(int effectId,
+                            audio_session_t sessionId,
+                            bool suspended) override;
+    audio_module_handle_t loadHwModule(const char* name) override;
+    uint32_t getPrimaryOutputSamplingRate() override;
+    size_t getPrimaryOutputFrameCount() override;
+    status_t setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
+    status_t getAudioPort(struct audio_port_v7* port) override;
+    status_t createAudioPatch(const struct audio_patch* patch,
+                              audio_patch_handle_t* handle) override;
+    status_t releaseAudioPatch(audio_patch_handle_t handle) override;
+    status_t listAudioPatches(unsigned int* num_patches,
+                              struct audio_patch* patches) override;
+    status_t setAudioPortConfig(const struct audio_port_config* config) override;
+    audio_hw_sync_t getAudioHwSyncForSession(audio_session_t sessionId) override;
+    status_t systemReady() override;
+    size_t frameCountHAL(audio_io_handle_t ioHandle) const override;
+    status_t getMicrophones(std::vector<media::MicrophoneInfo>* microphones) override;
+    status_t setAudioHalPids(const std::vector<pid_t>& pids) override;
+
+private:
+    const sp<media::IAudioFlingerService> mDelegate;
 };
 
-// ----------------------------------------------------------------------------
+/**
+ * A server-side adapter, wrapping an IAudioFlinger instance and presenting it as an
+ * IAudioFlingerService. Intended to be used by legacy server code that was written against
+ * IAudioFlinger, before IAudioFlingerService was introduced as an AIDL service.
+ * New servers should not use this adapter, but rather implement IAudioFlingerService directly, via
+ * BnAudioFlingerService.
+ */
+class AudioFlingerServerAdapter : public media::BnAudioFlingerService {
+public:
+    using Status = binder::Status;
+
+    /**
+     * Legacy server should implement this interface in order to be wrapped.
+     */
+    class Delegate : public IAudioFlinger {
+    protected:
+        friend class AudioFlingerServerAdapter;
+
+        enum class TransactionCode {
+            CREATE_TRACK = media::BnAudioFlingerService::TRANSACTION_createTrack,
+            CREATE_RECORD = media::BnAudioFlingerService::TRANSACTION_createRecord,
+            SAMPLE_RATE = media::BnAudioFlingerService::TRANSACTION_sampleRate,
+            FORMAT = media::BnAudioFlingerService::TRANSACTION_format,
+            FRAME_COUNT = media::BnAudioFlingerService::TRANSACTION_frameCount,
+            LATENCY = media::BnAudioFlingerService::TRANSACTION_latency,
+            SET_MASTER_VOLUME = media::BnAudioFlingerService::TRANSACTION_setMasterVolume,
+            SET_MASTER_MUTE = media::BnAudioFlingerService::TRANSACTION_setMasterMute,
+            MASTER_VOLUME = media::BnAudioFlingerService::TRANSACTION_masterVolume,
+            MASTER_MUTE = media::BnAudioFlingerService::TRANSACTION_masterMute,
+            SET_STREAM_VOLUME = media::BnAudioFlingerService::TRANSACTION_setStreamVolume,
+            SET_STREAM_MUTE = media::BnAudioFlingerService::TRANSACTION_setStreamMute,
+            STREAM_VOLUME = media::BnAudioFlingerService::TRANSACTION_streamVolume,
+            STREAM_MUTE = media::BnAudioFlingerService::TRANSACTION_streamMute,
+            SET_MODE = media::BnAudioFlingerService::TRANSACTION_setMode,
+            SET_MIC_MUTE = media::BnAudioFlingerService::TRANSACTION_setMicMute,
+            GET_MIC_MUTE = media::BnAudioFlingerService::TRANSACTION_getMicMute,
+            SET_RECORD_SILENCED = media::BnAudioFlingerService::TRANSACTION_setRecordSilenced,
+            SET_PARAMETERS = media::BnAudioFlingerService::TRANSACTION_setParameters,
+            GET_PARAMETERS = media::BnAudioFlingerService::TRANSACTION_getParameters,
+            REGISTER_CLIENT = media::BnAudioFlingerService::TRANSACTION_registerClient,
+            GET_INPUTBUFFERSIZE = media::BnAudioFlingerService::TRANSACTION_getInputBufferSize,
+            OPEN_OUTPUT = media::BnAudioFlingerService::TRANSACTION_openOutput,
+            OPEN_DUPLICATE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_openDuplicateOutput,
+            CLOSE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_closeOutput,
+            SUSPEND_OUTPUT = media::BnAudioFlingerService::TRANSACTION_suspendOutput,
+            RESTORE_OUTPUT = media::BnAudioFlingerService::TRANSACTION_restoreOutput,
+            OPEN_INPUT = media::BnAudioFlingerService::TRANSACTION_openInput,
+            CLOSE_INPUT = media::BnAudioFlingerService::TRANSACTION_closeInput,
+            INVALIDATE_STREAM = media::BnAudioFlingerService::TRANSACTION_invalidateStream,
+            SET_VOICE_VOLUME = media::BnAudioFlingerService::TRANSACTION_setVoiceVolume,
+            GET_RENDER_POSITION = media::BnAudioFlingerService::TRANSACTION_getRenderPosition,
+            GET_INPUT_FRAMES_LOST = media::BnAudioFlingerService::TRANSACTION_getInputFramesLost,
+            NEW_AUDIO_UNIQUE_ID = media::BnAudioFlingerService::TRANSACTION_newAudioUniqueId,
+            ACQUIRE_AUDIO_SESSION_ID = media::BnAudioFlingerService::TRANSACTION_acquireAudioSessionId,
+            RELEASE_AUDIO_SESSION_ID = media::BnAudioFlingerService::TRANSACTION_releaseAudioSessionId,
+            QUERY_NUM_EFFECTS = media::BnAudioFlingerService::TRANSACTION_queryNumberEffects,
+            QUERY_EFFECT = media::BnAudioFlingerService::TRANSACTION_queryEffect,
+            GET_EFFECT_DESCRIPTOR = media::BnAudioFlingerService::TRANSACTION_getEffectDescriptor,
+            CREATE_EFFECT = media::BnAudioFlingerService::TRANSACTION_createEffect,
+            MOVE_EFFECTS = media::BnAudioFlingerService::TRANSACTION_moveEffects,
+            LOAD_HW_MODULE = media::BnAudioFlingerService::TRANSACTION_loadHwModule,
+            GET_PRIMARY_OUTPUT_SAMPLING_RATE = media::BnAudioFlingerService::TRANSACTION_getPrimaryOutputSamplingRate,
+            GET_PRIMARY_OUTPUT_FRAME_COUNT = media::BnAudioFlingerService::TRANSACTION_getPrimaryOutputFrameCount,
+            SET_LOW_RAM_DEVICE = media::BnAudioFlingerService::TRANSACTION_setLowRamDevice,
+            GET_AUDIO_PORT = media::BnAudioFlingerService::TRANSACTION_getAudioPort,
+            CREATE_AUDIO_PATCH = media::BnAudioFlingerService::TRANSACTION_createAudioPatch,
+            RELEASE_AUDIO_PATCH = media::BnAudioFlingerService::TRANSACTION_releaseAudioPatch,
+            LIST_AUDIO_PATCHES = media::BnAudioFlingerService::TRANSACTION_listAudioPatches,
+            SET_AUDIO_PORT_CONFIG = media::BnAudioFlingerService::TRANSACTION_setAudioPortConfig,
+            GET_AUDIO_HW_SYNC_FOR_SESSION = media::BnAudioFlingerService::TRANSACTION_getAudioHwSyncForSession,
+            SYSTEM_READY = media::BnAudioFlingerService::TRANSACTION_systemReady,
+            FRAME_COUNT_HAL = media::BnAudioFlingerService::TRANSACTION_frameCountHAL,
+            GET_MICROPHONES = media::BnAudioFlingerService::TRANSACTION_getMicrophones,
+            SET_MASTER_BALANCE = media::BnAudioFlingerService::TRANSACTION_setMasterBalance,
+            GET_MASTER_BALANCE = media::BnAudioFlingerService::TRANSACTION_getMasterBalance,
+            SET_EFFECT_SUSPENDED = media::BnAudioFlingerService::TRANSACTION_setEffectSuspended,
+            SET_AUDIO_HAL_PIDS = media::BnAudioFlingerService::TRANSACTION_setAudioHalPids,
+        };
+
+        /**
+         * And optional hook, called on every transaction, before unparceling the data and
+         * dispatching to the respective method. Useful for bulk operations, such as logging or
+         * permission checks.
+         * If an error status is returned, the transaction will return immediately and will not be
+         * processed.
+         */
+        virtual status_t onPreTransact(TransactionCode code, const Parcel& data, uint32_t flags) {
+            (void) code;
+            (void) data;
+            (void) flags;
+            return OK;
+        };
+
+        /**
+         * An optional hook for implementing diagnostics dumping.
+         */
+        virtual status_t dump(int fd, const Vector<String16>& args) {
+            (void) fd;
+            (void) args;
+            return OK;
+        }
+    };
+
+    explicit AudioFlingerServerAdapter(
+            const sp<AudioFlingerServerAdapter::Delegate>& delegate);
+
+    status_t onTransact(uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) override;
+    status_t dump(int fd, const Vector<String16>& args) override;
+
+    Status createTrack(const media::CreateTrackRequest& request,
+                       media::CreateTrackResponse* _aidl_return) override;
+    Status createRecord(const media::CreateRecordRequest& request,
+                        media::CreateRecordResponse* _aidl_return) override;
+    Status sampleRate(int32_t ioHandle, int32_t* _aidl_return) override;
+    Status format(int32_t output, media::audio::common::AudioFormat* _aidl_return) override;
+    Status frameCount(int32_t ioHandle, int64_t* _aidl_return) override;
+    Status latency(int32_t output, int32_t* _aidl_return) override;
+    Status setMasterVolume(float value) override;
+    Status setMasterMute(bool muted) override;
+    Status masterVolume(float* _aidl_return) override;
+    Status masterMute(bool* _aidl_return) override;
+    Status setMasterBalance(float balance) override;
+    Status getMasterBalance(float* _aidl_return) override;
+    Status setStreamVolume(media::AudioStreamType stream, float value, int32_t output) override;
+    Status setStreamMute(media::AudioStreamType stream, bool muted) override;
+    Status
+    streamVolume(media::AudioStreamType stream, int32_t output, float* _aidl_return) override;
+    Status streamMute(media::AudioStreamType stream, bool* _aidl_return) override;
+    Status setMode(media::AudioMode mode) override;
+    Status setMicMute(bool state) override;
+    Status getMicMute(bool* _aidl_return) override;
+    Status setRecordSilenced(int32_t portId, bool silenced) override;
+    Status setParameters(int32_t ioHandle, const std::string& keyValuePairs) override;
+    Status
+    getParameters(int32_t ioHandle, const std::string& keys, std::string* _aidl_return) override;
+    Status registerClient(const sp<media::IAudioFlingerClient>& client) override;
+    Status getInputBufferSize(int32_t sampleRate, media::audio::common::AudioFormat format,
+                              int32_t channelMask, int64_t* _aidl_return) override;
+    Status openOutput(const media::OpenOutputRequest& request,
+                      media::OpenOutputResponse* _aidl_return) override;
+    Status openDuplicateOutput(int32_t output1, int32_t output2, int32_t* _aidl_return) override;
+    Status closeOutput(int32_t output) override;
+    Status suspendOutput(int32_t output) override;
+    Status restoreOutput(int32_t output) override;
+    Status openInput(const media::OpenInputRequest& request,
+                     media::OpenInputResponse* _aidl_return) override;
+    Status closeInput(int32_t input) override;
+    Status invalidateStream(media::AudioStreamType stream) override;
+    Status setVoiceVolume(float volume) override;
+    Status getRenderPosition(int32_t output, media::RenderPosition* _aidl_return) override;
+    Status getInputFramesLost(int32_t ioHandle, int32_t* _aidl_return) override;
+    Status newAudioUniqueId(media::AudioUniqueIdUse use, int32_t* _aidl_return) override;
+    Status acquireAudioSessionId(int32_t audioSession, int32_t pid, int32_t uid) override;
+    Status releaseAudioSessionId(int32_t audioSession, int32_t pid) override;
+    Status queryNumberEffects(int32_t* _aidl_return) override;
+    Status queryEffect(int32_t index, media::EffectDescriptor* _aidl_return) override;
+    Status getEffectDescriptor(const media::AudioUuid& effectUUID, const media::AudioUuid& typeUUID,
+                               int32_t preferredTypeFlag,
+                               media::EffectDescriptor* _aidl_return) override;
+    Status createEffect(const media::CreateEffectRequest& request,
+                        media::CreateEffectResponse* _aidl_return) override;
+    Status moveEffects(int32_t session, int32_t srcOutput, int32_t dstOutput) override;
+    Status setEffectSuspended(int32_t effectId, int32_t sessionId, bool suspended) override;
+    Status loadHwModule(const std::string& name, int32_t* _aidl_return) override;
+    Status getPrimaryOutputSamplingRate(int32_t* _aidl_return) override;
+    Status getPrimaryOutputFrameCount(int64_t* _aidl_return) override;
+    Status setLowRamDevice(bool isLowRamDevice, int64_t totalMemory) override;
+    Status getAudioPort(const media::AudioPort& port, media::AudioPort* _aidl_return) override;
+    Status createAudioPatch(const media::AudioPatch& patch, int32_t* _aidl_return) override;
+    Status releaseAudioPatch(int32_t handle) override;
+    Status listAudioPatches(int32_t maxCount,
+                            std::vector<media::AudioPatch>* _aidl_return) override;
+    Status setAudioPortConfig(const media::AudioPortConfig& config) override;
+    Status getAudioHwSyncForSession(int32_t sessionId, int32_t* _aidl_return) override;
+    Status systemReady() override;
+    Status frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) override;
+    Status getMicrophones(std::vector<media::MicrophoneInfoData>* _aidl_return) override;
+    Status setAudioHalPids(const std::vector<int32_t>& pids) override;
+
+private:
+    const sp<AudioFlingerServerAdapter::Delegate> mDelegate;
+};
 
 }; // namespace android
 

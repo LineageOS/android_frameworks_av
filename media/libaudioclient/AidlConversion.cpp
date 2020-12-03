@@ -236,6 +236,14 @@ ConversionResult<int32_t> legacy2aidl_audio_unique_id_t_int32_t(audio_unique_id_
     return convertReinterpret<int32_t>(legacy);
 }
 
+ConversionResult<audio_hw_sync_t> aidl2legacy_int32_t_audio_hw_sync_t(int32_t aidl) {
+    return convertReinterpret<audio_hw_sync_t>(aidl);
+}
+
+ConversionResult<int32_t> legacy2aidl_audio_hw_sync_t_int32_t(audio_hw_sync_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
 ConversionResult<pid_t> aidl2legacy_int32_t_pid_t(int32_t aidl) {
     return convertReinterpret<pid_t>(aidl);
 }
@@ -2080,6 +2088,98 @@ legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy) {
             legacy2aidl_audio_port_config_AudioPortConfig(legacy.active_config));
     aidl.ext = VALUE_OR_RETURN(legacy2aidl_AudioPortExt(legacy.ext, legacy.type));
     return aidl;
+}
+
+ConversionResult<audio_mode_t>
+aidl2legacy_AudioMode_audio_mode_t(media::AudioMode aidl) {
+    switch (aidl) {
+        case media::AudioMode::INVALID:
+            return AUDIO_MODE_INVALID;
+        case media::AudioMode::CURRENT:
+            return AUDIO_MODE_CURRENT;
+        case media::AudioMode::NORMAL:
+            return AUDIO_MODE_NORMAL;
+        case media::AudioMode::RINGTONE:
+            return AUDIO_MODE_RINGTONE;
+        case media::AudioMode::IN_CALL:
+            return AUDIO_MODE_IN_CALL;
+        case media::AudioMode::IN_COMMUNICATION:
+            return AUDIO_MODE_IN_COMMUNICATION;
+        case media::AudioMode::CALL_SCREEN:
+            return AUDIO_MODE_CALL_SCREEN;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioMode>
+legacy2aidl_audio_mode_t_AudioMode(audio_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_MODE_INVALID:
+            return media::AudioMode::INVALID;
+        case AUDIO_MODE_CURRENT:
+            return media::AudioMode::CURRENT;
+        case AUDIO_MODE_NORMAL:
+            return media::AudioMode::NORMAL;
+        case AUDIO_MODE_RINGTONE:
+            return media::AudioMode::RINGTONE;
+        case AUDIO_MODE_IN_CALL:
+            return media::AudioMode::IN_CALL;
+        case AUDIO_MODE_IN_COMMUNICATION:
+            return media::AudioMode::IN_COMMUNICATION;
+        case AUDIO_MODE_CALL_SCREEN:
+            return media::AudioMode::CALL_SCREEN;
+        case AUDIO_MODE_CNT:
+            break;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_unique_id_use_t>
+aidl2legacy_AudioUniqueIdUse_audio_unique_id_use_t(media::AudioUniqueIdUse aidl) {
+    switch (aidl) {
+        case media::AudioUniqueIdUse::UNSPECIFIED:
+            return AUDIO_UNIQUE_ID_USE_UNSPECIFIED;
+        case media::AudioUniqueIdUse::SESSION:
+            return AUDIO_UNIQUE_ID_USE_SESSION;
+        case media::AudioUniqueIdUse::MODULE:
+            return AUDIO_UNIQUE_ID_USE_MODULE;
+        case media::AudioUniqueIdUse::EFFECT:
+            return AUDIO_UNIQUE_ID_USE_EFFECT;
+        case media::AudioUniqueIdUse::PATCH:
+            return AUDIO_UNIQUE_ID_USE_PATCH;
+        case media::AudioUniqueIdUse::OUTPUT:
+            return AUDIO_UNIQUE_ID_USE_OUTPUT;
+        case media::AudioUniqueIdUse::INPUT:
+            return AUDIO_UNIQUE_ID_USE_INPUT;
+        case media::AudioUniqueIdUse::CLIENT:
+            return AUDIO_UNIQUE_ID_USE_CLIENT;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioUniqueIdUse>
+legacy2aidl_audio_unique_id_use_t_AudioUniqueIdUse(audio_unique_id_use_t legacy) {
+    switch (legacy) {
+        case AUDIO_UNIQUE_ID_USE_UNSPECIFIED:
+            return media::AudioUniqueIdUse::UNSPECIFIED;
+        case AUDIO_UNIQUE_ID_USE_SESSION:
+            return media::AudioUniqueIdUse::SESSION;
+        case AUDIO_UNIQUE_ID_USE_MODULE:
+            return media::AudioUniqueIdUse::MODULE;
+        case AUDIO_UNIQUE_ID_USE_EFFECT:
+            return media::AudioUniqueIdUse::EFFECT;
+        case AUDIO_UNIQUE_ID_USE_PATCH:
+            return media::AudioUniqueIdUse::PATCH;
+        case AUDIO_UNIQUE_ID_USE_OUTPUT:
+            return media::AudioUniqueIdUse::OUTPUT;
+        case AUDIO_UNIQUE_ID_USE_INPUT:
+            return media::AudioUniqueIdUse::INPUT;
+        case AUDIO_UNIQUE_ID_USE_CLIENT:
+            return media::AudioUniqueIdUse::CLIENT;
+        case AUDIO_UNIQUE_ID_USE_MAX:
+            break;
+    }
+    return unexpected(BAD_VALUE);
 }
 
 }  // namespace android
