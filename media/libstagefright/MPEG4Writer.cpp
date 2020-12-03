@@ -2774,7 +2774,7 @@ status_t MPEG4Writer::Track::start(MetaData *params) {
         // even if the file is well-formed and the primary picture is correct.
 
         // Reserve item ids for samples + grid
-        size_t numItemsToReserve = mNumTiles + (mNumTiles > 1);
+        size_t numItemsToReserve = mNumTiles + (mNumTiles > 0);
         status_t err = mOwner->reserveItemId_l(numItemsToReserve, &mItemIdBase);
         if (err != OK) {
             return err;

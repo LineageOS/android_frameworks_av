@@ -42,8 +42,8 @@ using namespace aaudio;   // TODO just import names needed
 #define BURSTS_PER_BUFFER_DEFAULT   2
 
 AAudioServiceEndpointPlay::AAudioServiceEndpointPlay(AAudioService &audioService)
-        : mStreamInternalPlay(audioService, true) {
-    mStreamInternal = &mStreamInternalPlay;
+    : AAudioServiceEndpointShared(
+        (AudioStreamInternal *)(new AudioStreamInternalPlay(audioService, true))) {
 }
 
 aaudio_result_t AAudioServiceEndpointPlay::open(const aaudio::AAudioStreamRequest &request) {
@@ -145,7 +145,7 @@ void *AAudioServiceEndpointPlay::callbackLoop() {
         result = getStreamInternal()->write(mMixer.getOutputBuffer(),
                                             getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
-            AAudioServiceEndpointShared::disconnectRegisteredStreams();
+            ALOGV("%s() write() returned AAUDIO_ERROR_DISCONNECTED, break", __func__);
             break;
         } else if (result != getFramesPerBurst()) {
             ALOGW("callbackLoop() wrote %d / %d",
