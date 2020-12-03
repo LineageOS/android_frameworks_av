@@ -99,6 +99,7 @@ bool MediaSampleReaderNDK::advanceExtractor_l() {
     }
 
     if (!AMediaExtractor_advance(mExtractor)) {
+        LOG(DEBUG) << "  EOS in advanceExtractor_l";
         mEosReached = true;
         for (auto it = mTrackSignals.begin(); it != mTrackSignals.end(); ++it) {
             it->second.notify_all();
@@ -137,6 +138,8 @@ media_status_t MediaSampleReaderNDK::seekExtractorBackwards_l(int64_t targetTime
         LOG(ERROR) << "Unable to seek to " << seekToTimeUs << ", target " << targetTimeUs;
         return status;
     }
+
+    mEosReached = false;
     mExtractorTrackIndex = AMediaExtractor_getSampleTrackIndex(mExtractor);
     int64_t sampleTimeUs = AMediaExtractor_getSampleTime(mExtractor);
 
@@ -181,6 +184,11 @@ media_status_t MediaSampleReaderNDK::waitForTrack_l(int trackIndex,
     if (mEosReached) {
         return AMEDIA_ERROR_END_OF_STREAM;
     }
+
+    if (!mEnforceSequentialAccess) {
+        return moveToTrack_l(trackIndex);
+    }
+
     return AMEDIA_OK;
 }
 
@@ -228,6 +236,8 @@ media_status_t MediaSampleReaderNDK::selectTrack(int trackIndex) {
 }
 
 media_status_t MediaSampleReaderNDK::setEnforceSequentialAccess(bool enforce) {
+    LOG(DEBUG) << "setEnforceSequentialAccess( " << enforce << " )";
+
     std::scoped_lock lock(mExtractorMutex);
 
     if (mEnforceSequentialAccess && !enforce) {
@@ -369,7 +379,11 @@ media_status_t MediaSampleReaderNDK::getSampleInfoForTrack(int trackIndex, Media
         info->presentationTimeUs = 0;
         info->flags = SAMPLE_FLAG_END_OF_STREAM;
         info->size = 0;
+        LOG(DEBUG) << "  getSampleInfoForTrack #" << trackIndex << ": End Of Stream";
+    } else {
+        LOG(ERROR) << "  getSampleInfoForTrack #" << trackIndex << ": Error " << status;
     }
+
     return status;
 }
 

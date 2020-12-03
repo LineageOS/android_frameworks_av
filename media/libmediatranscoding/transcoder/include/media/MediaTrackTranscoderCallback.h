@@ -39,6 +39,12 @@ public:
     virtual void onTrackFinished(const MediaTrackTranscoder* transcoder);
 
     /**
+     * Called when the MediaTrackTranscoder instance was explicitly stopped before it was finished.
+     * @param transcoder The MediaTrackTranscoder that was stopped.
+     */
+    virtual void onTrackStopped(const MediaTrackTranscoder* transcoder);
+
+    /**
      * Called when the MediaTrackTranscoder instance encountered an error it could not recover from.
      * @param transcoder The MediaTrackTranscoder that encountered the error.
      * @param status The non-zero error code describing the encountered error.

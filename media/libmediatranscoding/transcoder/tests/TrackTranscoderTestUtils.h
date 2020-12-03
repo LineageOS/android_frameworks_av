@@ -33,20 +33,14 @@ public:
             AMediaFormat* sourceFormat, bool includeBitrate = true) {
         // Default video destination format setup.
         static constexpr float kFrameRate = 30.0f;
-        static constexpr float kIFrameInterval = 30.0f;
         static constexpr int32_t kBitRate = 2 * 1000 * 1000;
-        static constexpr int32_t kColorFormatSurface = 0x7f000789;
 
         AMediaFormat* destinationFormat = AMediaFormat_new();
         AMediaFormat_copy(destinationFormat, sourceFormat);
         AMediaFormat_setFloat(destinationFormat, AMEDIAFORMAT_KEY_FRAME_RATE, kFrameRate);
-        AMediaFormat_setFloat(destinationFormat, AMEDIAFORMAT_KEY_I_FRAME_INTERVAL,
-                              kIFrameInterval);
         if (includeBitrate) {
             AMediaFormat_setInt32(destinationFormat, AMEDIAFORMAT_KEY_BIT_RATE, kBitRate);
         }
-        AMediaFormat_setInt32(destinationFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT,
-                              kColorFormatSurface);
 
         return std::shared_ptr<AMediaFormat>(destinationFormat, &AMediaFormat_delete);
     }
@@ -67,6 +61,13 @@ public:
     void onTrackFinished(const MediaTrackTranscoder* transcoder __unused) {
         std::unique_lock<std::mutex> lock(mMutex);
         mTranscodingFinished = true;
+        mTranscodingFinishedCondition.notify_all();
+    }
+
+    virtual void onTrackStopped(const MediaTrackTranscoder* transcoder __unused) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mTranscodingFinished = true;
+        mTranscodingStopped = true;
         mTranscodingFinishedCondition.notify_all();
     }
 
@@ -93,12 +94,18 @@ public:
         }
     }
 
+    bool transcodingWasStopped() const { return mTranscodingFinished && mTranscodingStopped; }
+    bool transcodingFinished() const {
+        return mTranscodingFinished && !mTranscodingStopped && mStatus == AMEDIA_OK;
+    }
+
 private:
     media_status_t mStatus = AMEDIA_OK;
     std::mutex mMutex;
     std::condition_variable mTranscodingFinishedCondition;
     std::condition_variable mTrackFormatAvailableCondition;
     bool mTranscodingFinished = false;
+    bool mTranscodingStopped = false;
     bool mTrackFormatAvailable = false;
 };
 

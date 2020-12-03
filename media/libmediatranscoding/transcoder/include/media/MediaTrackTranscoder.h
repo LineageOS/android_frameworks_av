@@ -62,18 +62,21 @@ public:
                              const std::shared_ptr<AMediaFormat>& destinationFormat);
 
     /**
-     * Starts the track transcoder. Once started the track transcoder have to be stopped by calling
-     * {@link #stop}, even after completing successfully. Start should only be called once.
+     * Starts the track transcoder. After the track transcoder is successfully started it will run
+     * until a callback signals that transcoding has ended. Start should only be called once.
      * @return True if the track transcoder started, or false if it had already been started.
      */
     bool start();
 
     /**
      * Stops the track transcoder. Once the transcoding has been stopped it cannot be restarted
-     * again. It is safe to call stop multiple times.
-     * @return True if the track transcoder stopped, or false if it was already stopped.
+     * again. It is safe to call stop multiple times. Stop is an asynchronous operation. Once the
+     * track transcoder has stopped the onTrackStopped callback will get called, unless the
+     * transcoding finished or encountered an error before it could be stopped in which case the
+     * callbacks corresponding to those events will be called instead.
+     * @param stopOnSyncSample Request the transcoder to stop after emitting a sync sample.
      */
-    bool stop();
+    void stop(bool stopOnSyncSample = false);
 
     /**
      * Set the sample consumer function. The MediaTrackTranscoder will deliver transcoded samples to
@@ -100,7 +103,9 @@ protected:
     // Called by subclasses when the actual track format becomes available.
     void notifyTrackFormatAvailable();
 
-    // Called by subclasses when a transcoded sample is available.
+    // Called by subclasses when a transcoded sample is available. Samples must not hold a strong
+    // reference to the track transcoder in order to avoid retain cycles through the track
+    // transcoder's sample queue.
     void onOutputSampleAvailable(const std::shared_ptr<MediaSample>& sample);
 
     // configureDestinationFormat needs to be implemented by subclasses, and gets called on an
@@ -110,7 +115,7 @@ protected:
 
     // runTranscodeLoop needs to be implemented by subclasses, and gets called on
     // MediaTrackTranscoder's internal thread when the track transcoder is started.
-    virtual media_status_t runTranscodeLoop() = 0;
+    virtual media_status_t runTranscodeLoop(bool* stopped) = 0;
 
     // abortTranscodeLoop needs to be implemented by subclasses, and should request transcoding to
     // be aborted as soon as possible. It should be safe to call abortTranscodeLoop multiple times.
@@ -120,13 +125,20 @@ protected:
     int mTrackIndex;
     std::shared_ptr<AMediaFormat> mSourceFormat;
 
+    enum StopRequest {
+        NONE,
+        STOP_NOW,
+        STOP_ON_SYNC,
+    };
+    std::atomic<StopRequest> mStopRequest = NONE;
+
 private:
     std::mutex mSampleMutex;
+    // SampleQueue for buffering output samples before a sample consumer has been set.
     MediaSampleQueue mSampleQueue GUARDED_BY(mSampleMutex);
     MediaSampleWriter::MediaSampleConsumerFunction mSampleConsumer GUARDED_BY(mSampleMutex);
     const std::weak_ptr<MediaTrackTranscoderCallback> mTranscoderCallback;
     std::mutex mStateMutex;
-    std::thread mTranscodingThread GUARDED_BY(mStateMutex);
     enum {
         UNINITIALIZED,
         CONFIGURED,

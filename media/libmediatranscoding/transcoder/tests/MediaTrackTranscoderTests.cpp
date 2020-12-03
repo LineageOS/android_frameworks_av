@@ -61,13 +61,10 @@ public:
         }
         ASSERT_NE(mTranscoder, nullptr);
 
-        initSampleReader();
+        initSampleReader("/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4");
     }
 
-    void initSampleReader() {
-        const char* sourcePath =
-                "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
-
+    void initSampleReader(const char* sourcePath) {
         const int sourceFd = open(sourcePath, O_RDONLY);
         ASSERT_GT(sourceFd, 0);
 
@@ -157,16 +154,23 @@ TEST_P(MediaTrackTranscoderTests, WaitNormalOperation) {
     ASSERT_TRUE(mTranscoder->start());
     drainOutputSamples();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(mTranscoder->stop());
+    EXPECT_TRUE(mCallback->transcodingFinished());
     EXPECT_TRUE(mGotEndOfStream);
 }
 
 TEST_P(MediaTrackTranscoderTests, StopNormalOperation) {
     LOG(DEBUG) << "Testing StopNormalOperation";
+
+    // Use a longer test asset to make sure that transcoding can be stopped.
+    initSampleReader("/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4");
+
     EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
               AMEDIA_OK);
     EXPECT_TRUE(mTranscoder->start());
-    EXPECT_TRUE(mTranscoder->stop());
+    mCallback->waitUntilTrackFormatAvailable();
+    mTranscoder->stop();
+    EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
+    EXPECT_TRUE(mCallback->transcodingWasStopped());
 }
 
 TEST_P(MediaTrackTranscoderTests, StartWithoutConfigure) {
@@ -178,17 +182,23 @@ TEST_P(MediaTrackTranscoderTests, StopWithoutStart) {
     LOG(DEBUG) << "Testing StopWithoutStart";
     EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
               AMEDIA_OK);
-    EXPECT_FALSE(mTranscoder->stop());
+    mTranscoder->stop();
 }
 
 TEST_P(MediaTrackTranscoderTests, DoubleStartStop) {
     LOG(DEBUG) << "Testing DoubleStartStop";
+
+    // Use a longer test asset to make sure that transcoding can be stopped.
+    initSampleReader("/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4");
+
     EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
               AMEDIA_OK);
     EXPECT_TRUE(mTranscoder->start());
     EXPECT_FALSE(mTranscoder->start());
-    EXPECT_TRUE(mTranscoder->stop());
-    EXPECT_FALSE(mTranscoder->stop());
+    mTranscoder->stop();
+    mTranscoder->stop();
+    EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
+    EXPECT_TRUE(mCallback->transcodingWasStopped());
 }
 
 TEST_P(MediaTrackTranscoderTests, DoubleConfigure) {
@@ -212,7 +222,8 @@ TEST_P(MediaTrackTranscoderTests, RestartAfterStop) {
     EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
               AMEDIA_OK);
     EXPECT_TRUE(mTranscoder->start());
-    EXPECT_TRUE(mTranscoder->stop());
+    mTranscoder->stop();
+    EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
     EXPECT_FALSE(mTranscoder->start());
 }
 
@@ -223,7 +234,7 @@ TEST_P(MediaTrackTranscoderTests, RestartAfterFinish) {
     ASSERT_TRUE(mTranscoder->start());
     drainOutputSamples();
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(mTranscoder->stop());
+    mTranscoder->stop();
     EXPECT_FALSE(mTranscoder->start());
     EXPECT_TRUE(mGotEndOfStream);
 }
@@ -235,7 +246,7 @@ TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderRelease) {
     ASSERT_TRUE(mTranscoder->start());
     drainOutputSamples(1 /* numSamplesToSave */);
     EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
-    EXPECT_TRUE(mTranscoder->stop());
+    mTranscoder->stop();
     EXPECT_TRUE(mGotEndOfStream);
 
     mTranscoder.reset();
@@ -251,7 +262,8 @@ TEST_P(MediaTrackTranscoderTests, HoldSampleAfterTranscoderStop) {
     ASSERT_TRUE(mTranscoder->start());
     drainOutputSamples(1 /* numSamplesToSave */);
     mSamplesSavedSemaphore.wait();
-    EXPECT_TRUE(mTranscoder->stop());
+    mTranscoder->stop();
+    EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     mSavedSamples.clear();
@@ -270,6 +282,44 @@ TEST_P(MediaTrackTranscoderTests, InvalidTrackIndex) {
     EXPECT_NE(mTranscoder->configure(mMediaSampleReader, mMediaSampleReader->getTrackCount(),
                                      mDestinationFormat),
               AMEDIA_OK);
+}
+
+TEST_P(MediaTrackTranscoderTests, StopOnSync) {
+    LOG(DEBUG) << "Testing StopOnSync";
+
+    // Use a longer test asset to make sure there is a GOP to finish.
+    initSampleReader("/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4");
+
+    EXPECT_EQ(mTranscoder->configure(mMediaSampleReader, mTrackIndex, mDestinationFormat),
+              AMEDIA_OK);
+
+    bool lastSampleWasEos = false;
+    bool lastRealSampleWasSync = false;
+    OneShotSemaphore samplesReceivedSemaphore;
+    uint32_t sampleCount = 0;
+
+    mTranscoder->setSampleConsumer([&](const std::shared_ptr<MediaSample>& sample) {
+        ASSERT_NE(sample, nullptr);
+
+        if ((lastSampleWasEos = sample->info.flags & SAMPLE_FLAG_END_OF_STREAM)) {
+            samplesReceivedSemaphore.signal();
+            return;
+        }
+        lastRealSampleWasSync = sample->info.flags & SAMPLE_FLAG_SYNC_SAMPLE;
+
+        if (++sampleCount >= 10) {  // Wait for a few samples before stopping.
+            samplesReceivedSemaphore.signal();
+        }
+    });
+
+    ASSERT_TRUE(mTranscoder->start());
+    samplesReceivedSemaphore.wait();
+    mTranscoder->stop(true /* stopOnSync */);
+    EXPECT_EQ(mCallback->waitUntilFinished(), AMEDIA_OK);
+
+    EXPECT_TRUE(lastSampleWasEos);
+    EXPECT_TRUE(lastRealSampleWasSync);
+    EXPECT_TRUE(mCallback->transcodingWasStopped());
 }
 
 };  // namespace android
