@@ -1,0 +1,22 @@
+cc_test {
+    name: "libmedia_helper_tests",
+
+    generated_headers: ["audio_policy_configuration_V7_0"],
+    generated_sources: ["audio_policy_configuration_V7_0"],
+    header_libs: ["libxsdc-utils"],
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libmedia_helper",
+        "libxml2",
+    ],
+
+    srcs: ["typeconverter_tests.cpp"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    test_suites: ["device-tests"],
+}
