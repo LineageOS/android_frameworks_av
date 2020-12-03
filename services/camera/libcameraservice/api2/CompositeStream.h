@@ -44,7 +44,9 @@ public:
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution);
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            std::vector<int> *surfaceIds,
+            int streamSetId, bool isShared, bool isMultiResolution);
 
     status_t deleteStream();
 
@@ -55,7 +57,9 @@ public:
     virtual status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared) = 0;
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            std::vector<int> *surfaceIds,
+            int streamSetId, bool isShared) = 0;
 
     // Release all internal streams and corresponding resources.
     virtual status_t deleteInternalStreams() = 0;

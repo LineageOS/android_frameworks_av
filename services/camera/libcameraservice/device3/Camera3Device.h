@@ -132,14 +132,17 @@ class Camera3Device :
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, bool isMultiResolution = false,
             uint64_t consumerUsage = 0) override;
+
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
             bool isShared = false, bool isMultiResolution = false,
@@ -190,7 +193,7 @@ class Camera3Device :
 
     ssize_t getJpegBufferSize(uint32_t width, uint32_t height) const override;
     ssize_t getPointCloudBufferSize() const;
-    ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height) const;
+    ssize_t getRawOpaqueBufferSize(int32_t width, int32_t height, bool maxResolution) const;
 
     // Methods called by subclasses
     void             notifyStatus(bool idle); // updates from StatusTracker

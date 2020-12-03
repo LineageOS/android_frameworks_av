@@ -31,7 +31,7 @@ const String8 Camera3FakeStream::FAKE_ID;
 Camera3FakeStream::Camera3FakeStream(int id) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, FAKE_WIDTH, FAKE_HEIGHT,
                 /*maxSize*/0, FAKE_FORMAT, FAKE_DATASPACE, FAKE_ROTATION,
-                FAKE_ID) {
+                FAKE_ID, std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT}) {
 
 }
 

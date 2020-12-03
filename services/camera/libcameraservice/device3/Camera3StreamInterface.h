@@ -62,6 +62,8 @@ typedef struct camera_stream {
     android_dataspace_t data_space;
     camera_stream_rotation_t rotation;
     const char* physical_camera_id;
+
+    std::unordered_set<int32_t> sensor_pixel_modes_used;
 } camera_stream_t;
 
 typedef struct camera_stream_buffer {
@@ -104,13 +106,15 @@ class OutputStreamInfo {
         uint64_t consumerUsage;
         bool finalized = false;
         bool supportsOffline = false;
+        std::unordered_set<int32_t> sensorPixelModesUsed;
         OutputStreamInfo() :
             width(-1), height(-1), format(-1), dataSpace(HAL_DATASPACE_UNKNOWN),
             consumerUsage(0) {}
         OutputStreamInfo(int _width, int _height, int _format, android_dataspace _dataSpace,
-                uint64_t _consumerUsage) :
+                uint64_t _consumerUsage, const std::unordered_set<int32_t>& _sensorPixelModesUsed) :
             width(_width), height(_height), format(_format),
-            dataSpace(_dataSpace), consumerUsage(_consumerUsage) {}
+            dataSpace(_dataSpace), consumerUsage(_consumerUsage),
+            sensorPixelModesUsed(_sensorPixelModesUsed) {}
 };
 
 /**
