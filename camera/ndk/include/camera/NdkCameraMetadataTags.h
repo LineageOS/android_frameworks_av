@@ -1957,7 +1957,10 @@ typedef enum acamera_metadata_tag {
      * explicitly set ACAMERA_CONTROL_ZOOM_RATIO, its value defaults to 1.0.</p>
      * <p>One limitation of controlling zoom using zoomRatio is that the ACAMERA_SCALER_CROP_REGION
      * must only be used for letterboxing or pillarboxing of the sensor active array, and no
-     * FREEFORM cropping can be used with ACAMERA_CONTROL_ZOOM_RATIO other than 1.0.</p>
+     * FREEFORM cropping can be used with ACAMERA_CONTROL_ZOOM_RATIO other than 1.0. If
+     * ACAMERA_CONTROL_ZOOM_RATIO is not 1.0, and ACAMERA_SCALER_CROP_REGION is set to be
+     * windowboxing, the camera framework will override the ACAMERA_SCALER_CROP_REGION to be
+     * the active array.</p>
      *
      * @see ACAMERA_CONTROL_AE_REGIONS
      * @see ACAMERA_CONTROL_ZOOM_RATIO
@@ -3651,7 +3654,9 @@ typedef enum acamera_metadata_tag {
      * </ol>
      * </li>
      * <li>Setting ACAMERA_CONTROL_ZOOM_RATIO to values different than 1.0 and
-     * ACAMERA_SCALER_CROP_REGION to be windowboxing at the same time is undefined behavior.</li>
+     * ACAMERA_SCALER_CROP_REGION to be windowboxing at the same time are not supported. In this
+     * case, the camera framework will override the ACAMERA_SCALER_CROP_REGION to be the active
+     * array.</li>
      * </ul>
      * <p>LEGACY capability devices will only support CENTER_ONLY cropping.</p>
      *
