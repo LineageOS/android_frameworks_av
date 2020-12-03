@@ -36,14 +36,9 @@ static const char *kKeyExtractor = "extractor";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaExtractor.java
 // These must be kept synchronized with the constants there.
-const char *RemoteMediaExtractor::kExtractorFormat =
-    "android.media.mediaextractor.fmt";
-const char *RemoteMediaExtractor::kExtractorMime =
-    "android.media.mediaextractor.mime";
-const char *RemoteMediaExtractor::kExtractorTracks =
-    "android.media.mediaextractor.ntrk";
-const char *RemoteMediaExtractor::kExtractorEntryPoint =
-    "android.media.mediaextractor.entry";
+static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
+static const char *kExtractorMime = "android.media.mediaextractor.mime";
+static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
 
 RemoteMediaExtractor::RemoteMediaExtractor(
         MediaExtractor *extractor,
@@ -79,9 +74,6 @@ RemoteMediaExtractor::RemoteMediaExtractor(
             }
             // what else is interesting and not already available?
         }
-        // By default, we set the entry point to be "other". Clients of this
-        // class will overwrite this value by calling setEntryPoint.
-        setEntryPoint(EntryPoint::OTHER);
     }
 }
 
@@ -149,12 +141,6 @@ status_t RemoteMediaExtractor::setMediaCas(const HInterfaceToken &casToken) {
 
 String8 RemoteMediaExtractor::name() {
     return String8(mExtractor->name());
-}
-
-status_t RemoteMediaExtractor::setEntryPoint(EntryPoint entryPoint) {
-    mMetricsItem->setInt32(kExtractorEntryPoint,
-                           static_cast<int32_t>(entryPoint));
-    return OK;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
