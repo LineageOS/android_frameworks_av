@@ -276,20 +276,22 @@ public:
                             int32_t planeSize = 0;
                             for (uint32_t i = 0; i < layout.numPlanes; ++i) {
                                 const C2PlaneInfo &plane = layout.planes[i];
-                                ssize_t minOffset = plane.minOffset(mWidth, mHeight);
-                                ssize_t maxOffset = plane.maxOffset(mWidth, mHeight);
+                                int64_t planeStride = std::abs(plane.rowInc / plane.colInc);
+                                ssize_t minOffset = plane.minOffset(
+                                        mWidth / plane.colSampling, mHeight / plane.rowSampling);
+                                ssize_t maxOffset = plane.maxOffset(
+                                        mWidth / plane.colSampling, mHeight / plane.rowSampling);
                                 if (minPtr > mView.data()[i] + minOffset) {
                                     minPtr = mView.data()[i] + minOffset;
                                 }
                                 if (maxPtr < mView.data()[i] + maxOffset) {
                                     maxPtr = mView.data()[i] + maxOffset;
                                 }
-                                planeSize += std::abs(plane.rowInc) * align(mHeight, 64)
-                                        / plane.rowSampling / plane.colSampling
-                                        * divUp(mAllocatedDepth, 8u);
+                                planeSize += planeStride * divUp(mAllocatedDepth, 8u)
+                                        * align(mHeight, 64) / plane.rowSampling;
                             }
 
-                            if ((maxPtr - minPtr + 1) <= planeSize) {
+                            if (minPtr == mView.data()[0] && (maxPtr - minPtr + 1) <= planeSize) {
                                 // FIXME: this is risky as reading/writing data out of bound results
                                 //        in an undefined behavior, but gralloc does assume a
                                 //        contiguous mapping
