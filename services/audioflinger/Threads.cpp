@@ -8643,6 +8643,7 @@ status_t AudioFlinger::RecordThread::releaseAudioPatch_l(const audio_patch_handl
 
 void AudioFlinger::RecordThread::updateOutDevices(const DeviceDescriptorBaseVector& outDevices)
 {
+    Mutex::Autolock _l(mLock);
     mOutDevices = outDevices;
     mOutDeviceTypeAddrs = deviceTypeAddrsFromDescriptors(mOutDevices);
     for (size_t i = 0; i < mEffectChains.size(); i++) {
