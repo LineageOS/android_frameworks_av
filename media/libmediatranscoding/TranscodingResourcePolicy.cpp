@@ -21,7 +21,6 @@
 #include <aidl/android/media/IResourceObserverService.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
-#include <binder/IServiceManager.h>
 #include <media/TranscodingResourcePolicy.h>
 #include <utils/Log.h>
 
