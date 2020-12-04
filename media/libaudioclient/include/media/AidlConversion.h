@@ -34,6 +34,7 @@
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
 #include <android/media/AudioMixLatencyClass.h>
+#include <android/media/AudioMode.h>
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPort.h>
 #include <android/media/AudioPortConfigType.h>
@@ -43,6 +44,7 @@
 #include <android/media/AudioPortSessionExt.h>
 #include <android/media/AudioProfile.h>
 #include <android/media/AudioTimestampInternal.h>
+#include <android/media/AudioUniqueIdUse.h>
 #include <android/media/EffectDescriptor.h>
 
 #include <android/media/SharedFileRegion.h>
@@ -74,6 +76,9 @@ ConversionResult<int32_t> legacy2aidl_audio_patch_handle_t_int32_t(audio_patch_h
 
 ConversionResult<audio_unique_id_t> aidl2legacy_int32_t_audio_unique_id_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_unique_id_t_int32_t(audio_unique_id_t legacy);
+
+ConversionResult<audio_hw_sync_t> aidl2legacy_int32_t_audio_hw_sync_t(int32_t aidl);
+ConversionResult<int32_t> legacy2aidl_audio_hw_sync_t_int32_t(audio_hw_sync_t legacy);
 
 // The legacy enum is unnamed. Thus, we use int.
 ConversionResult<int> aidl2legacy_AudioPortConfigType(media::AudioPortConfigType aidl);
@@ -325,5 +330,15 @@ ConversionResult<audio_port_v7>
 aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl);
 ConversionResult<media::AudioPort>
 legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy);
+
+ConversionResult<audio_mode_t>
+aidl2legacy_AudioMode_audio_mode_t(media::AudioMode aidl);
+ConversionResult<media::AudioMode>
+legacy2aidl_audio_mode_t_AudioMode(audio_mode_t legacy);
+
+ConversionResult<audio_unique_id_use_t>
+aidl2legacy_AudioUniqueIdUse_audio_unique_id_use_t(media::AudioUniqueIdUse aidl);
+ConversionResult<media::AudioUniqueIdUse>
+legacy2aidl_audio_unique_id_use_t_AudioUniqueIdUse(audio_unique_id_use_t legacy);
 
 }  // namespace android

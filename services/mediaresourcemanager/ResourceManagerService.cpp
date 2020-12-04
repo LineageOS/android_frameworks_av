@@ -22,6 +22,7 @@
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include <binder/IMediaResourceMonitor.h>
+#include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <cutils/sched_policy.h>
 #include <dirent.h>
@@ -96,7 +97,7 @@ void DeathNotifier::binderDied() {
 
     service->overridePid(mPid, -1);
     // thiz is freed in the call below, so it must be last call referring thiz
-    service->removeResource(mPid, mClientId, false);
+    service->removeResource(mPid, mClientId, false /*checkValid*/);
 }
 
 class OverrideProcessInfoDeathNotifier : public DeathNotifier {
@@ -422,8 +423,12 @@ Status ResourceManagerService::addResource(
 
     Mutex::Autolock lock(mLock);
     if (!mProcessInfo->isValidPid(pid)) {
-        ALOGE("Rejected addResource call with invalid pid.");
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        pid_t callingPid = IPCThreadState::self()->getCallingPid();
+        uid_t callingUid = IPCThreadState::self()->getCallingUid();
+        ALOGW("%s called with untrusted pid %d, using calling pid %d, uid %d", __FUNCTION__,
+                pid, callingPid, callingUid);
+        pid = callingPid;
+        uid = callingUid;
     }
     ResourceInfos& infos = getResourceInfosForEdit(pid, mMap);
     ResourceInfo& info = getResourceInfoForEdit(uid, clientId, client, infos);
@@ -477,8 +482,10 @@ Status ResourceManagerService::removeResource(
 
     Mutex::Autolock lock(mLock);
     if (!mProcessInfo->isValidPid(pid)) {
-        ALOGE("Rejected removeResource call with invalid pid.");
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        pid_t callingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
+                pid, callingPid);
+        pid = callingPid;
     }
     ssize_t index = mMap.indexOfKey(pid);
     if (index < 0) {
@@ -531,7 +538,7 @@ Status ResourceManagerService::removeResource(
 }
 
 Status ResourceManagerService::removeClient(int32_t pid, int64_t clientId) {
-    removeResource(pid, clientId, true);
+    removeResource(pid, clientId, true /*checkValid*/);
     return Status::ok();
 }
 
@@ -543,8 +550,10 @@ Status ResourceManagerService::removeResource(int pid, int64_t clientId, bool ch
 
     Mutex::Autolock lock(mLock);
     if (checkValid && !mProcessInfo->isValidPid(pid)) {
-        ALOGE("Rejected removeResource call with invalid pid.");
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        pid_t callingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
+                pid, callingPid);
+        pid = callingPid;
     }
     ssize_t index = mMap.indexOfKey(pid);
     if (index < 0) {
@@ -599,8 +608,10 @@ Status ResourceManagerService::reclaimResource(
     {
         Mutex::Autolock lock(mLock);
         if (!mProcessInfo->isValidPid(callingPid)) {
-            ALOGE("Rejected reclaimResource call with invalid callingPid.");
-            return Status::fromServiceSpecificError(BAD_VALUE);
+            pid_t actualCallingPid = IPCThreadState::self()->getCallingPid();
+            ALOGW("%s called with untrusted pid %d, using actual calling pid %d", __FUNCTION__,
+                    callingPid, actualCallingPid);
+            callingPid = actualCallingPid;
         }
         const MediaResourceParcel *secureCodec = NULL;
         const MediaResourceParcel *nonSecureCodec = NULL;
@@ -836,8 +847,10 @@ Status ResourceManagerService::markClientForPendingRemoval(int32_t pid, int64_t 
 
     Mutex::Autolock lock(mLock);
     if (!mProcessInfo->isValidPid(pid)) {
-        ALOGE("Rejected markClientForPendingRemoval call with invalid pid.");
-        return Status::fromServiceSpecificError(BAD_VALUE);
+        pid_t callingPid = IPCThreadState::self()->getCallingPid();
+        ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
+                pid, callingPid);
+        pid = callingPid;
     }
     ssize_t index = mMap.indexOfKey(pid);
     if (index < 0) {
@@ -866,8 +879,10 @@ Status ResourceManagerService::reclaimResourcesFromClientsPendingRemoval(int32_t
     {
         Mutex::Autolock lock(mLock);
         if (!mProcessInfo->isValidPid(pid)) {
-            ALOGE("Rejected reclaimResourcesFromClientsPendingRemoval call with invalid pid.");
-            return Status::fromServiceSpecificError(BAD_VALUE);
+            pid_t callingPid = IPCThreadState::self()->getCallingPid();
+            ALOGW("%s called with untrusted pid %d, using calling pid %d", __FUNCTION__,
+                    pid, callingPid);
+            pid = callingPid;
         }
 
         for (MediaResource::Type type : {MediaResource::Type::kSecureCodec,
