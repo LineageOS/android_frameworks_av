@@ -63,7 +63,6 @@ cc_defaults {
         "-Werror=conditional-uninitialized",
         "-Wextra",
         "-Wredundant-decls",
-        "-Wshadow",
         "-Wstrict-aliasing",
         "-fstrict-aliasing",
         "-Wthread-safety",
@@ -152,6 +151,7 @@ cc_library {
         "libmemunreachable",
         "libprotobuf-cpp-lite",
         "libstatslog",
+        "libstagefright",
         "libutils",
     ],
 

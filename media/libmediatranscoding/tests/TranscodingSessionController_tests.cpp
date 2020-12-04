@@ -44,11 +44,14 @@ using aidl::android::media::TranscodingRequestParcel;
 constexpr ClientIdType kClientId = 1000;
 constexpr SessionIdType kClientSessionId = 0;
 constexpr uid_t kClientUid = 5000;
+constexpr pid_t kClientPid = 10000;
 constexpr uid_t kInvalidUid = (uid_t)-1;
+constexpr pid_t kInvalidPid = (pid_t)-1;
 
 #define CLIENT(n) (kClientId + (n))
 #define SESSION(n) (kClientSessionId + (n))
 #define UID(n) (kClientUid + (n))
+#define PID(n) (kClientPid + (n))
 
 class TestUidPolicy : public UidPolicyInterface {
 public:
@@ -77,6 +80,31 @@ public:
 
     std::unordered_set<uid_t> mTopUids;
     std::weak_ptr<UidPolicyCallbackInterface> mUidPolicyCallback;
+};
+
+class TestResourcePolicy : public ResourcePolicyInterface {
+public:
+    TestResourcePolicy() { reset(); }
+    virtual ~TestResourcePolicy() = default;
+
+    // ResourcePolicyInterface
+    void setCallback(const std::shared_ptr<ResourcePolicyCallbackInterface>& /*cb*/) override {}
+    void setPidResourceLost(pid_t pid) override {
+        mResourceLostPid = pid;
+    }
+    // ~ResourcePolicyInterface
+
+    pid_t getPid() {
+        pid_t result = mResourceLostPid;
+        reset();
+        return result;
+    }
+
+private:
+    void reset() {
+        mResourceLostPid = kInvalidPid;
+    }
+    pid_t mResourceLostPid;
 };
 
 class TestTranscoder : public TranscoderInterface {
@@ -216,8 +244,9 @@ public:
         ALOGI("TranscodingSessionControllerTest set up");
         mTranscoder.reset(new TestTranscoder());
         mUidPolicy.reset(new TestUidPolicy());
-        mController.reset(new TranscodingSessionController(mTranscoder, mUidPolicy,
-                                                           nullptr /*resourcePolicy*/));
+        mResourcePolicy.reset(new TestResourcePolicy());
+        mController.reset(
+                new TranscodingSessionController(mTranscoder, mUidPolicy, mResourcePolicy));
         mUidPolicy->setCallback(mController);
 
         // Set priority only, ignore other fields for now.
@@ -239,6 +268,7 @@ public:
 
     std::shared_ptr<TestTranscoder> mTranscoder;
     std::shared_ptr<TestUidPolicy> mUidPolicy;
+    std::shared_ptr<TestResourcePolicy> mResourcePolicy;
     std::shared_ptr<TranscodingSessionController> mController;
     TranscodingRequestParcel mOfflineRequest;
     TranscodingRequestParcel mRealtimeRequest;
@@ -552,10 +582,12 @@ TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
 
     // Start with unspecified top UID.
     // Submit real-time session to CLIENT(0), session should start immediately.
+    mRealtimeRequest.clientPid = PID(0);
     mController->submit(CLIENT(0), SESSION(0), UID(0), mRealtimeRequest, mClientCallback0);
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
 
     // Submit offline session to CLIENT(0), should not start.
+    mOfflineRequest.clientPid = PID(0);
     mController->submit(CLIENT(1), SESSION(0), UID(0), mOfflineRequest, mClientCallback1);
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 
@@ -565,13 +597,22 @@ TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
 
     // Submit real-time session to CLIENT(2) in different uid UID(1).
     // Should pause previous session and start new session.
+    mRealtimeRequest.clientPid = PID(1);
     mController->submit(CLIENT(2), SESSION(0), UID(1), mRealtimeRequest, mClientCallback2);
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(2), SESSION(0)));
 
+    // Test 0: No call into ResourcePolicy if resource lost is from a non-running
+    // or non-existent session.
+    mController->onResourceLost(CLIENT(0), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), kInvalidPid);
+    mController->onResourceLost(CLIENT(3), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), kInvalidPid);
+
     // Test 1: No queue change during resource loss.
     // Signal resource lost.
-    mController->onResourceLost();
+    mController->onResourceLost(CLIENT(2), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), PID(1));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 
     // Signal resource available, CLIENT(2) should resume.
@@ -580,7 +621,8 @@ TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
 
     // Test 2: Change of queue order during resource loss.
     // Signal resource lost.
-    mController->onResourceLost();
+    mController->onResourceLost(CLIENT(2), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), PID(1));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 
     // Move UID(0) back to top, should have no resume due to no resource.
@@ -593,13 +635,15 @@ TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
 
     // Test 3: Adding new queue during resource loss.
     // Signal resource lost.
-    mController->onResourceLost();
+    mController->onResourceLost(CLIENT(0), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), PID(0));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 
     // Move UID(2) to top.
     mUidPolicy->setTop(UID(2));
 
     // Submit real-time session to CLIENT(3) in UID(2), session shouldn't start due to no resource.
+    mRealtimeRequest.clientPid = PID(2);
     mController->submit(CLIENT(3), SESSION(0), UID(2), mRealtimeRequest, mClientCallback3);
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 

@@ -337,8 +337,9 @@ TEST_F(MediaTranscoderTests, TestPreserveBitrate) {
     const char* destPath = "/data/local/tmp/MediaTranscoder_PreserveBitrate.MP4";
     testTranscodeVideo(srcPath, destPath, AMEDIA_MIMETYPE_VIDEO_AVC);
 
-    // Require maximum of 10% difference in file size.
-    EXPECT_LT(getFileSizeDiffPercent(srcPath, destPath, true /* absolute*/), 10);
+    // Require maximum of 25% difference in file size.
+    // TODO(b/174678336): Find a better test asset to tighten the threshold.
+    EXPECT_LT(getFileSizeDiffPercent(srcPath, destPath, true /* absolute*/), 25);
 }
 
 TEST_F(MediaTranscoderTests, TestCustomBitrate) {
@@ -350,8 +351,9 @@ TEST_F(MediaTranscoderTests, TestCustomBitrate) {
     testTranscodeVideo(srcPath, destPath2, AMEDIA_MIMETYPE_VIDEO_AVC, 8 * 1000 * 1000);
 
     // The source asset is very short and heavily compressed from the beginning so don't expect the
-    // requested bitrate to be exactly matched. However 40% difference seems reasonable.
-    EXPECT_GT(getFileSizeDiffPercent(destPath1, destPath2), 40);
+    // requested bitrate to be exactly matched. However the 8mbps should at least be larger.
+    // TODO(b/174678336): Find a better test asset to tighten the threshold.
+    EXPECT_GT(getFileSizeDiffPercent(destPath1, destPath2), 10);
 }
 
 static AMediaFormat* getAVCVideoFormat(AMediaFormat* sourceFormat) {

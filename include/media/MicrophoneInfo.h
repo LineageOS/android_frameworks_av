@@ -208,6 +208,21 @@ private:
     int32_t mDirectionality;
 };
 
+// Conversion routines, according to AidlConversion.h conventions.
+inline ConversionResult<MicrophoneInfo>
+aidl2legacy_MicrophoneInfo(const media::MicrophoneInfoData& aidl) {
+    MicrophoneInfo legacy;
+    RETURN_IF_ERROR(legacy.readFromParcelable(aidl));
+    return legacy;
+}
+
+inline ConversionResult<media::MicrophoneInfoData>
+legacy2aidl_MicrophoneInfo(const MicrophoneInfo& legacy) {
+    media::MicrophoneInfoData aidl;
+    RETURN_IF_ERROR(legacy.writeToParcelable(&aidl));
+    return aidl;
+}
+
 } // namespace media
 } // namespace android
 

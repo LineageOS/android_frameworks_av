@@ -123,16 +123,12 @@ static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
 #define INCLUDING_FROM_AUDIOFLINGER_H
 
-class AudioFlinger :
-    public BinderService<AudioFlinger>,
-    public BnAudioFlinger
+class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
-    friend class BinderService<AudioFlinger>;   // for AudioFlinger()
-
 public:
-    static const char* getServiceName() ANDROID_API { return "media.audio_flinger"; }
+    static void instantiate() ANDROID_API;
 
-    virtual     status_t    dump(int fd, const Vector<String16>& args);
+    status_t dump(int fd, const Vector<String16>& args) override;
 
     // IAudioFlinger interface, in binder opcode order
     status_t createTrack(const media::CreateTrackRequest& input,
@@ -270,11 +266,7 @@ public:
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids);
 
-    virtual     status_t    onTransact(
-                                uint32_t code,
-                                const Parcel& data,
-                                Parcel* reply,
-                                uint32_t flags);
+    status_t onPreTransact(TransactionCode code, const Parcel& data, uint32_t flags) override;
 
     // end of IAudioFlinger interface
 

@@ -485,30 +485,34 @@ void TranscodingSessionController::onProgressUpdate(ClientIdType clientId, Sessi
     });
 }
 
-void TranscodingSessionController::onResourceLost() {
+void TranscodingSessionController::onResourceLost(ClientIdType clientId, SessionIdType sessionId) {
     ALOGI("%s", __FUNCTION__);
 
-    std::scoped_lock lock{mLock};
-
-    if (mResourceLost) {
-        return;
-    }
-
-    // If we receive a resource loss event, the TranscoderLibrary already paused
-    // the transcoding, so we don't need to call onPaused to notify it to pause.
-    // Only need to update the session state here.
-    if (mCurrentSession != nullptr && mCurrentSession->state == Session::RUNNING) {
-        mCurrentSession->state = Session::PAUSED;
-        // Notify the client as a paused event.
-        auto clientCallback = mCurrentSession->callback.lock();
-        if (clientCallback != nullptr) {
-            clientCallback->onTranscodingPaused(mCurrentSession->key.second);
+    notifyClient(clientId, sessionId, "resource_lost", [=](const SessionKeyType& sessionKey) {
+        if (mResourceLost) {
+            return;
         }
-        mResourcePolicy->setPidResourceLost(mCurrentSession->request.clientPid);
-    }
-    mResourceLost = true;
 
-    validateState_l();
+        Session* resourceLostSession = &mSessionMap[sessionKey];
+        if (resourceLostSession->state != Session::RUNNING) {
+            ALOGW("session %s lost resource but is no longer running",
+                    sessionToString(sessionKey).c_str());
+            return;
+        }
+        // If we receive a resource loss event, the transcoder already paused the transcoding,
+        // so we don't need to call onPaused() to pause it. However, we still need to notify
+        // the client and update the session state here.
+        resourceLostSession->state = Session::PAUSED;
+        // Notify the client as a paused event.
+        auto clientCallback = resourceLostSession->callback.lock();
+        if (clientCallback != nullptr) {
+            clientCallback->onTranscodingPaused(sessionKey.second);
+        }
+        mResourcePolicy->setPidResourceLost(resourceLostSession->request.clientPid);
+        mResourceLost = true;
+
+        validateState_l();
+    });
 }
 
 void TranscodingSessionController::onTopUidsChanged(const std::unordered_set<uid_t>& uids) {

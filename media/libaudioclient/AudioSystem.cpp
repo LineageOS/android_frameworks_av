@@ -71,7 +71,7 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
             sp<IServiceManager> sm = defaultServiceManager();
             sp<IBinder> binder;
             do {
-                binder = sm->getService(String16("media.audio_flinger"));
+                binder = sm->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
                 if (binder != 0)
                     break;
                 ALOGW("AudioFlinger not published, waiting...");
@@ -83,7 +83,8 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger()
                 reportNoError = true;
             }
             binder->linkToDeath(gAudioFlingerClient);
-            gAudioFlinger = interface_cast<IAudioFlinger>(binder);
+            gAudioFlinger = new AudioFlingerClientAdapter(
+                    interface_cast<media::IAudioFlingerService>(binder));
             LOG_ALWAYS_FATAL_IF(gAudioFlinger == 0);
             afc = gAudioFlingerClient;
             // Make sure callbacks can be received by gAudioFlingerClient
