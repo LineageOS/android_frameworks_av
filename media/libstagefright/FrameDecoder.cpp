@@ -43,7 +43,7 @@
 namespace android {
 
 static const int64_t kBufferTimeOutUs = 10000LL; // 10 msec
-static const size_t kRetryCount = 50; // must be >0
+static const size_t kRetryCount = 100; // must be >0
 static const int64_t kDefaultSampleDurationUs = 33333LL; // 33ms
 
 sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
