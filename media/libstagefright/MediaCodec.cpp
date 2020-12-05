@@ -317,7 +317,7 @@ MediaCodec::BufferInfo::BufferInfo() : mOwnedByClient(false) {}
 
 class MediaCodec::ReleaseSurface {
 public:
-    ReleaseSurface() {
+    explicit ReleaseSurface(uint64_t usage) {
         BufferQueue::createBufferQueue(&mProducer, &mConsumer);
         mSurface = new Surface(mProducer, false /* controlledByApp */);
         struct ConsumerListener : public BnConsumerListener {
@@ -328,6 +328,7 @@ public:
         sp<ConsumerListener> listener{new ConsumerListener};
         mConsumer->consumerConnect(listener, false);
         mConsumer->setConsumerName(String8{"MediaCodec.release"});
+        mConsumer->setConsumerUsageBits(usage);
     }
 
     const sp<Surface> &getSurface() {
@@ -3122,7 +3123,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             if (asyncNotify != nullptr) {
                 if (mSurface != NULL) {
                     if (!mReleaseSurface) {
-                        mReleaseSurface.reset(new ReleaseSurface);
+                        uint64_t usage = 0;
+                        if (mSurface->getConsumerUsage(&usage) != OK) {
+                            usage = 0;
+                        }
+                        mReleaseSurface.reset(new ReleaseSurface(usage));
                     }
                     if (mSurface != mReleaseSurface->getSurface()) {
                         status_t err = connectToSurface(mReleaseSurface->getSurface());
