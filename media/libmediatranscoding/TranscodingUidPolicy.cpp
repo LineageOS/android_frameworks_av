@@ -17,11 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingUidPolicy"
 
+#include <android/activity_manager.h>
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
-#include <binder/ActivityManager.h>
-#include <cutils/misc.h>  // FIRST_APPLICATION_UID
-#include <cutils/multiuser.h>
 #include <inttypes.h>
 #include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
@@ -31,51 +29,12 @@
 namespace android {
 
 constexpr static uid_t OFFLINE_UID = -1;
-constexpr static const char* kTranscodingTag = "transcoding";
-
-struct TranscodingUidPolicy::UidObserver : public BnUidObserver,
-                                           public virtual IBinder::DeathRecipient {
-    explicit UidObserver(TranscodingUidPolicy* owner) : mOwner(owner) {}
-
-    // IUidObserver
-    void onUidGone(uid_t uid, bool disabled) override;
-    void onUidActive(uid_t uid) override;
-    void onUidIdle(uid_t uid, bool disabled) override;
-    void onUidStateChanged(uid_t uid, int32_t procState, int64_t procStateSeq,
-                           int32_t capability) override;
-
-    // IBinder::DeathRecipient implementation
-    void binderDied(const wp<IBinder>& who) override;
-
-    TranscodingUidPolicy* mOwner;
-};
-
-void TranscodingUidPolicy::UidObserver::onUidGone(uid_t uid __unused, bool disabled __unused) {}
-
-void TranscodingUidPolicy::UidObserver::onUidActive(uid_t uid __unused) {}
-
-void TranscodingUidPolicy::UidObserver::onUidIdle(uid_t uid __unused, bool disabled __unused) {}
-
-void TranscodingUidPolicy::UidObserver::onUidStateChanged(uid_t uid, int32_t procState,
-                                                          int64_t procStateSeq __unused,
-                                                          int32_t capability __unused) {
-    mOwner->onUidStateChanged(uid, procState);
-}
-
-void TranscodingUidPolicy::UidObserver::binderDied(const wp<IBinder>& /*who*/) {
-    ALOGW("TranscodingUidPolicy: ActivityManager has died");
-    // TODO(chz): this is a rare event (since if the AMS is dead, the system is
-    // probably dead as well). But we should try to reconnect.
-    mOwner->setUidObserverRegistered(false);
-}
-
-////////////////////////////////////////////////////////////////////////////
+constexpr static int32_t IMPORTANCE_UNKNOWN = INT32_MAX;
 
 TranscodingUidPolicy::TranscodingUidPolicy()
-      : mAm(std::make_shared<ActivityManager>()),
-        mUidObserver(new UidObserver(this)),
+      : mUidObserver(nullptr),
         mRegistered(false),
-        mTopUidState(ActivityManager::PROCESS_STATE_UNKNOWN) {
+        mTopUidState(IMPORTANCE_UNKNOWN) {
     registerSelf();
 }
 
@@ -83,39 +42,32 @@ TranscodingUidPolicy::~TranscodingUidPolicy() {
     unregisterSelf();
 }
 
+void TranscodingUidPolicy::OnUidImportance(uid_t uid, int32_t uidImportance, void* cookie) {
+    TranscodingUidPolicy* owner = reinterpret_cast<TranscodingUidPolicy*>(cookie);
+    owner->onUidStateChanged(uid, uidImportance);
+}
+
 void TranscodingUidPolicy::registerSelf() {
-    status_t res = mAm->linkToDeath(mUidObserver.get());
-    mAm->registerUidObserver(
-            mUidObserver.get(),
-            ActivityManager::UID_OBSERVER_GONE | ActivityManager::UID_OBSERVER_IDLE |
-                    ActivityManager::UID_OBSERVER_ACTIVE | ActivityManager::UID_OBSERVER_PROCSTATE,
-            ActivityManager::PROCESS_STATE_UNKNOWN, String16(kTranscodingTag));
+    mUidObserver = AActivityManager_addUidImportanceListener(
+            &OnUidImportance, -1, (void*)this);
 
-    if (res == OK) {
-        Mutex::Autolock _l(mUidLock);
-
-        mRegistered = true;
-        ALOGI("TranscodingUidPolicy: Registered with ActivityManager");
-    } else {
-        mAm->unregisterUidObserver(mUidObserver.get());
+    if (mUidObserver == nullptr) {
+        ALOGE("Failed to register uid observer");
+        return;
     }
+
+    Mutex::Autolock _l(mUidLock);
+    mRegistered = true;
+    ALOGI("Registered uid observer");
 }
 
 void TranscodingUidPolicy::unregisterSelf() {
-    mAm->unregisterUidObserver(mUidObserver.get());
-    mAm->unlinkToDeath(mUidObserver.get());
+    AActivityManager_removeUidImportanceListener(mUidObserver);
+    mUidObserver = nullptr;
 
     Mutex::Autolock _l(mUidLock);
-
     mRegistered = false;
-
-    ALOGI("TranscodingUidPolicy: Unregistered with ActivityManager");
-}
-
-void TranscodingUidPolicy::setUidObserverRegistered(bool registered) {
-    Mutex::Autolock _l(mUidLock);
-
-    mRegistered = registered;
+    ALOGI("Unregistered uid observer");
 }
 
 void TranscodingUidPolicy::setCallback(const std::shared_ptr<UidPolicyCallbackInterface>& cb) {
@@ -133,9 +85,9 @@ void TranscodingUidPolicy::registerMonitorUid(uid_t uid) {
         return;
     }
 
-    int32_t state = ActivityManager::PROCESS_STATE_UNKNOWN;
-    if (mRegistered && mAm->isUidActive(uid, String16(kTranscodingTag))) {
-        state = mAm->getUidProcessState(uid, String16(kTranscodingTag));
+    int32_t state = IMPORTANCE_UNKNOWN;
+    if (mRegistered && AActivityManager_isUidActive(uid)) {
+        state = AActivityManager_getUidImportance(uid);
     }
 
     ALOGV("%s: inserting new uid: %u, procState %d", __FUNCTION__, uid, state);
@@ -170,14 +122,14 @@ void TranscodingUidPolicy::unregisterMonitorUid(uid_t uid) {
 bool TranscodingUidPolicy::isUidOnTop(uid_t uid) {
     Mutex::Autolock _l(mUidLock);
 
-    return mTopUidState != ActivityManager::PROCESS_STATE_UNKNOWN &&
+    return mTopUidState != IMPORTANCE_UNKNOWN &&
            mTopUidState == getProcState_l(uid);
 }
 
 std::unordered_set<uid_t> TranscodingUidPolicy::getTopUids() const {
     Mutex::Autolock _l(mUidLock);
 
-    if (mTopUidState == ActivityManager::PROCESS_STATE_UNKNOWN) {
+    if (mTopUidState == IMPORTANCE_UNKNOWN) {
         return std::unordered_set<uid_t>();
     }
 
@@ -195,11 +147,13 @@ void TranscodingUidPolicy::onUidStateChanged(uid_t uid, int32_t procState) {
         if (it != mUidStateMap.end() && it->second != procState) {
             // Top set changed if 1) the uid is in the current top uid set, or 2) the
             // new procState is at least the same priority as the current top uid state.
-            bool isUidCurrentTop = mTopUidState != ActivityManager::PROCESS_STATE_UNKNOWN &&
-                                   mStateUidMap[mTopUidState].count(uid) > 0;
-            bool isNewStateHigherThanTop = procState != ActivityManager::PROCESS_STATE_UNKNOWN &&
-                                           (procState <= mTopUidState ||
-                                            mTopUidState == ActivityManager::PROCESS_STATE_UNKNOWN);
+            bool isUidCurrentTop =
+                    mTopUidState != IMPORTANCE_UNKNOWN &&
+                    mStateUidMap[mTopUidState].count(uid) > 0;
+            bool isNewStateHigherThanTop =
+                    procState != IMPORTANCE_UNKNOWN &&
+                    (procState <= mTopUidState ||
+                     mTopUidState == IMPORTANCE_UNKNOWN);
             topUidSetChanged = (isUidCurrentTop || isNewStateHigherThanTop);
 
             // Move uid to the new procState.
@@ -227,11 +181,12 @@ void TranscodingUidPolicy::onUidStateChanged(uid_t uid, int32_t procState) {
 }
 
 void TranscodingUidPolicy::updateTopUid_l() {
-    mTopUidState = ActivityManager::PROCESS_STATE_UNKNOWN;
+    mTopUidState = IMPORTANCE_UNKNOWN;
 
     // Find the lowest uid state (ignoring PROCESS_STATE_UNKNOWN) with some monitored uids.
     for (auto stateIt = mStateUidMap.begin(); stateIt != mStateUidMap.end(); stateIt++) {
-        if (stateIt->first != ActivityManager::PROCESS_STATE_UNKNOWN && !stateIt->second.empty()) {
+        if (stateIt->first != IMPORTANCE_UNKNOWN &&
+            !stateIt->second.empty()) {
             mTopUidState = stateIt->first;
             break;
         }
@@ -245,7 +200,7 @@ int32_t TranscodingUidPolicy::getProcState_l(uid_t uid) {
     if (it != mUidStateMap.end()) {
         return it->second;
     }
-    return ActivityManager::PROCESS_STATE_UNKNOWN;
+    return IMPORTANCE_UNKNOWN;
 }
 
 }  // namespace android

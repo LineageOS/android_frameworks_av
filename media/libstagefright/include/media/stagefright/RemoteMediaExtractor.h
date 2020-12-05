@@ -28,12 +28,6 @@ namespace android {
 // IMediaExtractor wrapper to the MediaExtractor.
 class RemoteMediaExtractor : public BnMediaExtractor {
 public:
-
-    static const char *kExtractorFormat;
-    static const char *kExtractorMime;
-    static const char *kExtractorTracks;
-    static const char *kExtractorEntryPoint;
-
     static sp<IMediaExtractor> wrap(
             MediaExtractor *extractor,
             const sp<DataSource> &source,
@@ -48,7 +42,6 @@ public:
     virtual uint32_t flags() const;
     virtual status_t setMediaCas(const HInterfaceToken &casToken);
     virtual String8 name();
-    virtual status_t setEntryPoint(EntryPoint entryPoint);
 
 private:
     MediaExtractor *mExtractor;
