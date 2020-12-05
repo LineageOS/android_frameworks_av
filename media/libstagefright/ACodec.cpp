@@ -5283,6 +5283,34 @@ status_t ACodec::getPortFormat(OMX_U32 portIndex, sp<AMessage> &notify) {
                     if (mChannelMaskPresent) {
                         notify->setInt32("channel-mask", mChannelMask);
                     }
+
+                    if (!mIsEncoder && portIndex == kPortIndexOutput) {
+                        AString mime;
+                        if (mConfigFormat->findString("mime", &mime)
+                                && !strcasecmp(MEDIA_MIMETYPE_AUDIO_AAC, mime.c_str())) {
+
+                            OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE presentation;
+                            InitOMXParams(&presentation);
+                            err = mOMXNode->getParameter(
+                                    (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAacDrcPresentation,
+                                    &presentation, sizeof(presentation));
+                            if (err != OK) {
+                                return err;
+                            }
+                            notify->setInt32("aac-encoded-target-level",
+                                             presentation.nEncodedTargetLevel);
+                            notify->setInt32("aac-drc-cut-level", presentation.nDrcCut);
+                            notify->setInt32("aac-drc-boost-level", presentation.nDrcBoost);
+                            notify->setInt32("aac-drc-heavy-compression",
+                                             presentation.nHeavyCompression);
+                            notify->setInt32("aac-target-ref-level",
+                                             presentation.nTargetReferenceLevel);
+                            notify->setInt32("aac-drc-effect-type", presentation.nDrcEffectType);
+                            notify->setInt32("aac-drc-album-mode", presentation.nDrcAlbumMode);
+                            notify->setInt32("aac-drc-output-loudness",
+                                             presentation.nDrcOutputLoudness);
+                        }
+                    }
                     break;
                 }
 
@@ -7704,6 +7732,58 @@ status_t ACodec::setParameters(const sp<AMessage> &params) {
     // Ignore errors as failure is expected for codecs that aren't video encoders.
     (void)configureTemporalLayers(params, false /* inConfigure */, mOutputFormat);
 
+    AString mime;
+    if (!mIsEncoder
+            && (mConfigFormat->findString("mime", &mime))
+            && !strcasecmp(MEDIA_MIMETYPE_AUDIO_AAC, mime.c_str())) {
+        OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE presentation;
+        InitOMXParams(&presentation);
+        mOMXNode->getParameter(
+                    (OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAacDrcPresentation,
+                    &presentation, sizeof(presentation));
+        int32_t value32 = 0;
+        bool updated = false;
+        if (params->findInt32("aac-pcm-limiter-enable", &value32)) {
+            presentation.nPCMLimiterEnable = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-encoded-target-level", &value32)) {
+            presentation.nEncodedTargetLevel = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-drc-cut-level", &value32)) {
+            presentation.nDrcCut = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-drc-boost-level", &value32)) {
+            presentation.nDrcBoost = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-drc-heavy-compression", &value32)) {
+            presentation.nHeavyCompression = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-target-ref-level", &value32)) {
+            presentation.nTargetReferenceLevel = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-drc-effect-type", &value32)) {
+            presentation.nDrcEffectType = value32;
+            updated = true;
+        }
+        if (params->findInt32("aac-drc-album-mode", &value32)) {
+            presentation.nDrcAlbumMode = value32;
+            updated = true;
+        }
+        if (!params->findInt32("aac-drc-output-loudness", &value32)) {
+            presentation.nDrcOutputLoudness = value32;
+            updated = true;
+        }
+        if (updated) {
+            mOMXNode->setParameter((OMX_INDEXTYPE)OMX_IndexParamAudioAndroidAacDrcPresentation,
+                &presentation, sizeof(presentation));
+        }
+    }
     return setVendorParameters(params);
 }
 
