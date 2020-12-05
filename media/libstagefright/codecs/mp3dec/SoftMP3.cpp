@@ -23,7 +23,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/MediaDefs.h>
 
-#include "include/pvmp3decoder_api.h"
+#include <pvmp3decoder_api.h>
 
 namespace android {
 
