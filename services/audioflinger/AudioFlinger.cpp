@@ -4092,6 +4092,7 @@ status_t AudioFlinger::onPreTransact(
     switch (code) {
         case TransactionCode::SET_MASTER_VOLUME:
         case TransactionCode::SET_MASTER_MUTE:
+        case TransactionCode::MASTER_MUTE:
         case TransactionCode::SET_MODE:
         case TransactionCode::SET_MIC_MUTE:
         case TransactionCode::SET_LOW_RAM_DEVICE:
