@@ -13,7 +13,7 @@ cc_library_headers {
 
 // !!!DO NOT DEPEND ON THIS SHARED LIBRARY DIRECTLY!!!
 // use libcodec2-impl-defaults instead
-cc_library_shared {
+cc_library {
     name: "libcodec2_vndk",
     vendor_available: true,
     min_sdk_version: "29",
