@@ -645,17 +645,18 @@ void CCodec::allocate(const sp<MediaCodecInfo> &codecInfo) {
                 std::make_shared<Codec2ClientInterfaceWrapper>(client));
     }
 
-    std::shared_ptr<Codec2Client::Component> comp =
-            Codec2Client::CreateComponentByName(
+    std::shared_ptr<Codec2Client::Component> comp;
+    c2_status_t status = Codec2Client::CreateComponentByName(
             componentName.c_str(),
             mClientListener,
+            &comp,
             &client);
-    if (!comp) {
-        ALOGE("Failed Create component: %s", componentName.c_str());
+    if (status != C2_OK) {
+        ALOGE("Failed Create component: %s, error=%d", componentName.c_str(), status);
         Mutexed<State>::Locked state(mState);
         state->set(RELEASED);
         state.unlock();
-        mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+        mCallback->onError((status == C2_NO_MEMORY ? NO_MEMORY : UNKNOWN_ERROR), ACTION_CODE_FATAL);
         state.lock();
         return;
     }
