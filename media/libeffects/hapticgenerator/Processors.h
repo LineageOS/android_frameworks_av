@@ -44,9 +44,12 @@ private:
 class SlowEnvelope {
 public:
     SlowEnvelope(float cornerFrequency, float sampleRate,
-                 float normalizationPower, size_t channelCount);
+                 float normalizationPower, float envOffset,
+                 size_t channelCount);
 
     void process(float *out, const float *in, size_t frameCount);
+
+    void setNormalizationPower(float normalizationPower);
 
     void clear();
 
@@ -54,15 +57,54 @@ private:
     const std::shared_ptr<HapticBiquadFilter> mLpf;
     std::vector<float> mLpfInBuffer;
     std::vector<float> mLpfOutBuffer;
-    const float mNormalizationPower;
+    float mNormalizationPower;
+    const float mEnvOffset;
     const float mChannelCount;
-    const float mEnv;
+};
+
+
+// A class providing a process function that compressively distorts a waveforms
+class Distortion {
+public:
+    Distortion(float cornerFrequency, float sampleRate,
+               float inputGain, float cubeThreshold,
+               float outputGain, size_t channelCount);
+
+    void process(float *out, const float *in, size_t frameCount);
+
+    void setCornerFrequency(float cornerFrequency);
+    void setInputGain(float inputGain);
+    void setCubeThrehold(float cubeThreshold);
+    void setOutputGain(float outputGain);
+
+    void clear();
+
+private:
+    const std::shared_ptr<HapticBiquadFilter> mLpf;
+    std::vector<float> mLpfInBuffer;
+    float mSampleRate;
+    float mCornerFrequency;
+    float mInputGain;
+    float mCubeThreshold;
+    float mOutputGain;
+    const size_t mChannelCount;
 };
 
 // Helper functions
 
 BiquadFilterCoefficients cascadeFirstOrderFilters(const BiquadFilterCoefficients &coefs1,
                                                   const BiquadFilterCoefficients &coefs2);
+
+BiquadFilterCoefficients lpfCoefs(const float cornerFrequency, const float sampleRate);
+
+BiquadFilterCoefficients bpfCoefs(const float ringingFrequency,
+                                  const float q,
+                                  const float sampleRate);
+
+BiquadFilterCoefficients bsfCoefs(const float ringingFrequency,
+                                  const float sampleRate,
+                                  const float zq,
+                                  const float pq);
 
 std::shared_ptr<HapticBiquadFilter> createLPF(const float cornerFrequency,
                                         const float sampleRate,
@@ -75,16 +117,6 @@ std::shared_ptr<HapticBiquadFilter> createLPF2(const float cornerFrequency,
 
 // Create two cascaded HPF with same corner frequency.
 std::shared_ptr<HapticBiquadFilter> createHPF2(const float cornerFrequency,
-                                         const float sampleRate,
-                                         const size_t channelCount);
-
-std::shared_ptr<HapticBiquadFilter> createAPF(const float cornerFrequency,
-                                        const float sampleRate,
-                                        const size_t channelCount);
-
-// Create two cascaded APF with two different corner frequency.
-std::shared_ptr<HapticBiquadFilter> createAPF2(const float cornerFrequency1,
-                                         const float cornerFrequency2,
                                          const float sampleRate,
                                          const size_t channelCount);
 

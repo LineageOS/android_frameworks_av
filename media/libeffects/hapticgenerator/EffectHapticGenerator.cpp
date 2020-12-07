@@ -101,6 +101,16 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->param.audioChannelCount = 0;
     context->param.maxHapticIntensity = os::HapticScale::MUTE;
 
+    context->param.resonantFrequency = 150.0f;
+    context->param.bpfQ = 1.0f;
+    context->param.slowEnvNormalizationPower = -0.8f;
+    context->param.bsfZeroQ = 8.0f;
+    context->param.bsfPoleQ = 4.0f;
+    context->param.distortionCornerFrequency = 300.0f;
+    context->param.distortionInputGain = 0.3f;
+    context->param.distortionCubeThreshold = 0.1f;
+    context->param.distortionOutputGain = 1.5f;
+
     context->state = HAPTICGENERATOR_STATE_INITIALIZED;
     return 0;
 }
@@ -128,16 +138,17 @@ void addBiquadFilter(
  */
 void HapticGenerator_buildProcessingChain(
         std::vector<std::function<void(float*, const float*, size_t)>>& processingChain,
-        struct HapticGeneratorProcessorsRecord& processorsRecord,
-        float sampleRate, size_t channelCount) {
-    float highPassCornerFrequency = 100.0f;
+        struct HapticGeneratorProcessorsRecord& processorsRecord, float sampleRate,
+        const struct HapticGeneratorParam* param) {
+    const size_t channelCount = param->hapticChannelCount;
+    float highPassCornerFrequency = 50.0f;
     auto hpf = createHPF2(highPassCornerFrequency, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, hpf);
-    float lowPassCornerFrequency = 3000.0f;
+    float lowPassCornerFrequency = 9000.0f;
     auto lpf = createLPF2(lowPassCornerFrequency, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, lpf);
 
-    auto ramp = std::make_shared<Ramp>(channelCount);
+    auto ramp = std::make_shared<Ramp>(channelCount);  // ramp = half-wave rectifier.
     // The process chain captures the shared pointer of the ramp in lambda. It will be the only
     // reference to the ramp.
     // The process record will keep a weak pointer to the ramp so that it is possible to access
@@ -154,19 +165,6 @@ void HapticGenerator_buildProcessingChain(
     lpf = createLPF2(lowPassCornerFrequency, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, lpf);
 
-    lowPassCornerFrequency = 5.0f;
-    float normalizationPower = -0.3f;
-    // The process chain captures the shared pointer of the slow envelope in lambda. It will
-    // be the only reference to the slow envelope.
-    // The process record will keep a weak pointer to the slow envelope so that it is possible
-    // to access the slow envelope outside of the process chain.
-    auto slowEnv = std::make_shared<SlowEnvelope>(
-            lowPassCornerFrequency, sampleRate, normalizationPower, channelCount);
-    processorsRecord.slowEnvs.push_back(slowEnv);
-    processingChain.push_back([slowEnv](float *out, const float *in, size_t frameCount) {
-            slowEnv->process(out, in, frameCount);
-    });
-
     lowPassCornerFrequency = 400.0f;
     lpf = createLPF2(lowPassCornerFrequency, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, lpf);
@@ -174,23 +172,38 @@ void HapticGenerator_buildProcessingChain(
     lpf = createLPF2(lowPassCornerFrequency, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, lpf);
 
-    auto apf = createAPF2(400.0f, 200.0f, sampleRate, channelCount);
-    addBiquadFilter(processingChain, processorsRecord, apf);
-    apf = createAPF2(100.0f, 50.0f, sampleRate, channelCount);
-    addBiquadFilter(processingChain, processorsRecord, apf);
-    float allPassCornerFrequency = 25.0f;
-    apf = createAPF(allPassCornerFrequency, sampleRate, channelCount);
-    addBiquadFilter(processingChain, processorsRecord, apf);
-
-    float resonantFrequency = 150.0f;
-    float bandpassQ = 1.0f;
-    auto bpf = createBPF(resonantFrequency, bandpassQ, sampleRate, channelCount);
+    auto bpf = createBPF(param->resonantFrequency, param->bpfQ, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, bpf);
 
-    float zeroQ = 8.0f;
-    float poleQ = 4.0f;
-    auto bsf = createBSF(resonantFrequency, zeroQ, poleQ, sampleRate, channelCount);
+    float normalizationPower = param->slowEnvNormalizationPower;
+    // The process chain captures the shared pointer of the slow envelope in lambda. It will
+    // be the only reference to the slow envelope.
+    // The process record will keep a weak pointer to the slow envelope so that it is possible
+    // to access the slow envelope outside of the process chain.
+    auto slowEnv = std::make_shared<SlowEnvelope>(  // SlowEnvelope = partial normalizer, or AGC.
+            5.0f /*envCornerFrequency*/, sampleRate, normalizationPower,
+            0.01f /*envOffset*/, channelCount);
+    processorsRecord.slowEnvs.push_back(slowEnv);
+    processingChain.push_back([slowEnv](float *out, const float *in, size_t frameCount) {
+            slowEnv->process(out, in, frameCount);
+    });
+
+
+    auto bsf = createBSF(
+            param->resonantFrequency, param->bsfZeroQ, param->bsfPoleQ, sampleRate, channelCount);
     addBiquadFilter(processingChain, processorsRecord, bsf);
+
+    // The process chain captures the shared pointer of the Distortion in lambda. It will
+    // be the only reference to the Distortion.
+    // The process record will keep a weak pointer to the Distortion so that it is possible
+    // to access the Distortion outside of the process chain.
+    auto distortion = std::make_shared<Distortion>(
+            param->distortionCornerFrequency, sampleRate, param->distortionInputGain,
+            param->distortionCubeThreshold, param->distortionOutputGain, channelCount);
+    processorsRecord.distortions.push_back(distortion);
+    processingChain.push_back([distortion](float *out, const float *in, size_t frameCount) {
+            distortion->process(out, in, frameCount);
+    });
 }
 
 int HapticGenerator_Configure(struct HapticGeneratorContext *context, effect_config_t *config) {
@@ -206,6 +219,7 @@ int HapticGenerator_Configure(struct HapticGeneratorContext *context, effect_con
         context->processorsRecord.filters.clear();
         context->processorsRecord.ramps.clear();
         context->processorsRecord.slowEnvs.clear();
+        context->processorsRecord.distortions.clear();
         memcpy(&context->config, config, sizeof(effect_config_t));
         context->param.audioChannelCount = audio_channel_count_from_out_mask(
                 ((audio_channel_mask_t) config->inputCfg.channels) & ~AUDIO_CHANNEL_HAPTIC_ALL);
@@ -224,7 +238,7 @@ int HapticGenerator_Configure(struct HapticGeneratorContext *context, effect_con
         HapticGenerator_buildProcessingChain(context->processingChain,
                                              context->processorsRecord,
                                              config->inputCfg.samplingRate,
-                                             context->param.hapticChannelCount);
+                                             &context->param);
     }
     return 0;
 }
@@ -235,6 +249,9 @@ int HapticGenerator_Reset(struct HapticGeneratorContext *context) {
     }
     for (auto& slowEnv : context->processorsRecord.slowEnvs) {
         slowEnv->clear();
+    }
+    for (auto& distortion : context->processorsRecord.distortions) {
+        distortion->clear();
     }
     return 0;
 }
