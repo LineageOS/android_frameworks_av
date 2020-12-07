@@ -39,12 +39,12 @@ void AudioRoute::dump(String8 *dst, int spaces) const
 bool AudioRoute::supportsPatch(const sp<PolicyAudioPort> &srcPort,
                                const sp<PolicyAudioPort> &dstPort) const
 {
-    if (mSink == 0 || dstPort == 0 || !dstPort->equals(mSink)) {
+    if (mSink == 0 || dstPort == 0 || dstPort != mSink) {
         return false;
     }
     ALOGV("%s: sinks %s matching", __FUNCTION__, mSink->getTagName().c_str());
     for (const auto &sourcePort : mSources) {
-        if (sourcePort->equals(srcPort)) {
+        if (sourcePort == srcPort) {
             ALOGV("%s: sources %s matching", __FUNCTION__, sourcePort->getTagName().c_str());
             return true;
         }
