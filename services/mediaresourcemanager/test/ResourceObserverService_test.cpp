@@ -25,14 +25,6 @@
 #include "ResourceObserverService.h"
 #include "ResourceManagerServiceTestUtils.h"
 
-namespace aidl {
-namespace android {
-namespace media {
-bool operator==(const MediaObservableParcel& lhs, const MediaObservableParcel& rhs) {
-    return lhs.type == rhs.type && lhs.value == rhs.value;
-}
-}}} // namespace ::aidl::android::media
-
 namespace android {
 
 using ::aidl::android::media::BnResourceObserver;
