@@ -19,14 +19,14 @@
 #define LOG_TAG "TypeConverter_Test"
 #include <log/log.h>
 
-#include <audio_policy_configuration_V7_0.h>
+#include <android_audio_policy_configuration_V7_0.h>
 #include <media/TypeConverter.h>
 #include <system/audio.h>
 #include <xsdc/XsdcSupport.h>
 
 using namespace android;
 namespace xsd {
-using namespace audio::policy::configuration::V7_0;
+using namespace android::audio::policy::configuration::V7_0;
 }
 
 TEST(TypeConverter, ParseChannelMasks) {
