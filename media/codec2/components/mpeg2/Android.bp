@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_mpeg2dec",
     defaults: [
         "libcodec2_soft-defaults",

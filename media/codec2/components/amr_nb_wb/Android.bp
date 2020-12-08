@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_amrnbdec",
     defaults: [
         "libcodec2_soft-defaults",
@@ -21,7 +21,7 @@ cc_library_shared {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_amrwbdec",
     defaults: [
         "libcodec2_soft-defaults",
@@ -40,7 +40,7 @@ cc_library_shared {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_amrnbenc",
     defaults: [
         "libcodec2_soft-defaults",
@@ -58,7 +58,7 @@ cc_library_shared {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_amrwbenc",
     defaults: [
         "libcodec2_soft-defaults",

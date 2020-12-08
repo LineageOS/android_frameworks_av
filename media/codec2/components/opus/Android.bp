@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_opusdec",
     defaults: [
         "libcodec2_soft-defaults",
@@ -9,7 +9,7 @@ cc_library_shared {
 
     shared_libs: ["libopus"],
 }
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_opusenc",
     defaults: [
         "libcodec2_soft-defaults",

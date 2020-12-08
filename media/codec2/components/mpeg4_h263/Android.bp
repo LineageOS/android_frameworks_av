@@ -1,4 +1,4 @@
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_mpeg4dec",
     defaults: [
         "libcodec2_soft-defaults",
@@ -15,7 +15,7 @@ cc_library_shared {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_h263dec",
     defaults: [
         "libcodec2_soft-defaults",
@@ -31,7 +31,7 @@ cc_library_shared {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_mpeg4enc",
     defaults: [
         "libcodec2_soft-defaults",
@@ -49,7 +49,7 @@ cc_library_shared {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2_soft_h263enc",
     defaults: [
         "libcodec2_soft-defaults",
