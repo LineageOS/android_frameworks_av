@@ -241,10 +241,15 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         default:    // FORCE_NONE
             devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
             if (!devices.isEmpty()) break;
+
+            // TODO (b/161358428): remove when preferred device
+            //  for strategy phone will be used instead of AUDIO_POLICY_FORCE_FOR_COMMUNICATION
+            devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_BLE_HEADSET);
+            if (!devices.isEmpty()) break;
+
             // when not in a phone call, phone strategy should route STREAM_VOICE_CALL to A2DP
             if (!isInCall() &&
-                    (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                     outputs.isA2dpSupported()) {
+                    (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
                 devices = availableOutputDevices.getFirstDevicesFromTypes({
                         AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
                         AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES});
@@ -267,12 +272,16 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         case AUDIO_POLICY_FORCE_SPEAKER:
             // when not in a phone call, phone strategy should route STREAM_VOICE_CALL to
             // A2DP speaker when forcing to speaker output
-            if (!isInCall() &&
-                    (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                     outputs.isA2dpSupported()) {
+            if (!isInCall()) {
                 devices = availableOutputDevices.getDevicesFromType(
-                        AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
+                        AUDIO_DEVICE_OUT_BLE_SPEAKER);
                 if (!devices.isEmpty()) break;
+
+                if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
+                    devices = availableOutputDevices.getDevicesFromType(
+                            AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
+                    if (!devices.isEmpty()) break;
+                }
             }
             if (!isInCall()) {
                 devices = availableOutputDevices.getFirstDevicesFromTypes({
@@ -386,18 +395,13 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                     STRATEGY_PHONE, availableOutputDevices, availableInputDevices, outputs);
             break;
         }
-        // FIXME: Find a better solution to prevent routing to BT hearing aid(b/122931261).
-        if ((devices2.isEmpty()) &&
-                (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
-            devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
-        }
+
         if ((devices2.isEmpty()) &&
             (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) == AUDIO_POLICY_FORCE_SPEAKER)) {
             devices2 = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
         }
         if (devices2.isEmpty() && (getLastRemovableMediaDevices().size() > 0)) {
-            if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP) &&
-                    outputs.isA2dpSupported()) {
+            if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
                 // Get the last connected device of wired and bluetooth a2dp
                 devices2 = availableOutputDevices.getFirstDevicesFromTypes(
                         getLastRemovableMediaDevices());
@@ -514,8 +518,9 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             if (device != nullptr) break;
         }
         device = availableDevices.getFirstExistingDevice({
-                AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_IN_USB_HEADSET,
-                AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
+                AUDIO_DEVICE_IN_BUILTIN_MIC});
         break;
 
     case AUDIO_SOURCE_VOICE_COMMUNICATION:
@@ -539,9 +544,13 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             FALLTHROUGH_INTENDED;
 
         default:    // FORCE_NONE
+            // TODO (b/161358428): remove AUDIO_DEVICE_IN_BLE_HEADSET from the list
+            //  when preferred device for strategy phone will be used instead of
+            //  AUDIO_POLICY_FORCE_FOR_COMMUNICATION.
             device = availableDevices.getFirstExistingDevice({
-                    AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_IN_USB_HEADSET,
-                    AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+                    AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                    AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
+                    AUDIO_DEVICE_IN_BUILTIN_MIC});
             break;
 
         case AUDIO_POLICY_FORCE_SPEAKER:
@@ -566,8 +575,9 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             if (device != nullptr) break;
         }
         device = availableDevices.getFirstExistingDevice({
-                AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_IN_USB_HEADSET,
-                AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
+                AUDIO_DEVICE_IN_BUILTIN_MIC});
         break;
     case AUDIO_SOURCE_CAMCORDER:
         // For a device without built-in mic, adding usb device
