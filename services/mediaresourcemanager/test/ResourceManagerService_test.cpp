@@ -27,14 +27,6 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/ProcessInfoInterface.h>
 
-namespace aidl {
-namespace android {
-namespace media {
-bool operator== (const MediaResourceParcel& lhs, const MediaResourceParcel& rhs) {
-    return lhs.type == rhs.type && lhs.subType == rhs.subType &&
-            lhs.id == rhs.id && lhs.value == rhs.value;
-}}}}
-
 namespace android {
 
 using Status = ::ndk::ScopedAStatus;
