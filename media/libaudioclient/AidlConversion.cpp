@@ -117,27 +117,28 @@ enum class Direction {
 
 ConversionResult<Direction> direction(media::AudioPortRole role, media::AudioPortType type) {
     switch (type) {
+        case media::AudioPortType::NONE:
+        case media::AudioPortType::SESSION:
+            break;  // must be listed  -Werror,-Wswitch
         case media::AudioPortType::DEVICE:
             switch (role) {
+                case media::AudioPortRole::NONE:
+                     break;  // must be listed  -Werror,-Wswitch
                 case media::AudioPortRole::SOURCE:
                     return Direction::INPUT;
                 case media::AudioPortRole::SINK:
                     return Direction::OUTPUT;
-                default:
-                    break;
             }
             break;
         case media::AudioPortType::MIX:
             switch (role) {
+                case media::AudioPortRole::NONE:
+                     break;  // must be listed  -Werror,-Wswitch
                 case media::AudioPortRole::SOURCE:
                     return Direction::OUTPUT;
                 case media::AudioPortRole::SINK:
                     return Direction::INPUT;
-                default:
-                    break;
             }
-            break;
-        default:
             break;
     }
     return unexpected(BAD_VALUE);
@@ -145,27 +146,28 @@ ConversionResult<Direction> direction(media::AudioPortRole role, media::AudioPor
 
 ConversionResult<Direction> direction(audio_port_role_t role, audio_port_type_t type) {
     switch (type) {
+        case AUDIO_PORT_TYPE_NONE:
+        case AUDIO_PORT_TYPE_SESSION:
+            break;  // must be listed  -Werror,-Wswitch
         case AUDIO_PORT_TYPE_DEVICE:
             switch (role) {
+                case AUDIO_PORT_ROLE_NONE:
+                     break;  // must be listed  -Werror,-Wswitch
                 case AUDIO_PORT_ROLE_SOURCE:
                     return Direction::INPUT;
                 case AUDIO_PORT_ROLE_SINK:
                     return Direction::OUTPUT;
-                default:
-                    break;
             }
             break;
         case AUDIO_PORT_TYPE_MIX:
             switch (role) {
+                case AUDIO_PORT_ROLE_NONE:
+                     break;  // must be listed  -Werror,-Wswitch
                 case AUDIO_PORT_ROLE_SOURCE:
                     return Direction::OUTPUT;
                 case AUDIO_PORT_ROLE_SINK:
                     return Direction::INPUT;
-                default:
-                    break;
             }
-            break;
-        default:
             break;
     }
     return unexpected(BAD_VALUE);
@@ -363,9 +365,8 @@ ConversionResult<audio_io_config_event> aidl2legacy_AudioIoConfigEvent_audio_io_
             return AUDIO_INPUT_CONFIG_CHANGED;
         case media::AudioIoConfigEvent::CLIENT_STARTED:
             return AUDIO_CLIENT_STARTED;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_AudioIoConfigEvent(
@@ -389,9 +390,8 @@ ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_Au
             return media::AudioIoConfigEvent::INPUT_CONFIG_CHANGED;
         case AUDIO_CLIENT_STARTED:
             return media::AudioIoConfigEvent::CLIENT_STARTED;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_port_role_t> aidl2legacy_AudioPortRole_audio_port_role_t(
@@ -403,9 +403,8 @@ ConversionResult<audio_port_role_t> aidl2legacy_AudioPortRole_audio_port_role_t(
             return AUDIO_PORT_ROLE_SOURCE;
         case media::AudioPortRole::SINK:
             return AUDIO_PORT_ROLE_SINK;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioPortRole> legacy2aidl_audio_port_role_t_AudioPortRole(
@@ -417,9 +416,8 @@ ConversionResult<media::AudioPortRole> legacy2aidl_audio_port_role_t_AudioPortRo
             return media::AudioPortRole::SOURCE;
         case AUDIO_PORT_ROLE_SINK:
             return media::AudioPortRole::SINK;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_port_type_t> aidl2legacy_AudioPortType_audio_port_type_t(
@@ -433,9 +431,8 @@ ConversionResult<audio_port_type_t> aidl2legacy_AudioPortType_audio_port_type_t(
             return AUDIO_PORT_TYPE_MIX;
         case media::AudioPortType::SESSION:
             return AUDIO_PORT_TYPE_SESSION;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortType(
@@ -449,9 +446,8 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
             return media::AudioPortType::MIX;
         case AUDIO_PORT_TYPE_SESSION:
             return media::AudioPortType::SESSION;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_format_t> aidl2legacy_AudioFormat_audio_format_t(
@@ -476,9 +472,8 @@ ConversionResult<audio_gain_mode_t> aidl2legacy_AudioGainMode_audio_gain_mode_t(
             return AUDIO_GAIN_MODE_CHANNELS;
         case media::AudioGainMode::RAMP:
             return AUDIO_GAIN_MODE_RAMP;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioGainMode> legacy2aidl_audio_gain_mode_t_AudioGainMode(audio_gain_mode_t legacy) {
@@ -489,9 +484,8 @@ ConversionResult<media::AudioGainMode> legacy2aidl_audio_gain_mode_t_AudioGainMo
             return media::AudioGainMode::CHANNELS;
         case AUDIO_GAIN_MODE_RAMP:
             return media::AudioGainMode::RAMP;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_gain_mode_t> aidl2legacy_int32_t_audio_gain_mode_t_mask(int32_t aidl) {
@@ -583,14 +577,15 @@ ConversionResult<audio_input_flags_t> aidl2legacy_AudioInputFlags_audio_input_fl
             return AUDIO_INPUT_FLAG_HW_AV_SYNC;
         case media::AudioInputFlags::DIRECT:
             return AUDIO_INPUT_FLAG_DIRECT;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioInputFlags> legacy2aidl_audio_input_flags_t_AudioInputFlags(
         audio_input_flags_t legacy) {
     switch (legacy) {
+        case AUDIO_INPUT_FLAG_NONE:
+            break; // shouldn't get here. must be listed  -Werror,-Wswitch
         case AUDIO_INPUT_FLAG_FAST:
             return media::AudioInputFlags::FAST;
         case AUDIO_INPUT_FLAG_HW_HOTWORD:
@@ -607,9 +602,8 @@ ConversionResult<media::AudioInputFlags> legacy2aidl_audio_input_flags_t_AudioIn
             return media::AudioInputFlags::HW_AV_SYNC;
         case AUDIO_INPUT_FLAG_DIRECT:
             return media::AudioInputFlags::DIRECT;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_output_flags_t> aidl2legacy_AudioOutputFlags_audio_output_flags_t(
@@ -647,14 +641,15 @@ ConversionResult<audio_output_flags_t> aidl2legacy_AudioOutputFlags_audio_output
             return AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
         case media::AudioOutputFlags::GAPLESS_OFFLOAD:
             return AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioOutputFlags> legacy2aidl_audio_output_flags_t_AudioOutputFlags(
         audio_output_flags_t legacy) {
     switch (legacy) {
+        case AUDIO_OUTPUT_FLAG_NONE:
+            break; // shouldn't get here. must be listed  -Werror,-Wswitch
         case AUDIO_OUTPUT_FLAG_DIRECT:
             return media::AudioOutputFlags::DIRECT;
         case AUDIO_OUTPUT_FLAG_PRIMARY:
@@ -687,9 +682,8 @@ ConversionResult<media::AudioOutputFlags> legacy2aidl_audio_output_flags_t_Audio
             return media::AudioOutputFlags::INCALL_MUSIC;
         case AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD:
             return media::AudioOutputFlags::GAPLESS_OFFLOAD;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_input_flags_t> aidl2legacy_audio_input_flags_mask(int32_t aidl) {
@@ -826,9 +820,8 @@ ConversionResult<audio_stream_type_t> aidl2legacy_AudioStreamType_audio_stream_t
             return AUDIO_STREAM_PATCH;
         case media::AudioStreamType::CALL_ASSISTANT:
             return AUDIO_STREAM_CALL_ASSISTANT;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioStreamType> legacy2aidl_audio_stream_type_t_AudioStreamType(
@@ -866,9 +859,8 @@ ConversionResult<media::AudioStreamType> legacy2aidl_audio_stream_type_t_AudioSt
             return media::AudioStreamType::PATCH;
         case AUDIO_STREAM_CALL_ASSISTANT:
             return media::AudioStreamType::CALL_ASSISTANT;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_source_t> aidl2legacy_AudioSourceType_audio_source_t(
@@ -905,9 +897,8 @@ ConversionResult<audio_source_t> aidl2legacy_AudioSourceType_audio_source_t(
             return AUDIO_SOURCE_FM_TUNER;
         case media::AudioSourceType::HOTWORD:
             return AUDIO_SOURCE_HOTWORD;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<media::AudioSourceType> legacy2aidl_audio_source_t_AudioSourceType(
@@ -943,9 +934,8 @@ ConversionResult<media::AudioSourceType> legacy2aidl_audio_source_t_AudioSourceT
             return media::AudioSourceType::FM_TUNER;
         case AUDIO_SOURCE_HOTWORD:
             return media::AudioSourceType::HOTWORD;
-        default:
-            return unexpected(BAD_VALUE);
     }
+    return unexpected(BAD_VALUE);
 }
 
 ConversionResult<audio_session_t> aidl2legacy_int32_t_audio_session_t(int32_t aidl) {
@@ -967,24 +957,21 @@ ConversionResult<audio_port_config_mix_ext_usecase> aidl2legacy_AudioPortConfigM
         case media::AudioPortRole::NONE:
             // Just verify that the union is empty.
             VALUE_OR_RETURN(UNION_GET(aidl, unspecified));
-            break;
+            return legacy;
 
         case media::AudioPortRole::SOURCE:
             // This is not a bug. A SOURCE role corresponds to the stream field.
             legacy.stream = VALUE_OR_RETURN(aidl2legacy_AudioStreamType_audio_stream_type_t(
                     VALUE_OR_RETURN(UNION_GET(aidl, stream))));
-            break;
+            return legacy;
 
         case media::AudioPortRole::SINK:
             // This is not a bug. A SINK role corresponds to the source field.
             legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSourceType_audio_source_t(
                     VALUE_OR_RETURN(UNION_GET(aidl, source))));
-            break;
-
-        default:
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return legacy;
     }
-    return legacy;
+    LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<media::AudioPortConfigMixExtUseCase> legacy2aidl_AudioPortConfigMixExtUseCase(
@@ -994,21 +981,19 @@ ConversionResult<media::AudioPortConfigMixExtUseCase> legacy2aidl_AudioPortConfi
     switch (role) {
         case AUDIO_PORT_ROLE_NONE:
             UNION_SET(aidl, unspecified, false);
-            break;
+            return aidl;
         case AUDIO_PORT_ROLE_SOURCE:
             // This is not a bug. A SOURCE role corresponds to the stream field.
             UNION_SET(aidl, stream, VALUE_OR_RETURN(
                     legacy2aidl_audio_stream_type_t_AudioStreamType(legacy.stream)));
-            break;
+            return aidl;
         case AUDIO_PORT_ROLE_SINK:
             // This is not a bug. A SINK role corresponds to the source field.
             UNION_SET(aidl, source,
                       VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSourceType(legacy.source)));
-            break;
-        default:
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return aidl;
     }
-    return aidl;
+    LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<audio_port_config_mix_ext> aidl2legacy_AudioPortConfigMixExt(
@@ -1054,23 +1039,22 @@ ConversionResult<audio_port_config_ext> aidl2legacy_AudioPortConfigExt(
         case media::AudioPortType::NONE:
             // Just verify that the union is empty.
             VALUE_OR_RETURN(UNION_GET(aidl, unspecified));
-            break;
+            return legacy;
         case media::AudioPortType::DEVICE:
             legacy.device = VALUE_OR_RETURN(
                     aidl2legacy_AudioPortConfigDeviceExt(VALUE_OR_RETURN(UNION_GET(aidl, device))));
-            break;
+            return legacy;
         case media::AudioPortType::MIX:
             legacy.mix = VALUE_OR_RETURN(
                     aidl2legacy_AudioPortConfigMixExt(VALUE_OR_RETURN(UNION_GET(aidl, mix)), role));
-            break;
+            return legacy;
         case media::AudioPortType::SESSION:
             legacy.session = VALUE_OR_RETURN(aidl2legacy_AudioPortConfigSessionExt(
                     VALUE_OR_RETURN(UNION_GET(aidl, session))));
-            break;
-        default:
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return legacy;
+
     }
-    return legacy;
+    LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<media::AudioPortConfigExt> legacy2aidl_AudioPortConfigExt(
@@ -1080,23 +1064,21 @@ ConversionResult<media::AudioPortConfigExt> legacy2aidl_AudioPortConfigExt(
     switch (type) {
         case AUDIO_PORT_TYPE_NONE:
             UNION_SET(aidl, unspecified, false);
-            break;
+            return aidl;
         case AUDIO_PORT_TYPE_DEVICE:
             UNION_SET(aidl, device,
                       VALUE_OR_RETURN(legacy2aidl_AudioPortConfigDeviceExt(legacy.device)));
-            break;
+            return aidl;
         case AUDIO_PORT_TYPE_MIX:
             UNION_SET(aidl, mix,
                       VALUE_OR_RETURN(legacy2aidl_AudioPortConfigMixExt(legacy.mix, role)));
-            break;
+            return aidl;
         case AUDIO_PORT_TYPE_SESSION:
             UNION_SET(aidl, session,
                       VALUE_OR_RETURN(legacy2aidl_AudioPortConfigSessionExt(legacy.session)));
-            break;
-        default:
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return aidl;
     }
-    return aidl;
+    LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<audio_port_config> aidl2legacy_AudioPortConfig_audio_port_config(
@@ -1912,25 +1894,24 @@ ConversionResult<audio_port_v7_ext> aidl2legacy_AudioPortExt(
         case media::AudioPortType::NONE:
             // Just verify that the union is empty.
             VALUE_OR_RETURN(UNION_GET(aidl, unspecified));
-            break;
+            return legacy;
         case media::AudioPortType::DEVICE:
             legacy.device = VALUE_OR_RETURN(
                     aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(
                             VALUE_OR_RETURN(UNION_GET(aidl, device))));
-            break;
+            return legacy;
         case media::AudioPortType::MIX:
             legacy.mix = VALUE_OR_RETURN(
                     aidl2legacy_AudioPortMixExt_audio_port_mix_ext(
                             VALUE_OR_RETURN(UNION_GET(aidl, mix))));
-            break;
+            return legacy;
         case media::AudioPortType::SESSION:
             legacy.session = VALUE_OR_RETURN(aidl2legacy_AudioPortSessionExt_audio_port_session_ext(
                     VALUE_OR_RETURN(UNION_GET(aidl, session))));
-            break;
-        default:
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return legacy;
+
     }
-    return legacy;
+    LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<media::AudioPortExt> legacy2aidl_AudioPortExt(
@@ -1939,25 +1920,23 @@ ConversionResult<media::AudioPortExt> legacy2aidl_AudioPortExt(
     switch (type) {
         case AUDIO_PORT_TYPE_NONE:
             UNION_SET(aidl, unspecified, false);
-            break;
+            return aidl;
         case AUDIO_PORT_TYPE_DEVICE:
             UNION_SET(aidl, device,
                       VALUE_OR_RETURN(
                               legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(legacy.device)));
-            break;
+            return aidl;
         case AUDIO_PORT_TYPE_MIX:
             UNION_SET(aidl, mix,
                       VALUE_OR_RETURN(legacy2aidl_audio_port_mix_ext_AudioPortMixExt(legacy.mix)));
-            break;
+            return aidl;
         case AUDIO_PORT_TYPE_SESSION:
             UNION_SET(aidl, session,
                       VALUE_OR_RETURN(legacy2aidl_audio_port_session_ext_AudioPortSessionExt(
                               legacy.session)));
-            break;
-        default:
-            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return aidl;
     }
-    return aidl;
+    LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
 }
 
 ConversionResult<audio_profile>
