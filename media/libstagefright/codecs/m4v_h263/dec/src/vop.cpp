@@ -501,6 +501,13 @@ decode_vol:
                 }
                 while ((qmat[*(zigzag_inv+i)] != 0) && (++i < 64));
 
+                /* qmatrix must have at least one non-zero value, which means
+                   i would be non-zero in valid cases */
+                if (i == 0)
+                {
+                    return PV_FAIL;
+                }
+
                 for (j = i; j < 64; j++)
                     qmat[*(zigzag_inv+j)] = qmat[*(zigzag_inv+i-1)];
             }
@@ -523,6 +530,13 @@ decode_vol:
                     qmat[*(zigzag_inv+i)] = (int) BitstreamReadBits16(stream, 8);
                 }
                 while ((qmat[*(zigzag_inv+i)] != 0) && (++i < 64));
+
+                /* qmatrix must have at least one non-zero value, which means
+                   i would be non-zero in valid cases */
+                if (i == 0)
+                {
+                    return PV_FAIL;
+                }
 
                 for (j = i; j < 64; j++)
                     qmat[*(zigzag_inv+j)] = qmat[*(zigzag_inv+i-1)];
