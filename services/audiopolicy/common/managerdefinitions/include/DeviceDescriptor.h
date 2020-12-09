@@ -65,9 +65,6 @@ public:
 
     bool supportsFormat(audio_format_t format);
 
-    void setDynamic() { mIsDynamic = true; }
-    bool isDynamic() const { return mIsDynamic; }
-
     // PolicyAudioPortConfig
     virtual sp<PolicyAudioPort> getPolicyAudioPort() const {
         return static_cast<PolicyAudioPort*>(const_cast<DeviceDescriptor*>(this));
@@ -108,8 +105,6 @@ private:
     std::string mTagName; // Unique human readable identifier for a device port found in conf file.
     FormatVector        mEncodedFormats;
     audio_format_t      mCurrentEncodedFormat;
-    bool                mIsDynamic = false;
-    const std::string   mDeclaredAddress; // Original device address
 };
 
 class DeviceVector : public SortedVector<sp<DeviceDescriptor> >
