@@ -11,7 +11,7 @@
 
   ],
 
-  "presubmit": [
+  "presubmit-large": [
     {
       "name": "CtsMediaTestCases",
       "options": [
@@ -29,7 +29,9 @@
           "exclude-filter": "android.media.cts.AudioRecordTest"
         }
       ]
-    },
+    }
+  ],
+  "presubmit": [
     {
       "name": "mediacodecTest"
     }
