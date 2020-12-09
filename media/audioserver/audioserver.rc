@@ -6,8 +6,11 @@ service audioserver /system/bin/audioserver
     capabilities BLOCK_SUSPEND
     ioprio rt 4
     task_profiles ProcessCapacityHigh HighPerformance
-
-    onrestart setprop sys.audio.restart.hal 1
+    onrestart restart vendor.audio-hal
+    onrestart restart vendor.audio-hal-4-0-msd
+    # Keep the original service names for backward compatibility
+    onrestart restart vendor.audio-hal-2-0
+    onrestart restart audio-hal-2-0
 
 on property:vts.native_server.on=1
     stop audioserver
@@ -37,11 +40,16 @@ on property:init.svc.audioserver=running
     start audio-hal-2-0
 
 on property:sys.audio.restart.hal=1
-    restart vendor.audio-hal
-    restart vendor.audio-hal-4-0-msd
+    # See b/159966243. Avoid restart loop between audioserver and HAL.
     # Keep the original service names for backward compatibility
-    restart vendor.audio-hal-2-0
-    restart audio-hal-2-0
+    stop vendor.audio-hal
+    stop vendor.audio-hal-4-0-msd
+    stop vendor.audio-hal-2-0
+    stop audio-hal-2-0
+    start vendor.audio-hal
+    start vendor.audio-hal-4-0-msd
+    start vendor.audio-hal-2-0
+    start audio-hal-2-0
     # reset the property
     setprop sys.audio.restart.hal 0
 

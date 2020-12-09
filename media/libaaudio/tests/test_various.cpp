@@ -33,6 +33,11 @@ aaudio_data_callback_result_t NoopDataCallbackProc(
         void *audioData,
         int32_t numFrames
 ) {
+    aaudio_direction_t direction = AAudioStream_getDirection(stream);
+    if (direction == AAUDIO_DIRECTION_INPUT) {
+        return AAUDIO_CALLBACK_RESULT_CONTINUE;
+    }
+    // Check to make sure the buffer is initialized to all zeros.
     int channels = AAudioStream_getChannelCount(stream);
     int numSamples = channels * numFrames;
     bool allZeros = true;
@@ -48,7 +53,8 @@ aaudio_data_callback_result_t NoopDataCallbackProc(
 constexpr int64_t NANOS_PER_MILLISECOND = 1000 * 1000;
 
 void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
-        aaudio_sharing_mode_t sharingMode) {
+        aaudio_sharing_mode_t sharingMode,
+        aaudio_direction_t direction = AAUDIO_DIRECTION_OUTPUT) {
     AAudioStreamBuilder* aaudioBuilder = nullptr;
     AAudioStream* aaudioStream = nullptr;
 
@@ -61,6 +67,7 @@ void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
                                         nullptr);
     AAudioStreamBuilder_setPerformanceMode(aaudioBuilder, perfMode);
     AAudioStreamBuilder_setSharingMode(aaudioBuilder, sharingMode);
+    AAudioStreamBuilder_setDirection(aaudioBuilder, direction);
     AAudioStreamBuilder_setFormat(aaudioBuilder, AAUDIO_FORMAT_PCM_FLOAT);
 
     // Create an AAudioStream using the Builder.
@@ -88,14 +95,28 @@ void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
     // We should NOT be able to start or change a stream after it has been released.
     EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestStart(aaudioStream));
     EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
-    EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestPause(aaudioStream));
+    // Pause is only implemented for OUTPUT.
+    if (direction == AAUDIO_DIRECTION_OUTPUT) {
+        EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE,
+                  AAudioStream_requestPause(aaudioStream));
+    }
     EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
     EXPECT_EQ(AAUDIO_ERROR_INVALID_STATE, AAudioStream_requestStop(aaudioStream));
     EXPECT_EQ(AAUDIO_STREAM_STATE_CLOSING, AAudioStream_getState(aaudioStream));
 
     // Does this crash?
-    EXPECT_LT(0, AAudioStream_getFramesRead(aaudioStream));
-    EXPECT_LT(0, AAudioStream_getFramesWritten(aaudioStream));
+    EXPECT_GT(AAudioStream_getFramesRead(aaudioStream), 0);
+    EXPECT_GT(AAudioStream_getFramesWritten(aaudioStream), 0);
+    EXPECT_GT(AAudioStream_getFramesPerBurst(aaudioStream), 0);
+    EXPECT_GE(AAudioStream_getXRunCount(aaudioStream), 0);
+    EXPECT_GT(AAudioStream_getBufferCapacityInFrames(aaudioStream), 0);
+    EXPECT_GT(AAudioStream_getBufferSizeInFrames(aaudioStream), 0);
+
+    int64_t timestampFrames = 0;
+    int64_t timestampNanos = 0;
+    aaudio_result_t result = AAudioStream_getTimestamp(aaudioStream, CLOCK_MONOTONIC,
+            &timestampFrames, &timestampNanos);
+    EXPECT_TRUE(result == AAUDIO_ERROR_INVALID_STATE || result == AAUDIO_ERROR_UNIMPLEMENTED);
 
     // Verify Closing State. Does this crash?
     aaudio_stream_state_t state = AAUDIO_STREAM_STATE_UNKNOWN;
@@ -107,20 +128,42 @@ void checkReleaseThenClose(aaudio_performance_mode_t perfMode,
     EXPECT_EQ(AAUDIO_OK, AAudioStream_close(aaudioStream));
 }
 
-TEST(test_various, aaudio_release_close_none) {
+TEST(test_various, aaudio_release_close_none_output) {
     checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_NONE,
-            AAUDIO_SHARING_MODE_SHARED);
+            AAUDIO_SHARING_MODE_SHARED,
+            AAUDIO_DIRECTION_OUTPUT);
     // No EXCLUSIVE streams with MODE_NONE.
 }
 
-TEST(test_various, aaudio_release_close_low_shared) {
-    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-            AAUDIO_SHARING_MODE_SHARED);
+TEST(test_various, aaudio_release_close_none_input) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_NONE,
+            AAUDIO_SHARING_MODE_SHARED,
+            AAUDIO_DIRECTION_INPUT);
+    // No EXCLUSIVE streams with MODE_NONE.
 }
 
-TEST(test_various, aaudio_release_close_low_exclusive) {
+TEST(test_various, aaudio_release_close_low_shared_output) {
     checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
-            AAUDIO_SHARING_MODE_EXCLUSIVE);
+            AAUDIO_SHARING_MODE_SHARED,
+            AAUDIO_DIRECTION_OUTPUT);
+}
+
+TEST(test_various, aaudio_release_close_low_shared_input) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_SHARING_MODE_SHARED,
+            AAUDIO_DIRECTION_INPUT);
+}
+
+TEST(test_various, aaudio_release_close_low_exclusive_output) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_SHARING_MODE_EXCLUSIVE,
+            AAUDIO_DIRECTION_OUTPUT);
+}
+
+TEST(test_various, aaudio_release_close_low_exclusive_input) {
+    checkReleaseThenClose(AAUDIO_PERFORMANCE_MODE_LOW_LATENCY,
+            AAUDIO_SHARING_MODE_EXCLUSIVE,
+            AAUDIO_DIRECTION_INPUT);
 }
 
 enum FunctionToCall {

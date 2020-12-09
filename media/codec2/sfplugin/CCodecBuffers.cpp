@@ -272,8 +272,6 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
 
     // The output format can be processed without a registered slot.
     if (outputFormat) {
-        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
-                mName, outputFormat->debugString().c_str());
         updateSkipCutBuffer(outputFormat, entry.notify);
     }
 
@@ -301,6 +299,10 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     }
 
     if (!entry.notify) {
+        if (outputFormat) {
+            ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
+                    mName, outputFormat->debugString().c_str());
+        }
         mPending.pop_front();
         return DISCARD;
     }
@@ -317,6 +319,10 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     // Append information from the front stash entry to outBuffer.
     (*outBuffer)->meta()->setInt64("timeUs", entry.timestamp);
     (*outBuffer)->meta()->setInt32("flags", entry.flags);
+    if (outputFormat) {
+        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
+                mName, outputFormat->debugString().c_str());
+    }
     ALOGV("[%s] popFromStashAndRegister: "
           "out buffer index = %zu [%p] => %p + %zu (%lld)",
           mName, *index, outBuffer->get(),

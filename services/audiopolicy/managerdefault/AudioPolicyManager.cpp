@@ -2256,7 +2256,7 @@ status_t AudioPolicyManager::startInput(audio_port_handle_t portId)
     sp<AudioInputDescriptor> inputDesc = mInputs.getInputForClient(portId);
     if (inputDesc == 0) {
         ALOGW("%s no input for client %d", __FUNCTION__, portId);
-        return BAD_VALUE;
+        return DEAD_OBJECT;
     }
     audio_io_handle_t input = inputDesc->mIoHandle;
     sp<RecordClientDescriptor> client = inputDesc->getClient(portId);
@@ -3161,6 +3161,8 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
     if (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL && hasPrimaryOutput()) {
         DeviceVector newDevices = getNewOutputDevices(mPrimaryOutput, true /*fromCache*/);
         waitMs = updateCallRouting(newDevices, delayMs);
+        // Only apply special touch sound delay once
+        delayMs = 0;
     }
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
@@ -3170,6 +3172,8 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
             // preventing the force re-routing in case of default dev that distinguishes on address.
             // Let's give back to engine full device choice decision however.
             waitMs = setOutputDevices(outputDesc, newDevices, !newDevices.isEmpty(), delayMs);
+            // Only apply special touch sound delay once
+            delayMs = 0;
         }
         if (forceVolumeReeval && !newDevices.isEmpty()) {
             applyStreamVolumes(outputDesc, newDevices.types(), waitMs, true);
@@ -5648,7 +5652,7 @@ uint32_t AudioPolicyManager::setBeaconMute(bool mute) {
             sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
             setVolumeSourceMute(ttsVolumeSource, mute/*on*/, desc, 0 /*delay*/, DeviceTypeSet());
             const uint32_t latency = desc->latency() * 2;
-            if (latency > maxLatency) {
+            if (desc->isActive(latency * 2) && latency > maxLatency) {
                 maxLatency = latency;
             }
         }

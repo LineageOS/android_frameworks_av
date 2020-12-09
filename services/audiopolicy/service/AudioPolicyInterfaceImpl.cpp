@@ -592,7 +592,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // check calling permissions
-    if (!(startRecording(client->opPackageName, client->pid, client->uid)
+    if (!(startRecording(client->opPackageName, client->pid, client->uid,
+            client->attributes.source == AUDIO_SOURCE_HOTWORD)
             || client->attributes.source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, client->uid, client->pid);
@@ -680,7 +681,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
         client->active = false;
         client->startTimeNs = 0;
         updateUidStates_l();
-        finishRecording(client->opPackageName, client->uid);
+        finishRecording(client->opPackageName, client->uid,
+                        client->attributes.source == AUDIO_SOURCE_HOTWORD);
     }
 
     return status;
@@ -706,7 +708,8 @@ status_t AudioPolicyService::stopInput(audio_port_handle_t portId)
     updateUidStates_l();
 
     // finish the recording app op
-    finishRecording(client->opPackageName, client->uid);
+    finishRecording(client->opPackageName, client->uid,
+                    client->attributes.source == AUDIO_SOURCE_HOTWORD);
     AutoCallerClear acc;
     return mAudioPolicyManager->stopInput(portId);
 }

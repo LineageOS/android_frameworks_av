@@ -1833,10 +1833,12 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
 
     mStatusWaiters++;
 
+    bool signalPipelineDrain = false;
     if (!active && mUseHalBufManager) {
         auto streamIds = mOutputStreams.getStreamIds();
         if (mStatus == STATUS_ACTIVE) {
             mRequestThread->signalPipelineDrain(streamIds);
+            signalPipelineDrain = true;
         }
         mRequestBufferSM.onWaitUntilIdle();
     }
@@ -1865,6 +1867,10 @@ status_t Camera3Device::waitUntilStateThenRelock(bool active, nsecs_t timeout) {
             }
         }
     } while (!stateSeen);
+
+    if (signalPipelineDrain) {
+        mRequestThread->resetPipelineDrain();
+    }
 
     mStatusWaiters--;
 
@@ -2304,6 +2310,15 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
         newRequest->mRotateAndCropAuto = true;
     } else {
         newRequest->mRotateAndCropAuto = false;
+    }
+
+    auto zoomRatioEntry =
+            newRequest->mSettingsList.begin()->metadata.find(ANDROID_CONTROL_ZOOM_RATIO);
+    if (zoomRatioEntry.count > 0 &&
+            zoomRatioEntry.data.f[0] == 1.0f) {
+        newRequest->mZoomRatioIs1x = true;
+    } else {
+        newRequest->mZoomRatioIs1x = false;
     }
 
     return newRequest;
@@ -4426,13 +4441,17 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                                 parent->mDistortionMappers.end()) {
                             continue;
                         }
-                        res = parent->mDistortionMappers[it->cameraId].correctCaptureRequest(
-                            &(it->metadata));
-                        if (res != OK) {
-                            SET_ERR("RequestThread: Unable to correct capture requests "
-                                    "for lens distortion for request %d: %s (%d)",
-                                    halRequest->frame_number, strerror(-res), res);
-                            return INVALID_OPERATION;
+
+                        if (!captureRequest->mDistortionCorrectionUpdated) {
+                            res = parent->mDistortionMappers[it->cameraId].correctCaptureRequest(
+                                    &(it->metadata));
+                            if (res != OK) {
+                                SET_ERR("RequestThread: Unable to correct capture requests "
+                                        "for lens distortion for request %d: %s (%d)",
+                                        halRequest->frame_number, strerror(-res), res);
+                                return INVALID_OPERATION;
+                            }
+                            captureRequest->mDistortionCorrectionUpdated = true;
                         }
                     }
 
@@ -4443,21 +4462,24 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                             continue;
                         }
 
-                        camera_metadata_entry_t e = it->metadata.find(ANDROID_CONTROL_ZOOM_RATIO);
-                        if (e.count > 0 && e.data.f[0] != 1.0f) {
+                        if (!captureRequest->mZoomRatioIs1x) {
                             cameraIdsWithZoom.insert(it->cameraId);
                         }
 
-                        res = parent->mZoomRatioMappers[it->cameraId].updateCaptureRequest(
-                            &(it->metadata));
-                        if (res != OK) {
-                            SET_ERR("RequestThread: Unable to correct capture requests "
-                                    "for zoom ratio for request %d: %s (%d)",
-                                    halRequest->frame_number, strerror(-res), res);
-                            return INVALID_OPERATION;
+                        if (!captureRequest->mZoomRatioUpdated) {
+                            res = parent->mZoomRatioMappers[it->cameraId].updateCaptureRequest(
+                                    &(it->metadata));
+                            if (res != OK) {
+                                SET_ERR("RequestThread: Unable to correct capture requests "
+                                        "for zoom ratio for request %d: %s (%d)",
+                                        halRequest->frame_number, strerror(-res), res);
+                                return INVALID_OPERATION;
+                            }
+                            captureRequest->mZoomRatioUpdated = true;
                         }
                     }
-                    if (captureRequest->mRotateAndCropAuto) {
+                    if (captureRequest->mRotateAndCropAuto &&
+                            !captureRequest->mRotationAndCropUpdated) {
                         for (it = captureRequest->mSettingsList.begin();
                                 it != captureRequest->mSettingsList.end(); it++) {
                             auto mapper = parent->mRotateAndCropMappers.find(it->cameraId);
@@ -4471,6 +4493,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                                 }
                             }
                         }
+                        captureRequest->mRotationAndCropUpdated = true;
                     }
                 }
             }
@@ -4783,6 +4806,12 @@ void Camera3Device::RequestThread::signalPipelineDrain(const std::vector<int>& s
     // If request thread is still busy, wait until paused then notify HAL
     mNotifyPipelineDrain = true;
     mStreamIdsToBeDrained = streamIds;
+}
+
+void Camera3Device::RequestThread::resetPipelineDrain() {
+    Mutex::Autolock pl(mPauseLock);
+    mNotifyPipelineDrain = false;
+    mStreamIdsToBeDrained.clear();
 }
 
 void Camera3Device::RequestThread::clearPreviousRequest() {

@@ -445,6 +445,7 @@ private:
     size_t updateBuffers(int32_t portIndex, const sp<AMessage> &msg);
     status_t onQueueInputBuffer(const sp<AMessage> &msg);
     status_t onReleaseOutputBuffer(const sp<AMessage> &msg);
+    BufferInfo *peekNextPortBuffer(int32_t portIndex);
     ssize_t dequeuePortBuffer(int32_t portIndex);
 
     status_t getBufferAndFormat(
@@ -476,6 +477,7 @@ private:
     status_t onSetParameters(const sp<AMessage> &params);
 
     status_t amendOutputFormatWithCodecSpecificData(const sp<MediaCodecBuffer> &buffer);
+    void handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &buffer);
     bool isExecuting() const;
 
     uint64_t getGraphicBufferSize();

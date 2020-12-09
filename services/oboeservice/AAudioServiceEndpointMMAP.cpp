@@ -226,7 +226,7 @@ error:
     return result;
 }
 
-aaudio_result_t AAudioServiceEndpointMMAP::close() {
+void AAudioServiceEndpointMMAP::close() {
     if (mMmapStream != nullptr) {
         // Needs to be explicitly cleared or CTS will fail but it is not clear why.
         mMmapStream.clear();
@@ -235,8 +235,6 @@ aaudio_result_t AAudioServiceEndpointMMAP::close() {
         // FIXME Make closing synchronous.
         AudioClock::sleepForNanos(100 * AAUDIO_NANOS_PER_MILLISECOND);
     }
-
-    return AAUDIO_OK;
 }
 
 aaudio_result_t AAudioServiceEndpointMMAP::startStream(sp<AAudioServiceStreamBase> stream,

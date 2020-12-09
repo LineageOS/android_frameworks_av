@@ -288,9 +288,7 @@ void C2SoftGav1Dec::onReset() {
 void C2SoftGav1Dec::onRelease() { destroyDecoder(); }
 
 c2_status_t C2SoftGav1Dec::onFlush_sm() {
-  Libgav1StatusCode status =
-      mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
-                              /*user_private_data=*/0);
+  Libgav1StatusCode status = mCodecCtx->SignalEOS();
   if (status != kLibgav1StatusOk) {
     ALOGE("Failed to flush av1 decoder. status: %d.", status);
     return C2_CORRUPTED;
@@ -299,7 +297,7 @@ c2_status_t C2SoftGav1Dec::onFlush_sm() {
   // Dequeue frame (if any) that was enqueued previously.
   const libgav1::DecoderBuffer *buffer;
   status = mCodecCtx->DequeueFrame(&buffer);
-  if (status != kLibgav1StatusOk) {
+  if (status != kLibgav1StatusOk && status != kLibgav1StatusNothingToDequeue) {
     ALOGE("Failed to dequeue frame after flushing the av1 decoder. status: %d",
           status);
     return C2_CORRUPTED;
@@ -433,7 +431,8 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
     TIME_DIFF(mTimeEnd, mTimeStart, delay);
 
     const Libgav1StatusCode status =
-        mCodecCtx->EnqueueFrame(bitstream, inSize, frameIndex);
+        mCodecCtx->EnqueueFrame(bitstream, inSize, frameIndex,
+                                /*buffer_private_data=*/nullptr);
 
     GETTIME(&mTimeEnd, nullptr);
     TIME_DIFF(mTimeStart, mTimeEnd, decodeTime);
@@ -447,17 +446,6 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
       return;
     }
 
-  } else {
-    const Libgav1StatusCode status =
-        mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
-                                /*user_private_data=*/0);
-    if (status != kLibgav1StatusOk) {
-      ALOGE("Failed to flush av1 decoder. status: %d.", status);
-      work->result = C2_CORRUPTED;
-      work->workletsProcessed = 1u;
-      mSignalledError = true;
-      return;
-    }
   }
 
   (void)outputBuffer(pool, work);
@@ -470,13 +458,12 @@ void C2SoftGav1Dec::process(const std::unique_ptr<C2Work> &work,
   }
 }
 
-static void copyOutputBufferToYV12Frame(uint8_t *dst, const uint8_t *srcY,
-                                        const uint8_t *srcU,
-                                        const uint8_t *srcV, size_t srcYStride,
-                                        size_t srcUStride, size_t srcVStride,
-                                        uint32_t width, uint32_t height) {
-  const size_t dstYStride = align(width, 16);
-  const size_t dstUVStride = align(dstYStride / 2, 16);
+static void copyOutputBufferToYuvPlanarFrame(uint8_t *dst, const uint8_t *srcY,
+                                             const uint8_t *srcU,
+                                             const uint8_t *srcV, size_t srcYStride,
+                                             size_t srcUStride, size_t srcVStride,
+                                             size_t dstYStride, size_t dstUVStride,
+                                             uint32_t width, uint32_t height) {
   uint8_t *const dstStart = dst;
 
   for (size_t i = 0; i < height; ++i) {
@@ -570,10 +557,10 @@ static void convertYUV420Planar16ToY410(uint32_t *dst, const uint16_t *srcY,
 static void convertYUV420Planar16ToYUV420Planar(
     uint8_t *dst, const uint16_t *srcY, const uint16_t *srcU,
     const uint16_t *srcV, size_t srcYStride, size_t srcUStride,
-    size_t srcVStride, size_t dstStride, size_t width, size_t height) {
+    size_t srcVStride, size_t dstYStride, size_t dstUVStride,
+    size_t width, size_t height) {
   uint8_t *dstY = (uint8_t *)dst;
-  size_t dstYSize = dstStride * height;
-  size_t dstUVStride = align(dstStride / 2, 16);
+  size_t dstYSize = dstYStride * height;
   size_t dstUVSize = dstUVStride * height / 2;
   uint8_t *dstV = dstY + dstYSize;
   uint8_t *dstU = dstV + dstUVSize;
@@ -584,7 +571,7 @@ static void convertYUV420Planar16ToYUV420Planar(
     }
 
     srcY += srcYStride;
-    dstY += dstStride;
+    dstY += dstYStride;
   }
 
   for (size_t y = 0; y < (height + 1) / 2; ++y) {
@@ -607,13 +594,14 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   const libgav1::DecoderBuffer *buffer;
   const Libgav1StatusCode status = mCodecCtx->DequeueFrame(&buffer);
 
-  if (status != kLibgav1StatusOk) {
+  if (status != kLibgav1StatusOk && status != kLibgav1StatusNothingToDequeue) {
     ALOGE("av1 decoder DequeueFrame failed. status: %d.", status);
     return false;
   }
 
-  // |buffer| can be NULL if status was equal to kLibgav1StatusOk. This is not
-  // an error. This could mean one of two things:
+  // |buffer| can be NULL if status was equal to kLibgav1StatusOk or
+  // kLibgav1StatusNothingToDequeue. This is not an error. This could mean one
+  // of two things:
   //  - The EnqueueFrame() call was either a flush (called with nullptr).
   //  - The enqueued frame did not have any displayable frames.
   if (!buffer) {
@@ -683,6 +671,9 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
   size_t srcYStride = buffer->stride[0];
   size_t srcUStride = buffer->stride[1];
   size_t srcVStride = buffer->stride[2];
+  C2PlanarLayout layout = wView.layout();
+  size_t dstYStride = layout.planes[C2PlanarLayout::PLANE_Y].rowInc;
+  size_t dstUVStride = layout.planes[C2PlanarLayout::PLANE_U].rowInc;
 
   if (buffer->bitdepth == 10) {
     const uint16_t *srcY = (const uint16_t *)buffer->plane[0];
@@ -692,18 +683,19 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     if (format == HAL_PIXEL_FORMAT_RGBA_1010102) {
       convertYUV420Planar16ToY410(
           (uint32_t *)dst, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
-          srcVStride / 2, align(mWidth, 16), mWidth, mHeight);
+          srcVStride / 2, dstYStride / sizeof(uint32_t), mWidth, mHeight);
     } else {
       convertYUV420Planar16ToYUV420Planar(dst, srcY, srcU, srcV, srcYStride / 2,
                                           srcUStride / 2, srcVStride / 2,
-                                          align(mWidth, 16), mWidth, mHeight);
+                                          dstYStride, dstUVStride, mWidth, mHeight);
     }
   } else {
     const uint8_t *srcY = (const uint8_t *)buffer->plane[0];
     const uint8_t *srcU = (const uint8_t *)buffer->plane[1];
     const uint8_t *srcV = (const uint8_t *)buffer->plane[2];
-    copyOutputBufferToYV12Frame(dst, srcY, srcU, srcV, srcYStride, srcUStride,
-                                srcVStride, mWidth, mHeight);
+    copyOutputBufferToYuvPlanarFrame(dst, srcY, srcU, srcV, srcYStride, srcUStride,
+                                     srcVStride, dstYStride, dstUVStride,
+                                     mWidth, mHeight);
   }
   finishWork(buffer->user_private_data, work, std::move(block));
   block = nullptr;
@@ -722,9 +714,7 @@ c2_status_t C2SoftGav1Dec::drainInternal(
     return C2_OMITTED;
   }
 
-  Libgav1StatusCode status =
-      mCodecCtx->EnqueueFrame(/*data=*/nullptr, /*size=*/0,
-                              /*user_private_data=*/0);
+  const Libgav1StatusCode status = mCodecCtx->SignalEOS();
   if (status != kLibgav1StatusOk) {
     ALOGE("Failed to flush av1 decoder. status: %d.", status);
     return C2_CORRUPTED;
