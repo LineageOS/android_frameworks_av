@@ -69,6 +69,7 @@ cc_library_shared {
 
         "AudioEffect.cpp",
         "AudioRecord.cpp",
+        "AudioSanitizer.cpp",
         "AudioSystem.cpp",
         "AudioTrack.cpp",
         "AudioTrackShared.cpp",
