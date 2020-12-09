@@ -140,7 +140,7 @@ status_t AudioGain::writeToParcelable(media::AudioGain* parcelable) const {
     parcelable->useInChannelMask = mUseInChannelMask;
     parcelable->useForVolume = mUseForVolume;
     parcelable->mode = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_gain_mode_t_mask_int32_t(mGain.mode));
+            legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
     parcelable->channelMask = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
     parcelable->minValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_value));
