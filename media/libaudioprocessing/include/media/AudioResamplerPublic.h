@@ -59,7 +59,7 @@ static inline bool isAudioPlaybackRateEqual(const AudioPlaybackRate &pr1,
 
 static inline bool isAudioPlaybackRateValid(const AudioPlaybackRate &playbackRate) {
     if (playbackRate.mFallbackMode == AUDIO_TIMESTRETCH_FALLBACK_FAIL &&
-            (playbackRate.mStretchMode == AUDIO_TIMESTRETCH_STRETCH_SPEECH ||
+            (playbackRate.mStretchMode == AUDIO_TIMESTRETCH_STRETCH_VOICE ||
                     playbackRate.mStretchMode == AUDIO_TIMESTRETCH_STRETCH_DEFAULT)) {
         //test sonic specific constraints
         return playbackRate.mSpeed >= TIMESTRETCH_SONIC_SPEED_MIN &&
