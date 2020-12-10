@@ -108,9 +108,16 @@ public:
 
     virtual aaudio_result_t validate() const override;
 
+
     void logParameters() const;
 
+    // Mark the stream so it can be deleted.
+    static void stopUsingStream(AudioStream *stream);
+
 private:
+    // Extract a raw pointer that we can pass to a 'C' app.
+    static AudioStream *startUsingStream(android::sp<AudioStream> &spAudioStream);
+
     bool                       mSharingModeMatchRequired = false; // must match sharing mode requested
     aaudio_performance_mode_t  mPerformanceMode = AAUDIO_PERFORMANCE_MODE_NONE;
 
