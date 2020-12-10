@@ -813,6 +813,9 @@ protected:
         std::unordered_set<audio_format_t> mManualSurroundFormats;
 
         std::unordered_map<uid_t, audio_flags_mask_t> mAllowedCapturePolicies;
+
+        // The map of device descriptor and formats reported by the device.
+        std::map<wp<DeviceDescriptor>, FormatVector> mReportedFormatsMap;
 private:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 

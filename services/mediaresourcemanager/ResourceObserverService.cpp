@@ -27,14 +27,6 @@
 
 #include "ResourceObserverService.h"
 
-namespace aidl {
-namespace android {
-namespace media {
-bool operator<(const MediaObservableFilter& lhs, const MediaObservableFilter &rhs) {
-    return lhs.type < rhs.type || (lhs.type == rhs.type && lhs.eventFilter < rhs.eventFilter);
-}
-}}} // namespace ::aidl::android::media
-
 namespace android {
 
 using ::aidl::android::media::MediaResourceParcel;

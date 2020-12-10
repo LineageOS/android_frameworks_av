@@ -89,14 +89,18 @@ static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
     AppOpsManager appOps;
     const int32_t op = appOps.permissionToOpCode(sAndroidPermissionRecordAudio);
     if (start) {
-        if (appOps.startOpNoThrow(op, uid, resolvedOpPackageName, /*startIfModeDefault*/ false)
-                != AppOpsManager::MODE_ALLOWED) {
-            ALOGE("Request denied by app op: %d", op);
+        if (int32_t mode = appOps.startOpNoThrow(
+                        op, uid, resolvedOpPackageName, /*startIfModeDefault*/ false);
+                mode != AppOpsManager::MODE_ALLOWED) {
+            ALOGE("Request start for \"%s\" (uid %d) denied by app op: %d, mode: %d",
+                    String8(resolvedOpPackageName).c_str(), uid, op, mode);
             return false;
         }
     } else {
-        if (appOps.checkOp(op, uid, resolvedOpPackageName) != AppOpsManager::MODE_ALLOWED) {
-            ALOGE("Request denied by app op: %d", op);
+        if (int32_t mode = appOps.checkOp(op, uid, resolvedOpPackageName);
+                mode != AppOpsManager::MODE_ALLOWED) {
+            ALOGE("Request check for \"%s\" (uid %d) denied by app op: %d, mode: %d",
+                    String8(resolvedOpPackageName).c_str(), uid, op, mode);
             return false;
         }
     }
