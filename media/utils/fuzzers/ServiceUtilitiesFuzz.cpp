@@ -54,8 +54,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     std::string packageNameStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
     android::String16 opPackageName(packageNameStr.c_str());
     android::recordingAllowed(opPackageName, pid, uid);
-    android::startRecording(opPackageName, pid, uid);
-    android::finishRecording(opPackageName, uid);
+    android::startRecording(opPackageName, pid, uid, false);
+    android::finishRecording(opPackageName, uid, false);
     android::captureAudioOutputAllowed(pid, uid);
     android::captureMediaOutputAllowed(pid, uid);
     android::captureHotwordAllowed(opPackageName, pid, uid);

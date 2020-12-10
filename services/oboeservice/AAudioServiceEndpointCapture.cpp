@@ -36,18 +36,18 @@ using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
 AAudioServiceEndpointCapture::AAudioServiceEndpointCapture(AAudioService &audioService)
-        : mStreamInternalCapture(audioService, true) {
-    mStreamInternal = &mStreamInternalCapture;
+    : AAudioServiceEndpointShared(
+            (AudioStreamInternal *)(new AudioStreamInternalCapture(audioService, true))) {
 }
 
 AAudioServiceEndpointCapture::~AAudioServiceEndpointCapture() {
-    delete mDistributionBuffer;
+    delete[] mDistributionBuffer;
 }
 
 aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAudioServiceEndpointShared::open(request);
     if (result == AAUDIO_OK) {
-        delete mDistributionBuffer;
+        delete[] mDistributionBuffer;
         int distributionBufferSizeBytes = getStreamInternal()->getFramesPerBurst()
                                           * getStreamInternal()->getBytesPerFrame();
         mDistributionBuffer = new uint8_t[distributionBufferSizeBytes];
@@ -69,7 +69,7 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         // Read audio data from stream using a blocking read.
         result = getStreamInternal()->read(mDistributionBuffer, getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
-            disconnectRegisteredStreams();
+            ALOGV("%s() read() returned AAUDIO_ERROR_DISCONNECTED, break", __func__);
             break;
         } else if (result != getFramesPerBurst()) {
             ALOGW("callbackLoop() read %d / %d",

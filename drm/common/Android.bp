@@ -14,7 +14,7 @@
 // limitations under the License.
 //
 
-cc_library_static {
+cc_library {
     name: "libdrmframeworkcommon",
 
     srcs: [
@@ -35,7 +35,11 @@ cc_library_static {
 
     cflags: ["-Wall", "-Werror"],
 
-    shared_libs: ["libbinder"],
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libutils"
+    ],
 
     export_include_dirs: ["include"],
 }
