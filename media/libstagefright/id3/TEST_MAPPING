@@ -7,7 +7,7 @@
     { "name": "ID3Test" }
   ],
 
-  "presubmit": [
+  "presubmit-large": [
     // this doesn't seem to run any tests.
     // but: cts-tradefed run -m CtsMediaTestCases -t android.media.cts.MediaMetadataRetrieverTest
     // does run he 32 and 64 bit tests, but not the instant tests
