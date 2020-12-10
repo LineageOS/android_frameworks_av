@@ -1,3 +1,18 @@
+cc_library_headers {
+    name: "libstagefright_mp3dec_headers",
+    vendor_available: true,
+    min_sdk_version: "29",
+    host_supported:true,
+    export_include_dirs: [
+        "include",
+        "src",
+    ],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+}
+
 cc_library_static {
     name: "libstagefright_mp3dec",
     vendor_available: true,
@@ -65,10 +80,8 @@ cc_library_static {
 
     include_dirs: ["frameworks/av/media/libstagefright/include"],
 
-    export_include_dirs: [
-        "include",
-        "src",
-    ],
+    header_libs: ["libstagefright_mp3dec_headers"],
+    export_header_lib_headers: ["libstagefright_mp3dec_headers"],
 
     cflags: [
         "-DOSCL_UNUSED_ARG(x)=(void)(x)",
