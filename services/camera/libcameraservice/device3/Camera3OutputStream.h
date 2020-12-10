@@ -210,6 +210,8 @@ class Camera3OutputStream :
      */
     static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
 
+    void setImageDumpMask(int mask) { mImageDumpMask = mask; }
+
   protected:
     Camera3OutputStream(int id, camera3_stream_type_t type,
             uint32_t width, uint32_t height, int format,
@@ -325,8 +327,13 @@ class Camera3OutputStream :
     // STATE_ABANDONED
     static bool shouldLogError(status_t res, StreamState state);
 
+    // Dump images to disk before returning to consumer
+    void dumpImageToDisk(nsecs_t timestamp, ANativeWindowBuffer* anwBuffer, int fence);
+
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;
+
+    int mImageDumpMask = 0;
 
 }; // class Camera3OutputStream
 

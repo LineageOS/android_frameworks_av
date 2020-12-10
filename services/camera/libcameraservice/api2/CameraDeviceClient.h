@@ -206,6 +206,7 @@ public:
     virtual void notifyRequestQueueEmpty();
     virtual void notifyRepeatingRequestError(long lastFrameNumber);
 
+    void setImageDumpMask(int mask) { if (mDevice != nullptr) mDevice->setImageDumpMask(mask); }
     /**
      * Interface used by independent components of CameraDeviceClient.
      */
