@@ -729,6 +729,8 @@ static std::vector<std::pair<const char *, uint32_t>> int64Mappings {
     {
         { "exif-offset", kKeyExifOffset },
         { "exif-size", kKeyExifSize },
+        { "xmp-offset", kKeyXmpOffset },
+        { "xmp-size", kKeyXmpSize },
         { "target-time", kKeyTargetTime },
         { "thumbnail-time", kKeyThumbnailTime },
         { "timeUs", kKeyTime },

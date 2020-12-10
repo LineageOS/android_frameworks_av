@@ -151,6 +151,8 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_TRACK_ID; # var introduced=28
     AMEDIAFORMAT_KEY_VALID_SAMPLES; # var introduced=29
     AMEDIAFORMAT_KEY_WIDTH; # var introduced=21
+    AMEDIAFORMAT_KEY_XMP_OFFSET; # var introduced=31
+    AMEDIAFORMAT_KEY_XMP_SIZE; # var introduced=31
     AMEDIAFORMAT_KEY_YEAR; # var introduced=29
     AMediaCodecActionCode_isRecoverable; # introduced=28
     AMediaCodecActionCode_isTransient; # introduced=28

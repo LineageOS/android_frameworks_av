@@ -74,6 +74,8 @@ enum {
     METADATA_KEY_SAMPLERATE      = 38,
     METADATA_KEY_BITS_PER_SAMPLE = 39,
     METADATA_KEY_VIDEO_CODEC_MIME_TYPE = 40,
+    METADATA_KEY_XMP_OFFSET      = 41,
+    METADATA_KEY_XMP_LENGTH      = 42,
 
     // Add more here...
 };
