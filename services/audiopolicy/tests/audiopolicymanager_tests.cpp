@@ -138,7 +138,7 @@ class AudioPolicyManagerTest : public testing::Test {
     // Tries to find a device port. If 'foundPort' isn't nullptr,
     // will generate a failure if the port hasn't been found.
     bool findDevicePort(audio_port_role_t role, audio_devices_t deviceType,
-            const std::string &address, audio_port *foundPort);
+            const std::string &address, audio_port_v7 *foundPort);
     static audio_port_handle_t getDeviceIdFromPatch(const struct audio_patch* patch);
     virtual AudioPolicyManagerTestClient* getClient() { return new AudioPolicyManagerTestClient; }
 
@@ -246,7 +246,7 @@ void AudioPolicyManagerTest::getInputForAttr(
 }
 
 bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
-        audio_devices_t deviceType, const std::string &address, audio_port *foundPort) {
+        audio_devices_t deviceType, const std::string &address, audio_port_v7 *foundPort) {
     uint32_t numPorts = 0;
     uint32_t generation1;
     status_t ret;
@@ -256,7 +256,7 @@ bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
     if (HasFailure()) return false;
 
     uint32_t generation2;
-    struct audio_port ports[numPorts];
+    struct audio_port_v7 ports[numPorts];
     ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation2);
     EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
     EXPECT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
@@ -744,7 +744,7 @@ std::unordered_set<audio_format_t>
     if (ret != NO_ERROR) {
         return formats;
     }
-    struct audio_port ports[numPorts];
+    struct audio_port_v7 ports[numPorts];
     ret = mManager->listAudioPorts(
             AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation1);
     EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
@@ -752,7 +752,9 @@ std::unordered_set<audio_format_t>
         return formats;
     }
     for (const auto &port : ports) {
-        formats.insert(port.formats, port.formats + port.num_formats);
+        for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+            formats.insert(port.audio_profiles[i].format);
+        }
     }
     return formats;
 }
@@ -873,7 +875,7 @@ protected:
             {AUDIO_USAGE_ALARM, AUDIO_SOURCE_DEFAULT, RULE_MATCH_ATTRIBUTE_USAGE}
     };
 
-    struct audio_port mInjectionPort;
+    struct audio_port_v7 mInjectionPort;
     audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
 };
 
@@ -890,7 +892,7 @@ void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
             AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig, mUsageRules);
     ASSERT_EQ(NO_ERROR, ret);
 
-    struct audio_port extractionPort;
+    struct audio_port_v7 extractionPort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                     mMixAddress, &extractionPort));
 
@@ -1059,7 +1061,7 @@ protected:
         {AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_VOICE_COMMUNICATION, RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET}
     };
 
-    struct audio_port mExtractionPort;
+    struct audio_port_v7 mExtractionPort;
     audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
 };
 
@@ -1076,7 +1078,7 @@ void AudioPolicyManagerTestDPMixRecordInjection::SetUp() {
             AUDIO_DEVICE_IN_REMOTE_SUBMIX, mMixAddress, audioConfig, mSourceRules);
     ASSERT_EQ(NO_ERROR, ret);
 
-    struct audio_port injectionPort;
+    struct audio_port_v7 injectionPort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
                     mMixAddress, &injectionPort));
 
@@ -1227,7 +1229,7 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, ExplicitlyRoutingAfterConnection)
             type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
             address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
 
-    audio_port devicePort;
+    audio_port_v7 devicePort;
     const audio_port_role_t role = audio_is_output_device(type)
             ? AUDIO_PORT_ROLE_SINK : AUDIO_PORT_ROLE_SOURCE;
     ASSERT_TRUE(findDevicePort(role, type, address, &devicePort));
@@ -1288,7 +1290,7 @@ void AudioPolicyManagerTVTest::testHDMIPortSelection(
             flags, &output, &portId);
     sp<SwAudioOutputDescriptor> outDesc = mManager->getOutputs().valueFor(output);
     ASSERT_NE(nullptr, outDesc.get());
-    audio_port port = {};
+    audio_port_v7 port = {};
     outDesc->toAudioPort(&port);
     mManager->releaseOutput(portId);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
@@ -1370,7 +1372,7 @@ TEST_F(AudioPolicyManagerDynamicHwModulesTest, ListAddedAudioPorts) {
             findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", nullptr));
     mClient->swapAllowedModuleNames({"primary", "r_submix"});
     mManager->onNewAudioModulesAvailable();
-    struct audio_port port;
+    struct audio_port_v7 port;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", &port));
 }
 

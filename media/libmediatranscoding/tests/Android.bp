@@ -14,15 +14,16 @@ cc_defaults {
     ],
 
     shared_libs: [
+        "libandroid",
         "libbinder_ndk",
         "libcutils",
         "liblog",
         "libutils",
-        "libmediatranscoding"
     ],
 
     static_libs: [
         "mediatranscoding_aidl_interface-ndk_platform",
+        "libmediatranscoding",
     ],
 
     cflags: [

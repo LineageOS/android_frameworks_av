@@ -92,7 +92,7 @@ void AudioInputDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig
     dstConfig->ext.mix.usecase.source = source();
 }
 
-void AudioInputDescriptor::toAudioPort(struct audio_port *port) const
+void AudioInputDescriptor::toAudioPort(struct audio_port_v7 *port) const
 {
     ALOG_ASSERT(mProfile != 0, "toAudioPort() called on input with null profile %d", mIoHandle);
 

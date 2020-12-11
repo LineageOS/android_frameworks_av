@@ -48,7 +48,7 @@ aidl_interface {
     },
 }
 
-cc_library_shared {
+cc_library {
     name: "libmediatranscoding",
 
     srcs: [

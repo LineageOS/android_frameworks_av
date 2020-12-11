@@ -261,7 +261,7 @@ public:
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual sp<AudioPort> getAudioPort() const { return mPolicyAudioPort->asAudioPort(); }
 
-    virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
     audio_module_handle_t getModuleHandle() const;
 
@@ -358,7 +358,7 @@ public:
 
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
-    virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
         status_t open(const audio_config_t *config,
                       const DeviceVector &devices,
@@ -432,7 +432,7 @@ public:
 
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
-    virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
     const sp<SourceClientDescriptor> mSource;
 
