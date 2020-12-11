@@ -1199,7 +1199,7 @@ bool AudioSystem::isOffloadSupported(const audio_offload_info_t& info)
 status_t AudioSystem::listAudioPorts(audio_port_role_t role,
                                      audio_port_type_t type,
                                      unsigned int *num_ports,
-                                     struct audio_port *ports,
+                                     struct audio_port_v7 *ports,
                                      unsigned int *generation)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
@@ -1207,7 +1207,7 @@ status_t AudioSystem::listAudioPorts(audio_port_role_t role,
     return aps->listAudioPorts(role, type, num_ports, ports, generation);
 }
 
-status_t AudioSystem::getAudioPort(struct audio_port *port)
+status_t AudioSystem::getAudioPort(struct audio_port_v7 *port)
 {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;

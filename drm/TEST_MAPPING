@@ -1,5 +1,5 @@
 {
-  "presubmit": [
+  "presubmit-large": [
     // The following tests validate codec and drm path.
     {
       "name": "GtsMediaTestCases",

@@ -1,6 +1,6 @@
 // for frameworks/av/media
 {
-    "presubmit": [
+    "presubmit-large": [
         // runs whenever we change something in this tree
         {
             "name": "CtsMediaTestCases",
@@ -17,7 +17,9 @@
                     "include-filter": "android.media.cts.DecodeEditEncodeTest"
                 }
             ]
-        },
+        }
+    ],
+    "presubmit": [
         {
             "name": "GtsMediaTestCases",
             "options" : [

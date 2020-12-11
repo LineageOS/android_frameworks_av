@@ -72,7 +72,7 @@ public:
             const struct audio_port_config *srcConfig = NULL) const;
     virtual sp<AudioPort> getAudioPort() const { return mProfile; }
 
-    void toAudioPort(struct audio_port *port) const;
+    void toAudioPort(struct audio_port_v7 *port) const;
     void setPreemptedSessions(const SortedVector<audio_session_t>& sessions);
     SortedVector<audio_session_t> getPreemptedSessions() const;
     bool hasPreemptedSession(audio_session_t session) const;

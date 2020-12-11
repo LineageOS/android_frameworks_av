@@ -547,7 +547,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
 }
 
 std::string AudioPolicyService::getDeviceTypeStrForPortId(audio_port_handle_t portId) {
-    struct audio_port port = {};
+    struct audio_port_v7 port = {};
     port.id = portId;
     status_t status = mAudioPolicyManager->getAudioPort(&port);
     if (status == NO_ERROR && port.type == AUDIO_PORT_TYPE_DEVICE) {
@@ -573,7 +573,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // check calling permissions
-    if (!(startRecording(client->opPackageName, client->pid, client->uid)
+    if (!(startRecording(client->opPackageName, client->pid, client->uid,
+            client->attributes.source == AUDIO_SOURCE_HOTWORD)
             || client->attributes.source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, client->uid, client->pid);
@@ -661,7 +662,8 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
         client->active = false;
         client->startTimeNs = 0;
         updateUidStates_l();
-        finishRecording(client->opPackageName, client->uid);
+        finishRecording(client->opPackageName, client->uid,
+                        client->attributes.source == AUDIO_SOURCE_HOTWORD);
     }
 
     return status;
@@ -687,7 +689,8 @@ status_t AudioPolicyService::stopInput(audio_port_handle_t portId)
     updateUidStates_l();
 
     // finish the recording app op
-    finishRecording(client->opPackageName, client->uid);
+    finishRecording(client->opPackageName, client->uid,
+                    client->attributes.source == AUDIO_SOURCE_HOTWORD);
     AutoCallerClear acc;
     return mAudioPolicyManager->stopInput(portId);
 }
@@ -1117,7 +1120,7 @@ bool AudioPolicyService::isDirectOutputSupported(const audio_config_base_t& conf
 status_t AudioPolicyService::listAudioPorts(audio_port_role_t role,
                                             audio_port_type_t type,
                                             unsigned int *num_ports,
-                                            struct audio_port *ports,
+                                            struct audio_port_v7 *ports,
                                             unsigned int *generation)
 {
     Mutex::Autolock _l(mLock);
@@ -1128,7 +1131,7 @@ status_t AudioPolicyService::listAudioPorts(audio_port_role_t role,
     return mAudioPolicyManager->listAudioPorts(role, type, num_ports, ports, generation);
 }
 
-status_t AudioPolicyService::getAudioPort(struct audio_port *port)
+status_t AudioPolicyService::getAudioPort(struct audio_port_v7 *port)
 {
     Mutex::Autolock _l(mLock);
     if (mAudioPolicyManager == NULL) {

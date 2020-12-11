@@ -688,7 +688,7 @@ public:
     virtual status_t listAudioPorts(audio_port_role_t role,
                                     audio_port_type_t type,
                                     unsigned int *num_ports,
-                                    struct audio_port *ports,
+                                    struct audio_port_v7 *ports,
                                     unsigned int *generation)
     {
         if (num_ports == NULL || (*num_ports != 0 && ports == NULL) ||
@@ -711,27 +711,27 @@ public:
                 numPortsReq = *num_ports;
             }
             if (numPortsReq > 0) {
-                reply.read(ports, numPortsReq * sizeof(struct audio_port));
+                reply.read(ports, numPortsReq * sizeof(struct audio_port_v7));
             }
             *generation = reply.readInt32();
         }
         return status;
     }
 
-    virtual status_t getAudioPort(struct audio_port *port)
+    virtual status_t getAudioPort(struct audio_port_v7 *port)
     {
         if (port == NULL) {
             return BAD_VALUE;
         }
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        data.write(port, sizeof(struct audio_port));
+        data.write(port, sizeof(struct audio_port_v7));
         status_t status = remote()->transact(GET_AUDIO_PORT, data, &reply);
         if (status != NO_ERROR ||
                 (status = (status_t)reply.readInt32()) != NO_ERROR) {
             return status;
         }
-        reply.read(port, sizeof(struct audio_port));
+        reply.read(port, sizeof(struct audio_port_v7));
         return status;
     }
 
@@ -2183,8 +2183,8 @@ status_t BnAudioPolicyService::onTransact(
                 numPortsReq = MAX_ITEMS_PER_LIST;
             }
             unsigned int numPorts = numPortsReq;
-            struct audio_port *ports =
-                    (struct audio_port *)calloc(numPortsReq, sizeof(struct audio_port));
+            struct audio_port_v7 *ports =
+                    (struct audio_port_v7 *)calloc(numPortsReq, sizeof(struct audio_port_v7));
             if (ports == NULL) {
                 reply->writeInt32(NO_MEMORY);
                 reply->writeInt32(0);
@@ -2199,7 +2199,7 @@ status_t BnAudioPolicyService::onTransact(
                 if (numPortsReq > numPorts) {
                     numPortsReq = numPorts;
                 }
-                reply->write(ports, numPortsReq * sizeof(struct audio_port));
+                reply->write(ports, numPortsReq * sizeof(struct audio_port_v7));
                 reply->writeInt32(generation);
             }
             free(ports);
@@ -2208,8 +2208,8 @@ status_t BnAudioPolicyService::onTransact(
 
         case GET_AUDIO_PORT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            struct audio_port port = {};
-            status_t status = data.read(&port, sizeof(struct audio_port));
+            struct audio_port_v7 port = {};
+            status_t status = data.read(&port, sizeof(struct audio_port_v7));
             if (status != NO_ERROR) {
                 ALOGE("b/23912202");
                 return status;
@@ -2220,7 +2220,7 @@ status_t BnAudioPolicyService::onTransact(
             }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
-                reply->write(&port, sizeof(struct audio_port));
+                reply->write(&port, sizeof(struct audio_port_v7));
             }
             return NO_ERROR;
         }
