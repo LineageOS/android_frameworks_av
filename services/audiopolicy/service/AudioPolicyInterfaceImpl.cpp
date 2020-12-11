@@ -454,8 +454,9 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     }
 
     // check calling permissions.
-    // Capturing from FM_TUNER source is controlled by captureAudioOutputAllowed() only as this
-    // does not affect users privacy as does capturing from an actual microphone.
+    // Capturing from FM_TUNER source is controlled by captureTunerAudioInputAllowed() and
+    // captureAudioOutputAllowed() (deprecated) as this does not affect users privacy
+    // as does capturing from an actual microphone.
     if (!(recordingAllowed(opPackageName, pid, uid) || attr->source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, uid, pid);
@@ -466,9 +467,14 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     if ((inputSource == AUDIO_SOURCE_VOICE_UPLINK ||
         inputSource == AUDIO_SOURCE_VOICE_DOWNLINK ||
         inputSource == AUDIO_SOURCE_VOICE_CALL ||
-        inputSource == AUDIO_SOURCE_ECHO_REFERENCE||
-        inputSource == AUDIO_SOURCE_FM_TUNER) &&
-        !canCaptureOutput) {
+        inputSource == AUDIO_SOURCE_ECHO_REFERENCE)
+        && !canCaptureOutput) {
+        return PERMISSION_DENIED;
+    }
+
+    if (inputSource == AUDIO_SOURCE_FM_TUNER
+        && !captureTunerAudioInputAllowed(pid, uid)
+        && !canCaptureOutput) {
         return PERMISSION_DENIED;
     }
 

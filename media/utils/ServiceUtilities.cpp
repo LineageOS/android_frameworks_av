@@ -145,6 +145,14 @@ bool captureMediaOutputAllowed(pid_t pid, uid_t uid) {
     return ok;
 }
 
+bool captureTunerAudioInputAllowed(pid_t pid, uid_t uid) {
+    if (isAudioServerOrRootUid(uid)) return true;
+    static const String16 sCaptureTunerAudioInput("android.permission.CAPTURE_TUNER_AUDIO_INPUT");
+    bool ok = PermissionCache::checkPermission(sCaptureTunerAudioInput, pid, uid);
+    if (!ok) ALOGV("Request requires android.permission.CAPTURE_TUNER_AUDIO_INPUT");
+    return ok;
+}
+
 bool captureVoiceCommunicationOutputAllowed(pid_t pid, uid_t uid) {
     if (isAudioServerOrRootUid(uid)) return true;
     static const String16 sCaptureVoiceCommOutput(
