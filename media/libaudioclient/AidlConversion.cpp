@@ -645,6 +645,8 @@ ConversionResult<audio_output_flags_t> aidl2legacy_AudioOutputFlags_audio_output
             return AUDIO_OUTPUT_FLAG_VOIP_RX;
         case media::AudioOutputFlags::INCALL_MUSIC:
             return AUDIO_OUTPUT_FLAG_INCALL_MUSIC;
+        case media::AudioOutputFlags::GAPLESS_OFFLOAD:
+            return AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD;
         default:
             return unexpected(BAD_VALUE);
     }
@@ -683,6 +685,8 @@ ConversionResult<media::AudioOutputFlags> legacy2aidl_audio_output_flags_t_Audio
             return media::AudioOutputFlags::VOIP_RX;
         case AUDIO_OUTPUT_FLAG_INCALL_MUSIC:
             return media::AudioOutputFlags::INCALL_MUSIC;
+        case AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD:
+            return media::AudioOutputFlags::GAPLESS_OFFLOAD;
         default:
             return unexpected(BAD_VALUE);
     }

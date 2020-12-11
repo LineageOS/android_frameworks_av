@@ -2192,7 +2192,7 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
 #ifdef DISABLE_AUDIO_SYSTEM_OFFLOAD
     return false;
 #else
-    return AudioSystem::isOffloadSupported(info);
+    return AudioSystem::getOffloadSupport(info) != AUDIO_OFFLOAD_NOT_SUPPORTED;
 #endif
 }
 
