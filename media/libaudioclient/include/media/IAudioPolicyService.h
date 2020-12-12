@@ -150,7 +150,7 @@ public:
     virtual status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) = 0;
    // Check if offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled
-    virtual bool isOffloadSupported(const audio_offload_info_t& info) = 0;
+    virtual audio_offload_mode_t getOffloadSupport(const audio_offload_info_t& info) = 0;
 
     // Check if direct playback is possible for given format, sample rate, channel mask and flags.
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,

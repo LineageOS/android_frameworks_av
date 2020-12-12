@@ -192,7 +192,7 @@ public:
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
     status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages);
     status_t setAllowedCapturePolicy(uint_t uid, audio_flags_mask_t capturePolicy) override;
-    virtual bool isOffloadSupported(const audio_offload_info_t &config);
+    virtual audio_offload_mode_t getOffloadSupport(const audio_offload_info_t &config);
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes);
 

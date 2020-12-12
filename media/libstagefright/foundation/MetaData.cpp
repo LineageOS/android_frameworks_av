@@ -28,7 +28,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MetaData.h>
 
-#ifndef __ANDROID_VNDK__
+#if !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 #include <binder/Parcel.h>
 #endif
 
@@ -48,7 +48,7 @@ MetaData::MetaData(const MetaDataBase &from)
 MetaData::~MetaData() {
 }
 
-#ifndef __ANDROID_VNDK__
+#if !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 /* static */
 sp<MetaData> MetaData::createFromParcel(const Parcel &parcel) {
 

@@ -1403,6 +1403,7 @@ void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushe
                 continue;
             }
             if (work->input.buffers.empty()
+                    || work->input.buffers.front() == nullptr
                     || work->input.buffers.front()->data().linearBlocks().empty()) {
                 ALOGD("[%s] no linear codec config data found", mName);
                 continue;

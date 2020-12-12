@@ -1188,12 +1188,12 @@ status_t AudioSystem::setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flag
     return aps->setAllowedCapturePolicy(uid, flags);
 }
 
-bool AudioSystem::isOffloadSupported(const audio_offload_info_t& info)
+audio_offload_mode_t AudioSystem::getOffloadSupport(const audio_offload_info_t& info)
 {
-    ALOGV("isOffloadSupported()");
+    ALOGV("%s", __func__);
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
-    if (aps == 0) return false;
-    return aps->isOffloadSupported(info);
+    if (aps == 0) return AUDIO_OFFLOAD_NOT_SUPPORTED;
+    return aps->getOffloadSupport(info);
 }
 
 status_t AudioSystem::listAudioPorts(audio_port_role_t role,
