@@ -291,7 +291,7 @@ status_t AudioPortConfig::writeToParcelable(media::AudioPortConfig* parcelable) 
     parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
     parcelable->gain.index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.index));
     parcelable->gain.mode = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_gain_mode_t_mask_int32_t(mGain.mode));
+            legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
     parcelable->gain.channelMask = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
     parcelable->gain.rampDurationMs = VALUE_OR_RETURN_STATUS(

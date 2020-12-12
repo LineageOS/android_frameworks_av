@@ -2593,7 +2593,7 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
     sp<DeviceDescriptorBase> device = VALUE_OR_RETURN_STATUS(
             aidl2legacy_DeviceDescriptorBase(request.device));
     audio_output_flags_t flags = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_audio_output_flags_mask(request.flags));
+            aidl2legacy_int32_t_audio_output_flags_t_mask(request.flags));
 
     audio_io_handle_t output;
     uint32_t latencyMs;
@@ -2643,7 +2643,8 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
         response->output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
         response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
         response->latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(latencyMs));
-        response->flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_mask(flags));
+        response->flags = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
         return NO_ERROR;
     }
 
@@ -2819,7 +2820,7 @@ status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
             device.mType,
             device.address().c_str(),
             VALUE_OR_RETURN_STATUS(aidl2legacy_AudioSourceType_audio_source_t(request.source)),
-            VALUE_OR_RETURN_STATUS(aidl2legacy_audio_input_flags_mask(request.flags)),
+            VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_input_flags_t_mask(request.flags)),
             AUDIO_DEVICE_NONE,
             String8{});
 

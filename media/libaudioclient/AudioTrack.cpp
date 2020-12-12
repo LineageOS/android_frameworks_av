@@ -2819,7 +2819,7 @@ status_t AudioTrack::getTimestamp_l(AudioTimestamp& timestamp)
         media::AudioTimestampInternal ts;
         mAudioTrack->getTimestamp(&ts, &status);
         if (status == OK) {
-            timestamp = VALUE_OR_FATAL(aidl2legacy_AudioTimestamp(ts));
+            timestamp = VALUE_OR_FATAL(aidl2legacy_AudioTimestampInternal_AudioTimestamp(ts));
         }
     } else {
         // read timestamp from shared memory

@@ -371,7 +371,7 @@ Status AudioFlinger::TrackHandle::getTimestamp(media::AudioTimestampInternal* ti
     if (*_aidl_return != OK) {
         return Status::ok();
     }
-    *timestamp = legacy2aidl_AudioTimestamp(legacy).value();
+    *timestamp = legacy2aidl_AudioTimestamp_AudioTimestampInternal(legacy).value();
     return Status::ok();
 }
 
