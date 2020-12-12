@@ -35,4 +35,5 @@ enum AudioOutputFlags {
     MMAP_NOIRQ       = 12,
     VOIP_RX          = 13,
     INCALL_MUSIC     = 14,
+    GAPLESS_OFFLOAD  = 15,
 }

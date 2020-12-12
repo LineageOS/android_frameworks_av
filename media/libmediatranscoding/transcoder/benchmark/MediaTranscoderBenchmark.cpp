@@ -32,8 +32,11 @@
 #include <benchmark/benchmark.h>
 #include <fcntl.h>
 #include <media/MediaTranscoder.h>
+#include <iostream>
 
 using namespace android;
+
+const std::string PARAM_VIDEO_FRAME_RATE = "VideoFrameRate";
 
 class TranscoderCallbacks : public MediaTranscoder::CallbackInterface {
 public:
@@ -151,7 +154,7 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
             if (strncmp(mime, "video/", 6) == 0) {
                 int32_t frameCount;
                 if (AMediaFormat_getInt32(srcFormat, AMEDIAFORMAT_KEY_FRAME_COUNT, &frameCount)) {
-                    state.counters["VideoFrameRate"] =
+                    state.counters[PARAM_VIDEO_FRAME_RATE] =
                             benchmark::Counter(frameCount, benchmark::Counter::kIsRate);
                 }
             }
@@ -332,4 +335,69 @@ TRANSCODER_BENCHMARK(BM_TranscodeHevc2AvcAV2AV720PMaxOperatingRate);
 TRANSCODER_BENCHMARK(BM_TranscodeAudioVideoPassthrough);
 TRANSCODER_BENCHMARK(BM_TranscodeVideoPassthrough);
 
-BENCHMARK_MAIN();
+class CustomCsvReporter : public benchmark::BenchmarkReporter {
+public:
+    CustomCsvReporter() : mPrintedHeader(false) {}
+    virtual bool ReportContext(const Context& context);
+    virtual void ReportRuns(const std::vector<Run>& reports);
+
+private:
+    void PrintRunData(const Run& report);
+
+    bool mPrintedHeader;
+    std::vector<std::string> mHeaders = {"name", "real_time", "cpu_time", PARAM_VIDEO_FRAME_RATE};
+};
+
+bool CustomCsvReporter::ReportContext(const Context& context __unused) {
+    return true;
+}
+
+void CustomCsvReporter::ReportRuns(const std::vector<Run>& reports) {
+    std::ostream& Out = GetOutputStream();
+
+    if (!mPrintedHeader) {
+        // print the header
+        for (auto header = mHeaders.begin(); header != mHeaders.end();) {
+            Out << *header++;
+            if (header != mHeaders.end()) Out << ",";
+        }
+        Out << "\n";
+        mPrintedHeader = true;
+    }
+
+    // print results for each run
+    for (const auto& run : reports) {
+        PrintRunData(run);
+    }
+}
+
+void CustomCsvReporter::PrintRunData(const Run& run) {
+    if (run.error_occurred) {
+        return;
+    }
+    std::ostream& Out = GetOutputStream();
+    Out << run.benchmark_name() << ",";
+    Out << run.GetAdjustedRealTime() << ",";
+    Out << run.GetAdjustedCPUTime() << ",";
+    auto frameRate = run.counters.find(PARAM_VIDEO_FRAME_RATE);
+    if (frameRate == run.counters.end()) {
+        Out << "NA"
+            << ",";
+    } else {
+        Out << frameRate->second << ",";
+    }
+    Out << '\n';
+}
+
+int main(int argc, char** argv) {
+    std::unique_ptr<benchmark::BenchmarkReporter> fileReporter;
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]).find("--benchmark_out") != std::string::npos) {
+            fileReporter.reset(new CustomCsvReporter);
+            break;
+        }
+    }
+    ::benchmark::Initialize(&argc, argv);
+    if (::benchmark::ReportUnrecognizedArguments(argc, argv)) return 1;
+    ::benchmark::RunSpecifiedBenchmarks(nullptr, fileReporter.get());
+}
