@@ -131,12 +131,15 @@ cc_library_static {
     shared_libs: [
         "liblog",
     ],
+    static_libs: [
+        "libaudioutils",
+    ],
     header_libs: [
         "libhardware_headers",
     ],
     cppflags: [
+        "-DBIQUAD_OPT",
         "-fvisibility=hidden",
-
         "-Wall",
         "-Werror",
     ],
