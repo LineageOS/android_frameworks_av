@@ -18,6 +18,7 @@
 #define LOG_TAG "VideoTrackTranscoder"
 
 #include <android-base/logging.h>
+#include <android-base/properties.h>
 #include <media/NdkCommon.h>
 #include <media/VideoTrackTranscoder.h>
 #include <utils/AndroidThreads.h>
@@ -39,7 +40,8 @@ static constexpr int32_t kColorFormatSurface = 0x7f000789;
 // Default key frame interval in seconds.
 static constexpr float kDefaultKeyFrameIntervalSeconds = 1.0f;
 // Default codec operating rate.
-static constexpr int32_t kDefaultCodecOperatingRate = 240;
+static int32_t kDefaultCodecOperatingRate =
+        base::GetIntProperty("debug.media.transcoding.codec_max_operating_rate", /*default*/ 240);
 // Default codec priority.
 static constexpr int32_t kDefaultCodecPriority = 1;
 // Default bitrate, in case source estimation fails.
