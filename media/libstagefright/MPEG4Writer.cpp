@@ -1137,11 +1137,24 @@ status_t MPEG4Writer::release() {
     if (!truncatePreAllocation()) {
         if (err == OK) { err = ERROR_IO; }
     }
+
+    // TODO(b/174770856) remove this measurement (and perhaps the fsync)
+    nsecs_t sync_started = systemTime(SYSTEM_TIME_REALTIME);
     if (fsync(mFd) != 0) {
         ALOGW("(ignored)fsync err:%s(%d)", std::strerror(errno), errno);
         // Don't bubble up fsync error, b/157291505.
         // if (err == OK) { err = ERROR_IO; }
     }
+    nsecs_t sync_finished = systemTime(SYSTEM_TIME_REALTIME);
+    nsecs_t sync_elapsed_ns = sync_finished - sync_started;
+    int64_t filesize = -1;
+    struct stat statbuf;
+    if (fstat(mFd, &statbuf) == 0) {
+        filesize = statbuf.st_size;
+    }
+    ALOGD("final fsync() takes %" PRId64 " ms, file size %" PRId64,
+          sync_elapsed_ns / 1000000, (int64_t) filesize);
+
     if (close(mFd) != 0) {
         ALOGE("close err:%s(%d)", std::strerror(errno), errno);
         if (err == OK) { err = ERROR_IO; }

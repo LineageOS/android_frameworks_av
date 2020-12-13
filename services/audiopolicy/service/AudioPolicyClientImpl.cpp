@@ -57,7 +57,7 @@ status_t AudioPolicyService::AudioPolicyClient::openOutput(audio_module_handle_t
     request.module = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_module_handle_t_int32_t(module));
     request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(*config));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_DeviceDescriptorBase(device));
-    request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_mask(flags));
+    request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
 
     status_t status = af->openOutput(request, &response);
     if (status == OK) {
@@ -134,7 +134,7 @@ status_t AudioPolicyService::AudioPolicyClient::openInput(audio_module_handle_t 
     request.config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(*config));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(deviceTypeAddr));
     request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSourceType(source));
-    request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_mask(flags));
+    request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
 
     media::OpenInputResponse response;
     status_t status = af->openInput(request, &response);
