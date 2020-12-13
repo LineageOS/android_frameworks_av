@@ -47,6 +47,8 @@
 #define WAIT_PERIOD_MS          10
 
 namespace android {
+using aidl_utils::statusTFromBinderStatus;
+
 // ---------------------------------------------------------------------------
 
 // static
@@ -450,7 +452,7 @@ status_t AudioRecord::start(AudioSystem::sync_event_t event, audio_session_t tri
     mActive = true;
 
     if (!(flags & CBLK_INVALID)) {
-        status = mAudioRecord->start(event, triggerSession).transactionError();
+        status = statusTFromBinderStatus(mAudioRecord->start(event, triggerSession));
         if (status == DEAD_OBJECT) {
             flags |= CBLK_INVALID;
         }
@@ -1439,8 +1441,8 @@ retry:
         if (mActive) {
             // callback thread or sync event hasn't changed
             // FIXME this fails if we have a new AudioFlinger instance
-            result = mAudioRecord->start(
-                AudioSystem::SYNC_EVENT_SAME, AUDIO_SESSION_NONE).transactionError();
+            result = statusTFromBinderStatus(mAudioRecord->start(
+                AudioSystem::SYNC_EVENT_SAME, AUDIO_SESSION_NONE));
         }
         mFramesReadServerOffset = mFramesRead; // server resets to zero so we need an offset.
     }
@@ -1531,7 +1533,7 @@ status_t AudioRecord::getActiveMicrophones(std::vector<media::MicrophoneInfo>* a
 {
     AutoMutex lock(mLock);
     std::vector<media::MicrophoneInfoData> mics;
-    status_t status = mAudioRecord->getActiveMicrophones(&mics).transactionError();
+    status_t status = statusTFromBinderStatus(mAudioRecord->getActiveMicrophones(&mics));
     activeMicrophones->resize(mics.size());
     for (size_t i = 0; status == OK && i < mics.size(); ++i) {
         status = activeMicrophones->at(i).readFromParcelable(mics[i]);
@@ -1552,7 +1554,7 @@ status_t AudioRecord::setPreferredMicrophoneDirection(audio_microphone_direction
         // the internal AudioRecord hasn't be created yet, so just stash the attribute.
         return OK;
     } else {
-        return mAudioRecord->setPreferredMicrophoneDirection(direction).transactionError();
+        return statusTFromBinderStatus(mAudioRecord->setPreferredMicrophoneDirection(direction));
     }
 }
 
@@ -1568,7 +1570,7 @@ status_t AudioRecord::setPreferredMicrophoneFieldDimension(float zoom) {
         // the internal AudioRecord hasn't be created yet, so just stash the attribute.
         return OK;
     } else {
-        return mAudioRecord->setPreferredMicrophoneFieldDimension(zoom).transactionError();
+        return statusTFromBinderStatus(mAudioRecord->setPreferredMicrophoneFieldDimension(zoom));
     }
 }
 

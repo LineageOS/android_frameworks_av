@@ -15,10 +15,12 @@
  */
 
 #include <binding/AAudioBinderAdapter.h>
+#include <media/AidlConversionUtil.h>
 #include <utility/AAudioUtilities.h>
 
 namespace aaudio {
 
+using android::aidl_utils::statusTFromBinderStatus;
 using android::binder::Status;
 
 AAudioBinderAdapter::AAudioBinderAdapter(IAAudioService* delegate)
@@ -36,7 +38,7 @@ aaudio_handle_t AAudioBinderAdapter::openStream(const AAudioStreamRequest& reque
                                           &params,
                                           &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     config = params;
     return result;
@@ -46,7 +48,7 @@ aaudio_result_t AAudioBinderAdapter::closeStream(aaudio_handle_t streamHandle) {
     aaudio_result_t result;
     Status status = mDelegate->closeStream(streamHandle, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
@@ -59,7 +61,7 @@ aaudio_result_t AAudioBinderAdapter::getStreamDescription(aaudio_handle_t stream
                                                     &endpoint,
                                                     &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     endpointOut = std::move(endpoint);
     return result;
@@ -69,7 +71,7 @@ aaudio_result_t AAudioBinderAdapter::startStream(aaudio_handle_t streamHandle) {
     aaudio_result_t result;
     Status status = mDelegate->startStream(streamHandle, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
@@ -78,7 +80,7 @@ aaudio_result_t AAudioBinderAdapter::pauseStream(aaudio_handle_t streamHandle) {
     aaudio_result_t result;
     Status status = mDelegate->pauseStream(streamHandle, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
@@ -87,7 +89,7 @@ aaudio_result_t AAudioBinderAdapter::stopStream(aaudio_handle_t streamHandle) {
     aaudio_result_t result;
     Status status = mDelegate->stopStream(streamHandle, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
@@ -96,7 +98,7 @@ aaudio_result_t AAudioBinderAdapter::flushStream(aaudio_handle_t streamHandle) {
     aaudio_result_t result;
     Status status = mDelegate->flushStream(streamHandle, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
@@ -107,7 +109,7 @@ aaudio_result_t AAudioBinderAdapter::registerAudioThread(aaudio_handle_t streamH
     aaudio_result_t result;
     Status status = mDelegate->registerAudioThread(streamHandle, clientThreadId, periodNanoseconds, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }
@@ -117,7 +119,7 @@ aaudio_result_t AAudioBinderAdapter::unregisterAudioThread(aaudio_handle_t strea
     aaudio_result_t result;
     Status status = mDelegate->unregisterAudioThread(streamHandle, clientThreadId, &result);
     if (!status.isOk()) {
-        result = AAudioConvert_androidToAAudioResult(status.transactionError());
+        result = AAudioConvert_androidToAAudioResult(statusTFromBinderStatus(status));
     }
     return result;
 }

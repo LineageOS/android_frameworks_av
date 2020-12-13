@@ -35,7 +35,7 @@
 
 #define VALUE_OR_RETURN_BINDER_STATUS(x) \
     ({ auto _tmp = (x); \
-       if (!_tmp.ok()) return Status::fromStatusT(_tmp.error()); \
+       if (!_tmp.ok()) return aidl_utils::binderStatusFromStatusT(_tmp.error()); \
        std::move(_tmp.value()); })
 
 // ----------------------------------------------------------------------------

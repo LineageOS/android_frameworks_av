@@ -558,7 +558,7 @@ binder::Status AudioStreamTrack::applyVolumeShaper(
         if (status < 0) { // a non-negative value is the volume shaper id.
             ALOGE("applyVolumeShaper() failed with status %d", status);
         }
-        return binder::Status::fromStatusT(status);
+        return aidl_utils::binderStatusFromStatusT(status);
     } else {
         ALOGD("applyVolumeShaper()"
                       " no AudioTrack for volume control from IPlayer");
