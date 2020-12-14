@@ -25,9 +25,9 @@
 
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
-#include "HidlUtils.h"
+#include "UuidUtils.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
+using ::android::hardware::audio::common::CPP_VERSION::implementation::UuidUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::MQDescriptorSync;
@@ -58,8 +58,8 @@ EffectHalHidl::~EffectHalHidl() {
 // static
 void EffectHalHidl::effectDescriptorToHal(
         const EffectDescriptor& descriptor, effect_descriptor_t* halDescriptor) {
-    HidlUtils::uuidToHal(descriptor.type, &halDescriptor->type);
-    HidlUtils::uuidToHal(descriptor.uuid, &halDescriptor->uuid);
+    UuidUtils::uuidToHal(descriptor.type, &halDescriptor->type);
+    UuidUtils::uuidToHal(descriptor.uuid, &halDescriptor->uuid);
     halDescriptor->flags = static_cast<uint32_t>(descriptor.flags);
     halDescriptor->cpuLoad = descriptor.cpuLoad;
     halDescriptor->memoryUsage = descriptor.memoryUsage;
