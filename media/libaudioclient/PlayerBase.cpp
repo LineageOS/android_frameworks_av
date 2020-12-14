@@ -15,13 +15,14 @@
  */
 
 #include <binder/IServiceManager.h>
+#include <media/AidlConversionUtil.h>
 #include <media/PlayerBase.h>
 
 #define max(a, b) ((a) > (b) ? (a) : (b))
 #define min(a, b) ((a) < (b) ? (a) : (b))
 
 namespace android {
-
+using aidl_utils::binderStatusFromStatusT;
 using media::VolumeShaperConfiguration;
 using media::VolumeShaperOperation;
 
@@ -150,7 +151,7 @@ binder::Status PlayerBase::setVolume(float vol) {
     if (status != NO_ERROR) {
         ALOGW("PlayerBase::setVolume() error %d", status);
     }
-    return binder::Status::fromStatusT(status);
+    return binderStatusFromStatusT(status);
 }
 
 binder::Status PlayerBase::setPan(float pan) {
@@ -170,7 +171,7 @@ binder::Status PlayerBase::setPan(float pan) {
     if (status != NO_ERROR) {
         ALOGW("PlayerBase::setPan() error %d", status);
     }
-    return binder::Status::fromStatusT(status);
+    return binderStatusFromStatusT(status);
 }
 
 binder::Status PlayerBase::setStartDelayMs(int32_t delayMs __unused) {
