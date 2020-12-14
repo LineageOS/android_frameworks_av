@@ -237,12 +237,9 @@ FrameDecoder::~FrameDecoder() {
 }
 
 bool isHDR(const sp<AMessage> &format) {
-    uint32_t standard, range, transfer;
+    uint32_t standard, transfer;
     if (!format->findInt32("color-standard", (int32_t*)&standard)) {
         standard = 0;
-    }
-    if (!format->findInt32("color-range", (int32_t*)&range)) {
-        range = 0;
     }
     if (!format->findInt32("color-transfer", (int32_t*)&transfer)) {
         transfer = 0;
