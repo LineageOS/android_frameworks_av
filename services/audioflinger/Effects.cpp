@@ -60,6 +60,7 @@
 
 namespace android {
 
+using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 
 namespace {
@@ -3027,7 +3028,7 @@ status_t AudioFlinger::DeviceEffectProxy::setEnabled(bool enabled, bool fromHand
                 bs = handle.second->disable(&status);
             }
             if (!bs.isOk()) {
-              status = bs.transactionError();
+              status = statusTFromBinderStatus(bs);
             }
         }
     }
@@ -3142,7 +3143,7 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
             bs = (*handle)->disable(&status);
         }
         if (!bs.isOk()) {
-            status = bs.transactionError();
+            status = statusTFromBinderStatus(bs);
         }
     }
     return status;

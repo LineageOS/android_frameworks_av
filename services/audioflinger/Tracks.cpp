@@ -54,6 +54,7 @@
 
 namespace android {
 
+using aidl_utils::binderStatusFromStatusT;
 using binder::Status;
 using media::VolumeShaper;
 // ----------------------------------------------------------------------------
@@ -2132,7 +2133,7 @@ AudioFlinger::RecordHandle::~RecordHandle() {
 binder::Status AudioFlinger::RecordHandle::start(int /*AudioSystem::sync_event_t*/ event,
         int /*audio_session_t*/ triggerSession) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(
+    return binderStatusFromStatusT(
         mRecordTrack->start((AudioSystem::sync_event_t)event, (audio_session_t) triggerSession));
 }
 
@@ -2155,19 +2156,19 @@ binder::Status AudioFlinger::RecordHandle::getActiveMicrophones(
     for (size_t i = 0; status == OK && i < mics.size(); ++i) {
        status = mics[i].writeToParcelable(&activeMicrophones->at(i));
     }
-    return binder::Status::fromStatusT(status);
+    return binderStatusFromStatusT(status);
 }
 
 binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneDirection(
         int /*audio_microphone_direction_t*/ direction) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(mRecordTrack->setPreferredMicrophoneDirection(
+    return binderStatusFromStatusT(mRecordTrack->setPreferredMicrophoneDirection(
             static_cast<audio_microphone_direction_t>(direction)));
 }
 
 binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneFieldDimension(float zoom) {
     ALOGV("%s()", __func__);
-    return binder::Status::fromStatusT(mRecordTrack->setPreferredMicrophoneFieldDimension(zoom));
+    return binderStatusFromStatusT(mRecordTrack->setPreferredMicrophoneFieldDimension(zoom));
 }
 
 // ----------------------------------------------------------------------------

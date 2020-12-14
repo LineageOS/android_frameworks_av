@@ -17,7 +17,7 @@
 #include <media/TrackPlayerBase.h>
 
 namespace android {
-
+using aidl_utils::binderStatusFromStatusT;
 using media::VolumeShaper;
 
 //--------------------------------------------------------------------------------------------------
@@ -115,7 +115,7 @@ binder::Status TrackPlayerBase::applyVolumeShaper(
     status_t s = spConfiguration->readFromParcelable(configuration)
             ?: spOperation->readFromParcelable(operation);
     if (s != OK) {
-        return binder::Status::fromStatusT(s);
+        return binderStatusFromStatusT(s);
     }
 
     if (mAudioTrack != 0) {
@@ -124,7 +124,7 @@ binder::Status TrackPlayerBase::applyVolumeShaper(
         if (status < 0) { // a non-negative value is the volume shaper id.
             ALOGE("TrackPlayerBase::applyVolumeShaper() failed with status %d", status);
         }
-        return binder::Status::fromStatusT(status);
+        return binderStatusFromStatusT(status);
     } else {
         ALOGD("TrackPlayerBase::applyVolumeShaper()"
               " no AudioTrack for volume control from IPlayer");
