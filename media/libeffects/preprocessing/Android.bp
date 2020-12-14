@@ -1,35 +1,5 @@
 // audio preprocessing wrapper
 cc_library_shared {
-    name: "libaudiopreprocessing_legacy",
-
-    vendor: true,
-
-    relative_install_path: "soundfx",
-
-    srcs: ["PreProcessing.cpp"],
-
-    shared_libs: [
-        "libwebrtc_audio_preprocessing",
-        "libspeexresampler",
-        "libutils",
-        "liblog",
-    ],
-
-    cflags: [
-        "-DWEBRTC_POSIX",
-        "-DWEBRTC_LEGACY",
-        "-fvisibility=hidden",
-        "-Wall",
-        "-Werror",
-    ],
-
-    header_libs: [
-        "libaudioeffects",
-        "libhardware_headers",
-    ],
-}
-
-cc_library_shared {
     name: "libaudiopreprocessing",
     vendor: true,
     relative_install_path: "soundfx",
