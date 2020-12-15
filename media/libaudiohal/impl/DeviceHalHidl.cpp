@@ -215,7 +215,7 @@ status_t DeviceHalHidl::getInputBufferSize(
         const struct audio_config *config, size_t *size) {
     if (mDevice == 0) return NO_INIT;
     AudioConfig hidlConfig;
-    HidlUtils::audioConfigFromHal(*config, &hidlConfig);
+    HidlUtils::audioConfigFromHal(*config, true /*isInput*/, &hidlConfig);
     Result retval;
     Return<void> ret = mDevice->getInputBufferSize(
             hidlConfig,
@@ -240,7 +240,7 @@ status_t DeviceHalHidl::openOutputStream(
     status_t status = deviceAddressFromHal(deviceType, address, &hidlDevice);
     if (status != OK) return status;
     AudioConfig hidlConfig;
-    HidlUtils::audioConfigFromHal(*config, &hidlConfig);
+    HidlUtils::audioConfigFromHal(*config, false /*isInput*/, &hidlConfig);
     Result retval = Result::NOT_INITIALIZED;
     Return<void> ret = mDevice->openOutputStream(
             handle,
@@ -275,7 +275,7 @@ status_t DeviceHalHidl::openInputStream(
     status_t status = deviceAddressFromHal(devices, address, &hidlDevice);
     if (status != OK) return status;
     AudioConfig hidlConfig;
-    HidlUtils::audioConfigFromHal(*config, &hidlConfig);
+    HidlUtils::audioConfigFromHal(*config, true /*isInput*/, &hidlConfig);
     Result retval = Result::NOT_INITIALIZED;
 #if MAJOR_VERSION == 2
     auto sinkMetadata = AudioSource(source);
