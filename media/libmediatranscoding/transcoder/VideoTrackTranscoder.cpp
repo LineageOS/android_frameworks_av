@@ -44,6 +44,8 @@ static constexpr int32_t kDefaultCodecOperatingRate = 240;
 static constexpr int32_t kDefaultCodecPriority = 1;
 // Default bitrate, in case source estimation fails.
 static constexpr int32_t kDefaultBitrateMbps = 10 * 1000 * 1000;
+// Default frame rate.
+static constexpr int32_t kDefaultFrameRate = 30;
 
 template <typename T>
 void VideoTrackTranscoder::BlockingQueue<T>::push(T const& value, bool front) {
@@ -210,7 +212,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_OPERATING_RATE, encoderFormat,
                                kDefaultCodecOperatingRate);
     SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_PRIORITY, encoderFormat, kDefaultCodecPriority);
-
+    SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_FRAME_RATE, encoderFormat, kDefaultFrameRate);
     AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT, kColorFormatSurface);
 
     // Always encode without rotation. The rotation degree will be transferred directly to
@@ -235,6 +237,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     }
     mEncoder = std::make_shared<CodecWrapper>(encoder, shared_from_this());
 
+    LOG(DEBUG) << "Configuring encoder with: " << AMediaFormat_toString(mDestinationFormat.get());
     status = AMediaCodec_configure(mEncoder->getCodec(), mDestinationFormat.get(),
                                    NULL /* surface */, NULL /* crypto */,
                                    AMEDIACODEC_CONFIGURE_FLAG_ENCODE);
@@ -282,6 +285,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     CopyFormatEntries(mDestinationFormat.get(), decoderFormat.get(), kEncoderEntriesToCopy,
                       entryCount);
 
+    LOG(DEBUG) << "Configuring decoder with: " << AMediaFormat_toString(decoderFormat.get());
     status = AMediaCodec_configure(mDecoder, decoderFormat.get(), mSurface, NULL /* crypto */,
                                    0 /* flags */);
     if (status != AMEDIA_OK) {
