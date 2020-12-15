@@ -89,6 +89,9 @@ apex_defaults {
     binaries: [
         "mediaswcodec",
     ],
+    native_shared_libs: [
+        "libstagefright_foundation",
+    ],
     prebuilts: [
         "com.android.media.swcodec-mediaswcodec.rc",
         "com.android.media.swcodec-ld.config.txt",
