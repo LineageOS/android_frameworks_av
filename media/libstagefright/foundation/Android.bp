@@ -86,11 +86,6 @@ cc_defaults {
                 "-DNO_IMEMORY",
             ],
         },
-        apex: {
-            exclude_shared_libs: [
-                "libbinder",
-            ],
-        },
         darwin: {
             enabled: false,
         },

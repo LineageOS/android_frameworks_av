@@ -51,12 +51,12 @@ MediaBuffer::MediaBuffer(size_t size)
       mRangeLength(size),
       mOwnsData(true),
       mMetaData(new MetaDataBase) {
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
     if (size < kSharedMemThreshold
             || std::atomic_load_explicit(&mUseSharedMemory, std::memory_order_seq_cst) == 0) {
 #endif
         mData = malloc(size);
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
     } else {
         ALOGV("creating memoryDealer");
         size_t newSize = 0;

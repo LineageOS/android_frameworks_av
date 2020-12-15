@@ -46,7 +46,7 @@ public:
     explicit MediaBuffer(size_t size);
 
     explicit MediaBuffer(const sp<ABuffer> &buffer);
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
     MediaBuffer(const sp<IMemory> &mem) :
          // TODO: Using unsecurePointer() has some associated security pitfalls
          //       (see declaration for details).
@@ -97,7 +97,7 @@ public:
     }
 
     virtual int remoteRefcount() const {
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
          // TODO: Using unsecurePointer() has some associated security pitfalls
          //       (see declaration for details).
          //       Either document why it is safe in this case or address the
@@ -114,7 +114,7 @@ public:
 
     // returns old value
     int addRemoteRefcount(int32_t value) {
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
           // TODO: Using unsecurePointer() has some associated security pitfalls
          //       (see declaration for details).
          //       Either document why it is safe in this case or address the
@@ -132,7 +132,7 @@ public:
     }
 
     static bool isDeadObject(const sp<IMemory> &memory) {
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
          // TODO: Using unsecurePointer() has some associated security pitfalls
          //       (see declaration for details).
          //       Either document why it is safe in this case or address the
@@ -235,7 +235,7 @@ private:
     };
 
     inline SharedControl *getSharedControl() const {
-#if !defined(NO_IMEMORY) && !defined(__ANDROID_APEX__)
+#ifndef NO_IMEMORY
          // TODO: Using unsecurePointer() has some associated security pitfalls
          //       (see declaration for details).
          //       Either document why it is safe in this case or address the
