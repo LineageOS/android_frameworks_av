@@ -54,9 +54,7 @@
 #include <cstdlib>
 #include <random>
 #include <vector>
-#ifndef WEBRTC_LEGACY
 #include <audio_effects/effect_agc2.h>
-#endif
 #include <audio_effects/effect_ns.h>
 #include <benchmark/benchmark.h>
 #include <hardware/audio_effect.h>
@@ -76,10 +74,8 @@ constexpr effect_uuid_t kEffectUuids[] = {
         {0xbb392ec0, 0x8d4d, 0x11e0, 0xa896, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
         // ns  uuid
         {0xc06c8400, 0x8e06, 0x11e0, 0x9cb6, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
-#ifndef WEBRTC_LEGACY
         // agc2 uuid
         {0x89f38e65, 0xd4d2, 0x4d64, 0xad0e, {0x2b, 0x3e, 0x79, 0x9e, 0xa8, 0x86}},
-#endif
 };
 constexpr size_t kNumEffectUuids = std::size(kEffectUuids);
 constexpr audio_channel_mask_t kChMasks[] = {
@@ -93,9 +89,7 @@ enum PreProcId {
     PREPROC_AGC,  // Automatic Gain Control
     PREPROC_AEC,  // Acoustic Echo Canceler
     PREPROC_NS,   // Noise Suppressor
-#ifndef WEBRTC_LEGACY
     PREPROC_AGC2,  // Automatic Gain Control 2
-#endif
     PREPROC_NUM_EFFECTS
 };
 
