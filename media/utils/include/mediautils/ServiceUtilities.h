@@ -24,6 +24,7 @@
 #include <binder/PermissionController.h>
 #include <cutils/multiuser.h>
 #include <private/android_filesystem_config.h>
+#include <system/audio-hal-enums.h>
 
 #include <map>
 #include <optional>
@@ -79,8 +80,8 @@ static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
 }
 
 bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
-bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid, bool isHotwordSource);
-void finishRecording(const String16& opPackageName, uid_t uid, bool isHotwordSource);
+bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid, audio_source_t source);
+void finishRecording(const String16& opPackageName, uid_t uid, audio_source_t source);
 bool captureAudioOutputAllowed(pid_t pid, uid_t uid);
 bool captureMediaOutputAllowed(pid_t pid, uid_t uid);
 bool captureVoiceCommunicationOutputAllowed(pid_t pid, uid_t uid);

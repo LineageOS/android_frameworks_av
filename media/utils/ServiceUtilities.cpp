@@ -22,6 +22,7 @@
 #include <binder/IServiceManager.h>
 #include <binder/PermissionCache.h>
 #include "mediautils/ServiceUtilities.h"
+#include <system/audio-hal-enums.h>
 
 #include <iterator>
 #include <algorithm>
@@ -61,8 +62,20 @@ static String16 resolveCallingPackage(PermissionController& permissionController
     return packages[0];
 }
 
+static int32_t getOpForSource(audio_source_t source) {
+  switch (source) {
+    case AUDIO_SOURCE_HOTWORD:
+      return AppOpsManager::OP_RECORD_AUDIO_HOTWORD;
+    case AUDIO_SOURCE_REMOTE_SUBMIX:
+      return AppOpsManager::OP_RECORD_AUDIO_OUTPUT;
+    case AUDIO_SOURCE_DEFAULT:
+    default:
+      return AppOpsManager::OP_RECORD_AUDIO;
+  }
+}
+
 static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
-        uid_t uid, bool start, bool isHotwordSource) {
+        uid_t uid, bool start, audio_source_t source) {
     // Okay to not track in app ops as audio server or media server is us and if
     // device is rooted security model is considered compromised.
     // system_server loses its RECORD_AUDIO permission when a secondary
@@ -87,11 +100,8 @@ static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
     }
 
     AppOpsManager appOps;
-    const int32_t opRecordAudio = appOps.permissionToOpCode(sAndroidPermissionRecordAudio);
-
+    const int32_t op = getOpForSource(source);
     if (start) {
-        const int32_t op = isHotwordSource ?
-                AppOpsManager::OP_RECORD_AUDIO_HOTWORD : opRecordAudio;
         if (int32_t mode = appOps.startOpNoThrow(
                         op, uid, resolvedOpPackageName, /*startIfModeDefault*/ false);
                 mode != AppOpsManager::MODE_ALLOWED) {
@@ -101,10 +111,10 @@ static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
         }
     } else {
         // Always use OP_RECORD_AUDIO for checks at creation time.
-        if (int32_t mode = appOps.checkOp(opRecordAudio, uid, resolvedOpPackageName);
+        if (int32_t mode = appOps.checkOp(op, uid, resolvedOpPackageName);
                 mode != AppOpsManager::MODE_ALLOWED) {
             ALOGE("Request check for \"%s\" (uid %d) denied by app op: %d, mode: %d",
-                    String8(resolvedOpPackageName).c_str(), uid, opRecordAudio, mode);
+                    String8(resolvedOpPackageName).c_str(), uid, op, mode);
             return false;
         }
     }
@@ -113,15 +123,14 @@ static bool checkRecordingInternal(const String16& opPackageName, pid_t pid,
 }
 
 bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid) {
-    return checkRecordingInternal(opPackageName, pid, uid, /*start*/ false,
-            /*is_hotword_source*/ false);
+    return checkRecordingInternal(opPackageName, pid, uid, /*start*/ false, AUDIO_SOURCE_DEFAULT);
 }
 
-bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid, bool isHotwordSource) {
-     return checkRecordingInternal(opPackageName, pid, uid, /*start*/ true, isHotwordSource);
+bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid, audio_source_t source) {
+     return checkRecordingInternal(opPackageName, pid, uid, /*start*/ true, source);
 }
 
-void finishRecording(const String16& opPackageName, uid_t uid, bool isHotwordSource) {
+void finishRecording(const String16& opPackageName, uid_t uid, audio_source_t source) {
     // Okay to not track in app ops as audio server is us and if
     // device is rooted security model is considered compromised.
     if (isAudioServerOrRootUid(uid)) return;
@@ -134,8 +143,8 @@ void finishRecording(const String16& opPackageName, uid_t uid, bool isHotwordSou
     }
 
     AppOpsManager appOps;
-    const int32_t op = isHotwordSource ? AppOpsManager::OP_RECORD_AUDIO_HOTWORD
-            : appOps.permissionToOpCode(sAndroidPermissionRecordAudio);
+
+    const int32_t op = getOpForSource(source);
     appOps.finishOp(op, uid, resolvedOpPackageName);
 }
 
