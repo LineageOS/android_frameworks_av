@@ -23,15 +23,10 @@
 #include <hardware/audio_effect.h>
 #include <utils/Log.h>
 #include <utils/Timers.h>
-#ifndef WEBRTC_LEGACY
 #include <audio_effects/effect_agc2.h>
-#endif
 #include <audio_effects/effect_ns.h>
 #include <audio_processing.h>
 #include <module_common_types.h>
-#ifdef WEBRTC_LEGACY
-#include "speex/speex_resampler.h"
-#endif
 
 // undefine to perform multi channels API functional tests
 //#define DUAL_MIC_TEST
@@ -46,9 +41,7 @@
 // types of pre processing modules
 enum preproc_id {
     PREPROC_AGC,  // Automatic Gain Control
-#ifndef WEBRTC_LEGACY
     PREPROC_AGC2,  // Automatic Gain Control 2
-#endif
     PREPROC_AEC,  // Acoustic Echo Canceler
     PREPROC_NS,   // Noise Suppressor
     PREPROC_NUM_EFFECTS
@@ -110,10 +103,8 @@ struct preproc_session_s {
     int id;                        // audio session ID
     int io;                        // handle of input stream this session is on
     webrtc::AudioProcessing* apm;  // handle on webRTC audio processing module (APM)
-#ifndef WEBRTC_LEGACY
     // Audio Processing module builder
     webrtc::AudioProcessingBuilder ap_builder;
-#endif
     size_t apmFrameCount;      // buffer size for webRTC process (10 ms)
     uint32_t apmSamplingRate;  // webRTC APM sampling rate (8/16 or 32 kHz)
     size_t frameCount;         // buffer size before input resampler ( <=> apmFrameCount)
@@ -124,42 +115,25 @@ struct preproc_session_s {
     uint32_t enabledMsk;       // bit field containing IDs of enabled pre processors
     uint32_t processedMsk;     // bit field containing IDs of pre processors already
                                // processed in current round
-#ifdef WEBRTC_LEGACY
-    webrtc::AudioFrame* procFrame;  // audio frame passed to webRTC AMP ProcessStream()
-#else
     // audio config strucutre
     webrtc::AudioProcessing::Config config;
     webrtc::StreamConfig inputConfig;   // input stream configuration
     webrtc::StreamConfig outputConfig;  // output stream configuration
-#endif
     int16_t* inBuf;    // input buffer used when resampling
     size_t inBufSize;  // input buffer size in frames
     size_t framesIn;   // number of frames in input buffer
-#ifdef WEBRTC_LEGACY
-    SpeexResamplerState* inResampler;  // handle on input speex resampler
-#endif
     int16_t* outBuf;    // output buffer used when resampling
     size_t outBufSize;  // output buffer size in frames
     size_t framesOut;   // number of frames in output buffer
-#ifdef WEBRTC_LEGACY
-    SpeexResamplerState* outResampler;  // handle on output speex resampler
-#endif
     uint32_t revChannelCount;  // number of channels on reverse stream
     uint32_t revEnabledMsk;    // bit field containing IDs of enabled pre processors
                                // with reverse channel
     uint32_t revProcessedMsk;  // bit field containing IDs of pre processors with reverse
                                // channel already processed in current round
-#ifdef WEBRTC_LEGACY
-    webrtc::AudioFrame* revFrame;  // audio frame passed to webRTC AMP AnalyzeReverseStream()
-#else
     webrtc::StreamConfig revConfig;     // reverse stream configuration.
-#endif
     int16_t* revBuf;    // reverse channel input buffer
     size_t revBufSize;  // reverse channel input buffer size
     size_t framesRev;   // number of frames in reverse channel input buffer
-#ifdef WEBRTC_LEGACY
-    SpeexResamplerState* revResampler;  // handle on reverse channel input speex resampler
-#endif
 };
 
 #ifdef DUAL_MIC_TEST
@@ -213,7 +187,6 @@ static const effect_descriptor_t sAgcDescriptor = {
         "Automatic Gain Control",
         "The Android Open Source Project"};
 
-#ifndef WEBRTC_LEGACY
 // Automatic Gain Control 2
 static const effect_descriptor_t sAgc2Descriptor = {
         {0xae3c653b, 0xbe18, 0x4ab8, 0x8938, {0x41, 0x8f, 0x0a, 0x7f, 0x06, 0xac}},  // type
@@ -224,7 +197,6 @@ static const effect_descriptor_t sAgc2Descriptor = {
         0,  // FIXME indicate memory usage
         "Automatic Gain Control 2",
         "The Android Open Source Project"};
-#endif
 
 // Acoustic Echo Cancellation
 static const effect_descriptor_t sAecDescriptor = {
@@ -249,9 +221,7 @@ static const effect_descriptor_t sNsDescriptor = {
         "The Android Open Source Project"};
 
 static const effect_descriptor_t* sDescriptors[PREPROC_NUM_EFFECTS] = {&sAgcDescriptor,
-#ifndef WEBRTC_LEGACY
                                                                        &sAgc2Descriptor,
-#endif
                                                                        &sAecDescriptor,
                                                                        &sNsDescriptor};
 
@@ -260,9 +230,7 @@ static const effect_descriptor_t* sDescriptors[PREPROC_NUM_EFFECTS] = {&sAgcDesc
 //------------------------------------------------------------------------------
 
 const effect_uuid_t* const sUuidToPreProcTable[PREPROC_NUM_EFFECTS] = {FX_IID_AGC,
-#ifndef WEBRTC_LEGACY
                                                                        FX_IID_AGC2,
-#endif
                                                                        FX_IID_AEC, FX_IID_NS};
 
 const effect_uuid_t* ProcIdToUuid(int procId) {
@@ -297,7 +265,6 @@ static const int kAgcDefaultTargetLevel = 3;
 static const int kAgcDefaultCompGain = 9;
 static const bool kAgcDefaultLimiter = true;
 
-#ifndef WEBRTC_LEGACY
 int Agc2Init(preproc_effect_t* effect) {
     ALOGV("Agc2Init");
     effect->session->config = effect->session->apm->GetConfig();
@@ -308,48 +275,27 @@ int Agc2Init(preproc_effect_t* effect) {
     effect->session->apm->ApplyConfig(effect->session->config);
     return 0;
 }
-#endif
 
 int AgcInit(preproc_effect_t* effect) {
     ALOGV("AgcInit");
-#ifdef WEBRTC_LEGACY
-    webrtc::GainControl* agc = static_cast<webrtc::GainControl*>(effect->engine);
-    agc->set_mode(webrtc::GainControl::kFixedDigital);
-    agc->set_target_level_dbfs(kAgcDefaultTargetLevel);
-    agc->set_compression_gain_db(kAgcDefaultCompGain);
-    agc->enable_limiter(kAgcDefaultLimiter);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.gain_controller1.target_level_dbfs = kAgcDefaultTargetLevel;
     effect->session->config.gain_controller1.compression_gain_db = kAgcDefaultCompGain;
     effect->session->config.gain_controller1.enable_limiter = kAgcDefaultLimiter;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
     return 0;
 }
 
-#ifndef WEBRTC_LEGACY
 int Agc2Create(preproc_effect_t* effect) {
     Agc2Init(effect);
     return 0;
 }
-#endif
 
 int AgcCreate(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    webrtc::GainControl* agc = effect->session->apm->gain_control();
-    ALOGV("AgcCreate got agc %p", agc);
-    if (agc == NULL) {
-        ALOGW("AgcCreate Error");
-        return -ENOMEM;
-    }
-    effect->engine = static_cast<preproc_fx_handle_t>(agc);
-#endif
     AgcInit(effect);
     return 0;
 }
 
-#ifndef WEBRTC_LEGACY
 int Agc2GetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSize, void* pValue) {
     int status = 0;
     uint32_t param = *(uint32_t*)pParam;
@@ -422,15 +368,11 @@ int Agc2GetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSiz
 
     return status;
 }
-#endif
 
 int AgcGetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSize, void* pValue) {
     int status = 0;
     uint32_t param = *(uint32_t*)pParam;
     t_agc_settings* pProperties = (t_agc_settings*)pValue;
-#ifdef WEBRTC_LEGACY
-    webrtc::GainControl* agc = static_cast<webrtc::GainControl*>(effect->engine);
-#endif
 
     switch (param) {
         case AGC_PARAM_TARGET_LEVEL:
@@ -459,32 +401,6 @@ int AgcGetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSize
             break;
     }
 
-#ifdef WEBRTC_LEGACY
-    switch (param) {
-        case AGC_PARAM_TARGET_LEVEL:
-            *(int16_t*)pValue = (int16_t)(agc->target_level_dbfs() * -100);
-            ALOGV("AgcGetParameter() target level %d milliBels", *(int16_t*)pValue);
-            break;
-        case AGC_PARAM_COMP_GAIN:
-            *(int16_t*)pValue = (int16_t)(agc->compression_gain_db() * 100);
-            ALOGV("AgcGetParameter() comp gain %d milliBels", *(int16_t*)pValue);
-            break;
-        case AGC_PARAM_LIMITER_ENA:
-            *(bool*)pValue = (bool)agc->is_limiter_enabled();
-            ALOGV("AgcGetParameter() limiter enabled %s",
-                  (*(int16_t*)pValue != 0) ? "true" : "false");
-            break;
-        case AGC_PARAM_PROPERTIES:
-            pProperties->targetLevel = (int16_t)(agc->target_level_dbfs() * -100);
-            pProperties->compGain = (int16_t)(agc->compression_gain_db() * 100);
-            pProperties->limiterEnabled = (bool)agc->is_limiter_enabled();
-            break;
-        default:
-            ALOGW("AgcGetParameter() unknown param %d", param);
-            status = -EINVAL;
-            break;
-    }
-#else
     effect->session->config = effect->session->apm->GetConfig();
     switch (param) {
         case AGC_PARAM_TARGET_LEVEL:
@@ -515,11 +431,9 @@ int AgcGetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSize
             status = -EINVAL;
             break;
     }
-#endif
     return status;
 }
 
-#ifndef WEBRTC_LEGACY
 int Agc2SetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
     int status = 0;
     uint32_t param = *(uint32_t*)pParam;
@@ -567,43 +481,9 @@ int Agc2SetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
 
     return status;
 }
-#endif
 
 int AgcSetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
     int status = 0;
-#ifdef WEBRTC_LEGACY
-    uint32_t param = *(uint32_t*)pParam;
-    t_agc_settings* pProperties = (t_agc_settings*)pValue;
-    webrtc::GainControl* agc = static_cast<webrtc::GainControl*>(effect->engine);
-
-    switch (param) {
-        case AGC_PARAM_TARGET_LEVEL:
-            ALOGV("AgcSetParameter() target level %d milliBels", *(int16_t*)pValue);
-            status = agc->set_target_level_dbfs(-(*(int16_t*)pValue / 100));
-            break;
-        case AGC_PARAM_COMP_GAIN:
-            ALOGV("AgcSetParameter() comp gain %d milliBels", *(int16_t*)pValue);
-            status = agc->set_compression_gain_db(*(int16_t*)pValue / 100);
-            break;
-        case AGC_PARAM_LIMITER_ENA:
-            ALOGV("AgcSetParameter() limiter enabled %s", *(bool*)pValue ? "true" : "false");
-            status = agc->enable_limiter(*(bool*)pValue);
-            break;
-        case AGC_PARAM_PROPERTIES:
-            ALOGV("AgcSetParameter() properties level %d, gain %d limiter %d",
-                  pProperties->targetLevel, pProperties->compGain, pProperties->limiterEnabled);
-            status = agc->set_target_level_dbfs(-(pProperties->targetLevel / 100));
-            if (status != 0) break;
-            status = agc->set_compression_gain_db(pProperties->compGain / 100);
-            if (status != 0) break;
-            status = agc->enable_limiter(pProperties->limiterEnabled);
-            break;
-        default:
-            ALOGW("AgcSetParameter() unknown param %08x value %08x", param, *(uint32_t*)pValue);
-            status = -EINVAL;
-            break;
-    }
-#else
     uint32_t param = *(uint32_t*)pParam;
     t_agc_settings* pProperties = (t_agc_settings*)pValue;
     effect->session->config = effect->session->apm->GetConfig();
@@ -637,96 +517,57 @@ int AgcSetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
             break;
     }
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 
     ALOGV("AgcSetParameter() done status %d", status);
 
     return status;
 }
 
-#ifndef WEBRTC_LEGACY
 void Agc2Enable(preproc_effect_t* effect) {
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.gain_controller2.enabled = true;
     effect->session->apm->ApplyConfig(effect->session->config);
 }
-#endif
 
 void AgcEnable(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    webrtc::GainControl* agc = static_cast<webrtc::GainControl*>(effect->engine);
-    ALOGV("AgcEnable agc %p", agc);
-    agc->Enable(true);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.gain_controller1.enabled = true;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 }
 
-#ifndef WEBRTC_LEGACY
 void Agc2Disable(preproc_effect_t* effect) {
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.gain_controller2.enabled = false;
     effect->session->apm->ApplyConfig(effect->session->config);
 }
-#endif
 
 void AgcDisable(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    ALOGV("AgcDisable");
-    webrtc::GainControl* agc = static_cast<webrtc::GainControl*>(effect->engine);
-    agc->Enable(false);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.gain_controller1.enabled = false;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 }
 
 static const preproc_ops_t sAgcOps = {AgcCreate,       AgcInit,         NULL, AgcEnable, AgcDisable,
                                       AgcSetParameter, AgcGetParameter, NULL};
 
-#ifndef WEBRTC_LEGACY
 static const preproc_ops_t sAgc2Ops = {Agc2Create,       Agc2Init,    NULL,
                                        Agc2Enable,       Agc2Disable, Agc2SetParameter,
                                        Agc2GetParameter, NULL};
-#endif
 
 //------------------------------------------------------------------------------
 // Acoustic Echo Canceler (AEC)
 //------------------------------------------------------------------------------
 
-#ifdef WEBRTC_LEGACY
-static const webrtc::EchoControlMobile::RoutingMode kAecDefaultMode =
-        webrtc::EchoControlMobile::kEarpiece;
-static const bool kAecDefaultComfortNoise = true;
-#endif
 
 int AecInit(preproc_effect_t* effect) {
     ALOGV("AecInit");
-#ifdef WEBRTC_LEGACY
-    webrtc::EchoControlMobile* aec = static_cast<webrtc::EchoControlMobile*>(effect->engine);
-    aec->set_routing_mode(kAecDefaultMode);
-    aec->enable_comfort_noise(kAecDefaultComfortNoise);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.echo_canceller.mobile_mode = true;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
     return 0;
 }
 
 int AecCreate(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    webrtc::EchoControlMobile* aec = effect->session->apm->echo_control_mobile();
-    ALOGV("AecCreate got aec %p", aec);
-    if (aec == NULL) {
-        ALOGW("AgcCreate Error");
-        return -ENOMEM;
-    }
-    effect->engine = static_cast<preproc_fx_handle_t>(aec);
-#endif
     AecInit(effect);
     return 0;
 }
@@ -744,13 +585,11 @@ int AecGetParameter(preproc_effect_t* effect, void* pParam, uint32_t* pValueSize
             *(uint32_t*)pValue = 1000 * effect->session->apm->stream_delay_ms();
             ALOGV("AecGetParameter() echo delay %d us", *(uint32_t*)pValue);
             break;
-#ifndef WEBRTC_LEGACY
         case AEC_PARAM_MOBILE_MODE:
             effect->session->config = effect->session->apm->GetConfig();
             *(uint32_t*)pValue = effect->session->config.echo_canceller.mobile_mode;
             ALOGV("AecGetParameter() mobile mode %d us", *(uint32_t*)pValue);
             break;
-#endif
         default:
             ALOGW("AecGetParameter() unknown param %08x value %08x", param, *(uint32_t*)pValue);
             status = -EINVAL;
@@ -770,14 +609,12 @@ int AecSetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
             status = effect->session->apm->set_stream_delay_ms(value / 1000);
             ALOGV("AecSetParameter() echo delay %d us, status %d", value, status);
             break;
-#ifndef WEBRTC_LEGACY
         case AEC_PARAM_MOBILE_MODE:
             effect->session->config = effect->session->apm->GetConfig();
             effect->session->config.echo_canceller.mobile_mode = value;
             ALOGV("AecSetParameter() mobile mode %d us", value);
             effect->session->apm->ApplyConfig(effect->session->config);
             break;
-#endif
         default:
             ALOGW("AecSetParameter() unknown param %08x value %08x", param, *(uint32_t*)pValue);
             status = -EINVAL;
@@ -787,57 +624,24 @@ int AecSetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
 }
 
 void AecEnable(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    webrtc::EchoControlMobile* aec = static_cast<webrtc::EchoControlMobile*>(effect->engine);
-    ALOGV("AecEnable aec %p", aec);
-    aec->Enable(true);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.echo_canceller.enabled = true;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 }
 
 void AecDisable(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    ALOGV("AecDisable");
-    webrtc::EchoControlMobile* aec = static_cast<webrtc::EchoControlMobile*>(effect->engine);
-    aec->Enable(false);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.echo_canceller.enabled = false;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 }
 
 int AecSetDevice(preproc_effect_t* effect, uint32_t device) {
     ALOGV("AecSetDevice %08x", device);
-#ifdef WEBRTC_LEGACY
-    webrtc::EchoControlMobile* aec = static_cast<webrtc::EchoControlMobile*>(effect->engine);
-    webrtc::EchoControlMobile::RoutingMode mode =
-            webrtc::EchoControlMobile::kQuietEarpieceOrHeadset;
-#endif
 
     if (audio_is_input_device(device)) {
         return 0;
     }
 
-#ifdef WEBRTC_LEGACY
-    switch (device) {
-        case AUDIO_DEVICE_OUT_EARPIECE:
-            mode = webrtc::EchoControlMobile::kEarpiece;
-            break;
-        case AUDIO_DEVICE_OUT_SPEAKER:
-            mode = webrtc::EchoControlMobile::kSpeakerphone;
-            break;
-        case AUDIO_DEVICE_OUT_WIRED_HEADSET:
-        case AUDIO_DEVICE_OUT_WIRED_HEADPHONE:
-        case AUDIO_DEVICE_OUT_USB_HEADSET:
-        default:
-            break;
-    }
-    aec->set_routing_mode(mode);
-#endif
     return 0;
 }
 
@@ -849,49 +653,19 @@ static const preproc_ops_t sAecOps = {AecCreate,       AecInit,     NULL,
 // Noise Suppression (NS)
 //------------------------------------------------------------------------------
 
-#ifdef WEBRTC_LEGACY
-static const webrtc::NoiseSuppression::Level kNsDefaultLevel = webrtc::NoiseSuppression::kModerate;
-#else
 static const webrtc::AudioProcessing::Config::NoiseSuppression::Level kNsDefaultLevel =
         webrtc::AudioProcessing::Config::NoiseSuppression::kModerate;
-#endif
 
 int NsInit(preproc_effect_t* effect) {
     ALOGV("NsInit");
-#ifdef WEBRTC_LEGACY
-    webrtc::NoiseSuppression* ns = static_cast<webrtc::NoiseSuppression*>(effect->engine);
-    ns->set_level(kNsDefaultLevel);
-    webrtc::Config config;
-    std::vector<webrtc::Point> geometry;
-    // TODO(aluebs): Make the geometry settable.
-    geometry.push_back(webrtc::Point(-0.03f, 0.f, 0.f));
-    geometry.push_back(webrtc::Point(-0.01f, 0.f, 0.f));
-    geometry.push_back(webrtc::Point(0.01f, 0.f, 0.f));
-    geometry.push_back(webrtc::Point(0.03f, 0.f, 0.f));
-    // The geometry needs to be set with Beamforming enabled.
-    config.Set<webrtc::Beamforming>(new webrtc::Beamforming(true, geometry));
-    effect->session->apm->SetExtraOptions(config);
-    config.Set<webrtc::Beamforming>(new webrtc::Beamforming(false, geometry));
-    effect->session->apm->SetExtraOptions(config);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.noise_suppression.level = kNsDefaultLevel;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
     effect->type = NS_TYPE_SINGLE_CHANNEL;
     return 0;
 }
 
 int NsCreate(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    webrtc::NoiseSuppression* ns = effect->session->apm->noise_suppression();
-    ALOGV("NsCreate got ns %p", ns);
-    if (ns == NULL) {
-        ALOGW("AgcCreate Error");
-        return -ENOMEM;
-    }
-    effect->engine = static_cast<preproc_fx_handle_t>(ns);
-#endif
     NsInit(effect);
     return 0;
 }
@@ -904,31 +678,6 @@ int NsGetParameter(preproc_effect_t* effect __unused, void* pParam __unused,
 
 int NsSetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
     int status = 0;
-#ifdef WEBRTC_LEGACY
-    webrtc::NoiseSuppression* ns = static_cast<webrtc::NoiseSuppression*>(effect->engine);
-    uint32_t param = *(uint32_t*)pParam;
-    uint32_t value = *(uint32_t*)pValue;
-    switch (param) {
-        case NS_PARAM_LEVEL:
-            ns->set_level((webrtc::NoiseSuppression::Level)value);
-            ALOGV("NsSetParameter() level %d", value);
-            break;
-        case NS_PARAM_TYPE: {
-            webrtc::Config config;
-            std::vector<webrtc::Point> geometry;
-            bool is_beamforming_enabled = value == NS_TYPE_MULTI_CHANNEL && ns->is_enabled();
-            config.Set<webrtc::Beamforming>(
-                    new webrtc::Beamforming(is_beamforming_enabled, geometry));
-            effect->session->apm->SetExtraOptions(config);
-            effect->type = value;
-            ALOGV("NsSetParameter() type %d", value);
-            break;
-        }
-        default:
-            ALOGW("NsSetParameter() unknown param %08x value %08x", param, value);
-            status = -EINVAL;
-    }
-#else
     uint32_t param = *(uint32_t*)pParam;
     uint32_t value = *(uint32_t*)pValue;
     effect->session->config = effect->session->apm->GetConfig();
@@ -943,52 +692,28 @@ int NsSetParameter(preproc_effect_t* effect, void* pParam, void* pValue) {
             status = -EINVAL;
     }
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 
     return status;
 }
 
 void NsEnable(preproc_effect_t* effect) {
-#ifdef WEBRTC_LEGACY
-    webrtc::NoiseSuppression* ns = static_cast<webrtc::NoiseSuppression*>(effect->engine);
-    ALOGV("NsEnable ns %p", ns);
-    ns->Enable(true);
-    if (effect->type == NS_TYPE_MULTI_CHANNEL) {
-        webrtc::Config config;
-        std::vector<webrtc::Point> geometry;
-        config.Set<webrtc::Beamforming>(new webrtc::Beamforming(true, geometry));
-        effect->session->apm->SetExtraOptions(config);
-    }
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.noise_suppression.enabled = true;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 }
 
 void NsDisable(preproc_effect_t* effect) {
     ALOGV("NsDisable");
-#ifdef WEBRTC_LEGACY
-    webrtc::NoiseSuppression* ns = static_cast<webrtc::NoiseSuppression*>(effect->engine);
-    ns->Enable(false);
-    webrtc::Config config;
-    std::vector<webrtc::Point> geometry;
-    config.Set<webrtc::Beamforming>(new webrtc::Beamforming(false, geometry));
-    effect->session->apm->SetExtraOptions(config);
-#else
     effect->session->config = effect->session->apm->GetConfig();
     effect->session->config.noise_suppression.enabled = false;
     effect->session->apm->ApplyConfig(effect->session->config);
-#endif
 }
 
 static const preproc_ops_t sNsOps = {NsCreate,  NsInit,         NULL,           NsEnable,
                                      NsDisable, NsSetParameter, NsGetParameter, NULL};
 
 static const preproc_ops_t* sPreProcOps[PREPROC_NUM_EFFECTS] = {&sAgcOps,
-#ifndef WEBRTC_LEGACY
                                                                 &sAgc2Ops,
-#endif
                                                                 &sAecOps, &sNsOps};
 
 //------------------------------------------------------------------------------
@@ -1119,9 +844,6 @@ int Session_Init(preproc_session_t* session) {
     session->id = 0;
     session->io = 0;
     session->createdMsk = 0;
-#ifdef WEBRTC_LEGACY
-    session->apm = NULL;
-#endif
     for (i = 0; i < PREPROC_NUM_EFFECTS && status == 0; i++) {
         status = Effect_Init(&session->effects[i], i);
     }
@@ -1135,75 +857,32 @@ extern "C" int Session_CreateEffect(preproc_session_t* session, int32_t procId,
     ALOGV("Session_CreateEffect procId %d, createdMsk %08x", procId, session->createdMsk);
 
     if (session->createdMsk == 0) {
-#ifdef WEBRTC_LEGACY
-        session->apm = webrtc::AudioProcessing::Create();
-        if (session->apm == NULL) {
-            ALOGW("Session_CreateEffect could not get apm engine");
-            goto error;
-        }
-        const webrtc::ProcessingConfig processing_config = {
-                {{kPreprocDefaultSr, kPreProcDefaultCnl},
-                 {kPreprocDefaultSr, kPreProcDefaultCnl},
-                 {kPreprocDefaultSr, kPreProcDefaultCnl},
-                 {kPreprocDefaultSr, kPreProcDefaultCnl}}};
-        session->apm->Initialize(processing_config);
-        session->procFrame = new webrtc::AudioFrame();
-        if (session->procFrame == NULL) {
-            ALOGW("Session_CreateEffect could not allocate audio frame");
-            goto error;
-        }
-        session->revFrame = new webrtc::AudioFrame();
-        if (session->revFrame == NULL) {
-            ALOGW("Session_CreateEffect could not allocate reverse audio frame");
-            goto error;
-        }
-#else
         session->apm = session->ap_builder.Create();
         if (session->apm == NULL) {
             ALOGW("Session_CreateEffect could not get apm engine");
             goto error;
         }
-#endif
         session->apmSamplingRate = kPreprocDefaultSr;
         session->apmFrameCount = (kPreprocDefaultSr) / 100;
         session->frameCount = session->apmFrameCount;
         session->samplingRate = kPreprocDefaultSr;
         session->inChannelCount = kPreProcDefaultCnl;
         session->outChannelCount = kPreProcDefaultCnl;
-#ifdef WEBRTC_LEGACY
-        session->procFrame->sample_rate_hz_ = kPreprocDefaultSr;
-        session->procFrame->num_channels_ = kPreProcDefaultCnl;
-#else
         session->inputConfig.set_sample_rate_hz(kPreprocDefaultSr);
         session->inputConfig.set_num_channels(kPreProcDefaultCnl);
         session->outputConfig.set_sample_rate_hz(kPreprocDefaultSr);
         session->outputConfig.set_num_channels(kPreProcDefaultCnl);
-#endif
         session->revChannelCount = kPreProcDefaultCnl;
-#ifdef WEBRTC_LEGACY
-        session->revFrame->sample_rate_hz_ = kPreprocDefaultSr;
-        session->revFrame->num_channels_ = kPreProcDefaultCnl;
-#else
         session->revConfig.set_sample_rate_hz(kPreprocDefaultSr);
         session->revConfig.set_num_channels(kPreProcDefaultCnl);
-#endif
         session->enabledMsk = 0;
         session->processedMsk = 0;
         session->revEnabledMsk = 0;
         session->revProcessedMsk = 0;
-#ifdef WEBRTC_LEGACY
-        session->inResampler = NULL;
-#endif
         session->inBuf = NULL;
         session->inBufSize = 0;
-#ifdef WEBRTC_LEGACY
-        session->outResampler = NULL;
-#endif
         session->outBuf = NULL;
         session->outBufSize = 0;
-#ifdef WEBRTC_LEGACY
-        session->revResampler = NULL;
-#endif
         session->revBuf = NULL;
         session->revBufSize = 0;
     }
@@ -1217,17 +896,8 @@ extern "C" int Session_CreateEffect(preproc_session_t* session, int32_t procId,
 
 error:
     if (session->createdMsk == 0) {
-#ifdef WEBRTC_LEGACY
-        delete session->revFrame;
-        session->revFrame = NULL;
-        delete session->procFrame;
-        session->procFrame = NULL;
-        delete session->apm;
-        session->apm = NULL;  // NOLINT(clang-analyzer-cplusplus.NewDelete)
-#else
         delete session->apm;
         session->apm = NULL;
-#endif
     }
     return status;
 }
@@ -1236,29 +906,8 @@ int Session_ReleaseEffect(preproc_session_t* session, preproc_effect_t* fx) {
     ALOGW_IF(Effect_Release(fx) != 0, " Effect_Release() failed for proc ID %d", fx->procId);
     session->createdMsk &= ~(1 << fx->procId);
     if (session->createdMsk == 0) {
-#ifdef WEBRTC_LEGACY
         delete session->apm;
         session->apm = NULL;
-        delete session->procFrame;
-        session->procFrame = NULL;
-        delete session->revFrame;
-        session->revFrame = NULL;
-        if (session->inResampler != NULL) {
-            speex_resampler_destroy(session->inResampler);
-            session->inResampler = NULL;
-        }
-        if (session->outResampler != NULL) {
-            speex_resampler_destroy(session->outResampler);
-            session->outResampler = NULL;
-        }
-        if (session->revResampler != NULL) {
-            speex_resampler_destroy(session->revResampler);
-            session->revResampler = NULL;
-        }
-#else
-        delete session->apm;
-        session->apm = NULL;
-#endif
         delete session->inBuf;
         session->inBuf = NULL;
         delete session->outBuf;
@@ -1284,9 +933,6 @@ int Session_SetConfig(preproc_session_t* session, effect_config_t* config) {
 
     ALOGV("Session_SetConfig sr %d cnl %08x", config->inputCfg.samplingRate,
           config->inputCfg.channels);
-#ifdef WEBRTC_LEGACY
-    int status;
-#endif
 
     // AEC implementation is limited to 16kHz
     if (config->inputCfg.samplingRate >= 32000 && !(session->createdMsk & (1 << PREPROC_AEC))) {
@@ -1297,51 +943,25 @@ int Session_SetConfig(preproc_session_t* session, effect_config_t* config) {
         session->apmSamplingRate = 8000;
     }
 
-#ifdef WEBRTC_LEGACY
-    const webrtc::ProcessingConfig processing_config = {
-            {{static_cast<int>(session->apmSamplingRate), inCnl},
-             {static_cast<int>(session->apmSamplingRate), outCnl},
-             {static_cast<int>(session->apmSamplingRate), inCnl},
-             {static_cast<int>(session->apmSamplingRate), inCnl}}};
-    status = session->apm->Initialize(processing_config);
-    if (status < 0) {
-        return -EINVAL;
-    }
-#endif
 
     session->samplingRate = config->inputCfg.samplingRate;
     session->apmFrameCount = session->apmSamplingRate / 100;
     if (session->samplingRate == session->apmSamplingRate) {
         session->frameCount = session->apmFrameCount;
     } else {
-#ifdef WEBRTC_LEGACY
-        session->frameCount =
-                (session->apmFrameCount * session->samplingRate) / session->apmSamplingRate + 1;
-#else
         session->frameCount =
                 (session->apmFrameCount * session->samplingRate) / session->apmSamplingRate;
-#endif
     }
     session->inChannelCount = inCnl;
     session->outChannelCount = outCnl;
-#ifdef WEBRTC_LEGACY
-    session->procFrame->num_channels_ = inCnl;
-    session->procFrame->sample_rate_hz_ = session->apmSamplingRate;
-#else
     session->inputConfig.set_sample_rate_hz(session->samplingRate);
     session->inputConfig.set_num_channels(inCnl);
     session->outputConfig.set_sample_rate_hz(session->samplingRate);
     session->outputConfig.set_num_channels(inCnl);
-#endif
 
     session->revChannelCount = inCnl;
-#ifdef WEBRTC_LEGACY
-    session->revFrame->num_channels_ = inCnl;
-    session->revFrame->sample_rate_hz_ = session->apmSamplingRate;
-#else
     session->revConfig.set_sample_rate_hz(session->samplingRate);
     session->revConfig.set_num_channels(inCnl);
-#endif
 
     // force process buffer reallocation
     session->inBufSize = 0;
@@ -1349,53 +969,6 @@ int Session_SetConfig(preproc_session_t* session, effect_config_t* config) {
     session->framesIn = 0;
     session->framesOut = 0;
 
-#ifdef WEBRTC_LEGACY
-    if (session->inResampler != NULL) {
-        speex_resampler_destroy(session->inResampler);
-        session->inResampler = NULL;
-    }
-    if (session->outResampler != NULL) {
-        speex_resampler_destroy(session->outResampler);
-        session->outResampler = NULL;
-    }
-    if (session->revResampler != NULL) {
-        speex_resampler_destroy(session->revResampler);
-        session->revResampler = NULL;
-    }
-    if (session->samplingRate != session->apmSamplingRate) {
-        int error;
-        session->inResampler =
-                speex_resampler_init(session->inChannelCount, session->samplingRate,
-                                     session->apmSamplingRate, RESAMPLER_QUALITY, &error);
-        if (session->inResampler == NULL) {
-            ALOGW("Session_SetConfig Cannot create speex resampler: %s",
-                  speex_resampler_strerror(error));
-            return -EINVAL;
-        }
-        session->outResampler =
-                speex_resampler_init(session->outChannelCount, session->apmSamplingRate,
-                                     session->samplingRate, RESAMPLER_QUALITY, &error);
-        if (session->outResampler == NULL) {
-            ALOGW("Session_SetConfig Cannot create speex resampler: %s",
-                  speex_resampler_strerror(error));
-            speex_resampler_destroy(session->inResampler);
-            session->inResampler = NULL;
-            return -EINVAL;
-        }
-        session->revResampler =
-                speex_resampler_init(session->inChannelCount, session->samplingRate,
-                                     session->apmSamplingRate, RESAMPLER_QUALITY, &error);
-        if (session->revResampler == NULL) {
-            ALOGW("Session_SetConfig Cannot create speex resampler: %s",
-                  speex_resampler_strerror(error));
-            speex_resampler_destroy(session->inResampler);
-            session->inResampler = NULL;
-            speex_resampler_destroy(session->outResampler);
-            session->outResampler = NULL;
-            return -EINVAL;
-        }
-    }
-#endif
 
     session->state = PREPROC_SESSION_STATE_CONFIG;
     return 0;
@@ -1430,22 +1003,7 @@ int Session_SetReverseConfig(preproc_session_t* session, effect_config_t* config
         return -EINVAL;
     }
     uint32_t inCnl = audio_channel_count_from_out_mask(config->inputCfg.channels);
-#ifdef WEBRTC_LEGACY
-    const webrtc::ProcessingConfig processing_config = {
-            {{static_cast<int>(session->apmSamplingRate), session->inChannelCount},
-             {static_cast<int>(session->apmSamplingRate), session->outChannelCount},
-             {static_cast<int>(session->apmSamplingRate), inCnl},
-             {static_cast<int>(session->apmSamplingRate), inCnl}}};
-    int status = session->apm->Initialize(processing_config);
-    if (status < 0) {
-        return -EINVAL;
-    }
-#endif
     session->revChannelCount = inCnl;
-#ifdef WEBRTC_LEGACY
-    session->revFrame->num_channels_ = inCnl;
-    session->revFrame->sample_rate_hz_ = session->apmSamplingRate;
-#endif
     // force process buffer reallocation
     session->revBufSize = 0;
     session->framesRev = 0;
@@ -1467,24 +1025,10 @@ void Session_SetProcEnabled(preproc_session_t* session, uint32_t procId, bool en
     if (enabled) {
         if (session->enabledMsk == 0) {
             session->framesIn = 0;
-#ifdef WEBRTC_LEGACY
-            if (session->inResampler != NULL) {
-                speex_resampler_reset_mem(session->inResampler);
-            }
-            session->framesOut = 0;
-            if (session->outResampler != NULL) {
-                speex_resampler_reset_mem(session->outResampler);
-            }
-#endif
         }
         session->enabledMsk |= (1 << procId);
         if (HasReverseStream(procId)) {
             session->framesRev = 0;
-#ifdef WEBRTC_LEGACY
-            if (session->revResampler != NULL) {
-                speex_resampler_reset_mem(session->revResampler);
-            }
-#endif
             session->revEnabledMsk |= (1 << procId);
         }
     } else {
@@ -1600,82 +1144,6 @@ int PreProcessingFx_Process(effect_handle_t self, audio_buffer_t* inBuffer,
             return 0;
         }
 
-#ifdef WEBRTC_LEGACY
-        if (session->inResampler != NULL) {
-            size_t fr = session->frameCount - session->framesIn;
-            if (inBuffer->frameCount < fr) {
-                fr = inBuffer->frameCount;
-            }
-            if (session->inBufSize < session->framesIn + fr) {
-                int16_t* buf;
-                session->inBufSize = session->framesIn + fr;
-                buf = (int16_t*)realloc(
-                        session->inBuf,
-                        session->inBufSize * session->inChannelCount * sizeof(int16_t));
-                if (buf == NULL) {
-                    session->framesIn = 0;
-                    free(session->inBuf);
-                    session->inBuf = NULL;
-                    return -ENOMEM;
-                }
-                session->inBuf = buf;
-            }
-            memcpy(session->inBuf + session->framesIn * session->inChannelCount, inBuffer->s16,
-                   fr * session->inChannelCount * sizeof(int16_t));
-#ifdef DUAL_MIC_TEST
-            pthread_mutex_lock(&gPcmDumpLock);
-            if (gPcmDumpFh != NULL) {
-                fwrite(inBuffer->raw, fr * session->inChannelCount * sizeof(int16_t), 1,
-                       gPcmDumpFh);
-            }
-            pthread_mutex_unlock(&gPcmDumpLock);
-#endif
-
-            session->framesIn += fr;
-            inBuffer->frameCount = fr;
-            if (session->framesIn < session->frameCount) {
-                return 0;
-            }
-            spx_uint32_t frIn = session->framesIn;
-            spx_uint32_t frOut = session->apmFrameCount;
-            if (session->inChannelCount == 1) {
-                speex_resampler_process_int(session->inResampler, 0, session->inBuf, &frIn,
-                                            session->procFrame->data_, &frOut);
-            } else {
-                speex_resampler_process_interleaved_int(session->inResampler, session->inBuf, &frIn,
-                                                        session->procFrame->data_, &frOut);
-            }
-            memmove(session->inBuf, session->inBuf + frIn * session->inChannelCount,
-                    (session->framesIn - frIn) * session->inChannelCount * sizeof(int16_t));
-            session->framesIn -= frIn;
-        } else {
-            size_t fr = session->frameCount - session->framesIn;
-            if (inBuffer->frameCount < fr) {
-                fr = inBuffer->frameCount;
-            }
-            memcpy(session->procFrame->data_ + session->framesIn * session->inChannelCount,
-                   inBuffer->s16, fr * session->inChannelCount * sizeof(int16_t));
-
-#ifdef DUAL_MIC_TEST
-            pthread_mutex_lock(&gPcmDumpLock);
-            if (gPcmDumpFh != NULL) {
-                fwrite(inBuffer->raw, fr * session->inChannelCount * sizeof(int16_t), 1,
-                       gPcmDumpFh);
-            }
-            pthread_mutex_unlock(&gPcmDumpLock);
-#endif
-
-            session->framesIn += fr;
-            inBuffer->frameCount = fr;
-            if (session->framesIn < session->frameCount) {
-                return 0;
-            }
-            session->framesIn = 0;
-        }
-        session->procFrame->samples_per_channel_ = session->apmFrameCount;
-
-        effect->session->apm->ProcessStream(session->procFrame);
-#else
         size_t fr = session->frameCount - session->framesIn;
         if (inBuffer->frameCount < fr) {
             fr = inBuffer->frameCount;
@@ -1696,7 +1164,6 @@ int PreProcessingFx_Process(effect_handle_t self, audio_buffer_t* inBuffer,
             return status;
         }
         outBuffer->frameCount = inBuffer->frameCount;
-#endif
 
         if (session->outBufSize < session->framesOut + session->frameCount) {
             int16_t* buf;
@@ -1713,30 +1180,7 @@ int PreProcessingFx_Process(effect_handle_t self, audio_buffer_t* inBuffer,
             session->outBuf = buf;
         }
 
-#ifdef WEBRTC_LEGACY
-        if (session->outResampler != NULL) {
-            spx_uint32_t frIn = session->apmFrameCount;
-            spx_uint32_t frOut = session->frameCount;
-            if (session->inChannelCount == 1) {
-                speex_resampler_process_int(
-                        session->outResampler, 0, session->procFrame->data_, &frIn,
-                        session->outBuf + session->framesOut * session->outChannelCount, &frOut);
-            } else {
-                speex_resampler_process_interleaved_int(
-                        session->outResampler, session->procFrame->data_, &frIn,
-                        session->outBuf + session->framesOut * session->outChannelCount, &frOut);
-            }
-            session->framesOut += frOut;
-        } else {
-            memcpy(session->outBuf + session->framesOut * session->outChannelCount,
-                   session->procFrame->data_,
-                   session->frameCount * session->outChannelCount * sizeof(int16_t));
-            session->framesOut += session->frameCount;
-        }
-        size_t fr = session->framesOut;
-#else
         fr = session->framesOut;
-#endif
         if (framesRq - framesWr < fr) {
             fr = framesRq - framesWr;
         }
@@ -2129,63 +1573,6 @@ int PreProcessingFx_ProcessReverse(effect_handle_t self, audio_buffer_t* inBuffe
 
     if ((session->revProcessedMsk & session->revEnabledMsk) == session->revEnabledMsk) {
         effect->session->revProcessedMsk = 0;
-#ifdef WEBRTC_LEGACY
-        if (session->revResampler != NULL) {
-            size_t fr = session->frameCount - session->framesRev;
-            if (inBuffer->frameCount < fr) {
-                fr = inBuffer->frameCount;
-            }
-            if (session->revBufSize < session->framesRev + fr) {
-                int16_t* buf;
-                session->revBufSize = session->framesRev + fr;
-                buf = (int16_t*)realloc(
-                        session->revBuf,
-                        session->revBufSize * session->inChannelCount * sizeof(int16_t));
-                if (buf == NULL) {
-                    session->framesRev = 0;
-                    free(session->revBuf);
-                    session->revBuf = NULL;
-                    return -ENOMEM;
-                }
-                session->revBuf = buf;
-            }
-            memcpy(session->revBuf + session->framesRev * session->inChannelCount, inBuffer->s16,
-                   fr * session->inChannelCount * sizeof(int16_t));
-
-            session->framesRev += fr;
-            inBuffer->frameCount = fr;
-            if (session->framesRev < session->frameCount) {
-                return 0;
-            }
-            spx_uint32_t frIn = session->framesRev;
-            spx_uint32_t frOut = session->apmFrameCount;
-            if (session->inChannelCount == 1) {
-                speex_resampler_process_int(session->revResampler, 0, session->revBuf, &frIn,
-                                            session->revFrame->data_, &frOut);
-            } else {
-                speex_resampler_process_interleaved_int(session->revResampler, session->revBuf,
-                                                        &frIn, session->revFrame->data_, &frOut);
-            }
-            memmove(session->revBuf, session->revBuf + frIn * session->inChannelCount,
-                    (session->framesRev - frIn) * session->inChannelCount * sizeof(int16_t));
-            session->framesRev -= frIn;
-        } else {
-            size_t fr = session->frameCount - session->framesRev;
-            if (inBuffer->frameCount < fr) {
-                fr = inBuffer->frameCount;
-            }
-            memcpy(session->revFrame->data_ + session->framesRev * session->inChannelCount,
-                   inBuffer->s16, fr * session->inChannelCount * sizeof(int16_t));
-            session->framesRev += fr;
-            inBuffer->frameCount = fr;
-            if (session->framesRev < session->frameCount) {
-                return 0;
-            }
-            session->framesRev = 0;
-        }
-        session->revFrame->samples_per_channel_ = session->apmFrameCount;
-        effect->session->apm->AnalyzeReverseStream(session->revFrame);
-#else
         size_t fr = session->frameCount - session->framesRev;
         if (inBuffer->frameCount < fr) {
             fr = inBuffer->frameCount;
@@ -2205,7 +1592,6 @@ int PreProcessingFx_ProcessReverse(effect_handle_t self, audio_buffer_t* inBuffe
             ALOGE("Process Reverse Stream failed with error %d\n", status);
             return status;
         }
-#endif
         return 0;
     } else {
         return -ENODATA;

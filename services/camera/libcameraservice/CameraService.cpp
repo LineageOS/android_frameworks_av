@@ -21,6 +21,7 @@
 #include <algorithm>
 #include <climits>
 #include <stdio.h>
+#include <cstdlib>
 #include <cstring>
 #include <ctime>
 #include <string>
@@ -1694,6 +1695,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             // Otherwise, add client to active clients list
             finishConnectLocked(client, partial);
         }
+
+        client->setImageDumpMask(mImageDumpMask);
     } // lock is destroyed, allow further connect calls
 
     // Important: release the mutex here so the client can call back into the service from its
@@ -3880,6 +3883,10 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleSetRotateAndCrop(args);
     } else if (args.size() >= 1 && args[0] == String16("get-rotate-and-crop")) {
         return handleGetRotateAndCrop(out);
+    } else if (args.size() >= 2 && args[0] == String16("set-image-dump-mask")) {
+        return handleSetImageDumpMask(args);
+    } else if (args.size() >= 1 && args[0] == String16("get-image-dump-mask")) {
+        return handleGetImageDumpMask(out);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return NO_ERROR;
@@ -3979,6 +3986,30 @@ status_t CameraService::handleGetRotateAndCrop(int out) {
     return dprintf(out, "rotateAndCrop override: %d\n", mOverrideRotateAndCropMode);
 }
 
+status_t CameraService::handleSetImageDumpMask(const Vector<String16>& args) {
+    char *endPtr;
+    errno = 0;
+    String8 maskString8 = String8(args[1]);
+    long maskValue = strtol(maskString8.c_str(), &endPtr, 10);
+
+    if (errno != 0) return BAD_VALUE;
+    if (endPtr != maskString8.c_str() + maskString8.size()) return BAD_VALUE;
+    if (maskValue < 0 || maskValue > 1) return BAD_VALUE;
+
+    Mutex::Autolock lock(mServiceLock);
+
+    mImageDumpMask = maskValue;
+
+    return OK;
+}
+
+status_t CameraService::handleGetImageDumpMask(int out) {
+    Mutex::Autolock lock(mServiceLock);
+
+    return dprintf(out, "Image dump mask: %d\n", mImageDumpMask);
+}
+
+
 status_t CameraService::printHelp(int out) {
     return dprintf(out, "Camera service commands:\n"
         "  get-uid-state <PACKAGE> [--user USER_ID] gets the uid state\n"
@@ -3987,6 +4018,9 @@ status_t CameraService::printHelp(int out) {
         "  set-rotate-and-crop <ROTATION> overrides the rotate-and-crop value for AUTO backcompat\n"
         "      Valid values 0=0 deg, 1=90 deg, 2=180 deg, 3=270 deg, 4=No override\n"
         "  get-rotate-and-crop returns the current override rotate-and-crop value\n"
+        "  set-image-dump-mask <MASK> specifies the formats to be saved to disk\n"
+        "      Valid values 0=OFF, 1=ON for JPEG\n"
+        "  get-image-dump-mask returns the current image-dump-mask value\n"
         "  help print this message\n");
 }
 

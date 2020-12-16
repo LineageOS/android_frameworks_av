@@ -1456,6 +1456,8 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
 
     newStream->setBufferManager(mBufferManager);
 
+    newStream->setImageDumpMask(mImageDumpMask);
+
     res = mOutputStreams.add(mNextStreamId, newStream);
     if (res < 0) {
         SET_ERR_L("Can't add new stream to set: %s (%d)", strerror(-res), res);
