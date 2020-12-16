@@ -15,12 +15,13 @@
  */
 
 #include <media/AudioDeviceTypeAddr.h>
-
 #include <arpa/inet.h>
 #include <iostream>
 #include <regex>
 #include <set>
 #include <sstream>
+
+#include <media/AidlConversion.h>
 
 namespace android {
 

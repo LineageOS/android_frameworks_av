@@ -23,7 +23,7 @@
 #include <binder/Parcelable.h>
 #include <binder/Parcel.h>
 #include <media/AudioContainers.h>
-#include <media/AidlConversion.h>
+#include <media/AidlConversionUtil.h>
 #include <system/audio.h>
 #include <utils/Errors.h>
 
