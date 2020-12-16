@@ -40,8 +40,12 @@ static constexpr int32_t kColorFormatSurface = 0x7f000789;
 // Default key frame interval in seconds.
 static constexpr float kDefaultKeyFrameIntervalSeconds = 1.0f;
 // Default codec operating rate.
-static int32_t kDefaultCodecOperatingRate =
-        base::GetIntProperty("debug.media.transcoding.codec_max_operating_rate", /*default*/ 240);
+static int32_t kDefaultCodecOperatingRate7200P = base::GetIntProperty(
+        "debug.media.transcoding.codec_max_operating_rate_720P", /*default*/ 480);
+static int32_t kDefaultCodecOperatingRate1080P = base::GetIntProperty(
+        "debug.media.transcoding.codec_max_operating_rate_1080P", /*default*/ 240);
+static int32_t kDefaultCodecOperatingRate4K = base::GetIntProperty(
+        "debug.media.transcoding.codec_max_operating_rate_4K", /*default*/ 120);
 // Default codec priority.
 static constexpr int32_t kDefaultCodecPriority = 1;
 // Default bitrate, in case source estimation fails.
@@ -183,6 +187,28 @@ VideoTrackTranscoder::~VideoTrackTranscoder() {
     }
 }
 
+// Search the default operating rate based on resolution.
+static int32_t getDefaultOperatingRate(AMediaFormat* encoderFormat) {
+    int32_t width, height;
+    if (AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_WIDTH, &width) && (width > 0) &&
+        AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_HEIGHT, &height) && (height > 0)) {
+        if ((width == 1280 && height == 720) || (width == 720 && height == 1280)) {
+            return kDefaultCodecOperatingRate1080P;
+        } else if ((width == 1920 && height == 1080) || (width == 1080 && height == 1920)) {
+            return kDefaultCodecOperatingRate1080P;
+        } else if (((width == 3840 && height == 2160) || (width == 2160 && height == 3840))) {
+            return kDefaultCodecOperatingRate4K;
+        } else {
+            LOG(WARNING) << "Could not find default operating rate: " << width << " " << height;
+            // Use 4K as that should be the lowest for the devices.
+            return kDefaultCodecOperatingRate4K;
+        }
+    } else {
+        LOG(ERROR) << "Failed to get default operating rate due to missing resolution";
+    }
+    return -1;
+}
+
 // Creates and configures the codecs.
 media_status_t VideoTrackTranscoder::configureDestinationFormat(
         const std::shared_ptr<AMediaFormat>& destinationFormat) {
@@ -213,8 +239,13 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
 
     SetDefaultFormatValueFloat(AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, encoderFormat,
                                kDefaultKeyFrameIntervalSeconds);
-    SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_OPERATING_RATE, encoderFormat,
-                               kDefaultCodecOperatingRate);
+
+    int32_t operatingRate = getDefaultOperatingRate(encoderFormat);
+
+    if (operatingRate != -1) {
+        SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_OPERATING_RATE, encoderFormat, operatingRate);
+    }
+
     SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_PRIORITY, encoderFormat, kDefaultCodecPriority);
     SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_FRAME_RATE, encoderFormat, kDefaultFrameRate);
     AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_COLOR_FORMAT, kColorFormatSurface);
