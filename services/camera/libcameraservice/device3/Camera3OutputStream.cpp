@@ -18,8 +18,15 @@
 #define ATRACE_TAG ATRACE_TAG_CAMERA
 //#define LOG_NDEBUG 0
 
+#include <ctime>
+#include <fstream>
+
+#include <android-base/unique_fd.h>
+#include <ui/GraphicBuffer.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
+
+#include "api1/client2/JpegProcessor.h"
 #include "Camera3OutputStream.h"
 #include "utils/TraceHFR.h"
 
@@ -278,6 +285,12 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             ALOGE("%s: Stream %d: Error setting timestamp: %s (%d)",
                   __FUNCTION__, mId, strerror(-res), res);
             return res;
+        }
+        // If this is a JPEG output, and image dump mask is set, save image to
+        // disk.
+        if (getFormat() == HAL_PIXEL_FORMAT_BLOB && getDataSpace() == HAL_DATASPACE_V0_JFIF &&
+                mImageDumpMask) {
+            dumpImageToDisk(timestamp, anwBuffer, anwReleaseFence);
         }
 
         res = queueBufferToConsumer(currentConsumer, anwBuffer, anwReleaseFence, surface_ids);
@@ -955,6 +968,49 @@ bool Camera3OutputStream::isConsumedByHWTexture() const {
     }
 
     return (usage & GRALLOC_USAGE_HW_TEXTURE) != 0;
+}
+
+void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
+        ANativeWindowBuffer* anwBuffer, int fence) {
+    // Deriver output file name
+    std::string fileExtension = "jpg";
+    char imageFileName[64];
+    time_t now = time(0);
+    tm *localTime = localtime(&now);
+    snprintf(imageFileName, sizeof(imageFileName), "IMG_%4d%02d%02d_%02d%02d%02d_%" PRId64 ".%s",
+            1900 + localTime->tm_year, localTime->tm_mon, localTime->tm_mday,
+            localTime->tm_hour, localTime->tm_min, localTime->tm_sec,
+            timestamp, fileExtension.c_str());
+
+    // Lock the image for CPU read
+    sp<GraphicBuffer> graphicBuffer = GraphicBuffer::from(anwBuffer);
+    void* mapped = nullptr;
+    base::unique_fd fenceFd(dup(fence));
+    status_t res = graphicBuffer->lockAsync(GraphicBuffer::USAGE_SW_READ_OFTEN, &mapped,
+            fenceFd.get());
+    if (res != OK) {
+        ALOGE("%s: Failed to lock the buffer: %s (%d)", __FUNCTION__, strerror(-res), res);
+        return;
+    }
+
+    // Figure out actual file size
+    auto actualJpegSize = android::camera2::JpegProcessor::findJpegSize((uint8_t*)mapped, mMaxSize);
+    if (actualJpegSize == 0) {
+        actualJpegSize = mMaxSize;
+    }
+
+    // Output image data to file
+    std::string filePath = "/data/misc/cameraserver/";
+    filePath += imageFileName;
+    std::ofstream imageFile(filePath.c_str(), std::ofstream::binary);
+    if (!imageFile.is_open()) {
+        ALOGE("%s: Unable to create file %s", __FUNCTION__, filePath.c_str());
+        graphicBuffer->unlock();
+        return;
+    }
+    imageFile.write((const char*)mapped, actualJpegSize);
+
+    graphicBuffer->unlock();
 }
 
 }; // namespace camera3

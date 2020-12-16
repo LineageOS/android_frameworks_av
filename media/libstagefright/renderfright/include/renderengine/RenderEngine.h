@@ -33,7 +33,7 @@
 /**
  * Allows to set RenderEngine backend to GLES (default) or Vulkan (NOT yet supported).
  */
-#define PROPERTY_DEBUG_RENDERENGINE_BACKEND "debug.renderengine.backend"
+#define PROPERTY_DEBUG_RENDERENGINE_BACKEND "debug.stagefright.renderengine.backend"
 
 struct ANativeWindowBuffer;
 

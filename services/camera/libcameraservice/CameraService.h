@@ -398,6 +398,8 @@ public:
         // Check what API level is used for this client. This is used to determine which
         // superclass this can be cast to.
         virtual bool canCastToApiClient(apiLevel level) const;
+
+        void setImageDumpMask(int /*mask*/) { }
     protected:
         // Initialized in constructor
 
@@ -1036,6 +1038,12 @@ private:
     // Get the rotate-and-crop AUTO override behavior
     status_t handleGetRotateAndCrop(int out);
 
+    // Set the mask for image dump to disk
+    status_t handleSetImageDumpMask(const Vector<String16>& args);
+
+    // Get the mask for image dump to disk
+    status_t handleGetImageDumpMask(int out);
+
     // Prints the shell command help
     status_t printHelp(int out);
 
@@ -1077,6 +1085,9 @@ private:
 
     // Current override rotate-and-crop mode
     uint8_t mOverrideRotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
+
+    // Current image dump mask
+    uint8_t mImageDumpMask = 0;
 };
 
 } // namespace android

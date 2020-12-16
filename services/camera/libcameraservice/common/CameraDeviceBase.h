@@ -367,6 +367,14 @@ class CameraDeviceBase : public virtual FrameProducer {
      * Get the status tracker of the camera device
      */
     virtual wp<camera3::StatusTracker> getStatusTracker() = 0;
+
+    /**
+     * Set bitmask for image dump flag
+     */
+    void setImageDumpMask(int mask) { mImageDumpMask = mask; }
+
+protected:
+    bool mImageDumpMask = 0;
 };
 
 }; // namespace android
