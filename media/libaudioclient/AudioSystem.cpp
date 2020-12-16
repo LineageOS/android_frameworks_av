@@ -1792,20 +1792,22 @@ int AudioSystem::AudioPolicyServiceClient::removeAudioPortCallback(
 }
 
 
-void AudioSystem::AudioPolicyServiceClient::onAudioPortListUpdate()
+Status AudioSystem::AudioPolicyServiceClient::onAudioPortListUpdate()
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mAudioPortCallbacks.size(); i++) {
         mAudioPortCallbacks[i]->onAudioPortListUpdate();
     }
+    return Status::ok();
 }
 
-void AudioSystem::AudioPolicyServiceClient::onAudioPatchListUpdate()
+Status AudioSystem::AudioPolicyServiceClient::onAudioPatchListUpdate()
 {
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mAudioPortCallbacks.size(); i++) {
         mAudioPortCallbacks[i]->onAudioPatchListUpdate();
     }
+    return Status::ok();
 }
 
 // ----------------------------------------------------------------------------
@@ -1839,20 +1841,26 @@ int AudioSystem::AudioPolicyServiceClient::removeAudioVolumeGroupCallback(
     return mAudioVolumeGroupCallback.size();
 }
 
-void AudioSystem::AudioPolicyServiceClient::onAudioVolumeGroupChanged(volume_group_t group,
-                                                                      int flags)
-{
+Status AudioSystem::AudioPolicyServiceClient::onAudioVolumeGroupChanged(int32_t group,
+                                                                        int32_t flags) {
+    volume_group_t groupLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_volume_group_t(group));
+    int flagsLegacy = VALUE_OR_RETURN_BINDER_STATUS(convertReinterpret<int>(flags));
+
     Mutex::Autolock _l(mLock);
     for (size_t i = 0; i < mAudioVolumeGroupCallback.size(); i++) {
-        mAudioVolumeGroupCallback[i]->onAudioVolumeGroupChanged(group, flags);
+        mAudioVolumeGroupCallback[i]->onAudioVolumeGroupChanged(groupLegacy, flagsLegacy);
     }
+    return Status::ok();
 }
 // ----------------------------------------------------------------------------
 
-void AudioSystem::AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(
-        String8 regId, int32_t state)
-{
-    ALOGV("AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(%s, %d)", regId.string(), state);
+Status AudioSystem::AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(
+        const ::std::string& regId, int32_t state) {
+    ALOGV("AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(%s, %d)", regId.c_str(), state);
+
+    String8 regIdLegacy = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_string_view_String8(regId));
+    int stateLegacy = VALUE_OR_RETURN_BINDER_STATUS(convertReinterpret<int>(state));
     dynamic_policy_callback cb = NULL;
     {
         Mutex::Autolock _l(AudioSystem::gLock);
@@ -1860,19 +1868,20 @@ void AudioSystem::AudioPolicyServiceClient::onDynamicPolicyMixStateUpdate(
     }
 
     if (cb != NULL) {
-        cb(DYNAMIC_POLICY_EVENT_MIX_STATE_UPDATE, regId, state);
+        cb(DYNAMIC_POLICY_EVENT_MIX_STATE_UPDATE, regIdLegacy, stateLegacy);
     }
+    return Status::ok();
 }
 
-void AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
-                                                int event,
-                                                const record_client_info_t *clientInfo,
-                                                const audio_config_base_t *clientConfig,
-                                                std::vector<effect_descriptor_t> clientEffects,
-                                                const audio_config_base_t *deviceConfig,
-                                                std::vector<effect_descriptor_t> effects,
-                                                audio_patch_handle_t patchHandle,
-                                                audio_source_t source) {
+Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
+        int32_t event,
+        const media::RecordClientInfo& clientInfo,
+        const media::AudioConfigBase& clientConfig,
+        const std::vector<media::EffectDescriptor>& clientEffects,
+        const media::AudioConfigBase& deviceConfig,
+        const std::vector<media::EffectDescriptor>& effects,
+        int32_t patchHandle,
+        media::AudioSourceType source) {
     record_config_callback cb = NULL;
     {
         Mutex::Autolock _l(AudioSystem::gLock);
@@ -1880,9 +1889,29 @@ void AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
     }
 
     if (cb != NULL) {
-        cb(event, clientInfo, clientConfig, clientEffects,
-           deviceConfig, effects, patchHandle, source);
+        int eventLegacy = VALUE_OR_RETURN_BINDER_STATUS(convertReinterpret<int>(event));
+        record_client_info_t clientInfoLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                aidl2legacy_RecordClientInfo_record_client_info_t(clientInfo));
+        audio_config_base_t clientConfigLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                aidl2legacy_AudioConfigBase_audio_config_base_t(clientConfig));
+        std::vector<effect_descriptor_t> clientEffectsLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                convertContainer<std::vector<effect_descriptor_t>>(
+                        clientEffects,
+                        aidl2legacy_EffectDescriptor_effect_descriptor_t));
+        audio_config_base_t deviceConfigLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                aidl2legacy_AudioConfigBase_audio_config_base_t(deviceConfig));
+        std::vector<effect_descriptor_t> effectsLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                convertContainer<std::vector<effect_descriptor_t>>(
+                        effects,
+                        aidl2legacy_EffectDescriptor_effect_descriptor_t));
+        audio_patch_handle_t patchHandleLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                aidl2legacy_int32_t_audio_patch_handle_t(patchHandle));
+        audio_source_t sourceLegacy = VALUE_OR_RETURN_BINDER_STATUS(
+                aidl2legacy_AudioSourceType_audio_source_t(source));
+        cb(eventLegacy, &clientInfoLegacy, &clientConfigLegacy, clientEffectsLegacy,
+           &deviceConfigLegacy, effectsLegacy, patchHandleLegacy, sourceLegacy);
     }
+    return Status::ok();
 }
 
 void AudioSystem::AudioPolicyServiceClient::binderDied(const wp<IBinder>& who __unused)
@@ -1902,6 +1931,30 @@ void AudioSystem::AudioPolicyServiceClient::binderDied(const wp<IBinder>& who __
     }
 
     ALOGW("AudioPolicyService server died!");
+}
+
+ConversionResult<record_client_info_t>
+aidl2legacy_RecordClientInfo_record_client_info_t(const media::RecordClientInfo& aidl) {
+    record_client_info_t legacy;
+    legacy.riid = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_unique_id_t(aidl.riid));
+    legacy.uid = VALUE_OR_RETURN(aidl2legacy_int32_t_uid_t(aidl.uid));
+    legacy.session = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_session_t(aidl.session));
+    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSourceType_audio_source_t(aidl.source));
+    legacy.port_id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
+    legacy.silenced = aidl.silenced;
+    return legacy;
+}
+
+ConversionResult<media::RecordClientInfo>
+legacy2aidl_record_client_info_t_RecordClientInfo(const record_client_info_t& legacy) {
+    media::RecordClientInfo aidl;
+    aidl.riid = VALUE_OR_RETURN(legacy2aidl_audio_unique_id_t_int32_t(legacy.riid));
+    aidl.uid = VALUE_OR_RETURN(legacy2aidl_uid_t_int32_t(legacy.uid));
+    aidl.session = VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(legacy.session));
+    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSourceType(legacy.source));
+    aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.port_id));
+    aidl.silenced = legacy.silenced;
+    return aidl;
 }
 
 } // namespace android
