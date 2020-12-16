@@ -235,6 +235,33 @@ media_status_t MediaSampleReaderNDK::selectTrack(int trackIndex) {
     return AMEDIA_OK;
 }
 
+media_status_t MediaSampleReaderNDK::unselectTrack(int trackIndex) {
+    std::scoped_lock lock(mExtractorMutex);
+
+    if (trackIndex < 0 || trackIndex >= mTrackCount) {
+        LOG(ERROR) << "Invalid trackIndex " << trackIndex << " for trackCount " << mTrackCount;
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    } else if (mExtractorTrackIndex >= 0) {
+        LOG(ERROR) << "unselectTrack must be called before sample reading begins.";
+        return AMEDIA_ERROR_UNSUPPORTED;
+    }
+
+    auto it = mTrackSignals.find(trackIndex);
+    if (it == mTrackSignals.end()) {
+        LOG(ERROR) << "TrackIndex " << trackIndex << " is not selected";
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
+    mTrackSignals.erase(it);
+
+    media_status_t status = AMediaExtractor_unselectTrack(mExtractor, trackIndex);
+    if (status != AMEDIA_OK) {
+        LOG(ERROR) << "AMediaExtractor_selectTrack returned error: " << status;
+        return status;
+    }
+
+    return AMEDIA_OK;
+}
+
 media_status_t MediaSampleReaderNDK::setEnforceSequentialAccess(bool enforce) {
     LOG(DEBUG) << "setEnforceSequentialAccess( " << enforce << " )";
 
