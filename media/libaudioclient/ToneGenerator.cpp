@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ToneGenerator"
 
+#include <utility>
+
 #include <math.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -979,7 +981,9 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
 //        none
 //
 ////////////////////////////////////////////////////////////////////////////////
-ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava) {
+ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava,
+        std::string opPackageName)
+        : mOpPackageName(std::move(opPackageName)) {
 
     ALOGV("ToneGenerator constructor: streamType=%d, volume=%f", streamType, volume);
 
@@ -1250,7 +1254,7 @@ void ToneGenerator::stopTone() {
 ////////////////////////////////////////////////////////////////////////////////
 bool ToneGenerator::initAudioTrack() {
     // Open audio track in mono, PCM 16bit, default sampling rate.
-    mpAudioTrack = new AudioTrack();
+    mpAudioTrack = new AudioTrack(mOpPackageName);
     ALOGV("AudioTrack(%p) created", mpAudioTrack.get());
 
     audio_attributes_t attr;
