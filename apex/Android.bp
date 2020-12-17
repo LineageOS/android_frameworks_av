@@ -100,7 +100,6 @@ apex_defaults {
         "crash_dump.policy",
         "mediaswcodec.xml",
     ],
-    use_vendor: true,
     key: "com.android.media.swcodec.key",
     certificate: ":com.android.media.swcodec.certificate",
 
