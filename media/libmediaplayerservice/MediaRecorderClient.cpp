@@ -127,7 +127,8 @@ status_t MediaRecorderClient::setAudioSource(int as)
     pid_t pid = IPCThreadState::self()->getCallingPid();
     uid_t uid = IPCThreadState::self()->getCallingUid();
 
-    if ((as == AUDIO_SOURCE_FM_TUNER && !captureAudioOutputAllowed(pid, uid))
+    if ((as == AUDIO_SOURCE_FM_TUNER
+            && !(captureAudioOutputAllowed(pid, uid) || captureTunerAudioInputAllowed(pid, uid)))
             || !recordingAllowed(String16(""), pid, uid)) {
         return PERMISSION_DENIED;
     }
