@@ -210,7 +210,7 @@ public:
                                       unsigned int *generation);
     virtual status_t setAudioPortConfig(const struct audio_port_config *config);
 
-    virtual void registerClient(const sp<IAudioPolicyServiceClient>& client);
+    virtual void registerClient(const sp<media::IAudioPolicyServiceClient>& client);
 
     virtual void setAudioPortCallbacksEnabled(bool enabled);
 
@@ -775,7 +775,7 @@ private:
     class NotificationClient : public IBinder::DeathRecipient {
     public:
                             NotificationClient(const sp<AudioPolicyService>& service,
-                                                const sp<IAudioPolicyServiceClient>& client,
+                                                const sp<media::IAudioPolicyServiceClient>& client,
                                                 uid_t uid, pid_t pid);
         virtual             ~NotificationClient();
 
@@ -807,12 +807,12 @@ private:
                             NotificationClient(const NotificationClient&);
                             NotificationClient& operator = (const NotificationClient&);
 
-        const wp<AudioPolicyService>        mService;
-        const uid_t                         mUid;
-        const pid_t                         mPid;
-        const sp<IAudioPolicyServiceClient> mAudioPolicyServiceClient;
-              bool                          mAudioPortCallbacksEnabled;
-              bool                          mAudioVolumeGroupCallbacksEnabled;
+        const wp<AudioPolicyService>               mService;
+        const uid_t                                mUid;
+        const pid_t                                mPid;
+        const sp<media::IAudioPolicyServiceClient> mAudioPolicyServiceClient;
+              bool                                 mAudioPortCallbacksEnabled;
+              bool                                 mAudioVolumeGroupCallbacksEnabled;
     };
 
     class AudioClient : public virtual RefBase {
