@@ -225,6 +225,8 @@ enum {
     kKeyExifSize         = 'exsz', // int64_t, Exif data size
     kKeyExifTiffOffset   = 'thdr', // int32_t, if > 0, buffer contains exif data block with
                                    // tiff hdr at specified offset
+    kKeyXmpOffset        = 'xmof', // int64_t, XMP data offset
+    kKeyXmpSize          = 'xmsz', // int64_t, XMP data size
     kKeyPcmBigEndian     = 'pcmb', // bool (int32_t)
 
     // Key for ALAC Magic Cookie
