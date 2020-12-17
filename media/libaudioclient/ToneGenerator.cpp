@@ -17,6 +17,8 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "ToneGenerator"
 
+#include <utility>
+
 #include <math.h>
 #include <utils/Log.h>
 #include <cutils/properties.h>
@@ -740,6 +742,11 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_JAPAN_RADIO_ACK
+        { .segments = { { .duration = 1000, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 2000, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_JAPAN_RINGTONE
         { .segments = { { .duration = 375, .waveFreq = { 400, 0 }, 0, 0 },
                         { .duration = 375, .waveFreq = { 0 }, 0, 0 },
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
@@ -881,7 +888,7 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
             TONE_SUP_CALL_WAITING,       // TONE_SUP_CALL_WAITING
-            TONE_SUP_RINGTONE            // TONE_SUP_RINGTONE
+            TONE_JAPAN_RINGTONE          // TONE_SUP_RINGTONE
         },
         {   // GB
             TONE_ANSI_DIAL,              // TONE_SUP_DIAL
@@ -979,7 +986,9 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
 //        none
 //
 ////////////////////////////////////////////////////////////////////////////////
-ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava) {
+ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava,
+        std::string opPackageName)
+        : mOpPackageName(std::move(opPackageName)) {
 
     ALOGV("ToneGenerator constructor: streamType=%d, volume=%f", streamType, volume);
 
@@ -1250,7 +1259,7 @@ void ToneGenerator::stopTone() {
 ////////////////////////////////////////////////////////////////////////////////
 bool ToneGenerator::initAudioTrack() {
     // Open audio track in mono, PCM 16bit, default sampling rate.
-    mpAudioTrack = new AudioTrack();
+    mpAudioTrack = new AudioTrack(mOpPackageName);
     ALOGV("AudioTrack(%p) created", mpAudioTrack.get());
 
     audio_attributes_t attr;

@@ -89,6 +89,9 @@ apex_defaults {
     binaries: [
         "mediaswcodec",
     ],
+    native_shared_libs: [
+        "libstagefright_foundation",
+    ],
     prebuilts: [
         "com.android.media.swcodec-mediaswcodec.rc",
         "com.android.media.swcodec-ld.config.txt",
@@ -97,7 +100,6 @@ apex_defaults {
         "crash_dump.policy",
         "mediaswcodec.xml",
     ],
-    use_vendor: true,
     key: "com.android.media.swcodec.key",
     certificate: ":com.android.media.swcodec.certificate",
 

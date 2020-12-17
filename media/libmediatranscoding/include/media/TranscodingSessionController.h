@@ -26,6 +26,7 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
+#include <chrono>
 #include <list>
 #include <map>
 #include <mutex>
@@ -82,16 +83,33 @@ private:
     using SessionQueueType = std::list<SessionKeyType>;
 
     struct Session {
-        SessionKeyType key;
-        uid_t uid;
         enum State {
-            NOT_STARTED,
+            INVALID = -1,
+            NOT_STARTED = 0,
             RUNNING,
             PAUSED,
-        } state;
+            FINISHED,
+            CANCELED,
+            ERROR,
+        };
+        SessionKeyType key;
+        uid_t uid;
         int32_t lastProgress;
+        int32_t pauseCount;
+        std::chrono::time_point<std::chrono::system_clock> stateEnterTime;
+        std::chrono::microseconds waitingTime;
+        std::chrono::microseconds runningTime;
+        std::chrono::microseconds pausedTime;
+
         TranscodingRequest request;
         std::weak_ptr<ITranscodingClientCallback> callback;
+
+        // Must use setState to change state.
+        void setState(Session::State state);
+        State getState() const { return state; }
+
+    private:
+        State state = INVALID;
     };
 
     // TODO(chz): call transcoder without global lock.
@@ -115,15 +133,17 @@ private:
 
     Session* mCurrentSession;
     bool mResourceLost;
+    std::list<Session> mSessionHistory;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
     TranscodingSessionController(const std::shared_ptr<TranscoderInterface>& transcoder,
                                  const std::shared_ptr<UidPolicyInterface>& uidPolicy,
                                  const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy);
 
+    void dumpSession_l(const Session& session, String8& result, bool closedSession = false);
     Session* getTopSession_l();
     void updateCurrentSession_l();
-    void removeSession_l(const SessionKeyType& sessionKey);
+    void removeSession_l(const SessionKeyType& sessionKey, Session::State finalState);
     void moveUidsToTop_l(const std::unordered_set<uid_t>& uids, bool preserveTopUid);
     void notifyClient(ClientIdType clientId, SessionIdType sessionId, const char* reason,
                       std::function<void(const SessionKeyType&)> func);

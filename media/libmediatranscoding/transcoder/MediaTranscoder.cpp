@@ -275,12 +275,6 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    media_status_t status = mSampleReader->selectTrack(trackIndex);
-    if (status != AMEDIA_OK) {
-        LOG(ERROR) << "Unable to select track " << trackIndex;
-        return status;
-    }
-
     std::shared_ptr<MediaTrackTranscoder> transcoder;
     std::shared_ptr<AMediaFormat> format;
 
@@ -322,10 +316,17 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         format = std::shared_ptr<AMediaFormat>(mergedFormat, &AMediaFormat_delete);
     }
 
+    media_status_t status = mSampleReader->selectTrack(trackIndex);
+    if (status != AMEDIA_OK) {
+        LOG(ERROR) << "Unable to select track " << trackIndex;
+        return status;
+    }
+
     status = transcoder->configure(mSampleReader, trackIndex, format);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Configure track transcoder for track #" << trackIndex << " returned error "
                    << status;
+        mSampleReader->unselectTrack(trackIndex);
         return status;
     }
 

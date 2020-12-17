@@ -48,6 +48,7 @@ public:
     size_t getTrackCount() const override;
     AMediaFormat* getTrackFormat(int trackIndex) override;
     media_status_t selectTrack(int trackIndex) override;
+    media_status_t unselectTrack(int trackIndex) override;
     media_status_t setEnforceSequentialAccess(bool enforce) override;
     media_status_t getEstimatedBitrateForTrack(int trackIndex, int32_t* bitrate) override;
     media_status_t getSampleInfoForTrack(int trackIndex, MediaSampleInfo* info) override;
