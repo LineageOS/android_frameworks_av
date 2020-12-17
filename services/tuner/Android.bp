@@ -40,6 +40,21 @@ aidl_interface {
     srcs: [
         ":tv_tuner_aidl",
     ],
+    imports: [
+        "android.hardware.common.fmq",
+    ],
+
+    backend: {
+        java: {
+            enabled: false,
+        },
+        cpp: {
+            enabled: false,
+        },
+        ndk: {
+            enabled: true,
+        },
+    },
 }
 
 cc_library {
@@ -52,8 +67,10 @@ cc_library {
 
     shared_libs: [
         "android.hardware.tv.tuner@1.0",
-        "libbinder",
+        "libbase",
         "libbinder_ndk",
+        "libcutils",
+        "libfmq",
         "libhidlbase",
         "liblog",
         "libmedia",
@@ -61,7 +78,13 @@ cc_library {
         "tv_tuner_aidl_interface-ndk_platform",
     ],
 
-    include_dirs: ["frameworks/av/include"],
+    static_libs: [
+        "android.hardware.common.fmq-unstable-ndk_platform",
+    ],
+
+    include_dirs: [
+      "frameworks/av/include"
+    ],
 
     cflags: [
         "-Werror",
@@ -83,6 +106,7 @@ cc_binary {
         "android.hardware.tv.tuner@1.0",
         "libbase",
         "libbinder",
+        "libfmq",
         "liblog",
         "libtunerservice",
         "libutils",
