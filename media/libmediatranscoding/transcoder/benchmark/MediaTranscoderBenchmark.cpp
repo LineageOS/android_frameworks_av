@@ -113,7 +113,6 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     std::string srcPath = kAssetDirectory + srcFileName;
     std::string dstPath = kAssetDirectory + dstFileName;
 
-    auto callbacks = std::make_shared<TranscoderCallbacks>();
     media_status_t status = AMEDIA_OK;
 
     if ((srcFd = open(srcPath.c_str(), O_RDONLY)) < 0) {
@@ -126,6 +125,7 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     }
 
     for (auto _ : state) {
+        auto callbacks = std::make_shared<TranscoderCallbacks>();
         auto transcoder = MediaTranscoder::create(callbacks);
 
         status = transcoder->configureSource(srcFd);
