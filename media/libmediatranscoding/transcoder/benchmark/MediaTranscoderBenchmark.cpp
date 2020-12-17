@@ -154,8 +154,8 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
             if (strncmp(mime, "video/", 6) == 0) {
                 int32_t frameCount;
                 if (AMediaFormat_getInt32(srcFormat, AMEDIAFORMAT_KEY_FRAME_COUNT, &frameCount)) {
-                    state.counters[PARAM_VIDEO_FRAME_RATE] =
-                            benchmark::Counter(frameCount, benchmark::Counter::kIsRate);
+                    state.counters[PARAM_VIDEO_FRAME_RATE] = benchmark::Counter(
+                            frameCount, benchmark::Counter::kIsIterationInvariantRate);
                 }
             }
 
