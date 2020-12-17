@@ -69,6 +69,13 @@ public:
     virtual media_status_t selectTrack(int trackIndex) = 0;
 
     /**
+     * Undo a track selection.
+     * @param trackIndex The track to un-select.
+     * @return AMEDIA_OK on success.
+     */
+    virtual media_status_t unselectTrack(int trackIndex) = 0;
+
+    /**
      * Toggles sequential access enforcement on or off. When the reader enforces sequential access
      * calls to read sample information will block unless the underlying extractor points to the
      * specified track.

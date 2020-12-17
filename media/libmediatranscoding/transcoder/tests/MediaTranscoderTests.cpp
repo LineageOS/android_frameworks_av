@@ -283,20 +283,22 @@ public:
         }
 
         EXPECT_NE(videoFormat, nullptr);
+        if (videoFormat != nullptr) {
+            LOG(INFO) << "source video format: " << AMediaFormat_toString(mSourceVideoFormat.get());
+            LOG(INFO) << "transcoded video format: " << AMediaFormat_toString(videoFormat.get());
 
-        LOG(INFO) << "source video format: " << AMediaFormat_toString(mSourceVideoFormat.get());
-        LOG(INFO) << "transcoded video format: " << AMediaFormat_toString(videoFormat.get());
+            for (int i = 0; i < (sizeof(kFieldsToPreserve) / sizeof(kFieldsToPreserve[0])); ++i) {
+                EXPECT_TRUE(kFieldsToPreserve[i].equal(kFieldsToPreserve[i].key,
+                                                       mSourceVideoFormat.get(), videoFormat.get()))
+                        << "Failed at key " << kFieldsToPreserve[i].key;
+            }
 
-        for (int i = 0; i < (sizeof(kFieldsToPreserve) / sizeof(kFieldsToPreserve[0])); ++i) {
-            EXPECT_TRUE(kFieldsToPreserve[i].equal(kFieldsToPreserve[i].key,
-                                                   mSourceVideoFormat.get(), videoFormat.get()))
-                    << "Failed at key " << kFieldsToPreserve[i].key;
-        }
-
-        if (extraVerifiers != nullptr) {
-            for (int i = 0; i < extraVerifiers->size(); ++i) {
-                const FormatVerifierEntry& entry = (*extraVerifiers)[i];
-                EXPECT_TRUE(entry.equal(entry.key, mSourceVideoFormat.get(), videoFormat.get()));
+            if (extraVerifiers != nullptr) {
+                for (int i = 0; i < extraVerifiers->size(); ++i) {
+                    const FormatVerifierEntry& entry = (*extraVerifiers)[i];
+                    EXPECT_TRUE(
+                            entry.equal(entry.key, mSourceVideoFormat.get(), videoFormat.get()));
+                }
             }
         }
 

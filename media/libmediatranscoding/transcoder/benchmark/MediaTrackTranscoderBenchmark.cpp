@@ -167,6 +167,10 @@ public:
         return AMEDIA_OK;
     }
 
+    media_status_t unselectTrack(int trackIndex __unused) override {
+        return AMEDIA_ERROR_UNSUPPORTED;
+    }
+
     media_status_t setEnforceSequentialAccess(bool enforce __unused) override { return AMEDIA_OK; }
 
     media_status_t getEstimatedBitrateForTrack(int trackIndex __unused,

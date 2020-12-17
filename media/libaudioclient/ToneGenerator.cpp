@@ -740,6 +740,11 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                              // TONE_JAPAN_RADIO_ACK
+        { .segments = { { .duration = 1000, .waveFreq = { 400, 0 }, 0, 0 },
+                        { .duration = 2000, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                              // TONE_JAPAN_RINGTONE
         { .segments = { { .duration = 375, .waveFreq = { 400, 0 }, 0, 0 },
                         { .duration = 375, .waveFreq = { 0 }, 0, 0 },
                         { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
@@ -881,7 +886,7 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
             TONE_SUP_CALL_WAITING,       // TONE_SUP_CALL_WAITING
-            TONE_SUP_RINGTONE            // TONE_SUP_RINGTONE
+            TONE_JAPAN_RINGTONE          // TONE_SUP_RINGTONE
         },
         {   // GB
             TONE_ANSI_DIAL,              // TONE_SUP_DIAL
