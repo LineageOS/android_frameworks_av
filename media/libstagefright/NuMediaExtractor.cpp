@@ -50,8 +50,9 @@ NuMediaExtractor::Sample::Sample(MediaBufferBase *buffer, int64_t timeUs)
       mSampleTimeUs(timeUs) {
 }
 
-NuMediaExtractor::NuMediaExtractor()
-    : mTotalBitrate(-1LL),
+NuMediaExtractor::NuMediaExtractor(EntryPoint entryPoint)
+    : mEntryPoint(entryPoint),
+      mTotalBitrate(-1LL),
       mDurationUs(-1LL) {
 }
 
@@ -93,6 +94,7 @@ status_t NuMediaExtractor::setDataSource(
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
     }
+    setEntryPointToRemoteMediaExtractor();
 
     status_t err = OK;
     if (!mCasToken.empty()) {
@@ -134,6 +136,7 @@ status_t NuMediaExtractor::setDataSource(int fd, off64_t offset, off64_t size) {
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
     }
+    setEntryPointToRemoteMediaExtractor();
 
     if (!mCasToken.empty()) {
         err = mImpl->setMediaCas(mCasToken);
@@ -168,6 +171,7 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
     if (mImpl == NULL) {
         return ERROR_UNSUPPORTED;
     }
+    setEntryPointToRemoteMediaExtractor();
 
     if (!mCasToken.empty()) {
         err = mImpl->setMediaCas(mCasToken);
@@ -465,6 +469,16 @@ void NuMediaExtractor::releaseTrackSamples(TrackInfo *info) {
 void NuMediaExtractor::releaseAllTrackSamples() {
     for (size_t i = 0; i < mSelectedTracks.size(); ++i) {
         releaseTrackSamples(&mSelectedTracks.editItemAt(i));
+    }
+}
+
+void NuMediaExtractor::setEntryPointToRemoteMediaExtractor() {
+    if (mImpl == NULL) {
+        return;
+    }
+    status_t err = mImpl->setEntryPoint(mEntryPoint);
+    if (err != OK) {
+        ALOGW("Failed to set entry point with error %d.", err);
     }
 }
 
