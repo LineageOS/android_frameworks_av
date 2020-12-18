@@ -810,7 +810,7 @@ public:
         return status;
     }
 
-    virtual void registerClient(const sp<IAudioPolicyServiceClient>& client)
+    virtual void registerClient(const sp<media::IAudioPolicyServiceClient>& client)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
@@ -2304,8 +2304,8 @@ status_t BnAudioPolicyService::onTransact(
 
         case REGISTER_CLIENT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
-            sp<IAudioPolicyServiceClient> client = interface_cast<IAudioPolicyServiceClient>(
-                    data.readStrongBinder());
+            sp<media::IAudioPolicyServiceClient> client =
+                    interface_cast<media::IAudioPolicyServiceClient>(data.readStrongBinder());
             registerClient(client);
             return NO_ERROR;
         } break;

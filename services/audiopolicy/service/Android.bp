@@ -31,6 +31,7 @@ cc_library_shared {
         "libutils",
         "audioclient-types-aidl-unstable-cpp",
         "audioflinger-aidl-unstable-cpp",
+        "audiopolicy-aidl-unstable-cpp",
         "capture_state_listener-aidl-cpp",
     ],
 

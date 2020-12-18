@@ -16,6 +16,9 @@
 
 package android.media.tv.tuner;
 
+import android.hardware.common.fmq.MQDescriptor;
+import android.hardware.common.fmq.SynchronizedReadWrite;
+import android.hardware.common.fmq.UnsynchronizedWrite;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.TunerServiceFrontendInfo;
 
@@ -24,6 +27,7 @@ import android.media.tv.tuner.TunerServiceFrontendInfo;
  *
  * {@hide}
  */
+//@VintfStability
 interface ITunerService {
 
     /**
@@ -48,4 +52,11 @@ interface ITunerService {
      * @return the aidl interface of the frontend.
      */
     ITunerFrontend openFrontend(in int frontendHandle);
+
+    /*
+     * Gets synchronized fast message queue.
+     *
+     * @return true if succeeds, false otherwise.
+     */
+    boolean getFmqSyncReadWrite(out MQDescriptor<byte, SynchronizedReadWrite> mqDesc);
 }

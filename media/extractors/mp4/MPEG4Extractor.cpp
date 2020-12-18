@@ -681,6 +681,19 @@ status_t MPEG4Extractor::readMetaData() {
             AMediaFormat_setInt64(mFileMetaData,
                     AMEDIAFORMAT_KEY_EXIF_SIZE, (int64_t)exifSize);
         }
+        off64_t xmpOffset;
+        size_t xmpSize;
+        if (mItemTable->getXmpOffsetAndSize(&xmpOffset, &xmpSize) == OK) {
+            // TODO(chz): b/175717339
+            // Use a hard-coded string here instead of named keys. The keys are available
+            // only on API 31+. The mp4 extractor is part of mainline and has min_sdk_version
+            // of 29. This hard-coded string can be replaced with the named constant once
+            // the mp4 extractor is built against API 31+.
+            AMediaFormat_setInt64(mFileMetaData,
+                    "xmp-offset" /*AMEDIAFORMAT_KEY_XMP_OFFSET*/, (int64_t)xmpOffset);
+            AMediaFormat_setInt64(mFileMetaData,
+                    "xmp-size" /*AMEDIAFORMAT_KEY_XMP_SIZE*/, (int64_t)xmpSize);
+        }
         for (uint32_t imageIndex = 0;
                 imageIndex < mItemTable->countImages(); imageIndex++) {
             AMediaFormat *meta = mItemTable->getImageMeta(imageIndex);

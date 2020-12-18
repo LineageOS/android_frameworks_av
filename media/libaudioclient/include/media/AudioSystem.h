@@ -20,12 +20,13 @@
 #include <sys/types.h>
 
 #include <android/media/BnAudioFlingerClient.h>
+#include <android/media/BnAudioPolicyServiceClient.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
-#include <media/IAudioPolicyServiceClient.h>
 #include <media/MicrophoneInfo.h>
 #include <set>
 #include <system/audio.h>
@@ -36,6 +37,23 @@
 #include <vector>
 
 namespace android {
+
+struct record_client_info {
+    audio_unique_id_t riid;
+    uid_t uid;
+    audio_session_t session;
+    audio_source_t source;
+    audio_port_handle_t port_id;
+    bool silenced;
+};
+
+typedef struct record_client_info record_client_info_t;
+
+// AIDL conversion functions.
+ConversionResult<record_client_info_t>
+aidl2legacy_RecordClientInfo_record_client_info_t(const media::RecordClientInfo& aidl);
+ConversionResult<media::RecordClientInfo>
+legacy2aidl_record_client_info_t_RecordClientInfo(const record_client_info_t& legacy);
 
 typedef void (*audio_error_callback)(status_t err);
 typedef void (*dynamic_policy_callback)(int event, String8 regId, int val);
@@ -580,7 +598,7 @@ private:
     };
 
     class AudioPolicyServiceClient: public IBinder::DeathRecipient,
-                                    public BnAudioPolicyServiceClient
+                                    public media::BnAudioPolicyServiceClient
     {
     public:
         AudioPolicyServiceClient() {
@@ -598,18 +616,20 @@ private:
         virtual void binderDied(const wp<IBinder>& who);
 
         // IAudioPolicyServiceClient
-        virtual void onAudioPortListUpdate();
-        virtual void onAudioPatchListUpdate();
-        virtual void onAudioVolumeGroupChanged(volume_group_t group, int flags);
-        virtual void onDynamicPolicyMixStateUpdate(String8 regId, int32_t state);
-        virtual void onRecordingConfigurationUpdate(int event,
-                                                    const record_client_info_t *clientInfo,
-                                                    const audio_config_base_t *clientConfig,
-                                                    std::vector<effect_descriptor_t> clientEffects,
-                                                    const audio_config_base_t *deviceConfig,
-                                                    std::vector<effect_descriptor_t> effects,
-                                                    audio_patch_handle_t patchHandle,
-                                                    audio_source_t source);
+        binder::Status onAudioVolumeGroupChanged(int32_t group, int32_t flags) override;
+        binder::Status onAudioPortListUpdate() override;
+        binder::Status onAudioPatchListUpdate() override;
+        binder::Status onDynamicPolicyMixStateUpdate(const std::string& regId,
+                                                     int32_t state) override;
+        binder::Status onRecordingConfigurationUpdate(
+                int32_t event,
+                const media::RecordClientInfo& clientInfo,
+                const media::AudioConfigBase& clientConfig,
+                const std::vector<media::EffectDescriptor>& clientEffects,
+                const media::AudioConfigBase& deviceConfig,
+                const std::vector<media::EffectDescriptor>& effects,
+                int32_t patchHandle,
+                media::AudioSourceType source) override;
 
     private:
         Mutex                               mLock;

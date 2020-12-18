@@ -35,6 +35,7 @@
 #include <utils/threads.h>
 #include "AudioPolicyService.h"
 #include <hardware_legacy/power.h>
+#include <media/AidlConversion.h>
 #include <media/AudioEffect.h>
 #include <media/AudioParameter.h>
 #include <mediautils/ServiceUtilities.h>
@@ -111,7 +112,7 @@ AudioPolicyService::~AudioPolicyService()
 
 // A notification client is always registered by AudioSystem when the client process
 // connects to AudioPolicyService.
-void AudioPolicyService::registerClient(const sp<IAudioPolicyServiceClient>& client)
+void AudioPolicyService::registerClient(const sp<media::IAudioPolicyServiceClient>& client)
 {
     if (client == 0) {
         ALOGW("%s got NULL client", __FUNCTION__);
@@ -293,10 +294,11 @@ status_t AudioPolicyService::clientSetAudioPortConfig(const struct audio_port_co
     return mAudioCommandThread->setAudioPortConfigCommand(config, delayMs);
 }
 
-AudioPolicyService::NotificationClient::NotificationClient(const sp<AudioPolicyService>& service,
-                                                     const sp<IAudioPolicyServiceClient>& client,
-                                                     uid_t uid,
-                                                     pid_t pid)
+AudioPolicyService::NotificationClient::NotificationClient(
+        const sp<AudioPolicyService>& service,
+        const sp<media::IAudioPolicyServiceClient>& client,
+        uid_t uid,
+        pid_t pid)
     : mService(service), mUid(uid), mPid(pid), mAudioPolicyServiceClient(client),
       mAudioPortCallbacksEnabled(false), mAudioVolumeGroupCallbacksEnabled(false)
 {
@@ -342,7 +344,8 @@ void AudioPolicyService::NotificationClient::onDynamicPolicyMixStateUpdate(
         const String8& regId, int32_t state)
 {
     if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
-        mAudioPolicyServiceClient->onDynamicPolicyMixStateUpdate(regId, state);
+        mAudioPolicyServiceClient->onDynamicPolicyMixStateUpdate(
+                legacy2aidl_String8_string(regId).value(), state);
     }
 }
 
@@ -357,8 +360,37 @@ void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
                                             audio_source_t source)
 {
     if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
-        mAudioPolicyServiceClient->onRecordingConfigurationUpdate(event, clientInfo,
-                clientConfig, clientEffects, deviceConfig, effects, patchHandle, source);
+        status_t status = [&]() -> status_t {
+            int32_t eventAidl = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(event));
+            media::RecordClientInfo clientInfoAidl = VALUE_OR_RETURN_STATUS(
+                    legacy2aidl_record_client_info_t_RecordClientInfo(*clientInfo));
+            media::AudioConfigBase clientConfigAidl = VALUE_OR_RETURN_STATUS(
+                    legacy2aidl_audio_config_base_t_AudioConfigBase(*clientConfig));
+            std::vector<media::EffectDescriptor> clientEffectsAidl = VALUE_OR_RETURN_STATUS(
+                    convertContainer<std::vector<media::EffectDescriptor>>(
+                            clientEffects,
+                            legacy2aidl_effect_descriptor_t_EffectDescriptor));
+            media::AudioConfigBase deviceConfigAidl = VALUE_OR_RETURN_STATUS(
+                    legacy2aidl_audio_config_base_t_AudioConfigBase(*deviceConfig));
+            std::vector<media::EffectDescriptor> effectsAidl = VALUE_OR_RETURN_STATUS(
+                    convertContainer<std::vector<media::EffectDescriptor>>(
+                            effects,
+                            legacy2aidl_effect_descriptor_t_EffectDescriptor));
+            int32_t patchHandleAidl = VALUE_OR_RETURN_STATUS(
+                    legacy2aidl_audio_patch_handle_t_int32_t(patchHandle));
+            media::AudioSourceType sourceAidl = VALUE_OR_RETURN_STATUS(
+                    legacy2aidl_audio_source_t_AudioSourceType(source));
+            return aidl_utils::statusTFromBinderStatus(
+                    mAudioPolicyServiceClient->onRecordingConfigurationUpdate(eventAidl,
+                                                                              clientInfoAidl,
+                                                                              clientConfigAidl,
+                                                                              clientEffectsAidl,
+                                                                              deviceConfigAidl,
+                                                                              effectsAidl,
+                                                                              patchHandleAidl,
+                                                                              sourceAidl));
+        }();
+        ALOGW_IF(status != OK, "onRecordingConfigurationUpdate() failed: %d", status);
     }
 }
 

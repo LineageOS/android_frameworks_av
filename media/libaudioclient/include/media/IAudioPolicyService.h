@@ -20,14 +20,15 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <utils/RefBase.h>
-#include <utils/Errors.h>
+
+#include <android/media/IAudioPolicyServiceClient.h>
 #include <binder/IInterface.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
-#include <media/IAudioPolicyServiceClient.h>
 #include <system/audio_policy.h>
+#include <utils/Errors.h>
+#include <utils/RefBase.h>
 #include <vector>
 
 namespace android {
@@ -180,7 +181,7 @@ public:
     /* Set audio port configuration */
     virtual status_t setAudioPortConfig(const struct audio_port_config *config) = 0;
 
-    virtual void registerClient(const sp<IAudioPolicyServiceClient>& client) = 0;
+    virtual void registerClient(const sp<media::IAudioPolicyServiceClient>& client) = 0;
 
     virtual void setAudioPortCallbacksEnabled(bool enabled) = 0;
 
