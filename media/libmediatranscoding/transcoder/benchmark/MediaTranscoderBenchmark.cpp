@@ -30,6 +30,7 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <binder/ProcessState.h>
 #include <fcntl.h>
 #include <media/MediaTranscoder.h>
 #include <iostream>
@@ -390,6 +391,7 @@ void CustomCsvReporter::PrintRunData(const Run& run) {
 }
 
 int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
     std::unique_ptr<benchmark::BenchmarkReporter> fileReporter;
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]).find("--benchmark_out") != std::string::npos) {
