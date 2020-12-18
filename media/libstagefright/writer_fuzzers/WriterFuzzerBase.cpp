@@ -218,7 +218,7 @@ void WriterFuzzerBase::sendBuffersToWriter(sp<MediaAdapter> &currentTrack, int32
     }
 }
 
-void WriterFuzzerBase::processData(const uint8_t *data, size_t size) {
+void WriterFuzzerBase::initFileWriterAndProcessData(const uint8_t *data, size_t size) {
     if (!createOutputFile()) {
         return;
     }
