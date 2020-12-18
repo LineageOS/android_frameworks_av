@@ -34,7 +34,7 @@ namespace heif {
 
 struct AssociationEntry;
 struct ImageItem;
-struct ExifItem;
+struct ExternalMetaItem;
 struct ItemLoc;
 struct ItemInfo;
 struct ItemProperty;
@@ -59,6 +59,7 @@ public:
     status_t getImageOffsetAndSize(
             uint32_t *itemIndex, off64_t *offset, size_t *size);
     status_t getExifOffsetAndSize(off64_t *offset, size_t *size);
+    status_t getXmpOffsetAndSize(off64_t *offset, size_t *size);
 
 protected:
     ~ItemTable();
@@ -84,7 +85,7 @@ private:
     bool mImageItemsValid;
     uint32_t mCurrentItemIndex;
     KeyedVector<uint32_t, ImageItem> mItemIdToItemMap;
-    KeyedVector<uint32_t, ExifItem> mItemIdToExifMap;
+    KeyedVector<uint32_t, ExternalMetaItem> mItemIdToMetaMap;
     Vector<uint32_t> mDisplayables;
 
     status_t parseIlocBox(off64_t offset, size_t size);

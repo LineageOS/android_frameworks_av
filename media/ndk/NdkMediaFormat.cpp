@@ -384,6 +384,8 @@ EXPORT const char* AMEDIAFORMAT_KEY_TRACK_ID = "track-id";
 EXPORT const char* AMEDIAFORMAT_KEY_TRACK_INDEX = "track-index";
 EXPORT const char* AMEDIAFORMAT_KEY_VALID_SAMPLES = "valid-samples";
 EXPORT const char* AMEDIAFORMAT_KEY_WIDTH = "width";
+EXPORT const char* AMEDIAFORMAT_KEY_XMP_OFFSET = "xmp-offset";
+EXPORT const char* AMEDIAFORMAT_KEY_XMP_SIZE = "xmp-size";
 EXPORT const char* AMEDIAFORMAT_KEY_YEAR = "year";
 
 } // extern "C"

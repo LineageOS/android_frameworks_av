@@ -84,6 +84,7 @@ bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid, audio_s
 void finishRecording(const String16& opPackageName, uid_t uid, audio_source_t source);
 bool captureAudioOutputAllowed(pid_t pid, uid_t uid);
 bool captureMediaOutputAllowed(pid_t pid, uid_t uid);
+bool captureTunerAudioInputAllowed(pid_t pid, uid_t uid);
 bool captureVoiceCommunicationOutputAllowed(pid_t pid, uid_t uid);
 bool captureHotwordAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
 bool settingsAllowed();

@@ -36,6 +36,10 @@ TrackPlayerBase::~TrackPlayerBase() {
 void TrackPlayerBase::init(AudioTrack* pat, player_type_t playerType, audio_usage_t usage) {
     PlayerBase::init(playerType, usage);
     mAudioTrack = pat;
+    if (mAudioTrack != 0) {
+        mSelfAudioDeviceCallback = new SelfAudioDeviceCallback(*this);
+        mAudioTrack->addAudioDeviceCallback(mSelfAudioDeviceCallback);
+    }
 }
 
 void TrackPlayerBase::destroy() {
@@ -43,9 +47,23 @@ void TrackPlayerBase::destroy() {
     baseDestroy();
 }
 
+TrackPlayerBase::SelfAudioDeviceCallback::SelfAudioDeviceCallback(PlayerBase& self) :
+    AudioSystem::AudioDeviceCallback(), mSelf(self) {
+}
+
+TrackPlayerBase::SelfAudioDeviceCallback::~SelfAudioDeviceCallback() {
+}
+
+void TrackPlayerBase::SelfAudioDeviceCallback::onAudioDeviceUpdate(audio_io_handle_t __unused,
+                                                                   audio_port_handle_t deviceId) {
+    mSelf.baseUpdateDeviceId(deviceId);
+}
+
 void TrackPlayerBase::doDestroy() {
     if (mAudioTrack != 0) {
         mAudioTrack->stop();
+        mAudioTrack->removeAudioDeviceCallback(mSelfAudioDeviceCallback);
+        mSelfAudioDeviceCallback.clear();
         // Note that there may still be another reference in post-unlock phase of SetPlayState
         mAudioTrack.clear();
     }

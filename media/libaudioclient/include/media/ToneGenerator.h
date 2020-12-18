@@ -17,6 +17,8 @@
 #ifndef ANDROID_TONEGENERATOR_H_
 #define ANDROID_TONEGENERATOR_H_
 
+#include <string>
+
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
 #include <utils/Compat.h>
@@ -152,7 +154,8 @@ public:
         NUM_SUP_TONES = LAST_SUP_TONE-FIRST_SUP_TONE+1
     };
 
-    ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava = false);
+    ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava = false,
+            std::string opPackageName = {});
     ~ToneGenerator();
 
     bool startTone(tone_type toneType, int durationMs = -1);
@@ -344,6 +347,8 @@ private:
     };
 
     KeyedVector<uint16_t, WaveGenerator *> mWaveGens;  // list of active wave generators.
+
+    std::string mOpPackageName;
 };
 
 }
