@@ -2187,4 +2187,14 @@ legacy2aidl_audio_unique_id_use_t_AudioUniqueIdUse(audio_unique_id_use_t legacy)
     return unexpected(BAD_VALUE);
 }
 
+ConversionResult<volume_group_t>
+aidl2legacy_int32_t_volume_group_t(int32_t aidl) {
+    return convertReinterpret<volume_group_t>(aidl);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_volume_group_t_int32_t(volume_group_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
 }  // namespace android

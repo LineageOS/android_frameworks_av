@@ -51,6 +51,7 @@
 #include <binder/IMemory.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioClient.h>
+#include <media/AudioCommonTypes.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/AudioTimestamp.h>
 #include <system/audio_effect.h>
@@ -352,5 +353,10 @@ ConversionResult<audio_unique_id_use_t>
 aidl2legacy_AudioUniqueIdUse_audio_unique_id_use_t(media::AudioUniqueIdUse aidl);
 ConversionResult<media::AudioUniqueIdUse>
 legacy2aidl_audio_unique_id_use_t_AudioUniqueIdUse(audio_unique_id_use_t legacy);
+
+ConversionResult<volume_group_t>
+aidl2legacy_int32_t_volume_group_t(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_volume_group_t_int32_t(volume_group_t legacy);
 
 }  // namespace android
