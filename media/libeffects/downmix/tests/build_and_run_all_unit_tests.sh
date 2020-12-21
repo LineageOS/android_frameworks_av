@@ -39,8 +39,7 @@ echo "========================================"
 echo "testing Downmix"
 adb shell mkdir $testdir
 
-adb push $ANDROID_BUILD_TOP/cts/tests/tests/media/res/raw/sinesweepraw.raw \
-$testdir
+adb push $ANDROID_BUILD_TOP/frameworks/av/media/libeffects/res/raw/sinesweepraw.raw $testdir
 adb push $OUT/testcases/downmixtest/arm64/downmixtest $testdir
 
 #run the downmix test application for test.
