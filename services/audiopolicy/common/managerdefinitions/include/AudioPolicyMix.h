@@ -101,7 +101,7 @@ public:
      *    An example of failure is when there are already rules in place to restrict
      *    a mix to the given uid (i.e. when a MATCH_UID rule was set for it).
      */
-    status_t setUidDeviceAffinities(uid_t uid, const Vector<AudioDeviceTypeAddr>& devices);
+    status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices);
     status_t removeUidDeviceAffinities(uid_t uid);
     status_t getDevicesForUid(uid_t uid, Vector<AudioDeviceTypeAddr>& devices) const;
 
@@ -115,7 +115,7 @@ public:
      *    An example of failure is when there are already rules in place to restrict
      *    a mix to the given userId (i.e. when a MATCH_USERID rule was set for it).
      */
-    status_t setUserIdDeviceAffinities(int userId, const Vector<AudioDeviceTypeAddr>& devices);
+    status_t setUserIdDeviceAffinities(int userId, const AudioDeviceTypeAddrVector& devices);
     status_t removeUserIdDeviceAffinities(int userId);
     status_t getDevicesForUserId(int userId, Vector<AudioDeviceTypeAddr>& devices) const;
 
