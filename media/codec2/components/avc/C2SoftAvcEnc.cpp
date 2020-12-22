@@ -1328,13 +1328,13 @@ c2_status_t C2SoftAvcEnc::setEncodeArgs(
             ps_inp_raw_buf->apv_bufs[1] = uPlane;
             ps_inp_raw_buf->apv_bufs[2] = vPlane;
 
-            ps_inp_raw_buf->au4_wd[0] = input->width();
-            ps_inp_raw_buf->au4_wd[1] = input->width() / 2;
-            ps_inp_raw_buf->au4_wd[2] = input->width() / 2;
+            ps_inp_raw_buf->au4_wd[0] = mSize->width;
+            ps_inp_raw_buf->au4_wd[1] = mSize->width / 2;
+            ps_inp_raw_buf->au4_wd[2] = mSize->width / 2;
 
-            ps_inp_raw_buf->au4_ht[0] = input->height();
-            ps_inp_raw_buf->au4_ht[1] = input->height() / 2;
-            ps_inp_raw_buf->au4_ht[2] = input->height() / 2;
+            ps_inp_raw_buf->au4_ht[0] = mSize->height;
+            ps_inp_raw_buf->au4_ht[1] = mSize->height / 2;
+            ps_inp_raw_buf->au4_ht[2] = mSize->height / 2;
 
             ps_inp_raw_buf->au4_strd[0] = yStride;
             ps_inp_raw_buf->au4_strd[1] = uStride;
@@ -1359,11 +1359,11 @@ c2_status_t C2SoftAvcEnc::setEncodeArgs(
             ps_inp_raw_buf->apv_bufs[0] = yPlane;
             ps_inp_raw_buf->apv_bufs[1] = uPlane;
 
-            ps_inp_raw_buf->au4_wd[0] = input->width();
-            ps_inp_raw_buf->au4_wd[1] = input->width();
+            ps_inp_raw_buf->au4_wd[0] = mSize->width;
+            ps_inp_raw_buf->au4_wd[1] = mSize->width;
 
-            ps_inp_raw_buf->au4_ht[0] = input->height();
-            ps_inp_raw_buf->au4_ht[1] = input->height() / 2;
+            ps_inp_raw_buf->au4_ht[0] = mSize->height;
+            ps_inp_raw_buf->au4_ht[1] = mSize->height / 2;
 
             ps_inp_raw_buf->au4_strd[0] = yStride;
             ps_inp_raw_buf->au4_strd[1] = uStride;
