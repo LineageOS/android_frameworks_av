@@ -85,7 +85,7 @@ status_t AudioMix::readFromParcel(Parcel *parcel)
     mDeviceType = (audio_devices_t) parcel->readInt32();
     mDeviceAddress = parcel->readString8();
     mCbFlags = (uint32_t)parcel->readInt32();
-    mAllowPrivilegedPlaybackCapture = parcel->readBool();
+    mAllowPrivilegedMediaPlaybackCapture = parcel->readBool();
     mVoiceCommunicationCaptureAllowed = parcel->readBool();
     size_t size = (size_t)parcel->readInt32();
     if (size > MAX_CRITERIA_PER_MIX) {
@@ -110,7 +110,7 @@ status_t AudioMix::writeToParcel(Parcel *parcel) const
     parcel->writeInt32(mDeviceType);
     parcel->writeString8(mDeviceAddress);
     parcel->writeInt32(mCbFlags);
-    parcel->writeBool(mAllowPrivilegedPlaybackCapture);
+    parcel->writeBool(mAllowPrivilegedMediaPlaybackCapture);
     parcel->writeBool(mVoiceCommunicationCaptureAllowed);
     size_t size = mCriteria.size();
     if (size > MAX_CRITERIA_PER_MIX) {
