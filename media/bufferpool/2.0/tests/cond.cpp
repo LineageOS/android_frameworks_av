@@ -21,6 +21,7 @@
 #include <android-base/logging.h>
 #include <binder/ProcessState.h>
 #include <bufferpool/ClientManager.h>
+#include <errno.h>
 #include <hidl/HidlSupport.h>
 #include <hidl/HidlTransportSupport.h>
 #include <hidl/LegacySupport.h>
@@ -66,6 +67,8 @@ union PipeMessage {
     } data;
     char array[0];
 };
+
+constexpr int kSignalInt = 200;
 
 // media.bufferpool test setup
 class BufferpoolMultiTest : public ::testing::Test {
@@ -152,30 +155,46 @@ class BufferpoolMultiTest : public ::testing::Test {
     message.data.command = PipeCommand::INIT_OK;
     sendMessage(mResultPipeFds, message);
 
+    int val = 0;
     receiveMessage(mCommandPipeFds, &message);
     {
       native_handle_t *rhandle = nullptr;
       std::shared_ptr<BufferPoolData> rbuffer;
+      void *mem = nullptr;
+      IpcMutex *mutex = nullptr;
       ResultStatus status = mManager->receive(
           message.data.connectionId, message.data.transactionId,
           message.data.bufferId, message.data.timestampUs, &rhandle, &rbuffer);
       mManager->close(message.data.connectionId);
       if (status != ResultStatus::OK) {
-        message.data.command = PipeCommand::RECEIVE_ERROR;
-        sendMessage(mResultPipeFds, message);
-        return;
+          message.data.command = PipeCommand::RECEIVE_ERROR;
+          sendMessage(mResultPipeFds, message);
+          return;
       }
-      if (!TestBufferPoolAllocator::Verify(rhandle, 0x77)) {
-        message.data.command = PipeCommand::RECEIVE_ERROR;
-        sendMessage(mResultPipeFds, message);
-        return;
+      if (!TestBufferPoolAllocator::MapMemoryForMutex(rhandle, &mem)) {
+          message.data.command = PipeCommand::RECEIVE_ERROR;
+          sendMessage(mResultPipeFds, message);
+          return;
       }
+      mutex = IpcMutex::Import(mem);
+      pthread_mutex_lock(&(mutex->lock));
+      while (mutex->signalled != true) {
+          pthread_cond_wait(&(mutex->cond), &(mutex->lock));
+      }
+      val = mutex->counter;
+      pthread_mutex_unlock(&(mutex->lock));
+
+      (void)TestBufferPoolAllocator::UnmapMemoryForMutex(mem);
       if (rhandle) {
         native_handle_close(rhandle);
         native_handle_delete(rhandle);
       }
     }
-    message.data.command = PipeCommand::RECEIVE_OK;
+    if (val == kSignalInt) {
+      message.data.command = PipeCommand::RECEIVE_OK;
+    } else {
+      message.data.command = PipeCommand::RECEIVE_ERROR;
+    }
     sendMessage(mResultPipeFds, message);
   }
 };
@@ -199,16 +218,17 @@ TEST_F(BufferpoolMultiTest, TransferBuffer) {
     TransactionId transactionId;
     int64_t postUs;
     std::vector<uint8_t> vecParams;
+    void *mem = nullptr;
+    IpcMutex *mutex = nullptr;
 
-    getTestAllocatorParams(&vecParams);
+    getIpcMutexParams(&vecParams);
     status = mManager->allocate(mConnectionId, vecParams, &shandle, &sbuffer);
     ASSERT_TRUE(status == ResultStatus::OK);
 
-    ASSERT_TRUE(TestBufferPoolAllocator::Fill(shandle, 0x77));
-    if (shandle) {
-        native_handle_close(shandle);
-        native_handle_delete(shandle);
-    }
+    ASSERT_TRUE(TestBufferPoolAllocator::MapMemoryForMutex(shandle, &mem));
+
+    mutex = new(mem) IpcMutex();
+    mutex->init();
 
     status = mManager->postSend(receiverId, sbuffer, &transactionId, &postUs);
     ASSERT_TRUE(status == ResultStatus::OK);
@@ -219,6 +239,20 @@ TEST_F(BufferpoolMultiTest, TransferBuffer) {
     message.data.transactionId = transactionId;
     message.data.timestampUs = postUs;
     sendMessage(mCommandPipeFds, message);
+    for (int i=0; i < 200000000; ++i) {
+      // no-op in order to ensure
+      // pthread_cond_wait is called before pthread_cond_signal
+    }
+    pthread_mutex_lock(&(mutex->lock));
+    mutex->counter = kSignalInt;
+    mutex->signalled = true;
+    pthread_cond_signal(&(mutex->cond));
+    pthread_mutex_unlock(&(mutex->lock));
+    (void)TestBufferPoolAllocator::UnmapMemoryForMutex(mem);
+    if (shandle) {
+      native_handle_close(shandle);
+      native_handle_delete(shandle);
+    }
   }
   EXPECT_TRUE(receiveMessage(mResultPipeFds, &message));
   EXPECT_TRUE(message.data.command == PipeCommand::RECEIVE_OK);
