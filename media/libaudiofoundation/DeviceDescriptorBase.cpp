@@ -22,9 +22,6 @@
 #include <media/DeviceDescriptorBase.h>
 #include <media/TypeConverter.h>
 
-#include <arpa/inet.h>
-#include <regex>
-
 namespace android {
 
 DeviceDescriptorBase::DeviceDescriptorBase(audio_devices_t type) :
@@ -37,46 +34,19 @@ DeviceDescriptorBase::DeviceDescriptorBase(audio_devices_t type, const std::stri
 {
 }
 
-namespace {
-
-static const std::string SUPPRESSED = "SUPPRESSED";
-static const std::regex MAC_ADDRESS_REGEX("([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}");
-
-bool isAddressSensitive(const std::string &address) {
-    if (std::regex_match(address, MAC_ADDRESS_REGEX)) {
-        return true;
-    }
-
-    sockaddr_storage ss4;
-    if (inet_pton(AF_INET, address.c_str(), &ss4) > 0) {
-        return true;
-    }
-
-    sockaddr_storage ss6;
-    if (inet_pton(AF_INET6, address.c_str(), &ss6) > 0) {
-        return true;
-    }
-
-    return false;
-}
-
-} // namespace
-
 DeviceDescriptorBase::DeviceDescriptorBase(const AudioDeviceTypeAddr &deviceTypeAddr) :
         AudioPort("", AUDIO_PORT_TYPE_DEVICE,
                   audio_is_output_device(deviceTypeAddr.mType) ? AUDIO_PORT_ROLE_SINK :
                                          AUDIO_PORT_ROLE_SOURCE),
         mDeviceTypeAddr(deviceTypeAddr)
 {
-    if (mDeviceTypeAddr.mAddress.empty() && audio_is_remote_submix_device(mDeviceTypeAddr.mType)) {
-        mDeviceTypeAddr.mAddress = "0";
+    if (mDeviceTypeAddr.address().empty() && audio_is_remote_submix_device(mDeviceTypeAddr.mType)) {
+        mDeviceTypeAddr.setAddress("0");
     }
-    mIsAddressSensitive = isAddressSensitive(mDeviceTypeAddr.mAddress);
 }
 
 void DeviceDescriptorBase::setAddress(const std::string &address) {
-    mDeviceTypeAddr.mAddress = address;
-    mIsAddressSensitive = isAddressSensitive(address);
+    mDeviceTypeAddr.setAddress(address);
 }
 
 void DeviceDescriptorBase::toAudioPortConfig(struct audio_port_config *dstConfig,
@@ -157,7 +127,7 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
             "%*s- supported encapsulation metadata types: %u",
             spaces, "", mEncapsulationMetadataTypes));
 
-    if (mDeviceTypeAddr.mAddress.size() != 0) {
+    if (mDeviceTypeAddr.address().size() != 0) {
         dst->append(base::StringPrintf(
                 "%*s- address: %-32s\n", spaces, "", mDeviceTypeAddr.getAddress()));
     }
@@ -166,14 +136,7 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
 
 std::string DeviceDescriptorBase::toString(bool includeSensitiveInfo) const
 {
-    std::stringstream sstream;
-    sstream << "type:0x" << std::hex << type();
-    // IP and MAC address are sensitive information. The sensitive information will be suppressed
-    // is `includeSensitiveInfo` is false.
-    sstream << ",@:"
-            << (!includeSensitiveInfo && mIsAddressSensitive ? SUPPRESSED
-                                                             : mDeviceTypeAddr.mAddress);
-    return sstream.str();
+    return mDeviceTypeAddr.toString(includeSensitiveInfo);
 }
 
 void DeviceDescriptorBase::log() const

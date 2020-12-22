@@ -112,9 +112,9 @@ enum {
     MOVE_EFFECTS_TO_IO,
     SET_RTT_ENABLED,
     IS_CALL_SCREEN_MODE_SUPPORTED,
-    SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
-    REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
-    GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+    SET_DEVICES_ROLE_FOR_PRODUCT_STRATEGY,
+    REMOVE_DEVICES_ROLE_FOR_PRODUCT_STRATEGY,
+    GET_DEVICES_FOR_ROLE_AND_PRODUCT_STRATEGY,
     GET_DEVICES_FOR_ATTRIBUTES,
     AUDIO_MODULES_UPDATED,  // oneway
     SET_CURRENT_IME_UID,
@@ -1357,17 +1357,31 @@ public:
         return reply.readBool();
     }
 
-    virtual status_t setPreferredDeviceForStrategy(product_strategy_t strategy,
-            const AudioDeviceTypeAddr &device)
+    virtual status_t setDevicesRoleForStrategy(product_strategy_t strategy,
+            device_role_t role, const AudioDeviceTypeAddrVector &devices)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeUint32(static_cast<uint32_t>(strategy));
-        status_t status = device.writeToParcel(&data);
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = data.writeParcelableVector(devices);
         if (status != NO_ERROR) {
             return BAD_VALUE;
         }
-        status = remote()->transact(SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+        status = remote()->transact(SET_DEVICES_ROLE_FOR_PRODUCT_STRATEGY, data, &reply);
+        if (status != NO_ERROR) {
+           return status;
+        }
+        return static_cast<status_t>(reply.readInt32());
+    }
+
+    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role)
+    {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeUint32(static_cast<uint32_t>(strategy));
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = remote()->transact(REMOVE_DEVICES_ROLE_FOR_PRODUCT_STRATEGY,
                 data, &reply);
         if (status != NO_ERROR) {
            return status;
@@ -1375,31 +1389,19 @@ public:
         return static_cast<status_t>(reply.readInt32());
     }
 
-    virtual status_t removePreferredDeviceForStrategy(product_strategy_t strategy)
+    virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
+            device_role_t role, AudioDeviceTypeAddrVector &devices)
     {
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeUint32(static_cast<uint32_t>(strategy));
-        status_t status = remote()->transact(REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
-                data, &reply);
-        if (status != NO_ERROR) {
-           return status;
-        }
-        return static_cast<status_t>(reply.readInt32());
-    }
-
-    virtual status_t getPreferredDeviceForStrategy(product_strategy_t strategy,
-            AudioDeviceTypeAddr &device)
-    {
-        Parcel data, reply;
-        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
-        data.writeUint32(static_cast<uint32_t>(strategy));
-        status_t status = remote()->transact(GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY,
+        data.writeUint32(static_cast<uint32_t>(role));
+        status_t status = remote()->transact(GET_DEVICES_FOR_ROLE_AND_PRODUCT_STRATEGY,
                 data, &reply);
         if (status != NO_ERROR) {
             return status;
         }
-        status = device.readFromParcel(&reply);
+        status = reply.readParcelableVector(&devices);
         if (status != NO_ERROR) {
             return status;
         }
@@ -1534,10 +1536,10 @@ status_t BnAudioPolicyService::onTransact(
         case RELEASE_SOUNDTRIGGER_SESSION:
         case SET_RTT_ENABLED:
         case IS_CALL_SCREEN_MODE_SUPPORTED:
-        case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case SET_DEVICES_ROLE_FOR_PRODUCT_STRATEGY:
         case SET_SUPPORTED_SYSTEM_USAGES:
-        case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
-        case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY:
+        case REMOVE_DEVICES_ROLE_FOR_PRODUCT_STRATEGY:
+        case GET_DEVICES_FOR_ROLE_AND_PRODUCT_STRATEGY:
         case GET_DEVICES_FOR_ATTRIBUTES:
         case SET_ALLOWED_CAPTURE_POLICY:
         case AUDIO_MODULES_UPDATED:
@@ -2616,33 +2618,36 @@ status_t BnAudioPolicyService::onTransact(
             return NO_ERROR;
         }
 
-        case SET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+        case SET_DEVICES_ROLE_FOR_PRODUCT_STRATEGY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             product_strategy_t strategy = (product_strategy_t) data.readUint32();
-            AudioDeviceTypeAddr device;
-            status_t status = device.readFromParcel((Parcel*)&data);
+            device_role_t role = (device_role_t) data.readUint32();
+            AudioDeviceTypeAddrVector devices;
+            status_t status = data.readParcelableVector(&devices);
             if (status != NO_ERROR) {
                 return status;
             }
-            status = setPreferredDeviceForStrategy(strategy, device);
+            status = setDevicesRoleForStrategy(strategy, role, devices);
             reply->writeInt32(status);
             return NO_ERROR;
         }
 
-        case REMOVE_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+        case REMOVE_DEVICES_ROLE_FOR_PRODUCT_STRATEGY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             product_strategy_t strategy = (product_strategy_t) data.readUint32();
-            status_t status = removePreferredDeviceForStrategy(strategy);
+            device_role_t role = (device_role_t) data.readUint32();
+            status_t status = removeDevicesRoleForStrategy(strategy, role);
             reply->writeInt32(status);
             return NO_ERROR;
         }
 
-        case GET_PREFERRED_DEVICE_FOR_PRODUCT_STRATEGY: {
+        case GET_DEVICES_FOR_ROLE_AND_PRODUCT_STRATEGY: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             product_strategy_t strategy = (product_strategy_t) data.readUint32();
-            AudioDeviceTypeAddr device;
-            status_t status = getPreferredDeviceForStrategy(strategy, device);
-            status_t marshall_status = device.writeToParcel(reply);
+            device_role_t role = (device_role_t) data.readUint32();
+            AudioDeviceTypeAddrVector devices;
+            status_t status = getDevicesForRoleAndStrategy(strategy, role, devices);
+            status_t marshall_status = reply->writeParcelableVector(devices);
             if (marshall_status != NO_ERROR) {
                 return marshall_status;
             }
