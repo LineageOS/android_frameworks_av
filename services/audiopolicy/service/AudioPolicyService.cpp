@@ -485,7 +485,7 @@ void AudioPolicyService::updateUidStates_l()
     sp<AudioRecordClient> topActive;
     sp<AudioRecordClient> latestActive;
     sp<AudioRecordClient> topSensitiveActive;
-    sp<AudioRecordClient> latestSensitiveActive;
+    sp<AudioRecordClient> latestSensitiveActiveOrComm;
 
     nsecs_t topStartNs = 0;
     nsecs_t latestStartNs = 0;
@@ -499,6 +499,7 @@ void AudioPolicyService::updateUidStates_l()
     bool rttCallActive = (isInCall || isInCommunication)
             && mUidPolicy->isRttEnabled();
     bool onlyHotwordActive = true;
+    bool isPhoneStateOwnerActive = false;
 
     // if Sensor Privacy is enabled then all recordings should be silenced.
     if (mSensorPrivacyPolicy->isSensorPrivacyEnabled()) {
@@ -526,6 +527,7 @@ void AudioPolicyService::updateUidStates_l()
             bool isAssistant = mUidPolicy->isAssistantUid(current->uid);
             bool isPrivacySensitive =
                     (current->attributes.flags & AUDIO_FLAG_CAPTURE_PRIVATE) != 0;
+
             if (appState == APP_STATE_TOP) {
                 if (isPrivacySensitive) {
                     if (current->startTimeNs > topSensitiveStartNs) {
@@ -547,9 +549,15 @@ void AudioPolicyService::updateUidStates_l()
             if (!(current->attributes.source == AUDIO_SOURCE_HOTWORD
                     || ((isA11yOnTop || rttCallActive) && isAssistant))) {
                 if (isPrivacySensitive) {
-                    if (current->startTimeNs > latestSensitiveStartNs) {
-                        latestSensitiveActive = current;
-                        latestSensitiveStartNs = current->startTimeNs;
+                    // if audio mode is IN_COMMUNICATION, make sure the audio mode owner
+                    // is marked latest sensitive active even if another app qualifies.
+                    if (current->startTimeNs > latestSensitiveStartNs
+                            || (isInCommunication && current->uid == mPhoneStateOwnerUid)) {
+                        if (!isInCommunication || latestSensitiveActiveOrComm == nullptr
+                                || latestSensitiveActiveOrComm->uid != mPhoneStateOwnerUid) {
+                            latestSensitiveActiveOrComm = current;
+                            latestSensitiveStartNs = current->startTimeNs;
+                        }
                     }
                     isSensitiveActive = true;
                 } else {
@@ -563,6 +571,9 @@ void AudioPolicyService::updateUidStates_l()
         if (current->attributes.source != AUDIO_SOURCE_HOTWORD) {
             onlyHotwordActive = false;
         }
+        if (current->uid == mPhoneStateOwnerUid) {
+            isPhoneStateOwnerActive = true;
+        }
     }
 
     // if no active client with UI on Top, consider latest active as top
@@ -571,8 +582,15 @@ void AudioPolicyService::updateUidStates_l()
         topStartNs = latestStartNs;
     }
     if (topSensitiveActive == nullptr) {
-        topSensitiveActive = latestSensitiveActive;
+        topSensitiveActive = latestSensitiveActiveOrComm;
         topSensitiveStartNs = latestSensitiveStartNs;
+    } else if (latestSensitiveActiveOrComm != nullptr) {
+        // if audio mode is IN_COMMUNICATION, favor audio mode owner over an app with
+        // foreground UI in case both are capturing with privacy sensitive flag.
+        if (isInCommunication && latestSensitiveActiveOrComm->uid == mPhoneStateOwnerUid) {
+            topSensitiveActive = latestSensitiveActiveOrComm;
+            topSensitiveStartNs = latestSensitiveStartNs;
+        }
     }
 
     // If both privacy sensitive and regular capture are active:
@@ -598,13 +616,11 @@ void AudioPolicyService::updateUidStates_l()
 
         auto canCaptureIfInCallOrCommunication = [&](const auto &recordClient) REQUIRES(mLock) {
             bool canCaptureCall = recordClient->canCaptureOutput;
-            return !(isInCall && !canCaptureCall);
-//TODO(b/160260850): restore restriction to mode owner once fix for misbehaving apps is merged
-//            bool canCaptureCommunication = recordClient->canCaptureOutput
-//                || recordClient->uid == mPhoneStateOwnerUid
-//                || isServiceUid(mPhoneStateOwnerUid);
-//            return !(isInCall && !canCaptureCall)
-//                && !(isInCommunication && !canCaptureCommunication);
+            bool canCaptureCommunication = recordClient->canCaptureOutput
+                || !isPhoneStateOwnerActive
+                || recordClient->uid == mPhoneStateOwnerUid;
+            return !(isInCall && !canCaptureCall)
+                && !(isInCommunication && !canCaptureCommunication);
         };
 
         // By default allow capture if:

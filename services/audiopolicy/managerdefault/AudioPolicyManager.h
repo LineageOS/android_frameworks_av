@@ -557,6 +557,11 @@ protected:
         void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0);
 
         /**
+         * @brief updates routing for all inputs.
+         */
+        void updateInputRouting();
+
+        /**
          * @brief checkOutputForAttributes checks and if necessary changes outputs used for the
          * given audio attributes.
          * must be called every time a condition that affects the output choice for a given
@@ -816,6 +821,10 @@ protected:
 
         // The map of device descriptor and formats reported by the device.
         std::map<wp<DeviceDescriptor>, FormatVector> mReportedFormatsMap;
+
+        // Cached product strategy ID corresponding to legacy strategy STRATEGY_PHONE
+        product_strategy_t mCommunnicationStrategy;
+
 private:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
@@ -971,6 +980,7 @@ private:
                 std::function<bool(audio_devices_t)> predicate,
                 const char* context);
 
+        bool isScoRequestedForComm() const;
 };
 
 };
