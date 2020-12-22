@@ -89,9 +89,7 @@ public:
 
     // ResourcePolicyInterface
     void setCallback(const std::shared_ptr<ResourcePolicyCallbackInterface>& /*cb*/) override {}
-    void setPidResourceLost(pid_t pid) override {
-        mResourceLostPid = pid;
-    }
+    void setPidResourceLost(pid_t pid) override { mResourceLostPid = pid; }
     // ~ResourcePolicyInterface
 
     pid_t getPid() {
@@ -101,10 +99,21 @@ public:
     }
 
 private:
-    void reset() {
-        mResourceLostPid = kInvalidPid;
-    }
+    void reset() { mResourceLostPid = kInvalidPid; }
     pid_t mResourceLostPid;
+};
+
+class TestThermalPolicy : public ThermalPolicyInterface {
+public:
+    TestThermalPolicy() = default;
+    virtual ~TestThermalPolicy() = default;
+
+    // ThermalPolicyInterface
+    void setCallback(const std::shared_ptr<ThermalPolicyCallbackInterface>& /*cb*/) override {}
+    bool getThrottlingStatus() { return false; }
+    // ~ThermalPolicyInterface
+
+private:
 };
 
 class TestTranscoder : public TranscoderInterface {
@@ -245,8 +254,9 @@ public:
         mTranscoder.reset(new TestTranscoder());
         mUidPolicy.reset(new TestUidPolicy());
         mResourcePolicy.reset(new TestResourcePolicy());
-        mController.reset(
-                new TranscodingSessionController(mTranscoder, mUidPolicy, mResourcePolicy));
+        mThermalPolicy.reset(new TestThermalPolicy());
+        mController.reset(new TranscodingSessionController(mTranscoder, mUidPolicy, mResourcePolicy,
+                                                           mThermalPolicy));
         mUidPolicy->setCallback(mController);
 
         // Set priority only, ignore other fields for now.
@@ -269,6 +279,7 @@ public:
     std::shared_ptr<TestTranscoder> mTranscoder;
     std::shared_ptr<TestUidPolicy> mUidPolicy;
     std::shared_ptr<TestResourcePolicy> mResourcePolicy;
+    std::shared_ptr<TestThermalPolicy> mThermalPolicy;
     std::shared_ptr<TranscodingSessionController> mController;
     TranscodingRequestParcel mOfflineRequest;
     TranscodingRequestParcel mRealtimeRequest;
@@ -577,6 +588,7 @@ TEST_F(TranscodingSessionControllerTest, TestTopUidSetChanged) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(1), SESSION(0)));
 }
 
+/* Test resource lost without thermal throttling */
 TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
     ALOGD("TestResourceLost");
 
@@ -633,10 +645,21 @@ TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
     mController->onResourceAvailable();
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(0)));
 
-    // Test 3: Adding new queue during resource loss.
-    // Signal resource lost.
+    // Test 3:
     mController->onResourceLost(CLIENT(0), SESSION(0));
     EXPECT_EQ(mResourcePolicy->getPid(), PID(0));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    // Cancel the paused top session during resource lost.
+    EXPECT_TRUE(mController->cancel(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(0)));
+    // Signal resource available, CLIENT(2)'s session should start.
+    mController->onResourceAvailable();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(2), SESSION(0)));
+
+    // Test 4: Adding new queue during resource loss.
+    // Signal resource lost.
+    mController->onResourceLost(CLIENT(2), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), PID(1));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 
     // Move UID(2) to top.
@@ -650,6 +673,133 @@ TEST_F(TranscodingSessionControllerTest, TestResourceLost) {
     // Signal resource available, CLIENT(3)'s session should start.
     mController->onResourceAvailable();
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(3), SESSION(0)));
+}
+
+/* Test thermal throttling without resource lost */
+TEST_F(TranscodingSessionControllerTest, TestThermalCallback) {
+    ALOGD("TestThermalCallback");
+
+    // Start with unspecified top UID.
+    // Submit real-time session to CLIENT(0), session should start immediately.
+    mRealtimeRequest.clientPid = PID(0);
+    mController->submit(CLIENT(0), SESSION(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit offline session to CLIENT(0), should not start.
+    mOfflineRequest.clientPid = PID(0);
+    mController->submit(CLIENT(1), SESSION(0), UID(0), mOfflineRequest, mClientCallback1);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Move UID(1) to top.
+    mUidPolicy->setTop(UID(1));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Submit real-time session to CLIENT(2) in different uid UID(1).
+    // Should pause previous session and start new session.
+    mRealtimeRequest.clientPid = PID(1);
+    mController->submit(CLIENT(2), SESSION(0), UID(1), mRealtimeRequest, mClientCallback2);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(2), SESSION(0)));
+
+    // Test 0: Basic case, no queue change during throttling, top session should pause/resume
+    // with throttling.
+    mController->onThrottlingStarted();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(2), SESSION(0)));
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(2), SESSION(0)));
+
+    // Test 1: Change of queue order during thermal throttling, when throttling stops,
+    // new top session should resume.
+    mController->onThrottlingStarted();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(2), SESSION(0)));
+    mUidPolicy->setTop(UID(0));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(0)));
+
+    // Test 2: Cancel session during throttling, when throttling stops, new top
+    // session should resume.
+    mController->onThrottlingStarted();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    // Cancel the paused top session during throttling.
+    EXPECT_TRUE(mController->cancel(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(0)));
+    // Throttling stops, CLIENT(2)'s session should start.
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(2), SESSION(0)));
+
+    // Test 3: Add new queue during throttling, when throttling stops, new top
+    // session should resume.
+    mController->onThrottlingStarted();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(2), SESSION(0)));
+    // Move UID(2) to top.
+    mUidPolicy->setTop(UID(2));
+    // Submit real-time session to CLIENT(3) in UID(2), session shouldn't start during throttling.
+    mRealtimeRequest.clientPid = PID(2);
+    mController->submit(CLIENT(3), SESSION(0), UID(2), mRealtimeRequest, mClientCallback3);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    // Throttling stops, CLIENT(3)'s session should start.
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(3), SESSION(0)));
+}
+
+/* Test resource lost and thermal throttling happening simultaneously */
+TEST_F(TranscodingSessionControllerTest, TestResourceLostAndThermalCallback) {
+    ALOGD("TestResourceLostAndThermalCallback");
+
+    // Start with unspecified top UID.
+    // Submit real-time session to CLIENT(0), session should start immediately.
+    mRealtimeRequest.clientPid = PID(0);
+    mController->submit(CLIENT(0), SESSION(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit offline session to CLIENT(0), should not start.
+    mOfflineRequest.clientPid = PID(0);
+    mController->submit(CLIENT(1), SESSION(0), UID(0), mOfflineRequest, mClientCallback1);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Move UID(1) to top.
+    mUidPolicy->setTop(UID(1));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Submit real-time session to CLIENT(2) in different uid UID(1).
+    // Should pause previous session and start new session.
+    mRealtimeRequest.clientPid = PID(1);
+    mController->submit(CLIENT(2), SESSION(0), UID(1), mRealtimeRequest, mClientCallback2);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(2), SESSION(0)));
+
+    // Test 0: Resource lost during throttling.
+    // Throttling starts, top session should pause.
+    mController->onThrottlingStarted();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(2), SESSION(0)));
+    // Signal resource lost, this should get ignored because the session is now paused.
+    mController->onResourceLost(CLIENT(2), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), kInvalidPid);
+    // Signal resource available, CLIENT(2) shouldn't resume.
+    mController->onResourceAvailable();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    // Throttling ends, top session should resume.
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(2), SESSION(0)));
+
+    // Test 1: Throttling during resource lost.
+    mController->onResourceLost(CLIENT(2), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), PID(1));
+    mController->onThrottlingStarted();
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    mController->onResourceAvailable();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(2), SESSION(0)));
+
+    // Test 2: Interleaving resource lost and throttling.
+    mController->onResourceLost(CLIENT(2), SESSION(0));
+    EXPECT_EQ(mResourcePolicy->getPid(), PID(1));
+    mController->onThrottlingStarted();
+    mController->onResourceAvailable();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    mController->onThrottlingStopped();
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(2), SESSION(0)));
 }
 
 }  // namespace android
