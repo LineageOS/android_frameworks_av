@@ -171,7 +171,7 @@ aaudio_result_t AudioStream::systemStart() {
     aaudio_result_t result = requestStart_l();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
-        (void) mPlayerBase->start();
+        (void) mPlayerBase->startWithStatus(getDeviceId());
     }
     return result;
 }
@@ -221,7 +221,7 @@ aaudio_result_t AudioStream::systemPause() {
     aaudio_result_t result = requestPause_l();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
-        (void) mPlayerBase->pause();
+        (void) mPlayerBase->pauseWithStatus();
     }
     return result;
 }
@@ -251,7 +251,7 @@ aaudio_result_t AudioStream::systemStopFromCallback() {
     aaudio_result_t result = safeStop_l();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
-        (void) mPlayerBase->stop();
+        (void) mPlayerBase->stopWithStatus();
     }
     return result;
 }
@@ -265,7 +265,7 @@ aaudio_result_t AudioStream::systemStopFromApp() {
     aaudio_result_t result = safeStop_l();
     if (result == AAUDIO_OK) {
         // We only call this for logging in "dumpsys audio". So ignore return code.
-        (void) mPlayerBase->stop();
+        (void) mPlayerBase->stopWithStatus();
     }
     return result;
 }
