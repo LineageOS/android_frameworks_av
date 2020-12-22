@@ -151,6 +151,15 @@ public:
     //     4) the combination of all devices is invalid for selection
     sp<DeviceDescriptor> getDeviceForOpening() const;
 
+    // Return the device descriptor that matches the given AudioDeviceTypeAddr
+    sp<DeviceDescriptor> getDeviceFromDeviceTypeAddr(
+            const AudioDeviceTypeAddr& deviceTypeAddr) const;
+
+    // Return the device vector that contains device descriptor whose AudioDeviceTypeAddr appears
+    // in the given AudioDeviceTypeAddrVector
+    DeviceVector getDevicesFromDeviceTypeAddrVec(
+            const AudioDeviceTypeAddrVector& deviceTypeAddrVector) const;
+
     // If there are devices with the given type and the devices to add is not empty,
     // remove all the devices with the given type and add all the devices to add.
     void replaceDevicesByType(audio_devices_t typeToRemove, const DeviceVector &devicesToAdd);
