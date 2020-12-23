@@ -1538,4 +1538,55 @@ status_t AudioPolicyService::registerSoundTriggerCaptureStateListener(
     return NO_ERROR;
 }
 
+status_t AudioPolicyService::setDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector &devices)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->setDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t AudioPolicyService::addDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector &devices)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->addDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t AudioPolicyService::removeDevicesRoleForCapturePreset(
+        audio_source_t audioSource, device_role_t role, const AudioDeviceTypeAddrVector& devices)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->removeDevicesRoleForCapturePreset(audioSource, role, devices);
+}
+
+status_t AudioPolicyService::clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+                                                              device_role_t role)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->clearDevicesRoleForCapturePreset(audioSource, role);
+}
+
+status_t AudioPolicyService::getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+                                                               device_role_t role,
+                                                               AudioDeviceTypeAddrVector &devices)
+{
+    if (mAudioPolicyManager == nullptr) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices);
+}
+
 } // namespace android

@@ -18,7 +18,10 @@ cc_test {
         "libxml2",
     ],
 
-    static_libs: ["libaudiopolicycomponents"],
+    static_libs: [
+        "libaudiopolicycomponents",
+        "libgmock"
+    ],
 
     header_libs: [
         "libaudiopolicycommon",

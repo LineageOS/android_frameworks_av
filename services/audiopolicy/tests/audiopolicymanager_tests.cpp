@@ -20,6 +20,7 @@
 #include <unistd.h>
 
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #define LOG_TAG "APM_Test"
 #include <Serializer.h>
@@ -36,6 +37,7 @@
 #include "AudioPolicyTestManager.h"
 
 using namespace android;
+using testing::UnorderedElementsAre;
 
 TEST(AudioPolicyManagerTestInit, EngineFailure) {
     AudioPolicyTestClient client;
@@ -1193,3 +1195,109 @@ TEST_F(AudioPolicyManagerDynamicHwModulesTest, ClientIsUpdated) {
     EXPECT_GT(mClient->getAudioPortListUpdateCount(), prevAudioPortListUpdateCount);
     EXPECT_GT(mManager->getAudioPortGeneration(), prevAudioPortGeneration);
 }
+
+using DevicesRoleForCapturePresetParam = std::tuple<audio_source_t, device_role_t>;
+
+class AudioPolicyManagerDevicesRoleForCapturePresetTest
+        : public AudioPolicyManagerTestWithConfigurationFile,
+          public testing::WithParamInterface<DevicesRoleForCapturePresetParam> {
+protected:
+    // The `inputDevice` and `inputDevice2` indicate the audio devices type to be used for setting
+    // device role. They must be declared in the test_audio_policy_configuration.xml
+    AudioDeviceTypeAddr inputDevice = AudioDeviceTypeAddr(AUDIO_DEVICE_IN_BUILTIN_MIC, "");
+    AudioDeviceTypeAddr inputDevice2 = AudioDeviceTypeAddr(AUDIO_DEVICE_IN_HDMI, "");
+};
+
+TEST_P(AudioPolicyManagerDevicesRoleForCapturePresetTest, DevicesRoleForCapturePreset) {
+    const audio_source_t audioSource = std::get<0>(GetParam());
+    const device_role_t role = std::get<1>(GetParam());
+
+    // Test invalid device when setting
+    const AudioDeviceTypeAddr outputDevice(AUDIO_DEVICE_OUT_SPEAKER, "");
+    const AudioDeviceTypeAddrVector outputDevices = {outputDevice};
+    ASSERT_EQ(BAD_VALUE,
+              mManager->setDevicesRoleForCapturePreset(audioSource, role, outputDevices));
+    ASSERT_EQ(BAD_VALUE,
+              mManager->addDevicesRoleForCapturePreset(audioSource, role, outputDevices));
+    AudioDeviceTypeAddrVector devices;
+    ASSERT_EQ(NAME_NOT_FOUND,
+              mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+    ASSERT_TRUE(devices.empty());
+    ASSERT_EQ(BAD_VALUE,
+              mManager->removeDevicesRoleForCapturePreset(audioSource, role, outputDevices));
+
+    // Without setting, call get/remove/clear must fail
+    ASSERT_EQ(NAME_NOT_FOUND,
+              mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+    ASSERT_EQ(NAME_NOT_FOUND,
+              mManager->removeDevicesRoleForCapturePreset(audioSource, role, devices));
+    ASSERT_EQ(NAME_NOT_FOUND,
+              mManager->clearDevicesRoleForCapturePreset(audioSource, role));
+
+    // Test set/get devices role
+    const AudioDeviceTypeAddrVector inputDevices = {inputDevice};
+    ASSERT_EQ(NO_ERROR,
+              mManager->setDevicesRoleForCapturePreset(audioSource, role, inputDevices));
+    ASSERT_EQ(NO_ERROR, mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+    EXPECT_THAT(devices, UnorderedElementsAre(inputDevice));
+
+    // Test setting will change the previously set devices
+    const AudioDeviceTypeAddrVector inputDevices2 = {inputDevice2};
+    ASSERT_EQ(NO_ERROR,
+              mManager->setDevicesRoleForCapturePreset(audioSource, role, inputDevices2));
+    devices.clear();
+    ASSERT_EQ(NO_ERROR, mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+    EXPECT_THAT(devices, UnorderedElementsAre(inputDevice2));
+
+    // Test add devices
+    ASSERT_EQ(NO_ERROR,
+              mManager->addDevicesRoleForCapturePreset(audioSource, role, inputDevices));
+    devices.clear();
+    ASSERT_EQ(NO_ERROR, mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+    EXPECT_THAT(devices, UnorderedElementsAre(inputDevice, inputDevice2));
+
+    // Test remove devices
+    ASSERT_EQ(NO_ERROR,
+              mManager->removeDevicesRoleForCapturePreset(audioSource, role, inputDevices));
+    devices.clear();
+    ASSERT_EQ(NO_ERROR, mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+    EXPECT_THAT(devices, UnorderedElementsAre(inputDevice2));
+
+    // Test remove devices that are not set as the device role
+    ASSERT_EQ(BAD_VALUE,
+              mManager->removeDevicesRoleForCapturePreset(audioSource, role, inputDevices));
+
+    // Test clear devices
+    ASSERT_EQ(NO_ERROR,
+              mManager->clearDevicesRoleForCapturePreset(audioSource, role));
+    devices.clear();
+    ASSERT_EQ(NAME_NOT_FOUND,
+              mManager->getDevicesForRoleAndCapturePreset(audioSource, role, devices));
+}
+
+INSTANTIATE_TEST_CASE_P(
+        DevicesRoleForCapturePresetOperation,
+        AudioPolicyManagerDevicesRoleForCapturePresetTest,
+        testing::Values(
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_MIC, DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_VOICE_UPLINK,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_VOICE_DOWNLINK,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_VOICE_CALL, DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_CAMCORDER, DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_VOICE_RECOGNITION,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_VOICE_COMMUNICATION,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_REMOTE_SUBMIX,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_UNPROCESSED, DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_VOICE_PERFORMANCE,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_ECHO_REFERENCE,
+                                                  DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_FM_TUNER, DEVICE_ROLE_PREFERRED}),
+                DevicesRoleForCapturePresetParam({AUDIO_SOURCE_HOTWORD, DEVICE_ROLE_PREFERRED})
+                )
+        );
