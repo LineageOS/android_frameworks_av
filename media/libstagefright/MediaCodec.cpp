@@ -4083,7 +4083,15 @@ status_t MediaCodec::onReleaseOutputBuffer(const sp<AMessage> &msg) {
                 }
             }
         }
-        mBufferChannel->renderOutputBuffer(buffer, renderTimeNs);
+        status_t err = mBufferChannel->renderOutputBuffer(buffer, renderTimeNs);
+
+        if (err == NO_INIT) {
+            ALOGE("rendering to non-initilized(obsolete) surface");
+            return err;
+        }
+        if (err != OK) {
+            ALOGI("rendring output error %d", err);
+        }
     } else {
         mBufferChannel->discardBuffer(buffer);
     }
