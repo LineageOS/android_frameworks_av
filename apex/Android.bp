@@ -32,15 +32,21 @@ apex_defaults {
                 "liboggextractor",
                 "libwavextractor",
             ],
+            // Transcoding service only run with primary ABI.
+            binaries: [
+                "mediatranscoding",
+            ],
         },
     },
     // JNI
     native_shared_libs: ["libmediaparser-jni"],
     compile_multilib: "both",
     prebuilts: [
-        "mediaextractor.policy",
         "code_coverage.policy",
+        "com.android.media-mediatranscoding.rc",
         "crash_dump.policy",
+        "mediaextractor.policy",
+        "media-linker-config",
     ],
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
@@ -62,9 +68,6 @@ apex {
     name: "com.android.media",
     manifest: "manifest.json",
     defaults: ["com.android.media-defaults"],
-    prebuilts: [
-        "media-linker-config",
-    ],
 }
 
 linker_config {
@@ -114,6 +117,13 @@ apex_defaults {
     // - build artifacts (lib/javalib/bin) against Android 10 SDK
     //   so that the artifacts can run.
     min_sdk_version: "29",
+}
+
+prebuilt_etc {
+    name: "com.android.media-mediatranscoding.rc",
+    src: "mediatranscoding.rc",
+    filename: "init.rc",
+    installable: false,
 }
 
 prebuilt_etc {

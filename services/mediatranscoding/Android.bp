@@ -7,8 +7,14 @@ cc_library_shared {
         "SimulatedTranscoder.cpp",
     ],
 
+    min_sdk_version: "29",
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
+
     shared_libs: [
-        "libandroid",
+        "libandroid#31",
         "libbase",
         "libbinder_ndk",
         "libcutils",
@@ -48,11 +54,15 @@ cc_binary {
         "libmediatranscodingservice",
     ],
 
+    min_sdk_version: "29",
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
+
     static_libs: [
         "mediatranscoding_aidl_interface-ndk_platform",
     ],
-
-    init_rc: ["mediatranscoding.rc"],
 
     cflags: [
         "-Werror",
