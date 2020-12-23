@@ -1028,7 +1028,6 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         if (*output != AUDIO_IO_HANDLE_NONE && setMsdPatch(device) == NO_ERROR) {
             ALOGV("%s() Using MSD devices %s instead of devices %s",
                   __func__, msdDevices.toString().c_str(), outputDevices.toString().c_str());
-            outputDevices = msdDevices;
         } else {
             *output = AUDIO_IO_HANDLE_NONE;
         }
