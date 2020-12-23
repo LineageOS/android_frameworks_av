@@ -184,16 +184,7 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
         break;
 
     case STRATEGY_DTMF:
-        if (!isInCall()) {
-            // when off call, DTMF strategy follows the same rules as MEDIA strategy
-            devices = getDevicesForStrategyInt(
-                    STRATEGY_MEDIA, availableOutputDevices, availableInputDevices, outputs);
-            break;
-        }
-        // when in call, DTMF and PHONE strategies follow the same rules
-        FALLTHROUGH_INTENDED;
-
-    case STRATEGY_PHONE:
+    case STRATEGY_PHONE: {
         // Force use of only devices on primary output if:
         // - in call AND
         //   - cannot route from voice call RX OR
@@ -216,84 +207,24 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                     availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID));
 
             if ((availableInputDevices.getDevice(AUDIO_DEVICE_IN_TELEPHONY_RX,
-                    String8(""), AUDIO_FORMAT_DEFAULT) == nullptr) ||
-                    ((availPrimaryInputDevices.getDevice(
-                            txDevice, String8(""), AUDIO_FORMAT_DEFAULT) != nullptr) &&
-                            (primaryOutput->getPolicyAudioPort()->getModuleVersionMajor() < 3))) {
+                                                 String8(""), AUDIO_FORMAT_DEFAULT) == nullptr) ||
+                ((availPrimaryInputDevices.getDevice(
+                        txDevice, String8(""), AUDIO_FORMAT_DEFAULT) != nullptr) &&
+                 (primaryOutput->getPolicyAudioPort()->getModuleVersionMajor() < 3))) {
                 availableOutputDevices = availPrimaryOutputDevices;
             }
         }
-        // for phone strategy, we first consider the forced use and then the available devices by
-        // order of priority
-        switch (getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION)) {
-        case AUDIO_POLICY_FORCE_BT_SCO:
-            if (!isInCall() || strategy != STRATEGY_DTMF) {
-                devices = availableOutputDevices.getDevicesFromType(
-                        AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT);
-                if (!devices.isEmpty()) break;
-            }
-            devices = availableOutputDevices.getFirstDevicesFromTypes({
-                    AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET, AUDIO_DEVICE_OUT_BLUETOOTH_SCO});
-            if (!devices.isEmpty()) break;
-            // if SCO device is requested but no SCO device is available, fall back to default case
-            FALLTHROUGH_INTENDED;
-
-        default:    // FORCE_NONE
-            devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
-            if (!devices.isEmpty()) break;
-
-            // TODO (b/161358428): remove when preferred device
-            //  for strategy phone will be used instead of AUDIO_POLICY_FORCE_FOR_COMMUNICATION
-            devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_BLE_HEADSET);
-            if (!devices.isEmpty()) break;
-
-            // when not in a phone call, phone strategy should route STREAM_VOICE_CALL to A2DP
-            if (!isInCall() &&
-                    (getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
-                devices = availableOutputDevices.getFirstDevicesFromTypes({
-                        AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
-                        AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES});
-                if (!devices.isEmpty()) break;
-            }
-            devices = availableOutputDevices.getFirstDevicesFromTypes({
-                    AUDIO_DEVICE_OUT_WIRED_HEADPHONE, AUDIO_DEVICE_OUT_WIRED_HEADSET,
-                    AUDIO_DEVICE_OUT_LINE, AUDIO_DEVICE_OUT_USB_HEADSET,
-                    AUDIO_DEVICE_OUT_USB_DEVICE});
-            if (!devices.isEmpty()) break;
-            if (!isInCall()) {
-                devices = availableOutputDevices.getFirstDevicesFromTypes({
-                        AUDIO_DEVICE_OUT_USB_ACCESSORY, AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET,
-                        AUDIO_DEVICE_OUT_AUX_DIGITAL, AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET});
-                if (!devices.isEmpty()) break;
-            }
-            devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_EARPIECE);
-            break;
-
-        case AUDIO_POLICY_FORCE_SPEAKER:
-            // when not in a phone call, phone strategy should route STREAM_VOICE_CALL to
-            // A2DP speaker when forcing to speaker output
-            if (!isInCall()) {
-                devices = availableOutputDevices.getDevicesFromType(
-                        AUDIO_DEVICE_OUT_BLE_SPEAKER);
-                if (!devices.isEmpty()) break;
-
-                if ((getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA) != AUDIO_POLICY_FORCE_NO_BT_A2DP)) {
-                    devices = availableOutputDevices.getDevicesFromType(
-                            AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
-                    if (!devices.isEmpty()) break;
-                }
-            }
-            if (!isInCall()) {
-                devices = availableOutputDevices.getFirstDevicesFromTypes({
-                        AUDIO_DEVICE_OUT_USB_ACCESSORY, AUDIO_DEVICE_OUT_USB_DEVICE,
-                        AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_AUX_DIGITAL,
-                        AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET});
-                if (!devices.isEmpty()) break;
-            }
-            devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
-            break;
-        }
-    break;
+        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
+        if (!devices.isEmpty()) break;
+        devices = availableOutputDevices.getFirstDevicesFromTypes({
+                                                                  AUDIO_DEVICE_OUT_WIRED_HEADPHONE,
+                                                                  AUDIO_DEVICE_OUT_WIRED_HEADSET,
+                                                                  AUDIO_DEVICE_OUT_LINE,
+                                                                  AUDIO_DEVICE_OUT_USB_HEADSET,
+                                                                  AUDIO_DEVICE_OUT_USB_DEVICE});
+        if (!devices.isEmpty()) break;
+        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_EARPIECE);
+    } break;
 
     case STRATEGY_SONIFICATION:
 
@@ -336,7 +267,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                 }
             }
             // Use both Bluetooth SCO and phone default output when ringing in normal mode
-            if (getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) == AUDIO_POLICY_FORCE_BT_SCO) {
+            if (audio_is_bluetooth_out_sco_device(getPreferredDeviceTypeForLegacyStrategy(
+                    availableOutputDevices, STRATEGY_PHONE))) {
                 if (strategy == STRATEGY_SONIFICATION) {
                     devices.replaceDevicesByType(
                             AUDIO_DEVICE_OUT_SPEAKER,
@@ -506,13 +438,16 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         }
     }
 
+    audio_devices_t commDeviceType =
+        getPreferredDeviceTypeForLegacyStrategy(availableOutputDevices, STRATEGY_PHONE);
+
     switch (inputSource) {
     case AUDIO_SOURCE_DEFAULT:
     case AUDIO_SOURCE_MIC:
         device = availableDevices.getDevice(
                 AUDIO_DEVICE_IN_BLUETOOTH_A2DP, String8(""), AUDIO_FORMAT_DEFAULT);
         if (device != nullptr) break;
-        if (getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) == AUDIO_POLICY_FORCE_BT_SCO) {
+        if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
             device = availableDevices.getDevice(
                     AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
             if (device != nullptr) break;
@@ -533,30 +468,29 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             availableDevices = availablePrimaryDevices;
         }
 
-        switch (getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION)) {
-        case AUDIO_POLICY_FORCE_BT_SCO:
+        if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
             // if SCO device is requested but no SCO device is available, fall back to default case
             device = availableDevices.getDevice(
                     AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
             if (device != nullptr) {
                 break;
             }
-            FALLTHROUGH_INTENDED;
-
-        default:    // FORCE_NONE
-            // TODO (b/161358428): remove AUDIO_DEVICE_IN_BLE_HEADSET from the list
-            //  when preferred device for strategy phone will be used instead of
-            //  AUDIO_POLICY_FORCE_FOR_COMMUNICATION.
-            device = availableDevices.getFirstExistingDevice({
-                    AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
-                    AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
-                    AUDIO_DEVICE_IN_BUILTIN_MIC});
+        }
+        switch (commDeviceType) {
+        case AUDIO_DEVICE_OUT_BLE_HEADSET:
+            device = availableDevices.getDevice(
+                    AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
             break;
-
-        case AUDIO_POLICY_FORCE_SPEAKER:
+        case AUDIO_DEVICE_OUT_SPEAKER:
             device = availableDevices.getFirstExistingDevice({
                     AUDIO_DEVICE_IN_BACK_MIC, AUDIO_DEVICE_IN_BUILTIN_MIC});
             break;
+        default:    // FORCE_NONE
+            device = availableDevices.getFirstExistingDevice({
+                    AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_IN_USB_HEADSET,
+                    AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+            break;
+
         }
         break;
 
@@ -569,7 +503,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
             LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
             availableDevices = availablePrimaryDevices;
         }
-        if (getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) == AUDIO_POLICY_FORCE_BT_SCO) {
+        if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
             device = availableDevices.getDevice(
                     AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
             if (device != nullptr) break;
@@ -619,6 +553,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         ALOGE_IF(device == nullptr,
                  "getDeviceForInputSource() no default device defined");
     }
+
     ALOGV_IF(device != nullptr,
              "getDeviceForInputSource()input source %d, device %08x",
              inputSource, device->type());
@@ -636,17 +571,35 @@ void Engine::updateDeviceSelectionCache()
     }
 }
 
-DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) const {
-    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+product_strategy_t Engine::getProductStrategyFromLegacy(legacy_strategy legacyStrategy) const {
+    for (const auto& strategyMap : mLegacyStrategyMap) {
+        if (strategyMap.second == legacyStrategy) {
+            return strategyMap.first;
+        }
+    }
+    return PRODUCT_STRATEGY_NONE;
+}
 
-    // check if this strategy has a preferred device that is available,
-    // if yes, give priority to it
+audio_devices_t Engine::getPreferredDeviceTypeForLegacyStrategy(
+        const DeviceVector& availableOutputDevices, legacy_strategy legacyStrategy) const {
+    product_strategy_t strategy = getProductStrategyFromLegacy(legacyStrategy);
+    DeviceVector devices = getPreferredAvailableDevicesForProductStrategy(
+            availableOutputDevices, strategy);
+    if (devices.size() > 0) {
+        return devices[0]->type();
+    }
+    return AUDIO_DEVICE_NONE;
+}
+
+DeviceVector Engine::getPreferredAvailableDevicesForProductStrategy(
+        const DeviceVector& availableOutputDevices, product_strategy_t strategy) const {
+    DeviceVector preferredAvailableDevVec = {};
     AudioDeviceTypeAddrVector preferredStrategyDevices;
     const status_t status = getDevicesForRoleAndStrategy(
             strategy, DEVICE_ROLE_PREFERRED, preferredStrategyDevices);
     if (status == NO_ERROR) {
         // there is a preferred device, is it available?
-        DeviceVector preferredAvailableDevVec =
+        preferredAvailableDevVec =
                 availableOutputDevices.getDevicesFromDeviceTypeAddrVec(preferredStrategyDevices);
         if (preferredAvailableDevVec.size() == preferredAvailableDevVec.size()) {
             ALOGVV("%s using pref device %s for strategy %u",
@@ -654,11 +607,30 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
             return preferredAvailableDevVec;
         }
     }
+    return preferredAvailableDevVec;
+}
+
+DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) const {
+    DeviceVector availableOutputDevices = getApmObserver()->getAvailableOutputDevices();
+    auto legacyStrategy = mLegacyStrategyMap.find(strategy) != end(mLegacyStrategyMap) ?
+                          mLegacyStrategyMap.at(strategy) : STRATEGY_NONE;
+
+    // When not in call, STRATEGY_PHONE and STRATEGY_DTMF follow STRATEGY_MEDIA
+    if (!isInCall() && (legacyStrategy == STRATEGY_PHONE || legacyStrategy == STRATEGY_DTMF)) {
+        legacyStrategy = STRATEGY_MEDIA;
+        strategy = getProductStrategyFromLegacy(STRATEGY_MEDIA);
+    }
+    // check if this strategy has a preferred device that is available,
+    // if yes, give priority to it.
+    DeviceVector preferredAvailableDevVec =
+            getPreferredAvailableDevicesForProductStrategy(availableOutputDevices, strategy);
+    if (!preferredAvailableDevVec.isEmpty()) {
+        return preferredAvailableDevVec;
+    }
 
     DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
     const SwAudioOutputCollection& outputs = getApmObserver()->getOutputs();
-    auto legacyStrategy = mLegacyStrategyMap.find(strategy) != end(mLegacyStrategyMap) ?
-                          mLegacyStrategyMap.at(strategy) : STRATEGY_NONE;
+
     return getDevicesForStrategyInt(legacyStrategy,
                                     availableOutputDevices,
                                     availableInputDevices, outputs);

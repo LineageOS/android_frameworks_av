@@ -790,16 +790,7 @@ void AudioPolicyManager::setForceUse(audio_policy_force_use_t usage,
     }
 
     updateCallAndOutputRouting(forceVolumeReeval, delayMs);
-
-    for (const auto& activeDesc : mInputs.getActiveInputs()) {
-        auto newDevice = getNewInputDevice(activeDesc);
-        // Force new input selection if the new device can not be reached via current input
-        if (activeDesc->mProfile->getSupportedDevices().contains(newDevice)) {
-            setInputDevice(activeDesc->mIoHandle, newDevice);
-        } else {
-            closeInput(activeDesc->mIoHandle);
-        }
-    }
+    updateInputRouting();
 }
 
 void AudioPolicyManager::setSystemProperty(const char* property, const char* value)
@@ -3145,6 +3136,7 @@ status_t AudioPolicyManager::removeUidDeviceAffinities(uid_t uid) {
     return res;
 }
 
+
 status_t AudioPolicyManager::setDevicesRoleForStrategy(product_strategy_t strategy,
                                                        device_role_t role,
                                                        const AudioDeviceTypeAddrVector &devices) {
@@ -3162,7 +3154,17 @@ status_t AudioPolicyManager::setDevicesRoleForStrategy(product_strategy_t strate
     }
 
     checkForDeviceAndOutputChanges();
-    updateCallAndOutputRouting();
+
+    bool forceVolumeReeval = false;
+    // FIXME: workaround for truncated touch sounds
+    // to be removed when the problem is handled by system UI
+    uint32_t delayMs = 0;
+    if (strategy == mCommunnicationStrategy) {
+        forceVolumeReeval = true;
+        delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
+        updateInputRouting();
+    }
+    updateCallAndOutputRouting(forceVolumeReeval, delayMs);
 
     return NO_ERROR;
 }
@@ -3193,6 +3195,18 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
     }
 }
 
+void AudioPolicyManager::updateInputRouting() {
+    for (const auto& activeDesc : mInputs.getActiveInputs()) {
+        auto newDevice = getNewInputDevice(activeDesc);
+        // Force new input selection if the new device can not be reached via current input
+        if (activeDesc->mProfile->getSupportedDevices().contains(newDevice)) {
+            setInputDevice(activeDesc->mIoHandle, newDevice);
+        } else {
+            closeInput(activeDesc->mIoHandle);
+        }
+    }
+}
+
 status_t AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
                                                           device_role_t role)
 {
@@ -3200,12 +3214,23 @@ status_t AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t str
 
     status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role);
     if (status != NO_ERROR) {
-        ALOGW("Engine could not remove preferred device for strategy %d", strategy);
+        ALOGV("Engine could not remove preferred device for strategy %d status %d",
+                strategy, status);
         return status;
     }
 
     checkForDeviceAndOutputChanges();
-    updateCallAndOutputRouting();
+
+    bool forceVolumeReeval = false;
+    // FIXME: workaround for truncated touch sounds
+    // to be removed when the problem is handled by system UI
+    uint32_t delayMs = 0;
+    if (strategy == mCommunnicationStrategy) {
+        forceVolumeReeval = true;
+        delayMs = TOUCH_SOUND_FIXED_DELAY_MS;
+        updateInputRouting();
+    }
+    updateCallAndOutputRouting(forceVolumeReeval, delayMs);
 
     return NO_ERROR;
 }
@@ -3245,6 +3270,7 @@ status_t AudioPolicyManager::addDevicesRoleForCapturePreset(
             "Engine could not add preferred devices %s for audio source %d role %d",
             dumpAudioDeviceTypeAddrVector(devices).c_str(), audioSource, role);
 
+    updateInputRouting();
     return status;
 }
 
@@ -3263,6 +3289,7 @@ status_t AudioPolicyManager::removeDevicesRoleForCapturePreset(
     ALOGW_IF(status != NO_ERROR,
             "Engine could not remove devices role (%d) for capture preset %d", role, audioSource);
 
+    updateInputRouting();
     return status;
 }
 
@@ -3274,6 +3301,7 @@ status_t AudioPolicyManager::clearDevicesRoleForCapturePreset(audio_source_t aud
     ALOGW_IF(status != NO_ERROR,
             "Engine could not clear devices role (%d) for capture preset %d", role, audioSource);
 
+    updateInputRouting();
     return status;
 }
 
@@ -3343,7 +3371,9 @@ void AudioPolicyManager::dump(String8 *dst) const
     }
     dst->appendFormat(" TTS output %savailable\n", mTtsOutputAvailable ? "" : "not ");
     dst->appendFormat(" Master mono: %s\n", mMasterMono ? "on" : "off");
+    dst->appendFormat(" Communnication Strategy: %d\n", mCommunnicationStrategy);
     dst->appendFormat(" Config source: %s\n", mConfig.getSource().c_str()); // getConfig not const
+
     mAvailableOutputDevices.dump(dst, String8("Available output"));
     mAvailableInputDevices.dump(dst, String8("Available input"));
     mHwModulesAll.dump(dst);
@@ -4639,6 +4669,9 @@ status_t AudioPolicyManager::initialize() {
     // Silence ALOGV statements
     property_set("log.tag." LOG_TAG, "D");
 
+    mCommunnicationStrategy = mEngine->getProductStrategyForAttributes(
+            mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL));
+
     updateDevicesAndOutputs();
     return status;
 }
@@ -5466,6 +5499,17 @@ void AudioPolicyManager::checkSecondaryOutputs() {
     }
 }
 
+bool AudioPolicyManager::isScoRequestedForComm() const {
+    AudioDeviceTypeAddrVector devices;
+    mEngine->getDevicesForRoleAndStrategy(mCommunnicationStrategy, DEVICE_ROLE_PREFERRED, devices);
+    for (const auto &device : devices) {
+        if (audio_is_bluetooth_out_sco_device(device.mType)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void AudioPolicyManager::checkA2dpSuspend()
 {
     audio_io_handle_t a2dpOutput = mOutputs.getA2dpOutput();
@@ -5477,23 +5521,21 @@ void AudioPolicyManager::checkA2dpSuspend()
     bool isScoConnected =
             (mAvailableInputDevices.types().count(AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET) != 0 ||
              !Intersection(mAvailableOutputDevices.types(), getAudioDeviceOutAllScoSet()).empty());
+    bool isScoRequested = isScoRequestedForComm();
 
     // if suspended, restore A2DP output if:
     //      ((SCO device is NOT connected) ||
-    //       ((forced usage communication is NOT SCO) && (forced usage for record is NOT SCO) &&
+    //       ((SCO is not requested) &&
     //        (phone state is NOT in call) && (phone state is NOT ringing)))
     //
     // if not suspended, suspend A2DP output if:
     //      (SCO device is connected) &&
-    //       ((forced usage for communication is SCO) || (forced usage for record is SCO) ||
+    //       ((SCO is requested) ||
     //       ((phone state is in call) || (phone state is ringing)))
     //
     if (mA2dpSuspended) {
         if (!isScoConnected ||
-             ((mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) !=
-                     AUDIO_POLICY_FORCE_BT_SCO) &&
-              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) !=
-                      AUDIO_POLICY_FORCE_BT_SCO) &&
+             (!isScoRequested &&
               (mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) &&
               (mEngine->getPhoneState() != AUDIO_MODE_RINGTONE))) {
 
@@ -5502,10 +5544,7 @@ void AudioPolicyManager::checkA2dpSuspend()
         }
     } else {
         if (isScoConnected &&
-             ((mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION) ==
-                     AUDIO_POLICY_FORCE_BT_SCO) ||
-              (mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_RECORD) ==
-                      AUDIO_POLICY_FORCE_BT_SCO) ||
+             (isScoRequested ||
               (mEngine->getPhoneState() == AUDIO_MODE_IN_CALL) ||
               (mEngine->getPhoneState() == AUDIO_MODE_RINGTONE))) {
 
@@ -6217,16 +6256,17 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     bool isVoiceVolSrc = callVolSrc == volumeSource;
     bool isBtScoVolSrc = btScoVolSrc == volumeSource;
 
-    audio_policy_forced_cfg_t forceUseForComm =
-            mEngine->getForceUse(AUDIO_POLICY_FORCE_FOR_COMMUNICATION);
+    bool isScoRequested = isScoRequestedForComm();
     // do not change in call volume if bluetooth is connected and vice versa
     // if sco and call follow same curves, bypass forceUseForComm
     if ((callVolSrc != btScoVolSrc) &&
-            ((isVoiceVolSrc && forceUseForComm == AUDIO_POLICY_FORCE_BT_SCO) ||
-             (isBtScoVolSrc && forceUseForComm != AUDIO_POLICY_FORCE_BT_SCO))) {
-        ALOGV("%s cannot set volume group %d volume with force use = %d for comm", __func__,
-             volumeSource, forceUseForComm);
-        return INVALID_OPERATION;
+            ((isVoiceVolSrc && isScoRequested) ||
+             (isBtScoVolSrc && !isScoRequested))) {
+        ALOGV("%s cannot set volume group %d volume when is%srequested for comm", __func__,
+             volumeSource, isScoRequested ? " " : "n ot ");
+        // Do not return an error here as AudioService will always set both voice call
+        // and bluetooth SCO volumes due to stream aliasing.
+        return NO_ERROR;
     }
     if (deviceTypes.empty()) {
         deviceTypes = outputDesc->devices().types();
