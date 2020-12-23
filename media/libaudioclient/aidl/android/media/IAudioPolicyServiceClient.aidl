@@ -44,4 +44,6 @@ oneway interface IAudioPolicyServiceClient {
                                         in EffectDescriptor[] effects,
                                         int /* audio_patch_handle_t */ patchHandle,
                                         AudioSourceType source);
+     /** Notifies a change of audio routing */
+     void onRoutingUpdated();
 }
