@@ -44,14 +44,12 @@ public:
             const media::VolumeShaperConfiguration& configuration,
             const media::VolumeShaperOperation& operation) override;
 
-            status_t startWithStatus(audio_port_handle_t deviceId);
+            status_t startWithStatus();
             status_t pauseWithStatus();
             status_t stopWithStatus();
 
             //FIXME temporary method while some player state is outside of this class
-            void reportEvent(player_state_t event, audio_port_handle_t deviceId);
-
-            void baseUpdateDeviceId(audio_port_handle_t deviceId);
+            void reportEvent(player_state_t event);
 
 protected:
 
@@ -73,7 +71,7 @@ protected:
 
 private:
             // report events to AudioService
-            void servicePlayerEvent(player_state_t event, audio_port_handle_t deviceId);
+            void servicePlayerEvent(player_state_t event);
             void serviceReleasePlayer();
 
     // native interface to AudioService
@@ -85,9 +83,6 @@ private:
     // Mutex for state reporting
     Mutex mPlayerStateLock;
     player_state_t mLastReportedEvent;
-
-    Mutex mDeviceIdLock;
-    audio_port_handle_t mLastReportedDeviceId;
 };
 
 } // namespace android
