@@ -340,7 +340,7 @@ int main(int argc, const char* argv[]) {
     const int outChannelCount = (channelCount == 1 ? 2 : channelCount);
 
     std::vector<short> in(frameLength * maxChannelCount);
-    std::vector<short> out(frameLength * maxChannelCount);
+    std::vector<short> out(frameLength * outChannelCount);
     std::vector<float> floatIn(frameLength * channelCount);
     std::vector<float> floatOut(frameLength * outChannelCount);
 
