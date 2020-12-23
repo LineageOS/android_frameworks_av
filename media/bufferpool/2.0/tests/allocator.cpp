@@ -120,6 +120,24 @@ struct AllocationDtor {
 
 }
 
+void IpcMutex::init() {
+  pthread_mutexattr_t mattr;
+  pthread_mutexattr_init(&mattr);
+  pthread_mutexattr_setpshared(&mattr, PTHREAD_PROCESS_SHARED);
+  pthread_mutex_init(&lock, &mattr);
+  pthread_mutexattr_destroy(&mattr);
+
+  pthread_condattr_t cattr;
+  pthread_condattr_init(&cattr);
+  pthread_condattr_setpshared(&cattr, PTHREAD_PROCESS_SHARED);
+  pthread_cond_init(&cond, &cattr);
+  pthread_condattr_destroy(&cattr);
+}
+
+IpcMutex *IpcMutex::Import(void *pMutex) {
+  return reinterpret_cast<IpcMutex *>(pMutex);
+}
+
 
 ResultStatus TestBufferPoolAllocator::allocate(
     const std::vector<uint8_t> &params,
@@ -201,9 +219,33 @@ bool TestBufferPoolAllocator::Verify(const native_handle_t *handle, const unsign
   return false;
 }
 
+bool TestBufferPoolAllocator::MapMemoryForMutex(const native_handle_t *handle, void **mem) {
+  if (!HandleAshmem::isValid(handle)) {
+    return false;
+  }
+  const HandleAshmem *o = static_cast<const HandleAshmem*>(handle);
+  *mem = mmap(
+      NULL, o->size(), PROT_READ|PROT_WRITE, MAP_SHARED, o->ashmemFd(), 0);
+  if (*mem == MAP_FAILED || *mem == nullptr) {
+    return false;
+  }
+  return true;
+}
+
+bool TestBufferPoolAllocator::UnmapMemoryForMutex(void *mem) {
+  munmap(mem, sizeof(IpcMutex));
+  return true;
+}
+
 void getTestAllocatorParams(std::vector<uint8_t> *params) {
   constexpr static int kAllocationSize = 1024 * 10;
   Params ashmemParams(kAllocationSize);
+
+  params->assign(ashmemParams.array, ashmemParams.array + sizeof(ashmemParams));
+}
+
+void getIpcMutexParams(std::vector<uint8_t> *params) {
+  Params ashmemParams(sizeof(IpcMutex));
 
   params->assign(ashmemParams.array, ashmemParams.array + sizeof(ashmemParams));
 }
