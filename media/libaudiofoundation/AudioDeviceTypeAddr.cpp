@@ -19,6 +19,7 @@
 #include <arpa/inet.h>
 #include <iostream>
 #include <regex>
+#include <set>
 #include <sstream>
 
 namespace android {
@@ -80,6 +81,14 @@ bool AudioDeviceTypeAddr::operator<(const AudioDeviceTypeAddr& other) const {
     return false;
 }
 
+bool AudioDeviceTypeAddr::operator==(const AudioDeviceTypeAddr &rhs) const {
+    return equals(rhs);
+}
+
+bool AudioDeviceTypeAddr::operator!=(const AudioDeviceTypeAddr &rhs) const {
+    return !operator==(rhs);
+}
+
 void AudioDeviceTypeAddr::reset() {
     mType = AUDIO_DEVICE_NONE;
     setAddress("");
@@ -118,6 +127,20 @@ DeviceTypeSet getAudioDeviceTypes(const AudioDeviceTypeAddrVector& deviceTypeAdd
         deviceTypes.insert(deviceTypeAddr.mType);
     }
     return deviceTypes;
+}
+
+AudioDeviceTypeAddrVector excludeDeviceTypeAddrsFrom(
+        const AudioDeviceTypeAddrVector& devices,
+        const AudioDeviceTypeAddrVector& devicesToExclude) {
+    std::set<AudioDeviceTypeAddr> devicesToExcludeSet(
+            devicesToExclude.begin(), devicesToExclude.end());
+    AudioDeviceTypeAddrVector remainedDevices;
+    for (const auto& device : devices) {
+        if (devicesToExcludeSet.count(device) == 0) {
+            remainedDevices.push_back(device);
+        }
+    }
+    return remainedDevices;
 }
 
 std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& deviceTypeAddrs,
