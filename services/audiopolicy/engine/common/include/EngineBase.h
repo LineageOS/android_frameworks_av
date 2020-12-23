@@ -127,11 +127,36 @@ public:
 
     status_t restoreOriginVolumeCurve(audio_stream_type_t stream);
 
+    status_t setDevicesRoleForCapturePreset(audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) override;
+
+    status_t addDevicesRoleForCapturePreset(audio_source_t audioSource, device_role_t role,
+            const AudioDeviceTypeAddrVector &devices) override;
+
+    /**
+     * Remove devices role for capture preset. When `forceMatched` is true, the devices to be
+     * removed must all show as role for the capture preset. Otherwise, only devices that has shown
+     * as role for the capture preset will be remove.
+     */
+    status_t doRemoveDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role, const AudioDeviceTypeAddrVector& devices,
+            bool forceMatched=true);
+
+    status_t removeDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role, const AudioDeviceTypeAddrVector& devices) override;
+
+    status_t clearDevicesRoleForCapturePreset(audio_source_t audioSource,
+            device_role_t role) override;
+
+    status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
+            device_role_t role, AudioDeviceTypeAddrVector &devices) const override;
+
 private:
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
     ProductStrategyPreferredRoutingMap mProductStrategyPreferredDevices;
+    CapturePresetDevicesRoleMap mCapturePresetDevicesRole;
     VolumeGroupMap mVolumeGroups;
     LastRemovableMediaDevices mLastRemovableMediaDevices;
     audio_mode_t mPhoneState = AUDIO_MODE_NORMAL;  /**< current phone state. */
