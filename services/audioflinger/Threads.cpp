@@ -1864,7 +1864,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         // index 0 is reserved for normal mixer's submix
         mFastTrackAvailMask(((1 << FastMixerState::sMaxFastTracks) - 1) & ~1),
         mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
-        mLeftVolFloat(-1.0), mRightVolFloat(-1.0)
+        mLeftVolFloat(-1.0), mRightVolFloat(-1.0),
+        mDownStreamPatch{}
 {
     snprintf(mThreadName, kThreadNameLength, "AudioOut_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
@@ -2632,12 +2633,16 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
     ALOGV("PlaybackThread::ioConfigChanged, thread %p, event %d", this, event);
 
     desc->mIoHandle = mId;
+    struct audio_patch patch = mPatch;
+    if (isMsdDevice()) {
+        patch = mDownStreamPatch;
+    }
 
     switch (event) {
     case AUDIO_OUTPUT_OPENED:
     case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
-        desc->mPatch = mPatch;
+        desc->mPatch = patch;
         desc->mChannelMask = mChannelMask;
         desc->mSamplingRate = mSampleRate;
         desc->mFormat = mFormat;
@@ -2647,7 +2652,7 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
         desc->mLatency = latency_l();
         break;
     case AUDIO_CLIENT_STARTED:
-        desc->mPatch = mPatch;
+        desc->mPatch = patch;
         desc->mPortId = portId;
         break;
     case AUDIO_OUTPUT_CLOSED:
