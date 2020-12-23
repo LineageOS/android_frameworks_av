@@ -354,6 +354,7 @@ class CameraDevice final : public RefBase {
     void checkRepeatingSequenceCompleteLocked(const int sequenceId, const int64_t lastFrameNumber);
     void checkAndFireSequenceCompleteLocked();
     void removeCompletedCallbackHolderLocked(int64_t lastCompletedRegularFrameNumber);
+    void sendCaptureSequenceCompletedLocked(int sequenceId, int64_t lastFrameNumber);
 
     // Misc variables
     int32_t mShadingMapSize[2];   // const after constructor
