@@ -345,6 +345,10 @@ public:
 
             void onAudioVolumeGroupChanged(volume_group_t group, int flags);
             void doOnAudioVolumeGroupChanged(volume_group_t group, int flags);
+
+            void onRoutingUpdated();
+            void doOnRoutingUpdated();
+
             void setEffectSuspended(int effectId,
                                     audio_session_t sessionId,
                                     bool suspended);
@@ -497,6 +501,7 @@ private:
             RECORDING_CONFIGURATION_UPDATE,
             SET_EFFECT_SUSPENDED,
             AUDIO_MODULES_UPDATE,
+            ROUTING_UPDATED,
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -543,6 +548,7 @@ private:
                                                           audio_session_t sessionId,
                                                           bool suspended);
                     void        audioModulesUpdateCommand();
+                    void        routingChangedCommand();
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;
@@ -761,6 +767,8 @@ private:
 
         virtual void onAudioVolumeGroupChanged(volume_group_t group, int flags);
 
+        virtual void onRoutingUpdated();
+
         virtual audio_unique_id_t newAudioUniqueId(audio_unique_id_use_t use);
 
         void setSoundTriggerCaptureState(bool active) override;
@@ -793,6 +801,7 @@ private:
                                                     std::vector<effect_descriptor_t> effects,
                                                     audio_patch_handle_t patchHandle,
                                                     audio_source_t source);
+                            void      onRoutingUpdated();
                             void      setAudioPortCallbacksEnabled(bool enabled);
                             void setAudioVolumeGroupCallbacksEnabled(bool enabled);
 

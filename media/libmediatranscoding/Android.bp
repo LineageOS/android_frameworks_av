@@ -44,12 +44,31 @@ aidl_interface {
     {
         java: {
             enabled: true,
+            apex_available: [
+                "com.android.media",
+                "test_com.android.media",
+            ],
+            min_sdk_version: "29",
+        },
+        ndk: {
+            enabled: true,
+            apex_available: [
+                "com.android.media",
+                "test_com.android.media",
+            ],
+            min_sdk_version: "29",
         },
     },
 }
 
 cc_library {
     name: "libmediatranscoding",
+
+    min_sdk_version: "29",
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
 
     srcs: [
         "TranscodingClientManager.cpp",
@@ -60,7 +79,7 @@ cc_library {
     ],
 
     shared_libs: [
-        "libandroid",
+        "libandroid#31",
         "libbinder_ndk",
         "libcutils",
         "liblog",

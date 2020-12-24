@@ -53,6 +53,7 @@ sp<AudioSystem::AudioFlingerClient> AudioSystem::gAudioFlingerClient;
 std::set<audio_error_callback> AudioSystem::gAudioErrorCallbacks;
 dynamic_policy_callback AudioSystem::gDynPolicyCallback = NULL;
 record_config_callback AudioSystem::gRecordConfigCallback = NULL;
+routing_callback AudioSystem::gRoutingCallback = NULL;
 
 // Required to be held while calling into gSoundTriggerCaptureStateListener.
 class CaptureStateListenerImpl;
@@ -769,6 +770,12 @@ status_t AudioSystem::AudioFlingerClient::removeAudioDeviceCallback(
 {
     Mutex::Autolock _l(gLock);
     gRecordConfigCallback = cb;
+}
+
+/*static*/ void AudioSystem::setRoutingCallback(routing_callback cb)
+{
+    Mutex::Autolock _l(gLock);
+    gRoutingCallback = cb;
 }
 
 // client singleton for AudioPolicyService binder interface
@@ -1910,6 +1917,19 @@ Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
                 aidl2legacy_AudioSourceType_audio_source_t(source));
         cb(eventLegacy, &clientInfoLegacy, &clientConfigLegacy, clientEffectsLegacy,
            &deviceConfigLegacy, effectsLegacy, patchHandleLegacy, sourceLegacy);
+    }
+    return Status::ok();
+}
+
+Status AudioSystem::AudioPolicyServiceClient::onRoutingUpdated() {
+    routing_callback cb = NULL;
+    {
+        Mutex::Autolock _l(AudioSystem::gLock);
+        cb = gRoutingCallback;
+    }
+
+    if (cb != NULL) {
+        cb();
     }
     return Status::ok();
 }

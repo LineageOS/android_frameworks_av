@@ -28,6 +28,14 @@ cc_defaults {
         "VideoTrackTranscoder.cpp",
     ],
 
+    min_sdk_version: "29",
+    apex_available: [
+        "com.android.media",
+        "test_com.android.media",
+    ],
+
+    //header_libs: [ "libarect_headers", "libarect_headers_for_ndk" ],
+    static_libs: [ "libarect" ],
     shared_libs: [
         "libbase",
         "libcutils",
