@@ -813,6 +813,10 @@ void ID3::Iterator::findFrame() {
                 baseSize = U32_AT(&mParent.mData[mOffset + 4]);
             }
 
+            if (baseSize == 0) {
+                return;
+            }
+
             // Prevent integer overflow when adding
             if (SIZE_MAX - 10 <= baseSize) {
                 return;
