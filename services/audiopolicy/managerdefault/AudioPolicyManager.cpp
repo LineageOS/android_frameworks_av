@@ -5362,6 +5362,8 @@ void AudioPolicyManager::checkForDeviceAndOutputChanges(std::function<bool()> on
     if (mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD) != 0) {
         setMsdPatch();
     }
+    // an event that changed routing likely occurred, inform upper layers
+    mpClientInterface->onRoutingUpdated();
 }
 
 bool AudioPolicyManager::followsSameRouting(const audio_attributes_t &lAttr,

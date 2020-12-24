@@ -17,7 +17,6 @@
 #ifndef ANDROID_TRANSCODER_WRAPPER_H
 #define ANDROID_TRANSCODER_WRAPPER_H
 
-#include <android-base/thread_annotations.h>
 #include <media/NdkMediaError.h>
 #include <media/TranscoderInterface.h>
 

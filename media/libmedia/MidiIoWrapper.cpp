@@ -21,6 +21,7 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <algorithm>
 
 #include <media/MidiIoWrapper.h>
 #include <media/MediaExtractorPluginApi.h>
@@ -33,6 +34,8 @@ static int size(void *handle) {
 }
 
 namespace android {
+int MidiIoWrapper::sCacheBufferSize = 0;
+Mutex MidiIoWrapper::mCacheLock;
 
 MidiIoWrapper::MidiIoWrapper(const char *path) {
     ALOGV("MidiIoWrapper(%s)", path);
@@ -40,6 +43,8 @@ MidiIoWrapper::MidiIoWrapper(const char *path) {
     mBase = 0;
     mLength = lseek(mFd, 0, SEEK_END);
     mDataSource = nullptr;
+    mCacheBuffer = NULL;
+    mCacheBufRangeLength = 0;
 }
 
 MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
@@ -48,6 +53,8 @@ MidiIoWrapper::MidiIoWrapper(int fd, off64_t offset, int64_t size) {
     mBase = offset;
     mLength = size;
     mDataSource = nullptr;
+    mCacheBuffer = NULL;
+    mCacheBufRangeLength = 0;
 }
 
 class MidiIoWrapper::DataSourceUnwrapper {
@@ -97,6 +104,8 @@ MidiIoWrapper::MidiIoWrapper(CDataSource *csource) {
     } else {
         mLength = 0;
     }
+    mCacheBuffer = NULL;
+    mCacheBufRangeLength = 0;
 }
 
 MidiIoWrapper::~MidiIoWrapper() {
@@ -105,11 +114,80 @@ MidiIoWrapper::~MidiIoWrapper() {
         close(mFd);
     }
     delete mDataSource;
+
+    if (NULL != mCacheBuffer) {
+        delete [] mCacheBuffer;
+        mCacheBuffer = NULL;
+        {
+            Mutex::Autolock _l(mCacheLock);
+            sCacheBufferSize -= mLength;
+        }
+    }
 }
 
 int MidiIoWrapper::readAt(void *buffer, int offset, int size) {
     ALOGV("readAt(%p, %d, %d)", buffer, offset, size);
 
+    if (offset < 0) {
+        return UNKNOWN_ERROR;
+    }
+
+    if (offset + size > mLength) {
+        size = mLength - offset;
+    }
+
+    if (mCacheBuffer == NULL) {
+        Mutex::Autolock _l(mCacheLock);
+        if (sCacheBufferSize + mLength <= kTotalCacheSize) {
+            mCacheBuffer = new (std::nothrow) unsigned char[mLength];
+            if (NULL != mCacheBuffer) {
+                sCacheBufferSize += mLength;
+                ALOGV("sCacheBufferSize : %d", sCacheBufferSize);
+            } else {
+                ALOGE("failed to allocate memory for mCacheBuffer");
+            }
+        } else {
+            ALOGV("not allocate memory for mCacheBuffer");
+        }
+    }
+
+    if (mCacheBuffer != NULL) {
+        if (mCacheBufRangeLength > 0 && mCacheBufRangeLength >= (offset + size)) {
+            /* Use buffered data */
+            memcpy(buffer, (void*)(mCacheBuffer + offset), size);
+            return size;
+        } else {
+            /* Buffer new data */
+            int64_t beyondCacheBufRangeLength = (offset + size) - mCacheBufRangeLength;
+            int64_t numRequiredBytesToCache =
+                  std::max((int64_t)kSingleCacheSize, beyondCacheBufRangeLength);
+            int64_t availableReadLength = mLength - mCacheBufRangeLength;
+            int64_t readSize = std::min(availableReadLength, numRequiredBytesToCache);
+            int actualNumBytesRead =
+                unbufferedReadAt(mCacheBuffer + mCacheBufRangeLength,
+                        mCacheBufRangeLength, readSize);
+            if(actualNumBytesRead > 0) {
+                mCacheBufRangeLength += actualNumBytesRead;
+                if (offset >= mCacheBufRangeLength) {
+                    return 0;
+                } else if (offset + size >= mCacheBufRangeLength) {
+                    memcpy(buffer, (void*)(mCacheBuffer + offset), mCacheBufRangeLength - offset);
+                    return mCacheBufRangeLength - offset;
+                } else {
+                    memcpy(buffer, (void*)(mCacheBuffer + offset), size);
+                    return size;
+                }
+            } else {
+                return actualNumBytesRead;
+            }
+        }
+    } else {
+        return unbufferedReadAt(buffer, offset, size);
+    }
+}
+
+int MidiIoWrapper::unbufferedReadAt(void *buffer, int offset, int size) {
+    ALOGV("unbufferedReadAt(%p, %d, %d)", buffer, offset, size);
     if (mDataSource != NULL) {
         return mDataSource->readAt(offset, buffer, size);
     }

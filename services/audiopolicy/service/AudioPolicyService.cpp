@@ -275,6 +275,19 @@ void AudioPolicyService::doOnRecordingConfigurationUpdate(
     }
 }
 
+void AudioPolicyService::onRoutingUpdated()
+{
+    mOutputCommandThread->routingChangedCommand();
+}
+
+void AudioPolicyService::doOnRoutingUpdated()
+{
+  Mutex::Autolock _l(mNotificationClientsLock);
+    for (size_t i = 0; i < mNotificationClients.size(); i++) {
+        mNotificationClients.valueAt(i)->onRoutingUpdated();
+    }
+}
+
 status_t AudioPolicyService::clientCreateAudioPatch(const struct audio_patch *patch,
                                                 audio_patch_handle_t *handle,
                                                 int delayMs)
@@ -402,6 +415,13 @@ void AudioPolicyService::NotificationClient::setAudioPortCallbacksEnabled(bool e
 void AudioPolicyService::NotificationClient::setAudioVolumeGroupCallbacksEnabled(bool enabled)
 {
     mAudioVolumeGroupCallbacksEnabled = enabled;
+}
+
+void AudioPolicyService::NotificationClient::onRoutingUpdated()
+{
+    if (mAudioPolicyServiceClient != 0 && isServiceUid(mUid)) {
+        mAudioPolicyServiceClient->onRoutingUpdated();
+    }
 }
 
 void AudioPolicyService::binderDied(const wp<IBinder>& who) {
@@ -1414,6 +1434,16 @@ bool AudioPolicyService::AudioCommandThread::threadLoop()
                     svc->doOnNewAudioModulesAvailable();
                     mLock.lock();
                     } break;
+                case ROUTING_UPDATED: {
+                    ALOGV("AudioCommandThread() processing routing update");
+                    svc = mService.promote();
+                    if (svc == 0) {
+                        break;
+                    }
+                    mLock.unlock();
+                    svc->doOnRoutingUpdated();
+                    mLock.lock();
+                    } break;
 
                 default:
                     ALOGW("AudioCommandThread() unknown command %d", command->mCommand);
@@ -1710,6 +1740,14 @@ void AudioPolicyService::AudioCommandThread::audioModulesUpdateCommand()
     sendCommand(command);
 }
 
+void AudioPolicyService::AudioCommandThread::routingChangedCommand()
+{
+    sp<AudioCommand>command = new AudioCommand();
+    command->mCommand = ROUTING_UPDATED;
+    ALOGV("AudioCommandThread() adding routing update");
+    sendCommand(command);
+}
+
 status_t AudioPolicyService::AudioCommandThread::sendCommand(sp<AudioCommand>& command, int delayMs)
 {
     {
@@ -1870,6 +1908,10 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
         } break;
 
         case RECORDING_CONFIGURATION_UPDATE: {
+
+        } break;
+
+        case ROUTING_UPDATED: {
 
         } break;
 
