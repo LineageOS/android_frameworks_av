@@ -61,24 +61,24 @@ public:
     /// Input Surface configuration
     struct Config {
         // IN PARAMS (GBS)
-        float mMinFps; // minimum fps (repeat frame to achieve this)
-        float mMaxFps; // max fps (via frame drop)
-        float mCaptureFps; // capture fps
-        float mCodedFps;   // coded fps
-        bool mSuspended; // suspended
-        int64_t mTimeOffsetUs; // time offset (input => codec)
-        int64_t mSuspendAtUs; // suspend/resume time
-        int64_t mStartAtUs; // start time
-        bool mStopped; // stopped
-        int64_t mStopAtUs; // stop time
+        float mMinFps = 0.0; // minimum fps (repeat frame to achieve this)
+        float mMaxFps = 0.0; // max fps (via frame drop)
+        float mCaptureFps = 0.0; // capture fps
+        float mCodedFps = 0.0;   // coded fps
+        bool mSuspended = false; // suspended
+        int64_t mTimeOffsetUs = 0; // time offset (input => codec)
+        int64_t mSuspendAtUs = 0; // suspend/resume time
+        int64_t mStartAtUs = 0; // start time
+        bool mStopped = false; // stopped
+        int64_t mStopAtUs = 0; // stop time
 
         // OUT PARAMS (GBS)
-        int64_t mInputDelayUs; // delay between encoder input and surface input
+        int64_t mInputDelayUs = 0; // delay between encoder input and surface input
 
         // IN PARAMS (CODEC WRAPPER)
-        float mFixedAdjustedFps; // fixed fps via PTS manipulation
-        float mMinAdjustedFps; // minimum fps via PTS manipulation
-        uint64_t mUsage; // consumer usage
+        float mFixedAdjustedFps = 0.0; // fixed fps via PTS manipulation
+        float mMinAdjustedFps = 0.0; // minimum fps via PTS manipulation
+        uint64_t mUsage = 0; // consumer usage
     };
 
     /**
