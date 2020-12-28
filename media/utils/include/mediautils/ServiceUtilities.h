@@ -110,7 +110,7 @@ public:
 private:
     static constexpr const char* nativePackageManagerName = "package_native";
     std::optional<bool> doIsAllowed(uid_t uid);
-    sp<content::pm::IPackageManagerNative> retreivePackageManager();
+    sp<content::pm::IPackageManagerNative> retrievePackageManager();
     sp<content::pm::IPackageManagerNative> mPackageManager; // To check apps manifest
     uint_t mPackageManagerErrors = 0;
     struct Package {
