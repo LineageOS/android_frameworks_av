@@ -200,9 +200,10 @@ struct Codec2Client : public Codec2ConfigurableClient {
     // Try to create a component with a given name from all known
     // IComponentStore services. numberOfAttempts determines the number of times
     // to retry the HIDL call if the transaction fails.
-    static std::shared_ptr<Component> CreateComponentByName(
+    static c2_status_t CreateComponentByName(
             char const* componentName,
             std::shared_ptr<Listener> const& listener,
+            std::shared_ptr<Component>* component,
             std::shared_ptr<Codec2Client>* owner = nullptr,
             size_t numberOfAttempts = 10);
 
