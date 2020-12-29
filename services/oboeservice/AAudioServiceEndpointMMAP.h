@@ -106,7 +106,12 @@ private:
 
     int64_t                                   mHardwareTimeOffsetNanos = 0; // TODO get from HAL
 
-    bool                                      mExternalPositionSupported = true;
+    aaudio_result_t                           mHalExternalPositionStatus = AAUDIO_OK;
+    uint64_t                                  mLastPositionFrames = 0;
+    int64_t                                   mTimestampNanosForLastPosition = 0;
+    int32_t                                   mTimestampGracePeriodMs;
+    int32_t                                   mFrozenPositionCount = 0;
+    int32_t                                   mFrozenTimestampCount = 0;
 
 };
 
