@@ -521,13 +521,11 @@ status_t HeicCompositeStream::configureStream() {
 status_t HeicCompositeStream::insertGbp(SurfaceMap* /*out*/outSurfaceMap,
         Vector<int32_t>* /*out*/outputStreamIds, int32_t* /*out*/currentStreamId) {
     if (outSurfaceMap->find(mAppSegmentStreamId) == outSurfaceMap->end()) {
-        (*outSurfaceMap)[mAppSegmentStreamId] = std::vector<size_t>();
         outputStreamIds->push_back(mAppSegmentStreamId);
     }
     (*outSurfaceMap)[mAppSegmentStreamId].push_back(mAppSegmentSurfaceId);
 
     if (outSurfaceMap->find(mMainImageStreamId) == outSurfaceMap->end()) {
-        (*outSurfaceMap)[mMainImageStreamId] = std::vector<size_t>();
         outputStreamIds->push_back(mMainImageStreamId);
     }
     (*outSurfaceMap)[mMainImageStreamId].push_back(mMainImageSurfaceId);

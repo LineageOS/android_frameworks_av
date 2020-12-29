@@ -286,7 +286,7 @@ status_t checkIMemory(const sp<IMemory>& iMemory)
     return NO_ERROR;
 }
 
-sp<content::pm::IPackageManagerNative> MediaPackageManager::retreivePackageManager() {
+sp<content::pm::IPackageManagerNative> MediaPackageManager::retrievePackageManager() {
     const sp<IServiceManager> sm = defaultServiceManager();
     if (sm == nullptr) {
         ALOGW("%s: failed to retrieve defaultServiceManager", __func__);
@@ -303,27 +303,27 @@ sp<content::pm::IPackageManagerNative> MediaPackageManager::retreivePackageManag
 std::optional<bool> MediaPackageManager::doIsAllowed(uid_t uid) {
     if (mPackageManager == nullptr) {
         /** Can not fetch package manager at construction it may not yet be registered. */
-        mPackageManager = retreivePackageManager();
+        mPackageManager = retrievePackageManager();
         if (mPackageManager == nullptr) {
             ALOGW("%s: Playback capture is denied as package manager is not reachable", __func__);
             return std::nullopt;
         }
     }
 
+    // Retrieve package names for the UID and transform to a std::vector<std::string>.
+    Vector<String16> str16PackageNames;
+    PermissionController{}.getPackagesForUid(uid, str16PackageNames);
     std::vector<std::string> packageNames;
-    auto status = mPackageManager->getNamesForUids({(int32_t)uid}, &packageNames);
-    if (!status.isOk()) {
-        ALOGW("%s: Playback capture is denied for uid %u as the package names could not be "
-              "retrieved from the package manager: %s", __func__, uid, status.toString8().c_str());
-        return std::nullopt;
+    for (const auto& str16PackageName : str16PackageNames) {
+        packageNames.emplace_back(String8(str16PackageName).string());
     }
     if (packageNames.empty()) {
         ALOGW("%s: Playback capture for uid %u is denied as no package name could be retrieved "
-              "from the package manager: %s", __func__, uid, status.toString8().c_str());
+              "from the package manager.", __func__, uid);
         return std::nullopt;
     }
     std::vector<bool> isAllowed;
-    status = mPackageManager->isAudioPlaybackCaptureAllowed(packageNames, &isAllowed);
+    auto status = mPackageManager->isAudioPlaybackCaptureAllowed(packageNames, &isAllowed);
     if (!status.isOk()) {
         ALOGW("%s: Playback capture is denied for uid %u as the manifest property could not be "
               "retrieved from the package manager: %s", __func__, uid, status.toString8().c_str());

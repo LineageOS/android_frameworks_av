@@ -1008,6 +1008,8 @@ c2_status_t Codec2Client::ForAllServices(
                 std::scoped_lock lock{key2IndexMutex};
                 key2Index[key] = index; // update last known client index
                 return C2_OK;
+            } else if (status == C2_NO_MEMORY) {
+                return C2_NO_MEMORY;
             } else if (status == C2_TRANSACTION_FAILED) {
                 LOG(WARNING) << "\"" << key << "\" failed for service \""
                              << client->getName()
@@ -1028,24 +1030,23 @@ c2_status_t Codec2Client::ForAllServices(
     return status; // return the last status from a valid client
 }
 
-std::shared_ptr<Codec2Client::Component>
-        Codec2Client::CreateComponentByName(
+c2_status_t Codec2Client::CreateComponentByName(
         const char* componentName,
         const std::shared_ptr<Listener>& listener,
+        std::shared_ptr<Component>* component,
         std::shared_ptr<Codec2Client>* owner,
         size_t numberOfAttempts) {
     std::string key{"create:"};
     key.append(componentName);
-    std::shared_ptr<Component> component;
     c2_status_t status = ForAllServices(
             key,
             numberOfAttempts,
-            [owner, &component, componentName, &listener](
+            [owner, component, componentName, &listener](
                     const std::shared_ptr<Codec2Client> &client)
                         -> c2_status_t {
                 c2_status_t status = client->createComponent(componentName,
                                                              listener,
-                                                             &component);
+                                                             component);
                 if (status == C2_OK) {
                     if (owner) {
                         *owner = client;
@@ -1064,7 +1065,7 @@ std::shared_ptr<Codec2Client::Component>
                    << "\" from all known services. "
                       "Last returned status = " << status << ".";
     }
-    return component;
+    return status;
 }
 
 std::shared_ptr<Codec2Client::Interface>

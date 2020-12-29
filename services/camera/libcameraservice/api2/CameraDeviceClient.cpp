@@ -170,7 +170,6 @@ binder::Status CameraDeviceClient::insertGbpLocked(const sp<IGraphicBufferProduc
 
     const StreamSurfaceId& streamSurfaceId = mStreamMap.valueAt(idx);
     if (outSurfaceMap->find(streamSurfaceId.streamId()) == outSurfaceMap->end()) {
-        (*outSurfaceMap)[streamSurfaceId.streamId()] = std::vector<size_t>();
         outputStreamIds->push_back(streamSurfaceId.streamId());
     }
     (*outSurfaceMap)[streamSurfaceId.streamId()].push_back(streamSurfaceId.surfaceId());
