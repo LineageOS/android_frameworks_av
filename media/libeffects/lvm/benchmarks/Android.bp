@@ -14,3 +14,24 @@ cc_benchmark {
         "libhardware_headers",
     ],
 }
+
+cc_benchmark {
+    name: "reverb_benchmark",
+    vendor: true,
+    include_dirs: [
+        "frameworks/av/media/libeffects/lvm/wrapper/Reverb",
+    ],
+    srcs: ["reverb_benchmark.cpp"],
+    static_libs: [
+        "libreverb",
+        "libreverbwrapper",
+    ],
+    shared_libs: [
+        "libaudioutils",
+        "liblog",
+    ],
+    header_libs: [
+        "libaudioeffects",
+        "libhardware_headers",
+    ],
+}
