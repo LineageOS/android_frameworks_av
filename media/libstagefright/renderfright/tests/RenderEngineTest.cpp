@@ -111,9 +111,9 @@ struct RenderEngineTest : public ::testing::Test {
         std::vector<uint8_t> outBuffer(mBuffer->getWidth() * mBuffer->getHeight() * 3);
         auto outPtr = reinterpret_cast<uint8_t*>(outBuffer.data());
 
-        for (int32_t j = 0; j < mBuffer->getHeight(); j++) {
+        for (uint32_t j = 0; j < mBuffer->getHeight(); j++) {
             const uint8_t* src = pixels + (mBuffer->getStride() * j) * 4;
-            for (int32_t i = 0; i < mBuffer->getWidth(); i++) {
+            for (uint32_t i = 0; i < mBuffer->getWidth(); i++) {
                 // Only copy R, G and B components
                 outPtr[0] = src[0];
                 outPtr[1] = src[1];
@@ -419,9 +419,9 @@ struct BufferSourceVariant {
         buf->lock(GRALLOC_USAGE_SW_READ_OFTEN | GRALLOC_USAGE_SW_WRITE_OFTEN,
                   reinterpret_cast<void**>(&pixels));
 
-        for (int32_t j = 0; j < buf->getHeight(); j++) {
+        for (uint32_t j = 0; j < buf->getHeight(); j++) {
             uint8_t* iter = pixels + (buf->getStride() * j) * 4;
-            for (int32_t i = 0; i < buf->getWidth(); i++) {
+            for (uint32_t i = 0; i < buf->getWidth(); i++) {
                 iter[0] = uint8_t(r * 255);
                 iter[1] = uint8_t(g * 255);
                 iter[2] = uint8_t(b * 255);

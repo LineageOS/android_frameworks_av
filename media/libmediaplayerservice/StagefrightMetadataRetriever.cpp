@@ -638,7 +638,8 @@ void StagefrightMetadataRetriever::parseMetaData() {
     }
 
     // The duration value is a string representing the duration in ms.
-    sprintf(tmp, "%" PRId64, (maxDurationUs + 500) / 1000);
+    sprintf(tmp, "%" PRId64,
+           (maxDurationUs > (INT64_MAX - 500) ? INT64_MAX : (maxDurationUs + 500)) / 1000);
     mMetaData.add(METADATA_KEY_DURATION, String8(tmp));
 
     if (hasAudio) {

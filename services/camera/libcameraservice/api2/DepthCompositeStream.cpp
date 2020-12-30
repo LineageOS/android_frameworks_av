@@ -666,13 +666,11 @@ void DepthCompositeStream::onFrameAvailable(const BufferItem& item) {
 status_t DepthCompositeStream::insertGbp(SurfaceMap* /*out*/outSurfaceMap,
         Vector<int32_t> * /*out*/outputStreamIds, int32_t* /*out*/currentStreamId) {
     if (outSurfaceMap->find(mDepthStreamId) == outSurfaceMap->end()) {
-        (*outSurfaceMap)[mDepthStreamId] = std::vector<size_t>();
         outputStreamIds->push_back(mDepthStreamId);
     }
     (*outSurfaceMap)[mDepthStreamId].push_back(mDepthSurfaceId);
 
     if (outSurfaceMap->find(mBlobStreamId) == outSurfaceMap->end()) {
-        (*outSurfaceMap)[mBlobStreamId] = std::vector<size_t>();
         outputStreamIds->push_back(mBlobStreamId);
     }
     (*outSurfaceMap)[mBlobStreamId].push_back(mBlobSurfaceId);
