@@ -139,7 +139,9 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
         /*
          * Persistent fast data memory
          */
+#ifndef BIQUAD_OPT
         InstAlloc_AddMember(&FastData, sizeof(LVREV_FastData_st));
+#endif
         if (pInstanceParams->NumDelays == LVREV_DELAYLINES_4) {
             InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY * sizeof(LVM_FLOAT));
             InstAlloc_AddMember(&FastData, LVREV_MAX_T2_DELAY * sizeof(LVM_FLOAT));
@@ -163,7 +165,9 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
         /*
          * Persistent fast coefficient memory
          */
+#ifndef BIQUAD_OPT
         InstAlloc_AddMember(&FastCoef, sizeof(LVREV_FastCoef_st));
+#endif
         pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size = InstAlloc_GetTotal(&FastCoef);
         pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Type = LVM_PERSISTENT_FAST_COEF;
         pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress = LVM_NULL;

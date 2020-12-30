@@ -134,9 +134,11 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
     /*
      * Set the data, coefficient and temporary memory pointers
      */
+#ifndef BIQUAD_OPT
     /* Fast data memory base address */
     pLVREV_Private->pFastData =
             (LVREV_FastData_st*)InstAlloc_AddMember(&FastData, sizeof(LVREV_FastData_st));
+#endif
     if (pInstanceParams->NumDelays == LVREV_DELAYLINES_4) {
         pLVREV_Private->pDelay_T[3] =
                 (LVM_FLOAT*)InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY * sizeof(LVM_FLOAT));
@@ -194,9 +196,11 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
     pLVREV_Private->T[3] = LVREV_MAX_T3_DELAY;
     pLVREV_Private->AB_Selection = 1; /* Select smoothing A to B */
 
+#ifndef BIQUAD_OPT
     /* Fast coefficient memory base address */
     pLVREV_Private->pFastCoef =
             (LVREV_FastCoef_st*)InstAlloc_AddMember(&FastCoef, sizeof(LVREV_FastCoef_st));
+#endif
     /* General purpose scratch */
     pLVREV_Private->pScratch =
             (LVM_FLOAT*)InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
@@ -307,6 +311,17 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
     pLVREV_Private->B_DelaySize[2] = LVREV_MAX_AP2_DELAY;
     pLVREV_Private->A_DelaySize[3] = LVREV_MAX_AP3_DELAY;
     pLVREV_Private->B_DelaySize[3] = LVREV_MAX_AP3_DELAY;
+
+#ifdef BIQUAD_OPT
+    pLVREV_Private->pRevHPFBiquad.reset(
+            new android::audio_utils::BiquadFilter<LVM_FLOAT>(LVM_MAX_CHANNELS));
+    pLVREV_Private->pRevLPFBiquad.reset(
+            new android::audio_utils::BiquadFilter<LVM_FLOAT>(LVM_MAX_CHANNELS));
+    for (int i = 0; i < LVREV_DELAYLINES_4; i++) {
+        pLVREV_Private->revLPFBiquad[i].reset(
+                new android::audio_utils::BiquadFilter<LVM_FLOAT>(LVM_MAX_CHANNELS));
+    }
+#endif
 
     LVREV_ClearAudioBuffers(*phInstance);
 
