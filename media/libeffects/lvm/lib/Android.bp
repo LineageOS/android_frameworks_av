@@ -204,10 +204,12 @@ cc_library_static {
         "Reverb/lib",
         "Common/lib",
     ],
-
+    static_libs: [
+        "libaudioutils",
+    ],
     cppflags: [
+        "-DBIQUAD_OPT",
         "-fvisibility=hidden",
-
         "-Wall",
         "-Werror",
     ],
