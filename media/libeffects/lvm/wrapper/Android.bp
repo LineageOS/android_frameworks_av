@@ -38,7 +38,7 @@ cc_library {
 }
 
 // reverb wrapper
-cc_library_shared {
+cc_library {
     name: "libreverbwrapper",
 
     arch: {
