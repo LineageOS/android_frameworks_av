@@ -174,6 +174,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t* phInstance, LVM_InstPara
     /*
      * Treble Enhancement
      */
+#ifndef BIQUAD_OPT
     pInstance->pTE_Taps = (LVM_TE_Data_t*)calloc(1, sizeof(*(pInstance->pTE_Taps)));
     if (pInstance->pTE_Taps == LVM_NULL) {
         return LVM_NULLADDRESS;
@@ -182,6 +183,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t* phInstance, LVM_InstPara
     if (pInstance->pTE_State == LVM_NULL) {
         return LVM_NULLADDRESS;
     }
+#endif
     pInstance->Params.TE_OperatingMode = LVM_TE_OFF;
     pInstance->Params.TE_EffectLevel = 0;
     pInstance->TE_Active = LVM_FALSE;
@@ -494,6 +496,7 @@ void LVM_DelInstanceHandle(LVM_Handle_t* phInstance) {
     /*
      * Treble Enhancement
      */
+#ifndef BIQUAD_OPT
     if (pInstance->pTE_Taps != LVM_NULL) {
         free(pInstance->pTE_Taps);
         pInstance->pTE_Taps = LVM_NULL;
@@ -502,6 +505,7 @@ void LVM_DelInstanceHandle(LVM_Handle_t* phInstance) {
         free(pInstance->pTE_State);
         pInstance->pTE_State = LVM_NULL;
     }
+#endif
 
     /*
      * Free the default EQNB pre-gain and pointer to the band definitions
