@@ -181,12 +181,14 @@ void wb_syn_filt(
         L_tmp4  = fxp_mac_16by16(yy[(i<<2)+3  - j], a[j], L_tmp4);
 
         L_tmp1 = shl_int32(L_tmp1, 4);
+        L_tmp1 = L_tmp1 == INT32_MIN ? INT32_MIN + 1 : L_tmp1;
 
         y[(i<<2)] = yy[(i<<2)] = amr_wb_round(-L_tmp1);
 
         L_tmp2  = fxp_mac_16by16(yy[(i<<2)], a[1], L_tmp2);
 
         L_tmp2 = shl_int32(L_tmp2, 4);
+        L_tmp2 = L_tmp2 == INT32_MIN ? INT32_MIN + 1 : L_tmp2;
 
         y[(i<<2)+1] = yy[(i<<2)+1] = amr_wb_round(-L_tmp2);
 
@@ -197,12 +199,14 @@ void wb_syn_filt(
         L_tmp3  = fxp_mac_16by16(yy[(i<<2) + 1], a[1], L_tmp3);
 
         L_tmp3 = shl_int32(L_tmp3, 4);
+        L_tmp3 = L_tmp3 == INT32_MIN ? INT32_MIN + 1 : L_tmp3;
 
         y[(i<<2)+2] = yy[(i<<2)+2] = amr_wb_round(-L_tmp3);
 
         L_tmp4  = fxp_mac_16by16(yy[(i<<2)+2], a[1], L_tmp4);
 
         L_tmp4 = shl_int32(L_tmp4, 4);
+        L_tmp4 = L_tmp4 == INT32_MIN ? INT32_MIN + 1 : L_tmp4;
 
         y[(i<<2)+3] = yy[(i<<2)+3] = amr_wb_round(-L_tmp4);
     }
