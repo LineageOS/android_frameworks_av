@@ -29,6 +29,11 @@
 /*                                                                                      */
 /****************************************************************************************/
 
+const LVM_INT16 LVREV_MAX_T_DELAY[] = {LVREV_MAX_T0_DELAY, LVREV_MAX_T1_DELAY, LVREV_MAX_T2_DELAY,
+                                       LVREV_MAX_T3_DELAY};
+const LVM_INT16 LVREV_MAX_AP_DELAY[] = {LVREV_MAX_AP0_DELAY, LVREV_MAX_AP1_DELAY,
+                                        LVREV_MAX_AP2_DELAY, LVREV_MAX_AP3_DELAY};
+
 /* Table with supported sampling rates.  The table can be indexed using LVM_Fs_en       */
 const LVM_UINT32 LVM_FsTable[] = {8000,  11025, 12000, 16000, 22050,  24000, 32000,
                                   44100, 48000, 88200, 96000, 176400, 192000};
