@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "FO_2I_D16F32Css_LShx_TRC_WRA_01_Private.h"
 #include "LVM_Macros.h"
@@ -173,3 +174,4 @@ void FO_Mc_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLO
         pDelays -= NrChannels * 2;
     }
 }
+#endif

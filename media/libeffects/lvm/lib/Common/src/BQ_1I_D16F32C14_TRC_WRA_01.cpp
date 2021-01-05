@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "BQ_1I_D16F32Css_TRC_WRA_01_Private.h"
 #include "LVM_Macros.h"
@@ -71,3 +72,4 @@ void BQ_1I_D16F32C14_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT* p
         *pDataOut++ = (LVM_FLOAT)(ynL);  // Write Left output
     }
 }
+#endif

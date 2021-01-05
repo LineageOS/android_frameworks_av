@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "PK_2I_D32F32CssGss_TRC_WRA_01_Private.h"
 #include "LVM_Macros.h"
@@ -173,3 +174,4 @@ void PK_Mc_D32F32C14G11_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT
         }
     }
 }
+#endif
