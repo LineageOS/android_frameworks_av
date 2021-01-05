@@ -435,10 +435,10 @@ exit:
         *handle = (audio_patch_handle_t) mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH);
         newPatch.mHalHandle = halHandle;
         mAudioFlinger.mDeviceEffectManager.createAudioPatch(*handle, newPatch);
-        mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
             addSoftwarePatchToInsertedModules(insertedModule, *handle, &newPatch.mAudioPatch);
         }
+        mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
     } else {
         newPatch.clearConnections(this);
     }
