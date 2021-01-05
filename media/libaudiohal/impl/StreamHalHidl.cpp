@@ -25,6 +25,7 @@
 
 #include "DeviceHalHidl.h"
 #include "EffectHalHidl.h"
+#include "HidlUtils.h"
 #include "StreamHalHidl.h"
 #include "VersionUtils.h"
 
@@ -610,12 +611,25 @@ status_t StreamOutHalHidl::updateSourceMetadata(
         const StreamOutHalInterface::SourceMetadata& sourceMetadata) {
     CPP_VERSION::SourceMetadata halMetadata = {
         .tracks = transformToHidlVec(sourceMetadata.tracks,
-              [](const playback_track_metadata& metadata) -> PlaybackTrackMetadata {
-                  return {
-                    .usage=static_cast<AudioUsage>(metadata.usage),
-                    .contentType=static_cast<AudioContentType>(metadata.content_type),
-                    .gain=metadata.gain,
+              [](const playback_track_metadata_v7& metadata) -> PlaybackTrackMetadata {
+                  PlaybackTrackMetadata halTrackMetadata = {
+                      .usage=static_cast<AudioUsage>(metadata.base.usage),
+                      .contentType=static_cast<AudioContentType>(metadata.base.content_type),
+                      .gain=metadata.base.gain,
                   };
+#if MAJOR_VERSION >= 7
+                  HidlUtils::audioChannelMaskFromHal(metadata.channel_mask, false /*isInput*/,
+                                                    &halTrackMetadata.channelMask);
+
+                  std::istringstream tags{metadata.tags};
+                  std::string tag;
+                  while (std::getline(tags, tag, HidlUtils::sAudioTagSeparator)) {
+                      if (!tag.empty()) {
+                          halTrackMetadata.tags.push_back(tag);
+                      }
+                  }
+#endif
+                  return halTrackMetadata;
               })};
     return processReturn("updateSourceMetadata", mStream->updateSourceMetadata(halMetadata));
 }
@@ -902,11 +916,23 @@ status_t StreamInHalHidl::updateSinkMetadata(const
         StreamInHalInterface::SinkMetadata& sinkMetadata) {
     CPP_VERSION::SinkMetadata halMetadata = {
         .tracks = transformToHidlVec(sinkMetadata.tracks,
-              [](const record_track_metadata& metadata) -> RecordTrackMetadata {
-                  return {
-                    .source=static_cast<AudioSource>(metadata.source),
-                    .gain=metadata.gain,
+              [](const record_track_metadata_v7& metadata) -> RecordTrackMetadata {
+                  RecordTrackMetadata halTrackMetadata = {
+                      .source=static_cast<AudioSource>(metadata.base.source),
+                      .gain=metadata.base.gain,
                   };
+#if MAJOR_VERSION >= 7
+                  HidlUtils::audioChannelMaskFromHal(metadata.channel_mask, true /*isInput*/,
+                                                    &halTrackMetadata.channelMask);
+                  std::istringstream tags{metadata.tags};
+                  std::string tag;
+                  while (std::getline(tags, tag, HidlUtils::sAudioTagSeparator)) {
+                      if (!tag.empty()) {
+                          halTrackMetadata.tags.push_back(tag);
+                      }
+                  }
+#endif
+                  return halTrackMetadata;
               })};
     return processReturn("updateSinkMetadata", mStream->updateSinkMetadata(halMetadata));
 }
