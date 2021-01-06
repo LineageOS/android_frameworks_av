@@ -244,6 +244,7 @@ public:
 private:
     void setPlayPolicy();
 
+    android::Mutex mPlayPolicyLock;
     android::KeyedVector<android::String8, android::String8> mPlayPolicy;
     SessionLibrary* mSessionLibrary;
 
