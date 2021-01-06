@@ -1492,6 +1492,20 @@ void AudioFlinger::forwardParametersToDownstreamPatches_l(
     }
 }
 
+// Update downstream patches for all playback threads attached to an MSD module
+void AudioFlinger::updateDownStreamPatches_l(const struct audio_patch *patch,
+                                             const std::set<audio_io_handle_t> streams)
+{
+    for (const audio_io_handle_t stream : streams) {
+        PlaybackThread *playbackThread = checkPlaybackThread_l(stream);
+        if (playbackThread == nullptr || !playbackThread->isMsdDevice()) {
+            continue;
+        }
+        playbackThread->setDownStreamPatch(patch);
+        playbackThread->sendIoConfigEvent(AUDIO_OUTPUT_CONFIG_CHANGED);
+    }
+}
+
 // Filter reserved keys from setParameters() before forwarding to audio HAL or acting upon.
 // Some keys are used for audio routing and audio path configuration and should be reserved for use
 // by audio policy and audio flinger for functional, privacy and security reasons.
@@ -2575,7 +2589,11 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
                       *output, thread.get());
             }
             mPlaybackThreads.add(*output, thread);
-            mPatchPanel.notifyStreamOpened(outHwDev, *output);
+            struct audio_patch patch;
+            mPatchPanel.notifyStreamOpened(outHwDev, *output, &patch);
+            if (thread->isMsdDevice()) {
+                thread->setDownStreamPatch(&patch);
+            }
             return thread;
         }
     }

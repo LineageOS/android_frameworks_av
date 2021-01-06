@@ -1,6 +1,13 @@
 cc_defaults {
     name: "benchmarkdefaults",
-    shared_libs: ["libmediandk", "libbase", "libbinder_ndk", "libutils", "libnativewindow"],
+    shared_libs: [
+        "libmediandk",
+        "libbase",
+        "libbinder_ndk",
+        "libbinder",
+        "libutils",
+        "libnativewindow",
+    ],
     static_libs: ["libmediatranscoder", "libgoogle-benchmark"],
     test_config_template: "AndroidTestTemplate.xml",
     test_suites: ["device-tests", "TranscoderBenchmarks"],
