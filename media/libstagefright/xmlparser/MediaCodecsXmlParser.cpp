@@ -148,6 +148,25 @@ std::string getVendorXmlPath(const std::string &path) {
         }
         ALOGI("getVendorXmlPath (%s)", result.c_str());
     }
+
+    // Choose lahaina_vendor xml file on non-GSI.
+    // This is workaround for Lahaina
+    if (!strncmp(android::base::GetProperty("ro.media.xml_variant.codecs", "").c_str(),
+            "_lahaina", strlen("_lahaina"))) {
+        if (!strncmp(path.c_str(), "/vendor/etc/media_codecs_lahaina.xml",
+                        strlen("/vendor/etc/media_codecs_lahaina.xml"))) {
+            vendorPath = "/vendor/etc/media_codecs_lahaina_vendor.xml";
+        } else if (!strncmp(path.c_str(), "/vendor/etc/media_codecs_performance_lahaina.xml",
+                        strlen("/vendor/etc/media_codecs_performance_lahaina.xml"))) {
+            vendorPath = "/vendor/etc/media_codecs_performance_lahaina_vendor.xml";
+        }
+        if (fileExists(vendorPath)) {
+            result = vendorPath;
+            ALOGI("getVendorXmlPath (%s)", result.c_str());
+        } else {
+            ALOGI("%s doesn't exist, using %s", vendorPath.c_str(), result.c_str());
+        }
+    }
     return result;
 }
 
