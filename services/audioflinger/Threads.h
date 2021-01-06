@@ -435,8 +435,10 @@ public:
 
                 // the value returned by default implementation is not important as the
                 // strategy is only meaningful for PlaybackThread which implements this method
-                virtual uint32_t getStrategyForSession_l(audio_session_t sessionId __unused)
-                        { return 0; }
+                virtual product_strategy_t getStrategyForSession_l(
+                        audio_session_t sessionId __unused) {
+                    return static_cast<product_strategy_t>(0);
+                }
 
                 // check if some effects must be suspended/restored when an effect is enabled
                 // or disabled
@@ -924,7 +926,7 @@ public:
                         uint32_t hasAudioSession_l(audio_session_t sessionId) const override {
                             return ThreadBase::hasAudioSession_l(sessionId, mTracks);
                         }
-                virtual uint32_t getStrategyForSession_l(audio_session_t sessionId);
+                virtual product_strategy_t getStrategyForSession_l(audio_session_t sessionId);
 
 
                 virtual status_t setSyncEvent(const sp<SyncEvent>& event);

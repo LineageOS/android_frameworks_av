@@ -2117,4 +2117,14 @@ legacy2aidl_volume_group_t_int32_t(volume_group_t legacy) {
     return convertReinterpret<int32_t>(legacy);
 }
 
+ConversionResult<product_strategy_t>
+aidl2legacy_int32_t_product_strategy_t(int32_t aidl) {
+    return convertReinterpret<product_strategy_t>(aidl);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_product_strategy_t_int32_t(product_strategy_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
 }  // namespace android
