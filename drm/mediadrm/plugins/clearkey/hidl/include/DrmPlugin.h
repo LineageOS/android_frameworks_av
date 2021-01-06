@@ -330,6 +330,7 @@ private:
     int64_t mCloseSessionOkCount;
     int64_t mCloseSessionNotOpenedCount;
     uint32_t mNextSecureStopId;
+    android::Mutex mPlayPolicyLock;
 
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN_AND_NEW(DrmPlugin);
 };
