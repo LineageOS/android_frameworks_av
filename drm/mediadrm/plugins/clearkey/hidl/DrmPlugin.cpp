@@ -212,6 +212,7 @@ Return<void> DrmPlugin::getKeyRequest_1_1(
 }
 
 void DrmPlugin::setPlayPolicy() {
+    android::Mutex::Autolock lock(mPlayPolicyLock);
     mPlayPolicy.clear();
 
     KeyValue policy;
