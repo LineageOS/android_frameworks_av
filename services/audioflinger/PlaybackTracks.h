@@ -148,7 +148,7 @@ public:
      */
     bool            readAndClearHasChanged() { return !mChangeNotified.test_and_set(); }
 
-    using SourceMetadatas = std::vector<playback_track_metadata_t>;
+    using SourceMetadatas = std::vector<playback_track_metadata_v7_t>;
     using MetadataInserter = std::back_insert_iterator<SourceMetadatas>;
     /** Copy the track metadata in the provided iterator. Thread safe. */
     virtual void    copyMetadataTo(MetadataInserter& backInserter) const;

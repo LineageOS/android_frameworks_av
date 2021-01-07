@@ -173,6 +173,9 @@ class StreamOutHalLocal : public StreamOutHalInterface, public StreamHalLocal {
     static int asyncCallback(stream_callback_event_t event, void *param, void *cookie);
 
     static int asyncEventCallback(stream_event_callback_type_t event, void *param, void *cookie);
+
+    void doUpdateSourceMetadataV7(const SourceMetadata& sourceMetadata);
+    void doUpdateSourceMetadata(const SourceMetadata& sourceMetadata);
 };
 
 class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
@@ -227,6 +230,9 @@ class StreamInHalLocal : public StreamInHalInterface, public StreamHalLocal {
     StreamInHalLocal(audio_stream_in_t *stream, sp<DeviceHalLocal> device);
 
     virtual ~StreamInHalLocal();
+
+    void doUpdateSinkMetadata(const SinkMetadata& sinkMetadata);
+    void doUpdateSinkMetadataV7(const SinkMetadata& sinkMetadata);
 };
 
 } // namespace CPP_VERSION
