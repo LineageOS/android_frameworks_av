@@ -1876,7 +1876,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         // index 0 is reserved for normal mixer's submix
         mFastTrackAvailMask(((1 << FastMixerState::sMaxFastTracks) - 1) & ~1),
         mHwSupportsPause(false), mHwPaused(false), mFlushPending(false),
-        mLeftVolFloat(-1.0), mRightVolFloat(-1.0)
+        mLeftVolFloat(-1.0), mRightVolFloat(-1.0),
+        mDownStreamPatch{}
 {
     snprintf(mThreadName, kThreadNameLength, "AudioOut_%X", id);
     mNBLogWriter = audioFlinger->newWriter_l(kLogSize, mThreadName);
@@ -2660,12 +2661,16 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
     ALOGV("PlaybackThread::ioConfigChanged, thread %p, event %d", this, event);
 
     desc->mIoHandle = mId;
+    struct audio_patch patch = mPatch;
+    if (isMsdDevice()) {
+        patch = mDownStreamPatch;
+    }
 
     switch (event) {
     case AUDIO_OUTPUT_OPENED:
     case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
-        desc->mPatch = mPatch;
+        desc->mPatch = patch;
         desc->mChannelMask = mChannelMask;
         desc->mSamplingRate = mSampleRate;
         desc->mFormat = mFormat;
@@ -2675,7 +2680,7 @@ void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, 
         desc->mLatency = latency_l();
         break;
     case AUDIO_CLIENT_STARTED:
-        desc->mPatch = mPatch;
+        desc->mPatch = patch;
         desc->mPortId = portId;
         break;
     case AUDIO_OUTPUT_CLOSED:
@@ -8097,10 +8102,15 @@ void AudioFlinger::RecordThread::updateMetadata_l()
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<RecordTrack> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        metadata.tracks.push_back({
+        record_track_metadata_v7_t trackMetadata;
+        trackMetadata.base = {
                 .source = track->attributes().source,
                 .gain = 1, // capture tracks do not have volumes
-        });
+        };
+        trackMetadata.channel_mask = track->channelMask(),
+        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+
+        metadata.tracks.push_back(trackMetadata);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }
@@ -9675,11 +9685,15 @@ void AudioFlinger::MmapPlaybackThread::updateMetadata_l()
     StreamOutHalInterface::SourceMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        metadata.tracks.push_back({
+        playback_track_metadata_v7_t trackMetadata;
+        trackMetadata.base = {
                 .usage = track->attributes().usage,
                 .content_type = track->attributes().content_type,
                 .gain = mHalVolFloat, // TODO: propagate from aaudio pre-mix volume
-        });
+        };
+        trackMetadata.channel_mask = track->channelMask(),
+        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+        metadata.tracks.push_back(trackMetadata);
     }
     mOutput->stream->updateSourceMetadata(metadata);
 }
@@ -9800,10 +9814,14 @@ void AudioFlinger::MmapCaptureThread::updateMetadata_l()
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        metadata.tracks.push_back({
+        record_track_metadata_v7_t trackMetadata;
+        trackMetadata.base = {
                 .source = track->attributes().source,
                 .gain = 1, // capture tracks do not have volumes
-        });
+        };
+        trackMetadata.channel_mask = track->channelMask(),
+        strncpy(trackMetadata.tags, track->attributes().tags, AUDIO_ATTRIBUTES_TAGS_MAX_SIZE);
+        metadata.tracks.push_back(trackMetadata);
     }
     mInput->stream->updateSinkMetadata(metadata);
 }

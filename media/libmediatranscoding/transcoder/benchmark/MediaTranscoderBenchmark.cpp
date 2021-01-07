@@ -30,6 +30,7 @@
  */
 
 #include <benchmark/benchmark.h>
+#include <binder/ProcessState.h>
 #include <fcntl.h>
 #include <media/MediaTranscoder.h>
 #include <iostream>
@@ -113,7 +114,6 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     std::string srcPath = kAssetDirectory + srcFileName;
     std::string dstPath = kAssetDirectory + dstFileName;
 
-    auto callbacks = std::make_shared<TranscoderCallbacks>();
     media_status_t status = AMEDIA_OK;
 
     if ((srcFd = open(srcPath.c_str(), O_RDONLY)) < 0) {
@@ -126,6 +126,7 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     }
 
     for (auto _ : state) {
+        auto callbacks = std::make_shared<TranscoderCallbacks>();
         auto transcoder = MediaTranscoder::create(callbacks);
 
         status = transcoder->configureSource(srcFd);
@@ -154,8 +155,8 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
             if (strncmp(mime, "video/", 6) == 0) {
                 int32_t frameCount;
                 if (AMediaFormat_getInt32(srcFormat, AMEDIAFORMAT_KEY_FRAME_COUNT, &frameCount)) {
-                    state.counters[PARAM_VIDEO_FRAME_RATE] =
-                            benchmark::Counter(frameCount, benchmark::Counter::kIsRate);
+                    state.counters[PARAM_VIDEO_FRAME_RATE] = benchmark::Counter(
+                            frameCount, benchmark::Counter::kIsIterationInvariantRate);
                 }
             }
 
@@ -390,6 +391,7 @@ void CustomCsvReporter::PrintRunData(const Run& run) {
 }
 
 int main(int argc, char** argv) {
+    android::ProcessState::self()->startThreadPool();
     std::unique_ptr<benchmark::BenchmarkReporter> fileReporter;
     for (int i = 1; i < argc; ++i) {
         if (std::string(argv[i]).find("--benchmark_out") != std::string::npos) {

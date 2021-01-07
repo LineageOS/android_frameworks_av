@@ -459,7 +459,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         device = availableDevices.getFirstExistingDevice({
                 AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
                 AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
-                AUDIO_DEVICE_IN_BUILTIN_MIC});
+                AUDIO_DEVICE_IN_BLUETOOTH_BLE, AUDIO_DEVICE_IN_BUILTIN_MIC});
         break;
 
     case AUDIO_SOURCE_VOICE_COMMUNICATION:
@@ -493,7 +493,8 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         default:    // FORCE_NONE
             device = availableDevices.getFirstExistingDevice({
                     AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_IN_USB_HEADSET,
-                    AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+                    AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BLUETOOTH_BLE,
+                    AUDIO_DEVICE_IN_BUILTIN_MIC});
             break;
 
         }
@@ -501,13 +502,25 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
 
     case AUDIO_SOURCE_VOICE_RECOGNITION:
     case AUDIO_SOURCE_UNPROCESSED:
-    case AUDIO_SOURCE_HOTWORD:
-        if (inputSource == AUDIO_SOURCE_HOTWORD) {
-            // We should not use primary output criteria for Hotword but rather limit
-            // to devices attached to the same HW module as the build in mic
-            LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
-            availableDevices = availablePrimaryDevices;
+        if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
+            device = availableDevices.getDevice(
+                    AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
+            if (device != nullptr) break;
         }
+        // we need to make BLUETOOTH_BLE has higher priority than BUILTIN_MIC,
+        // because sometimes user want to do voice search by bt remote
+        // even if BUILDIN_MIC is available.
+        device = availableDevices.getFirstExistingDevice({
+                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_IN_WIRED_HEADSET,
+                AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_IN_USB_DEVICE,
+                AUDIO_DEVICE_IN_BLUETOOTH_BLE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+
+        break;
+    case AUDIO_SOURCE_HOTWORD:
+        // We should not use primary output criteria for Hotword but rather limit
+        // to devices attached to the same HW module as the build in mic
+        LOG_ALWAYS_FATAL_IF(availablePrimaryDevices.isEmpty(), "Primary devices not found");
+        availableDevices = availablePrimaryDevices;
         if (audio_is_bluetooth_out_sco_device(commDeviceType)) {
             device = availableDevices.getDevice(
                     AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
@@ -533,7 +546,8 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
     case AUDIO_SOURCE_VOICE_PERFORMANCE:
         device = availableDevices.getFirstExistingDevice({
                 AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_IN_USB_HEADSET,
-                AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BUILTIN_MIC});
+                AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_IN_BLUETOOTH_BLE,
+                AUDIO_DEVICE_IN_BUILTIN_MIC});
         break;
     case AUDIO_SOURCE_REMOTE_SUBMIX:
         device = availableDevices.getDevice(

@@ -21,6 +21,9 @@
 /*                                                                                  */
 /************************************************************************************/
 
+#ifdef BIQUAD_OPT
+#include <system/audio.h>
+#endif
 #include "LVCS.h"
 #include "LVCS_Private.h"
 #include "LVCS_Equaliser.h"
@@ -56,14 +59,18 @@
 LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t hInstance, LVCS_Params_t* pParams) {
     LVM_UINT16 Offset;
     LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
+#ifndef BIQUAD_OPT
     LVCS_Equaliser_t* pConfig = (LVCS_Equaliser_t*)&pInstance->Equaliser;
     LVCS_Data_t* pData;
     LVCS_Coefficient_t* pCoefficients;
     BQ_FLOAT_Coefs_t Coeffs;
+#endif
     const BiquadA012B12CoefsSP_t* pEqualiserCoefTable;
 
+#ifndef BIQUAD_OPT
     pData = (LVCS_Data_t*)pInstance->pData;
     pCoefficients = (LVCS_Coefficient_t*)pInstance->pCoeff;
+#endif
     /*
      * If the sample rate changes re-initialise the filters
      */
@@ -75,6 +82,13 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
         Offset = (LVM_UINT16)(pParams->SampleRate + (pParams->SpeakerType * (1 + LVM_FS_48000)));
         pEqualiserCoefTable = (BiquadA012B12CoefsSP_t*)&LVCS_EqualiserCoefTable[0];
 
+#ifdef BIQUAD_OPT
+        std::array<LVM_FLOAT, android::audio_utils::kBiquadNumCoefs> coefs = {
+                pEqualiserCoefTable[Offset].A0, pEqualiserCoefTable[Offset].A1,
+                pEqualiserCoefTable[Offset].A2, -(pEqualiserCoefTable[Offset].B1),
+                -(pEqualiserCoefTable[Offset].B2)};
+        pInstance->pEqBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_2, coefs));
+#else
         /* Left and right filters */
         /* Convert incoming coefficients to the required format/ordering */
         Coeffs.A0 = (LVM_FLOAT)pEqualiserCoefTable[Offset].A0;
@@ -103,6 +117,7 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
                 pConfig->pBiquadCallBack = BQ_2I_D16F32C15_TRC_WRA_01;
                 break;
         }
+#endif
     }
 
     return (LVCS_SUCCESS);
@@ -129,19 +144,25 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
 LVCS_ReturnStatus_en LVCS_Equaliser(LVCS_Handle_t hInstance, LVM_FLOAT* pInputOutput,
                                     LVM_UINT16 NumSamples) {
     LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
+#ifndef BIQUAD_OPT
     LVCS_Equaliser_t* pConfig = (LVCS_Equaliser_t*)&pInstance->Equaliser;
     LVCS_Coefficient_t* pCoefficients;
 
     pCoefficients = (LVCS_Coefficient_t*)pInstance->pCoeff;
+#endif
 
     /*
      * Check if the equaliser is required
      */
     if ((pInstance->Params.OperatingMode & LVCS_EQUALISERSWITCH) != 0) {
         /* Apply filter to the left and right channels */
+#ifdef BIQUAD_OPT
+        pInstance->pEqBiquad->process(pInputOutput, pInputOutput, NumSamples);
+#else
         (pConfig->pBiquadCallBack)(
                 (Biquad_FLOAT_Instance_t*)&pCoefficients->EqualiserBiquadInstance,
                 (LVM_FLOAT*)pInputOutput, (LVM_FLOAT*)pInputOutput, (LVM_INT16)NumSamples);
+#endif
     }
 
     return (LVCS_SUCCESS);

@@ -241,18 +241,54 @@ status_t StreamOutHalLocal::getPresentationPosition(uint64_t *frames, struct tim
     return mStream->get_presentation_position(mStream, frames, timestamp);
 }
 
-status_t StreamOutHalLocal::updateSourceMetadata(const SourceMetadata& sourceMetadata) {
-    if (mStream->update_source_metadata == nullptr) {
-        return INVALID_OPERATION;
+void StreamOutHalLocal::doUpdateSourceMetadata(const SourceMetadata& sourceMetadata) {
+    std::vector<playback_track_metadata> halTracks;
+    halTracks.reserve(sourceMetadata.tracks.size());
+    for (auto& metadata : sourceMetadata.tracks) {
+        playback_track_metadata halTrackMetadata;
+        playback_track_metadata_from_v7(&halTrackMetadata, &metadata);
+        halTracks.push_back(halTrackMetadata);
     }
+    const source_metadata_t halMetadata = {
+        .track_count = halTracks.size(),
+        .tracks = halTracks.data(),
+    };
+    mStream->update_source_metadata(mStream, &halMetadata);
+}
+
+#if MAJOR_VERSION >= 7
+void StreamOutHalLocal::doUpdateSourceMetadataV7(const SourceMetadata& sourceMetadata) {
     const source_metadata_t metadata {
         .track_count = sourceMetadata.tracks.size(),
         // const cast is fine as it is in a const structure
-        .tracks = const_cast<playback_track_metadata*>(sourceMetadata.tracks.data()),
+        .tracks = const_cast<playback_track_metadata_v7*>(sourceMetadata.tracks.data()),
     };
-    mStream->update_source_metadata(mStream, &metadata);
+    mStream->update_source_metadata_v7(mStream, &metadata);
+}
+#endif
+
+status_t StreamOutHalLocal::updateSourceMetadata(const SourceMetadata& sourceMetadata) {
+#if MAJOR_VERSION < 7
+    if (mStream->update_source_metadata == nullptr) {
+        return INVALID_OPERATION;
+    }
+    doUpdateSourceMetadata(sourceMetadata);
+#else
+    if (mDevice->version() < AUDIO_DEVICE_API_VERSION_3_2)
+        if (mStream->update_source_metadata == nullptr) {
+            return INVALID_OPERATION;
+        }
+        doUpdateSourceMetadata(sourceMetadata);
+    } else {
+        if (mStream->update_source_metadata_v7 == nullptr) {
+            return INVALID_OPERATION;
+        }
+        doUpdateSourceMetadataV7(sourceMetadata);
+    }
+#endif
     return OK;
 }
+
 
 status_t StreamOutHalLocal::start() {
     if (mStream->start == NULL) return INVALID_OPERATION;
@@ -352,16 +388,52 @@ status_t StreamInHalLocal::getCapturePosition(int64_t *frames, int64_t *time) {
     return mStream->get_capture_position(mStream, frames, time);
 }
 
-status_t StreamInHalLocal::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
-    if (mStream->update_sink_metadata == nullptr) {
-        return INVALID_OPERATION;
+void StreamInHalLocal::doUpdateSinkMetadata(const SinkMetadata& sinkMetadata) {
+    std::vector<record_track_metadata> halTracks;
+    halTracks.reserve(sinkMetadata.tracks.size());
+    for (auto& metadata : sinkMetadata.tracks) {
+        record_track_metadata halTrackMetadata;
+        record_track_metadata_from_v7(&halTrackMetadata, &metadata);
+        halTracks.push_back(halTrackMetadata);
     }
-    const sink_metadata_t metadata {
+    const sink_metadata_t halMetadata = {
+        .track_count = halTracks.size(),
+        .tracks = halTracks.data(),
+    };
+    mStream->update_sink_metadata(mStream, &halMetadata);
+}
+
+#if MAJOR_VERSION >= 7
+void StreamInHalLocal::doUpdateSinkMetadataV7(const SinkMetadata& sinkMetadata) {
+    const sink_metadata_v7_t halMetadata {
         .track_count = sinkMetadata.tracks.size(),
         // const cast is fine as it is in a const structure
-        .tracks = const_cast<record_track_metadata*>(sinkMetadata.tracks.data()),
+        .tracks = const_cast<record_track_metadata_v7*>(sinkMetadata.tracks.data()),
     };
-    mStream->update_sink_metadata(mStream, &metadata);
+    mStream->update_sink_metadata_v7(mStream, &halMetadata);
+}
+#endif
+
+status_t StreamInHalLocal::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
+#if MAJOR_VERSION < 7
+
+    if (mStream->update_sink_metadata == nullptr) {
+        return INVALID_OPERATION;  // not supported by the HAL
+    }
+    doUpdateSinkMetadata(sinkMetadata);
+#else
+    if (mDevice->version() < AUDIO_DEVICE_API_VERSION_3_2)
+        if (mStream->update_sink_metadata == nullptr) {
+            return INVALID_OPERATION;  // not supported by the HAL
+        }
+        doUpdateSinkMetadata(sinkMetadata);
+    } else {
+        if (mStream->update_sink_metadata_v7 == nullptr) {
+            return INVALID_OPERATION;  // not supported by the HAL
+        }
+        doUpdateSinkMetadataV7(sinkMetadata);
+    }
+#endif
     return OK;
 }
 

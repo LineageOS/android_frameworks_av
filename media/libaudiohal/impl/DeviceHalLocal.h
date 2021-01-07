@@ -117,6 +117,8 @@ class DeviceHalLocal : public DeviceHalInterface
     void closeOutputStream(struct audio_stream_out *stream_out);
     void closeInputStream(struct audio_stream_in *stream_in);
 
+    uint32_t version() const { return mDev->common.version; }
+
   private:
     audio_hw_device_t *mDev;
 
@@ -127,8 +129,6 @@ class DeviceHalLocal : public DeviceHalInterface
 
     // The destructor automatically closes the device.
     virtual ~DeviceHalLocal();
-
-    uint32_t version() const { return mDev->common.version; }
 };
 
 } // namespace CPP_VERSION

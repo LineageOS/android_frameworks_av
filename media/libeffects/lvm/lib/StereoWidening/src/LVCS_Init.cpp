@@ -123,6 +123,7 @@ void LVCS_DeInit(LVCS_Handle_t* phInstance) {
     if (pInstance == LVM_NULL) {
         return;
     }
+#ifndef BIQUAD_OPT
     if (pInstance->pCoeff != LVM_NULL) {
         free(pInstance->pCoeff);
         pInstance->pCoeff = LVM_NULL;
@@ -131,6 +132,7 @@ void LVCS_DeInit(LVCS_Handle_t* phInstance) {
         free(pInstance->pData);
         pInstance->pData = LVM_NULL;
     }
+#endif
     free(pInstance);
     *phInstance = LVM_NULL;
     return;
