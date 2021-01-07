@@ -1609,9 +1609,11 @@ status_t AudioTrack::createTrack_l()
 
     media::CreateTrackResponse response;
     status = audioFlinger->createTrack(VALUE_OR_FATAL(input.toAidl()), response);
-    IAudioFlinger::CreateTrackOutput output = VALUE_OR_FATAL(
-            IAudioFlinger::CreateTrackOutput::fromAidl(
-                    response));
+
+    IAudioFlinger::CreateTrackOutput output{};
+    if (status == NO_ERROR) {
+        output = VALUE_OR_FATAL(IAudioFlinger::CreateTrackOutput::fromAidl(response));
+    }
 
     if (status != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
         ALOGE("%s(%d): AudioFlinger could not create track, status: %d output %d",
