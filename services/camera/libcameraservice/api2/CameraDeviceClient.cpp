@@ -51,6 +51,7 @@
 
 namespace android {
 using namespace camera2;
+using camera3::camera_stream_rotation_t::CAMERA_STREAM_ROTATION_0;
 
 CameraDeviceClientBase::CameraDeviceClientBase(
         const sp<CameraService>& cameraService,
@@ -806,7 +807,7 @@ binder::Status CameraDeviceClient::createStream(
 
         err = compositeStream->createStream(surfaces, deferredConsumer, streamInfo.width,
                 streamInfo.height, streamInfo.format,
-                static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
+                static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
                 isShared);
         if (err == OK) {
@@ -816,7 +817,7 @@ binder::Status CameraDeviceClient::createStream(
     } else {
         err = mDevice->createStream(surfaces, deferredConsumer, streamInfo.width,
                 streamInfo.height, streamInfo.format, streamInfo.dataSpace,
-                static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
+                static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
                 isShared);
     }
@@ -884,7 +885,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
     String8 physicalCameraId(outputConfiguration.getPhysicalCameraId());
     err = mDevice->createStream(noSurface, /*hasDeferredConsumer*/true, width,
             height, format, dataSpace,
-            static_cast<camera3_stream_rotation_t>(outputConfiguration.getRotation()),
+            static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
             &streamId, physicalCameraId, &surfaceIds,
             outputConfiguration.getSurfaceSetID(), isShared,
             consumerUsage);
@@ -1151,9 +1152,12 @@ binder::Status CameraDeviceClient::createDefaultRequest(int templateId,
         return STATUS_ERROR(CameraService::ERROR_DISCONNECTED, "Camera device no longer alive");
     }
 
-    CameraMetadata metadata;
     status_t err;
-    if ( (err = mDevice->createDefaultRequest(templateId, &metadata) ) == OK &&
+    camera_request_template_t tempId = camera_request_template_t::CAMERA_TEMPLATE_COUNT;
+    if (!(res = mapRequestTemplate(templateId, &tempId)).isOk()) return res;
+
+    CameraMetadata metadata;
+    if ( (err = mDevice->createDefaultRequest(tempId, &metadata) ) == OK &&
         request != NULL) {
 
         request->swap(metadata);
@@ -1885,4 +1889,41 @@ status_t CameraDeviceClient::getRotationTransformLocked(int32_t* transform) {
     return CameraUtils::getRotationTransform(staticInfo, transform);
 }
 
+binder::Status CameraDeviceClient::mapRequestTemplate(int templateId,
+        camera_request_template_t* tempId /*out*/) {
+    binder::Status ret = binder::Status::ok();
+
+    if (tempId == nullptr) {
+        ret = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                "Camera %s: Invalid template argument", mCameraIdStr.string());
+        return ret;
+    }
+    switch(templateId) {
+        case ICameraDeviceUser::TEMPLATE_PREVIEW:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_PREVIEW;
+            break;
+        case ICameraDeviceUser::TEMPLATE_RECORD:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_VIDEO_RECORD;
+            break;
+        case ICameraDeviceUser::TEMPLATE_STILL_CAPTURE:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_STILL_CAPTURE;
+            break;
+        case ICameraDeviceUser::TEMPLATE_VIDEO_SNAPSHOT:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_VIDEO_SNAPSHOT;
+            break;
+        case ICameraDeviceUser::TEMPLATE_ZERO_SHUTTER_LAG:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_ZERO_SHUTTER_LAG;
+            break;
+        case ICameraDeviceUser::TEMPLATE_MANUAL:
+            *tempId = camera_request_template_t::CAMERA_TEMPLATE_MANUAL;
+            break;
+        default:
+            ret = STATUS_ERROR_FMT(CameraService::ERROR_ILLEGAL_ARGUMENT,
+                    "Camera %s: Template ID %d is invalid or not supported",
+                    mCameraIdStr.string(), templateId);
+            return ret;
+    }
+
+    return ret;
+}
 } // namespace android

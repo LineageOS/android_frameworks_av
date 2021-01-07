@@ -37,6 +37,8 @@
 namespace android {
 namespace camera2 {
 
+using android::camera3::CAMERA_TEMPLATE_PREVIEW;
+
 Parameters::Parameters(int cameraId,
         int cameraFacing) :
         cameraId(cameraId),
@@ -2468,7 +2470,7 @@ status_t Parameters::getDefaultFocalLength(CameraDeviceBase *device) {
 
         // Use focal length in preview template if it exists
         CameraMetadata previewTemplate;
-        status_t res = device->createDefaultRequest(CAMERA3_TEMPLATE_PREVIEW, &previewTemplate);
+        status_t res = device->createDefaultRequest(CAMERA_TEMPLATE_PREVIEW, &previewTemplate);
         if (res != OK) {
             ALOGE("%s: Failed to create default PREVIEW request: %s (%d)",
                     __FUNCTION__, strerror(-res), res);

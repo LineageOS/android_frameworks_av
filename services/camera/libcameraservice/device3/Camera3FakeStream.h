@@ -104,7 +104,7 @@ class Camera3FakeStream :
      * Note that we release the lock briefly in this function
      */
     virtual status_t returnBufferCheckedLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>& surface_ids,
@@ -121,17 +121,17 @@ class Camera3FakeStream :
     static const int FAKE_HEIGHT = 240;
     static const int FAKE_FORMAT = HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     static const android_dataspace FAKE_DATASPACE = HAL_DATASPACE_UNKNOWN;
-    static const camera3_stream_rotation_t FAKE_ROTATION = CAMERA3_STREAM_ROTATION_0;
+    static const camera_stream_rotation_t FAKE_ROTATION = CAMERA_STREAM_ROTATION_0;
     static const uint64_t FAKE_USAGE = GRALLOC_USAGE_HW_COMPOSER;
     static const String8 FAKE_ID;
 
     /**
      * Internal Camera3Stream interface
      */
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+    virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
     virtual status_t returnBufferLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp, const std::vector<size_t>& surface_ids);
 
     virtual status_t configureQueueLocked();

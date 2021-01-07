@@ -484,7 +484,7 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
     states.inflightIntf.checkInflightMapLengthLocked();
 }
 
-void processCaptureResult(CaptureOutputStates& states, const camera3_capture_result *result) {
+void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result) {
     ATRACE_CALL();
 
     status_t res;
@@ -688,7 +688,7 @@ void processOneCaptureResultLocked(
     using hardware::camera::device::V3_2::BufferStatus;
     std::unique_ptr<ResultMetadataQueue>& fmq = states.fmq;
     BufferRecordsInterface& bufferRecords = states.bufferRecordsIntf;
-    camera3_capture_result r;
+    camera_capture_result r;
     status_t res;
     r.frame_number = result.frameNumber;
 
@@ -727,7 +727,7 @@ void processOneCaptureResultLocked(
     r.physcam_ids = physCamIds.data();
     r.physcam_metadata = phyCamMetadatas.data();
 
-    std::vector<camera3_stream_buffer_t> outputBuffers(result.outputBuffers.size());
+    std::vector<camera_stream_buffer_t> outputBuffers(result.outputBuffers.size());
     std::vector<buffer_handle_t> outputBufferHandles(result.outputBuffers.size());
     for (size_t i = 0; i < result.outputBuffers.size(); i++) {
         auto& bDst = outputBuffers[i];
@@ -788,7 +788,7 @@ void processOneCaptureResultLocked(
     r.num_output_buffers = outputBuffers.size();
     r.output_buffers = outputBuffers.data();
 
-    camera3_stream_buffer_t inputBuffer;
+    camera_stream_buffer_t inputBuffer;
     if (result.inputBuffer.streamId == -1) {
         r.input_buffer = nullptr;
     } else {
@@ -829,7 +829,7 @@ void processOneCaptureResultLocked(
 void returnOutputBuffers(
         bool useHalBufManager,
         sp<NotificationListener> listener,
-        const camera3_stream_buffer_t *outputBuffers, size_t numBuffers,
+        const camera_stream_buffer_t *outputBuffers, size_t numBuffers,
         nsecs_t timestamp, bool requested, nsecs_t requestTimeNs,
         SessionStatsBuilder& sessionStatsBuilder, bool timestampIncreasing,
         const SurfaceMap& outputSurfaces,
@@ -842,7 +842,7 @@ void returnOutputBuffers(
         int streamId = stream->getId();
 
         // Call notify(ERROR_BUFFER) if necessary.
-        if (outputBuffers[i].status == CAMERA3_BUFFER_STATUS_ERROR &&
+        if (outputBuffers[i].status == CAMERA_BUFFER_STATUS_ERROR &&
                 errorBufStrategy == ERROR_BUF_RETURN_NOTIFY) {
             if (listener != nullptr) {
                 CaptureResultExtras extras = inResultExtras;
@@ -872,7 +872,7 @@ void returnOutputBuffers(
 
         // Do not return the buffer if the buffer status is error, and the error
         // buffer strategy is CACHE.
-        if (outputBuffers[i].status != CAMERA3_BUFFER_STATUS_ERROR ||
+        if (outputBuffers[i].status != CAMERA_BUFFER_STATUS_ERROR ||
                 errorBufStrategy != ERROR_BUF_CACHE) {
             if (it != outputSurfaces.end()) {
                 res = stream->returnBuffer(
@@ -894,7 +894,7 @@ void returnOutputBuffers(
             ALOGE("Can't return buffer to its stream: %s (%d)", strerror(-res), res);
             dropped = true;
         } else {
-            if (outputBuffers[i].status == CAMERA3_BUFFER_STATUS_ERROR || timestamp == 0) {
+            if (outputBuffers[i].status == CAMERA_BUFFER_STATUS_ERROR || timestamp == 0) {
                 dropped = true;
             }
         }
@@ -907,10 +907,10 @@ void returnOutputBuffers(
         // Long processing consumers can cause returnBuffer timeout for shared stream
         // If that happens, cancel the buffer and send a buffer error to client
         if (it != outputSurfaces.end() && res == TIMED_OUT &&
-                outputBuffers[i].status == CAMERA3_BUFFER_STATUS_OK) {
+                outputBuffers[i].status == CAMERA_BUFFER_STATUS_OK) {
             // cancel the buffer
-            camera3_stream_buffer_t sb = outputBuffers[i];
-            sb.status = CAMERA3_BUFFER_STATUS_ERROR;
+            camera_stream_buffer_t sb = outputBuffers[i];
+            sb.status = CAMERA_BUFFER_STATUS_ERROR;
             stream->returnBuffer(sb, /*timestamp*/0,
                     timestampIncreasing, std::vector<size_t> (),
                     inResultExtras.frameNumber);
@@ -942,7 +942,7 @@ void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
     for (auto iter = request.pendingOutputBuffers.begin();
             iter != request.pendingOutputBuffers.end(); ) {
         if (request.errorBufStrategy != ERROR_BUF_CACHE ||
-                iter->status != CAMERA3_BUFFER_STATUS_ERROR) {
+                iter->status != CAMERA_BUFFER_STATUS_ERROR) {
             iter = request.pendingOutputBuffers.erase(iter);
         } else {
             iter++;
@@ -950,7 +950,7 @@ void returnAndRemovePendingOutputBuffers(bool useHalBufManager,
     }
 }
 
-void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg) {
+void notifyShutter(CaptureOutputStates& states, const camera_shutter_msg_t &msg) {
     ATRACE_CALL();
     ssize_t idx;
 
@@ -1028,26 +1028,26 @@ void notifyShutter(CaptureOutputStates& states, const camera3_shutter_msg_t &msg
     }
 }
 
-void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
+void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
     ATRACE_CALL();
     // Map camera HAL error codes to ICameraDeviceCallback error codes
     // Index into this with the HAL error code
-    static const int32_t halErrorMap[CAMERA3_MSG_NUM_ERRORS] = {
+    static const int32_t halErrorMap[CAMERA_MSG_NUM_ERRORS] = {
         // 0 = Unused error code
         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_INVALID_ERROR,
-        // 1 = CAMERA3_MSG_ERROR_DEVICE
+        // 1 = CAMERA_MSG_ERROR_DEVICE
         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_DEVICE,
-        // 2 = CAMERA3_MSG_ERROR_REQUEST
+        // 2 = CAMERA_MSG_ERROR_REQUEST
         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_REQUEST,
-        // 3 = CAMERA3_MSG_ERROR_RESULT
+        // 3 = CAMERA_MSG_ERROR_RESULT
         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_RESULT,
-        // 4 = CAMERA3_MSG_ERROR_BUFFER
+        // 4 = CAMERA_MSG_ERROR_BUFFER
         hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_BUFFER
     };
 
     int32_t errorCode =
             ((msg.error_code >= 0) &&
-                    (msg.error_code < CAMERA3_MSG_NUM_ERRORS)) ?
+                    (msg.error_code < CAMERA_MSG_NUM_ERRORS)) ?
             halErrorMap[msg.error_code] :
             hardware::camera2::ICameraDeviceCallbacks::ERROR_CAMERA_INVALID_ERROR;
 
@@ -1136,13 +1136,13 @@ void notifyError(CaptureOutputStates& states, const camera3_error_msg_t &msg) {
     }
 }
 
-void notify(CaptureOutputStates& states, const camera3_notify_msg *msg) {
+void notify(CaptureOutputStates& states, const camera_notify_msg *msg) {
     switch (msg->type) {
-        case CAMERA3_MSG_ERROR: {
+        case CAMERA_MSG_ERROR: {
             notifyError(states, msg->message.error);
             break;
         }
-        case CAMERA3_MSG_SHUTTER: {
+        case CAMERA_MSG_SHUTTER: {
             notifyShutter(states, msg->message.shutter);
             break;
         }
@@ -1158,10 +1158,10 @@ void notify(CaptureOutputStates& states,
     using android::hardware::camera::device::V3_2::ErrorCode;
 
     ATRACE_CALL();
-    camera3_notify_msg m;
+    camera_notify_msg m;
     switch (msg.type) {
         case MsgType::ERROR:
-            m.type = CAMERA3_MSG_ERROR;
+            m.type = CAMERA_MSG_ERROR;
             m.message.error.frame_number = msg.msg.error.frameNumber;
             if (msg.msg.error.errorStreamId >= 0) {
                 sp<Camera3StreamInterface> stream =
@@ -1177,21 +1177,21 @@ void notify(CaptureOutputStates& states,
             }
             switch (msg.msg.error.errorCode) {
                 case ErrorCode::ERROR_DEVICE:
-                    m.message.error.error_code = CAMERA3_MSG_ERROR_DEVICE;
+                    m.message.error.error_code = CAMERA_MSG_ERROR_DEVICE;
                     break;
                 case ErrorCode::ERROR_REQUEST:
-                    m.message.error.error_code = CAMERA3_MSG_ERROR_REQUEST;
+                    m.message.error.error_code = CAMERA_MSG_ERROR_REQUEST;
                     break;
                 case ErrorCode::ERROR_RESULT:
-                    m.message.error.error_code = CAMERA3_MSG_ERROR_RESULT;
+                    m.message.error.error_code = CAMERA_MSG_ERROR_RESULT;
                     break;
                 case ErrorCode::ERROR_BUFFER:
-                    m.message.error.error_code = CAMERA3_MSG_ERROR_BUFFER;
+                    m.message.error.error_code = CAMERA_MSG_ERROR_BUFFER;
                     break;
             }
             break;
         case MsgType::SHUTTER:
-            m.type = CAMERA3_MSG_SHUTTER;
+            m.type = CAMERA_MSG_SHUTTER;
             m.message.shutter.frame_number = msg.msg.shutter.frameNumber;
             m.message.shutter.timestamp = msg.msg.shutter.timestamp;
             break;
@@ -1292,11 +1292,11 @@ void requestStreamBuffers(RequestBufferStates& states,
 
         hardware::hidl_vec<StreamBuffer> tmpRetBuffers(numBuffersRequested);
         bool currentReqSucceeds = true;
-        std::vector<camera3_stream_buffer_t> streamBuffers(numBuffersRequested);
+        std::vector<camera_stream_buffer_t> streamBuffers(numBuffersRequested);
         size_t numAllocatedBuffers = 0;
         size_t numPushedInflightBuffers = 0;
         for (size_t b = 0; b < numBuffersRequested; b++) {
-            camera3_stream_buffer_t& sb = streamBuffers[b];
+            camera_stream_buffer_t& sb = streamBuffers[b];
             // Since this method can run concurrently with request thread
             // We need to update the wait duration everytime we call getbuffer
             nsecs_t waitDuration =  states.reqBufferIntf.getWaitDuration();
@@ -1367,9 +1367,9 @@ void requestStreamBuffers(RequestBufferStates& states,
                 }
             }
             for (size_t b = 0; b < numAllocatedBuffers; b++) {
-                camera3_stream_buffer_t& sb = streamBuffers[b];
+                camera_stream_buffer_t& sb = streamBuffers[b];
                 sb.acquire_fence = -1;
-                sb.status = CAMERA3_BUFFER_STATUS_ERROR;
+                sb.status = CAMERA_BUFFER_STATUS_ERROR;
             }
             returnOutputBuffers(states.useHalBufManager, /*listener*/nullptr,
                     streamBuffers.data(), numAllocatedBuffers, 0, /*requested*/false,
@@ -1407,9 +1407,9 @@ void returnStreamBuffers(ReturnBufferStates& states,
             continue;
         }
 
-        camera3_stream_buffer_t streamBuffer;
+        camera_stream_buffer_t streamBuffer;
         streamBuffer.buffer = buffer;
-        streamBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
+        streamBuffer.status = CAMERA_BUFFER_STATUS_ERROR;
         streamBuffer.acquire_fence = -1;
         streamBuffer.release_fence = -1;
 
@@ -1504,19 +1504,19 @@ void flushInflightRequests(FlushInflightReqStates& states) {
         int32_t frameNumber = std::get<1>(tuple);
         buffer_handle_t* buffer = std::get<2>(tuple);
 
-        camera3_stream_buffer_t streamBuffer;
+        camera_stream_buffer_t streamBuffer;
         streamBuffer.buffer = buffer;
-        streamBuffer.status = CAMERA3_BUFFER_STATUS_ERROR;
+        streamBuffer.status = CAMERA_BUFFER_STATUS_ERROR;
         streamBuffer.acquire_fence = -1;
         streamBuffer.release_fence = -1;
 
         for (auto& stream : streams) {
             if (streamId == stream->getId()) {
                 // Return buffer to deleted stream
-                camera3_stream* halStream = stream->asHalStream();
+                camera_stream* halStream = stream->asHalStream();
                 streamBuffer.stream = halStream;
                 switch (halStream->stream_type) {
-                    case CAMERA3_STREAM_OUTPUT:
+                    case CAMERA_STREAM_OUTPUT:
                         res = stream->returnBuffer(streamBuffer, /*timestamp*/ 0,
                                 /*timestampIncreasing*/true,
                                 std::vector<size_t> (), frameNumber);
@@ -1526,7 +1526,7 @@ void flushInflightRequests(FlushInflightReqStates& states) {
                                   frameNumber, streamId, strerror(-res), res);
                         }
                         break;
-                    case CAMERA3_STREAM_INPUT:
+                    case CAMERA_STREAM_INPUT:
                         res = stream->returnInputBuffer(streamBuffer);
                         if (res != OK) {
                             ALOGE("%s: Can't return input buffer for frame %d to"

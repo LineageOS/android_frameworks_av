@@ -341,7 +341,7 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
         return res;
     }
 
-    size_t finalJpegSize = actualJpegSize + sizeof(struct camera3_jpeg_blob);
+    size_t finalJpegSize = actualJpegSize + sizeof(struct camera_jpeg_blob);
     if (finalJpegSize > finalJpegBufferSize) {
         ALOGE("%s: Final jpeg buffer not large enough for the jpeg blob header", __FUNCTION__);
         outputANW->cancelBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
@@ -357,9 +357,9 @@ status_t DepthCompositeStream::processInputFrame(nsecs_t ts, const InputFrame &i
 
     ALOGV("%s: Final jpeg size: %zu", __func__, finalJpegSize);
     uint8_t* header = static_cast<uint8_t *> (dstBuffer) +
-        (gb->getWidth() - sizeof(struct camera3_jpeg_blob));
-    struct camera3_jpeg_blob *blob = reinterpret_cast<struct camera3_jpeg_blob*> (header);
-    blob->jpeg_blob_id = CAMERA3_JPEG_BLOB_ID;
+        (gb->getWidth() - sizeof(struct camera_jpeg_blob));
+    struct camera_jpeg_blob *blob = reinterpret_cast<struct camera_jpeg_blob*> (header);
+    blob->jpeg_blob_id = CAMERA_JPEG_BLOB_ID;
     blob->jpeg_size = actualJpegSize;
     outputANW->queueBuffer(mOutputSurface.get(), anb, /*fence*/ -1);
 
@@ -486,7 +486,7 @@ bool DepthCompositeStream::isDepthCompositeStream(const sp<Surface> &surface) {
 
 status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surface>>& consumers,
         bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
-        camera3_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
+        camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
         std::vector<int> *surfaceIds, int /*streamSetId*/, bool /*isShared*/) {
     if (mSupportedDepthSizes.empty()) {
         ALOGE("%s: This camera device doesn't support any depth map streams!", __FUNCTION__);
