@@ -780,7 +780,13 @@ private:
                 };
 
                 static C2R setDmaBufUsage(bool /* mayBlock */, C2P<C2StoreDmaBufUsageInfo> &me) {
-                    strncpy(me.set().m.heapName, "system", me.v.flexCount());
+                    long long usage = (long long)me.get().m.usage;
+                    if (C2DmaBufAllocator::system_uncached_supported() &&
+                        !(usage & (C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE))) {
+                        strncpy(me.set().m.heapName, "system-uncached", me.v.flexCount());
+                    } else {
+                        strncpy(me.set().m.heapName, "system", me.v.flexCount());
+                    }
                     me.set().m.allocFlags = 0;
                     return C2R::Ok();
                 };
