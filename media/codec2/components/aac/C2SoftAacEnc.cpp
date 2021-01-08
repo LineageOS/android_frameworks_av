@@ -692,11 +692,13 @@ private:
 
 }  // namespace android
 
+__attribute__((cfi_canonical_jump_table))
 extern "C" ::C2ComponentFactory* CreateCodec2Factory() {
     ALOGV("in %s", __func__);
     return new ::android::C2SoftAacEncFactory();
 }
 
+__attribute__((cfi_canonical_jump_table))
 extern "C" void DestroyCodec2Factory(::C2ComponentFactory* factory) {
     ALOGV("in %s", __func__);
     delete factory;
