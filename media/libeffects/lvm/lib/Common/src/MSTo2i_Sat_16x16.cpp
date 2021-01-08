@@ -21,46 +21,6 @@
 
 #include "VectorArithmetic.h"
 
-/**********************************************************************************
-   FUNCTION  MSTO2I_SAT_16X16
-***********************************************************************************/
-
-void MSTo2i_Sat_16x16(const LVM_INT16* srcM, const LVM_INT16* srcS, LVM_INT16* dst, LVM_INT16 n) {
-    LVM_INT32 temp, mVal, sVal;
-    LVM_INT16 ii;
-
-    for (ii = n; ii != 0; ii--) {
-        mVal = (LVM_INT32)*srcM;
-        srcM++;
-
-        sVal = (LVM_INT32)*srcS;
-        srcS++;
-
-        temp = mVal + sVal;
-
-        if (temp > 0x00007FFF) {
-            *dst = 0x7FFF;
-        } else if (temp < -0x00008000) {
-            *dst = -0x8000;
-        } else {
-            *dst = (LVM_INT16)temp;
-        }
-        dst++;
-
-        temp = mVal - sVal;
-
-        if (temp > 0x00007FFF) {
-            *dst = 0x7FFF;
-        } else if (temp < -0x00008000) {
-            *dst = -0x8000;
-        } else {
-            *dst = (LVM_INT16)temp;
-        }
-        dst++;
-    }
-
-    return;
-}
 void MSTo2i_Sat_Float(const LVM_FLOAT* srcM, const LVM_FLOAT* srcS, LVM_FLOAT* dst, LVM_INT16 n) {
     LVM_FLOAT temp, mVal, sVal;
     LVM_INT16 ii;
@@ -97,4 +57,3 @@ void MSTo2i_Sat_Float(const LVM_FLOAT* srcM, const LVM_FLOAT* srcS, LVM_FLOAT* d
 
     return;
 }
-/**********************************************************************************/
