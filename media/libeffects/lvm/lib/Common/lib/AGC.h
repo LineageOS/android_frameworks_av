@@ -48,11 +48,6 @@ typedef struct {
 /*    Function Prototypes                                                              */
 /*                                                                                */
 /**********************************************************************************/
-void AGC_MIX_VOL_2St1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t* pInstance, /* Instance pointer */
-                                 const LVM_FLOAT* pStSrc,                /* Stereo source */
-                                 const LVM_FLOAT* pMonoSrc,              /* Mono source */
-                                 LVM_FLOAT* pDst,                        /* Stereo destination */
-                                 LVM_UINT16 n);                          /* Number of samples */
 void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t* pInstance,  /* Instance pointer */
                                 const LVM_FLOAT* pStSrc,                 /* Source */
                                 const LVM_FLOAT* pMonoSrc,               /* Mono source */
