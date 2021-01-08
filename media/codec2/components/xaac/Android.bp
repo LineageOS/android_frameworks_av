@@ -3,6 +3,7 @@ cc_library {
     defaults: [
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_all-defaults",
+	"libcodec2_soft_sanitize_cfi-defaults",
     ],
 
     srcs: ["C2SoftXaacDec.cpp"],
