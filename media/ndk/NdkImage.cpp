@@ -58,7 +58,7 @@ AImage::close(int releaseFenceFd) {
     if (mIsClosed) {
         return;
     }
-    if (!mReader->mIsClosed) {
+    if (mReader->mIsOpen) {
         mReader->releaseImageLocked(this, releaseFenceFd);
     }
     // Should have been set to nullptr in releaseImageLocked
