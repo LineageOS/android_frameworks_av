@@ -261,7 +261,7 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
 
 
 void SessionConfigurationUtils::mapStreamInfo(const OutputStreamInfo &streamInfo,
-            camera3_stream_rotation_t rotation, String8 physicalId,
+            camera3::camera_stream_rotation_t rotation, String8 physicalId,
             hardware::camera::device::V3_4::Stream *stream /*out*/) {
     if (stream == nullptr) {
         return;
@@ -373,7 +373,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
     }
     *earlyExit = false;
     auto ret = Camera3Device::mapToStreamConfigurationMode(
-            static_cast<camera3_stream_configuration_mode_t> (operatingMode),
+            static_cast<camera_stream_configuration_mode_t> (operatingMode),
             /*out*/ &streamConfiguration.operationMode);
     if (ret != OK) {
         String8 msg = String8::format(
@@ -432,7 +432,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
             if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
                 streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
             }
-            mapStreamInfo(streamInfo, CAMERA3_STREAM_ROTATION_0, physicalCameraId,
+            mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId,
                     &streamConfiguration.streams[streamIdx++]);
             isStreamInfoValid = true;
 
@@ -487,12 +487,12 @@ SessionConfigurationUtils::convertToHALStreamCombination(
 
                     for (const auto& compositeStream : compositeStreams) {
                         mapStreamInfo(compositeStream,
-                                static_cast<camera3_stream_rotation_t> (it.getRotation()),
+                                static_cast<camera_stream_rotation_t> (it.getRotation()),
                                 physicalCameraId, &streamConfiguration.streams[streamIdx++]);
                     }
                 } else {
                     mapStreamInfo(streamInfo,
-                            static_cast<camera3_stream_rotation_t> (it.getRotation()),
+                            static_cast<camera_stream_rotation_t> (it.getRotation()),
                             physicalCameraId, &streamConfiguration.streams[streamIdx++]);
                 }
                 isStreamInfoValid = true;

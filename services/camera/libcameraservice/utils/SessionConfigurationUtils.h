@@ -23,7 +23,6 @@
 #include <camera/camera2/SubmitInfo.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 
-#include <hardware/camera3.h>
 #include <device3/Camera3StreamInterface.h>
 
 #include <stdint.h>
@@ -54,7 +53,7 @@ public:
         const String8 &cameraId, const CameraMetadata &physicalCameraMetadata);
 
     static void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
-            camera3_stream_rotation_t rotation, String8 physicalId,
+            camera3::camera_stream_rotation_t rotation, String8 physicalId,
             hardware::camera::device::V3_4::Stream *stream /*out*/);
 
     // Check that the physicalCameraId passed in is spported by the camera

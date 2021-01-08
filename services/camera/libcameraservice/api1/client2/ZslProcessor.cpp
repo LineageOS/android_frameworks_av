@@ -42,6 +42,9 @@ typedef android::RingBufferConsumer::PinnedBufferItem PinnedBufferItem;
 namespace android {
 namespace camera2 {
 
+using android::camera3::CAMERA_STREAM_ROTATION_0;
+using android::camera3::CAMERA_TEMPLATE_STILL_CAPTURE;
+
 namespace {
 struct TimestampFinder : public RingBufferConsumer::RingBufferComparator {
     typedef RingBufferConsumer::BufferInfo BufferInfo;
@@ -257,7 +260,7 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
 
         res = device->createStream(outSurface, params.fastInfo.maxZslSize.width,
             params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
-            HAL_DATASPACE_UNKNOWN, CAMERA3_STREAM_ROTATION_0, &mZslStreamId,
+            HAL_DATASPACE_UNKNOWN, CAMERA_STREAM_ROTATION_0, &mZslStreamId,
             String8());
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create ZSL stream: "
@@ -348,7 +351,7 @@ status_t ZslProcessor::updateRequestWithDefaultStillRequest(CameraMetadata &requ
     }
 
     CameraMetadata stillTemplate;
-    device->createDefaultRequest(CAMERA3_TEMPLATE_STILL_CAPTURE, &stillTemplate);
+    device->createDefaultRequest(CAMERA_TEMPLATE_STILL_CAPTURE, &stillTemplate);
 
     // Find some of the post-processing tags, and assign the value from template to the request.
     // Only check the aberration mode and noise reduction mode for now, as they are very important

@@ -76,7 +76,8 @@ status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const Stri
 bool Camera2Client::isZslEnabledInStillTemplate() {
     bool zslEnabled = false;
     CameraMetadata stillTemplate;
-    status_t res = mDevice->createDefaultRequest(CAMERA2_TEMPLATE_STILL_CAPTURE, &stillTemplate);
+    status_t res = mDevice->createDefaultRequest(
+            camera_request_template_t::CAMERA_TEMPLATE_STILL_CAPTURE, &stillTemplate);
     if (res == OK) {
         camera_metadata_entry_t enableZsl = stillTemplate.find(ANDROID_CONTROL_ENABLE_ZSL);
         if (enableZsl.count == 1) {

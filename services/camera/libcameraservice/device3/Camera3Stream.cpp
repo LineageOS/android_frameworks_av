@@ -37,20 +37,20 @@ Camera3Stream::~Camera3Stream() {
     }
 }
 
-Camera3Stream* Camera3Stream::cast(camera3_stream *stream) {
+Camera3Stream* Camera3Stream::cast(camera_stream *stream) {
     return static_cast<Camera3Stream*>(stream);
 }
 
-const Camera3Stream* Camera3Stream::cast(const camera3_stream *stream) {
+const Camera3Stream* Camera3Stream::cast(const camera_stream *stream) {
     return static_cast<const Camera3Stream*>(stream);
 }
 
 Camera3Stream::Camera3Stream(int id,
-        camera3_stream_type type,
+        camera_stream_type type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
-        android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+        android_dataspace dataSpace, camera_stream_rotation_t rotation,
         const String8& physicalCameraId, int setId) :
-    camera3_stream(),
+    camera_stream(),
     mId(id),
     mSetId(setId),
     mName(String8::format("Camera3Stream[%d]", id)),
@@ -75,15 +75,14 @@ Camera3Stream::Camera3Stream(int id,
     mPhysicalCameraId(physicalCameraId),
     mLastTimestamp(0) {
 
-    camera3_stream::stream_type = type;
-    camera3_stream::width = width;
-    camera3_stream::height = height;
-    camera3_stream::format = format;
-    camera3_stream::data_space = dataSpace;
-    camera3_stream::rotation = rotation;
-    camera3_stream::max_buffers = 0;
-    camera3_stream::priv = NULL;
-    camera3_stream::physical_camera_id = mPhysicalCameraId.string();
+    camera_stream::stream_type = type;
+    camera_stream::width = width;
+    camera_stream::height = height;
+    camera_stream::format = format;
+    camera_stream::data_space = dataSpace;
+    camera_stream::rotation = rotation;
+    camera_stream::max_buffers = 0;
+    camera_stream::physical_camera_id = mPhysicalCameraId.string();
 
     if ((format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_RAW_OPAQUE) &&
             maxSize == 0) {
@@ -101,19 +100,19 @@ int Camera3Stream::getStreamSetId() const {
 }
 
 uint32_t Camera3Stream::getWidth() const {
-    return camera3_stream::width;
+    return camera_stream::width;
 }
 
 uint32_t Camera3Stream::getHeight() const {
-    return camera3_stream::height;
+    return camera_stream::height;
 }
 
 int Camera3Stream::getFormat() const {
-    return camera3_stream::format;
+    return camera_stream::format;
 }
 
 android_dataspace Camera3Stream::getDataSpace() const {
-    return camera3_stream::data_space;
+    return camera_stream::data_space;
 }
 
 uint64_t Camera3Stream::getUsage() const {
@@ -153,7 +152,7 @@ const String8& Camera3Stream::physicalCameraId() const {
 }
 
 int Camera3Stream::getMaxHalBuffers() const {
-    return camera3_stream::max_buffers;
+    return camera_stream::max_buffers;
 }
 
 void Camera3Stream::setOfflineProcessingSupport(bool support) {
@@ -233,7 +232,7 @@ status_t Camera3Stream::restoreConfiguredState() {
     return res;
 }
 
-camera3_stream* Camera3Stream::startConfiguration() {
+camera_stream* Camera3Stream::startConfiguration() {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     status_t res;
@@ -264,9 +263,9 @@ camera3_stream* Camera3Stream::startConfiguration() {
     }
 
     mOldUsage = mUsage;
-    mOldMaxBuffers = camera3_stream::max_buffers;
-    mOldFormat = camera3_stream::format;
-    mOldDataSpace = camera3_stream::data_space;
+    mOldMaxBuffers = camera_stream::max_buffers;
+    mOldFormat = camera_stream::format;
+    mOldDataSpace = camera_stream::data_space;
 
     res = getEndpointUsage(&mUsage);
     if (res != OK) {
@@ -339,12 +338,12 @@ status_t Camera3Stream::finishConfiguration(/*out*/bool* streamReconfigured) {
     }
 
     // Check if the stream configuration is unchanged, and skip reallocation if
-    // so. As documented in hardware/camera3.h:configure_streams().
+    // so.
     if (mState == STATE_IN_RECONFIG &&
             mOldUsage == mUsage &&
-            mOldMaxBuffers == camera3_stream::max_buffers &&
-            mOldDataSpace == camera3_stream::data_space &&
-            mOldFormat == camera3_stream::format) {
+            mOldMaxBuffers == camera_stream::max_buffers &&
+            mOldDataSpace == camera_stream::data_space &&
+            mOldFormat == camera_stream::format) {
         mState = STATE_CONFIGURED;
         return OK;
     }
@@ -403,7 +402,7 @@ status_t Camera3Stream::cancelConfiguration() {
     }
 
     mUsage = mOldUsage;
-    camera3_stream::max_buffers = mOldMaxBuffers;
+    camera_stream::max_buffers = mOldMaxBuffers;
 
     mState = ((mState == STATE_IN_RECONFIG) || (mState == STATE_IN_IDLE)) ? STATE_CONFIGURED :
             STATE_CONSTRUCTED;
@@ -463,7 +462,7 @@ status_t Camera3Stream::startPrepare(int maxCount, bool blockRequest) {
 
     mLastMaxCount = bufferCount;
 
-    mPreparedBuffers.insertAt(camera3_stream_buffer_t(), /*index*/0, bufferCount);
+    mPreparedBuffers.insertAt(camera_stream_buffer_t(), /*index*/0, bufferCount);
     mPreparedBufferIdx = 0;
 
     mState = STATE_PREPARING;
@@ -538,7 +537,7 @@ status_t Camera3Stream::cancelPrepareLocked() {
     // they weren't filled.
     for (size_t i = 0; i < mPreparedBufferIdx; i++) {
         mPreparedBuffers.editItemAt(i).release_fence = -1;
-        mPreparedBuffers.editItemAt(i).status = CAMERA3_BUFFER_STATUS_ERROR;
+        mPreparedBuffers.editItemAt(i).status = CAMERA_BUFFER_STATUS_ERROR;
         returnBufferLocked(mPreparedBuffers[i], 0);
     }
     mPreparedBuffers.clear();
@@ -604,7 +603,7 @@ status_t Camera3Stream::tearDown() {
     return OK;
 }
 
-status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
+status_t Camera3Stream::getBuffer(camera_stream_buffer *buffer,
         nsecs_t waitBufferTimeout,
         const std::vector<size_t>& surface_ids) {
     ATRACE_HFR_CALL();
@@ -623,9 +622,9 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     }
 
     // Wait for new buffer returned back if we are running into the limit.
-    if (getHandoutOutputBufferCountLocked() == camera3_stream::max_buffers) {
+    if (getHandoutOutputBufferCountLocked() == camera_stream::max_buffers) {
         ALOGV("%s: Already dequeued max output buffers (%d), wait for next returned one.",
-                        __FUNCTION__, camera3_stream::max_buffers);
+                        __FUNCTION__, camera_stream::max_buffers);
         nsecs_t waitStart = systemTime(SYSTEM_TIME_MONOTONIC);
         if (waitBufferTimeout < kWaitForBufferDuration) {
             waitBufferTimeout = kWaitForBufferDuration;
@@ -637,7 +636,7 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
             if (res == TIMED_OUT) {
                 ALOGE("%s: wait for output buffer return timed out after %lldms (max_buffers %d)",
                         __FUNCTION__, waitBufferTimeout / 1000000LL,
-                        camera3_stream::max_buffers);
+                        camera_stream::max_buffers);
             }
             return res;
         }
@@ -655,7 +654,7 @@ status_t Camera3Stream::getBuffer(camera3_stream_buffer *buffer,
     return res;
 }
 
-bool Camera3Stream::isOutstandingBuffer(const camera3_stream_buffer &buffer) const{
+bool Camera3Stream::isOutstandingBuffer(const camera_stream_buffer &buffer) const{
     if (buffer.buffer == nullptr) {
         return false;
     }
@@ -670,7 +669,7 @@ bool Camera3Stream::isOutstandingBuffer(const camera3_stream_buffer &buffer) con
     return false;
 }
 
-void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer) {
+void Camera3Stream::removeOutstandingBuffer(const camera_stream_buffer &buffer) {
     if (buffer.buffer == nullptr) {
         return;
     }
@@ -685,7 +684,7 @@ void Camera3Stream::removeOutstandingBuffer(const camera3_stream_buffer &buffer)
     }
 }
 
-status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
+status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
         nsecs_t timestamp, bool timestampIncreasing,
          const std::vector<size_t>& surface_ids, uint64_t frameNumber) {
     ATRACE_HFR_CALL();
@@ -700,11 +699,11 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     removeOutstandingBuffer(buffer);
 
     // Buffer status may be changed, so make a copy of the stream_buffer struct.
-    camera3_stream_buffer b = buffer;
+    camera_stream_buffer b = buffer;
     if (timestampIncreasing && timestamp != 0 && timestamp <= mLastTimestamp) {
         ALOGE("%s: Stream %d: timestamp %" PRId64 " is not increasing. Prev timestamp %" PRId64,
                 __FUNCTION__, mId, timestamp, mLastTimestamp);
-        b.status = CAMERA3_BUFFER_STATUS_ERROR;
+        b.status = CAMERA_BUFFER_STATUS_ERROR;
     }
     mLastTimestamp = timestamp;
 
@@ -728,7 +727,7 @@ status_t Camera3Stream::returnBuffer(const camera3_stream_buffer &buffer,
     return res;
 }
 
-status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer, bool respectHalLimit) {
+status_t Camera3Stream::getInputBuffer(camera_stream_buffer *buffer, bool respectHalLimit) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     status_t res = OK;
@@ -741,9 +740,9 @@ status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer, bool respe
     }
 
     // Wait for new buffer returned back if we are running into the limit.
-    if (getHandoutInputBufferCountLocked() == camera3_stream::max_buffers && respectHalLimit) {
+    if (getHandoutInputBufferCountLocked() == camera_stream::max_buffers && respectHalLimit) {
         ALOGV("%s: Already dequeued max input buffers (%d), wait for next returned one.",
-                __FUNCTION__, camera3_stream::max_buffers);
+                __FUNCTION__, camera_stream::max_buffers);
         res = mInputBufferReturnedSignal.waitRelative(mLock, kWaitForBufferDuration);
         if (res != OK) {
             if (res == TIMED_OUT) {
@@ -766,7 +765,7 @@ status_t Camera3Stream::getInputBuffer(camera3_stream_buffer *buffer, bool respe
     return res;
 }
 
-status_t Camera3Stream::returnInputBuffer(const camera3_stream_buffer &buffer) {
+status_t Camera3Stream::returnInputBuffer(const camera_stream_buffer &buffer) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
 
@@ -808,7 +807,7 @@ void Camera3Stream::fireBufferRequestForFrameNumber(uint64_t frameNumber,
 }
 
 void Camera3Stream::fireBufferListenersLocked(
-        const camera3_stream_buffer& buffer, bool acquired, bool output, nsecs_t timestamp,
+        const camera_stream_buffer& buffer, bool acquired, bool output, nsecs_t timestamp,
         uint64_t frameNumber) {
     List<wp<Camera3StreamBufferListener> >::iterator it, end;
 
@@ -817,7 +816,7 @@ void Camera3Stream::fireBufferListenersLocked(
     Camera3StreamBufferListener::BufferInfo info =
         Camera3StreamBufferListener::BufferInfo();
     info.mOutput = output;
-    info.mError = (buffer.status == CAMERA3_BUFFER_STATUS_ERROR);
+    info.mError = (buffer.status == CAMERA_BUFFER_STATUS_ERROR);
     info.mFrameNumber = frameNumber;
     info.mTimestamp = timestamp;
     info.mStreamId = getId();
@@ -887,22 +886,22 @@ void Camera3Stream::dump(int fd, const Vector<String16> &args) const
             "      Latency histogram for wait on max_buffers");
 }
 
-status_t Camera3Stream::getBufferLocked(camera3_stream_buffer *,
+status_t Camera3Stream::getBufferLocked(camera_stream_buffer *,
         const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }
-status_t Camera3Stream::returnBufferLocked(const camera3_stream_buffer &,
+status_t Camera3Stream::returnBufferLocked(const camera_stream_buffer &,
                                            nsecs_t, const std::vector<size_t>&) {
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }
-status_t Camera3Stream::getInputBufferLocked(camera3_stream_buffer *) {
+status_t Camera3Stream::getInputBufferLocked(camera_stream_buffer *) {
     ALOGE("%s: This type of stream does not support input", __FUNCTION__);
     return INVALID_OPERATION;
 }
 status_t Camera3Stream::returnInputBufferLocked(
-        const camera3_stream_buffer &) {
+        const camera_stream_buffer &) {
     ALOGE("%s: This type of stream does not support input", __FUNCTION__);
     return INVALID_OPERATION;
 }
