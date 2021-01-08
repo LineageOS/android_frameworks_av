@@ -96,13 +96,23 @@ LVPSA_RETURN LVPSA_Process(pLVPSA_Handle_t hInstance, LVM_FLOAT* pLVPSA_InputSam
     for (ii = 0; ii < pLVPSA_Inst->nRelevantFilters; ii++) {
         switch (pLVPSA_Inst->pBPFiltersPrecision[ii]) {
             case LVPSA_SimplePrecisionFilter:
+#ifdef BIQUAD_OPT
+                pLVPSA_Inst->specBiquad[ii].process(pScratch + InputBlockSize, pScratch,
+                                                    (LVM_INT16)InputBlockSize);
+#else
                 BP_1I_D16F16C14_TRC_WRA_01(&pLVPSA_Inst->pBP_Instances[ii], pScratch,
                                            pScratch + InputBlockSize, (LVM_INT16)InputBlockSize);
+#endif
                 break;
 
             case LVPSA_DoublePrecisionFilter:
+#ifdef BIQUAD_OPT
+                pLVPSA_Inst->specBiquad[ii].process(pScratch + InputBlockSize, pScratch,
+                                                    (LVM_INT16)InputBlockSize);
+#else
                 BP_1I_D16F32C30_TRC_WRA_01(&pLVPSA_Inst->pBP_Instances[ii], pScratch,
                                            pScratch + InputBlockSize, (LVM_INT16)InputBlockSize);
+#endif
                 break;
             default:
                 break;
