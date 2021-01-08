@@ -3,7 +3,8 @@ cc_library {
     defaults: [
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_signed-defaults",
-   ],
+        "libcodec2_soft_sanitize_cfi-defaults",
+    ],
 
     static_libs: ["libavcdec"],
 
@@ -20,7 +21,8 @@ cc_library {
     defaults: [
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_signed-defaults",
-   ],
+        "libcodec2_soft_sanitize_cfi-defaults",
+    ],
 
     static_libs: ["libavcenc"],
 
