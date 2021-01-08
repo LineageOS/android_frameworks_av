@@ -529,6 +529,11 @@ void AudioPolicyService::updateUidStates_l()
 
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
+        if (!isVirtualSource(current->attributes.source)
+                && isUserSensorPrivacyEnabledForUid(current->uid)) {
+            setAppState_l(current->portId, APP_STATE_IDLE);
+            continue;
+        }
         if (!current->active) {
             continue;
         }
@@ -978,6 +983,16 @@ status_t AudioPolicyService::handleGetUidState(Vector<String16>& args, int out, 
     return NO_INIT;
 }
 
+bool AudioPolicyService::isUserSensorPrivacyEnabledForUid(uid_t uid) {
+    userid_t userId = multiuser_get_user_id(uid);
+    if (mMicrophoneSensorPrivacyPolicies.find(userId) == mMicrophoneSensorPrivacyPolicies.end()) {
+        sp<SensorPrivacyPolicy> userPolicy = new SensorPrivacyPolicy(this);
+        userPolicy->registerSelfForMicrophoneOnly(userId);
+        mMicrophoneSensorPrivacyPolicies[userId] = userPolicy;
+    }
+    return mMicrophoneSensorPrivacyPolicies[userId]->isSensorPrivacyEnabled();
+}
+
 status_t AudioPolicyService::printHelp(int out) {
     return dprintf(out, "Audio policy service commands:\n"
         "  get-uid-state <PACKAGE> [--user USER_ID] gets the uid state\n"
@@ -1209,6 +1224,14 @@ void AudioPolicyService::SensorPrivacyPolicy::registerSelf() {
     SensorPrivacyManager spm;
     mSensorPrivacyEnabled = spm.isSensorPrivacyEnabled();
     spm.addSensorPrivacyListener(this);
+}
+
+void AudioPolicyService::SensorPrivacyPolicy::registerSelfForMicrophoneOnly(int userId) {
+    SensorPrivacyManager spm;
+    mSensorPrivacyEnabled = spm.isIndividualSensorPrivacyEnabled(userId,
+            SensorPrivacyManager::INDIVIDUAL_SENSOR_MICROPHONE);
+    spm.addIndividualSensorPrivacyListener(userId,
+            SensorPrivacyManager::INDIVIDUAL_SENSOR_MICROPHONE, this);
 }
 
 void AudioPolicyService::SensorPrivacyPolicy::unregisterSelf() {
