@@ -27,6 +27,7 @@ mmap2: 1
 mmap: 1
 fstat64: 1
 fstat: 1
+stat: 1
 stat64: 1
 statfs64: 1
 madvise: 1
