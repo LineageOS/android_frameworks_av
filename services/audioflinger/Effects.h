@@ -373,8 +373,8 @@ private:
     DISALLOW_COPY_AND_ASSIGN(EffectHandle);
 
     Mutex mLock;                             // protects IEffect method calls
-    wp<EffectBase> mEffect;                  // pointer to controlled EffectModule
-    sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
+    const wp<EffectBase> mEffect;            // pointer to controlled EffectModule
+    const sp<media::IEffectClient> mEffectClient;  // callback interface for client notifications
     /*const*/ sp<Client> mClient;            // client for shared memory allocation, see
                                              //   disconnect()
     sp<IMemory> mCblkMemory;                 // shared memory for control block
@@ -558,6 +558,8 @@ private:
 
         wp<ThreadBase> thread() { return mThread; }
 
+        // TODO(b/161341295) secure this against concurrent access to mThread
+        // by other callers.
         void setThread(const wp<ThreadBase>& thread) {
             mThread = thread;
             sp<ThreadBase> p = thread.promote();
@@ -565,9 +567,9 @@ private:
         }
 
     private:
-        wp<EffectChain> mChain;
-        wp<ThreadBase> mThread;
-        wp<AudioFlinger> mAudioFlinger;
+        const wp<EffectChain> mChain;
+        wp<ThreadBase> mThread;         // TODO(b/161341295) protect against concurrent access
+        wp<AudioFlinger> mAudioFlinger; // this could be const with some rearrangement.
     };
 
     friend class AudioFlinger;  // for mThread, mEffects
