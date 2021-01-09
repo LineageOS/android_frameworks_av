@@ -23,6 +23,7 @@
 #include <sys/types.h>
 
 #include <binder/IPCThreadState.h>
+#include <binder/IServiceManager.h>
 #include <binder/Parcel.h>
 #include <media/AudioEffect.h>
 #include <media/IAudioPolicyService.h>
@@ -1289,6 +1290,9 @@ public:
     virtual status_t listAudioSessions(audio_stream_type_t streams,
                                        Vector< sp<AudioSessionInfo>> &sessions)
     {
+        if (!checkCallingPermission(String16("lineageos.permission.LIST_AUDIO_SESSIONS"))) {
+            return PERMISSION_DENIED;
+        }
         Parcel data, reply;
         data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
         data.writeInt32(streams);
