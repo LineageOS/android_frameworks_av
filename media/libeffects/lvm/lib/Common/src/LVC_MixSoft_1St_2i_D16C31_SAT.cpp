@@ -35,7 +35,7 @@
 #define ARRAY_SIZE(a) ((sizeof(a)) / (sizeof(*(a))))
 
 /**********************************************************************************
-   FUNCTION LVC_MixSoft_1St_2i_D16C31_SAT
+   FUNCTION LVC_MixSoft_1St_MC_float_SAT
 ***********************************************************************************/
 /* This threshold is used to decide on the processing to be applied on
  * front center and back center channels
@@ -192,106 +192,3 @@ void LVC_MixSoft_1St_MC_float_SAT(LVMixer3_2St_FLOAT_st* ptrInstance, const LVM_
         }
     }
 }
-void LVC_MixSoft_1St_2i_D16C31_SAT(LVMixer3_2St_FLOAT_st* ptrInstance, const LVM_FLOAT* src,
-                                   LVM_FLOAT* dst, LVM_INT16 n) {
-    char HardMixing = TRUE;
-    LVM_FLOAT TargetGain;
-    Mix_Private_FLOAT_st* pInstance1 =
-            (Mix_Private_FLOAT_st*)(ptrInstance->MixerStream[0].PrivateParams);
-    Mix_Private_FLOAT_st* pInstance2 =
-            (Mix_Private_FLOAT_st*)(ptrInstance->MixerStream[1].PrivateParams);
-
-    if (n <= 0) return;
-
-    /******************************************************************************
-       SOFT MIXING
-    *******************************************************************************/
-    if ((pInstance1->Current != pInstance1->Target) ||
-        (pInstance2->Current != pInstance2->Target)) {
-        if (pInstance1->Delta == 1.0f) {
-            pInstance1->Current = pInstance1->Target;
-            TargetGain = pInstance1->Target;
-            LVC_Mixer_SetTarget(&(ptrInstance->MixerStream[0]), TargetGain);
-        } else if (Abs_Float(pInstance1->Current - pInstance1->Target) < pInstance1->Delta) {
-            pInstance1->Current = pInstance1->Target; /* Difference is not significant anymore. \
-                                                         Make them equal. */
-            TargetGain = pInstance1->Target;
-            LVC_Mixer_SetTarget(&(ptrInstance->MixerStream[0]), TargetGain);
-        } else {
-            /* Soft mixing has to be applied */
-            HardMixing = FALSE;
-        }
-
-        if (HardMixing == TRUE) {
-            if (pInstance2->Delta == 1.0f) {
-                pInstance2->Current = pInstance2->Target;
-                TargetGain = pInstance2->Target;
-                LVC_Mixer_SetTarget(&(ptrInstance->MixerStream[1]), TargetGain);
-            } else if (Abs_Float(pInstance2->Current - pInstance2->Target) < pInstance2->Delta) {
-                pInstance2->Current = pInstance2->Target; /* Difference is not significant anymore.
-                                                             \ Make them equal. */
-                TargetGain = pInstance2->Target;
-                LVC_Mixer_SetTarget(&(ptrInstance->MixerStream[1]), TargetGain);
-            } else {
-                /* Soft mixing has to be applied */
-                HardMixing = FALSE;
-            }
-        }
-
-        if (HardMixing == FALSE) {
-            LVC_Core_MixSoft_1St_2i_D16C31_WRA(&(ptrInstance->MixerStream[0]),
-                                               &(ptrInstance->MixerStream[1]), src, dst, n);
-        }
-    }
-
-    /******************************************************************************
-       HARD MIXING
-    *******************************************************************************/
-
-    if (HardMixing) {
-        if ((pInstance1->Target == 1.0f) && (pInstance2->Target == 1.0f)) {
-            if (src != dst) {
-                Copy_Float(src, dst, n);
-            }
-        } else {
-            LVC_Core_MixHard_1St_2i_D16C31_SAT(&(ptrInstance->MixerStream[0]),
-                                               &(ptrInstance->MixerStream[1]), src, dst, n);
-        }
-    }
-
-    /******************************************************************************
-       CALL BACK
-    *******************************************************************************/
-
-    if (ptrInstance->MixerStream[0].CallbackSet) {
-        if (Abs_Float(pInstance1->Current - pInstance1->Target) < pInstance1->Delta) {
-            pInstance1->Current = pInstance1->Target; /* Difference is not significant anymore. \
-                                                         Make them equal. */
-            TargetGain = pInstance1->Target;
-            LVC_Mixer_SetTarget(&ptrInstance->MixerStream[0], TargetGain);
-            ptrInstance->MixerStream[0].CallbackSet = FALSE;
-            if (ptrInstance->MixerStream[0].pCallBack != 0) {
-                (*ptrInstance->MixerStream[0].pCallBack)(
-                        ptrInstance->MixerStream[0].pCallbackHandle,
-                        ptrInstance->MixerStream[0].pGeneralPurpose,
-                        ptrInstance->MixerStream[0].CallbackParam);
-            }
-        }
-    }
-    if (ptrInstance->MixerStream[1].CallbackSet) {
-        if (Abs_Float(pInstance2->Current - pInstance2->Target) < pInstance2->Delta) {
-            pInstance2->Current = pInstance2->Target; /* Difference is not significant anymore.
-                                                         Make them equal. */
-            TargetGain = pInstance2->Target;
-            LVC_Mixer_SetTarget(&ptrInstance->MixerStream[1], TargetGain);
-            ptrInstance->MixerStream[1].CallbackSet = FALSE;
-            if (ptrInstance->MixerStream[1].pCallBack != 0) {
-                (*ptrInstance->MixerStream[1].pCallBack)(
-                        ptrInstance->MixerStream[1].pCallbackHandle,
-                        ptrInstance->MixerStream[1].pGeneralPurpose,
-                        ptrInstance->MixerStream[1].CallbackParam);
-            }
-        }
-    }
-}
-/**********************************************************************************/

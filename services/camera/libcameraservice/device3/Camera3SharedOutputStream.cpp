@@ -30,10 +30,10 @@ Camera3SharedOutputStream::Camera3SharedOutputStream(int id,
         const std::vector<sp<Surface>>& surfaces,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
-        camera3_stream_rotation_t rotation,
+        camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         int setId, bool useHalBufManager) :
-        Camera3OutputStream(id, CAMERA3_STREAM_OUTPUT, width, height,
+        Camera3OutputStream(id, CAMERA_STREAM_OUTPUT, width, height,
                             format, dataSpace, rotation, physicalCameraId,
                             consumerUsage, timestampOffset, setId),
         mUseHalBufManager(useHalBufManager) {
@@ -65,7 +65,7 @@ status_t Camera3SharedOutputStream::connectStreamSplitterLocked() {
         }
     }
 
-    res = mStreamSplitter->connect(initialSurfaces, usage, mUsage, camera3_stream::max_buffers,
+    res = mStreamSplitter->connect(initialSurfaces, usage, mUsage, camera_stream::max_buffers,
             getWidth(), getHeight(), getFormat(), &mConsumer);
     if (res != OK) {
         ALOGE("%s: Failed to connect to stream splitter: %s(%d)",
@@ -157,7 +157,7 @@ status_t Camera3SharedOutputStream::setConsumers(const std::vector<sp<Surface>>&
     return ret;
 }
 
-status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffer,
+status_t Camera3SharedOutputStream::getBufferLocked(camera_stream_buffer *buffer,
         const std::vector<size_t>& surfaceIds) {
     ANativeWindowBuffer* anb;
     int fenceFd = -1;
@@ -180,7 +180,7 @@ status_t Camera3SharedOutputStream::getBufferLocked(camera3_stream_buffer *buffe
      * in which case we reassign it to acquire_fence
      */
     handoutBufferLocked(*buffer, &(anb->handle), /*acquireFence*/fenceFd,
-                        /*releaseFence*/-1, CAMERA3_BUFFER_STATUS_OK, /*output*/true);
+                        /*releaseFence*/-1, CAMERA_BUFFER_STATUS_OK, /*output*/true);
 
     return OK;
 }

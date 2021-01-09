@@ -43,9 +43,6 @@ extern "C" {
     long vorbis_packet_blocksize(vorbis_info *vi,ogg_packet *op);
 }
 
-static constexpr int OGG_PAGE_FLAG_CONTINUED_PACKET = 1;
-static constexpr int OGG_PAGE_FLAG_END_OF_STREAM = 4;
-
 namespace android {
 
 struct OggSource : public MediaTrackHelper {
@@ -300,8 +297,7 @@ media_status_t OggSource::read(
     AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
 
     *out = packet;
-    ALOGV("returning buffer %p, size %zu, length %zu",
-          packet, packet->size(), packet->range_length());
+    ALOGV("returning buffer %p", packet);
     return AMEDIA_OK;
 }
 
@@ -362,10 +358,10 @@ status_t MyOggExtractor::findNextPage(
 
         if (!memcmp(signature, "OggS", 4)) {
             if (*pageOffset > startOffset) {
-                ALOGV("skipped %lld bytes of junk at %lld to reach next frame",
-                     (long long)(*pageOffset - startOffset), (long long)(startOffset));
+                ALOGV("skipped %lld bytes of junk to reach next frame",
+                     (long long)(*pageOffset - startOffset));
             }
-            ALOGV("found frame at %lld", (long long)(*pageOffset));
+
             return OK;
         }
 
@@ -633,8 +629,7 @@ media_status_t MyOpusExtractor::readNextPacket(MediaBufferHelper **out) {
     // Calculate timestamps by accumulating durations starting from the first sample of a page;
     // We assume that we only seek to page boundaries.
     AMediaFormat *meta = (*out)->meta_data();
-    if (AMediaFormat_getInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, &currentPageSamples) &&
-            (mCurrentPage.mFlags & OGG_PAGE_FLAG_END_OF_STREAM)) {
+    if (AMediaFormat_getInt32(meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, &currentPageSamples)) {
         // first packet in page
         if (mOffset == mFirstDataOffset) {
             currentPageSamples -= mStartGranulePosition;
@@ -817,7 +812,6 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
             }
             buffer = tmp;
 
-            ALOGV("reading %zu bytes @ %zu", packetSize, size_t(dataOffset));
             ssize_t n = mSource->readAt(
                     dataOffset,
                     (uint8_t *)buffer->data() + buffer->range_length(),
@@ -836,9 +830,8 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
 
             if (gotFullPacket) {
                 // We've just read the entire packet.
-                ALOGV("got full packet, size %zu", fullSize);
 
-                if (mFirstPacketInPage && (mCurrentPage.mFlags & OGG_PAGE_FLAG_END_OF_STREAM)) {
+                if (mFirstPacketInPage) {
                     AMediaFormat *meta = buffer->meta_data();
                     AMediaFormat_setInt32(
                             meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, mCurrentPageSamples);
@@ -871,9 +864,6 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
             }
 
             // fall through, the buffer now contains the start of the packet.
-            ALOGV("have start of packet, getting rest");
-        } else {
-            ALOGV("moving to next page");
         }
 
         CHECK_EQ(mNextLaceIndex, mCurrentPage.mNumSegments);
@@ -909,10 +899,9 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
         mNextLaceIndex = 0;
 
         if (buffer != NULL) {
-            if ((mCurrentPage.mFlags & OGG_PAGE_FLAG_CONTINUED_PACKET) == 0) {
+            if ((mCurrentPage.mFlags & 1) == 0) {
                 // This page does not continue the packet, i.e. the packet
                 // is already complete.
-                ALOGV("packet was already complete?!");
 
                 if (timeUs >= 0) {
                     AMediaFormat *meta = buffer->meta_data();
@@ -920,10 +909,8 @@ media_status_t MyOggExtractor::_readNextPacket(MediaBufferHelper **out, bool cal
                 }
 
                 AMediaFormat *meta = buffer->meta_data();
-                if (mCurrentPage.mFlags & OGG_PAGE_FLAG_END_OF_STREAM) {
-                    AMediaFormat_setInt32(
-                            meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, mCurrentPageSamples);
-                }
+                AMediaFormat_setInt32(
+                        meta, AMEDIAFORMAT_KEY_VALID_SAMPLES, mCurrentPageSamples);
                 mFirstPacketInPage = false;
 
                 *out = buffer;
@@ -942,7 +929,6 @@ status_t MyOggExtractor::init() {
     for (size_t i = 0; i < mNumHeaders; ++i) {
         // ignore timestamp for configuration packets
         if ((err = _readNextPacket(&packet, /* calcVorbisTimestamp = */ false)) != AMEDIA_OK) {
-            ALOGV("readNextPacket failed");
             return err;
         }
         ALOGV("read packet of size %zu\n", packet->range_length());
@@ -1021,10 +1007,6 @@ int32_t MyOggExtractor::getPacketBlockSize(MediaBufferHelper *buffer) {
         (const uint8_t *)buffer->data() + buffer->range_offset();
 
     size_t size = buffer->range_length();
-
-    if (size == 0) {
-        return 0;
-    }
 
     ogg_buffer buf;
     buf.data = (uint8_t *)data;

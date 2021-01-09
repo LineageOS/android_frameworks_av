@@ -42,10 +42,10 @@ namespace camera3 {
 Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, int format,
-        android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+        android_dataspace dataSpace, camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
         int setId) :
-        Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height,
+        Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, setId),
         mConsumer(consumer),
@@ -69,9 +69,9 @@ Camera3OutputStream::Camera3OutputStream(int id,
 Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, size_t maxSize, int format,
-        android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+        android_dataspace dataSpace, camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId, int setId) :
-        Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height, maxSize,
+        Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height, maxSize,
                             format, dataSpace, rotation, physicalCameraId, setId),
         mConsumer(consumer),
         mTransform(0),
@@ -101,9 +101,9 @@ Camera3OutputStream::Camera3OutputStream(int id,
 Camera3OutputStream::Camera3OutputStream(int id,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
-        camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+        camera_stream_rotation_t rotation, nsecs_t timestampOffset,
         const String8& physicalCameraId, int setId) :
-        Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, width, height,
+        Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
                             physicalCameraId, setId),
         mConsumer(nullptr),
@@ -134,11 +134,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
     mBufferProducerListener = new BufferProducerListener(this, needsReleaseNotify);
 }
 
-Camera3OutputStream::Camera3OutputStream(int id, camera3_stream_type_t type,
+Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          uint32_t width, uint32_t height,
                                          int format,
                                          android_dataspace dataSpace,
-                                         camera3_stream_rotation_t rotation,
+                                         camera_stream_rotation_t rotation,
                                          const String8& physicalCameraId,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
                                          int setId) :
@@ -166,7 +166,7 @@ Camera3OutputStream::~Camera3OutputStream() {
     disconnectLocked();
 }
 
-status_t Camera3OutputStream::getBufferLocked(camera3_stream_buffer *buffer,
+status_t Camera3OutputStream::getBufferLocked(camera_stream_buffer *buffer,
         const std::vector<size_t>&) {
     ATRACE_HFR_CALL();
 
@@ -184,7 +184,7 @@ status_t Camera3OutputStream::getBufferLocked(camera3_stream_buffer *buffer,
      * in which case we reassign it to acquire_fence
      */
     handoutBufferLocked(*buffer, &(anb->handle), /*acquireFence*/fenceFd,
-                        /*releaseFence*/-1, CAMERA3_BUFFER_STATUS_OK, /*output*/true);
+                        /*releaseFence*/-1, CAMERA_BUFFER_STATUS_OK, /*output*/true);
 
     return OK;
 }
@@ -196,7 +196,7 @@ status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
 }
 
 status_t Camera3OutputStream::returnBufferLocked(
-        const camera3_stream_buffer &buffer,
+        const camera_stream_buffer &buffer,
         nsecs_t timestamp, const std::vector<size_t>& surface_ids) {
     ATRACE_HFR_CALL();
 
@@ -213,7 +213,7 @@ status_t Camera3OutputStream::returnBufferLocked(
 }
 
 status_t Camera3OutputStream::returnBufferCheckedLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>& surface_ids,
@@ -243,11 +243,11 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
     /**
      * Return buffer back to ANativeWindow
      */
-    if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR || mDropBuffers || timestamp == 0) {
+    if (buffer.status == CAMERA_BUFFER_STATUS_ERROR || mDropBuffers || timestamp == 0) {
         // Cancel buffer
         if (mDropBuffers) {
             ALOGV("%s: Dropping a frame for stream %d.", __FUNCTION__, mId);
-        } else if (buffer.status == CAMERA3_BUFFER_STATUS_ERROR) {
+        } else if (buffer.status == CAMERA_BUFFER_STATUS_ERROR) {
             ALOGV("%s: A frame is dropped for stream %d due to buffer error.", __FUNCTION__, mId);
         } else {
             ALOGE("%s: Stream %d: timestamp shouldn't be 0", __FUNCTION__, mId);
@@ -267,7 +267,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
             mBufferProducerListener->onBufferReleased();
         }
     } else {
-        if (mTraceFirstBuffer && (stream_type == CAMERA3_STREAM_OUTPUT)) {
+        if (mTraceFirstBuffer && (stream_type == CAMERA_STREAM_OUTPUT)) {
             {
                 char traceLog[48];
                 snprintf(traceLog, sizeof(traceLog), "Stream %d: first full buffer\n", mId);
@@ -303,7 +303,7 @@ status_t Camera3OutputStream::returnBufferCheckedLocked(
 
     // Once a valid buffer has been returned to the queue, can no longer
     // dequeue all buffers for preallocation.
-    if (buffer.status != CAMERA3_BUFFER_STATUS_ERROR) {
+    if (buffer.status != CAMERA_BUFFER_STATUS_ERROR) {
         mStreamUnpreparable = true;
     }
 
@@ -424,7 +424,7 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
     if (mMaxSize == 0) {
         // For buffers of known size
         res = native_window_set_buffers_dimensions(mConsumer.get(),
-                camera3_stream::width, camera3_stream::height);
+                camera_stream::width, camera_stream::height);
     } else {
         // For buffers with bounded size
         res = native_window_set_buffers_dimensions(mConsumer.get(),
@@ -433,23 +433,23 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
     if (res != OK) {
         ALOGE("%s: Unable to configure stream buffer dimensions"
                 " %d x %d (maxSize %zu) for stream %d",
-                __FUNCTION__, camera3_stream::width, camera3_stream::height,
+                __FUNCTION__, camera_stream::width, camera_stream::height,
                 mMaxSize, mId);
         return res;
     }
     res = native_window_set_buffers_format(mConsumer.get(),
-            camera3_stream::format);
+            camera_stream::format);
     if (res != OK) {
         ALOGE("%s: Unable to configure stream buffer format %#x for stream %d",
-                __FUNCTION__, camera3_stream::format, mId);
+                __FUNCTION__, camera_stream::format, mId);
         return res;
     }
 
     res = native_window_set_buffers_data_space(mConsumer.get(),
-            camera3_stream::data_space);
+            camera_stream::data_space);
     if (res != OK) {
         ALOGE("%s: Unable to configure stream dataspace %#x for stream %d",
-                __FUNCTION__, camera3_stream::data_space, mId);
+                __FUNCTION__, camera_stream::data_space, mId);
         return res;
     }
 
@@ -464,14 +464,14 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
     }
 
     ALOGV("%s: Consumer wants %d buffers, HAL wants %d", __FUNCTION__,
-            maxConsumerBuffers, camera3_stream::max_buffers);
-    if (camera3_stream::max_buffers == 0) {
+            maxConsumerBuffers, camera_stream::max_buffers);
+    if (camera_stream::max_buffers == 0) {
         ALOGE("%s: Camera HAL requested max_buffer count: %d, requires at least 1",
-                __FUNCTION__, camera3_stream::max_buffers);
+                __FUNCTION__, camera_stream::max_buffers);
         return INVALID_OPERATION;
     }
 
-    mTotalBufferCount = maxConsumerBuffers + camera3_stream::max_buffers;
+    mTotalBufferCount = maxConsumerBuffers + camera_stream::max_buffers;
     mHandoutTotalBufferCount = 0;
     mFrameCount = 0;
     mLastTimestamp = 0;
@@ -763,7 +763,7 @@ status_t Camera3OutputStream::getEndpointUsageForSurface(uint64_t *usage,
     uint64_t u = 0;
 
     res = native_window_get_consumer_usage(static_cast<ANativeWindow*>(surface.get()), &u);
-    applyZSLUsageQuirk(camera3_stream::format, &u);
+    applyZSLUsageQuirk(camera_stream::format, &u);
     *usage = u;
     return res;
 }

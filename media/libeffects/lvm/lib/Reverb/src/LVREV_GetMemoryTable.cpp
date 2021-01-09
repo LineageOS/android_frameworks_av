@@ -63,7 +63,6 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
     INST_ALLOC FastData;
     INST_ALLOC FastCoef;
     INST_ALLOC Temporary;
-    LVM_INT16 i;
     LVM_UINT16 MaxBlockSize;
 
     /*
@@ -117,11 +116,11 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
          * Select the maximum internal block size
          */
         if (pInstanceParams->NumDelays == LVREV_DELAYLINES_4) {
-            MaxBlockSize = LVREV_MAX_AP3_DELAY;
+            MaxBlockSize = LVREV_MAX_AP_DELAY[3];
         } else if (pInstanceParams->NumDelays == LVREV_DELAYLINES_2) {
-            MaxBlockSize = LVREV_MAX_AP1_DELAY;
+            MaxBlockSize = LVREV_MAX_AP_DELAY[1];
         } else {
-            MaxBlockSize = LVREV_MAX_AP0_DELAY;
+            MaxBlockSize = LVREV_MAX_AP_DELAY[0];
         }
 
         if (MaxBlockSize > pInstanceParams->MaxBlockSize) {
@@ -142,20 +141,8 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
 #ifndef BIQUAD_OPT
         InstAlloc_AddMember(&FastData, sizeof(LVREV_FastData_st));
 #endif
-        if (pInstanceParams->NumDelays == LVREV_DELAYLINES_4) {
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T3_DELAY * sizeof(LVM_FLOAT));
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T2_DELAY * sizeof(LVM_FLOAT));
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * sizeof(LVM_FLOAT));
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * sizeof(LVM_FLOAT));
-        }
-
-        if (pInstanceParams->NumDelays == LVREV_DELAYLINES_2) {
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T1_DELAY * sizeof(LVM_FLOAT));
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * sizeof(LVM_FLOAT));
-        }
-
-        if (pInstanceParams->NumDelays == LVREV_DELAYLINES_1) {
-            InstAlloc_AddMember(&FastData, LVREV_MAX_T0_DELAY * sizeof(LVM_FLOAT));
+        for (size_t i = 0; i < pInstanceParams->NumDelays; i++) {
+            InstAlloc_AddMember(&FastData, LVREV_MAX_T_DELAY[i] * sizeof(LVM_FLOAT));
         }
 
         pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size = InstAlloc_GetTotal(&FastData);
@@ -179,25 +166,9 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
         InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
         /* Mono->stereo input saved for end mix */
         InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_FLOAT) * MaxBlockSize);
-        if (pInstanceParams->NumDelays == LVREV_DELAYLINES_4) {
-            for (i = 0; i < 4; i++) {
-                /* A Scratch buffer for each delay line */
-                InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
-            }
-        }
-
-        if (pInstanceParams->NumDelays == LVREV_DELAYLINES_2) {
-            for (i = 0; i < 2; i++) {
-                /* A Scratch buffer for each delay line */
-                InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
-            }
-        }
-
-        if (pInstanceParams->NumDelays == LVREV_DELAYLINES_1) {
-            for (i = 0; i < 1; i++) {
-                /* A Scratch buffer for each delay line */
-                InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
-            }
+        for (size_t i = 0; i < pInstanceParams->NumDelays; i++) {
+            /* A Scratch buffer for each delay line */
+            InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
         }
 
         pMemoryTable->Region[LVM_TEMPORARY_FAST].Size = InstAlloc_GetTotal(&Temporary);
