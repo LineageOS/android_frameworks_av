@@ -109,6 +109,22 @@ constexpr audio_channel_mask_t lvmConfigChMask[] = {
         AUDIO_CHANNEL_OUT_5POINT1POINT2,
         AUDIO_CHANNEL_OUT_7POINT1,
         AUDIO_CHANNEL_INDEX_MASK_8,
+        AUDIO_CHANNEL_INDEX_MASK_9,
+        AUDIO_CHANNEL_INDEX_MASK_10,
+        AUDIO_CHANNEL_INDEX_MASK_11,
+        AUDIO_CHANNEL_INDEX_MASK_12,
+        AUDIO_CHANNEL_INDEX_MASK_13,
+        AUDIO_CHANNEL_INDEX_MASK_14,
+        AUDIO_CHANNEL_INDEX_MASK_15,
+        AUDIO_CHANNEL_INDEX_MASK_16,
+        AUDIO_CHANNEL_INDEX_MASK_17,
+        AUDIO_CHANNEL_INDEX_MASK_18,
+        AUDIO_CHANNEL_INDEX_MASK_19,
+        AUDIO_CHANNEL_INDEX_MASK_20,
+        AUDIO_CHANNEL_INDEX_MASK_21,
+        AUDIO_CHANNEL_INDEX_MASK_22,
+        AUDIO_CHANNEL_INDEX_MASK_23,
+        AUDIO_CHANNEL_INDEX_MASK_24,
 };
 
 void printUsage() {
@@ -394,7 +410,7 @@ int lvmControl(struct EffectContext* pContext, lvmConfigParams_t* plvmConfigPara
         params->SourceFormat = LVM_MONO;
     } else if (params->NrChannels == 2) {
         params->SourceFormat = LVM_STEREO;
-    } else if (params->NrChannels > 2 && params->NrChannels <= 8) {  // FCC_2 FCC_8
+    } else if (params->NrChannels > FCC_2 && params->NrChannels <= FCC_24) {
         params->SourceFormat = LVM_MULTICHANNEL;
     } else {
         return -EINVAL;
