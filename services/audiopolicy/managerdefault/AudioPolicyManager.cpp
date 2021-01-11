@@ -4657,6 +4657,9 @@ status_t AudioPolicyManager::initialize() {
         return status;
     }
 
+    mCommunnicationStrategy = mEngine->getProductStrategyForAttributes(
+        mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL));
+
     // after parsing the config, mOutputDevicesAll and mInputDevicesAll contain all known devices;
     // open all output streams needed to access attached devices
     onNewAudioModulesAvailableInt(nullptr /*newDevices*/);
@@ -4685,9 +4688,6 @@ status_t AudioPolicyManager::initialize() {
 
     // Silence ALOGV statements
     property_set("log.tag." LOG_TAG, "D");
-
-    mCommunnicationStrategy = mEngine->getProductStrategyForAttributes(
-            mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL));
 
     updateDevicesAndOutputs();
     return status;
