@@ -161,8 +161,6 @@ void FO_2I_D16F32Css_LShx_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
                                           Biquad_2I_Order1_FLOAT_Taps_t* pTaps,
                                           FO_FLOAT_LShx_Coefs_t* pCoef);
 
-void FO_2I_D16F32C15_LShx_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT* pDataIn,
-                                     LVM_FLOAT* pDataOut, LVM_INT16 NrSamples);
 /*** 32 bit data path *************************************************************/
 void FO_1I_D32F32Cll_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
                                      Biquad_1I_Order1_FLOAT_Taps_t* pTaps, FO_FLOAT_Coefs_t* pCoef);
@@ -193,8 +191,6 @@ void BP_1I_D32F32C30_TRC_WRA_02(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT* p
 void PK_2I_D32F32CssGss_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
                                         Biquad_2I_Order2_FLOAT_Taps_t* pTaps,
                                         PK_FLOAT_Coefs_t* pCoef);
-void PK_2I_D32F32C14G11_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT* pDataIn,
-                                   LVM_FLOAT* pDataOut, LVM_INT16 NrSamples);
 void PK_Mc_D32F32C14G11_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT* pDataIn,
                                    LVM_FLOAT* pDataOut, LVM_INT16 NrFrames, LVM_INT16 NrChannels);
 

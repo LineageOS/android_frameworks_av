@@ -273,7 +273,7 @@ AImageReader::AImageReader(int32_t width,
 
 AImageReader::~AImageReader() {
     Mutex::Autolock _l(mLock);
-    LOG_FATAL_IF("AImageReader not closed before destruction", mIsClosed != true);
+    LOG_FATAL_IF(mIsOpen, "AImageReader not closed before destruction");
 }
 
 media_status_t
@@ -347,16 +347,16 @@ AImageReader::init() {
     }
     mHandler = new CallbackHandler(this);
     mCbLooper->registerHandler(mHandler);
-
+    mIsOpen = true;
     return AMEDIA_OK;
 }
 
 void AImageReader::close() {
     Mutex::Autolock _l(mLock);
-    if (mIsClosed) {
+    if (!mIsOpen) {
         return;
     }
-    mIsClosed = true;
+    mIsOpen = false;
     AImageReader_ImageListener nullListener = {nullptr, nullptr};
     setImageListenerLocked(&nullListener);
 

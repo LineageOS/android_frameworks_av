@@ -21,27 +21,6 @@
 
 #include "ScalarArithmetic.h"
 
-/****************************************************************************************
- *  Name        : Abs_32()
- *  Input       : Signed 32-bit integer
- *  Output      :
- *  Returns     : Absolute value
- *  Description : Absolute value with maximum negative value corner case
- *  Remarks     :
- ****************************************************************************************/
-
-LVM_INT32 Abs_32(LVM_INT32 input) {
-    if (input < 0) {
-        if (input == (LVM_INT32)(0x80000000U)) {
-            /* The corner case, so set to the maximum positive value */
-            input = (LVM_INT32)0x7fffffff;
-        } else {
-            /* Negative input, so invert */
-            input = (LVM_INT32)(-input);
-        }
-    }
-    return input;
-}
 LVM_FLOAT Abs_Float(LVM_FLOAT input) {
     if (input < 0) {
         /* Negative input, so invert */

@@ -29,7 +29,7 @@ namespace camera3 {
 const String8 Camera3FakeStream::FAKE_ID;
 
 Camera3FakeStream::Camera3FakeStream(int id) :
-        Camera3IOStreamBase(id, CAMERA3_STREAM_OUTPUT, FAKE_WIDTH, FAKE_HEIGHT,
+        Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, FAKE_WIDTH, FAKE_HEIGHT,
                 /*maxSize*/0, FAKE_FORMAT, FAKE_DATASPACE, FAKE_ROTATION,
                 FAKE_ID) {
 
@@ -39,7 +39,7 @@ Camera3FakeStream::~Camera3FakeStream() {
 
 }
 
-status_t Camera3FakeStream::getBufferLocked(camera3_stream_buffer *,
+status_t Camera3FakeStream::getBufferLocked(camera_stream_buffer *,
         const std::vector<size_t>&) {
     ATRACE_CALL();
     ALOGE("%s: Stream %d: Fake stream cannot produce buffers!", __FUNCTION__, mId);
@@ -47,7 +47,7 @@ status_t Camera3FakeStream::getBufferLocked(camera3_stream_buffer *,
 }
 
 status_t Camera3FakeStream::returnBufferLocked(
-        const camera3_stream_buffer &,
+        const camera_stream_buffer &,
         nsecs_t, const std::vector<size_t>&) {
     ATRACE_CALL();
     ALOGE("%s: Stream %d: Fake stream cannot return buffers!", __FUNCTION__, mId);
@@ -55,7 +55,7 @@ status_t Camera3FakeStream::returnBufferLocked(
 }
 
 status_t Camera3FakeStream::returnBufferCheckedLocked(
-            const camera3_stream_buffer &,
+            const camera_stream_buffer &,
             nsecs_t,
             bool,
             const std::vector<size_t>&,

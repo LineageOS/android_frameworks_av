@@ -24,7 +24,6 @@
 #include <utils/Mutex.h>
 #include <utils/Thread.h>
 #include <utils/KeyedVector.h>
-#include <hardware/camera3.h>
 
 #include "common/CameraDeviceBase.h"
 

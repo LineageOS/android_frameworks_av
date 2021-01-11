@@ -101,9 +101,6 @@ void LVC_MixSoft_2Mc_D16C31_SAT(LVMixer3_2St_FLOAT_st* pInstance, const LVM_FLOA
 void LVC_MixSoft_1St_MC_float_SAT(LVMixer3_2St_FLOAT_st* pInstance, const LVM_FLOAT* src,
                                   LVM_FLOAT* dst, /* dst can be equal to src */
                                   LVM_INT16 NrFrames, LVM_INT32 NrChannels, LVM_INT32 ChMask);
-void LVC_MixSoft_1St_2i_D16C31_SAT(LVMixer3_2St_FLOAT_st* pInstance, const LVM_FLOAT* src,
-                                   LVM_FLOAT* dst, /* dst can be equal to src */
-                                   LVM_INT16 n);   /* Number of stereo samples */
 
 /**********************************************************************************/
 

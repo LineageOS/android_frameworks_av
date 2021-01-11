@@ -21,31 +21,6 @@
 #include <string.h>
 #include "VectorArithmetic.h"
 
-/**********************************************************************************
-   FUNCTION COPY_16
-***********************************************************************************/
-
-void Copy_16(const LVM_INT16* src, LVM_INT16* dst, LVM_INT16 n) {
-    LVM_INT16 ii;
-
-    if (src > dst) {
-        for (ii = n; ii != 0; ii--) {
-            *dst = *src;
-            dst++;
-            src++;
-        }
-    } else {
-        src += n - 1;
-        dst += n - 1;
-        for (ii = n; ii != 0; ii--) {
-            *dst = *src;
-            dst--;
-            src--;
-        }
-    }
-
-    return;
-}
 void Copy_Float(const LVM_FLOAT* src, LVM_FLOAT* dst, LVM_INT16 n) {
     memmove(dst, src, n * sizeof(LVM_FLOAT));
     return;

@@ -50,7 +50,7 @@ public:
     // CompositeStream overrides
     status_t createInternalStreams(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
-            camera3_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
+            camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
             std::vector<int> *surfaceIds, int streamSetId, bool isShared) override;
     status_t deleteInternalStreams() override;
     status_t configureStream() override;

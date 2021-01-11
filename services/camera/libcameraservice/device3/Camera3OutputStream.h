@@ -81,7 +81,7 @@ class Camera3OutputStream :
      */
     Camera3OutputStream(int id, sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const String8& physicalCameraId,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
@@ -93,7 +93,7 @@ class Camera3OutputStream :
      */
     Camera3OutputStream(int id, sp<Surface> consumer,
             uint32_t width, uint32_t height, size_t maxSize, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             nsecs_t timestampOffset, const String8& physicalCameraId,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
@@ -104,7 +104,7 @@ class Camera3OutputStream :
      */
     Camera3OutputStream(int id, uint32_t width, uint32_t height, int format,
             uint64_t consumerUsage, android_dataspace dataSpace,
-            camera3_stream_rotation_t rotation, nsecs_t timestampOffset,
+            camera_stream_rotation_t rotation, nsecs_t timestampOffset,
             const String8& physicalCameraId,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
 
@@ -213,9 +213,9 @@ class Camera3OutputStream :
     void setImageDumpMask(int mask) { mImageDumpMask = mask; }
 
   protected:
-    Camera3OutputStream(int id, camera3_stream_type_t type,
+    Camera3OutputStream(int id, camera_stream_type_t type,
             uint32_t width, uint32_t height, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const String8& physicalCameraId,
             uint64_t consumerUsage = 0, nsecs_t timestampOffset = 0,
             int setId = CAMERA3_STREAM_SET_ID_INVALID);
@@ -224,7 +224,7 @@ class Camera3OutputStream :
      * Note that we release the lock briefly in this function
      */
     virtual status_t returnBufferCheckedLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>& surface_ids,
@@ -295,11 +295,11 @@ class Camera3OutputStream :
     /**
      * Internal Camera3Stream interface
      */
-    virtual status_t getBufferLocked(camera3_stream_buffer *buffer,
+    virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids);
 
     virtual status_t returnBufferLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp, const std::vector<size_t>& surface_ids);
 
     virtual status_t queueBufferToConsumer(sp<ANativeWindow>& consumer,

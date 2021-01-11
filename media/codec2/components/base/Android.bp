@@ -20,7 +20,7 @@ cc_library {
 
     shared_libs: [
         "libcutils", // for properties
-        "liblog",    // for ALOG
+        "liblog", // for ALOG
         "libsfplugin_ccodec_utils", // for ImageCopy
         "libstagefright_foundation", // for Mutexed
     ],
@@ -38,7 +38,7 @@ cc_library {
 
 filegroup {
     name: "codec2_soft_exports",
-    srcs: [ "exports.lds" ],
+    srcs: ["exports.lds"],
 }
 
 // public dependency for software codec implementation
@@ -91,7 +91,20 @@ cc_defaults {
         misc_undefined: [
             "signed-integer-overflow",
         ],
+    },
+}
+
+cc_defaults {
+    name: "libcodec2_soft_sanitize_cfi-defaults",
+
+    sanitize: {
         cfi: true,
+        config: {
+            cfi_assembly_support: true,
+        },
+        diag: {
+            cfi: true,
+        },
     },
 }
 
@@ -131,4 +144,3 @@ cc_library {
 
     ldflags: ["-Wl,-Bsymbolic"],
 }
-
