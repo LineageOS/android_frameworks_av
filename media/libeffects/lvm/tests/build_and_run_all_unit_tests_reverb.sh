@@ -59,7 +59,7 @@ do
         do
             for fs in ${fs_arr[*]}
             do
-                for chMask in {0..22}
+                for chMask in {0..38}
                 do
                     adb shell $testdir/reverb_test \
                         --input $testdir/sinesweepraw.raw \
