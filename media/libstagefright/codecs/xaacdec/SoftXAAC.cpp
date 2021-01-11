@@ -1693,6 +1693,7 @@ IA_ERRORCODE SoftXAAC::setXAACDRCInfo(int32_t drcCut, int32_t drcBoost, int32_t 
 
 }  // namespace android
 
+__attribute__((cfi_canonical_jump_table))
 android::SoftOMXComponent* createSoftOMXComponent(const char* name,
                                                   const OMX_CALLBACKTYPE* callbacks,
                                                   OMX_PTR appData, OMX_COMPONENTTYPE** component) {
