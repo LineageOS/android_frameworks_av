@@ -338,6 +338,8 @@ public:
     bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
     virtual DeviceVector supportedDevices() const;
     virtual bool devicesSupportEncodedFormats(const DeviceTypeSet& deviceTypes);
+    virtual bool containsSingleDeviceSupportingEncodedFormats(
+            const sp<DeviceDescriptor>& device) const;
     virtual uint32_t latency();
     virtual bool isDuplicated() const { return (mOutput1 != NULL && mOutput2 != NULL); }
     virtual bool isFixedVolume(const DeviceTypeSet& deviceTypes);
@@ -396,6 +398,14 @@ public:
     bool supportsAllDevices(const DeviceVector &devices) const;
 
     /**
+     * @brief supportsDevicesForPlayback
+     * @param devices to be checked against
+     * @return true if the devices is a supported combo for playback
+     *         false otherwise
+     */
+    bool supportsDevicesForPlayback(const DeviceVector &devices) const;
+
+    /**
      * @brief filterSupportedDevices takes a vector of devices and filters them according to the
      * device supported by this output (the profile from which this output derives from)
      * @param devices reference device vector to be filtered
@@ -412,6 +422,7 @@ public:
     sp<SwAudioOutputDescriptor> mOutput2;    // used by duplicated outputs: second output
     uint32_t mDirectOpenCount; // number of clients using this output (direct outputs only)
     audio_session_t mDirectClientSession; // session id of the direct output client
+    bool mPendingReopenToQueryProfiles = false;
 };
 
 // Audio output driven by an input device directly.

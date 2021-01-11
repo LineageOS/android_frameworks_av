@@ -344,6 +344,13 @@ bool SwAudioOutputDescriptor::supportsAllDevices(const DeviceVector &devices) co
     return supportedDevices().containsAllDevices(devices);
 }
 
+bool SwAudioOutputDescriptor::supportsDevicesForPlayback(const DeviceVector &devices) const
+{
+    // No considering duplicated output
+    // TODO: need to verify if the profile supports the devices combo for playback.
+    return !isDuplicated() && supportsAllDevices(devices);
+}
+
 DeviceVector SwAudioOutputDescriptor::filterSupportedDevices(const DeviceVector &devices) const
 {
     DeviceVector filteredDevices = supportedDevices();
@@ -358,6 +365,16 @@ bool SwAudioOutputDescriptor::devicesSupportEncodedFormats(const DeviceTypeSet& 
     } else {
        return mProfile->devicesSupportEncodedFormats(deviceTypes);
     }
+}
+
+bool SwAudioOutputDescriptor::containsSingleDeviceSupportingEncodedFormats(
+        const sp<DeviceDescriptor>& device) const
+{
+    if (isDuplicated()) {
+        return (mOutput1->containsSingleDeviceSupportingEncodedFormats(device) &&
+                mOutput2->containsSingleDeviceSupportingEncodedFormats(device));
+    }
+    return mProfile->containsSingleDeviceSupportingEncodedFormats(device);
 }
 
 uint32_t SwAudioOutputDescriptor::latency()

@@ -143,6 +143,8 @@ public:
         return false;
     }
 
+    bool containsSingleDeviceSupportingEncodedFormats(const sp<DeviceDescriptor>& device) const;
+
     void clearSupportedDevices() { mSupportedDevices.clear(); }
     void addSupportedDevice(const sp<DeviceDescriptor> &device)
     {

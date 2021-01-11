@@ -355,4 +355,31 @@ legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy) {
     return convertContainer<std::vector<media::AudioProfile>>(legacy, legacy2aidl_AudioProfile);
 }
 
+AudioProfileVector intersectAudioProfiles(const AudioProfileVector& profiles1,
+                                          const AudioProfileVector& profiles2)
+{
+    std::map<audio_format_t, std::pair<ChannelMaskSet, SampleRateSet>> infos2;
+    for (const auto& profile : profiles2) {
+        infos2.emplace(profile->getFormat(),
+                std::make_pair(profile->getChannels(), profile->getSampleRates()));
+    }
+    AudioProfileVector profiles;
+    for (const auto& profile : profiles1) {
+        const auto it = infos2.find(profile->getFormat());
+        if (it == infos2.end()) {
+            continue;
+        }
+        ChannelMaskSet channelMasks = SetIntersection(profile->getChannels(), it->second.first);
+        if (channelMasks.empty()) {
+            continue;
+        }
+        SampleRateSet sampleRates = SetIntersection(profile->getSampleRates(), it->second.second);
+        if (sampleRates.empty()) {
+            continue;
+        }
+        profiles.push_back(new AudioProfile(profile->getFormat(), channelMasks, sampleRates));
+    }
+    return profiles;
+}
+
 } // namespace android
