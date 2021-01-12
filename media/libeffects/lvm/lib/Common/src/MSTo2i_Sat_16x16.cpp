@@ -18,7 +18,7 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-
+#include "ScalarArithmetic.h"
 #include "VectorArithmetic.h"
 
 void MSTo2i_Sat_Float(const LVM_FLOAT* srcM, const LVM_FLOAT* srcS, LVM_FLOAT* dst, LVM_INT16 n) {
@@ -33,26 +33,10 @@ void MSTo2i_Sat_Float(const LVM_FLOAT* srcM, const LVM_FLOAT* srcS, LVM_FLOAT* d
         srcS++;
 
         temp = mVal + sVal;
-
-        if (temp > 1.0f) {
-            *dst = 1.0f;
-        } else if (temp < -1.0f) {
-            *dst = -1.0f;
-        } else {
-            *dst = (LVM_FLOAT)temp;
-        }
-        dst++;
+        *dst++ = LVM_Clamp(temp);
 
         temp = mVal - sVal;
-
-        if (temp > 1.0f) {
-            *dst = 1.0f;
-        } else if (temp < -1.0f) {
-            *dst = -1.0f;
-        } else {
-            *dst = (LVM_FLOAT)temp;
-        }
-        dst++;
+        *dst++ = LVM_Clamp(temp);
     }
 
     return;
