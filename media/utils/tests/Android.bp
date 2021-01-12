@@ -1,0 +1,19 @@
+cc_test {
+    name: "media_synchronization_tests",
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+
+    shared_libs: [
+        "liblog",
+        "libmediautils",
+        "libutils",
+    ],
+
+    srcs: [
+        "media_synchronization_tests.cpp",
+    ],
+}
