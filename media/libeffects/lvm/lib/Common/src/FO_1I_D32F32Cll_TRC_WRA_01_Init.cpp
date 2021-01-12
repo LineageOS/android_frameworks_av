@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "FO_1I_D32F32Cll_TRC_WRA_01_Private.h"
 
@@ -50,5 +51,6 @@ void FO_1I_D32F32Cll_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
     temp = pCoef->B1;
     pBiquadState->coefs[2] = temp;
 }
+#endif
 /*------------------------------------------------*/
 /* End Of File: FO_1I_D32F32Cll_TRC_WRA_01_Init.c */
