@@ -52,8 +52,12 @@ public:
         devices.merge(mDynamicDevices);
         return devices;
     }
+    std::string getTagForDevice(audio_devices_t device,
+                                const String8 &address = String8(),
+                                audio_format_t codec = AUDIO_FORMAT_DEFAULT);
     void addDynamicDevice(const sp<DeviceDescriptor> &device)
     {
+        device->setDynamic();
         mDynamicDevices.add(device);
     }
 
