@@ -125,7 +125,7 @@ public:
                                   output_type_t *outputType) override;
         virtual status_t startOutput(audio_port_handle_t portId);
         virtual status_t stopOutput(audio_port_handle_t portId);
-        virtual void releaseOutput(audio_port_handle_t portId);
+        virtual bool releaseOutput(audio_port_handle_t portId);
         virtual status_t getInputForAttr(const audio_attributes_t *attr,
                                          audio_io_handle_t *input,
                                          audio_unique_id_t riid,
@@ -981,6 +981,12 @@ private:
                 const char* context);
 
         bool isScoRequestedForComm() const;
+
+        bool areAllActiveTracksRerouted(const sp<SwAudioOutputDescriptor>& output);
+
+        sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(const sp<IOProfile>& profile,
+                                                                   const DeviceVector& devices);
+
 };
 
 };

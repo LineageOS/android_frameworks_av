@@ -636,6 +636,7 @@ void SoftVorbis::onPortEnableCompleted(OMX_U32 portIndex, bool enabled) {
 
 }  // namespace android
 
+__attribute__((cfi_canonical_jump_table))
 android::SoftOMXComponent *createSoftOMXComponent(
         const char *name, const OMX_CALLBACKTYPE *callbacks,
         OMX_PTR appData, OMX_COMPONENTTYPE **component) {
