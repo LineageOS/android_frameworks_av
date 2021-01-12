@@ -18,9 +18,9 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-
 #include "LVC_Mixer_Private.h"
 #include "LVM_Macros.h"
+#include "ScalarArithmetic.h"
 
 /**********************************************************************************
    FUNCTION LVCore_MIXSOFT_1ST_D16C31_WRA
@@ -46,13 +46,8 @@ void LVC_Core_MixInSoft_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLO
             if (Current > Target) Current = Target;
 
             for (ii = OutLoop; ii != 0; ii--) {
-                Temp = ((LVM_FLOAT)*dst) + (((LVM_FLOAT) * (src++) * Current));
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = (LVM_FLOAT)Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
 
@@ -62,13 +57,8 @@ void LVC_Core_MixInSoft_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLO
             if (Current > Target) Current = Target;
 
             for (jj = 4; jj != 0; jj--) {
-                Temp = ((LVM_FLOAT)*dst) + (((LVM_FLOAT) * (src++) * Current));
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = (LVM_FLOAT)Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
     } else {
@@ -77,13 +67,8 @@ void LVC_Core_MixInSoft_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLO
             if (Current < Target) Current = Target;
 
             for (ii = OutLoop; ii != 0; ii--) {
-                Temp = ((LVM_FLOAT)*dst) + (((LVM_FLOAT) * (src++) * Current));
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = (LVM_FLOAT)Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
 
@@ -92,13 +77,8 @@ void LVC_Core_MixInSoft_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_FLO
             if (Current < Target) Current = Target;
 
             for (jj = 4; jj != 0; jj--) {
-                Temp = ((LVM_FLOAT)*dst) + (((LVM_FLOAT) * (src++) * Current));
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = (LVM_FLOAT)Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
     }
@@ -148,13 +128,8 @@ void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_
             if (Current > Target) Current = Target;
 
             for (ii = OutLoop * NrChannels; ii != 0; ii--) {
-                Temp = (*dst) + (*(src++) * Current);
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
 
@@ -164,21 +139,11 @@ void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_
             if (Current > Target) Current = Target;
 
             for (jj = NrChannels; jj != 0; jj--) {
-                Temp = (*dst) + (*(src++) * Current);
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
 
-                Temp = (*dst) + (*(src++) * Current);
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
     } else {
@@ -187,13 +152,8 @@ void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_
             if (Current < Target) Current = Target;
 
             for (ii = OutLoop * NrChannels; ii != 0; ii--) {
-                Temp = (*dst) + (*(src++) * Current);
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
 
@@ -202,21 +162,11 @@ void LVC_Core_MixInSoft_Mc_D16C31_SAT(LVMixer3_FLOAT_st* ptrInstance, const LVM_
             if (Current < Target) Current = Target;
 
             for (jj = NrChannels; jj != 0; jj--) {
-                Temp = (*dst) + (*(src++) * Current);
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
 
-                Temp = (*dst) + (*(src++) * Current);
-                if (Temp > 1.0f)
-                    *dst++ = 1.0f;
-                else if (Temp < -1.0f)
-                    *dst++ = -1.0f;
-                else
-                    *dst++ = Temp;
+                Temp = *dst + *src++ * Current;
+                *dst++ = LVM_Clamp(Temp);
             }
         }
     }

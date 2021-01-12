@@ -18,7 +18,6 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-
 #include "LVC_Mixer_Private.h"
 #include "LVM_Macros.h"
 #include "ScalarArithmetic.h"
@@ -35,20 +34,13 @@ void LVC_Core_MixSoft_1St_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_F
     LVM_FLOAT Delta = (LVM_FLOAT)pInstance->Delta;
     LVM_FLOAT Current = (LVM_FLOAT)pInstance->Current;
     LVM_FLOAT Target = (LVM_FLOAT)pInstance->Target;
-    LVM_FLOAT Temp;
 
     InLoop = (LVM_INT16)(n >> 2); /* Process per 4 samples */
     OutLoop = (LVM_INT16)(n - (InLoop << 2));
 
     if (Current < Target) {
         if (OutLoop) {
-            Temp = Current + Delta;
-            if (Temp > 1.0f)
-                Temp = 1.0f;
-            else if (Temp < -1.0f)
-                Temp = -1.0f;
-
-            Current = Temp;
+            Current = LVM_Clamp(Current + Delta);
             if (Current > Target) Current = Target;
 
             for (ii = OutLoop; ii != 0; ii--) {
@@ -57,14 +49,8 @@ void LVC_Core_MixSoft_1St_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_F
         }
 
         for (ii = InLoop; ii != 0; ii--) {
-            Temp = Current + Delta;
+            Current = LVM_Clamp(Current + Delta);
 
-            if (Temp > 1.0f)
-                Temp = 1.0f;
-            else if (Temp < -1.0f)
-                Temp = -1.0f;
-
-            Current = Temp;
             if (Current > Target) Current = Target;
 
             *(dst++) = (((LVM_FLOAT) * (src++) * Current));
@@ -121,7 +107,6 @@ void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_FL
     LVM_FLOAT Delta = (LVM_FLOAT)pInstance->Delta;
     LVM_FLOAT Current = (LVM_FLOAT)pInstance->Current;
     LVM_FLOAT Target = (LVM_FLOAT)pInstance->Target;
-    LVM_FLOAT Temp;
 
     /*
      * Same operation is performed on consecutive frames.
@@ -134,13 +119,7 @@ void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_FL
 
     if (Current < Target) {
         if (OutLoop) {
-            Temp = Current + Delta;
-            if (Temp > 1.0f)
-                Temp = 1.0f;
-            else if (Temp < -1.0f)
-                Temp = -1.0f;
-
-            Current = Temp;
+            Current = LVM_Clamp(Current + Delta);
             if (Current > Target) Current = Target;
 
             for (ii = OutLoop; ii != 0; ii--) {
@@ -151,14 +130,7 @@ void LVC_Core_MixSoft_Mc_D16C31_WRA(LVMixer3_FLOAT_st* ptrInstance, const LVM_FL
         }
 
         for (ii = InLoop; ii != 0; ii--) {
-            Temp = Current + Delta;
-
-            if (Temp > 1.0f)
-                Temp = 1.0f;
-            else if (Temp < -1.0f)
-                Temp = -1.0f;
-
-            Current = Temp;
+            Current = LVM_Clamp(Current + Delta);
             if (Current > Target) Current = Target;
 
             for (jj = NrChannels; jj != 0; jj--) {
