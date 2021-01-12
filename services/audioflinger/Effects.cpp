@@ -2785,11 +2785,7 @@ status_t AudioFlinger::EffectChain::EffectCallback::createEffectHal(
         const effect_uuid_t *pEffectUuid, int32_t sessionId, int32_t deviceId,
         sp<EffectHalInterface> *effect) {
     status_t status = NO_INIT;
-    sp<AudioFlinger> af = mAudioFlinger.promote();
-    if (af == nullptr) {
-        return status;
-    }
-    sp<EffectsFactoryHalInterface> effectsFactory = af->getEffectsFactory();
+    sp<EffectsFactoryHalInterface> effectsFactory = mAudioFlinger.getEffectsFactory();
     if (effectsFactory != 0) {
         status = effectsFactory->createEffect(pEffectUuid, sessionId, io(), deviceId, effect);
     }
@@ -2798,19 +2794,13 @@ status_t AudioFlinger::EffectChain::EffectCallback::createEffectHal(
 
 bool AudioFlinger::EffectChain::EffectCallback::updateOrphanEffectChains(
         const sp<AudioFlinger::EffectBase>& effect) {
-    sp<AudioFlinger> af = mAudioFlinger.promote();
-    if (af == nullptr) {
-        return false;
-    }
     // in EffectChain context, an EffectBase is always from an EffectModule so static cast is safe
-    return af->updateOrphanEffectChains(effect->asEffectModule());
+    return mAudioFlinger.updateOrphanEffectChains(effect->asEffectModule());
 }
 
 status_t AudioFlinger::EffectChain::EffectCallback::allocateHalBuffer(
         size_t size, sp<EffectBufferHalInterface>* buffer) {
-    sp<AudioFlinger> af = mAudioFlinger.promote();
-    LOG_ALWAYS_FATAL_IF(af == nullptr, "allocateHalBuffer() could not retrieved audio flinger");
-    return af->mEffectsFactoryHal->allocateBuffer(size, buffer);
+    return mAudioFlinger.mEffectsFactoryHal->allocateBuffer(size, buffer);
 }
 
 status_t AudioFlinger::EffectChain::EffectCallback::addEffectToHal(

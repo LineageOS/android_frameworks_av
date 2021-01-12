@@ -524,8 +524,9 @@ private:
         // during construction (but may keep a reference for later promotion).
         EffectCallback(const wp<EffectChain>& owner,
                        const wp<ThreadBase>& thread)
-            : mChain(owner) {
-            setThread(thread);
+            : mChain(owner)
+            , mThread(thread)
+            , mAudioFlinger(*gAudioFlinger) {
         }
 
         status_t createEffectHal(const effect_uuid_t *pEffectUuid,
@@ -566,14 +567,12 @@ private:
 
         void setThread(const wp<ThreadBase>& thread) {
             mThread = thread;
-            sp<ThreadBase> p = thread.promote();
-            mAudioFlinger = p ? p->mAudioFlinger : nullptr;
         }
 
     private:
         const wp<EffectChain> mChain;
         mediautils::atomic_wp<ThreadBase> mThread;
-        wp<AudioFlinger> mAudioFlinger; // this could be const with some rearrangement.
+        AudioFlinger &mAudioFlinger;  // implementation detail: outer instance always exists.
     };
 
     friend class AudioFlinger;  // for mThread, mEffects
