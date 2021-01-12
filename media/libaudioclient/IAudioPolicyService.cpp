@@ -1593,7 +1593,8 @@ status_t BnAudioPolicyService::onTransact(
         case SET_ALLOWED_CAPTURE_POLICY:
         case AUDIO_MODULES_UPDATED:
         case SET_CURRENT_IME_UID:
-        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER: {
+        case REGISTER_SOUNDTRIGGER_CAPTURE_STATE_LISTENER:
+        case LIST_AUDIO_SESSIONS: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
