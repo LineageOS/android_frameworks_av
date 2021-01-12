@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #ifndef _BQ_2I_D16F32CSS_TRC_WRA_01_PRIVATE_H_
 #define _BQ_2I_D16F32CSS_TRC_WRA_01_PRIVATE_H_
 
@@ -35,3 +36,4 @@ typedef struct _Filter_State_FLOAT {
 typedef Filter_State_FLOAT* PFilter_State_FLOAT;
 
 #endif /* _BQ_2I_D16F32CSS_TRC_WRA_01_PRIVATE_H_ */
+#endif

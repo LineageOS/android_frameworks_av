@@ -16,6 +16,7 @@
  */
 
 /*-------------------------------------------------------------------------*/
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "FO_2I_D16F32Css_LShx_TRC_WRA_01_Private.h"
 
@@ -51,5 +52,6 @@ void FO_2I_D16F32Css_LShx_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
     temp = pCoef->B1;
     pBiquadState->coefs[2] = temp;
 }
+#endif
 /*-------------------------------------------------------------------------*/
 /* End Of File: FO_2I_D16F32Css_LShx_TRC_WRA_01_Init.c                     */
