@@ -36,6 +36,7 @@
 
 /* Stereo enhancer structure */
 typedef struct {
+#ifndef BIQUAD_OPT
     /*
      * Middle filter
      */
@@ -45,6 +46,7 @@ typedef struct {
      * Side filter
      */
     void (*pBiquadCallBack_Side)(Biquad_FLOAT_Instance_t*, LVM_FLOAT*, LVM_FLOAT*, LVM_INT16);
+#endif
     LVM_FLOAT MidGain; /* Middle gain in mobile speaker mode */
 } LVCS_StereoEnhancer_t;
 

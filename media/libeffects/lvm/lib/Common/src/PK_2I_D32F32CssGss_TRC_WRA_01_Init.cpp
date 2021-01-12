@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "PK_2I_D32F32CssGss_TRC_WRA_01_Private.h"
 void PK_2I_D32F32CssGss_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
@@ -31,3 +32,4 @@ void PK_2I_D32F32CssGss_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
 
     pBiquadState->coefs[3] = pCoef->G;
 }
+#endif
