@@ -133,8 +133,8 @@ public:
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.
     virtual status_t stopOutput(audio_port_handle_t portId) = 0;
-    // releases the output.
-    virtual void releaseOutput(audio_port_handle_t portId) = 0;
+    // releases the output, return true if the output descriptor is reopened.
+    virtual bool releaseOutput(audio_port_handle_t portId) = 0;
 
     // request an input appropriate for record from the supplied device with supplied parameters.
     virtual status_t getInputForAttr(const audio_attributes_t *attr,

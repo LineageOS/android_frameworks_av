@@ -217,6 +217,18 @@ void DeviceVector::refreshTypes()
     ALOGV("DeviceVector::refreshTypes() mDeviceTypes %s", dumpDeviceTypes(mDeviceTypes).c_str());
 }
 
+void DeviceVector::refreshAudioProfiles() {
+    if (empty()) {
+        mSupportedProfiles.clear();
+        return;
+    }
+    mSupportedProfiles = itemAt(0)->getAudioProfiles();
+    for (size_t i = 1; i < size(); ++i) {
+        mSupportedProfiles = intersectAudioProfiles(
+                mSupportedProfiles, itemAt(i)->getAudioProfiles());
+    }
+}
+
 ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -238,6 +250,7 @@ void DeviceVector::add(const DeviceVector &devices)
     }
     if (added) {
         refreshTypes();
+        refreshAudioProfiles();
     }
 }
 
@@ -250,6 +263,7 @@ ssize_t DeviceVector::add(const sp<DeviceDescriptor>& item)
         ret = SortedVector::add(item);
         if (ret >= 0) {
             refreshTypes();
+            refreshAudioProfiles();
         }
     } else {
         ALOGW("DeviceVector::add device %08x already in", item->type());
@@ -268,6 +282,7 @@ ssize_t DeviceVector::remove(const sp<DeviceDescriptor>& item)
         ret = SortedVector::removeAt(ret);
         if (ret >= 0) {
             refreshTypes();
+            refreshAudioProfiles();
         }
     }
     return ret;

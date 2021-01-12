@@ -265,6 +265,8 @@ public:
         return String8("");
     }
 
+    const AudioProfileVector& getSupportedProfiles() { return mSupportedProfiles; }
+
     // Return a string to describe the DeviceVector. The sensitive information will only be
     // added to the string if `includeSensitiveInfo` is true.
     std::string toString(bool includeSensitiveInfo = false) const;
@@ -273,7 +275,9 @@ public:
 
 private:
     void refreshTypes();
+    void refreshAudioProfiles();
     DeviceTypeSet mDeviceTypes;
+    AudioProfileVector mSupportedProfiles;
 };
 
 } // namespace android
