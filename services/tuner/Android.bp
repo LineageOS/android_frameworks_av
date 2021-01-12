@@ -64,8 +64,7 @@ cc_library {
     name: "libtunerservice",
 
     srcs: [
-        "TunerService.cpp",
-        "TunerFrontend.cpp"
+        "Tuner*.cpp"
     ],
 
     shared_libs: [

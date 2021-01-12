@@ -21,7 +21,7 @@ import android.media.tv.tuner.TunerFrontendSettings;
 import android.media.tv.tuner.TunerFrontendStatus;
 
 /**
- * Tuner Frontend interface handles tuner related operations.
+ * Tuner Frontend interface handles frontend related operations.
  *
  * {@hide}
  */
