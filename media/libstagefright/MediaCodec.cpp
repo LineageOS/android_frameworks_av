@@ -1310,6 +1310,8 @@ status_t MediaCodec::configure(
     // save msg for reset
     mConfigureMsg = msg;
 
+    sp<AMessage> callback = mCallback;
+
     status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure, mIsVideo));
@@ -1334,7 +1336,18 @@ status_t MediaCodec::configure(
             // the configure failure is due to wrong state.
 
             ALOGE("configure failed with err 0x%08x, resetting...", err);
-            reset();
+            status_t err2 = reset();
+            if (err2 != OK) {
+                ALOGE("retrying configure: failed to reset codec (%08x)", err2);
+                break;
+            }
+            if (callback != nullptr) {
+                err2 = setCallback(callback);
+                if (err2 != OK) {
+                    ALOGE("retrying configure: failed to set callback (%08x)", err2);
+                    break;
+                }
+            }
         }
         if (!isResourceError(err)) {
             break;
@@ -1443,6 +1456,8 @@ uint64_t MediaCodec::getGraphicBufferSize() {
 status_t MediaCodec::start() {
     sp<AMessage> msg = new AMessage(kWhatStart, this);
 
+    sp<AMessage> callback;
+
     status_t err;
     std::vector<MediaResourceParcel> resources;
     resources.push_back(MediaResource::CodecResource(mFlags & kFlagIsSecure, mIsVideo));
@@ -1467,6 +1482,20 @@ status_t MediaCodec::start() {
                 ALOGE("retrying start: failed to configure codec");
                 break;
             }
+            if (callback != nullptr) {
+                err = setCallback(callback);
+                if (err != OK) {
+                    ALOGE("retrying start: failed to set callback");
+                    break;
+                }
+                ALOGD("succeed to set callback for reclaim");
+            }
+        }
+
+        // Keep callback message after the first iteration if necessary.
+        if (i == 0 && mCallback != nullptr && mFlags & kFlagIsAsync) {
+            callback = mCallback;
+            ALOGD("keep callback message for reclaim");
         }
 
         sp<AMessage> response;
