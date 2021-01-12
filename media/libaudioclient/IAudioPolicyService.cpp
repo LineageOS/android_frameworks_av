@@ -959,7 +959,8 @@ status_t BnAudioPolicyService::onTransact(
         case START_AUDIO_SOURCE:
         case STOP_AUDIO_SOURCE:
         case GET_SURROUND_FORMATS:
-        case SET_SURROUND_FORMAT_ENABLED: {
+        case SET_SURROUND_FORMAT_ENABLED:
+        case LIST_AUDIO_SESSIONS: {
             if (multiuser_get_app_id(IPCThreadState::self()->getCallingUid()) >= AID_APP_START) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
