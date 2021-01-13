@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "BQ_2I_D16F32Css_TRC_WRA_01_Private.h"
 
@@ -55,3 +56,4 @@ void BQ_2I_D16F32Css_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
 }
 /*-------------------------------------------------------------------------*/
 /* End Of File: BQ_2I_D16F32Css_TRC_WRA_01_Init                              */
+#endif

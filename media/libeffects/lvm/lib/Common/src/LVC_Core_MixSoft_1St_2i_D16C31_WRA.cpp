@@ -18,13 +18,12 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-#include <algorithm>
 #include "LVC_Mixer_Private.h"
-#include "ScalarArithmetic.h"
 #include "LVM_Macros.h"
+#include "ScalarArithmetic.h"
 
 static inline LVM_FLOAT ADD2_SAT_FLOAT(LVM_FLOAT a, LVM_FLOAT b) {
-    return std::clamp(a + b, -1.0f, 1.0f);
+    return LVM_Clamp(a + b);
 }
 void LVC_Core_MixSoft_1St_MC_float_WRA(Mix_Private_FLOAT_st** ptrInstance, const LVM_FLOAT* src,
                                        LVM_FLOAT* dst, LVM_INT16 NrFrames, LVM_INT16 NrChannels) {

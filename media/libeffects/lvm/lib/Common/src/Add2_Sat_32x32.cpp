@@ -18,24 +18,15 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-
+#include "ScalarArithmetic.h"
 #include "VectorArithmetic.h"
 
 void Add2_Sat_Float(const LVM_FLOAT* src, LVM_FLOAT* dst, LVM_INT16 n) {
     LVM_FLOAT Temp;
     LVM_INT16 ii;
     for (ii = n; ii != 0; ii--) {
-        Temp = ((LVM_FLOAT)*src) + ((LVM_FLOAT)*dst);
-        src++;
-
-        if (Temp > 1.000000f) {
-            *dst = 1.000000f;
-        } else if (Temp < -1.000000f) {
-            *dst = -1.000000f;
-        } else {
-            *dst = Temp;
-        }
-        dst++;
+        Temp = *src++ + *dst;
+        *dst++ = LVM_Clamp(Temp);
     }
     return;
 }

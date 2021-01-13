@@ -23,12 +23,12 @@
 /*    Structures                                                                    */
 /*                                                                                  */
 /************************************************************************************/
-
+#ifndef BIQUAD_OPT
 /* Equaliser structure */
 typedef struct {
     void (*pBiquadCallBack)(Biquad_FLOAT_Instance_t*, LVM_FLOAT*, LVM_FLOAT*, LVM_INT16);
 } LVCS_Equaliser_t;
-
+#endif
 /************************************************************************************/
 /*                                                                                  */
 /*    Function prototypes                                                           */

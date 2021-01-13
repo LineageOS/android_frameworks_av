@@ -16,6 +16,7 @@
  */
 
 /*-------------------------------------------------------------------------*/
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "BQ_2I_D16F16Css_TRC_WRA_01_Private.h"
 
@@ -57,3 +58,4 @@ void BQ_2I_D16F16Css_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
 }
 /*-------------------------------------------------------------------------*/
 /* End Of File: BQ_2I_D16F16Css_TRC_WRA_01_Init.c                              */
+#endif
