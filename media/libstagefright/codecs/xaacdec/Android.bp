@@ -14,9 +14,6 @@ cc_library_shared {
         // integer_overflow: true,
         misc_undefined: [ "signed-integer-overflow", "unsigned-integer-overflow", ],
         cfi: true,
-	diag: {
-            cfi: true,
-        },
         config: {
             cfi_assembly_support: true,
         },
