@@ -165,6 +165,11 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual bool     isUnpreparable() = 0;
 
     /**
+     * Mark the stream as unpreparable.
+     */
+    virtual void     markUnpreparable() = 0;
+
+    /**
      * Start stream preparation. May only be called in the CONFIGURED state,
      * when no valid buffers have yet been returned to this stream. Prepares
      * up to maxCount buffers, or the maximum number of buffers needed by the

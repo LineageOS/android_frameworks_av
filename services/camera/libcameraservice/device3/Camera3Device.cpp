@@ -4686,6 +4686,10 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 buffer.status = CAMERA3_BUFFER_STATUS_OK;
                 buffer.acquire_fence = -1;
                 buffer.release_fence = -1;
+                // Mark the output stream as unpreparable to block clients from calling
+                // 'prepare' after this request reaches CameraHal and before the respective
+                // buffers are requested.
+                outputStream->markUnpreparable();
             } else {
                 res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
                         waitDuration,
