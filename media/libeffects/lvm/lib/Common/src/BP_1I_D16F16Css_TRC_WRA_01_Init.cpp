@@ -16,6 +16,7 @@
  */
 
 /*-------------------------------------------------------------------------*/
+#ifndef BIQUAD_OPT
 #include "BIQUAD.h"
 #include "BP_1I_D16F16Css_TRC_WRA_01_Private.h"
 
@@ -47,5 +48,6 @@ void BP_1I_D16F16Css_TRC_WRA_01_Init(Biquad_FLOAT_Instance_t* pInstance,
     pBiquadState->coefs[1] = pCoef->B2;
     pBiquadState->coefs[2] = pCoef->B1;
 }
+#endif
 /*-------------------------------------------------------------------------*/
 /* End Of File: BP_1I_D16F16Css_TRC_WRA_01_Init.c                              */

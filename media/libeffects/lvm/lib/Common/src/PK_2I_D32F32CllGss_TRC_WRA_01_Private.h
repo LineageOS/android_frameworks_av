@@ -15,6 +15,7 @@
  * limitations under the License.
  */
 
+#ifndef BIQUAD_OPT
 #ifndef _PK_2I_D32F32CLLGSS_TRC_WRA_01_PRIVATE_H_
 #define _PK_2I_D32F32CLLGSS_TRC_WRA_01_PRIVATE_H_
 
@@ -28,3 +29,4 @@ typedef struct _Filter_State_ {
 typedef Filter_State* PFilter_State;
 
 #endif /* _PK_2I_D32F32CLLGSS_TRC_WRA_01_PRIVATE_H_ */
+#endif

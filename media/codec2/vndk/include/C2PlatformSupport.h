@@ -144,6 +144,15 @@ c2_status_t CreateCodec2BlockPool(
 std::shared_ptr<C2ComponentStore> GetCodec2PlatformComponentStore();
 
 /**
+ * Returns the platform component store.
+ * NOTE: For testing only
+ * \retval nullptr if the platform component store could not be obtained
+ */
+std::shared_ptr<C2ComponentStore> GetTestComponentStore(
+        std::vector<std::tuple<C2String, C2ComponentFactory::CreateCodec2FactoryFunc,
+        C2ComponentFactory::DestroyCodec2FactoryFunc>>);
+
+/**
  * Sets the preferred component store in this process for the sole purpose of accessing its
  * interface. If this is not called, the default IComponentStore HAL (if exists) is the preferred
  * store for this purpose. If the default IComponentStore HAL is not present, the platform

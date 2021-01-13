@@ -17,13 +17,6 @@ cc_library_shared {
             "signed-integer-overflow",
         ],
         cfi: true,
-        diag: {
-            cfi: true,
-        },
-        config: {
-            cfi_assembly_support: true,
-        },
-
     },
 
     // We need this because the current asm generates the following link error:

@@ -18,9 +18,9 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-
 #include "Mixer_private.h"
 #include "LVM_Macros.h"
+#include "ScalarArithmetic.h"
 
 /**********************************************************************************
    FUNCTION CORE_MIXSOFT_1ST_D32C31_WRA
@@ -52,14 +52,7 @@ void Core_MixInSoft_D32C31_SAT(Mix_1St_Cll_FLOAT_t* pInstance, const LVM_FLOAT* 
             Temp2 = *dst;
 
             Temp3 = Temp1 * (pInstance->Current);
-            Temp1 = Temp2 + Temp3;
-
-            if (Temp1 > 1.0f)
-                Temp1 = 1.0f;
-            else if (Temp1 < -1.0f)
-                Temp1 = -1.0f;
-
-            *dst++ = Temp1;
+            *dst++ = LVM_Clamp(Temp2 + Temp3);
         }
     }
 
@@ -72,13 +65,7 @@ void Core_MixInSoft_D32C31_SAT(Mix_1St_Cll_FLOAT_t* pInstance, const LVM_FLOAT* 
             Temp2 = *dst;
 
             Temp3 = Temp1 * (pInstance->Current);
-            Temp1 = Temp2 + Temp3;
-
-            if (Temp1 > 1.0f)
-                Temp1 = 1.0f;
-            else if (Temp1 < -1.0f)
-                Temp1 = -1.0f;
-            *dst++ = Temp1;
+            *dst++ = LVM_Clamp(Temp2 + Temp3);
         }
     }
 }

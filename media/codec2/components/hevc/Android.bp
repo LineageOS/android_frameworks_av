@@ -3,12 +3,12 @@ cc_library {
     defaults: [
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_signed-defaults",
-        "libcodec2_soft_sanitize_cfi-defaults",
     ],
 
     srcs: ["C2SoftHevcDec.cpp"],
 
     static_libs: ["libhevcdec"],
+
 }
 
 cc_library {
@@ -16,10 +16,10 @@ cc_library {
     defaults: [
         "libcodec2_soft-defaults",
         "libcodec2_soft_sanitize_signed-defaults",
-        "libcodec2_soft_sanitize_cfi-defaults",
     ],
 
     srcs: ["C2SoftHevcEnc.cpp"],
 
     static_libs: ["libhevcenc"],
+
 }
