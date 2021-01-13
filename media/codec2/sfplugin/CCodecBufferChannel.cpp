@@ -1300,53 +1300,29 @@ status_t CCodecBufferChannel::requestInitialInputBuffers() {
                 return a.capacity < b.capacity;
             });
 
-    {
-        Mutexed<std::list<sp<ABuffer>>>::Locked configs(mFlushedConfigs);
-        if (!configs->empty()) {
-            while (!configs->empty()) {
-                sp<ABuffer> config = configs->front();
-                configs->pop_front();
-                // Find the smallest input buffer that can fit the config.
-                auto i = std::find_if(
-                        clientInputBuffers.begin(),
-                        clientInputBuffers.end(),
-                        [cfgSize = config->size()](const ClientInputBuffer& b) {
-                            return b.capacity >= cfgSize;
-                        });
-                if (i == clientInputBuffers.end()) {
-                    ALOGW("[%s] no input buffer large enough for the config "
-                          "(%zu bytes)",
-                          mName, config->size());
-                    return NO_MEMORY;
-                }
-                sp<MediaCodecBuffer> buffer = i->buffer;
-                memcpy(buffer->base(), config->data(), config->size());
-                buffer->setRange(0, config->size());
-                buffer->meta()->clear();
-                buffer->meta()->setInt64("timeUs", 0);
-                buffer->meta()->setInt32("csd", 1);
-                if (queueInputBufferInternal(buffer) != OK) {
-                    ALOGW("[%s] Error while queueing a flushed config",
-                          mName);
-                    return UNKNOWN_ERROR;
-                }
-                clientInputBuffers.erase(i);
-            }
-        } else if (oStreamFormat.value == C2BufferData::LINEAR &&
-                   (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
-            sp<MediaCodecBuffer> buffer = clientInputBuffers.front().buffer;
-            // WORKAROUND: Some apps expect CSD available without queueing
-            //             any input. Queue an empty buffer to get the CSD.
-            buffer->setRange(0, 0);
-            buffer->meta()->clear();
-            buffer->meta()->setInt64("timeUs", 0);
-            if (queueInputBufferInternal(buffer) != OK) {
-                ALOGW("[%s] Error while queueing an empty buffer to get CSD",
-                      mName);
-                return UNKNOWN_ERROR;
-            }
-            clientInputBuffers.pop_front();
+    std::list<std::unique_ptr<C2Work>> flushedConfigs;
+    mFlushedConfigs.lock()->swap(flushedConfigs);
+    if (!flushedConfigs.empty()) {
+        err = mComponent->queue(&flushedConfigs);
+        if (err != C2_OK) {
+            ALOGW("[%s] Error while queueing a flushed config", mName);
+            return UNKNOWN_ERROR;
         }
+    }
+    if (oStreamFormat.value == C2BufferData::LINEAR &&
+            (!prepend || prepend.value == PREPEND_HEADER_TO_NONE)) {
+        sp<MediaCodecBuffer> buffer = clientInputBuffers.front().buffer;
+        // WORKAROUND: Some apps expect CSD available without queueing
+        //             any input. Queue an empty buffer to get the CSD.
+        buffer->setRange(0, 0);
+        buffer->meta()->clear();
+        buffer->meta()->setInt64("timeUs", 0);
+        if (queueInputBufferInternal(buffer) != OK) {
+            ALOGW("[%s] Error while queueing an empty buffer to get CSD",
+                  mName);
+            return UNKNOWN_ERROR;
+        }
+        clientInputBuffers.pop_front();
     }
 
     for (const ClientInputBuffer& clientInputBuffer: clientInputBuffers) {
@@ -1396,27 +1372,36 @@ void CCodecBufferChannel::release() {
 
 void CCodecBufferChannel::flush(const std::list<std::unique_ptr<C2Work>> &flushedWork) {
     ALOGV("[%s] flush", mName);
-    {
-        Mutexed<std::list<sp<ABuffer>>>::Locked configs(mFlushedConfigs);
-        for (const std::unique_ptr<C2Work> &work : flushedWork) {
-            if (!(work->input.flags & C2FrameData::FLAG_CODEC_CONFIG)) {
-                continue;
-            }
-            if (work->input.buffers.empty()
-                    || work->input.buffers.front()->data().linearBlocks().empty()) {
-                ALOGD("[%s] no linear codec config data found", mName);
-                continue;
-            }
-            C2ReadView view =
-                    work->input.buffers.front()->data().linearBlocks().front().map().get();
-            if (view.error() != C2_OK) {
-                ALOGD("[%s] failed to map flushed codec config data: %d", mName, view.error());
-                continue;
-            }
-            configs->push_back(ABuffer::CreateAsCopy(view.data(), view.capacity()));
-            ALOGV("[%s] stashed flushed codec config data (size=%u)", mName, view.capacity());
+    std::list<std::unique_ptr<C2Work>> configs;
+    for (const std::unique_ptr<C2Work> &work : flushedWork) {
+        if (!(work->input.flags & C2FrameData::FLAG_CODEC_CONFIG)) {
+            continue;
         }
+        if (work->input.buffers.empty()
+                || work->input.buffers.front() == nullptr
+                || work->input.buffers.front()->data().linearBlocks().empty()) {
+            ALOGD("[%s] no linear codec config data found", mName);
+            continue;
+        }
+        std::unique_ptr<C2Work> copy(new C2Work);
+        copy->input.flags = C2FrameData::flags_t(work->input.flags | C2FrameData::FLAG_DROP_FRAME);
+        copy->input.ordinal = work->input.ordinal;
+        copy->input.buffers.insert(
+                copy->input.buffers.begin(),
+                work->input.buffers.begin(),
+                work->input.buffers.end());
+        for (const std::unique_ptr<C2Param> &param : work->input.configUpdate) {
+            copy->input.configUpdate.push_back(C2Param::Copy(*param));
+        }
+        copy->input.infoBuffers.insert(
+                copy->input.infoBuffers.begin(),
+                work->input.infoBuffers.begin(),
+                work->input.infoBuffers.end());
+        copy->worklets.emplace_back(new C2Worklet);
+        configs.push_back(std::move(copy));
+        ALOGV("[%s] stashed flushed codec config data", mName);
     }
+    mFlushedConfigs.lock()->swap(configs);
     {
         Mutexed<Input>::Locked input(mInput);
         input->buffers->flush();
