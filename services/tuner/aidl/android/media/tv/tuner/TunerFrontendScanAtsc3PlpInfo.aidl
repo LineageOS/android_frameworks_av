@@ -16,21 +16,13 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFrontendScanMessage;
-
 /**
- * TunerFrontendCallback interface handles tuner frontend related callbacks.
+ * Atsc3 Frontend Physical Layer Pipe Info.
  *
  * {@hide}
  */
-interface ITunerFrontendCallback {
-        /**
-     * Notify the client that a new event happened on the frontend.
-     */
-    void onEvent(in int frontendEventType);
+parcelable TunerFrontendScanAtsc3PlpInfo {
+    int plpId;
 
-    /**
-     * notify the client of scan messages.
-     */
-    void onScanMessage(in int messageType, in TunerFrontendScanMessage message);
+    boolean llsFlag;
 }

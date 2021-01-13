@@ -1,5 +1,5 @@
 /**
- * Copyright 2020, The Android Open Source Project
+ * Copyright 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,41 @@
 
 package android.media.tv.tuner;
 
+import android.media.tv.tuner.TunerFrontendScanAtsc3PlpInfo;
+
 /**
- * Atsc3 Frontend Physical Layer Pipe Info.
+ * Tuner Frontend Scan Message interface.
  *
  * {@hide}
  */
-parcelable TunerAtsc3PlpInfo {
-    int plpId;
+union TunerFrontendScanMessage {
+    boolean isLocked;
 
-    boolean llsFlag;
+    boolean isEnd;
+
+    byte progressPercent;
+
+    int[] frequencies;
+
+    int[] symbolRates;
+
+    int hierarchy;
+
+    int analogType;
+
+    byte[] plpIds;
+
+    byte[] groupIds;
+
+    char[] inputStreamIds;
+
+    int std;
+
+    TunerFrontendScanAtsc3PlpInfo[] atsc3PlpInfos;
+
+    int modulation;
+
+    int annex;
+
+    boolean isHighPriority;
 }

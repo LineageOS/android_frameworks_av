@@ -80,6 +80,7 @@ public:
     TunerService();
     virtual ~TunerService();
 
+    // TODO: create a map between resource id and handles.
     static int getResourceIdFromHandle(int resourceHandle) {
         return (resourceHandle & 0x00ff0000) >> 16;
     }
