@@ -274,6 +274,7 @@ cc_library {
         "MPEG2TSWriter.cpp",
         "MPEG4Writer.cpp",
         "MediaAdapter.cpp",
+        "MediaAppender.cpp",
         "MediaClock.cpp",
         "MediaCodec.cpp",
         "MediaCodecList.cpp",
