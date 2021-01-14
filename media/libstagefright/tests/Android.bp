@@ -20,7 +20,7 @@ cc_test {
         "frameworks/native/include/media/openmax",
     ],
 
-    compile_multilib: "32",
+    compile_multilib: "prefer32",
 
     cflags: [
         "-Werror",
