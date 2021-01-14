@@ -61,7 +61,7 @@ cc_library_shared {
     header_libs: ["libaudioclient_headers"],
 }
 
-cc_library_shared {
+cc_library {
     name: "libaudioclient",
 
     aidl: {
