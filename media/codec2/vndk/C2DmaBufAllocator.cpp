@@ -315,8 +315,8 @@ c2_status_t C2DmaBufAllocator::mapUsage(C2MemoryUsage usage, size_t capacity, C2
         if (mUsageMapper) {
             res = mUsageMapper(usage, capacity, heap_name, flags);
         } else {
-            // No system-uncached yet, so disabled for now
-            if (0 && !(usage.expected & (C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE)))
+            if (C2DmaBufAllocator::system_uncached_supported() &&
+                !(usage.expected & (C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE)))
                 *heap_name = "system-uncached";
             else
                 *heap_name = "system";
