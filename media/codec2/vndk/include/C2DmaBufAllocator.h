@@ -84,6 +84,16 @@ class C2DmaBufAllocator : public C2Allocator {
     void setUsageMapper(const UsageMapperFn& mapper, uint64_t minUsage, uint64_t maxUsage,
                         uint64_t blockSize);
 
+    static bool system_uncached_supported(void) {
+        static int cached_result = -1;
+
+        if (cached_result == -1) {
+            struct stat buffer;
+            cached_result = (stat("/dev/dma_heap/system-uncached", &buffer) == 0);
+        }
+        return (cached_result == 1);
+    };
+
    private:
     c2_status_t mInit;
     BufferAllocator mBufferAllocator;
