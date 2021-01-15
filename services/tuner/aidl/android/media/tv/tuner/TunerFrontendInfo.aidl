@@ -21,13 +21,16 @@ import android.media.tv.tuner.TunerFrontendCapabilities;
 /**
  * FrontendInfo interface that carries tuner frontend information.
  *
+ * <p>This is used to update the TunerResourceManager and pass Frontend
+ * information from HAL to the client side.
+ *
  * {@hide}
  */
-parcelable TunerServiceFrontendInfo {
+parcelable TunerFrontendInfo {
     /**
-     * Frontend Id
+     * Frontend Handle
      */
-    int id;
+    int handle;
 
     /**
      * Frontend Type
