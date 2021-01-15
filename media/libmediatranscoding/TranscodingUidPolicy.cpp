@@ -48,8 +48,9 @@ void TranscodingUidPolicy::OnUidImportance(uid_t uid, int32_t uidImportance, voi
 }
 
 void TranscodingUidPolicy::registerSelf() {
-    mUidObserver = AActivityManager_addUidImportanceListener(
-            &OnUidImportance, -1, (void*)this);
+    if (__builtin_available(android 31, *)) {
+        mUidObserver = AActivityManager_addUidImportanceListener(&OnUidImportance, -1, (void*)this);
+    }
 
     if (mUidObserver == nullptr) {
         ALOGE("Failed to register uid observer");
@@ -62,12 +63,16 @@ void TranscodingUidPolicy::registerSelf() {
 }
 
 void TranscodingUidPolicy::unregisterSelf() {
-    AActivityManager_removeUidImportanceListener(mUidObserver);
-    mUidObserver = nullptr;
+    if (__builtin_available(android 31, *)) {
+        AActivityManager_removeUidImportanceListener(mUidObserver);
+        mUidObserver = nullptr;
 
-    Mutex::Autolock _l(mUidLock);
-    mRegistered = false;
-    ALOGI("Unregistered uid observer");
+        Mutex::Autolock _l(mUidLock);
+        mRegistered = false;
+        ALOGI("Unregistered uid observer");
+    } else {
+        ALOGE("Failed to unregister uid observer");
+    }
 }
 
 void TranscodingUidPolicy::setCallback(const std::shared_ptr<UidPolicyCallbackInterface>& cb) {
@@ -86,8 +91,10 @@ void TranscodingUidPolicy::registerMonitorUid(uid_t uid) {
     }
 
     int32_t state = IMPORTANCE_UNKNOWN;
-    if (mRegistered && AActivityManager_isUidActive(uid)) {
-        state = AActivityManager_getUidImportance(uid);
+    if (__builtin_available(android 31, *)) {
+        if (mRegistered && AActivityManager_isUidActive(uid)) {
+            state = AActivityManager_getUidImportance(uid);
+        }
     }
 
     ALOGV("%s: inserting new uid: %u, procState %d", __FUNCTION__, uid, state);

@@ -62,16 +62,18 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
     uid_t callingUid = AIBinder_getCallingUid();
     pid_t callingPid = AIBinder_getCallingPid();
-    int32_t permissionResult;
-    if (APermissionManager_checkPermission("android.permission.DUMP", callingPid, callingUid,
-                                           &permissionResult) != PERMISSION_MANAGER_STATUS_OK ||
-        permissionResult != PERMISSION_MANAGER_PERMISSION_GRANTED) {
-        result.format(
-                "Permission Denial: "
-                "can't dump MediaTranscodingService from pid=%d, uid=%d\n",
-                AIBinder_getCallingPid(), AIBinder_getCallingUid());
-        write(fd, result.string(), result.size());
-        return PERMISSION_DENIED;
+    if (__builtin_available(android 31, *)) {
+        int32_t permissionResult;
+        if (APermissionManager_checkPermission("android.permission.DUMP", callingPid, callingUid,
+                                               &permissionResult) != PERMISSION_MANAGER_STATUS_OK ||
+            permissionResult != PERMISSION_MANAGER_PERMISSION_GRANTED) {
+            result.format(
+                    "Permission Denial: "
+                    "can't dump MediaTranscodingService from pid=%d, uid=%d\n",
+                    AIBinder_getCallingPid(), AIBinder_getCallingUid());
+            write(fd, result.string(), result.size());
+            return PERMISSION_DENIED;
+        }
     }
 
     const size_t SIZE = 256;
