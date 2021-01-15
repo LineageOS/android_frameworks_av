@@ -19,6 +19,7 @@
 
 #include <aidl/android/media/tv/tuner/BnTunerFrontend.h>
 #include <android/hardware/tv/tuner/1.0/ITuner.h>
+#include <android/hardware/tv/tuner/1.1/IFrontendCallback.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
@@ -27,6 +28,7 @@ using ::aidl::android::media::tv::tuner::BnTunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerFrontendCallback;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3Settings;
 using ::aidl::android::media::tv::tuner::TunerFrontendDvbsCodeRate;
+using ::aidl::android::media::tv::tuner::TunerFrontendScanMessage;
 using ::aidl::android::media::tv::tuner::TunerFrontendSettings;
 using ::aidl::android::media::tv::tuner::TunerFrontendStatus;
 using ::android::hardware::Return;
@@ -39,16 +41,17 @@ using ::android::hardware::tv::tuner::V1_0::FrontendId;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanMessage;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanMessageType;
 using ::android::hardware::tv::tuner::V1_0::IFrontend;
-using ::android::hardware::tv::tuner::V1_0::IFrontendCallback;
 using ::android::hardware::tv::tuner::V1_0::ITuner;
-
+using ::android::hardware::tv::tuner::V1_1::IFrontendCallback;
+using ::android::hardware::tv::tuner::V1_1::FrontendScanMessageExt1_1;
+using ::android::hardware::tv::tuner::V1_1::FrontendScanMessageTypeExt1_1;
 
 namespace android {
 
 class TunerFrontend : public BnTunerFrontend {
 
 public:
-    TunerFrontend(sp<ITuner> tuner, int frontendHandle);
+    TunerFrontend(sp<ITuner> tuner, int id);
     virtual ~TunerFrontend();
     Status setCallback(
             const std::shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) override;
@@ -61,6 +64,7 @@ public:
     Status close() override;
     Status getStatus(const std::vector<int32_t>& statusTypes,
             std::vector<TunerFrontendStatus>* _aidl_return) override;
+    Status getFrontendId(int* _aidl_return) override;
 
     struct FrontendCallback : public IFrontendCallback {
         FrontendCallback(const std::shared_ptr<ITunerFrontendCallback> tunerFrontendCallback)
@@ -69,6 +73,8 @@ public:
         virtual Return<void> onEvent(FrontendEventType frontendEventType);
         virtual Return<void> onScanMessage(
                 FrontendScanMessageType type, const FrontendScanMessage& message);
+        virtual Return<void> onScanMessageExt1_1(
+                FrontendScanMessageTypeExt1_1 type, const FrontendScanMessageExt1_1& message);
 
         std::shared_ptr<ITunerFrontendCallback> mTunerFrontendCallback;
     };

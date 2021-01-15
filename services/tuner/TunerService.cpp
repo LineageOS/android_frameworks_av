@@ -252,7 +252,8 @@ Status TunerService::openFrontend(
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(mTuner, frontendHandle);
+    int id = getResourceIdFromHandle(frontendHandle);
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(mTuner, id);
     return Status::ok();
 }
 
