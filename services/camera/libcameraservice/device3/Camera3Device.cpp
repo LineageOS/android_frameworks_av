@@ -2161,6 +2161,14 @@ void Camera3Device::notifyStatus(bool idle) {
                 streamStats[i].mRequestCount = stats->second.mRequestedFrameCount;
                 streamStats[i].mErrorCount = stats->second.mDroppedFrameCount;
                 streamStats[i].mStartLatencyMs = stats->second.mStartLatencyMs;
+                streamStats[i].mHistogramType =
+                        hardware::CameraStreamStats::HISTOGRAM_TYPE_CAPTURE_LATENCY;
+                streamStats[i].mHistogramBins.assign(
+                        stats->second.mCaptureLatencyBins.begin(),
+                        stats->second.mCaptureLatencyBins.end());
+                streamStats[i].mHistogramCounts.assign(
+                        stats->second.mCaptureLatencyHistogram.begin(),
+                        stats->second.mCaptureLatencyHistogram.end());
             }
         }
         listener->notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);

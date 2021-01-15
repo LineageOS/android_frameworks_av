@@ -94,6 +94,24 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    int histogramType = HISTOGRAM_TYPE_UNKNOWN;
+    if ((err = parcel->readInt32(&histogramType)) != OK) {
+        ALOGE("%s: Failed to read histogram type from parcel", __FUNCTION__);
+        return err;
+    }
+
+    std::vector<float> histogramBins;
+    if ((err = parcel->readFloatVector(&histogramBins)) != OK) {
+        ALOGE("%s: Failed to read histogram bins from parcel", __FUNCTION__);
+        return err;
+    }
+
+    std::vector<int64_t> histogramCounts;
+    if ((err = parcel->readInt64Vector(&histogramCounts)) != OK) {
+        ALOGE("%s: Failed to read histogram counts from parcel", __FUNCTION__);
+        return err;
+    }
+
     mWidth = width;
     mHeight = height;
     mFormat = format;
@@ -104,6 +122,9 @@ status_t CameraStreamStats::readFromParcel(const android::Parcel* parcel) {
     mStartLatencyMs = startLatencyMs;
     mMaxHalBuffers = maxHalBuffers;
     mMaxAppBuffers = maxAppBuffers;
+    mHistogramType = histogramType;
+    mHistogramBins = std::move(histogramBins);
+    mHistogramCounts = std::move(histogramCounts);
 
     return OK;
 }
@@ -163,6 +184,21 @@ status_t CameraStreamStats::writeToParcel(android::Parcel* parcel) const {
 
     if ((err = parcel->writeInt32(mMaxAppBuffers)) != OK) {
         ALOGE("%s: Failed to write max app buffers", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt32(mHistogramType)) != OK) {
+        ALOGE("%s: Failed to write histogram type", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeFloatVector(mHistogramBins)) != OK) {
+        ALOGE("%s: Failed to write histogram bins!", __FUNCTION__);
+        return err;
+    }
+
+    if ((err = parcel->writeInt64Vector(mHistogramCounts)) != OK) {
+        ALOGE("%s: Failed to write histogram counts!", __FUNCTION__);
         return err;
     }
 
