@@ -32,6 +32,7 @@ cc_binary {
         "libpowermanager",
         "libutils",
         "libvibrator",
+
     ],
 
     // TODO check if we still need all of these include directories
