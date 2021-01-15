@@ -112,7 +112,6 @@ cc_library {
         "libprocessgroup",
         "libshmemcompat",
         "libutils",
-        "libvibrator",
     ],
     export_shared_lib_headers: [
         "audioflinger-aidl-unstable-cpp",
