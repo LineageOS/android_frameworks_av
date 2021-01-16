@@ -3547,7 +3547,9 @@ audio_offload_mode_t AudioPolicyManager::getOffloadSupport(const audio_offload_i
                                             offloadInfo.channel_mask,
                                             AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD,
                                             true /* directOnly */);
-    ALOGV("%s: profile %sfound", __func__, profile != 0 ? "" : "NOT ");
+    ALOGV("%s: profile %sfound%s", __func__, profile != nullptr ? "" : "NOT ",
+            (profile != nullptr && (profile->getFlags() & AUDIO_OUTPUT_FLAG_GAPLESS_OFFLOAD) != 0)
+            ? ", supports gapless" : "");
     if (profile == nullptr) {
         return AUDIO_OFFLOAD_NOT_SUPPORTED;
     }
