@@ -1,34 +1,16 @@
 filegroup {
     name: "tv_tuner_aidl",
     srcs: [
-        "aidl/android/media/tv/tuner/ITunerFrontend.aidl",
-        "aidl/android/media/tv/tuner/ITunerFrontendCallback.aidl",
-        "aidl/android/media/tv/tuner/ITunerService.aidl",
-        "aidl/android/media/tv/tuner/TunerAtsc3PlpInfo.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAnalogCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAtscCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAtsc3Capabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendCableCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendDvbsCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendDvbtCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendIsdbsCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendIsdbs3Capabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendIsdbtCapabilities.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAnalogSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAtsc3PlpSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAtsc3Settings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendAtscSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendCableSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendDvbsCodeRate.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendDvbsSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendDvbtSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendIsdbs3Settings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendIsdbsSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendIsdbtSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendSettings.aidl",
-        "aidl/android/media/tv/tuner/TunerFrontendStatus.aidl",
-        "aidl/android/media/tv/tuner/TunerServiceFrontendInfo.aidl",
+        "aidl/android/media/tv/tuner/*.aidl",
+    ],
+    path: "aidl",
+}
+
+filegroup {
+    name: "tv_tuner_frontend_info",
+    srcs: [
+        "aidl/android/media/tv/tuner/TunerFrontendInfo.aidl",
+        "aidl/android/media/tv/tuner/TunerFrontend*Capabilities.aidl",
     ],
     path: "aidl",
 }
@@ -57,6 +39,27 @@ aidl_interface {
     },
 }
 
+aidl_interface {
+    name: "tv_tuner_frontend_info_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":tv_tuner_frontend_info",
+    ],
+
+    backend: {
+        java: {
+            enabled: true,
+        },
+        cpp: {
+            enabled: true,
+        },
+        ndk: {
+            enabled: true,
+        },
+    },
+}
+
 cc_library {
     name: "libtunerservice",
 
@@ -67,6 +70,7 @@ cc_library {
 
     shared_libs: [
         "android.hardware.tv.tuner@1.0",
+        "android.hardware.tv.tuner@1.1",
         "libbase",
         "libbinder_ndk",
         "libcutils",

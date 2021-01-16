@@ -20,7 +20,7 @@ import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.fmq.UnsynchronizedWrite;
 import android.media.tv.tuner.ITunerFrontend;
-import android.media.tv.tuner.TunerServiceFrontendInfo;
+import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
  * TunerService interface handles tuner related operations.
@@ -43,7 +43,7 @@ interface ITunerService {
      * @param frontendHandle the handle of the frontend granted by TRM.
      * @return the information of the frontend.
      */
-    TunerServiceFrontendInfo getFrontendInfo(in int frontendHandle);
+    TunerFrontendInfo getFrontendInfo(in int frontendHandle);
 
     /**
      * Open a Tuner Frontend interface.

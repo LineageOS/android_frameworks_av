@@ -27,6 +27,11 @@ namespace hardware {
  */
 class CameraStreamStats : public android::Parcelable {
 public:
+    enum HistogramType {
+        HISTOGRAM_TYPE_UNKNOWN = 0,
+        HISTOGRAM_TYPE_CAPTURE_LATENCY = 1,
+    };
+
     int mWidth;
     int mHeight;
     int mFormat;
@@ -45,15 +50,26 @@ public:
     int mMaxHalBuffers;
     int mMaxAppBuffers;
 
+    // Histogram type. So far only capture latency histogram is supported.
+    int mHistogramType;
+    // The bounary values separating adjacent histogram bins.
+    // A vector of {h1, h2, h3} represents bins of [0, h1), [h1, h2), [h2, h3),
+    // and [h3, infinity)
+    std::vector<float> mHistogramBins;
+    // The counts for all histogram bins.
+    // size(mHistogramBins) + 1 = size(mHistogramCounts)
+    std::vector<int64_t> mHistogramCounts;
+
     CameraStreamStats() :
             mWidth(0), mHeight(0), mFormat(0), mDataSpace(0), mUsage(0),
             mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
-            mMaxHalBuffers(0), mMaxAppBuffers(0) {}
+            mMaxHalBuffers(0), mMaxAppBuffers(0), mHistogramType(HISTOGRAM_TYPE_UNKNOWN) {}
     CameraStreamStats(int width, int height, int format, int dataSpace, int64_t usage,
             int maxHalBuffers, int maxAppBuffers)
             : mWidth(width), mHeight(height), mFormat(format), mDataSpace(dataSpace),
               mUsage(usage), mRequestCount(0), mErrorCount(0), mStartLatencyMs(0),
-              mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers) {}
+              mMaxHalBuffers(maxHalBuffers), mMaxAppBuffers(maxAppBuffers),
+              mHistogramType(HISTOGRAM_TYPE_UNKNOWN) {}
 
     virtual status_t readFromParcel(const android::Parcel* parcel) override;
     virtual status_t writeToParcel(android::Parcel* parcel) const override;
