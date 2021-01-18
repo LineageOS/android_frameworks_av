@@ -221,7 +221,7 @@ Status TunerService::getFrontendIds(std::vector<int32_t>* ids, int32_t* /* _aidl
 }
 
 Status TunerService::getFrontendInfo(
-        int32_t frontendHandle, TunerServiceFrontendInfo* _aidl_return) {
+        int32_t frontendHandle, TunerFrontendInfo* _aidl_return) {
     if (mTuner == nullptr) {
         ALOGE("ITuner service is not init.");
         return ::ndk::ScopedAStatus::fromServiceSpecificError(
@@ -239,7 +239,7 @@ Status TunerService::getFrontendInfo(
         return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
 
-    TunerServiceFrontendInfo tunerInfo = convertToAidlFrontendInfo(feId, info);
+    TunerFrontendInfo tunerInfo = convertToAidlFrontendInfo(info);
     *_aidl_return = tunerInfo;
     return Status::ok();
 }
@@ -252,13 +252,13 @@ Status TunerService::openFrontend(
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(mTuner, frontendHandle);
+    int id = getResourceIdFromHandle(frontendHandle);
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(mTuner, id);
     return Status::ok();
 }
 
-TunerServiceFrontendInfo TunerService::convertToAidlFrontendInfo(int feId, FrontendInfo halInfo) {
-    TunerServiceFrontendInfo info{
-        .id = feId,
+TunerFrontendInfo TunerService::convertToAidlFrontendInfo(FrontendInfo halInfo) {
+    TunerFrontendInfo info{
         .type = (int)halInfo.type,
         .minFrequency = (int)halInfo.minFrequency,
         .maxFrequency = (int)halInfo.maxFrequency,

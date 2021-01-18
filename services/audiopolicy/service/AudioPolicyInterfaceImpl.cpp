@@ -1241,7 +1241,7 @@ status_t AudioPolicyService::registerPolicyMixes(const Vector<AudioMix>& mixes, 
             return mix.mVoiceCommunicationCaptureAllowed; });
 
     bool needCaptureMediaOutput = std::any_of(mixes.begin(), mixes.end(), [](auto& mix) {
-            return mix.mAllowPrivilegedPlaybackCapture; });
+            return mix.mAllowPrivilegedMediaPlaybackCapture; });
 
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     const pid_t callingPid = IPCThreadState::self()->getCallingPid();

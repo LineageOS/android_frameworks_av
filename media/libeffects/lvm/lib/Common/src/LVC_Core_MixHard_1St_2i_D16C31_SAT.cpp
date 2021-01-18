@@ -18,7 +18,6 @@
 /**********************************************************************************
    INCLUDE FILES
 ***********************************************************************************/
-
 #include "LVC_Mixer_Private.h"
 #include "LVM_Macros.h"
 #include "ScalarArithmetic.h"
@@ -30,13 +29,8 @@ void LVC_Core_MixHard_1St_MC_float_SAT(Mix_Private_FLOAT_st** ptrInstance, const
     for (ii = NrFrames; ii != 0; ii--) {
         for (jj = 0; jj < NrChannels; jj++) {
             Mix_Private_FLOAT_st* pInstance1 = (Mix_Private_FLOAT_st*)(ptrInstance[jj]);
-            Temp = ((LVM_FLOAT) * (src++) * (LVM_FLOAT)pInstance1->Current);
-            if (Temp > 1.0f)
-                *dst++ = 1.0f;
-            else if (Temp < -1.0f)
-                *dst++ = -1.0f;
-            else
-                *dst++ = (LVM_FLOAT)Temp;
+            Temp =  *src++ * pInstance1->Current;
+            *dst++ = LVM_Clamp(Temp);
         }
     }
 }

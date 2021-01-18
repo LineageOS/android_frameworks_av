@@ -260,7 +260,12 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
+#if !defined(__ANDROID_APEX__)
+    // TODO(jiyong): replace this #ifdef with a __builtin_available check.
     AMediaCodec* encoder = AMediaCodec_createEncoderByTypeForClient(destinationMime, mPid, mUid);
+#else
+    AMediaCodec* encoder = AMediaCodec_createEncoderByType(destinationMime);
+#endif
     if (encoder == nullptr) {
         LOG(ERROR) << "Unable to create encoder for type " << destinationMime;
         return AMEDIA_ERROR_UNSUPPORTED;
@@ -290,7 +295,12 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
+#if !defined(__ANDROID_APEX__)
+    // TODO(jiyong): replace this #ifdef with a __builtin_available check.
     mDecoder = AMediaCodec_createDecoderByTypeForClient(sourceMime, mPid, mUid);
+#else
+    mDecoder = AMediaCodec_createDecoderByType(sourceMime);
+#endif
     if (mDecoder == nullptr) {
         LOG(ERROR) << "Unable to create decoder for type " << sourceMime;
         return AMEDIA_ERROR_UNSUPPORTED;

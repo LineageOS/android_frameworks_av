@@ -122,9 +122,9 @@ void DeviceDescriptorBase::dump(std::string *dst, int spaces, int index,
             spaces, "", ::android::toString(mDeviceTypeAddr.mType).c_str()));
 
     dst->append(base::StringPrintf(
-            "%*s- supported encapsulation modes: %u", spaces, "", mEncapsulationModes));
+            "%*s- supported encapsulation modes: %u\n", spaces, "", mEncapsulationModes));
     dst->append(base::StringPrintf(
-            "%*s- supported encapsulation metadata types: %u",
+            "%*s- supported encapsulation metadata types: %u\n",
             spaces, "", mEncapsulationMetadataTypes));
 
     if (mDeviceTypeAddr.address().size() != 0) {

@@ -14,6 +14,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef BIQUAD_OPT
 #ifndef _BP_1I_D32F32CLL_TRC_WRA_02_PRIVATE_H_
 #define _BP_1I_D32F32CLL_TRC_WRA_02_PRIVATE_H_
 
@@ -32,3 +33,4 @@ typedef struct _Filter_State_FLOAT {
 typedef Filter_State_Float* PFilter_State_FLOAT;
 
 #endif /*_BP_1I_D32F32CLL_TRC_WRA_02_PRIVATE_H_*/
+#endif

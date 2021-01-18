@@ -14,10 +14,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 #include "BIQUAD.h"
 #include "DC_2I_D16_TRC_WRA_01_Private.h"
 #include "LVM_Macros.h"
+#include "ScalarArithmetic.h"
 /*
  * FUNCTION:       DC_Mc_D16_TRC_WRA_01
  *
@@ -48,12 +48,7 @@ void DC_Mc_D16_TRC_WRA_01(Biquad_FLOAT_Instance_t* pInstance, LVM_FLOAT* pDataIn
         /* Subtract DC and saturate */
         for (i = NrChannels - 1; i >= 0; i--) {
             Diff = *(pDataIn++) - (ChDC[i]);
-            if (Diff > 1.0f) {
-                Diff = 1.0f;
-            } else if (Diff < -1.0f) {
-                Diff = -1.0f;
-            }
-            *(pDataOut++) = (LVM_FLOAT)Diff;
+            *(pDataOut++) = LVM_Clamp(Diff);
             if (Diff < 0) {
                 ChDC[i] -= DC_FLOAT_STEP;
             } else {

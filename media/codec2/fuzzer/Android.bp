@@ -1,0 +1,333 @@
+/*
+ * Copyright (C) 2020 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *
+ * Originally developed and contributed by Ittiam Systems Pvt. Ltd, Bangalore
+ */
+
+cc_defaults {
+    name: "C2Fuzzer-defaults",
+
+    srcs: [
+        "C2Fuzzer.cpp",
+    ],
+
+    static_libs: [
+        "liblog",
+        "libion",
+        "libfmq",
+        "libbase",
+        "libutils",
+        "libcutils",
+        "libcodec2",
+        "libhidlbase",
+        "libdmabufheap",
+        "libcodec2_vndk",
+        "libnativewindow",
+        "libcodec2_soft_common",
+        "libsfplugin_ccodec_utils",
+        "libstagefright_foundation",
+        "libstagefright_bufferpool@2.0.1",
+        "android.hardware.graphics.mapper@2.0",
+        "android.hardware.graphics.mapper@3.0",
+        "android.hardware.media.bufferpool@2.0",
+        "android.hardware.graphics.allocator@2.0",
+        "android.hardware.graphics.allocator@3.0",
+        "android.hardware.graphics.bufferqueue@2.0",
+    ],
+
+    shared_libs: [
+        "libui",
+        "libdl",
+        "libbinder",
+        "libhardware",
+        "libvndksupport",
+        "libprocessgroup",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Werror",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerAvcDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.avc.decoder\"",
+    ],
+
+    static_libs: [
+        "libavcdec",
+        "libcodec2_soft_avcdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerHevcDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.hevc.decoder\"",
+    ],
+
+    static_libs: [
+        "libhevcdec",
+        "libcodec2_soft_hevcdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerMpeg2Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.mpeg2.decoder\"",
+    ],
+
+    static_libs: [
+        "libmpeg2dec",
+        "libcodec2_soft_mpeg2dec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerMpeg4Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.mpeg4.decoder\"",
+    ],
+
+    static_libs: [
+        "libstagefright_m4vh263dec",
+        "libcodec2_soft_mpeg4dec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerH263Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.h263.decoder\"",
+    ],
+
+    static_libs: [
+        "libstagefright_m4vh263dec",
+        "libcodec2_soft_h263dec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerVp8Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.vp8.decoder\"",
+    ],
+
+    static_libs: [
+        "libvpx",
+        "libcodec2_soft_vp8dec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerVp9Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.vp9.decoder\"",
+    ],
+
+    static_libs: [
+        "libvpx",
+        "libcodec2_soft_vp9dec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerAacDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.aac.decoder\"",
+    ],
+
+    static_libs: [
+        "libFraunhoferAAC",
+        "libcodec2_soft_aacdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerAmrnbDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.amrnb.decoder\"",
+    ],
+
+    static_libs: [
+        "libstagefright_amrnbdec",
+        "libstagefright_amrwbdec",
+        "libstagefright_amrnb_common",
+        "libcodec2_soft_amrnbdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerAmrwbDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.amrwb.decoder\"",
+    ],
+
+    static_libs: [
+        "libstagefright_amrnbdec",
+        "libstagefright_amrwbdec",
+        "libstagefright_amrnb_common",
+        "libcodec2_soft_amrwbdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerFlacDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.flac.decoder\"",
+    ],
+
+    static_libs: [
+        "libFLAC",
+        "libstagefright_flacdec",
+        "libcodec2_soft_flacdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerG711AlawDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.g711.alaw.decoder\"",
+    ],
+
+    static_libs: [
+        "codecs_g711dec",
+        "libcodec2_soft_g711alawdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerG711MlawDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.g711.mlaw.decoder\"",
+    ],
+
+    static_libs: [
+        "codecs_g711dec",
+        "libcodec2_soft_g711mlawdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerGsmDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.gsm.decoder\"",
+    ],
+
+    static_libs: [
+        "libgsm",
+        "libcodec2_soft_gsmdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerMp3Dec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.mp3.decoder\"",
+    ],
+
+    static_libs: [
+        "libstagefright_mp3dec",
+        "libcodec2_soft_mp3dec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerOpusDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.opus.decoder\"",
+    ],
+
+    static_libs: [
+        "libopus",
+        "libcodec2_soft_opusdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerRawDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.raw.decoder\"",
+    ],
+
+    static_libs: [
+        "libcodec2_soft_rawdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerVorbisDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.vorbis.decoder\"",
+    ],
+
+    static_libs: [
+        "libvorbisidec",
+        "libcodec2_soft_vorbisdec",
+    ],
+}
+
+cc_fuzz {
+    name: "C2FuzzerXaacDec",
+    defaults: ["C2Fuzzer-defaults"],
+
+    cflags: [
+        "-DC2COMPONENTNAME=\"c2.android.xaac.decoder\"",
+    ],
+
+    static_libs: [
+        "libxaacdec",
+        "libcodec2_soft_xaacdec",
+    ],
+}

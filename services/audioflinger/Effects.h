@@ -512,6 +512,12 @@ public:
 
 private:
 
+    // For transaction consistency, please consider holding the EffectChain lock before
+    // calling the EffectChain::EffectCallback methods, excepting
+    // createEffectHal and allocateHalBuffer.
+    //
+    // This prevents migration of the EffectChain to another PlaybackThread
+    // for the purposes of the EffectCallback.
     class EffectCallback :  public EffectCallbackInterface {
     public:
         // Note: ctors taking a weak pointer to their owner must not promote it
@@ -556,10 +562,8 @@ private:
 
         wp<EffectChain> chain() const override { return mChain; }
 
-        wp<ThreadBase> thread() { return mThread; }
+        wp<ThreadBase> thread() const { return mThread.load(); }
 
-        // TODO(b/161341295) secure this against concurrent access to mThread
-        // by other callers.
         void setThread(const wp<ThreadBase>& thread) {
             mThread = thread;
             sp<ThreadBase> p = thread.promote();
@@ -568,7 +572,7 @@ private:
 
     private:
         const wp<EffectChain> mChain;
-        wp<ThreadBase> mThread;         // TODO(b/161341295) protect against concurrent access
+        mediautils::atomic_wp<ThreadBase> mThread;
         wp<AudioFlinger> mAudioFlinger; // this could be const with some rearrangement.
     };
 

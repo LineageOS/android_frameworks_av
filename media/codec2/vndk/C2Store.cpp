@@ -622,6 +622,12 @@ public:
             std::vector<std::unique_ptr<C2SettingResult>> *const failures) override;
     C2PlatformComponentStore();
 
+    // For testing only
+    C2PlatformComponentStore(
+            std::vector<std::tuple<C2String,
+                                   C2ComponentFactory::CreateCodec2FactoryFunc,
+                                   C2ComponentFactory::DestroyCodec2FactoryFunc>>);
+
     virtual ~C2PlatformComponentStore() override = default;
 
 private:
@@ -658,6 +664,24 @@ private:
               mLibHandle(nullptr),
               createFactory(nullptr),
               destroyFactory(nullptr),
+              mComponentFactory(nullptr) {
+        }
+
+        /**
+         * Creates an uninitialized component module.
+         * NOTE: For testing only
+         *
+         * \param name[in]  component name.
+         *
+         * \note Only used by ComponentLoader.
+         */
+        ComponentModule(
+                C2ComponentFactory::CreateCodec2FactoryFunc createFactory,
+                C2ComponentFactory::DestroyCodec2FactoryFunc destroyFactory)
+            : mInit(C2_NO_INIT),
+              mLibHandle(nullptr),
+              createFactory(createFactory),
+              destroyFactory(destroyFactory),
               mComponentFactory(nullptr) {
         }
 
@@ -717,7 +741,13 @@ private:
             std::lock_guard<std::mutex> lock(mMutex);
             std::shared_ptr<ComponentModule> localModule = mModule.lock();
             if (localModule == nullptr) {
-                localModule = std::make_shared<ComponentModule>();
+                if(mCreateFactory) {
+                    // For testing only
+                    localModule = std::make_shared<ComponentModule>(mCreateFactory,
+                                                                    mDestroyFactory);
+                } else {
+                    localModule = std::make_shared<ComponentModule>();
+                }
                 res = localModule->init(mLibPath);
                 if (res == C2_OK) {
                     mModule = localModule;
@@ -733,10 +763,22 @@ private:
         ComponentLoader(std::string libPath)
             : mLibPath(libPath) {}
 
+        // For testing only
+        ComponentLoader(std::tuple<C2String,
+                          C2ComponentFactory::CreateCodec2FactoryFunc,
+                          C2ComponentFactory::DestroyCodec2FactoryFunc> func)
+            : mLibPath(std::get<0>(func)),
+              mCreateFactory(std::get<1>(func)),
+              mDestroyFactory(std::get<2>(func)) {}
+
     private:
         std::mutex mMutex; ///< mutex guarding the module
         std::weak_ptr<ComponentModule> mModule; ///< weak reference to the loaded module
         std::string mLibPath; ///< library path
+
+        // For testing only
+        C2ComponentFactory::CreateCodec2FactoryFunc mCreateFactory = nullptr;
+        C2ComponentFactory::DestroyCodec2FactoryFunc mDestroyFactory = nullptr;
     };
 
     struct Interface : public C2InterfaceHelper {
@@ -780,7 +822,13 @@ private:
                 };
 
                 static C2R setDmaBufUsage(bool /* mayBlock */, C2P<C2StoreDmaBufUsageInfo> &me) {
-                    strncpy(me.set().m.heapName, "system", me.v.flexCount());
+                    long long usage = (long long)me.get().m.usage;
+                    if (C2DmaBufAllocator::system_uncached_supported() &&
+                        !(usage & (C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE))) {
+                        strncpy(me.set().m.heapName, "system-uncached", me.v.flexCount());
+                    } else {
+                        strncpy(me.set().m.heapName, "system", me.v.flexCount());
+                    }
                     me.set().m.allocFlags = 0;
                     return C2R::Ok();
                 };
@@ -846,25 +894,33 @@ private:
 
     std::shared_ptr<C2ReflectorHelper> mReflector;
     Interface mInterface;
+
+    // For testing only
+    std::vector<std::tuple<C2String,
+                          C2ComponentFactory::CreateCodec2FactoryFunc,
+                          C2ComponentFactory::DestroyCodec2FactoryFunc>> mCodec2FactoryFuncs;
 };
 
 c2_status_t C2PlatformComponentStore::ComponentModule::init(
         std::string libPath) {
     ALOGV("in %s", __func__);
     ALOGV("loading dll");
-    mLibHandle = dlopen(libPath.c_str(), RTLD_NOW|RTLD_NODELETE);
-    LOG_ALWAYS_FATAL_IF(mLibHandle == nullptr,
-            "could not dlopen %s: %s", libPath.c_str(), dlerror());
 
-    createFactory =
-        (C2ComponentFactory::CreateCodec2FactoryFunc)dlsym(mLibHandle, "CreateCodec2Factory");
-    LOG_ALWAYS_FATAL_IF(createFactory == nullptr,
-            "createFactory is null in %s", libPath.c_str());
+    if(!createFactory) {
+        mLibHandle = dlopen(libPath.c_str(), RTLD_NOW|RTLD_NODELETE);
+        LOG_ALWAYS_FATAL_IF(mLibHandle == nullptr,
+                "could not dlopen %s: %s", libPath.c_str(), dlerror());
 
-    destroyFactory =
-        (C2ComponentFactory::DestroyCodec2FactoryFunc)dlsym(mLibHandle, "DestroyCodec2Factory");
-    LOG_ALWAYS_FATAL_IF(destroyFactory == nullptr,
-            "destroyFactory is null in %s", libPath.c_str());
+        createFactory =
+            (C2ComponentFactory::CreateCodec2FactoryFunc)dlsym(mLibHandle, "CreateCodec2Factory");
+        LOG_ALWAYS_FATAL_IF(createFactory == nullptr,
+                "createFactory is null in %s", libPath.c_str());
+
+        destroyFactory =
+            (C2ComponentFactory::DestroyCodec2FactoryFunc)dlsym(mLibHandle, "DestroyCodec2Factory");
+        LOG_ALWAYS_FATAL_IF(destroyFactory == nullptr,
+                "destroyFactory is null in %s", libPath.c_str());
+    }
 
     mComponentFactory = createFactory();
     if (mComponentFactory == nullptr) {
@@ -1065,6 +1121,22 @@ C2PlatformComponentStore::C2PlatformComponentStore()
     emplace("libcodec2_soft_vp8enc.so");
     emplace("libcodec2_soft_vp9dec.so");
     emplace("libcodec2_soft_vp9enc.so");
+
+}
+
+// For testing only
+C2PlatformComponentStore::C2PlatformComponentStore(
+    std::vector<std::tuple<C2String,
+                C2ComponentFactory::CreateCodec2FactoryFunc,
+                C2ComponentFactory::DestroyCodec2FactoryFunc>> funcs)
+    : mVisited(false),
+      mReflector(std::make_shared<C2ReflectorHelper>()),
+      mInterface(mReflector),
+      mCodec2FactoryFuncs(funcs) {
+
+    for(auto const& func: mCodec2FactoryFuncs) {
+        mComponents.emplace(std::get<0>(func), func);
+    }
 }
 
 c2_status_t C2PlatformComponentStore::copyBuffer(
@@ -1184,4 +1256,11 @@ std::shared_ptr<C2ComponentStore> GetCodec2PlatformComponentStore() {
     return store;
 }
 
+// For testing only
+std::shared_ptr<C2ComponentStore> GetTestComponentStore(
+        std::vector<std::tuple<C2String,
+        C2ComponentFactory::CreateCodec2FactoryFunc,
+        C2ComponentFactory::DestroyCodec2FactoryFunc>> funcs) {
+    return std::shared_ptr<C2ComponentStore>(new C2PlatformComponentStore(funcs));
+}
 } // namespace android

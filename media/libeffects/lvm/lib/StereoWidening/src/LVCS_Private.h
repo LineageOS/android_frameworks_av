@@ -113,7 +113,9 @@ typedef struct {
     /* Sub-block configurations */
     LVCS_StereoEnhancer_t StereoEnhancer; /* Stereo enhancer configuration */
     LVCS_ReverbGenerator_t Reverberation; /* Reverberation configuration */
+#ifndef BIQUAD_OPT
     LVCS_Equaliser_t Equaliser;           /* Equaliser configuration */
+#endif
     LVCS_BypassMix_t BypassMix;           /* Bypass mixer configuration */
 
     /* Bypass variable */

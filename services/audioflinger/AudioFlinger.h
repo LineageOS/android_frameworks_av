@@ -73,6 +73,7 @@
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/Synchronization.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
