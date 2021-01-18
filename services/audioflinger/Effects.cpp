@@ -2816,7 +2816,7 @@ status_t AudioFlinger::EffectChain::EffectCallback::allocateHalBuffer(
 status_t AudioFlinger::EffectChain::EffectCallback::addEffectToHal(
         sp<EffectHalInterface> effect) {
     status_t result = NO_INIT;
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return result;
     }
@@ -2832,7 +2832,7 @@ status_t AudioFlinger::EffectChain::EffectCallback::addEffectToHal(
 status_t AudioFlinger::EffectChain::EffectCallback::removeEffectFromHal(
         sp<EffectHalInterface> effect) {
     status_t result = NO_INIT;
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return result;
     }
@@ -2846,7 +2846,7 @@ status_t AudioFlinger::EffectChain::EffectCallback::removeEffectFromHal(
 }
 
 audio_io_handle_t AudioFlinger::EffectChain::EffectCallback::io() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return AUDIO_IO_HANDLE_NONE;
     }
@@ -2854,7 +2854,7 @@ audio_io_handle_t AudioFlinger::EffectChain::EffectCallback::io() const {
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOutput() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return true;
     }
@@ -2862,7 +2862,7 @@ bool AudioFlinger::EffectChain::EffectCallback::isOutput() const {
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffload() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return false;
     }
@@ -2870,7 +2870,7 @@ bool AudioFlinger::EffectChain::EffectCallback::isOffload() const {
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrDirect() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return false;
     }
@@ -2878,7 +2878,7 @@ bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrDirect() const {
 }
 
 bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrMmap() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return false;
     }
@@ -2886,7 +2886,7 @@ bool AudioFlinger::EffectChain::EffectCallback::isOffloadOrMmap() const {
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return 0;
     }
@@ -2894,7 +2894,7 @@ uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
 }
 
 audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::channelMask() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return AUDIO_CHANNEL_NONE;
     }
@@ -2902,7 +2902,7 @@ audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::channelMask() co
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::channelCount() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return 0;
     }
@@ -2910,7 +2910,7 @@ uint32_t AudioFlinger::EffectChain::EffectCallback::channelCount() const {
 }
 
 audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::hapticChannelMask() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return AUDIO_CHANNEL_NONE;
     }
@@ -2918,7 +2918,7 @@ audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::hapticChannelMas
 }
 
 size_t AudioFlinger::EffectChain::EffectCallback::frameCount() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return 0;
     }
@@ -2926,7 +2926,7 @@ size_t AudioFlinger::EffectChain::EffectCallback::frameCount() const {
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::latency() const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return 0;
     }
@@ -2934,7 +2934,7 @@ uint32_t AudioFlinger::EffectChain::EffectCallback::latency() const {
 }
 
 void AudioFlinger::EffectChain::EffectCallback::setVolumeForOutput(float left, float right) const {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return;
     }
@@ -2943,13 +2943,13 @@ void AudioFlinger::EffectChain::EffectCallback::setVolumeForOutput(float left, f
 
 void AudioFlinger::EffectChain::EffectCallback::checkSuspendOnEffectEnabled(
         const sp<EffectBase>& effect, bool enabled, bool threadLocked) {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return;
     }
     t->checkSuspendOnEffectEnabled(enabled, effect->sessionId(), threadLocked);
 
-    sp<EffectChain> c = mChain.promote();
+    sp<EffectChain> c = chain().promote();
     if (c == nullptr) {
         return;
     }
@@ -2958,7 +2958,7 @@ void AudioFlinger::EffectChain::EffectCallback::checkSuspendOnEffectEnabled(
 }
 
 void AudioFlinger::EffectChain::EffectCallback::onEffectEnable(const sp<EffectBase>& effect) {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return;
     }
@@ -2969,7 +2969,7 @@ void AudioFlinger::EffectChain::EffectCallback::onEffectEnable(const sp<EffectBa
 void AudioFlinger::EffectChain::EffectCallback::onEffectDisable(const sp<EffectBase>& effect) {
     checkSuspendOnEffectEnabled(effect, false, false /*threadLocked*/);
 
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return;
     }
@@ -2978,7 +2978,7 @@ void AudioFlinger::EffectChain::EffectCallback::onEffectDisable(const sp<EffectB
 
 bool AudioFlinger::EffectChain::EffectCallback::disconnectEffectHandle(EffectHandle *handle,
                                                       bool unpinIfLast) {
-    sp<ThreadBase> t = mThread.promote();
+    sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return false;
     }
@@ -2987,7 +2987,7 @@ bool AudioFlinger::EffectChain::EffectCallback::disconnectEffectHandle(EffectHan
 }
 
 void AudioFlinger::EffectChain::EffectCallback::resetVolume() {
-    sp<EffectChain> c = mChain.promote();
+    sp<EffectChain> c = chain().promote();
     if (c == nullptr) {
         return;
     }
@@ -2996,7 +2996,7 @@ void AudioFlinger::EffectChain::EffectCallback::resetVolume() {
 }
 
 uint32_t AudioFlinger::EffectChain::EffectCallback::strategy() const {
-    sp<EffectChain> c = mChain.promote();
+    sp<EffectChain> c = chain().promote();
     if (c == nullptr) {
         return PRODUCT_STRATEGY_NONE;
     }
@@ -3004,7 +3004,7 @@ uint32_t AudioFlinger::EffectChain::EffectCallback::strategy() const {
 }
 
 int32_t AudioFlinger::EffectChain::EffectCallback::activeTrackCnt() const {
-    sp<EffectChain> c = mChain.promote();
+    sp<EffectChain> c = chain().promote();
     if (c == nullptr) {
         return 0;
     }
