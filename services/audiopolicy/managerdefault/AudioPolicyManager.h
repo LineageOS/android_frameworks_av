@@ -571,6 +571,16 @@ protected:
          */
         void checkOutputForAttributes(const audio_attributes_t &attr);
 
+        /**
+         * @brief checkAudioSourceForAttributes checks if any AudioSource following the same routing
+         * as the given audio attributes is not routed and try to connect it.
+         * It must be called once checkOutputForAttributes has been called for orphans AudioSource,
+         * aka AudioSource not attached to any Audio Output (e.g. AudioSource connected to direct
+         * Output which has been disconnected (and output closed) due to sink device unavailable).
+         * @param attr to be considered
+         */
+        void checkAudioSourceForAttributes(const audio_attributes_t &attr);
+
         bool followsSameRouting(const audio_attributes_t &lAttr,
                                 const audio_attributes_t &rAttr) const;
 
@@ -739,6 +749,7 @@ protected:
 
         sp<SourceClientDescriptor> getSourceForAttributesOnOutput(audio_io_handle_t output,
                                                                   const audio_attributes_t &attr);
+        void clearAudioSourcesForOutput(audio_io_handle_t output);
 
         void cleanUpForDevice(const sp<DeviceDescriptor>& deviceDesc);
 
