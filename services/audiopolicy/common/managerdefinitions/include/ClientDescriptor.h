@@ -195,10 +195,18 @@ public:
 
     ~SourceClientDescriptor() override = default;
 
+    void connect(audio_patch_handle_t patchHandle, const sp<DeviceDescriptor>& sinkDevice) {
+        mPatchHandle = patchHandle;
+        mSinkDevice = sinkDevice;
+    }
+    void disconnect() {
+        mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
+        mSinkDevice = nullptr;
+    }
+    bool isConnected() const { return mPatchHandle != AUDIO_PATCH_HANDLE_NONE; }
     audio_patch_handle_t getPatchHandle() const { return mPatchHandle; }
-    void setPatchHandle(audio_patch_handle_t patchHandle) { mPatchHandle = patchHandle; }
-
     sp<DeviceDescriptor> srcDevice() const { return mSrcDevice; }
+    sp<DeviceDescriptor> sinkDevice() const { return mSinkDevice; }
     wp<SwAudioOutputDescriptor> swOutput() const { return mSwOutput; }
     void setSwOutput(const sp<SwAudioOutputDescriptor>& swOutput);
     wp<HwAudioOutputDescriptor> hwOutput() const { return mHwOutput; }
@@ -210,6 +218,7 @@ public:
  private:
     audio_patch_handle_t mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
     const sp<DeviceDescriptor> mSrcDevice;
+    sp<DeviceDescriptor> mSinkDevice;
     wp<SwAudioOutputDescriptor> mSwOutput;
     wp<HwAudioOutputDescriptor> mHwOutput;
 };
