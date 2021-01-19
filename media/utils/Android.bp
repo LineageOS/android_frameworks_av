@@ -60,3 +60,10 @@ cc_library {
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
 }
+
+cc_library_headers {
+    name: "libmediautils_headers",
+    vendor_available: true,  // required for platform/hardware/interfaces
+
+    export_include_dirs: ["include"],
+}
