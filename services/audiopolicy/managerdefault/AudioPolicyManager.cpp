@@ -447,7 +447,7 @@ status_t AudioPolicyManager::handleDeviceConfigChange(audio_devices_t device,
     // Case 1: A2DP active device switches from primary to primary
     // module
     // Case 2: A2DP device config changes on primary module.
-    if (audio_is_a2dp_out_device(device)) {
+    if (audio_is_a2dp_out_device(device) && hasPrimaryOutput()) {
         sp<HwModule> module = mHwModules.getModuleForDeviceType(device, encodedFormat);
         audio_module_handle_t primaryHandle = mPrimaryOutput->getModuleHandle();
         if (availablePrimaryOutputDevices().contains(devDesc) &&
@@ -4677,10 +4677,7 @@ status_t AudioPolicyManager::initialize() {
         }
     }
 
-    if (mPrimaryOutput == 0) {
-        ALOGE("Failed to open primary output");
-        status = NO_INIT;
-    }
+    ALOGW_IF(mPrimaryOutput == nullptr, "The policy configuration does not declare a primary output");
 
     // Silence ALOGV statements
     property_set("log.tag." LOG_TAG, "D");
@@ -4793,7 +4790,7 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                     setEngineDeviceConnectionState(device, AUDIO_POLICY_DEVICE_STATE_AVAILABLE);
                 }
             }
-            if (mPrimaryOutput == 0 &&
+            if (mPrimaryOutput == nullptr &&
                     outProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
                 mPrimaryOutput = outputDesc;
             }
@@ -4870,6 +4867,10 @@ void AudioPolicyManager::addOutput(audio_io_handle_t output,
 
 void AudioPolicyManager::removeOutput(audio_io_handle_t output)
 {
+    if (mPrimaryOutput != 0 && mPrimaryOutput == mOutputs.valueFor(output)) {
+        ALOGV("%s: removing primary output", __func__);
+        mPrimaryOutput = nullptr;
+    }
     mOutputs.removeItem(output);
     selectOutputForMusicEffects();
 }
@@ -5027,6 +5028,11 @@ status_t AudioPolicyManager::checkOutputsForDevice(const sp<DeviceDescriptor>& d
                             nextAudioPortGeneration();
                             output = AUDIO_IO_HANDLE_NONE;
                         }
+                    }
+                    if (mPrimaryOutput == nullptr
+		            && (profile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) != 0) {
+                        ALOGV("%s(): re-assigning mPrimaryOutput", __func__);
+                        mPrimaryOutput = desc;
                     }
                 }
             } else {
