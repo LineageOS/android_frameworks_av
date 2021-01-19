@@ -115,5 +115,19 @@ template <typename T>
 using atomic_sp = LockItem<
         ::android::sp<T>, std::mutex, LockItem<::android::sp<T>>::FLAG_DTOR_OUT_OF_LOCK>;
 
+/**
+ * Defers a function to run in the RAII destructor.
+ * A C++ implementation of Go _defer_ https://golangr.com/defer/.
+ */
+class Defer {
+public:
+    template <typename U>
+    explicit Defer(U &&f) : mThunk(std::forward<U>(f)) {}
+    ~Defer() { mThunk(); }
+
+private:
+    const std::function<void()> mThunk;
+};
+
 } // namespace android::mediautils
 
