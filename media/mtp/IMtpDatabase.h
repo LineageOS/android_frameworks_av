@@ -39,7 +39,7 @@ public:
     // Called to report success or failure of the SendObject file transfer.
     virtual void                    endSendObject(MtpObjectHandle handle,
                                             bool succeeded) = 0;
-    
+
     // Called to rescan a file, such as after an edit.
     virtual void                    rescanFile(const char* path,
                                             MtpObjectHandle handle,
@@ -90,6 +90,8 @@ public:
                                             MtpStringBuffer& outFilePath,
                                             int64_t& outFileLength,
                                             MtpObjectFormat& outFormat) = 0;
+
+    virtual int                     openFilePath(const char* path, bool transcode) = 0;
 
     virtual MtpResponseCode         beginDeleteObject(MtpObjectHandle handle) = 0;
     virtual void                    endDeleteObject(MtpObjectHandle handle, bool succeeded) = 0;

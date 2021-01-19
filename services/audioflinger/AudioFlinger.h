@@ -73,6 +73,7 @@
 #include <media/ExtendedAudioBufferProvider.h>
 #include <media/VolumeShaper.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/Synchronization.h>
 
 #include <audio_utils/clock.h>
 #include <audio_utils/FdToString.h>
@@ -305,6 +306,24 @@ private:
     Mutex               mUnregisteredWritersLock;
 
 public:
+    // Life cycle of gAudioFlinger and AudioFlinger:
+    //
+    // AudioFlinger is created once and survives until audioserver crashes
+    // irrespective of sp<> and wp<> as it is refcounted by ServiceManager and we
+    // don't issue a ServiceManager::tryUnregisterService().
+    //
+    // gAudioFlinger is an atomic pointer set on AudioFlinger::onFirstRef().
+    // After this is set, it is safe to obtain a wp<> or sp<> from it as the
+    // underlying object does not go away.
+    //
+    // Note: For most inner classes, it is acceptable to hold a reference to the outer
+    // AudioFlinger instance as creation requires AudioFlinger to exist in the first place.
+    //
+    // An atomic here ensures underlying writes have completed before setting
+    // the pointer. Access by memory_order_seq_cst.
+    //
+
+    static inline std::atomic<AudioFlinger *> gAudioFlinger = nullptr;
 
     class SyncEvent;
 
