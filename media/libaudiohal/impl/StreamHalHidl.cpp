@@ -61,6 +61,12 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
     }
 }
 
+StreamHalHidl::~StreamHalHidl() {
+    // The last step is to flush all binder commands so that the deletion
+    // of IStreamIn / IStreamOut (mStream) is issued with less delay. See b/35394629.
+    hardware::IPCThreadState::self()->flushCommands();
+}
+
 status_t StreamHalHidl::getSampleRate(uint32_t *rate) {
     if (!mStream) return NO_INIT;
     return processReturn("getSampleRate", mStream->getSampleRate(), rate);
