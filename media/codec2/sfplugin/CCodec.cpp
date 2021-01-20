@@ -1007,6 +1007,26 @@ void CCodec::configure(const sp<AMessage> &msg) {
             }
         }
 
+        /*
+         * Handle dataspace
+         */
+        int32_t usingRecorder;
+        if (msg->findInt32("android._using-recorder", &usingRecorder) && usingRecorder) {
+            android_dataspace dataSpace = HAL_DATASPACE_BT709;
+            int32_t width, height;
+            if (msg->findInt32("width", &width)
+                    && msg->findInt32("height", &height)) {
+                ColorAspects aspects;
+                getColorAspectsFromFormat(msg, aspects);
+                setDefaultCodecColorAspectsIfNeeded(aspects, width, height);
+                // TODO: read dataspace / color aspect from the component
+                setColorAspectsIntoFormat(aspects, const_cast<sp<AMessage> &>(msg));
+                dataSpace = getDataSpaceForColorAspects(aspects, true /* mayexpand */);
+            }
+            msg->setInt32("android._dataspace", (int32_t)dataSpace);
+            ALOGD("setting dataspace to %x", dataSpace);
+        }
+
         int32_t subscribeToAllVendorParams;
         if (msg->findInt32("x-*", &subscribeToAllVendorParams) && subscribeToAllVendorParams) {
             if (config->subscribeToAllVendorParams(comp, C2_MAY_BLOCK) != OK) {
