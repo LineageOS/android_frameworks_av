@@ -277,8 +277,8 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t hInstance, LVDBE_Params_t* pP
     /*
      * Create biquad instance
      */
-    pInstance->pHPFBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(
-            (FCC_1 == pParams->NrChannels) ? FCC_2 : pParams->NrChannels));
+    pInstance->pHPFBiquad.reset(
+            new android::audio_utils::BiquadFilter<LVM_FLOAT>(pParams->NrChannels));
 
     /*
      * Update the filters

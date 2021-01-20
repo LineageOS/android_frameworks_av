@@ -530,19 +530,11 @@ int lvmMainProcess(EffectContext* pContext, LVM_ControlParams_t* pParams,
     const int ioChannelCount = plvmConfigParams->fChannels;
     const int ioFrameSize = ioChannelCount * sizeof(short);  // file load size
     const int maxChannelCount = std::max(channelCount, ioChannelCount);
-    /*
-     * Mono input will be converted to 2 channels internally in the process call
-     * by copying the same data into the second channel.
-     * Hence when channelCount is 1, output buffer should be allocated for
-     * 2 channels. The memAllocChCount takes care of allocation of sufficient
-     * memory for the output buffer.
-     */
-    const int memAllocChCount = (channelCount == 1 ? 2 : channelCount);
 
     std::vector<short> in(frameLength * maxChannelCount);
     std::vector<short> out(frameLength * maxChannelCount);
     std::vector<float> floatIn(frameLength * channelCount);
-    std::vector<float> floatOut(frameLength * memAllocChCount);
+    std::vector<float> floatOut(frameLength * channelCount);
 
     int frameCounter = 0;
     while (fread(in.data(), ioFrameSize, frameLength, finp) == (size_t)frameLength) {
