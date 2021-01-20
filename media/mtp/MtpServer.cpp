@@ -794,22 +794,18 @@ MtpResponseCode MtpServer::doGetObject() {
     struct stat sstat;
     uint64_t finalsize;
     bool transcode = android::base::GetBoolProperty("sys.fuse.transcode_mtp", true);
-    if (!transcode) {
-        ALOGD("Mtp transcode disabled");
-        mfr.fd = mDatabase->openFilePath(filePath, false);
-        // Doing this here because we want to update fileLength only for this case and leave the
-        // regular path as unchanged as possible.
-        if (mfr.fd >= 0) {
-            fstat(mfr.fd, &sstat);
-            finalsize = sstat.st_size;
-            fileLength = finalsize;
-        } else {
-            ALOGW("Mtp open with no transcoding failed for %s. Falling back to the original",
-                    filePath);
-        }
-    }
+    ALOGD("Mtp transcode = %d", transcode);
+    mfr.fd = mDatabase->openFilePath(filePath, transcode);
+    // Doing this here because we want to update fileLength only for this case and leave the
+    // regular path as unchanged as possible.
+    if (mfr.fd >= 0) {
+        fstat(mfr.fd, &sstat);
+        finalsize = sstat.st_size;
+        fileLength = finalsize;
+    } else {
+        ALOGW("Mtp open via IMtpDatabase failed for %s. Falling back to the original",
+                filePath);
 
-    if (transcode || mfr.fd < 0) {
         mfr.fd = open(filePath, O_RDONLY);
         if (mfr.fd < 0) {
             return MTP_RESPONSE_GENERAL_ERROR;
