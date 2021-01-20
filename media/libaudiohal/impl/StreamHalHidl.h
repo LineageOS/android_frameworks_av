@@ -101,6 +101,8 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // Subclasses can not be constructed directly by clients.
     explicit StreamHalHidl(IStream *stream);
 
+    ~StreamHalHidl() override;
+
     status_t getCachedBufferSize(size_t *size);
 
     bool requestHalThreadPriority(pid_t threadPid, pid_t threadId);
@@ -182,13 +184,6 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<WriteStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
-    // Do not move the Defer.  This should be the first member variable in the class;
-    // thus the last member destructor called upon instance destruction.
-    //
-    // The last step is to flush all binder commands so that the AudioFlinger
-    // may recognize the deletion of IStreamOut (mStream) with less delay. See b/35394629.
-    mediautils::Defer mLast{[]() { hardware::IPCThreadState::self()->flushCommands(); }};
-
     mediautils::atomic_wp<StreamOutHalInterfaceCallback> mCallback;
     mediautils::atomic_wp<StreamOutHalInterfaceEventCallback> mEventCallback;
     const sp<IStreamOut> mStream;
@@ -246,13 +241,6 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     typedef MessageQueue<ReadParameters, hardware::kSynchronizedReadWrite> CommandMQ;
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<ReadStatus, hardware::kSynchronizedReadWrite> StatusMQ;
-
-    // Do not move the Defer.  This should be the first member variable in the class;
-    // thus the last member destructor called upon instance destruction.
-    //
-    // The last step is to flush all binder commands so that the AudioFlinger
-    // may recognize the deletion of IStreamIn (mStream) with less delay. See b/35394629.
-    mediautils::Defer mLast{[]() { hardware::IPCThreadState::self()->flushCommands(); }};
 
     const sp<IStreamIn> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
