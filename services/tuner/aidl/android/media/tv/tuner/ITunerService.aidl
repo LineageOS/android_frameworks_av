@@ -19,6 +19,7 @@ package android.media.tv.tuner;
 import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.fmq.UnsynchronizedWrite;
+import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
 import android.media.tv.tuner.TunerFrontendInfo;
@@ -77,4 +78,8 @@ interface ITunerService {
      */
     ITunerLnb openLnbByName(in String lnbName);
 
+    /**
+     * Create a new instance of Demux.
+     */
+    ITunerDemux openDemux(in int demuxHandle);
 }

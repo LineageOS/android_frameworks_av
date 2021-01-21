@@ -27,6 +27,7 @@ using ::aidl::android::hardware::common::fmq::GrantorDescriptor;
 using ::aidl::android::hardware::common::fmq::MQDescriptor;
 using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
 using ::aidl::android::media::tv::tuner::BnTunerService;
+using ::aidl::android::media::tv::tuner::ITunerDemux;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerLnb;
 using ::aidl::android::media::tv::tuner::TunerFrontendInfo;
@@ -101,6 +102,7 @@ public:
             MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) override;
     Status openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) override;
     Status openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>* _aidl_return) override;
+    Status openDemux(int32_t demuxHandle, std::shared_ptr<ITunerDemux>* _aidl_return) override;
 
 private:
     template <typename HidlPayload, typename AidlPayload, typename AidlFlavor>
@@ -109,12 +111,10 @@ private:
             MQDescriptor<AidlPayload, AidlFlavor>* aidl);
 
     bool getITuner();
-    Result openFilter();
-    Result openDemux();
     Result configFilter();
 
     sp<ITuner> mTuner;
-    sp<IDemux> mDemux;
+    std::shared_ptr<ITunerDemux> mDemux;
     sp<IFilter> mFilter;
     AidlMessageQueue* mAidlMq;
     MQDescriptorSync<uint8_t> mFilterMQDesc;
