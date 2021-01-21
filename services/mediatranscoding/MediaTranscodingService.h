@@ -33,7 +33,6 @@ class TranscodingSessionController;
 class TranscoderInterface;
 class UidPolicyInterface;
 class ResourcePolicyInterface;
-class ThermalPolicyInterface;
 
 class MediaTranscodingService : public BnMediaTranscodingService {
 public:
@@ -62,7 +61,6 @@ private:
 
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
     std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
-    std::shared_ptr<ThermalPolicyInterface> mThermalPolicy;
     std::shared_ptr<TranscodingSessionController> mSessionController;
     std::shared_ptr<TranscodingClientManager> mClientManager;
 };
