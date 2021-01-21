@@ -1579,7 +1579,7 @@ OSCL_EXPORT_REF Bool PVEncodeVideoFrame(VideoEncControls *encCtrl, VideoEncFrame
         if (currLayer == 0)
         {
             video->forwardRefVop = tempForwRefVop; /* For P-Vop base only */
-            video->forwardRefVop->refSelectCode = tempRefSelCode;
+            if (video->forwardRefVop != NULL) video->forwardRefVop->refSelectCode = tempRefSelCode;
         }
 
         return status;
