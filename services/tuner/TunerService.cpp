@@ -21,6 +21,7 @@
 #include "TunerService.h"
 #include "TunerFrontend.h"
 #include "TunerLnb.h"
+#include "TunerDemux.h"
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAnalogCapabilities;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3Capabilities;
@@ -113,17 +114,19 @@ bool TunerService::getITuner() {
     return true;
 }
 
-Result TunerService::openDemux() {
+Status TunerService::openDemux(
+        int /* demuxHandle */, std::shared_ptr<ITunerDemux>* _aidl_return) {
     ALOGD("openDemux");
     if (!getITuner()) {
-        return Result::NOT_INITIALIZED;
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::NOT_INITIALIZED));
     }
     if (mDemux != nullptr) {
-        return Result::SUCCESS;
+        *_aidl_return = mDemux->ref<ITunerDemux>();
+        return Status::ok();
     }
     Result res;
     uint32_t id;
-    sp<IDemux> demuxSp;
+    sp<IDemux> demuxSp = nullptr;
     mTuner->openDemux([&](Result r, uint32_t demuxId, const sp<IDemux>& demux) {
         demuxSp = demux;
         id = demuxId;
@@ -131,37 +134,14 @@ Result TunerService::openDemux() {
         ALOGD("open demux, id = %d", demuxId);
     });
     if (res == Result::SUCCESS) {
-        mDemux = demuxSp;
-    } else {
-        ALOGD("open demux failed, res = %d", res);
-    }
-    return res;
-}
-
-Result TunerService::openFilter() {
-    ALOGD("openFilter");
-    if (!getITuner()) {
-        return Result::NOT_INITIALIZED;
-    }
-    DemuxFilterMainType mainType = DemuxFilterMainType::TS;
-    DemuxFilterType filterType {
-        .mainType = mainType,
-    };
-    filterType.subType.tsFilterType(DemuxTsFilterType::VIDEO);
-
-    sp<FilterCallback> callback = new FilterCallback();
-    Result res;
-    mDemux->openFilter(filterType, 16000000, callback,
-            [&](Result r, const sp<IFilter>& filter) {
-                mFilter = filter;
-                res = r;
-            });
-    if (res != Result::SUCCESS || mFilter == NULL) {
-        ALOGD("Failed to open filter, type = %d", filterType.mainType);
-        return res;
+        mDemux = ::ndk::SharedRefBase::make<TunerDemux>(demuxSp, id);
+        *_aidl_return = mDemux->ref<ITunerDemux>();
+        return Status::ok();
     }
 
-    return Result::SUCCESS;
+    ALOGD("open demux failed, res = %d", res);
+    mDemux = nullptr;
+    return Status::fromServiceSpecificError(static_cast<int32_t>(res));
 }
 
 Result TunerService::configFilter() {
@@ -273,8 +253,6 @@ Status TunerService::getFmqSyncReadWrite(
         MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) {
     ALOGD("getFmqSyncReadWrite");
     // TODO: put the following methods AIDL, and should be called from clients.
-    openDemux();
-    openFilter();
     configFilter();
     mFilter->start();
     if (mqDesc == nullptr) {

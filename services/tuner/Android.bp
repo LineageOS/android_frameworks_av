@@ -64,7 +64,7 @@ cc_library {
     name: "libtunerservice",
 
     srcs: [
-        "Tuner*.cpp"
+        "Tuner*.cpp",
     ],
 
     shared_libs: [
@@ -86,7 +86,7 @@ cc_library {
     ],
 
     include_dirs: [
-      "frameworks/av/include"
+        "frameworks/av/include"
     ],
 
     cflags: [
