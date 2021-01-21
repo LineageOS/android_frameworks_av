@@ -304,6 +304,8 @@ public:
 
     virtual status_t setRttEnabled(bool enabled);
 
+    virtual bool isUserSensorPrivacyEnabledForUid(uid_t uid);
+
             bool isCallScreenModeSupported() override;
 
             void doOnNewAudioModulesAvailable();
@@ -466,6 +468,7 @@ private:
                     : mService(service) {}
 
             void registerSelf();
+            void registerSelfForMicrophoneOnly(int userId);
             void unregisterSelf();
 
             bool isSensorPrivacyEnabled();
@@ -939,6 +942,8 @@ private:
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 
     CaptureStateNotifier mCaptureStateNotifier;
+
+    std::map<userid_t, sp<SensorPrivacyPolicy>> mMicrophoneSensorPrivacyPolicies;
 };
 
 } // namespace android
