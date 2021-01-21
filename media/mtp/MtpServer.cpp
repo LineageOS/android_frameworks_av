@@ -790,11 +790,30 @@ MtpResponseCode MtpServer::doGetObject() {
     auto start = std::chrono::steady_clock::now();
 
     const char* filePath = (const char *)pathBuf;
-    mtp_file_range  mfr;
-    mfr.fd = open(filePath, O_RDONLY);
-    if (mfr.fd < 0) {
-        return MTP_RESPONSE_GENERAL_ERROR;
+    mtp_file_range mfr;
+    struct stat sstat;
+    uint64_t finalsize;
+    bool transcode = android::base::GetBoolProperty("sys.fuse.transcode_mtp", true);
+    ALOGD("Mtp transcode = %d", transcode);
+    mfr.fd = mDatabase->openFilePath(filePath, transcode);
+    // Doing this here because we want to update fileLength only for this case and leave the
+    // regular path as unchanged as possible.
+    if (mfr.fd >= 0) {
+        fstat(mfr.fd, &sstat);
+        finalsize = sstat.st_size;
+        fileLength = finalsize;
+    } else {
+        ALOGW("Mtp open via IMtpDatabase failed for %s. Falling back to the original",
+                filePath);
+
+        mfr.fd = open(filePath, O_RDONLY);
+        if (mfr.fd < 0) {
+            return MTP_RESPONSE_GENERAL_ERROR;
+        }
+        fstat(mfr.fd, &sstat);
+        finalsize = sstat.st_size;
     }
+
     mfr.offset = 0;
     mfr.length = fileLength;
     mfr.command = mRequest.getOperationCode();
@@ -815,9 +834,6 @@ MtpResponseCode MtpServer::doGetObject() {
 
     auto end = std::chrono::steady_clock::now();
     std::chrono::duration<double> diff = end - start;
-    struct stat sstat;
-    fstat(mfr.fd, &sstat);
-    uint64_t finalsize = sstat.st_size;
     ALOGV("Sent a file over MTP. Time: %f s, Size: %" PRIu64 ", Rate: %f bytes/s",
             diff.count(), finalsize, ((double) finalsize) / diff.count());
     closeObjFd(mfr.fd, filePath);

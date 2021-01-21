@@ -25,6 +25,7 @@
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
 #include <media/audiohal/StreamHalInterface.h>
+#include <mediautils/Synchronization.h>
 
 #include "ConversionHelperHidl.h"
 #include "StreamPowerLog.h"
@@ -100,8 +101,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // Subclasses can not be constructed directly by clients.
     explicit StreamHalHidl(IStream *stream);
 
-    // The destructor automatically closes the stream.
-    virtual ~StreamHalHidl();
+    ~StreamHalHidl() override;
 
     status_t getCachedBufferSize(size_t *size);
 
@@ -112,7 +112,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
 
   private:
     const int HAL_THREAD_PRIORITY_DEFAULT = -1;
-    IStream *mStream;
+    IStream * const mStream;
     int mHalThreadPriority;
     size_t mCachedBufferSize;
 };
@@ -184,9 +184,9 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<WriteStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
-    wp<StreamOutHalInterfaceCallback> mCallback;
-    wp<StreamOutHalInterfaceEventCallback> mEventCallback;
-    sp<IStreamOut> mStream;
+    mediautils::atomic_wp<StreamOutHalInterfaceCallback> mCallback;
+    mediautils::atomic_wp<StreamOutHalInterfaceEventCallback> mEventCallback;
+    const sp<IStreamOut> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;
@@ -242,7 +242,7 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<ReadStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
-    sp<IStreamIn> mStream;
+    const sp<IStreamIn> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;

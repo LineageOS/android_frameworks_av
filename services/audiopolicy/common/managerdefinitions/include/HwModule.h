@@ -52,8 +52,12 @@ public:
         devices.merge(mDynamicDevices);
         return devices;
     }
+    std::string getTagForDevice(audio_devices_t device,
+                                const String8 &address = String8(),
+                                audio_format_t codec = AUDIO_FORMAT_DEFAULT);
     void addDynamicDevice(const sp<DeviceDescriptor> &device)
     {
+        device->setDynamic();
         mDynamicDevices.add(device);
     }
 
@@ -131,8 +135,17 @@ class HwModuleCollection : public Vector<sp<HwModule> >
 public:
     sp<HwModule> getModuleFromName(const char *name) const;
 
+    /**
+     * @brief getModuleForDeviceType try to get a device from type / format on all modules
+     * @param device type to consider
+     * @param encodedFormat to consider
+     * @param[out] tagName if not null, if a matching device is found, will return the tagName
+     * of original device from XML file so that audio routes matchin rules work.
+     * @return valid module if considered device found, nullptr otherwise.
+     */
     sp<HwModule> getModuleForDeviceType(audio_devices_t device,
-                                        audio_format_t encodedFormat) const;
+                                        audio_format_t encodedFormat,
+                                        std::string *tagName = nullptr) const;
 
     sp<HwModule> getModuleForDevice(const sp<DeviceDescriptor> &device,
                                     audio_format_t encodedFormat) const;

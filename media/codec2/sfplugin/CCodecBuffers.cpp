@@ -324,6 +324,7 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     // Append information from the front stash entry to outBuffer.
     (*outBuffer)->meta()->setInt64("timeUs", entry.timestamp);
     (*outBuffer)->meta()->setInt32("flags", entry.flags);
+    (*outBuffer)->meta()->setInt64("frameIndex", entry.ordinal.frameIndex.peekll());
     if (outputFormat) {
         ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
                 mName, outputFormat->debugString().c_str());
