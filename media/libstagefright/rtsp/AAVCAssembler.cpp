@@ -25,6 +25,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 
 #include <stdint.h>
@@ -39,7 +40,9 @@ AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
       mNextExpectedSeqNo(0),
       mAccessUnitDamaged(false),
       mFirstIFrameProvided(false),
-      mLastIFrameProvidedAtMs(0) {
+      mLastIFrameProvidedAtMs(0),
+      mWidth(0),
+      mHeight(0) {
 }
 
 AAVCAssembler::~AAVCAssembler() {
@@ -115,6 +118,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     sp<ABuffer> buffer = *queue->begin();
     uint32_t rtpTime;
     CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+    buffer->meta()->setObject("source", source);
+
     int64_t startTime = source->mFirstSysTime / 1000;
     int64_t nowTime = ALooper::GetNowUs() / 1000;
     int64_t playedTime = nowTime - startTime;
@@ -224,6 +229,21 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     }
 }
 
+void AAVCAssembler::checkSpsUpdated(const sp<ABuffer> &buffer) {
+    const uint8_t *data = buffer->data();
+    unsigned nalType = data[0] & 0x1f;
+    if (nalType == 0x7) {
+        int32_t width = 0, height = 0;
+        FindAVCDimensions(buffer, &width, &height);
+        if (width != mWidth || height != mHeight) {
+            mFirstIFrameProvided = false;
+            mWidth = width;
+            mHeight = height;
+            ALOGD("found a new resolution (%u x %u)", mWidth, mHeight);
+        }
+    }
+}
+
 void AAVCAssembler::checkIFrameProvided(const sp<ABuffer> &buffer) {
     if (buffer->size() == 0) {
         return;
@@ -231,13 +251,25 @@ void AAVCAssembler::checkIFrameProvided(const sp<ABuffer> &buffer) {
     const uint8_t *data = buffer->data();
     unsigned nalType = data[0] & 0x1f;
     if (nalType == 0x5) {
-        mFirstIFrameProvided = true;
         mLastIFrameProvidedAtMs = ALooper::GetNowUs() / 1000;
+        if (!mFirstIFrameProvided) {
+            mFirstIFrameProvided = true;
 
-        uint32_t rtpTime;
-        CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
-        ALOGD("got First I-frame to be decoded. rtpTime=%u, size=%zu", rtpTime, buffer->size());
+            uint32_t rtpTime;
+            CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+            ALOGD("got First I-frame to be decoded. rtpTime=%d, size=%zu", rtpTime, buffer->size());
+        }
     }
+}
+
+bool AAVCAssembler::dropFramesUntilIframe(const sp<ABuffer> &buffer) {
+    const uint8_t *data = buffer->data();
+    unsigned nalType = data[0] & 0x1f;
+    if (!mFirstIFrameProvided && nalType < 0x5) {
+        return true;
+    }
+
+    return false;
 }
 
 void AAVCAssembler::addSingleNALUnit(const sp<ABuffer> &buffer) {
@@ -246,10 +278,22 @@ void AAVCAssembler::addSingleNALUnit(const sp<ABuffer> &buffer) {
     hexdump(buffer->data(), buffer->size());
 #endif
 
+    checkSpsUpdated(buffer);
     checkIFrameProvided(buffer);
 
     uint32_t rtpTime;
     CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+
+    if (dropFramesUntilIframe(buffer)) {
+        sp<ARTPSource> source = nullptr;
+        buffer->meta()->findObject("source", (sp<android::RefBase>*)&source);
+        if (source != nullptr) {
+            ALOGD("Issued FIR to get the I-frame");
+            source->onIssueFIRByAssembler();
+        }
+        ALOGV("Dropping P-frame till I-frame provided. rtpTime %u", rtpTime);
+        return;
+    }
 
     if (!mNALUnits.empty() && rtpTime != mAccessUnitRTPTime) {
         submitAccessUnit();
@@ -431,6 +475,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 
     size_t offset = 1;
     int32_t cvo = -1;
+    sp<ARTPSource> source = nullptr;
     List<sp<ABuffer> >::iterator it = queue->begin();
     for (size_t i = 0; i < totalCount; ++i) {
         const sp<ABuffer> &buffer = *it;
@@ -442,6 +487,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 
         memcpy(unit->data() + offset, buffer->data() + 2, buffer->size() - 2);
 
+        buffer->meta()->findObject("source", (sp<android::RefBase>*)&source);
         buffer->meta()->findInt32("cvo", &cvo);
         offset += buffer->size() - 2;
 
@@ -452,6 +498,9 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 
     if (cvo >= 0) {
         unit->meta()->setInt32("cvo", cvo);
+    }
+    if (source != nullptr) {
+        unit->meta()->setObject("source", source);
     }
 
     addSingleNALUnit(unit);

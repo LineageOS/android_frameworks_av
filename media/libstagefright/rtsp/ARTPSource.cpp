@@ -226,7 +226,7 @@ void ARTPSource::addFIR(const sp<ABuffer> &buffer) {
         // Send it if last FIR is not sent within a sec.
         send = true;
     } else if (mIssueFIRRequests && (usecsSinceLastFIR > 5000000)) {
-        // A FIR issued periodically reagardless packet loss.
+        // A FIR issued periodically regardless packet loss.
         // Send it if last FIR is not sent within 5 secs.
         send = true;
     }
