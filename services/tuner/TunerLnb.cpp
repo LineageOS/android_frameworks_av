@@ -18,6 +18,9 @@
 
 #include "TunerLnb.h"
 
+using ::android::hardware::tv::tuner::V1_0::LnbPosition;
+using ::android::hardware::tv::tuner::V1_0::LnbTone;
+using ::android::hardware::tv::tuner::V1_0::LnbVoltage;
 using ::android::hardware::tv::tuner::V1_0::Result;
 
 namespace android {
@@ -45,31 +48,57 @@ Status TunerLnb::setCallback(
 
     sp<ILnbCallback> lnbCallback = new LnbCallback(tunerLnbCallback);
     Result status = mLnb->setCallback(lnbCallback);
-    if (status == Result::SUCCESS) {
-        return Status::ok();
-    }
-
     return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerLnb::setVoltage(int /*voltage*/) {
-    return Status::ok();
+Status TunerLnb::setVoltage(int voltage) {
+    if (mLnb == NULL) {
+        ALOGE("ILnb is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mLnb->setVoltage(static_cast<LnbVoltage>(voltage));
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerLnb::setTone(int /*voltage*/) {
-    return Status::ok();
+Status TunerLnb::setTone(int tone) {
+    if (mLnb == NULL) {
+        ALOGE("ILnb is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mLnb->setTone(static_cast<LnbTone>(tone));
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerLnb::setSatellitePosition(int /*position*/) {
-    return Status::ok();
+Status TunerLnb::setSatellitePosition(int position) {
+    if (mLnb == NULL) {
+        ALOGE("ILnb is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mLnb->setSatellitePosition(static_cast<LnbPosition>(position));
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerLnb::sendDiseqcMessage(const vector<uint8_t>& /*diseqcMessage*/) {
-    return Status::ok();
+Status TunerLnb::sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) {
+    if (mLnb == NULL) {
+        ALOGE("ILnb is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mLnb->sendDiseqcMessage(diseqcMessage);
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
 Status TunerLnb::close() {
-    return Status::ok();
+    if (mLnb == NULL) {
+        ALOGE("ILnb is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mLnb->close();
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
 /////////////// ILnbCallback ///////////////////////

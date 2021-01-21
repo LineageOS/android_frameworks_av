@@ -44,7 +44,7 @@ public:
     virtual ~TunerLnb();
     Status setCallback(const shared_ptr<ITunerLnbCallback>& tunerLnbCallback) override;
     Status setVoltage(int voltage) override;
-    Status setTone(int voltage) override;
+    Status setTone(int tone) override;
     Status setSatellitePosition(int position) override;
     Status sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) override;
     Status close() override;
