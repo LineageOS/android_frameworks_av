@@ -20,6 +20,7 @@ import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.fmq.UnsynchronizedWrite;
 import android.media.tv.tuner.ITunerFrontend;
+import android.media.tv.tuner.ITunerLnb;
 import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
@@ -59,4 +60,21 @@ interface ITunerService {
      * @return true if succeeds, false otherwise.
      */
     boolean getFmqSyncReadWrite(out MQDescriptor<byte, SynchronizedReadWrite> mqDesc);
+
+    /**
+     * Open a new interface of ITunerLnb given a lnbHandle.
+     *
+     * @param lnbHandle the handle of the LNB granted by TRM.
+     * @return a newly created ITunerLnb interface.
+     */
+    ITunerLnb openLnb(in int lnbHandle);
+
+    /**
+     * Open a new interface of ITunerLnb given a LNB name.
+     *
+     * @param lnbName the name for an external LNB to be opened.
+     * @return a newly created ITunerLnb interface.
+     */
+    ITunerLnb openLnbByName(in String lnbName);
+
 }
