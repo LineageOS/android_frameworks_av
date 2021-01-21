@@ -4505,6 +4505,9 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
 
     if (objectTypeIndication == 0x6B || objectTypeIndication == 0x69) {
         // mp3 audio
+        if (mLastTrack == NULL)
+            return ERROR_MALFORMED;
+
         AMediaFormat_setString(mLastTrack->meta,AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
         return OK;
     }
@@ -4593,6 +4596,10 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
             return ERROR_MALFORMED;
         }
         if (offset >= csd_size || csd[offset] != 0x01) {
+            return ERROR_MALFORMED;
+        }
+
+        if (mLastTrack == NULL) {
             return ERROR_MALFORMED;
         }
         // formerly kKeyVorbisInfo
