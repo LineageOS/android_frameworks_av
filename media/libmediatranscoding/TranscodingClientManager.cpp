@@ -138,11 +138,10 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         ALOGE("submitRequest rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
-        return STATUS_ERROR_FMT(
-                IMediaTranscodingService::ERROR_PERMISSION_DENIED,
-                "submitRequest rejected (clientPid %d, clientUid %d) "
-                "(don't trust callingUid %d)",
-                in_clientPid, in_clientUid, callingUid);
+        return STATUS_ERROR_FMT(IMediaTranscodingService::ERROR_PERMISSION_DENIED,
+                                "submitRequest rejected (clientPid %d, clientUid %d) "
+                                "(don't trust callingUid %d)",
+                                in_clientPid, in_clientUid, callingUid);
     }
 
     // Check if we can trust clientPid. Only privilege caller could forward the
@@ -155,11 +154,10 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
         ALOGE("submitRequest rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
-        return STATUS_ERROR_FMT(
-                IMediaTranscodingService::ERROR_PERMISSION_DENIED,
-                "submitRequest rejected (clientPid %d, clientUid %d) "
-                "(don't trust callingUid %d)",
-                in_clientPid, in_clientUid, callingUid);
+        return STATUS_ERROR_FMT(IMediaTranscodingService::ERROR_PERMISSION_DENIED,
+                                "submitRequest rejected (clientPid %d, clientUid %d) "
+                                "(don't trust callingUid %d)",
+                                in_clientPid, in_clientUid, callingUid);
     }
 
     int32_t sessionId = mNextSessionId.fetch_add(1);

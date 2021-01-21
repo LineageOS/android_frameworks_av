@@ -20,6 +20,7 @@
 #include <aidl/android/media/TranscodingSessionPriority.h>
 #include <media/ControllerClientInterface.h>
 #include <media/ResourcePolicyInterface.h>
+#include <media/ThermalPolicyInterface.h>
 #include <media/TranscoderInterface.h>
 #include <media/TranscodingRequest.h>
 #include <media/UidPolicyInterface.h>
@@ -38,7 +39,8 @@ using ::aidl::android::media::TranscodingSessionPriority;
 class TranscodingSessionController : public UidPolicyCallbackInterface,
                                      public ControllerClientInterface,
                                      public TranscoderCallbackInterface,
-                                     public ResourcePolicyCallbackInterface {
+                                     public ResourcePolicyCallbackInterface,
+                                     public ThermalPolicyCallbackInterface {
 public:
     virtual ~TranscodingSessionController();
 
@@ -70,6 +72,11 @@ public:
     void onResourceAvailable() override;
     // ~ResourcePolicyCallbackInterface
 
+    // ThermalPolicyCallbackInterface
+    void onThrottlingStarted() override;
+    void onThrottlingStopped() override;
+    // ~ResourcePolicyCallbackInterface
+
     /**
      * Dump all the session information to the fd.
      */
@@ -88,6 +95,8 @@ private:
             NOT_STARTED = 0,
             RUNNING,
             PAUSED,
+            // The following states would not appear in live sessions map, but could
+            // appear in past sessions map for logging purpose.
             FINISHED,
             CANCELED,
             ERROR,
@@ -130,15 +139,18 @@ private:
     std::shared_ptr<TranscoderInterface> mTranscoder;
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
     std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
+    std::shared_ptr<ThermalPolicyInterface> mThermalPolicy;
 
     Session* mCurrentSession;
     bool mResourceLost;
+    bool mThermalThrottling;
     std::list<Session> mSessionHistory;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
     TranscodingSessionController(const std::shared_ptr<TranscoderInterface>& transcoder,
                                  const std::shared_ptr<UidPolicyInterface>& uidPolicy,
-                                 const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy);
+                                 const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy,
+                                 const std::shared_ptr<ThermalPolicyInterface>& thermalPolicy);
 
     void dumpSession_l(const Session& session, String8& result, bool closedSession = false);
     Session* getTopSession_l();
