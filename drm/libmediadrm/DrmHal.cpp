@@ -1585,4 +1585,15 @@ bool DrmHal::requiresSecureDecoder(const char *mime,
     return mPluginV1_4->requiresSecureDecoder(hidl_string(mime), hLevel);
 }
 
+status_t DrmHal::setPlaybackId(Vector<uint8_t> const &sessionId, const char *playbackId) {
+    Mutex::Autolock autoLock(mLock);
+    if (mPluginV1_4 == NULL) {
+        return ERROR_UNSUPPORTED;
+    }
+    drm::V1_0::Status err = mPluginV1_4->setPlaybackId(
+            toHidlVec(sessionId),
+            hidl_string(playbackId));
+    return toStatusT(err);
+}
+
 }  // namespace android

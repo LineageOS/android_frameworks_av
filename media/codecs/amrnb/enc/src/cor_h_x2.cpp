@@ -240,7 +240,7 @@ void cor_h_x2(
     Word16 j;
     Word16 k;
     Word32 s;
-    Word32 y32[L_CODE];
+    Word32 y32[L_CODE]{};
     Word32 max;
     Word32 tot;
 

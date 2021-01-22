@@ -48,10 +48,14 @@ private:
     bool mAccessUnitDamaged;
     bool mFirstIFrameProvided;
     uint64_t mLastIFrameProvidedAtMs;
+    int32_t mWidth;
+    int32_t mHeight;
     List<sp<ABuffer> > mNALUnits;
 
     int32_t addNack(const sp<ARTPSource> &source);
+    void checkSpsUpdated(const sp<ABuffer> &buffer);
     void checkIFrameProvided(const sp<ABuffer> &buffer);
+    bool dropFramesUntilIframe(const sp<ABuffer> &buffer);
     AssemblyStatus addNALUnit(const sp<ARTPSource> &source);
     void addSingleNALUnit(const sp<ABuffer> &buffer);
     AssemblyStatus addFragmentedNALUnit(List<sp<ABuffer> > *queue);
