@@ -477,34 +477,35 @@ void AudioPolicyService::updateUidStates_l()
 {
 //    Go over all active clients and allow capture (does not force silence) in the
 //    following cases:
-//    The client is the assistant
-//        AND an accessibility service is on TOP or a RTT call is active
+//    The client source is virtual (remote submix, call audio TX or RX...)
+//    OR The user the client is running in has microphone sensor privacy disabled
+//        AND The client is the assistant
+//                AND an accessibility service is on TOP or a RTT call is active
+//                        AND the source is VOICE_RECOGNITION or HOTWORD
+//                    OR uses VOICE_RECOGNITION AND is on TOP
+//                        OR uses HOTWORD
+//                    AND there is no active privacy sensitive capture or call
+//                        OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+//            OR The client is an accessibility service
+//                AND Is on TOP
+//                        AND the source is VOICE_RECOGNITION or HOTWORD
+//                    OR The assistant is not on TOP
+//                        AND there is no active privacy sensitive capture or call
+//                            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+//                AND is on TOP
 //                AND the source is VOICE_RECOGNITION or HOTWORD
-//            OR uses VOICE_RECOGNITION AND is on TOP
-//                OR uses HOTWORD
-//            AND there is no active privacy sensitive capture or call
-//                OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-//    OR The client is an accessibility service
-//        AND Is on TOP
-//                AND the source is VOICE_RECOGNITION or HOTWORD
-//            OR The assistant is not on TOP
+//            OR the client source is HOTWORD
+//                AND is on TOP
+//                    OR all active clients are using HOTWORD source
+//                AND no call is active
+//                    OR client has CAPTURE_AUDIO_OUTPUT privileged permission
+//            OR the client is the current InputMethodService
+//                AND a RTT call is active AND the source is VOICE_RECOGNITION
+//            OR Any client
+//                AND The assistant is not on TOP
+//                AND is on TOP or latest started
 //                AND there is no active privacy sensitive capture or call
 //                    OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-//        AND is on TOP
-//        AND the source is VOICE_RECOGNITION or HOTWORD
-//    OR the client source is virtual (remote submix, call audio TX or RX...)
-//    OR the client source is HOTWORD
-//        AND is on TOP
-//            OR all active clients are using HOTWORD source
-//        AND no call is active
-//            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
-//    OR the client is the current InputMethodService
-//        AND a RTT call is active AND the source is VOICE_RECOGNITION
-//    OR Any client
-//        AND The assistant is not on TOP
-//        AND is on TOP or latest started
-//        AND there is no active privacy sensitive capture or call
-//            OR client has CAPTURE_AUDIO_OUTPUT privileged permission
 
 
     sp<AudioRecordClient> topActive;
@@ -534,12 +535,8 @@ void AudioPolicyService::updateUidStates_l()
 
     for (size_t i =0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
-        if (!isVirtualSource(current->attributes.source)
-                && isUserSensorPrivacyEnabledForUid(current->uid)) {
-            setAppState_l(current->portId, APP_STATE_IDLE);
-            continue;
-        }
-        if (!current->active) {
+        if (!current->active || (!isVirtualSource(current->attributes.source)
+                && isUserSensorPrivacyEnabledForUid(current->uid))) {
             continue;
         }
 
@@ -667,6 +664,9 @@ void AudioPolicyService::updateUidStates_l()
         if (isVirtualSource(source)) {
             // Allow capture for virtual (remote submix, call audio TX or RX...) sources
             allowCapture = true;
+        } else if (isUserSensorPrivacyEnabledForUid(current->uid)) {
+            // If sensor privacy is enabled, don't allow capture
+            allowCapture = false;
         } else if (mUidPolicy->isAssistantUid(current->uid)) {
             // For assistant allow capture if:
             //     An accessibility service is on TOP or a RTT call is active
