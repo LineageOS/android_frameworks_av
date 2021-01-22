@@ -48,7 +48,7 @@ void TranscodingUidPolicy::OnUidImportance(uid_t uid, int32_t uidImportance, voi
 }
 
 void TranscodingUidPolicy::registerSelf() {
-    if (__builtin_available(android 31, *)) {
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
         mUidObserver = AActivityManager_addUidImportanceListener(&OnUidImportance, -1, (void*)this);
     }
 
@@ -63,7 +63,7 @@ void TranscodingUidPolicy::registerSelf() {
 }
 
 void TranscodingUidPolicy::unregisterSelf() {
-    if (__builtin_available(android 31, *)) {
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
         AActivityManager_removeUidImportanceListener(mUidObserver);
         mUidObserver = nullptr;
 
@@ -91,7 +91,7 @@ void TranscodingUidPolicy::registerMonitorUid(uid_t uid) {
     }
 
     int32_t state = IMPORTANCE_UNKNOWN;
-    if (__builtin_available(android 31, *)) {
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
         if (mRegistered && AActivityManager_isUidActive(uid)) {
             state = AActivityManager_getUidImportance(uid);
         }
