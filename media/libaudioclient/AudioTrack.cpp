@@ -22,6 +22,7 @@
 #include <math.h>
 #include <sys/resource.h>
 
+#include <android/media/IAudioPolicyService.h>
 #include <android-base/macros.h>
 #include <audio_utils/clock.h>
 #include <audio_utils/primitives.h>
@@ -31,7 +32,6 @@
 #include <private/media/AudioTrackShared.h>
 #include <processgroup/sched_policy.h>
 #include <media/IAudioFlinger.h>
-#include <media/IAudioPolicyService.h>
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
@@ -172,9 +172,20 @@ status_t AudioTrack::getMinFrameCount(
 bool AudioTrack::isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes) {
     ALOGV("%s()", __FUNCTION__);
-    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    const sp<media::IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return false;
-    return aps->isDirectOutputSupported(config, attributes);
+
+    auto result = [&]() -> ConversionResult<bool> {
+        media::AudioConfigBase configAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_config_base_t_AudioConfigBase(config));
+        media::AudioAttributesInternal attributesAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_attributes_t_AudioAttributesInternal(attributes));
+        bool retAidl;
+        RETURN_IF_ERROR(aidl_utils::statusTFromBinderStatus(
+                aps->isDirectOutputSupported(configAidl, attributesAidl, &retAidl)));
+        return retAidl;
+    }();
+    return result.value_or(false);
 }
 
 // ---------------------------------------------------------------------------

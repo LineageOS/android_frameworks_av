@@ -39,12 +39,14 @@
 #include <media/AudioEffect.h>
 #include <media/AudioParameter.h>
 #include <mediautils/ServiceUtilities.h>
+#include <mediautils/TimeCheck.h>
 #include <sensorprivacy/SensorPrivacyManager.h>
 
 #include <system/audio.h>
 #include <system/audio_policy.h>
 
 namespace android {
+using binder::Status;
 
 static const char kDeadlockedString[] = "AudioPolicyService may be deadlocked\n";
 static const char kCmdDeadlockedString[] = "AudioPolicyService command thread may be deadlocked\n";
@@ -112,11 +114,11 @@ AudioPolicyService::~AudioPolicyService()
 
 // A notification client is always registered by AudioSystem when the client process
 // connects to AudioPolicyService.
-void AudioPolicyService::registerClient(const sp<media::IAudioPolicyServiceClient>& client)
+Status AudioPolicyService::registerClient(const sp<media::IAudioPolicyServiceClient>& client)
 {
     if (client == 0) {
         ALOGW("%s got NULL client", __FUNCTION__);
-        return;
+        return Status::ok();
     }
     Mutex::Autolock _l(mNotificationClientsLock);
 
@@ -136,9 +138,10 @@ void AudioPolicyService::registerClient(const sp<media::IAudioPolicyServiceClien
         sp<IBinder> binder = IInterface::asBinder(client);
         binder->linkToDeath(notificationClient);
     }
+        return Status::ok();
 }
 
-void AudioPolicyService::setAudioPortCallbacksEnabled(bool enabled)
+Status AudioPolicyService::setAudioPortCallbacksEnabled(bool enabled)
 {
     Mutex::Autolock _l(mNotificationClientsLock);
 
@@ -147,12 +150,13 @@ void AudioPolicyService::setAudioPortCallbacksEnabled(bool enabled)
     int64_t token = ((int64_t)uid<<32) | pid;
 
     if (mNotificationClients.indexOfKey(token) < 0) {
-        return;
+        return Status::ok();
     }
     mNotificationClients.valueFor(token)->setAudioPortCallbacksEnabled(enabled);
+    return Status::ok();
 }
 
-void AudioPolicyService::setAudioVolumeGroupCallbacksEnabled(bool enabled)
+Status AudioPolicyService::setAudioVolumeGroupCallbacksEnabled(bool enabled)
 {
     Mutex::Autolock _l(mNotificationClientsLock);
 
@@ -161,9 +165,10 @@ void AudioPolicyService::setAudioVolumeGroupCallbacksEnabled(bool enabled)
     int64_t token = ((int64_t)uid<<32) | pid;
 
     if (mNotificationClients.indexOfKey(token) < 0) {
-        return;
+        return Status::ok();
     }
     mNotificationClients.valueFor(token)->setAudioVolumeGroupCallbacksEnabled(enabled);
+    return Status::ok();
 }
 
 // removeNotificationClient() is called when the client process dies.
@@ -816,6 +821,92 @@ status_t AudioPolicyService::dumpPermissionDenial(int fd)
 
 status_t AudioPolicyService::onTransact(
         uint32_t code, const Parcel& data, Parcel* reply, uint32_t flags) {
+    // make sure transactions reserved to AudioFlinger do not come from other processes
+    switch (code) {
+        case TRANSACTION_startOutput:
+        case TRANSACTION_stopOutput:
+        case TRANSACTION_releaseOutput:
+        case TRANSACTION_getInputForAttr:
+        case TRANSACTION_startInput:
+        case TRANSACTION_stopInput:
+        case TRANSACTION_releaseInput:
+        case TRANSACTION_getOutputForEffect:
+        case TRANSACTION_registerEffect:
+        case TRANSACTION_unregisterEffect:
+        case TRANSACTION_setEffectEnabled:
+        case TRANSACTION_getStrategyForStream:
+        case TRANSACTION_getOutputForAttr:
+        case TRANSACTION_moveEffectsToIo:
+            ALOGW("%s: transaction %d received from PID %d",
+                  __func__, code, IPCThreadState::self()->getCallingPid());
+            return INVALID_OPERATION;
+        default:
+            break;
+    }
+
+    // make sure the following transactions come from system components
+    switch (code) {
+        case TRANSACTION_setDeviceConnectionState:
+        case TRANSACTION_handleDeviceConfigChange:
+        case TRANSACTION_setPhoneState:
+//FIXME: Allow setForceUse calls from system apps until a better use case routing API is available
+//      case TRANSACTION_setForceUse:
+        case TRANSACTION_initStreamVolume:
+        case TRANSACTION_setStreamVolumeIndex:
+        case TRANSACTION_setVolumeIndexForAttributes:
+        case TRANSACTION_getStreamVolumeIndex:
+        case TRANSACTION_getVolumeIndexForAttributes:
+        case TRANSACTION_getMinVolumeIndexForAttributes:
+        case TRANSACTION_getMaxVolumeIndexForAttributes:
+        case TRANSACTION_isStreamActive:
+        case TRANSACTION_isStreamActiveRemotely:
+        case TRANSACTION_isSourceActive:
+        case TRANSACTION_getDevicesForStream:
+        case TRANSACTION_registerPolicyMixes:
+        case TRANSACTION_setMasterMono:
+        case TRANSACTION_getSurroundFormats:
+        case TRANSACTION_setSurroundFormatEnabled:
+        case TRANSACTION_setAssistantUid:
+        case TRANSACTION_setA11yServicesUids:
+        case TRANSACTION_setUidDeviceAffinities:
+        case TRANSACTION_removeUidDeviceAffinities:
+        case TRANSACTION_setUserIdDeviceAffinities:
+        case TRANSACTION_removeUserIdDeviceAffinities:
+        case TRANSACTION_getHwOffloadEncodingFormatsSupportedForA2DP:
+        case TRANSACTION_listAudioVolumeGroups:
+        case TRANSACTION_getVolumeGroupFromAudioAttributes:
+        case TRANSACTION_acquireSoundTriggerSession:
+        case TRANSACTION_releaseSoundTriggerSession:
+        case TRANSACTION_setRttEnabled:
+        case TRANSACTION_isCallScreenModeSupported:
+        case TRANSACTION_setDevicesRoleForStrategy:
+        case TRANSACTION_setSupportedSystemUsages:
+        case TRANSACTION_removeDevicesRoleForStrategy:
+        case TRANSACTION_getDevicesForRoleAndStrategy:
+        case TRANSACTION_getDevicesForAttributes:
+        case TRANSACTION_setAllowedCapturePolicy:
+        case TRANSACTION_onNewAudioModulesAvailable:
+        case TRANSACTION_setCurrentImeUid:
+        case TRANSACTION_registerSoundTriggerCaptureStateListener:
+        case TRANSACTION_setDevicesRoleForCapturePreset:
+        case TRANSACTION_addDevicesRoleForCapturePreset:
+        case TRANSACTION_removeDevicesRoleForCapturePreset:
+        case TRANSACTION_clearDevicesRoleForCapturePreset:
+        case TRANSACTION_getDevicesForRoleAndCapturePreset: {
+            if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
+                ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
+                      __func__, code, IPCThreadState::self()->getCallingPid(),
+                      IPCThreadState::self()->getCallingUid());
+                return INVALID_OPERATION;
+            }
+        } break;
+        default:
+            break;
+    }
+
+    std::string tag("IAudioPolicyService command " + std::to_string(code));
+    TimeCheck check(tag.c_str());
+
     switch (code) {
         case SHELL_COMMAND_TRANSACTION: {
             int in = data.readFileDescriptor();
@@ -2022,9 +2113,10 @@ void AudioPolicyService::setEffectSuspended(int effectId,
     mAudioCommandThread->setEffectSuspendedCommand(effectId, sessionId, suspended);
 }
 
-void AudioPolicyService::onNewAudioModulesAvailable()
+Status AudioPolicyService::onNewAudioModulesAvailable()
 {
     mOutputCommandThread->audioModulesUpdateCommand();
+    return Status::ok();
 }
 
 
