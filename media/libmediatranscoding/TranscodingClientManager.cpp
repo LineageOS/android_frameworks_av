@@ -302,7 +302,7 @@ bool TranscodingClientManager::isTrustedCaller(pid_t pid, uid_t uid) {
     }
 
     int32_t result;
-    if (__builtin_available(android 31, *)) {
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
         if (APermissionManager_checkPermission("android.permission.WRITE_MEDIA_STORAGE", pid, uid,
                                                &result) == PERMISSION_MANAGER_STATUS_OK &&
             result == PERMISSION_MANAGER_PERMISSION_GRANTED) {
