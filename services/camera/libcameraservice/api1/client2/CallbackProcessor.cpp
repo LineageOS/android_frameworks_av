@@ -39,6 +39,7 @@ CallbackProcessor::CallbackProcessor(sp<Camera2Client> client):
         mDevice(client->getCameraDevice()),
         mId(client->getCameraId()),
         mCallbackAvailable(false),
+        mCallbackPaused(true),
         mCallbackToApp(false),
         mCallbackStreamId(NO_STREAM) {
 }
@@ -216,6 +217,14 @@ int CallbackProcessor::getStreamId() const {
     return mCallbackStreamId;
 }
 
+void CallbackProcessor::unpauseCallback() {
+    mCallbackPaused = false;
+}
+
+void CallbackProcessor::pauseCallback() {
+    mCallbackPaused = true;
+}
+
 void CallbackProcessor::dump(int /*fd*/, const Vector<String16>& /*args*/) const {
 }
 
@@ -234,7 +243,7 @@ bool CallbackProcessor::threadLoop() {
 
     do {
         sp<Camera2Client> client = mClient.promote();
-        if (client == 0) {
+        if (client == 0 || mCallbackPaused) {
             res = discardNewCallback();
         } else {
             res = processNewCallback(client);
