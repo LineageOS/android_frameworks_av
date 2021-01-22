@@ -18,8 +18,10 @@
 
 #include <android/binder_manager.h>
 #include <utils/Log.h>
-#include "TunerFrontend.h"
 #include "TunerService.h"
+#include "TunerFrontend.h"
+#include "TunerLnb.h"
+#include "TunerDemux.h"
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAnalogCapabilities;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3Capabilities;
@@ -39,6 +41,9 @@ using ::android::hardware::tv::tuner::V1_0::DemuxFilterType;
 using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterType;
 using ::android::hardware::tv::tuner::V1_0::FrontendId;
 using ::android::hardware::tv::tuner::V1_0::FrontendType;
+using ::android::hardware::tv::tuner::V1_0::IFrontend;
+using ::android::hardware::tv::tuner::V1_0::ILnb;
+using ::android::hardware::tv::tuner::V1_0::LnbId;
 using ::android::hardware::tv::tuner::V1_0::Result;
 
 namespace android {
@@ -47,7 +52,7 @@ TunerService::TunerService() {}
 TunerService::~TunerService() {}
 
 void TunerService::instantiate() {
-    std::shared_ptr<TunerService> service =
+    shared_ptr<TunerService> service =
             ::ndk::SharedRefBase::make<TunerService>();
     AServiceManager_addService(service->asBinder().get(), getServiceName());
 }
@@ -61,8 +66,8 @@ bool TunerService::unsafeHidlToAidlMQDescriptor(
     static_assert(sizeof(HidlPayload) == sizeof(AidlPayload), "Payload types are incompatible");
     static_assert(
             has_typedef_fixed_size<AidlPayload>::value == true ||
-            std::is_fundamental<AidlPayload>::value ||
-            std::is_enum<AidlPayload>::value,
+            is_fundamental<AidlPayload>::value ||
+            is_enum<AidlPayload>::value,
             "Only fundamental types, enums, and AIDL parcelables annotated with @FixedSize "
             "and built for the NDK backend are supported as AIDL payload types.");
     aidlDesc->fileDescriptor = ndk::ScopedFileDescriptor(dup(hidlDesc.handle()->data[0]));
@@ -109,17 +114,19 @@ bool TunerService::getITuner() {
     return true;
 }
 
-Result TunerService::openDemux() {
+Status TunerService::openDemux(
+        int /* demuxHandle */, std::shared_ptr<ITunerDemux>* _aidl_return) {
     ALOGD("openDemux");
     if (!getITuner()) {
-        return Result::NOT_INITIALIZED;
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::NOT_INITIALIZED));
     }
     if (mDemux != nullptr) {
-        return Result::SUCCESS;
+        *_aidl_return = mDemux->ref<ITunerDemux>();
+        return Status::ok();
     }
     Result res;
     uint32_t id;
-    sp<IDemux> demuxSp;
+    sp<IDemux> demuxSp = nullptr;
     mTuner->openDemux([&](Result r, uint32_t demuxId, const sp<IDemux>& demux) {
         demuxSp = demux;
         id = demuxId;
@@ -127,37 +134,14 @@ Result TunerService::openDemux() {
         ALOGD("open demux, id = %d", demuxId);
     });
     if (res == Result::SUCCESS) {
-        mDemux = demuxSp;
-    } else {
-        ALOGD("open demux failed, res = %d", res);
-    }
-    return res;
-}
-
-Result TunerService::openFilter() {
-    ALOGD("openFilter");
-    if (!getITuner()) {
-        return Result::NOT_INITIALIZED;
-    }
-    DemuxFilterMainType mainType = DemuxFilterMainType::TS;
-    DemuxFilterType filterType {
-        .mainType = mainType,
-    };
-    filterType.subType.tsFilterType(DemuxTsFilterType::VIDEO);
-
-    sp<FilterCallback> callback = new FilterCallback();
-    Result res;
-    mDemux->openFilter(filterType, 16000000, callback,
-            [&](Result r, const sp<IFilter>& filter) {
-                mFilter = filter;
-                res = r;
-            });
-    if (res != Result::SUCCESS || mFilter == NULL) {
-        ALOGD("Failed to open filter, type = %d", filterType.mainType);
-        return res;
+        mDemux = ::ndk::SharedRefBase::make<TunerDemux>(demuxSp, id);
+        *_aidl_return = mDemux->ref<ITunerDemux>();
+        return Status::ok();
     }
 
-    return Result::SUCCESS;
+    ALOGD("open demux failed, res = %d", res);
+    mDemux = nullptr;
+    return Status::fromServiceSpecificError(static_cast<int32_t>(res));
 }
 
 Result TunerService::configFilter() {
@@ -192,7 +176,7 @@ Result TunerService::configFilter() {
     if (getQueueDescResult == Result::SUCCESS) {
         unsafeHidlToAidlMQDescriptor<uint8_t, int8_t, SynchronizedReadWrite>(
                 mFilterMQDesc,  &mAidlMQDesc);
-        mAidlMq = new (std::nothrow) AidlMessageQueue(mAidlMQDesc);
+        mAidlMq = new (nothrow) AidlMessageQueue(mAidlMQDesc);
         EventFlag::createEventFlag(mAidlMq->getEventFlagWord(), &mEventFlag);
     } else {
         ALOGD("get MQDesc failed, res = %d", getQueueDescResult);
@@ -200,9 +184,9 @@ Result TunerService::configFilter() {
     return getQueueDescResult;
 }
 
-Status TunerService::getFrontendIds(std::vector<int32_t>* ids, int32_t* /* _aidl_return */) {
+Status TunerService::getFrontendIds(vector<int32_t>* ids, int32_t* /* _aidl_return */) {
     if (!getITuner()) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
+        return Status::fromServiceSpecificError(
                 static_cast<int32_t>(Result::NOT_INITIALIZED));
     }
     hidl_vec<FrontendId> feIds;
@@ -212,10 +196,10 @@ Status TunerService::getFrontendIds(std::vector<int32_t>* ids, int32_t* /* _aidl
         res = r;
     });
     if (res != Result::SUCCESS) {
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
     ids->resize(feIds.size());
-    std::copy(feIds.begin(), feIds.end(), ids->begin());
+    copy(feIds.begin(), feIds.end(), ids->begin());
 
     return Status::ok();
 }
@@ -230,7 +214,7 @@ Status TunerService::getFrontendInfo(
 
     Result res;
     FrontendInfo info;
-    int feId = getResourceIdFromHandle(frontendHandle);
+    int feId = getResourceIdFromHandle(frontendHandle, FRONTEND);
     mTuner->getFrontendInfo(feId, [&](Result r, const FrontendInfo& feInfo) {
         info = feInfo;
         res = r;
@@ -245,15 +229,83 @@ Status TunerService::getFrontendInfo(
 }
 
 Status TunerService::openFrontend(
-        int32_t frontendHandle, std::shared_ptr<ITunerFrontend>* _aidl_return) {
+        int32_t frontendHandle, shared_ptr<ITunerFrontend>* _aidl_return) {
     if (mTuner == nullptr) {
         ALOGE("ITuner service is not init.");
-        return ::ndk::ScopedAStatus::fromServiceSpecificError(
-                static_cast<int32_t>(Result::UNAVAILABLE));
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    int id = getResourceIdFromHandle(frontendHandle);
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(mTuner, id);
+    Result status;
+    sp<IFrontend> frontend;
+    int id = getResourceIdFromHandle(frontendHandle, FRONTEND);
+    mTuner->openFrontendById(id, [&](Result result, const sp<IFrontend>& fe) {
+        frontend = fe;
+        status = result;
+    });
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerFrontend>(frontend, id);
+    return Status::ok();
+}
+
+Status TunerService::getFmqSyncReadWrite(
+        MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) {
+    ALOGD("getFmqSyncReadWrite");
+    // TODO: put the following methods AIDL, and should be called from clients.
+    configFilter();
+    mFilter->start();
+    if (mqDesc == nullptr) {
+        ALOGD("getFmqSyncReadWrite null MQDescriptor.");
+        *_aidl_return = false;
+    } else {
+        ALOGD("getFmqSyncReadWrite true");
+        *_aidl_return = true;
+        *mqDesc = move(mAidlMQDesc);
+    }
+    return ndk::ScopedAStatus::ok();
+}
+
+Status TunerService::openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) {
+    if (mTuner == nullptr) {
+        ALOGE("ITuner service is not init.");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status;
+    sp<ILnb> lnb;
+    int id = getResourceIdFromHandle(lnbHandle, LNB);
+    mTuner->openLnbById(id, [&](Result result, const sp<ILnb>& lnbSp){
+        lnb = lnbSp;
+        status = result;
+    });
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerLnb>(lnb, id);
+    return Status::ok();
+}
+
+Status TunerService::openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>* _aidl_return) {
+    if (mTuner == nullptr) {
+        ALOGE("ITuner service is not init.");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    int lnbId;
+    Result status;
+    sp<ILnb> lnb;
+    mTuner->openLnbByName(lnbName, [&](Result r, LnbId id, const sp<ILnb>& lnbSp) {
+        status = r;
+        lnb = lnbSp;
+        lnbId = (int)id;
+    });
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerLnb>(lnb, lnbId);
     return Status::ok();
 }
 
@@ -367,24 +419,4 @@ TunerFrontendInfo TunerService::convertToAidlFrontendInfo(FrontendInfo halInfo) 
     info.caps = caps;
     return info;
 }
-
-Status TunerService::getFmqSyncReadWrite(
-        MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) {
-    ALOGD("getFmqSyncReadWrite");
-    // TODO: put the following methods AIDL, and should be called from clients.
-    openDemux();
-    openFilter();
-    configFilter();
-    mFilter->start();
-    if (mqDesc == nullptr) {
-        ALOGD("getFmqSyncReadWrite null MQDescriptor.");
-        *_aidl_return = false;
-    } else {
-        ALOGD("getFmqSyncReadWrite true");
-        *_aidl_return = true;
-        *mqDesc = std::move(mAidlMQDesc);
-    }
-    return ndk::ScopedAStatus::ok();
-}
-
 } // namespace android

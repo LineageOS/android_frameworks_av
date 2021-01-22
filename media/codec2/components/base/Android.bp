@@ -102,9 +102,6 @@ cc_defaults {
         config: {
             cfi_assembly_support: true,
         },
-        diag: {
-            cfi: true,
-        },
     },
 }
 
