@@ -20,6 +20,8 @@
 #include <android/hardware/drm/1.2/ICryptoPlugin.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 
+#include <mutex>
+
 #include "ClearKeyTypes.h"
 #include "Session.h"
 #include "Utils.h"
@@ -93,7 +95,7 @@ struct CryptoPlugin : public drm::V1_2::ICryptoPlugin {
             const SharedBuffer& source,
             uint64_t offset,
             const DestinationBuffer& destination,
-            decrypt_1_2_cb _hidl_cb);
+            decrypt_1_2_cb _hidl_cb) NO_THREAD_SAFETY_ANALYSIS; // use unique_lock
 
     Return<void> setSharedBufferBase(const hidl_memory& base,
             uint32_t bufferId);
@@ -105,7 +107,8 @@ struct CryptoPlugin : public drm::V1_2::ICryptoPlugin {
 private:
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN(CryptoPlugin);
 
-    std::map<uint32_t, sp<IMemory> > mSharedBufferMap;
+    std::mutex mSharedBufferLock;
+    std::map<uint32_t, sp<IMemory>> mSharedBufferMap GUARDED_BY(mSharedBufferLock);
     sp<Session> mSession;
     Status mInitStatus;
 };
