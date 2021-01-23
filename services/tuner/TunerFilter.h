@@ -53,6 +53,7 @@ public:
     Status start() override;
     Status stop() override;
     Status flush() override;
+    sp<IFilter> getHalFilter();
 
     struct FilterCallback : public IFilterCallback {
         FilterCallback(const std::shared_ptr<ITunerFilterCallback> tunerFilterCallback)

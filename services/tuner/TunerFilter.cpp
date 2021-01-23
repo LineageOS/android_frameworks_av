@@ -149,6 +149,10 @@ Status TunerFilter::flush() {
     return Status::ok();
 }
 
+sp<IFilter> TunerFilter::getHalFilter() {
+    return mFilter;
+}
+
 /////////////// FilterCallback ///////////////////////
 
 void TunerFilter::FilterCallback::getMediaEvent(

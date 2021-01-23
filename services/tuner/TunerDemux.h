@@ -22,11 +22,16 @@
 
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::tv::tuner::BnTunerDemux;
+using ::aidl::android::media::tv::tuner::ITunerDvr;
+using ::aidl::android::media::tv::tuner::ITunerDvrCallback;
 using ::aidl::android::media::tv::tuner::ITunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::android::hardware::tv::tuner::V1_0::IDemux;
+using ::android::hardware::tv::tuner::V1_0::IDvr;
+using ::android::hardware::tv::tuner::V1_0::IDvrCallback;
 
+using namespace std;
 
 namespace android {
 
@@ -35,10 +40,13 @@ class TunerDemux : public BnTunerDemux {
 public:
     TunerDemux(sp<IDemux> demux, int demuxId);
     virtual ~TunerDemux();
-    Status setFrontendDataSource(const std::shared_ptr<ITunerFrontend>& frontend) override;
+    Status setFrontendDataSource(const shared_ptr<ITunerFrontend>& frontend) override;
     Status openFilter(
-        int mainType, int subtype, int bufferSize, const std::shared_ptr<ITunerFilterCallback>& cb,
-        std::shared_ptr<ITunerFilter>* _aidl_return);
+        int mainType, int subtype, int bufferSize, const shared_ptr<ITunerFilterCallback>& cb,
+        shared_ptr<ITunerFilter>* _aidl_return);
+    Status openDvr(
+        int dvbType, int bufferSize, const shared_ptr<ITunerDvrCallback>& cb,
+        shared_ptr<ITunerDvr>* _aidl_return) override;
 
 private:
     sp<IDemux> mDemux;
