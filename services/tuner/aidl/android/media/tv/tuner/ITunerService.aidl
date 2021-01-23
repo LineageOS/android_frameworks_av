@@ -34,10 +34,8 @@ interface ITunerService {
 
     /**
      * Gets frontend IDs.
-     *
-     * @return the result code of the operation.
      */
-    int getFrontendIds(out int[] ids);
+    void getFrontendIds(out int[] ids);
 
     /**
      * Retrieve the frontend's information.
@@ -82,4 +80,10 @@ interface ITunerService {
      * Create a new instance of Demux.
      */
     ITunerDemux openDemux(in int demuxHandle);
+
+    /**
+     * Update Tuner Resources in TunerResourceManager.
+     */
+    // TODO: b/178124017 update TRM in TunerService independently.
+    void updateTunerResources();
 }
