@@ -41,8 +41,6 @@ enum {
     AMEDIACODEC_CALLING_PID = -1,
 };
 
-#if __ANDROID_API__ >= 31
-
 /**
  * Create codec by name on behalf of a client.
  *
@@ -90,8 +88,6 @@ AMediaCodec* AMediaCodec_createDecoderByTypeForClient(const char *mime_type,
 AMediaCodec* AMediaCodec_createEncoderByTypeForClient(const char *mime_type,
                                                       pid_t pid,
                                                       uid_t uid) __INTRODUCED_IN(31);
-
-#endif // __ANDROID_API__ >= 31
 
 __END_DECLS
 

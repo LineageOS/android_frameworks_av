@@ -135,12 +135,12 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
     } else if (in_clientUid < 0) {
         return Status::ok();
     } else if (in_clientUid != callingUid && !owner->isTrustedCaller(callingPid, callingUid)) {
-        ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+        ALOGE("submitRequest rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
         return STATUS_ERROR_FMT(
                 IMediaTranscodingService::ERROR_PERMISSION_DENIED,
-                "MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+                "submitRequest rejected (clientPid %d, clientUid %d) "
                 "(don't trust callingUid %d)",
                 in_clientPid, in_clientUid, callingUid);
     }
@@ -152,12 +152,12 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
     } else if (in_clientPid < 0) {
         return Status::ok();
     } else if (in_clientPid != callingPid && !owner->isTrustedCaller(callingPid, callingUid)) {
-        ALOGE("MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+        ALOGE("submitRequest rejected (clientPid %d, clientUid %d) "
               "(don't trust callingUid %d)",
               in_clientPid, in_clientUid, callingUid);
         return STATUS_ERROR_FMT(
                 IMediaTranscodingService::ERROR_PERMISSION_DENIED,
-                "MediaTranscodingService::registerClient rejected (clientPid %d, clientUid %d) "
+                "submitRequest rejected (clientPid %d, clientUid %d) "
                 "(don't trust callingUid %d)",
                 in_clientPid, in_clientUid, callingUid);
     }
@@ -302,7 +302,7 @@ bool TranscodingClientManager::isTrustedCaller(pid_t pid, uid_t uid) {
     }
 
     int32_t result;
-    if (__builtin_available(android 31, *)) {
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
         if (APermissionManager_checkPermission("android.permission.WRITE_MEDIA_STORAGE", pid, uid,
                                                &result) == PERMISSION_MANAGER_STATUS_OK &&
             result == PERMISSION_MANAGER_PERMISSION_GRANTED) {

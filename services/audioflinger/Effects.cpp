@@ -238,7 +238,7 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
     bool doEnable = false;
     bool enabled = false;
     audio_io_handle_t io = AUDIO_IO_HANDLE_NONE;
-    uint32_t strategy = PRODUCT_STRATEGY_NONE;
+    product_strategy_t strategy = PRODUCT_STRATEGY_NONE;
 
     {
         Mutex::Autolock _l(mLock);
@@ -2985,7 +2985,7 @@ void AudioFlinger::EffectChain::EffectCallback::resetVolume() {
 
 }
 
-uint32_t AudioFlinger::EffectChain::EffectCallback::strategy() const {
+product_strategy_t AudioFlinger::EffectChain::EffectCallback::strategy() const {
     sp<EffectChain> c = chain().promote();
     if (c == nullptr) {
         return PRODUCT_STRATEGY_NONE;

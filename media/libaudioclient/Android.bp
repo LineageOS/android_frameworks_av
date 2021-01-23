@@ -37,11 +37,16 @@ cc_library_shared {
         "AudioPolicy.cpp",
         "AudioProductStrategy.cpp",
         "AudioVolumeGroup.cpp",
+        "PolicyAidlConversion.cpp"
     ],
     shared_libs: [
+        "audioclient-types-aidl-unstable-cpp",
         "audioflinger-aidl-unstable-cpp",
-        "capture_state_listener-aidl-cpp",
+        "audiopolicy-aidl-unstable-cpp",
+        "audiopolicy-types-aidl-unstable-cpp",
+        "capture_state_listener-aidl-unstable-cpp",
         "libaudiofoundation",
+        "libaudioclient_aidl_conversion",
         "libaudioutils",
         "libbinder",
         "libcutils",
@@ -55,8 +60,13 @@ cc_library_shared {
     include_dirs: ["system/media/audio_utils/include"],
     export_include_dirs: ["include"],
     export_shared_lib_headers: [
+        "audioclient-types-aidl-unstable-cpp",
         "audioflinger-aidl-unstable-cpp",
-        "capture_state_listener-aidl-cpp",
+        "audiopolicy-aidl-unstable-cpp",
+        "audiopolicy-types-aidl-unstable-cpp",
+        "capture_state_listener-aidl-unstable-cpp",
+        "libaudiofoundation",
+        "libaudioclient_aidl_conversion",
     ],
     header_libs: ["libaudioclient_headers"],
 }
@@ -84,7 +94,6 @@ cc_library {
         "AudioTrack.cpp",
         "AudioTrackShared.cpp",
         "IAudioFlinger.cpp",
-        "IAudioPolicyService.cpp",
         "ToneGenerator.cpp",
         "PlayerBase.cpp",
         "RecordingActivityTracker.cpp",
@@ -94,8 +103,9 @@ cc_library {
         "audioclient-types-aidl-unstable-cpp",
         "audioflinger-aidl-unstable-cpp",
         "audiopolicy-aidl-unstable-cpp",
+        "audiopolicy-types-aidl-unstable-cpp",
         "av-types-aidl-unstable-cpp",
-        "capture_state_listener-aidl-cpp",
+        "capture_state_listener-aidl-unstable-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libaudioutils",
@@ -247,6 +257,9 @@ aidl_interface {
     name: "capture_state_listener-aidl",
     unstable: true,
     local_include_dir: "aidl",
+    host_supported: true,
+    double_loadable: true,
+    vendor_available: true,
     srcs: [
         "aidl/android/media/ICaptureStateListener.aidl",
     ],
@@ -333,6 +346,44 @@ aidl_interface {
         },
     },
 }
+aidl_interface {
+    name: "audiopolicy-types-aidl",
+    unstable: true,
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/AudioAttributesEx.aidl",
+        "aidl/android/media/AudioMix.aidl",
+        "aidl/android/media/AudioMixCallbackFlag.aidl",
+        "aidl/android/media/AudioMixMatchCriterion.aidl",
+        "aidl/android/media/AudioMixMatchCriterionValue.aidl",
+        "aidl/android/media/AudioMixRouteFlag.aidl",
+        "aidl/android/media/AudioMixType.aidl",
+        "aidl/android/media/AudioOffloadMode.aidl",
+        "aidl/android/media/AudioPolicyDeviceState.aidl",
+        "aidl/android/media/AudioPolicyForceUse.aidl",
+        "aidl/android/media/AudioPolicyForcedConfig.aidl",
+        "aidl/android/media/AudioProductStrategy.aidl",
+        "aidl/android/media/AudioVolumeGroup.aidl",
+        "aidl/android/media/DeviceRole.aidl",
+        "aidl/android/media/SoundTriggerSession.aidl",
+    ],
+    imports: [
+        "audio_common-aidl",
+        "audioclient-types-aidl",
+    ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+            ],
+        },
+    },
+}
 
 aidl_interface {
     name: "audioflinger-aidl",
@@ -385,12 +436,19 @@ aidl_interface {
     host_supported: true,
     vendor_available: true,
     srcs: [
+        "aidl/android/media/GetInputForAttrResponse.aidl",
+        "aidl/android/media/GetOutputForAttrResponse.aidl",
+        "aidl/android/media/Int.aidl",
         "aidl/android/media/RecordClientInfo.aidl",
 
+        "aidl/android/media/IAudioPolicyService.aidl",
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
     ],
     imports: [
+        "audio_common-aidl",
         "audioclient-types-aidl",
+        "audiopolicy-types-aidl",
+        "capture_state_listener-aidl",
     ],
     double_loadable: true,
     backend: {

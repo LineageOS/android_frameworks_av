@@ -105,11 +105,6 @@ public:
     Status openDemux(int32_t demuxHandle, std::shared_ptr<ITunerDemux>* _aidl_return) override;
 
 private:
-    template <typename HidlPayload, typename AidlPayload, typename AidlFlavor>
-    bool unsafeHidlToAidlMQDescriptor(
-            const hardware::MQDescriptor<HidlPayload, FlavorTypeToValue<AidlFlavor>::value>& hidl,
-            MQDescriptor<AidlPayload, AidlFlavor>* aidl);
-
     bool getITuner();
     Result configFilter();
 
