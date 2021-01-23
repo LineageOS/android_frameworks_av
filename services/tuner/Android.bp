@@ -23,6 +23,7 @@ aidl_interface {
         ":tv_tuner_aidl",
     ],
     imports: [
+        "android.hardware.common",
         "android.hardware.common.fmq",
     ],
 
@@ -85,6 +86,7 @@ cc_library {
 
     static_libs: [
         "android.hardware.common.fmq-unstable-ndk_platform",
+        "libaidlcommonsupport",
     ],
 
     include_dirs: [
