@@ -17,6 +17,7 @@
 #define LOG_TAG "TunerService"
 
 #include <android/binder_manager.h>
+#include <fmq/ConvertMQDescriptors.h>
 #include <utils/Log.h>
 #include "TunerService.h"
 #include "TunerFrontend.h"
@@ -55,50 +56,6 @@ void TunerService::instantiate() {
     shared_ptr<TunerService> service =
             ::ndk::SharedRefBase::make<TunerService>();
     AServiceManager_addService(service->asBinder().get(), getServiceName());
-}
-
-template <typename HidlPayload, typename AidlPayload, typename AidlFlavor>
-bool TunerService::unsafeHidlToAidlMQDescriptor(
-        const hardware::MQDescriptor<HidlPayload, FlavorTypeToValue<AidlFlavor>::value>& hidlDesc,
-        MQDescriptor<AidlPayload, AidlFlavor>* aidlDesc) {
-    // TODO: use the builtin coversion method when it's merged.
-    ALOGD("unsafeHidlToAidlMQDescriptor");
-    static_assert(sizeof(HidlPayload) == sizeof(AidlPayload), "Payload types are incompatible");
-    static_assert(
-            has_typedef_fixed_size<AidlPayload>::value == true ||
-            is_fundamental<AidlPayload>::value ||
-            is_enum<AidlPayload>::value,
-            "Only fundamental types, enums, and AIDL parcelables annotated with @FixedSize "
-            "and built for the NDK backend are supported as AIDL payload types.");
-    aidlDesc->fileDescriptor = ndk::ScopedFileDescriptor(dup(hidlDesc.handle()->data[0]));
-    for (const auto& grantor : hidlDesc.grantors()) {
-        if (static_cast<int32_t>(grantor.offset) < 0 || static_cast<int64_t>(grantor.extent) < 0) {
-            ALOGD("Unsafe static_cast of grantor fields. offset=%d, extend=%ld",
-                    static_cast<int32_t>(grantor.offset), static_cast<long>(grantor.extent));
-            logError(
-                    "Unsafe static_cast of grantor fields. Either the hardware::MQDescriptor is "
-                    "invalid, or the MessageQueue is too large to be described by AIDL.");
-            return false;
-        }
-        aidlDesc->grantors.push_back(
-                GrantorDescriptor {
-                        .offset = static_cast<int32_t>(grantor.offset),
-                        .extent = static_cast<int64_t>(grantor.extent)
-                });
-    }
-    if (static_cast<int32_t>(hidlDesc.getQuantum()) < 0 ||
-            static_cast<int32_t>(hidlDesc.getFlags()) < 0) {
-        ALOGD("Unsafe static_cast of quantum or flags. Quantum=%d, flags=%d",
-                static_cast<int32_t>(hidlDesc.getQuantum()),
-                static_cast<int32_t>(hidlDesc.getFlags()));
-        logError(
-                "Unsafe static_cast of quantum or flags. Either the hardware::MQDescriptor is "
-                "invalid, or the MessageQueue is too large to be described by AIDL.");
-        return false;
-    }
-    aidlDesc->quantum = static_cast<int32_t>(hidlDesc.getQuantum());
-    aidlDesc->flags = static_cast<int32_t>(hidlDesc.getFlags());
-    return true;
 }
 
 bool TunerService::getITuner() {

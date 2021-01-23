@@ -223,6 +223,11 @@ class Camera3Stream :
     bool             isUnpreparable();
 
     /**
+     * Mark the stream as unpreparable.
+     */
+    void             markUnpreparable() override;
+
+    /**
      * Start stream preparation. May only be called in the CONFIGURED state,
      * when no valid buffers have yet been returned to this stream. Prepares
      * up to maxCount buffers, or the maximum number of buffers needed by the

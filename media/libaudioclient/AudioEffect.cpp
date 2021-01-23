@@ -23,15 +23,25 @@
 #include <sys/types.h>
 #include <limits.h>
 
+#include <android/media/IAudioPolicyService.h>
 #include <binder/IPCThreadState.h>
+#include <media/AidlConversion.h>
 #include <media/AudioEffect.h>
+#include <media/PolicyAidlConversion.h>
 #include <media/ShmemCompat.h>
 #include <private/media/AudioEffectShared.h>
 #include <utils/Log.h>
 
+#define RETURN_STATUS_IF_ERROR(x)    \
+    {                                \
+        auto _tmp = (x);             \
+        if (_tmp != OK) return _tmp; \
+    }
+
 namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
+using media::IAudioPolicyService;
 
 namespace {
 
@@ -539,9 +549,23 @@ status_t AudioEffect::queryDefaultPreProcessing(audio_session_t audioSession,
                                           effect_descriptor_t *descriptors,
                                           uint32_t *count)
 {
+    if (descriptors == nullptr || count == nullptr) {
+        return BAD_VALUE;
+    }
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
-    return aps->queryDefaultPreProcessing(audioSession, descriptors, count);
+
+    int32_t audioSessionAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_session_t_int32_t(audioSession));
+    media::Int countAidl;
+    countAidl.value = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*count));
+    std::vector<media::EffectDescriptor> retAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->queryDefaultPreProcessing(audioSessionAidl, &countAidl, &retAidl)));
+    *count = VALUE_OR_RETURN_STATUS(convertIntegral<uint32_t>(countAidl.value));
+    RETURN_STATUS_IF_ERROR(convertRange(retAidl.begin(), retAidl.end(), descriptors,
+                                        aidl2legacy_EffectDescriptor_effect_descriptor_t));
+    return OK;
 }
 
 status_t AudioEffect::newEffectUniqueId(audio_unique_id_t* id)
@@ -581,7 +605,18 @@ status_t AudioEffect::addSourceDefaultEffect(const char *typeStr,
         uuid = *EFFECT_UUID_NULL;
     }
 
-    return aps->addSourceDefaultEffect(&type, opPackageName, &uuid, priority, source, id);
+    media::AudioUuid typeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(type));
+    media::AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
+    std::string opPackageNameAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_String16_string(opPackageName));
+    media::AudioSourceType sourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSourceType(source));
+    int32_t retAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->addSourceDefaultEffect(typeAidl, opPackageNameAidl, uuidAidl, priority, sourceAidl,
+                                        &retAidl)));
+    *id = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_unique_id_t(retAidl));
+    return OK;
 }
 
 status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
@@ -613,7 +648,18 @@ status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
         uuid = *EFFECT_UUID_NULL;
     }
 
-    return aps->addStreamDefaultEffect(&type, opPackageName, &uuid, priority, usage, id);
+    media::AudioUuid typeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(type));
+    media::AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
+    std::string opPackageNameAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_String16_string(opPackageName));
+    media::AudioUsage usageAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_usage_t_AudioUsage(usage));
+    int32_t retAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->addStreamDefaultEffect(typeAidl, opPackageNameAidl, uuidAidl, priority, usageAidl,
+                                        &retAidl)));
+    *id = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_unique_id_t(retAidl));
+    return OK;
 }
 
 status_t AudioEffect::removeSourceDefaultEffect(audio_unique_id_t id)
@@ -621,7 +667,8 @@ status_t AudioEffect::removeSourceDefaultEffect(audio_unique_id_t id)
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    return aps->removeSourceDefaultEffect(id);
+    int32_t idAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_unique_id_t_int32_t(id));
+    return statusTFromBinderStatus(aps->removeSourceDefaultEffect(idAidl));
 }
 
 status_t AudioEffect::removeStreamDefaultEffect(audio_unique_id_t id)
@@ -629,7 +676,8 @@ status_t AudioEffect::removeStreamDefaultEffect(audio_unique_id_t id)
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    return aps->removeStreamDefaultEffect(id);
+    int32_t idAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_unique_id_t_int32_t(id));
+    return statusTFromBinderStatus(aps->removeStreamDefaultEffect(idAidl));
 }
 
 // -------------------------------------------------------------------------

@@ -2852,7 +2852,7 @@ audio_io_handle_t AudioPolicyManager::getOutputForEffect(const effect_descriptor
 
 status_t AudioPolicyManager::registerEffect(const effect_descriptor_t *desc,
                                 audio_io_handle_t io,
-                                uint32_t strategy,
+                                product_strategy_t strategy,
                                 int session,
                                 int id)
 {

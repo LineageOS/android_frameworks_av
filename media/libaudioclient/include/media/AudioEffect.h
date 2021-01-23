@@ -21,7 +21,6 @@
 #include <sys/types.h>
 
 #include <media/IAudioFlinger.h>
-#include <media/IAudioPolicyService.h>
 #include <media/AudioSystem.h>
 #include <system/audio_effect.h>
 

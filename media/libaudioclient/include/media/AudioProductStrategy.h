@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <android/media/AudioProductStrategy.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioCommonTypes.h>
 #include <media/AudioAttributes.h>
 #include <system/audio.h>
@@ -61,6 +63,12 @@ private:
 };
 
 using AudioProductStrategyVector = std::vector<AudioProductStrategy>;
+
+// AIDL conversion routines.
+ConversionResult<media::AudioProductStrategy>
+legacy2aidl_AudioProductStrategy(const AudioProductStrategy& legacy);
+ConversionResult<AudioProductStrategy>
+aidl2legacy_AudioProductStrategy(const media::AudioProductStrategy& aidl);
 
 } // namespace android
 
