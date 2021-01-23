@@ -23,6 +23,7 @@ aidl_interface {
         ":tv_tuner_aidl",
     ],
     imports: [
+        "android.hardware.common",
         "android.hardware.common.fmq",
     ],
 
