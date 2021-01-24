@@ -26,4 +26,9 @@ interface ITunerFilter {
      * Get the filter Id.
      */
     int getId();
+
+    /**
+     * Get the 64-bit filter Id.
+     */
+    long getId64Bit();
 }

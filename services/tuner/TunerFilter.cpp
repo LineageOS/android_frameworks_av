@@ -24,11 +24,13 @@ namespace android {
 
 TunerFilter::TunerFilter(sp<IFilter> filter, sp<IFilterCallback> callback) {
     mFilter = filter;
+    mFilter_1_1 = ::android::hardware::tv::tuner::V1_1::IFilter::castFrom(filter);
     mFilterCallback = callback;
 }
 
 TunerFilter::~TunerFilter() {
     mFilter = nullptr;
+    mFilter_1_1 = nullptr;
     mFilterCallback = nullptr;
 }
 
@@ -47,6 +49,24 @@ Status TunerFilter::getId(int32_t* _aidl_return) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }
     *_aidl_return = mId;
+    return Status::ok();
+}
+
+Status TunerFilter::getId64Bit(int64_t* _aidl_return) {
+    if (mFilter_1_1 == nullptr) {
+        ALOGE("IFilter_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res;
+    mFilter_1_1->getId64Bit([&](Result r, uint64_t filterId) {
+        res = r;
+        mId64Bit = filterId;
+    });
+    if (res != Result::SUCCESS) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    *_aidl_return = mId64Bit;
     return Status::ok();
 }
 

@@ -23,6 +23,7 @@ aidl_interface {
         ":tv_tuner_aidl",
     ],
     imports: [
+        "android.hardware.common",
         "android.hardware.common.fmq",
     ],
 
@@ -79,6 +80,8 @@ cc_library {
         "libmedia",
         "libutils",
         "tv_tuner_aidl_interface-ndk_platform",
+        "tv_tuner_resource_manager_aidl_interface-ndk_platform",
+        "tv_tuner_resource_manager_aidl_interface-cpp",
     ],
 
     static_libs: [
@@ -113,6 +116,8 @@ cc_binary {
         "liblog",
         "libtunerservice",
         "libutils",
+        "tv_tuner_resource_manager_aidl_interface-ndk_platform",
+        "tv_tuner_resource_manager_aidl_interface-cpp",
     ],
 
     static_libs: [
