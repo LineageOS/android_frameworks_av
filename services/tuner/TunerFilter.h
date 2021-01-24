@@ -19,6 +19,7 @@
 
 #include <aidl/android/media/tv/tuner/BnTunerFilter.h>
 #include <aidl/android/media/tv/tuner/ITunerFilterCallback.h>
+#include <android/hardware/tv/tuner/1.1/IFilter.h>
 #include <android/hardware/tv/tuner/1.0/ITuner.h>
 #include <media/stagefright/foundation/ADebug.h>
 
@@ -41,6 +42,7 @@ public:
     TunerFilter(sp<IFilter> filter, sp<IFilterCallback> callback);
     virtual ~TunerFilter();
     Status getId(int32_t* _aidl_return) override;
+    Status getId64Bit(int64_t* _aidl_return) override;
 
     struct FilterCallback : public IFilterCallback {
         FilterCallback(const std::shared_ptr<ITunerFilterCallback> tunerFilterCallback)
@@ -54,8 +56,10 @@ public:
 
 private:
     sp<IFilter> mFilter;
+    sp<::android::hardware::tv::tuner::V1_1::IFilter> mFilter_1_1;
     sp<IFilterCallback> mFilterCallback;
     int32_t mId;
+    int64_t mId64Bit;
 };
 
 } // namespace android
