@@ -26,6 +26,7 @@
 #include <media/TranscodingClientManager.h>
 #include <media/TranscodingResourcePolicy.h>
 #include <media/TranscodingSessionController.h>
+#include <media/TranscodingThermalPolicy.h>
 #include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
@@ -44,13 +45,15 @@ MediaTranscodingService::MediaTranscodingService(
         const std::shared_ptr<TranscoderInterface>& transcoder)
       : mUidPolicy(new TranscodingUidPolicy()),
         mResourcePolicy(new TranscodingResourcePolicy()),
-        mSessionController(
-                new TranscodingSessionController(transcoder, mUidPolicy, mResourcePolicy)),
+        mThermalPolicy(new TranscodingThermalPolicy()),
+        mSessionController(new TranscodingSessionController(transcoder, mUidPolicy, mResourcePolicy,
+                                                            mThermalPolicy)),
         mClientManager(new TranscodingClientManager(mSessionController)) {
     ALOGV("MediaTranscodingService is created");
     transcoder->setCallback(mSessionController);
     mUidPolicy->setCallback(mSessionController);
     mResourcePolicy->setCallback(mSessionController);
+    mThermalPolicy->setCallback(mSessionController);
 }
 
 MediaTranscodingService::~MediaTranscodingService() {
