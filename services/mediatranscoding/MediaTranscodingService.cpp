@@ -62,7 +62,7 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
     uid_t callingUid = AIBinder_getCallingUid();
     pid_t callingPid = AIBinder_getCallingPid();
-    if (__builtin_available(android 31, *)) {
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
         int32_t permissionResult;
         if (APermissionManager_checkPermission("android.permission.DUMP", callingPid, callingUid,
                                                &permissionResult) != PERMISSION_MANAGER_STATUS_OK ||

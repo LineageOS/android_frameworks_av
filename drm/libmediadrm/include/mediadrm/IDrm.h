@@ -152,6 +152,10 @@ struct IDrm : public virtual RefBase {
             const char *mime,
             DrmPlugin::SecurityLevel securityLevel) const = 0;
 
+    virtual status_t setPlaybackId(
+            Vector<uint8_t> const &sessionId,
+            const char *playbackId) = 0;
+
 protected:
     IDrm() {}
 

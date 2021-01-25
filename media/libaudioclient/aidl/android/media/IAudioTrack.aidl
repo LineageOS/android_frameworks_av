@@ -16,6 +16,8 @@
 
 package android.media;
 
+import android.media.AudioDualMonoMode;
+import android.media.AudioPlaybackRate;
 import android.media.AudioTimestampInternal;
 import android.media.SharedFileRegion;
 import android.media.VolumeShaperConfiguration;
@@ -81,4 +83,34 @@ interface IAudioTrack {
 
     /** Gets the volume shaper state. */
     @nullable VolumeShaperState getVolumeShaperState(int id);
+
+    /**
+     * Returns DualMonoMode setting associated with this AudioTrack.
+     */
+    AudioDualMonoMode getDualMonoMode();
+
+    /**
+     * Sets DualMonoMode setting.
+     */
+    void setDualMonoMode(in AudioDualMonoMode mode);
+
+    /**
+     * Returns the AudioDescriptionMixLevel.
+     */
+    float getAudioDescriptionMixLevel();
+
+    /**
+     * Sets the AudioDescriptionMixLevel.
+     */
+    void setAudioDescriptionMixLevel(float leveldB);
+
+    /**
+     * Returns the AudioPlaybackRate.
+     */
+    AudioPlaybackRate getPlaybackRateParameters();
+
+    /**
+     * Sets the AudioPlaybackRate.
+     */
+    void setPlaybackRateParameters(in AudioPlaybackRate playbackRate);
 }

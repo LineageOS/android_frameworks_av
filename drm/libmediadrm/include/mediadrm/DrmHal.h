@@ -184,6 +184,10 @@ struct DrmHal : public IDrm,
             const char *mime,
             DrmPlugin::SecurityLevel securityLevel) const;
 
+    virtual status_t setPlaybackId(
+            Vector<uint8_t> const &sessionId,
+            const char *playbackId);
+
     // Methods of IDrmPluginListener
     Return<void> sendEvent(EventType eventType,
             const hidl_vec<uint8_t>& sessionId, const hidl_vec<uint8_t>& data);

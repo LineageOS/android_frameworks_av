@@ -111,6 +111,84 @@ convertContainer(const InputContainer& input, const Func& itemConversion) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
+// The code below establishes:
+// IntegralTypeOf<T>, which works for either integral types (in which case it evaluates to T), or
+// enum types (in which case it evaluates to std::underlying_type_T<T>).
+
+template<typename T, typename = std::enable_if_t<std::is_integral_v<T> || std::is_enum_v<T>>>
+struct IntegralTypeOfStruct {
+    using Type = T;
+};
+
+template<typename T>
+struct IntegralTypeOfStruct<T, std::enable_if_t<std::is_enum_v<T>>> {
+    using Type = std::underlying_type_t<T>;
+};
+
+template<typename T>
+using IntegralTypeOf = typename IntegralTypeOfStruct<T>::Type;
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
+// Utilities for handling bitmasks.
+
+template<typename Enum>
+Enum indexToEnum_index(int index) {
+    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
+    return static_cast<Enum>(index);
+}
+
+template<typename Enum>
+Enum indexToEnum_bitmask(int index) {
+    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
+    return static_cast<Enum>(1 << index);
+}
+
+template<typename Mask, typename Enum>
+Mask enumToMask_bitmask(Enum e) {
+    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
+    static_assert(std::is_enum_v<Mask> || std::is_integral_v<Mask>);
+    return static_cast<Mask>(e);
+}
+
+template<typename Mask, typename Enum>
+Mask enumToMask_index(Enum e) {
+    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
+    static_assert(std::is_enum_v<Mask> || std::is_integral_v<Mask>);
+    return static_cast<Mask>(static_cast<std::make_unsigned_t<IntegralTypeOf<Mask>>>(1)
+            << static_cast<int>(e));
+}
+
+template<typename DestMask, typename SrcMask, typename DestEnum, typename SrcEnum>
+ConversionResult<DestMask> convertBitmask(
+        SrcMask src, const std::function<ConversionResult<DestEnum>(SrcEnum)>& enumConversion,
+        const std::function<SrcEnum(int)>& srcIndexToEnum,
+        const std::function<DestMask(DestEnum)>& destEnumToMask) {
+    using UnsignedDestMask = std::make_unsigned_t<IntegralTypeOf<DestMask>>;
+    using UnsignedSrcMask = std::make_unsigned_t<IntegralTypeOf<SrcMask>>;
+
+    UnsignedDestMask dest = static_cast<UnsignedDestMask>(0);
+    UnsignedSrcMask usrc = static_cast<UnsignedSrcMask>(src);
+
+    int srcBitIndex = 0;
+    while (usrc != 0) {
+        if (usrc & 1) {
+            SrcEnum srcEnum = srcIndexToEnum(srcBitIndex);
+            DestEnum destEnum = VALUE_OR_RETURN(enumConversion(srcEnum));
+            DestMask destMask = destEnumToMask(destEnum);
+            dest |= destMask;
+        }
+        ++srcBitIndex;
+        usrc >>= 1;
+    }
+    return static_cast<DestMask>(dest);
+}
+
+template<typename Mask, typename Enum>
+bool bitmaskIsSet(Mask mask, Enum index) {
+    return (mask & enumToMask_index<Mask, Enum>(index)) != 0;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities for working with AIDL unions.
 // UNION_GET(obj, fieldname) returns a ConversionResult<T> containing either the strongly-typed
 //   value of the respective field, or BAD_VALUE if the union is not set to the requested field.
@@ -224,6 +302,7 @@ static inline ::android::binder::Status binderStatusFromStatusT(
     // throw a ServiceSpecificException.
     return Status::fromServiceSpecificError(status, emptyIfNull);
 }
+
 
 } // namespace aidl_utils
 

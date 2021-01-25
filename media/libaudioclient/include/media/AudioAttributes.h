@@ -17,7 +17,9 @@
 
 #pragma once
 
+#include <android/media/AudioAttributesEx.h>
 #include <media/AudioCommonTypes.h>
+#include <media/AidlConversionUtil.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
 #include <binder/Parcelable.h>
@@ -56,5 +58,11 @@ private:
      */
     volume_group_t mGroupId = VOLUME_GROUP_NONE;
 };
+
+// AIDL conversion routines.
+ConversionResult<media::AudioAttributesEx>
+legacy2aidl_AudioAttributes_AudioAttributesEx(const AudioAttributes& legacy);
+ConversionResult<AudioAttributes>
+aidl2legacy_AudioAttributesEx_AudioAttributes(const media::AudioAttributesEx& aidl);
 
 } // namespace android

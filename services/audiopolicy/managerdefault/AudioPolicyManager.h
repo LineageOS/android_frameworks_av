@@ -180,7 +180,7 @@ public:
                                 const DeviceTypeSet& deviceTypes) const;
 
         // return the strategy corresponding to a given stream type
-        virtual uint32_t getStrategyForStream(audio_stream_type_t stream)
+        virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream)
         {
             return streamToStrategy(stream);
         }
@@ -200,7 +200,7 @@ public:
         virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc = NULL);
         virtual status_t registerEffect(const effect_descriptor_t *desc,
                                         audio_io_handle_t io,
-                                        uint32_t strategy,
+                                        product_strategy_t strategy,
                                         int session,
                                         int id);
         virtual status_t unregisterEffect(int id);
