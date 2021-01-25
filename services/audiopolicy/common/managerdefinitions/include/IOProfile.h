@@ -112,6 +112,19 @@ public:
     }
 
     /**
+     * @brief getTag
+     * @param deviceTypes to be considered
+     * @return tagName of first matching device for the considered types, empty string otherwise.
+     */
+    std::string getTag(const DeviceTypeSet& deviceTypes) const
+    {
+        if (supportsDeviceTypes(deviceTypes)) {
+            return mSupportedDevices.getDevicesFromTypes(deviceTypes).itemAt(0)->getTagName();
+        }
+        return {};
+    }
+
+    /**
      * @brief supportsDevice
      * @param device to be checked against
      *        forceCheckOnAddress if true, check on type and address whatever the type, otherwise
@@ -143,6 +156,8 @@ public:
         return false;
     }
 
+    bool containsSingleDeviceSupportingEncodedFormats(const sp<DeviceDescriptor>& device) const;
+
     void clearSupportedDevices() { mSupportedDevices.clear(); }
     void addSupportedDevice(const sp<DeviceDescriptor> &device)
     {
@@ -150,6 +165,12 @@ public:
     }
     void removeSupportedDevice(const sp<DeviceDescriptor> &device)
     {
+        ssize_t ret = mSupportedDevices.indexOf(device);
+        if (ret >= 0 && !mSupportedDevices.itemAt(ret)->isDynamic()) {
+            // devices equality checks only type, address, name and format
+            // Prevents from removing non dynamically added devices
+            return;
+        }
         mSupportedDevices.remove(device);
     }
     void setSupportedDevices(const DeviceVector &devices)

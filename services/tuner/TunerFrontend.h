@@ -19,6 +19,8 @@
 
 #include <aidl/android/media/tv/tuner/BnTunerFrontend.h>
 #include <android/hardware/tv/tuner/1.0/ITuner.h>
+#include <android/hardware/tv/tuner/1.1/IFrontend.h>
+#include <android/hardware/tv/tuner/1.1/IFrontendCallback.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <utils/Log.h>
 
@@ -27,6 +29,7 @@ using ::aidl::android::media::tv::tuner::BnTunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerFrontendCallback;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3Settings;
 using ::aidl::android::media::tv::tuner::TunerFrontendDvbsCodeRate;
+using ::aidl::android::media::tv::tuner::TunerFrontendScanMessage;
 using ::aidl::android::media::tv::tuner::TunerFrontendSettings;
 using ::aidl::android::media::tv::tuner::TunerFrontendStatus;
 using ::android::hardware::Return;
@@ -39,19 +42,21 @@ using ::android::hardware::tv::tuner::V1_0::FrontendId;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanMessage;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanMessageType;
 using ::android::hardware::tv::tuner::V1_0::IFrontend;
-using ::android::hardware::tv::tuner::V1_0::IFrontendCallback;
-using ::android::hardware::tv::tuner::V1_0::ITuner;
+using ::android::hardware::tv::tuner::V1_1::IFrontendCallback;
+using ::android::hardware::tv::tuner::V1_1::FrontendScanMessageExt1_1;
+using ::android::hardware::tv::tuner::V1_1::FrontendScanMessageTypeExt1_1;
 
+using namespace std;
 
 namespace android {
 
 class TunerFrontend : public BnTunerFrontend {
 
 public:
-    TunerFrontend(sp<ITuner> tuner, int frontendHandle);
+    TunerFrontend(sp<IFrontend> frontend, int id);
     virtual ~TunerFrontend();
     Status setCallback(
-            const std::shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) override;
+            const shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) override;
     Status tune(const TunerFrontendSettings& settings) override;
     Status stopTune() override;
     Status scan(const TunerFrontendSettings& settings, int frontendScanType) override;
@@ -59,27 +64,31 @@ public:
     Status setLnb(int lnbHandle) override;
     Status setLna(bool bEnable) override;
     Status close() override;
-    Status getStatus(const std::vector<int32_t>& statusTypes,
-            std::vector<TunerFrontendStatus>* _aidl_return) override;
+    Status getStatus(const vector<int32_t>& statusTypes,
+            vector<TunerFrontendStatus>* _aidl_return) override;
+    Status getFrontendId(int* _aidl_return) override;
 
     struct FrontendCallback : public IFrontendCallback {
-        FrontendCallback(const std::shared_ptr<ITunerFrontendCallback> tunerFrontendCallback)
+        FrontendCallback(const shared_ptr<ITunerFrontendCallback> tunerFrontendCallback)
                 : mTunerFrontendCallback(tunerFrontendCallback) {};
 
         virtual Return<void> onEvent(FrontendEventType frontendEventType);
         virtual Return<void> onScanMessage(
                 FrontendScanMessageType type, const FrontendScanMessage& message);
+        virtual Return<void> onScanMessageExt1_1(
+                FrontendScanMessageTypeExt1_1 type, const FrontendScanMessageExt1_1& message);
 
-        std::shared_ptr<ITunerFrontendCallback> mTunerFrontendCallback;
+        shared_ptr<ITunerFrontendCallback> mTunerFrontendCallback;
     };
 
 private:
     hidl_vec<FrontendAtsc3PlpSettings> getAtsc3PlpSettings(
             const TunerFrontendAtsc3Settings& settings);
     FrontendDvbsCodeRate getDvbsCodeRate(const TunerFrontendDvbsCodeRate& codeRate);
+
     int mId;
-    sp<ITuner> mTuner;
     sp<IFrontend> mFrontend;
+    sp<::android::hardware::tv::tuner::V1_1::IFrontend> mFrontend_1_1;
 };
 
 } // namespace android

@@ -21,9 +21,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#ifdef BIQUAD_OPT
 #include <system/audio.h>
-#endif
 #include "LVREV_Private.h"
 #include "Filter.h"
 
@@ -75,17 +73,10 @@ LVREV_ReturnStatus_en LVREV_ApplyNewSettings(LVREV_Instance_st* pPrivate) {
 
         Omega = LVM_GetOmega(pPrivate->NewParams.HPF, pPrivate->NewParams.SampleRate);
         LVM_FO_HPF(Omega, &Coeffs);
-#ifdef BIQUAD_OPT
         const std::array<LVM_FLOAT, android::audio_utils::kBiquadNumCoefs> coefs = {
                 Coeffs.A0, Coeffs.A1, 0.0, -(Coeffs.B1), 0.0};
         pPrivate->pRevHPFBiquad.reset(
                 new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
-#else
-        FO_1I_D32F32Cll_TRC_WRA_01_Init(&pPrivate->pFastCoef->HPCoefs, &pPrivate->pFastData->HPTaps,
-                                        &Coeffs);
-        LoadConst_Float(0, (LVM_FLOAT*)&pPrivate->pFastData->HPTaps,
-                        sizeof(Biquad_1I_Order1_FLOAT_Taps_t) / sizeof(LVM_FLOAT));
-#endif
     }
 
     /*
@@ -110,17 +101,10 @@ LVREV_ReturnStatus_en LVREV_ApplyNewSettings(LVREV_Instance_st* pPrivate) {
                 LVM_FO_LPF(Omega, &Coeffs);
             }
         }
-#ifdef BIQUAD_OPT
         const std::array<LVM_FLOAT, android::audio_utils::kBiquadNumCoefs> coefs = {
                 Coeffs.A0, Coeffs.A1, 0.0, -(Coeffs.B1), 0.0};
         pPrivate->pRevLPFBiquad.reset(
                 new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
-#else
-        FO_1I_D32F32Cll_TRC_WRA_01_Init(&pPrivate->pFastCoef->LPCoefs, &pPrivate->pFastData->LPTaps,
-                                        &Coeffs);
-        LoadConst_Float(0, (LVM_FLOAT*)&pPrivate->pFastData->LPTaps,
-                        sizeof(Biquad_1I_Order1_FLOAT_Taps_t) / sizeof(LVM_FLOAT));
-#endif
     }
 
     /*
@@ -245,15 +229,10 @@ LVREV_ReturnStatus_en LVREV_ApplyNewSettings(LVREV_Instance_st* pPrivate) {
                 Coeffs.A1 = 0;
                 Coeffs.B1 = 0;
             }
-#ifdef BIQUAD_OPT
             const std::array<LVM_FLOAT, android::audio_utils::kBiquadNumCoefs> coefs = {
                     Coeffs.A0, Coeffs.A1, 0.0, -(Coeffs.B1), 0.0};
             pPrivate->revLPFBiquad[i].reset(
                     new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
-#else
-            FO_1I_D32F32Cll_TRC_WRA_01_Init(&pPrivate->pFastCoef->RevLPCoefs[i],
-                                            &pPrivate->pFastData->RevLPTaps[i], &Coeffs);
-#endif
         }
     }
 

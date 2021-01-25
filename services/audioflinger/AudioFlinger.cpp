@@ -31,7 +31,7 @@
 #include <sys/resource.h>
 #include <thread>
 
-
+#include <android/media/IAudioPolicyService.h>
 #include <android/os/IExternalVibratorService.h>
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
@@ -42,7 +42,6 @@
 #include <media/audiohal/DevicesFactoryHalInterface.h>
 #include <media/audiohal/EffectsFactoryHalInterface.h>
 #include <media/AudioParameter.h>
-#include <media/IAudioPolicyService.h>
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 #include <mediautils/TimeCheck.h>
@@ -127,9 +126,6 @@ uint32_t AudioFlinger::mScreenState;
 // In order to avoid invalidating offloaded tracks each time a Visualizer is turned on and off
 // we define a minimum time during which a global effect is considered enabled.
 static const nsecs_t kMinGlobalEffectEnabletimeNs = seconds(7200);
-
-Mutex gLock;
-wp<AudioFlinger> gAudioFlinger;
 
 // Keep a strong reference to media.log service around forever.
 // The service is within our parent process so it can never die in a way that we could observe.
@@ -268,7 +264,7 @@ void AudioFlinger::onFirstRef()
 
     mMode = AUDIO_MODE_NORMAL;
 
-    gAudioFlinger = this;
+    gAudioFlinger = this;  // we are already refcounted, store into atomic pointer.
 
     mDevicesFactoryHalCallback = new DevicesFactoryHalCallbackImpl;
     mDevicesFactoryHal->setCallbackOnce(mDevicesFactoryHalCallback);
@@ -325,11 +321,9 @@ status_t MmapStreamInterface::openMmapStream(MmapStreamInterface::stream_directi
                                              sp<MmapStreamInterface>& interface,
                                              audio_port_handle_t *handle)
 {
-    sp<AudioFlinger> af;
-    {
-        Mutex::Autolock _l(gLock);
-        af = gAudioFlinger.promote();
-    }
+    // TODO: Use ServiceManager to get IAudioFlinger instead of by atomic pointer.
+    // This allows moving oboeservice (AAudio) to a separate process in the future.
+    sp<AudioFlinger> af = AudioFlinger::gAudioFlinger.load();  // either nullptr or singleton AF.
     status_t ret = NO_INIT;
     if (af != 0) {
         ret = af->openMmapStream(

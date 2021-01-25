@@ -277,7 +277,7 @@ private:
         uint32_t outputDelay;
     };
     Mutexed<Output> mOutput;
-    Mutexed<std::list<sp<ABuffer>>> mFlushedConfigs;
+    Mutexed<std::list<std::unique_ptr<C2Work>>> mFlushedConfigs;
 
     std::atomic_uint64_t mFrameIndex;
     std::atomic_uint64_t mFirstValidFrameIndex;
@@ -288,6 +288,7 @@ private:
         sp<Surface> surface;
         uint32_t generation;
         int maxDequeueBuffers;
+        std::map<uint64_t, int> rotation;
     };
     Mutexed<OutputSurface> mOutputSurface;
 

@@ -387,6 +387,7 @@ void DrmHal::cleanup() {
     mPlugin.clear();
     mPluginV1_1.clear();
     mPluginV1_2.clear();
+    mPluginV1_4.clear();
 }
 
 std::vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
@@ -622,6 +623,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
                 mPlugin = plugin;
                 mPluginV1_1 = drm::V1_1::IDrmPlugin::castFrom(mPlugin);
                 mPluginV1_2 = drm::V1_2::IDrmPlugin::castFrom(mPlugin);
+                mPluginV1_4 = drm::V1_4::IDrmPlugin::castFrom(mPlugin);
                 break;
             }
         }
@@ -642,6 +644,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
             mPlugin.clear();
             mPluginV1_1.clear();
             mPluginV1_2.clear();
+            mPluginV1_4.clear();
         }
     }
 
@@ -1562,6 +1565,35 @@ void DrmHal::reportPluginMetrics() const
             ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }
     }
+}
+
+bool DrmHal::requiresSecureDecoder(const char *mime) const {
+    Mutex::Autolock autoLock(mLock);
+    if (mPluginV1_4 == NULL) {
+        return false;
+    }
+    return mPluginV1_4->requiresSecureDecoderDefault(hidl_string(mime));
+}
+
+bool DrmHal::requiresSecureDecoder(const char *mime,
+        DrmPlugin::SecurityLevel securityLevel) const {
+    Mutex::Autolock autoLock(mLock);
+    if (mPluginV1_4 == NULL) {
+        return false;
+    }
+    auto hLevel = toHidlSecurityLevel(securityLevel);
+    return mPluginV1_4->requiresSecureDecoder(hidl_string(mime), hLevel);
+}
+
+status_t DrmHal::setPlaybackId(Vector<uint8_t> const &sessionId, const char *playbackId) {
+    Mutex::Autolock autoLock(mLock);
+    if (mPluginV1_4 == NULL) {
+        return ERROR_UNSUPPORTED;
+    }
+    drm::V1_0::Status err = mPluginV1_4->setPlaybackId(
+            toHidlVec(sessionId),
+            hidl_string(playbackId));
+    return toStatusT(err);
 }
 
 }  // namespace android

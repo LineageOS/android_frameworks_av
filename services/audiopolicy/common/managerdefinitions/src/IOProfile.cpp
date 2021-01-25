@@ -105,6 +105,17 @@ bool IOProfile::isCompatibleProfile(const DeviceVector &devices,
     return true;
 }
 
+bool IOProfile::containsSingleDeviceSupportingEncodedFormats(
+        const sp<DeviceDescriptor>& device) const {
+    if (device == nullptr) {
+        return false;
+    }
+    DeviceVector deviceList = mSupportedDevices.getDevicesFromType(device->type());
+    return std::count_if(deviceList.begin(), deviceList.end(),
+            [&device](sp<DeviceDescriptor> deviceDesc) {
+                return device == deviceDesc && deviceDesc->hasCurrentEncodedFormat(); }) == 1;
+}
+
 void IOProfile::dump(String8 *dst) const
 {
     std::string portStr;

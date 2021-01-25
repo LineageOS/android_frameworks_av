@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOPOLICYSERVICE_H
 #define ANDROID_AUDIOPOLICYSERVICE_H
 
+#include <android/media/BnAudioPolicyService.h>
 #include <android-base/thread_annotations.h>
 #include <cutils/misc.h>
 #include <cutils/config_utils.h>
@@ -29,7 +30,6 @@
 #include <binder/IUidObserver.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
-#include <media/IAudioPolicyService.h>
 #include <media/ToneGenerator.h>
 #include <media/AudioEffect.h>
 #include <media/AudioPolicy.h>
@@ -47,7 +47,7 @@ namespace android {
 
 class AudioPolicyService :
     public BinderService<AudioPolicyService>,
-    public BnAudioPolicyService,
+    public media::BnAudioPolicyService,
     public IBinder::DeathRecipient
 {
     friend class BinderService<AudioPolicyService>;
@@ -61,108 +61,175 @@ public:
     //
     // BnAudioPolicyService (see AudioPolicyInterface for method descriptions)
     //
-
-    void onNewAudioModulesAvailable() override;
-    virtual status_t setDeviceConnectionState(audio_devices_t device,
-                                              audio_policy_dev_state_t state,
-                                              const char *device_address,
-                                              const char *device_name,
-                                              audio_format_t encodedFormat);
-    virtual audio_policy_dev_state_t getDeviceConnectionState(
-                                                                audio_devices_t device,
-                                                                const char *device_address);
-    virtual status_t handleDeviceConfigChange(audio_devices_t device,
-                                              const char *device_address,
-                                              const char *device_name,
-                                              audio_format_t encodedFormat);
-    virtual status_t setPhoneState(audio_mode_t state, uid_t uid);
-    virtual status_t setForceUse(audio_policy_force_use_t usage, audio_policy_forced_cfg_t config);
-    virtual audio_policy_forced_cfg_t getForceUse(audio_policy_force_use_t usage);
-    virtual audio_io_handle_t getOutput(audio_stream_type_t stream);
-    status_t getOutputForAttr(audio_attributes_t *attr,
-                              audio_io_handle_t *output,
-                              audio_session_t session,
-                              audio_stream_type_t *stream,
-                              pid_t pid,
-                              uid_t uid,
-                              const audio_config_t *config,
-                              audio_output_flags_t flags,
-                              audio_port_handle_t *selectedDeviceId,
-                              audio_port_handle_t *portId,
-                              std::vector<audio_io_handle_t> *secondaryOutputs) override;
-    virtual status_t startOutput(audio_port_handle_t portId);
-    virtual status_t stopOutput(audio_port_handle_t portId);
-    virtual void releaseOutput(audio_port_handle_t portId);
-    virtual status_t getInputForAttr(const audio_attributes_t *attr,
-                                     audio_io_handle_t *input,
-                                     audio_unique_id_t riid,
-                                     audio_session_t session,
-                                     pid_t pid,
-                                     uid_t uid,
-                                     const String16& opPackageName,
-                                     const audio_config_base_t *config,
-                                     audio_input_flags_t flags,
-                                     audio_port_handle_t *selectedDeviceId = NULL,
-                                     audio_port_handle_t *portId = NULL);
-    virtual status_t startInput(audio_port_handle_t portId);
-    virtual status_t stopInput(audio_port_handle_t portId);
-    virtual void releaseInput(audio_port_handle_t portId);
-    virtual status_t initStreamVolume(audio_stream_type_t stream,
-                                      int indexMin,
-                                      int indexMax);
-    virtual status_t setStreamVolumeIndex(audio_stream_type_t stream,
-                                          int index,
-                                          audio_devices_t device);
-    virtual status_t getStreamVolumeIndex(audio_stream_type_t stream,
-                                          int *index,
-                                          audio_devices_t device);
-
-    virtual status_t setVolumeIndexForAttributes(const audio_attributes_t &attr,
-                                                 int index,
-                                                 audio_devices_t device);
-    virtual status_t getVolumeIndexForAttributes(const audio_attributes_t &attr,
-                                                 int &index,
-                                                 audio_devices_t device);
-    virtual status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr,
-                                                    int &index);
-    virtual status_t getMaxVolumeIndexForAttributes(const audio_attributes_t &attr,
-                                                    int &index);
-
-    virtual uint32_t getStrategyForStream(audio_stream_type_t stream);
-    virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
-    virtual status_t getDevicesForAttributes(const AudioAttributes &aa,
-                                             AudioDeviceTypeAddrVector *devices) const;
-
-    virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc);
-    virtual status_t registerEffect(const effect_descriptor_t *desc,
-                                    audio_io_handle_t io,
-                                    uint32_t strategy,
-                                    audio_session_t session,
-                                    int id);
-    virtual status_t unregisterEffect(int id);
-    virtual status_t setEffectEnabled(int id, bool enabled);
-    status_t moveEffectsToIo(const std::vector<int>& ids, audio_io_handle_t io) override;
-    virtual bool isStreamActive(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
-    virtual bool isStreamActiveRemotely(audio_stream_type_t stream, uint32_t inPastMs = 0) const;
-    virtual bool isSourceActive(audio_source_t source) const;
-
-    virtual status_t queryDefaultPreProcessing(audio_session_t audioSession,
-                                              effect_descriptor_t *descriptors,
-                                              uint32_t *count);
-    virtual status_t addSourceDefaultEffect(const effect_uuid_t *type,
-                                            const String16& opPackageName,
-                                            const effect_uuid_t *uuid,
-                                            int32_t priority,
-                                            audio_source_t source,
-                                            audio_unique_id_t* id);
-    virtual status_t addStreamDefaultEffect(const effect_uuid_t *type,
-                                            const String16& opPackageName,
-                                            const effect_uuid_t *uuid,
-                                            int32_t priority,
-                                            audio_usage_t usage,
-                                            audio_unique_id_t* id);
-    virtual status_t removeSourceDefaultEffect(audio_unique_id_t id);
-    virtual status_t removeStreamDefaultEffect(audio_unique_id_t id);
+    binder::Status onNewAudioModulesAvailable() override;
+    binder::Status setDeviceConnectionState(
+            const media::AudioDevice& device,
+            media::AudioPolicyDeviceState state,
+            const std::string& deviceName,
+            media::audio::common::AudioFormat encodedFormat) override;
+    binder::Status getDeviceConnectionState(const media::AudioDevice& device,
+                                            media::AudioPolicyDeviceState* _aidl_return) override;
+    binder::Status handleDeviceConfigChange(
+            const media::AudioDevice& device,
+            const std::string& deviceName,
+            media::audio::common::AudioFormat encodedFormat) override;
+    binder::Status setPhoneState(media::AudioMode state, int32_t uid) override;
+    binder::Status setForceUse(media::AudioPolicyForceUse usage,
+                               media::AudioPolicyForcedConfig config) override;
+    binder::Status getForceUse(media::AudioPolicyForceUse usage,
+                               media::AudioPolicyForcedConfig* _aidl_return) override;
+    binder::Status getOutput(media::AudioStreamType stream, int32_t* _aidl_return) override;
+    binder::Status getOutputForAttr(const media::AudioAttributesInternal& attr, int32_t session,
+                                    int32_t pid, int32_t uid, const media::AudioConfig& config,
+                                    int32_t flags,
+                                    media::GetOutputForAttrResponse* _aidl_return) override;
+    binder::Status startOutput(int32_t portId) override;
+    binder::Status stopOutput(int32_t portId) override;
+    binder::Status releaseOutput(int32_t portId) override;
+    binder::Status getInputForAttr(const media::AudioAttributesInternal& attr, int32_t input,
+                                   int32_t riid, int32_t session, int32_t pid, int32_t uid,
+                                   const std::string& opPackageName,
+                                   const media::AudioConfigBase& config, int32_t flags,
+                                   media::GetInputForAttrResponse* _aidl_return) override;
+    binder::Status startInput(int32_t portId) override;
+    binder::Status stopInput(int32_t portId) override;
+    binder::Status releaseInput(int32_t portId) override;
+    binder::Status initStreamVolume(media::AudioStreamType stream, int32_t indexMin,
+                                    int32_t indexMax) override;
+    binder::Status setStreamVolumeIndex(media::AudioStreamType stream, int32_t device,
+                                        int32_t index) override;
+    binder::Status getStreamVolumeIndex(media::AudioStreamType stream, int32_t device,
+                                        int32_t* _aidl_return) override;
+    binder::Status setVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+                                               int32_t device, int32_t index) override;
+    binder::Status getVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+                                               int32_t device, int32_t* _aidl_return) override;
+    binder::Status getMaxVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+                                                  int32_t* _aidl_return) override;
+    binder::Status getMinVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
+                                                  int32_t* _aidl_return) override;
+    binder::Status getStrategyForStream(media::AudioStreamType stream,
+                                        int32_t* _aidl_return) override;
+    binder::Status getDevicesForStream(media::AudioStreamType stream,
+                                       int32_t* _aidl_return) override;
+    binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
+                                           std::vector<media::AudioDevice>* _aidl_return) override;
+    binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
+                                      int32_t* _aidl_return) override;
+    binder::Status registerEffect(const media::EffectDescriptor& desc, int32_t io, int32_t strategy,
+                                  int32_t session, int32_t id) override;
+    binder::Status unregisterEffect(int32_t id) override;
+    binder::Status setEffectEnabled(int32_t id, bool enabled) override;
+    binder::Status moveEffectsToIo(const std::vector<int32_t>& ids, int32_t io) override;
+    binder::Status isStreamActive(media::AudioStreamType stream, int32_t inPastMs,
+                                  bool* _aidl_return) override;
+    binder::Status isStreamActiveRemotely(media::AudioStreamType stream, int32_t inPastMs,
+                                          bool* _aidl_return) override;
+    binder::Status isSourceActive(media::AudioSourceType source, bool* _aidl_return) override;
+    binder::Status queryDefaultPreProcessing(
+            int32_t audioSession, media::Int* count,
+            std::vector<media::EffectDescriptor>* _aidl_return) override;
+    binder::Status addSourceDefaultEffect(const media::AudioUuid& type,
+                                          const std::string& opPackageName,
+                                          const media::AudioUuid& uuid, int32_t priority,
+                                          media::AudioSourceType source,
+                                          int32_t* _aidl_return) override;
+    binder::Status addStreamDefaultEffect(const media::AudioUuid& type,
+                                          const std::string& opPackageName,
+                                          const media::AudioUuid& uuid, int32_t priority,
+                                          media::AudioUsage usage, int32_t* _aidl_return) override;
+    binder::Status removeSourceDefaultEffect(int32_t id) override;
+    binder::Status removeStreamDefaultEffect(int32_t id) override;
+    binder::Status setSupportedSystemUsages(
+            const std::vector<media::AudioUsage>& systemUsages) override;
+    binder::Status setAllowedCapturePolicy(int32_t uid, int32_t capturePolicy) override;
+    binder::Status getOffloadSupport(const media::AudioOffloadInfo& info,
+                                     media::AudioOffloadMode* _aidl_return) override;
+    binder::Status isDirectOutputSupported(const media::AudioConfigBase& config,
+                                           const media::AudioAttributesInternal& attributes,
+                                           bool* _aidl_return) override;
+    binder::Status listAudioPorts(media::AudioPortRole role, media::AudioPortType type,
+                                  media::Int* count, std::vector<media::AudioPort>* ports,
+                                  int32_t* _aidl_return) override;
+    binder::Status getAudioPort(const media::AudioPort& port,
+                                media::AudioPort* _aidl_return) override;
+    binder::Status createAudioPatch(const media::AudioPatch& patch, int32_t handle,
+                                    int32_t* _aidl_return) override;
+    binder::Status releaseAudioPatch(int32_t handle) override;
+    binder::Status listAudioPatches(media::Int* count, std::vector<media::AudioPatch>* patches,
+                                    int32_t* _aidl_return) override;
+    binder::Status setAudioPortConfig(const media::AudioPortConfig& config) override;
+    binder::Status registerClient(const sp<media::IAudioPolicyServiceClient>& client) override;
+    binder::Status setAudioPortCallbacksEnabled(bool enabled) override;
+    binder::Status setAudioVolumeGroupCallbacksEnabled(bool enabled) override;
+    binder::Status acquireSoundTriggerSession(media::SoundTriggerSession* _aidl_return) override;
+    binder::Status releaseSoundTriggerSession(int32_t session) override;
+    binder::Status getPhoneState(media::AudioMode* _aidl_return) override;
+    binder::Status registerPolicyMixes(const std::vector<media::AudioMix>& mixes,
+                                       bool registration) override;
+    binder::Status setUidDeviceAffinities(int32_t uid,
+                                          const std::vector<media::AudioDevice>& devices) override;
+    binder::Status removeUidDeviceAffinities(int32_t uid) override;
+    binder::Status setUserIdDeviceAffinities(
+            int32_t userId,
+            const std::vector<media::AudioDevice>& devices) override;
+    binder::Status removeUserIdDeviceAffinities(int32_t userId) override;
+    binder::Status startAudioSource(const media::AudioPortConfig& source,
+                                    const media::AudioAttributesInternal& attributes,
+                                    int32_t* _aidl_return) override;
+    binder::Status stopAudioSource(int32_t portId) override;
+    binder::Status setMasterMono(bool mono) override;
+    binder::Status getMasterMono(bool* _aidl_return) override;
+    binder::Status getStreamVolumeDB(media::AudioStreamType stream, int32_t index, int32_t device,
+                                     float* _aidl_return) override;
+    binder::Status getSurroundFormats(bool reported, media::Int* count,
+                                      std::vector<media::audio::common::AudioFormat>* formats,
+                                      bool* _aidl_return) override;
+    binder::Status getHwOffloadEncodingFormatsSupportedForA2DP(
+            std::vector<media::audio::common::AudioFormat>* _aidl_return) override;
+    binder::Status setSurroundFormatEnabled(media::audio::common::AudioFormat audioFormat,
+                                            bool enabled) override;
+    binder::Status setAssistantUid(int32_t uid) override;
+    binder::Status setA11yServicesUids(const std::vector<int32_t>& uids) override;
+    binder::Status setCurrentImeUid(int32_t uid) override;
+    binder::Status isHapticPlaybackSupported(bool* _aidl_return) override;
+    binder::Status listAudioProductStrategies(
+            std::vector<media::AudioProductStrategy>* _aidl_return) override;
+    binder::Status getProductStrategyFromAudioAttributes(const media::AudioAttributesEx& aa,
+                                                         int32_t* _aidl_return) override;
+    binder::Status listAudioVolumeGroups(
+            std::vector<media::AudioVolumeGroup>* _aidl_return) override;
+    binder::Status getVolumeGroupFromAudioAttributes(const media::AudioAttributesEx& aa,
+                                                     int32_t* _aidl_return) override;
+    binder::Status setRttEnabled(bool enabled) override;
+    binder::Status isCallScreenModeSupported(bool* _aidl_return) override;
+    binder::Status setDevicesRoleForStrategy(
+            int32_t strategy, media::DeviceRole role,
+            const std::vector<media::AudioDevice>& devices) override;
+    binder::Status removeDevicesRoleForStrategy(int32_t strategy, media::DeviceRole role) override;
+    binder::Status getDevicesForRoleAndStrategy(
+            int32_t strategy, media::DeviceRole role,
+            std::vector<media::AudioDevice>* _aidl_return) override;
+    binder::Status setDevicesRoleForCapturePreset(
+            media::AudioSourceType audioSource,
+            media::DeviceRole role,
+            const std::vector<media::AudioDevice>& devices) override;
+    binder::Status addDevicesRoleForCapturePreset(
+            media::AudioSourceType audioSource,
+            media::DeviceRole role,
+            const std::vector<media::AudioDevice>& devices) override;
+    binder::Status removeDevicesRoleForCapturePreset(
+            media::AudioSourceType audioSource,
+            media::DeviceRole role,
+            const std::vector<media::AudioDevice>& devices) override;
+    binder::Status clearDevicesRoleForCapturePreset(media::AudioSourceType audioSource,
+                                                    media::DeviceRole role) override;
+    binder::Status getDevicesForRoleAndCapturePreset(
+            media::AudioSourceType audioSource,
+            media::DeviceRole role,
+            std::vector<media::AudioDevice>* _aidl_return) override;
+    binder::Status registerSoundTriggerCaptureStateListener(
+            const sp<media::ICaptureStateListener>& listener, bool* _aidl_return) override;
 
     virtual     status_t    onTransact(
                                 uint32_t code,
@@ -190,168 +257,53 @@ public:
                                      audio_io_handle_t output,
                                      int delayMs = 0);
     virtual status_t setVoiceVolume(float volume, int delayMs = 0);
-    status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages);
-    status_t setAllowedCapturePolicy(uint_t uid, audio_flags_mask_t capturePolicy) override;
-    virtual audio_offload_mode_t getOffloadSupport(const audio_offload_info_t &config);
-    virtual bool isDirectOutputSupported(const audio_config_base_t& config,
-                                         const audio_attributes_t& attributes);
 
-    virtual status_t listAudioPorts(audio_port_role_t role,
-                                    audio_port_type_t type,
-                                    unsigned int *num_ports,
-                                    struct audio_port_v7 *ports,
-                                    unsigned int *generation);
-    virtual status_t getAudioPort(struct audio_port_v7 *port);
-    virtual status_t createAudioPatch(const struct audio_patch *patch,
-                                       audio_patch_handle_t *handle);
-    virtual status_t releaseAudioPatch(audio_patch_handle_t handle);
-    virtual status_t listAudioPatches(unsigned int *num_patches,
-                                      struct audio_patch *patches,
-                                      unsigned int *generation);
-    virtual status_t setAudioPortConfig(const struct audio_port_config *config);
+    void doOnNewAudioModulesAvailable();
+    status_t doStopOutput(audio_port_handle_t portId);
+    void doReleaseOutput(audio_port_handle_t portId);
 
-    virtual void registerClient(const sp<media::IAudioPolicyServiceClient>& client);
+    status_t clientCreateAudioPatch(const struct audio_patch *patch,
+                              audio_patch_handle_t *handle,
+                              int delayMs);
+    status_t clientReleaseAudioPatch(audio_patch_handle_t handle,
+                                     int delayMs);
+    virtual status_t clientSetAudioPortConfig(const struct audio_port_config *config,
+                                              int delayMs);
 
-    virtual void setAudioPortCallbacksEnabled(bool enabled);
+    void removeNotificationClient(uid_t uid, pid_t pid);
+    void onAudioPortListUpdate();
+    void doOnAudioPortListUpdate();
+    void onAudioPatchListUpdate();
+    void doOnAudioPatchListUpdate();
 
-    virtual void setAudioVolumeGroupCallbacksEnabled(bool enabled);
+    void onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
+    void doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
+    void onRecordingConfigurationUpdate(int event,
+                                        const record_client_info_t *clientInfo,
+                                        const audio_config_base_t *clientConfig,
+                                        std::vector<effect_descriptor_t> clientEffects,
+                                        const audio_config_base_t *deviceConfig,
+                                        std::vector<effect_descriptor_t> effects,
+                                        audio_patch_handle_t patchHandle,
+                                        audio_source_t source);
+    void doOnRecordingConfigurationUpdate(int event,
+                                          const record_client_info_t *clientInfo,
+                                          const audio_config_base_t *clientConfig,
+                                          std::vector<effect_descriptor_t> clientEffects,
+                                          const audio_config_base_t *deviceConfig,
+                                          std::vector<effect_descriptor_t> effects,
+                                          audio_patch_handle_t patchHandle,
+                                          audio_source_t source);
 
-    virtual status_t acquireSoundTriggerSession(audio_session_t *session,
-                                           audio_io_handle_t *ioHandle,
-                                           audio_devices_t *device);
+    void onAudioVolumeGroupChanged(volume_group_t group, int flags);
+    void doOnAudioVolumeGroupChanged(volume_group_t group, int flags);
 
-    virtual status_t releaseSoundTriggerSession(audio_session_t session);
+    void onRoutingUpdated();
+    void doOnRoutingUpdated();
 
-    virtual audio_mode_t getPhoneState();
-
-    virtual status_t registerPolicyMixes(const Vector<AudioMix>& mixes, bool registration);
-
-    virtual status_t setUidDeviceAffinities(uid_t uid, const AudioDeviceTypeAddrVector& devices);
-
-    virtual status_t removeUidDeviceAffinities(uid_t uid);
-
-    virtual status_t setDevicesRoleForStrategy(product_strategy_t strategy,
-                                               device_role_t role,
-                                               const AudioDeviceTypeAddrVector &devices);
-
-    virtual status_t removeDevicesRoleForStrategy(product_strategy_t strategy, device_role_t role);
-
-    virtual status_t getDevicesForRoleAndStrategy(product_strategy_t strategy,
-                                                  device_role_t role,
-                                                  AudioDeviceTypeAddrVector &devices);
-
-    virtual status_t setDevicesRoleForCapturePreset(audio_source_t audioSource,
-                                                    device_role_t role,
-                                                    const AudioDeviceTypeAddrVector &devices);
-
-    virtual status_t addDevicesRoleForCapturePreset(audio_source_t audioSource,
-                                                    device_role_t role,
-                                                    const AudioDeviceTypeAddrVector &devices);
-
-    virtual status_t removeDevicesRoleForCapturePreset(
-            audio_source_t audioSource, device_role_t role,
-            const AudioDeviceTypeAddrVector& devices);
-
-    virtual status_t clearDevicesRoleForCapturePreset(audio_source_t audioSource,
-                                                      device_role_t role);
-
-    virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
-                                                       device_role_t role,
-                                                       AudioDeviceTypeAddrVector &devices);
-
-    virtual status_t setUserIdDeviceAffinities(int userId,
-            const AudioDeviceTypeAddrVector& devices);
-
-    virtual status_t removeUserIdDeviceAffinities(int userId);
-
-    virtual status_t startAudioSource(const struct audio_port_config *source,
-                                      const audio_attributes_t *attributes,
-                                      audio_port_handle_t *portId);
-    virtual status_t stopAudioSource(audio_port_handle_t portId);
-
-    virtual status_t setMasterMono(bool mono);
-    virtual status_t getMasterMono(bool *mono);
-
-    virtual float    getStreamVolumeDB(
-                audio_stream_type_t stream, int index, audio_devices_t device);
-
-    virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
-                                        audio_format_t *surroundFormats,
-                                        bool *surroundFormatsEnabled,
-                                        bool reported);
-    virtual status_t getHwOffloadEncodingFormatsSupportedForA2DP(
-                                        std::vector<audio_format_t> *formats);
-    virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
-
-    virtual status_t setAssistantUid(uid_t uid);
-    virtual status_t setA11yServicesUids(const std::vector<uid_t>& uids);
-    virtual status_t setCurrentImeUid(uid_t uid);
-
-    virtual bool     isHapticPlaybackSupported();
-
-    virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies);
-    virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
-                                                           product_strategy_t &productStrategy);
-
-    virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups);
-
-    virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
-                                                       volume_group_t &volumeGroup);
-
-    status_t registerSoundTriggerCaptureStateListener(
-        const sp<media::ICaptureStateListener>& listener,
-        bool* result) override;
-
-    virtual status_t setRttEnabled(bool enabled);
-
-            bool isCallScreenModeSupported() override;
-
-            void doOnNewAudioModulesAvailable();
-            status_t doStopOutput(audio_port_handle_t portId);
-            void doReleaseOutput(audio_port_handle_t portId);
-
-            status_t clientCreateAudioPatch(const struct audio_patch *patch,
-                                      audio_patch_handle_t *handle,
-                                      int delayMs);
-            status_t clientReleaseAudioPatch(audio_patch_handle_t handle,
-                                             int delayMs);
-            virtual status_t clientSetAudioPortConfig(const struct audio_port_config *config,
-                                                      int delayMs);
-
-            void removeNotificationClient(uid_t uid, pid_t pid);
-            void onAudioPortListUpdate();
-            void doOnAudioPortListUpdate();
-            void onAudioPatchListUpdate();
-            void doOnAudioPatchListUpdate();
-
-            void onDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
-            void doOnDynamicPolicyMixStateUpdate(const String8& regId, int32_t state);
-            void onRecordingConfigurationUpdate(int event,
-                                                const record_client_info_t *clientInfo,
-                                                const audio_config_base_t *clientConfig,
-                                                std::vector<effect_descriptor_t> clientEffects,
-                                                const audio_config_base_t *deviceConfig,
-                                                std::vector<effect_descriptor_t> effects,
-                                                audio_patch_handle_t patchHandle,
-                                                audio_source_t source);
-            void doOnRecordingConfigurationUpdate(int event,
-                                                  const record_client_info_t *clientInfo,
-                                                  const audio_config_base_t *clientConfig,
-                                                  std::vector<effect_descriptor_t> clientEffects,
-                                                  const audio_config_base_t *deviceConfig,
-                                                  std::vector<effect_descriptor_t> effects,
-                                                  audio_patch_handle_t patchHandle,
-                                                  audio_source_t source);
-
-            void onAudioVolumeGroupChanged(volume_group_t group, int flags);
-            void doOnAudioVolumeGroupChanged(volume_group_t group, int flags);
-
-            void onRoutingUpdated();
-            void doOnRoutingUpdated();
-
-            void setEffectSuspended(int effectId,
-                                    audio_session_t sessionId,
-                                    bool suspended);
+    void setEffectSuspended(int effectId,
+                            audio_session_t sessionId,
+                            bool suspended);
 
 private:
                         AudioPolicyService() ANDROID_API;
@@ -386,6 +338,8 @@ private:
     bool isSupportedSystemUsage(audio_usage_t usage);
     status_t validateUsage(audio_usage_t usage);
     status_t validateUsage(audio_usage_t usage, pid_t pid, uid_t uid);
+
+    bool isUserSensorPrivacyEnabledForUid(uid_t uid);
 
     void updateUidStates();
     void updateUidStates_l() REQUIRES(mLock);
@@ -466,6 +420,7 @@ private:
                     : mService(service) {}
 
             void registerSelf();
+            void registerSelfForMicrophoneOnly(int userId);
             void unregisterSelf();
 
             bool isSensorPrivacyEnabled();
@@ -939,6 +894,8 @@ private:
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 
     CaptureStateNotifier mCaptureStateNotifier;
+
+    std::map<userid_t, sp<SensorPrivacyPolicy>> mMicrophoneSensorPrivacyPolicies;
 };
 
 } // namespace android

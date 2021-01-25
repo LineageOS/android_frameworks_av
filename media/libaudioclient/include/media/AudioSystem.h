@@ -68,8 +68,11 @@ typedef void (*record_config_callback)(int event,
 typedef void (*routing_callback)();
 
 class IAudioFlinger;
-class IAudioPolicyService;
 class String8;
+
+namespace media {
+class IAudioPolicyService;
+}
 
 class AudioSystem
 {
@@ -308,7 +311,7 @@ public:
 
     static status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
 
-    static uint32_t getStrategyForStream(audio_stream_type_t stream);
+    static product_strategy_t getStrategyForStream(audio_stream_type_t stream);
     static audio_devices_t getDevicesForStream(audio_stream_type_t stream);
     static status_t getDevicesForAttributes(const AudioAttributes &aa,
                                             AudioDeviceTypeAddrVector *devices);
@@ -316,7 +319,7 @@ public:
     static audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc);
     static status_t registerEffect(const effect_descriptor_t *desc,
                                     audio_io_handle_t io,
-                                    uint32_t strategy,
+                                    product_strategy_t strategy,
                                     audio_session_t session,
                                     int id);
     static status_t unregisterEffect(int id);
@@ -327,7 +330,7 @@ public:
     // and output configuration cache (gOutputs)
     static void clearAudioConfigCache();
 
-    static const sp<IAudioPolicyService> get_audio_policy_service();
+    static const sp<media::IAudioPolicyService> get_audio_policy_service();
 
     // helpers for android.media.AudioManager.getProperty(), see description there for meaning
     static uint32_t getPrimaryOutputSamplingRate();
@@ -337,7 +340,7 @@ public:
 
     static status_t setSupportedSystemUsages(const std::vector<audio_usage_t>& systemUsages);
 
-    static status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags);
+    static status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t capturePolicy);
 
     // Indicate if hw offload is possible for given format, stream type, sample rate,
     // bit rate, duration, video and streaming or offload property is enabled and when possible
@@ -667,7 +670,7 @@ private:
     static audio_format_t gPrevInFormat;
     static audio_channel_mask_t gPrevInChannelMask;
 
-    static sp<IAudioPolicyService> gAudioPolicyService;
+    static sp<media::IAudioPolicyService> gAudioPolicyService;
 };
 
 };  // namespace android

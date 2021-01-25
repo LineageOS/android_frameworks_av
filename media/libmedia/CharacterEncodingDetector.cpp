@@ -268,7 +268,7 @@ void CharacterEncodingDetector::detectAndConvert() {
 
                 ucnv_convertEx(mUtf8Conv, conv, &target, target + targetLength,
                         &source, source + strlen(source),
-                        NULL, NULL, NULL, NULL, TRUE, TRUE, &status);
+                        NULL, NULL, NULL, NULL, true, true, &status);
 
                 if (U_FAILURE(status)) {
                     ALOGE("ucnv_convertEx failed: %d", status);

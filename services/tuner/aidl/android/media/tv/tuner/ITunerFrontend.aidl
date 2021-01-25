@@ -19,10 +19,9 @@ package android.media.tv.tuner;
 import android.media.tv.tuner.ITunerFrontendCallback;
 import android.media.tv.tuner.TunerFrontendSettings;
 import android.media.tv.tuner.TunerFrontendStatus;
-import android.media.tv.tuner.TunerServiceFrontendInfo;
 
 /**
- * Tuner Frontend interface handles tuner related operations.
+ * Tuner Frontend interface handles frontend related operations.
  *
  * {@hide}
  */
@@ -82,4 +81,9 @@ interface ITunerFrontend {
      * Gets the statuses of the frontend.
      */
     TunerFrontendStatus[] getStatus(in int[] statusTypes);
+
+    /**
+     * Gets the id of the frontend.
+     */
+    int getFrontendId();
 }

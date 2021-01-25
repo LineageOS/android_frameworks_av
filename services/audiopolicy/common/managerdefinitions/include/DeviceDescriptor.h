@@ -65,6 +65,9 @@ public:
 
     bool supportsFormat(audio_format_t format);
 
+    void setDynamic() { mIsDynamic = true; }
+    bool isDynamic() const { return mIsDynamic; }
+
     // PolicyAudioPortConfig
     virtual sp<PolicyAudioPort> getPolicyAudioPort() const {
         return static_cast<PolicyAudioPort*>(const_cast<DeviceDescriptor*>(this));
@@ -105,6 +108,8 @@ private:
     std::string mTagName; // Unique human readable identifier for a device port found in conf file.
     FormatVector        mEncodedFormats;
     audio_format_t      mCurrentEncodedFormat;
+    bool                mIsDynamic = false;
+    const std::string   mDeclaredAddress; // Original device address
 };
 
 class DeviceVector : public SortedVector<sp<DeviceDescriptor> >
@@ -265,6 +270,8 @@ public:
         return String8("");
     }
 
+    const AudioProfileVector& getSupportedProfiles() { return mSupportedProfiles; }
+
     // Return a string to describe the DeviceVector. The sensitive information will only be
     // added to the string if `includeSensitiveInfo` is true.
     std::string toString(bool includeSensitiveInfo = false) const;
@@ -273,7 +280,9 @@ public:
 
 private:
     void refreshTypes();
+    void refreshAudioProfiles();
     DeviceTypeSet mDeviceTypes;
+    AudioProfileVector mSupportedProfiles;
 };
 
 } // namespace android

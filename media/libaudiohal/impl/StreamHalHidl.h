@@ -25,6 +25,7 @@
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
 #include <media/audiohal/StreamHalInterface.h>
+#include <mediautils/Synchronization.h>
 
 #include "ConversionHelperHidl.h"
 #include "StreamPowerLog.h"
@@ -100,8 +101,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
     // Subclasses can not be constructed directly by clients.
     explicit StreamHalHidl(IStream *stream);
 
-    // The destructor automatically closes the stream.
-    virtual ~StreamHalHidl();
+    ~StreamHalHidl() override;
 
     status_t getCachedBufferSize(size_t *size);
 
@@ -112,7 +112,7 @@ class StreamHalHidl : public virtual StreamHalInterface, public ConversionHelper
 
   private:
     const int HAL_THREAD_PRIORITY_DEFAULT = -1;
-    IStream *mStream;
+    IStream * const mStream;
     int mHalThreadPriority;
     size_t mCachedBufferSize;
 };
@@ -173,6 +173,24 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     void onDrainReady();
     void onError();
 
+    // Returns the Dual Mono mode presentation setting.
+    status_t getDualMonoMode(audio_dual_mono_mode_t* mode) override;
+
+    // Sets the Dual Mono mode presentation on the output device.
+    status_t setDualMonoMode(audio_dual_mono_mode_t mode) override;
+
+    // Returns the Audio Description Mix level in dB.
+    status_t getAudioDescriptionMixLevel(float* leveldB) override;
+
+    // Sets the Audio Description Mix level in dB.
+    status_t setAudioDescriptionMixLevel(float leveldB) override;
+
+    // Retrieves current playback rate parameters.
+    status_t getPlaybackRateParameters(audio_playback_rate_t* playbackRate) override;
+
+    // Sets the playback rate parameters that control playback behavior.
+    status_t setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) override;
+
     status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) override;
 
     // Methods used by StreamCodecFormatCallback (HIDL).
@@ -184,9 +202,9 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<WriteStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
-    wp<StreamOutHalInterfaceCallback> mCallback;
-    wp<StreamOutHalInterfaceEventCallback> mEventCallback;
-    sp<IStreamOut> mStream;
+    mediautils::atomic_wp<StreamOutHalInterfaceCallback> mCallback;
+    mediautils::atomic_wp<StreamOutHalInterfaceEventCallback> mEventCallback;
+    const sp<IStreamOut> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;
@@ -242,7 +260,7 @@ class StreamInHalHidl : public StreamInHalInterface, public StreamHalHidl {
     typedef MessageQueue<uint8_t, hardware::kSynchronizedReadWrite> DataMQ;
     typedef MessageQueue<ReadStatus, hardware::kSynchronizedReadWrite> StatusMQ;
 
-    sp<IStreamIn> mStream;
+    const sp<IStreamIn> mStream;
     std::unique_ptr<CommandMQ> mCommandMQ;
     std::unique_ptr<DataMQ> mDataMQ;
     std::unique_ptr<StatusMQ> mStatusMQ;

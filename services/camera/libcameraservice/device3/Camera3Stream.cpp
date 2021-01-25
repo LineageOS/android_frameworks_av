@@ -417,6 +417,13 @@ bool Camera3Stream::isUnpreparable() {
     return mStreamUnpreparable;
 }
 
+void Camera3Stream::markUnpreparable() {
+    ATRACE_CALL();
+
+    Mutex::Autolock l(mLock);
+    mStreamUnpreparable = true;
+}
+
 status_t Camera3Stream::startPrepare(int maxCount, bool blockRequest) {
     ATRACE_CALL();
 

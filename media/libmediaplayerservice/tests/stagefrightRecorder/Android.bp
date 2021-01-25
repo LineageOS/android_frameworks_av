@@ -41,7 +41,7 @@ cc_test {
         "libmediandk",
     ],
 
-    compile_multilib: "32",
+    compile_multilib: "prefer32",
 
     cflags: [
         "-Werror",

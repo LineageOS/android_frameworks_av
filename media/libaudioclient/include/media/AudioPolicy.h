@@ -120,7 +120,7 @@ public:
     String8         mDeviceAddress;
     uint32_t        mCbFlags; // flags indicating which callbacks to use, see kCbFlag*
     /** Ignore the AUDIO_FLAG_NO_MEDIA_PROJECTION */
-    bool            mAllowPrivilegedPlaybackCapture = false;
+    bool            mAllowPrivilegedMediaPlaybackCapture = false;
     /** Indicates if the caller can capture voice communication output */
     bool            mVoiceCommunicationCaptureAllowed = false;
 };

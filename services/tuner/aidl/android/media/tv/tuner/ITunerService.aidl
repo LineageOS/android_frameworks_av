@@ -19,8 +19,10 @@ package android.media.tv.tuner;
 import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.fmq.UnsynchronizedWrite;
+import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerFrontend;
-import android.media.tv.tuner.TunerServiceFrontendInfo;
+import android.media.tv.tuner.ITunerLnb;
+import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
  * TunerService interface handles tuner related operations.
@@ -32,10 +34,8 @@ interface ITunerService {
 
     /**
      * Gets frontend IDs.
-     *
-     * @return the result code of the operation.
      */
-    int getFrontendIds(out int[] ids);
+    void getFrontendIds(out int[] ids);
 
     /**
      * Retrieve the frontend's information.
@@ -43,7 +43,7 @@ interface ITunerService {
      * @param frontendHandle the handle of the frontend granted by TRM.
      * @return the information of the frontend.
      */
-    TunerServiceFrontendInfo getFrontendInfo(in int frontendHandle);
+    TunerFrontendInfo getFrontendInfo(in int frontendHandle);
 
     /**
      * Open a Tuner Frontend interface.
@@ -59,4 +59,31 @@ interface ITunerService {
      * @return true if succeeds, false otherwise.
      */
     boolean getFmqSyncReadWrite(out MQDescriptor<byte, SynchronizedReadWrite> mqDesc);
+
+    /**
+     * Open a new interface of ITunerLnb given a lnbHandle.
+     *
+     * @param lnbHandle the handle of the LNB granted by TRM.
+     * @return a newly created ITunerLnb interface.
+     */
+    ITunerLnb openLnb(in int lnbHandle);
+
+    /**
+     * Open a new interface of ITunerLnb given a LNB name.
+     *
+     * @param lnbName the name for an external LNB to be opened.
+     * @return a newly created ITunerLnb interface.
+     */
+    ITunerLnb openLnbByName(in String lnbName);
+
+    /**
+     * Create a new instance of Demux.
+     */
+    ITunerDemux openDemux(in int demuxHandle);
+
+    /**
+     * Update Tuner Resources in TunerResourceManager.
+     */
+    // TODO: b/178124017 update TRM in TunerService independently.
+    void updateTunerResources();
 }

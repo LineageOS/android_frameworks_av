@@ -17,10 +17,9 @@
 #define LOG_TAG "TunerFrontend"
 
 #include "TunerFrontend.h"
-#include "TunerService.h"
 
-using ::aidl::android::media::tv::tuner::TunerAtsc3PlpInfo;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3PlpSettings;
+using ::aidl::android::media::tv::tuner::TunerFrontendScanAtsc3PlpInfo;
 using ::android::hardware::tv::tuner::V1_0::FrontendAnalogSifStandard;
 using ::android::hardware::tv::tuner::V1_0::FrontendAnalogType;
 using ::android::hardware::tv::tuner::V1_0::FrontendAtscModulation;
@@ -69,29 +68,23 @@ using ::android::hardware::tv::tuner::V1_0::FrontendScanAtsc3PlpInfo;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanType;
 using ::android::hardware::tv::tuner::V1_0::FrontendSettings;;
 using ::android::hardware::tv::tuner::V1_0::Result;
+using ::android::hardware::tv::tuner::V1_1::FrontendModulation;
 
 namespace android {
 
-TunerFrontend::TunerFrontend(sp<ITuner> tuner, int frontendHandle) {
-    mTuner = tuner;
-    mId = TunerService::getResourceIdFromHandle(frontendHandle);
-
-    if (mTuner != NULL) {
-        Result status;
-        mTuner->openFrontendById(mId, [&](Result result, const sp<IFrontend>& frontend) {
-            mFrontend = frontend;
-            status = result;
-        });
-        if (status != Result::SUCCESS) {
-            mFrontend = NULL;
-        }
-    }
+TunerFrontend::TunerFrontend(sp<IFrontend> frontend, int id) {
+    mFrontend = frontend;
+    mFrontend_1_1 = ::android::hardware::tv::tuner::V1_1::IFrontend::castFrom(mFrontend);
+    mId = id;
 }
 
-TunerFrontend::~TunerFrontend() {}
+TunerFrontend::~TunerFrontend() {
+    mFrontend = NULL;
+    mId = -1;
+}
 
 Status TunerFrontend::setCallback(
-        const std::shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) {
+        const shared_ptr<ITunerFrontendCallback>& tunerFrontendCallback) {
     if (mFrontend == NULL) {
         ALOGE("IFrontend is not initialized");
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
@@ -124,6 +117,7 @@ Status TunerFrontend::scan(const TunerFrontendSettings& settings, int frontendSc
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
+    // TODO: extend TunerFrontendSettings to use 1.1 types
     FrontendSettings frontendSettings;
     switch (settings.getTag()) {
         case TunerFrontendSettings::analog:
@@ -307,8 +301,13 @@ Status TunerFrontend::close() {
     return Status::ok();
 }
 
-Status TunerFrontend::getStatus(const std::vector<int32_t>& /*statusTypes*/,
-		std::vector<TunerFrontendStatus>* /*_aidl_return*/) {
+Status TunerFrontend::getStatus(const vector<int32_t>& /*statusTypes*/,
+        vector<TunerFrontendStatus>* /*_aidl_return*/) {
+    return Status::ok();
+}
+
+Status TunerFrontend::getFrontendId(int* _aidl_return) {
+    *_aidl_return = mId;
     return Status::ok();
 }
 
@@ -323,59 +322,56 @@ Return<void> TunerFrontend::FrontendCallback::onEvent(FrontendEventType frontend
 Return<void> TunerFrontend::FrontendCallback::onScanMessage(
         FrontendScanMessageType type, const FrontendScanMessage& message) {
     ALOGD("FrontendCallback::onScanMessage, type=%d", type);
+    TunerFrontendScanMessage scanMessage;
     switch(type) {
         case FrontendScanMessageType::LOCKED: {
-            if (message.isLocked()) {
-                mTunerFrontendCallback->onLocked();
-            }
+            scanMessage.set<TunerFrontendScanMessage::isLocked>(message.isLocked());
             break;
         }
         case FrontendScanMessageType::END: {
-            if (message.isEnd()) {
-                mTunerFrontendCallback->onScanStopped();
-            }
+            scanMessage.set<TunerFrontendScanMessage::isEnd>(message.isEnd());
             break;
         }
         case FrontendScanMessageType::PROGRESS_PERCENT: {
-            mTunerFrontendCallback->onProgress((int)message.progressPercent());
+            scanMessage.set<TunerFrontendScanMessage::progressPercent>(message.progressPercent());
             break;
         }
         case FrontendScanMessageType::FREQUENCY: {
             auto f = message.frequencies();
-            std::vector<int32_t> frequencies(std::begin(f), std::end(f));
-            mTunerFrontendCallback->onFrequenciesReport(frequencies);
+            vector<int> frequencies(begin(f), end(f));
+            scanMessage.set<TunerFrontendScanMessage::frequencies>(frequencies);
             break;
         }
         case FrontendScanMessageType::SYMBOL_RATE: {
             auto s = message.symbolRates();
-            std::vector<int32_t> symbolRates(std::begin(s), std::end(s));
-            mTunerFrontendCallback->onSymbolRates(symbolRates);
+            vector<int> symbolRates(begin(s), end(s));
+            scanMessage.set<TunerFrontendScanMessage::symbolRates>(symbolRates);
             break;
         }
         case FrontendScanMessageType::HIERARCHY: {
-            mTunerFrontendCallback->onHierarchy((int)message.hierarchy());
+            scanMessage.set<TunerFrontendScanMessage::hierarchy>((int)message.hierarchy());
             break;
         }
         case FrontendScanMessageType::ANALOG_TYPE: {
-            mTunerFrontendCallback->onSignalType((int)message.analogType());
+            scanMessage.set<TunerFrontendScanMessage::analogType>((int)message.analogType());
             break;
         }
         case FrontendScanMessageType::PLP_IDS: {
             auto p = message.plpIds();
-            std::vector<int32_t> plpIds(std::begin(p), std::end(p));
-            mTunerFrontendCallback->onPlpIds(plpIds);
+            vector<uint8_t> plpIds(begin(p), end(p));
+            scanMessage.set<TunerFrontendScanMessage::plpIds>(plpIds);
             break;
         }
         case FrontendScanMessageType::GROUP_IDS: {
             auto g = message.groupIds();
-            std::vector<int32_t> groupIds(std::begin(g), std::end(g));
-            mTunerFrontendCallback->onGroupIds(groupIds);
+            vector<uint8_t> groupIds(begin(g), end(g));
+            scanMessage.set<TunerFrontendScanMessage::groupIds>(groupIds);
             break;
         }
         case FrontendScanMessageType::INPUT_STREAM_IDS: {
             auto i = message.inputStreamIds();
-            std::vector<int32_t> streamIds(std::begin(i), std::end(i));
-            mTunerFrontendCallback->onInputStreamIds(streamIds);
+            vector<char16_t> streamIds(begin(i), end(i));
+            scanMessage.set<TunerFrontendScanMessage::inputStreamIds>(streamIds);
             break;
         }
         case FrontendScanMessageType::STANDARD: {
@@ -383,41 +379,85 @@ Return<void> TunerFrontend::FrontendCallback::onScanMessage(
             int standard;
             if (std.getDiscriminator() == FrontendScanMessage::Standard::hidl_discriminator::sStd) {
                 standard = (int) std.sStd();
-                mTunerFrontendCallback->onDvbsStandard(standard);
             } else if (std.getDiscriminator() ==
                     FrontendScanMessage::Standard::hidl_discriminator::tStd) {
                 standard = (int) std.tStd();
-                mTunerFrontendCallback->onDvbsStandard(standard);
             } else if (std.getDiscriminator() ==
                     FrontendScanMessage::Standard::hidl_discriminator::sifStd) {
                 standard = (int) std.sifStd();
-                mTunerFrontendCallback->onAnalogSifStandard(standard);
             }
+            scanMessage.set<TunerFrontendScanMessage::std>(standard);
             break;
         }
         case FrontendScanMessageType::ATSC3_PLP_INFO: {
-            std::vector<FrontendScanAtsc3PlpInfo> plpInfos = message.atsc3PlpInfos();
-            std::vector<TunerAtsc3PlpInfo> tunerPlpInfos;
+            vector<FrontendScanAtsc3PlpInfo> plpInfos = message.atsc3PlpInfos();
+            vector<TunerFrontendScanAtsc3PlpInfo> tunerPlpInfos;
             for (int i = 0; i < plpInfos.size(); i++) {
                 auto info = plpInfos[i];
                 int plpId = (int) info.plpId;
                 bool lls = (bool) info.bLlsFlag;
-                TunerAtsc3PlpInfo plpInfo{
+                TunerFrontendScanAtsc3PlpInfo plpInfo{
                     .plpId = plpId,
                     .llsFlag = lls,
                 };
                 tunerPlpInfos.push_back(plpInfo);
             }
-            mTunerFrontendCallback->onAtsc3PlpInfos(tunerPlpInfos);
+            scanMessage.set<TunerFrontendScanMessage::atsc3PlpInfos>(tunerPlpInfos);
             break;
         }
         default:
             break;
     }
+    mTunerFrontendCallback->onScanMessage((int)type, scanMessage);
     return Void();
 }
 
-////////////////////////////////////////////////////////////////////////////////
+Return<void> TunerFrontend::FrontendCallback::onScanMessageExt1_1(
+        FrontendScanMessageTypeExt1_1 type, const FrontendScanMessageExt1_1& message) {
+    ALOGD("onScanMessageExt1_1::onScanMessage, type=%d", type);
+    TunerFrontendScanMessage scanMessage;
+    switch(type) {
+        case FrontendScanMessageTypeExt1_1::MODULATION: {
+            FrontendModulation m = message.modulation();
+            int modulation;
+            if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dvbc) {
+                modulation = (int) m.dvbc();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dvbt) {
+                modulation = (int) m.dvbt();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dvbs) {
+                modulation = (int) m.dvbs();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::isdbs) {
+                modulation = (int) m.isdbs();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::isdbs3) {
+                modulation = (int) m.isdbs3();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::isdbt) {
+                modulation = (int) m.isdbt();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::atsc) {
+                modulation = (int) m.atsc();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::atsc3) {
+                modulation = (int) m.atsc3();
+            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dtmb) {
+                modulation = (int) m.dtmb();
+            }
+            scanMessage.set<TunerFrontendScanMessage::modulation>(modulation);
+            break;
+        }
+        case FrontendScanMessageTypeExt1_1::DVBC_ANNEX: {
+            scanMessage.set<TunerFrontendScanMessage::annex>((int)message.annex());
+            break;
+        }
+        case FrontendScanMessageTypeExt1_1::HIGH_PRIORITY: {
+            scanMessage.set<TunerFrontendScanMessage::isHighPriority>(message.isHighPriority());
+            break;
+        }
+        default:
+            break;
+    }
+    mTunerFrontendCallback->onScanMessage((int)type, scanMessage);
+    return Void();
+}
+
+/////////////// TunerFrontend Helper Methods ///////////////////////
 
 hidl_vec<FrontendAtsc3PlpSettings> TunerFrontend::getAtsc3PlpSettings(
         const TunerFrontendAtsc3Settings& settings) {

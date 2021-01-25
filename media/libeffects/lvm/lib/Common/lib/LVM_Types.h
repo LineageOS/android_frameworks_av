@@ -26,7 +26,7 @@
 #define LVM_TYPES_H
 
 #include <stdint.h>
-
+#include <system/audio.h>
 /****************************************************************************************/
 /*                                                                                      */
 /*  definitions                                                                         */
@@ -82,7 +82,7 @@ typedef float LVM_FLOAT; /* single precision floating point */
 #define EFFECT_BUFFER_FORMAT AUDIO_FORMAT_PCM_FLOAT
 typedef float effect_buffer_t;
 
-#define LVM_MAX_CHANNELS 8  // FCC_8
+#define LVM_MAX_CHANNELS FCC_24
 
 /****************************************************************************************/
 /*                                                                                      */

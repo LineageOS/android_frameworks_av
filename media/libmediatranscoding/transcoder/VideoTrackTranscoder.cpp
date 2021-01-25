@@ -260,7 +260,15 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    AMediaCodec* encoder = AMediaCodec_createEncoderByTypeForClient(destinationMime, mPid, mUid);
+    // TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
+    #define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
+
+    AMediaCodec* encoder;
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+        encoder = AMediaCodec_createEncoderByTypeForClient(destinationMime, mPid, mUid);
+    } else {
+        encoder = AMediaCodec_createEncoderByType(destinationMime);
+    }
     if (encoder == nullptr) {
         LOG(ERROR) << "Unable to create encoder for type " << destinationMime;
         return AMEDIA_ERROR_UNSUPPORTED;
@@ -290,7 +298,11 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    mDecoder = AMediaCodec_createDecoderByTypeForClient(sourceMime, mPid, mUid);
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+        mDecoder = AMediaCodec_createDecoderByTypeForClient(sourceMime, mPid, mUid);
+    } else {
+        mDecoder = AMediaCodec_createDecoderByType(sourceMime);
+    }
     if (mDecoder == nullptr) {
         LOG(ERROR) << "Unable to create decoder for type " << sourceMime;
         return AMEDIA_ERROR_UNSUPPORTED;

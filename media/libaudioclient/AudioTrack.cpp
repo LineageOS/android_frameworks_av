@@ -22,6 +22,7 @@
 #include <math.h>
 #include <sys/resource.h>
 
+#include <android/media/IAudioPolicyService.h>
 #include <android-base/macros.h>
 #include <audio_utils/clock.h>
 #include <audio_utils/primitives.h>
@@ -31,7 +32,6 @@
 #include <private/media/AudioTrackShared.h>
 #include <processgroup/sched_policy.h>
 #include <media/IAudioFlinger.h>
-#include <media/IAudioPolicyService.h>
 #include <media/AudioParameter.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
@@ -50,6 +50,8 @@
 #define WAIT_PERIOD_MS                  10
 #define WAIT_STREAM_END_TIMEOUT_SEC     120
 static const int kMaxLoopCountNotifications = 32;
+
+using ::android::aidl_utils::statusTFromBinderStatus;
 
 namespace android {
 // ---------------------------------------------------------------------------
@@ -172,9 +174,20 @@ status_t AudioTrack::getMinFrameCount(
 bool AudioTrack::isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes) {
     ALOGV("%s()", __FUNCTION__);
-    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    const sp<media::IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return false;
-    return aps->isDirectOutputSupported(config, attributes);
+
+    auto result = [&]() -> ConversionResult<bool> {
+        media::AudioConfigBase configAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_config_base_t_AudioConfigBase(config));
+        media::AudioAttributesInternal attributesAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_attributes_t_AudioAttributesInternal(attributes));
+        bool retAidl;
+        RETURN_IF_ERROR(aidl_utils::statusTFromBinderStatus(
+                aps->isDirectOutputSupported(configAidl, attributesAidl, &retAidl)));
+        return retAidl;
+    }();
+    return result.value_or(false);
 }
 
 // ---------------------------------------------------------------------------
@@ -1085,6 +1098,53 @@ uint32_t AudioTrack::getOriginalSampleRate() const
     return mOriginalSampleRate;
 }
 
+status_t AudioTrack::setDualMonoMode(audio_dual_mono_mode_t mode)
+{
+    AutoMutex lock(mLock);
+    return setDualMonoMode_l(mode);
+}
+
+status_t AudioTrack::setDualMonoMode_l(audio_dual_mono_mode_t mode)
+{
+    const status_t status = statusTFromBinderStatus(
+        mAudioTrack->setDualMonoMode(VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(mode))));
+    if (status == NO_ERROR) mDualMonoMode = mode;
+    return status;
+}
+
+status_t AudioTrack::getDualMonoMode(audio_dual_mono_mode_t* mode) const
+{
+    AutoMutex lock(mLock);
+    media::AudioDualMonoMode mediaMode;
+    const status_t status = statusTFromBinderStatus(mAudioTrack->getDualMonoMode(&mediaMode));
+    if (status == NO_ERROR) {
+        *mode = VALUE_OR_RETURN_STATUS(
+                aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(mediaMode));
+    }
+    return status;
+}
+
+status_t AudioTrack::setAudioDescriptionMixLevel(float leveldB)
+{
+    AutoMutex lock(mLock);
+    return setAudioDescriptionMixLevel_l(leveldB);
+}
+
+status_t AudioTrack::setAudioDescriptionMixLevel_l(float leveldB)
+{
+    const status_t status = statusTFromBinderStatus(
+             mAudioTrack->setAudioDescriptionMixLevel(leveldB));
+    if (status == NO_ERROR) mAudioDescriptionMixLeveldB = leveldB;
+    return status;
+}
+
+status_t AudioTrack::getAudioDescriptionMixLevel(float* leveldB) const
+{
+    AutoMutex lock(mLock);
+    return statusTFromBinderStatus(mAudioTrack->getAudioDescriptionMixLevel(leveldB));
+}
+
 status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
 {
     AutoMutex lock(mLock);
@@ -1092,7 +1152,13 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
         return NO_ERROR;
     }
     if (isOffloadedOrDirect_l()) {
-        return INVALID_OPERATION;
+        const status_t status = statusTFromBinderStatus(mAudioTrack->setPlaybackRateParameters(
+                VALUE_OR_RETURN_STATUS(
+                        legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(playbackRate))));
+        if (status == NO_ERROR) {
+            mPlaybackRate = playbackRate;
+        }
+        return status;
     }
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
         return INVALID_OPERATION;
@@ -1157,9 +1223,18 @@ status_t AudioTrack::setPlaybackRate(const AudioPlaybackRate &playbackRate)
     return NO_ERROR;
 }
 
-const AudioPlaybackRate& AudioTrack::getPlaybackRate() const
+const AudioPlaybackRate& AudioTrack::getPlaybackRate()
 {
     AutoMutex lock(mLock);
+    if (isOffloadedOrDirect_l()) {
+        media::AudioPlaybackRate playbackRateTemp;
+        const status_t status = statusTFromBinderStatus(
+                mAudioTrack->getPlaybackRateParameters(&playbackRateTemp));
+        if (status == NO_ERROR) { // update local version if changed.
+            mPlaybackRate =
+                    aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(playbackRateTemp).value();
+        }
+    }
     return mPlaybackRate;
 }
 
@@ -1759,6 +1834,13 @@ status_t AudioTrack::createTrack_l()
     playbackRateTemp.mPitch = effectivePitch;
     mProxy->setPlaybackRate(playbackRateTemp);
     mProxy->setMinimum(mNotificationFramesAct);
+
+    if (mDualMonoMode != AUDIO_DUAL_MONO_MODE_OFF) {
+        setDualMonoMode_l(mDualMonoMode);
+    }
+    if (mAudioDescriptionMixLeveldB != -std::numeric_limits<float>::infinity()) {
+        setAudioDescriptionMixLevel_l(mAudioDescriptionMixLeveldB);
+    }
 
     mDeathNotifier = new DeathNotifier(this);
     IInterface::asBinder(mAudioTrack)->linkToDeath(mDeathNotifier, this);

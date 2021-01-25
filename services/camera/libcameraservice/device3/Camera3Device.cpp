@@ -2161,6 +2161,14 @@ void Camera3Device::notifyStatus(bool idle) {
                 streamStats[i].mRequestCount = stats->second.mRequestedFrameCount;
                 streamStats[i].mErrorCount = stats->second.mDroppedFrameCount;
                 streamStats[i].mStartLatencyMs = stats->second.mStartLatencyMs;
+                streamStats[i].mHistogramType =
+                        hardware::CameraStreamStats::HISTOGRAM_TYPE_CAPTURE_LATENCY;
+                streamStats[i].mHistogramBins.assign(
+                        stats->second.mCaptureLatencyBins.begin(),
+                        stats->second.mCaptureLatencyBins.end());
+                streamStats[i].mHistogramCounts.assign(
+                        stats->second.mCaptureLatencyHistogram.begin(),
+                        stats->second.mCaptureLatencyHistogram.end());
             }
         }
         listener->notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
@@ -4686,6 +4694,10 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 buffer.status = CAMERA_BUFFER_STATUS_OK;
                 buffer.acquire_fence = -1;
                 buffer.release_fence = -1;
+                // Mark the output stream as unpreparable to block clients from calling
+                // 'prepare' after this request reaches CameraHal and before the respective
+                // buffers are requested.
+                outputStream->markUnpreparable();
             } else {
                 res = outputStream->getBuffer(&outputBuffers->editItemAt(j),
                         waitDuration,

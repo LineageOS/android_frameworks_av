@@ -62,7 +62,9 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
 }
 
 StreamHalHidl::~StreamHalHidl() {
-    mStream = nullptr;
+    // The last step is to flush all binder commands so that the deletion
+    // of IStreamIn / IStreamOut (mStream) is issued with less delay. See b/35394629.
+    hardware::IPCThreadState::self()->flushCommands();
 }
 
 status_t StreamHalHidl::getSampleRate(uint32_t *rate) {
@@ -286,7 +288,7 @@ struct StreamOutCallback : public IStreamOutCallback {
     }
 
   private:
-    wp<StreamOutHalHidl> mStream;
+    const wp<StreamOutHalHidl> mStream;
 };
 
 }  // namespace
@@ -297,21 +299,19 @@ StreamOutHalHidl::StreamOutHalHidl(const sp<IStreamOut>& stream)
 
 StreamOutHalHidl::~StreamOutHalHidl() {
     if (mStream != 0) {
-        if (mCallback.unsafe_get()) {
+        if (mCallback.load().unsafe_get()) {
             processReturn("clearCallback", mStream->clearCallback());
         }
 #if MAJOR_VERSION >= 6
-        if (mEventCallback.unsafe_get() != nullptr) {
+        if (mEventCallback.load().unsafe_get() != nullptr) {
             processReturn("setEventCallback",
                     mStream->setEventCallback(nullptr));
         }
 #endif
         processReturn("close", mStream->close());
-        mStream.clear();
     }
-    mCallback.clear();
-    mEventCallback.clear();
-    hardware::IPCThreadState::self()->flushCommands();
+    mCallback = nullptr;
+    mEventCallback = nullptr;
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
     }
@@ -364,7 +364,7 @@ status_t StreamOutHalHidl::write(const void *buffer, size_t bytes, size_t *writt
 
     if (bytes == 0 && !mDataMQ) {
         // Can't determine the size for the MQ buffer. Wait for a non-empty write request.
-        ALOGW_IF(mCallback.unsafe_get(), "First call to async write with 0 bytes");
+        ALOGW_IF(mCallback.load().unsafe_get(), "First call to async write with 0 bytes");
         return OK;
     }
 
@@ -636,12 +636,105 @@ status_t StreamOutHalHidl::updateSourceMetadata(
 #endif
 
 #if MAJOR_VERSION < 6
+status_t StreamOutHalHidl::getDualMonoMode(audio_dual_mono_mode_t* mode __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::setDualMonoMode(audio_dual_mono_mode_t mode __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::getAudioDescriptionMixLevel(float* leveldB __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::setAudioDescriptionMixLevel(float leveldB __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::getPlaybackRateParameters(
+        audio_playback_rate_t* playbackRate __unused) {
+    return INVALID_OPERATION;
+}
+
+status_t StreamOutHalHidl::setPlaybackRateParameters(
+        const audio_playback_rate_t& playbackRate __unused) {
+    return INVALID_OPERATION;
+}
+
 status_t StreamOutHalHidl::setEventCallback(
         const sp<StreamOutHalInterfaceEventCallback>& callback __unused) {
     // Codec format callback is supported starting from audio HAL V6.0
     return INVALID_OPERATION;
 }
 #else
+
+status_t StreamOutHalHidl::getDualMonoMode(audio_dual_mono_mode_t* mode) {
+    if (mStream == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getDualMonoMode(
+            [&](Result r, DualMonoMode hidlMode) {
+                retval = r;
+                if (retval == Result::OK) {
+                    *mode = static_cast<audio_dual_mono_mode_t>(hidlMode);
+                }
+            });
+    return processReturn("getDualMonoMode", ret, retval);
+}
+
+status_t StreamOutHalHidl::setDualMonoMode(audio_dual_mono_mode_t mode) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn(
+            "setDualMonoMode", mStream->setDualMonoMode(static_cast<DualMonoMode>(mode)));
+}
+
+status_t StreamOutHalHidl::getAudioDescriptionMixLevel(float* leveldB) {
+    if (mStream == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getAudioDescriptionMixLevel(
+            [&](Result r, float hidlLeveldB) {
+                retval = r;
+                if (retval == Result::OK) {
+                    *leveldB = hidlLeveldB;
+                }
+            });
+    return processReturn("getAudioDescriptionMixLevel", ret, retval);
+}
+
+status_t StreamOutHalHidl::setAudioDescriptionMixLevel(float leveldB) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn(
+            "setAudioDescriptionMixLevel", mStream->setAudioDescriptionMixLevel(leveldB));
+}
+
+status_t StreamOutHalHidl::getPlaybackRateParameters(audio_playback_rate_t* playbackRate) {
+    if (mStream == 0) return NO_INIT;
+    Result retval;
+    Return<void> ret = mStream->getPlaybackRateParameters(
+            [&](Result r, PlaybackRate hidlPlaybackRate) {
+                retval = r;
+                if (retval == Result::OK) {
+                    playbackRate->mSpeed = hidlPlaybackRate.speed;
+                    playbackRate->mPitch = hidlPlaybackRate.pitch;
+                    playbackRate->mStretchMode =
+                        static_cast<audio_timestretch_stretch_mode_t>(
+                            hidlPlaybackRate.timestretchMode);
+                    playbackRate->mFallbackMode =
+                        static_cast<audio_timestretch_fallback_mode_t>(
+                            hidlPlaybackRate.fallbackMode);
+                }
+            });
+    return processReturn("getPlaybackRateParameters", ret, retval);
+}
+
+status_t StreamOutHalHidl::setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) {
+    if (mStream == 0) return NO_INIT;
+    return processReturn(
+            "setPlaybackRateParameters", mStream->setPlaybackRateParameters(
+                PlaybackRate{playbackRate.mSpeed, playbackRate.mPitch,
+                    static_cast<TimestretchMode>(playbackRate.mStretchMode),
+                    static_cast<TimestretchFallbackMode>(playbackRate.mFallbackMode)}));
+}
 
 #include PATH(android/hardware/audio/FILE_VERSION/IStreamOutEventCallback.h)
 
@@ -680,28 +773,28 @@ status_t StreamOutHalHidl::setEventCallback(
 #endif
 
 void StreamOutHalHidl::onWriteReady() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
+    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onWriteReady");
     callback->onWriteReady();
 }
 
 void StreamOutHalHidl::onDrainReady() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
+    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onDrainReady");
     callback->onDrainReady();
 }
 
 void StreamOutHalHidl::onError() {
-    sp<StreamOutHalInterfaceCallback> callback = mCallback.promote();
+    sp<StreamOutHalInterfaceCallback> callback = mCallback.load().promote();
     if (callback == 0) return;
     ALOGV("asyncCallback onError");
     callback->onError();
 }
 
 void StreamOutHalHidl::onCodecFormatChanged(const std::basic_string<uint8_t>& metadataBs) {
-    sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.promote();
+    sp<StreamOutHalInterfaceEventCallback> callback = mEventCallback.load().promote();
     if (callback == nullptr) return;
     ALOGV("asyncCodecFormatCallback %s", __func__);
     callback->onCodecFormatChanged(metadataBs);
@@ -715,8 +808,6 @@ StreamInHalHidl::StreamInHalHidl(const sp<IStreamIn>& stream)
 StreamInHalHidl::~StreamInHalHidl() {
     if (mStream != 0) {
         processReturn("close", mStream->close());
-        mStream.clear();
-        hardware::IPCThreadState::self()->flushCommands();
     }
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);

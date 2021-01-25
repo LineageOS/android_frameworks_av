@@ -33,6 +33,7 @@
 
 #include <media/nbaio/Pipe.h>
 #include <media/nbaio/PipeReader.h>
+#include <media/AudioValidator.h>
 #include <media/RecordBufferConverter.h>
 #include <mediautils/ServiceUtilities.h>
 #include <audio_utils/minifloat.h>
@@ -52,9 +53,17 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
+// TODO: Remove when this is put into AidlConversionUtil.h
+#define VALUE_OR_RETURN_BINDER_STATUS(x)    \
+    ({                                      \
+       auto _tmp = (x);                     \
+       if (!_tmp.ok()) return ::android::aidl_utils::binderStatusFromStatusT(_tmp.error()); \
+       std::move(_tmp.value());             \
+     })
+
 namespace android {
 
-using aidl_utils::binderStatusFromStatusT;
+using ::android::aidl_utils::binderStatusFromStatusT;
 using binder::Status;
 using media::VolumeShaper;
 // ----------------------------------------------------------------------------
@@ -413,6 +422,64 @@ Status AudioFlinger::TrackHandle::getVolumeShaperState(
     legacy->writeToParcelable(&aidl);
     *_aidl_return = aidl;
     return Status::ok();
+}
+
+Status AudioFlinger::TrackHandle::getDualMonoMode(media::AudioDualMonoMode* _aidl_return)
+{
+    audio_dual_mono_mode_t mode = AUDIO_DUAL_MONO_MODE_OFF;
+    const status_t status = mTrack->getDualMonoMode(&mode)
+            ?: AudioValidator::validateDualMonoMode(mode);
+    if (status == OK) {
+        *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
+                legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(mode));
+    }
+    return binderStatusFromStatusT(status);
+}
+
+Status AudioFlinger::TrackHandle::setDualMonoMode(
+        media::AudioDualMonoMode mode)
+{
+    const auto localMonoMode = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(mode));
+    return binderStatusFromStatusT(AudioValidator::validateDualMonoMode(localMonoMode)
+            ?: mTrack->setDualMonoMode(localMonoMode));
+}
+
+Status AudioFlinger::TrackHandle::getAudioDescriptionMixLevel(float* _aidl_return)
+{
+    float leveldB = -std::numeric_limits<float>::infinity();
+    const status_t status = mTrack->getAudioDescriptionMixLevel(&leveldB)
+            ?: AudioValidator::validateAudioDescriptionMixLevel(leveldB);
+    if (status == OK) *_aidl_return = leveldB;
+    return binderStatusFromStatusT(status);
+}
+
+Status AudioFlinger::TrackHandle::setAudioDescriptionMixLevel(float leveldB)
+{
+    return binderStatusFromStatusT(AudioValidator::validateAudioDescriptionMixLevel(leveldB)
+             ?: mTrack->setAudioDescriptionMixLevel(leveldB));
+}
+
+Status AudioFlinger::TrackHandle::getPlaybackRateParameters(
+        media::AudioPlaybackRate* _aidl_return)
+{
+    audio_playback_rate_t localPlaybackRate{};
+    status_t status = mTrack->getPlaybackRateParameters(&localPlaybackRate)
+            ?: AudioValidator::validatePlaybackRate(localPlaybackRate);
+    if (status == NO_ERROR) {
+        *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(
+                legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(localPlaybackRate));
+    }
+    return binderStatusFromStatusT(status);
+}
+
+Status AudioFlinger::TrackHandle::setPlaybackRateParameters(
+        const media::AudioPlaybackRate& playbackRate)
+{
+    const audio_playback_rate_t localPlaybackRate = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(playbackRate));
+    return binderStatusFromStatusT(AudioValidator::validatePlaybackRate(localPlaybackRate)
+            ?: mTrack->setPlaybackRateParameters(localPlaybackRate));
 }
 
 // ----------------------------------------------------------------------------
@@ -1498,6 +1565,108 @@ void AudioFlinger::PlaybackThread::Track::signal()
         Mutex::Autolock _l(t->mLock);
         t->broadcast_l();
     }
+}
+
+status_t AudioFlinger::PlaybackThread::Track::getDualMonoMode(audio_dual_mono_mode_t* mode)
+{
+    status_t status = INVALID_OPERATION;
+    if (isOffloadedOrDirect()) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr) {
+            PlaybackThread *t = (PlaybackThread *)thread.get();
+            Mutex::Autolock _l(t->mLock);
+            status = t->mOutput->stream->getDualMonoMode(mode);
+            ALOGD_IF((status == NO_ERROR) && (mDualMonoMode != *mode),
+                    "%s: mode %d inconsistent", __func__, mDualMonoMode);
+        }
+    }
+    return status;
+}
+
+status_t AudioFlinger::PlaybackThread::Track::setDualMonoMode(audio_dual_mono_mode_t mode)
+{
+    status_t status = INVALID_OPERATION;
+    if (isOffloadedOrDirect()) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr) {
+            auto t = static_cast<PlaybackThread *>(thread.get());
+            Mutex::Autolock lock(t->mLock);
+            status = t->mOutput->stream->setDualMonoMode(mode);
+            if (status == NO_ERROR) {
+                mDualMonoMode = mode;
+            }
+        }
+    }
+    return status;
+}
+
+status_t AudioFlinger::PlaybackThread::Track::getAudioDescriptionMixLevel(float* leveldB)
+{
+    status_t status = INVALID_OPERATION;
+    if (isOffloadedOrDirect()) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr) {
+            auto t = static_cast<PlaybackThread *>(thread.get());
+            Mutex::Autolock lock(t->mLock);
+            status = t->mOutput->stream->getAudioDescriptionMixLevel(leveldB);
+            ALOGD_IF((status == NO_ERROR) && (mAudioDescriptionMixLevel != *leveldB),
+                    "%s: level %.3f inconsistent", __func__, mAudioDescriptionMixLevel);
+        }
+    }
+    return status;
+}
+
+status_t AudioFlinger::PlaybackThread::Track::setAudioDescriptionMixLevel(float leveldB)
+{
+    status_t status = INVALID_OPERATION;
+    if (isOffloadedOrDirect()) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr) {
+            auto t = static_cast<PlaybackThread *>(thread.get());
+            Mutex::Autolock lock(t->mLock);
+            status = t->mOutput->stream->setAudioDescriptionMixLevel(leveldB);
+            if (status == NO_ERROR) {
+                mAudioDescriptionMixLevel = leveldB;
+            }
+        }
+    }
+    return status;
+}
+
+status_t AudioFlinger::PlaybackThread::Track::getPlaybackRateParameters(
+        audio_playback_rate_t* playbackRate)
+{
+    status_t status = INVALID_OPERATION;
+    if (isOffloadedOrDirect()) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr) {
+            auto t = static_cast<PlaybackThread *>(thread.get());
+            Mutex::Autolock lock(t->mLock);
+            status = t->mOutput->stream->getPlaybackRateParameters(playbackRate);
+            ALOGD_IF((status == NO_ERROR) &&
+                    !isAudioPlaybackRateEqual(mPlaybackRateParameters, *playbackRate),
+                    "%s: playbackRate inconsistent", __func__);
+        }
+    }
+    return status;
+}
+
+status_t AudioFlinger::PlaybackThread::Track::setPlaybackRateParameters(
+        const audio_playback_rate_t& playbackRate)
+{
+    status_t status = INVALID_OPERATION;
+    if (isOffloadedOrDirect()) {
+        sp<ThreadBase> thread = mThread.promote();
+        if (thread != nullptr) {
+            auto t = static_cast<PlaybackThread *>(thread.get());
+            Mutex::Autolock lock(t->mLock);
+            status = t->mOutput->stream->setPlaybackRateParameters(playbackRate);
+            if (status == NO_ERROR) {
+                mPlaybackRateParameters = playbackRate;
+            }
+        }
+    }
+    return status;
 }
 
 //To be called with thread lock held

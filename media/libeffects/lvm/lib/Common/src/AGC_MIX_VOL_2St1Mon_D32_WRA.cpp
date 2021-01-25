@@ -20,7 +20,6 @@
 /*    Includes                                                                          */
 /*                                                                                      */
 /****************************************************************************************/
-
 #include "AGC.h"
 #include "ScalarArithmetic.h"
 
@@ -126,7 +125,7 @@ void AGC_MIX_VOL_Mc1Mon_D32_WRA(AGC_MIX_VOL_2St1Mon_FLOAT_t* pInstance, const LV
              */
             SampleVal = SampleVal * Vol_Mult;
 
-            *pDst++ = SampleVal; /* Save the results */
+            *pDst++ = LVM_Clamp(SampleVal); /* Save the results */
 
             /*
              * Update the AGC gain

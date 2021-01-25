@@ -23,12 +23,6 @@
 /*    Structures                                                                    */
 /*                                                                                  */
 /************************************************************************************/
-
-/* Equaliser structure */
-typedef struct {
-    void (*pBiquadCallBack)(Biquad_FLOAT_Instance_t*, LVM_FLOAT*, LVM_FLOAT*, LVM_INT16);
-} LVCS_Equaliser_t;
-
 /************************************************************************************/
 /*                                                                                  */
 /*    Function prototypes                                                           */

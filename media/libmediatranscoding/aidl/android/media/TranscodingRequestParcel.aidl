@@ -33,10 +33,24 @@ parcelable TranscodingRequestParcel {
      */
     @utf8InCpp String sourceFilePath;
 
+    /*
+     * The filedescrptor of the sourceFilePath. If the source Fd is provided, transcoding service
+     * will use this fd instead of calling back to client side to open the sourceFilePath.
+     * -1 means not available.
+     */
+     int sourceFd = -1;
+
     /**
      * The absolute file path of the destination file.
      */
     @utf8InCpp String destinationFilePath;
+
+    /*
+     * The filedescrptor of the destinationFilePath. If the destination Fd is provided, transcoding
+     * service will use this fd instead of calling back to client side to open the sourceFilePath.
+     * -1 means not available.
+     */
+     int destinationFd = -1;
 
     /**
      * The UID of the client that this transcoding request is for. Only privileged caller could

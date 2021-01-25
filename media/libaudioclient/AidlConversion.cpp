@@ -31,86 +31,6 @@ using base::unexpected;
 
 namespace {
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// The code below establishes:
-// IntegralTypeOf<T>, which works for either integral types (in which case it evaluates to T), or
-// enum types (in which case it evaluates to std::underlying_type_T<T>).
-
-template<typename T, typename = std::enable_if_t<std::is_integral_v<T> || std::is_enum_v<T>>>
-struct IntegralTypeOfStruct {
-    using Type = T;
-};
-
-template<typename T>
-struct IntegralTypeOfStruct<T, std::enable_if_t<std::is_enum_v<T>>> {
-    using Type = std::underlying_type_t<T>;
-};
-
-template<typename T>
-using IntegralTypeOf = typename IntegralTypeOfStruct<T>::Type;
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-// Utilities for handling bitmasks.
-
-template<typename Enum>
-Enum index2enum_index(int index) {
-    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
-    return static_cast<Enum>(index);
-}
-
-template<typename Enum>
-Enum index2enum_bitmask(int index) {
-    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
-    return static_cast<Enum>(1 << index);
-}
-
-template<typename Mask, typename Enum>
-Mask enumToMask_bitmask(Enum e) {
-    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
-    static_assert(std::is_enum_v<Mask> || std::is_integral_v<Mask>);
-    return static_cast<Mask>(e);
-}
-
-template<typename Mask, typename Enum>
-Mask enumToMask_index(Enum e) {
-    static_assert(std::is_enum_v<Enum> || std::is_integral_v<Enum>);
-    static_assert(std::is_enum_v<Mask> || std::is_integral_v<Mask>);
-    return static_cast<Mask>(static_cast<std::make_unsigned_t<IntegralTypeOf<Mask>>>(1)
-            << static_cast<int>(e));
-}
-
-template<typename DestMask, typename SrcMask, typename DestEnum, typename SrcEnum>
-ConversionResult<DestMask> convertBitmask(
-        SrcMask src, const std::function<ConversionResult<DestEnum>(SrcEnum)>& enumConversion,
-        const std::function<SrcEnum(int)>& srcIndexToEnum,
-        const std::function<DestMask(DestEnum)>& destEnumToMask) {
-    using UnsignedDestMask = std::make_unsigned_t<IntegralTypeOf<DestMask>>;
-    using UnsignedSrcMask = std::make_unsigned_t<IntegralTypeOf<SrcMask>>;
-
-    UnsignedDestMask dest = static_cast<UnsignedDestMask>(0);
-    UnsignedSrcMask usrc = static_cast<UnsignedSrcMask>(src);
-
-    int srcBitIndex = 0;
-    while (usrc != 0) {
-        if (usrc & 1) {
-            SrcEnum srcEnum = srcIndexToEnum(srcBitIndex);
-            DestEnum destEnum = VALUE_OR_RETURN(enumConversion(srcEnum));
-            DestMask destMask = destEnumToMask(destEnum);
-            dest |= destMask;
-        }
-        ++srcBitIndex;
-        usrc >>= 1;
-    }
-    return static_cast<DestMask>(dest);
-}
-
-template<typename Mask, typename Enum>
-bool bitmaskIsSet(Mask mask, Enum index) {
-    return (mask & enumToMask_index<Mask, Enum>(index)) != 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////////////////////////
-
 enum class Direction {
     INPUT, OUTPUT
 };
@@ -318,7 +238,7 @@ ConversionResult<unsigned int> aidl2legacy_int32_t_config_mask(int32_t aidl) {
     return convertBitmask<unsigned int, int32_t, int, media::AudioPortConfigType>(
             aidl, aidl2legacy_AudioPortConfigType_int32_t,
             // AudioPortConfigType enum is index-based.
-            index2enum_index<media::AudioPortConfigType>,
+            indexToEnum_index<media::AudioPortConfigType>,
             // AUDIO_PORT_CONFIG_* flags are mask-based.
             enumToMask_bitmask<unsigned int, int>);
 }
@@ -327,7 +247,7 @@ ConversionResult<int32_t> legacy2aidl_config_mask_int32_t(unsigned int legacy) {
     return convertBitmask<int32_t, unsigned int, media::AudioPortConfigType, int>(
             legacy, legacy2aidl_int32_t_AudioPortConfigType,
             // AUDIO_PORT_CONFIG_* flags are mask-based.
-            index2enum_bitmask<unsigned>,
+            indexToEnum_bitmask<unsigned>,
             // AudioPortConfigType enum is index-based.
             enumToMask_index<int32_t, media::AudioPortConfigType>);
 }
@@ -494,7 +414,7 @@ ConversionResult<audio_gain_mode_t> aidl2legacy_int32_t_audio_gain_mode_t_mask(i
     return convertBitmask<audio_gain_mode_t, int32_t, audio_gain_mode_t, media::AudioGainMode>(
             aidl, aidl2legacy_AudioGainMode_audio_gain_mode_t,
             // AudioGainMode is index-based.
-            index2enum_index<media::AudioGainMode>,
+            indexToEnum_index<media::AudioGainMode>,
             // AUDIO_GAIN_MODE_* constants are mask-based.
             enumToMask_bitmask<audio_gain_mode_t, audio_gain_mode_t>);
 }
@@ -503,7 +423,7 @@ ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_
     return convertBitmask<int32_t, audio_gain_mode_t, media::AudioGainMode, audio_gain_mode_t>(
             legacy, legacy2aidl_audio_gain_mode_t_AudioGainMode,
             // AUDIO_GAIN_MODE_* constants are mask-based.
-            index2enum_bitmask<audio_gain_mode_t>,
+            indexToEnum_bitmask<audio_gain_mode_t>,
             // AudioGainMode is index-based.
             enumToMask_index<int32_t, media::AudioGainMode>);
 }
@@ -695,7 +615,7 @@ ConversionResult<audio_input_flags_t> aidl2legacy_int32_t_audio_input_flags_t_ma
     LegacyMask converted = VALUE_OR_RETURN(
             (convertBitmask<LegacyMask, int32_t, audio_input_flags_t, media::AudioInputFlags>(
                     aidl, aidl2legacy_AudioInputFlags_audio_input_flags_t,
-                    index2enum_index<media::AudioInputFlags>,
+                    indexToEnum_index<media::AudioInputFlags>,
                     enumToMask_bitmask<LegacyMask, audio_input_flags_t>)));
     return static_cast<audio_input_flags_t>(converted);
 }
@@ -707,18 +627,18 @@ ConversionResult<int32_t> legacy2aidl_audio_input_flags_t_int32_t_mask(
     LegacyMask legacyMask = static_cast<LegacyMask>(legacy);
     return convertBitmask<int32_t, LegacyMask, media::AudioInputFlags, audio_input_flags_t>(
             legacyMask, legacy2aidl_audio_input_flags_t_AudioInputFlags,
-            index2enum_bitmask<audio_input_flags_t>,
+            indexToEnum_bitmask<audio_input_flags_t>,
             enumToMask_index<int32_t, media::AudioInputFlags>);
 }
 
 ConversionResult<audio_output_flags_t> aidl2legacy_int32_t_audio_output_flags_t_mask(
         int32_t aidl) {
     return convertBitmask<audio_output_flags_t,
-                          int32_t,
-                          audio_output_flags_t,
-                          media::AudioOutputFlags>(
+            int32_t,
+            audio_output_flags_t,
+            media::AudioOutputFlags>(
             aidl, aidl2legacy_AudioOutputFlags_audio_output_flags_t,
-            index2enum_index<media::AudioOutputFlags>,
+            indexToEnum_index<media::AudioOutputFlags>,
             enumToMask_bitmask<audio_output_flags_t, audio_output_flags_t>);
 }
 
@@ -729,7 +649,7 @@ ConversionResult<int32_t> legacy2aidl_audio_output_flags_t_int32_t_mask(
     LegacyMask legacyMask = static_cast<LegacyMask>(legacy);
     return convertBitmask<int32_t, LegacyMask, media::AudioOutputFlags, audio_output_flags_t>(
             legacyMask, legacy2aidl_audio_output_flags_t_AudioOutputFlags,
-            index2enum_bitmask<audio_output_flags_t>,
+            indexToEnum_bitmask<audio_output_flags_t>,
             enumToMask_index<int32_t, media::AudioOutputFlags>);
 }
 
@@ -1468,7 +1388,7 @@ legacy2aidl_audio_flags_mask_t_AudioFlag(audio_flags_mask_t legacy) {
 ConversionResult<audio_flags_mask_t>
 aidl2legacy_int32_t_audio_flags_mask_t_mask(int32_t aidl) {
     return convertBitmask<audio_flags_mask_t, int32_t, audio_flags_mask_t, media::AudioFlag>(
-            aidl, aidl2legacy_AudioFlag_audio_flags_mask_t, index2enum_index<media::AudioFlag>,
+            aidl, aidl2legacy_AudioFlag_audio_flags_mask_t, indexToEnum_index<media::AudioFlag>,
             enumToMask_bitmask<audio_flags_mask_t, audio_flags_mask_t>);
 }
 
@@ -1476,7 +1396,7 @@ ConversionResult<int32_t>
 legacy2aidl_audio_flags_mask_t_int32_t_mask(audio_flags_mask_t legacy) {
     return convertBitmask<int32_t, audio_flags_mask_t, media::AudioFlag, audio_flags_mask_t>(
             legacy, legacy2aidl_audio_flags_mask_t_AudioFlag,
-            index2enum_bitmask<audio_flags_mask_t>,
+            indexToEnum_bitmask<audio_flags_mask_t>,
             enumToMask_index<int32_t, media::AudioFlag>);
 }
 
@@ -1779,44 +1699,44 @@ legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
 ConversionResult<uint32_t>
 aidl2legacy_AudioEncapsulationMode_mask(int32_t aidl) {
     return convertBitmask<uint32_t,
-                          int32_t,
-                          audio_encapsulation_mode_t,
-                          media::AudioEncapsulationMode>(
+            int32_t,
+            audio_encapsulation_mode_t,
+            media::AudioEncapsulationMode>(
             aidl, aidl2legacy_AudioEncapsulationMode_audio_encapsulation_mode_t,
-            index2enum_index<media::AudioEncapsulationMode>,
+            indexToEnum_index<media::AudioEncapsulationMode>,
             enumToMask_index<uint32_t, audio_encapsulation_mode_t>);
 }
 
 ConversionResult<int32_t>
 legacy2aidl_AudioEncapsulationMode_mask(uint32_t legacy) {
     return convertBitmask<int32_t,
-                          uint32_t,
-                          media::AudioEncapsulationMode,
-                          audio_encapsulation_mode_t>(
+            uint32_t,
+            media::AudioEncapsulationMode,
+            audio_encapsulation_mode_t>(
             legacy, legacy2aidl_audio_encapsulation_mode_t_AudioEncapsulationMode,
-            index2enum_index<audio_encapsulation_mode_t>,
+            indexToEnum_index<audio_encapsulation_mode_t>,
             enumToMask_index<int32_t, media::AudioEncapsulationMode>);
 }
 
 ConversionResult<uint32_t>
 aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl) {
     return convertBitmask<uint32_t,
-                          int32_t,
-                          audio_encapsulation_metadata_type_t,
-                          media::AudioEncapsulationMetadataType>(
+            int32_t,
+            audio_encapsulation_metadata_type_t,
+            media::AudioEncapsulationMetadataType>(
             aidl, aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t,
-            index2enum_index<media::AudioEncapsulationMetadataType>,
+            indexToEnum_index<media::AudioEncapsulationMetadataType>,
             enumToMask_index<uint32_t, audio_encapsulation_metadata_type_t>);
 }
 
 ConversionResult<int32_t>
 legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy) {
     return convertBitmask<int32_t,
-                          uint32_t,
-                          media::AudioEncapsulationMetadataType,
-                          audio_encapsulation_metadata_type_t>(
+            uint32_t,
+            media::AudioEncapsulationMetadataType,
+            audio_encapsulation_metadata_type_t>(
             legacy, legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType,
-            index2enum_index<audio_encapsulation_metadata_type_t>,
+            indexToEnum_index<audio_encapsulation_metadata_type_t>,
             enumToMask_index<int32_t, media::AudioEncapsulationMetadataType>);
 }
 
@@ -2195,6 +2115,90 @@ aidl2legacy_int32_t_volume_group_t(int32_t aidl) {
 ConversionResult<int32_t>
 legacy2aidl_volume_group_t_int32_t(volume_group_t legacy) {
     return convertReinterpret<int32_t>(legacy);
+}
+
+ConversionResult<product_strategy_t>
+aidl2legacy_int32_t_product_strategy_t(int32_t aidl) {
+    return convertReinterpret<product_strategy_t>(aidl);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_product_strategy_t_int32_t(product_strategy_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
+ConversionResult<audio_dual_mono_mode_t>
+aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(media::AudioDualMonoMode aidl) {
+    switch (aidl) {
+        case media::AudioDualMonoMode::OFF:
+            return AUDIO_DUAL_MONO_MODE_OFF;
+        case media::AudioDualMonoMode::LR:
+            return AUDIO_DUAL_MONO_MODE_LR;
+        case media::AudioDualMonoMode::LL:
+            return AUDIO_DUAL_MONO_MODE_LL;
+        case media::AudioDualMonoMode::RR:
+            return AUDIO_DUAL_MONO_MODE_RR;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioDualMonoMode>
+legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(audio_dual_mono_mode_t legacy) {
+    switch (legacy) {
+        case AUDIO_DUAL_MONO_MODE_OFF:
+            return media::AudioDualMonoMode::OFF;
+        case AUDIO_DUAL_MONO_MODE_LR:
+            return media::AudioDualMonoMode::LR;
+        case AUDIO_DUAL_MONO_MODE_LL:
+            return media::AudioDualMonoMode::LL;
+        case AUDIO_DUAL_MONO_MODE_RR:
+            return media::AudioDualMonoMode::RR;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_timestretch_fallback_mode_t>
+aidl2legacy_int32_t_audio_timestretch_fallback_mode_t(int32_t aidl) {
+    return convertReinterpret<audio_timestretch_fallback_mode_t>(aidl);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_audio_timestretch_fallback_mode_t_int32_t(audio_timestretch_fallback_mode_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
+ConversionResult<audio_timestretch_stretch_mode_t>
+aidl2legacy_int32_t_audio_timestretch_stretch_mode_t(int32_t aidl) {
+    return convertReinterpret<audio_timestretch_stretch_mode_t>(aidl);
+}
+
+ConversionResult<int32_t>
+legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(audio_timestretch_stretch_mode_t legacy) {
+    return convertReinterpret<int32_t>(legacy);
+}
+
+ConversionResult<audio_playback_rate_t>
+aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(const media::AudioPlaybackRate& aidl) {
+    audio_playback_rate_t legacy;
+    legacy.mSpeed = aidl.speed;
+    legacy.mPitch = aidl.pitch;
+    legacy.mFallbackMode = VALUE_OR_RETURN(
+            aidl2legacy_int32_t_audio_timestretch_fallback_mode_t(aidl.fallbackMode));
+    legacy.mStretchMode = VALUE_OR_RETURN(
+            aidl2legacy_int32_t_audio_timestretch_stretch_mode_t(aidl.stretchMode));
+    return legacy;
+}
+
+ConversionResult<media::AudioPlaybackRate>
+legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy) {
+    media::AudioPlaybackRate aidl;
+    aidl.speed = legacy.mSpeed;
+    aidl.pitch = legacy.mPitch;
+    aidl.fallbackMode = VALUE_OR_RETURN(
+            legacy2aidl_audio_timestretch_fallback_mode_t_int32_t(legacy.mFallbackMode));
+    aidl.stretchMode = VALUE_OR_RETURN(
+            legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(legacy.mStretchMode));
+    return aidl;
 }
 
 }  // namespace android

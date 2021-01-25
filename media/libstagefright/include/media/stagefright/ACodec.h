@@ -31,6 +31,7 @@
 #include <OMX_Audio.h>
 #include <hardware/gralloc.h>
 #include <nativebase/nativebase.h>
+#include <android/hardware/graphics/common/1.2/types.h>
 #include <android/hidl/allocator/1.0/IAllocator.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 
@@ -54,6 +55,7 @@ class MemoryDealer;
 struct DescribeColorFormat2Params;
 struct DataConverter;
 
+using android::hardware::graphics::common::V1_2::BufferUsage;
 typedef hidl::allocator::V1_0::IAllocator TAllocator;
 typedef hidl::memory::V1_0::IMemory TMemory;
 
@@ -165,7 +167,8 @@ private:
     enum {
         kVideoGrallocUsage = (GRALLOC_USAGE_HW_TEXTURE
                             | GRALLOC_USAGE_HW_COMPOSER
-                            | GRALLOC_USAGE_EXTERNAL_DISP),
+                            | GRALLOC_USAGE_EXTERNAL_DISP)
+                            | static_cast<uint64_t>(BufferUsage::VIDEO_DECODER),
     };
 
     struct BufferInfo {

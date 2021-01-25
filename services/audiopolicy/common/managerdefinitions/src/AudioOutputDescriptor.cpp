@@ -344,6 +344,13 @@ bool SwAudioOutputDescriptor::supportsAllDevices(const DeviceVector &devices) co
     return supportedDevices().containsAllDevices(devices);
 }
 
+bool SwAudioOutputDescriptor::supportsDevicesForPlayback(const DeviceVector &devices) const
+{
+    // No considering duplicated output
+    // TODO: need to verify if the profile supports the devices combo for playback.
+    return !isDuplicated() && supportsAllDevices(devices);
+}
+
 DeviceVector SwAudioOutputDescriptor::filterSupportedDevices(const DeviceVector &devices) const
 {
     DeviceVector filteredDevices = supportedDevices();
@@ -358,6 +365,16 @@ bool SwAudioOutputDescriptor::devicesSupportEncodedFormats(const DeviceTypeSet& 
     } else {
        return mProfile->devicesSupportEncodedFormats(deviceTypes);
     }
+}
+
+bool SwAudioOutputDescriptor::containsSingleDeviceSupportingEncodedFormats(
+        const sp<DeviceDescriptor>& device) const
+{
+    if (isDuplicated()) {
+        return (mOutput1->containsSingleDeviceSupportingEncodedFormats(device) &&
+                mOutput2->containsSingleDeviceSupportingEncodedFormats(device));
+    }
+    return mProfile->containsSingleDeviceSupportingEncodedFormats(device);
 }
 
 uint32_t SwAudioOutputDescriptor::latency()
@@ -510,6 +527,9 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         lConfig.offload_info.duration_us = -1;
         lConfig.offload_info.has_video = true; // conservative
         lConfig.offload_info.is_streaming = true; // likely
+        lConfig.offload_info.encapsulation_mode = lConfig.offload_info.encapsulation_mode;
+        lConfig.offload_info.content_id = lConfig.offload_info.content_id;
+        lConfig.offload_info.sync_id = lConfig.offload_info.sync_id;
     }
 
     mFlags = (audio_output_flags_t)(mFlags | flags);

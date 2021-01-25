@@ -25,7 +25,9 @@
 #include <android/hardware/drm/1.2/IDrmFactory.h>
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmPluginListener.h>
+#include <android/hardware/drm/1.4/IDrmPlugin.h>
 
+#include <media/drm/DrmAPI.h>
 #include <mediadrm/DrmMetrics.h>
 #include <mediadrm/DrmSessionManager.h>
 #include <mediadrm/IDrm.h>
@@ -176,6 +178,16 @@ struct DrmHal : public IDrm,
 
     virtual status_t setListener(const sp<IDrmClient>& listener);
 
+    virtual bool requiresSecureDecoder(const char *mime) const;
+
+    virtual bool requiresSecureDecoder(
+            const char *mime,
+            DrmPlugin::SecurityLevel securityLevel) const;
+
+    virtual status_t setPlaybackId(
+            Vector<uint8_t> const &sessionId,
+            const char *playbackId);
+
     // Methods of IDrmPluginListener
     Return<void> sendEvent(EventType eventType,
             const hidl_vec<uint8_t>& sessionId, const hidl_vec<uint8_t>& data);
@@ -202,6 +214,7 @@ private:
     sp<IDrmPlugin> mPlugin;
     sp<drm::V1_1::IDrmPlugin> mPluginV1_1;
     sp<drm::V1_2::IDrmPlugin> mPluginV1_2;
+    sp<drm::V1_4::IDrmPlugin> mPluginV1_4;
     String8 mAppPackageName;
 
     // Mutable to allow modification within GetPropertyByteArray.

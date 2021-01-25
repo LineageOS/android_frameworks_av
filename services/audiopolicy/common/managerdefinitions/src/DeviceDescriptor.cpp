@@ -49,10 +49,13 @@ DeviceDescriptor::DeviceDescriptor(audio_devices_t type,
 {
 }
 
+// Let DeviceDescriptorBase initialize the address since it handles specific cases like
+// legacy remote submix where "0" is added as default address.
 DeviceDescriptor::DeviceDescriptor(const AudioDeviceTypeAddr &deviceTypeAddr,
                                    const std::string &tagName,
                                    const FormatVector &encodedFormats) :
-        DeviceDescriptorBase(deviceTypeAddr), mTagName(tagName), mEncodedFormats(encodedFormats)
+        DeviceDescriptorBase(deviceTypeAddr), mTagName(tagName), mEncodedFormats(encodedFormats),
+        mDeclaredAddress(DeviceDescriptorBase::address())
 {
     mCurrentEncodedFormat = AUDIO_FORMAT_DEFAULT;
     /* If framework runs against a pre 5.0 Audio HAL, encoded formats are absent from the config.
@@ -75,6 +78,10 @@ void DeviceDescriptor::attach(const sp<HwModule>& module)
 void DeviceDescriptor::detach() {
     mId = AUDIO_PORT_HANDLE_NONE;
     PolicyAudioPort::detach();
+    // The device address may have been overwritten on device connection
+    setAddress(mDeclaredAddress);
+    // Device Port does not have a name unless provided by setDeviceConnectionState
+    setName("");
 }
 
 template<typename T>
@@ -217,6 +224,18 @@ void DeviceVector::refreshTypes()
     ALOGV("DeviceVector::refreshTypes() mDeviceTypes %s", dumpDeviceTypes(mDeviceTypes).c_str());
 }
 
+void DeviceVector::refreshAudioProfiles() {
+    if (empty()) {
+        mSupportedProfiles.clear();
+        return;
+    }
+    mSupportedProfiles = itemAt(0)->getAudioProfiles();
+    for (size_t i = 1; i < size(); ++i) {
+        mSupportedProfiles = intersectAudioProfiles(
+                mSupportedProfiles, itemAt(i)->getAudioProfiles());
+    }
+}
+
 ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -238,6 +257,7 @@ void DeviceVector::add(const DeviceVector &devices)
     }
     if (added) {
         refreshTypes();
+        refreshAudioProfiles();
     }
 }
 
@@ -250,6 +270,7 @@ ssize_t DeviceVector::add(const sp<DeviceDescriptor>& item)
         ret = SortedVector::add(item);
         if (ret >= 0) {
             refreshTypes();
+            refreshAudioProfiles();
         }
     } else {
         ALOGW("DeviceVector::add device %08x already in", item->type());
@@ -268,6 +289,7 @@ ssize_t DeviceVector::remove(const sp<DeviceDescriptor>& item)
         ret = SortedVector::removeAt(ret);
         if (ret >= 0) {
             refreshTypes();
+            refreshAudioProfiles();
         }
     }
     return ret;

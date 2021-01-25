@@ -133,8 +133,8 @@ public:
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.
     virtual status_t stopOutput(audio_port_handle_t portId) = 0;
-    // releases the output.
-    virtual void releaseOutput(audio_port_handle_t portId) = 0;
+    // releases the output, return true if the output descriptor is reopened.
+    virtual bool releaseOutput(audio_port_handle_t portId) = 0;
 
     // request an input appropriate for record from the supplied device with supplied parameters.
     virtual status_t getInputForAttr(const audio_attributes_t *attr,
@@ -191,7 +191,7 @@ public:
                                                     int &index) = 0;
 
     // return the strategy corresponding to a given stream type
-    virtual uint32_t getStrategyForStream(audio_stream_type_t stream) = 0;
+    virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) = 0;
 
     // return the enabled output devices for the given stream type
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream) = 0;
@@ -204,7 +204,7 @@ public:
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc) = 0;
     virtual status_t registerEffect(const effect_descriptor_t *desc,
                                     audio_io_handle_t io,
-                                    uint32_t strategy,
+                                    product_strategy_t strategy,
                                     int session,
                                     int id) = 0;
     virtual status_t unregisterEffect(int id) = 0;

@@ -15,6 +15,7 @@
  */
 
 #include <media/AudioValidator.h>
+#include <cmath>
 
 namespace android {
 
@@ -119,6 +120,64 @@ status_t AudioValidator::validateAudioPatch(
         }
     }
     return safetyNetLog(status, bugNumber);
+}
+
+/* static */
+status_t AudioValidator::validateAudioDescriptionMixLevel(float leveldB)
+{
+    constexpr float MAX_AUDIO_DESCRIPTION_MIX_LEVEL = 48.f;
+    return std::isnan(leveldB) || leveldB > MAX_AUDIO_DESCRIPTION_MIX_LEVEL ? BAD_VALUE : OK;
+}
+
+/* static */
+status_t AudioValidator::validateDualMonoMode(audio_dual_mono_mode_t dualMonoMode)
+{
+    switch (dualMonoMode) {
+        case AUDIO_DUAL_MONO_MODE_OFF:
+        case AUDIO_DUAL_MONO_MODE_LR:
+        case AUDIO_DUAL_MONO_MODE_LL:
+        case AUDIO_DUAL_MONO_MODE_RR:
+        return OK;
+    }
+    return BAD_VALUE;
+}
+
+/* static */
+status_t AudioValidator::validatePlaybackRateFallbackMode(
+        audio_timestretch_fallback_mode_t fallbackMode)
+{
+    switch (fallbackMode) {
+        case AUDIO_TIMESTRETCH_FALLBACK_CUT_REPEAT:
+            // This is coarse sounding timestretching used for internal debugging,
+            // not intended for general use.
+            break; // warning if not listed.
+        case AUDIO_TIMESTRETCH_FALLBACK_DEFAULT:
+        case AUDIO_TIMESTRETCH_FALLBACK_MUTE:
+        case AUDIO_TIMESTRETCH_FALLBACK_FAIL:
+            return OK;
+    }
+    return BAD_VALUE;
+}
+
+/* static */
+status_t AudioValidator::validatePlaybackRateStretchMode(
+        audio_timestretch_stretch_mode_t stretchMode)
+{
+    switch (stretchMode) {
+        case AUDIO_TIMESTRETCH_STRETCH_DEFAULT:
+        case AUDIO_TIMESTRETCH_STRETCH_VOICE:
+            return OK;
+    }
+    return BAD_VALUE;
+}
+
+/* static */
+status_t AudioValidator::validatePlaybackRate(
+        const audio_playback_rate_t& playbackRate)
+{
+    if (playbackRate.mSpeed < 0.f || playbackRate.mPitch < 0.f) return BAD_VALUE;
+    return validatePlaybackRateFallbackMode(playbackRate.mFallbackMode) ?:
+            validatePlaybackRateStretchMode(playbackRate.mStretchMode);
 }
 
 }; // namespace android

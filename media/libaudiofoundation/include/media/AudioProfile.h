@@ -137,5 +137,7 @@ aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl);
 ConversionResult<std::vector<media::AudioProfile>>
 legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy);
 
+AudioProfileVector intersectAudioProfiles(const AudioProfileVector& profiles1,
+                                          const AudioProfileVector& profiles2);
 
 } // namespace android

@@ -56,19 +56,10 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t hInstance) {
      * Clear all filter tap data, delay-lines and other signal related data
      */
 
-#ifdef BIQUAD_OPT
     pLVREV_Private->pRevHPFBiquad->clear();
     pLVREV_Private->pRevLPFBiquad->clear();
-#else
-    LoadConst_Float(0, (LVM_FLOAT*)&pLVREV_Private->pFastData->HPTaps, 2);
-    LoadConst_Float(0, (LVM_FLOAT*)&pLVREV_Private->pFastData->LPTaps, 2);
-#endif
     for (size_t i = 0; i < pLVREV_Private->InstanceParams.NumDelays; i++) {
-#ifdef BIQUAD_OPT
         pLVREV_Private->revLPFBiquad[i]->clear();
-#else
-        LoadConst_Float(0, (LVM_FLOAT*)&pLVREV_Private->pFastData->RevLPTaps[i], 2);
-#endif
         LoadConst_Float(0, pLVREV_Private->pDelay_T[i], LVREV_MAX_T_DELAY[i]);
     }
     return LVREV_SUCCESS;

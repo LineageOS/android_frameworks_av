@@ -209,9 +209,12 @@ MediaCodecList::MediaCodecList(std::vector<MediaCodecListBuilderBase*> builders)
             ALOGD("ignored a null builder");
             continue;
         }
-        mInitCheck = builder->buildMediaCodecList(&writer);
-        if (mInitCheck != OK) {
-            break;
+        auto currentCheck = builder->buildMediaCodecList(&writer);
+        if (currentCheck != OK) {
+            ALOGD("ignored failed builder");
+            continue;
+        } else {
+            mInitCheck = currentCheck;
         }
     }
     writer.writeGlobalSettings(mGlobalSettings);

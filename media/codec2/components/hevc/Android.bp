@@ -9,6 +9,7 @@ cc_library {
     srcs: ["C2SoftHevcDec.cpp"],
 
     static_libs: ["libhevcdec"],
+
 }
 
 cc_library {
@@ -22,4 +23,5 @@ cc_library {
     srcs: ["C2SoftHevcEnc.cpp"],
 
     static_libs: ["libhevcenc"],
+
 }

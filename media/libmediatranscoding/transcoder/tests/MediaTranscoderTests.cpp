@@ -334,6 +334,17 @@ TEST_F(MediaTranscoderTests, TestVideoTranscode_HevcToAvc_Rotation) {
     testTranscodeVideo(srcPath, destPath, AMEDIA_MIMETYPE_VIDEO_AVC);
 }
 
+TEST_F(MediaTranscoderTests, TestVideoTranscode_4K) {
+#if defined(__i386__) || defined(__x86_64__)
+    LOG(WARNING) << "Skipping 4K test on x86 as SW encoder does not support 4K.";
+    return;
+#else
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/Video_4K_HEVC_10Frames_Audio.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_4K.MP4";
+    testTranscodeVideo(srcPath, destPath, AMEDIA_MIMETYPE_VIDEO_AVC);
+#endif
+}
+
 TEST_F(MediaTranscoderTests, TestPreserveBitrate) {
     const char* srcPath = "/data/local/tmp/TranscodingTestAssets/cubicle_avc_480x240_aac_24KHz.mp4";
     const char* destPath = "/data/local/tmp/MediaTranscoder_PreserveBitrate.MP4";

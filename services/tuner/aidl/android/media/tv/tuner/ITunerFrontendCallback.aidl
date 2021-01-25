@@ -16,7 +16,7 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerAtsc3PlpInfo;
+import android.media.tv.tuner.TunerFrontendScanMessage;
 
 /**
  * TunerFrontendCallback interface handles tuner frontend related callbacks.
@@ -24,73 +24,13 @@ import android.media.tv.tuner.TunerAtsc3PlpInfo;
  * {@hide}
  */
 interface ITunerFrontendCallback {
-    /**
+        /**
      * Notify the client that a new event happened on the frontend.
      */
     void onEvent(in int frontendEventType);
 
     /**
-     * notify locked message to client from the ongoing scan.
+     * notify the client of scan messages.
      */
-    void onLocked();
-
-    /**
-     * notify scan stopped message to client from the ongoing scan.
-     */
-    void onScanStopped();
-
-    /**
-     * notify progress message to client from the ongoing scan.
-     */
-    void onProgress(in int percent);
-
-    /**
-     * notify Frequencies message to client from the ongoing scan.
-     */
-    void onFrequenciesReport(in int[] frequency);
-
-    /**
-     * notify SymbolRates message to client from the ongoing scan.
-     */
-    void onSymbolRates(in int[] rates);
-
-    /**
-     * notify Hierarchy message to client from the ongoing scan.
-     */
-    void onHierarchy(in int hierarchy);
-
-    /**
-     * notify SignalType message to client from the ongoing scan.
-     */
-    void onSignalType(in int signalType);
-
-    /**
-     * notify PlpIds message to client from the ongoing scan.
-     */
-    void onPlpIds(in int[] plpIds);
-
-    /**
-     * notify GroupIds message to client from the ongoing scan.
-     */
-    void onGroupIds(in int[] groupIds);
-
-    /**
-     * notify InputStreamIds message to client from the ongoing scan.
-     */
-    void onInputStreamIds(in int[] inputStreamIds);
-
-    /**
-     * notify DvbsStandard message to client from the ongoing scan.
-     */
-    void onDvbsStandard(in int dvbsStandandard);
-
-    /**
-     * notify AnalogSifStandard message to client from the ongoing scan.
-     */
-    void onAnalogSifStandard(in int sifStandandard);
-
-    /**
-     * notify Atsc3PlpInfos message to client from the ongoing scan.
-     */
-    void onAtsc3PlpInfos(in TunerAtsc3PlpInfo[] atsc3PlpInfos);
+    void onScanMessage(in int messageType, in TunerFrontendScanMessage message);
 }
