@@ -251,22 +251,6 @@ the constant by NUM_EG1_FRAC_BITS
 */
 
 /* use LFO_GAIN_TO_CENTS to convert the LFO gain value to cents */
-#if 0
-#define    DOUBLE_LOG2_10    (double) (3.32192809488736)    /* log2(10) */
-
-#define    DOUBLE_LFO_GAIN_TO_CENTS    (double)                \
-    (                                                        \
-                (DOUBLE_LOG2_10) *                            \
-                1200.0    /                                    \
-                20.0                                        \
-    )
-
-#define    LFO_GAIN_TO_CENTS    (int32_t)                        \
-    (                                                        \
-                DOUBLE_LFO_GAIN_TO_CENTS *                    \
-                (0x1L << NUM_EG1_FRAC_BITS)                    \
-    )
-#endif
 
 #define LFO_GAIN_TO_CENTS (int32_t) (1671981156L >> (23 - NUM_EG1_FRAC_BITS))
 
