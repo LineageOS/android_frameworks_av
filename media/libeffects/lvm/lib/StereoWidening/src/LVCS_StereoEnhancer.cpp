@@ -21,9 +21,7 @@
 /*                                                                                  */
 /************************************************************************************/
 
-#ifdef BIQUAD_OPT
 #include <system/audio.h>
-#endif
 #include "LVCS.h"
 #include "LVCS_Private.h"
 #include "LVCS_StereoEnhancer.h"
@@ -55,19 +53,8 @@
 LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t hInstance, LVCS_Params_t* pParams) {
     LVM_UINT16 Offset;
     LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
-#ifndef BIQUAD_OPT
-    LVCS_StereoEnhancer_t* pConfig = (LVCS_StereoEnhancer_t*)&pInstance->StereoEnhancer;
-    LVCS_Data_t* pData;
-    LVCS_Coefficient_t* pCoefficient;
-    FO_FLOAT_Coefs_t CoeffsMid;
-    BQ_FLOAT_Coefs_t CoeffsSide;
-#endif
     const BiquadA012B12CoefsSP_t* pSESideCoefs;
 
-#ifndef BIQUAD_OPT
-    pData = (LVCS_Data_t*)pInstance->pData;
-    pCoefficient = (LVCS_Coefficient_t*)pInstance->pCoeff;
-#endif
 
     /*
      * If the sample rate or speaker type has changed update the filters
@@ -80,71 +67,20 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
         /* Mid filter */
         Offset = (LVM_UINT16)pParams->SampleRate;
 
-#ifdef BIQUAD_OPT
         std::array<LVM_FLOAT, android::audio_utils::kBiquadNumCoefs> coefs = {
                 LVCS_SEMidCoefTable[Offset].A0, LVCS_SEMidCoefTable[Offset].A1, 0.0,
                 -(LVCS_SEMidCoefTable[Offset].B1), 0.0};
         pInstance->pSEMidBiquad.reset(
                 new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
-#else
-        /* Convert incoming coefficients to the required format/ordering */
-        CoeffsMid.A0 = (LVM_FLOAT)LVCS_SEMidCoefTable[Offset].A0;
-        CoeffsMid.A1 = (LVM_FLOAT)LVCS_SEMidCoefTable[Offset].A1;
-        CoeffsMid.B1 = (LVM_FLOAT)-LVCS_SEMidCoefTable[Offset].B1;
-
-        /* Clear the taps */
-        LoadConst_Float(0,                                   /* Value */
-                        (LVM_FLOAT*)&pData->SEBiquadTapsMid, /* Destination */
-                        /* Number of words */
-                        (LVM_UINT16)(sizeof(pData->SEBiquadTapsMid) / sizeof(LVM_FLOAT)));
-
-        FO_1I_D16F16Css_TRC_WRA_01_Init(&pCoefficient->SEBiquadInstanceMid, &pData->SEBiquadTapsMid,
-                                        &CoeffsMid);
-
-        /* Callbacks */
-        if (LVCS_SEMidCoefTable[Offset].Scale == 15) {
-            pConfig->pBiquadCallBack_Mid = FO_1I_D16F16C15_TRC_WRA_01;
-        }
-#endif
 
         Offset = (LVM_UINT16)(pParams->SampleRate);
         pSESideCoefs = (BiquadA012B12CoefsSP_t*)&LVCS_SESideCoefTable[0];
 
         /* Side filter */
-#ifdef BIQUAD_OPT
         coefs = {pSESideCoefs[Offset].A0, pSESideCoefs[Offset].A1, pSESideCoefs[Offset].A2,
                  -(pSESideCoefs[Offset].B1), -(pSESideCoefs[Offset].B2)};
         pInstance->pSESideBiquad.reset(
                 new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
-#else
-        /* Convert incoming coefficients to the required format/ordering */
-        CoeffsSide.A0 = (LVM_FLOAT)pSESideCoefs[Offset].A0;
-        CoeffsSide.A1 = (LVM_FLOAT)pSESideCoefs[Offset].A1;
-        CoeffsSide.A2 = (LVM_FLOAT)pSESideCoefs[Offset].A2;
-        CoeffsSide.B1 = (LVM_FLOAT)-pSESideCoefs[Offset].B1;
-        CoeffsSide.B2 = (LVM_FLOAT)-pSESideCoefs[Offset].B2;
-
-        /* Clear the taps */
-        LoadConst_Float(0,                                    /* Value */
-                        (LVM_FLOAT*)&pData->SEBiquadTapsSide, /* Destination */
-                        /* Number of words */
-                        (LVM_UINT16)(sizeof(pData->SEBiquadTapsSide) / sizeof(LVM_FLOAT)));
-        /* Callbacks */
-        switch (pSESideCoefs[Offset].Scale) {
-            case 14:
-                BQ_1I_D16F32Css_TRC_WRA_01_Init(&pCoefficient->SEBiquadInstanceSide,
-                                                &pData->SEBiquadTapsSide, &CoeffsSide);
-
-                pConfig->pBiquadCallBack_Side = BQ_1I_D16F32C14_TRC_WRA_01;
-                break;
-            case 15:
-                BQ_1I_D16F16Css_TRC_WRA_01_Init(&pCoefficient->SEBiquadInstanceSide,
-                                                &pData->SEBiquadTapsSide, &CoeffsSide);
-
-                pConfig->pBiquadCallBack_Side = BQ_1I_D16F16C15_TRC_WRA_01;
-                break;
-        }
-#endif
     }
 
     return (LVCS_SUCCESS);
@@ -191,13 +127,7 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t hInstance, const LVM_FLOA
                                          LVM_FLOAT* pOutData, LVM_UINT16 NumSamples) {
     LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
     LVCS_StereoEnhancer_t* pConfig = (LVCS_StereoEnhancer_t*)&pInstance->StereoEnhancer;
-#ifndef BIQUAD_OPT
-    LVCS_Coefficient_t* pCoefficient;
-#endif
     LVM_FLOAT* pScratch;
-#ifndef BIQUAD_OPT
-    pCoefficient = (LVCS_Coefficient_t*)pInstance->pCoeff;
-#endif
     pScratch = (LVM_FLOAT*)pInstance->pScratch;
     /*
      * Check if the Stereo Enhancer is enabled
@@ -212,13 +142,7 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t hInstance, const LVM_FLOA
          * Apply filter to the middle signal
          */
         if (pInstance->OutputDevice == LVCS_HEADPHONE) {
-#ifdef BIQUAD_OPT
             pInstance->pSEMidBiquad->process(pScratch, pScratch, NumSamples);
-#else
-            (pConfig->pBiquadCallBack_Mid)(
-                    (Biquad_FLOAT_Instance_t*)&pCoefficient->SEBiquadInstanceMid,
-                    (LVM_FLOAT*)pScratch, (LVM_FLOAT*)pScratch, (LVM_INT16)NumSamples);
-#endif
         } else {
             Mult3s_Float(pScratch,                    /* Source */
                          (LVM_FLOAT)pConfig->MidGain, /* Gain */
@@ -231,15 +155,8 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t hInstance, const LVM_FLOA
          * and in all modes for mobile speakers
          */
         if (pInstance->Params.SourceFormat == LVCS_STEREO) {
-#ifdef BIQUAD_OPT
             pInstance->pSESideBiquad->process(pScratch + NumSamples, pScratch + NumSamples,
                                               NumSamples);
-#else
-            (pConfig->pBiquadCallBack_Side)(
-                    (Biquad_FLOAT_Instance_t*)&pCoefficient->SEBiquadInstanceSide,
-                    (LVM_FLOAT*)(pScratch + NumSamples), (LVM_FLOAT*)(pScratch + NumSamples),
-                    (LVM_INT16)NumSamples);
-#endif
         }
 
         /*

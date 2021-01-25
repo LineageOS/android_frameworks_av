@@ -51,10 +51,6 @@ typedef struct {
     LVM_FLOAT StereoSamples[2 * LVCS_STEREODELAY_CS_MAX_VAL];
     /* Reverb Level */
     LVM_FLOAT ReverbLevel;
-#ifndef BIQUAD_OPT
-    /* Filter */
-    void (*pBiquadCallBack)(Biquad_FLOAT_Instance_t*, LVM_FLOAT*, LVM_FLOAT*, LVM_INT16);
-#endif
 } LVCS_ReverbGenerator_t;
 
 /************************************************************************************/
