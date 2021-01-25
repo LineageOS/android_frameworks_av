@@ -643,6 +643,14 @@ using effect_buffer_t = int16_t;
         binder::Status getVolumeShaperState(
                 int32_t id,
                 std::optional<media::VolumeShaperState>* _aidl_return) override;
+        binder::Status getDualMonoMode(media::AudioDualMonoMode* _aidl_return) override;
+        binder::Status setDualMonoMode(media::AudioDualMonoMode mode) override;
+        binder::Status getAudioDescriptionMixLevel(float* _aidl_return) override;
+        binder::Status setAudioDescriptionMixLevel(float leveldB) override;
+        binder::Status getPlaybackRateParameters(
+                media::AudioPlaybackRate* _aidl_return) override;
+        binder::Status setPlaybackRateParameters(
+                const media::AudioPlaybackRate& playbackRate) override;
 
     private:
         const sp<PlaybackThread::Track> mTrack;
