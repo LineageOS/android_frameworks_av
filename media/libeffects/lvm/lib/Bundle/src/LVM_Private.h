@@ -33,9 +33,7 @@
 /*                                                                                  */
 /************************************************************************************/
 
-#ifdef BIQUAD_OPT
 #include <audio_utils/BiquadFilter.h>
-#endif
 #include "LVM.h"            /* LifeVibes */
 #include "LVM_Common.h"     /* LifeVibes common */
 #include "BIQUAD.h"         /* Biquad library */
@@ -130,17 +128,6 @@ typedef struct {
     LVM_INT16 SamplesToOutput; /* Samples to write to the output */
 } LVM_Buffer_t;
 
-#ifndef BIQUAD_OPT
-/* Filter taps */
-typedef struct {
-    Biquad_2I_Order1_FLOAT_Taps_t TrebleBoost_Taps; /* Treble boost Taps */
-} LVM_TE_Data_t;
-
-/* Coefficients */
-typedef struct {
-    Biquad_FLOAT_Instance_t TrebleBoost_State; /* State for the treble boost filter */
-} LVM_TE_Coefs_t;
-#endif
 
 typedef struct {
     /* Public parameters */
@@ -190,13 +177,8 @@ typedef struct {
     LVM_INT16 VC_AVLFixedVolume;         /* AVL fixed volume */
 
     /* Treble Enhancement */
-#ifdef BIQUAD_OPT
     std::unique_ptr<android::audio_utils::BiquadFilter<LVM_FLOAT>>
             pTEBiquad; /* Biquad filter instance */
-#else
-    LVM_TE_Data_t* pTE_Taps;   /* Treble boost Taps */
-    LVM_TE_Coefs_t* pTE_State; /* State for the treble boost filter */
-#endif
     LVM_INT16 TE_Active;       /* Control flag */
 
     /* Headroom */
