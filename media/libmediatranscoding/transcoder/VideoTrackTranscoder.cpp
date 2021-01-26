@@ -396,6 +396,10 @@ void VideoTrackTranscoder::enqueueInputSample(int32_t bufferIndex) {
             mStatus = status;
             return;
         }
+
+        if (mSampleInfo.size) {
+            ++mInputFrameCount;
+        }
     } else {
         LOG(DEBUG) << "EOS from source.";
         mEosFromSource = true;
@@ -445,6 +449,9 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
         sample->info.flags = bufferInfo.flags;
         sample->info.presentationTimeUs = bufferInfo.presentationTimeUs;
 
+        if (bufferInfo.size > 0 && (bufferInfo.flags & SAMPLE_FLAG_CODEC_CONFIG) == 0) {
+            ++mOutputFrameCount;
+        }
         onOutputSampleAvailable(sample);
 
         mLastSampleWasSync = sample->info.flags & SAMPLE_FLAG_SYNC_SAMPLE;
@@ -456,6 +463,15 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
     if (bufferInfo.flags & AMEDIACODEC_BUFFER_FLAG_END_OF_STREAM) {
         LOG(DEBUG) << "EOS from encoder.";
         mEosFromEncoder = true;
+
+        if (mInputFrameCount != mOutputFrameCount) {
+            LOG(WARNING) << "Input / Output frame count mismatch: " << mInputFrameCount << " vs "
+                         << mOutputFrameCount;
+            if (mInputFrameCount > 0 && mOutputFrameCount == 0) {
+                LOG(ERROR) << "Encoder did not produce any output frames.";
+                mStatus = AMEDIA_ERROR_UNKNOWN;
+            }
+        }
     }
 }
 

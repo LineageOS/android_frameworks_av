@@ -99,6 +99,8 @@ private:
     std::shared_ptr<AMediaFormat> mActualOutputFormat;
     pid_t mPid;
     uid_t mUid;
+    uint64_t mInputFrameCount = 0;
+    uint64_t mOutputFrameCount = 0;
 };
 
 }  // namespace android
