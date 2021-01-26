@@ -86,6 +86,7 @@ cc_library {
 
     static_libs: [
         "android.hardware.common.fmq-unstable-ndk_platform",
+        "libaidlcommonsupport",
     ],
 
     include_dirs: [

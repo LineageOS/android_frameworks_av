@@ -16,41 +16,13 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterConfiguration;
+import android.media.tv.tuner.TunerFilterTsConfiguration;
 
 /**
- * Tuner Filter interface handles tuner related operations.
+ * Filter configuration.
  *
  * {@hide}
  */
-interface ITunerFilter {
-    /**
-     * Get the filter Id.
-     */
-    int getId();
-
-    /**
-     * Get the 64-bit filter Id.
-     */
-    long getId64Bit();
-
-    /**
-     * Configure the filter.
-     */
-    void configure(in TunerFilterConfiguration config);
-
-    /**
-     * Start the filter.
-     */
-    void start();
-
-    /**
-     * Stop the filter.
-     */
-    void stop();
-
-    /**
-     * Flush the filter.
-     */
-    void flush();
+union TunerFilterConfiguration {
+    TunerFilterTsConfiguration ts;
 }

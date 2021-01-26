@@ -16,41 +16,14 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterConfiguration;
-
 /**
- * Tuner Filter interface handles tuner related operations.
+ * Filter Settings for a Video and Audio.
  *
  * {@hide}
  */
-interface ITunerFilter {
+parcelable TunerFilterAvSettings {
     /**
-     * Get the filter Id.
+     * true if the filter output goes to decoder directly in pass through mode.
      */
-    int getId();
-
-    /**
-     * Get the 64-bit filter Id.
-     */
-    long getId64Bit();
-
-    /**
-     * Configure the filter.
-     */
-    void configure(in TunerFilterConfiguration config);
-
-    /**
-     * Start the filter.
-     */
-    void start();
-
-    /**
-     * Stop the filter.
-     */
-    void stop();
-
-    /**
-     * Flush the filter.
-     */
-    void flush();
+    boolean isPassthrough;
 }
