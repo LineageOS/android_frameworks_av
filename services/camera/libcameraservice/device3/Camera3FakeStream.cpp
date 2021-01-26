@@ -134,6 +134,11 @@ status_t Camera3FakeStream::updateStream(const std::vector<sp<Surface>> &/*outpu
     return INVALID_OPERATION;
 }
 
+status_t Camera3FakeStream::setBatchSize(size_t /*batchSize*/) {
+    ALOGE("%s: this method is not supported!", __FUNCTION__);
+    return INVALID_OPERATION;
+}
+
 }; // namespace camera3
 
 }; // namespace android

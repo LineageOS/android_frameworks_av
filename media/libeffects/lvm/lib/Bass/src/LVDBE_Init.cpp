@@ -21,9 +21,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#ifdef BIQUAD_OPT
 #include <system/audio.h>
-#endif
 #include <stdlib.h>
 #include "LVDBE.h"
 #include "LVDBE_Private.h"
@@ -92,19 +90,12 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_
     if (pInstance->pData == NULL) {
         return LVDBE_NULLADDRESS;
     }
-#ifdef BIQUAD_OPT
     /*
      * Create biquad instance
      */
     pInstance->pHPFBiquad.reset(
             new android::audio_utils::BiquadFilter<LVM_FLOAT>(LVM_MAX_CHANNELS));
     pInstance->pBPFBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1));
-#else
-    pInstance->pCoef = (LVDBE_Coef_FLOAT_t*)calloc(1, sizeof(*(pInstance->pCoef)));
-    if (pInstance->pCoef == NULL) {
-        return LVDBE_NULLADDRESS;
-    }
-#endif
 
     /*
      * Initialise the filters
@@ -194,12 +185,6 @@ void LVDBE_DeInit(LVDBE_Handle_t* phInstance) {
         free(pInstance->pData);
         pInstance->pData = LVM_NULL;
     }
-#ifndef BIQUAD_OPT
-    if (pInstance->pCoef != LVM_NULL) {
-        free(pInstance->pCoef);
-        pInstance->pCoef = LVM_NULL;
-    }
-#endif
     free(pInstance);
     *phInstance = LVM_NULL;
 }

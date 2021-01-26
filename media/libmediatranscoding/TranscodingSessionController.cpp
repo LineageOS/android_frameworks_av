@@ -63,10 +63,12 @@ const char* TranscodingSessionController::sessionStateToString(const Session::St
 TranscodingSessionController::TranscodingSessionController(
         const std::shared_ptr<TranscoderInterface>& transcoder,
         const std::shared_ptr<UidPolicyInterface>& uidPolicy,
-        const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy)
+        const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy,
+        const std::shared_ptr<ThermalPolicyInterface>& thermalPolicy)
       : mTranscoder(transcoder),
         mUidPolicy(uidPolicy),
         mResourcePolicy(resourcePolicy),
+        mThermalPolicy(thermalPolicy),
         mCurrentSession(nullptr),
         mResourceLost(false) {
     // Only push empty offline queue initially. Realtime queues are added when requests come in.
@@ -74,6 +76,7 @@ TranscodingSessionController::TranscodingSessionController(
     mOfflineUidIterator = mUidSortedList.begin();
     mSessionQueues.emplace(OFFLINE_UID, SessionQueueType());
     mUidPackageNames[OFFLINE_UID] = "(offline)";
+    mThermalThrottling = thermalPolicy->getThrottlingStatus();
 }
 
 TranscodingSessionController::~TranscodingSessionController() {}
@@ -141,7 +144,7 @@ void TranscodingSessionController::dumpAllSessions(int fd, const Vector<String16
 
     snprintf(buffer, SIZE, "\n========== Dumping past sessions =========\n");
     result.append(buffer);
-    for (auto &session : mSessionHistory) {
+    for (auto& session : mSessionHistory) {
         dumpSession_l(session, result, true /*closedSession*/);
     }
 
@@ -192,18 +195,27 @@ void TranscodingSessionController::updateCurrentSession_l() {
           topSession == nullptr ? "null" : sessionToString(topSession->key).c_str(),
           curSession == nullptr ? "null" : sessionToString(curSession->key).c_str());
 
+    if (topSession == nullptr) {
+        mCurrentSession = nullptr;
+        return;
+    }
+
+    bool shouldBeRunning = !((mResourcePolicy != nullptr && mResourceLost) ||
+                             (mThermalPolicy != nullptr && mThermalThrottling));
     // If we found a topSession that should be run, and it's not already running,
     // take some actions to ensure it's running.
-    if (topSession != nullptr &&
-        (topSession != curSession || topSession->getState() != Session::RUNNING)) {
-        // If another session is currently running, pause it first.
+    if (topSession != curSession ||
+        (shouldBeRunning ^ (topSession->getState() == Session::RUNNING))) {
+        // If current session is running, pause it first. Note this is true for either
+        // cases: 1) If top session is changing, or 2) if top session is not changing but
+        // the topSession's state is changing.
         if (curSession != nullptr && curSession->getState() == Session::RUNNING) {
             mTranscoder->pause(curSession->key.first, curSession->key.second);
             curSession->setState(Session::PAUSED);
         }
-        // If we are not experiencing resource loss, we can start or resume
-        // the topSession now.
-        if (!mResourceLost) {
+        // If we are not experiencing resource loss nor thermal throttling, we can start
+        // or resume the topSession now.
+        if (shouldBeRunning) {
             if (topSession->getState() == Session::NOT_STARTED) {
                 mTranscoder->start(topSession->key.first, topSession->key.second,
                                    topSession->request, topSession->callback.lock());
@@ -566,7 +578,9 @@ void TranscodingSessionController::onResourceLost(ClientIdType clientId, Session
         if (clientCallback != nullptr) {
             clientCallback->onTranscodingPaused(sessionKey.second);
         }
-        mResourcePolicy->setPidResourceLost(resourceLostSession->request.clientPid);
+        if (mResourcePolicy != nullptr) {
+            mResourcePolicy->setPidResourceLost(resourceLostSession->request.clientPid);
+        }
         mResourceLost = true;
 
         validateState_l();
@@ -608,6 +622,36 @@ void TranscodingSessionController::onResourceAvailable() {
     ALOGI("%s", __FUNCTION__);
 
     mResourceLost = false;
+    updateCurrentSession_l();
+
+    validateState_l();
+}
+
+void TranscodingSessionController::onThrottlingStarted() {
+    std::scoped_lock lock{mLock};
+
+    if (mThermalThrottling) {
+        return;
+    }
+
+    ALOGI("%s", __FUNCTION__);
+
+    mThermalThrottling = true;
+    updateCurrentSession_l();
+
+    validateState_l();
+}
+
+void TranscodingSessionController::onThrottlingStopped() {
+    std::scoped_lock lock{mLock};
+
+    if (!mThermalThrottling) {
+        return;
+    }
+
+    ALOGI("%s", __FUNCTION__);
+
+    mThermalThrottling = false;
     updateCurrentSession_l();
 
     validateState_l();

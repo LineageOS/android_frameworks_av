@@ -173,6 +173,24 @@ class StreamOutHalHidl : public StreamOutHalInterface, public StreamHalHidl {
     void onDrainReady();
     void onError();
 
+    // Returns the Dual Mono mode presentation setting.
+    status_t getDualMonoMode(audio_dual_mono_mode_t* mode) override;
+
+    // Sets the Dual Mono mode presentation on the output device.
+    status_t setDualMonoMode(audio_dual_mono_mode_t mode) override;
+
+    // Returns the Audio Description Mix level in dB.
+    status_t getAudioDescriptionMixLevel(float* leveldB) override;
+
+    // Sets the Audio Description Mix level in dB.
+    status_t setAudioDescriptionMixLevel(float leveldB) override;
+
+    // Retrieves current playback rate parameters.
+    status_t getPlaybackRateParameters(audio_playback_rate_t* playbackRate) override;
+
+    // Sets the playback rate parameters that control playback behavior.
+    status_t setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) override;
+
     status_t setEventCallback(const sp<StreamOutHalInterfaceEventCallback>& callback) override;
 
     // Methods used by StreamCodecFormatCallback (HIDL).

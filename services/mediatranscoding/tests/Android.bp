@@ -18,13 +18,13 @@ cc_defaults {
         "libbinder_ndk",
         "liblog",
         "libutils",
-        "libmediatranscodingservice",
         "libcutils",
     ],
 
     static_libs: [
         "mediatranscoding_aidl_interface-ndk_platform",
         "resourcemanager_aidl_interface-ndk_platform",
+        "libmediatranscodingservice",
     ],
 
     required: [

@@ -25,6 +25,7 @@
 #include <android/media/AudioClient.h>
 #include <android/media/AudioConfig.h>
 #include <android/media/AudioConfigBase.h>
+#include <android/media/AudioDualMonoMode.h>
 #include <android/media/AudioEncapsulationMode.h>
 #include <android/media/AudioEncapsulationMetadataType.h>
 #include <android/media/AudioFlag.h>
@@ -36,6 +37,7 @@
 #include <android/media/AudioMixLatencyClass.h>
 #include <android/media/AudioMode.h>
 #include <android/media/AudioOutputFlags.h>
+#include <android/media/AudioPlaybackRate.h>
 #include <android/media/AudioPort.h>
 #include <android/media/AudioPortConfigType.h>
 #include <android/media/AudioPortDeviceExt.h>
@@ -358,5 +360,25 @@ ConversionResult<volume_group_t>
 aidl2legacy_int32_t_volume_group_t(int32_t aidl);
 ConversionResult<int32_t>
 legacy2aidl_volume_group_t_int32_t(volume_group_t legacy);
+
+ConversionResult<audio_dual_mono_mode_t>
+aidl2legacy_AudioDualMonoMode_audio_dual_mono_mode_t(media::AudioDualMonoMode aidl);
+ConversionResult<media::AudioDualMonoMode>
+legacy2aidl_audio_dual_mono_mode_t_AudioDualMonoMode(audio_dual_mono_mode_t legacy);
+
+ConversionResult<audio_timestretch_fallback_mode_t>
+aidl2legacy_int32_t_audio_timestretch_fallback_mode_t(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_audio_timestretch_fallback_mode_t_int32_t(audio_timestretch_fallback_mode_t legacy);
+
+ConversionResult<audio_timestretch_stretch_mode_t>
+aidl2legacy_int32_t_audio_timestretch_stretch_mode_t(int32_t aidl);
+ConversionResult<int32_t>
+legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(audio_timestretch_stretch_mode_t legacy);
+
+ConversionResult<audio_playback_rate_t>
+aidl2legacy_AudioPlaybackRate_audio_playback_rate_t(const media::AudioPlaybackRate& aidl);
+ConversionResult<media::AudioPlaybackRate>
+legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t& legacy);
 
 }  // namespace android
