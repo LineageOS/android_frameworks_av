@@ -189,6 +189,65 @@ status_t Camera3OutputStream::getBufferLocked(camera_stream_buffer *buffer,
     return OK;
 }
 
+status_t Camera3OutputStream::getBuffersLocked(std::vector<OutstandingBuffer>* outBuffers) {
+    status_t res;
+
+    if ((res = getBufferPreconditionCheckLocked()) != OK) {
+        return res;
+    }
+
+    if (mUseBufferManager) {
+        ALOGE("%s: stream %d is managed by buffer manager and does not support batch operation",
+                __FUNCTION__, mId);
+        return INVALID_OPERATION;
+    }
+
+    sp<Surface> consumer = mConsumer;
+    /**
+     * Release the lock briefly to avoid deadlock for below scenario:
+     * Thread 1: StreamingProcessor::startStream -> Camera3Stream::isConfiguring().
+     * This thread acquired StreamingProcessor lock and try to lock Camera3Stream lock.
+     * Thread 2: Camera3Stream::returnBuffer->StreamingProcessor::onFrameAvailable().
+     * This thread acquired Camera3Stream lock and bufferQueue lock, and try to lock
+     * StreamingProcessor lock.
+     * Thread 3: Camera3Stream::getBuffer(). This thread acquired Camera3Stream lock
+     * and try to lock bufferQueue lock.
+     * Then there is circular locking dependency.
+     */
+    mLock.unlock();
+
+    size_t numBuffersRequested = outBuffers->size();
+    std::vector<Surface::BatchBuffer> buffers(numBuffersRequested);
+
+    nsecs_t dequeueStart = systemTime(SYSTEM_TIME_MONOTONIC);
+    res = consumer->dequeueBuffers(&buffers);
+    nsecs_t dequeueEnd = systemTime(SYSTEM_TIME_MONOTONIC);
+    mDequeueBufferLatency.add(dequeueStart, dequeueEnd);
+
+    mLock.lock();
+
+    if (res != OK) {
+        if (shouldLogError(res, mState)) {
+            ALOGE("%s: Stream %d: Can't dequeue %zu output buffers: %s (%d)",
+                    __FUNCTION__, mId, numBuffersRequested, strerror(-res), res);
+        }
+        checkRetAndSetAbandonedLocked(res);
+        return res;
+    }
+    checkRemovedBuffersLocked();
+
+    /**
+     * FenceFD now owned by HAL except in case of error,
+     * in which case we reassign it to acquire_fence
+     */
+    for (size_t i = 0; i < numBuffersRequested; i++) {
+        handoutBufferLocked(*(outBuffers->at(i).outBuffer),
+                &(buffers[i].buffer->handle), /*acquireFence*/buffers[i].fenceFd,
+                /*releaseFence*/-1, CAMERA_BUFFER_STATUS_OK, /*output*/true);
+    }
+    return OK;
+}
+
 status_t Camera3OutputStream::queueBufferToConsumer(sp<ANativeWindow>& consumer,
             ANativeWindowBuffer* buffer, int anwReleaseFence,
             const std::vector<size_t>&) {
@@ -199,6 +258,10 @@ status_t Camera3OutputStream::returnBufferLocked(
         const camera_stream_buffer &buffer,
         nsecs_t timestamp, const std::vector<size_t>& surface_ids) {
     ATRACE_HFR_CALL();
+
+    if (mHandoutTotalBufferCount == 1) {
+        returnPrefetchedBuffersLocked();
+    }
 
     status_t res = returnAnyBufferLocked(buffer, timestamp, /*output*/true, surface_ids);
 
@@ -580,11 +643,46 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
          * and try to lock bufferQueue lock.
          * Then there is circular locking dependency.
          */
-        sp<ANativeWindow> currentConsumer = mConsumer;
+        sp<Surface> consumer = mConsumer;
+        size_t remainingBuffers = camera_stream::max_buffers - mHandoutTotalBufferCount;
         mLock.unlock();
+        std::unique_lock<std::mutex> batchLock(mBatchLock);
 
         nsecs_t dequeueStart = systemTime(SYSTEM_TIME_MONOTONIC);
-        res = currentConsumer->dequeueBuffer(currentConsumer.get(), anb, fenceFd);
+
+        if (mBatchSize == 1) {
+            sp<ANativeWindow> anw = consumer;
+            res = anw->dequeueBuffer(anw.get(), anb, fenceFd);
+        } else {
+            res = OK;
+            if (mBatchedBuffers.size() == 0) {
+                size_t batchSize = mBatchSize;
+                if (remainingBuffers == 0) {
+                    ALOGE("%s: cannot get buffer while all buffers are handed out", __FUNCTION__);
+                    return INVALID_OPERATION;
+                }
+                if (batchSize > remainingBuffers) {
+                    batchSize = remainingBuffers;
+                }
+                // Refill batched buffers
+                mBatchedBuffers.resize(batchSize);
+                res = consumer->dequeueBuffers(&mBatchedBuffers);
+                if (res != OK) {
+                    ALOGE("%s: batch dequeueBuffers call failed! %s (%d)",
+                            __FUNCTION__, strerror(-res), res);
+                    mBatchedBuffers.clear();
+                }
+            }
+
+            if (res == OK) {
+                // Dispatch batch buffers
+                *anb = mBatchedBuffers.back().buffer;
+                *fenceFd = mBatchedBuffers.back().fenceFd;
+                mBatchedBuffers.pop_back();
+            }
+        }
+        batchLock.unlock();
+
         nsecs_t dequeueEnd = systemTime(SYSTEM_TIME_MONOTONIC);
         mDequeueBufferLatency.add(dequeueStart, dequeueEnd);
 
@@ -677,6 +775,8 @@ status_t Camera3OutputStream::disconnectLocked() {
     if (mConsumer == nullptr) {
         return OK;
     }
+
+    returnPrefetchedBuffersLocked();
 
     ALOGV("%s: disconnecting stream %d from native window", __FUNCTION__, getId());
 
@@ -1011,6 +1111,52 @@ void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
     imageFile.write((const char*)mapped, actualJpegSize);
 
     graphicBuffer->unlock();
+}
+
+status_t Camera3OutputStream::setBatchSize(size_t batchSize) {
+    Mutex::Autolock l(mLock);
+    std::lock_guard<std::mutex> lock(mBatchLock);
+    if (batchSize == 0) {
+        ALOGE("%s: invalid batch size 0", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (mUseBufferManager) {
+        ALOGE("%s: batch operation is not supported with buffer manager", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    if (!isVideoStream()) {
+        ALOGE("%s: batch operation is not supported with non-video stream", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+
+    if (batchSize != mBatchSize) {
+        if (mBatchedBuffers.size() != 0) {
+            ALOGE("%s: change batch size from %zu to %zu dynamically is not supported",
+                    __FUNCTION__, mBatchSize, batchSize);
+            return INVALID_OPERATION;
+        }
+
+        if (camera_stream::max_buffers < batchSize) {
+            ALOGW("%s: batch size is capped by max_buffers %d", __FUNCTION__,
+                    camera_stream::max_buffers);
+            batchSize = camera_stream::max_buffers;
+        }
+        mBatchSize = batchSize;
+    }
+    return OK;
+}
+
+void Camera3OutputStream::returnPrefetchedBuffersLocked() {
+    std::lock_guard<std::mutex> batchLock(mBatchLock);
+    if (mBatchedBuffers.size() != 0) {
+        ALOGW("%s: %zu extra prefetched buffers detected. Returning",
+                __FUNCTION__, mBatchedBuffers.size());
+
+        mConsumer->cancelBuffers(mBatchedBuffers);
+        mBatchedBuffers.clear();
+    }
 }
 
 }; // namespace camera3
