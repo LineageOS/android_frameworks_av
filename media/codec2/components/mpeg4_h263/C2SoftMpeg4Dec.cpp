@@ -35,8 +35,10 @@
 namespace android {
 constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
 #ifdef MPEG4
+constexpr size_t kMaxDimension = 1920;
 constexpr char COMPONENT_NAME[] = "c2.android.mpeg4.decoder";
 #else
+constexpr size_t kMaxDimension = 352;
 constexpr char COMPONENT_NAME[] = "c2.android.h263.decoder";
 #endif
 
@@ -75,13 +77,8 @@ public:
                 DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
                 .withDefault(new C2StreamPictureSizeInfo::output(0u, 176, 144))
                 .withFields({
-#ifdef MPEG4
-                    C2F(mSize, width).inRange(2, 1920, 2),
-                    C2F(mSize, height).inRange(2, 1088, 2),
-#else
-                    C2F(mSize, width).inRange(2, 352, 2),
-                    C2F(mSize, height).inRange(2, 288, 2),
-#endif
+                    C2F(mSize, width).inRange(2, kMaxDimension, 2),
+                    C2F(mSize, height).inRange(2, kMaxDimension, 2),
                 })
                 .withSetter(SizeSetter)
                 .build());
@@ -130,19 +127,10 @@ public:
 
         addParameter(
                 DefineParam(mMaxSize, C2_PARAMKEY_MAX_PICTURE_SIZE)
-#ifdef MPEG4
-                .withDefault(new C2StreamMaxPictureSizeTuning::output(0u, 1920, 1088))
-#else
                 .withDefault(new C2StreamMaxPictureSizeTuning::output(0u, 352, 288))
-#endif
                 .withFields({
-#ifdef MPEG4
-                    C2F(mSize, width).inRange(2, 1920, 2),
-                    C2F(mSize, height).inRange(2, 1088, 2),
-#else
-                    C2F(mSize, width).inRange(2, 352, 2),
-                    C2F(mSize, height).inRange(2, 288, 2),
-#endif
+                    C2F(mSize, width).inRange(2, kMaxDimension, 2),
+                    C2F(mSize, height).inRange(2, kMaxDimension, 2),
                 })
                 .withSetter(MaxPictureSizeSetter, mSize)
                 .build());
@@ -200,13 +188,8 @@ public:
                                     const C2P<C2StreamPictureSizeInfo::output> &size) {
         (void)mayBlock;
         // TODO: get max width/height from the size's field helpers vs. hardcoding
-#ifdef MPEG4
-        me.set().width = c2_min(c2_max(me.v.width, size.v.width), 1920u);
-        me.set().height = c2_min(c2_max(me.v.height, size.v.height), 1088u);
-#else
-        me.set().width = c2_min(c2_max(me.v.width, size.v.width), 352u);
-        me.set().height = c2_min(c2_max(me.v.height, size.v.height), 288u);
-#endif
+        me.set().width = c2_min(c2_max(me.v.width, size.v.width), kMaxDimension);
+        me.set().height = c2_min(c2_max(me.v.height, size.v.height), kMaxDimension);
         return C2R::Ok();
     }
 
