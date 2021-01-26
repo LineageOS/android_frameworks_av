@@ -17,6 +17,7 @@
 #ifndef ANDROID_SERVERS_CAMERA3_OUTPUT_STREAM_H
 #define ANDROID_SERVERS_CAMERA3_OUTPUT_STREAM_H
 
+#include <mutex>
 #include <utils/RefBase.h>
 #include <gui/IProducerListener.h>
 #include <gui/Surface.h>
@@ -206,6 +207,19 @@ class Camera3OutputStream :
             KeyedVector<sp<Surface>, size_t> *outputMap/*out*/);
 
     /**
+     * Set the batch size for buffer operations. The output stream will request
+     * buffers from buffer queue on a batch basis. Currently only video streams
+     * are allowed to set the batch size. Also if the stream is managed by
+     * buffer manager (Surface group in Java API) then batching is also not
+     * supported. Changing batch size on the fly while there is already batched
+     * buffers in the stream is also not supported.
+     * If the batch size is larger than the max dequeue count set
+     * by the camera HAL, the batch size will be set to the max dequeue count
+     * instead.
+     */
+    virtual status_t setBatchSize(size_t batchSize = 1) override;
+
+    /**
      * Apply ZSL related consumer usage quirk.
      */
     static void applyZSLUsageQuirk(int format, uint64_t *consumerUsage /*inout*/);
@@ -292,11 +306,25 @@ class Camera3OutputStream :
     // Whether to drop valid buffers.
     bool mDropBuffers;
 
+
+    // Protecting batch states below, must be acquired after mLock
+    std::mutex mBatchLock;
+
+    // The batch size for buffer operation
+    size_t mBatchSize = 1;
+
+    // Prefetched buffers (ready to be handed to client)
+    std::vector<Surface::BatchBuffer> mBatchedBuffers;
+
+    // ---- End of mBatchLock protected scope ----
+
     /**
      * Internal Camera3Stream interface
      */
     virtual status_t getBufferLocked(camera_stream_buffer *buffer,
             const std::vector<size_t>& surface_ids);
+
+    virtual status_t getBuffersLocked(/*out*/std::vector<OutstandingBuffer>* buffers) override;
 
     virtual status_t returnBufferLocked(
             const camera_stream_buffer &buffer,
@@ -329,6 +357,8 @@ class Camera3OutputStream :
 
     // Dump images to disk before returning to consumer
     void dumpImageToDisk(nsecs_t timestamp, ANativeWindowBuffer* anwBuffer, int fence);
+
+    void returnPrefetchedBuffersLocked();
 
     static const int32_t kDequeueLatencyBinSize = 5; // in ms
     CameraLatencyHistogram mDequeueBufferLatency;

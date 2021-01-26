@@ -71,11 +71,12 @@ cc_library {
     ],
 
     srcs: [
-        "TranscodingClientManager.cpp",
-        "TranscodingSessionController.cpp",
-        "TranscodingResourcePolicy.cpp",
-        "TranscodingUidPolicy.cpp",
         "TranscoderWrapper.cpp",
+        "TranscodingClientManager.cpp",
+        "TranscodingResourcePolicy.cpp",
+        "TranscodingSessionController.cpp",
+        "TranscodingThermalPolicy.cpp",
+        "TranscodingUidPolicy.cpp",
     ],
 
     shared_libs: [

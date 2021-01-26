@@ -354,5 +354,36 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingUidPolicy) {
     ALOGD("TestTranscodingUidPolicy finished.");
 }
 
+TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingThermalPolicy) {
+    ALOGD("TestTranscodingThermalPolicy starting...");
+
+    registerMultipleClients();
+
+    // Submit request, should start immediately.
+    EXPECT_TRUE(mClient1->submit(0, "test_source_file_0", "test_destination_file_0"));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
+
+    // Now, simulate thermal status change by adb cmd. The status code is as defined in
+    // frameworks/native/include/android/thermal.h.
+    // ATHERMAL_STATUS_SEVERE(3): should start throttling.
+    EXPECT_TRUE(ShellHelper::RunCmd("cmd thermalservice override-status 3"));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Pause(CLIENT(1), 0));
+
+    // ATHERMAL_STATUS_CRITICAL(4): shouldn't start throttling again (already started).
+    EXPECT_TRUE(ShellHelper::RunCmd("cmd thermalservice override-status 4"));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::NoEvent);
+
+    // ATHERMAL_STATUS_MODERATE(2): should stop throttling.
+    EXPECT_TRUE(ShellHelper::RunCmd("cmd thermalservice override-status 2"));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Resume(CLIENT(1), 0));
+
+    // ATHERMAL_STATUS_LIGHT(1): shouldn't stop throttling again (already stopped).
+    EXPECT_TRUE(ShellHelper::RunCmd("cmd thermalservice override-status 1"));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 0));
+
+    unregisterMultipleClients();
+
+    ALOGD("TestTranscodingThermalPolicy finished.");
+}
 }  // namespace media
 }  // namespace android

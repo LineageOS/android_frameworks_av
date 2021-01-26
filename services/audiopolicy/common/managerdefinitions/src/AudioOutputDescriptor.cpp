@@ -527,6 +527,9 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *config,
         lConfig.offload_info.duration_us = -1;
         lConfig.offload_info.has_video = true; // conservative
         lConfig.offload_info.is_streaming = true; // likely
+        lConfig.offload_info.encapsulation_mode = lConfig.offload_info.encapsulation_mode;
+        lConfig.offload_info.content_id = lConfig.offload_info.content_id;
+        lConfig.offload_info.sync_id = lConfig.offload_info.sync_id;
     }
 
     mFlags = (audio_output_flags_t)(mFlags | flags);

@@ -65,7 +65,7 @@ public:
      * Otherwise, return BAD_VALUE.
      */
     static status_t validateAudioPort(
-            const struct audio_port_v7& port, std::string_view ugNumber = {});
+            const struct audio_port_v7& port, std::string_view bugNumber = {});
 
     /**
      * Return NO_ERROR only when there is no error with the given audio patch.
@@ -73,6 +73,36 @@ public:
      */
     static status_t validateAudioPatch(
             const struct audio_patch& patch, std::string_view bugNumber = {});
+
+    /**
+     * Return NO_ERROR if leveldB is acceptable, otherwise BAD_VALUE.
+     */
+    static status_t validateAudioDescriptionMixLevel(float leveldB);
+
+    /**
+     * Return NO_ERROR if dualMonoMode is one of the enum values, otherwise BAD_VALUE.
+     */
+    static status_t validateDualMonoMode(audio_dual_mono_mode_t dualMonoMode);
+
+    /**
+     * Return NO_ERROR if fallbackMode is one of the enum values, otherwise BAD_VALUE.
+     */
+    static status_t validatePlaybackRateFallbackMode(
+            audio_timestretch_fallback_mode_t fallbackMode);
+
+    /**
+     * Return NO_ERROR if fallbackMode is one of the enum values, otherwise BAD_VALUE.
+     */
+    static status_t validatePlaybackRateStretchMode(audio_timestretch_stretch_mode_t stretchMode);
+
+    /**
+     * Return NO_ERROR if playbackRate is acceptable - the enums are correct and the
+     * rate and speed non-negative, otherwise BAD_VALUE.
+     *
+     * This is a basic bounds check - the system might have stricter requirements for
+     * playbackRate on a particular stream / device.
+     */
+    static status_t validatePlaybackRate(const audio_playback_rate_t& playbackRate);
 };
 
 }; // namespace android

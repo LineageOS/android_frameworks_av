@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2004-2010 NXP Software
- * Copyright (C) 2010 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,6 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+package android.media;
 
-#include "BIQUAD.h"
-#include "PK_2I_D32F32CllGss_TRC_WRA_01_Private.h"
+// TODO(b/175167149): Reconcile AudioDualMonoMode with framework-media-sources
+
+@Backing(type="int")
+enum AudioDualMonoMode {
+    OFF = 0,
+    LR = 1,
+    LL = 2,
+    RR = 3,
+}

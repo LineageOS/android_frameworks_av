@@ -24,9 +24,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#ifdef BIQUAD_OPT
 #include <audio_utils/BiquadFilter.h>
-#endif
 #include "LVREV.h"
 #include "LVREV_Tables.h"
 #include "BIQUAD.h"
@@ -105,22 +103,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-#ifndef BIQUAD_OPT
-/* Fast data structure */
-typedef struct {
-    Biquad_1I_Order1_FLOAT_Taps_t HPTaps;       /* High pass filter taps */
-    Biquad_1I_Order1_FLOAT_Taps_t LPTaps;       /* Low pass filter taps */
-    Biquad_1I_Order1_FLOAT_Taps_t RevLPTaps[LVREV_DELAYLINES_4]; /* Reverb low pass filters taps */
-} LVREV_FastData_st;
-
-/* Fast coefficient structure */
-typedef struct {
-    Biquad_FLOAT_Instance_t HPCoefs;       /* High pass filter coefficients */
-    Biquad_FLOAT_Instance_t LPCoefs;       /* Low pass filter coefficients */
-    Biquad_FLOAT_Instance_t
-            RevLPCoefs[LVREV_DELAYLINES_4]; /* Reverb low pass filters coefficients */
-} LVREV_FastCoef_st;
-#endif
 
 typedef struct {
     /* General */
@@ -140,17 +122,12 @@ typedef struct {
                                                processing */
 
     /* Aligned memory pointers */
-#ifdef BIQUAD_OPT
     std::unique_ptr<android::audio_utils::BiquadFilter<LVM_FLOAT>>
             pRevHPFBiquad; /* Biquad filter instance for HPF */
     std::unique_ptr<android::audio_utils::BiquadFilter<LVM_FLOAT>>
             pRevLPFBiquad; /* Biquad filter instance for LPF */
     std::array<std::unique_ptr<android::audio_utils::BiquadFilter<LVM_FLOAT>>, LVREV_DELAYLINES_4>
             revLPFBiquad; /* Biquad filter instance for Reverb LPF */
-#else
-    LVREV_FastData_st* pFastData; /* Fast data memory base address */
-    LVREV_FastCoef_st* pFastCoef; /* Fast coefficient memory base address */
-#endif
     LVM_FLOAT* pScratchDelayLine[LVREV_DELAYLINES_4]; /* Delay line scratch memory */
     LVM_FLOAT* pScratch;             /* Multi ussge scratch */
     LVM_FLOAT* pInputSave;           /* Reverb block input save for dry/wet

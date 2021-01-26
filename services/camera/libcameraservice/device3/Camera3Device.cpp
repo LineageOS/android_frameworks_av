@@ -913,6 +913,7 @@ status_t Camera3Device::convertMetadataListToRequestListLocked(
         for (auto& outputStream : (*firstRequest)->mOutputStreams) {
             if (outputStream->isVideoStream()) {
                 (*firstRequest)->mBatchSize = requestList->size();
+                outputStream->setBatchSize(requestList->size());
                 break;
             }
         }
@@ -4753,15 +4754,21 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         }
         bool isStillCapture = false;
         bool isZslCapture = false;
+        const camera_metadata_t* settings = halRequest->settings;
+        bool shouldUnlockSettings = false;
+        if (settings == nullptr) {
+            shouldUnlockSettings = true;
+            settings = captureRequest->mSettingsList.begin()->metadata.getAndLock();
+        }
         if (!mNextRequests[0].captureRequest->mSettingsList.begin()->metadata.isEmpty()) {
             camera_metadata_ro_entry_t e = camera_metadata_ro_entry_t();
-            find_camera_metadata_ro_entry(halRequest->settings, ANDROID_CONTROL_CAPTURE_INTENT, &e);
+            find_camera_metadata_ro_entry(settings, ANDROID_CONTROL_CAPTURE_INTENT, &e);
             if ((e.count > 0) && (e.data.u8[0] == ANDROID_CONTROL_CAPTURE_INTENT_STILL_CAPTURE)) {
                 isStillCapture = true;
                 ATRACE_ASYNC_BEGIN("still capture", mNextRequests[i].halRequest.frame_number);
             }
 
-            find_camera_metadata_ro_entry(halRequest->settings, ANDROID_CONTROL_ENABLE_ZSL, &e);
+            find_camera_metadata_ro_entry(settings, ANDROID_CONTROL_ENABLE_ZSL, &e);
             if ((e.count > 0) && (e.data.u8[0] == ANDROID_CONTROL_ENABLE_ZSL_TRUE)) {
                 isZslCapture = true;
             }
@@ -4770,7 +4777,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 totalNumBuffers, captureRequest->mResultExtras,
                 /*hasInput*/halRequest->input_buffer != NULL,
                 hasCallback,
-                calculateMaxExpectedDuration(halRequest->settings),
+                calculateMaxExpectedDuration(settings),
                 requestedPhysicalCameras, isStillCapture, isZslCapture,
                 captureRequest->mRotateAndCropAuto, mPrevCameraIdsWithZoom,
                 (mUseHalBufManager) ? uniqueSurfaceIdMap :
@@ -4780,6 +4787,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
                 __FUNCTION__,
                 captureRequest->mResultExtras.requestId, captureRequest->mResultExtras.frameNumber,
                 captureRequest->mResultExtras.burstId);
+
+        if (shouldUnlockSettings) {
+            captureRequest->mSettingsList.begin()->metadata.unlock(settings);
+        }
+
         if (res != OK) {
             SET_ERR("RequestThread: Unable to register new in-flight request:"
                     " %s (%d)", strerror(-res), res);
