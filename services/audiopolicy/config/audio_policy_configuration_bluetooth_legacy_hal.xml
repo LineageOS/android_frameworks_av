@@ -185,6 +185,9 @@
         <!-- Hearing aid Audio HAL -->
         <xi:include href="hearing_aid_audio_policy_configuration.xml"/>
 
+        <!-- Le Audio Audio HAL -->
+        <xi:include href="le_audio_policy_configuration.xml"/>
+
         <!-- MSD Audio HAL (optional) -->
         <xi:include href="msd_audio_policy_configuration.xml"/>
 
