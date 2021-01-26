@@ -41,6 +41,14 @@ HwModule::~HwModule()
     }
 }
 
+std::string HwModule::getTagForDevice(audio_devices_t device, const String8 &address,
+                                          audio_format_t codec)
+{
+    DeviceVector declaredDevices = getDeclaredDevices();
+    sp<DeviceDescriptor> deviceDesc = declaredDevices.getDevice(device, address, codec);
+    return deviceDesc ? deviceDesc->getTagName() : std::string{};
+}
+
 status_t HwModule::addOutputProfile(const std::string& name, const audio_config_t *config,
                                     audio_devices_t device, const String8& address)
 {
@@ -49,7 +57,8 @@ status_t HwModule::addOutputProfile(const std::string& name, const audio_config_
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
                                               config->sample_rate));
 
-    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device, "" /*tagName*/, address.string());
+    sp<DeviceDescriptor> devDesc =
+            new DeviceDescriptor(device, getTagForDevice(device), address.string());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
@@ -116,7 +125,8 @@ status_t HwModule::addInputProfile(const std::string& name, const audio_config_t
     profile->addAudioProfile(new AudioProfile(config->format, config->channel_mask,
                                               config->sample_rate));
 
-    sp<DeviceDescriptor> devDesc = new DeviceDescriptor(device, "" /*tagName*/, address.string());
+    sp<DeviceDescriptor> devDesc =
+            new DeviceDescriptor(device, getTagForDevice(device), address.string());
     addDynamicDevice(devDesc);
     // Reciprocally attach the device to the module
     devDesc->attach(this);
