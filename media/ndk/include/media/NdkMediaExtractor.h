@@ -50,8 +50,6 @@ __BEGIN_DECLS
 struct AMediaExtractor;
 typedef struct AMediaExtractor AMediaExtractor;
 
-#if __ANDROID_API__ >= 21
-
 /**
  * Create new media extractor.
  *
@@ -82,8 +80,6 @@ media_status_t AMediaExtractor_setDataSourceFd(AMediaExtractor*, int fd, off64_t
 media_status_t AMediaExtractor_setDataSource(AMediaExtractor*,
         const char *location) __INTRODUCED_IN(21);
 
-#if __ANDROID_API__ >= 28
-
 /**
  * Set the custom data source implementation from which the extractor will read.
  *
@@ -91,8 +87,6 @@ media_status_t AMediaExtractor_setDataSource(AMediaExtractor*,
  */
 media_status_t AMediaExtractor_setDataSourceCustom(AMediaExtractor*,
         AMediaDataSource *src) __INTRODUCED_IN(28);
-
-#endif /* __ANDROID_API__ >= 28 */
 
 /**
  * Return the number of tracks in the previously specified media file
@@ -211,8 +205,6 @@ enum {
     AMEDIAEXTRACTOR_SAMPLE_FLAG_ENCRYPTED = 2,
 };
 
-#if __ANDROID_API__ >= 28
-
 /**
  * Returns the format of the extractor. The caller must free the returned format
  * using AMediaFormat_delete(format).
@@ -265,10 +257,6 @@ int64_t AMediaExtractor_getCachedDuration(AMediaExtractor *) __INTRODUCED_IN(28)
  */
 media_status_t AMediaExtractor_getSampleFormat(AMediaExtractor *ex,
         AMediaFormat *fmt) __INTRODUCED_IN(28);
-
-#endif /* __ANDROID_API__ >= 28 */
-
-#endif /* __ANDROID_API__ >= 21 */
 
 __END_DECLS
 
