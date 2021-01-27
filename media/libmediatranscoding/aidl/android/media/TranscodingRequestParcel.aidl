@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.os.ParcelFileDescriptor;
 import android.media.TranscodingSessionPriority;
 import android.media.TranscodingTestConfig;
 import android.media.TranscodingType;
@@ -35,10 +36,10 @@ parcelable TranscodingRequestParcel {
 
     /*
      * The filedescrptor of the sourceFilePath. If the source Fd is provided, transcoding service
-     * will use this fd instead of calling back to client side to open the sourceFilePath.
-     * -1 means not available.
+     * will use this fd instead of calling back to client side to open the sourceFilePath. It is
+     * client's responsibility to make sure sourceFd is opened from sourceFilePath.
      */
-     int sourceFd = -1;
+    @nullable ParcelFileDescriptor sourceFd;
 
     /**
      * The absolute file path of the destination file.
@@ -47,10 +48,11 @@ parcelable TranscodingRequestParcel {
 
     /*
      * The filedescrptor of the destinationFilePath. If the destination Fd is provided, transcoding
-     * service will use this fd instead of calling back to client side to open the sourceFilePath.
-     * -1 means not available.
+     * service will use this fd instead of calling back to client side to open the
+     * destinationFilePath. It is client's responsibility to make sure destinationFd is opened
+     * from destinationFilePath.
      */
-     int destinationFd = -1;
+    @nullable ParcelFileDescriptor destinationFd;
 
     /**
      * The UID of the client that this transcoding request is for. Only privileged caller could

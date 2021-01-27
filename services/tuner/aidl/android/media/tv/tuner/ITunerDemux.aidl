@@ -16,6 +16,8 @@
 
 package android.media.tv.tuner;
 
+import android.media.tv.tuner.ITunerDvr;
+import android.media.tv.tuner.ITunerDvrCallback;
 import android.media.tv.tuner.ITunerFilter;
 import android.media.tv.tuner.ITunerFilterCallback;
 import android.media.tv.tuner.ITunerFrontend;
@@ -37,4 +39,9 @@ interface ITunerDemux {
      */
     ITunerFilter openFilter(
         in int mainType, in int subtype, in int bufferSize, in ITunerFilterCallback cb);
+
+    /**
+     * Open a DVR (Digital Video Record) instance in the demux.
+     */
+    ITunerDvr openDvr(in int dvbType, in int bufferSize, in ITunerDvrCallback cb);
 }

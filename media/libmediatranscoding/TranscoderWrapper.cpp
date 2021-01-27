@@ -202,9 +202,8 @@ void TranscoderWrapper::reportError(ClientIdType clientId, SessionIdType session
 void TranscoderWrapper::start(ClientIdType clientId, SessionIdType sessionId,
                               const TranscodingRequestParcel& request,
                               const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
-    queueEvent(Event::Start, clientId, sessionId, [=] {
+    queueEvent(Event::Start, clientId, sessionId, [=, &request] {
         media_status_t err = handleStart(clientId, sessionId, request, clientCb);
-
         if (err != AMEDIA_OK) {
             cleanup();
             reportError(clientId, sessionId, err);
@@ -237,9 +236,8 @@ void TranscoderWrapper::pause(ClientIdType clientId, SessionIdType sessionId) {
 void TranscoderWrapper::resume(ClientIdType clientId, SessionIdType sessionId,
                                const TranscodingRequestParcel& request,
                                const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
-    queueEvent(Event::Resume, clientId, sessionId, [=] {
+    queueEvent(Event::Resume, clientId, sessionId, [=, &request] {
         media_status_t err = handleResume(clientId, sessionId, request, clientCb);
-
         if (err != AMEDIA_OK) {
             cleanup();
             reportError(clientId, sessionId, err);
@@ -329,19 +327,27 @@ media_status_t TranscoderWrapper::setupTranscoder(
 
     Status status;
     ::ndk::ScopedFileDescriptor srcFd, dstFd;
-    status = clientCb->openFileDescriptor(request.sourceFilePath, "r", &srcFd);
-    if (!status.isOk() || srcFd.get() < 0) {
-        ALOGE("failed to open source");
-        return AMEDIA_ERROR_IO;
+    int srcFdInt = request.sourceFd.get();
+    if (srcFdInt < 0) {
+        status = clientCb->openFileDescriptor(request.sourceFilePath, "r", &srcFd);
+        if (!status.isOk() || srcFd.get() < 0) {
+            ALOGE("failed to open source");
+            return AMEDIA_ERROR_IO;
+        }
+        srcFdInt = srcFd.get();
     }
 
-    // Open dest file with "rw", as the transcoder could potentially reuse part of it
-    // for resume case. We might want the further differentiate and open with "w" only
-    // for start.
-    status = clientCb->openFileDescriptor(request.destinationFilePath, "rw", &dstFd);
-    if (!status.isOk() || dstFd.get() < 0) {
-        ALOGE("failed to open destination");
-        return AMEDIA_ERROR_IO;
+    int dstFdInt = request.destinationFd.get();
+    if (dstFdInt < 0) {
+        // Open dest file with "rw", as the transcoder could potentially reuse part of it
+        // for resume case. We might want the further differentiate and open with "w" only
+        // for start.
+        status = clientCb->openFileDescriptor(request.destinationFilePath, "rw", &dstFd);
+        if (!status.isOk() || dstFd.get() < 0) {
+            ALOGE("failed to open destination");
+            return AMEDIA_ERROR_IO;
+        }
+        dstFdInt = dstFd.get();
     }
 
     mCurrentClientId = clientId;
@@ -354,7 +360,7 @@ media_status_t TranscoderWrapper::setupTranscoder(
         return AMEDIA_ERROR_UNKNOWN;
     }
 
-    media_status_t err = mTranscoder->configureSource(srcFd.get());
+    media_status_t err = mTranscoder->configureSource(srcFdInt);
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure source: %d", err);
         return err;
@@ -385,7 +391,7 @@ media_status_t TranscoderWrapper::setupTranscoder(
         }
     }
 
-    err = mTranscoder->configureDestination(dstFd.get());
+    err = mTranscoder->configureDestination(dstFdInt);
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure dest: %d", err);
         return err;

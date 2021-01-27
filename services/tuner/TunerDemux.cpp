@@ -16,8 +16,8 @@
 
 #define LOG_TAG "TunerDemux"
 
+#include "TunerDvr.h"
 #include "TunerDemux.h"
-#include "TunerFilter.h"
 
 using ::android::hardware::tv::tuner::V1_0::DemuxAlpFilterType;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterMainType;
@@ -26,6 +26,7 @@ using ::android::hardware::tv::tuner::V1_0::DemuxIpFilterType;
 using ::android::hardware::tv::tuner::V1_0::DemuxMmtpFilterType;
 using ::android::hardware::tv::tuner::V1_0::DemuxTlvFilterType;
 using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterType;
+using ::android::hardware::tv::tuner::V1_0::DvrType;
 using ::android::hardware::tv::tuner::V1_0::Result;
 
 namespace android {
@@ -100,4 +101,27 @@ Status TunerDemux::openFilter(
     return Status::ok();
 }
 
+Status TunerDemux::openDvr(int dvrType, int bufferSize, const shared_ptr<ITunerDvrCallback>& cb,
+        shared_ptr<ITunerDvr>* _aidl_return) {
+    if (mDemux == nullptr) {
+        ALOGE("IDemux is not initialized.");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res;
+    sp<IDvrCallback> callback = new TunerDvr::DvrCallback(cb);
+    sp<IDvr> hidlDvr;
+    mDemux->openDvr(static_cast<DvrType>(dvrType), bufferSize, callback,
+            [&](Result r, const sp<IDvr>& dvr) {
+                hidlDvr = dvr;
+                res = r;
+            });
+    if (res != Result::SUCCESS) {
+        *_aidl_return = NULL;
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerDvr>(hidlDvr, dvrType);
+    return Status::ok();
+}
 }  // namespace android
