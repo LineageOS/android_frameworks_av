@@ -59,8 +59,9 @@ class Codec2Fuzzer {
  private:
   class BufferSource {
    public:
-    BufferSource(const uint8_t* data, size_t size)
-        : mData(data), mSize(size), mReadIndex(size - kMarkerSize) {}
+    BufferSource(const uint8_t* data, size_t size) : mData(data), mSize(size) {
+      mReadIndex = (size <= kMarkerSize) ? 0 : (size - kMarkerSize);
+    }
     ~BufferSource() {
       mData = nullptr;
       mSize = 0;
@@ -72,10 +73,20 @@ class Codec2Fuzzer {
     FrameData getFrame();
 
    private:
-    bool isMarker() { return (memcmp(&mData[mReadIndex], kMarker, kMarkerSize) == 0); }
+    bool isMarker() {
+      if ((kMarkerSize < mSize) && (mReadIndex < mSize - kMarkerSize)) {
+        return (memcmp(&mData[mReadIndex], kMarker, kMarkerSize) == 0);
+      } else {
+        return false;
+      }
+    }
 
     bool isCSDMarker(size_t position) {
-      return (memcmp(&mData[position], kCsdMarkerSuffix, kMarkerSuffixSize) == 0);
+      if ((kMarkerSuffixSize < mSize) && (position < mSize - kMarkerSuffixSize)) {
+        return (memcmp(&mData[position], kCsdMarkerSuffix, kMarkerSuffixSize) == 0);
+      } else {
+        return false;
+      }
     }
 
     bool searchForMarker();
