@@ -413,10 +413,10 @@ exit:
         *handle = (audio_patch_handle_t) mAudioFlinger.nextUniqueId(AUDIO_UNIQUE_ID_USE_PATCH);
         newPatch.mHalHandle = halHandle;
         mAudioFlinger.mDeviceEffectManager.createAudioPatch(*handle, newPatch);
-        mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
         if (insertedModule != AUDIO_MODULE_HANDLE_NONE) {
-            addSoftwarePatchToInsertedModules(insertedModule, *handle);
+            addSoftwarePatchToInsertedModules(insertedModule, *handle, &newPatch.mAudioPatch);
         }
+        mPatches.insert(std::make_pair(*handle, std::move(newPatch)));
     } else {
         newPatch.clearConnections(this);
     }
@@ -781,10 +781,20 @@ status_t AudioFlinger::PatchPanel::getDownstreamSoftwarePatches(
 }
 
 void AudioFlinger::PatchPanel::notifyStreamOpened(
-        AudioHwDevice *audioHwDevice, audio_io_handle_t stream)
+        AudioHwDevice *audioHwDevice, audio_io_handle_t stream, struct audio_patch *patch)
 {
     if (audioHwDevice->isInsert()) {
         mInsertedModules[audioHwDevice->handle()].streams.insert(stream);
+        if (patch != nullptr) {
+            std::vector <SoftwarePatch> swPatches;
+            getDownstreamSoftwarePatches(stream, &swPatches);
+            if (swPatches.size() > 0) {
+                auto iter = mPatches.find(swPatches[0].getPatchHandle());
+                if (iter != mPatches.end()) {
+                    *patch = iter->second.mAudioPatch;
+                }
+            }
+        }
     }
 }
 
@@ -813,9 +823,13 @@ sp<DeviceHalInterface> AudioFlinger::PatchPanel::findHwDeviceByModule(audio_modu
 }
 
 void AudioFlinger::PatchPanel::addSoftwarePatchToInsertedModules(
-        audio_module_handle_t module, audio_patch_handle_t handle)
+        audio_module_handle_t module, audio_patch_handle_t handle,
+        const struct audio_patch *patch)
 {
     mInsertedModules[module].sw_patches.insert(handle);
+    if (!mInsertedModules[module].streams.empty()) {
+        mAudioFlinger.updateDownStreamPatches_l(patch, mInsertedModules[module].streams);
+    }
 }
 
 void AudioFlinger::PatchPanel::removeSoftwarePatchFromInsertedModules(

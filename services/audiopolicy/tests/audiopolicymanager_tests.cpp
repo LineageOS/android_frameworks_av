@@ -326,6 +326,7 @@ class AudioPolicyManagerTestMsd : public AudioPolicyManagerTest {
 
     sp<DeviceDescriptor> mMsdOutputDevice;
     sp<DeviceDescriptor> mMsdInputDevice;
+    sp<DeviceDescriptor> mDefaultOutputDevice;
 };
 
 void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
@@ -380,17 +381,21 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
     primaryEncodedOutputProfile->addSupportedDevice(config.getDefaultOutputDevice());
     config.getHwModules().getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY)->
             addOutputProfile(primaryEncodedOutputProfile);
+
+    mDefaultOutputDevice = config.getDefaultOutputDevice();
 }
 
 void AudioPolicyManagerTestMsd::TearDown() {
     mMsdOutputDevice.clear();
     mMsdInputDevice.clear();
+    mDefaultOutputDevice.clear();
     AudioPolicyManagerTest::TearDown();
 }
 
 TEST_F(AudioPolicyManagerTestMsd, InitSuccess) {
     ASSERT_TRUE(mMsdOutputDevice);
     ASSERT_TRUE(mMsdInputDevice);
+    ASSERT_TRUE(mDefaultOutputDevice);
 }
 
 TEST_F(AudioPolicyManagerTestMsd, Dump) {
@@ -409,7 +414,7 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedRoutesToMsd) {
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
-    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
@@ -418,7 +423,7 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrPcmRoutesToMsd) {
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
-    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
@@ -427,11 +432,11 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrEncodedPlusPcmRoutesToMsd) {
     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
-    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
     getOutputForAttr(&selectedDeviceId,
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
-    ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+    ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
     ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
@@ -453,7 +458,7 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT,
                 nullptr /*output*/, &portId);
-        ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+        ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
         ASSERT_EQ(1, patchCount.deltaFromSnapshot());
         mManager->releaseOutput(portId);
         ASSERT_EQ(1, patchCount.deltaFromSnapshot());
@@ -475,7 +480,7 @@ TEST_F(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE;
         getOutputForAttr(&selectedDeviceId,
                 AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000, AUDIO_OUTPUT_FLAG_DIRECT);
-        ASSERT_EQ(selectedDeviceId, mMsdOutputDevice->getId());
+        ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
         ASSERT_EQ(0, patchCount.deltaFromSnapshot());
     }
 }

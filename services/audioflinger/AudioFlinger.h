@@ -320,6 +320,9 @@ public:
     status_t removeEffectFromHal(audio_port_handle_t deviceId,
             audio_module_handle_t hwModuleId, sp<EffectHalInterface> effect);
 
+    void updateDownStreamPatches_l(const struct audio_patch *patch,
+                                   const std::set<audio_io_handle_t> streams);
+
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
     static const size_t kLogMemorySize = 400 * 1024;
