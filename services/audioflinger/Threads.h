@@ -940,6 +940,11 @@ public:
                                         && outDeviceTypes().count(mTimestampCorrectedDevice) != 0;
                             }
 
+                void setDownStreamPatch(const struct audio_patch *patch) {
+                    Mutex::Autolock _l(mLock);
+                    mDownStreamPatch = *patch;
+                }
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
@@ -1218,6 +1223,10 @@ protected:
                 // volumes last sent to audio HAL with stream->setVolume()
                 float mLeftVolFloat;
                 float mRightVolFloat;
+
+                // audio patch used by the downstream software patch.
+                // Only used if ThreadBase::mIsMsdDevice is true.
+                struct audio_patch mDownStreamPatch;
 };
 
 class MixerThread : public PlaybackThread {
