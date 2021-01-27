@@ -44,4 +44,9 @@ interface ITunerDemux {
      * Open a DVR (Digital Video Record) instance in the demux.
      */
     ITunerDvr openDvr(in int dvbType, in int bufferSize, in ITunerDvrCallback cb);
+
+    /**
+     * Releases the ITunerDemux instance.
+     */
+    void close();
 }

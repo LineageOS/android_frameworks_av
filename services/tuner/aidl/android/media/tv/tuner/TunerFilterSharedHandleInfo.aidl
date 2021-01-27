@@ -16,21 +16,14 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterEvent;
+import android.hardware.common.NativeHandle;
 
 /**
- * TunerFilterCallback interface handles tuner filter related callbacks.
+ * Filter Shared Handle Information.
  *
  * {@hide}
  */
-interface ITunerFilterCallback {
-    /**
-     * Notify the client a new status of a filter.
-     */
-    void onFilterStatus(int status);
-
-    /**
-     * Notify the client that a new filter event happened.
-     */
-    void onFilterEvent(in TunerFilterEvent[] filterEvent);
+parcelable TunerFilterSharedHandleInfo {
+    NativeHandle handle;
+    long size;
 }
