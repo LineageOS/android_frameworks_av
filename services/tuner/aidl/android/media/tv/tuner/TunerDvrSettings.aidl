@@ -16,41 +16,19 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterConfiguration;
-
 /**
- * Tuner Filter interface handles tuner related operations.
+ * Dvr Settings interface.
  *
  * {@hide}
  */
-interface ITunerFilter {
-    /**
-     * Get the filter Id.
-     */
-    int getId();
+parcelable TunerDvrSettings {
+    int statusMask;
 
-    /**
-     * Get the 64-bit filter Id.
-     */
-    long getId64Bit();
+    int lowThreshold;
 
-    /**
-     * Configure the filter.
-     */
-    void configure(in TunerFilterConfiguration config);
+    int highThreshold;
 
-    /**
-     * Start the filter.
-     */
-    void start();
+    int dataFormat;
 
-    /**
-     * Stop the filter.
-     */
-    void stop();
-
-    /**
-     * Flush the filter.
-     */
-    void flush();
+    int packetSize;
 }

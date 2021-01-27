@@ -954,5 +954,13 @@ media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo* ci
     return AMEDIA_OK;
 }
 
+EXPORT const char* AMEDIACODEC_KEY_HDR10_PLUS_INFO = AMEDIAFORMAT_KEY_HDR10_PLUS_INFO;
+EXPORT const char* AMEDIACODEC_KEY_LOW_LATENCY = AMEDIAFORMAT_KEY_LOW_LATENCY;
+EXPORT const char* AMEDIACODEC_KEY_OFFSET_TIME = "time-offset-us";
+EXPORT const char* AMEDIACODEC_KEY_REQUEST_SYNC_FRAME = "request-sync";
+EXPORT const char* AMEDIACODEC_KEY_SUSPEND = "drop-input-frames";
+EXPORT const char* AMEDIACODEC_KEY_SUSPEND_TIME = "drop-start-time-us";
+EXPORT const char* AMEDIACODEC_KEY_VIDEO_BITRATE = "video-bitrate";
+
 } // extern "C"
 

@@ -16,41 +16,19 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterConfiguration;
-
 /**
- * Tuner Filter interface handles tuner related operations.
+ * TunerDvrCallback interface handles tuner dvr related callbacks.
  *
  * {@hide}
  */
-interface ITunerFilter {
+interface ITunerDvrCallback {
     /**
-     * Get the filter Id.
+     * Notify the client a new status of the demux's record.
      */
-    int getId();
+    void onRecordStatus(in int status);
 
     /**
-     * Get the 64-bit filter Id.
+     * Notify the client a new status of the demux's playback.
      */
-    long getId64Bit();
-
-    /**
-     * Configure the filter.
-     */
-    void configure(in TunerFilterConfiguration config);
-
-    /**
-     * Start the filter.
-     */
-    void start();
-
-    /**
-     * Stop the filter.
-     */
-    void stop();
-
-    /**
-     * Flush the filter.
-     */
-    void flush();
+    void onPlaybackStatus(in int status);
 }
