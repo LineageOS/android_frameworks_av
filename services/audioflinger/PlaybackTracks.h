@@ -117,6 +117,12 @@ public:
             int         auxEffectId() const { return mAuxEffectId; }
     virtual status_t    getTimestamp(AudioTimestamp& timestamp);
             void        signal();
+            status_t    getDualMonoMode(audio_dual_mono_mode_t* mode);
+            status_t    setDualMonoMode(audio_dual_mono_mode_t mode);
+            status_t    getAudioDescriptionMixLevel(float* leveldB);
+            status_t    setAudioDescriptionMixLevel(float leveldB);
+            status_t    getPlaybackRateParameters(audio_playback_rate_t* playbackRate);
+            status_t    setPlaybackRateParameters(const audio_playback_rate_t& playbackRate);
 
 // implement FastMixerState::VolumeProvider interface
     virtual gain_minifloat_packed_t getVolumeLR();
@@ -280,6 +286,10 @@ protected:
     sp<os::ExternalVibration>    mExternalVibration;
     /** How many frames should be in the buffer before the track is considered ready */
     const size_t        mFrameCountToBeReady;
+
+    audio_dual_mono_mode_t mDualMonoMode = AUDIO_DUAL_MONO_MODE_OFF;
+    float               mAudioDescriptionMixLevel = -std::numeric_limits<float>::infinity();
+    audio_playback_rate_t  mPlaybackRateParameters = AUDIO_PLAYBACK_RATE_INITIALIZER;
 
 private:
     void                interceptBuffer(const AudioBufferProvider::Buffer& buffer);
