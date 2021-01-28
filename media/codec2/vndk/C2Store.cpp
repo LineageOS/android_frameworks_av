@@ -102,16 +102,30 @@ C2PlatformAllocatorStoreImpl::C2PlatformAllocatorStoreImpl() {
 }
 
 static bool using_ion(void) {
-    static int cached_result = -1;
-
-    if (cached_result == -1) {
+    static int cached_result = []()->int {
         struct stat buffer;
-        cached_result = (stat("/dev/ion", &buffer) == 0);
-        if (cached_result)
+        int ret = (stat("/dev/ion", &buffer) == 0);
+
+        if (property_get_int32("debug.c2.use_dmabufheaps", 0)) {
+            /*
+             * Double check that the system heap is present so we
+             * can gracefully fail back to ION if we cannot satisfy
+             * the override
+             */
+            ret = (stat("/dev/dma_heap/system", &buffer) != 0);
+            if (ret)
+                ALOGE("debug.c2.use_dmabufheaps set, but no system heap. Ignoring override!");
+            else
+                ALOGD("debug.c2.use_dmabufheaps set, forcing DMABUF Heaps");
+        }
+
+        if (ret)
             ALOGD("Using ION\n");
         else
             ALOGD("Using DMABUF Heaps\n");
-    }
+        return ret;
+    }();
+
     return (cached_result == 1);
 }
 
