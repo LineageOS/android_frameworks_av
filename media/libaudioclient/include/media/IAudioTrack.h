@@ -27,6 +27,7 @@
 #include <utils/String8.h>
 #include <media/AudioTimestamp.h>
 #include <media/VolumeShaper.h>
+#include <system/audio.h>
 
 namespace android {
 
@@ -86,6 +87,24 @@ public:
 
     /* gets the volume shaper state */
     virtual sp<media::VolumeShaper::State> getVolumeShaperState(int id) = 0;
+
+    /* Returns the Dual Mono mode presentation setting. */
+    virtual status_t    getDualMonoMode(audio_dual_mono_mode_t* mode) = 0;
+
+    /* Sets the Dual Mono mode presentation on the output device. */
+    virtual status_t    setDualMonoMode(audio_dual_mono_mode_t mode) = 0;
+
+    /* Returns the Audio Description Mix level in dB. */
+    virtual status_t    getAudioDescriptionMixLevel(float* leveldB) = 0;
+
+    /* Sets the Audio Description Mix level in dB. */
+    virtual status_t    setAudioDescriptionMixLevel(float leveldB) = 0;
+
+    /* Retrieves current playback rate parameters. */
+    virtual status_t    getPlaybackRateParameters(audio_playback_rate_t* playbackRate) = 0;
+
+    /* Sets the playback rate parameters that control playback behavior. */
+    virtual status_t    setPlaybackRateParameters(const audio_playback_rate_t& playbackRate) = 0;
 };
 
 // ----------------------------------------------------------------------------
