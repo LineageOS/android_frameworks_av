@@ -40,6 +40,9 @@ enum DeviceConnectionResult : int32_t {
 
 // Enumeration for all the string translations to integers (generally int32_t) unless noted.
 enum AudioEnumCategory {
+    AAUDIO_DIRECTION,
+    AAUDIO_PERFORMANCE_MODE,
+    AAUDIO_SHARING_MODE,
     CALLER_NAME,
     CONTENT_TYPE,
     ENCODING,

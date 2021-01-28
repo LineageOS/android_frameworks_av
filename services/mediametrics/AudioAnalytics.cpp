@@ -136,6 +136,25 @@ static constexpr const char * const AudioDeviceConnectionFields[] = {
     "connection_count",
 };
 
+// static constexpr const char * const AAudioStreamFields[] {
+//     "mediametrics_aaudiostream_reported",
+//     "caller_name",
+//     "path",
+//     "direction",
+//     "frames_per_burst",
+//     "buffer_size",
+//     "buffer_capacity",
+//     "channel_count",
+//     "total_frames_transferred",
+//     "perf_mode_requested",
+//     "perf_mode_actual",
+//     "sharing",
+//     "xrun_count",
+//     "device_type",
+//     "format_app",
+//     "format_device",
+// };
+
 /**
  * sendToStatsd is a helper method that sends the arguments to statsd
  * and returns a pair { result, summary_string }.
@@ -190,6 +209,24 @@ AudioAnalytics::AudioAnalytics()
                         mPreviousAnalyticsState->clear();  // removes data from the state.
                     }
                 });
+            }));
+
+    // Handle legacy aaudio stream statistics
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item) {
+                mAAudioStreamInfo.endAAudioStream(item, AAudioStreamInfo::CALLER_PATH_LEGACY);
+            }));
+
+    // Handle mmap aaudio stream statistics
+    mActions.addAction(
+        AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM "*." AMEDIAMETRICS_PROP_EVENT,
+        std::string(AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM),
+        std::make_shared<AnalyticsActions::Function>(
+            [this](const std::shared_ptr<const android::mediametrics::Item> &item) {
+                mAAudioStreamInfo.endAAudioStream(item, AAudioStreamInfo::CALLER_PATH_MMAP);
             }));
 
     // Handle device use record statistics
@@ -841,6 +878,111 @@ void AudioAnalytics::DeviceConnection::expire() {
         ALOGV("%s: statsd %s", __func__, str.c_str());
         mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
     }
+}
+
+void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
+        const std::shared_ptr<const android::mediametrics::Item> &item, CallerPath path) const {
+    const std::string& key = item->getKey();
+
+    std::string callerNameStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_CALLERNAME, &callerNameStr);
+
+    const auto callerName = types::lookup<types::CALLER_NAME, int32_t>(callerNameStr);
+
+    std::string directionStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_DIRECTION, &directionStr);
+    const auto direction = types::lookup<types::AAUDIO_DIRECTION, int32_t>(directionStr);
+
+    int32_t framesPerBurst = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_BURSTFRAMES, &framesPerBurst);
+
+    int32_t bufferSizeInFrames = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_BUFFERSIZEFRAMES, &bufferSizeInFrames);
+
+    int32_t bufferCapacityInFrames = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, &bufferCapacityInFrames);
+
+    int32_t channelCount = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_CHANNELCOUNT, &channelCount);
+
+    int64_t totalFramesTransferred = -1;
+    // TODO: log and get total frames transferred
+
+    std::string perfModeRequestedStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_PERFORMANCEMODE, &perfModeRequestedStr);
+    const auto perfModeRequested =
+            types::lookup<types::AAUDIO_PERFORMANCE_MODE, int32_t>(perfModeRequestedStr);
+
+    int32_t perfModeActual = 0;
+    // TODO: log and get actual performance mode
+
+    std::string sharingModeStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SHARINGMODE, &sharingModeStr);
+    const auto sharingMode = types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeStr);
+
+    int32_t xrunCount = -1;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_UNDERRUN, &xrunCount);
+
+    std::string deviceType;
+    // TODO: only routed device id is logged, but no device type
+
+    int32_t formatApp = 0;
+    // TODO: log format from app
+
+    std::string formatDeviceStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_ENCODING, &formatDeviceStr);
+    const auto formatDevice = types::lookup<types::ENCODING, int32_t>(formatDeviceStr);
+
+    LOG(LOG_LEVEL) << "key:" << key
+            << " caller_name:" << callerName << "(" << callerNameStr << ")"
+            << " path:" << path
+            << " direction:" << direction << "(" << directionStr << ")"
+            << " frames_per_burst:" << framesPerBurst
+            << " buffer_size:" << bufferSizeInFrames
+            << " buffer_capacity:" << bufferCapacityInFrames
+            << " channel_count:" << channelCount
+            << " total_frames_transferred:" << totalFramesTransferred
+            << " perf_mode_requested:" << perfModeRequested << "(" << perfModeRequestedStr << ")"
+            << " perf_mode_actual:" << perfModeActual
+            << " sharing:" << sharingMode << "(" << sharingModeStr << ")"
+            << " xrun_count:" << xrunCount
+            << " device_type:" << deviceType
+            << " format_app:" << formatApp
+            << " format_device: " << formatDevice << "(" << formatDeviceStr << ")";
+
+    // TODO: send the metric to statsd when the proto is ready
+    // if (mAudioAnalytics.mDeliverStatistics) {
+    //     const auto [ result, str ] = sendToStatsd(AAudioStreamFields,
+    //             CONDITION(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED)
+    //             , callerName
+    //             , path
+    //             , direction
+    //             , framesPerBurst
+    //             , bufferSizeInFrames
+    //             , bufferCapacityInFrames
+    //             , channelCount
+    //             , totalFramesTransferred
+    //             , perfModeRequested
+    //             , perfModeActual
+    //             , sharingMode
+    //             , xrunCount
+    //             , deviceType.c_str()
+    //             , formatApp
+    //             , formatDevice
+    //             );
+    //     ALOGV("%s: statsd %s", __func__, str.c_str());
+    //     mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
+    // }
 }
 
 } // namespace android::mediametrics
