@@ -159,6 +159,10 @@ CCodecBufferChannel::CCodecBufferChannel(
         output->outputDelay = 0u;
         output->numSlots = kSmoothnessFactor;
     }
+    {
+        Mutexed<BlockPools>::Locked pools(mBlockPools);
+        pools->outputPoolId = C2BlockPool::BASIC_LINEAR;
+    }
 }
 
 CCodecBufferChannel::~CCodecBufferChannel() {
@@ -1092,9 +1096,12 @@ status_t CCodecBufferChannel::start(
 
         bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
         C2BlockPool::local_id_t outputPoolId_;
+        C2BlockPool::local_id_t prevOutputPoolId;
 
         {
             Mutexed<BlockPools>::Locked pools(mBlockPools);
+
+            prevOutputPoolId = pools->outputPoolId;
 
             // set default allocator ID.
             pools->outputAllocatorId = (graphic) ? C2PlatformAllocatorStore::GRALLOC
@@ -1187,6 +1194,15 @@ status_t CCodecBufferChannel::start(
             ALOGD("[%s] Configured output block pool ids %llu => %s",
                     mName, (unsigned long long)poolIdsTuning->m.values[0], asString(err));
             outputPoolId_ = pools->outputPoolId;
+        }
+
+        if (prevOutputPoolId != C2BlockPool::BASIC_LINEAR
+                && prevOutputPoolId != C2BlockPool::BASIC_GRAPHIC) {
+            c2_status_t err = mComponent->destroyBlockPool(prevOutputPoolId);
+            if (err != C2_OK) {
+                ALOGW("Failed to clean up previous block pool %llu - %s (%d)\n",
+                        (unsigned long long) prevOutputPoolId, asString(err), err);
+            }
         }
 
         Mutexed<Output>::Locked output(mOutput);
