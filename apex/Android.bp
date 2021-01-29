@@ -15,7 +15,10 @@
 apex_defaults {
     name: "com.android.media-defaults",
     updatable: true,
-    java_libs: ["updatable-media"],
+    java_libs: [
+      "updatable-media",
+      "service-media-s",
+    ],
     multilib: {
         first: {
             // Extractor process runs only with the primary ABI.

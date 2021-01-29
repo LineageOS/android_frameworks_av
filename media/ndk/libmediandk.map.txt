@@ -27,6 +27,13 @@ LIBMEDIANDK {
     AImage_getPlaneRowStride; # introduced=24
     AImage_getTimestamp; # introduced=24
     AImage_getWidth; # introduced=24
+    AMEDIACODEC_KEY_HDR10_PLUS_INFO; # var introduced=31
+    AMEDIACODEC_KEY_LOW_LATENCY; # var introduced=31
+    AMEDIACODEC_KEY_OFFSET_TIME; # var introduced=31
+    AMEDIACODEC_KEY_REQUEST_SYNC_FRAME; # var introduced=31
+    AMEDIACODEC_KEY_SUSPEND; # var introduced=31
+    AMEDIACODEC_KEY_SUSPEND_TIME; # var introduced=31
+    AMEDIACODEC_KEY_VIDEO_BITRATE; # var introduced=31
     AMEDIAFORMAT_KEY_AAC_DRC_ATTENUATION_FACTOR; # var introduced=28
     AMEDIAFORMAT_KEY_AAC_DRC_BOOST_FACTOR; # var introduced=28
     AMEDIAFORMAT_KEY_AAC_DRC_HEAVY_COMPRESSION; # var introduced=28
@@ -91,6 +98,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_GRID_ROWS; # var introduced=28
     AMEDIAFORMAT_KEY_HAPTIC_CHANNEL_COUNT; # var introduced=29
     AMEDIAFORMAT_KEY_HDR_STATIC_INFO; # var introduced=28
+    AMEDIAFORMAT_KEY_HDR10_PLUS_INFO; # var introduced=31
     AMEDIAFORMAT_KEY_HEIGHT; # var introduced=21
     AMEDIAFORMAT_KEY_ICC_PROFILE; # var introduced=29
     AMEDIAFORMAT_KEY_INTRA_REFRESH_PERIOD; # var introduced=28

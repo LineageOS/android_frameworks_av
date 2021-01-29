@@ -154,6 +154,40 @@ const std::unordered_map<std::string, int32_t>& getAudioTrackTraitsMap() {
     return map;
 }
 
+const std::unordered_map<std::string, int32_t>& getAAudioDirection() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    // This may be found in frameworks/av/media/libaaudio/include/aaudio/AAudio.h
+    static std::unordered_map<std::string, int32_t> map {
+        // UNKNOWN is -1
+        {"AAUDIO_DIRECTION_OUTPUT",    0},
+        {"AAUDIO_DIRECTION_INPUT",     1},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getAAudioPerformanceMode() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    // This may be found in frameworks/av/media/libaaudio/include/aaudio/AAudio.h
+    static std::unordered_map<std::string, int32_t> map {
+        // UNKNOWN is -1
+        {"AAUDIO_PERFORMANCE_MODE_NONE",            10},
+        {"AAUDIO_PERFORMANCE_MODE_POWER_SAVING",    11},
+        {"AAUDIO_PERFORMANCE_MODE_LOW_LATENCY",     12},
+    };
+    return map;
+}
+
+const std::unordered_map<std::string, int32_t>& getAAudioSharingMode() {
+    // DO NOT MODIFY VALUES(OK to add new ones).
+    // This may be found in frameworks/av/media/libaaudio/include/aaudio/AAudio.h
+    static std::unordered_map<std::string, int32_t> map {
+        // UNKNOWN is -1
+        {"AAUDIO_SHARING_MODE_EXCLUSIVE",    0},
+        {"AAUDIO_SHARING_MODE_SHARED",       1},
+    };
+    return map;
+}
+
 // Helper: Create the corresponding int32 from string flags split with '|'.
 template <typename Traits>
 int32_t int32FromFlags(const std::string &flags)
@@ -431,6 +465,72 @@ template <>
 int32_t lookup<TRACK_TRAITS>(const std::string &traits)
 {
     return flagsFromMap(traits, getAudioTrackTraitsMap());
+}
+
+template <>
+std::string lookup<AAUDIO_DIRECTION>(const std::string &direction)
+{
+    auto& map = getAAudioDirection();
+    auto it = map.find(direction);
+    if (it == map.end()) {
+        return "";
+    }
+    return direction;
+}
+
+template <>
+int32_t lookup<AAUDIO_DIRECTION>(const std::string &direction)
+{
+    auto& map = getAAudioDirection();
+    auto it = map.find(direction);
+    if (it == map.end()) {
+        return -1; // return unknown
+    }
+    return it->second;
+}
+
+template <>
+std::string lookup<AAUDIO_PERFORMANCE_MODE>(const std::string &performanceMode)
+{
+    auto& map = getAAudioPerformanceMode();
+    auto it = map.find(performanceMode);
+    if (it == map.end()) {
+        return "";
+    }
+    return performanceMode;
+}
+
+template <>
+int32_t lookup<AAUDIO_PERFORMANCE_MODE>(const std::string &performanceMode)
+{
+    auto& map = getAAudioPerformanceMode();
+    auto it = map.find(performanceMode);
+    if (it == map.end()) {
+        return -1; // return unknown
+    }
+    return it->second;
+}
+
+template <>
+std::string lookup<AAUDIO_SHARING_MODE>(const std::string &sharingMode)
+{
+    auto& map = getAAudioSharingMode();
+    auto it = map.find(sharingMode);
+    if (it == map.end()) {
+        return "";
+    }
+    return sharingMode;
+}
+
+template <>
+int32_t lookup<AAUDIO_SHARING_MODE>(const std::string &sharingMode)
+{
+    auto& map = getAAudioSharingMode();
+    auto it = map.find(sharingMode);
+    if (it == map.end()) {
+        return -1; // return unknown
+    }
+    return it->second;
 }
 
 } // namespace android::mediametrics::types

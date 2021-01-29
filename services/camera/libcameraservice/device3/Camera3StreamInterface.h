@@ -306,6 +306,24 @@ class Camera3StreamInterface : public virtual RefBase {
             nsecs_t waitBufferTimeout,
             const std::vector<size_t>& surface_ids = std::vector<size_t>()) = 0;
 
+    struct OutstandingBuffer {
+        camera_stream_buffer* outBuffer;
+
+        /**
+         * Multiple surfaces could share the same HAL stream, but a request may
+         * be only for a subset of surfaces. In this case, the
+         * Camera3StreamInterface object needs the surface ID information to acquire
+         * buffers for those surfaces. For the case of single surface for a HAL
+         * stream, surface_ids parameter has no effect.
+         */
+        std::vector<size_t> surface_ids;
+    };
+    /**
+     * Similar to getBuffer() except this method fills multiple buffers.
+     */
+    virtual status_t getBuffers(std::vector<OutstandingBuffer>* buffers,
+            nsecs_t waitBufferTimeout) = 0;
+
     /**
      * Return a buffer to the stream after use by the HAL.
      *
