@@ -21,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include <mutex>
 
 #include <C2Buffer.h>
 #include <C2Component.h>
@@ -265,6 +266,7 @@ private:
 
     void feedInputBufferIfAvailable();
     void feedInputBufferIfAvailableInternal();
+    void queueDummyWork();
     status_t queueInputBufferInternal(sp<MediaCodecBuffer> buffer,
                                       std::shared_ptr<C2LinearBlock> encryptedBlock = nullptr,
                                       size_t blockSize = 0);
@@ -341,6 +343,9 @@ private:
 
     std::atomic_bool mInputMetEos;
     std::once_flag mRenderWarningFlag;
+
+    uint64_t mLastInputBufferAvailableTs;
+    std::mutex mTsLock;
 
     sp<ICrypto> mCrypto;
     sp<IDescrambler> mDescrambler;
