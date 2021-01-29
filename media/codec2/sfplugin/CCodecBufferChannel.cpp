@@ -27,6 +27,7 @@
 #include <numeric>
 #include <thread>
 #include <chrono>
+#include <regex>
 
 #include <C2AllocatorGralloc.h>
 #include <C2PlatformSupport.h>
@@ -84,6 +85,10 @@ constexpr size_t kSmoothnessFactor = 4;
 // This is for keeping IGBP's buffer dropping logic in legacy mode other
 // than making it non-blocking. Do not change this value.
 const static size_t kDequeueTimeoutNs = 0;
+// If app goes into background, decoding paused. we have WA logic in HAL to sleep some actions.
+// This value is to monitor if decoding is paused then we can signal a new empty work to HAL
+// after app resume to foreground to notify HAL something
+const static uint64_t kPipelinePausedTimeoutMs = 500;
 
 static bool areRenderMetricsEnabled() {
     std::string v = GetServerConfigurableFlag("media_native", "render_metrics_enabled", "false");
@@ -162,6 +167,7 @@ CCodecBufferChannel::CCodecBufferChannel(
       mRenderingDepth(3u),
       mMetaMode(MODE_NONE),
       mInputMetEos(false),
+      mLastInputBufferAvailableTs(0u),
       mSendEncryptedInfoBuffer(false) {
     {
         Mutexed<Input>::Locked input(mInput);
@@ -724,13 +730,38 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
     return queueInputBufferInternal(buffer, block, bufferSize);
 }
 
+void CCodecBufferChannel::queueDummyWork() {
+    std::unique_ptr<C2Work> work(new C2Work);
+    // WA: signal a empty work to HAL to trigger specific event, but totally drop the work
+    work->input.flags = C2FrameData::FLAG_DROP_FRAME;
+    std::list<std::unique_ptr<C2Work>> items;
+    items.push_back(std::move(work));
+    (void)mComponent->queue(&items);
+}
+
 void CCodecBufferChannel::feedInputBufferIfAvailable() {
     QueueGuard guard(mSync);
     if (!guard.isRunning()) {
         ALOGV("[%s] We're not running --- no input buffer reported", mName);
         return;
     }
+
     feedInputBufferIfAvailableInternal();
+
+    // limit this WA to qc hw decoder only
+    // if feedInputBufferIfAvailableInternal() successfully (has available input buffer),
+    // mLastInputBufferAvailableTs would be updated. otherwise, not input buffer available
+    std::regex pattern{"c2\\.qti\\..*\\.decoder.*"};
+    if (std::regex_match(mComponentName, pattern)) {
+        std::lock_guard<std::mutex> tsLock(mTsLock);
+        uint64_t now = std::chrono::duration_cast<std::chrono::milliseconds>(
+                PipelineWatcher::Clock::now().time_since_epoch()).count();
+        if (now - mLastInputBufferAvailableTs > kPipelinePausedTimeoutMs) {
+            ALOGV("long time elapsed since last input available, let's queue a specific work to "
+                    "HAL to notify something");
+            queueDummyWork();
+        }
+    }
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
@@ -768,6 +799,13 @@ void CCodecBufferChannel::feedInputBufferIfAvailableInternal() {
                 break;
             }
         }
+
+        {
+            std::lock_guard<std::mutex> tsLock(mTsLock);
+            mLastInputBufferAvailableTs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    PipelineWatcher::Clock::now().time_since_epoch()).count();
+        }
+
         ALOGV("[%s] new input index = %zu [%p]", mName, index, inBuffer.get());
         mCallback->onInputBufferAvailable(index, inBuffer);
         if (++numInputBuffersAvailable >= pipelineRoom) {
@@ -1731,6 +1769,14 @@ status_t CCodecBufferChannel::requestInitialInputBuffers(
         clientInputBuffers.erase(minIndex);
     }
 
+    if (!clientInputBuffers.empty()) {
+        {
+            std::lock_guard<std::mutex> tsLock(mTsLock);
+            mLastInputBufferAvailableTs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    PipelineWatcher::Clock::now().time_since_epoch()).count();
+        }
+    }
+
     for (const auto &[index, buffer] : clientInputBuffers) {
         mCallback->onInputBufferAvailable(index, buffer);
     }
@@ -1899,6 +1945,9 @@ bool CCodecBufferChannel::handleWork(
 
     if (work->result == C2_OK){
         notifyClient = true;
+    } else if (work->result == C2_OMITTED) {
+        ALOGV("[%s] empty work returned; omitted.", mName);
+        return false; // omitted
     } else if (work->result == C2_NOT_FOUND) {
         ALOGD("[%s] flushed work; ignored.", mName);
     } else {
