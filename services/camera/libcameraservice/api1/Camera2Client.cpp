@@ -2296,6 +2296,14 @@ status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
         static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
 }
 
+bool Camera2Client::supportsCameraMute() {
+    return mDevice->supportsCameraMute();
+}
+
+status_t Camera2Client::setCameraMute(bool enabled) {
+    return mDevice->setCameraMute(enabled);
+}
+
 status_t Camera2Client::waitUntilCurrentRequestIdLocked() {
     int32_t activeRequestId = mStreamingProcessor->getActiveRequestId();
     if (activeRequestId != 0) {

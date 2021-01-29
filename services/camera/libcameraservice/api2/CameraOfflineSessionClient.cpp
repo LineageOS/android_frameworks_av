@@ -72,6 +72,16 @@ status_t CameraOfflineSessionClient::setRotateAndCropOverride(uint8_t /*rotateAn
     return OK;
 }
 
+bool CameraOfflineSessionClient::supportsCameraMute() {
+    // Offline mode doesn't support muting
+    return false;
+}
+
+status_t CameraOfflineSessionClient::setCameraMute(bool) {
+    return INVALID_OPERATION;
+}
+
+
 status_t CameraOfflineSessionClient::dump(int fd, const Vector<String16>& args) {
     return BasicClient::dump(fd, args);
 }
