@@ -278,6 +278,12 @@ public:
         // Override rotate-and-crop AUTO behavior
         virtual status_t setRotateAndCropOverride(uint8_t rotateAndCrop) = 0;
 
+        // Whether the client supports camera muting (black only output)
+        virtual bool supportsCameraMute() = 0;
+
+        // Set/reset camera mute
+        virtual status_t setCameraMute(bool enabled) = 0;
+
     protected:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
@@ -1044,6 +1050,9 @@ private:
     // Get the mask for image dump to disk
     status_t handleGetImageDumpMask(int out);
 
+    // Set the camera mute state
+    status_t handleSetCameraMute(const Vector<String16>& args);
+
     // Prints the shell command help
     status_t printHelp(int out);
 
@@ -1088,6 +1097,9 @@ private:
 
     // Current image dump mask
     uint8_t mImageDumpMask = 0;
+
+    // Current camera mute mode
+    bool mOverrideCameraMuteMode = false;
 };
 
 } // namespace android

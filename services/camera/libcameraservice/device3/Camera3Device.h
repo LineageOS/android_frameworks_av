@@ -238,6 +238,21 @@ class Camera3Device :
     status_t setRotateAndCropAutoBehavior(
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
+    /**
+     * Whether camera muting (producing black-only output) is supported.
+     *
+     * Calling setCameraMute(true) when this returns false will return an
+     * INVALID_OPERATION error.
+     */
+    bool supportsCameraMute();
+
+    /**
+     * Mute the camera.
+     *
+     * When muted, black image data is output on all output streams.
+     */
+    status_t setCameraMute(bool enabled);
+
     // Get the status trackeer for the camera device
     wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
 
@@ -525,6 +540,11 @@ class Camera3Device :
         // overriding of ROTATE_AND_CROP value and adjustment of coordinates
         // in several other controls in both the request and the result
         bool                                mRotateAndCropAuto;
+        // Original value of TEST_PATTERN_MODE and DATA so that they can be
+        // restored when sensor muting is turned off
+        int32_t                             mOriginalTestPatternMode;
+        int32_t                             mOriginalTestPatternData[4];
+
         // Whether this capture request has its zoom ratio set to 1.0x before
         // the framework overrides it for camera HAL consumption.
         bool                                mZoomRatioIs1x;
@@ -868,6 +888,7 @@ class Camera3Device :
         status_t setRotateAndCropAutoBehavior(
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
+        status_t setCameraMute(bool enabled);
       protected:
 
         virtual bool threadLoop();
@@ -888,6 +909,10 @@ class Camera3Device :
 
         // Override rotate_and_crop control if needed; returns true if the current value was changed
         bool               overrideAutoRotateAndCrop(const sp<CaptureRequest> &request);
+
+        // Override test_pattern control if needed for camera mute; returns true
+        // if the current value was changed
+        bool               overrideTestPattern(const sp<CaptureRequest> &request);
 
         static const nsecs_t kRequestTimeout = 50e6; // 50 ms
 
@@ -1011,6 +1036,8 @@ class Camera3Device :
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
         camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
+        bool               mCameraMute;
+        bool               mCameraMuteChanged;
 
         int64_t            mRepeatingLastFrameNumber;
 
@@ -1276,6 +1303,10 @@ class Camera3Device :
 
     // Whether HAL supports offline processing capability.
     bool mSupportOfflineProcessing = false;
+
+    // Whether the HAL supports camera muting via test pattern
+    bool mSupportCameraMute = false;
+
 }; // class Camera3Device
 
 }; // namespace android
