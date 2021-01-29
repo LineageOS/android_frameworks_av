@@ -56,6 +56,12 @@ AudioStream::~AudioStream() {
 
     ALOGE_IF(mHasThread, "%s() callback thread never join()ed", __func__);
 
+    if (!mMetricsId.empty()) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM)
+                .record();
+    }
+
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
