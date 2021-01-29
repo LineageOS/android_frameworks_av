@@ -27,6 +27,7 @@
 #include <C2Debug.h>
 
 #include <codec2/hidl/client.h>
+#include <media/stagefright/foundation/ColorUtils.h>
 #include <utils/RefBase.h>
 
 #include "InputSurfaceWrapper.h"
@@ -123,6 +124,7 @@ struct CCodecConfig {
 
     std::shared_ptr<InputSurfaceWrapper> mInputSurface;
     std::unique_ptr<InputSurfaceWrapper::Config> mISConfig;
+    ColorAspects mClientColorAspects;
 
     /// the current configuration. Updated after configure() and based on configUpdate in
     /// onWorkDone
