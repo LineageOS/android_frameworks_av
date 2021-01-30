@@ -182,8 +182,9 @@ TEST(TypeConverter, ParseFormats) {
         audio_format_t format;
         EXPECT_TRUE(FormatConverter::fromString(stringVal, format))
                 << "Conversion of \"" << stringVal << "\" failed";
-        EXPECT_TRUE(audio_is_valid_format(format))
-                << "Converted format \"" << stringVal << "\" is invalid";
+        EXPECT_EQ(enumVal != xsd::AudioFormat::AUDIO_FORMAT_DEFAULT,
+                audio_is_valid_format(format))
+                << "Validity of \"" << stringVal << "\" is not as expected";
         EXPECT_EQ(stringVal, toString(format));
     }
 }
