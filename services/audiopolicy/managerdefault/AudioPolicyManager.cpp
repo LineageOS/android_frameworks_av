@@ -1037,8 +1037,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     *output = AUDIO_IO_HANDLE_NONE;
     if (!msdDevices.isEmpty()) {
         *output = getOutputForDevices(msdDevices, session, *stream, config, flags);
-        sp<DeviceDescriptor> device = outputDevices.isEmpty() ? nullptr : outputDevices.itemAt(0);
-        if (*output != AUDIO_IO_HANDLE_NONE && setMsdPatch(device) == NO_ERROR) {
+        if (*output != AUDIO_IO_HANDLE_NONE && setMsdPatches(&outputDevices) == NO_ERROR) {
             ALOGV("%s() Using MSD devices %s instead of devices %s",
                   __func__, msdDevices.toString().c_str(), outputDevices.toString().c_str());
         } else {
@@ -1054,6 +1053,12 @@ status_t AudioPolicyManager::getOutputForAttrInt(
     }
 
     *selectedDeviceId = getFirstDeviceId(outputDevices);
+    for (auto &outputDevice : outputDevices) {
+        if (outputDevice->getId() == getConfig().getDefaultOutputDevice()->getId()) {
+            *selectedDeviceId = outputDevice->getId();
+            break;
+        }
+    }
 
     if (outputDevices.onlyContainsDevicesWithType(AUDIO_DEVICE_OUT_TELEPHONY_TX)) {
         *outputType = API_OUTPUT_TELEPHONY_TX;
@@ -1196,24 +1201,9 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
     sp<SwAudioOutputDescriptor> outputDesc =
             new SwAudioOutputDescriptor(profile, mpClientInterface);
 
-    String8 address = getFirstDeviceAddress(devices);
-
-    // MSD patch may be using the only output stream that can service this request. Release
-    // MSD patch to prioritize this request over any active output on MSD.
-    AudioPatchCollection msdPatches = getMsdPatches();
-    for (size_t i = 0; i < msdPatches.size(); i++) {
-        const auto& patch = msdPatches[i];
-        for (size_t j = 0; j < patch->mPatch.num_sinks; ++j) {
-            const struct audio_port_config *sink = &patch->mPatch.sinks[j];
-            if (sink->type == AUDIO_PORT_TYPE_DEVICE &&
-                    devices.containsDeviceWithType(sink->ext.device.type) &&
-                    (address.isEmpty() || strncmp(sink->ext.device.address, address.string(),
-                            AUDIO_DEVICE_MAX_ADDRESS_LEN) == 0)) {
-                releaseAudioPatch(patch->getHandle(), mUidCached);
-                break;
-            }
-        }
-    }
+    // An MSD patch may be using the only output stream that can service this request. Release
+    // all MSD patches to prioritize this request over any active output on MSD.
+    releaseMsdPatches(devices);
 
     status_t status = outputDesc->open(config, devices, stream, flags, output);
 
@@ -1386,7 +1376,8 @@ status_t AudioPolicyManager::getBestMsdAudioProfileFor(const sp<DeviceDescriptor
     }
     AudioProfileVector deviceProfiles;
     for (const auto &outProfile : outputProfiles) {
-        if (hwAvSync == ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0)) {
+        if (hwAvSync == ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) &&
+                outProfile->supportsDevice(outputDevice)) {
             appendAudioProfiles(deviceProfiles, outProfile->getAudioProfiles());
         }
     }
@@ -1454,38 +1445,83 @@ PatchBuilder AudioPolicyManager::buildMsdPatch(const sp<DeviceDescriptor> &outpu
     return patchBuilder;
 }
 
-status_t AudioPolicyManager::setMsdPatch(const sp<DeviceDescriptor> &outputDevice) {
-    sp<DeviceDescriptor> device = outputDevice;
-    if (device == nullptr) {
+status_t AudioPolicyManager::setMsdPatches(const DeviceVector *outputDevices) {
+    DeviceVector devices;
+    if (outputDevices != nullptr && outputDevices->size() > 0) {
+        devices.add(*outputDevices);
+    } else {
         // Use media strategy for unspecified output device. This should only
         // occur on checkForDeviceAndOutputChanges(). Device connection events may
         // therefore invalidate explicit routing requests.
-        DeviceVector devices = mEngine->getOutputDevicesForAttributes(
+        devices = mEngine->getOutputDevicesForAttributes(
                     attributes_initializer(AUDIO_USAGE_MEDIA), nullptr, false /*fromCache*/);
-        LOG_ALWAYS_FATAL_IF(devices.isEmpty(), "no outpudevice to set Msd Patch");
-        device = devices.itemAt(0);
+        LOG_ALWAYS_FATAL_IF(devices.isEmpty(), "no output device to set MSD patch");
     }
-    ALOGV("%s() for device %s", __func__, device->toString().c_str());
-    PatchBuilder patchBuilder = buildMsdPatch(device);
-    const struct audio_patch* patch = patchBuilder.patch();
-    const AudioPatchCollection msdPatches = getMsdPatches();
-    if (!msdPatches.isEmpty()) {
-        LOG_ALWAYS_FATAL_IF(msdPatches.size() > 1,
-                "The current MSD prototype only supports one output patch");
-        sp<AudioPatch> currentPatch = msdPatches.valueAt(0);
-        if (audio_patches_are_equal(&currentPatch->mPatch, patch)) {
-            return NO_ERROR;
+    std::vector<PatchBuilder> patchesToCreate;
+    for (auto i = 0u; i < devices.size(); ++i) {
+        ALOGV("%s() for device %s", __func__, devices[i]->toString().c_str());
+        patchesToCreate.push_back(buildMsdPatch(devices[i]));
+    }
+    // Retain only the MSD patches associated with outputDevices request.
+    // Tear down the others, and create new ones as needed.
+    AudioPatchCollection patchesToRemove = getMsdPatches();
+    for (auto it = patchesToCreate.begin(); it != patchesToCreate.end(); ) {
+        auto retainedPatch = false;
+        for (auto i = 0u; i < patchesToRemove.size(); ++i) {
+            if (audio_patches_are_equal(it->patch(), &patchesToRemove[i]->mPatch)) {
+                patchesToRemove.removeItemsAt(i);
+                retainedPatch = true;
+                break;
+            }
         }
+        if (retainedPatch) {
+            it = patchesToCreate.erase(it);
+            continue;
+        }
+        ++it;
+    }
+    if (patchesToCreate.size() == 0 && patchesToRemove.size() == 0) {
+        return NO_ERROR;
+    }
+    for (auto i = 0u; i < patchesToRemove.size(); ++i) {
+        auto &currentPatch = patchesToRemove.valueAt(i);
         releaseAudioPatch(currentPatch->getHandle(), mUidCached);
     }
-    status_t status = installPatch(__func__, -1 /*index*/, nullptr /*patchHandle*/,
-            patch, 0 /*delayMs*/, mUidCached, nullptr /*patchDescPtr*/);
-    ALOGE_IF(status != NO_ERROR, "%s() error %d creating MSD audio patch", __func__, status);
-    ALOGI_IF(status == NO_ERROR, "%s() Patch created from MSD_IN to "
-           "device:%s (format:%#x channels:%#x samplerate:%d)", __func__,
-             device->toString().c_str(), patch->sources[0].format,
-             patch->sources[0].channel_mask, patch->sources[0].sample_rate);
+    status_t status = NO_ERROR;
+    for (const auto &p : patchesToCreate) {
+        auto currStatus = installPatch(__func__, -1 /*index*/, nullptr /*patchHandle*/,
+                p.patch(), 0 /*delayMs*/, mUidCached, nullptr /*patchDescPtr*/);
+        char message[256];
+        snprintf(message, sizeof(message), "%s() %s: creating MSD patch from device:IN_BUS to "
+            "device:%#x (format:%#x channels:%#x samplerate:%d)", __func__,
+                currStatus == NO_ERROR ? "Success" : "Error",
+                p.patch()->sinks[0].ext.device.type, p.patch()->sources[0].format,
+                p.patch()->sources[0].channel_mask, p.patch()->sources[0].sample_rate);
+        if (currStatus == NO_ERROR) {
+            ALOGD("%s", message);
+        } else {
+            ALOGE("%s", message);
+            if (status == NO_ERROR) {
+                status = currStatus;
+            }
+        }
+    }
     return status;
+}
+
+void AudioPolicyManager::releaseMsdPatches(const DeviceVector& devices) {
+    AudioPatchCollection msdPatches = getMsdPatches();
+    for (size_t i = 0; i < msdPatches.size(); i++) {
+        const auto& patch = msdPatches[i];
+        for (size_t j = 0; j < patch->mPatch.num_sinks; ++j) {
+            const struct audio_port_config *sink = &patch->mPatch.sinks[j];
+            if (sink->type == AUDIO_PORT_TYPE_DEVICE && devices.getDevice(sink->ext.device.type,
+                    String8(sink->ext.device.address), AUDIO_FORMAT_DEFAULT) != nullptr) {
+                releaseAudioPatch(patch->getHandle(), mUidCached);
+                break;
+            }
+        }
+    }
 }
 
 audio_io_handle_t AudioPolicyManager::selectOutput(const SortedVector<audio_io_handle_t>& outputs,
@@ -5309,8 +5345,13 @@ void AudioPolicyManager::closeOutput(audio_io_handle_t output)
             }
         }
         if (!directOutputOpen) {
-            ALOGV("no direct outputs open, reset MSD patch");
-            setMsdPatch();
+            ALOGV("no direct outputs open, reset MSD patches");
+            // TODO: The MSD patches to be established here may differ to current MSD patches due to
+            // how output devices for patching are resolved. Avoid by caching and reusing the
+            // arguments to mEngine->getOutputDevicesForAttributes() when resolving which output
+            // devices to patch to. This may be complicated by the fact that devices may become
+            // unavailable.
+            setMsdPatches();
         }
     }
 }
@@ -5377,7 +5418,13 @@ void AudioPolicyManager::checkForDeviceAndOutputChanges(std::function<bool()> on
     if (onOutputsChecked != nullptr && onOutputsChecked()) checkA2dpSuspend();
     updateDevicesAndOutputs();
     if (mHwModules.getModuleFromName(AUDIO_HARDWARE_MODULE_ID_MSD) != 0) {
-        setMsdPatch();
+        // TODO: The MSD patches to be established here may differ to current MSD patches due to how
+        // output devices for patching are resolved. Nevertheless, AudioTracks affected by device
+        // configuration changes will ultimately be rerouted correctly. We can still avoid
+        // unnecessary rerouting by caching and reusing the arguments to
+        // mEngine->getOutputDevicesForAttributes() when resolving which output devices to patch to.
+        // This may be complicated by the fact that devices may become unavailable.
+        setMsdPatches();
     }
 }
 
