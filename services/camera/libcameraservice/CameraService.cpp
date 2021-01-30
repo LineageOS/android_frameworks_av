@@ -1686,6 +1686,11 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
         }
 
+        // Set camera muting behavior
+        if (client->supportsCameraMute()) {
+            client->setCameraMute(mOverrideCameraMuteMode);
+        }
+
         if (shimUpdateOnly) {
             // If only updating legacy shim parameters, immediately disconnect client
             mServiceLock.unlock();
@@ -3887,6 +3892,8 @@ status_t CameraService::shellCommand(int in, int out, int err, const Vector<Stri
         return handleSetImageDumpMask(args);
     } else if (args.size() >= 1 && args[0] == String16("get-image-dump-mask")) {
         return handleGetImageDumpMask(out);
+    } else if (args.size() >= 2 && args[0] == String16("set-camera-mute")) {
+        return handleSetCameraMute(args);
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return NO_ERROR;
@@ -4009,6 +4016,29 @@ status_t CameraService::handleGetImageDumpMask(int out) {
     return dprintf(out, "Image dump mask: %d\n", mImageDumpMask);
 }
 
+status_t CameraService::handleSetCameraMute(const Vector<String16>& args) {
+    int muteValue = strtol(String8(args[1]), nullptr, 10);
+    if (errno != 0) return BAD_VALUE;
+
+    if (muteValue < 0 || muteValue > 1) return BAD_VALUE;
+    Mutex::Autolock lock(mServiceLock);
+
+    mOverrideCameraMuteMode = (muteValue == 1);
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                if (basicClient->supportsCameraMute()) {
+                    basicClient->setCameraMute(mOverrideCameraMuteMode);
+                }
+            }
+        }
+    }
+
+    return OK;
+}
 
 status_t CameraService::printHelp(int out) {
     return dprintf(out, "Camera service commands:\n"
@@ -4021,6 +4051,7 @@ status_t CameraService::printHelp(int out) {
         "  set-image-dump-mask <MASK> specifies the formats to be saved to disk\n"
         "      Valid values 0=OFF, 1=ON for JPEG\n"
         "  get-image-dump-mask returns the current image-dump-mask value\n"
+        "  set-camera-mute <0/1> enable or disable camera muting\n"
         "  help print this message\n");
 }
 

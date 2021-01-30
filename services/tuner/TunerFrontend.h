@@ -41,6 +41,7 @@ using ::android::hardware::tv::tuner::V1_0::FrontendEventType;
 using ::android::hardware::tv::tuner::V1_0::FrontendId;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanMessage;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanMessageType;
+using ::android::hardware::tv::tuner::V1_0::FrontendSettings;;
 using ::android::hardware::tv::tuner::V1_0::IFrontend;
 using ::android::hardware::tv::tuner::V1_1::IFrontendCallback;
 using ::android::hardware::tv::tuner::V1_1::FrontendScanMessageExt1_1;
@@ -85,6 +86,7 @@ private:
     hidl_vec<FrontendAtsc3PlpSettings> getAtsc3PlpSettings(
             const TunerFrontendAtsc3Settings& settings);
     FrontendDvbsCodeRate getDvbsCodeRate(const TunerFrontendDvbsCodeRate& codeRate);
+    FrontendSettings getHidlFrontendSettings(const TunerFrontendSettings& settings);
 
     int mId;
     sp<IFrontend> mFrontend;
