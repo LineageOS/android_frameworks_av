@@ -357,6 +357,15 @@ status_t Camera3Device::initializeCommonLocked() {
         mRotateAndCropMappers.emplace(mId.c_str(), &mDeviceInfo);
     }
 
+    camera_metadata_entry_t availableTestPatternModes = mDeviceInfo.find(
+            ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES);
+    for (size_t i = 0; i < availableTestPatternModes.count; i++) {
+        if (availableTestPatternModes.data.i32[i] == ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
+            mSupportCameraMute = true;
+            break;
+        }
+    }
+
     return OK;
 }
 
@@ -2388,6 +2397,26 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
         newRequest->mZoomRatioIs1x = false;
     }
 
+    if (mSupportCameraMute) {
+        auto testPatternModeEntry =
+                newRequest->mSettingsList.begin()->metadata.find(ANDROID_SENSOR_TEST_PATTERN_MODE);
+        newRequest->mOriginalTestPatternMode = testPatternModeEntry.count > 0 ?
+                testPatternModeEntry.data.i32[0] :
+                ANDROID_SENSOR_TEST_PATTERN_MODE_OFF;
+
+        auto testPatternDataEntry =
+                newRequest->mSettingsList.begin()->metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
+        if (testPatternDataEntry.count > 0) {
+            memcpy(newRequest->mOriginalTestPatternData, testPatternModeEntry.data.i32,
+                    sizeof(newRequest->mOriginalTestPatternData));
+        } else {
+            newRequest->mOriginalTestPatternData[0] = 0;
+            newRequest->mOriginalTestPatternData[1] = 0;
+            newRequest->mOriginalTestPatternData[2] = 0;
+            newRequest->mOriginalTestPatternData[3] = 0;
+        }
+    }
+
     return newRequest;
 }
 
@@ -3860,6 +3889,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
+        mCameraMute(false),
+        mCameraMuteChanged(false),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
         mPrepareVideoStream(false),
@@ -4484,10 +4515,13 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         mPrevTriggers = triggerCount;
 
         bool rotateAndCropChanged = overrideAutoRotateAndCrop(captureRequest);
+        bool testPatternChanged = overrideTestPattern(captureRequest);
 
-        // If the request is the same as last, or we had triggers last time
+        // If the request is the same as last, or we had triggers now or last time or
+        // changing overrides this time
         bool newRequest =
-                (mPrevRequest != captureRequest || triggersMixedIn || rotateAndCropChanged) &&
+                (mPrevRequest != captureRequest || triggersMixedIn ||
+                        rotateAndCropChanged || testPatternChanged) &&
                 // Request settings are all the same within one batch, so only treat the first
                 // request in a batch as new
                 !(batchedRequest && i > 0);
@@ -4949,6 +4983,16 @@ status_t Camera3Device::RequestThread::setRotateAndCropAutoBehavior(
         return BAD_VALUE;
     }
     mRotateAndCropOverride = rotateAndCropValue;
+    return OK;
+}
+
+status_t Camera3Device::RequestThread::setCameraMute(bool enabled) {
+    ATRACE_CALL();
+    Mutex::Autolock l(mTriggerMutex);
+    if (enabled != mCameraMute) {
+        mCameraMute = enabled;
+        mCameraMuteChanged = true;
+    }
     return OK;
 }
 
@@ -5502,6 +5546,61 @@ bool Camera3Device::RequestThread::overrideAutoRotateAndCrop(
         }
     }
     return false;
+}
+
+bool Camera3Device::RequestThread::overrideTestPattern(
+        const sp<CaptureRequest> &request) {
+    ATRACE_CALL();
+
+    Mutex::Autolock l(mTriggerMutex);
+
+    bool changed = false;
+
+    int32_t testPatternMode = request->mOriginalTestPatternMode;
+    int32_t testPatternData[4] = {
+        request->mOriginalTestPatternData[0],
+        request->mOriginalTestPatternData[1],
+        request->mOriginalTestPatternData[2],
+        request->mOriginalTestPatternData[3]
+    };
+
+    if (mCameraMute) {
+        testPatternMode = ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR;
+        testPatternData[0] = 0;
+        testPatternData[1] = 0;
+        testPatternData[2] = 0;
+        testPatternData[3] = 0;
+    }
+
+    CameraMetadata &metadata = request->mSettingsList.begin()->metadata;
+
+    auto testPatternEntry = metadata.find(ANDROID_SENSOR_TEST_PATTERN_MODE);
+    if (testPatternEntry.count > 0) {
+        if (testPatternEntry.data.i32[0] != testPatternMode) {
+            testPatternEntry.data.i32[0] = testPatternMode;
+            changed = true;
+        }
+    } else {
+        metadata.update(ANDROID_SENSOR_TEST_PATTERN_MODE,
+                &testPatternMode, 1);
+        changed = true;
+    }
+
+    auto testPatternColor = metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
+    if (testPatternColor.count > 0) {
+        for (size_t i = 0; i < 4; i++) {
+            if (testPatternColor.data.i32[i] != (int32_t)testPatternData[i]) {
+                testPatternColor.data.i32[i] = testPatternData[i];
+                changed = true;
+            }
+        }
+    } else {
+        metadata.update(ANDROID_SENSOR_TEST_PATTERN_DATA,
+                (int32_t*)testPatternData, 4);
+        changed = true;
+    }
+
+    return changed;
 }
 
 /**
@@ -6127,6 +6226,24 @@ status_t Camera3Device::setRotateAndCropAutoBehavior(
         return INVALID_OPERATION;
     }
     return mRequestThread->setRotateAndCropAutoBehavior(rotateAndCropValue);
+}
+
+bool Camera3Device::supportsCameraMute() {
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    return mSupportCameraMute;
+}
+
+status_t Camera3Device::setCameraMute(bool enabled) {
+    ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
+
+    if (mRequestThread == nullptr || !mSupportCameraMute) {
+        return INVALID_OPERATION;
+    }
+    return mRequestThread->setCameraMute(enabled);
 }
 
 }; // namespace android

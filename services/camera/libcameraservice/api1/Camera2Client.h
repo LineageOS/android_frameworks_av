@@ -87,6 +87,9 @@ public:
     virtual int32_t         getGlobalAudioRestriction();
     virtual status_t        setRotateAndCropOverride(uint8_t rotateAndCrop);
 
+    virtual bool            supportsCameraMute();
+    virtual status_t        setCameraMute(bool enabled);
+
     /**
      * Interface used by CameraService
      */
