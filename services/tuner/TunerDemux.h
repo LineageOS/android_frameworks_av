@@ -47,6 +47,7 @@ public:
     Status openDvr(
         int dvbType, int bufferSize, const shared_ptr<ITunerDvrCallback>& cb,
         shared_ptr<ITunerDvr>* _aidl_return) override;
+    Status close() override;
 
 private:
     sp<IDemux> mDemux;
