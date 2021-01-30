@@ -29,6 +29,8 @@ class AudioPolicyTestManager : public AudioPolicyManager {
     using AudioPolicyManager::getOutputs;
     using AudioPolicyManager::getAvailableOutputDevices;
     using AudioPolicyManager::getAvailableInputDevices;
+    using AudioPolicyManager::releaseMsdPatches;
+    using AudioPolicyManager::setMsdPatches;
     using AudioPolicyManager::setSurroundFormatEnabled;
     uint32_t getAudioPortGeneration() const { return mAudioPortGeneration; }
 };
