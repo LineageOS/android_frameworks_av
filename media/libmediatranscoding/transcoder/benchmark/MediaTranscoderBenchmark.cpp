@@ -33,6 +33,7 @@
 #include <binder/ProcessState.h>
 #include <fcntl.h>
 #include <media/MediaTranscoder.h>
+#include <media/NdkCommon.h>
 
 #include <iostream>
 
@@ -87,6 +88,7 @@ static AMediaFormat* CreateDefaultVideoFormat() {
 
     AMediaFormat* videoFormat = AMediaFormat_new();
     AMediaFormat_setInt32(videoFormat, AMEDIAFORMAT_KEY_BIT_RATE, kVideoBitRate);
+    AMediaFormat_setString(videoFormat, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_AVC);
     return videoFormat;
 }
 
@@ -222,7 +224,7 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
 }
 
 static void SetMaxOperatingRate(AMediaFormat* format) {
-    AMediaFormat_setFloat(format, AMEDIAFORMAT_KEY_OPERATING_RATE, INT32_MAX);
+    AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_OPERATING_RATE, INT32_MAX);
     AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_PRIORITY, 1);
 }
 
