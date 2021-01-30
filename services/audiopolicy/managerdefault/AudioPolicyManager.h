@@ -844,13 +844,6 @@ protected:
         // end point.
         audio_port_handle_t mCallRxSourceClientPort = AUDIO_PORT_HANDLE_NONE;
 
-private:
-        void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
-
-        // Add or remove AC3 DTS encodings based on user preferences.
-        void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
-        void modifySurroundChannelMasks(ChannelMaskSet *channelMasksPtr);
-
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
         DeviceVector getMsdAudioOutDevices() const;
@@ -860,7 +853,14 @@ private:
                                            audio_port_config *sourceConfig,
                                            audio_port_config *sinkConfig) const;
         PatchBuilder buildMsdPatch(const sp<DeviceDescriptor> &outputDevice) const;
-        status_t setMsdPatch(const sp<DeviceDescriptor> &outputDevice = nullptr);
+        status_t setMsdPatches(const DeviceVector *outputDevices = nullptr);
+        void releaseMsdPatches(const DeviceVector& devices);
+private:
+        void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
+
+        // Add or remove AC3 DTS encodings based on user preferences.
+        void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);
+        void modifySurroundChannelMasks(ChannelMaskSet *channelMasksPtr);
 
         // If any, resolve any "dynamic" fields of an Audio Profiles collection
         void updateAudioProfiles(const sp<DeviceDescriptor>& devDesc, audio_io_handle_t ioHandle,
