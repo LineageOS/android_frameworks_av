@@ -399,6 +399,21 @@ class CameraDeviceBase : public virtual FrameProducer {
             camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue) = 0;
 
     /**
+     * Whether camera muting (producing black-only output) is supported.
+     *
+     * Calling setCameraMute(true) when this returns false will return an
+     * INVALID_OPERATION error.
+     */
+    virtual bool supportsCameraMute() = 0;
+
+    /**
+     * Mute the camera.
+     *
+     * When muted, black image data is output on all output streams.
+     */
+    virtual status_t setCameraMute(bool enabled) = 0;
+
+    /**
      * Get the status tracker of the camera device
      */
     virtual wp<camera3::StatusTracker> getStatusTracker() = 0;
