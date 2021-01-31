@@ -16,16 +16,19 @@
 
 #define LOG_TAG "TunerFilter"
 
-#include <aidlcommonsupport/NativeHandle.h>
 #include "TunerFilter.h"
 
+using ::android::hardware::hidl_handle;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterMainType;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxMmtpFilterType;
 using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterType;
 using ::android::hardware::tv::tuner::V1_0::Result;
-
 namespace android {
 
-TunerFilter::TunerFilter(sp<IFilter> filter, sp<IFilterCallback> callback) {
+TunerFilter::TunerFilter(
+        sp<IFilter> filter, sp<IFilterCallback> callback) {
     mFilter = filter;
     mFilter_1_1 = ::android::hardware::tv::tuner::V1_1::IFilter::castFrom(filter);
     mFilterCallback = callback;
@@ -103,6 +106,7 @@ Status TunerFilter::configure(const TunerFilterConfiguration& config) {
                     break;
                 }
             }
+            halSettings.ts(ts);
             break;
         }
     }
@@ -112,6 +116,44 @@ Status TunerFilter::configure(const TunerFilterConfiguration& config) {
     }
     return Status::ok();
 }
+
+Status TunerFilter::getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_return) {
+    if (mFilter_1_1 == nullptr) {
+        ALOGE("IFilter_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res;
+    mFilter_1_1->getAvSharedHandle([&](Result r, hidl_handle avMemory, uint64_t avMemSize) {
+        res = r;
+        if (res == Result::SUCCESS) {
+            TunerFilterSharedHandleInfo info{
+                .handle = dupToAidl(hidl_handle(avMemory.getNativeHandle())),
+                .size = static_cast<int64_t>(avMemSize),
+            };
+            *_aidl_return = std::move(info);
+        } else {
+            _aidl_return = NULL;
+        }
+    });
+
+    return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+}
+
+Status TunerFilter::releaseAvHandle(
+        const ::aidl::android::hardware::common::NativeHandle& handle, int64_t avDataId) {
+    if (mFilter == nullptr) {
+        ALOGE("IFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res = mFilter->releaseAvHandle(hidl_handle(makeFromAidl(handle)), avDataId);
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
 
 Status TunerFilter::start() {
     if (mFilter == nullptr) {
@@ -149,6 +191,18 @@ Status TunerFilter::flush() {
     return Status::ok();
 }
 
+Status TunerFilter::close() {
+    if (mFilter == nullptr) {
+        ALOGE("IFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+    Result res = mFilter->close();
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
 sp<IFilter> TunerFilter::getHalFilter() {
     return mFilter;
 }
@@ -164,8 +218,8 @@ void TunerFilter::FilterCallback::getMediaEvent(
         tunerMedia.streamId = static_cast<int>(mediaEvent.streamId);
         tunerMedia.isPtsPresent = mediaEvent.isPtsPresent;
         tunerMedia.pts = static_cast<long>(mediaEvent.pts);
-        tunerMedia.dataLength = static_cast<long>(mediaEvent.dataLength);
-        tunerMedia.offset = static_cast<long>(mediaEvent.offset);
+        tunerMedia.dataLength = static_cast<int>(mediaEvent.dataLength);
+        tunerMedia.offset = static_cast<int>(mediaEvent.offset);
         tunerMedia.isSecureMemory = mediaEvent.isSecureMemory;
         tunerMedia.avDataId = static_cast<long>(mediaEvent.avDataId);
         tunerMedia.mpuSequenceNumber = static_cast<int>(mediaEvent.mpuSequenceNumber);
@@ -187,7 +241,6 @@ Return<void> TunerFilter::FilterCallback::onFilterStatus(DemuxFilterStatus statu
 }
 
 Return<void> TunerFilter::FilterCallback::onFilterEvent(const DemuxFilterEvent& filterEvent) {
-    ALOGD("FilterCallback::onFilterEvent");
     std::vector<DemuxFilterEvent::Event> events = filterEvent.events;
     std::vector<TunerFilterEvent> tunerEvent;
 
@@ -203,7 +256,8 @@ Return<void> TunerFilter::FilterCallback::onFilterEvent(const DemuxFilterEvent& 
             }
         }
     }
-    mTunerFilterCallback->onFilterEvent(&tunerEvent);
+
+    mTunerFilterCallback->onFilterEvent(tunerEvent);
     return Void();
 }
 

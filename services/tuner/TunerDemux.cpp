@@ -124,4 +124,17 @@ Status TunerDemux::openDvr(int dvrType, int bufferSize, const shared_ptr<ITunerD
     *_aidl_return = ::ndk::SharedRefBase::make<TunerDvr>(hidlDvr, dvrType);
     return Status::ok();
 }
+
+Status TunerDemux::close() {
+    if (mDemux == nullptr) {
+        ALOGE("IDemux is not initialized.");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res = mDemux->close();
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
 }  // namespace android
