@@ -16,7 +16,9 @@
 
 package android.media.tv.tuner;
 
+import android.hardware.common.NativeHandle;
 import android.media.tv.tuner.TunerFilterConfiguration;
+import android.media.tv.tuner.TunerFilterSharedHandleInfo;
 
 /**
  * Tuner Filter interface handles tuner related operations.
@@ -40,6 +42,16 @@ interface ITunerFilter {
     void configure(in TunerFilterConfiguration config);
 
     /**
+     * Get the a/v shared memory handle
+     */
+    TunerFilterSharedHandleInfo getAvSharedHandleInfo();
+
+    /**
+     * Release the handle reported by the HAL for AV memory.
+     */
+    void releaseAvHandle(in NativeHandle handle, in long avDataId);
+
+    /**
      * Start the filter.
      */
     void start();
@@ -53,4 +65,9 @@ interface ITunerFilter {
      * Flush the filter.
      */
     void flush();
+
+    /**
+     * Close the filter.
+     */
+    void close();
 }

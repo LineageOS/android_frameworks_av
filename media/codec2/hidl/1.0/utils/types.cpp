@@ -895,13 +895,12 @@ bool objcpy(InfoBuffer* d, const C2InfoBuffer& s,
         BufferPoolSender* bufferPoolSender,
         std::list<BaseBlock>* baseBlocks,
         std::map<const void*, uint32_t>* baseBlockIndices) {
-    // TODO: C2InfoBuffer is not implemented.
-    (void)d;
-    (void)s;
-    (void)bufferPoolSender;
-    (void)baseBlocks;
-    (void)baseBlockIndices;
-    LOG(INFO) << "InfoBuffer not implemented.";
+    d->index = static_cast<ParamIndex>(s.index());
+    Buffer& dBuffer = d->buffer;
+    if (!objcpy(&dBuffer, s.data(), bufferPoolSender, baseBlocks, baseBlockIndices)) {
+        LOG(ERROR) << "Invalid C2InfoBuffer::data";
+        return false;
+    }
     return true;
 }
 
@@ -1336,6 +1335,68 @@ bool objcpy(std::shared_ptr<C2Buffer>* d, const Buffer& s,
     return true;
 }
 
+// InfoBuffer -> C2InfoBuffer
+bool objcpy(std::vector<C2InfoBuffer> *d, const InfoBuffer& s,
+        const std::vector<C2BaseBlock>& baseBlocks) {
+
+    // Currently, a non-null C2InfoBufer must contain exactly 1 block.
+    if (s.buffer.blocks.size() == 0) {
+        return true;
+    } else if (s.buffer.blocks.size() != 1) {
+        LOG(ERROR) << "Invalid InfoBuffer::Buffer "
+                      "Currently, a C2InfoBuffer must contain exactly 1 block.";
+        return false;
+    }
+
+    const Block &sBlock = s.buffer.blocks[0];
+    if (sBlock.index >= baseBlocks.size()) {
+        LOG(ERROR) << "Invalid InfoBuffer::Buffer::blocks[0].index: "
+                      "Array index out of range.";
+        return false;
+    }
+    const C2BaseBlock &baseBlock = baseBlocks[sBlock.index];
+
+    // Parse meta.
+    std::vector<C2Param*> sBlockMeta;
+    if (!parseParamsBlob(&sBlockMeta, sBlock.meta)) {
+        LOG(ERROR) << "Invalid InfoBuffer::Buffer::blocks[0].meta.";
+        return false;
+    }
+
+    // Copy fence.
+    C2Fence dFence;
+    if (!objcpy(&dFence, sBlock.fence)) {
+        LOG(ERROR) << "Invalid InfoBuffer::Buffer::blocks[0].fence.";
+        return false;
+    }
+
+    // Construct a block.
+    switch (baseBlock.type) {
+    case C2BaseBlock::LINEAR:
+        if (sBlockMeta.size() == 1 && sBlockMeta[0] != nullptr &&
+            sBlockMeta[0]->size() == sizeof(C2Hidl_RangeInfo)) {
+            C2Hidl_RangeInfo *rangeInfo =
+                    reinterpret_cast<C2Hidl_RangeInfo*>(sBlockMeta[0]);
+            d->emplace_back(C2InfoBuffer::CreateLinearBuffer(
+                    s.index,
+                    baseBlock.linear->share(
+                            rangeInfo->offset, rangeInfo->length, dFence)));
+            return true;
+        }
+        LOG(ERROR) << "Invalid Meta for C2BaseBlock::Linear InfoBuffer.";
+        break;
+    case C2BaseBlock::GRAPHIC:
+        // It's not used now
+        LOG(ERROR) << "Non-Used C2BaseBlock::type for InfoBuffer.";
+        break;
+    default:
+        LOG(ERROR) << "Invalid C2BaseBlock::type for InfoBuffer.";
+        break;
+    }
+
+    return false;
+}
+
 // FrameData -> C2FrameData
 bool objcpy(C2FrameData* d, const FrameData& s,
         const std::vector<C2BaseBlock>& baseBlocks) {
@@ -1370,8 +1431,18 @@ bool objcpy(C2FrameData* d, const FrameData& s,
         }
     }
 
-    // TODO: Implement this once C2InfoBuffer has constructors.
     d->infoBuffers.clear();
+    if (s.infoBuffers.size() == 0) {
+        // InfoBuffer is optional
+        return true;
+    }
+    d->infoBuffers.reserve(s.infoBuffers.size());
+    for (const InfoBuffer &sInfoBuffer: s.infoBuffers) {
+        if (!objcpy(&(d->infoBuffers), sInfoBuffer, baseBlocks)) {
+            LOG(ERROR) << "Invalid Framedata::infoBuffers.";
+            return false;
+        }
+    }
     return true;
 }
 
