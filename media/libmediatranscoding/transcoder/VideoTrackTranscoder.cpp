@@ -238,7 +238,12 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     int32_t operatingRate = getDefaultOperatingRate(encoderFormat);
 
     if (operatingRate != -1) {
-        SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_OPERATING_RATE, encoderFormat, operatingRate);
+        float tmpf;
+        int32_t tmpi;
+        if (!AMediaFormat_getFloat(encoderFormat, AMEDIAFORMAT_KEY_OPERATING_RATE, &tmpf) &&
+            !AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_OPERATING_RATE, &tmpi)) {
+            AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_OPERATING_RATE, operatingRate);
+        }
     }
 
     SetDefaultFormatValueInt32(AMEDIAFORMAT_KEY_PRIORITY, encoderFormat, kDefaultCodecPriority);
@@ -260,8 +265,8 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    // TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
-    #define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
+// TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
+#define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
 
     AMediaCodec* encoder;
     if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {

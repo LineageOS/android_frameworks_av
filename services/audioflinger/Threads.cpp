@@ -2961,7 +2961,10 @@ void AudioFlinger::PlaybackThread::updateMetadata_l()
     auto backInserter = std::back_inserter(metadata.tracks);
     for (const sp<Track> &track : mActiveTracks) {
         // No track is invalid as this is called after prepareTrack_l in the same critical section
-        track->copyMetadataTo(backInserter);
+        // Do not forward metadata for PatchTrack with unspecified stream type
+        if (track->streamType() != AUDIO_STREAM_PATCH) {
+            track->copyMetadataTo(backInserter);
+        }
     }
     sendMetadataToBackend_l(metadata);
 }
@@ -8101,6 +8104,10 @@ void AudioFlinger::RecordThread::updateMetadata_l()
     }
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<RecordTrack> &track : mActiveTracks) {
+        // Do not forward PatchRecord metadata to audio HAL
+        if (track->isPatchTrack()) {
+            continue;
+        }
         // No track is invalid as this is called after prepareTrack_l in the same critical section
         record_track_metadata_v7_t trackMetadata;
         trackMetadata.base = {
