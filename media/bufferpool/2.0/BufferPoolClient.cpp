@@ -32,6 +32,8 @@ namespace implementation {
 static constexpr int64_t kReceiveTimeoutUs = 1000000; // 100ms
 static constexpr int kPostMaxRetry = 3;
 static constexpr int kCacheTtlUs = 1000000; // TODO: tune
+static constexpr size_t kMaxCachedBufferCount = 64;
+static constexpr size_t kCachedBufferCountTarget = kMaxCachedBufferCount - 16;
 
 class BufferPoolClient::Impl
         : public std::enable_shared_from_this<BufferPoolClient::Impl> {
@@ -135,6 +137,10 @@ private:
         void decActive_l() {
             --mActive;
             mLastChangeUs = getTimestampNow();
+        }
+
+        int cachedBufferCount() const {
+            return mBuffers.size() - mActive;
         }
     } mCache;
 
@@ -668,10 +674,12 @@ bool BufferPoolClient::Impl::syncReleased(uint32_t messageId) {
 // should have mCache.mLock
 void BufferPoolClient::Impl::evictCaches(bool clearCache) {
     int64_t now = getTimestampNow();
-    if (now >= mLastEvictCacheUs + kCacheTtlUs || clearCache) {
+    if (now >= mLastEvictCacheUs + kCacheTtlUs ||
+            clearCache || mCache.cachedBufferCount() > kMaxCachedBufferCount) {
         size_t evicted = 0;
         for (auto it = mCache.mBuffers.begin(); it != mCache.mBuffers.end();) {
-            if (!it->second->hasCache() && (it->second->expire() || clearCache)) {
+            if (!it->second->hasCache() && (it->second->expire() ||
+                        clearCache || mCache.cachedBufferCount() > kCachedBufferCountTarget)) {
                 it = mCache.mBuffers.erase(it);
                 ++evicted;
             } else {
