@@ -206,13 +206,18 @@ void MediaTranscoder::onProgressUpdate(const MediaSampleWriter* writer __unused,
     mCallbacks->onProgressUpdate(this, progress);
 }
 
-MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks, pid_t pid,
-                                 uid_t uid)
-      : mCallbacks(callbacks), mPid(pid), mUid(uid) {}
+void MediaTranscoder::onHeartBeat(const MediaSampleWriter* writer __unused) {
+    // Signal heart-beat to the client.
+    mCallbacks->onHeartBeat(this);
+}
+
+MediaTranscoder::MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks,
+                                 int64_t heartBeatIntervalUs, pid_t pid, uid_t uid)
+      : mCallbacks(callbacks), mHeartBeatIntervalUs(heartBeatIntervalUs), mPid(pid), mUid(uid) {}
 
 std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
-        const std::shared_ptr<CallbackInterface>& callbacks, pid_t pid, uid_t uid,
-        const std::shared_ptr<ndk::ScopedAParcel>& pausedState) {
+        const std::shared_ptr<CallbackInterface>& callbacks, int64_t heartBeatIntervalUs, pid_t pid,
+        uid_t uid, const std::shared_ptr<ndk::ScopedAParcel>& pausedState) {
     if (pausedState != nullptr) {
         LOG(INFO) << "Initializing from paused state.";
     }
@@ -221,7 +226,8 @@ std::shared_ptr<MediaTranscoder> MediaTranscoder::create(
         return nullptr;
     }
 
-    return std::shared_ptr<MediaTranscoder>(new MediaTranscoder(callbacks, pid, uid));
+    return std::shared_ptr<MediaTranscoder>(
+            new MediaTranscoder(callbacks, heartBeatIntervalUs, pid, uid));
 }
 
 media_status_t MediaTranscoder::configureSource(int fd) {
@@ -348,7 +354,7 @@ media_status_t MediaTranscoder::configureDestination(int fd) {
     }
 
     mSampleWriter = MediaSampleWriter::Create();
-    const bool initOk = mSampleWriter->init(fd, shared_from_this());
+    const bool initOk = mSampleWriter->init(fd, shared_from_this(), mHeartBeatIntervalUs);
 
     if (!initOk) {
         LOG(ERROR) << "Unable to initialize sample writer with destination fd: " << fd;

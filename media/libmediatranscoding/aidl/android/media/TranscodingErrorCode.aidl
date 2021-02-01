@@ -31,4 +31,5 @@ enum TranscodingErrorCode {
     kInvalidOperation = 5,
     kErrorIO = 6,
     kInsufficientResources = 7,
+    kWatchdogTimeout = 8,
 }
