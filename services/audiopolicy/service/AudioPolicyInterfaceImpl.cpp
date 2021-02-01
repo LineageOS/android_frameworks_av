@@ -280,6 +280,7 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
                                             int32_t uidAidl,
                                             const media::AudioConfig& configAidl,
                                             int32_t flagsAidl,
+                                            int32_t selectedDeviceIdAidl,
                                             media::GetOutputForAttrResponse* _aidl_return)
 {
     audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
@@ -293,8 +294,10 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
             aidl2legacy_AudioConfig_audio_config_t(configAidl));
     audio_output_flags_t flags = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_output_flags_t_mask(flagsAidl));
+    audio_port_handle_t selectedDeviceId = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_int32_t_audio_port_handle_t(selectedDeviceIdAidl));
+
     audio_io_handle_t output;
-    audio_port_handle_t selectedDeviceId;
     audio_port_handle_t portId;
     std::vector<audio_io_handle_t> secondaryOutputs;
 
@@ -504,6 +507,7 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
                                            const std::string& opPackageNameAidl,
                                            const media::AudioConfigBase& configAidl,
                                            int32_t flagsAidl,
+                                           int32_t selectedDeviceIdAidl,
                                            media::GetInputForAttrResponse* _aidl_return) {
     audio_attributes_t attr = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl));
@@ -521,7 +525,9 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
             aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl));
     audio_input_flags_t flags = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_input_flags_t_mask(flagsAidl));
-    audio_port_handle_t selectedDeviceId;
+    audio_port_handle_t selectedDeviceId = VALUE_OR_RETURN_BINDER_STATUS(
+                aidl2legacy_int32_t_audio_port_handle_t(selectedDeviceIdAidl));
+
     audio_port_handle_t portId;
 
     if (mAudioPolicyManager == NULL) {
