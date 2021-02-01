@@ -53,22 +53,6 @@ cc_defaults {
 }
 
 cc_library_shared {
-    name: "libaudiohal@2.0",
-    defaults: ["libaudiohal_default"],
-    shared_libs: [
-        "android.hardware.audio.common@2.0",
-        "android.hardware.audio.common@2.0-util",
-        "android.hardware.audio.effect@2.0",
-        "android.hardware.audio@2.0",
-    ],
-    cflags: [
-        "-DMAJOR_VERSION=2",
-        "-DMINOR_VERSION=0",
-        "-include common/all-versions/VersionMacro.h",
-    ]
-}
-
-cc_library_shared {
     name: "libaudiohal@4.0",
     defaults: ["libaudiohal_default"],
     shared_libs: [
