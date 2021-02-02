@@ -192,6 +192,7 @@ protected:
     int32_t  mColorFormat;
     int32_t  mEncoderFormat;
     int32_t  mEncoderDataSpace;
+    int32_t  mBufferDataSpace;
     status_t mInitCheck;
 
     sp<Camera>   mCamera;
