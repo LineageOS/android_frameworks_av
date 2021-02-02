@@ -151,6 +151,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
 
     /* protected content */
     kParamIndexSecureMode,
+    kParamIndexEncryptedBuffer, // info-buffer, used with SM_READ_PROTECTED_WITH_ENCRYPTED
 
     // deprecated
     kParamIndexDelayRequest = kParamIndexDelay | C2Param::CoreIndex::IS_REQUEST_FLAG,
@@ -1145,6 +1146,8 @@ constexpr char C2_PARAMKEY_PRIORITY[] = "algo.priority";
 C2ENUM(C2Config::secure_mode_t, uint32_t,
     SM_UNPROTECTED,    ///< no content protection
     SM_READ_PROTECTED, ///< input and output buffers shall be protected from reading
+    /// both read protected and readable encrypted buffers are used
+    SM_READ_PROTECTED_WITH_ENCRYPTED,
 )
 
 typedef C2GlobalParam<C2Tuning, C2SimpleValueStruct<C2Config::secure_mode_t>, kParamIndexSecureMode>
