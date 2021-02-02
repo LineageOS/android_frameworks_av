@@ -62,7 +62,7 @@ cc_library_shared {
     ],
     cflags: [
         "-fvisibility=hidden",
-        "-DEXPORT=__attribute__ ((visibility (\"default\")))",
+        "-DEXPORT=__attribute__((visibility(\"default\")))",
         "-Wall",
         "-Wextra",
         "-Werror",
