@@ -980,12 +980,14 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
             legacy2aidl_audio_config_t_AudioConfig(*config));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
+    int32_t selectedDeviceIdAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_handle_t_int32_t(*selectedDeviceId));
 
     media::GetOutputForAttrResponse responseAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getOutputForAttr(attrAidl, sessionAidl, pidAidl, uidAidl, configAidl, flagsAidl,
-                                  &responseAidl)));
+                                  selectedDeviceIdAidl, &responseAidl)));
 
     *output = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_io_handle_t(responseAidl.output));
@@ -1077,12 +1079,15 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     media::AudioConfigBase configAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_base_t_AudioConfigBase(*config));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
+    int32_t selectedDeviceIdAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_port_handle_t_int32_t(*selectedDeviceId));
 
     media::GetInputForAttrResponse response;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, pidAidl, uidAidl,
-                                 opPackageNameAidl, configAidl, flagsAidl, &response)));
+                                 opPackageNameAidl, configAidl, flagsAidl, selectedDeviceIdAidl,
+                                 &response)));
 
     *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.input));
     *selectedDeviceId = VALUE_OR_RETURN_STATUS(
