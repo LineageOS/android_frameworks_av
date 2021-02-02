@@ -18,6 +18,8 @@
 #define LOG_TAG "AMRExtractor"
 #include <utils/Log.h>
 
+#include <inttypes.h>
+
 #include "AMRExtractor.h"
 
 #include <media/stagefright/foundation/ADebug.h>
@@ -283,8 +285,22 @@ media_status_t AMRSource::read(
     ReadOptions::SeekMode mode;
     if (mOffsetTableLength > 0 && options && options->getSeekTo(&seekTimeUs, &mode)) {
         size_t size;
-        int64_t seekFrame = seekTimeUs / 20000LL;  // 20ms per frame.
-        mCurrentTimeUs = seekFrame * 20000LL;
+        const int64_t frameDurationUs = 20000LL;  // 20ms per frame.
+        int64_t seekFrame = 0;
+        switch(mode & 0x7) {
+            case ReadOptions::SEEK_NEXT_SYNC:
+                seekFrame = (seekTimeUs + frameDurationUs - 1) / frameDurationUs;
+                break;
+            case ReadOptions::SEEK_CLOSEST_SYNC:
+            case ReadOptions::SEEK_CLOSEST:
+                seekFrame = (seekTimeUs + frameDurationUs/2) / frameDurationUs;
+                break;
+            case ReadOptions::SEEK_PREVIOUS_SYNC:
+            default:
+                seekFrame = seekTimeUs / frameDurationUs;
+                break;
+        }
+        mCurrentTimeUs = seekFrame * frameDurationUs;
 
         size_t index = seekFrame < 0 ? 0 : seekFrame / 50;
         if (index >= mOffsetTableLength) {
