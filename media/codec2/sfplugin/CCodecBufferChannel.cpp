@@ -143,7 +143,8 @@ CCodecBufferChannel::CCodecBufferChannel(
       mFrameIndex(0u),
       mFirstValidFrameIndex(0u),
       mMetaMode(MODE_NONE),
-      mInputMetEos(false) {
+      mInputMetEos(false),
+      mSendEncryptedInfoBuffer(false) {
     mOutputSurface.lock()->maxDequeueBuffers = kSmoothnessFactor + kRenderingDepth;
     {
         Mutexed<Input>::Locked input(mInput);
@@ -188,7 +189,10 @@ status_t CCodecBufferChannel::signalEndOfInputStream() {
     return mInputSurface->signalEndOfInputStream();
 }
 
-status_t CCodecBufferChannel::queueInputBufferInternal(sp<MediaCodecBuffer> buffer) {
+status_t CCodecBufferChannel::queueInputBufferInternal(
+        sp<MediaCodecBuffer> buffer,
+        std::shared_ptr<C2LinearBlock> encryptedBlock,
+        size_t blockSize) {
     int64_t timeUs;
     CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
@@ -246,6 +250,11 @@ status_t CCodecBufferChannel::queueInputBufferInternal(sp<MediaCodecBuffer> buff
             }
         }
         work->input.buffers.push_back(c2buffer);
+        if (encryptedBlock) {
+            work->input.infoBuffers.emplace_back(C2InfoBuffer::CreateLinearBuffer(
+                    kParamIndexEncryptedBuffer,
+                    encryptedBlock->share(0, blockSize, C2Fence())));
+        }
         queuedBuffers.push_back(c2buffer);
     } else if (eos) {
         flags |= C2FrameData::FLAG_END_OF_STREAM;
@@ -514,6 +523,40 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
     }
     sp<EncryptedLinearBlockBuffer> encryptedBuffer((EncryptedLinearBlockBuffer *)buffer.get());
 
+    std::shared_ptr<C2LinearBlock> block;
+    size_t allocSize = buffer->size();
+    size_t bufferSize = 0;
+    c2_status_t blockRes = C2_OK;
+    bool copied = false;
+    if (mSendEncryptedInfoBuffer) {
+        static const C2MemoryUsage kDefaultReadWriteUsage{
+            C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE};
+        constexpr int kAllocGranule0 = 1024 * 64;
+        constexpr int kAllocGranule1 = 1024 * 1024;
+        std::shared_ptr<C2BlockPool> pool = mBlockPools.lock()->inputPool;
+        // round up encrypted sizes to limit fragmentation and encourage buffer reuse
+        if (allocSize <= kAllocGranule1) {
+            bufferSize = align(allocSize, kAllocGranule0);
+        } else {
+            bufferSize = align(allocSize, kAllocGranule1);
+        }
+        blockRes = pool->fetchLinearBlock(
+                bufferSize, kDefaultReadWriteUsage, &block);
+
+        if (blockRes == C2_OK) {
+            C2WriteView view = block->map().get();
+            if (view.error() == C2_OK && view.size() == bufferSize) {
+                copied = true;
+                // TODO: only copy clear sections
+                memcpy(view.data(), buffer->data(), allocSize);
+            }
+        }
+    }
+
+    if (!copied) {
+        block.reset();
+    }
+
     ssize_t result = -1;
     ssize_t codecDataOffset = 0;
     if (numSubSamples == 1
@@ -605,7 +648,8 @@ status_t CCodecBufferChannel::queueSecureInputBuffer(
     }
 
     buffer->setRange(codecDataOffset, result - codecDataOffset);
-    return queueInputBufferInternal(buffer);
+
+    return queueInputBufferInternal(buffer, block, bufferSize);
 }
 
 void CCodecBufferChannel::feedInputBufferIfAvailable() {
@@ -887,6 +931,7 @@ status_t CCodecBufferChannel::start(
     C2PortActualDelayTuning::input inputDelay(0);
     C2PortActualDelayTuning::output outputDelay(0);
     C2ActualPipelineDelayTuning pipelineDelay(0);
+    C2SecureModeTuning secureMode(C2Config::SM_UNPROTECTED);
 
     c2_status_t err = mComponent->query(
             {
@@ -897,6 +942,7 @@ status_t CCodecBufferChannel::start(
                 &inputDelay,
                 &pipelineDelay,
                 &outputDelay,
+                &secureMode,
             },
             {},
             C2_DONT_BLOCK,
@@ -918,6 +964,9 @@ status_t CCodecBufferChannel::start(
 
     // TODO: get this from input format
     bool secure = mComponent->getName().find(".secure") != std::string::npos;
+
+    // secure mode is a static parameter (shall not change in the executing state)
+    mSendEncryptedInfoBuffer = secureMode.value == C2Config::SM_READ_PROTECTED_WITH_ENCRYPTED;
 
     std::shared_ptr<C2AllocatorStore> allocatorStore = GetCodec2PlatformAllocatorStore();
     int poolMask = GetCodec2PoolMask();
