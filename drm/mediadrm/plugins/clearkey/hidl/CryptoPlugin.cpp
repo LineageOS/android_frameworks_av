@@ -142,12 +142,14 @@ Return<void> CryptoPlugin::decrypt_1_2(
 
     base = static_cast<uint8_t *>(static_cast<void *>(destBase->getPointer()));
 
-    if (destBuffer.offset + destBuffer.size > destBase->getSize()) {
+    totalSize = 0;
+    if (__builtin_add_overflow(destBuffer.offset, destBuffer.size, &totalSize) ||
+        totalSize > destBase->getSize()) {
+        android_errorWriteLog(0x534e4554, "176444622");
         _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "invalid buffer size");
         return Void();
     }
-    destPtr = static_cast<void *>(base + destination.nonsecureMemory.offset);
-
+    destPtr = static_cast<void*>(base + destination.nonsecureMemory.offset);
 
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
