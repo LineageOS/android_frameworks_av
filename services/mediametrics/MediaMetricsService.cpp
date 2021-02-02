@@ -25,6 +25,7 @@
 #include <android/content/pm/IPackageManagerNative.h>  // package info
 #include <audio_utils/clock.h>                 // clock conversions
 #include <binder/IPCThreadState.h>             // get calling uid
+#include <binder/IServiceManager.h>            // checkCallingPermission
 #include <cutils/properties.h>                 // for property_get
 #include <mediautils/MemoryLeakTrackUtil.h>
 #include <memunreachable/memunreachable.h>
