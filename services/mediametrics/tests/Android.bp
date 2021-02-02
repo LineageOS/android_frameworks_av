@@ -19,6 +19,7 @@ cc_test {
         "libmediametricsservice",
         "libmediautils",
         "libutils",
+        "mediametricsservice-aidl-unstable-cpp",
     ],
 
     header_libs: [
