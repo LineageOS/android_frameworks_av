@@ -84,6 +84,7 @@ static const char *kCodecKeyName = "codec";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaCodec.java
 // These must be kept synchronized with the constants there.
+static const char *kCodecLogSessionId = "android.media.mediacodec.log-session-id";
 static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
 static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
 static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
@@ -1298,6 +1299,8 @@ status_t MediaCodec::configure(
     }
 
     if (mIsVideo) {
+        // TODO: validity check log-session-id: it should be a 32-hex-digit.
+        format->findString("log-session-id", &mLogSessionId);
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
         if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
@@ -1305,6 +1308,7 @@ status_t MediaCodec::configure(
         }
 
         if (mMetricsHandle != 0) {
+            mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
             mediametrics_setInt32(mMetricsHandle, kCodecWidth, mVideoWidth);
             mediametrics_setInt32(mMetricsHandle, kCodecHeight, mVideoHeight);
             mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);
