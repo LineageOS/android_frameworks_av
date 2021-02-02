@@ -18,6 +18,8 @@
 #define LOG_TAG "AACExtractor"
 #include <utils/Log.h>
 
+#include <inttypes.h>
+
 #include "AACExtractor.h"
 #include <media/MediaExtractorPluginApi.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -277,7 +279,22 @@ media_status_t AACSource::read(
     ReadOptions::SeekMode mode;
     if (options && options->getSeekTo(&seekTimeUs, &mode)) {
         if (mFrameDurationUs > 0) {
-            int64_t seekFrame = seekTimeUs / mFrameDurationUs;
+            int64_t seekFrame = 0;
+            switch(mode & 0x7) {
+                case ReadOptions::SEEK_NEXT_SYNC:
+                    // "at or after"
+                    seekFrame = (seekTimeUs + mFrameDurationUs - 1) / mFrameDurationUs;
+                    break;
+                case ReadOptions::SEEK_CLOSEST_SYNC:
+                case ReadOptions::SEEK_CLOSEST:
+                    seekFrame = (seekTimeUs + mFrameDurationUs/2) / mFrameDurationUs;
+                    break;
+                case ReadOptions::SEEK_PREVIOUS_SYNC:
+                default:
+                    // 'at or before'
+                    seekFrame = seekTimeUs / mFrameDurationUs;
+                    break;
+            }
             if (seekFrame < 0 || seekFrame >= (int64_t)mOffsetVector.size()) {
                 android_errorWriteLog(0x534e4554, "70239507");
                 return AMEDIA_ERROR_MALFORMED;
