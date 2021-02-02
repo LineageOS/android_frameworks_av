@@ -16,15 +16,13 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterSettings;
-
 /**
- * Filter Settings for a TS filter.
+ * Filter Settings for Pes Data.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
+parcelable TunerFilterPesDataSettings {
+    char streamId;
 
-    TunerFilterSettings filterSettings;
+    boolean isRaw;
 }

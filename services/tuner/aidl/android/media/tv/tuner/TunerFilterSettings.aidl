@@ -17,6 +17,10 @@
 package android.media.tv.tuner;
 
 import android.media.tv.tuner.TunerFilterAvSettings;
+import android.media.tv.tuner.TunerFilterDownloadSettings;
+import android.media.tv.tuner.TunerFilterPesDataSettings;
+import android.media.tv.tuner.TunerFilterRecordSettings;
+import android.media.tv.tuner.TunerFilterSectionSettings;
 
 /**
  * Filter Settings.
@@ -24,5 +28,17 @@ import android.media.tv.tuner.TunerFilterAvSettings;
  * {@hide}
  */
 union TunerFilterSettings {
+    boolean nothing;
+
     TunerFilterAvSettings av;
+
+    TunerFilterSectionSettings section;
+
+    TunerFilterPesDataSettings pesData;
+
+    TunerFilterRecordSettings record;
+
+    TunerFilterDownloadSettings download;
+
+    boolean isPassthrough;
 }
