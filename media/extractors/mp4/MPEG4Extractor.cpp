@@ -640,8 +640,7 @@ media_status_t MPEG4Extractor::getTrackMetaData(
         }
     }
 
-    AMediaFormat_copy(meta, track->meta);
-    return AMEDIA_OK;
+    return AMediaFormat_copy(meta, track->meta);
 }
 
 status_t MPEG4Extractor::readMetaData() {
