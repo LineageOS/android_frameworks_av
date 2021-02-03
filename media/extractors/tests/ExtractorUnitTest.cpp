@@ -18,6 +18,8 @@
 #define LOG_TAG "ExtractorUnitTest"
 #include <utils/Log.h>
 
+#include <inttypes.h>
+
 #include <datasource/FileSource.h>
 #include <media/stagefright/MediaBufferGroup.h>
 #include <media/stagefright/MediaCodecConstants.h>
@@ -503,7 +505,7 @@ TEST_P(ExtractorFunctionalityTest, MetaDataComparisonTest) {
                                               &trackSampleRate));
             ASSERT_EQ(exChannelCount, trackChannelCount) << "ChannelCount not as expected";
             ASSERT_EQ(exSampleRate, trackSampleRate) << "SampleRate not as expected";
-        } else {
+        } else if (!strncmp(extractorMime, "video/", 6)) {
             int32_t exWidth, exHeight;
             int32_t trackWidth, trackHeight;
             ASSERT_TRUE(AMediaFormat_getInt32(extractorFormat, AMEDIAFORMAT_KEY_WIDTH, &exWidth));
@@ -512,6 +514,8 @@ TEST_P(ExtractorFunctionalityTest, MetaDataComparisonTest) {
             ASSERT_TRUE(AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_HEIGHT, &trackHeight));
             ASSERT_EQ(exWidth, trackWidth) << "Width not as expected";
             ASSERT_EQ(exHeight, trackHeight) << "Height not as expected";
+        } else {
+            ALOGV("non a/v track");
         }
         status = cTrack->stop(track);
         ASSERT_EQ(OK, status) << "Failed to stop the track";
@@ -568,8 +572,9 @@ TEST_P(ExtractorFunctionalityTest, MultipleStartStopTest) {
 TEST_P(ExtractorFunctionalityTest, SeekTest) {
     if (mDisableTest) return;
 
-    ALOGV("Validates %s Extractor behaviour for different seek modes", mContainer.c_str());
     string inputFileName = gEnv->getRes() + get<1>(GetParam());
+    ALOGV("Validates %s Extractor behaviour for different seek modes filename %s",
+          mContainer.c_str(), inputFileName.c_str());
 
     int32_t status = setDataSource(inputFileName);
     ASSERT_EQ(status, 0) << "SetDataSource failed for" << mContainer << "extractor";
@@ -680,7 +685,8 @@ TEST_P(ExtractorFunctionalityTest, SeekTest) {
                 if (seekIdx >= seekablePointsSize) seekIdx = seekablePointsSize - 1;
 
                 int64_t seekToTimeStamp = seekablePoints[seekIdx];
-                if (seekablePointsSize > 1) {
+                if (seekIdx > 1) {
+                    // pick a time just earlier than this seek point
                     int64_t prevTimeStamp = seekablePoints[seekIdx - 1];
                     seekToTimeStamp = seekToTimeStamp - ((seekToTimeStamp - prevTimeStamp) >> 3);
                 }
@@ -711,11 +717,7 @@ TEST_P(ExtractorFunctionalityTest, SeekTest) {
                     // CMediaTrackReadOptions::SEEK is 8. Using mask 0111b to get true modes
                     switch (mode & 0x7) {
                         case CMediaTrackReadOptions::SEEK_PREVIOUS_SYNC:
-                            if (seekablePointsSize == 1) {
-                                EXPECT_EQ(timeStamp, seekablePoints[seekIdx]);
-                            } else {
-                                EXPECT_EQ(timeStamp, seekablePoints[seekIdx - 1]);
-                            }
+                            EXPECT_EQ(timeStamp, seekablePoints[seekIdx > 0 ? (seekIdx - 1) : 0]);
                             break;
                         case CMediaTrackReadOptions::SEEK_NEXT_SYNC:
                         case CMediaTrackReadOptions::SEEK_CLOSEST_SYNC:
@@ -743,8 +745,9 @@ TEST_P(ExtractorFunctionalityTest, MonkeySeekTest) {
     // TODO(b/155630778): Enable test for wav extractors
     if (mExtractorName == WAV) return;
 
-    ALOGV("Validates %s Extractor behaviour for invalid seek points", mContainer.c_str());
     string inputFileName = gEnv->getRes() + get<1>(GetParam());
+    ALOGV("Validates %s Extractor behaviour for invalid seek points, filename %s",
+          mContainer.c_str(), inputFileName.c_str());
 
     int32_t status = setDataSource(inputFileName);
     ASSERT_EQ(status, 0) << "SetDataSource failed for" << mContainer << "extractor";
@@ -832,8 +835,9 @@ TEST_P(ExtractorFunctionalityTest, SanityTest) {
     // TODO(b/155626946): Enable test for MPEG2 TS/PS extractors
     if (mExtractorName == MPEG2TS || mExtractorName == MPEG2PS) return;
 
-    ALOGV("Validates %s Extractor behaviour for invalid tracks", mContainer.c_str());
     string inputFileName = gEnv->getRes() + get<1>(GetParam());
+    ALOGV("Validates %s Extractor behaviour for invalid tracks - file %s",
+          mContainer.c_str(), inputFileName.c_str());
 
     int32_t status = setDataSource(inputFileName);
     ASSERT_EQ(status, 0) << "SetDataSource failed for" << mContainer << "extractor";
@@ -872,12 +876,16 @@ TEST_P(ExtractorFunctionalityTest, SanityTest) {
 TEST_P(ConfigParamTest, ConfigParamValidation) {
     if (mDisableTest) return;
 
+    const int trackNumber = 0;
+
     string container = GetParam().first;
-    ALOGV("Validates %s Extractor for input's file properties", container.c_str());
     string inputFileName = gEnv->getRes();
     inputID inputFileId = GetParam().second;
     configFormat configParam;
     getFileProperties(inputFileId, inputFileName, configParam);
+
+    ALOGV("Validates %s Extractor for input's file properties, file %s",
+          container.c_str(), inputFileName.c_str());
 
     int32_t status = setDataSource(inputFileName);
     ASSERT_EQ(status, 0) << "SetDataSource failed for " << container << "extractor";
@@ -888,7 +896,7 @@ TEST_P(ConfigParamTest, ConfigParamValidation) {
     int32_t numTracks = mExtractor->countTracks();
     ASSERT_GT(numTracks, 0) << "Extractor didn't find any track for the given clip";
 
-    MediaTrackHelper *track = mExtractor->getTrack(0);
+    MediaTrackHelper *track = mExtractor->getTrack(trackNumber);
     ASSERT_NE(track, nullptr) << "Failed to get track for index 0";
 
     AMediaFormat *trackFormat = AMediaFormat_new();
@@ -910,7 +918,7 @@ TEST_P(ConfigParamTest, ConfigParamValidation) {
                 AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_SAMPLE_RATE, &trackSampleRate));
         ASSERT_EQ(configParam.sampleRate, trackSampleRate) << "SampleRate not as expected";
         ASSERT_EQ(configParam.channelCount, trackChannelCount) << "ChannelCount not as expected";
-    } else {
+    } else if (!strncmp(trackMime, "video/", 6)) {
         int32_t trackWidth, trackHeight;
         ASSERT_TRUE(AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_WIDTH, &trackWidth));
         ASSERT_TRUE(AMediaFormat_getInt32(trackFormat, AMEDIAFORMAT_KEY_HEIGHT, &trackHeight));

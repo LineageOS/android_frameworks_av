@@ -24,6 +24,7 @@ import android.media.tv.tuner.TunerFilterSettings;
  * {@hide}
  */
 parcelable TunerFilterTsConfiguration {
-    int tpid;
+    char tpid;
+
     TunerFilterSettings filterSettings;
 }

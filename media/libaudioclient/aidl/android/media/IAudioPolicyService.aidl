@@ -83,7 +83,8 @@ interface IAudioPolicyService {
                                               int /* pid_t */ pid,
                                               int /* uid_t */ uid,
                                               in AudioConfig config,
-                                              int /* Bitmask, indexed by AudioOutputFlags */ flags);
+                                              int /* Bitmask, indexed by AudioOutputFlags */ flags,
+                                              int /* audio_port_handle_t */ selectedDeviceId);
 
     void startOutput(int /* audio_port_handle_t */ portId);
 
@@ -99,7 +100,9 @@ interface IAudioPolicyService {
                                             int /* uid_t */ uid,
                                             @utf8InCpp String opPackageName,
                                             in AudioConfigBase config,
-                                            int /* Bitmask, indexed by AudioInputFlags */ flags);
+                                            int /* Bitmask, indexed by AudioInputFlags */ flags,
+                                            int /* audio_port_handle_t */ selectedDeviceId);
+
 
     void startInput(int /* audio_port_handle_t */ portId);
 

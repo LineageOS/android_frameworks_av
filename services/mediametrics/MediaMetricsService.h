@@ -24,7 +24,7 @@
 
 // IMediaMetricsService must include Vector, String16, Errors
 #include <android-base/thread_annotations.h>
-#include <media/IMediaMetricsService.h>
+#include <android/media/BnMediaMetricsService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/String8.h>
 
@@ -32,11 +32,17 @@
 
 namespace android {
 
-class MediaMetricsService : public BnMediaMetricsService
+class MediaMetricsService : public media::BnMediaMetricsService
 {
 public:
     MediaMetricsService();
     ~MediaMetricsService() override;
+
+    // AIDL interface
+    binder::Status submitBuffer(const std::vector<uint8_t>& buffer) override {
+        status_t status = submitBuffer((char *)buffer.data(), buffer.size());
+        return binder::Status::fromStatusT(status);
+    }
 
     /**
      * Submits the indicated record to the mediaanalytics service.
@@ -45,11 +51,11 @@ public:
      * \return status failure, which is negative on binder transaction failure.
      *         As the transaction is one-way, remote failures will not be reported.
      */
-    status_t submit(mediametrics::Item *item) override {
+    status_t submit(mediametrics::Item *item) {
         return submitInternal(item, false /* release */);
     }
 
-    status_t submitBuffer(const char *buffer, size_t length) override {
+    status_t submitBuffer(const char *buffer, size_t length) {
         mediametrics::Item *item = new mediametrics::Item();
         return item->readFromByteString(buffer, length)
                 ?: submitInternal(item, true /* release */);
@@ -81,7 +87,7 @@ protected:
 
     // Internal call where release is true if ownership of item is transferred
     // to the service (that is, the service will eventually delete the item).
-    status_t submitInternal(mediametrics::Item *item, bool release) override;
+    status_t submitInternal(mediametrics::Item *item, bool release);
 
 private:
     void processExpirations();
