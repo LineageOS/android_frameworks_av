@@ -425,8 +425,7 @@ media_status_t MP3Extractor::getTrackMetaData(
     if (mInitCheck != OK || index != 0) {
         return AMEDIA_ERROR_UNKNOWN;
     }
-    AMediaFormat_copy(meta, mMeta);
-    return AMEDIA_OK;
+    return AMediaFormat_copy(meta, mMeta);
 }
 
 ////////////////////////////////////////////////////////////////////////////////
