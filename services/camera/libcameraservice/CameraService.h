@@ -637,7 +637,8 @@ private:
             public virtual IBinder::DeathRecipient {
         public:
             explicit SensorPrivacyPolicy(wp<CameraService> service)
-                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false) {}
+                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false),
+                      isIndividual(false), userId(0) {}
 
             void registerSelf();
             status_t registerSelfForIndividual(int userId);
