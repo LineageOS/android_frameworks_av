@@ -18,16 +18,23 @@
 
 #include "TunerFilter.h"
 
+using ::aidl::android::media::tv::tuner::TunerFilterSectionCondition;
+
 using ::android::hardware::hidl_handle;
+using ::android::hardware::tv::tuner::V1_0::DemuxAlpLengthType;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterMainType;
-using ::android::hardware::tv::tuner::V1_0::DemuxFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxIpAddress;
 using ::android::hardware::tv::tuner::V1_0::DemuxMmtpFilterType;
-using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxMmtpPid;
+using ::android::hardware::tv::tuner::V1_0::DemuxRecordScIndexType;
+using ::android::hardware::tv::tuner::V1_0::DemuxStreamId;
 using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterType;
 using ::android::hardware::tv::tuner::V1_0::Result;
 using ::android::hardware::tv::tuner::V1_1::Constant;
 
 namespace android {
+
+using namespace std;
 
 TunerFilter::TunerFilter(
         sp<IFilter> filter, sp<IFilterCallback> callback) {
@@ -40,13 +47,6 @@ TunerFilter::~TunerFilter() {
     mFilter = nullptr;
     mFilter_1_1 = nullptr;
     mFilterCallback = nullptr;
-}
-
-DemuxFilterAvSettings TunerFilter::getAvSettings(const TunerFilterSettings& settings) {
-    DemuxFilterAvSettings av {
-        .isPassthrough = settings.get<TunerFilterSettings::av>().isPassthrough,
-    };
-    return av;
 }
 
 Status TunerFilter::getId(int32_t* _aidl_return) {
@@ -91,32 +91,291 @@ Status TunerFilter::configure(const TunerFilterConfiguration& config) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    // TODO: more filter types.
-    TunerFilterSettings tunerSettings;
-    DemuxFilterSettings halSettings;
+    DemuxFilterSettings settings;
     switch (config.getTag()) {
         case TunerFilterConfiguration::ts: {
-            uint16_t tpid = static_cast<uint16_t>(config.get<TunerFilterConfiguration::ts>().tpid);
-            tunerSettings = config.get<TunerFilterConfiguration::ts>().filterSettings;
-            DemuxTsFilterSettings ts {
-                .tpid = tpid,
-            };
-
-            switch (tunerSettings.getTag()) {
-                case TunerFilterSettings::av: {
-                    ts.filterSettings.av(getAvSettings(tunerSettings));
-                    break;
-                }
-            }
-            halSettings.ts(ts);
+            getHidlTsSettings(config, settings);
+            break;
+        }
+        case TunerFilterConfiguration::mmtp: {
+            getHidlMmtpSettings(config, settings);
+            break;
+        }
+        case TunerFilterConfiguration::ip: {
+            getHidlIpSettings(config, settings);
+            break;
+        }
+        case TunerFilterConfiguration::tlv: {
+            getHidlTlvSettings(config, settings);
+            break;
+        }
+        case TunerFilterConfiguration::alp: {
+            getHidlAlpSettings(config, settings);
             break;
         }
     }
-    Result res = mFilter->configure(halSettings);
+
+    Result res = mFilter->configure(settings);
     if (res != Result::SUCCESS) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
     return Status::ok();
+}
+
+void TunerFilter::getHidlTsSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings) {
+    auto tsConf = config.get<TunerFilterConfiguration::ts>();
+    DemuxTsFilterSettings ts{
+        .tpid = static_cast<uint16_t>(tsConf.tpid),
+    };
+
+    TunerFilterSettings tunerSettings = tsConf.filterSettings;
+    switch (tunerSettings.getTag()) {
+        case TunerFilterSettings::av: {
+            ts.filterSettings.av(getAvSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::section: {
+            ts.filterSettings.section(getSectionSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::pesData: {
+            ts.filterSettings.pesData(getPesDataSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::record: {
+            ts.filterSettings.record(getRecordSettings(tunerSettings));
+            break;
+        }
+        default: {
+            ts.filterSettings.noinit();
+            break;
+        }
+    }
+    settings.ts(ts);
+}
+
+void TunerFilter::getHidlMmtpSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings) {
+    auto mmtpConf = config.get<TunerFilterConfiguration::mmtp>();
+    DemuxMmtpFilterSettings mmtp{
+        .mmtpPid = static_cast<DemuxMmtpPid>(mmtpConf.mmtpPid),
+    };
+
+    TunerFilterSettings tunerSettings = mmtpConf.filterSettings;
+    switch (tunerSettings.getTag()) {
+        case TunerFilterSettings::av: {
+            mmtp.filterSettings.av(getAvSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::section: {
+            mmtp.filterSettings.section(getSectionSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::pesData: {
+            mmtp.filterSettings.pesData(getPesDataSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::record: {
+            mmtp.filterSettings.record(getRecordSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::download: {
+            mmtp.filterSettings.download(getDownloadSettings(tunerSettings));
+            break;
+        }
+        default: {
+            mmtp.filterSettings.noinit();
+            break;
+        }
+    }
+    settings.mmtp(mmtp);
+}
+
+void TunerFilter::getHidlIpSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings) {
+    auto ipConf = config.get<TunerFilterConfiguration::ip>();
+    DemuxIpAddress ipAddr{
+        .srcPort = static_cast<uint16_t>(ipConf.ipAddr.srcPort),
+        .dstPort = static_cast<uint16_t>(ipConf.ipAddr.dstPort),
+    };
+    ipConf.ipAddr.srcIpAddress.isIpV6
+            ? ipAddr.srcIpAddress.v6(getIpV6Address(ipConf.ipAddr.srcIpAddress))
+            : ipAddr.srcIpAddress.v4(getIpV4Address(ipConf.ipAddr.srcIpAddress));
+    ipConf.ipAddr.dstIpAddress.isIpV6
+            ? ipAddr.dstIpAddress.v6(getIpV6Address(ipConf.ipAddr.dstIpAddress))
+            : ipAddr.dstIpAddress.v4(getIpV4Address(ipConf.ipAddr.dstIpAddress));
+    DemuxIpFilterSettings ip{
+        .ipAddr = ipAddr,
+    };
+
+    TunerFilterSettings tunerSettings = ipConf.filterSettings;
+    switch (tunerSettings.getTag()) {
+        case TunerFilterSettings::section: {
+            ip.filterSettings.section(getSectionSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::isPassthrough: {
+            ip.filterSettings.bPassthrough(tunerSettings.isPassthrough);
+            break;
+        }
+        default: {
+            ip.filterSettings.noinit();
+            break;
+        }
+    }
+    settings.ip(ip);
+}
+
+hidl_array<uint8_t, IP_V6_LENGTH> TunerFilter::getIpV6Address(TunerDemuxIpAddress addr) {
+    hidl_array<uint8_t, IP_V6_LENGTH> ip = {0};
+    if (addr.addr.size() != IP_V6_LENGTH) {
+        return ip;
+    }
+    copy(addr.addr.begin(), addr.addr.end(), ip.data());
+    return ip;
+}
+
+hidl_array<uint8_t, IP_V4_LENGTH> TunerFilter::getIpV4Address(TunerDemuxIpAddress addr) {
+    hidl_array<uint8_t, IP_V4_LENGTH> ip = {0};
+    if (addr.addr.size() != IP_V4_LENGTH) {
+        return ip;
+    }
+    copy(addr.addr.begin(), addr.addr.end(), ip.data());
+    return ip;
+}
+
+void TunerFilter::getHidlTlvSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings) {
+    auto tlvConf = config.get<TunerFilterConfiguration::tlv>();
+    DemuxTlvFilterSettings tlv{
+        .packetType = static_cast<uint8_t>(tlvConf.packetType),
+        .isCompressedIpPacket = tlvConf.isCompressedIpPacket,
+    };
+
+    TunerFilterSettings tunerSettings = tlvConf.filterSettings;
+    switch (tunerSettings.getTag()) {
+        case TunerFilterSettings::section: {
+            tlv.filterSettings.section(getSectionSettings(tunerSettings));
+            break;
+        }
+        case TunerFilterSettings::isPassthrough: {
+            tlv.filterSettings.bPassthrough(tunerSettings.isPassthrough);
+            break;
+        }
+        default: {
+            tlv.filterSettings.noinit();
+            break;
+        }
+    }
+    settings.tlv(tlv);
+}
+
+void TunerFilter::getHidlAlpSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings) {
+    auto alpConf = config.get<TunerFilterConfiguration::alp>();
+    DemuxAlpFilterSettings alp{
+        .packetType = static_cast<uint8_t>(alpConf.packetType),
+        .lengthType = static_cast<DemuxAlpLengthType>(alpConf.lengthType),
+    };
+
+    TunerFilterSettings tunerSettings = alpConf.filterSettings;
+    switch (tunerSettings.getTag()) {
+        case TunerFilterSettings::section: {
+            alp.filterSettings.section(getSectionSettings(tunerSettings));
+            break;
+        }
+        default: {
+            alp.filterSettings.noinit();
+            break;
+        }
+    }
+    settings.alp(alp);
+}
+
+DemuxFilterAvSettings TunerFilter::getAvSettings(const TunerFilterSettings& settings) {
+    DemuxFilterAvSettings av {
+        .isPassthrough = settings.get<TunerFilterSettings::av>().isPassthrough,
+    };
+    return av;
+}
+
+DemuxFilterSectionSettings TunerFilter::getSectionSettings(const TunerFilterSettings& settings) {
+    auto s = settings.get<TunerFilterSettings::section>();
+    DemuxFilterSectionSettings section{
+        .isCheckCrc = s.isCheckCrc,
+        .isRepeat = s.isRepeat,
+        .isRaw = s.isRaw,
+    };
+
+    switch (s.condition.getTag()) {
+        case TunerFilterSectionCondition::sectionBits: {
+            auto sectionBits = s.condition.get<TunerFilterSectionCondition::sectionBits>();
+            vector<uint8_t> filter(sectionBits.filter.size());
+            vector<uint8_t> mask(sectionBits.mask.size());
+            vector<uint8_t> mode(sectionBits.mode.size());
+            copy(sectionBits.filter.begin(), sectionBits.filter.end(), filter.begin());
+            copy(sectionBits.mask.begin(), sectionBits.mask.end(), mask.begin());
+            copy(sectionBits.mode.begin(), sectionBits.mode.end(), mode.begin());
+            section.condition.sectionBits({
+                .filter = filter,
+                .mask = mask,
+                .mode = mode,
+            });
+            break;
+        }
+        case TunerFilterSectionCondition::tableInfo: {
+            auto tableInfo = s.condition.get<TunerFilterSectionCondition::tableInfo>();
+            section.condition.tableInfo({
+                .tableId = static_cast<uint16_t>(tableInfo.tableId),
+                .version = static_cast<uint16_t>(tableInfo.version),
+            });
+            break;
+        }
+        default: {
+            break;
+        }
+    }
+    return section;
+}
+
+DemuxFilterPesDataSettings TunerFilter::getPesDataSettings(const TunerFilterSettings& settings) {
+    DemuxFilterPesDataSettings pes{
+        .streamId = static_cast<DemuxStreamId>(
+                settings.get<TunerFilterSettings::pesData>().streamId),
+        .isRaw = settings.get<TunerFilterSettings::pesData>().isRaw,
+    };
+    return pes;
+}
+
+DemuxFilterRecordSettings TunerFilter::getRecordSettings(const TunerFilterSettings& settings) {
+    auto r = settings.get<TunerFilterSettings::record>();
+    DemuxFilterRecordSettings record{
+        .tsIndexMask = static_cast<uint32_t>(r.tsIndexMask),
+        .scIndexType = static_cast<DemuxRecordScIndexType>(r.scIndexType),
+    };
+
+    switch (r.scIndexMask.getTag()) {
+        case TunerFilterScIndexMask::sc: {
+            record.scIndexMask.sc(static_cast<uint32_t>(
+                    r.scIndexMask.get<TunerFilterScIndexMask::sc>()));
+            break;
+        }
+        case TunerFilterScIndexMask::scHevc: {
+            record.scIndexMask.scHevc(static_cast<uint32_t>(
+                    r.scIndexMask.get<TunerFilterScIndexMask::scHevc>()));
+            break;
+        }
+    }
+    return record;
+}
+
+DemuxFilterDownloadSettings TunerFilter::getDownloadSettings(const TunerFilterSettings& settings) {
+    DemuxFilterDownloadSettings download {
+        .downloadId = static_cast<uint32_t>(
+                settings.get<TunerFilterSettings::download>().downloadId),
+    };
+    return download;
 }
 
 Status TunerFilter::getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_return) {
@@ -133,7 +392,7 @@ Status TunerFilter::getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_ret
                 .handle = dupToAidl(hidl_handle(avMemory.getNativeHandle())),
                 .size = static_cast<int64_t>(avMemSize),
             };
-            *_aidl_return = std::move(info);
+            *_aidl_return = move(info);
         } else {
             _aidl_return = NULL;
         }
@@ -219,7 +478,7 @@ Return<void> TunerFilter::FilterCallback::onFilterStatus(DemuxFilterStatus statu
 }
 
 Return<void> TunerFilter::FilterCallback::onFilterEvent(const DemuxFilterEvent& filterEvent) {
-    std::vector<DemuxFilterEventExt::Event> emptyEventsExt;
+    vector<DemuxFilterEventExt::Event> emptyEventsExt;
     DemuxFilterEventExt emptyFilterEventExt {
             .events = emptyEventsExt,
     };
@@ -230,9 +489,9 @@ Return<void> TunerFilter::FilterCallback::onFilterEvent(const DemuxFilterEvent& 
 Return<void> TunerFilter::FilterCallback::onFilterEvent_1_1(const DemuxFilterEvent& filterEvent,
         const DemuxFilterEventExt& filterEventExt) {
     if (mTunerFilterCallback != NULL) {
-        std::vector<DemuxFilterEvent::Event> events = filterEvent.events;
-        std::vector<DemuxFilterEventExt::Event> eventsExt = filterEventExt.events;
-        std::vector<TunerFilterEvent> tunerEvent;
+        vector<DemuxFilterEvent::Event> events = filterEvent.events;
+        vector<DemuxFilterEventExt::Event> eventsExt = filterEventExt.events;
+        vector<TunerFilterEvent> tunerEvent;
 
         getAidlFilterEvent(events, eventsExt, tunerEvent);
         mTunerFilterCallback->onFilterEvent(tunerEvent);
@@ -242,9 +501,9 @@ Return<void> TunerFilter::FilterCallback::onFilterEvent_1_1(const DemuxFilterEve
 
 /////////////// FilterCallback Helper Methods ///////////////////////
 
-void TunerFilter::FilterCallback::getAidlFilterEvent(std::vector<DemuxFilterEvent::Event>& events,
-        std::vector<DemuxFilterEventExt::Event>& eventsExt,
-        std::vector<TunerFilterEvent>& tunerEvent) {
+void TunerFilter::FilterCallback::getAidlFilterEvent(vector<DemuxFilterEvent::Event>& events,
+        vector<DemuxFilterEventExt::Event>& eventsExt,
+        vector<TunerFilterEvent>& tunerEvent) {
     if (events.empty() && !eventsExt.empty()) {
         auto eventExt = eventsExt[0];
         switch (eventExt.getDiscriminator()) {
@@ -305,7 +564,7 @@ void TunerFilter::FilterCallback::getAidlFilterEvent(std::vector<DemuxFilterEven
 }
 
 void TunerFilter::FilterCallback::getMediaEvent(
-        std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEvent::Event>& events, vector<TunerFilterEvent>& res) {
     for (DemuxFilterEvent::Event e : events) {
         DemuxFilterMediaEvent mediaEvent = e.media();
         TunerFilterMediaEvent tunerMedia;
@@ -346,13 +605,13 @@ void TunerFilter::FilterCallback::getMediaEvent(
         }
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::media>(std::move(tunerMedia));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::media>(move(tunerMedia));
+        res.push_back(move(tunerEvent));
     }
 }
 
 void TunerFilter::FilterCallback::getSectionEvent(
-        std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEvent::Event>& events, vector<TunerFilterEvent>& res) {
     for (DemuxFilterEvent::Event e : events) {
         DemuxFilterSectionEvent sectionEvent = e.section();
         TunerFilterSectionEvent tunerSection;
@@ -363,13 +622,13 @@ void TunerFilter::FilterCallback::getSectionEvent(
         tunerSection.dataLength = static_cast<char>(sectionEvent.dataLength);
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::section>(std::move(tunerSection));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::section>(move(tunerSection));
+        res.push_back(move(tunerEvent));
     }
 }
 
 void TunerFilter::FilterCallback::getPesEvent(
-        std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEvent::Event>& events, vector<TunerFilterEvent>& res) {
     for (DemuxFilterEvent::Event e : events) {
         DemuxFilterPesEvent pesEvent = e.pes();
         TunerFilterPesEvent tunerPes;
@@ -379,13 +638,13 @@ void TunerFilter::FilterCallback::getPesEvent(
         tunerPes.mpuSequenceNumber = static_cast<int>(pesEvent.mpuSequenceNumber);
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::pes>(std::move(tunerPes));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::pes>(move(tunerPes));
+        res.push_back(move(tunerEvent));
     }
 }
 
-void TunerFilter::FilterCallback::getTsRecordEvent(std::vector<DemuxFilterEvent::Event>& events,
-        std::vector<DemuxFilterEventExt::Event>& eventsExt, std::vector<TunerFilterEvent>& res) {
+void TunerFilter::FilterCallback::getTsRecordEvent(vector<DemuxFilterEvent::Event>& events,
+        vector<DemuxFilterEventExt::Event>& eventsExt, vector<TunerFilterEvent>& res) {
     for (int i = 0; i < events.size(); i++) {
         TunerFilterTsRecordEvent tunerTsRecord;
         DemuxFilterTsRecordEvent tsRecordEvent = events[i].tsRecord();
@@ -421,13 +680,13 @@ void TunerFilter::FilterCallback::getTsRecordEvent(std::vector<DemuxFilterEvent:
         }
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::tsRecord>(std::move(tunerTsRecord));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::tsRecord>(move(tunerTsRecord));
+        res.push_back(move(tunerEvent));
     }
 }
 
-void TunerFilter::FilterCallback::getMmtpRecordEvent(std::vector<DemuxFilterEvent::Event>& events,
-        std::vector<DemuxFilterEventExt::Event>& eventsExt, std::vector<TunerFilterEvent>& res) {
+void TunerFilter::FilterCallback::getMmtpRecordEvent(vector<DemuxFilterEvent::Event>& events,
+        vector<DemuxFilterEventExt::Event>& eventsExt, vector<TunerFilterEvent>& res) {
     for (int i = 0; i < events.size(); i++) {
         TunerFilterMmtpRecordEvent tunerMmtpRecord;
         DemuxFilterMmtpRecordEvent mmtpRecordEvent = events[i].mmtpRecord();
@@ -449,13 +708,13 @@ void TunerFilter::FilterCallback::getMmtpRecordEvent(std::vector<DemuxFilterEven
         }
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::mmtpRecord>(std::move(tunerMmtpRecord));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::mmtpRecord>(move(tunerMmtpRecord));
+        res.push_back(move(tunerEvent));
     }
 }
 
 void TunerFilter::FilterCallback::getDownloadEvent(
-        std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEvent::Event>& events, vector<TunerFilterEvent>& res) {
     for (DemuxFilterEvent::Event e : events) {
         DemuxFilterDownloadEvent downloadEvent = e.download();
         TunerFilterDownloadEvent tunerDownload;
@@ -467,13 +726,13 @@ void TunerFilter::FilterCallback::getDownloadEvent(
         tunerDownload.dataLength = static_cast<char>(downloadEvent.dataLength);
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::download>(std::move(tunerDownload));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::download>(move(tunerDownload));
+        res.push_back(move(tunerEvent));
     }
 }
 
 void TunerFilter::FilterCallback::getIpPayloadEvent(
-        std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEvent::Event>& events, vector<TunerFilterEvent>& res) {
     for (DemuxFilterEvent::Event e : events) {
         DemuxFilterIpPayloadEvent ipPayloadEvent = e.ipPayload();
         TunerFilterIpPayloadEvent tunerIpPayload;
@@ -481,31 +740,31 @@ void TunerFilter::FilterCallback::getIpPayloadEvent(
         tunerIpPayload.dataLength = static_cast<char>(ipPayloadEvent.dataLength);
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::ipPayload>(std::move(tunerIpPayload));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::ipPayload>(move(tunerIpPayload));
+        res.push_back(move(tunerEvent));
     }
 }
 
 void TunerFilter::FilterCallback::getTemiEvent(
-        std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEvent::Event>& events, vector<TunerFilterEvent>& res) {
     for (DemuxFilterEvent::Event e : events) {
         DemuxFilterTemiEvent temiEvent = e.temi();
         TunerFilterTemiEvent tunerTemi;
 
         tunerTemi.pts = static_cast<long>(temiEvent.pts);
         tunerTemi.descrTag = static_cast<int8_t>(temiEvent.descrTag);
-        std::vector<uint8_t> descrData = temiEvent.descrData;
+        vector<uint8_t> descrData = temiEvent.descrData;
         tunerTemi.descrData.resize(descrData.size());
         copy(descrData.begin(), descrData.end(), tunerTemi.descrData.begin());
 
         TunerFilterEvent tunerEvent;
-        tunerEvent.set<TunerFilterEvent::temi>(std::move(tunerTemi));
-        res.push_back(std::move(tunerEvent));
+        tunerEvent.set<TunerFilterEvent::temi>(move(tunerTemi));
+        res.push_back(move(tunerEvent));
     }
 }
 
 void TunerFilter::FilterCallback::getMonitorEvent(
-        std::vector<DemuxFilterEventExt::Event>& eventsExt, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEventExt::Event>& eventsExt, vector<TunerFilterEvent>& res) {
     DemuxFilterMonitorEvent monitorEvent = eventsExt[0].monitorEvent();
     TunerFilterMonitorEvent tunerMonitor;
 
@@ -525,14 +784,14 @@ void TunerFilter::FilterCallback::getMonitorEvent(
     }
 
     TunerFilterEvent tunerEvent;
-    tunerEvent.set<TunerFilterEvent::monitor>(std::move(tunerMonitor));
-    res.push_back(std::move(tunerEvent));
+    tunerEvent.set<TunerFilterEvent::monitor>(move(tunerMonitor));
+    res.push_back(move(tunerEvent));
 }
 
 void TunerFilter::FilterCallback::getRestartEvent(
-        std::vector<DemuxFilterEventExt::Event>& eventsExt, std::vector<TunerFilterEvent>& res) {
+        vector<DemuxFilterEventExt::Event>& eventsExt, vector<TunerFilterEvent>& res) {
     TunerFilterEvent tunerEvent;
     tunerEvent.set<TunerFilterEvent::startId>(static_cast<int>(eventsExt[0].startId()));
-    res.push_back(std::move(tunerEvent));
+    res.push_back(move(tunerEvent));
 }
 }  // namespace android
