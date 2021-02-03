@@ -22,8 +22,8 @@
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
+#include "ParameterUtils.h"
 #include "StreamHalLocal.h"
-#include "VersionUtils.h"
 
 namespace android {
 namespace CPP_VERSION {
@@ -258,7 +258,7 @@ void StreamOutHalLocal::doUpdateSourceMetadata(const SourceMetadata& sourceMetad
 
 #if MAJOR_VERSION >= 7
 void StreamOutHalLocal::doUpdateSourceMetadataV7(const SourceMetadata& sourceMetadata) {
-    const source_metadata_t metadata {
+    const source_metadata_v7_t metadata {
         .track_count = sourceMetadata.tracks.size(),
         // const cast is fine as it is in a const structure
         .tracks = const_cast<playback_track_metadata_v7*>(sourceMetadata.tracks.data()),
@@ -274,7 +274,7 @@ status_t StreamOutHalLocal::updateSourceMetadata(const SourceMetadata& sourceMet
     }
     doUpdateSourceMetadata(sourceMetadata);
 #else
-    if (mDevice->version() < AUDIO_DEVICE_API_VERSION_3_2)
+    if (mDevice->version() < AUDIO_DEVICE_API_VERSION_3_2) {
         if (mStream->update_source_metadata == nullptr) {
             return INVALID_OPERATION;
         }
@@ -446,13 +446,12 @@ void StreamInHalLocal::doUpdateSinkMetadataV7(const SinkMetadata& sinkMetadata) 
 
 status_t StreamInHalLocal::updateSinkMetadata(const SinkMetadata& sinkMetadata) {
 #if MAJOR_VERSION < 7
-
     if (mStream->update_sink_metadata == nullptr) {
         return INVALID_OPERATION;  // not supported by the HAL
     }
     doUpdateSinkMetadata(sinkMetadata);
 #else
-    if (mDevice->version() < AUDIO_DEVICE_API_VERSION_3_2)
+    if (mDevice->version() < AUDIO_DEVICE_API_VERSION_3_2) {
         if (mStream->update_sink_metadata == nullptr) {
             return INVALID_OPERATION;  // not supported by the HAL
         }
