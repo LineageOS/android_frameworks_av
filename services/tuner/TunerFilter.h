@@ -20,26 +20,48 @@
 #include <aidl/android/media/tv/tuner/BnTunerFilter.h>
 #include <aidl/android/media/tv/tuner/ITunerFilterCallback.h>
 #include <aidlcommonsupport/NativeHandle.h>
-#include <android/hardware/tv/tuner/1.1/IFilter.h>
 #include <android/hardware/tv/tuner/1.0/ITuner.h>
+#include <android/hardware/tv/tuner/1.1/IFilter.h>
+#include <android/hardware/tv/tuner/1.1/IFilterCallback.h>
+#include <android/hardware/tv/tuner/1.1/types.h>
 #include <media/stagefright/foundation/ADebug.h>
 
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
 using ::aidl::android::media::tv::tuner::TunerFilterConfiguration;
+using ::aidl::android::media::tv::tuner::TunerFilterDownloadEvent;
+using ::aidl::android::media::tv::tuner::TunerFilterIpPayloadEvent;
 using ::aidl::android::media::tv::tuner::TunerFilterEvent;
 using ::aidl::android::media::tv::tuner::TunerFilterMediaEvent;
+using ::aidl::android::media::tv::tuner::TunerFilterMmtpRecordEvent;
+using ::aidl::android::media::tv::tuner::TunerFilterMonitorEvent;
+using ::aidl::android::media::tv::tuner::TunerFilterPesEvent;
+using ::aidl::android::media::tv::tuner::TunerFilterScIndexMask;
+using ::aidl::android::media::tv::tuner::TunerFilterSectionEvent;
 using ::aidl::android::media::tv::tuner::TunerFilterSharedHandleInfo;
 using ::aidl::android::media::tv::tuner::TunerFilterSettings;
+using ::aidl::android::media::tv::tuner::TunerFilterTemiEvent;
+using ::aidl::android::media::tv::tuner::TunerFilterTsRecordEvent;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterAvSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterDownloadEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterIpPayloadEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterMediaEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterMmtpRecordEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterPesEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterSectionEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterStatus;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterTemiEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterTsRecordEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxPid;
 using ::android::hardware::tv::tuner::V1_0::IFilter;
-using ::android::hardware::tv::tuner::V1_0::IFilterCallback;
+using ::android::hardware::tv::tuner::V1_1::DemuxFilterEventExt;
+using ::android::hardware::tv::tuner::V1_1::DemuxFilterMonitorEvent;
+using ::android::hardware::tv::tuner::V1_1::DemuxFilterTsRecordEventExt;
+using ::android::hardware::tv::tuner::V1_1::IFilterCallback;
 
 namespace android {
 
@@ -65,9 +87,40 @@ public:
                 : mTunerFilterCallback(tunerFilterCallback) {};
 
         virtual Return<void> onFilterEvent(const DemuxFilterEvent& filterEvent);
+        virtual Return<void> onFilterEvent_1_1(const DemuxFilterEvent& filterEvent,
+                const DemuxFilterEventExt& filterEventExt);
         virtual Return<void> onFilterStatus(DemuxFilterStatus status);
+
+        void getAidlFilterEvent(std::vector<DemuxFilterEvent::Event>& events,
+                std::vector<DemuxFilterEventExt::Event>& eventsExt,
+                std::vector<TunerFilterEvent>& tunerEvent);
+
         void getMediaEvent(
                 std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
+        void getSectionEvent(
+                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
+        void getPesEvent(
+                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
+        void getTsRecordEvent(
+                std::vector<DemuxFilterEvent::Event>& events,
+                std::vector<DemuxFilterEventExt::Event>& eventsExt,
+                std::vector<TunerFilterEvent>& res);
+        void getMmtpRecordEvent(
+                std::vector<DemuxFilterEvent::Event>& events,
+                std::vector<DemuxFilterEventExt::Event>& eventsExt,
+                std::vector<TunerFilterEvent>& res);
+        void getDownloadEvent(
+                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
+        void getIpPayloadEvent(
+                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
+        void getTemiEvent(
+                std::vector<DemuxFilterEvent::Event>& events, std::vector<TunerFilterEvent>& res);
+        void getMonitorEvent(
+                std::vector<DemuxFilterEventExt::Event>& eventsExt,
+                std::vector<TunerFilterEvent>& res);
+        void getRestartEvent(
+                std::vector<DemuxFilterEventExt::Event>& eventsExt,
+                std::vector<TunerFilterEvent>& res);
 
         std::shared_ptr<ITunerFilterCallback> mTunerFilterCallback;
     };

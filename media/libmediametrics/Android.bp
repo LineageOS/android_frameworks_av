@@ -7,7 +7,6 @@ cc_library {
     name: "libmediametrics",
 
     srcs: [
-        "IMediaMetricsService.cpp",
         "MediaMetricsItem.cpp",
         "MediaMetrics.cpp",
     ],
@@ -17,6 +16,7 @@ cc_library {
         "libcutils",
         "liblog",
         "libutils",
+        "mediametricsservice-aidl-unstable-cpp",
     ],
 
     export_include_dirs: ["include"],
@@ -57,4 +57,22 @@ cc_library {
         "//frameworks/base/core/jni",
         "//frameworks/base/media/jni",
     ],
+}
+
+aidl_interface {
+    name: "mediametricsservice-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    vendor_available: true,
+    srcs: [
+        "aidl/android/media/IMediaMetricsService.aidl",
+    ],
+    double_loadable: true,
+    backend: {
+        cpp: {
+            apex_available: [
+                "//apex_available:platform",
+            ],
+        },
+    },
 }

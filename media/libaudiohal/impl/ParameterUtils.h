@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2018 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,8 +14,7 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_HARDWARE_VERSION_UTILS_H
-#define ANDROID_HARDWARE_VERSION_UTILS_H
+#pragma once
 
 #include PATH(android/hardware/audio/FILE_VERSION/types.h)
 #include <hidl/HidlSupport.h>
@@ -59,5 +58,3 @@ Return<Result> setParameters(T& object, hidl_vec<ParameterValue> context,
 } // namespace utils
 } // namespace CPP_VERSION
 } // namespace android
-
-#endif // ANDROID_HARDWARE_VERSION_UTILS_H
