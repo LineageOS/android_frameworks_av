@@ -29,6 +29,7 @@
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
+using ::aidl::android::media::tv::tuner::TunerDemuxIpAddress;
 using ::aidl::android::media::tv::tuner::TunerFilterConfiguration;
 using ::aidl::android::media::tv::tuner::TunerFilterDownloadEvent;
 using ::aidl::android::media::tv::tuner::TunerFilterIpPayloadEvent;
@@ -45,17 +46,28 @@ using ::aidl::android::media::tv::tuner::TunerFilterTemiEvent;
 using ::aidl::android::media::tv::tuner::TunerFilterTsRecordEvent;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
+using ::android::hardware::hidl_array;
+using ::android::hardware::tv::tuner::V1_0::DemuxAlpFilterSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterAvSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterDownloadEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterDownloadSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterIpPayloadEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterMediaEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterMmtpRecordEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterPesDataSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterPesEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterRecordSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterSectionEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterSectionSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxFilterSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterStatus;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterTemiEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterTsRecordEvent;
+using ::android::hardware::tv::tuner::V1_0::DemuxIpFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxMmtpFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxTlvFilterSettings;
+using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxPid;
 using ::android::hardware::tv::tuner::V1_0::IFilter;
 using ::android::hardware::tv::tuner::V1_1::DemuxFilterEventExt;
@@ -64,6 +76,9 @@ using ::android::hardware::tv::tuner::V1_1::DemuxFilterTsRecordEventExt;
 using ::android::hardware::tv::tuner::V1_1::IFilterCallback;
 
 namespace android {
+
+const static int IP_V4_LENGTH = 4;
+const static int IP_V6_LENGTH = 16;
 
 class TunerFilter : public BnTunerFilter {
 
@@ -127,6 +142,25 @@ public:
 
 private:
     DemuxFilterAvSettings getAvSettings(const TunerFilterSettings& settings);
+    DemuxFilterSectionSettings getSectionSettings(const TunerFilterSettings& settings);
+    DemuxFilterPesDataSettings getPesDataSettings(const TunerFilterSettings& settings);
+    DemuxFilterRecordSettings getRecordSettings(const TunerFilterSettings& settings);
+    DemuxFilterDownloadSettings getDownloadSettings(const TunerFilterSettings& settings);
+
+    void getHidlTsSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
+    void getHidlMmtpSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
+    void getHidlIpSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
+    void getHidlTlvSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
+    void getHidlAlpSettings(
+        const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
+
+    hidl_array<uint8_t, IP_V4_LENGTH> getIpV4Address(TunerDemuxIpAddress addr);
+    hidl_array<uint8_t, IP_V6_LENGTH> getIpV6Address(TunerDemuxIpAddress addr);
+
     sp<IFilter> mFilter;
     sp<::android::hardware::tv::tuner::V1_1::IFilter> mFilter_1_1;
     sp<IFilterCallback> mFilterCallback;

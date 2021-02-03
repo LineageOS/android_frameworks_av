@@ -16,15 +16,13 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterSettings;
-
 /**
- * Filter Settings for a TS filter.
+ * Demux ip address configure.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
+parcelable TunerDemuxIpAddress {
+    boolean isIpV6;
 
-    TunerFilterSettings filterSettings;
+    byte[] addr;
 }
