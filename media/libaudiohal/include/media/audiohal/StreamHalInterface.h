@@ -31,18 +31,22 @@ namespace android {
 class StreamHalInterface : public virtual RefBase
 {
   public:
+    // TODO(mnaganov): Remove
     // Return the sampling rate in Hz - eg. 44100.
     virtual status_t getSampleRate(uint32_t *rate) = 0;
 
     // Return size of input/output buffer in bytes for this stream - eg. 4800.
     virtual status_t getBufferSize(size_t *size) = 0;
 
+    // TODO(mnaganov): Remove
     // Return the channel mask.
     virtual status_t getChannelMask(audio_channel_mask_t *mask) = 0;
 
+    // TODO(mnaganov): Remove
     // Return the audio format - e.g. AUDIO_FORMAT_PCM_16_BIT.
     virtual status_t getFormat(audio_format_t *format) = 0;
 
+    // TODO(mnaganov): Change to use audio_config_base_t
     // Convenience method.
     virtual status_t getAudioProperties(
             uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format) = 0;

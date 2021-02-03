@@ -81,7 +81,7 @@ public:
     binder::Status getOutput(media::AudioStreamType stream, int32_t* _aidl_return) override;
     binder::Status getOutputForAttr(const media::AudioAttributesInternal& attr, int32_t session,
                                     int32_t pid, int32_t uid, const media::AudioConfig& config,
-                                    int32_t flags,
+                                    int32_t flags, int32_t selectedDeviceId,
                                     media::GetOutputForAttrResponse* _aidl_return) override;
     binder::Status startOutput(int32_t portId) override;
     binder::Status stopOutput(int32_t portId) override;
@@ -90,6 +90,7 @@ public:
                                    int32_t riid, int32_t session, int32_t pid, int32_t uid,
                                    const std::string& opPackageName,
                                    const media::AudioConfigBase& config, int32_t flags,
+                                   int32_t selectedDeviceId,
                                    media::GetInputForAttrResponse* _aidl_return) override;
     binder::Status startInput(int32_t portId) override;
     binder::Status stopInput(int32_t portId) override;

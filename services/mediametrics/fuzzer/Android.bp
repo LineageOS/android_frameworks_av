@@ -43,6 +43,7 @@ cc_fuzz {
         "libstagefright",
         "libstatslog",
         "libutils",
+        "mediametricsservice-aidl-unstable-cpp",
     ],
 
     include_dirs: [

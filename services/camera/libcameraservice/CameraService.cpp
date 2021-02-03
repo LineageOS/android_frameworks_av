@@ -237,6 +237,10 @@ CameraService::~CameraService() {
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
     mUidPolicy->unregisterSelf();
     mSensorPrivacyPolicy->unregisterSelf();
+
+    for (auto const& [_, policy] : mCameraSensorPrivacyPolicies) {
+        policy->unregisterSelf();
+    }
 }
 
 void CameraService::onNewProviderRegistered() {
@@ -1688,7 +1692,8 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
         // Set camera muting behavior
         if (client->supportsCameraMute()) {
-            client->setCameraMute(mOverrideCameraMuteMode);
+            client->setCameraMute(mOverrideCameraMuteMode ||
+                    isUserSensorPrivacyEnabledForUid(clientUid));
         }
 
         if (shimUpdateOnly) {
@@ -3217,6 +3222,39 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
     }
 }
 
+status_t CameraService::SensorPrivacyPolicy::registerSelfForIndividual(int userId) {
+    Mutex::Autolock _l(mSensorPrivacyLock);
+    if (mRegistered) {
+        return OK;
+    }
+
+    status_t res = mSpm.addIndividualSensorPrivacyListener(userId,
+            SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA, this);
+    if (res != OK) {
+        ALOGE("Unable to register camera privacy listener: %s (%d)", strerror(-res), res);
+        return res;
+    }
+
+    res = mSpm.isIndividualSensorPrivacyEnabled(userId,
+        SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA, mSensorPrivacyEnabled);
+    if (res != OK) {
+        ALOGE("Unable to check camera privacy: %s (%d)", strerror(-res), res);
+        return res;
+    }
+
+    res = mSpm.linkToDeath(this);
+    if (res != OK) {
+        ALOGE("Register link to death failed for sensor privacy: %s (%d)", strerror(-res), res);
+        return res;
+    }
+
+    mRegistered = true;
+    isIndividual = true;
+    this->userId = userId;
+    ALOGV("SensorPrivacyPolicy: Registered with SensorPrivacyManager");
+    return OK;
+}
+
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
     Mutex::Autolock _l(mSensorPrivacyLock);
     mSpm.removeSensorPrivacyListener(this);
@@ -3236,10 +3274,14 @@ binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(bool e
         mSensorPrivacyEnabled = enabled;
     }
     // if sensor privacy is enabled then block all clients from accessing the camera
-    if (enabled) {
-        sp<CameraService> service = mService.promote();
-        if (service != nullptr) {
-            service->blockAllClients();
+    sp<CameraService> service = mService.promote();
+    if (service != nullptr) {
+        if (isIndividual) {
+            service->setMuteForAllClients(userId, enabled);
+        } else {
+            if (enabled) {
+                service->blockAllClients();
+            }
         }
     }
     return binder::Status::ok();
@@ -3870,6 +3912,19 @@ void CameraService::blockAllClients() {
     }
 }
 
+void CameraService::setMuteForAllClients(userid_t userId, bool enabled) {
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr
+                    && multiuser_get_user_id(basicClient->getClientUid()) == userId) {
+                basicClient->setCameraMute(enabled);
+            }
+        }
+    }
+}
+
 // NOTE: This is a remote API - make sure all args are validated
 status_t CameraService::shellCommand(int in, int out, int err, const Vector<String16>& args) {
     if (!checkCallingPermission(sManageCameraPermission, nullptr, nullptr)) {
@@ -4074,6 +4129,18 @@ int32_t CameraService::updateAudioRestrictionLocked() {
         mAppOps.setCameraAudioRestriction(mode);
     }
     return mode;
+}
+
+bool CameraService::isUserSensorPrivacyEnabledForUid(uid_t uid) {
+    userid_t userId = multiuser_get_user_id(uid);
+    if (mCameraSensorPrivacyPolicies.find(userId) == mCameraSensorPrivacyPolicies.end()) {
+        sp<SensorPrivacyPolicy> userPolicy = new SensorPrivacyPolicy(this);
+        if (userPolicy->registerSelfForIndividual(userId) != OK) {
+            return false;
+        }
+        mCameraSensorPrivacyPolicies[userId] = userPolicy;
+    }
+    return mCameraSensorPrivacyPolicies[userId]->isSensorPrivacyEnabled();
 }
 
 }; // namespace android

@@ -100,6 +100,7 @@ cc_binary {
         "libmediametricsservice",
         "libmediautils",
         "libutils",
+        "mediametricsservice-aidl-unstable-cpp",
     ],
     header_libs: [
         "libaudioutils_headers",
@@ -142,6 +143,7 @@ cc_library {
     },
 
     shared_libs: [
+        "mediametricsservice-aidl-unstable-cpp",
         "libbase", // android logging
         "libbinder",
         "libcutils",

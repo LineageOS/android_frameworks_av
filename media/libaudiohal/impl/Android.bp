@@ -54,29 +54,15 @@ cc_defaults {
 }
 
 cc_library_shared {
-    name: "libaudiohal@2.0",
-    defaults: ["libaudiohal_default"],
-    shared_libs: [
-        "android.hardware.audio.common@2.0",
-        "android.hardware.audio.common@2.0-util",
-        "android.hardware.audio.effect@2.0",
-        "android.hardware.audio@2.0",
-    ],
-    cflags: [
-        "-DMAJOR_VERSION=2",
-        "-DMINOR_VERSION=0",
-        "-include common/all-versions/VersionMacro.h",
-    ]
-}
-
-cc_library_shared {
     name: "libaudiohal@4.0",
     defaults: ["libaudiohal_default"],
     shared_libs: [
         "android.hardware.audio.common@4.0",
         "android.hardware.audio.common@4.0-util",
         "android.hardware.audio.effect@4.0",
+        "android.hardware.audio.effect@4.0-util",
         "android.hardware.audio@4.0",
+        "android.hardware.audio@4.0-util",
     ],
     cflags: [
         "-DMAJOR_VERSION=4",
@@ -92,7 +78,9 @@ cc_library_shared {
         "android.hardware.audio.common@5.0",
         "android.hardware.audio.common@5.0-util",
         "android.hardware.audio.effect@5.0",
+        "android.hardware.audio.effect@5.0-util",
         "android.hardware.audio@5.0",
+        "android.hardware.audio@5.0-util",
     ],
     cflags: [
         "-DMAJOR_VERSION=5",
@@ -108,7 +96,9 @@ cc_library_shared {
         "android.hardware.audio.common@6.0",
         "android.hardware.audio.common@6.0-util",
         "android.hardware.audio.effect@6.0",
+        "android.hardware.audio.effect@6.0-util",
         "android.hardware.audio@6.0",
+        "android.hardware.audio@6.0-util",
     ],
     cflags: [
         "-DMAJOR_VERSION=6",
@@ -118,14 +108,15 @@ cc_library_shared {
 }
 
 cc_library_shared {
-    enabled: false,
     name: "libaudiohal@7.0",
     defaults: ["libaudiohal_default"],
     shared_libs: [
         "android.hardware.audio.common@7.0",
         "android.hardware.audio.common@7.0-util",
         "android.hardware.audio.effect@7.0",
+        "android.hardware.audio.effect@7.0-util",
         "android.hardware.audio@7.0",
+        "android.hardware.audio@7.0-util",
     ],
     cflags: [
         "-DMAJOR_VERSION=7",
@@ -133,4 +124,3 @@ cc_library_shared {
         "-include common/all-versions/VersionMacro.h",
     ]
 }
-
