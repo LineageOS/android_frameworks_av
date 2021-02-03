@@ -16,6 +16,10 @@
 
 package android.media.tv.tuner;
 
+import android.media.tv.tuner.TunerFilterAlpConfiguration;
+import android.media.tv.tuner.TunerFilterIpConfiguration;
+import android.media.tv.tuner.TunerFilterMmtpConfiguration;
+import android.media.tv.tuner.TunerFilterTlvConfiguration;
 import android.media.tv.tuner.TunerFilterTsConfiguration;
 
 /**
@@ -25,4 +29,12 @@ import android.media.tv.tuner.TunerFilterTsConfiguration;
  */
 union TunerFilterConfiguration {
     TunerFilterTsConfiguration ts;
+
+    TunerFilterMmtpConfiguration mmtp;
+
+    TunerFilterIpConfiguration ip;
+
+    TunerFilterTlvConfiguration tlv;
+
+    TunerFilterAlpConfiguration alp;
 }

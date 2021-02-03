@@ -19,12 +19,14 @@ package android.media.tv.tuner;
 import android.media.tv.tuner.TunerFilterSettings;
 
 /**
- * Filter Settings for a TS filter.
+ * Filter Settings for a tlv filter.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
+parcelable TunerFilterTlvConfiguration {
+    byte packetType;
+
+    boolean isCompressedIpPacket;
 
     TunerFilterSettings filterSettings;
 }

@@ -16,15 +16,11 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterSettings;
-
 /**
- * Filter Settings for a TS filter.
+ * Filter Settings for downloading.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
-
-    TunerFilterSettings filterSettings;
+parcelable TunerFilterDownloadSettings {
+    int downloadId;
 }
