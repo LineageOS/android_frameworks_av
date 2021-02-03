@@ -17,6 +17,7 @@
 package android.media.tv.tuner;
 
 import android.hardware.common.NativeHandle;
+import android.media.tv.tuner.TunerAudioExtraMetaData;
 
 /**
  * Filter Event for Audio or Video Filter.
@@ -71,5 +72,13 @@ parcelable TunerFilterMediaEvent {
 
     boolean isPesPrivateData;
 
-    // TODO: add ExtraMetaData
+    /**
+     * If TunerAudioExtraMetaData field is valid or not
+     */
+    boolean isAudioExtraMetaData;
+
+    /**
+     * Only valid when isAudioExtraMetaData is true
+     */
+    TunerAudioExtraMetaData audio;
 }

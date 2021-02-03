@@ -16,7 +16,15 @@
 
 package android.media.tv.tuner;
 
+import android.media.tv.tuner.TunerFilterDownloadEvent;
+import android.media.tv.tuner.TunerFilterIpPayloadEvent;
 import android.media.tv.tuner.TunerFilterMediaEvent;
+import android.media.tv.tuner.TunerFilterMmtpRecordEvent;
+import android.media.tv.tuner.TunerFilterMonitorEvent;
+import android.media.tv.tuner.TunerFilterPesEvent;
+import android.media.tv.tuner.TunerFilterSectionEvent;
+import android.media.tv.tuner.TunerFilterTemiEvent;
+import android.media.tv.tuner.TunerFilterTsRecordEvent;
 
 /**
  * Filter events.
@@ -25,4 +33,22 @@ import android.media.tv.tuner.TunerFilterMediaEvent;
  */
 union TunerFilterEvent {
     TunerFilterMediaEvent media;
+
+    TunerFilterSectionEvent section;
+
+    TunerFilterPesEvent pes;
+
+    TunerFilterTsRecordEvent tsRecord;
+
+    TunerFilterMmtpRecordEvent mmtpRecord;
+
+    TunerFilterDownloadEvent download;
+
+    TunerFilterIpPayloadEvent ipPayload;
+
+    TunerFilterTemiEvent temi;
+
+    TunerFilterMonitorEvent monitor;
+
+    int startId;
 }
