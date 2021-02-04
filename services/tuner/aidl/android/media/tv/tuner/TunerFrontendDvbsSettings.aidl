@@ -53,4 +53,13 @@ parcelable TunerFrontendDvbsSettings {
      * Vcm mode.
      */
     int vcm;
+
+    /**
+     * Fields after isExtended are only valid when isExtended is true
+     */
+    boolean isExtended;
+
+    int scanType;
+
+    boolean isDiseqcRxMessage;
 }

@@ -20,6 +20,7 @@
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3PlpSettings;
 using ::aidl::android::media::tv::tuner::TunerFrontendScanAtsc3PlpInfo;
+using ::aidl::android::media::tv::tuner::TunerFrontendUnionSettings;
 using ::android::hardware::tv::tuner::V1_0::FrontendAnalogSifStandard;
 using ::android::hardware::tv::tuner::V1_0::FrontendAnalogType;
 using ::android::hardware::tv::tuner::V1_0::FrontendAtscModulation;
@@ -67,7 +68,18 @@ using ::android::hardware::tv::tuner::V1_0::FrontendIsdbtSettings;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanAtsc3PlpInfo;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanType;
 using ::android::hardware::tv::tuner::V1_0::Result;
+using ::android::hardware::tv::tuner::V1_1::FrontendAnalogAftFlag;
+using ::android::hardware::tv::tuner::V1_1::FrontendCableTimeInterleaveMode;
+using ::android::hardware::tv::tuner::V1_1::FrontendDvbcBandwidth;
 using ::android::hardware::tv::tuner::V1_1::FrontendModulation;
+using ::android::hardware::tv::tuner::V1_1::FrontendDtmbBandwidth;
+using ::android::hardware::tv::tuner::V1_1::FrontendDtmbCodeRate;
+using ::android::hardware::tv::tuner::V1_1::FrontendDtmbGuardInterval;
+using ::android::hardware::tv::tuner::V1_1::FrontendDtmbModulation;
+using ::android::hardware::tv::tuner::V1_1::FrontendDtmbTimeInterleaveMode;
+using ::android::hardware::tv::tuner::V1_1::FrontendDtmbTransmissionMode;
+using ::android::hardware::tv::tuner::V1_1::FrontendDvbsScanType;
+using ::android::hardware::tv::tuner::V1_1::FrontendSpectralInversion;
 
 namespace android {
 
@@ -105,12 +117,23 @@ Status TunerFrontend::setCallback(
 
 Status TunerFrontend::tune(const TunerFrontendSettings& settings) {
     if (mFrontend == NULL) {
-        ALOGD("IFrontend is not initialized");
+        ALOGE("IFrontend is not initialized");
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
+    Result status;
     FrontendSettings frontendSettings = getHidlFrontendSettings(settings);
-    Result status = mFrontend->tune(frontendSettings);
+    if (settings.isExtended) {
+        if (mFrontend_1_1 == NULL) {
+            ALOGE("IFrontend_1_1 is not initialized");
+            return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        }
+        FrontendSettingsExt1_1 frontendSettingsExt = getHidlFrontendSettingsExt(settings);
+        status = mFrontend_1_1->tune_1_1(frontendSettings, frontendSettingsExt);
+    } else {
+        status = mFrontend->tune(frontendSettings);
+    }
+
     if (status == Result::SUCCESS) {
         return Status::ok();
     }
@@ -138,9 +161,21 @@ Status TunerFrontend::scan(const TunerFrontendSettings& settings, int frontendSc
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
+    Result status;
     FrontendSettings frontendSettings = getHidlFrontendSettings(settings);
-    Result status = mFrontend->scan(
-            frontendSettings, static_cast<FrontendScanType>(frontendScanType));
+    if (settings.isExtended) {
+        if (mFrontend_1_1 == NULL) {
+            ALOGE("IFrontend_1_1 is not initialized");
+            return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+        }
+        FrontendSettingsExt1_1 frontendSettingsExt = getHidlFrontendSettingsExt(settings);
+        status = mFrontend_1_1->scan_1_1(frontendSettings,
+                static_cast<FrontendScanType>(frontendScanType), frontendSettingsExt);
+    } else {
+        status = mFrontend->scan(
+                frontendSettings, static_cast<FrontendScanType>(frontendScanType));
+    }
+
     if (status == Result::SUCCESS) {
         return Status::ok();
     }
@@ -303,24 +338,34 @@ Return<void> TunerFrontend::FrontendCallback::onScanMessageExt1_1(
         case FrontendScanMessageTypeExt1_1::MODULATION: {
             FrontendModulation m = message.modulation();
             int modulation;
-            if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dvbc) {
-                modulation = (int) m.dvbc();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dvbt) {
-                modulation = (int) m.dvbt();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dvbs) {
-                modulation = (int) m.dvbs();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::isdbs) {
-                modulation = (int) m.isdbs();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::isdbs3) {
-                modulation = (int) m.isdbs3();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::isdbt) {
-                modulation = (int) m.isdbt();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::atsc) {
-                modulation = (int) m.atsc();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::atsc3) {
-                modulation = (int) m.atsc3();
-            } else if (m.getDiscriminator() == FrontendModulation::hidl_discriminator::dtmb) {
-                modulation = (int) m.dtmb();
+            switch (m.getDiscriminator()) {
+                case FrontendModulation::hidl_discriminator::dvbc:
+                    modulation = (int) m.dvbc();
+                    break;
+                case FrontendModulation::hidl_discriminator::dvbt:
+                    modulation = (int) m.dvbt();
+                    break;
+                case FrontendModulation::hidl_discriminator::dvbs:
+                    modulation = (int) m.dvbs();
+                    break;
+                case FrontendModulation::hidl_discriminator::isdbs:
+                    modulation = (int) m.isdbs();
+                    break;
+                case FrontendModulation::hidl_discriminator::isdbs3:
+                    modulation = (int) m.isdbs3();
+                    break;
+                case FrontendModulation::hidl_discriminator::isdbt:
+                    modulation = (int) m.isdbt();
+                    break;
+                case FrontendModulation::hidl_discriminator::atsc:
+                    modulation = (int) m.atsc();
+                    break;
+                case FrontendModulation::hidl_discriminator::atsc3:
+                    modulation = (int) m.atsc3();
+                    break;
+                case FrontendModulation::hidl_discriminator::dtmb:
+                    modulation = (int) m.dtmb();
+                    break;
             }
             scanMessage.set<TunerFrontendScanMessage::modulation>(modulation);
             break;
@@ -384,166 +429,216 @@ FrontendDvbsCodeRate TunerFrontend::getDvbsCodeRate(const TunerFrontendDvbsCodeR
     return coderate;
 }
 
-FrontendSettings TunerFrontend::getHidlFrontendSettings(const TunerFrontendSettings& settings) {
-    // TODO: extend TunerFrontendSettings to use 1.1 types
+FrontendSettings TunerFrontend::getHidlFrontendSettings(const TunerFrontendSettings& aidlSettings) {
+    auto settings = aidlSettings.settings;
     FrontendSettings frontendSettings;
+
     switch (settings.getTag()) {
-        case TunerFrontendSettings::analog:
+        case TunerFrontendUnionSettings::analog: {
+            auto analog = settings.get<TunerFrontendUnionSettings::analog>();
             frontendSettings.analog({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::analog>().frequency),
-                .type = static_cast<FrontendAnalogType>(
-                        settings.get<TunerFrontendSettings::analog>().signalType),
-                .sifStandard = static_cast<FrontendAnalogSifStandard>(
-                        settings.get<TunerFrontendSettings::analog>().sifStandard),
+                .frequency = static_cast<uint32_t>(analog.frequency),
+                .type = static_cast<FrontendAnalogType>(analog.signalType),
+                .sifStandard = static_cast<FrontendAnalogSifStandard>(analog.sifStandard),
             });
             break;
-        case TunerFrontendSettings::atsc:
+        }
+        case TunerFrontendUnionSettings::atsc: {
+            auto atsc = settings.get<TunerFrontendUnionSettings::atsc>();
             frontendSettings.atsc({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::atsc>().frequency),
-                .modulation = static_cast<FrontendAtscModulation>(
-                        settings.get<TunerFrontendSettings::atsc>().modulation),
+                .frequency = static_cast<uint32_t>(atsc.frequency),
+                .modulation = static_cast<FrontendAtscModulation>(atsc.modulation),
             });
             break;
-        case TunerFrontendSettings::atsc3:
+        }
+        case TunerFrontendUnionSettings::atsc3: {
+            auto atsc3 = settings.get<TunerFrontendUnionSettings::atsc3>();
             frontendSettings.atsc3({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::atsc3>().frequency),
-                .bandwidth = static_cast<FrontendAtsc3Bandwidth>(
-                        settings.get<TunerFrontendSettings::atsc3>().bandwidth),
+                .frequency = static_cast<uint32_t>(atsc3.frequency),
+                .bandwidth = static_cast<FrontendAtsc3Bandwidth>(atsc3.bandwidth),
                 .demodOutputFormat = static_cast<FrontendAtsc3DemodOutputFormat>(
-                        settings.get<TunerFrontendSettings::atsc3>().demodOutputFormat),
-                .plpSettings = getAtsc3PlpSettings(settings.get<TunerFrontendSettings::atsc3>()),
+                        atsc3.demodOutputFormat),
+                .plpSettings = getAtsc3PlpSettings(atsc3),
             });
             break;
-        case TunerFrontendSettings::cable:
+        }
+        case TunerFrontendUnionSettings::cable: {
+            auto dvbc = settings.get<TunerFrontendUnionSettings::cable>();
             frontendSettings.dvbc({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::cable>().frequency),
-                .modulation = static_cast<FrontendDvbcModulation>(
-                        settings.get<TunerFrontendSettings::cable>().modulation),
-                .fec = static_cast<FrontendInnerFec>(
-                        settings.get<TunerFrontendSettings::cable>().innerFec),
-                .symbolRate = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::cable>().symbolRate),
-                .outerFec = static_cast<FrontendDvbcOuterFec>(
-                        settings.get<TunerFrontendSettings::cable>().outerFec),
-                .annex = static_cast<FrontendDvbcAnnex>(
-                        settings.get<TunerFrontendSettings::cable>().annex),
+                .frequency = static_cast<uint32_t>(dvbc.frequency),
+                .modulation = static_cast<FrontendDvbcModulation>(dvbc.modulation),
+                .fec = static_cast<FrontendInnerFec>(dvbc.innerFec),
+                .symbolRate = static_cast<uint32_t>(dvbc.symbolRate),
+                .outerFec = static_cast<FrontendDvbcOuterFec>(dvbc.outerFec),
+                .annex = static_cast<FrontendDvbcAnnex>(dvbc.annex),
                 .spectralInversion = static_cast<FrontendDvbcSpectralInversion>(
-                        settings.get<TunerFrontendSettings::cable>().spectralInversion),
+                        dvbc.spectralInversion),
             });
             break;
-        case TunerFrontendSettings::dvbs:
+        }
+        case TunerFrontendUnionSettings::dvbs: {
+            auto dvbs = settings.get<TunerFrontendUnionSettings::dvbs>();
             frontendSettings.dvbs({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::dvbs>().frequency),
-                .modulation = static_cast<FrontendDvbsModulation>(
-                        settings.get<TunerFrontendSettings::dvbs>().modulation),
-                .coderate = getDvbsCodeRate(
-                        settings.get<TunerFrontendSettings::dvbs>().codeRate),
-                .symbolRate = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::dvbs>().symbolRate),
-                .rolloff = static_cast<FrontendDvbsRolloff>(
-                        settings.get<TunerFrontendSettings::dvbs>().rolloff),
-                .pilot = static_cast<FrontendDvbsPilot>(
-                        settings.get<TunerFrontendSettings::dvbs>().pilot),
-                .inputStreamId = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::dvbs>().inputStreamId),
-                .standard = static_cast<FrontendDvbsStandard>(
-                        settings.get<TunerFrontendSettings::dvbs>().standard),
-                .vcmMode = static_cast<FrontendDvbsVcmMode>(
-                        settings.get<TunerFrontendSettings::dvbs>().vcm),
+                .frequency = static_cast<uint32_t>(dvbs.frequency),
+                .modulation = static_cast<FrontendDvbsModulation>(dvbs.modulation),
+                .coderate = getDvbsCodeRate(dvbs.codeRate),
+                .symbolRate = static_cast<uint32_t>(dvbs.symbolRate),
+                .rolloff = static_cast<FrontendDvbsRolloff>(dvbs.rolloff),
+                .pilot = static_cast<FrontendDvbsPilot>(dvbs.pilot),
+                .inputStreamId = static_cast<uint32_t>(dvbs.inputStreamId),
+                .standard = static_cast<FrontendDvbsStandard>(dvbs.standard),
+                .vcmMode = static_cast<FrontendDvbsVcmMode>(dvbs.vcm),
             });
             break;
-        case TunerFrontendSettings::dvbt:
+        }
+        case TunerFrontendUnionSettings::dvbt: {
+            auto dvbt = settings.get<TunerFrontendUnionSettings::dvbt>();
             frontendSettings.dvbt({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::dvbt>().frequency),
+                .frequency = static_cast<uint32_t>(dvbt.frequency),
                 .transmissionMode = static_cast<FrontendDvbtTransmissionMode>(
-                        settings.get<TunerFrontendSettings::dvbt>().transmissionMode),
-                .bandwidth = static_cast<FrontendDvbtBandwidth>(
-                        settings.get<TunerFrontendSettings::dvbt>().bandwidth),
-                .constellation = static_cast<FrontendDvbtConstellation>(
-                        settings.get<TunerFrontendSettings::dvbt>().constellation),
-                .hierarchy = static_cast<FrontendDvbtHierarchy>(
-                        settings.get<TunerFrontendSettings::dvbt>().hierarchy),
-                .hpCoderate = static_cast<FrontendDvbtCoderate>(
-                        settings.get<TunerFrontendSettings::dvbt>().hpCodeRate),
-                .lpCoderate = static_cast<FrontendDvbtCoderate>(
-                        settings.get<TunerFrontendSettings::dvbt>().lpCodeRate),
-                .guardInterval = static_cast<FrontendDvbtGuardInterval>(
-                        settings.get<TunerFrontendSettings::dvbt>().guardInterval),
-                .isHighPriority = settings.get<TunerFrontendSettings::dvbt>().isHighPriority,
-                .standard = static_cast<FrontendDvbtStandard>(
-                        settings.get<TunerFrontendSettings::dvbt>().standard),
-                .isMiso = settings.get<TunerFrontendSettings::dvbt>().isMiso,
-                .plpMode = static_cast<FrontendDvbtPlpMode>(
-                        settings.get<TunerFrontendSettings::dvbt>().plpMode),
-                .plpId = static_cast<uint8_t>(
-                        settings.get<TunerFrontendSettings::dvbt>().plpId),
-                .plpGroupId = static_cast<uint8_t>(
-                        settings.get<TunerFrontendSettings::dvbt>().plpGroupId),
+                        dvbt.transmissionMode),
+                .bandwidth = static_cast<FrontendDvbtBandwidth>(dvbt.bandwidth),
+                .constellation = static_cast<FrontendDvbtConstellation>(dvbt.constellation),
+                .hierarchy = static_cast<FrontendDvbtHierarchy>(dvbt.hierarchy),
+                .hpCoderate = static_cast<FrontendDvbtCoderate>(dvbt.hpCodeRate),
+                .lpCoderate = static_cast<FrontendDvbtCoderate>(dvbt.lpCodeRate),
+                .guardInterval = static_cast<FrontendDvbtGuardInterval>(dvbt.guardInterval),
+                .isHighPriority = dvbt.isHighPriority,
+                .standard = static_cast<FrontendDvbtStandard>(dvbt.standard),
+                .isMiso = dvbt.isMiso,
+                .plpMode = static_cast<FrontendDvbtPlpMode>(dvbt.plpMode),
+                .plpId = static_cast<uint8_t>(dvbt.plpId),
+                .plpGroupId = static_cast<uint8_t>(dvbt.plpGroupId),
             });
             break;
-        case TunerFrontendSettings::isdbs:
+        }
+        case TunerFrontendUnionSettings::isdbs: {
+            auto isdbs = settings.get<TunerFrontendUnionSettings::isdbs>();
             frontendSettings.isdbs({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::isdbs>().frequency),
-                .streamId = static_cast<uint16_t>(
-                        settings.get<TunerFrontendSettings::isdbs>().streamId),
-                .streamIdType = static_cast<FrontendIsdbsStreamIdType>(
-                        settings.get<TunerFrontendSettings::isdbs>().streamIdType),
-                .modulation = static_cast<FrontendIsdbsModulation>(
-                        settings.get<TunerFrontendSettings::isdbs>().modulation),
-                .coderate = static_cast<FrontendIsdbsCoderate>(
-                        settings.get<TunerFrontendSettings::isdbs>().codeRate),
-                .symbolRate = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::isdbs>().symbolRate),
-                .rolloff = static_cast<FrontendIsdbsRolloff>(
-                        settings.get<TunerFrontendSettings::isdbs>().rolloff),
+                .frequency = static_cast<uint32_t>(isdbs.frequency),
+                .streamId = static_cast<uint16_t>(isdbs.streamId),
+                .streamIdType = static_cast<FrontendIsdbsStreamIdType>(isdbs.streamIdType),
+                .modulation = static_cast<FrontendIsdbsModulation>(isdbs.modulation),
+                .coderate = static_cast<FrontendIsdbsCoderate>(isdbs.codeRate),
+                .symbolRate = static_cast<uint32_t>(isdbs.symbolRate),
+                .rolloff = static_cast<FrontendIsdbsRolloff>(isdbs.rolloff),
             });
             break;
-        case TunerFrontendSettings::isdbs3:
+        }
+        case TunerFrontendUnionSettings::isdbs3: {
+            auto isdbs3 = settings.get<TunerFrontendUnionSettings::isdbs3>();
             frontendSettings.isdbs3({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::isdbs3>().frequency),
-                .streamId = static_cast<uint16_t>(
-                        settings.get<TunerFrontendSettings::isdbs3>().streamId),
-                .streamIdType = static_cast<FrontendIsdbsStreamIdType>(
-                        settings.get<TunerFrontendSettings::isdbs3>().streamIdType),
-                .modulation = static_cast<FrontendIsdbs3Modulation>(
-                        settings.get<TunerFrontendSettings::isdbs3>().modulation),
-                .coderate = static_cast<FrontendIsdbs3Coderate>(
-                        settings.get<TunerFrontendSettings::isdbs3>().codeRate),
-                .symbolRate = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::isdbs3>().symbolRate),
-                .rolloff = static_cast<FrontendIsdbs3Rolloff>(
-                        settings.get<TunerFrontendSettings::isdbs3>().rolloff),
+                .frequency = static_cast<uint32_t>(isdbs3.frequency),
+                .streamId = static_cast<uint16_t>(isdbs3.streamId),
+                .streamIdType = static_cast<FrontendIsdbsStreamIdType>(isdbs3.streamIdType),
+                .modulation = static_cast<FrontendIsdbs3Modulation>(isdbs3.modulation),
+                .coderate = static_cast<FrontendIsdbs3Coderate>(isdbs3.codeRate),
+                .symbolRate = static_cast<uint32_t>(isdbs3.symbolRate),
+                .rolloff = static_cast<FrontendIsdbs3Rolloff>(isdbs3.rolloff),
             });
             break;
-        case TunerFrontendSettings::isdbt:
+        }
+        case TunerFrontendUnionSettings::isdbt: {
+            auto isdbt = settings.get<TunerFrontendUnionSettings::isdbt>();
             frontendSettings.isdbt({
-                .frequency = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::isdbt>().frequency),
-                .modulation = static_cast<FrontendIsdbtModulation>(
-                        settings.get<TunerFrontendSettings::isdbt>().modulation),
-                .bandwidth = static_cast<FrontendIsdbtBandwidth>(
-                        settings.get<TunerFrontendSettings::isdbt>().bandwidth),
-                .mode = static_cast<FrontendIsdbtMode>(
-                        settings.get<TunerFrontendSettings::isdbt>().mode),
-                .coderate = static_cast<FrontendIsdbtCoderate>(
-                        settings.get<TunerFrontendSettings::isdbt>().codeRate),
-                .guardInterval = static_cast<FrontendIsdbtGuardInterval>(
-                        settings.get<TunerFrontendSettings::isdbt>().guardInterval),
-                .serviceAreaId = static_cast<uint32_t>(
-                        settings.get<TunerFrontendSettings::isdbt>().serviceAreaId),
+                .frequency = static_cast<uint32_t>(isdbt.frequency),
+                .modulation = static_cast<FrontendIsdbtModulation>(isdbt.modulation),
+                .bandwidth = static_cast<FrontendIsdbtBandwidth>(isdbt.bandwidth),
+                .mode = static_cast<FrontendIsdbtMode>(isdbt.mode),
+                .coderate = static_cast<FrontendIsdbtCoderate>(isdbt.codeRate),
+                .guardInterval = static_cast<FrontendIsdbtGuardInterval>(isdbt.guardInterval),
+                .serviceAreaId = static_cast<uint32_t>(isdbt.serviceAreaId),
             });
             break;
+        }
         default:
             break;
     }
+
     return frontendSettings;
+}
+
+FrontendSettingsExt1_1 TunerFrontend::getHidlFrontendSettingsExt(
+        const TunerFrontendSettings& aidlSettings) {
+    FrontendSettingsExt1_1 frontendSettingsExt{
+        .endFrequency = static_cast<uint32_t>(aidlSettings.endFrequency),
+        .inversion = static_cast<FrontendSpectralInversion>(aidlSettings.inversion),
+    };
+
+    auto settings = aidlSettings.settings;
+    switch (settings.getTag()) {
+        case TunerFrontendUnionSettings::analog: {
+            auto analog = settings.get<TunerFrontendUnionSettings::analog>();
+            if (analog.isExtended) {
+                frontendSettingsExt.settingExt.analog({
+                    .aftFlag = static_cast<FrontendAnalogAftFlag>(analog.aftFlag),
+                });
+            } else {
+                frontendSettingsExt.settingExt.noinit();
+            }
+            break;
+        }
+        case TunerFrontendUnionSettings::cable: {
+            auto dvbc = settings.get<TunerFrontendUnionSettings::cable>();
+            if (dvbc.isExtended) {
+                frontendSettingsExt.settingExt.dvbc({
+                    .interleaveMode = static_cast<FrontendCableTimeInterleaveMode>(
+                            dvbc.interleaveMode),
+                    .bandwidth = static_cast<FrontendDvbcBandwidth>(
+                            dvbc.bandwidth),
+                });
+            } else {
+                frontendSettingsExt.settingExt.noinit();
+            }
+            break;
+        }
+        case TunerFrontendUnionSettings::dvbs: {
+            auto dvbs = settings.get<TunerFrontendUnionSettings::dvbs>();
+            if (dvbs.isExtended) {
+                frontendSettingsExt.settingExt.dvbs({
+                    .scanType = static_cast<FrontendDvbsScanType>(dvbs.scanType),
+                    .isDiseqcRxMessage = dvbs.isDiseqcRxMessage,
+                });
+            } else {
+                frontendSettingsExt.settingExt.noinit();
+            }
+            break;
+        }
+        case TunerFrontendUnionSettings::dvbt: {
+            auto dvbt = settings.get<TunerFrontendUnionSettings::dvbt>();
+            if (dvbt.isExtended) {
+                frontendSettingsExt.settingExt.dvbt({
+                    .constellation =
+                            static_cast<hardware::tv::tuner::V1_1::FrontendDvbtConstellation>(
+                                    dvbt.constellation),
+                    .transmissionMode =
+                            static_cast<hardware::tv::tuner::V1_1::FrontendDvbtTransmissionMode>(
+                                    dvbt.transmissionMode),
+                });
+            } else {
+                frontendSettingsExt.settingExt.noinit();
+            }
+            break;
+        }
+        case TunerFrontendUnionSettings::dtmb: {
+            auto dtmb = settings.get<TunerFrontendUnionSettings::dtmb>();
+            frontendSettingsExt.settingExt.dtmb({
+                .frequency = static_cast<uint32_t>(dtmb.frequency),
+                .transmissionMode = static_cast<FrontendDtmbTransmissionMode>(
+                        dtmb.transmissionMode),
+                .bandwidth = static_cast<FrontendDtmbBandwidth>(dtmb.bandwidth),
+                .modulation = static_cast<FrontendDtmbModulation>(dtmb.modulation),
+                .codeRate = static_cast<FrontendDtmbCodeRate>(dtmb.codeRate),
+                .guardInterval = static_cast<FrontendDtmbGuardInterval>(dtmb.guardInterval),
+                .interleaveMode = static_cast<FrontendDtmbTimeInterleaveMode>(dtmb.interleaveMode),
+            });
+            break;
+        }
+        default:
+            frontendSettingsExt.settingExt.noinit();
+            break;
+    }
+
+    return frontendSettingsExt;
 }
 }  // namespace android
