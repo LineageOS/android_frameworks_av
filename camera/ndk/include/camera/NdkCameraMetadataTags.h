@@ -40,8 +40,6 @@
 
 __BEGIN_DECLS
 
-#if __ANDROID_API__ >= 24
-
 typedef enum acamera_metadata_section {
     ACAMERA_COLOR_CORRECTION,
     ACAMERA_CONTROL,
@@ -8992,8 +8990,6 @@ typedef enum acamera_metadata_enum_acamera_heic_available_heic_stream_configurat
 } acamera_metadata_enum_android_heic_available_heic_stream_configurations_t;
 
 
-
-#endif /* __ANDROID_API__ >= 24 */
 
 __END_DECLS
 

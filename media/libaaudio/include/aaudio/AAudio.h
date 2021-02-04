@@ -1024,7 +1024,6 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
 // Stream Control
 // ============================================================
 
-#if __ANDROID_API__ >= 30
 /**
  * Free the audio resources associated with a stream created by
  * AAudioStreamBuilder_openStream().
@@ -1042,17 +1041,20 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_delete(AAudioStreamBuilder* buil
  * On other "Legacy" streams some audio resources will still be in use
  * and some callbacks may still be in process after this call.
  *
+ * Available since API level 30.
+ *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return {@link #AAUDIO_OK} or a negative error.
  */
 AAUDIO_API aaudio_result_t  AAudioStream_release(AAudioStream* stream) __INTRODUCED_IN(30);
-#endif // __ANDROID_API__
 
 /**
  * Delete the internal data structures associated with the stream created
  * by AAudioStreamBuilder_openStream().
  *
  * If AAudioStream_release() has not been called then it will be called automatically.
+ *
+ * Available since API level 26.
  *
  * @param stream reference provided by AAudioStreamBuilder_openStream()
  * @return {@link #AAUDIO_OK} or a negative error.
