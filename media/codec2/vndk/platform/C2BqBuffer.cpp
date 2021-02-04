@@ -369,7 +369,7 @@ private:
                         std::make_shared<C2BufferQueueBlockPoolData>(
                                 slotBuffer->getGenerationNumber(),
                                 mProducerId, slot,
-                                shared_from_this());
+                                mProducer);
                 mPoolDatas[slot] = poolData;
                 *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
                 return C2_OK;
@@ -437,7 +437,7 @@ public:
             }
             std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
                     std::make_shared<C2BufferQueueBlockPoolData>(
-                            0, (uint64_t)0, ~0, shared_from_this());
+                            0, (uint64_t)0, ~0, nullptr);
             *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
             ALOGV("allocated a buffer successfully");
 
@@ -534,17 +534,6 @@ public:
 private:
     friend struct C2BufferQueueBlockPoolData;
 
-    void cancel(uint32_t generation, uint64_t igbp_id, int32_t igbp_slot) {
-        bool cancelled = false;
-        {
-        std::scoped_lock<std::mutex> lock(mMutex);
-        if (generation == mGeneration && igbp_id == mProducerId && mProducer) {
-            (void)mProducer->cancelBuffer(igbp_slot, hidl_handle{}).isOk();
-            cancelled = true;
-        }
-        }
-    }
-
     c2_status_t mInit;
     uint64_t mProducerId;
     uint32_t mGeneration;
@@ -570,30 +559,30 @@ C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
         const sp<HGraphicBufferProducer>& producer) :
         mLocal(false), mHeld(producer && bqId != 0),
         mGeneration(generation), mBqId(bqId), mBqSlot(bqSlot),
+        mCurrentGeneration(generation), mCurrentBqId(bqId),
         mTransfer(false), mAttach(false), mDisplay(false),
-        mOwner(owner), mIgbp(producer),
-        mLocalPool() {
+        mOwner(owner), mIgbp(producer) {
 }
 
 C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
         uint32_t generation, uint64_t bqId, int32_t bqSlot,
-        const std::shared_ptr<C2BufferQueueBlockPool::Impl>& pool) :
+        const android::sp<HGraphicBufferProducer>& producer) :
         mLocal(true), mHeld(true),
         mGeneration(generation), mBqId(bqId), mBqSlot(bqSlot),
-        mTransfer(false), mAttach(false), mDisplay(false),
-        mIgbp(pool ? pool->mProducer : nullptr),
-        mLocalPool(pool) {
+        mCurrentGeneration(generation), mCurrentBqId(bqId),
+        mTransfer(false), mAttach(false), mDisplay(false), mIgbp(producer) {
 }
 
 C2BufferQueueBlockPoolData::~C2BufferQueueBlockPoolData() {
-    if (!mHeld || mBqId == 0) {
+    if (!mHeld || mBqId == 0 || !mIgbp) {
         return;
     }
+
     if (mLocal) {
-        if (mLocalPool) {
-            mLocalPool->cancel(mGeneration, mBqId, mBqSlot);
+        if (mGeneration == mCurrentGeneration && mBqId == mCurrentBqId) {
+            mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
         }
-    } else if (mIgbp && !mOwner.expired()) {
+    } else if (!mOwner.expired()) {
         mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
     }
 }
@@ -607,11 +596,15 @@ int C2BufferQueueBlockPoolData::migrate(
         uint32_t toGeneration, uint64_t toBqId,
         sp<GraphicBuffer> *buffers, uint32_t oldGeneration) {
     std::scoped_lock<std::mutex> l(mLock);
+
+    mCurrentBqId = toBqId;
+    mCurrentGeneration = toGeneration;
+
     if (!mHeld || mBqId == 0) {
         ALOGV("buffer is not owned");
         return -1;
     }
-    if (!mLocal || !mLocalPool) {
+    if (!mLocal) {
         ALOGV("pool is not local");
         return -1;
     }
@@ -661,6 +654,7 @@ int C2BufferQueueBlockPoolData::migrate(
     }
     ALOGV("local migration from gen %u : %u slot %d : %d",
           mGeneration, toGeneration, mBqSlot, slot);
+    mIgbp = producer;
     mGeneration = toGeneration;
     mBqId = toBqId;
     mBqSlot = slot;
