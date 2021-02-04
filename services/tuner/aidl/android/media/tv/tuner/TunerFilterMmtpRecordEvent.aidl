@@ -17,7 +17,7 @@
 package android.media.tv.tuner;
 
 /**
- * Filter Event for MMTP Record Filter.
+ * Filter Event for an MMTP Record Filter.
  *
  * {@hide}
  */

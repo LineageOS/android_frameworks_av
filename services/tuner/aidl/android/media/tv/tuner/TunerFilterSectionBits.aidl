@@ -16,15 +16,15 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterSettings;
-
 /**
- * Filter Settings for a TS filter.
+ * Bits settings of a section Filter.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
+parcelable TunerFilterSectionBits {
+    byte[] filter;
 
-    TunerFilterSettings filterSettings;
+    byte[] mask;
+
+    byte[] mode;
 }

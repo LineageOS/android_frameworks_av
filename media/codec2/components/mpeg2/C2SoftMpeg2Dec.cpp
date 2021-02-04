@@ -30,6 +30,7 @@
 
 namespace android {
 constexpr size_t kMinInputBufferSize = 2 * 1024 * 1024;
+constexpr size_t kMaxDimension = 1920;
 constexpr char COMPONENT_NAME[] = "c2.android.mpeg2.decoder";
 
 class C2SoftMpeg2Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
@@ -64,8 +65,8 @@ public:
                 DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
                 .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
                 .withFields({
-                    C2F(mSize, width).inRange(16, 1920, 4),
-                    C2F(mSize, height).inRange(16, 1088, 4),
+                    C2F(mSize, width).inRange(16, kMaxDimension, 2),
+                    C2F(mSize, height).inRange(16, kMaxDimension, 2),
                 })
                 .withSetter(SizeSetter)
                 .build());
@@ -91,8 +92,8 @@ public:
                 DefineParam(mMaxSize, C2_PARAMKEY_MAX_PICTURE_SIZE)
                 .withDefault(new C2StreamMaxPictureSizeTuning::output(0u, 320, 240))
                 .withFields({
-                    C2F(mSize, width).inRange(2, 1920, 2),
-                    C2F(mSize, height).inRange(2, 1088, 2),
+                    C2F(mSize, width).inRange(2, kMaxDimension, 2),
+                    C2F(mSize, height).inRange(2, kMaxDimension, 2),
                 })
                 .withSetter(MaxPictureSizeSetter, mSize)
                 .build());
@@ -204,8 +205,8 @@ public:
                                     const C2P<C2StreamPictureSizeInfo::output> &size) {
         (void)mayBlock;
         // TODO: get max width/height from the size's field helpers vs. hardcoding
-        me.set().width = c2_min(c2_max(me.v.width, size.v.width), 1920u);
-        me.set().height = c2_min(c2_max(me.v.height, size.v.height), 1088u);
+        me.set().width = c2_min(c2_max(me.v.width, size.v.width), kMaxDimension);
+        me.set().height = c2_min(c2_max(me.v.height, size.v.height), kMaxDimension);
         return C2R::Ok();
     }
 
