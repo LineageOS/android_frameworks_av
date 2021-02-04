@@ -1092,6 +1092,8 @@ void CCodec::configure(const sp<AMessage> &msg) {
     Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
     const std::unique_ptr<Config> &config = *configLocked;
 
+    config->queryConfiguration(comp);
+
     mCallback->onComponentConfigured(config->mInputFormat, config->mOutputFormat);
 }
 
