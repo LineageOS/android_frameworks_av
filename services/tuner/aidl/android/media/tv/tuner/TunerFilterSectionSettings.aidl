@@ -16,15 +16,19 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterSettings;
+import android.media.tv.tuner.TunerFilterSectionCondition;
 
 /**
- * Filter Settings for a TS filter.
+ * Filter Settings for a section filter.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
+parcelable TunerFilterSectionSettings {
+    TunerFilterSectionCondition condition;
 
-    TunerFilterSettings filterSettings;
+    boolean isCheckCrc;
+
+    boolean isRepeat;
+
+    boolean isRaw;
 }

@@ -22,7 +22,7 @@ package android.media.tv.tuner;
  * {@hide}
  */
 parcelable TunerAudioExtraMetaData {
-	byte adFade;
+    byte adFade;
 
     byte adPan;
 
