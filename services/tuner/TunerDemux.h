@@ -27,9 +27,11 @@ using ::aidl::android::media::tv::tuner::ITunerDvrCallback;
 using ::aidl::android::media::tv::tuner::ITunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
+using ::aidl::android::media::tv::tuner::ITunerTimeFilter;
 using ::android::hardware::tv::tuner::V1_0::IDemux;
 using ::android::hardware::tv::tuner::V1_0::IDvr;
 using ::android::hardware::tv::tuner::V1_0::IDvrCallback;
+using ::android::hardware::tv::tuner::V1_0::ITimeFilter;
 
 using namespace std;
 
@@ -43,10 +45,15 @@ public:
     Status setFrontendDataSource(const shared_ptr<ITunerFrontend>& frontend) override;
     Status openFilter(
         int mainType, int subtype, int bufferSize, const shared_ptr<ITunerFilterCallback>& cb,
-        shared_ptr<ITunerFilter>* _aidl_return);
+        shared_ptr<ITunerFilter>* _aidl_return) override;
+    Status openTimeFilter(shared_ptr<ITunerTimeFilter>* _aidl_return) override;
+    Status getAvSyncHwId(const shared_ptr<ITunerFilter>& tunerFilter, int* _aidl_return) override;
+    Status getAvSyncTime(int avSyncHwId, int64_t* _aidl_return) override;
     Status openDvr(
         int dvbType, int bufferSize, const shared_ptr<ITunerDvrCallback>& cb,
         shared_ptr<ITunerDvr>* _aidl_return) override;
+    Status connectCiCam(int ciCamId) override;
+    Status disconnectCiCam() override;
     Status close() override;
 
 private:
