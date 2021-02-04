@@ -4,6 +4,7 @@ cc_test {
     srcs: [
         "CCodecBuffers_test.cpp",
         "CCodecConfig_test.cpp",
+        "FrameReassembler_test.cpp",
         "ReflectedParamUpdater_test.cpp",
     ],
 
