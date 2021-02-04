@@ -23,12 +23,13 @@
 #include <media/EffectsFactoryApi.h>
 #include <utils/Log.h>
 
+#include <util/EffectUtils.h>
+
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
-#include "UuidUtils.h"
 
-using ::android::hardware::audio::common::CPP_VERSION::implementation::UuidUtils;
 using ::android::hardware::audio::common::utils::EnumBitfield;
+using ::android::hardware::audio::effect::CPP_VERSION::implementation::EffectUtils;
 using ::android::hardware::hidl_vec;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
@@ -42,6 +43,10 @@ using namespace ::android::hardware::audio::effect::CPP_VERSION;
 
 EffectHalHidl::EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId)
         : mEffect(effect), mEffectId(effectId), mBuffersChanged(true), mEfGroup(nullptr) {
+    effect_descriptor_t halDescriptor{};
+    if (EffectHalHidl::getDescriptor(&halDescriptor) == NO_ERROR) {
+        mIsInput = (halDescriptor.flags & EFFECT_FLAG_TYPE_PRE_PROC) == EFFECT_FLAG_TYPE_PRE_PROC;
+    }
 }
 
 EffectHalHidl::~EffectHalHidl() {
@@ -53,59 +58,6 @@ EffectHalHidl::~EffectHalHidl() {
     if (mEfGroup) {
         EventFlag::deleteEventFlag(&mEfGroup);
     }
-}
-
-// static
-void EffectHalHidl::effectDescriptorToHal(
-        const EffectDescriptor& descriptor, effect_descriptor_t* halDescriptor) {
-    UuidUtils::uuidToHal(descriptor.type, &halDescriptor->type);
-    UuidUtils::uuidToHal(descriptor.uuid, &halDescriptor->uuid);
-    halDescriptor->flags = static_cast<uint32_t>(descriptor.flags);
-    halDescriptor->cpuLoad = descriptor.cpuLoad;
-    halDescriptor->memoryUsage = descriptor.memoryUsage;
-    memcpy(halDescriptor->name, descriptor.name.data(), descriptor.name.size());
-    memcpy(halDescriptor->implementor,
-            descriptor.implementor.data(), descriptor.implementor.size());
-}
-
-// TODO(mnaganov): These buffer conversion functions should be shared with Effect wrapper
-// via HidlUtils. Move them there when hardware/interfaces will get un-frozen again.
-
-// static
-void EffectHalHidl::effectBufferConfigFromHal(
-        const buffer_config_t& halConfig, EffectBufferConfig* config) {
-    config->samplingRateHz = halConfig.samplingRate;
-    config->channels = EnumBitfield<AudioChannelMask>(halConfig.channels);
-    config->format = AudioFormat(halConfig.format);
-    config->accessMode = EffectBufferAccess(halConfig.accessMode);
-    config->mask = EnumBitfield<EffectConfigParameters>(halConfig.mask);
-}
-
-// static
-void EffectHalHidl::effectBufferConfigToHal(
-        const EffectBufferConfig& config, buffer_config_t* halConfig) {
-    halConfig->buffer.frameCount = 0;
-    halConfig->buffer.raw = NULL;
-    halConfig->samplingRate = config.samplingRateHz;
-    halConfig->channels = static_cast<uint32_t>(config.channels);
-    halConfig->bufferProvider.cookie = NULL;
-    halConfig->bufferProvider.getBuffer = NULL;
-    halConfig->bufferProvider.releaseBuffer = NULL;
-    halConfig->format = static_cast<uint8_t>(config.format);
-    halConfig->accessMode = static_cast<uint8_t>(config.accessMode);
-    halConfig->mask = static_cast<uint8_t>(config.mask);
-}
-
-// static
-void EffectHalHidl::effectConfigFromHal(const effect_config_t& halConfig, EffectConfig* config) {
-    effectBufferConfigFromHal(halConfig.inputCfg, &config->inputCfg);
-    effectBufferConfigFromHal(halConfig.outputCfg, &config->outputCfg);
-}
-
-// static
-void EffectHalHidl::effectConfigToHal(const EffectConfig& config, effect_config_t* halConfig) {
-    effectBufferConfigToHal(config.inputCfg, &halConfig->inputCfg);
-    effectBufferConfigToHal(config.outputCfg, &halConfig->outputCfg);
 }
 
 // static
@@ -269,7 +221,7 @@ status_t EffectHalHidl::getDescriptor(effect_descriptor_t *pDescriptor) {
             [&](Result r, const EffectDescriptor& result) {
                 retval = r;
                 if (retval == Result::OK) {
-                    effectDescriptorToHal(result, pDescriptor);
+                    EffectUtils::effectDescriptorToHal(result, pDescriptor);
                 }
             });
     return ret.isOk() ? analyzeResult(retval) : FAILED_TRANSACTION;
@@ -301,14 +253,16 @@ status_t EffectHalHidl::getConfigImpl(
         ret = mEffect->getConfig([&] (Result r, const EffectConfig &hidlConfig) {
             result = analyzeResult(r);
             if (r == Result::OK) {
-                effectConfigToHal(hidlConfig, static_cast<effect_config_t*>(pReplyData));
+                EffectUtils::effectConfigToHal(
+                        hidlConfig, static_cast<effect_config_t*>(pReplyData));
             }
         });
     } else {
         ret = mEffect->getConfigReverse([&] (Result r, const EffectConfig &hidlConfig) {
             result = analyzeResult(r);
             if (r == Result::OK) {
-                effectConfigToHal(hidlConfig, static_cast<effect_config_t*>(pReplyData));
+                EffectUtils::effectConfigToHal(
+                        hidlConfig, static_cast<effect_config_t*>(pReplyData));
             }
         });
     }
@@ -332,7 +286,7 @@ status_t EffectHalHidl::setConfigImpl(
         ALOGE("Buffer provider callbacks are not supported");
     }
     EffectConfig hidlConfig;
-    effectConfigFromHal(*halConfig, &hidlConfig);
+    EffectUtils::effectConfigFromHal(*halConfig, mIsInput, &hidlConfig);
     Return<Result> ret = cmdCode == EFFECT_CMD_SET_CONFIG ?
             mEffect->setConfig(hidlConfig, nullptr, nullptr) :
             mEffect->setConfigReverse(hidlConfig, nullptr, nullptr);

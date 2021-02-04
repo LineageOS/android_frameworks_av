@@ -65,9 +65,6 @@ class EffectHalHidl : public EffectHalInterface
 
     uint64_t effectId() const { return mEffectId; }
 
-    static void effectDescriptorToHal(
-            const EffectDescriptor& descriptor, effect_descriptor_t* halDescriptor);
-
   private:
     friend class EffectsFactoryHalHidl;
     typedef MessageQueue<Result, hardware::kSynchronizedReadWrite> StatusMQ;
@@ -79,14 +76,9 @@ class EffectHalHidl : public EffectHalInterface
     bool mBuffersChanged;
     std::unique_ptr<StatusMQ> mStatusMQ;
     EventFlag* mEfGroup;
+    bool mIsInput = false;
 
     static status_t analyzeResult(const Result& result);
-    static void effectBufferConfigFromHal(
-            const buffer_config_t& halConfig, EffectBufferConfig* config);
-    static void effectBufferConfigToHal(
-            const EffectBufferConfig& config, buffer_config_t* halConfig);
-    static void effectConfigFromHal(const effect_config_t& halConfig, EffectConfig* config);
-    static void effectConfigToHal(const EffectConfig& config, effect_config_t* halConfig);
 
     // Can not be constructed directly by clients.
     EffectHalHidl(const sp<IEffect>& effect, uint64_t effectId);

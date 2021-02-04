@@ -19,13 +19,16 @@
 
 #include <cutils/native_handle.h>
 
+#include <UuidUtils.h>
+#include <util/EffectUtils.h>
+
 #include "ConversionHelperHidl.h"
 #include "EffectBufferHalHidl.h"
 #include "EffectHalHidl.h"
 #include "EffectsFactoryHalHidl.h"
-#include "UuidUtils.h"
 
 using ::android::hardware::audio::common::CPP_VERSION::implementation::UuidUtils;
+using ::android::hardware::audio::effect::CPP_VERSION::implementation::EffectUtils;
 using ::android::hardware::Return;
 
 namespace android {
@@ -76,7 +79,7 @@ status_t EffectsFactoryHalHidl::getDescriptor(
         if (queryResult != OK) return queryResult;
     }
     if (index >= mLastDescriptors.size()) return NAME_NOT_FOUND;
-    EffectHalHidl::effectDescriptorToHal(mLastDescriptors[index], pDescriptor);
+    EffectUtils::effectDescriptorToHal(mLastDescriptors[index], pDescriptor);
     return OK;
 }
 
@@ -91,7 +94,7 @@ status_t EffectsFactoryHalHidl::getDescriptor(
             [&](Result r, const EffectDescriptor& result) {
                 retval = r;
                 if (retval == Result::OK) {
-                    EffectHalHidl::effectDescriptorToHal(result, pDescriptor);
+                    EffectUtils::effectDescriptorToHal(result, pDescriptor);
                 }
             });
     if (ret.isOk()) {
