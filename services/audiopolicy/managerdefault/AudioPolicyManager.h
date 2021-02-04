@@ -421,13 +421,30 @@ protected:
         {
             return static_cast<VolumeSource>(volumeGroup);
         }
-        VolumeSource toVolumeSource(const audio_attributes_t &attributes) const
+        /**
+         * @brief toVolumeSource converts an audio attributes into a volume source
+         * (either a legacy stream or a volume group). If fallback on default is allowed, and if
+         * the audio attributes do not follow any specific product strategy's rule, it will be
+         * associated to default volume source, e.g. music. Thus, any of call of volume API
+         * using this translation function may affect the default volume source.
+         * If fallback is not allowed and no matching rule is identified for the given attributes,
+         * the volume source will be undefined, thus, no volume will be altered/modified.
+         * @param attributes to be considered
+         * @param fallbackOnDefault
+         * @return volume source associated with given attributes, otherwise either music if
+         * fallbackOnDefault is set or none.
+         */
+        VolumeSource toVolumeSource(
+            const audio_attributes_t &attributes, bool fallbackOnDefault = true) const
         {
-            return toVolumeSource(mEngine->getVolumeGroupForAttributes(attributes));
+            return toVolumeSource(mEngine->getVolumeGroupForAttributes(
+                attributes, fallbackOnDefault));
         }
-        VolumeSource toVolumeSource(audio_stream_type_t stream) const
+        VolumeSource toVolumeSource(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const
         {
-            return toVolumeSource(mEngine->getVolumeGroupForStreamType(stream));
+            return toVolumeSource(mEngine->getVolumeGroupForStreamType(
+                stream, fallbackOnDefault));
         }
         IVolumeCurves &getVolumeCurves(VolumeSource volumeSource)
         {
