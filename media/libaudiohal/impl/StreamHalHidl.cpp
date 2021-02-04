@@ -17,18 +17,23 @@
 #define LOG_TAG "StreamHalHidl"
 //#define LOG_NDEBUG 0
 
-#include PATH(android/hardware/audio/FILE_VERSION/IStreamOutCallback.h)
+#include <android/hidl/manager/1.0/IServiceManager.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioParameter.h>
 #include <mediautils/SchedulingPolicyService.h>
 #include <utils/Log.h>
 
+#include PATH(android/hardware/audio/FILE_VERSION/IStreamOutCallback.h)
+#include <HidlUtils.h>
+#include <util/CoreUtils.h>
+
 #include "DeviceHalHidl.h"
 #include "EffectHalHidl.h"
-#include "HidlUtils.h"
+#include "ParameterUtils.h"
 #include "StreamHalHidl.h"
-#include "VersionUtils.h"
 
+using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
+using ::android::hardware::audio::CPP_VERSION::implementation::CoreUtils;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
@@ -50,14 +55,11 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
 
     // Instrument audio signal power logging.
     // Note: This assumes channel mask, format, and sample rate do not change after creation.
-    if (mStream != nullptr /* && mStreamPowerLog.isUserDebugOrEngBuild() */) {
-        // Obtain audio properties (see StreamHalHidl::getAudioProperties() below).
-        Return<void> ret = mStream->getAudioProperties(
-                [&](auto sr, auto m, auto f) {
-                mStreamPowerLog.init(sr,
-                        static_cast<audio_channel_mask_t>(m),
-                        static_cast<audio_format_t>(f));
-            });
+    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
+    if (/* mStreamPowerLog.isUserDebugOrEngBuild() && */
+        StreamHalHidl::getAudioProperties(
+                &config.sample_rate, &config.channel_mask, &config.format) == NO_ERROR) {
+        mStreamPowerLog.init(config.sample_rate, config.channel_mask, config.format);
     }
 }
 
@@ -65,9 +67,12 @@ StreamHalHidl::~StreamHalHidl() {
     mStream = nullptr;
 }
 
+// Note: this method will be removed
 status_t StreamHalHidl::getSampleRate(uint32_t *rate) {
-    if (!mStream) return NO_INIT;
-    return processReturn("getSampleRate", mStream->getSampleRate(), rate);
+    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
+    status_t status = getAudioProperties(&config.sample_rate, &config.channel_mask, &config.format);
+    *rate = config.sample_rate;
+    return status;
 }
 
 status_t StreamHalHidl::getBufferSize(size_t *size) {
@@ -79,19 +84,26 @@ status_t StreamHalHidl::getBufferSize(size_t *size) {
     return status;
 }
 
+// Note: this method will be removed
 status_t StreamHalHidl::getChannelMask(audio_channel_mask_t *mask) {
-    if (!mStream) return NO_INIT;
-    return processReturn("getChannelMask", mStream->getChannelMask(), mask);
+    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
+    status_t status = getAudioProperties(&config.sample_rate, &config.channel_mask, &config.format);
+    *mask = config.channel_mask;
+    return status;
 }
 
+// Note: this method will be removed
 status_t StreamHalHidl::getFormat(audio_format_t *format) {
-    if (!mStream) return NO_INIT;
-    return processReturn("getFormat", mStream->getFormat(), format);
+    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
+    status_t status = getAudioProperties(&config.sample_rate, &config.channel_mask, &config.format);
+    *format = config.format;
+    return status;
 }
 
 status_t StreamHalHidl::getAudioProperties(
         uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format) {
     if (!mStream) return NO_INIT;
+#if MAJOR_VERSION <= 6
     Return<void> ret = mStream->getAudioProperties(
             [&](uint32_t sr, auto m, auto f) {
                 *sampleRate = sr;
@@ -99,6 +111,26 @@ status_t StreamHalHidl::getAudioProperties(
                 *format = static_cast<audio_format_t>(f);
             });
     return processReturn("getAudioProperties", ret);
+#else
+    Result retval;
+    status_t conversionStatus = BAD_VALUE;
+    audio_config_base_t halConfig = AUDIO_CONFIG_BASE_INITIALIZER;
+    Return<void> ret = mStream->getAudioProperties(
+            [&](Result r, const AudioConfigBase& config) {
+                retval = r;
+                if (retval == Result::OK) {
+                    conversionStatus = HidlUtils::audioConfigBaseToHal(config, &halConfig);
+                }
+            });
+    if (status_t status = processReturn("getAudioProperties", ret, retval); status == NO_ERROR) {
+        *sampleRate = halConfig.sample_rate;
+        *mask = halConfig.channel_mask;
+        *format = halConfig.format;
+        return conversionStatus;
+    } else {
+        return status;
+    }
+#endif
 }
 
 status_t StreamHalHidl::setParameters(const String8& kvPairs) {
@@ -224,6 +256,24 @@ status_t StreamHalHidl::getCachedBufferSize(size_t *size) {
         return OK;
     }
     return getBufferSize(size);
+}
+
+status_t StreamHalHidl::getHalPid(pid_t *pid) {
+    using ::android::hidl::base::V1_0::DebugInfo;
+    using ::android::hidl::manager::V1_0::IServiceManager;
+
+    DebugInfo debugInfo;
+    auto ret = mStream->getDebugInfo([&] (const auto &info) {
+        debugInfo = info;
+    });
+    if (!ret.isOk()) {
+        return INVALID_OPERATION;
+    }
+    if (debugInfo.pid != (int)IServiceManager::PidConstant::NO_PID) {
+        *pid = debugInfo.pid;
+        return NO_ERROR;
+    }
+    return NAME_NOT_FOUND;
 }
 
 bool StreamHalHidl::requestHalThreadPriority(pid_t threadPid, pid_t threadId) {
@@ -454,7 +504,7 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
                     const CommandMQ::Descriptor& commandMQ,
                     const DataMQ::Descriptor& dataMQ,
                     const StatusMQ::Descriptor& statusMQ,
-                    const ThreadInfo& halThreadInfo) {
+                    const auto& halThreadInfo) {
                 retval = r;
                 if (retval == Result::OK) {
                     tempCommandMQ.reset(new CommandMQ(commandMQ));
@@ -463,8 +513,12 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
                     if (tempDataMQ->isValid() && tempDataMQ->getEventFlagWord()) {
                         EventFlag::createEventFlag(tempDataMQ->getEventFlagWord(), &mEfGroup);
                     }
+#if MAJOR_VERSION <= 6
                     halThreadPid = halThreadInfo.pid;
                     halThreadTid = halThreadInfo.tid;
+#else
+                    halThreadTid = halThreadInfo;
+#endif
                 }
             });
     if (!ret.isOk() || retval != Result::OK) {
@@ -485,6 +539,11 @@ status_t StreamOutHalHidl::prepareForWriting(size_t bufferSize) {
         ALOGE_IF(!mEfGroup, "Event flag creation for writing failed");
         return NO_INIT;
     }
+#if MAJOR_VERSION >= 7
+    if (status_t status = getHalPid(&halThreadPid); status != NO_ERROR) {
+        return status;
+    }
+#endif
     requestHalThreadPriority(halThreadPid, halThreadTid);
 
     mCommandMQ = std::move(tempCommandMQ);
@@ -598,40 +657,15 @@ status_t StreamOutHalHidl::updateSourceMetadata(
     return INVALID_OPERATION;
 }
 #elif MAJOR_VERSION >= 4
-/** Transform a standard collection to an HIDL vector. */
-template <class Values, class ElementConverter>
-static auto transformToHidlVec(const Values& values, ElementConverter converter) {
-    hidl_vec<decltype(converter(*values.begin()))> result{values.size()};
-    using namespace std;
-    transform(begin(values), end(values), begin(result), converter);
-    return result;
-}
-
 status_t StreamOutHalHidl::updateSourceMetadata(
         const StreamOutHalInterface::SourceMetadata& sourceMetadata) {
-    CPP_VERSION::SourceMetadata halMetadata = {
-        .tracks = transformToHidlVec(sourceMetadata.tracks,
-              [](const playback_track_metadata_v7& metadata) -> PlaybackTrackMetadata {
-                  PlaybackTrackMetadata halTrackMetadata = {
-                      .usage=static_cast<AudioUsage>(metadata.base.usage),
-                      .contentType=static_cast<AudioContentType>(metadata.base.content_type),
-                      .gain=metadata.base.gain,
-                  };
-#if MAJOR_VERSION >= 7
-                  HidlUtils::audioChannelMaskFromHal(metadata.channel_mask, false /*isInput*/,
-                                                    &halTrackMetadata.channelMask);
-
-                  std::istringstream tags{metadata.tags};
-                  std::string tag;
-                  while (std::getline(tags, tag, HidlUtils::sAudioTagSeparator)) {
-                      if (!tag.empty()) {
-                          halTrackMetadata.tags.push_back(tag);
-                      }
-                  }
-#endif
-                  return halTrackMetadata;
-              })};
-    return processReturn("updateSourceMetadata", mStream->updateSourceMetadata(halMetadata));
+    CPP_VERSION::SourceMetadata hidlMetadata;
+    if (status_t status = CoreUtils::sourceMetadataFromHalV7(
+                    sourceMetadata.tracks, true /*ignoreNonVendorTags*/, &hidlMetadata);
+            status != OK) {
+        return status;
+    }
+    return processReturn("updateSourceMetadata", mStream->updateSourceMetadata(hidlMetadata));
 }
 #endif
 
@@ -904,7 +938,7 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
                     const CommandMQ::Descriptor& commandMQ,
                     const DataMQ::Descriptor& dataMQ,
                     const StatusMQ::Descriptor& statusMQ,
-                    const ThreadInfo& halThreadInfo) {
+                    const auto& halThreadInfo) {
                 retval = r;
                 if (retval == Result::OK) {
                     tempCommandMQ.reset(new CommandMQ(commandMQ));
@@ -913,8 +947,12 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
                     if (tempDataMQ->isValid() && tempDataMQ->getEventFlagWord()) {
                         EventFlag::createEventFlag(tempDataMQ->getEventFlagWord(), &mEfGroup);
                     }
+#if MAJOR_VERSION <= 6
                     halThreadPid = halThreadInfo.pid;
                     halThreadTid = halThreadInfo.tid;
+#else
+                    halThreadTid = halThreadInfo;
+#endif
                 }
             });
     if (!ret.isOk() || retval != Result::OK) {
@@ -935,6 +973,11 @@ status_t StreamInHalHidl::prepareForReading(size_t bufferSize) {
         ALOGE_IF(!mEfGroup, "Event flag creation for reading failed");
         return NO_INIT;
     }
+#if MAJOR_VERSION >= 7
+    if (status_t status = getHalPid(&halThreadPid); status != NO_ERROR) {
+        return status;
+    }
+#endif
     requestHalThreadPriority(halThreadPid, halThreadTid);
 
     mCommandMQ = std::move(tempCommandMQ);
@@ -997,7 +1040,7 @@ status_t StreamInHalHidl::getActiveMicrophones(
         for (size_t k = 0; k < micArrayHal.size(); k++) {
             audio_microphone_characteristic_t dst;
             // convert
-            microphoneInfoToHal(micArrayHal[k], &dst);
+            (void)CoreUtils::microphoneInfoToHal(micArrayHal[k], &dst);
             media::MicrophoneInfo microphone = media::MicrophoneInfo(dst);
             microphonesInfo->push_back(microphone);
         }
@@ -1007,27 +1050,13 @@ status_t StreamInHalHidl::getActiveMicrophones(
 
 status_t StreamInHalHidl::updateSinkMetadata(const
         StreamInHalInterface::SinkMetadata& sinkMetadata) {
-    CPP_VERSION::SinkMetadata halMetadata = {
-        .tracks = transformToHidlVec(sinkMetadata.tracks,
-              [](const record_track_metadata_v7& metadata) -> RecordTrackMetadata {
-                  RecordTrackMetadata halTrackMetadata = {
-                      .source=static_cast<AudioSource>(metadata.base.source),
-                      .gain=metadata.base.gain,
-                  };
-#if MAJOR_VERSION >= 7
-                  HidlUtils::audioChannelMaskFromHal(metadata.channel_mask, true /*isInput*/,
-                                                    &halTrackMetadata.channelMask);
-                  std::istringstream tags{metadata.tags};
-                  std::string tag;
-                  while (std::getline(tags, tag, HidlUtils::sAudioTagSeparator)) {
-                      if (!tag.empty()) {
-                          halTrackMetadata.tags.push_back(tag);
-                      }
-                  }
-#endif
-                  return halTrackMetadata;
-              })};
-    return processReturn("updateSinkMetadata", mStream->updateSinkMetadata(halMetadata));
+    CPP_VERSION::SinkMetadata hidlMetadata;
+    if (status_t status = CoreUtils::sinkMetadataFromHalV7(
+                    sinkMetadata.tracks, true /*ignoreNonVendorTags*/, &hidlMetadata);
+            status != OK) {
+        return status;
+    }
+    return processReturn("updateSinkMetadata", mStream->updateSinkMetadata(hidlMetadata));
 }
 #endif
 
