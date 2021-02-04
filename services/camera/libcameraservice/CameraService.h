@@ -638,7 +638,7 @@ private:
         public:
             explicit SensorPrivacyPolicy(wp<CameraService> service)
                     : mService(service), mSensorPrivacyEnabled(false), mRegistered(false),
-                      isIndividual(false), userId(0) {}
+                      mIsIndividual(false), mUserId(0) {}
 
             void registerSelf();
             status_t registerSelfForIndividual(int userId);
@@ -657,8 +657,8 @@ private:
             Mutex mSensorPrivacyLock;
             bool mSensorPrivacyEnabled;
             bool mRegistered;
-            bool isIndividual;
-            userid_t userId;
+            bool mIsIndividual;
+            userid_t mUserId;
     };
 
     sp<UidPolicy> mUidPolicy;
