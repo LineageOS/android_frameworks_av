@@ -11,6 +11,7 @@ cc_library_shared {
         "CCodecConfig.cpp",
         "Codec2Buffer.cpp",
         "Codec2InfoBuilder.cpp",
+        "FrameReassembler.cpp",
         "PipelineWatcher.cpp",
         "ReflectedParamUpdater.cpp",
     ],
