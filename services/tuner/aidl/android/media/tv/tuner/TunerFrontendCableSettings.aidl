@@ -51,4 +51,13 @@ parcelable TunerFrontendCableSettings {
      * Spectral Inversion Type.
      */
     int spectralInversion;
+
+    /**
+     * Fields after isExtended are only valid when isExtended is true
+     */
+    boolean isExtended;
+
+    int interleaveMode;
+
+    int bandwidth;
 }
