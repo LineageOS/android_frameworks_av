@@ -16,15 +16,17 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFilterSettings;
+import android.media.tv.tuner.TunerFilterScIndexMask;
 
 /**
- * Filter Settings for a TS filter.
+ * Filter Settings for recording.
  *
  * {@hide}
  */
-parcelable TunerFilterTsConfiguration {
-    char tpid;
+parcelable TunerFilterRecordSettings {
+    int tsIndexMask;
 
-    TunerFilterSettings filterSettings;
+    int scIndexType;
+
+    TunerFilterScIndexMask scIndexMask;
 }
