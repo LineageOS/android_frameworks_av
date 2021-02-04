@@ -311,12 +311,9 @@ DemuxFilterSectionSettings TunerFilter::getSectionSettings(const TunerFilterSett
     switch (s.condition.getTag()) {
         case TunerFilterSectionCondition::sectionBits: {
             auto sectionBits = s.condition.get<TunerFilterSectionCondition::sectionBits>();
-            vector<uint8_t> filter(sectionBits.filter.size());
-            vector<uint8_t> mask(sectionBits.mask.size());
-            vector<uint8_t> mode(sectionBits.mode.size());
-            copy(sectionBits.filter.begin(), sectionBits.filter.end(), filter.begin());
-            copy(sectionBits.mask.begin(), sectionBits.mask.end(), mask.begin());
-            copy(sectionBits.mode.begin(), sectionBits.mode.end(), mode.begin());
+            vector<uint8_t> filter(sectionBits.filter.begin(), sectionBits.filter.end());
+            vector<uint8_t> mask(sectionBits.mask.begin(), sectionBits.mask.end());
+            vector<uint8_t> mode(sectionBits.mode.begin(), sectionBits.mode.end());
             section.condition.sectionBits({
                 .filter = filter,
                 .mask = mask,
