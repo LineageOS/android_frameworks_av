@@ -857,9 +857,9 @@ constexpr char PARAMETER_KEY_OFFSET_TIME[] = "time-offset-us";
 constexpr char PARAMETER_KEY_REQUEST_SYNC_FRAME[] = "request-sync";
 constexpr char PARAMETER_KEY_SUSPEND[] = "drop-input-frames";
 constexpr char PARAMETER_KEY_SUSPEND_TIME[] = "drop-start-time-us";
+constexpr char PARAMETER_KEY_TUNNEL_PEEK[] =  "tunnel-peek";
 constexpr char PARAMETER_KEY_VIDEO_BITRATE[] = "video-bitrate";
 
 }
 
 #endif  // MEDIA_CODEC_CONSTANTS_H_
-
