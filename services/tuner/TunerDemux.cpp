@@ -98,7 +98,7 @@ Status TunerDemux::openFilter(
         return Status::fromServiceSpecificError(static_cast<int32_t>(status));
     }
 
-    *_aidl_return = ::ndk::SharedRefBase::make<TunerFilter>(filterSp, cbSp);
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerFilter>(filterSp, cbSp, type, subType);
     return Status::ok();
 }
 

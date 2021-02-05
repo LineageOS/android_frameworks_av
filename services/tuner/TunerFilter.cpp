@@ -30,23 +30,50 @@ using ::android::hardware::tv::tuner::V1_0::DemuxRecordScIndexType;
 using ::android::hardware::tv::tuner::V1_0::DemuxStreamId;
 using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterType;
 using ::android::hardware::tv::tuner::V1_0::Result;
+using ::android::hardware::tv::tuner::V1_1::AudioStreamType;
 using ::android::hardware::tv::tuner::V1_1::Constant;
+using ::android::hardware::tv::tuner::V1_1::VideoStreamType;
 
 namespace android {
 
 using namespace std;
 
 TunerFilter::TunerFilter(
-        sp<IFilter> filter, sp<IFilterCallback> callback) {
+        sp<IFilter> filter, sp<IFilterCallback> callback, int mainType, int subType) {
     mFilter = filter;
     mFilter_1_1 = ::android::hardware::tv::tuner::V1_1::IFilter::castFrom(filter);
     mFilterCallback = callback;
+    mMainType = mainType;
+    mSubType = subType;
 }
 
 TunerFilter::~TunerFilter() {
     mFilter = nullptr;
     mFilter_1_1 = nullptr;
     mFilterCallback = nullptr;
+}
+
+Status TunerFilter::getQueueDesc(AidlMQDesc* _aidl_return) {
+    if (mFilter == NULL) {
+        ALOGE("IFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    MQDesc dvrMQDesc;
+    Result res;
+    mFilter->getQueueDesc([&](Result r, const MQDesc& desc) {
+        dvrMQDesc = desc;
+        res = r;
+    });
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+
+    AidlMQDesc aidlMQDesc;
+    unsafeHidlToAidlMQDescriptor<uint8_t, int8_t, SynchronizedReadWrite>(
+                dvrMQDesc,  &aidlMQDesc);
+    *_aidl_return = move(aidlMQDesc);
+    return Status::ok();
 }
 
 Status TunerFilter::getId(int32_t* _aidl_return) {
@@ -116,6 +143,65 @@ Status TunerFilter::configure(const TunerFilterConfiguration& config) {
     }
 
     Result res = mFilter->configure(settings);
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
+Status TunerFilter::configureMonitorEvent(int monitorEventType) {
+    if (mFilter_1_1 == nullptr) {
+        ALOGE("IFilter_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res = mFilter_1_1->configureMonitorEvent(monitorEventType);
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
+Status TunerFilter::configureIpFilterContextId(int cid) {
+    if (mFilter_1_1 == nullptr) {
+        ALOGE("IFilter_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res = mFilter_1_1->configureIpCid(cid);
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
+Status TunerFilter::configureAvStreamType(int avStreamType) {
+    if (mFilter_1_1 == nullptr) {
+        ALOGE("IFilter_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    AvStreamType type;
+    if (!getHidlAvStreamType(avStreamType, type)) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::INVALID_STATE));
+    }
+
+    Result res = mFilter_1_1->configureAvStreamType(type);
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
+Status TunerFilter::setDataSource(const shared_ptr<ITunerFilter>& filter) {
+    if (mFilter == nullptr) {
+        ALOGE("IFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    ITunerFilter* tunerFilter = filter.get();
+    sp<IFilter> hidlFilter = static_cast<TunerFilter*>(tunerFilter)->getHalFilter();
+    Result res = mFilter->setDataSource(hidlFilter);
     if (res != Result::SUCCESS) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
@@ -466,6 +552,34 @@ Status TunerFilter::close() {
 
 sp<IFilter> TunerFilter::getHalFilter() {
     return mFilter;
+}
+
+bool TunerFilter::isAudioFilter() {
+    return (mMainType == (int)DemuxFilterMainType::TS
+                    && mSubType == (int)DemuxTsFilterType::AUDIO)
+            || (mMainType == (int)DemuxFilterMainType::MMTP
+                    && mSubType == (int)DemuxMmtpFilterType::AUDIO);
+}
+
+bool TunerFilter::isVideoFilter() {
+    return (mMainType == (int)DemuxFilterMainType::TS
+                    && mSubType == (int)DemuxTsFilterType::VIDEO)
+            || (mMainType == (int)DemuxFilterMainType::MMTP
+                    && mSubType == (int)DemuxMmtpFilterType::VIDEO);
+}
+
+bool TunerFilter::getHidlAvStreamType(int avStreamType, AvStreamType& type) {
+    if (isAudioFilter()) {
+        type.audio(static_cast<AudioStreamType>(avStreamType));
+        return true;
+    }
+
+    if (isVideoFilter()) {
+        type.video(static_cast<VideoStreamType>(avStreamType));
+        return true;
+    }
+
+    return false;
 }
 
 /////////////// FilterCallback ///////////////////////
