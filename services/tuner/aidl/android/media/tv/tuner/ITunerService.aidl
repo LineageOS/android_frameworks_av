@@ -20,6 +20,7 @@ import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.fmq.UnsynchronizedWrite;
 import android.media.tv.tuner.ITunerDemux;
+import android.media.tv.tuner.ITunerDescrambler;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
 import android.media.tv.tuner.TunerDemuxCapabilities;
@@ -88,6 +89,13 @@ interface ITunerService {
      * @return the demux’s capabilities.
      */
     TunerDemuxCapabilities getDemuxCaps();
+
+    /* Open a new interface of ITunerDescrambler given a descramblerHandle.
+     *
+     * @param descramblerHandle the handle of the descrambler granted by TRM.
+     * @return a newly created ITunerDescrambler interface.
+     */
+    ITunerDescrambler openDescrambler(in int descramblerHandle);
 
     /**
      * Update Tuner Resources in TunerResourceManager.
