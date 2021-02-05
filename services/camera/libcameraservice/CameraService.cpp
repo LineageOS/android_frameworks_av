@@ -3249,8 +3249,8 @@ status_t CameraService::SensorPrivacyPolicy::registerSelfForIndividual(int userI
     }
 
     mRegistered = true;
-    isIndividual = true;
-    this->userId = userId;
+    mIsIndividual = true;
+    mUserId = userId;
     ALOGV("SensorPrivacyPolicy: Registered with SensorPrivacyManager");
     return OK;
 }
@@ -3276,8 +3276,8 @@ binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(bool e
     // if sensor privacy is enabled then block all clients from accessing the camera
     sp<CameraService> service = mService.promote();
     if (service != nullptr) {
-        if (isIndividual) {
-            service->setMuteForAllClients(userId, enabled);
+        if (mIsIndividual) {
+            service->setMuteForAllClients(mUserId, enabled);
         } else {
             if (enabled) {
                 service->blockAllClients();
