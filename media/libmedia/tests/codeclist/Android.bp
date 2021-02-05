@@ -16,7 +16,7 @@
 
 cc_test {
     name: "CodecListTest",
-    test_suites: ["device-tests"],
+    test_suites: ["device-tests", "mts"],
     gtest: true,
 
     srcs: [
@@ -32,7 +32,7 @@ cc_test {
         "libstagefright_xmlparser",
         "libutils",
     ],
-
+    compile_multilib: "first",
     cflags: [
         "-Werror",
         "-Wall",
