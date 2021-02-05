@@ -31,6 +31,7 @@ using ::aidl::android::media::tv::tuner::BnTunerService;
 using ::aidl::android::media::tv::tuner::ITunerDemux;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerLnb;
+using ::aidl::android::media::tv::tuner::TunerDemuxCapabilities;
 using ::aidl::android::media::tv::tuner::TunerFrontendInfo;
 using ::aidl::android::media::tv::tunerresourcemanager::ITunerResourceManager;
 
@@ -42,6 +43,7 @@ using ::android::hardware::MessageQueue;
 using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
+using ::android::hardware::tv::tuner::V1_0::DemuxCapabilities;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterAvSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterEvent;
 using ::android::hardware::tv::tuner::V1_0::DemuxFilterMainType;
@@ -113,6 +115,7 @@ public:
     Status openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) override;
     Status openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>* _aidl_return) override;
     Status openDemux(int32_t demuxHandle, std::shared_ptr<ITunerDemux>* _aidl_return) override;
+    Status getDemuxCaps(TunerDemuxCapabilities* _aidl_return) override;
     Status updateTunerResources() override;
 
 private:
@@ -125,6 +128,7 @@ private:
     Result getHidlFrontendInfo(int id, FrontendInfo& info);
     vector<int> getLnbHandles();
 
+    TunerDemuxCapabilities getAidlDemuxCaps(DemuxCapabilities caps);
     TunerFrontendInfo convertToAidlFrontendInfo(FrontendInfo halInfo);
 
     sp<ITuner> mTuner;
