@@ -793,7 +793,7 @@ MtpResponseCode MtpServer::doGetObject() {
     mtp_file_range mfr;
     struct stat sstat;
     uint64_t finalsize;
-    bool transcode = android::base::GetBoolProperty("sys.fuse.transcode_mtp", true);
+    bool transcode = android::base::GetBoolProperty("sys.fuse.transcode_mtp", false);
     ALOGD("Mtp transcode = %d", transcode);
     mfr.fd = mDatabase->openFilePath(filePath, transcode);
     // Doing this here because we want to update fileLength only for this case and leave the
