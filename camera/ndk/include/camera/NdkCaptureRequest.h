@@ -44,8 +44,6 @@
 
 __BEGIN_DECLS
 
-#if __ANDROID_API__ >= 24
-
 // Container for output targets
 typedef struct ACameraOutputTargets ACameraOutputTargets;
 
@@ -304,10 +302,6 @@ camera_status_t ACaptureRequest_setEntry_rational(
  */
 void ACaptureRequest_free(ACaptureRequest* request) __INTRODUCED_IN(24);
 
-#endif /* __ANDROID_API__ >= 24 */
-
-#if __ANDROID_API__ >= 28
-
 /**
  * Associate an arbitrary user context pointer to the {@link ACaptureRequest}
  *
@@ -355,10 +349,6 @@ camera_status_t ACaptureRequest_getUserContext(
  * @return a valid ACaptureRequest pointer or NULL if the input request cannot be copied.
  */
 ACaptureRequest* ACaptureRequest_copy(const ACaptureRequest* src) __INTRODUCED_IN(28);
-
-#endif /* __ANDROID_API__ >= 28 */
-
-#if __ANDROID_API__ >= 29
 
 /**
  * Get a metadata entry from input {@link ACaptureRequest} for
@@ -568,8 +558,6 @@ camera_status_t ACaptureRequest_setEntry_physicalCamera_double(
 camera_status_t ACaptureRequest_setEntry_physicalCamera_rational(
         ACaptureRequest* request, const char* physicalId, uint32_t tag,
         uint32_t count, const ACameraMetadata_rational* data) __INTRODUCED_IN(29);
-
-#endif /* __ANDROID_API__ >= 29 */
 
 __END_DECLS
 

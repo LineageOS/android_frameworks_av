@@ -41,17 +41,13 @@
 #include <sys/cdefs.h>
 
 #ifndef __ANDROID_VNDK__
-#if __ANDROID_API__ >= 30
 #include "jni.h"
-#endif  /* __ANDROID_API__ >= 30 */
 #endif  /* __ANDROID_VNDK__ */
 
 #include "NdkCameraError.h"
 #include "NdkCameraMetadataTags.h"
 
 __BEGIN_DECLS
-
-#if __ANDROID_API__ >= 24
 
 /**
  * ACameraMetadata is opaque type that provides access to read-only camera metadata like camera
@@ -238,10 +234,6 @@ ACameraMetadata* ACameraMetadata_copy(const ACameraMetadata* src) __INTRODUCED_I
  */
 void ACameraMetadata_free(ACameraMetadata* metadata) __INTRODUCED_IN(24);
 
-#endif /* __ANDROID_API__ >= 24 */
-
-#if __ANDROID_API__ >= 29
-
 /**
  * Helper function to check if a camera is logical multi-camera.
  *
@@ -260,10 +252,7 @@ bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
         /*out*/size_t* numPhysicalCameras, /*out*/const char* const** physicalCameraIds)
         __INTRODUCED_IN(29);
 
-#endif /* __ANDROID_API__ >= 29 */
-
 #ifndef __ANDROID_VNDK__
-#if __ANDROID_API__ >= 30
 
 /**
  * Return a {@link ACameraMetadata} that references the same data as
@@ -290,7 +279,6 @@ bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
 ACameraMetadata* ACameraMetadata_fromCameraMetadata(JNIEnv* env, jobject cameraMetadata)
         __INTRODUCED_IN(30);
 
-#endif /* __ANDROID_API__ >= 30 */
 #endif  /* __ANDROID_VNDK__ */
 
 __END_DECLS

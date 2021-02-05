@@ -53,8 +53,6 @@ __BEGIN_DECLS
  */
 typedef struct AImageReader AImageReader;
 
-#if __ANDROID_API__ >= 24
-
 /**
  * Create a new reader for images of the desired size and format.
  *
@@ -320,10 +318,6 @@ typedef struct AImageReader_ImageListener {
 media_status_t AImageReader_setImageListener(
         AImageReader* reader, AImageReader_ImageListener* listener) __INTRODUCED_IN(24);
 
-#endif /* __ANDROID_API__ >= 24 */
-
-#if __ANDROID_API__ >= 26
-
 /**
  * AImageReader constructor similar to {@link AImageReader_new} that takes an additional parameter
  * for the consumer usage. All other parameters and the return values are identical to those passed
@@ -509,8 +503,6 @@ media_status_t AImageReader_setBufferRemovedListener(
 media_status_t AImageReader_getWindowNativeHandle(
     AImageReader *reader, /* out */native_handle_t **handle);
 #endif
-
-#endif /* __ANDROID_API__ >= 26 */
 
 __END_DECLS
 

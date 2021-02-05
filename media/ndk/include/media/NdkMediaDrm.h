@@ -165,8 +165,6 @@ typedef void (*AMediaDrmKeysChangeListener)(AMediaDrm *,
         const AMediaDrmSessionId *sessionId, const AMediaDrmKeyStatus *keyStatus,
         size_t numKeys, bool hasNewUsableKey);
 
-#if __ANDROID_API__ >= 21
-
 /**
  * Query if the given scheme identified by its UUID is supported on this device, and
  * whether the drm plugin is able to handle the media container format specified by mimeType.
@@ -575,8 +573,6 @@ media_status_t AMediaDrm_sign(AMediaDrm *, const AMediaDrmSessionId *sessionId,
 media_status_t AMediaDrm_verify(AMediaDrm *, const AMediaDrmSessionId *sessionId,
         const char *macAlgorithm, uint8_t *keyId, const uint8_t *message, size_t messageSize,
         const uint8_t *signature, size_t signatureSize) __INTRODUCED_IN(21);
-
-#endif /* __ANDROID_API__ >= 21 */
 
 __END_DECLS
 
