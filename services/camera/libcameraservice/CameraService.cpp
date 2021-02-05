@@ -2932,10 +2932,21 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
             res == AppOpsManager::MODE_ERRORED ? "ERRORED" :
             "UNKNOWN");
 
-    if (res != AppOpsManager::MODE_ALLOWED) {
+    if (res == AppOpsManager::MODE_ERRORED) {
         ALOGI("Camera %s: Access for \"%s\" revoked", mCameraIdStr.string(),
               String8(mClientPackageName).string());
         block();
+    } else if (res == AppOpsManager::MODE_IGNORED) {
+        bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid, mClientPackageName);
+        ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d",
+                mCameraIdStr.string(), String8(mClientPackageName).string(),
+                mUidIsTrusted, isUidActive);
+        // If the calling Uid is trusted (a native service), or the client Uid is active (WAR for
+        // b/175320666), the AppOpsManager could return MODE_IGNORED. Do not treat such cases as
+        // error.
+        if (!mUidIsTrusted && !isUidActive) {
+            block();
+        }
     }
 }
 
