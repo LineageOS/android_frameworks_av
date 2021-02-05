@@ -20,6 +20,7 @@
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3PlpSettings;
 using ::aidl::android::media::tv::tuner::TunerFrontendScanAtsc3PlpInfo;
+using ::aidl::android::media::tv::tuner::TunerFrontendStatusAtsc3PlpInfo;
 using ::aidl::android::media::tv::tuner::TunerFrontendUnionSettings;
 using ::android::hardware::tv::tuner::V1_0::FrontendAnalogSifStandard;
 using ::android::hardware::tv::tuner::V1_0::FrontendAnalogType;
@@ -65,13 +66,15 @@ using ::android::hardware::tv::tuner::V1_0::FrontendIsdbtGuardInterval;
 using ::android::hardware::tv::tuner::V1_0::FrontendIsdbtMode;
 using ::android::hardware::tv::tuner::V1_0::FrontendIsdbtModulation;
 using ::android::hardware::tv::tuner::V1_0::FrontendIsdbtSettings;
+using ::android::hardware::tv::tuner::V1_0::FrontendModulationStatus;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanAtsc3PlpInfo;
 using ::android::hardware::tv::tuner::V1_0::FrontendScanType;
+using ::android::hardware::tv::tuner::V1_0::FrontendStatusType;
 using ::android::hardware::tv::tuner::V1_0::Result;
 using ::android::hardware::tv::tuner::V1_1::FrontendAnalogAftFlag;
+using ::android::hardware::tv::tuner::V1_1::FrontendBandwidth;
 using ::android::hardware::tv::tuner::V1_1::FrontendCableTimeInterleaveMode;
 using ::android::hardware::tv::tuner::V1_1::FrontendDvbcBandwidth;
-using ::android::hardware::tv::tuner::V1_1::FrontendModulation;
 using ::android::hardware::tv::tuner::V1_1::FrontendDtmbBandwidth;
 using ::android::hardware::tv::tuner::V1_1::FrontendDtmbCodeRate;
 using ::android::hardware::tv::tuner::V1_1::FrontendDtmbGuardInterval;
@@ -79,7 +82,13 @@ using ::android::hardware::tv::tuner::V1_1::FrontendDtmbModulation;
 using ::android::hardware::tv::tuner::V1_1::FrontendDtmbTimeInterleaveMode;
 using ::android::hardware::tv::tuner::V1_1::FrontendDtmbTransmissionMode;
 using ::android::hardware::tv::tuner::V1_1::FrontendDvbsScanType;
+using ::android::hardware::tv::tuner::V1_1::FrontendGuardInterval;
+using ::android::hardware::tv::tuner::V1_1::FrontendInterleaveMode;
+using ::android::hardware::tv::tuner::V1_1::FrontendModulation;
+using ::android::hardware::tv::tuner::V1_1::FrontendRollOff;
+using ::android::hardware::tv::tuner::V1_1::FrontendTransmissionMode;
 using ::android::hardware::tv::tuner::V1_1::FrontendSpectralInversion;
+using ::android::hardware::tv::tuner::V1_1::FrontendStatusTypeExt1_1;
 
 namespace android {
 
@@ -219,8 +228,55 @@ Status TunerFrontend::close() {
     return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerFrontend::getStatus(const vector<int32_t>& /*statusTypes*/,
-        vector<TunerFrontendStatus>* /*_aidl_return*/) {
+Status TunerFrontend::getStatus(const vector<int32_t>& statusTypes,
+        vector<TunerFrontendStatus>* _aidl_return) {
+    if (mFrontend == NULL) {
+        ALOGD("IFrontend is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res;
+    vector<FrontendStatus> status;
+    vector<FrontendStatusType> types;
+    for (auto s : statusTypes) {
+        types.push_back(static_cast<FrontendStatusType>(s));
+    }
+
+    mFrontend->getStatus(types, [&](Result r, const hidl_vec<FrontendStatus>& s) {
+        res = r;
+        status = s;
+    });
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+
+    getAidlFrontendStatus(status, *_aidl_return);
+    return Status::ok();
+}
+
+Status TunerFrontend::getStatusExtended_1_1(const vector<int32_t>& statusTypes,
+        vector<TunerFrontendStatus>* _aidl_return) {
+    if (mFrontend_1_1 == NULL) {
+        ALOGD("IFrontend_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res;
+    vector<FrontendStatusExt1_1> status;
+    vector<FrontendStatusTypeExt1_1> types;
+    for (auto s : statusTypes) {
+        types.push_back(static_cast<FrontendStatusTypeExt1_1>(s));
+    }
+
+    mFrontend_1_1->getStatusExt1_1(types, [&](Result r, const hidl_vec<FrontendStatusExt1_1>& s) {
+        res = r;
+        status = s;
+    });
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+
+    getAidlFrontendStatusExt(status, *_aidl_return);
     return Status::ok();
 }
 
@@ -312,7 +368,7 @@ Return<void> TunerFrontend::FrontendCallback::onScanMessage(
             vector<TunerFrontendScanAtsc3PlpInfo> tunerPlpInfos;
             for (int i = 0; i < plpInfos.size(); i++) {
                 auto info = plpInfos[i];
-                int plpId = (int) info.plpId;
+                int8_t plpId = (int8_t) info.plpId;
                 bool lls = (bool) info.bLlsFlag;
                 TunerFrontendScanAtsc3PlpInfo plpInfo{
                     .plpId = plpId,
@@ -386,6 +442,341 @@ Return<void> TunerFrontend::FrontendCallback::onScanMessageExt1_1(
 }
 
 /////////////// TunerFrontend Helper Methods ///////////////////////
+
+void TunerFrontend::getAidlFrontendStatus(
+        vector<FrontendStatus>& hidlStatus, vector<TunerFrontendStatus>& aidlStatus) {
+    for (FrontendStatus s : hidlStatus) {
+        TunerFrontendStatus status;
+        switch (s.getDiscriminator()) {
+            case FrontendStatus::hidl_discriminator::isDemodLocked: {
+                status.set<TunerFrontendStatus::isDemodLocked>(s.isDemodLocked());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::snr: {
+                status.set<TunerFrontendStatus::snr>((int)s.snr());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::ber: {
+                status.set<TunerFrontendStatus::ber>((int)s.ber());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::per: {
+                status.set<TunerFrontendStatus::per>((int)s.per());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::preBer: {
+                status.set<TunerFrontendStatus::preBer>((int)s.preBer());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::signalQuality: {
+                status.set<TunerFrontendStatus::signalQuality>((int)s.signalQuality());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::signalStrength: {
+                status.set<TunerFrontendStatus::signalStrength>((int)s.signalStrength());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::symbolRate: {
+                status.set<TunerFrontendStatus::symbolRate>((int)s.symbolRate());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::innerFec: {
+                status.set<TunerFrontendStatus::innerFec>((long)s.innerFec());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::modulation: {
+                switch (s.modulation().getDiscriminator()) {
+                    case FrontendModulationStatus::hidl_discriminator::dvbc:
+                        status.set<TunerFrontendStatus::modulation>((int)s.modulation().dvbc());
+                        aidlStatus.push_back(status);
+                        break;
+                    case FrontendModulationStatus::hidl_discriminator::dvbs:
+                        status.set<TunerFrontendStatus::modulation>((int)s.modulation().dvbs());
+                        aidlStatus.push_back(status);
+                        break;
+                    case FrontendModulationStatus::hidl_discriminator::isdbs:
+                        status.set<TunerFrontendStatus::modulation>((int)s.modulation().isdbs());
+                        aidlStatus.push_back(status);
+                        break;
+                    case FrontendModulationStatus::hidl_discriminator::isdbs3:
+                        status.set<TunerFrontendStatus::modulation>((int)s.modulation().isdbs3());
+                        aidlStatus.push_back(status);
+                        break;
+                    case FrontendModulationStatus::hidl_discriminator::isdbt:
+                        status.set<TunerFrontendStatus::modulation>((int)s.modulation().isdbt());
+                        aidlStatus.push_back(status);
+                        break;
+                }
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::inversion: {
+                status.set<TunerFrontendStatus::inversion>((int)s.inversion());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::lnbVoltage: {
+                status.set<TunerFrontendStatus::lnbVoltage>((int)s.lnbVoltage());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::plpId: {
+                status.set<TunerFrontendStatus::plpId>((int8_t)s.plpId());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::isEWBS: {
+                status.set<TunerFrontendStatus::isEWBS>(s.isEWBS());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::agc: {
+                status.set<TunerFrontendStatus::agc>((int8_t)s.agc());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::isLnaOn: {
+                status.set<TunerFrontendStatus::isLnaOn>(s.isLnaOn());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::isLayerError: {
+                vector<bool> e(s.isLayerError().begin(), s.isLayerError().end());
+                status.set<TunerFrontendStatus::isLayerError>(e);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::mer: {
+                status.set<TunerFrontendStatus::mer>((int)s.mer());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::freqOffset: {
+                status.set<TunerFrontendStatus::freqOffset>((int)s.freqOffset());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::hierarchy: {
+                status.set<TunerFrontendStatus::hierarchy>((int)s.hierarchy());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::isRfLocked: {
+                status.set<TunerFrontendStatus::isRfLocked>(s.isRfLocked());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatus::hidl_discriminator::plpInfo: {
+                vector<TunerFrontendStatusAtsc3PlpInfo> info;
+                for (auto i : s.plpInfo()) {
+                    info.push_back({
+                        .plpId = (int8_t)i.plpId,
+                        .isLocked = i.isLocked,
+                        .uec = (int)i.uec,
+                    });
+                }
+                status.set<TunerFrontendStatus::plpInfo>(info);
+                aidlStatus.push_back(status);
+                break;
+            }
+        }
+    }
+}
+
+void TunerFrontend::getAidlFrontendStatusExt(
+        vector<FrontendStatusExt1_1>& hidlStatus, vector<TunerFrontendStatus>& aidlStatus) {
+    for (FrontendStatusExt1_1 s : hidlStatus) {
+        TunerFrontendStatus status;
+        switch (s.getDiscriminator()) {
+            case FrontendStatusExt1_1::hidl_discriminator::modulations: {
+                vector<int> aidlMod;
+                for (auto m : s.modulations()) {
+                    switch (m.getDiscriminator()) {
+                        case FrontendModulation::hidl_discriminator::dvbc:
+                            aidlMod.push_back((int)m.dvbc());
+                            break;
+                        case FrontendModulation::hidl_discriminator::dvbs:
+                            aidlMod.push_back((int)m.dvbs());
+                            break;
+                        case FrontendModulation::hidl_discriminator::dvbt:
+                            aidlMod.push_back((int)m.dvbt());
+                            break;
+                        case FrontendModulation::hidl_discriminator::isdbs:
+                            aidlMod.push_back((int)m.isdbs());
+                            break;
+                        case FrontendModulation::hidl_discriminator::isdbs3:
+                            aidlMod.push_back((int)m.isdbs3());
+                            break;
+                        case FrontendModulation::hidl_discriminator::isdbt:
+                            aidlMod.push_back((int)m.isdbt());
+                            break;
+                        case FrontendModulation::hidl_discriminator::atsc:
+                            aidlMod.push_back((int)m.atsc());
+                            break;
+                        case FrontendModulation::hidl_discriminator::atsc3:
+                            aidlMod.push_back((int)m.atsc3());
+                            break;
+                        case FrontendModulation::hidl_discriminator::dtmb:
+                            aidlMod.push_back((int)m.dtmb());
+                            break;
+                    }
+                }
+                status.set<TunerFrontendStatus::modulations>(aidlMod);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::bers: {
+                vector<int> b(s.bers().begin(), s.bers().end());
+                status.set<TunerFrontendStatus::bers>(b);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::codeRates: {
+                vector<int64_t> codeRates;
+                for (auto c : s.codeRates()) {
+                    codeRates.push_back((long)c);
+                }
+                status.set<TunerFrontendStatus::codeRates>(codeRates);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::bandwidth: {
+                switch (s.bandwidth().getDiscriminator()) {
+                    case FrontendBandwidth::hidl_discriminator::atsc3:
+                        status.set<TunerFrontendStatus::bandwidth>((int)s.bandwidth().atsc3());
+                        break;
+                    case FrontendBandwidth::hidl_discriminator::dvbc:
+                        status.set<TunerFrontendStatus::bandwidth>((int)s.bandwidth().dvbc());
+                        break;
+                    case FrontendBandwidth::hidl_discriminator::dvbt:
+                        status.set<TunerFrontendStatus::bandwidth>((int)s.bandwidth().dvbt());
+                        break;
+                    case FrontendBandwidth::hidl_discriminator::isdbt:
+                        status.set<TunerFrontendStatus::bandwidth>((int)s.bandwidth().isdbt());
+                        break;
+                    case FrontendBandwidth::hidl_discriminator::dtmb:
+                        status.set<TunerFrontendStatus::bandwidth>((int)s.bandwidth().dtmb());
+                        break;
+                }
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::interval: {
+                switch (s.interval().getDiscriminator()) {
+                    case FrontendGuardInterval::hidl_discriminator::dvbt:
+                        status.set<TunerFrontendStatus::interval>((int)s.interval().dvbt());
+                        break;
+                    case FrontendGuardInterval::hidl_discriminator::isdbt:
+                        status.set<TunerFrontendStatus::interval>((int)s.interval().isdbt());
+                        break;
+                    case FrontendGuardInterval::hidl_discriminator::dtmb:
+                        status.set<TunerFrontendStatus::interval>((int)s.interval().dtmb());
+                        break;
+                }
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::transmissionMode: {
+                switch (s.transmissionMode().getDiscriminator()) {
+                    case FrontendTransmissionMode::hidl_discriminator::dvbt:
+                        status.set<TunerFrontendStatus::transmissionMode>(
+                                (int)s.transmissionMode().dvbt());
+                        break;
+                    case FrontendTransmissionMode::hidl_discriminator::isdbt:
+                        status.set<TunerFrontendStatus::transmissionMode>(
+                                (int)s.transmissionMode().isdbt());
+                        break;
+                    case FrontendTransmissionMode::hidl_discriminator::dtmb:
+                        status.set<TunerFrontendStatus::transmissionMode>(
+                                (int)s.transmissionMode().dtmb());
+                        break;
+                }
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::uec: {
+                status.set<TunerFrontendStatus::uec>((int)s.uec());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::systemId: {
+                status.set<TunerFrontendStatus::systemId>((char16_t)s.systemId());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::interleaving: {
+                vector<int> aidlInter;
+                for (auto i : s.interleaving()) {
+                    switch (i.getDiscriminator()) {
+                        case FrontendInterleaveMode::hidl_discriminator::atsc3:
+                            aidlInter.push_back((int)i.atsc3());
+                            break;
+                        case FrontendInterleaveMode::hidl_discriminator::dvbc:
+                            aidlInter.push_back((int)i.dvbc());
+                            break;
+                        case FrontendInterleaveMode::hidl_discriminator::dtmb:
+                            aidlInter.push_back((int)i.dtmb());
+                            break;
+                    }
+                }
+                status.set<TunerFrontendStatus::interleaving>(aidlInter);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::isdbtSegment: {
+                auto seg = s.isdbtSegment();
+                vector<uint8_t> i(seg.begin(), seg.end());
+                status.set<TunerFrontendStatus::isdbtSegment>(i);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::tsDataRate: {
+                vector<int> ts(s.tsDataRate().begin(), s.tsDataRate().end());
+                status.set<TunerFrontendStatus::tsDataRate>(ts);
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::rollOff: {
+                switch (s.rollOff().getDiscriminator()) {
+                    case FrontendRollOff::hidl_discriminator::dvbs:
+                        status.set<TunerFrontendStatus::interleaving>((int)s.rollOff().dvbs());
+                        break;
+                    case FrontendRollOff::hidl_discriminator::isdbs:
+                        status.set<TunerFrontendStatus::interleaving>((int)s.rollOff().isdbs());
+                        break;
+                    case FrontendRollOff::hidl_discriminator::isdbs3:
+                        status.set<TunerFrontendStatus::interleaving>((int)s.rollOff().isdbs3());
+                        break;
+                }
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::isMiso: {
+                status.set<TunerFrontendStatus::isMiso>(s.isMiso());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::isLinear: {
+                status.set<TunerFrontendStatus::isLinear>(s.isLinear());
+                aidlStatus.push_back(status);
+                break;
+            }
+            case FrontendStatusExt1_1::hidl_discriminator::isShortFrames: {
+                status.set<TunerFrontendStatus::isShortFrames>(s.isShortFrames());
+                aidlStatus.push_back(status);
+                break;
+            }
+        }
+    }
+}
 
 hidl_vec<FrontendAtsc3PlpSettings> TunerFrontend::getAtsc3PlpSettings(
         const TunerFrontendAtsc3Settings& settings) {
