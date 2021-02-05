@@ -67,4 +67,9 @@ parcelable TunerFrontendDvbtSettings {
      * Physical Layer Pipe (PLP) Group Id
      */
     int plpGroupId;
+
+    /**
+     * Fields after isExtended are only valid when isExtended is true
+     */
+    boolean isExtended;
 }
