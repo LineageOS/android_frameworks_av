@@ -510,7 +510,7 @@ public:
                     if (data) {
                         int slot = data->migrate(
                                 mProducer, generation,
-                                producerId, mBuffers, oldGeneration);
+                                producerId, mBuffers[i], oldGeneration);
                         if (slot >= 0) {
                             buffers[slot] = mBuffers[i];
                             poolDatas[slot] = data;
@@ -594,7 +594,7 @@ C2BufferQueueBlockPoolData::type_t C2BufferQueueBlockPoolData::getType() const {
 int C2BufferQueueBlockPoolData::migrate(
         const sp<HGraphicBufferProducer>& producer,
         uint32_t toGeneration, uint64_t toBqId,
-        sp<GraphicBuffer> *buffers, uint32_t oldGeneration) {
+        sp<GraphicBuffer> graphicBuffer, uint32_t oldGeneration) {
     std::scoped_lock<std::mutex> l(mLock);
 
     mCurrentBqId = toBqId;
@@ -608,8 +608,12 @@ int C2BufferQueueBlockPoolData::migrate(
         ALOGV("pool is not local");
         return -1;
     }
-    if (mBqSlot < 0 || mBqSlot >= NUM_BUFFER_SLOTS || !buffers[mBqSlot]) {
+    if (mBqSlot < 0 || mBqSlot >= NUM_BUFFER_SLOTS) {
         ALOGV("slot is not in effect");
+        return -1;
+    }
+    if (!graphicBuffer) {
+        ALOGV("buffer is null");
         return -1;
     }
     if (toGeneration == mGeneration && mBqId == toBqId) {
@@ -624,7 +628,6 @@ int C2BufferQueueBlockPoolData::migrate(
         ALOGV("buffer is in transfer");
         return -1;
     }
-    sp<GraphicBuffer> const& graphicBuffer = buffers[mBqSlot];
     graphicBuffer->setGenerationNumber(toGeneration);
 
     HBuffer hBuffer{};
