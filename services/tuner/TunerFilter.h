@@ -25,8 +25,12 @@
 #include <android/hardware/tv/tuner/1.1/IFilterCallback.h>
 #include <android/hardware/tv/tuner/1.1/types.h>
 #include <media/stagefright/foundation/ADebug.h>
+#include <fmq/ConvertMQDescriptors.h>
+#include <fmq/MessageQueue.h>
 
 using Status = ::ndk::ScopedAStatus;
+using ::aidl::android::hardware::common::fmq::MQDescriptor;
+using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
 using ::aidl::android::media::tv::tuner::BnTunerFilter;
 using ::aidl::android::media::tv::tuner::ITunerFilterCallback;
 using ::aidl::android::media::tv::tuner::TunerDemuxIpAddress;
@@ -44,6 +48,7 @@ using ::aidl::android::media::tv::tuner::TunerFilterSharedHandleInfo;
 using ::aidl::android::media::tv::tuner::TunerFilterSettings;
 using ::aidl::android::media::tv::tuner::TunerFilterTemiEvent;
 using ::aidl::android::media::tv::tuner::TunerFilterTsRecordEvent;
+using ::android::hardware::MQDescriptorSync;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::hardware::hidl_array;
@@ -70,6 +75,7 @@ using ::android::hardware::tv::tuner::V1_0::DemuxTlvFilterSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterSettings;
 using ::android::hardware::tv::tuner::V1_0::DemuxPid;
 using ::android::hardware::tv::tuner::V1_0::IFilter;
+using ::android::hardware::tv::tuner::V1_1::AvStreamType;
 using ::android::hardware::tv::tuner::V1_1::DemuxFilterEventExt;
 using ::android::hardware::tv::tuner::V1_1::DemuxFilterMonitorEvent;
 using ::android::hardware::tv::tuner::V1_1::DemuxFilterTsRecordEventExt;
@@ -77,20 +83,28 @@ using ::android::hardware::tv::tuner::V1_1::IFilterCallback;
 
 namespace android {
 
+using MQDesc = MQDescriptorSync<uint8_t>;
+using AidlMQDesc = MQDescriptor<int8_t, SynchronizedReadWrite>;
+
 const static int IP_V4_LENGTH = 4;
 const static int IP_V6_LENGTH = 16;
 
 class TunerFilter : public BnTunerFilter {
 
 public:
-    TunerFilter(sp<IFilter> filter, sp<IFilterCallback> callback);
+    TunerFilter(sp<IFilter> filter, sp<IFilterCallback> callback, int mainType, int subTyp);
     virtual ~TunerFilter();
     Status getId(int32_t* _aidl_return) override;
     Status getId64Bit(int64_t* _aidl_return) override;
+    Status getQueueDesc(AidlMQDesc* _aidl_return) override;
     Status configure(const TunerFilterConfiguration& config) override;
+    Status configureMonitorEvent(int monitorEventType) override;
+    Status configureIpFilterContextId(int cid) override;
+    Status configureAvStreamType(int avStreamType) override;
     Status getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_return) override;
     Status releaseAvHandle(const ::aidl::android::hardware::common::NativeHandle& handle,
             int64_t avDataId) override;
+    Status setDataSource(const std::shared_ptr<ITunerFilter>& filter) override;
     Status start() override;
     Status stop() override;
     Status flush() override;
@@ -147,6 +161,10 @@ private:
     DemuxFilterRecordSettings getRecordSettings(const TunerFilterSettings& settings);
     DemuxFilterDownloadSettings getDownloadSettings(const TunerFilterSettings& settings);
 
+    bool isAudioFilter();
+    bool isVideoFilter();
+    bool getHidlAvStreamType(int avStreamType, AvStreamType& type);
+
     void getHidlTsSettings(
         const TunerFilterConfiguration& config, DemuxFilterSettings& settings);
     void getHidlMmtpSettings(
@@ -166,6 +184,8 @@ private:
     sp<IFilterCallback> mFilterCallback;
     int32_t mId;
     int64_t mId64Bit;
+    int mMainType;
+    int mSubType;
 };
 
 } // namespace android
