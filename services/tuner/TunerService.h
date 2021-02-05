@@ -19,7 +19,7 @@
 
 #include <aidl/android/media/tv/tunerresourcemanager/ITunerResourceManager.h>
 #include <aidl/android/media/tv/tuner/BnTunerService.h>
-#include <android/hardware/tv/tuner/1.0/ITuner.h>
+#include <android/hardware/tv/tuner/1.1/ITuner.h>
 #include <fmq/AidlMessageQueue.h>
 #include <fmq/EventFlag.h>
 #include <fmq/MessageQueue.h>
@@ -33,6 +33,7 @@ using ::aidl::android::media::tv::tuner::ITunerDescrambler;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerLnb;
 using ::aidl::android::media::tv::tuner::TunerDemuxCapabilities;
+using ::aidl::android::media::tv::tuner::TunerFrontendDtmbCapabilities;
 using ::aidl::android::media::tv::tuner::TunerFrontendInfo;
 using ::aidl::android::media::tv::tunerresourcemanager::ITunerResourceManager;
 
@@ -98,10 +99,10 @@ public:
 
     Status getFrontendIds(vector<int32_t>* ids) override;
     Status getFrontendInfo(int32_t id, TunerFrontendInfo* _aidl_return) override;
+    Status getFrontendDtmbCapabilities(
+            int32_t id, TunerFrontendDtmbCapabilities* _aidl_return) override;
     Status openFrontend(
             int32_t frontendHandle, shared_ptr<ITunerFrontend>* _aidl_return) override;
-    Status getFmqSyncReadWrite(
-            MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) override;
     Status openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) override;
     Status openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>* _aidl_return) override;
     Status openDemux(int32_t demuxHandle, std::shared_ptr<ITunerDemux>* _aidl_return) override;
@@ -123,8 +124,8 @@ public:
     }
 
 private:
-    bool getITuner();
-    Result configFilter();
+    bool hasITuner();
+    bool hasITuner_1_1();
 
     void updateFrontendResources();
     void updateLnbResources();
@@ -136,15 +137,10 @@ private:
     TunerFrontendInfo convertToAidlFrontendInfo(FrontendInfo halInfo);
 
     sp<ITuner> mTuner;
-    sp<IFilter> mFilter;
+    sp<::android::hardware::tv::tuner::V1_1::ITuner> mTuner_1_1;
 
     shared_ptr<ITunerResourceManager> mTunerResourceManager;
     int mResourceRequestCount = 0;
-
-    AidlMessageQueue* mAidlMq;
-    MQDescriptorSync<uint8_t> mFilterMQDesc;
-    AidlMQDesc mAidlMQDesc;
-    EventFlag* mEventFlag;
 };
 
 } // namespace android

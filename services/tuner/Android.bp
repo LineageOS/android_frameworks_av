@@ -111,6 +111,7 @@ cc_binary {
 
     shared_libs: [
         "android.hardware.tv.tuner@1.0",
+        "android.hardware.tv.tuner@1.1",
         "libbase",
         "libbinder",
         "libfmq",
