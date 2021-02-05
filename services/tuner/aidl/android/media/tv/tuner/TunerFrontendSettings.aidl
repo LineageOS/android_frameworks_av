@@ -1,5 +1,5 @@
 /**
- * Copyright 2020, The Android Open Source Project
+ * Copyright 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,37 +16,19 @@
 
 package android.media.tv.tuner;
 
-import android.media.tv.tuner.TunerFrontendAnalogSettings;
-import android.media.tv.tuner.TunerFrontendAtscSettings;
-import android.media.tv.tuner.TunerFrontendAtsc3Settings;
-import android.media.tv.tuner.TunerFrontendCableSettings;
-import android.media.tv.tuner.TunerFrontendDvbsSettings;
-import android.media.tv.tuner.TunerFrontendDvbtSettings;
-import android.media.tv.tuner.TunerFrontendIsdbsSettings;
-import android.media.tv.tuner.TunerFrontendIsdbs3Settings;
-import android.media.tv.tuner.TunerFrontendIsdbtSettings;
+import android.media.tv.tuner.TunerFrontendUnionSettings;
 
 /**
- * Analog Frontend Settings interface.
+ * Frontend Settings interface.
  *
  * {@hide}
  */
-union TunerFrontendSettings {
-    TunerFrontendAnalogSettings analog;
+parcelable TunerFrontendSettings {
+    TunerFrontendUnionSettings settings;
 
-    TunerFrontendAtscSettings atsc;
+    boolean isExtended;
 
-    TunerFrontendAtsc3Settings atsc3;
+    int endFrequency;
 
-    TunerFrontendCableSettings cable;
-
-    TunerFrontendDvbsSettings dvbs;
-
-    TunerFrontendDvbtSettings dvbt;
-
-    TunerFrontendIsdbsSettings isdbs;
-
-    TunerFrontendIsdbs3Settings isdbs3;
-
-    TunerFrontendIsdbtSettings isdbt;
+    int inversion;
 }

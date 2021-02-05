@@ -1,5 +1,5 @@
 /**
- * Copyright 2020, The Android Open Source Project
+ * Copyright 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,27 +17,22 @@
 package android.media.tv.tuner;
 
 /**
- * Analog Frontend Settings interface.
+ * DTMB Frontend Settings interface.
  *
  * {@hide}
  */
-parcelable TunerFrontendAnalogSettings {
-    /**
-     * Signal frequency in Hertz
-     */
+parcelable TunerFrontendDtmbSettings {
     int frequency;
 
-    int signalType;
+    int transmissionMode;
 
-    /**
-     * Standard Interchange Format (SIF) setting
-     */
-    int sifStandard;
+    int bandwidth;
 
-    /**
-     * Fields after isExtended are only valid when isExtended is true
-     */
-    boolean isExtended;
+    int modulation;
 
-    int aftFlag;
+    int codeRate;
+
+    int guardInterval;
+
+    int interleaveMode;
 }
