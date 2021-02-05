@@ -28,6 +28,8 @@
 #include <media/stagefright/foundation/avc_utils.h>
 #include <media/stagefright/foundation/hexdump.h>
 
+#include <android-base/properties.h>
+
 #include <stdint.h>
 
 namespace android {
@@ -513,7 +515,11 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 void AAVCAssembler::submitAccessUnit() {
     CHECK(!mNALUnits.empty());
 
-    ALOGV("Access unit complete (%zu nal units)", mNALUnits.size());
+    if(android::base::GetBoolProperty("debug.stagefright.fps", false)) {
+        ALOGD("Access unit complete (%zu nal units)", mNALUnits.size());
+    } else {
+        ALOGV("Access unit complete (%zu nal units)", mNALUnits.size());
+    }
 
     size_t totalSize = 0;
     for (List<sp<ABuffer> >::iterator it = mNALUnits.begin();
