@@ -12,7 +12,13 @@
         </mixPort>
         <!-- Le Audio Audio Ports -->
         <mixPort name="le audio output" role="source">
-            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT,AUDIO_FORMAT_PCM_24_BIT,AUDIO_FORMAT_PCM_32_BIT"
+            <profile name="" format="AUDIO_FORMAT_PCM_16_BIT"
+                     samplingRates="8000,16000,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO"/>
+            <profile name="" format="AUDIO_FORMAT_PCM_24_BIT_PACKED"
+                     samplingRates="8000,16000,24000,32000,44100,48000"
+                     channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO"/>
+            <profile name="" format="AUDIO_FORMAT_PCM_32_BIT"
                      samplingRates="8000,16000,24000,32000,44100,48000"
                      channelMasks="AUDIO_CHANNEL_OUT_MONO,AUDIO_CHANNEL_OUT_STEREO"/>
         </mixPort>
@@ -37,6 +43,10 @@
         <!-- Hearing AIDs Audio Ports -->
         <devicePort tagName="BT Hearing Aid Out" type="AUDIO_DEVICE_OUT_HEARING_AID" role="sink"/>
         <!-- BLE Audio Ports -->
+        <!-- Note that these device types are not valid in HAL versions < 7. Any device
+             running pre-V7 HAL and using this file will not pass VTS. Need to use
+             bluetooth_audio_policy_configuration_7_0.xml instead.
+        -->
         <devicePort tagName="BLE Headset Out" type="AUDIO_DEVICE_OUT_BLE_HEADSET" role="sink"/>
         <devicePort tagName="BLE Speaker Out" type="AUDIO_DEVICE_OUT_BLE_SPEAKER" role="sink"/>
     </devicePorts>
