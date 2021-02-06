@@ -83,6 +83,11 @@ interface ITunerFrontend {
     TunerFrontendStatus[] getStatus(in int[] statusTypes);
 
     /**
+     * Gets the 1.1 extended statuses of the frontend.
+     */
+    TunerFrontendStatus[] getStatusExtended_1_1(in int[] statusTypes);
+
+    /**
      * Gets the id of the frontend.
      */
     int getFrontendId();

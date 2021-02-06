@@ -22,6 +22,7 @@ import android.hardware.common.fmq.UnsynchronizedWrite;
 import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
+import android.media.tv.tuner.TunerDemuxCapabilities;
 import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
@@ -80,6 +81,13 @@ interface ITunerService {
      * Create a new instance of Demux.
      */
     ITunerDemux openDemux(in int demuxHandle);
+
+    /**
+     * Retrieve the Tuner Demux capabilities.
+     *
+     * @return the demux’s capabilities.
+     */
+    TunerDemuxCapabilities getDemuxCaps();
 
     /**
      * Update Tuner Resources in TunerResourceManager.
