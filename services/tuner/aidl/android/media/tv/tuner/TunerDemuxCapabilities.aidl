@@ -1,5 +1,5 @@
 /**
- * Copyright 2020, The Android Open Source Project
+ * Copyright 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,12 +17,34 @@
 package android.media.tv.tuner;
 
 /**
- * Atsc3 Frontend Physical Layer Pipe Info.
+ * Tuner Demux capabilities interface.
  *
  * {@hide}
  */
-parcelable TunerFrontendScanAtsc3PlpInfo {
-    byte plpId;
+parcelable TunerDemuxCapabilities {
+    int numDemux;
 
-    boolean llsFlag;
+    int numRecord;
+
+    int numPlayback;
+
+    int numTsFilter;
+
+    int numSectionFilter;
+
+    int numAudioFilter;
+
+    int numVideoFilter;
+
+    int numPesFilter;
+
+    int numPcrFilter;
+
+    int numBytesInSectionFilter;
+
+    int filterCaps;
+
+    int[] linkCaps;
+
+    boolean bTimeFilter;
 }

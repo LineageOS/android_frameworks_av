@@ -92,7 +92,27 @@ Status TunerService::openDemux(
         return Status::ok();
     }
 
-    ALOGD("open demux failed, res = %d", res);
+    ALOGW("open demux failed, res = %d", res);
+    return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+}
+
+Status TunerService::getDemuxCaps(TunerDemuxCapabilities* _aidl_return) {
+    ALOGD("getDemuxCaps");
+    if (!getITuner()) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::NOT_INITIALIZED));
+    }
+    Result res;
+    DemuxCapabilities caps;
+    mTuner->getDemuxCaps([&](Result r, const DemuxCapabilities& demuxCaps) {
+        caps = demuxCaps;
+        res = r;
+    });
+    if (res == Result::SUCCESS) {
+        *_aidl_return = getAidlDemuxCaps(caps);
+        return Status::ok();
+    }
+
+    ALOGW("Get demux caps failed, res = %d", res);
     return Status::fromServiceSpecificError(static_cast<int32_t>(res));
 }
 
@@ -341,6 +361,26 @@ Result TunerService::getHidlFrontendInfo(int id, FrontendInfo& info) {
         res = r;
     });
     return res;
+}
+
+TunerDemuxCapabilities TunerService::getAidlDemuxCaps(DemuxCapabilities caps) {
+    TunerDemuxCapabilities aidlCaps{
+        .numDemux = (int)caps.numDemux,
+        .numRecord = (int)caps.numRecord,
+        .numPlayback = (int)caps.numPlayback,
+        .numTsFilter = (int)caps.numTsFilter,
+        .numSectionFilter = (int)caps.numSectionFilter,
+        .numAudioFilter = (int)caps.numAudioFilter,
+        .numVideoFilter = (int)caps.numVideoFilter,
+        .numPesFilter = (int)caps.numPesFilter,
+        .numPcrFilter = (int)caps.numPcrFilter,
+        .numBytesInSectionFilter = (int)caps.numBytesInSectionFilter,
+        .filterCaps = (int)caps.filterCaps,
+        .bTimeFilter = caps.bTimeFilter,
+    };
+    aidlCaps.linkCaps.resize(caps.linkCaps.size());
+    copy(caps.linkCaps.begin(), caps.linkCaps.end(), aidlCaps.linkCaps.begin());
+    return aidlCaps;
 }
 
 TunerFrontendInfo TunerService::convertToAidlFrontendInfo(FrontendInfo halInfo) {
