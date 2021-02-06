@@ -45,8 +45,6 @@
 
 __BEGIN_DECLS
 
-#if __ANDROID_API__ >= 24
-
 /**
  * ACameraCaptureSession is an opaque type that manages frame captures of a camera device.
  *
@@ -593,10 +591,6 @@ camera_status_t ACameraCaptureSession_stopRepeating(ACameraCaptureSession* sessi
 camera_status_t ACameraCaptureSession_abortCaptures(ACameraCaptureSession* session)
         __INTRODUCED_IN(24);
 
-#endif /* __ANDROID_API__ >= 24 */
-
-#if __ANDROID_API__ >= 28
-
 typedef struct ACaptureSessionOutput ACaptureSessionOutput;
 
 /**
@@ -641,9 +635,7 @@ typedef struct ACaptureSessionOutput ACaptureSessionOutput;
  */
 camera_status_t ACameraCaptureSession_updateSharedOutput(ACameraCaptureSession* session,
         ACaptureSessionOutput* output) __INTRODUCED_IN(28);
-#endif /* __ANDROID_API__ >= 28 */
 
-#if __ANDROID_API__ >= 29
 /**
  * The definition of final capture result callback with logical multi-camera support.
  *
@@ -787,8 +779,6 @@ camera_status_t ACameraCaptureSession_logicalCamera_setRepeatingRequest(
         /*optional*/ACameraCaptureSession_logicalCamera_captureCallbacks* callbacks,
         int numRequests, ACaptureRequest** requests,
         /*optional*/int* captureSequenceId) __INTRODUCED_IN(29);
-
-#endif /* __ANDROID_API__ >= 29 */
 
 __END_DECLS
 

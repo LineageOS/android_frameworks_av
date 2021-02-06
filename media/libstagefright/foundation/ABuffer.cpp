@@ -67,7 +67,7 @@ ABuffer::~ABuffer() {
 
 void ABuffer::setRange(size_t offset, size_t size) {
     CHECK_LE(offset, mCapacity);
-    CHECK_LE(offset + size, mCapacity);
+    CHECK_LE(size, mCapacity - offset);
 
     mRangeOffset = offset;
     mRangeLength = size;
