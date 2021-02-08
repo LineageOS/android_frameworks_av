@@ -2183,7 +2183,9 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             status = BAD_VALUE;
             goto error;
         }
-        if (policyMix) {
+        if (device->type() == AUDIO_DEVICE_IN_ECHO_REFERENCE) {
+            *inputType = API_INPUT_MIX_CAPTURE;
+        } else if (policyMix) {
             ALOG_ASSERT(policyMix->mMixType == MIX_TYPE_RECORDERS, "Invalid Mix Type");
             // there is an external policy, but this input is attached to a mix of recorders,
             // meaning it receives audio injected into the framework, so the recorder doesn't
