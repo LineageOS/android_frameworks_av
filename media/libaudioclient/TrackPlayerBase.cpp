@@ -33,8 +33,9 @@ TrackPlayerBase::~TrackPlayerBase() {
     doDestroy();
 }
 
-void TrackPlayerBase::init(AudioTrack* pat, player_type_t playerType, audio_usage_t usage) {
-    PlayerBase::init(playerType, usage);
+void TrackPlayerBase::init(AudioTrack* pat, player_type_t playerType, audio_usage_t usage,
+        audio_session_t sessionId) {
+    PlayerBase::init(playerType, usage, sessionId);
     mAudioTrack = pat;
     if (mAudioTrack != 0) {
         mSelfAudioDeviceCallback = new SelfAudioDeviceCallback(*this);
