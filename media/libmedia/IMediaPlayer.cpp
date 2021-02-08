@@ -17,8 +17,8 @@
 
 #include <arpa/inet.h>
 #include <stdint.h>
-#include <sys/types.h>
 
+#include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 
 #include <media/AudioResamplerPublic.h>
@@ -85,10 +85,36 @@ enum {
 };
 
 // ModDrm helpers
-static void readVector(const Parcel& reply, Vector<uint8_t>& vector) {
-    uint32_t size = reply.readUint32();
-    vector.insertAt((size_t)0, size);
-    reply.read(vector.editArray(), size);
+static status_t readVector(const Parcel& reply, Vector<uint8_t>& vector) {
+    uint32_t size = 0;
+    status_t status = reply.readUint32(&size);
+    if (status == OK) {
+        status = size <= reply.dataAvail() ? OK : BAD_VALUE;
+    }
+    if (status == OK) {
+        status = vector.insertAt((size_t) 0, size) >= 0 ? OK : NO_MEMORY;
+    }
+    if (status == OK) {
+        status = reply.read(vector.editArray(), size);
+    }
+    if (status != OK) {
+        char errorMsg[100];
+        char buganizerId[] = "173720767";
+        snprintf(errorMsg,
+                sizeof(errorMsg),
+                "%s: failed to read array. Size: %d, status: %d.",
+                __func__,
+                size,
+                status);
+        android_errorWriteWithInfoLog(
+                /* safetyNet tag= */ 0x534e4554,
+                buganizerId,
+                IPCThreadState::self()->getCallingUid(),
+                errorMsg,
+                strlen(errorMsg));
+        ALOGE("%s (b/%s)", errorMsg, buganizerId);
+    }
+    return status;
 }
 
 static void writeVector(Parcel& data, Vector<uint8_t> const& vector) {
@@ -964,8 +990,10 @@ status_t BnMediaPlayer::onTransact(
             uint8_t uuid[16];
             data.read(uuid, sizeof(uuid));
             Vector<uint8_t> drmSessionId;
-            readVector(data, drmSessionId);
-
+            status_t status = readVector(data, drmSessionId);
+            if (status != OK) {
+              return status;
+            }
             uint32_t result = prepareDrm(uuid, drmSessionId);
             reply->writeInt32(result);
             return OK;
