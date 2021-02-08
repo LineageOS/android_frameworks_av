@@ -35,6 +35,14 @@
 #include <ostream>
 #include <sstream>
 
+#ifndef __ANDROID_APEX__
+#include <codec2/hidl/plugin/FilterPlugin.h>
+#include <dlfcn.h>
+#include <C2Config.h>
+#include <DefaultFilterPlugin.h>
+#include <FilterWrapper.h>
+#endif
+
 namespace android {
 namespace hardware {
 namespace media {
@@ -176,6 +184,16 @@ std::shared_ptr<ParameterCache> ComponentStore::getParameterCache() const {
     return mParameterCache;
 }
 
+#ifndef __ANDROID_APEX__
+// static
+std::shared_ptr<FilterWrapper> ComponentStore::GetFilterWrapper() {
+    constexpr const char kPluginPath[] = "libc2filterplugin.so";
+    static std::shared_ptr<FilterWrapper> wrapper = FilterWrapper::Create(
+            std::make_unique<DefaultFilterPlugin>(kPluginPath));
+    return wrapper;
+}
+#endif
+
 // Methods from ::android::hardware::media::c2::V1_0::IComponentStore
 Return<void> ComponentStore::createComponent(
         const hidl_string& name,
@@ -189,6 +207,9 @@ Return<void> ComponentStore::createComponent(
             mStore->createComponent(name, &c2component));
 
     if (status == Status::OK) {
+#ifndef __ANDROID_APEX__
+        c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
+#endif
         onInterfaceLoaded(c2component->intf());
         component = new Component(c2component, listener, this, pool);
         if (!component) {
@@ -214,8 +235,12 @@ Return<void> ComponentStore::createInterface(
         createInterface_cb _hidl_cb) {
     std::shared_ptr<C2ComponentInterface> c2interface;
     c2_status_t res = mStore->createInterface(name, &c2interface);
+
     sp<IComponentInterface> interface;
     if (res == C2_OK) {
+#ifndef __ANDROID_APEX__
+        c2interface = GetFilterWrapper()->maybeWrapInterface(c2interface);
+#endif
         onInterfaceLoaded(c2interface);
         interface = new ComponentInterface(c2interface, mParameterCache);
     }
@@ -457,7 +482,6 @@ Return<void> ComponentStore::debug(
     }
     return Void();
 }
-
 
 }  // namespace utils
 }  // namespace V1_0
