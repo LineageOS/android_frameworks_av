@@ -1,6 +1,6 @@
 cc_library {
     name: "libflacextractor",
-    defaults: ["extractor-defaults"],
+    defaults: ["extractor-defaults", "libbinder_ndk_host_user"],
 
     srcs: ["FLACExtractor.cpp"],
 
