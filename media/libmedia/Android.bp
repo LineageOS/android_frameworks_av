@@ -324,8 +324,8 @@ cc_library {
 
     shared_libs: [
         "android.hidl.token@1.0-utils",
-        "audioclient-types-aidl-unstable-cpp",
-        "av-types-aidl-unstable-cpp",
+        "audioclient-types-aidl-cpp",
+        "av-types-aidl-cpp",
         "liblog",
         "libcutils",
         "libprocessgroup",

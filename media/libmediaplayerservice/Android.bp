@@ -15,7 +15,7 @@ cc_library_shared {
     shared_libs: [
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
-        "av-types-aidl-unstable-cpp",
+        "av-types-aidl-cpp",
         "libbase",
         "libandroid_net",
         "libaudioclient",
