@@ -17,6 +17,7 @@
 #define LOG_TAG "TunerFrontend"
 
 #include "TunerFrontend.h"
+#include "TunerLnb.h"
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3PlpSettings;
 using ::aidl::android::media::tv::tuner::TunerFrontendScanAtsc3PlpInfo;
@@ -206,12 +207,68 @@ Status TunerFrontend::stopScan() {
     return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerFrontend::setLnb(int /*lnbHandle*/) {
-    return Status::ok();
+Status TunerFrontend::setLnb(const shared_ptr<ITunerLnb>& lnb) {
+    if (mFrontend == NULL) {
+        ALOGD("IFrontend is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mFrontend->setLnb(static_cast<TunerLnb*>(lnb.get())->getId());
+    if (status == Result::SUCCESS) {
+        return Status::ok();
+    }
+
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerFrontend::setLna(bool /*bEnable*/) {
-    return Status::ok();
+Status TunerFrontend::setLna(bool bEnable) {
+    if (mFrontend == NULL) {
+        ALOGD("IFrontend is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mFrontend->setLna(bEnable);
+    if (status == Result::SUCCESS) {
+        return Status::ok();
+    }
+
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+}
+
+Status TunerFrontend::linkCiCamToFrontend(int ciCamId, int32_t* _aidl_return) {
+    if (mFrontend_1_1 == NULL) {
+        ALOGD("IFrontend_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    int ltsId;
+    Result status;
+    mFrontend_1_1->linkCiCam(static_cast<uint32_t>(ciCamId),
+            [&](Result r, uint32_t id) {
+                status = r;
+                ltsId = id;
+            });
+
+    if (status == Result::SUCCESS) {
+        *_aidl_return = ltsId;
+        return Status::ok();
+    }
+
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+}
+
+Status TunerFrontend::unlinkCiCamToFrontend(int ciCamId) {
+    if (mFrontend_1_1 == NULL) {
+        ALOGD("IFrontend_1_1 is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mFrontend_1_1->unlinkCiCam(ciCamId);
+    if (status == Result::SUCCESS) {
+        return Status::ok();
+    }
+
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
 Status TunerFrontend::close() {
