@@ -29,6 +29,7 @@ using ::aidl::android::hardware::common::fmq::MQDescriptor;
 using ::aidl::android::hardware::common::fmq::SynchronizedReadWrite;
 using ::aidl::android::media::tv::tuner::BnTunerService;
 using ::aidl::android::media::tv::tuner::ITunerDemux;
+using ::aidl::android::media::tv::tuner::ITunerDescrambler;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerLnb;
 using ::aidl::android::media::tv::tuner::TunerDemuxCapabilities;
@@ -55,6 +56,7 @@ using ::android::hardware::tv::tuner::V1_0::DemuxTsFilterType;
 using ::android::hardware::tv::tuner::V1_0::FrontendId;
 using ::android::hardware::tv::tuner::V1_0::FrontendInfo;
 using ::android::hardware::tv::tuner::V1_0::IDemux;
+using ::android::hardware::tv::tuner::V1_0::IDescrambler;
 using ::android::hardware::tv::tuner::V1_0::IFilter;
 using ::android::hardware::tv::tuner::V1_0::IFilterCallback;
 using ::android::hardware::tv::tuner::V1_0::ITuner;
@@ -94,6 +96,20 @@ public:
     TunerService();
     virtual ~TunerService();
 
+    Status getFrontendIds(vector<int32_t>* ids) override;
+    Status getFrontendInfo(int32_t id, TunerFrontendInfo* _aidl_return) override;
+    Status openFrontend(
+            int32_t frontendHandle, shared_ptr<ITunerFrontend>* _aidl_return) override;
+    Status getFmqSyncReadWrite(
+            MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) override;
+    Status openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) override;
+    Status openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>* _aidl_return) override;
+    Status openDemux(int32_t demuxHandle, std::shared_ptr<ITunerDemux>* _aidl_return) override;
+    Status getDemuxCaps(TunerDemuxCapabilities* _aidl_return) override;
+    Status openDescrambler(int32_t descramblerHandle,
+            std::shared_ptr<ITunerDescrambler>* _aidl_return) override;
+    Status updateTunerResources() override;
+
     // TODO: create a map between resource id and handles.
     static int getResourceIdFromHandle(int resourceHandle, int /*type*/) {
         return (resourceHandle & 0x00ff0000) >> 16;
@@ -105,18 +121,6 @@ public:
                 | (id << 16)
                 | (mResourceRequestCount++ & 0xffff);
     }
-
-    Status getFrontendIds(vector<int32_t>* ids) override;
-    Status getFrontendInfo(int32_t frontendHandle, TunerFrontendInfo* _aidl_return) override;
-    Status openFrontend(
-            int32_t frontendHandle, shared_ptr<ITunerFrontend>* _aidl_return) override;
-    Status getFmqSyncReadWrite(
-            MQDescriptor<int8_t, SynchronizedReadWrite>* mqDesc, bool* _aidl_return) override;
-    Status openLnb(int lnbHandle, shared_ptr<ITunerLnb>* _aidl_return) override;
-    Status openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>* _aidl_return) override;
-    Status openDemux(int32_t demuxHandle, std::shared_ptr<ITunerDemux>* _aidl_return) override;
-    Status getDemuxCaps(TunerDemuxCapabilities* _aidl_return) override;
-    Status updateTunerResources() override;
 
 private:
     bool getITuner();

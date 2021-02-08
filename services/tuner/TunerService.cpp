@@ -23,6 +23,7 @@
 #include "TunerFrontend.h"
 #include "TunerLnb.h"
 #include "TunerDemux.h"
+#include "TunerDescrambler.h"
 
 using ::aidl::android::media::tv::tuner::TunerFrontendAnalogCapabilities;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3Capabilities;
@@ -270,6 +271,28 @@ Status TunerService::openLnbByName(const string& lnbName, shared_ptr<ITunerLnb>*
     }
 
     *_aidl_return = ::ndk::SharedRefBase::make<TunerLnb>(lnb, lnbId);
+    return Status::ok();
+}
+
+Status TunerService::openDescrambler(int32_t /*descramblerHandle*/,
+            std::shared_ptr<ITunerDescrambler>* _aidl_return) {
+    if (!getITuner()) {
+        ALOGD("get ITuner failed");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status;
+    sp<IDescrambler> descrambler;
+    //int id = getResourceIdFromHandle(descramblerHandle, DESCRAMBLER);
+    mTuner->openDescrambler([&](Result r, const sp<IDescrambler>& descramblerSp) {
+        status = r;
+        descrambler = descramblerSp;
+    });
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+
+    *_aidl_return = ::ndk::SharedRefBase::make<TunerDescrambler>(descrambler);
     return Status::ok();
 }
 
