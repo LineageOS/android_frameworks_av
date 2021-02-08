@@ -14,14 +14,14 @@ cc_library_headers {
         "libaudiofoundation_headers",
     ],
     static_libs: [
-        "audioflinger-aidl-unstable-cpp",
-        "audiopolicy-aidl-unstable-cpp",
-        "av-types-aidl-unstable-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "av-types-aidl-cpp",
     ],
     export_static_lib_headers: [
-        "audioflinger-aidl-unstable-cpp",
-        "audiopolicy-aidl-unstable-cpp",
-        "av-types-aidl-unstable-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "av-types-aidl-cpp",
     ],
     target: {
         darwin: {
@@ -40,11 +40,11 @@ cc_library_shared {
         "PolicyAidlConversion.cpp"
     ],
     shared_libs: [
-        "audioclient-types-aidl-unstable-cpp",
-        "audioflinger-aidl-unstable-cpp",
-        "audiopolicy-aidl-unstable-cpp",
-        "audiopolicy-types-aidl-unstable-cpp",
-        "capture_state_listener-aidl-unstable-cpp",
+        "audioclient-types-aidl-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
         "libaudiofoundation",
         "libaudioclient_aidl_conversion",
         "libaudioutils",
@@ -60,11 +60,11 @@ cc_library_shared {
     include_dirs: ["system/media/audio_utils/include"],
     export_include_dirs: ["include"],
     export_shared_lib_headers: [
-        "audioclient-types-aidl-unstable-cpp",
-        "audioflinger-aidl-unstable-cpp",
-        "audiopolicy-aidl-unstable-cpp",
-        "audiopolicy-types-aidl-unstable-cpp",
-        "capture_state_listener-aidl-unstable-cpp",
+        "audioclient-types-aidl-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
         "libaudiofoundation",
         "libaudioclient_aidl_conversion",
     ],
@@ -100,12 +100,12 @@ cc_library {
         "TrackPlayerBase.cpp",
     ],
     shared_libs: [
-        "audioclient-types-aidl-unstable-cpp",
-        "audioflinger-aidl-unstable-cpp",
-        "audiopolicy-aidl-unstable-cpp",
-        "audiopolicy-types-aidl-unstable-cpp",
-        "av-types-aidl-unstable-cpp",
-        "capture_state_listener-aidl-unstable-cpp",
+        "audioclient-types-aidl-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "av-types-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
         "libaudioutils",
@@ -125,8 +125,8 @@ cc_library {
         "libvibrator",
     ],
     export_shared_lib_headers: [
-        "audioflinger-aidl-unstable-cpp",
-        "audiopolicy-aidl-unstable-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
         "libbinder",
     ],
 
@@ -144,15 +144,15 @@ cc_library {
     ],
     export_header_lib_headers: ["libaudioclient_headers"],
     export_static_lib_headers: [
-        "effect-aidl-unstable-cpp",
-        "shared-file-region-aidl-unstable-cpp",
+        "effect-aidl-cpp",
+        "shared-file-region-aidl-cpp",
     ],
 
     static_libs: [
-        "effect-aidl-unstable-cpp",
+        "effect-aidl-cpp",
         // for memory heap analysis
         "libc_malloc_debug_backtrace",
-        "shared-file-region-aidl-unstable-cpp",
+        "shared-file-region-aidl-cpp",
     ],
     cflags: [
         "-Wall",
@@ -213,18 +213,18 @@ cc_library {
         "libaudioclient_aidl_conversion_util",
     ],
     shared_libs: [
-        "audioclient-types-aidl-unstable-cpp",
+        "audioclient-types-aidl-cpp",
         "libbase",
         "libbinder",
         "liblog",
         "libshmemcompat",
         "libutils",
-        "shared-file-region-aidl-unstable-cpp",
+        "shared-file-region-aidl-cpp",
     ],
     export_shared_lib_headers: [
-        "audioclient-types-aidl-unstable-cpp",
+        "audioclient-types-aidl-cpp",
         "libbase",
-        "shared-file-region-aidl-unstable-cpp",
+        "shared-file-region-aidl-cpp",
     ],
     cflags: [
         "-Wall",
