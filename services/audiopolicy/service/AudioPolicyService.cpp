@@ -23,6 +23,7 @@
 #define __STDC_LIMIT_MACROS
 #include <stdint.h>
 #include <sys/time.h>
+#include <dlfcn.h>
 
 #include <audio_utils/clock.h>
 #include <binder/IServiceManager.h>
@@ -44,12 +45,14 @@
 
 #include <system/audio.h>
 #include <system/audio_policy.h>
+#include <AudioPolicyManager.h>
 
 namespace android {
 using binder::Status;
 
 static const char kDeadlockedString[] = "AudioPolicyService may be deadlocked\n";
 static const char kCmdDeadlockedString[] = "AudioPolicyService command thread may be deadlocked\n";
+static const char kAudioPolicyManagerCustomPath[] = "libaudiopolicymanagercustom.so";
 
 static const int kDumpLockTimeoutNs = 1 * NANOS_PER_SECOND;
 
@@ -59,12 +62,54 @@ static const String16 sManageAudioPolicyPermission("android.permission.MANAGE_AU
 
 // ----------------------------------------------------------------------------
 
+static AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface)
+{
+    AudioPolicyManager *apm = new AudioPolicyManager(clientInterface);
+    status_t status = apm->initialize();
+    if (status != NO_ERROR) {
+        delete apm;
+        apm = nullptr;
+    }
+    return apm;
+}
+
+static void destroyAudioPolicyManager(AudioPolicyInterface *interface)
+{
+    delete interface;
+}
+// ----------------------------------------------------------------------------
+
 AudioPolicyService::AudioPolicyService()
     : BnAudioPolicyService(),
       mAudioPolicyManager(NULL),
       mAudioPolicyClient(NULL),
       mPhoneState(AUDIO_MODE_INVALID),
-      mCaptureStateNotifier(false) {
+      mCaptureStateNotifier(false),
+      mCreateAudioPolicyManager(createAudioPolicyManager),
+      mDestroyAudioPolicyManager(destroyAudioPolicyManager) {
+}
+
+void AudioPolicyService::loadAudioPolicyManager()
+{
+    mLibraryHandle = dlopen(kAudioPolicyManagerCustomPath, RTLD_NOW);
+    if (mLibraryHandle != nullptr) {
+        ALOGI("%s loading %s", __func__, kAudioPolicyManagerCustomPath);
+        mCreateAudioPolicyManager = reinterpret_cast<CreateAudioPolicyManagerInstance>
+                                            (dlsym(mLibraryHandle, "createAudioPolicyManager"));
+        const char *lastError = dlerror();
+        ALOGW_IF(mCreateAudioPolicyManager == nullptr, "%s createAudioPolicyManager is null %s",
+                    __func__, lastError != nullptr ? lastError : "no error");
+
+        mDestroyAudioPolicyManager = reinterpret_cast<DestroyAudioPolicyManagerInstance>(
+                                        dlsym(mLibraryHandle, "destroyAudioPolicyManager"));
+        lastError = dlerror();
+        ALOGW_IF(mDestroyAudioPolicyManager == nullptr, "%s destroyAudioPolicyManager is null %s",
+                    __func__, lastError != nullptr ? lastError : "no error");
+        if (mCreateAudioPolicyManager == nullptr || mDestroyAudioPolicyManager == nullptr){
+            unloadAudioPolicyManager();
+            LOG_ALWAYS_FATAL("could not find audiopolicymanager interface methods");
+        }
+    }
 }
 
 void AudioPolicyService::onFirstRef()
@@ -78,7 +123,9 @@ void AudioPolicyService::onFirstRef()
         mOutputCommandThread = new AudioCommandThread(String8("ApmOutput"), this);
 
         mAudioPolicyClient = new AudioPolicyClient(this);
-        mAudioPolicyManager = createAudioPolicyManager(mAudioPolicyClient);
+
+        loadAudioPolicyManager();
+        mAudioPolicyManager = mCreateAudioPolicyManager(mAudioPolicyClient);
     }
     // load audio processing modules
     sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects();
@@ -94,12 +141,25 @@ void AudioPolicyService::onFirstRef()
     sensorPrivacyPolicy->registerSelf();
 }
 
+void AudioPolicyService::unloadAudioPolicyManager()
+{
+    ALOGV("%s ", __func__);
+    if (mLibraryHandle != nullptr) {
+        dlclose(mLibraryHandle);
+    }
+    mLibraryHandle = nullptr;
+    mCreateAudioPolicyManager = nullptr;
+    mDestroyAudioPolicyManager = nullptr;
+}
+
 AudioPolicyService::~AudioPolicyService()
 {
     mAudioCommandThread->exit();
     mOutputCommandThread->exit();
 
-    destroyAudioPolicyManager(mAudioPolicyManager);
+    mDestroyAudioPolicyManager(mAudioPolicyManager);
+    unloadAudioPolicyManager();
+
     delete mAudioPolicyClient;
 
     mNotificationClients.clear();
