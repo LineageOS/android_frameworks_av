@@ -24,6 +24,7 @@ import android.media.tv.tuner.ITunerDescrambler;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
 import android.media.tv.tuner.TunerDemuxCapabilities;
+import android.media.tv.tuner.TunerFrontendDtmbCapabilities;
 import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
@@ -48,19 +49,17 @@ interface ITunerService {
     TunerFrontendInfo getFrontendInfo(in int frontendHandle);
 
     /**
+     * Get Dtmb Frontend Capabilities.
+     */
+    TunerFrontendDtmbCapabilities getFrontendDtmbCapabilities(in int id);
+
+    /**
      * Open a Tuner Frontend interface.
      *
      * @param frontendHandle the handle of the frontend granted by TRM.
      * @return the aidl interface of the frontend.
      */
     ITunerFrontend openFrontend(in int frontendHandle);
-
-    /*
-     * Gets synchronized fast message queue.
-     *
-     * @return true if succeeds, false otherwise.
-     */
-    boolean getFmqSyncReadWrite(out MQDescriptor<byte, SynchronizedReadWrite> mqDesc);
 
     /**
      * Open a new interface of ITunerLnb given a lnbHandle.
