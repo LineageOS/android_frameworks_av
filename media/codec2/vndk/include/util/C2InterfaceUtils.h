@@ -17,6 +17,7 @@
 #ifndef C2UTILS_INTERFACE_UTILS_H_
 #define C2UTILS_INTERFACE_UTILS_H_
 
+#include <C2Component.h>
 #include <C2Param.h>
 #include <C2Work.h>
 
@@ -1128,6 +1129,19 @@ struct C2FieldUtils {
     static std::vector<Info> locateField(
             const C2ParamField &pf, const std::shared_ptr<C2ParamReflector> &reflector);
 
+};
+
+/**
+ * Utility class for C2ComponentInterface
+ */
+struct C2InterfaceUtils {
+    /**
+     * Create traits from C2ComponentInterface. Note that rank cannot be queried from interfaces,
+     * so left untouched.
+     */
+    static bool FillTraitsFromInterface(
+            C2Component::Traits *traits,
+            const std::shared_ptr<C2ComponentInterface> &intf);
 };
 
 #include <util/C2Debug-interface.h>
