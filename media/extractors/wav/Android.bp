@@ -1,7 +1,7 @@
 cc_library {
     name: "libwavextractor",
 
-    defaults: ["extractor-defaults"],
+    defaults: ["extractor-defaults", "libbinder_ndk_host_user"],
 
     srcs: ["WAVExtractor.cpp"],
 
