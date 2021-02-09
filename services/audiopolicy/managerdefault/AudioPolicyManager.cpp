@@ -1214,7 +1214,7 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
                 (config->channel_mask == desc->getChannelMask()) &&
                 (session == desc->mDirectClientSession)) {
                 desc->mDirectOpenCount++;
-                ALOGI("%s reusing direct output %d for session %d", __func__,
+                ALOGV("%s reusing direct output %d for session %d", __func__,
                     mOutputs.keyAt(i), session);
                 *output = mOutputs.keyAt(i);
                 return NO_ERROR;
@@ -2139,7 +2139,7 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
         *inputType = API_INPUT_LEGACY;
         device = inputDesc->getDevice();
 
-        ALOGI("%s reusing MMAP input %d for session %d", __FUNCTION__, *input, session);
+        ALOGV("%s reusing MMAP input %d for session %d", __FUNCTION__, *input, session);
         goto exit;
     }
 
@@ -3322,7 +3322,7 @@ void AudioPolicyManager::updateInputRouting() {
 status_t AudioPolicyManager::removeDevicesRoleForStrategy(product_strategy_t strategy,
                                                           device_role_t role)
 {
-    ALOGI("%s() strategy=%d role=%d", __func__, strategy, role);
+    ALOGV("%s() strategy=%d role=%d", __func__, strategy, role);
 
     status_t status = mEngine->removeDevicesRoleForStrategy(strategy, role);
     if (status != NO_ERROR) {
@@ -3424,7 +3424,7 @@ status_t AudioPolicyManager::getDevicesForRoleAndCapturePreset(
 
 status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
         const AudioDeviceTypeAddrVector& devices) {
-    ALOGI("%s() userId=%d num devices %zu", __func__, userId, devices.size());
+    ALOGV("%s() userId=%d num devices %zu", __func__, userId, devices.size());
     if (!areAllDevicesSupported(devices, audio_is_output_device, __func__)) {
         return BAD_VALUE;
     }
@@ -3443,7 +3443,7 @@ status_t AudioPolicyManager::setUserIdDeviceAffinities(int userId,
 }
 
 status_t AudioPolicyManager::removeUserIdDeviceAffinities(int userId) {
-    ALOGI("%s() userId=%d", __FUNCTION__, userId);
+    ALOGV("%s() userId=%d", __FUNCTION__, userId);
     status_t status = mPolicyMixes.removeUserIdDeviceAffinities(userId);
     if (status != NO_ERROR) {
         ALOGE("%s() Could not remove all device affinities fo userId = %d",
@@ -4945,7 +4945,8 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
             const DeviceVector &supportedDevices = inProfile->getSupportedDevices();
             DeviceVector availProfileDevices = supportedDevices.filter(mInputDevicesAll);
             if (availProfileDevices.isEmpty()) {
-                ALOGE("%s: Input device list is empty!", __FUNCTION__);
+                ALOGV("%s: Input device list is empty! for profile %s",
+                    __func__, inProfile->getTagName().c_str());
                 continue;
             }
             sp<AudioInputDescriptor> inputDesc =
@@ -6684,7 +6685,7 @@ void AudioPolicyManager::modifySurroundChannelMasks(ChannelMaskSet *channelMasks
         for (auto it = channelMasks.begin(); it != channelMasks.end();) {
             audio_channel_mask_t channelMask = *it;
             if (channelMask & ~AUDIO_CHANNEL_OUT_STEREO) {
-                ALOGI("%s: force NEVER, so remove channelMask 0x%08x", __FUNCTION__, channelMask);
+                ALOGV("%s: force NEVER, so remove channelMask 0x%08x", __FUNCTION__, channelMask);
                 it = channelMasks.erase(it);
             } else {
                 ++it;
@@ -6704,7 +6705,7 @@ void AudioPolicyManager::modifySurroundChannelMasks(ChannelMaskSet *channelMasks
         // If not then add 5.1 support.
         if (!supports5dot1) {
             channelMasks.insert(AUDIO_CHANNEL_OUT_5POINT1);
-            ALOGI("%s: force MANUAL or ALWAYS, so adding channelMask for 5.1 surround", __func__);
+            ALOGV("%s: force MANUAL or ALWAYS, so adding channelMask for 5.1 surround", __func__);
         }
     }
 }
