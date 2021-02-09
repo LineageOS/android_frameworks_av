@@ -103,11 +103,16 @@ void addSupportedProfileLevels(
     c2_status_t err1 = intf->querySupportedParams(&paramDescs);
     if (err1 == C2_OK) {
         for (const std::shared_ptr<C2ParamDescriptor> &desc : paramDescs) {
-            switch ((uint32_t)desc->index()) {
-            case C2StreamHdr10PlusInfo::output::PARAM_TYPE:
+            C2Param::Type type = desc->index();
+            // only consider supported parameters on raw ports
+            if (!(encoder ? type.forInput() : type.forOutput())) {
+                continue;
+            }
+            switch (type.coreIndex()) {
+            case C2StreamHdr10PlusInfo::CORE_INDEX:
                 supportsHdr10Plus = true;
                 break;
-            case C2StreamHdrStaticInfo::output::PARAM_TYPE:
+            case C2StreamHdrStaticInfo::CORE_INDEX:
                 supportsHdr = true;
                 break;
             default:
