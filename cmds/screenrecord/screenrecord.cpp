@@ -57,7 +57,7 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/AMessage.h>
 #include <mediadrm/ICrypto.h>
-#include <ui/DisplayConfig.h>
+#include <ui/DisplayMode.h>
 #include <ui/DisplayState.h>
 
 #include "screenrecord.h"
@@ -68,7 +68,7 @@ using android::ABuffer;
 using android::ALooper;
 using android::AMessage;
 using android::AString;
-using android::DisplayConfig;
+using android::ui::DisplayMode;
 using android::FrameOutput;
 using android::IBinder;
 using android::IGraphicBufferProducer;
@@ -689,8 +689,8 @@ static status_t recordScreen(const char* fileName) {
         return err;
     }
 
-    DisplayConfig displayConfig;
-    err = SurfaceComposerClient::getActiveDisplayConfig(display, &displayConfig);
+    DisplayMode displayMode;
+    err = SurfaceComposerClient::getActiveDisplayMode(display, &displayMode);
     if (err != NO_ERROR) {
         fprintf(stderr, "ERROR: unable to get display config\n");
         return err;
@@ -700,7 +700,7 @@ static status_t recordScreen(const char* fileName) {
     if (gVerbose) {
         printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
                 layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
-                displayConfig.refreshRate, toCString(displayState.orientation),
+                displayMode.refreshRate, toCString(displayState.orientation),
                 displayState.layerStack);
         fflush(stdout);
     }
@@ -718,7 +718,7 @@ static status_t recordScreen(const char* fileName) {
     sp<FrameOutput> frameOutput;
     sp<IGraphicBufferProducer> encoderInputSurface;
     if (gOutputFormat != FORMAT_FRAMES && gOutputFormat != FORMAT_RAW_FRAMES) {
-        err = prepareEncoder(displayConfig.refreshRate, &encoder, &encoderInputSurface);
+        err = prepareEncoder(displayMode.refreshRate, &encoder, &encoderInputSurface);
 
         if (err != NO_ERROR && !gSizeSpecified) {
             // fallback is defined for landscape; swap if we're in portrait
@@ -731,7 +731,7 @@ static status_t recordScreen(const char* fileName) {
                         gVideoWidth, gVideoHeight, newWidth, newHeight);
                 gVideoWidth = newWidth;
                 gVideoHeight = newHeight;
-                err = prepareEncoder(displayConfig.refreshRate, &encoder, &encoderInputSurface);
+                err = prepareEncoder(displayMode.refreshRate, &encoder, &encoderInputSurface);
             }
         }
         if (err != NO_ERROR) return err;

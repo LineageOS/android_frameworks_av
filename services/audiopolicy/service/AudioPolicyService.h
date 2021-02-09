@@ -38,7 +38,6 @@
 #include "CaptureStateNotifier.h"
 #include <AudioPolicyInterface.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
-
 #include <unordered_map>
 
 namespace android {
@@ -861,7 +860,8 @@ private:
 
     // Internal dump utilities.
     status_t dumpPermissionDenial(int fd);
-
+    void loadAudioPolicyManager();
+    void unloadAudioPolicyManager();
 
     mutable Mutex mLock;    // prevents concurrent access to AudioPolicy manager functions changing
                             // device connection state  or routing
@@ -895,6 +895,10 @@ private:
     MediaPackageManager mPackageManager; // To check allowPlaybackCapture
 
     CaptureStateNotifier mCaptureStateNotifier;
+
+    void *mLibraryHandle = nullptr;
+    CreateAudioPolicyManagerInstance mCreateAudioPolicyManager;
+    DestroyAudioPolicyManagerInstance mDestroyAudioPolicyManager;
 
     std::map<userid_t, sp<SensorPrivacyPolicy>> mMicrophoneSensorPrivacyPolicies;
 };

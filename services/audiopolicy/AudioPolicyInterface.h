@@ -450,9 +450,11 @@ public:
     virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
 };
 
-extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface);
-extern "C" void destroyAudioPolicyManager(AudioPolicyInterface *interface);
-
+    // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager
+    // methods respectively, expected by AudioPolicyService, needs to be exposed by
+    // libaudiopolicymanagercustom.
+    using CreateAudioPolicyManagerInstance = AudioPolicyInterface* (*)(AudioPolicyClientInterface*);
+    using DestroyAudioPolicyManagerInstance = void (*)(AudioPolicyInterface*);
 
 } // namespace android
 
