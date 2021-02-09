@@ -104,8 +104,8 @@ public:
     virtual type_t getType() const override;
 
     int migrate(const android::sp<HGraphicBufferProducer>& producer,
-                uint32_t toGeneration, uint64_t toBqId,
-                android::sp<android::GraphicBuffer> graphicBuffer, uint32_t oldGeneration);
+                uint32_t toGeneration, uint64_t toUsage, uint64_t toBqId,
+                android::sp<android::GraphicBuffer>& graphicBuffer, uint32_t oldGeneration);
 
 private:
     friend struct _C2BlockFactory;
