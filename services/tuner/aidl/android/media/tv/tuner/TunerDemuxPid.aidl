@@ -1,5 +1,5 @@
 /**
- * Copyright 2020, The Android Open Source Project
+ * Copyright 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -17,23 +17,12 @@
 package android.media.tv.tuner;
 
 /**
- * Cable(DVBC) Frontend Capabilities interface.
+ * Demux PID interface.
  *
  * {@hide}
  */
-parcelable TunerFrontendCableCapabilities {
-    /**
-     * Modulation capability
-     */
-    int modulationCap;
+union TunerDemuxPid {
+    int tPid;
 
-    /**
-     * Code Rate capability
-     */
-    long codeRateCap; // inner FEC will converge to codeRate
-
-    /**
-     * Annex capability
-     */
-    int annexCap;
+    int mmtpPid;
 }

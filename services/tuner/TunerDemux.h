@@ -56,6 +56,8 @@ public:
     Status disconnectCiCam() override;
     Status close() override;
 
+    int getId() { return mDemuxId; }
+
 private:
     sp<IDemux> mDemux;
     int mDemuxId;

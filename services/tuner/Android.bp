@@ -85,7 +85,7 @@ cc_library {
     ],
 
     static_libs: [
-        "android.hardware.common.fmq-unstable-ndk_platform",
+        "android.hardware.common.fmq-V1-ndk_platform",
         "libaidlcommonsupport",
     ],
 
@@ -111,6 +111,7 @@ cc_binary {
 
     shared_libs: [
         "android.hardware.tv.tuner@1.0",
+        "android.hardware.tv.tuner@1.1",
         "libbase",
         "libbinder",
         "libfmq",

@@ -279,6 +279,23 @@ ssize_t DeviceVector::add(const sp<DeviceDescriptor>& item)
     return ret;
 }
 
+int DeviceVector::do_compare(const void* lhs, const void* rhs) const {
+    const auto ldevice = *reinterpret_cast<const sp<DeviceDescriptor>*>(lhs);
+    const auto rdevice = *reinterpret_cast<const sp<DeviceDescriptor>*>(rhs);
+    int ret = 0;
+
+    // sort by type.
+    ret = compare_type(ldevice->type(), rdevice->type());
+    if (ret != 0)
+        return ret;
+    // for same type higher priority for latest device.
+    ret = compare_type(rdevice->getId(), ldevice->getId());
+    if (ret != 0)
+        return ret;
+    // fallback to default sort using pointer address
+    return SortedVector::do_compare(lhs, rhs);
+}
+
 ssize_t DeviceVector::remove(const sp<DeviceDescriptor>& item)
 {
     ssize_t ret = indexOf(item);
