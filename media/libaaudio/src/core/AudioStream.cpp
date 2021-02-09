@@ -591,7 +591,8 @@ void AudioStream::MyPlayerBase::registerWithAudioManager(const android::sp<Audio
     std::lock_guard<std::mutex> lock(mParentLock);
     mParent = parent;
     if (!mRegistered) {
-        init(android::PLAYER_TYPE_AAUDIO, AAudioConvert_usageToInternal(parent->getUsage()));
+        init(android::PLAYER_TYPE_AAUDIO, AAudioConvert_usageToInternal(parent->getUsage()),
+            (audio_session_t)parent->getSessionId());
         mRegistered = true;
     }
 }

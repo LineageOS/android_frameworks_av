@@ -49,6 +49,8 @@ public:
     Status sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) override;
     Status close() override;
 
+    int getId() { return mId; }
+
     struct LnbCallback : public ILnbCallback {
         LnbCallback(const shared_ptr<ITunerLnbCallback> tunerLnbCallback)
                 : mTunerLnbCallback(tunerLnbCallback) {};
