@@ -52,10 +52,10 @@ namespace android {
 TunerService::TunerService() {}
 TunerService::~TunerService() {}
 
-void TunerService::instantiate() {
+binder_status_t TunerService::instantiate() {
     shared_ptr<TunerService> service =
             ::ndk::SharedRefBase::make<TunerService>();
-    AServiceManager_addService(service->asBinder().get(), getServiceName());
+    return AServiceManager_addService(service->asBinder().get(), getServiceName());
 }
 
 bool TunerService::hasITuner() {
@@ -68,23 +68,20 @@ bool TunerService::hasITuner() {
         ALOGE("Failed to get ITuner service");
         return false;
     }
+    mTunerVersion = TUNER_HAL_VERSION_1_0;
+    mTuner_1_1 = ::android::hardware::tv::tuner::V1_1::ITuner::castFrom(mTuner);
+    if (mTuner_1_1 != nullptr) {
+        mTunerVersion = TUNER_HAL_VERSION_1_1;
+    } else {
+        ALOGE("Failed to get ITuner_1_1 service");
+    }
     return true;
 }
 
 bool TunerService::hasITuner_1_1() {
     ALOGD("hasITuner_1_1");
-    if (mTuner_1_1 != nullptr) {
-        return true;
-    }
-    if (!hasITuner()) {
-        return false;
-    }
-    mTuner_1_1 = ::android::hardware::tv::tuner::V1_1::ITuner::castFrom(mTuner);
-    if (mTuner_1_1 == nullptr) {
-        ALOGE("Failed to get ITuner_1_1 service");
-        return false;
-    }
-    return true;
+    hasITuner();
+    return (mTunerVersion == TUNER_HAL_VERSION_1_1);
 }
 
 Status TunerService::openDemux(
@@ -297,6 +294,12 @@ Status TunerService::updateTunerResources() {
     updateFrontendResources();
     updateLnbResources();
     // TODO: update Demux, Descrambler.
+    return Status::ok();
+}
+
+Status TunerService::getTunerHalVersion(int* _aidl_return) {
+    hasITuner();
+    *_aidl_return = mTunerVersion;
     return Status::ok();
 }
 
