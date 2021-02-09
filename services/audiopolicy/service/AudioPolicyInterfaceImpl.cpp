@@ -1804,7 +1804,7 @@ Status AudioPolicyService::getStreamVolumeDB(media::AudioStreamType streamAidl, 
 Status AudioPolicyService::getSurroundFormats(
         bool reported, media::Int* count,
         std::vector<media::audio::common::AudioFormat>* formats,
-        bool* _aidl_return) {
+        std::vector<bool>* formatsEnabled) {
     unsigned int numSurroundFormats = VALUE_OR_RETURN_BINDER_STATUS(
             convertIntegral<unsigned int>(count->value));
     if (numSurroundFormats > MAX_ITEMS_PER_LIST) {
@@ -1812,6 +1812,7 @@ Status AudioPolicyService::getSurroundFormats(
     }
     unsigned int numSurroundFormatsReq = numSurroundFormats;
     std::unique_ptr<audio_format_t[]>surroundFormats(new audio_format_t[numSurroundFormats]);
+    std::unique_ptr<bool[]>surroundFormatsEnabled(new bool[numSurroundFormats]);
 
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
@@ -1820,11 +1821,15 @@ Status AudioPolicyService::getSurroundFormats(
     AutoCallerClear acc;
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             mAudioPolicyManager->getSurroundFormats(&numSurroundFormats, surroundFormats.get(),
-                                                    _aidl_return, reported)));
+                                                    surroundFormatsEnabled.get(), reported)));
     numSurroundFormatsReq = std::min(numSurroundFormats, numSurroundFormatsReq);
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
             convertRange(surroundFormats.get(), surroundFormats.get() + numSurroundFormatsReq,
                          std::back_inserter(*formats), legacy2aidl_audio_format_t_AudioFormat)));
+    formatsEnabled->insert(
+            formatsEnabled->begin(),
+            surroundFormatsEnabled.get(),
+            surroundFormatsEnabled.get() + numSurroundFormatsReq);
     count->value = VALUE_OR_RETURN_BINDER_STATUS(convertIntegral<uint32_t>(numSurroundFormats));
     return Status::ok();
 }

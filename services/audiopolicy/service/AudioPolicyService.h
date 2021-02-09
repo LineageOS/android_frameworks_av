@@ -184,7 +184,7 @@ public:
                                      float* _aidl_return) override;
     binder::Status getSurroundFormats(bool reported, media::Int* count,
                                       std::vector<media::audio::common::AudioFormat>* formats,
-                                      bool* _aidl_return) override;
+                                      std::vector<bool>* formatsEnabled) override;
     binder::Status getHwOffloadEncodingFormatsSupportedForA2DP(
             std::vector<media::audio::common::AudioFormat>* _aidl_return) override;
     binder::Status setSurroundFormatEnabled(media::audio::common::AudioFormat audioFormat,
