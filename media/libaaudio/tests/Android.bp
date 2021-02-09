@@ -16,7 +16,7 @@ cc_test {
         "libbinder",
         "libcutils",
         "libutils",
-        "shared-file-region-aidl-unstable-cpp",
+        "shared-file-region-aidl-cpp",
     ],
 }
 

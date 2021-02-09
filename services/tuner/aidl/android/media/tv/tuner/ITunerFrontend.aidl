@@ -17,6 +17,7 @@
 package android.media.tv.tuner;
 
 import android.media.tv.tuner.ITunerFrontendCallback;
+import android.media.tv.tuner.ITunerLnb;
 import android.media.tv.tuner.TunerFrontendSettings;
 import android.media.tv.tuner.TunerFrontendStatus;
 
@@ -61,9 +62,9 @@ interface ITunerFrontend {
     /**
      * Sets Low-Noise Block downconverter (LNB) for satellite frontend.
      *
-     * @param lnbHandle lnb handle in use.
+     * @param tuner lnb interface.
      */
-    void setLnb(in int lnbHandle);
+    void setLnb(in ITunerLnb lnb);
 
     /**
      * Enable or Disable Low Noise Amplifier (LNA).
@@ -71,6 +72,18 @@ interface ITunerFrontend {
      * @param bEnable enable Lna or not.
      */
     void setLna(in boolean bEnable);
+
+    /**
+     * Link Frontend to the cicam with given id.
+     *
+     * @return lts id
+     */
+    int linkCiCamToFrontend(in int ciCamId);
+
+    /**
+     * Unink Frontend to the cicam with given id.
+     */
+    void unlinkCiCamToFrontend(in int ciCamId);
 
     /**
      * Releases the ITunerFrontend instance.

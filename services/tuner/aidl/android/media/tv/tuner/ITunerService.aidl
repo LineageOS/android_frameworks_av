@@ -20,9 +20,11 @@ import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.fmq.UnsynchronizedWrite;
 import android.media.tv.tuner.ITunerDemux;
+import android.media.tv.tuner.ITunerDescrambler;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
 import android.media.tv.tuner.TunerDemuxCapabilities;
+import android.media.tv.tuner.TunerFrontendDtmbCapabilities;
 import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
@@ -47,19 +49,17 @@ interface ITunerService {
     TunerFrontendInfo getFrontendInfo(in int frontendHandle);
 
     /**
+     * Get Dtmb Frontend Capabilities.
+     */
+    TunerFrontendDtmbCapabilities getFrontendDtmbCapabilities(in int id);
+
+    /**
      * Open a Tuner Frontend interface.
      *
      * @param frontendHandle the handle of the frontend granted by TRM.
      * @return the aidl interface of the frontend.
      */
     ITunerFrontend openFrontend(in int frontendHandle);
-
-    /*
-     * Gets synchronized fast message queue.
-     *
-     * @return true if succeeds, false otherwise.
-     */
-    boolean getFmqSyncReadWrite(out MQDescriptor<byte, SynchronizedReadWrite> mqDesc);
 
     /**
      * Open a new interface of ITunerLnb given a lnbHandle.
@@ -88,6 +88,13 @@ interface ITunerService {
      * @return the demux’s capabilities.
      */
     TunerDemuxCapabilities getDemuxCaps();
+
+    /* Open a new interface of ITunerDescrambler given a descramblerHandle.
+     *
+     * @param descramblerHandle the handle of the descrambler granted by TRM.
+     * @return a newly created ITunerDescrambler interface.
+     */
+    ITunerDescrambler openDescrambler(in int descramblerHandle);
 
     /**
      * Update Tuner Resources in TunerResourceManager.

@@ -27,6 +27,7 @@
 using Status = ::ndk::ScopedAStatus;
 using ::aidl::android::media::tv::tuner::BnTunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerFrontendCallback;
+using ::aidl::android::media::tv::tuner::ITunerLnb;
 using ::aidl::android::media::tv::tuner::TunerFrontendAtsc3Settings;
 using ::aidl::android::media::tv::tuner::TunerFrontendDvbsCodeRate;
 using ::aidl::android::media::tv::tuner::TunerFrontendScanMessage;
@@ -65,8 +66,10 @@ public:
     Status stopTune() override;
     Status scan(const TunerFrontendSettings& settings, int frontendScanType) override;
     Status stopScan() override;
-    Status setLnb(int lnbHandle) override;
+    Status setLnb(const shared_ptr<ITunerLnb>& lnb) override;
     Status setLna(bool bEnable) override;
+    Status linkCiCamToFrontend(int ciCamId, int32_t* _aidl_return) override;
+    Status unlinkCiCamToFrontend(int ciCamId) override;
     Status close() override;
     Status getStatus(const vector<int32_t>& statusTypes,
             vector<TunerFrontendStatus>* _aidl_return) override;
