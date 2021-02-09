@@ -55,6 +55,11 @@ def parseArgs():
                            metavar="ANDROID_AUDIO_BASE_HEADER",
                            type=argparse.FileType('r'),
                            required=True)
+    argparser.add_argument('--androidaudiocommonbaseheader',
+                           help="Android Audio CommonBase C header file, Mandatory.",
+                           metavar="ANDROID_AUDIO_COMMON_BASE_HEADER",
+                           type=argparse.FileType('r'),
+                           required=True)
     argparser.add_argument('--audiopolicyconfigurationfile',
                            help="Android Audio Policy Configuration file, Mandatory.",
                            metavar="(AUDIO_POLICY_CONFIGURATION_FILE)",
@@ -176,12 +181,12 @@ def parseAndroidAudioPolicyConfigurationFile(audiopolicyconfigurationfile):
 #   -Output devices type
 #   -Input devices type
 #
-def parseAndroidAudioFile(androidaudiobaseheaderFile):
+def parseAndroidAudioFile(androidaudiobaseheaderFile, androidaudiocommonbaseheaderFile):
     #
     # Adaptation table between Android Enumeration prefix and Audio PFW Criterion type names
     #
     criterion_mapping_table = {
-        'AUDIO_MODE' : "AndroidModeType",
+        'HAL_AUDIO_MODE' : "AndroidModeType",
         'AUDIO_DEVICE_OUT' : "OutputDevicesMaskType",
         'AUDIO_DEVICE_IN' : "InputDevicesMaskType"}
 
@@ -196,9 +201,9 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
     ignored_values = ['CNT', 'MAX', 'ALL', 'NONE']
 
     criteria_pattern = re.compile(
-        r"\s*(?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
-        r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*=\s*" \
-        r"(?P<values>(?:0[xX])?[0-9a-fA-F]+)")
+        r"\s*V\((?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
+        r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*,\s*" \
+        r"(?:AUDIO_DEVICE_BIT_IN \| )?(?P<values>(?:0[xX])?[0-9a-fA-F]+|[0-9]+)")
 
     logging.info("Checking Android Header file {}".format(androidaudiobaseheaderFile))
 
@@ -209,27 +214,91 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
                 androidaudiobaseheaderFile.name, line_number, line))
 
             criterion_name = criterion_mapping_table[match.groupdict()['type']]
-            literal = ''.join((w.capitalize() for w in match.groupdict()['literal'].split('_')))
-            numerical_value = match.groupdict()['values']
+            criterion_literal = \
+                ''.join((w.capitalize() for w in match.groupdict()['literal'].split('_')))
+            criterion_numerical_value = match.groupdict()['values']
 
-            # for AUDIO_DEVICE_IN: need to remove sign bit
+            # for AUDIO_DEVICE_IN: need to remove sign bit / rename default to stub
             if criterion_name == "InputDevicesMaskType":
-                numerical_value = str(int(numerical_value, 0) & ~2147483648)
+                if criterion_literal == "Default":
+                    criterion_numerical_value = str(int("0x40000000", 0))
+                else:
+                    try:
+                        string_int = int(criterion_numerical_value, 0)
+                    except ValueError:
+                        # Handle the exception
+                        logging.info("value {}:{} for criterion {} is not a number, ignoring"
+                            .format(criterion_numerical_value, criterion_literal, criterion_name))
+                        continue
+                    criterion_numerical_value = str(int(criterion_numerical_value, 0) & ~2147483648)
+
+            if criterion_name == "OutputDevicesMaskType":
+                if criterion_literal == "Default":
+                    criterion_numerical_value = str(int("0x40000000", 0))
+
+            try:
+                string_int = int(criterion_numerical_value, 0)
+            except ValueError:
+                # Handle the exception
+                logging.info("The value {}:{} is for criterion {} is not a number, ignoring"
+                    .format(criterion_numerical_value, criterion_literal, criterion_name))
+                continue
 
             # Remove duplicated numerical values
-            if int(numerical_value, 0) in all_criteria[criterion_name].values():
+            if int(criterion_numerical_value, 0) in all_criteria[criterion_name].values():
                 logging.info("criterion {} duplicated values:".format(criterion_name))
-                logging.info("{}:{}".format(numerical_value, literal))
+                logging.info("{}:{}".format(criterion_numerical_value, criterion_literal))
                 logging.info("KEEPING LATEST")
                 for key in list(all_criteria[criterion_name]):
-                    if all_criteria[criterion_name][key] == int(numerical_value, 0):
+                    if all_criteria[criterion_name][key] == int(criterion_numerical_value, 0):
                         del all_criteria[criterion_name][key]
 
-            all_criteria[criterion_name][literal] = int(numerical_value, 0)
+            all_criteria[criterion_name][criterion_literal] = int(criterion_numerical_value, 0)
 
             logging.debug("type:{},".format(criterion_name))
-            logging.debug("iteral:{},".format(literal))
-            logging.debug("values:{}.".format(numerical_value))
+            logging.debug("iteral:{},".format(criterion_literal))
+            logging.debug("values:{}.".format(criterion_numerical_value))
+
+    logging.info("Checking Android Common Header file {}".format(androidaudiocommonbaseheaderFile))
+
+    criteria_pattern = re.compile(
+        r"\s*(?P<type>(?:"+'|'.join(criterion_mapping_table.keys()) + "))_" \
+        r"(?P<literal>(?!" + '|'.join(ignored_values) + ")\w*)\s*=\s*" \
+        r"(?:AUDIO_DEVICE_BIT_IN \| )?(?P<values>(?:0[xX])?[0-9a-fA-F]+|[0-9]+)")
+
+    for line_number, line in enumerate(androidaudiocommonbaseheaderFile):
+        match = criteria_pattern.match(line)
+        if match:
+            logging.debug("The following line is VALID: {}:{}\n{}".format(
+                androidaudiocommonbaseheaderFile.name, line_number, line))
+
+            criterion_name = criterion_mapping_table[match.groupdict()['type']]
+            criterion_literal = \
+                ''.join((w.capitalize() for w in match.groupdict()['literal'].split('_')))
+            criterion_numerical_value = match.groupdict()['values']
+
+            try:
+                string_int = int(criterion_numerical_value, 0)
+            except ValueError:
+                # Handle the exception
+                logging.info("The value {}:{} is for criterion {} is not a number, ignoring"
+                    .format(criterion_numerical_value, criterion_literal, criterion_name))
+                continue
+
+            # Remove duplicated numerical values
+            if int(criterion_numerical_value, 0) in all_criteria[criterion_name].values():
+                logging.info("criterion {} duplicated values:".format(criterion_name))
+                logging.info("{}:{}".format(criterion_numerical_value, criterion_literal))
+                logging.info("KEEPING LATEST")
+                for key in list(all_criteria[criterion_name]):
+                    if all_criteria[criterion_name][key] == int(criterion_numerical_value, 0):
+                        del all_criteria[criterion_name][key]
+
+            all_criteria[criterion_name][criterion_literal] = int(criterion_numerical_value, 0)
+
+            logging.debug("type:{},".format(criterion_name))
+            logging.debug("iteral:{},".format(criterion_literal))
+            logging.debug("values:{}.".format(criterion_numerical_value))
 
     return all_criteria
 
@@ -238,7 +307,8 @@ def main():
     logging.root.setLevel(logging.INFO)
     args = parseArgs()
 
-    all_criteria = parseAndroidAudioFile(args.androidaudiobaseheader)
+    all_criteria = parseAndroidAudioFile(args.androidaudiobaseheader,
+                                         args.androidaudiocommonbaseheader)
 
     address_criteria = parseAndroidAudioPolicyConfigurationFile(args.audiopolicyconfigurationfile)
 
