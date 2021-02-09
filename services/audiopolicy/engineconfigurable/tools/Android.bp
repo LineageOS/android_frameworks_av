@@ -42,8 +42,8 @@ genrule_defaults {
     cmd: "cp $(locations :audio_policy_configuration_files) $(genDir)/. && " +
          "cp $(location :audio_policy_configuration_top_file) $(genDir)/audio_policy_configuration.xml && " +
          "$(location buildPolicyCriterionTypes.py) " +
-         // @todo update if 1428659 is merged "--androidaudiobaseheader $(location :android_audio_base_header_file) " +
-         " --androidaudiobaseheader system/media/audio/include/system/audio-base.h " +
+         " --androidaudiobaseheader $(location :libaudio_system_audio_base) " +
+         " --androidaudiocommonbaseheader $(location :libaudio_system_audio_common_base) " +
          "--audiopolicyconfigurationfile $(genDir)/audio_policy_configuration.xml " +
          "--criteriontypes $(location :audio_policy_engine_criterion_types_template) " +
          "--outputfile $(out)",
@@ -51,6 +51,8 @@ genrule_defaults {
         // The commented inputs must be provided to use this genrule_defaults
         // @todo uncomment if 1428659 is merged":android_audio_base_header_file",
         ":audio_policy_engine_criterion_types_template",
+        ":libaudio_system_audio_base",
+        ":libaudio_system_audio_common_base",
         // ":audio_policy_configuration_top_file",
         // ":audio_policy_configuration_files",
     ],
