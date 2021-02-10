@@ -1,6 +1,7 @@
 cc_benchmark {
     name: "lvm_benchmark",
     vendor: true,
+    host_supported: true,
     srcs: ["lvm_benchmark.cpp"],
     static_libs: [
         "libbundlewrapper",
