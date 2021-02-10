@@ -285,6 +285,7 @@ bool mediametrics::Item::selfrecord() {
     status_t status = writeToByteString(&str, &size);
     if (status == NO_ERROR) {
         status = submitBuffer(str, size);
+        free(str);
     }
     if (status != NO_ERROR) {
         ALOGW("%s: failed to record: %s", __func__, this->toString().c_str());
