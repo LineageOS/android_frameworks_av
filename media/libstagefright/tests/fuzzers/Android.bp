@@ -8,7 +8,9 @@ cc_defaults {
     ],
     shared_libs: [
         "libstagefright",
-	"libstagefright_codecbase",
+        "libstagefright_codecbase",
+        "libbase",
+        "libcutils",
         "libutils",
         "libstagefright_foundation",
         "libmedia",
@@ -16,7 +18,10 @@ cc_defaults {
         "libmedia_omx",
         "libgui",
         "libbinder",
-        "libcutils",
+        "liblog",
+    ],
+    include_dirs: [
+        "frameworks/av/media/libstagefright",
     ],
 }
 
@@ -50,4 +55,28 @@ cc_fuzz {
         "MediaMuxerFuzzer.cpp",
     ],
     defaults: ["libstagefright_fuzzer_defaults"],
+}
+
+cc_fuzz {
+    name: "libstagefright_frameDecoder_fuzzer",
+    srcs: [
+        "FrameDecoderFuzzer.cpp",
+    ],
+    defaults: ["libstagefright_fuzzer_defaults"],
+}
+
+cc_fuzz {
+    name: "libstagefright_writer_fuzzer",
+    srcs: [
+        "FuzzerMediaUtility.cpp",
+        "WriterFuzzer.cpp",
+    ],
+    dictionary: "dictionaries/formats.dict",
+    defaults: ["libstagefright_fuzzer_defaults"],
+    static_libs: [
+        "libstagefright_webm",
+        "libdatasource",
+        "libstagefright_esds",
+        "libogg",
+    ],
 }
