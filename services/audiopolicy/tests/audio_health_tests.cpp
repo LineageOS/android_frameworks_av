@@ -21,6 +21,7 @@
 #include <gtest/gtest.h>
 
 #include <media/AudioSystem.h>
+#include <media/TypeConverter.h>
 #include <system/audio.h>
 #include <utils/Log.h>
 
@@ -68,9 +69,18 @@ TEST(AudioHealthTest, AttachedDeviceFound) {
     ASSERT_NE("AudioPolicyConfig::setDefault", manager.getConfig().getSource());
 
     for (auto desc : manager.getConfig().getInputDevices()) {
-        ASSERT_NE(attachedDevices.end(), attachedDevices.find(desc->type()));
+        if (attachedDevices.find(desc->type()) == attachedDevices.end()) {
+            std::string deviceType;
+            (void)DeviceConverter::toString(desc->type(), deviceType);
+            ADD_FAILURE() << "Input device \"" << deviceType << "\" not found";
+        }
     }
     for (auto desc : manager.getConfig().getOutputDevices()) {
-        ASSERT_NE(attachedDevices.end(), attachedDevices.find(desc->type()));
+        if (attachedDevices.find(desc->type()) == attachedDevices.end()) {
+            std::string deviceType;
+            (void)DeviceConverter::toString(desc->type(), deviceType);
+            ADD_FAILURE() << "Output device \"" << deviceType << "\" not found";
+        }
     }
 }
+
