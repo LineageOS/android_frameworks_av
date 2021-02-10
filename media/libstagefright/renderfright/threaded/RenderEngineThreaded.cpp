@@ -23,7 +23,6 @@
 #include <future>
 
 #include <android-base/stringprintf.h>
-#include <private/gui/SyncFeatures.h>
 #include <utils/Trace.h>
 
 #include "gl/GLESRenderEngine.h"
@@ -123,7 +122,7 @@ bool RenderEngineThreaded::useNativeFenceSync() const {
         std::lock_guard lock(mThreadMutex);
         mFunctionCalls.push([&resultPromise](renderengine::RenderEngine& /*instance*/) {
             ATRACE_NAME("REThreaded::useNativeFenceSync");
-            bool returnValue = SyncFeatures::getInstance().useNativeFenceSync();
+            bool returnValue = SyncFeatures::GetInstance().useNativeFenceSync();
             resultPromise.set_value(returnValue);
         });
     }
@@ -138,7 +137,7 @@ bool RenderEngineThreaded::useWaitSync() const {
         std::lock_guard lock(mThreadMutex);
         mFunctionCalls.push([&resultPromise](renderengine::RenderEngine& /*instance*/) {
             ATRACE_NAME("REThreaded::useWaitSync");
-            bool returnValue = SyncFeatures::getInstance().useWaitSync();
+            bool returnValue = SyncFeatures::GetInstance().useWaitSync();
             resultPromise.set_value(returnValue);
         });
     }

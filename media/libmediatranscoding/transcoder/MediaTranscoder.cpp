@@ -234,7 +234,6 @@ media_status_t MediaTranscoder::configureSource(int fd) {
     lseek(fd, 0, SEEK_SET);
 
     mSampleReader = MediaSampleReaderNDK::createFromFd(fd, 0 /* offset */, fileSize);
-
     if (mSampleReader == nullptr) {
         LOG(ERROR) << "Unable to parse source fd: " << fd;
         return AMEDIA_ERROR_UNSUPPORTED;

@@ -272,16 +272,17 @@ interface IAudioPolicyService {
     float getStreamVolumeDB(AudioStreamType stream, int index, int /* audio_devices_t */ device);
 
     /**
-     * Returns whether surround formats are enabled.
+     * Populates supported surround formats and their enabled state in formats and formatsEnabled.
      *
      * On input, count represents the maximum length of the returned array.
      * On output, count is the total number of elements, which may be larger than the array size.
      * Passing '0' on input and inspecting the value on output is a common way of determining the
      * number of elements without actually retrieving them.
      */
-    boolean getSurroundFormats(boolean reported,
-                               inout Int count,
-                               out AudioFormat[] formats);
+    void getSurroundFormats(boolean reported,
+                            inout Int count,
+                            out AudioFormat[] formats,
+                            out boolean[] formatsEnabled);
 
     AudioFormat[] getHwOffloadEncodingFormatsSupportedForA2DP();
 

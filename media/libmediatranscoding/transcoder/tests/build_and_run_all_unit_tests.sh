@@ -1,8 +1,11 @@
 #!/bin/bash
+
+# Exit on compilation error.
+set -e
+
 #
 # Run tests in this directory.
 #
-
 if [ "$SYNC_FINISHED" != true ]; then
   if [ -z "$ANDROID_BUILD_TOP" ]; then
       echo "Android build environment not set"
@@ -23,6 +26,9 @@ fi
 . $ANDROID_BUILD_TOP/frameworks/av/media/libmediatranscoding/tests/push_assets.sh
 
 echo "========================================"
+
+# Don't exit if a test fails.
+set +e
 
 echo "testing MediaSampleReaderNDK"
 adb shell ASAN_OPTIONS=detect_container_overflow=0 /data/nativetest64/MediaSampleReaderNDKTests/MediaSampleReaderNDKTests

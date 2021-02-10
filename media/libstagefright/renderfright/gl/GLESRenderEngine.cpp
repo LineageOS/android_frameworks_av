@@ -30,7 +30,6 @@
 #include <android-base/stringprintf.h>
 #include <cutils/compiler.h>
 #include <cutils/properties.h>
-#include <gui/DebugEGLImageTracker.h>
 #include <renderengine/Mesh.h>
 #include <renderengine/Texture.h>
 #include <renderengine/private/Description.h>
@@ -436,7 +435,6 @@ GLESRenderEngine::~GLESRenderEngine() {
         EGLImageKHR expired = mFramebufferImageCache.front().second;
         mFramebufferImageCache.pop_front();
         eglDestroyImageKHR(mEGLDisplay, expired);
-        DEBUG_EGL_IMAGE_TRACKER_DESTROY();
     }
     eglDestroyImageKHR(mEGLDisplay, mPlaceholderImage);
     mImageCache.clear();
@@ -1012,15 +1010,11 @@ EGLImageKHR GLESRenderEngine::createFramebufferImageIfNeeded(ANativeWindowBuffer
                 EGLImageKHR expired = mFramebufferImageCache.front().second;
                 mFramebufferImageCache.pop_front();
                 eglDestroyImageKHR(mEGLDisplay, expired);
-                DEBUG_EGL_IMAGE_TRACKER_DESTROY();
             }
             mFramebufferImageCache.push_back({graphicBuffer->getId(), image});
         }
     }
 
-    if (image != EGL_NO_IMAGE_KHR) {
-        DEBUG_EGL_IMAGE_TRACKER_CREATE();
-    }
     return image;
 }
 
