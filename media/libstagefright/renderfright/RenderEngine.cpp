@@ -18,7 +18,6 @@
 
 #include <cutils/properties.h>
 #include <log/log.h>
-#include <private/gui/SyncFeatures.h>
 #include "gl/GLESRenderEngine.h"
 #include "threaded/RenderEngineThreaded.h"
 
@@ -52,6 +51,39 @@ std::unique_ptr<RenderEngine> RenderEngine::create(const RenderEngineCreationArg
 
 RenderEngine::~RenderEngine() = default;
 
+// static
+SyncFeatures &SyncFeatures::GetInstance() {
+    static SyncFeatures syncFeatures;
+    return syncFeatures;
+}
+
+bool SyncFeatures::useNativeFenceSync() const { return mHasNativeFenceSync; }
+bool SyncFeatures::useFenceSync() const { return mHasFenceSync; }
+bool SyncFeatures::useWaitSync() const { return mHasWaitSync; }
+
+SyncFeatures::SyncFeatures()
+    : mHasNativeFenceSync(false),
+      mHasFenceSync(false),
+      mHasWaitSync(false) {
+    EGLDisplay dpy = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    // This can only be called after EGL has been initialized; otherwise the
+    // check below will abort.
+    const char* exts = eglQueryString(dpy, EGL_EXTENSIONS);
+    LOG_ALWAYS_FATAL_IF(exts == nullptr, "eglQueryString failed");
+    if (strstr(exts, "EGL_ANDROID_native_fence_sync")) {
+        // This makes GLConsumer use the EGL_ANDROID_native_fence_sync
+        // extension to create Android native fences to signal when all
+        // GLES reads for a given buffer have completed.
+        mHasNativeFenceSync = true;
+    }
+    if (strstr(exts, "EGL_KHR_fence_sync")) {
+        mHasFenceSync = true;
+    }
+    if (strstr(exts, "EGL_KHR_wait_sync")) {
+        mHasWaitSync = true;
+    }
+}
+
 namespace impl {
 
 RenderEngine::RenderEngine(const RenderEngineCreationArgs& args) : mArgs(args) {}
@@ -59,11 +91,11 @@ RenderEngine::RenderEngine(const RenderEngineCreationArgs& args) : mArgs(args) {
 RenderEngine::~RenderEngine() = default;
 
 bool RenderEngine::useNativeFenceSync() const {
-    return SyncFeatures::getInstance().useNativeFenceSync();
+    return SyncFeatures::GetInstance().useNativeFenceSync();
 }
 
 bool RenderEngine::useWaitSync() const {
-    return SyncFeatures::getInstance().useWaitSync();
+    return SyncFeatures::GetInstance().useWaitSync();
 }
 
 } // namespace impl
