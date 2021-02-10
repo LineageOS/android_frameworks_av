@@ -346,8 +346,6 @@ private:
     status_t validateUsage(audio_usage_t usage);
     status_t validateUsage(audio_usage_t usage, const media::permission::Identity& identity);
 
-    bool isUserSensorPrivacyEnabledForUid(uid_t uid);
-
     void updateUidStates();
     void updateUidStates_l() REQUIRES(mLock);
 
@@ -908,8 +906,6 @@ private:
     void *mLibraryHandle = nullptr;
     CreateAudioPolicyManagerInstance mCreateAudioPolicyManager;
     DestroyAudioPolicyManagerInstance mDestroyAudioPolicyManager;
-
-    std::map<userid_t, sp<SensorPrivacyPolicy>> mMicrophoneSensorPrivacyPolicies;
 };
 
 } // namespace android
