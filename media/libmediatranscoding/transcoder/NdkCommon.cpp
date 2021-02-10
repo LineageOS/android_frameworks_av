@@ -40,6 +40,9 @@ const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME = "request-sync";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE = "video-bitrate";
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES = "max-bframes";
 
+/* TODO(lnilsson): Finalize value or adopt AMediaFormat key once available. */
+const char* TBD_AMEDIACODEC_PARAMETER_KEY_COLOR_TRANSFER_REQUEST = "color-transfer-request";
+
 namespace AMediaFormatUtils {
 
 #define DEFINE_FORMAT_VALUE_COPY_FUNC(_type, _typeName)                                      \

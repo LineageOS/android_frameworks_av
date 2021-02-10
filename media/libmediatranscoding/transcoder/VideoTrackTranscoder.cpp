@@ -51,6 +51,32 @@ static constexpr int32_t kDefaultBitrateMbps = 10 * 1000 * 1000;
 // Default frame rate.
 static constexpr int32_t kDefaultFrameRate = 30;
 
+// Determines whether a track format describes HDR video content or not. The
+// logic is based on isHdr() in libstagefright/Utils.cpp.
+static bool isHdr(AMediaFormat* format) {
+    // If VUI signals HDR content, this internal flag is set by the extractor.
+    int32_t isHdr;
+    if (AMediaFormat_getInt32(format, "android._is-hdr", &isHdr)) {
+        return isHdr;
+    }
+
+    // If container supplied HDR static info without transfer set, assume HDR.
+    const char* hdrInfo;
+    int32_t transfer;
+    if ((AMediaFormat_getString(format, AMEDIAFORMAT_KEY_HDR_STATIC_INFO, &hdrInfo) ||
+         AMediaFormat_getString(format, "hdr10-plus-info", &hdrInfo)) &&
+        !AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_COLOR_TRANSFER, &transfer)) {
+        return true;
+    }
+
+    // Otherwise, check if an HDR transfer function is set.
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_COLOR_TRANSFER, &transfer)) {
+        return transfer == COLOR_TRANSFER_ST2084 || transfer == COLOR_TRANSFER_HLG;
+    }
+
+    return false;
+}
+
 template <typename T>
 void VideoTrackTranscoder::BlockingQueue<T>::push(T const& value, bool front) {
     {
@@ -320,6 +346,14 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
+    // Request decoder to convert HDR content to SDR.
+    const bool sourceIsHdr = isHdr(mSourceFormat.get());
+    if (sourceIsHdr) {
+        AMediaFormat_setInt32(decoderFormat.get(),
+                              TBD_AMEDIACODEC_PARAMETER_KEY_COLOR_TRANSFER_REQUEST,
+                              COLOR_TRANSFER_SDR_VIDEO);
+    }
+
     // Prevent decoder from overwriting frames that the encoder has not yet consumed.
     AMediaFormat_setInt32(decoderFormat.get(), TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP, 0);
 
@@ -338,6 +372,25 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Unable to configure video decoder: " << status;
         return status;
+    }
+
+    if (sourceIsHdr) {
+        bool supported = false;
+        AMediaFormat* inputFormat = AMediaCodec_getInputFormat(mDecoder);
+
+        if (inputFormat != nullptr) {
+            int32_t transferFunc;
+            supported = AMediaFormat_getInt32(inputFormat,
+                                              TBD_AMEDIACODEC_PARAMETER_KEY_COLOR_TRANSFER_REQUEST,
+                                              &transferFunc) &&
+                        transferFunc == COLOR_TRANSFER_SDR_VIDEO;
+            AMediaFormat_delete(inputFormat);
+        }
+
+        if (!supported) {
+            LOG(ERROR) << "HDR to SDR conversion unsupported by the codec";
+            return AMEDIA_ERROR_UNSUPPORTED;
+        }
     }
 
     // Configure codecs to run in async mode.

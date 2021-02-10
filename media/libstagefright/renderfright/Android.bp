@@ -23,7 +23,6 @@ cc_defaults {
         "libEGL",
         "libGLESv1_CM",
         "libGLESv2",
-        "libgui",
         "liblog",
         "libnativewindow",
         "libprocessgroup",

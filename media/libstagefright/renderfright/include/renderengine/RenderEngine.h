@@ -302,6 +302,20 @@ private:
     status_t mStatus;
 };
 
+class SyncFeatures {
+public:
+    static SyncFeatures &GetInstance();
+    bool useNativeFenceSync() const;
+    bool useFenceSync() const;
+    bool useWaitSync() const;
+
+private:
+    SyncFeatures();
+    bool mHasNativeFenceSync;
+    bool mHasFenceSync;
+    bool mHasWaitSync;
+};
+
 namespace impl {
 
 // impl::RenderEngine contains common implementation that is graphics back-end agnostic.

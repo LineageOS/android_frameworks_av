@@ -40,18 +40,8 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#ifndef __ANDROID__
-// Value copied from 'bionic/libc/include/android/api-level.h' which is not available on
-// non Android systems. It is set to 10000 which is same as __ANDROID_API_FUTURE__ value.
-#ifndef __ANDROID_API__
-#define __ANDROID_API__ 10000
-#endif
-
-// Value copied from 'bionic/libc/include/android/versioning.h' which is not available on
-// non Android systems
-#ifndef __INTRODUCED_IN
-#define __INTRODUCED_IN(api_level)
-#endif
+#if !defined(__INTRODUCED_IN)
+#define __INTRODUCED_IN(__api_level) /* nothing */
 #endif
 
 #include "NdkMediaError.h"
@@ -312,13 +302,11 @@ extern const char* AMEDIAFORMAT_KEY_YEAR __INTRODUCED_IN(29);
  */
 extern const char* AMEDIAFORMAT_KEY_LOW_LATENCY __INTRODUCED_IN(30);
 
-#if __ANDROID_API__ >= 31
 extern const char* AMEDIAFORMAT_KEY_HDR10_PLUS_INFO __INTRODUCED_IN(31);
 extern const char* AMEDIAFORMAT_KEY_SLOW_MOTION_MARKERS __INTRODUCED_IN(31);
 extern const char* AMEDIAFORMAT_KEY_THUMBNAIL_CSD_AV1C __INTRODUCED_IN(31);
 extern const char* AMEDIAFORMAT_KEY_XMP_OFFSET __INTRODUCED_IN(31);
 extern const char* AMEDIAFORMAT_KEY_XMP_SIZE __INTRODUCED_IN(31);
-#endif /* __ANDROID_API__ >= 31 */
 
 __END_DECLS
 
