@@ -45,11 +45,18 @@ static constexpr int COLOR_FormatYUV420SemiPlanar = 21;
 static constexpr int COLOR_FormatYUV420Flexible = 0x7F420888;
 static constexpr int COLOR_FormatSurface = 0x7f000789;
 
+// Color transfer functions defined by MediaCodecConstants.h but not in NDK
+static constexpr int32_t COLOR_TRANSFER_HLG = 7;
+static constexpr int32_t COLOR_TRANSFER_LINEAR = 1;
+static constexpr int32_t COLOR_TRANSFER_SDR_VIDEO = 3;
+static constexpr int32_t COLOR_TRANSFER_ST2084 = 6;
+
 // constants not defined in NDK
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_ALLOW_FRAME_DROP;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_REQUEST_SYNC_FRAME;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_VIDEO_BITRATE;
 extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES;
+extern const char* TBD_AMEDIACODEC_PARAMETER_KEY_COLOR_TRANSFER_REQUEST;
 static constexpr int TBD_AMEDIACODEC_BUFFER_FLAG_KEY_FRAME = 0x1;
 
 static constexpr int kBitrateModeConstant = 2;

@@ -265,6 +265,10 @@ status_t DeviceHalHidl::openInputStream(
     (void)outputDevice;
     (void)outputDeviceAddress;
 #else
+#if MAJOR_VERSION >= 7
+    (void)HidlUtils::audioChannelMaskFromHal(
+            AUDIO_CHANNEL_NONE, true /*isInput*/, &sinkMetadata.tracks[0].channelMask);
+#endif
     if (outputDevice != AUDIO_DEVICE_NONE) {
         DeviceAddress hidlOutputDevice;
         if (status_t status = CoreUtils::deviceAddressFromHal(
