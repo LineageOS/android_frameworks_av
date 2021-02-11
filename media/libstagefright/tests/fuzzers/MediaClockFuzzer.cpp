@@ -17,52 +17,53 @@
 //          dylan.katz@leviathansecurity.com
 
 #include <fuzzer/FuzzedDataProvider.h>
-#include <media/stagefright/MediaClock.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/MediaClock.h>
 
 namespace android {
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  FuzzedDataProvider fdp = FuzzedDataProvider(data, size);
-  sp<MediaClock> mClock(new MediaClock);
+    FuzzedDataProvider fdp = FuzzedDataProvider(data, size);
+    sp<MediaClock> mClock(new MediaClock);
 
-  bool registered = false;
-  while (fdp.remaining_bytes() > 0) {
-    switch (fdp.ConsumeIntegralInRange<uint8_t>(0, 5)) {
-    case 0: {
-      if (registered == false) {
-        mClock->init();
-        registered = true;
-      }
-      break;
+    bool registered = false;
+    while (fdp.remaining_bytes() > 0) {
+        switch (fdp.ConsumeIntegralInRange<uint8_t>(0, 5)) {
+            case 0: {
+                if (registered == false) {
+                    mClock->init();
+                    registered = true;
+                }
+                break;
+                }
+            case 1: {
+                int64_t startingTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
+                mClock->setStartingTimeMedia(startingTimeMediaUs);
+                break;
+            }
+            case 2: {
+                mClock->clearAnchor();
+                break;
+            }
+            case 3: {
+                int64_t anchorTimeRealUs = fdp.ConsumeIntegral<int64_t>();
+                int64_t anchorTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
+                int64_t maxTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
+                mClock->updateAnchor(anchorTimeMediaUs, anchorTimeRealUs,
+                                     maxTimeMediaUs);
+                break;
+            }
+            case 4: {
+                int64_t maxTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
+                mClock->updateMaxTimeMedia(maxTimeMediaUs);
+                break;
+                }
+            case 5: {
+                wp<AMessage> msg(new AMessage);
+                mClock->setNotificationMessage(msg.promote());
+            }
+        }
     }
-    case 1: {
-      int64_t startingTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
-      mClock->setStartingTimeMedia(startingTimeMediaUs);
-      break;
-    }
-    case 2: {
-      mClock->clearAnchor();
-      break;
-    }
-    case 3: {
-      int64_t anchorTimeRealUs = fdp.ConsumeIntegral<int64_t>();
-      int64_t anchorTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
-      int64_t maxTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
-      mClock->updateAnchor(anchorTimeMediaUs, anchorTimeRealUs, maxTimeMediaUs);
-      break;
-    }
-    case 4: {
-      int64_t maxTimeMediaUs = fdp.ConsumeIntegral<int64_t>();
-      mClock->updateMaxTimeMedia(maxTimeMediaUs);
-      break;
-    }
-    case 5: {
-      wp<AMessage> msg(new AMessage);
-      mClock->setNotificationMessage(msg.promote());
-    }
-    }
-  }
 
-  return 0;
+    return 0;
 }
-} // namespace android
+}  // namespace android
