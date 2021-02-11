@@ -32,7 +32,11 @@ int main(int argc __unused, char** argv) {
     sp<IServiceManager> sm = defaultServiceManager();
     ALOGD("ServiceManager: %p", sm.get());
 
-    TunerService::instantiate();
+    binder_status_t status = TunerService::instantiate();
+    if (status != STATUS_OK) {
+        ALOGD("Failed to add tuner service as AIDL interface");
+        return -1;
+    }
 
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
