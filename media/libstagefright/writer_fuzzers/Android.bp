@@ -58,3 +58,59 @@ cc_library_static {
         "WriterFuzzerBase.cpp",
     ],
 }
+
+cc_fuzz {
+    name: "amrnb_writer_fuzzer",
+    defaults: ["writer-fuzzer-defaults"],
+    srcs: [
+        "amr_writer_fuzzer.cpp",
+    ],
+    cflags: [
+        "-DAMRNB",
+    ],
+}
+
+cc_fuzz {
+    name: "amrwb_writer_fuzzer",
+    defaults: ["writer-fuzzer-defaults"],
+    srcs: [
+        "amr_writer_fuzzer.cpp",
+    ],
+}
+
+cc_fuzz {
+    name : "mpeg4_writer_fuzzer",
+    defaults : ["writer-fuzzer-defaults"],
+    srcs : [
+        "mpeg4_writer_fuzzer.cpp",
+    ],
+    static_libs: [
+        "libstagefright_esds",
+    ],
+}
+
+cc_fuzz {
+    name : "ogg_writer_fuzzer",
+    defaults : ["writer-fuzzer-defaults"],
+    srcs : [
+        "ogg_writer_fuzzer.cpp",
+    ],
+    static_libs: [
+        "libogg",
+    ],
+}
+
+cc_fuzz {
+    name : "webm_writer_fuzzer",
+    defaults : ["writer-fuzzer-defaults"],
+    srcs : [
+        "webm_writer_fuzzer.cpp",
+    ],
+    static_libs: [
+        "libstagefright_webm",
+        "libdatasource",
+    ],
+    include_dirs: [
+        "frameworks/av/media/libstagefright",
+    ],
+}
