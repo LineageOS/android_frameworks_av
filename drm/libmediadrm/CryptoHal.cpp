@@ -376,6 +376,7 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
 
     Return<void> hResult;
 
+    mLock.unlock();
     if (mPluginV1_2 != NULL) {
         hResult = mPluginV1_2->decrypt_1_2(secure, toHidlArray16(keyId), toHidlArray16(iv),
                 hMode, hPattern, hSubSamples, hSource, offset, hDestination,
