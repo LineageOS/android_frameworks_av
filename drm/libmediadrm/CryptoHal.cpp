@@ -393,4 +393,8 @@ status_t CryptoHal::setMediaDrmSession(const Vector<uint8_t> &sessionId) {
     return toStatusT(mPlugin->setMediaDrmSession(toHidlVec(sessionId)));
 }
 
+status_t CryptoHal::getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const {
+    Mutex::Autolock autoLock(mLock);
+    return DrmUtils::GetLogMessages<drm::V1_4::ICryptoPlugin>(mPlugin, logs);
+}
 }  // namespace android

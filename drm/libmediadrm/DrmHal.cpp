@@ -1545,4 +1545,9 @@ status_t DrmHal::setPlaybackId(Vector<uint8_t> const &sessionId, const char *pla
     return toStatusT(err);
 }
 
+status_t DrmHal::getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const {
+    Mutex::Autolock autoLock(mLock);
+    return DrmUtils::GetLogMessages<drm::V1_4::IDrmPlugin>(mPlugin, logs);
+}
+
 }  // namespace android
