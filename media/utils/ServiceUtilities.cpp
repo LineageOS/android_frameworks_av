@@ -114,15 +114,14 @@ static bool checkRecordingInternal(const Identity& identity, const String16& msg
         if (int32_t mode = appOps.startOpNoThrow(op, identity.uid,
             resolvedOpPackageName, /*startIfModeDefault*/ false,
             VALUE_OR_FATAL(aidl2legacy_optional_string_view_optional_String16(
-                identity.attributionTag)), msg) != AppOpsManager::MODE_ALLOWED) {
+                identity.attributionTag)), msg) == AppOpsManager::MODE_ERRORED) {
             ALOGE("Request start for \"%s\" (uid %d) denied by app op: %d, mode: %d",
                 String8(resolvedOpPackageName).c_str(), identity.uid, op, mode);
             return false;
         }
     } else {
-        // Always use OP_RECORD_AUDIO for checks at creation time.
         if (int32_t mode = appOps.checkOp(op, uid,
-            resolvedOpPackageName) != AppOpsManager::MODE_ALLOWED) {
+            resolvedOpPackageName) == AppOpsManager::MODE_ERRORED) {
             ALOGE("Request check for \"%s\" (uid %d) denied by app op: %d, mode: %d",
                 String8(resolvedOpPackageName).c_str(), identity.uid, op, mode);
             return false;
