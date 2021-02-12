@@ -518,9 +518,24 @@ struct CCodec::ClientListener : public Codec2Client::Listener {
     virtual void onError(
             const std::weak_ptr<Codec2Client::Component>& component,
             uint32_t errorCode) override {
-        // TODO
-        (void)component;
-        (void)errorCode;
+        {
+            // Component is only used for reporting as we use a separate listener for each instance
+            std::shared_ptr<Codec2Client::Component> comp = component.lock();
+            if (!comp) {
+                ALOGD("Component died with error: 0x%x", errorCode);
+            } else {
+                ALOGD("Component \"%s\" returned error: 0x%x", comp->getName().c_str(), errorCode);
+            }
+        }
+
+        // Report to MediaCodec
+        // Note: for now we do not propagate the error code to MediaCodec as we would need
+        // to translate to a MediaCodec error.
+        sp<CCodec> codec(mCodec.promote());
+        if (!codec || !codec->mCallback) {
+            return;
+        }
+        codec->mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
     }
 
     virtual void onDeath(
