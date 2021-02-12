@@ -804,13 +804,13 @@ void TunerFrontend::getAidlFrontendStatusExt(
             case FrontendStatusExt1_1::hidl_discriminator::rollOff: {
                 switch (s.rollOff().getDiscriminator()) {
                     case FrontendRollOff::hidl_discriminator::dvbs:
-                        status.set<TunerFrontendStatus::interleaving>((int)s.rollOff().dvbs());
+                        status.set<TunerFrontendStatus::rollOff>((int)s.rollOff().dvbs());
                         break;
                     case FrontendRollOff::hidl_discriminator::isdbs:
-                        status.set<TunerFrontendStatus::interleaving>((int)s.rollOff().isdbs());
+                        status.set<TunerFrontendStatus::rollOff>((int)s.rollOff().isdbs());
                         break;
                     case FrontendRollOff::hidl_discriminator::isdbs3:
-                        status.set<TunerFrontendStatus::interleaving>((int)s.rollOff().isdbs3());
+                        status.set<TunerFrontendStatus::rollOff>((int)s.rollOff().isdbs3());
                         break;
                 }
                 aidlStatus.push_back(status);
