@@ -107,12 +107,19 @@ int main(int argc, const char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    int numFrames = fileSize1 / sizeof(int16_t);
+    size_t numFrames = fileSize1 / sizeof(int16_t);
     std::unique_ptr<int16_t[]> inBuffer1(new int16_t[numFrames]());
     std::unique_ptr<int16_t[]> inBuffer2(new int16_t[numFrames]());
 
-    fread(inBuffer1.get(), sizeof(int16_t), numFrames, fInput1.get());
-    fread(inBuffer2.get(), sizeof(int16_t), numFrames, fInput2.get());
+    if (numFrames != fread(inBuffer1.get(), sizeof(int16_t), numFrames, fInput1.get())) {
+        printf("\nError: Unable to read %zu samples from file %s\n", numFrames, argv[1]);
+        return EXIT_FAILURE;
+    }
+
+    if (numFrames != fread(inBuffer2.get(), sizeof(int16_t), numFrames, fInput2.get())) {
+        printf("\nError: Unable to read %zu samples from file %s\n", numFrames, argv[2]);
+        return EXIT_FAILURE;
+    }
 
     auto pairAutoCorr1 = correlation(inBuffer1.get(), inBuffer1.get(), numFrames, enableCrossCorr);
     auto pairAutoCorr2 = correlation(inBuffer2.get(), inBuffer2.get(), numFrames, enableCrossCorr);
