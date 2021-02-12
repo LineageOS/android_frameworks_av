@@ -101,4 +101,11 @@ interface ITunerService {
      */
     // TODO: b/178124017 update TRM in TunerService independently.
     void updateTunerResources();
+
+    /**
+     * Get an integer that carries the Tuner HIDL version. The high 16 bits are the
+     * major version number while the low 16 bits are the minor version. Default
+     * value is unknown version 0.
+     */
+    int getTunerHalVersion();
 }

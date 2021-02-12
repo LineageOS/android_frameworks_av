@@ -69,6 +69,10 @@ using namespace std;
 
 namespace android {
 
+const static int TUNER_HAL_VERSION_UNKNOWN = 0;
+const static int TUNER_HAL_VERSION_1_0 = 1 << 16;
+const static int TUNER_HAL_VERSION_1_1 = (1 << 16) | 1;
+
 typedef enum {
     FRONTEND,
     LNB,
@@ -93,7 +97,7 @@ class TunerService : public BnTunerService {
 
 public:
     static char const *getServiceName() { return "media.tuner"; }
-    static void instantiate();
+    static binder_status_t instantiate();
     TunerService();
     virtual ~TunerService();
 
@@ -110,6 +114,7 @@ public:
     Status openDescrambler(int32_t descramblerHandle,
             std::shared_ptr<ITunerDescrambler>* _aidl_return) override;
     Status updateTunerResources() override;
+    Status getTunerHalVersion(int* _aidl_return) override;
 
     // TODO: create a map between resource id and handles.
     static int getResourceIdFromHandle(int resourceHandle, int /*type*/) {
@@ -141,6 +146,8 @@ private:
 
     shared_ptr<ITunerResourceManager> mTunerResourceManager;
     int mResourceRequestCount = 0;
+
+    int mTunerVersion = TUNER_HAL_VERSION_UNKNOWN;
 };
 
 } // namespace android
