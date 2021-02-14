@@ -645,6 +645,7 @@ c2_status_t C2InterfaceHelper::config(
                     lateReadParams.emplace_back(p);
                     std::unique_ptr<C2Param> request(C2Param::CopyAsRequest(*p));
                     p = request.get();
+                    paramIx = p->index();
                     paramRequests.emplace_back(std::move(request));
                 }
             }
