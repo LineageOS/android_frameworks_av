@@ -9,6 +9,7 @@ cc_library {
     },
 
     vendor: true,
+    host_supported: true,
     srcs: ["Bundle/EffectBundle.cpp"],
 
     cppflags: [
@@ -25,7 +26,6 @@ cc_library {
     shared_libs: [
         "libaudioutils",
         "libcutils",
-        "libdl",
         "liblog",
     ],
 
