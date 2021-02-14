@@ -9,6 +9,7 @@ cc_library_static {
     },
 
     vendor: true,
+    host_supported: true,
     srcs: [
         "StereoWidening/src/LVCS_BypassMix.cpp",
         "StereoWidening/src/LVCS_Control.cpp",
