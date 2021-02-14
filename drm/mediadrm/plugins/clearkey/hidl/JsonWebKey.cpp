@@ -65,7 +65,7 @@ bool JsonWebKey::extractKeysFromJsonWebKeySet(const std::string& jsonWebKeySet,
     // all the base64 encoded keys. Each key is also stored separately as
     // a JSON object in mJsonObjects[1..n] where n is the total
     // number of keys in the set.
-    if (!isJsonWebKeySet(mJsonObjects[0])) {
+    if (mJsonObjects.size() == 0 || !isJsonWebKeySet(mJsonObjects[0])) {
         return false;
     }
 
