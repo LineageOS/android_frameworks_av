@@ -487,6 +487,31 @@ public:
     }
 };
 
+void RevertOutputFormatIfNeeded(
+        const sp<AMessage> &oldFormat, sp<AMessage> &currentFormat) {
+    // We used to not report changes to these keys to the client.
+    const static std::set<std::string> sIgnoredKeys({
+            KEY_BIT_RATE,
+            KEY_MAX_BIT_RATE,
+            "csd-0",
+            "csd-1",
+            "csd-2",
+    });
+    if (currentFormat == oldFormat) {
+        return;
+    }
+    sp<AMessage> diff = currentFormat->changesFrom(oldFormat);
+    AMessage::Type type;
+    for (size_t i = diff->countEntries(); i > 0; --i) {
+        if (sIgnoredKeys.count(diff->getEntryNameAt(i - 1, &type)) > 0) {
+            diff->removeEntryAt(i - 1);
+        }
+    }
+    if (diff->countEntries() == 0) {
+        currentFormat = oldFormat;
+    }
+}
+
 }  // namespace
 
 // CCodec::ClientListener
@@ -518,9 +543,24 @@ struct CCodec::ClientListener : public Codec2Client::Listener {
     virtual void onError(
             const std::weak_ptr<Codec2Client::Component>& component,
             uint32_t errorCode) override {
-        // TODO
-        (void)component;
-        (void)errorCode;
+        {
+            // Component is only used for reporting as we use a separate listener for each instance
+            std::shared_ptr<Codec2Client::Component> comp = component.lock();
+            if (!comp) {
+                ALOGD("Component died with error: 0x%x", errorCode);
+            } else {
+                ALOGD("Component \"%s\" returned error: 0x%x", comp->getName().c_str(), errorCode);
+            }
+        }
+
+        // Report to MediaCodec
+        // Note: for now we do not propagate the error code to MediaCodec as we would need
+        // to translate to a MediaCodec error.
+        sp<CCodec> codec(mCodec.promote());
+        if (!codec || !codec->mCallback) {
+            return;
+        }
+        codec->mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
     }
 
     virtual void onDeath(
@@ -1687,7 +1727,9 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
                     || comp->getName().find("c2.android.") == 0)) {
         mChannel->setParameters(configUpdate);
     } else {
+        sp<AMessage> outputFormat = config->mOutputFormat;
         (void)config->setParameters(comp, configUpdate, C2_MAY_BLOCK);
+        RevertOutputFormatIfNeeded(outputFormat, config->mOutputFormat);
     }
 }
 
@@ -1812,7 +1854,6 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             // handle configuration changes in work done
             Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
             const std::unique_ptr<Config> &config = *configLocked;
-            bool changed = false;
             Config::Watcher<C2StreamInitDataInfo::output> initData =
                 config->watch<C2StreamInitDataInfo::output>();
             if (!work->worklets.empty()
@@ -1847,9 +1888,9 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ++stream;
                 }
 
-                if (config->updateConfiguration(updates, config->mOutputDomain)) {
-                    changed = true;
-                }
+                sp<AMessage> outputFormat = config->mOutputFormat;
+                config->updateConfiguration(updates, config->mOutputDomain);
+                RevertOutputFormatIfNeeded(outputFormat, config->mOutputFormat);
 
                 // copy standard infos to graphic buffers if not already present (otherwise, we
                 // may overwrite the actual intermediate value with a final value)
@@ -1883,7 +1924,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
             }
             mChannel->onWorkDone(
-                    std::move(work), changed ? config->mOutputFormat->dup() : nullptr,
+                    std::move(work), config->mOutputFormat,
                     initData.hasChanged() ? initData.update().get() : nullptr);
             break;
         }
