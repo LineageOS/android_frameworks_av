@@ -166,8 +166,8 @@ int Effect_setEnabled(EffectContext* pContext, bool enabled);
 
 /* Effect Library Interface Implementation */
 
-extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t sessionId, int32_t ioId __unused,
-                            effect_handle_t* pHandle) {
+extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t sessionId,
+                            int32_t /* ioId __unused */, effect_handle_t* pHandle) {
     int ret = 0;
     int sessionNo = -1;
     int i;
@@ -1344,7 +1344,8 @@ int VirtualizerForceVirtualizationMode(EffectContext* pContext, audio_devices_t 
 //
 //----------------------------------------------------------------------------
 void VirtualizerGetSpeakerAngles(audio_channel_mask_t channelMask,
-                                 audio_devices_t deviceType __unused, int32_t* pSpeakerAngles) {
+                                 audio_devices_t /* deviceType __unused */,
+                                 int32_t* pSpeakerAngles) {
     // the channel count is guaranteed to be 1 or 2
     // the device is guaranteed to be of type headphone
     // this virtualizer is always using 2 virtual speakers at -90 and 90deg of azimuth, 0deg of
@@ -1485,8 +1486,8 @@ int32_t EqualizerGetCentreFrequency(EffectContext* pContext, int32_t band) {
 //  pLow:       lower band range
 //  pLow:       upper band range
 //----------------------------------------------------------------------------
-int32_t EqualizerGetBandFreqRange(EffectContext* pContext __unused, int32_t band, uint32_t* pLow,
-                                  uint32_t* pHi) {
+int32_t EqualizerGetBandFreqRange(EffectContext* /* pContext __unused */, int32_t band,
+                                  uint32_t* pLow, uint32_t* pHi) {
     *pLow = bandFreqRange[band][0];
     *pHi = bandFreqRange[band][1];
     return 0;
@@ -1509,7 +1510,7 @@ int32_t EqualizerGetBandFreqRange(EffectContext* pContext __unused, int32_t band
 //  pLow:       lower band range
 //  pLow:       upper band range
 //----------------------------------------------------------------------------
-int32_t EqualizerGetBand(EffectContext* pContext __unused, uint32_t targetFreq) {
+int32_t EqualizerGetBand(EffectContext* /* pContext __unused */, uint32_t targetFreq) {
     int band = 0;
 
     if (targetFreq < bandFreqRange[0][0]) {
