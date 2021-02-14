@@ -107,7 +107,7 @@ class WriterFuzzerBase {
 
     void sendBuffersToWriter(sp<MediaAdapter>& currentTrack, int32_t trackIndex);
 
-    void processData(const uint8_t* data, size_t size);
+    void initFileWriterAndProcessData(const uint8_t* data, size_t size);
 
    protected:
     class BufferSource {
