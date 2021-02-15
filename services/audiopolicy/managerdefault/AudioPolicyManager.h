@@ -329,11 +329,14 @@ public:
             return mEngine->listAudioProductStrategies(strategies);
         }
 
-        virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
-                                                               product_strategy_t &productStrategy)
+        virtual status_t getProductStrategyFromAudioAttributes(
+                const AudioAttributes &aa, product_strategy_t &productStrategy,
+                bool fallbackOnDefault)
         {
-            productStrategy = mEngine->getProductStrategyForAttributes(aa.getAttributes());
-            return productStrategy != PRODUCT_STRATEGY_NONE ? NO_ERROR : BAD_VALUE;
+            productStrategy = mEngine->getProductStrategyForAttributes(
+                    aa.getAttributes(), fallbackOnDefault);
+            return (fallbackOnDefault && productStrategy == PRODUCT_STRATEGY_NONE) ?
+                    BAD_VALUE : NO_ERROR;
         }
 
         virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups)
@@ -341,11 +344,13 @@ public:
             return mEngine->listAudioVolumeGroups(groups);
         }
 
-        virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
-                                                           volume_group_t &volumeGroup)
+        virtual status_t getVolumeGroupFromAudioAttributes(
+                const AudioAttributes &aa, volume_group_t &volumeGroup, bool fallbackOnDefault)
         {
-            volumeGroup = mEngine->getVolumeGroupForAttributes(aa.getAttributes());
-            return volumeGroup != VOLUME_GROUP_NONE ? NO_ERROR : BAD_VALUE;
+            volumeGroup = mEngine->getVolumeGroupForAttributes(
+                        aa.getAttributes(), fallbackOnDefault);
+            return (fallbackOnDefault && volumeGroup == VOLUME_GROUP_NONE) ?
+                    BAD_VALUE : NO_ERROR;
         }
 
         bool isCallScreenModeSupported() override;
