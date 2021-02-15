@@ -129,7 +129,8 @@ public:
      * @param attr
      * @return applicable product strategy for the given attribute, default if none applicable.
      */
-    product_strategy_t getProductStrategyForAttributes(const audio_attributes_t &attr) const;
+    product_strategy_t getProductStrategyForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const;
 
     product_strategy_t getProductStrategyForStream(audio_stream_type_t stream) const;
 
@@ -153,9 +154,11 @@ public:
 
     std::string getDeviceAddressForProductStrategy(product_strategy_t strategy) const;
 
-    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const;
+    volume_group_t getVolumeGroupForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const;
 
-    volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const;
+    volume_group_t getVolumeGroupForStreamType(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const;
 
     volume_group_t getDefaultVolumeGroup() const;
 
