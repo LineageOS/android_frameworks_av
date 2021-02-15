@@ -148,9 +148,8 @@ bool Codec2Fuzzer::initDecoder() {
   std::vector<std::tuple<C2String, C2ComponentFactory::CreateCodec2FactoryFunc,
         C2ComponentFactory::DestroyCodec2FactoryFunc>> codec2FactoryFunc;
 
-  codec2FactoryFunc.emplace_back(std::make_tuple(C2COMPONENTNAME,
-                                                &CreateCodec2Factory,
-                                                &DestroyCodec2Factory));
+  codec2FactoryFunc.emplace_back(
+      std::make_tuple(C2COMPONENTNAME, &CreateCodec2Factory, &DestroyCodec2Factory));
 
   std::shared_ptr<C2ComponentStore> componentStore = GetTestComponentStore(codec2FactoryFunc);
   if (!componentStore) {
