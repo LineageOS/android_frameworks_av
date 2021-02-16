@@ -169,7 +169,7 @@ void ProductStrategy::dump(String8 *dst, int spaces) const
 }
 
 product_strategy_t ProductStrategyMap::getProductStrategyForAttributes(
-        const audio_attributes_t &attr) const
+        const audio_attributes_t &attr, bool fallbackOnDefault) const
 {
     for (const auto &iter : *this) {
         if (iter.second->matches(attr)) {
@@ -178,7 +178,7 @@ product_strategy_t ProductStrategyMap::getProductStrategyForAttributes(
     }
     ALOGV("%s: No matching product strategy for attributes %s, return default", __FUNCTION__,
           toString(attr).c_str());
-    return getDefault();
+    return fallbackOnDefault? getDefault() : PRODUCT_STRATEGY_NONE;
 }
 
 audio_attributes_t ProductStrategyMap::getAttributesForStreamType(audio_stream_type_t stream) const
@@ -272,7 +272,8 @@ std::string ProductStrategyMap::getDeviceAddressForProductStrategy(product_strat
     return at(psId)->getDeviceAddress();
 }
 
-volume_group_t ProductStrategyMap::getVolumeGroupForAttributes(const audio_attributes_t &attr) const
+volume_group_t ProductStrategyMap::getVolumeGroupForAttributes(
+        const audio_attributes_t &attr, bool fallbackOnDefault) const
 {
     for (const auto &iter : *this) {
         volume_group_t group = iter.second->getVolumeGroupForAttributes(attr);
@@ -280,10 +281,11 @@ volume_group_t ProductStrategyMap::getVolumeGroupForAttributes(const audio_attri
             return group;
         }
     }
-    return getDefaultVolumeGroup();
+    return fallbackOnDefault ? getDefaultVolumeGroup() : VOLUME_GROUP_NONE;
 }
 
-volume_group_t ProductStrategyMap::getVolumeGroupForStreamType(audio_stream_type_t stream) const
+volume_group_t ProductStrategyMap::getVolumeGroupForStreamType(
+        audio_stream_type_t stream, bool fallbackOnDefault) const
 {
     for (const auto &iter : *this) {
         volume_group_t group = iter.second->getVolumeGroupForStreamType(stream);
@@ -292,7 +294,7 @@ volume_group_t ProductStrategyMap::getVolumeGroupForStreamType(audio_stream_type
         }
     }
     ALOGW("%s: no volume group for %s, using default", __func__, toString(stream).c_str());
-    return getDefaultVolumeGroup();
+    return fallbackOnDefault ? getDefaultVolumeGroup() : VOLUME_GROUP_NONE;
 }
 
 volume_group_t ProductStrategyMap::getDefaultVolumeGroup() const
