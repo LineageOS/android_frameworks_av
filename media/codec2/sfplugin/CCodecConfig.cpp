@@ -765,21 +765,13 @@ void CCodecConfig::initializeStandardParams() {
 
     // convert to compression type and add default
     add(ConfigMapper(KEY_AAC_DRC_HEAVY_COMPRESSION, C2_PARAMKEY_DRC_COMPRESSION_MODE, "value")
-        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
-        .withMappers([](C2Value v) -> C2Value {
+        .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM))
+        .withMapper([](C2Value v) -> C2Value {
             int32_t value;
             if (!v.get(&value) || value < 0) {
                 value = property_get_int32(PROP_DRC_OVERRIDE_HEAVY, DRC_DEFAULT_MOBILE_DRC_HEAVY);
             }
             return value == 1 ? C2Config::DRC_COMPRESSION_HEAVY : C2Config::DRC_COMPRESSION_LIGHT;
-        },[](C2Value v) -> C2Value {
-            int32_t value;
-            if (v.get(&value)) {
-              return value;
-            }
-            else {
-              return C2Value();
-            }
         }));
 
     // convert to dBFS and add default
