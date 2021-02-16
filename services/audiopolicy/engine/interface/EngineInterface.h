@@ -110,11 +110,12 @@ public:
      * Get the strategy selected for a given audio attributes.
      *
      * @param[in] audio attributes to get the selected @product_strategy_t followed by.
-     *
+     * @param fallbackOnDefault if true, will return the fallback strategy if the attributes
+     * are not explicitly assigned to a given strategy.
      * @return @product_strategy_t to be followed.
      */
     virtual product_strategy_t getProductStrategyForAttributes(
-            const audio_attributes_t &attr) const = 0;
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const = 0;
 
     /**
      * @brief getOutputDevicesForAttributes retrieves the devices to be used for given
@@ -271,19 +272,25 @@ public:
      * @brief getVolumeGroupForAttributes gets the appropriate volume group to be used for a given
      * Audio Attributes.
      * @param attr to be considered
+     * @param fallbackOnDefault if true, will return the fallback volume group if the attributes
+     * are not associated to any volume group.
      * @return volume group associated to the given audio attributes, default group if none
      * applicable, VOLUME_GROUP_NONE if no default group defined.
      */
-    virtual volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const = 0;
+    virtual volume_group_t getVolumeGroupForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const = 0;
 
     /**
      * @brief getVolumeGroupForStreamType gets the appropriate volume group to be used for a given
      * legacy stream type
      * @param stream type to be considered
+     * @param fallbackOnDefault if true, will return the fallback volume group if the stream type
+     * is not associated to any volume group.
      * @return volume group associated to the given stream type, default group if none applicable,
      * VOLUME_GROUP_NONE if no default group defined.
      */
-    virtual volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const = 0;
+    virtual volume_group_t getVolumeGroupForStreamType(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const = 0;
 
     /**
      * @brief listAudioVolumeGroups introspection API to get the Audio Volume Groups, aka
