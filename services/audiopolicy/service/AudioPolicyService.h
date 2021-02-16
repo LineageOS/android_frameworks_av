@@ -196,10 +196,12 @@ public:
     binder::Status listAudioProductStrategies(
             std::vector<media::AudioProductStrategy>* _aidl_return) override;
     binder::Status getProductStrategyFromAudioAttributes(const media::AudioAttributesEx& aa,
+                                                         bool fallbackOnDefault,
                                                          int32_t* _aidl_return) override;
     binder::Status listAudioVolumeGroups(
             std::vector<media::AudioVolumeGroup>* _aidl_return) override;
     binder::Status getVolumeGroupFromAudioAttributes(const media::AudioAttributesEx& aa,
+                                                     bool fallbackOnDefault,
                                                      int32_t* _aidl_return) override;
     binder::Status setRttEnabled(bool enabled) override;
     binder::Status isCallScreenModeSupported(bool* _aidl_return) override;
