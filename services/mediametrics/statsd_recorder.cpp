@@ -55,6 +55,11 @@ bool statsd_recorder(const mediametrics::Item *item)
     // flesh out the protobuf we'll hand off with our data
     //
 
+    // string kRecorderLogSessionId = "android.media.mediarecorder.log-session-id";
+    std::string log_session_id;
+    if (item->getString("android.media.mediarecorder.log_session_id", &log_session_id)) {
+        metrics_proto.set_log_session_id(std::move(log_session_id));
+    }
     // string kRecorderAudioMime = "android.media.mediarecorder.audio.mime";
     std::string audio_mime;
     if (item->getString("android.media.mediarecorder.audio.mime", &audio_mime)) {
