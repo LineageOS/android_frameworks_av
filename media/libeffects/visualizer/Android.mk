@@ -18,6 +18,9 @@ LOCAL_SHARED_LIBRARIES := \
 
 LOCAL_MODULE_RELATIVE_PATH := soundfx
 LOCAL_MODULE:= libvisualizer
+LOCAL_LICENSE_KINDS:= SPDX-license-identifier-Apache-2.0
+LOCAL_LICENSE_CONDITIONS:= notice
+LOCAL_NOTICE_FILE:= $(LOCAL_PATH)/NOTICE
 
 LOCAL_C_INCLUDES := \
 	$(call include-path-for, audio-effects) \

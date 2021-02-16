@@ -1,5 +1,16 @@
 // Build the unit tests for MediaTranscodingService
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_services_mediatranscoding_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: [
+        "frameworks_av_services_mediatranscoding_license",
+    ],
+}
+
 cc_defaults {
     name: "mediatranscodingservice_test_defaults",
 
