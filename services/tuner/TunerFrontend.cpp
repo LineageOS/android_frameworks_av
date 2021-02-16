@@ -278,11 +278,13 @@ Status TunerFrontend::close() {
     }
 
     Result status = mFrontend->close();
-    if (status == Result::SUCCESS) {
-        return Status::ok();
-    }
+    mFrontend = NULL;
+    mFrontend_1_1 = NULL;
 
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerFrontend::getStatus(const vector<int32_t>& statusTypes,
