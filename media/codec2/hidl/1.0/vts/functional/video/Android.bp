@@ -14,6 +14,15 @@
  * limitations under the License.
  */
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
 cc_test {
     name: "VtsHalMediaC2V1_0TargetVideoDecTest",
     stem: "vts_media_c2_v1_0_video_dec_test",
@@ -40,4 +49,3 @@ cc_test {
     data: [":media_c2_v1_video_encode_res"],
     test_config: "VtsHalMediaC2V1_0TargetVideoEncTest.xml",
 }
-
