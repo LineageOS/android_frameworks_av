@@ -633,7 +633,9 @@ AudioPolicyManagerFuzzerDPPlaybackReRouting::~AudioPolicyManagerFuzzerDPPlayback
 }
 
 bool AudioPolicyManagerFuzzerDPPlaybackReRouting::initialize() {
-    AudioPolicyManagerFuzzerDynamicPolicy::initialize();
+    if (!AudioPolicyManagerFuzzerDynamicPolicy::initialize()) {
+        return false;
+    }
     mTracker.reset(new RecordingActivityTracker());
 
     mAudioConfig = AUDIO_CONFIG_INITIALIZER;
@@ -743,7 +745,9 @@ AudioPolicyManagerFuzzerDPMixRecordInjection::~AudioPolicyManagerFuzzerDPMixReco
 }
 
 bool AudioPolicyManagerFuzzerDPMixRecordInjection::initialize() {
-    AudioPolicyManagerFuzzerDynamicPolicy::initialize();
+    if (!AudioPolicyManagerFuzzerDynamicPolicy::initialize()) {
+        return false;
+    }
 
     mTracker.reset(new RecordingActivityTracker());
 
