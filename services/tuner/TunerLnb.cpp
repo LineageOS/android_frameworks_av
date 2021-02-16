@@ -97,8 +97,13 @@ Status TunerLnb::close() {
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    Result status = mLnb->close();
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    Result res = mLnb->close();
+    mLnb = NULL;
+
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
 }
 
 /////////////// ILnbCallback ///////////////////////

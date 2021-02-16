@@ -542,6 +542,9 @@ Status TunerFilter::close() {
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
     Result res = mFilter->close();
+    mFilter = NULL;
+    mFilter_1_1 = NULL;
+
     if (res != Result::SUCCESS) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
