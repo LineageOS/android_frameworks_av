@@ -93,10 +93,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t* phInstance, LVM_InstPara
     /*
      * Create the instance handle
      */
-    *phInstance = (LVM_Handle_t)calloc(1, sizeof(*pInstance));
-    if (*phInstance == LVM_NULL) {
-        return LVM_NULLADDRESS;
-    }
+    *phInstance = new LVM_Instance_t;
     pInstance = (LVM_Instance_t*)*phInstance;
 
     pInstance->InstParams = *pInstParams;
@@ -543,7 +540,7 @@ void LVM_DelInstanceHandle(LVM_Handle_t* phInstance) {
         pInstance->pPSAInput = LVM_NULL;
     }
 
-    free(*phInstance);
+    delete pInstance;
     return;
 }
 
