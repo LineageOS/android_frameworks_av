@@ -22,6 +22,7 @@
 #include <android/hardware/drm/1.0/ICryptoPlugin.h>
 #include <android/hardware/drm/1.1/ICryptoFactory.h>
 #include <android/hardware/drm/1.2/ICryptoPlugin.h>
+#include <android/hardware/drm/1.4/ICryptoPlugin.h>
 
 #include <mediadrm/ICrypto.h>
 #include <utils/KeyedVector.h>
@@ -70,6 +71,8 @@ struct CryptoHal : public ICrypto {
         return setHeapBase(heap);
     }
     virtual void unsetHeap(int32_t seqNum) { clearHeapBase(seqNum); }
+
+    virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const;
 
 private:
     mutable Mutex mLock;

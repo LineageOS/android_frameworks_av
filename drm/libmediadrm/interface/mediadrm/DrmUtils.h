@@ -19,12 +19,18 @@
 
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/IDrmFactory.h>
+#include <android/hardware/drm/1.4/IDrmPlugin.h>
 #include <android/hardware/drm/1.4/types.h>
+#include <media/stagefright/MediaErrors.h>
 #include <utils/Errors.h>  // for status_t
+#include <utils/Vector.h>
 #include <utils/StrongPointer.h>
 #include <vector>
 
+
 using namespace ::android::hardware::drm;
+using ::android::hardware::hidl_vec;
+using ::android::hardware::Return;
 
 namespace android {
 
@@ -105,6 +111,31 @@ inline status_t toStatusT(const android::hardware::Return<T> &status) {
     auto t = static_cast<T>(status);
     auto err = static_cast<::V1_4::Status>(t);
     return toStatusT_1_4(err);
+}
+
+template<typename T, typename U>
+status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
+    sp<T> plugin = T::castFrom(obj);
+    if (plugin == NULL) {
+        return ERROR_UNSUPPORTED;
+    }
+
+    ::V1_4::Status err{};
+    ::V1_4::IDrmPlugin::getLogMessages_cb cb = [&](
+            ::V1_4::Status status,
+            hidl_vec<::V1_4::LogMessage> hLogs) {
+        if (::V1_4::Status::OK == status) {
+            err = status;
+            return;
+        }
+        logs.appendArray(hLogs.data(), hLogs.size());
+    };
+
+    Return<void> hResult = plugin->getLogMessages(cb);
+    if (!hResult.isOk()) {
+        return DEAD_OBJECT;
+    }
+    return toStatusT(err);
 }
 
 } // namespace DrmUtils
