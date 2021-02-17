@@ -18,6 +18,9 @@
 
 #include "TunerTimeFilter.h"
 
+using ::android::hardware::tv::tuner::V1_0::Result;
+using ::android::hardware::tv::tuner::V1_1::Constant64Bit;
+
 namespace android {
 
 TunerTimeFilter::TunerTimeFilter(sp<ITimeFilter> timeFilter) {
@@ -28,23 +31,76 @@ TunerTimeFilter::~TunerTimeFilter() {
     mTimeFilter = NULL;
 }
 
-Status TunerTimeFilter::setTimeStamp(int64_t /*timeStamp*/) {
-    return Status::ok();
+Status TunerTimeFilter::setTimeStamp(int64_t timeStamp) {
+    if (mTimeFilter == NULL) {
+        ALOGE("ITimeFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mTimeFilter->setTimeStamp(timeStamp);
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
 Status TunerTimeFilter::clearTimeStamp() {
-    return Status::ok();
+    if (mTimeFilter == NULL) {
+        ALOGE("ITimeFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status = mTimeFilter->clearTimeStamp();
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerTimeFilter::getSourceTime(int64_t* /*_aidl_return*/) {
-    return Status::ok();
+Status TunerTimeFilter::getSourceTime(int64_t* _aidl_return) {
+    if (mTimeFilter == NULL) {
+        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
+        ALOGE("ITimeFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status;
+    mTimeFilter->getSourceTime(
+            [&](Result r, uint64_t t) {
+                status = r;
+                *_aidl_return = t;
+            });
+    if (status != Result::SUCCESS) {
+        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
+    }
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
-Status TunerTimeFilter::getTimeStamp(int64_t* /*_aidl_return*/) {
-    return Status::ok();
+Status TunerTimeFilter::getTimeStamp(int64_t* _aidl_return) {
+    if (mTimeFilter == NULL) {
+        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
+        ALOGE("ITimeFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result status;
+    mTimeFilter->getTimeStamp(
+            [&](Result r, uint64_t t) {
+                status = r;
+                *_aidl_return = t;
+            });
+    if (status != Result::SUCCESS) {
+        *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
+    }
+    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
 }
 
 Status TunerTimeFilter::close() {
+    if (mTimeFilter == NULL) {
+        ALOGE("ITimeFilter is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res = mTimeFilter->close();
+    mTimeFilter = NULL;
+
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
     return Status::ok();
 }
 }  // namespace android

@@ -222,6 +222,8 @@ Status TunerDemux::close() {
     }
 
     Result res = mDemux->close();
+    mDemux = NULL;
+
     if (res != Result::SUCCESS) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }
