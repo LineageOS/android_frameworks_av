@@ -195,6 +195,22 @@ status_t MediaPlayer::setDataSource(const sp<IDataSource> &source)
     return err;
 }
 
+status_t MediaPlayer::setDataSource(const String8& rtpParams)
+{
+    ALOGV("setDataSource(rtpParams)");
+    status_t err = UNKNOWN_ERROR;
+    const sp<IMediaPlayerService> service(getMediaPlayerService());
+    if (service != 0) {
+        sp<IMediaPlayer> player(service->create(this, mAudioSessionId));
+        if ((NO_ERROR != doSetRetransmitEndpoint(player)) ||
+            (NO_ERROR != player->setDataSource(rtpParams))) {
+            player.clear();
+        }
+        err = attachNewPlayer(player);
+    }
+    return err;
+}
+
 status_t MediaPlayer::invoke(const Parcel& request, Parcel *reply)
 {
     Mutex::Autolock _l(mLock);
