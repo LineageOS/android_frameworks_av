@@ -21,6 +21,7 @@
 
 #define C2_LOG_VERBOSE
 
+#include <C2Config.h>
 #include <C2Debug.h>
 #include <C2Param.h>
 #include <C2ParamDef.h>
@@ -30,6 +31,7 @@
 #include <cmath>
 #include <limits>
 #include <map>
+#include <sstream>
 #include <type_traits>
 
 #include <android-base/stringprintf.h>
@@ -1304,3 +1306,81 @@ std::vector<C2FieldUtils::Info> C2FieldUtils::locateField(
     return std::vector<Info>(location.begin(), location.end());
 }
 
+//static
+bool C2InterfaceUtils::FillTraitsFromInterface(
+        C2Component::Traits *traits,
+        const std::shared_ptr<C2ComponentInterface> &intf) {
+    if (!traits) {
+        return false;
+    }
+    traits->name = intf->getName();
+
+    C2ComponentKindSetting kind;
+    C2ComponentDomainSetting domain;
+    c2_status_t res = intf->query_vb({ &kind, &domain }, {}, C2_MAY_BLOCK, nullptr);
+    bool fixDomain = res != C2_OK;
+    if (res == C2_OK) {
+        traits->kind = kind.value;
+        traits->domain = domain.value;
+    } else {
+        // TODO: remove this fall-back
+        C2_LOG(DEBUG) << "failed to query interface for kind and domain: " << res;
+
+        traits->kind =
+            (traits->name.find("encoder") != std::string::npos) ? C2Component::KIND_ENCODER :
+            (traits->name.find("decoder") != std::string::npos) ? C2Component::KIND_DECODER :
+            C2Component::KIND_OTHER;
+    }
+
+    uint32_t mediaTypeIndex = traits->kind == C2Component::KIND_ENCODER
+            ? C2PortMediaTypeSetting::output::PARAM_TYPE
+            : C2PortMediaTypeSetting::input::PARAM_TYPE;
+    std::vector<std::unique_ptr<C2Param>> params;
+    res = intf->query_vb({}, { mediaTypeIndex }, C2_MAY_BLOCK, &params);
+    if (res != C2_OK) {
+        C2_LOG(DEBUG) << "failed to query interface: " << res;
+        return false;
+    }
+    if (params.size() != 1u) {
+        C2_LOG(DEBUG) << "failed to query interface: unexpected vector size: " << params.size();
+        return false;
+    }
+    C2PortMediaTypeSetting *mediaTypeConfig = C2PortMediaTypeSetting::From(params[0].get());
+    if (mediaTypeConfig == nullptr) {
+        C2_LOG(DEBUG) << "failed to query media type";
+        return false;
+    }
+    traits->mediaType =
+        std::string(mediaTypeConfig->m.value,
+                    strnlen(mediaTypeConfig->m.value, mediaTypeConfig->flexCount()));
+
+    if (fixDomain) {
+        if (strncmp(traits->mediaType.c_str(), "audio/", 6) == 0) {
+            traits->domain = C2Component::DOMAIN_AUDIO;
+        } else if (strncmp(traits->mediaType.c_str(), "video/", 6) == 0) {
+            traits->domain = C2Component::DOMAIN_VIDEO;
+        } else if (strncmp(traits->mediaType.c_str(), "image/", 6) == 0) {
+            traits->domain = C2Component::DOMAIN_IMAGE;
+        } else {
+            traits->domain = C2Component::DOMAIN_OTHER;
+        }
+    }
+
+    params.clear();
+    res = intf->query_vb({}, { C2ComponentAliasesSetting::PARAM_TYPE }, C2_MAY_BLOCK, &params);
+    if (res == C2_OK && params.size() == 1u) {
+        C2ComponentAliasesSetting *aliasesSetting =
+            C2ComponentAliasesSetting::From(params[0].get());
+        if (aliasesSetting) {
+            std::istringstream iss(
+                    std::string(aliasesSetting->m.value, aliasesSetting->flexCount()));
+            C2_LOG(DEBUG) << intf->getName() << " has aliases: " << iss.str();
+
+            for (std::string tok; std::getline(iss, tok, ','); ) {
+                traits->aliases.push_back(tok);
+                C2_LOG(DEBUG) << "adding alias: " << tok;
+            }
+        }
+    }
+    return true;
+}
