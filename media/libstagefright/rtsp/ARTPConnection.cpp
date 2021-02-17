@@ -72,7 +72,8 @@ struct ARTPConnection::StreamInfo {
 ARTPConnection::ARTPConnection(uint32_t flags)
     : mFlags(flags),
       mPollEventPending(false),
-      mLastReceiverReportTimeUs(-1) {
+      mLastReceiverReportTimeUs(-1),
+      mLastBitrateReportTimeUs(-1) {
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -191,8 +192,8 @@ void ARTPConnection::MakeRTPSocketPair(
     }
 
     int sockopt = 1;
-    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(*rtcpSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
 
     int sizeSockSt = isIPv6 ? sizeof(addr6) : sizeof(addr4);
 
@@ -411,6 +412,7 @@ void ARTPConnection::onPollStreams() {
     }
 
     int64_t nowUs = ALooper::GetNowUs();
+    showRxBitrate(nowUs);
     if (mLastReceiverReportTimeUs <= 0
             || mLastReceiverReportTimeUs + 5000000LL <= nowUs) {
         sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
@@ -435,7 +437,10 @@ void ARTPConnection::onPollStreams() {
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
 
-                source->addReceiverReport(buffer);
+                if (source->isNeedToReport()) {
+                    source->addReceiverReport(buffer);
+                    source->addTMMBR(buffer);
+                }
 
                 if (mFlags & kRegularlyRequestFIR) {
                     source->addFIR(buffer);
@@ -513,6 +518,7 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
             0,
             remoteAddrLen > 0 ? pRemoteRTCPAddr : NULL,
             remoteAddrLen > 0 ? &remoteAddrLen : NULL);
+        mCumulativeBytes += nbytes;
     } while (nbytes < 0 && errno == EINTR);
 
     if (nbytes <= 0) {
@@ -674,8 +680,12 @@ status_t ARTPConnection::parseRTCP(StreamInfo *s, const sp<ABuffer> &buffer) {
                 break;
 
             case 205:  // TSFB (transport layer specific feedback)
+                parseTSFB(s, data, headerLength);
+                break;
             case 206:  // PSFB (payload specific feedback)
                 // hexdump(data, headerLength);
+                parsePSFB(s, data, headerLength);
+                ALOGI("RTCP packet type %u of size %zu", (unsigned)data[1], headerLength);
                 break;
 
             case 203:
@@ -744,6 +754,123 @@ status_t ARTPConnection::parseSR(
     return 0;
 }
 
+status_t ARTPConnection::parseTSFB(
+        StreamInfo *s, const uint8_t *data, size_t size) {
+    uint8_t msgType = data[0] & 0x1f;
+    uint32_t id = u32at(&data[4]);
+
+    if (size < 12) {
+        // broken packet
+        return -1;
+    }
+
+    const uint8_t *ptr = &data[12];
+    size -= 12;
+
+    using namespace std;
+    size_t FCISize;
+    switch(msgType) {
+        case 1:     // Generic NACK
+        {
+            FCISize = 4;
+            while (size >= FCISize) {
+                uint16_t PID = u16at(&ptr[0]);  // lost packet RTP number
+                uint16_t BLP = u16at(&ptr[2]);  // Bitmask of following Lost Packets
+
+                size -= FCISize;
+                ptr += FCISize;
+
+                AString list_of_losts;
+                list_of_losts.append(PID);
+                for (int i=0 ; i<16 ; i++) {
+                    bool is_lost = BLP & (0x1 << i);
+                    if (is_lost) {
+                        list_of_losts.append(", ");
+                        list_of_losts.append(PID + i);
+                    }
+                }
+                ALOGI("Opponent losts packet of RTP %s", list_of_losts.c_str());
+            }
+            break;
+        }
+        case 3:     // TMMBR
+        case 4:     // TMMBN
+        {
+            FCISize = 8;
+            while (size >= FCISize) {
+                uint32_t MxTBR = u32at(&ptr[4]);
+                uint32_t MxTBRExp = MxTBR >> 26;
+                uint32_t MxTBRMantissa = (MxTBR >> 9) & 0x01FFFF;
+                uint32_t overhead = MxTBR & 0x01FF;
+
+                size -= FCISize;
+                ptr += FCISize;
+
+                uint32_t bitRate = (1 << MxTBRExp) * MxTBRMantissa;
+
+                if (msgType == 3)
+                    ALOGI("Op -> UE Req Tx bitrate : %d X 2^%d = %d",
+                        MxTBRMantissa, MxTBRExp, bitRate);
+                else if (msgType == 4)
+                    ALOGI("OP -> UE Noti Rx bitrate : %d X 2^%d = %d",
+                        MxTBRMantissa, MxTBRExp, bitRate);
+
+                sp<AMessage> notify = s->mNotifyMsg->dup();
+                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("payload-type", 205);
+                notify->setInt32("feedback-type", msgType);
+                notify->setInt32("sender", id);
+                notify->setInt32("bit-rate", bitRate);
+                notify->post();
+                ALOGI("overhead : %d", overhead);
+            }
+            break;
+        }
+        default:
+        {
+            ALOGI("Not supported TSFB type %d", msgType);
+            break;
+        }
+    }
+
+    return 0;
+}
+
+status_t ARTPConnection::parsePSFB(
+        StreamInfo *s, const uint8_t *data, size_t size) {
+    uint8_t msgType = data[0] & 0x1f;
+    uint32_t id = u32at(&data[4]);
+
+    if (size < 12) {
+        // broken packet
+        return -1;
+    }
+
+    size -= 12;
+
+    using namespace std;
+    switch(msgType) {
+        case 1:     // Picture Loss Indication (PLI)
+        {
+            CHECK(size == 0);   // PLI does not need parameters
+            sp<AMessage> notify = s->mNotifyMsg->dup();
+            notify->setInt32("IMS-Rx-notice", 1);
+            notify->setInt32("payload-type", 206);
+            notify->setInt32("feedback-type", msgType);
+            notify->setInt32("sender", id);
+            notify->post();
+            ALOGI("PLI detected.");
+            break;
+        }
+        default:
+        {
+            ALOGI("Not supported PSFB type %d", msgType);
+            break;
+        }
+    }
+
+    return 0;
+}
 sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
     sp<ARTPSource> source;
     ssize_t index = info->mSources.indexOfKey(srcId);
@@ -753,6 +880,8 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
         source = new ARTPSource(
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
+        source->setSelfID(mSelfID);
+        source->setMinMaxBitrate(mMinBitrate, mMaxBitrate);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -768,6 +897,27 @@ void ARTPConnection::injectPacket(int index, const sp<ABuffer> &buffer) {
     msg->post();
 }
 
+void ARTPConnection::setSelfID(const uint32_t selfID) {
+    mSelfID = selfID;
+}
+
+void ARTPConnection::setMinMaxBitrate(int32_t min, int32_t max) {
+    mMinBitrate = min;
+    mMaxBitrate = max;
+}
+
+void ARTPConnection::showRxBitrate(int64_t nowUs) {
+    if (mLastBitrateReportTimeUs <= 0) {
+        mCumulativeBytes = 0;
+        mLastBitrateReportTimeUs = nowUs;
+    }
+    else if (mLastBitrateReportTimeUs + 1000000ll <= nowUs) {
+        int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
+        ALOGI("Actual Rx bitrate : %d bits/sec", mCumulativeBytes * 8 / timeDiff);
+        mCumulativeBytes = 0;
+        mLastBitrateReportTimeUs = nowUs;
+    }
+}
 void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
     int32_t index;
     CHECK(msg->findInt32("index", &index));

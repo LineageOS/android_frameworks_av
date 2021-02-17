@@ -117,6 +117,8 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mAudioSource((audio_source_t)AUDIO_SOURCE_CNT), // initialize with invalid value
       mPrivacySensitive(PRIVACY_SENSITIVE_DEFAULT),
       mVideoSource(VIDEO_SOURCE_LIST_END),
+      mRTPCVOExtMap(-1),
+      mRTPCVODegrees(0),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mDeviceCallbackEnabled(false),
@@ -818,6 +820,40 @@ status_t StagefrightRecorder::setParamRtpRemotePort(int32_t remotePort) {
     return OK;
 }
 
+status_t StagefrightRecorder::setParamSelfID(int32_t selfID) {
+    ALOGV("setParamSelfID: %x", selfID);
+
+    mSelfID = selfID;
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamPayloadType(int32_t payloadType) {
+    ALOGV("setParamPayloadType: %x", payloadType);
+
+    mPayloadType = payloadType;
+    return OK;
+}
+
+status_t StagefrightRecorder::setRTPCVOExtMap(int32_t extmap) {
+    ALOGV("setRtpCvoExtMap: %d", extmap);
+
+    mRTPCVOExtMap = extmap;
+    return OK;
+}
+
+status_t StagefrightRecorder::setRTPCVODegrees(int32_t cvoDegrees) {
+    Mutex::Autolock autolock(mLock);
+    ALOGV("setRtpCvoDegrees: %d", cvoDegrees);
+
+    mRTPCVODegrees = cvoDegrees;
+
+    if (mStarted && mOutputFormat == OUTPUT_FORMAT_RTP_AVP) {
+        mWriter->updateCVODegrees(mRTPCVODegrees);
+    }
+
+    return OK;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -939,6 +975,28 @@ status_t StagefrightRecorder::setParameter(
         int32_t remotePort;
         if (safe_strtoi32(value.string(), &remotePort)) {
             return setParamRtpRemotePort(remotePort);
+        }
+    } else if (key == "rtp-param-self-id") {
+        int32_t selfID;
+        int64_t temp;
+        if (safe_strtoi64(value.string(), &temp)) {
+            selfID = static_cast<int32_t>(temp);
+            return setParamSelfID(selfID);
+        }
+    } else if (key == "rtp-param-payload-type") {
+        int32_t payloadType;
+        if (safe_strtoi32(value.string(), &payloadType)) {
+            return setParamPayloadType(payloadType);
+        }
+    } else if (key == "rtp-param-ext-cvo-extmap") {
+        int32_t extmap;
+        if (safe_strtoi32(value.string(), &extmap)) {
+            return setRTPCVOExtMap(extmap);
+        }
+    } else if (key == "rtp-param-ext-cvo-degrees") {
+        int32_t degrees;
+        if (safe_strtoi32(value.string(), &degrees)) {
+            return setRTPCVODegrees(degrees);
         }
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
@@ -1106,6 +1164,12 @@ status_t StagefrightRecorder::start() {
             sp<MetaData> meta = new MetaData;
             int64_t startTimeUs = systemTime() / 1000;
             meta->setInt64(kKeyTime, startTimeUs);
+            meta->setInt32(kKeySelfID, mSelfID);
+            meta->setInt32(kKeyPayloadType, mPayloadType);
+            if (mRTPCVOExtMap > 0) {
+                meta->setInt32(kKeyRtpExtMap, mRTPCVOExtMap);
+                meta->setInt32(kKeyRtpCvoDegrees, mRTPCVODegrees);
+            }
             status = mWriter->start(meta.get());
             break;
         }

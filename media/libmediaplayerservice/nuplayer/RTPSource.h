@@ -46,6 +46,8 @@ namespace android {
 struct ALooper;
 struct AnotherPacketSource;
 
+const int32_t videoMinBitrate = 192000;
+
 struct NuPlayer::RTPSource : public NuPlayer::Source {
     RTPSource(
             const sp<AMessage> &notify,
@@ -111,6 +113,9 @@ private:
         int32_t mRemotePort;
         int32_t mTimeScale;
         int32_t mAS;
+
+        /* Unique ID indicates itself */
+        uint32_t mSelfID;
 
         /* a copy of TrackInfo in RTSPSource */
         sp<AnotherPacketSource> mSource;

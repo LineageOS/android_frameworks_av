@@ -109,6 +109,8 @@ void NuPlayer::RTPSource::prepareAsync() {
         notify->setSize("trackIndex", i);
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
+        mRTPConn->setSelfID(info->mSelfID);
+        mRTPConn->setMinMaxBitrate(videoMinBitrate, 512000);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
@@ -353,6 +355,22 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                 // that the data communication worked since we got the first
                 // rtcp packet.
                 ALOGV("first-rtcp");
+                break;
+            }
+
+            int32_t IMSRxNotice;
+            if (msg->findInt32("IMS-Rx-notice", &IMSRxNotice)) {
+                int32_t payloadType, feedbackType;
+                CHECK(msg->findInt32("payload-type", &payloadType));
+                CHECK(msg->findInt32("feedback-type", &feedbackType));
+
+                sp<AMessage> notify = dupNotify();
+                notify->setInt32("what", kWhatIMSRxNotice);
+                notify->setMessage("message", msg);
+                notify->post();
+
+                ALOGV("IMSRxNotice \t\t payload : %d feedback : %d",
+                      payloadType, feedbackType);
                 break;
             }
 
@@ -646,6 +664,8 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
     } else if (key == "rtp-param-rtp-timeout") {
     } else if (key == "rtp-param-rtcp-timeout") {
     } else if (key == "rtp-param-time-scale") {
+    } else if (key == "rtp-param-self-id") {
+        info->mSelfID = atoi(value);
     }
 
     return OK;
