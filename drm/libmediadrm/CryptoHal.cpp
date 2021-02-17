@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MediaErrors.h>
 #include <mediadrm/CryptoHal.h>
+#include <mediadrm/DrmUtils.h>
 
 using drm::V1_0::BufferType;
 using drm::V1_0::DestinationBuffer;
@@ -39,6 +40,7 @@ using drm::V1_0::SharedBuffer;
 using drm::V1_0::Status;
 using drm::V1_0::SubSample;
 
+using ::android::DrmUtils::toStatusT;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_handle;
 using ::android::hardware::hidl_memory;
@@ -52,42 +54,6 @@ using ::android::sp;
 typedef drm::V1_2::Status Status_V1_2;
 
 namespace android {
-
-static status_t toStatusT(Status status) {
-    switch (status) {
-    case Status::OK:
-        return OK;
-    case Status::ERROR_DRM_NO_LICENSE:
-        return ERROR_DRM_NO_LICENSE;
-    case Status::ERROR_DRM_LICENSE_EXPIRED:
-        return ERROR_DRM_LICENSE_EXPIRED;
-    case Status::ERROR_DRM_RESOURCE_BUSY:
-        return ERROR_DRM_RESOURCE_BUSY;
-    case Status::ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION:
-        return ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION;
-    case Status::ERROR_DRM_SESSION_NOT_OPENED:
-        return ERROR_DRM_SESSION_NOT_OPENED;
-    case Status::ERROR_DRM_CANNOT_HANDLE:
-        return ERROR_DRM_CANNOT_HANDLE;
-    case Status::ERROR_DRM_DECRYPT:
-        return ERROR_DRM_DECRYPT;
-    default:
-        return UNKNOWN_ERROR;
-    }
-}
-
-static status_t toStatusT_1_2(Status_V1_2 status) {
-    switch (status) {
-    case Status_V1_2::ERROR_DRM_SESSION_LOST_STATE:
-        return ERROR_DRM_SESSION_LOST_STATE;;
-    case Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE:
-        return ERROR_DRM_FRAME_TOO_LARGE;
-    case Status_V1_2::ERROR_DRM_INSUFFICIENT_SECURITY:
-        return ERROR_DRM_INSUFFICIENT_SECURITY;
-    default:
-        return toStatusT(static_cast<Status>(status));
-    }
-}
 
 static hidl_vec<uint8_t> toHidlVec(const Vector<uint8_t> &vector) {
     hidl_vec<uint8_t> vec;
@@ -384,7 +350,7 @@ ssize_t CryptoHal::decrypt(const uint8_t keyId[16], const uint8_t iv[16],
                         bytesWritten = hBytesWritten;
                         *errorDetailMsg = toString8(hDetailedError);
                     }
-                    err = toStatusT_1_2(status);
+                    err = toStatusT(status);
                 }
             );
     } else {
@@ -427,4 +393,8 @@ status_t CryptoHal::setMediaDrmSession(const Vector<uint8_t> &sessionId) {
     return toStatusT(mPlugin->setMediaDrmSession(toHidlVec(sessionId)));
 }
 
+status_t CryptoHal::getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const {
+    Mutex::Autolock autoLock(mLock);
+    return DrmUtils::GetLogMessages<drm::V1_4::ICryptoPlugin>(mPlugin, logs);
+}
 }  // namespace android
