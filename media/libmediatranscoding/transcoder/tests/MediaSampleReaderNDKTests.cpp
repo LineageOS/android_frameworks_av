@@ -272,6 +272,38 @@ TEST_F(MediaSampleReaderNDKTests, TestParallelSampleAccess) {
     compareSamples(tester.getSamples());
 }
 
+/** Reads all samples except the last in each track, before finishing. */
+TEST_F(MediaSampleReaderNDKTests, TestLastSampleBeforeEOS) {
+    LOG(DEBUG) << "TestLastSampleBeforeEOS Starts";
+    initExtractorSamples();
+
+    {  // Natural track order
+        SampleAccessTester tester{mSourceFd, mFileSize};
+        for (int trackIndex = 0; trackIndex < mTrackCount; ++trackIndex) {
+            tester.readSamplesAsync(trackIndex, mExtractorSamples[trackIndex].size() - 1);
+        }
+        tester.waitForTracks();
+        for (int trackIndex = 0; trackIndex < mTrackCount; ++trackIndex) {
+            tester.readSamplesAsync(trackIndex, SAMPLE_COUNT_ALL);
+            tester.waitForTrack(trackIndex);
+        }
+        compareSamples(tester.getSamples());
+    }
+
+    {  // Reverse track order
+        SampleAccessTester tester{mSourceFd, mFileSize};
+        for (int trackIndex = mTrackCount - 1; trackIndex >= 0; --trackIndex) {
+            tester.readSamplesAsync(trackIndex, mExtractorSamples[trackIndex].size() - 1);
+        }
+        tester.waitForTracks();
+        for (int trackIndex = mTrackCount - 1; trackIndex >= 0; --trackIndex) {
+            tester.readSamplesAsync(trackIndex, SAMPLE_COUNT_ALL);
+            tester.waitForTrack(trackIndex);
+        }
+        compareSamples(tester.getSamples());
+    }
+}
+
 /** Reads all samples from all tracks sequentially. */
 TEST_F(MediaSampleReaderNDKTests, TestSequentialSampleAccess) {
     LOG(DEBUG) << "TestSequentialSampleAccess Starts";

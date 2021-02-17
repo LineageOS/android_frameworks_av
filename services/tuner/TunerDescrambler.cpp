@@ -97,6 +97,8 @@ Status TunerDescrambler::close() {
     }
 
     Result res = mDescrambler->close();
+    mDescrambler = NULL;
+
     if (res != Result::SUCCESS) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(res));
     }

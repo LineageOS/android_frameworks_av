@@ -18,6 +18,7 @@ cc_test {
         "libaudioeffects",
         "libhardware_headers",
     ],
+    gtest: false,
 }
 
 cc_test {
@@ -29,4 +30,5 @@ cc_test {
         "-Werror",
         "-Wextra",
     ],
+    gtest: false,
 }

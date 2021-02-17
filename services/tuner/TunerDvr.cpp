@@ -154,6 +154,8 @@ Status TunerDvr::close() {
     }
 
     Result res = mDvr->close();
+    mDvr = NULL;
+
     if (res != Result::SUCCESS) {
         return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
     }
