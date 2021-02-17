@@ -63,6 +63,9 @@ struct ASessionDescription : public RefBase {
     // i.e. we have a fixed duration, otherwise this is live streaming.
     static bool parseNTPRange(const char *s, float *npt1, float *npt2);
 
+    static void SDPStringFactory(AString &sdp, const char *ip, bool isAudio, unsigned port,
+        unsigned payloadType, unsigned as, const char *codec, const char *fmtp = NULL,
+        int32_t width = 0, int32_t height = 0);
 protected:
     virtual ~ASessionDescription();
 
