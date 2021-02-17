@@ -45,7 +45,11 @@ struct ARTPSource : public RefBase {
 
     void addReceiverReport(const sp<ABuffer> &buffer);
     void addFIR(const sp<ABuffer> &buffer);
+    void addTMMBR(const sp<ABuffer> &buffer);
     void setSelfID(const uint32_t selfID);
+    void setMinMaxBitrate(int32_t min, int32_t max);
+
+    bool isNeedToReport();
 
     void noticeAbandonBuffer(int cnt=1);
 
@@ -55,6 +59,36 @@ struct ARTPSource : public RefBase {
     int32_t mClockRate;
 
 private:
+    struct QualManager {
+        QualManager() : mMinBitrate(-1), mMaxBitrate(-1), mTargetBitrate(-1) {};
+
+        int32_t mMinBitrate;
+        int32_t mMaxBitrate;
+        int32_t mBitrateStep;
+
+        int32_t mTargetBitrate;
+
+        void setTargetBitrate(uint8_t fraction) {
+            if (fraction <= (256 * 2 /100)) {           // loss less than 2%
+                mTargetBitrate += mBitrateStep;
+            } else if (fraction > (256 * 5 / 100)) {    // loss more than 5%
+                mTargetBitrate -= mBitrateStep;
+            }
+
+            if (mTargetBitrate > mMaxBitrate)
+                mTargetBitrate = mMaxBitrate;
+            else if (mTargetBitrate < mMinBitrate)
+                mTargetBitrate = mMinBitrate;
+        };
+
+        void setMinMaxBitrate(int32_t min, int32_t max) {
+            mMinBitrate = min;
+            mMaxBitrate = max;
+            mBitrateStep = (max - min) / 8;
+            mTargetBitrate = min;
+        };
+    } mQualManager;
+
     uint32_t mID;
     uint32_t mHighestSeqNumber;
     uint32_t mPrevExpected;

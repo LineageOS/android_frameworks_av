@@ -110,6 +110,7 @@ void NuPlayer::RTPSource::prepareAsync() {
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
+        mRTPConn->setMinMaxBitrate(videoMinBitrate, 512000);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
