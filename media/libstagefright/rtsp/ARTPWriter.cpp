@@ -1164,8 +1164,8 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
     CHECK_GE(mRTCPSocket, 0);
 
     int sockopt = 1;
-    setsockopt(mRTPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(mRTCPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(mRTPSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(mRTCPSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
 
     if (mIsIPv6) {
         memset(&mLocalAddr6, 0, sizeof(mLocalAddr6));
@@ -1207,7 +1207,7 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
     if (bind(mRTPSocket, localAddr, sizeSockSt) == -1) {
         ALOGE("failed to bind rtp %s:%d err=%s", localIp.string(), localPort, strerror(errno));
     } else {
-        ALOGI("succeed to bind rtp %s:%d", localIp.string(), localPort);
+        ALOGD("succeed to bind rtp %s:%d", localIp.string(), localPort);
     }
 
     if (mIsIPv6)
@@ -1218,13 +1218,8 @@ void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
     if (bind(mRTCPSocket, localAddr, sizeSockSt) == -1) {
         ALOGE("failed to bind rtcp %s:%d err=%s", localIp.string(), localPort + 1, strerror(errno));
     } else {
-        ALOGI("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
+        ALOGD("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
     }
-
-    if (mIsIPv6)
-        mLocalAddr6.sin6_port = htons((uint16_t)localPort);
-    else
-        mLocalAddr.sin_port = htons((uint16_t)localPort);
 }
 
 }  // namespace android
