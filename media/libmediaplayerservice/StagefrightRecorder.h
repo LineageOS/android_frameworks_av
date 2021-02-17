@@ -142,6 +142,7 @@ private:
     String8 mRemoteIp;
     int32_t mLocalPort;
     int32_t mRemotePort;
+    int32_t mSelfID;
 
     int64_t mDurationRecordedUs;
     int64_t mStartedRecordingUs;
@@ -227,6 +228,7 @@ private:
     status_t setParamRtpLocalPort(int32_t localPort);
     status_t setParamRtpRemoteIp(const String8 &remoteIp);
     status_t setParamRtpRemotePort(int32_t remotePort);
+    status_t setParamSelfID(int32_t selfID);
     void clipVideoBitRate();
     void clipVideoFrameRate();
     void clipVideoFrameWidth();
