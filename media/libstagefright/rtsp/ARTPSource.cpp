@@ -22,6 +22,7 @@
 
 #include "AAMRAssembler.h"
 #include "AAVCAssembler.h"
+#include "AHEVCAssembler.h"
 #include "AH263Assembler.h"
 #include "AMPEG2TSAssembler.h"
 #include "AMPEG4AudioAssembler.h"
@@ -64,6 +65,9 @@ ARTPSource::ARTPSource(
 
     if (!strncmp(desc.c_str(), "H264/", 5)) {
         mAssembler = new AAVCAssembler(notify);
+        mIssueFIRRequests = true;
+    } else if (!strncmp(desc.c_str(), "H265/", 5)) {
+        mAssembler = new AHEVCAssembler(notify);
         mIssueFIRRequests = true;
     } else if (!strncmp(desc.c_str(), "MP4A-LATM/", 10)) {
         mAssembler = new AMPEG4AudioAssembler(notify, params);
