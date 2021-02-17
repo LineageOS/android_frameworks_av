@@ -177,5 +177,93 @@ std::vector<sp<ICryptoPlugin>> MakeCryptoPlugins(const uint8_t uuid[16], const v
     return plugins;
 }
 
+status_t toStatusT_1_4(::V1_4::Status status) {
+    switch (status) {
+    case ::V1_4::Status::OK:
+        return OK;
+    case ::V1_4::Status::BAD_VALUE:
+        return BAD_VALUE;
+    case ::V1_4::Status::ERROR_DRM_CANNOT_HANDLE:
+        return ERROR_DRM_CANNOT_HANDLE;
+    case ::V1_4::Status::ERROR_DRM_DECRYPT:
+        return ERROR_DRM_DECRYPT;
+    case ::V1_4::Status::ERROR_DRM_DEVICE_REVOKED:
+        return ERROR_DRM_DEVICE_REVOKED;
+    case ::V1_4::Status::ERROR_DRM_FRAME_TOO_LARGE:
+        return ERROR_DRM_FRAME_TOO_LARGE;
+    case ::V1_4::Status::ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION:
+        return ERROR_DRM_INSUFFICIENT_OUTPUT_PROTECTION;
+    case ::V1_4::Status::ERROR_DRM_INSUFFICIENT_SECURITY:
+        return ERROR_DRM_INSUFFICIENT_SECURITY;
+    case ::V1_4::Status::ERROR_DRM_INVALID_STATE:
+        return ERROR_DRM_INVALID_STATE;
+    case ::V1_4::Status::ERROR_DRM_LICENSE_EXPIRED:
+        return ERROR_DRM_LICENSE_EXPIRED;
+    case ::V1_4::Status::ERROR_DRM_NO_LICENSE:
+        return ERROR_DRM_NO_LICENSE;
+    case ::V1_4::Status::ERROR_DRM_NOT_PROVISIONED:
+        return ERROR_DRM_NOT_PROVISIONED;
+    case ::V1_4::Status::ERROR_DRM_RESOURCE_BUSY:
+        return ERROR_DRM_RESOURCE_BUSY;
+    case ::V1_4::Status::ERROR_DRM_RESOURCE_CONTENTION:
+        return ERROR_DRM_RESOURCE_CONTENTION;
+    case ::V1_4::Status::ERROR_DRM_SESSION_LOST_STATE:
+        return ERROR_DRM_SESSION_LOST_STATE;
+    case ::V1_4::Status::ERROR_DRM_SESSION_NOT_OPENED:
+        return ERROR_DRM_SESSION_NOT_OPENED;
+
+    // New in S / drm@1.4:
+    case ::V1_4::Status::CANNOT_DECRYPT_ZERO_SUBSAMPLES:
+        return ERROR_DRM_ZERO_SUBSAMPLES;
+    case ::V1_4::Status::CRYPTO_LIBRARY_ERROR:
+        return ERROR_DRM_CRYPTO_LIBRARY;
+    case ::V1_4::Status::GENERAL_OEM_ERROR:
+        return ERROR_DRM_GENERIC_OEM;
+    case ::V1_4::Status::GENERAL_PLUGIN_ERROR:
+        return ERROR_DRM_GENERIC_PLUGIN;
+    case ::V1_4::Status::INIT_DATA_INVALID:
+        return ERROR_DRM_INIT_DATA;
+    case ::V1_4::Status::KEY_NOT_LOADED:
+        return ERROR_DRM_KEY_NOT_LOADED;
+    case ::V1_4::Status::LICENSE_PARSE_ERROR:
+        return ERROR_DRM_LICENSE_PARSE;
+    case ::V1_4::Status::LICENSE_POLICY_ERROR:
+        return ERROR_DRM_LICENSE_POLICY;
+    case ::V1_4::Status::LICENSE_RELEASE_ERROR:
+        return ERROR_DRM_LICENSE_RELEASE;
+    case ::V1_4::Status::LICENSE_REQUEST_REJECTED:
+        return ERROR_DRM_LICENSE_REQUEST_REJECTED;
+    case ::V1_4::Status::LICENSE_RESTORE_ERROR:
+        return ERROR_DRM_LICENSE_RESTORE;
+    case ::V1_4::Status::LICENSE_STATE_ERROR:
+        return ERROR_DRM_LICENSE_STATE;
+    case ::V1_4::Status::MALFORMED_CERTIFICATE:
+        return ERROR_DRM_CERTIFICATE_MALFORMED;
+    case ::V1_4::Status::MEDIA_FRAMEWORK_ERROR:
+        return ERROR_DRM_MEDIA_FRAMEWORK;
+    case ::V1_4::Status::MISSING_CERTIFICATE:
+        return ERROR_DRM_CERTIFICATE_MISSING;
+    case ::V1_4::Status::PROVISIONING_CERTIFICATE_ERROR:
+        return ERROR_DRM_PROVISIONING_CERTIFICATE;
+    case ::V1_4::Status::PROVISIONING_CONFIGURATION_ERROR:
+        return ERROR_DRM_PROVISIONING_CONFIG;
+    case ::V1_4::Status::PROVISIONING_PARSE_ERROR:
+        return ERROR_DRM_PROVISIONING_PARSE;
+    case ::V1_4::Status::RETRYABLE_PROVISIONING_ERROR:
+        return ERROR_DRM_PROVISIONING_RETRY;
+    case ::V1_4::Status::SECURE_STOP_RELEASE_ERROR:
+        return ERROR_DRM_SECURE_STOP_RELEASE;
+    case ::V1_4::Status::STORAGE_READ_FAILURE:
+        return ERROR_DRM_STORAGE_READ;
+    case ::V1_4::Status::STORAGE_WRITE_FAILURE:
+        return ERROR_DRM_STORAGE_WRITE;
+
+    case ::V1_4::Status::ERROR_DRM_UNKNOWN:
+    default:
+        return ERROR_DRM_UNKNOWN;
+    }
+    return ERROR_DRM_UNKNOWN;
+}
+
 }  // namespace DrmUtils
 }  // namespace android
