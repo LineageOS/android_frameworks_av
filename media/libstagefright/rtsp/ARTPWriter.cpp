@@ -182,14 +182,15 @@ bool ARTPWriter::reachedEOS() {
     return (mFlags & kFlagEOS) != 0;
 }
 
-status_t ARTPWriter::start(MetaData * /* params */) {
+status_t ARTPWriter::start(MetaData * params) {
     Mutex::Autolock autoLock(mLock);
     if (mFlags & kFlagStarted) {
         return INVALID_OPERATION;
     }
 
     mFlags &= ~kFlagEOS;
-    mSourceID = rand();
+    if (mSourceID == 0)
+        mSourceID = rand();
     mSeqNo = UniformRand(65536);
     mRTPTimeBase = 0;
     mNumRTPSent = 0;
@@ -200,6 +201,10 @@ status_t ARTPWriter::start(MetaData * /* params */) {
 
     const char *mime;
     CHECK(mSource->getFormat()->findCString(kKeyMIMEType, &mime));
+
+    int32_t selfID = 0;
+    if(params->findInt32(kKeySelfID, &selfID))
+        mSourceID = selfID;
 
     mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
