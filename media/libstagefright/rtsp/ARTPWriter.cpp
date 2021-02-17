@@ -62,6 +62,7 @@ ARTPWriter::ARTPWriter(int fd)
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)) {
     CHECK_GE(fd, 0);
+    mIsIPv6 = false;
 
     mLooper->setName("rtp writer");
     mLooper->registerHandler(mReflector);
@@ -111,56 +112,13 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)) {
     CHECK_GE(fd, 0);
+    mIsIPv6 = false;
 
     mLooper->setName("rtp writer");
     mLooper->registerHandler(mReflector);
     mLooper->start();
 
-    mRTPSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    CHECK_GE(mRTPSocket, 0);
-    mRTCPSocket = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    CHECK_GE(mRTCPSocket, 0);
-
-    // socket need to be SO_REUSEADDR to avoid "Address already in use" error.
-    int sockopt = 1;
-    setsockopt(mRTPSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(mRTPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(mRTCPSocket, SOL_SOCKET, SO_REUSEADDR, (int *)&sockopt, sizeof(sockopt));
-    setsockopt(mRTCPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
-
-    // binding rtp socket to assign source ip/port.
-    memset(mLocalAddr.sin_zero, 0, sizeof(mRTPAddr.sin_zero));
-    mLocalAddr.sin_family = AF_INET;
-    mLocalAddr.sin_addr.s_addr = inet_addr(localIp.string());
-    mLocalAddr.sin_port = htons((unsigned short int)localPort);
-    if (bind(mRTPSocket, (struct sockaddr*)&mLocalAddr, sizeof(mLocalAddr)) == -1) {
-        ALOGE("failed to bind rtp %s:%d err=%s", localIp.string(),
-                ntohs(mLocalAddr.sin_port), strerror(errno));
-    } else {
-        ALOGD("succeed to bind rtp %s:%d", localIp.string(), ntohs(mLocalAddr.sin_port));
-    }
-    // binding rtcp socket to assign source ip/port.
-    mLocalAddr.sin_port = htons(ntohs(mLocalAddr.sin_port) + 1);
-    if (bind(mRTCPSocket, (struct sockaddr*)&mLocalAddr, sizeof(mLocalAddr)) == -1) {
-        ALOGE("failed to bind rtcp %s:%d", localIp.string(), ntohs(mLocalAddr.sin_port));
-    } else {
-        ALOGD("succeed to bind rtcp %s:%d", localIp.string(), ntohs(mLocalAddr.sin_port) | 1);
-    }
-    mLocalAddr.sin_port = htons(ntohs(mLocalAddr.sin_port) - 1);
-
-    // update client settings
-    memset(mRTPAddr.sin_zero, 0, sizeof(mRTPAddr.sin_zero));
-    mRTPAddr.sin_family = AF_INET;
-    mRTPAddr.sin_addr.s_addr = inet_addr(remoteIp.string());
-    mRTPAddr.sin_port = htons((unsigned short int)remotePort);
-
-    mRTCPAddr = mRTPAddr;
-    mRTCPAddr.sin_port = htons(ntohs(mRTPAddr.sin_port) | 1);
-
-    ALOGD("localIp=%s, rtp=%d, rtcp=%d", localIp.string(), localPort, localPort+1);
-    ALOGD("remoteIp=%s, rtp=%d, rtcp=%d", remoteIp.string(), ntohs(mRTPAddr.sin_port),
-            ntohs(mRTCPAddr.sin_port));
-
+    makeSocketPairAndBind(localIp, localPort, remoteIp , remotePort);
     mSPSBuf = NULL;
     mPPSBuf = NULL;
 
@@ -470,10 +428,25 @@ void ARTPWriter::onSendSR(const sp<AMessage> &msg) {
 }
 
 void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
-    ssize_t n = sendto(
-            isRTCP ? mRTCPSocket : mRTPSocket, buffer->data(), buffer->size(), 0,
-            (const struct sockaddr *)(isRTCP ? &mRTCPAddr : &mRTPAddr),
-            sizeof(mRTCPAddr));
+    int sizeSockSt;
+    struct sockaddr *remAddr;
+
+    if (mIsIPv6) {
+        sizeSockSt = sizeof(struct sockaddr_in6);
+        if (isRTCP)
+            remAddr = (struct sockaddr *)&mRTCPAddr6;
+        else
+            remAddr = (struct sockaddr *)&mRTPAddr6;
+    } else {
+        sizeSockSt = sizeof(struct sockaddr_in);
+        if (isRTCP)
+            remAddr = (struct sockaddr *)&mRTCPAddr;
+        else
+            remAddr = (struct sockaddr *)&mRTPAddr;
+    }
+
+    ssize_t n = sendto(isRTCP ? mRTCPSocket : mRTPSocket,
+            buffer->data(), buffer->size(), 0, remAddr, sizeSockSt);
 
     CHECK_EQ(n, (ssize_t)buffer->size());
 
@@ -624,7 +597,7 @@ void ARTPWriter::dumpSessionDesc() {
         sdp.append("m=audio ");
     }
 
-    sdp.append(AStringPrintf("%d", ntohs(mRTPAddr.sin_port)));
+    sdp.append(AStringPrintf("%d", mIsIPv6 ? ntohs(mRTPAddr6.sin6_port) : ntohs(mRTPAddr.sin_port)));
     sdp.append(
           " RTP/AVP " PT_STR "\r\n"
           "b=AS 320000\r\n"
@@ -1028,6 +1001,82 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
 
     mLastRTPTime = rtpTime;
     mLastNTPTime = GetNowNTP();
+}
+
+void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
+        String8& remoteIp, int remotePort) {
+    if (localIp.contains(":"))
+        mIsIPv6 = true;
+    else
+        mIsIPv6 = false;
+
+    mRTPSocket = socket(mIsIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(mRTPSocket, 0);
+    mRTCPSocket = socket(mIsIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(mRTCPSocket, 0);
+
+    int sockopt = 1;
+    setsockopt(mRTPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(mRTCPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+
+    if (mIsIPv6) {
+        memset(&mLocalAddr6, 0, sizeof(mLocalAddr6));
+        memset(&mRTPAddr6, 0, sizeof(mRTPAddr6));
+        memset(&mRTCPAddr6, 0, sizeof(mRTCPAddr6));
+
+        mLocalAddr6.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, localIp.string(), &mLocalAddr6.sin6_addr);
+        mLocalAddr6.sin6_port = htons((uint16_t)localPort);
+
+        mRTPAddr6.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, remoteIp.string(), &mRTPAddr6.sin6_addr);
+        mRTPAddr6.sin6_port = htons((uint16_t)remotePort);
+
+        mRTCPAddr6 = mRTPAddr6;
+        mRTCPAddr6.sin6_port = htons((uint16_t)(remotePort + 1));
+    } else {
+        memset(&mLocalAddr, 0, sizeof(mLocalAddr));
+        memset(&mRTPAddr, 0, sizeof(mRTPAddr));
+        memset(&mRTCPAddr, 0, sizeof(mRTCPAddr));
+
+        mLocalAddr.sin_family = AF_INET;
+        mLocalAddr.sin_addr.s_addr = inet_addr(localIp.string());
+        mLocalAddr.sin_port = htons((uint16_t)localPort);
+
+        mRTPAddr.sin_family = AF_INET;
+        mRTPAddr.sin_addr.s_addr = inet_addr(remoteIp.string());
+        mRTPAddr.sin_port = htons((uint16_t)remotePort);
+
+        mRTCPAddr = mRTPAddr;
+        mRTCPAddr.sin_port = htons((uint16_t)(remotePort + 1));
+    }
+
+    struct sockaddr *localAddr = mIsIPv6 ?
+        (struct sockaddr*)&mLocalAddr6 : (struct sockaddr*)&mLocalAddr;
+
+    int sizeSockSt = mIsIPv6 ? sizeof(mLocalAddr6) : sizeof(mLocalAddr);
+
+    if (bind(mRTPSocket, localAddr, sizeSockSt) == -1) {
+        ALOGE("failed to bind rtp %s:%d err=%s", localIp.string(), localPort, strerror(errno));
+    } else {
+        ALOGI("succeed to bind rtp %s:%d", localIp.string(), localPort);
+    }
+
+    if (mIsIPv6)
+        mLocalAddr6.sin6_port = htons((uint16_t)(localPort + 1));
+    else
+        mLocalAddr.sin_port = htons((uint16_t)(localPort + 1));
+
+    if (bind(mRTCPSocket, localAddr, sizeSockSt) == -1) {
+        ALOGE("failed to bind rtcp %s:%d err=%s", localIp.string(), localPort + 1, strerror(errno));
+    } else {
+        ALOGI("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
+    }
+
+    if (mIsIPv6)
+        mLocalAddr6.sin6_port = htons((uint16_t)localPort);
+    else
+        mLocalAddr.sin_port = htons((uint16_t)localPort);
 }
 
 }  // namespace android
