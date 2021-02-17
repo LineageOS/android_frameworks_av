@@ -98,6 +98,9 @@ bool MediaSampleReaderNDK::advanceExtractor_l() {
         mTrackCursors[mExtractorTrackIndex].next.reset();
     }
 
+    // Update the extractor's sample index even if this track reaches EOS, so that the other tracks
+    // are not given an incorrect extractor position.
+    mExtractorSampleIndex++;
     if (!AMediaExtractor_advance(mExtractor)) {
         LOG(DEBUG) << "  EOS in advanceExtractor_l";
         mEosReached = true;
@@ -108,7 +111,6 @@ bool MediaSampleReaderNDK::advanceExtractor_l() {
     }
 
     mExtractorTrackIndex = AMediaExtractor_getSampleTrackIndex(mExtractor);
-    mExtractorSampleIndex++;
 
     SampleCursor& cursor = mTrackCursors[mExtractorTrackIndex];
     if (mExtractorSampleIndex > cursor.previous.index) {
