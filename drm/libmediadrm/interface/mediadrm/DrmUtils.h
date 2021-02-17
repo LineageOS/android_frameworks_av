@@ -19,6 +19,7 @@
 
 #include <android/hardware/drm/1.0/ICryptoFactory.h>
 #include <android/hardware/drm/1.0/IDrmFactory.h>
+#include <android/hardware/drm/1.4/types.h>
 #include <utils/Errors.h>  // for status_t
 #include <utils/StrongPointer.h>
 #include <vector>
@@ -91,8 +92,21 @@ std::vector<sp<::V1_0::ICryptoFactory>> MakeCryptoFactories(const uint8_t uuid[1
 std::vector<sp<::V1_0::ICryptoPlugin>> MakeCryptoPlugins(const uint8_t uuid[16],
                                                          const void *initData, size_t initDataSize);
 
+status_t toStatusT_1_4(::V1_4::Status status);
+
+template<typename S>
+inline status_t toStatusT(S status) {
+    auto err = static_cast<::V1_4::Status>(status);
+    return toStatusT_1_4(err);
+}
+
+template<typename T>
+inline status_t toStatusT(const android::hardware::Return<T> &status) {
+    auto t = static_cast<T>(status);
+    auto err = static_cast<::V1_4::Status>(t);
+    return toStatusT_1_4(err);
+}
+
 } // namespace DrmUtils
-
 } // namespace android
-
 #endif // ANDROID_DRMUTILS_H
