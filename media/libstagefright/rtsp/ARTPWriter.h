@@ -95,6 +95,7 @@ private:
     MediaBufferBase *mPPSBuf;
 
     uint32_t mSourceID;
+    uint32_t mPayloadType;
     uint32_t mSeqNo;
     uint32_t mRTPTimeBase;
     uint32_t mNumRTPSent;
