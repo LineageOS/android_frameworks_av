@@ -345,5 +345,64 @@ bool ASessionDescription::parseNTPRange(
     return *npt2 > *npt1;
 }
 
+// static
+void ASessionDescription::SDPStringFactory(AString &sdp,
+    const char *ip, bool isAudio, unsigned port, unsigned payloadType,
+    unsigned as, const char *codec, const char *fmtp, int32_t width, int32_t height)
+{
+    bool isIPv4 = (AString(ip).find("::") == -1) ? true : false;
+    sdp.clear();
+    sdp.append("v=0\r\n");
+
+    sdp.append("a=range:npt=now-\r\n");
+
+    sdp.append("m=");
+    sdp.append(isAudio ? "audio " : "video ");
+    sdp.append(port);
+    sdp.append(" RTP/AVP ");
+    sdp.append(payloadType);
+    sdp.append("\r\n");
+
+    sdp.append("c= IN IP");
+    if(isIPv4)
+     sdp.append("4 ");
+    else
+     sdp.append("6 ");
+    sdp.append(ip);
+    sdp.append("\r\n");
+
+    sdp.append("b=AS:");
+    sdp.append(as > 0 ? as : 960);
+    sdp.append("\r\n");
+
+    sdp.append("a=rtpmap:");
+    sdp.append(payloadType);
+    sdp.append(" ");
+    sdp.append(codec);
+    sdp.append("/");
+    sdp.append(isAudio ? "8000" : "90000");
+    sdp.append("\r\n");
+
+    if(fmtp != NULL) {
+        sdp.append("a=fmtp:");
+        sdp.append(payloadType);
+        sdp.append(" ");
+        sdp.append(fmtp);
+        sdp.append("\r\n");
+    }
+
+    if(width > 0 && height > 0) {
+        sdp.append("a=framesize:");
+        sdp.append(payloadType);
+        sdp.append(" ");
+        sdp.append(width);
+        sdp.append("-");
+        sdp.append(height);
+        sdp.append("\r\n");
+    }
+
+    ALOGV("SDPStringFactory => %s", sdp.c_str());
+}
+
 }  // namespace android
 

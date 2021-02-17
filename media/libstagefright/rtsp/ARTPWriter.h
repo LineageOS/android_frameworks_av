@@ -36,6 +36,8 @@ class MediaBuffer;
 
 struct ARTPWriter : public MediaWriter {
     explicit ARTPWriter(int fd);
+    explicit ARTPWriter(int fd, String8& localIp, int localPort,
+                                String8& remoteIp, int remotePort);
 
     virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();
@@ -76,13 +78,21 @@ private:
     sp<ALooper> mLooper;
     sp<AHandlerReflector<ARTPWriter> > mReflector;
 
-    int mSocket;
+    bool mIsIPv6;
+    int mRTPSocket, mRTCPSocket;
+    struct sockaddr_in mLocalAddr;
     struct sockaddr_in mRTPAddr;
     struct sockaddr_in mRTCPAddr;
+    struct sockaddr_in6 mLocalAddr6;
+    struct sockaddr_in6 mRTPAddr6;
+    struct sockaddr_in6 mRTCPAddr6;
 
     AString mProfileLevel;
     AString mSeqParamSet;
     AString mPicParamSet;
+
+    MediaBufferBase *mSPSBuf;
+    MediaBufferBase *mPPSBuf;
 
     uint32_t mSourceID;
     uint32_t mSeqNo;
@@ -96,6 +106,7 @@ private:
 
     enum {
         INVALID,
+        H265,
         H264,
         H263,
         AMR_NB,
@@ -114,11 +125,14 @@ private:
     void dumpSessionDesc();
 
     void sendBye();
+    void sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
+    void sendHEVCData(MediaBufferBase *mediaBuf);
     void sendAVCData(MediaBufferBase *mediaBuf);
     void sendH263Data(MediaBufferBase *mediaBuf);
     void sendAMRData(MediaBufferBase *mediaBuf);
 
     void send(const sp<ABuffer> &buffer, bool isRTCP);
+    void makeSocketPairAndBind(String8& localIp, int localPort, String8& remoteIp, int remotePort);
 
     DISALLOW_EVIL_CONSTRUCTORS(ARTPWriter);
 };

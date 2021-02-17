@@ -14,11 +14,11 @@
  * limitations under the License.
  */
 
-//#define LOG_NDEBUG 0
-#define LOG_TAG "AAVCAssembler"
+#define LOG_NDEBUG 0
+#define LOG_TAG "AHEVCAssembler"
 #include <utils/Log.h>
 
-#include "AAVCAssembler.h"
+#include "AHEVCAssembler.h"
 
 #include "ARTPSource.h"
 
@@ -29,21 +29,32 @@
 
 #include <stdint.h>
 
+#define H265_NALU_MASK 0x3F
+#define H265_NALU_VPS 0x20
+#define H265_NALU_SPS 0x21
+#define H265_NALU_PPS 0x22
+#define H265_NALU_AP 0x30
+#define H265_NALU_FU 0x31
+#define H265_NALU_PACI 0x32
+
+
 namespace android {
 
 // static
-AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
+AHEVCAssembler::AHEVCAssembler(const sp<AMessage> &notify)
     : mNotifyMsg(notify),
       mAccessUnitRTPTime(0),
       mNextExpectedSeqNoValid(false),
       mNextExpectedSeqNo(0),
       mAccessUnitDamaged(false) {
+
+      ALOGV("Constructor");
 }
 
-AAVCAssembler::~AAVCAssembler() {
+AHEVCAssembler::~AHEVCAssembler() {
 }
 
-ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
+ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
         const sp<ARTPSource> &source) {
     List<sp<ABuffer> > *queue = source->queue();
 
@@ -59,10 +70,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     int64_t playedTime = nowTime - startTime;
     int32_t playedTimeRtp = source->mFirstRtpTime +
         (((uint32_t)playedTime) * (source->mClockRate / 1000));
-    const int32_t jitterTime = source->mClockRate / 5;  // 200ms
-    int32_t expiredTimeInJb = rtpTime + jitterTime;
+    int32_t expiredTimeInJb = rtpTime + (source->mClockRate / 5);
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
-    bool isTooLate = expiredTimeInJb < (playedTimeRtp - jitterTime);
     ALOGV("start=%lld, now=%lld, played=%lld", (long long)startTime,
             (long long)nowTime, (long long)playedTime);
     ALOGV("rtp-time(JB)=%d, played-rtp-time(JB)=%d, expired-rtp-time(JB)=%d isExpired=%d",
@@ -73,30 +82,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         return NOT_ENOUGH_DATA;
     }
 
-    if (isTooLate) {
-        ALOGV("buffer arrived too lately..");
-        ALOGW("start=%lld, now=%lld, played=%lld", (long long)startTime,
-                (long long)nowTime, (long long)playedTime);
-        ALOGW("rtp-time(JB)=%d, plyed-rtp-time(JB)=%d, exp-rtp-time(JB)=%d diff=%lld isExpired=%d",
-                rtpTime, playedTimeRtp, expiredTimeInJb,
-                ((long long)playedTimeRtp) - expiredTimeInJb, isExpired);
-        ALOGW("expected Seq. NO =%d", buffer->int32Data());
-
-        List<sp<ABuffer> >::iterator it = queue->begin();
-        while (it != queue->end()) {
-            CHECK((*it)->meta()->findInt32("rtp-time", &rtpTime));
-            if (rtpTime + jitterTime >= playedTimeRtp) {
-                mNextExpectedSeqNo = (*it)->int32Data();
-                break;
-            }
-            it++;
-        }
-        source->noticeAbandonBuffer();
-    }
-
     if (mNextExpectedSeqNoValid) {
-        int32_t size = queue->size();
-        int32_t cnt = 0;
         List<sp<ABuffer> >::iterator it = queue->begin();
         while (it != queue->end()) {
             if ((uint32_t)(*it)->int32Data() >= mNextExpectedSeqNo) {
@@ -104,13 +90,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
             }
 
             it = queue->erase(it);
-            cnt++;
         }
 
-        if (cnt > 0) {
-            source->noticeAbandonBuffer(cnt);
-            ALOGW("delete %d of %d buffers", cnt, size);
-        }
         if (queue->empty()) {
             return NOT_ENOUGH_DATA;
         }
@@ -138,16 +119,16 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         return MALFORMED_PACKET;
     }
 
-    unsigned nalType = data[0] & 0x1f;
-    if (nalType >= 1 && nalType <= 23) {
+    unsigned nalType = (data[0] >> 1) & H265_NALU_MASK;
+    if (nalType > 0 && nalType < H265_NALU_AP) {
         addSingleNALUnit(buffer);
         queue->erase(queue->begin());
         ++mNextExpectedSeqNo;
         return OK;
-    } else if (nalType == 28) {
+    } else if (nalType == H265_NALU_FU) {
         // FU-A
         return addFragmentedNALUnit(queue);
-    } else if (nalType == 24) {
+    } else if (nalType == H265_NALU_AP) {
         // STAP-A
         bool success = addSingleTimeAggregationPacket(buffer);
         queue->erase(queue->begin());
@@ -171,7 +152,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     }
 }
 
-void AAVCAssembler::addSingleNALUnit(const sp<ABuffer> &buffer) {
+void AHEVCAssembler::addSingleNALUnit(const sp<ABuffer> &buffer) {
     ALOGV("addSingleNALUnit of size %zu", buffer->size());
 #if !LOG_NDEBUG
     hexdump(buffer->data(), buffer->size());
@@ -188,7 +169,7 @@ void AAVCAssembler::addSingleNALUnit(const sp<ABuffer> &buffer) {
     mNALUnits.push_back(buffer);
 }
 
-bool AAVCAssembler::addSingleTimeAggregationPacket(const sp<ABuffer> &buffer) {
+bool AHEVCAssembler::addSingleTimeAggregationPacket(const sp<ABuffer> &buffer) {
     const uint8_t *data = buffer->data();
     size_t size = buffer->size();
 
@@ -225,7 +206,7 @@ bool AAVCAssembler::addSingleTimeAggregationPacket(const sp<ABuffer> &buffer) {
     return true;
 }
 
-ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
+ARTPAssembler::AssemblyStatus AHEVCAssembler::addFragmentedNALUnit(
         List<sp<ABuffer> > *queue) {
     CHECK(!queue->empty());
 
@@ -234,9 +215,15 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
     size_t size = buffer->size();
 
     CHECK(size > 0);
-    unsigned indicator = data[0];
+    /*   H265 payload header is 16 bit
+        0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+       |F|     Type  |  Layer ID | TID |
+       +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     */
+    unsigned indicator = (data[0] >> 1);
 
-    CHECK((indicator & 0x1f) == 28);
+    CHECK((indicator & H265_NALU_MASK) == H265_NALU_FU);
 
     if (size < 2) {
         ALOGV("Ignoring malformed FU buffer (size = %zu)", size);
@@ -246,7 +233,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
         return MALFORMED_PACKET;
     }
 
-    if (!(data[1] & 0x80)) {
+    if (!(data[2] & 0x80)) {
         // Start bit not set on the first buffer.
 
         ALOGV("Start bit not set on first buffer");
@@ -256,15 +243,22 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
         return MALFORMED_PACKET;
     }
 
-    uint32_t nalType = data[1] & 0x1f;
-    uint32_t nri = (data[0] >> 5) & 3;
+    /*  FU INDICATOR HDR
+        0 1 2 3 4 5 6 7
+       +-+-+-+-+-+-+-+-+
+       |S|E|   Type    |
+       +-+-+-+-+-+-+-+-+
+     */
+    uint32_t nalType = data[2] & H265_NALU_MASK;
+    uint32_t tid = data[1] & 0x7;
+    ALOGV("nalType =%u, tid =%u", nalType, tid);
 
     uint32_t expectedSeqNo = (uint32_t)buffer->int32Data() + 1;
-    size_t totalSize = size - 2;
+    size_t totalSize = size - 3;
     size_t totalCount = 1;
     bool complete = false;
 
-    if (data[1] & 0x40) {
+    if (data[2] & 0x40) {
         // Huh? End bit also set on the first buffer.
 
         ALOGV("Grrr. This isn't fragmented at all.");
@@ -287,10 +281,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
                 return WRONG_SEQUENCE_NUMBER;
             }
 
-            if (size < 2
-                    || data[0] != indicator
-                    || (data[1] & 0x1f) != nalType
-                    || (data[1] & 0x80)) {
+            if (size < 3
+                    || ((data[0] >> 1) & H265_NALU_MASK) != indicator
+                    || (data[2] & H265_NALU_MASK) != nalType
+                    || (data[2] & 0x80)) {
                 ALOGV("Ignoring malformed FU buffer.");
 
                 // Delete the whole start of the FU.
@@ -305,12 +299,12 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
                 return MALFORMED_PACKET;
             }
 
-            totalSize += size - 2;
+            totalSize += size - 3;
             ++totalCount;
 
             expectedSeqNo = expectedSeqNo + 1;
 
-            if (data[1] & 0x40) {
+            if (data[2] & 0x40) {
                 // This is the last fragment.
                 complete = true;
                 break;
@@ -330,14 +324,15 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 
     // Leave room for the header. So far totalSize did not include the
     // header byte.
-    ++totalSize;
+    totalSize += 2;
 
     sp<ABuffer> unit = new ABuffer(totalSize);
     CopyTimes(unit, *queue->begin());
 
-    unit->data()[0] = (nri << 5) | nalType;
+    unit->data()[0] = (nalType << 1);
+    unit->data()[1] = tid;
 
-    size_t offset = 1;
+    size_t offset = 2;
     List<sp<ABuffer> >::iterator it = queue->begin();
     for (size_t i = 0; i < totalCount; ++i) {
         const sp<ABuffer> &buffer = *it;
@@ -347,8 +342,8 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
         hexdump(buffer->data(), buffer->size());
 #endif
 
-        memcpy(unit->data() + offset, buffer->data() + 2, buffer->size() - 2);
-        offset += buffer->size() - 2;
+        memcpy(unit->data() + offset, buffer->data() + 3, buffer->size() - 3);
+        offset += buffer->size() - 3;
 
         it = queue->erase(it);
     }
@@ -362,7 +357,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
     return OK;
 }
 
-void AAVCAssembler::submitAccessUnit() {
+void AHEVCAssembler::submitAccessUnit() {
     CHECK(!mNALUnits.empty());
 
     ALOGV("Access unit complete (%zu nal units)", mNALUnits.size());
@@ -404,7 +399,7 @@ void AAVCAssembler::submitAccessUnit() {
     msg->post();
 }
 
-ARTPAssembler::AssemblyStatus AAVCAssembler::assembleMore(
+ARTPAssembler::AssemblyStatus AHEVCAssembler::assembleMore(
         const sp<ARTPSource> &source) {
     AssemblyStatus status = addNALUnit(source);
     if (status == MALFORMED_PACKET) {
@@ -413,7 +408,7 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::assembleMore(
     return status;
 }
 
-void AAVCAssembler::packetLost() {
+void AHEVCAssembler::packetLost() {
     CHECK(mNextExpectedSeqNoValid);
     ALOGV("packetLost (expected %d)", mNextExpectedSeqNo);
 
@@ -422,7 +417,7 @@ void AAVCAssembler::packetLost() {
     mAccessUnitDamaged = true;
 }
 
-void AAVCAssembler::onByeReceived() {
+void AHEVCAssembler::onByeReceived() {
     sp<AMessage> msg = mNotifyMsg->dup();
     msg->setInt32("eos", true);
     msg->post();

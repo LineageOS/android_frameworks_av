@@ -22,6 +22,7 @@
 
 #include "AAMRAssembler.h"
 #include "AAVCAssembler.h"
+#include "AHEVCAssembler.h"
 #include "AH263Assembler.h"
 #include "AMPEG2TSAssembler.h"
 #include "AMPEG4AudioAssembler.h"
@@ -41,7 +42,11 @@ ARTPSource::ARTPSource(
         uint32_t id,
         const sp<ASessionDescription> &sessionDesc, size_t index,
         const sp<AMessage> &notify)
-    : mID(id),
+    : mFirstSeqNumber(0),
+      mFirstRtpTime(0),
+      mFirstSysTime(0),
+      mClockRate(0),
+      mID(id),
       mHighestSeqNumber(0),
       mPrevExpected(0),
       mBaseSeqNumber(0),
@@ -60,6 +65,9 @@ ARTPSource::ARTPSource(
 
     if (!strncmp(desc.c_str(), "H264/", 5)) {
         mAssembler = new AAVCAssembler(notify);
+        mIssueFIRRequests = true;
+    } else if (!strncmp(desc.c_str(), "H265/", 5)) {
+        mAssembler = new AHEVCAssembler(notify);
         mIssueFIRRequests = true;
     } else if (!strncmp(desc.c_str(), "MP4A-LATM/", 10)) {
         mAssembler = new AMPEG4AudioAssembler(notify, params);
@@ -112,9 +120,16 @@ void ARTPSource::timeUpdate(uint32_t rtpTime, uint64_t ntpTime) {
 bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     uint32_t seqNum = (uint32_t)buffer->int32Data();
 
-    if (mNumBuffersReceived++ == 0) {
+    if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
+        int32_t firstRtpTime;
+        CHECK(buffer->meta()->findInt32("rtp-time", &firstRtpTime));
+        mFirstSysTime = ALooper::GetNowUs();
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
+        mFirstRtpTime = firstRtpTime;
+        ALOGV("first-rtp arrived: first-rtp-time=%d, sys-time=%lld, seq-num=%u",
+                mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber);
+        mClockRate = 90000;
         mQueue.push_back(buffer);
         return true;
     }
@@ -306,6 +321,9 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     buffer->setRange(buffer->offset(), buffer->size() + 32);
 }
 
+void ARTPSource::noticeAbandonBuffer(int cnt) {
+    mNumBuffersReceived -= cnt;
+}
 }  // namespace android
 
 

@@ -35,6 +35,24 @@
 #define PT      97
 #define PT_STR  "97"
 
+#define H264_NALU_MASK 0x1F
+#define H264_NALU_SPS 0x7
+#define H264_NALU_PPS 0x8
+#define H264_NALU_IFRAME 0x5
+#define H264_NALU_PFRAME 0x1
+
+#define H265_NALU_MASK 0x3F
+#define H265_NALU_VPS 0x40
+#define H265_NALU_SPS 0x42
+#define H265_NALU_PPS 0x44
+
+#define UDP_HEADER_SIZE 8
+#define RTP_HEADER_SIZE 12
+#define RTP_HEADER_EXT_SIZE 1
+#define RTP_FU_HEADER_SIZE 2
+#define RTP_PAYLOAD_ROOM_SIZE 140
+
+
 namespace android {
 
 // static const size_t kMaxPacketSize = 65507;  // maximum payload in UDP over IP
@@ -50,13 +68,16 @@ ARTPWriter::ARTPWriter(int fd)
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)) {
     CHECK_GE(fd, 0);
+    mIsIPv6 = false;
 
     mLooper->setName("rtp writer");
     mLooper->registerHandler(mReflector);
     mLooper->start();
 
-    mSocket = socket(AF_INET, SOCK_DGRAM, 0);
-    CHECK_GE(mSocket, 0);
+    mRTPSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(mRTPSocket, 0);
+    mRTCPSocket = socket(AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(mRTCPSocket, 0);
 
     memset(mRTPAddr.sin_zero, 0, sizeof(mRTPAddr.sin_zero));
     mRTPAddr.sin_family = AF_INET;
@@ -72,6 +93,40 @@ ARTPWriter::ARTPWriter(int fd)
 
     mRTCPAddr = mRTPAddr;
     mRTCPAddr.sin_port = htons(ntohs(mRTPAddr.sin_port) | 1);
+    mSPSBuf = NULL;
+    mPPSBuf = NULL;
+
+#if LOG_TO_FILES
+    mRTPFd = open(
+            "/data/misc/rtpout.bin",
+            O_WRONLY | O_CREAT | O_TRUNC,
+            0644);
+    CHECK_GE(mRTPFd, 0);
+
+    mRTCPFd = open(
+            "/data/misc/rtcpout.bin",
+            O_WRONLY | O_CREAT | O_TRUNC,
+            0644);
+    CHECK_GE(mRTCPFd, 0);
+#endif
+}
+
+ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteIp,
+    int remotePort)
+    : mFlags(0),
+      mFd(dup(fd)),
+      mLooper(new ALooper),
+      mReflector(new AHandlerReflector<ARTPWriter>(this)) {
+    CHECK_GE(fd, 0);
+    mIsIPv6 = false;
+
+    mLooper->setName("rtp writer");
+    mLooper->registerHandler(mReflector);
+    mLooper->start();
+
+    makeSocketPairAndBind(localIp, localPort, remoteIp , remotePort);
+    mSPSBuf = NULL;
+    mPPSBuf = NULL;
 
 #if LOG_TO_FILES
     mRTPFd = open(
@@ -97,11 +152,24 @@ ARTPWriter::~ARTPWriter() {
     mRTPFd = -1;
 #endif
 
-    close(mSocket);
-    mSocket = -1;
+    close(mRTPSocket);
+    mRTPSocket = -1;
+
+    close(mRTCPSocket);
+    mRTCPSocket = -1;
 
     close(mFd);
     mFd = -1;
+
+    if(mSPSBuf != NULL) {
+        mSPSBuf->release();
+        mSPSBuf = NULL;
+    }
+
+    if(mPPSBuf != NULL) {
+        mPPSBuf->release();
+        mPPSBuf = NULL;
+    }
 }
 
 status_t ARTPWriter::addSource(const sp<MediaSource> &source) {
@@ -123,7 +191,7 @@ status_t ARTPWriter::start(MetaData * /* params */) {
     mFlags &= ~kFlagEOS;
     mSourceID = rand();
     mSeqNo = UniformRand(65536);
-    mRTPTimeBase = rand();
+    mRTPTimeBase = 0;
     mNumRTPSent = 0;
     mNumRTPOctetsSent = 0;
     mLastRTPTime = 0;
@@ -136,6 +204,8 @@ status_t ARTPWriter::start(MetaData * /* params */) {
     mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
         mMode = H264;
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        mMode = H265;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_H263)) {
         mMode = H263;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_NB)) {
@@ -173,9 +243,12 @@ status_t ARTPWriter::pause() {
     return OK;
 }
 
-static void StripStartcode(MediaBufferBase *buffer) {
+// return size of SPS if there is more NAL unit found following to SPS.
+static uint32_t StripStartcode(MediaBufferBase *buffer) {
+    uint32_t nalSize = 0;
+
     if (buffer->range_length() < 4) {
-        return;
+        return 0;
     }
 
     const uint8_t *ptr =
@@ -184,6 +257,56 @@ static void StripStartcode(MediaBufferBase *buffer) {
     if (!memcmp(ptr, "\x00\x00\x00\x01", 4)) {
         buffer->set_range(
                 buffer->range_offset() + 4, buffer->range_length() - 4);
+    }
+
+    ptr = (const uint8_t *)buffer->data() + buffer->range_offset();
+
+    if ((*ptr & H264_NALU_MASK) == H264_NALU_SPS) {
+        for (uint32_t i = 0; i < buffer->range_length(); i++) {
+
+            if (!memcmp(ptr + i, "\x00\x00\x00\x01", 4)) {
+                // Now, we found one more NAL unit in the media buffer.
+                // Mostly, it will be a PPS.
+                nalSize = i;
+                ALOGV("SPS found. size=%d", nalSize);
+            }
+        }
+    }
+
+    return nalSize;
+}
+
+static void SpsPpsParser(MediaBufferBase *mediaBuffer,
+    MediaBufferBase **spsBuffer, MediaBufferBase **ppsBuffer, uint32_t spsSize) {
+
+    if (mediaBuffer == NULL || mediaBuffer->range_length() < 4)
+        return;
+
+    if((*spsBuffer) != NULL) {
+        (*spsBuffer)->release();
+        (*spsBuffer) = NULL;
+    }
+
+    if((*ppsBuffer) != NULL) {
+        (*ppsBuffer)->release();
+        (*ppsBuffer) = NULL;
+    }
+
+    // we got sps/pps but startcode of sps is striped.
+    (*spsBuffer) = MediaBufferBase::Create(spsSize);
+    int32_t ppsSize = mediaBuffer->range_length() - spsSize - 4/*startcode*/;
+    (*ppsBuffer) = MediaBufferBase::Create(ppsSize);
+    memcpy((*spsBuffer)->data(),
+            (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
+            spsSize);
+
+    if (ppsSize > 0) {
+        ALOGV("PPS found. size=%d", (int)ppsSize);
+        mediaBuffer->set_range(mediaBuffer->range_offset() + spsSize + 4/*startcode*/,
+                mediaBuffer->range_length() - spsSize - 4/*startcode*/);
+        memcpy((*ppsBuffer)->data(),
+                (const uint8_t *)mediaBuffer->data() + mediaBuffer->range_offset(),
+                ppsSize);
     }
 }
 
@@ -280,8 +403,15 @@ void ARTPWriter::onRead(const sp<AMessage> &msg) {
         ALOGV("read buffer of size %zu", mediaBuf->range_length());
 
         if (mMode == H264) {
+            uint32_t spsSize = 0;
+            if ((spsSize = StripStartcode(mediaBuf)) > 0) {
+                SpsPpsParser(mediaBuf, &mSPSBuf, &mPPSBuf, spsSize);
+            } else {
+                sendAVCData(mediaBuf);
+            }
+        } else if (mMode == H265) {
             StripStartcode(mediaBuf);
-            sendAVCData(mediaBuf);
+            sendHEVCData(mediaBuf);
         } else if (mMode == H263) {
             sendH263Data(mediaBuf);
         } else if (mMode == AMR_NB || mMode == AMR_WB) {
@@ -309,10 +439,25 @@ void ARTPWriter::onSendSR(const sp<AMessage> &msg) {
 }
 
 void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
-    ssize_t n = sendto(
-            mSocket, buffer->data(), buffer->size(), 0,
-            (const struct sockaddr *)(isRTCP ? &mRTCPAddr : &mRTPAddr),
-            sizeof(mRTCPAddr));
+    int sizeSockSt;
+    struct sockaddr *remAddr;
+
+    if (mIsIPv6) {
+        sizeSockSt = sizeof(struct sockaddr_in6);
+        if (isRTCP)
+            remAddr = (struct sockaddr *)&mRTCPAddr6;
+        else
+            remAddr = (struct sockaddr *)&mRTPAddr6;
+    } else {
+        sizeSockSt = sizeof(struct sockaddr_in);
+        if (isRTCP)
+            remAddr = (struct sockaddr *)&mRTCPAddr;
+        else
+            remAddr = (struct sockaddr *)&mRTPAddr;
+    }
+
+    ssize_t n = sendto(isRTCP ? mRTCPSocket : mRTPSocket,
+            buffer->data(), buffer->size(), 0, remAddr, sizeSockSt);
 
     CHECK_EQ(n, (ssize_t)buffer->size());
 
@@ -463,7 +608,7 @@ void ARTPWriter::dumpSessionDesc() {
         sdp.append("m=audio ");
     }
 
-    sdp.append(AStringPrintf("%d", ntohs(mRTPAddr.sin_port)));
+    sdp.append(AStringPrintf("%d", mIsIPv6 ? ntohs(mRTPAddr6.sin6_port) : ntohs(mRTPAddr.sin_port)));
     sdp.append(
           " RTP/AVP " PT_STR "\r\n"
           "b=AS 320000\r\n"
@@ -569,6 +714,151 @@ void ARTPWriter::sendBye() {
     send(buffer, true /* isRTCP */);
 }
 
+void ARTPWriter::sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs) {
+    const uint8_t *mediaData =
+        (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
+
+    if ((mediaData[0] & H264_NALU_MASK) != H264_NALU_IFRAME)
+        return;
+
+    if (mSPSBuf != NULL) {
+        mSPSBuf->meta_data().setInt64(kKeyTime, timeUs);
+        mSPSBuf->meta_data().setInt32(kKeySps, 1);
+        sendAVCData(mSPSBuf);
+    }
+
+    if (mPPSBuf != NULL) {
+        mPPSBuf->meta_data().setInt64(kKeyTime, timeUs);
+        mPPSBuf->meta_data().setInt32(kKeyPps, 1);
+        sendAVCData(mPPSBuf);
+    }
+}
+
+void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
+    // 12 bytes RTP header + 2 bytes for the FU-indicator and FU-header.
+    CHECK_GE(kMaxPacketSize, 12u + 2u);
+
+    int64_t timeUs;
+    CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
+
+    sendSPSPPSIfIFrame(mediaBuf, timeUs);
+
+    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
+
+    const uint8_t *mediaData =
+        (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
+
+    sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
+
+    if (mediaBuf->range_length() + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE
+            <= buffer->capacity()) {
+        // The data fits into a single packet
+        uint8_t *data = buffer->data();
+        data[0] = 0x80;
+        data[1] = (1 << 7) | PT;  // M-bit
+        data[2] = (mSeqNo >> 8) & 0xff;
+        data[3] = mSeqNo & 0xff;
+        data[4] = rtpTime >> 24;
+        data[5] = (rtpTime >> 16) & 0xff;
+        data[6] = (rtpTime >> 8) & 0xff;
+        data[7] = rtpTime & 0xff;
+        data[8] = mSourceID >> 24;
+        data[9] = (mSourceID >> 16) & 0xff;
+        data[10] = (mSourceID >> 8) & 0xff;
+        data[11] = mSourceID & 0xff;
+
+        memcpy(&data[12],
+               mediaData, mediaBuf->range_length());
+
+        buffer->setRange(0, mediaBuf->range_length() + 12);
+
+        send(buffer, false /* isRTCP */);
+
+        ++mSeqNo;
+        ++mNumRTPSent;
+        mNumRTPOctetsSent += buffer->size() - 12;
+    } else {
+        // FU-A
+
+        unsigned nalType = (mediaData[0] >> 1) & H265_NALU_MASK;
+        ALOGV("H265 nalType 0x%x, data[0]=0x%x", nalType, mediaData[0]);
+        size_t offset = 2; //H265 payload header is 16 bit.
+
+        bool firstPacket = true;
+        while (offset < mediaBuf->range_length()) {
+            size_t size = mediaBuf->range_length() - offset;
+            bool lastPacket = true;
+            if (size + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_FU_HEADER_SIZE +
+                    RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
+                lastPacket = false;
+                size = buffer->capacity() - UDP_HEADER_SIZE - RTP_HEADER_SIZE -
+                    RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
+            }
+
+            uint8_t *data = buffer->data();
+            data[0] = 0x80;
+            data[1] = (lastPacket ? (1 << 7) : 0x00) | PT;  // M-bit
+            data[2] = (mSeqNo >> 8) & 0xff;
+            data[3] = mSeqNo & 0xff;
+            data[4] = rtpTime >> 24;
+            data[5] = (rtpTime >> 16) & 0xff;
+            data[6] = (rtpTime >> 8) & 0xff;
+            data[7] = rtpTime & 0xff;
+            data[8] = mSourceID >> 24;
+            data[9] = (mSourceID >> 16) & 0xff;
+            data[10] = (mSourceID >> 8) & 0xff;
+            data[11] = mSourceID & 0xff;
+
+            /*  H265 payload header is 16 bit
+                 0 1 2 3 4 5 6 7 0 1 2 3 4 5 6 7
+                +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+                |F|     Type  |  Layer ID | TID |
+                +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+            */
+            ALOGV("H265 payload header 0x%x %x", mediaData[0], mediaData[1]);
+            // excludes Type from 1st byte of H265 payload header.
+            data[12] = mediaData[0] & 0x81;
+            // fills Type as FU (49 == 0x31)
+            data[12] = data[12] | (0x31 << 1);
+            data[13] = mediaData[1];
+
+            ALOGV("H265 FU header 0x%x %x", data[12], data[13]);
+
+            CHECK(!firstPacket || !lastPacket);
+            /*
+                FU INDICATOR HDR
+                0 1 2 3 4 5 6 7
+                +-+-+-+-+-+-+-+
+                |S|E|   Type  |
+                +-+-+-+-+-+-+-+
+            */
+
+            data[14] =
+                (firstPacket ? 0x80 : 0x00)
+                | (lastPacket ? 0x40 : 0x00)
+                | (nalType & H265_NALU_MASK);
+            ALOGV("H265 FU indicator 0x%x", data[14]);
+
+            memcpy(&data[15], &mediaData[offset], size);
+
+            buffer->setRange(0, 15 + size);
+
+            send(buffer, false /* isRTCP */);
+
+            ++mSeqNo;
+            ++mNumRTPSent;
+            mNumRTPOctetsSent += buffer->size() - 12;
+
+            firstPacket = false;
+            offset += size;
+        }
+    }
+
+    mLastRTPTime = rtpTime;
+    mLastNTPTime = GetNowNTP();
+
+}
+
 void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
     // 12 bytes RTP header + 2 bytes for the FU-indicator and FU-header.
     CHECK_GE(kMaxPacketSize, 12u + 2u);
@@ -576,17 +866,30 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
     int64_t timeUs;
     CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
+    sendSPSPPSIfIFrame(mediaBuf, timeUs);
+
     uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100LL);
 
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
 
+    int32_t sps, pps;
+    bool isSpsPps = false;
+    if (mediaBuf->meta_data().findInt32(kKeySps, &sps) ||
+            mediaBuf->meta_data().findInt32(kKeyPps, &pps)) {
+        isSpsPps = true;
+    }
+
     sp<ABuffer> buffer = new ABuffer(kMaxPacketSize);
-    if (mediaBuf->range_length() + 12 <= buffer->capacity()) {
+    if (mediaBuf->range_length() + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_PAYLOAD_ROOM_SIZE
+            <= buffer->capacity()) {
         // The data fits into a single packet
         uint8_t *data = buffer->data();
         data[0] = 0x80;
-        data[1] = (1 << 7) | PT;  // M-bit
+        if (isSpsPps)
+            data[1] = PT;  // Marker bit should not be set in case of sps/pps
+        else
+            data[1] = (1 << 7) | PT;
         data[2] = (mSeqNo >> 8) & 0xff;
         data[3] = mSeqNo & 0xff;
         data[4] = rtpTime >> 24;
@@ -618,9 +921,11 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
         while (offset < mediaBuf->range_length()) {
             size_t size = mediaBuf->range_length() - offset;
             bool lastPacket = true;
-            if (size + 12 + 2 > buffer->capacity()) {
+            if (size + UDP_HEADER_SIZE + RTP_HEADER_SIZE + RTP_FU_HEADER_SIZE +
+                    RTP_PAYLOAD_ROOM_SIZE > buffer->capacity()) {
                 lastPacket = false;
-                size = buffer->capacity() - 12 - 2;
+                size = buffer->capacity() - UDP_HEADER_SIZE - RTP_HEADER_SIZE -
+                    RTP_FU_HEADER_SIZE - RTP_PAYLOAD_ROOM_SIZE;
             }
 
             uint8_t *data = buffer->data();
@@ -832,6 +1137,82 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
 
     mLastRTPTime = rtpTime;
     mLastNTPTime = GetNowNTP();
+}
+
+void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
+        String8& remoteIp, int remotePort) {
+    if (localIp.contains(":"))
+        mIsIPv6 = true;
+    else
+        mIsIPv6 = false;
+
+    mRTPSocket = socket(mIsIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(mRTPSocket, 0);
+    mRTCPSocket = socket(mIsIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
+    CHECK_GE(mRTCPSocket, 0);
+
+    int sockopt = 1;
+    setsockopt(mRTPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+    setsockopt(mRTCPSocket, SOL_SOCKET, SO_REUSEPORT, (int *)&sockopt, sizeof(sockopt));
+
+    if (mIsIPv6) {
+        memset(&mLocalAddr6, 0, sizeof(mLocalAddr6));
+        memset(&mRTPAddr6, 0, sizeof(mRTPAddr6));
+        memset(&mRTCPAddr6, 0, sizeof(mRTCPAddr6));
+
+        mLocalAddr6.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, localIp.string(), &mLocalAddr6.sin6_addr);
+        mLocalAddr6.sin6_port = htons((uint16_t)localPort);
+
+        mRTPAddr6.sin6_family = AF_INET6;
+        inet_pton(AF_INET6, remoteIp.string(), &mRTPAddr6.sin6_addr);
+        mRTPAddr6.sin6_port = htons((uint16_t)remotePort);
+
+        mRTCPAddr6 = mRTPAddr6;
+        mRTCPAddr6.sin6_port = htons((uint16_t)(remotePort + 1));
+    } else {
+        memset(&mLocalAddr, 0, sizeof(mLocalAddr));
+        memset(&mRTPAddr, 0, sizeof(mRTPAddr));
+        memset(&mRTCPAddr, 0, sizeof(mRTCPAddr));
+
+        mLocalAddr.sin_family = AF_INET;
+        mLocalAddr.sin_addr.s_addr = inet_addr(localIp.string());
+        mLocalAddr.sin_port = htons((uint16_t)localPort);
+
+        mRTPAddr.sin_family = AF_INET;
+        mRTPAddr.sin_addr.s_addr = inet_addr(remoteIp.string());
+        mRTPAddr.sin_port = htons((uint16_t)remotePort);
+
+        mRTCPAddr = mRTPAddr;
+        mRTCPAddr.sin_port = htons((uint16_t)(remotePort + 1));
+    }
+
+    struct sockaddr *localAddr = mIsIPv6 ?
+        (struct sockaddr*)&mLocalAddr6 : (struct sockaddr*)&mLocalAddr;
+
+    int sizeSockSt = mIsIPv6 ? sizeof(mLocalAddr6) : sizeof(mLocalAddr);
+
+    if (bind(mRTPSocket, localAddr, sizeSockSt) == -1) {
+        ALOGE("failed to bind rtp %s:%d err=%s", localIp.string(), localPort, strerror(errno));
+    } else {
+        ALOGI("succeed to bind rtp %s:%d", localIp.string(), localPort);
+    }
+
+    if (mIsIPv6)
+        mLocalAddr6.sin6_port = htons((uint16_t)(localPort + 1));
+    else
+        mLocalAddr.sin_port = htons((uint16_t)(localPort + 1));
+
+    if (bind(mRTCPSocket, localAddr, sizeSockSt) == -1) {
+        ALOGE("failed to bind rtcp %s:%d err=%s", localIp.string(), localPort + 1, strerror(errno));
+    } else {
+        ALOGI("succeed to bind rtcp %s:%d", localIp.string(), localPort + 1);
+    }
+
+    if (mIsIPv6)
+        mLocalAddr6.sin6_port = htons((uint16_t)localPort);
+    else
+        mLocalAddr.sin_port = htons((uint16_t)localPort);
 }
 
 }  // namespace android
