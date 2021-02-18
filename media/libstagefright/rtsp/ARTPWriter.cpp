@@ -1165,6 +1165,11 @@ void ARTPWriter::updateCVODegrees(int32_t cvoDegrees) {
     mRTPCVODegrees = cvoDegrees;
 }
 
+void ARTPWriter::updatePayloadType(int32_t payloadType) {
+    Mutex::Autolock autoLock(mLock);
+    mPayloadType = payloadType;
+}
+
 static size_t getFrameSize(bool isWide, unsigned FT) {
     static const size_t kFrameSizeNB[8] = {
         95, 103, 118, 134, 148, 159, 204, 244
