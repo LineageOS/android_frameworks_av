@@ -291,6 +291,8 @@ private:
     bool                        mIsOutputFileSet;
     Mutex                       mLock;
     Mutex                       mNotifyLock;
+
+    int                         mOutputFormat;
 };
 
 };  // namespace android

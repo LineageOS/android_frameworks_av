@@ -143,6 +143,7 @@ private:
     int32_t mLocalPort;
     int32_t mRemotePort;
     int32_t mSelfID;
+    int32_t mOpponentID;
     int32_t mPayloadType;
     int32_t mRTPCVOExtMap;
     int32_t mRTPCVODegrees;
@@ -232,6 +233,7 @@ private:
     status_t setParamRtpRemoteIp(const String8 &remoteIp);
     status_t setParamRtpRemotePort(int32_t remotePort);
     status_t setParamSelfID(int32_t selfID);
+    status_t setParamVideoOpponentID(int32_t opponentID);
     status_t setParamPayloadType(int32_t payloadType);
     status_t setRTPCVOExtMap(int32_t extmap);
     status_t setRTPCVODegrees(int32_t cvoDegrees);
