@@ -2838,28 +2838,34 @@ void NuPlayer::sendTimedTextData(const sp<ABuffer> &buffer) {
 }
 
 void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
-    int32_t notice, payloadType, feedbackType, id, bitrate;
+    int32_t payloadType;
 
-    CHECK(msg->findInt32("IMS-Rx-notice", &notice));
     CHECK(msg->findInt32("payload-type", &payloadType));
-    CHECK(msg->findInt32("feedback-type", &feedbackType));
-    CHECK(msg->findInt32("sender", &id));
 
     Parcel in;
     in.writeInt32(payloadType);
-    in.writeInt32(feedbackType);
-    in.writeInt32(id);
 
     switch (payloadType) {
-        case 205:   // TSFB
+        case NuPlayer::RTPSource::RTCP_TSFB:   // RTCP TSFB
+        case NuPlayer::RTPSource::RTCP_PSFB:   // RTCP PSFB
         {
-            CHECK(msg->findInt32("bit-rate", &bitrate));
-            in.writeInt32(bitrate);
+            int32_t feedbackType, id;
+            CHECK(msg->findInt32("feedback-type", &feedbackType));
+            CHECK(msg->findInt32("sender", &id));
+            in.writeInt32(feedbackType);
+            in.writeInt32(id);
+            if (payloadType == NuPlayer::RTPSource::RTCP_TSFB) {
+                int32_t bitrate;
+                CHECK(msg->findInt32("bit-rate", &bitrate));
+                in.writeInt32(bitrate);
+            }
             break;
         }
-        case 206:   // PSFB
+        case NuPlayer::RTPSource::RTP_CVO:
         {
-            // nothing to do yet
+            int32_t cvo;
+            CHECK(msg->findInt32("cvo", &cvo));
+            in.writeInt32(cvo);
             break;
         }
         default:
