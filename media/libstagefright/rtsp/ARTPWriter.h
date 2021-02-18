@@ -37,7 +37,8 @@ class MediaBuffer;
 struct ARTPWriter : public MediaWriter {
     explicit ARTPWriter(int fd);
     explicit ARTPWriter(int fd, String8& localIp, int localPort,
-                                String8& remoteIp, int remotePort);
+                                String8& remoteIp, int remotePort,
+                                uint32_t seqNo);
 
     virtual status_t addSource(const sp<MediaSource> &source);
     virtual bool reachedEOS();
@@ -46,6 +47,7 @@ struct ARTPWriter : public MediaWriter {
     virtual status_t pause();
     void updateCVODegrees(int32_t cvoDegrees);
     void updatePayloadType(int32_t payloadType);
+    uint32_t getSequenceNum();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
     virtual void setTMMBNInfo(uint32_t opponentID, uint32_t bitrate);
