@@ -1,0 +1,49 @@
+cc_defaults {
+    name: "sample-codec2-hidl-plugin-defaults",
+
+    srcs: [
+        "SampleFilterPlugin.cpp",
+    ],
+
+    defaults: [
+        "libcodec2-impl-defaults",
+    ],
+
+    header_libs: [
+        "libcodec2_hidl_plugin_headers",
+        "libgui_headers",
+    ],
+
+    shared_libs: [
+        "libEGL",
+        "libGLESv1_CM",
+        "libGLESv2",
+        "libGLESv3",
+        "libbase",
+        "libcodec2",
+        "libcutils",
+        "libprocessgroup",
+        "libsfplugin_ccodec_utils",
+        "libsync",
+        "libui",
+        "libutils",
+    ],
+
+    static_libs: [
+        "librenderfright",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+}
+
+cc_library {
+    name: "sample-codec2-hidl-plugin",
+    vendor: true,
+
+    defaults: [
+        "sample-codec2-hidl-plugin-defaults",
+    ],
+}
