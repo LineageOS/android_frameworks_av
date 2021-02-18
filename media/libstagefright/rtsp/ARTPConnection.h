@@ -30,6 +30,7 @@ struct ASessionDescription;
 struct ARTPConnection : public AHandler {
     enum Flags {
         kRegularlyRequestFIR = 2,
+        kViLTEConnection = 4,
     };
 
     explicit ARTPConnection(uint32_t flags = 0);
@@ -94,9 +95,10 @@ private:
     void onPollStreams();
     void onInjectPacket(const sp<AMessage> &msg);
     void onSendReceiverReports();
-    void showRxBitrate(int64_t nowUs);
+    void checkRxBitrate(int64_t nowUs);
 
     status_t receive(StreamInfo *info, bool receiveRTP);
+    ssize_t send(const StreamInfo *info, const sp<ABuffer> buffer);
 
     status_t parseRTP(StreamInfo *info, const sp<ABuffer> &buffer);
     status_t parseRTPExt(StreamInfo *s, const uint8_t *extData, size_t extLen, int32_t *cvoDegrees);
