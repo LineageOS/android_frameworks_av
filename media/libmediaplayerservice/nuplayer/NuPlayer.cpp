@@ -2848,6 +2848,7 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
     switch (payloadType) {
         case NuPlayer::RTPSource::RTCP_TSFB:   // RTCP TSFB
         case NuPlayer::RTPSource::RTCP_PSFB:   // RTCP PSFB
+        case NuPlayer::RTPSource::RTP_AUTODOWN:
         {
             int32_t feedbackType, id;
             CHECK(msg->findInt32("feedback-type", &feedbackType));
