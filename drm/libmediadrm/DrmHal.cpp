@@ -55,6 +55,7 @@ using drm::V1_1::SecureStopRelease;
 using drm::V1_1::SecurityLevel;
 using drm::V1_2::KeySetId;
 using drm::V1_2::KeyStatusType;
+using ::android::DrmUtils::toStatusT;
 using ::android::hardware::drm::V1_1::DrmMetricGroup;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
@@ -233,58 +234,6 @@ static List<Vector<uint8_t>> toKeySetIds(const hidl_vec<KeySetId>&
         keySetIds.push_back(toVector(hKeySetIds[i]));
     }
     return keySetIds;
-}
-
-static status_t toStatusT(Status status) {
-    switch (status) {
-    case Status::OK:
-        return OK;
-        break;
-    case Status::ERROR_DRM_NO_LICENSE:
-        return ERROR_DRM_NO_LICENSE;
-        break;
-    case Status::ERROR_DRM_LICENSE_EXPIRED:
-        return ERROR_DRM_LICENSE_EXPIRED;
-        break;
-    case Status::ERROR_DRM_SESSION_NOT_OPENED:
-        return ERROR_DRM_SESSION_NOT_OPENED;
-        break;
-    case Status::ERROR_DRM_CANNOT_HANDLE:
-        return ERROR_DRM_CANNOT_HANDLE;
-        break;
-    case Status::ERROR_DRM_INVALID_STATE:
-        return ERROR_DRM_INVALID_STATE;
-        break;
-    case Status::BAD_VALUE:
-        return BAD_VALUE;
-        break;
-    case Status::ERROR_DRM_NOT_PROVISIONED:
-        return ERROR_DRM_NOT_PROVISIONED;
-        break;
-    case Status::ERROR_DRM_RESOURCE_BUSY:
-        return ERROR_DRM_RESOURCE_BUSY;
-        break;
-    case Status::ERROR_DRM_DEVICE_REVOKED:
-        return ERROR_DRM_DEVICE_REVOKED;
-        break;
-    case Status::ERROR_DRM_UNKNOWN:
-    default:
-        return ERROR_DRM_UNKNOWN;
-        break;
-    }
-}
-
-static status_t toStatusT_1_2(Status_V1_2 status) {
-    switch (status) {
-    case Status_V1_2::ERROR_DRM_RESOURCE_CONTENTION:
-        return ERROR_DRM_RESOURCE_CONTENTION;
-    case Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE:
-        return ERROR_DRM_FRAME_TOO_LARGE;
-    case Status_V1_2::ERROR_DRM_INSUFFICIENT_SECURITY:
-        return ERROR_DRM_INSUFFICIENT_SECURITY;
-    default:
-        return toStatusT(static_cast<Status>(status));
-    }
 }
 
 Mutex DrmHal::mLock;
@@ -825,7 +774,7 @@ status_t DrmHal::getKeyRequest(Vector<uint8_t> const &sessionId,
                         defaultUrl = toString8(hDefaultUrl);
                         *keyRequestType = toKeyRequestType_1_1(hKeyRequestType);
                     }
-                    err = toStatusT_1_2(status);
+                    err = toStatusT(status);
                 });
     } else if (mPluginV1_1 != NULL) {
         hResult = mPluginV1_1->getKeyRequest_1_1(
@@ -947,7 +896,7 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
                         request = toVector(hRequest);
                         defaultUrl = toString8(hDefaultUrl);
                     }
-                    err = toStatusT_1_2(status);
+                    err = toStatusT(status);
                 }
             );
     } else {
@@ -1119,7 +1068,7 @@ status_t DrmHal::getHdcpLevels(DrmPlugin::HdcpLevel *connected,
                         *connected = toHdcpLevel(hConnected);
                         *max = toHdcpLevel(hMax);
                     }
-                    err = toStatusT_1_2(status);
+                    err = toStatusT(status);
                 });
     } else if (mPluginV1_1 != NULL) {
         hResult = mPluginV1_1->getHdcpLevels(
@@ -1594,6 +1543,11 @@ status_t DrmHal::setPlaybackId(Vector<uint8_t> const &sessionId, const char *pla
             toHidlVec(sessionId),
             hidl_string(playbackId));
     return toStatusT(err);
+}
+
+status_t DrmHal::getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const {
+    Mutex::Autolock autoLock(mLock);
+    return DrmUtils::GetLogMessages<drm::V1_4::IDrmPlugin>(mPlugin, logs);
 }
 
 }  // namespace android
