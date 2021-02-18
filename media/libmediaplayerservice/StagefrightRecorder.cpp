@@ -17,6 +17,9 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "StagefrightRecorder"
 #include <inttypes.h>
+// TODO/workaround: including base logging now as it conflicts with ADebug.h
+// and it must be included first.
+#include <android-base/logging.h>
 #include <utils/Log.h>
 
 #include "WebmWriter.h"
@@ -44,6 +47,7 @@
 #include <media/stagefright/CameraSourceTimeLapse.h>
 #include <media/stagefright/MPEG2TSWriter.h>
 #include <media/stagefright/MPEG4Writer.h>
+#include <media/stagefright/MediaCodecConstants.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <media/stagefright/MediaCodecSource.h>
@@ -119,6 +123,8 @@ StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
       mVideoSource(VIDEO_SOURCE_LIST_END),
       mRTPCVOExtMap(-1),
       mRTPCVODegrees(0),
+      mRTPSockDscp(0),
+      mRTPSockNetwork(0),
       mLastSeqNo(0),
       mStarted(false),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
@@ -575,17 +581,30 @@ status_t StagefrightRecorder::setParamVideoEncodingBitRate(int32_t bitRate) {
     mVideoBitRate = bitRate;
 
     // A new bitrate(TMMBR) should be applied on runtime as well if OutputFormat is RTP_AVP
-    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP &&  mStarted && mPauseStartTimeUs == 0) {
-        /* Regular I frames overloads on the network so we should consider about it.
-         * Discounted encoding bitrate will be margins for the overloads.
-         * But applied bitrate reply(TMMBN) must be sent as same as TMMBR */
+    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP) {
+        // Regular I frames may overload the network so we reduce the bitrate to allow
+        // margins for the I frame overruns.
+        // Still send requested bitrate (TMMBR) in the reply (TMMBN).
         const float coefficient = 0.8f;
         mVideoBitRate = (bitRate * coefficient) / 1000 * 1000;
+    }
+    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP && mStarted && mPauseStartTimeUs == 0) {
         mVideoEncoderSource->setEncodingBitrate(mVideoBitRate);
         ARTPWriter* rtpWriter  = static_cast<ARTPWriter*>(mWriter.get());
         rtpWriter->setTMMBNInfo(mOpponentID, bitRate);
     }
 
+    return OK;
+}
+
+status_t StagefrightRecorder::setParamVideoBitRateMode(int32_t bitRateMode) {
+    ALOGV("setParamVideoBitRateMode: %d", bitRateMode);
+    // TODO: clarify what bitrate mode of -1 is as these start from 0
+    if (bitRateMode < -1) {
+        ALOGE("Unsupported video bitrate mode: %d", bitRateMode);
+        return BAD_VALUE;
+    }
+    mVideoBitRateMode = bitRateMode;
     return OK;
 }
 
@@ -867,6 +886,23 @@ status_t StagefrightRecorder::setRTPCVODegrees(int32_t cvoDegrees) {
     return OK;
 }
 
+status_t StagefrightRecorder::setParamRtpDscp(int32_t dscp) {
+    ALOGV("setParamRtpDscp: %d", dscp);
+
+    mRTPSockDscp = dscp;
+    return OK;
+}
+
+status_t StagefrightRecorder::setSocketNetwork(int64_t networkHandle) {
+    ALOGV("setSocketNetwork: %llu", (unsigned long long) networkHandle);
+
+    mRTPSockNetwork = networkHandle;
+    if (mStarted && mOutputFormat == OUTPUT_FORMAT_RTP_AVP) {
+        mWriter->updateSocketNetwork(mRTPSockNetwork);
+    }
+    return OK;
+}
+
 status_t StagefrightRecorder::requestIDRFrame() {
     status_t ret = BAD_VALUE;
     if (mVideoEncoderSource != NULL) {
@@ -945,6 +981,11 @@ status_t StagefrightRecorder::setParameter(
         if (safe_strtoi32(value.string(), &video_bitrate)) {
             return setParamVideoEncodingBitRate(video_bitrate);
         }
+    } else if (key == "video-param-bitrate-mode") {
+        int32_t video_bitrate_mode;
+        if (safe_strtoi32(value.string(), &video_bitrate_mode)) {
+            return setParamVideoBitRateMode(video_bitrate_mode);
+        }
     } else if (key == "video-param-rotation-angle-degrees") {
         int32_t degrees;
         if (safe_strtoi32(value.string(), &degrees)) {
@@ -1006,6 +1047,13 @@ status_t StagefrightRecorder::setParameter(
             selfID = static_cast<int32_t>(temp);
             return setParamSelfID(selfID);
         }
+    } else if (key == "rtp-param-opponent-id") {
+        int32_t opnId;
+        int64_t temp;
+        if (safe_strtoi64(value.string(), &temp)) {
+            opnId = static_cast<int32_t>(temp);
+            return setParamVideoOpponentID(opnId);
+        }
     } else if (key == "rtp-param-payload-type") {
         int32_t payloadType;
         if (safe_strtoi32(value.string(), &payloadType)) {
@@ -1023,6 +1071,16 @@ status_t StagefrightRecorder::setParameter(
         }
     } else if (key == "video-param-request-i-frame") {
         return requestIDRFrame();
+    } else if (key == "rtp-param-set-socket-dscp") {
+        int32_t dscp;
+        if (safe_strtoi32(value.string(), &dscp)) {
+            return setParamRtpDscp(dscp);
+        }
+    } else if (key == "rtp-param-set-socket-network") {
+        int64_t networkHandle;
+        if (safe_strtoi64(value.string(), &networkHandle)) {
+            return setSocketNetwork(networkHandle);
+        }
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
     }
@@ -1191,10 +1249,15 @@ status_t StagefrightRecorder::start() {
             meta->setInt64(kKeyTime, startTimeUs);
             meta->setInt32(kKeySelfID, mSelfID);
             meta->setInt32(kKeyPayloadType, mPayloadType);
+            meta->setInt64(kKeySocketNetwork, mRTPSockNetwork);
             if (mRTPCVOExtMap > 0) {
                 meta->setInt32(kKeyRtpExtMap, mRTPCVOExtMap);
                 meta->setInt32(kKeyRtpCvoDegrees, mRTPCVODegrees);
             }
+            if (mRTPSockDscp > 0) {
+                meta->setInt32(kKeyRtpDscp, mRTPSockDscp);
+            }
+
             status = mWriter->start(meta.get());
             break;
         }
@@ -1929,7 +1992,13 @@ status_t StagefrightRecorder::setupVideoEncoder(
         }
     }
 
+    if (mOutputFormat == OUTPUT_FORMAT_RTP_AVP) {
+        // This indicates that a raw image provided to encoder needs to be rotated.
+        format->setInt32("rotation-degrees", mRotationDegrees);
+    }
+
     format->setInt32("bitrate", mVideoBitRate);
+    format->setInt32("bitrate-mode", mVideoBitRateMode);
     format->setInt32("frame-rate", mFrameRate);
     format->setInt32("i-frame-interval", mIFramesIntervalSec);
 
@@ -2352,6 +2421,8 @@ status_t StagefrightRecorder::reset() {
     mVideoHeight   = 144;
     mFrameRate     = -1;
     mVideoBitRate  = 192000;
+    // Following MediaCodec's default
+    mVideoBitRateMode = BITRATE_MODE_VBR;
     mSampleRate    = 8000;
     mAudioChannels = 1;
     mAudioBitRate  = 12200;

@@ -132,6 +132,8 @@ struct NuPlayer::Source : public AHandler {
 
     virtual void setOffloadAudio(bool /* offload */) {}
 
+    virtual void setTargetBitrate(int32_t) {}
+
     // Modular DRM
     virtual status_t prepareDrm(
             const uint8_t /*uuid*/[16], const Vector<uint8_t> &/*drmSessionId*/,

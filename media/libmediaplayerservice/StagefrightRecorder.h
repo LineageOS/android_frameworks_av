@@ -119,6 +119,7 @@ private:
     int32_t mVideoWidth, mVideoHeight;
     int32_t mFrameRate;
     int32_t mVideoBitRate;
+    int32_t mVideoBitRateMode;
     int32_t mAudioBitRate;
     int32_t mAudioChannels;
     int32_t mSampleRate;
@@ -147,6 +148,8 @@ private:
     int32_t mPayloadType;
     int32_t mRTPCVOExtMap;
     int32_t mRTPCVODegrees;
+    int32_t mRTPSockDscp;
+    int64_t mRTPSockNetwork;
     uint32_t mLastSeqNo;
 
     int64_t mDurationRecordedUs;
@@ -215,6 +218,7 @@ private:
     status_t setParamCaptureFpsEnable(int32_t timeLapseEnable);
     status_t setParamCaptureFps(double fps);
     status_t setParamVideoEncodingBitRate(int32_t bitRate);
+    status_t setParamVideoBitRateMode(int32_t bitRateMode);
     status_t setParamVideoIFramesInterval(int32_t seconds);
     status_t setParamVideoEncoderProfile(int32_t profile);
     status_t setParamVideoEncoderLevel(int32_t level);
@@ -238,6 +242,8 @@ private:
     status_t setParamPayloadType(int32_t payloadType);
     status_t setRTPCVOExtMap(int32_t extmap);
     status_t setRTPCVODegrees(int32_t cvoDegrees);
+    status_t setParamRtpDscp(int32_t dscp);
+    status_t setSocketNetwork(int64_t networkHandle);
     status_t requestIDRFrame();
     void clipVideoBitRate();
     void clipVideoFrameRate();
