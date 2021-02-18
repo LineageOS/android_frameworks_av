@@ -26,6 +26,7 @@
 #include <android/hardware/drm/1.2/IDrmPlugin.h>
 #include <android/hardware/drm/1.2/IDrmPluginListener.h>
 #include <android/hardware/drm/1.4/IDrmPlugin.h>
+#include <android/hardware/drm/1.4/types.h>
 
 #include <media/drm/DrmAPI.h>
 #include <mediadrm/DrmMetrics.h>
@@ -187,6 +188,8 @@ struct DrmHal : public IDrm,
     virtual status_t setPlaybackId(
             Vector<uint8_t> const &sessionId,
             const char *playbackId);
+
+    virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const;
 
     // Methods of IDrmPluginListener
     Return<void> sendEvent(EventType eventType,
