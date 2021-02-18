@@ -99,6 +99,7 @@ private:
     status_t receive(StreamInfo *info, bool receiveRTP);
 
     status_t parseRTP(StreamInfo *info, const sp<ABuffer> &buffer);
+    status_t parseRTPExt(StreamInfo *s, const uint8_t *extData, size_t extLen, int32_t *cvoDegrees);
     status_t parseRTCP(StreamInfo *info, const sp<ABuffer> &buffer);
     status_t parseSR(StreamInfo *info, const uint8_t *data, size_t size);
     status_t parseTSFB(StreamInfo *info, const uint8_t *data, size_t size);

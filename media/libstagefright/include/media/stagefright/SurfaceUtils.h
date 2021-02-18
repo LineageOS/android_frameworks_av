@@ -38,6 +38,8 @@ status_t setNativeWindowSizeFormatAndUsage(
         int width, int height, int format, int rotation, int usage, bool reconnect);
 void setNativeWindowHdrMetadata(
         ANativeWindow *nativeWindow /* nonnull */, HDRStaticInfo *info /* nonnull */);
+status_t setNativeWindowRotation(
+        ANativeWindow *nativeWindow /* nonnull */, int rotation);
 status_t pushBlankBuffersToNativeWindow(ANativeWindow *nativeWindow /* nonnull */);
 status_t nativeWindowConnect(ANativeWindow *surface, const char *reason);
 status_t nativeWindowDisconnect(ANativeWindow *surface, const char *reason);
