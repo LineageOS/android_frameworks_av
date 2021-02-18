@@ -57,6 +57,7 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
         RTCP_TSFB = 205,
         RTCP_PSFB = 206,
         RTP_CVO = 300,
+        RTP_AUTODOWN = 400,
     };
 
     virtual status_t getBufferingSettings(
