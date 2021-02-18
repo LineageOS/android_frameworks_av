@@ -57,6 +57,7 @@ namespace android {
 
 // static const size_t kMaxPacketSize = 65507;  // maximum payload in UDP over IP
 static const size_t kMaxPacketSize = 1500;
+static char kCNAME[255] = "someone@somewhere";
 
 static int UniformRand(int limit) {
     return ((double)rand() * limit) / RAND_MAX;
@@ -197,6 +198,8 @@ status_t ARTPWriter::start(MetaData * params) {
     mNumRTPOctetsSent = 0;
     mLastRTPTime = 0;
     mLastNTPTime = 0;
+    mOpponentID = 0;
+    mBitrate = 192000;
     mNumSRsSent = 0;
     mRTPCVOExtMap = -1;
     mRTPCVODegrees = 0;
@@ -406,6 +409,18 @@ void ARTPWriter::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
+void ARTPWriter::setTMMBNInfo(uint32_t opponentID, uint32_t bitrate) {
+    mOpponentID = opponentID;
+    mBitrate = bitrate;
+
+    sp<ABuffer> buffer = new ABuffer(65536);
+    buffer->setRange(0, 0);
+
+    addTMMBN(buffer);
+
+    send(buffer, true /* isRTCP */);
+}
+
 void ARTPWriter::onRead(const sp<AMessage> &msg) {
     MediaBufferBase *mediaBuf;
     status_t err = mSource->read(&mediaBuf);
@@ -543,7 +558,6 @@ void ARTPWriter::addSDES(const sp<ABuffer> &buffer) {
 
     data[offset++] = 1;  // CNAME
 
-    static const char *kCNAME = "someone@somewhere";
     data[offset++] = strlen(kCNAME);
 
     memcpy(&data[offset], kCNAME, strlen(kCNAME));
@@ -580,9 +594,52 @@ void ARTPWriter::addSDES(const sp<ABuffer> &buffer) {
     buffer->setRange(buffer->offset(), buffer->size() + offset);
 }
 
+void ARTPWriter::addTMMBN(const sp<ABuffer> &buffer) {
+    if (buffer->size() + 20 > buffer->capacity()) {
+        ALOGW("RTCP buffer too small to accomodate SR.");
+        return;
+    }
+    if (mOpponentID == 0)
+        return;
+
+    uint8_t *data = buffer->data() + buffer->size();
+
+    data[0] = 0x80 | 4; // TMMBN
+    data[1] = 205;      // TSFB
+    data[2] = 0;
+    data[3] = 4;        // total (4+1) * sizeof(int32_t) = 20 bytes
+    data[4] = mSourceID >> 24;
+    data[5] = (mSourceID >> 16) & 0xff;
+    data[6] = (mSourceID >> 8) & 0xff;
+    data[7] = mSourceID & 0xff;
+
+    *(int32_t*)(&data[8]) = 0;  // 4 bytes blank
+
+    data[12] = mOpponentID >> 24;
+    data[13] = (mOpponentID >> 16) & 0xff;
+    data[14] = (mOpponentID >> 8) & 0xff;
+    data[15] = mOpponentID & 0xff;
+
+    int32_t exp, mantissa;
+
+    // Round off to the nearest 2^4th
+    ALOGI("UE -> Op Noti Tx bitrate : %d ", mBitrate & 0xfffffff0);
+    for (exp=4 ; exp < 32 ; exp++)
+        if (((mBitrate >> exp) & 0x01) != 0)
+            break;
+    mantissa = mBitrate >> exp;
+
+    data[16] = ((exp << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
+    data[17] =                        (mantissa & 0x07f80) >> 7;
+    data[18] =                        (mantissa & 0x0007f) << 1;
+    data[19] = 40;              // 40 bytes overhead;
+
+    buffer->setRange(buffer->offset(), buffer->size() + 20);
+}
+
 // static
 uint64_t ARTPWriter::GetNowNTP() {
-    uint64_t nowUs = ALooper::GetNowUs();
+    uint64_t nowUs = systemTime(SYSTEM_TIME_REALTIME) / 1000ll;
 
     nowUs += ((70LL * 365 + 17) * 24) * 60 * 60 * 1000000LL;
 
@@ -1217,6 +1274,11 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
 
 void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,
         String8& remoteIp, int remotePort) {
+    static char kSomeone[16] = "someone@";
+    int nameLength = strlen(kSomeone);
+    memcpy(kCNAME, kSomeone, nameLength);
+    memcpy(kCNAME + nameLength, localIp.c_str(), localIp.length() + 1);
+
     if (localIp.contains(":"))
         mIsIPv6 = true;
     else
