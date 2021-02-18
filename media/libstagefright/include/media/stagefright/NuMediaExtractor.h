@@ -100,6 +100,8 @@ struct NuMediaExtractor : public RefBase {
 
     status_t getAudioPresentations(size_t trackIdx, AudioPresentationCollection *presentations);
 
+    status_t setPlaybackId(const String8& playbackId);
+
 protected:
     virtual ~NuMediaExtractor();
 

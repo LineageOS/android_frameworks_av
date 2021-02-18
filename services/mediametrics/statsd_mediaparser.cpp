@@ -80,6 +80,9 @@ bool statsd_mediaparser(const mediametrics::Item *item)
     int32_t videoHeight = -1;
     item->getInt32("android.media.mediaparser.videoHeight", &videoHeight);
 
+    std::string playbackSessionId;
+    item->getString("android.media.mediaparser.playbackId", &playbackSessionId);
+
     if (enabled_statsd) {
         (void) android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
                                    timestamp,
@@ -95,7 +98,8 @@ bool statsd_mediaparser(const mediametrics::Item *item)
                                    trackCodecs.c_str(),
                                    alteredParameters.c_str(),
                                    videoWidth,
-                                   videoHeight);
+                                   videoHeight,
+                                   playbackSessionId.c_str());
     } else {
         ALOGV("NOT sending MediaParser media metrics.");
     }

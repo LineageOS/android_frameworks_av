@@ -72,6 +72,8 @@ public:
     };
 
     virtual status_t setEntryPoint(EntryPoint entryPoint) = 0;
+
+    virtual status_t setPlaybackId(const String8& playbackId) = 0;
 };
 
 

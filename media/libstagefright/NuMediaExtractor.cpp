@@ -880,4 +880,15 @@ status_t NuMediaExtractor::getAudioPresentations(
     return ERROR_UNSUPPORTED;
 }
 
+status_t NuMediaExtractor::setPlaybackId(const String8& playbackId) {
+    if (mImpl == nullptr) {
+        return ERROR_UNSUPPORTED;
+    }
+    status_t status = mImpl->setPlaybackId(playbackId);
+    if (status != OK) {
+        ALOGW("Failed to set playback session id: %d.", status);
+    }
+    return status;
+}
+
 }  // namespace android
