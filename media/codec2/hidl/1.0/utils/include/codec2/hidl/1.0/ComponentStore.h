@@ -37,6 +37,8 @@
 #include <vector>
 
 namespace android {
+class FilterWrapper;
+
 namespace hardware {
 namespace media {
 namespace c2 {
@@ -73,6 +75,8 @@ struct ComponentStore : public IComponentStore {
      * Configurable::init().
      */
     std::shared_ptr<ParameterCache> getParameterCache() const;
+
+    static std::shared_ptr<FilterWrapper> GetFilterWrapper();
 
     // Methods from ::android::hardware::media::c2::V1_0::IComponentStore.
     virtual Return<void> createComponent(
