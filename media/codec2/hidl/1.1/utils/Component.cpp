@@ -22,6 +22,10 @@
 #include <codec2/hidl/1.1/ComponentStore.h>
 #include <codec2/hidl/1.1/InputBufferManager.h>
 
+#ifndef __ANDROID_APEX__
+#include <FilterWrapper.h>
+#endif
+
 #include <hidl/HidlBinderSupport.h>
 #include <utils/Timers.h>
 
@@ -390,10 +394,17 @@ Return<void> Component::createBlockPool(
         uint32_t allocatorId,
         createBlockPool_cb _hidl_cb) {
     std::shared_ptr<C2BlockPool> blockPool;
+#ifdef __ANDROID_APEX__
     c2_status_t status = CreateCodec2BlockPool(
             static_cast<C2PlatformAllocatorStore::id_t>(allocatorId),
             mComponent,
             &blockPool);
+#else
+    c2_status_t status = ComponentStore::GetFilterWrapper()->createBlockPool(
+            static_cast<C2PlatformAllocatorStore::id_t>(allocatorId),
+            mComponent,
+            &blockPool);
+#endif
     if (status != C2_OK) {
         blockPool = nullptr;
     }
