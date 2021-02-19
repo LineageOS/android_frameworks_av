@@ -27,6 +27,7 @@
 #include <mediadrm/ICrypto.h>
 
 #include "CCodecBuffers.h"
+#include "Codec2Mapper.h"
 
 namespace android {
 
@@ -1008,18 +1009,32 @@ void GraphicInputBuffers::flush() {
     // track of the flushed work.
 }
 
+static uint32_t extractPixelFormat(const sp<AMessage> &format) {
+    int32_t frameworkColorFormat = 0;
+    if (!format->findInt32("android._color-format", &frameworkColorFormat)) {
+        return PIXEL_FORMAT_UNKNOWN;
+    }
+    uint32_t pixelFormat = PIXEL_FORMAT_UNKNOWN;
+    if (C2Mapper::mapPixelFormatFrameworkToCodec(frameworkColorFormat, &pixelFormat)) {
+        return pixelFormat;
+    }
+    return PIXEL_FORMAT_UNKNOWN;
+}
+
 std::unique_ptr<InputBuffers> GraphicInputBuffers::toArrayMode(size_t size) {
     std::unique_ptr<InputBuffersArray> array(
             new InputBuffersArray(mComponentName.c_str(), "2D-BB-Input[N]"));
     array->setPool(mPool);
     array->setFormat(mFormat);
+    uint32_t pixelFormat = extractPixelFormat(mFormat);
     array->initialize(
             mImpl,
             size,
-            [pool = mPool, format = mFormat, lbp = mLocalBufferPool]() -> sp<Codec2Buffer> {
+            [pool = mPool, format = mFormat, lbp = mLocalBufferPool, pixelFormat]()
+                    -> sp<Codec2Buffer> {
                 C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
                 return AllocateGraphicBuffer(
-                        pool, format, HAL_PIXEL_FORMAT_YV12, usage, lbp);
+                        pool, format, pixelFormat, usage, lbp);
             });
     return std::move(array);
 }
@@ -1033,7 +1048,7 @@ sp<Codec2Buffer> GraphicInputBuffers::createNewBuffer() {
     (void)mFormat->findInt64("android._C2MemoryUsage", &usageValue);
     C2MemoryUsage usage{usageValue | C2MemoryUsage::CPU_READ | C2MemoryUsage::CPU_WRITE};
     return AllocateGraphicBuffer(
-            mPool, mFormat, HAL_PIXEL_FORMAT_YV12, usage, mLocalBufferPool);
+            mPool, mFormat, extractPixelFormat(mFormat), usage, mLocalBufferPool);
 }
 
 // OutputBuffersArray
