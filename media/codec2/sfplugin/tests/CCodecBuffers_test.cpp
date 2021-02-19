@@ -18,11 +18,12 @@
 
 #include <gtest/gtest.h>
 
-#include <media/stagefright/foundation/AString.h>
+#include <codec2/hidl/client.h>
 #include <media/stagefright/MediaCodecConstants.h>
 
 #include <C2BlockInternal.h>
 #include <C2PlatformSupport.h>
+#include <Codec2Mapper.h>
 
 namespace android {
 
@@ -102,6 +103,318 @@ TEST(RawGraphicOutputBuffersTest, ChangeNumSlots) {
             continue;
         }
         releaseBuffer(index);
+    }
+}
+
+TEST(RawGraphicOutputBuffersTest, FlexYuvColorFormat) {
+    constexpr int32_t kWidth = 320;
+    constexpr int32_t kHeight = 240;
+
+    std::vector<uint32_t> flexPixelFormats({HAL_PIXEL_FORMAT_YCbCr_420_888});
+    std::shared_ptr<Codec2Client> client = Codec2Client::CreateFromService("default");
+    if (client) {
+        // Query vendor format for Flexible YUV
+        std::vector<std::unique_ptr<C2Param>> heapParams;
+        C2StoreFlexiblePixelFormatDescriptorsInfo *pixelFormatInfo = nullptr;
+        if (client->query(
+                    {},
+                    {C2StoreFlexiblePixelFormatDescriptorsInfo::PARAM_TYPE},
+                    C2_MAY_BLOCK,
+                    &heapParams) == C2_OK
+                && heapParams.size() == 1u) {
+            pixelFormatInfo = C2StoreFlexiblePixelFormatDescriptorsInfo::From(
+                    heapParams[0].get());
+        } else {
+            pixelFormatInfo = nullptr;
+        }
+        if (pixelFormatInfo && *pixelFormatInfo) {
+            for (size_t i = 0; i < pixelFormatInfo->flexCount(); ++i) {
+                const C2FlexiblePixelFormatDescriptorStruct &desc =
+                    pixelFormatInfo->m.values[i];
+                if (desc.bitDepth != 8
+                        || desc.subsampling != C2Color::YUV_420
+                        // TODO(b/180076105): some devices report wrong layouts
+                        // || desc.layout == C2Color::INTERLEAVED_PACKED
+                        // || desc.layout == C2Color::INTERLEAVED_ALIGNED
+                        || desc.layout == C2Color::UNKNOWN_LAYOUT) {
+                    continue;
+                }
+                flexPixelFormats.push_back(desc.pixelFormat);
+            }
+        }
+    }
+
+    for (uint32_t pixelFormat : flexPixelFormats) {
+        std::shared_ptr<RawGraphicOutputBuffers> buffers =
+            std::make_shared<RawGraphicOutputBuffers>(
+                    AStringPrintf("test pixel format 0x%x", pixelFormat).c_str());
+
+        sp<AMessage> format{new AMessage};
+        format->setInt32(KEY_WIDTH, kWidth);
+        format->setInt32(KEY_HEIGHT, kHeight);
+        format->setInt32(KEY_COLOR_FORMAT, COLOR_FormatYUV420Flexible);
+        int32_t fwkPixelFormat = 0;
+        if (C2Mapper::mapPixelFormatCodecToFramework(pixelFormat, &fwkPixelFormat)) {
+            format->setInt32("android._color-format", fwkPixelFormat);
+        }
+        buffers->setFormat(format);
+
+        std::shared_ptr<C2BlockPool> pool;
+        ASSERT_EQ(OK, GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, nullptr, &pool));
+
+        std::shared_ptr<C2GraphicBlock> block;
+        ASSERT_EQ(OK, pool->fetchGraphicBlock(
+                kWidth, kHeight, pixelFormat,
+                C2MemoryUsage{C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block));
+
+        {
+            C2GraphicView view = block->map().get();
+            C2PlanarLayout layout = view.layout();
+
+            // Verify the block is in YUV420 format
+            ASSERT_EQ(C2PlanarLayout::TYPE_YUV, layout.type);
+            ASSERT_EQ(3u, layout.numPlanes);
+            const C2PlaneInfo& yPlane = layout.planes[C2PlanarLayout::PLANE_Y];
+            const C2PlaneInfo& uPlane = layout.planes[C2PlanarLayout::PLANE_U];
+            const C2PlaneInfo& vPlane = layout.planes[C2PlanarLayout::PLANE_V];
+
+            // Y plane
+            ASSERT_EQ(1u, yPlane.colSampling);
+            ASSERT_EQ(1u, yPlane.rowSampling);
+            ASSERT_EQ(8u, yPlane.allocatedDepth);
+            ASSERT_EQ(8u, yPlane.bitDepth);
+            ASSERT_EQ(0u, yPlane.rightShift);
+
+            // U plane
+            ASSERT_EQ(2u, uPlane.colSampling);
+            ASSERT_EQ(2u, uPlane.rowSampling);
+            ASSERT_EQ(8u, uPlane.allocatedDepth);
+            ASSERT_EQ(8u, uPlane.bitDepth);
+            ASSERT_EQ(0u, uPlane.rightShift);
+
+            // V plane
+            ASSERT_EQ(2u, vPlane.colSampling);
+            ASSERT_EQ(2u, vPlane.rowSampling);
+            ASSERT_EQ(8u, vPlane.allocatedDepth);
+            ASSERT_EQ(8u, vPlane.bitDepth);
+            ASSERT_EQ(0u, vPlane.rightShift);
+
+            uint8_t *yRowPtr = view.data()[C2PlanarLayout::PLANE_Y];
+            uint8_t *uRowPtr = view.data()[C2PlanarLayout::PLANE_U];
+            uint8_t *vRowPtr = view.data()[C2PlanarLayout::PLANE_V];
+            for (int32_t row = 0; row < kHeight; ++row) {
+                uint8_t *yPtr = yRowPtr;
+                uint8_t *uPtr = uRowPtr;
+                uint8_t *vPtr = vRowPtr;
+                for (int32_t col = 0; col < kWidth; ++col) {
+                    *yPtr = ((row + col) & 0xFF);
+                    yPtr += yPlane.colInc;
+
+                    if (row < kHeight / 2 && col < kWidth / 2) {
+                        *uPtr = ((row + col + 1) & 0xFF);
+                        *vPtr = ((row + col + 2) & 0xFF);
+                        uPtr += uPlane.colInc;
+                        vPtr += vPlane.colInc;
+                    }
+                }
+                yRowPtr += yPlane.rowInc;
+                if (row < kHeight / 2) {
+                    uRowPtr += uPlane.rowInc;
+                    vRowPtr += vPlane.rowInc;
+                }
+            }
+        }
+
+        std::shared_ptr<C2Buffer> c2Buffer = C2Buffer::CreateGraphicBuffer(block->share(
+                block->crop(), C2Fence{}));
+        size_t index;
+        sp<MediaCodecBuffer> clientBuffer;
+        ASSERT_EQ(OK, buffers->registerBuffer(c2Buffer, &index, &clientBuffer));
+        ASSERT_NE(nullptr, clientBuffer);
+        sp<ABuffer> imageData;
+        ASSERT_TRUE(clientBuffer->format()->findBuffer("image-data", &imageData));
+        MediaImage2 *img = (MediaImage2 *)imageData->data();
+        ASSERT_EQ(MediaImage2::MEDIA_IMAGE_TYPE_YUV, img->mType);
+        ASSERT_EQ(3u, img->mNumPlanes);
+        ASSERT_EQ(kWidth, img->mWidth);
+        ASSERT_EQ(kHeight, img->mHeight);
+        ASSERT_EQ(8u, img->mBitDepth);
+        ASSERT_EQ(8u, img->mBitDepthAllocated);
+        const MediaImage2::PlaneInfo &yPlane = img->mPlane[MediaImage2::Y];
+        const MediaImage2::PlaneInfo &uPlane = img->mPlane[MediaImage2::U];
+        const MediaImage2::PlaneInfo &vPlane = img->mPlane[MediaImage2::V];
+        ASSERT_EQ(1u, yPlane.mHorizSubsampling);
+        ASSERT_EQ(1u, yPlane.mVertSubsampling);
+        ASSERT_EQ(2u, uPlane.mHorizSubsampling);
+        ASSERT_EQ(2u, uPlane.mVertSubsampling);
+        ASSERT_EQ(2u, vPlane.mHorizSubsampling);
+        ASSERT_EQ(2u, vPlane.mVertSubsampling);
+
+        uint8_t *yRowPtr = clientBuffer->data() + yPlane.mOffset;
+        uint8_t *uRowPtr = clientBuffer->data() + uPlane.mOffset;
+        uint8_t *vRowPtr = clientBuffer->data() + vPlane.mOffset;
+        for (int32_t row = 0; row < kHeight; ++row) {
+            uint8_t *yPtr = yRowPtr;
+            uint8_t *uPtr = uRowPtr;
+            uint8_t *vPtr = vRowPtr;
+            for (int32_t col = 0; col < kWidth; ++col) {
+                ASSERT_EQ((row + col) & 0xFF, *yPtr);
+                yPtr += yPlane.mColInc;
+                if (row < kHeight / 2 && col < kWidth / 2) {
+                    ASSERT_EQ((row + col + 1) & 0xFF, *uPtr);
+                    ASSERT_EQ((row + col + 2) & 0xFF, *vPtr);
+                    uPtr += uPlane.mColInc;
+                    vPtr += vPlane.mColInc;
+                }
+            }
+            yRowPtr += yPlane.mRowInc;
+            if (row < kHeight / 2) {
+                uRowPtr += uPlane.mRowInc;
+                vRowPtr += vPlane.mRowInc;
+            }
+        }
+    }
+}
+
+TEST(RawGraphicOutputBuffersTest, P010ColorFormat) {
+    constexpr int32_t kWidth = 320;
+    constexpr int32_t kHeight = 240;
+
+    std::shared_ptr<RawGraphicOutputBuffers> buffers =
+        std::make_shared<RawGraphicOutputBuffers>("test P010");
+
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_WIDTH, kWidth);
+    format->setInt32(KEY_HEIGHT, kHeight);
+    format->setInt32(KEY_COLOR_FORMAT, COLOR_FormatYUVP010);
+    int32_t fwkPixelFormat = 0;
+    if (C2Mapper::mapPixelFormatCodecToFramework(HAL_PIXEL_FORMAT_YCBCR_P010, &fwkPixelFormat)) {
+        format->setInt32("android._color-format", fwkPixelFormat);
+    }
+    buffers->setFormat(format);
+
+    std::shared_ptr<C2BlockPool> pool;
+    ASSERT_EQ(OK, GetCodec2BlockPool(C2BlockPool::BASIC_GRAPHIC, nullptr, &pool));
+
+    std::shared_ptr<C2GraphicBlock> block;
+    c2_status_t err = pool->fetchGraphicBlock(
+            kWidth, kHeight, HAL_PIXEL_FORMAT_YCBCR_P010,
+            C2MemoryUsage{C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE}, &block);
+    if (err != C2_OK) {
+        GTEST_SKIP();
+    }
+
+    {
+        C2GraphicView view = block->map().get();
+        C2PlanarLayout layout = view.layout();
+
+        // Verify the block is in YUV420 format
+        ASSERT_EQ(C2PlanarLayout::TYPE_YUV, layout.type);
+        ASSERT_EQ(3u, layout.numPlanes);
+        const C2PlaneInfo& yPlane = layout.planes[C2PlanarLayout::PLANE_Y];
+        const C2PlaneInfo& uPlane = layout.planes[C2PlanarLayout::PLANE_U];
+        const C2PlaneInfo& vPlane = layout.planes[C2PlanarLayout::PLANE_V];
+
+        // Y plane
+        ASSERT_EQ(1u, yPlane.colSampling);
+        ASSERT_EQ(1u, yPlane.rowSampling);
+        ASSERT_EQ(16u, yPlane.allocatedDepth);
+        ASSERT_EQ(10u, yPlane.bitDepth);
+        ASSERT_EQ(6u, yPlane.rightShift);
+
+        // U plane
+        ASSERT_EQ(2u, uPlane.colSampling);
+        ASSERT_EQ(2u, uPlane.rowSampling);
+        ASSERT_EQ(16u, uPlane.allocatedDepth);
+        ASSERT_EQ(10u, uPlane.bitDepth);
+        ASSERT_EQ(6u, uPlane.rightShift);
+
+        // V plane
+        ASSERT_EQ(2u, vPlane.colSampling);
+        ASSERT_EQ(2u, vPlane.rowSampling);
+        ASSERT_EQ(16u, vPlane.allocatedDepth);
+        ASSERT_EQ(10u, vPlane.bitDepth);
+        ASSERT_EQ(6u, vPlane.rightShift);
+
+        uint8_t *yRowPtr = view.data()[C2PlanarLayout::PLANE_Y];
+        uint8_t *uRowPtr = view.data()[C2PlanarLayout::PLANE_U];
+        uint8_t *vRowPtr = view.data()[C2PlanarLayout::PLANE_V];
+        for (int32_t row = 0; row < kHeight; ++row) {
+            uint8_t *yPtr = yRowPtr;
+            uint8_t *uPtr = uRowPtr;
+            uint8_t *vPtr = vRowPtr;
+            for (int32_t col = 0; col < kWidth; ++col) {
+                yPtr[0] = ((row + col) & 0x3) << 6;
+                yPtr[1] = ((row + col) & 0x3FC) >> 2;
+                yPtr += yPlane.colInc;
+
+                if (row < kHeight / 2 && col < kWidth / 2) {
+                    uPtr[0] = ((row + col + 1) & 0x3) << 6;
+                    uPtr[1] = ((row + col + 1) & 0x3FC) >> 2;
+                    vPtr[0] = ((row + col + 2) & 0x3) << 6;
+                    vPtr[1] = ((row + col + 2) & 0x3FC) >> 2;
+                    uPtr += uPlane.colInc;
+                    vPtr += vPlane.colInc;
+                }
+            }
+            yRowPtr += yPlane.rowInc;
+            if (row < kHeight / 2) {
+                uRowPtr += uPlane.rowInc;
+                vRowPtr += vPlane.rowInc;
+            }
+        }
+    }
+
+    std::shared_ptr<C2Buffer> c2Buffer = C2Buffer::CreateGraphicBuffer(block->share(
+            block->crop(), C2Fence{}));
+    size_t index;
+    sp<MediaCodecBuffer> clientBuffer;
+    ASSERT_EQ(OK, buffers->registerBuffer(c2Buffer, &index, &clientBuffer));
+    ASSERT_NE(nullptr, clientBuffer);
+    sp<ABuffer> imageData;
+    ASSERT_TRUE(clientBuffer->format()->findBuffer("image-data", &imageData));
+    MediaImage2 *img = (MediaImage2 *)imageData->data();
+    ASSERT_EQ(MediaImage2::MEDIA_IMAGE_TYPE_YUV, img->mType);
+    ASSERT_EQ(3u, img->mNumPlanes);
+    ASSERT_EQ(kWidth, img->mWidth);
+    ASSERT_EQ(kHeight, img->mHeight);
+    ASSERT_EQ(10u, img->mBitDepth);
+    ASSERT_EQ(16u, img->mBitDepthAllocated);
+    const MediaImage2::PlaneInfo &yPlane = img->mPlane[MediaImage2::Y];
+    const MediaImage2::PlaneInfo &uPlane = img->mPlane[MediaImage2::U];
+    const MediaImage2::PlaneInfo &vPlane = img->mPlane[MediaImage2::V];
+    ASSERT_EQ(1u, yPlane.mHorizSubsampling);
+    ASSERT_EQ(1u, yPlane.mVertSubsampling);
+    ASSERT_EQ(2u, uPlane.mHorizSubsampling);
+    ASSERT_EQ(2u, uPlane.mVertSubsampling);
+    ASSERT_EQ(2u, vPlane.mHorizSubsampling);
+    ASSERT_EQ(2u, vPlane.mVertSubsampling);
+
+    uint8_t *yRowPtr = clientBuffer->data() + yPlane.mOffset;
+    uint8_t *uRowPtr = clientBuffer->data() + uPlane.mOffset;
+    uint8_t *vRowPtr = clientBuffer->data() + vPlane.mOffset;
+    for (int32_t row = 0; row < kHeight; ++row) {
+        uint8_t *yPtr = yRowPtr;
+        uint8_t *uPtr = uRowPtr;
+        uint8_t *vPtr = vRowPtr;
+        for (int32_t col = 0; col < kWidth; ++col) {
+            ASSERT_EQ(((row + col) & 0x3) << 6, yPtr[0]);
+            ASSERT_EQ(((row + col) & 0x3FC) >> 2, yPtr[1]);
+            yPtr += yPlane.mColInc;
+            if (row < kHeight / 2 && col < kWidth / 2) {
+                ASSERT_EQ(((row + col + 1) & 0x3) << 6, uPtr[0]);
+                ASSERT_EQ(((row + col + 1) & 0x3FC) >> 2, uPtr[1]);
+                ASSERT_EQ(((row + col + 2) & 0x3) << 6, vPtr[0]);
+                ASSERT_EQ(((row + col + 2) & 0x3FC) >> 2, vPtr[1]);
+                uPtr += uPlane.mColInc;
+                vPtr += vPlane.mColInc;
+            }
+        }
+        yRowPtr += yPlane.mRowInc;
+        if (row < kHeight / 2) {
+            uRowPtr += uPlane.mRowInc;
+            vRowPtr += vPlane.mRowInc;
+        }
     }
 }
 
@@ -407,7 +720,6 @@ public:
                 }
             }
         }
-
         size_t yPlaneSize = stride * kHeight;
         size_t uvPlaneSize = stride * kHeight / 4;
         size_t capacity = yPlaneSize + uvPlaneSize * 2;
