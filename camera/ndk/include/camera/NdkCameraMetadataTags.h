@@ -40,6 +40,7 @@
 
 __BEGIN_DECLS
 
+
 typedef enum acamera_metadata_section {
     ACAMERA_COLOR_CORRECTION,
     ACAMERA_CONTROL,
@@ -3841,6 +3842,32 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_ROTATE_AND_CROP =                            // byte (acamera_metadata_enum_android_scaler_rotate_and_crop_t)
             ACAMERA_SCALER_START + 17,
+    /**
+     * <p>Default YUV/PRIVATE size to use for requesting secure image buffers.</p>
+     *
+     * <p>Type: int32[2]</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This entry lists the default size supported in the secure camera mode. This entry is
+     * optional on devices support the SECURE_IMAGE_DATA capability. This entry will be null
+     * if the camera device does not list SECURE_IMAGE_DATA capability.</p>
+     * <p>When the key is present, only a PRIVATE/YUV output of the specified size is guaranteed
+     * to be supported by the camera HAL in the secure camera mode. Any other format or
+     * resolutions might not be supported. Use
+     * {@link ACameraDevice_isSessionConfigurationSupported }
+     * API to query if a secure session configuration is supported if the device supports this
+     * API.</p>
+     * <p>If this key returns null on a device with SECURE_IMAGE_DATA capability, the application
+     * can assume all output sizes listed in the
+     * {@link ACAMERA_SCALER_AVAILABLE_MIN_FRAME_DURATIONS }
+     * are supported.</p>
+     */
+    ACAMERA_SCALER_DEFAULT_SECURE_IMAGE_SIZE =                  // int32[2]
+            ACAMERA_SCALER_START + 18,
     ACAMERA_SCALER_END,
 
     /**
@@ -9140,6 +9167,7 @@ typedef enum acamera_metadata_enum_acamera_heic_available_heic_stream_configurat
     ACAMERA_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS_INPUT          = 1,
 
 } acamera_metadata_enum_android_heic_available_heic_stream_configurations_t;
+
 
 
 

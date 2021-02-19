@@ -415,19 +415,37 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper("color-matrix",        C2_PARAMKEY_DEFAULT_COLOR_ASPECTS,   "matrix")
         .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::CODED & (D::CONFIG | D::PARAM)));
 
+    // read back default for decoders. This is needed in case the component does not support
+    // color aspects. In that case, these values get copied to color-* keys.
+    add(ConfigMapper("default-color-range",     C2_PARAMKEY_DEFAULT_COLOR_ASPECTS,   "range")
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::CODED & D::READ)
+        .withC2Mappers<C2Color::range_t>());
+    add(ConfigMapper("default-color-transfer",  C2_PARAMKEY_DEFAULT_COLOR_ASPECTS,   "transfer")
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::CODED & D::READ)
+        .withC2Mappers<C2Color::transfer_t>());
+    add(ConfigMapper("default-color-primaries", C2_PARAMKEY_DEFAULT_COLOR_ASPECTS,   "primaries")
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::CODED & D::READ));
+    add(ConfigMapper("default-color-matrix",    C2_PARAMKEY_DEFAULT_COLOR_ASPECTS,   "matrix")
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::CODED & D::READ));
+
     // read back final for decoder output (also, configure final aspects as well. This should be
     // overwritten based on coded/default values if component supports color aspects, but is used
     // as final values if component does not support aspects at all)
     add(ConfigMapper(KEY_COLOR_RANGE,       C2_PARAMKEY_COLOR_ASPECTS,   "range")
-        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW)
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW & D::READ)
         .withC2Mappers<C2Color::range_t>());
     add(ConfigMapper(KEY_COLOR_TRANSFER,    C2_PARAMKEY_COLOR_ASPECTS,   "transfer")
-        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW)
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW & D::READ)
         .withC2Mappers<C2Color::transfer_t>());
     add(ConfigMapper("color-primaries",     C2_PARAMKEY_COLOR_ASPECTS,   "primaries")
-        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW));
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW & D::READ));
     add(ConfigMapper("color-matrix",        C2_PARAMKEY_COLOR_ASPECTS,   "matrix")
-        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW));
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW & D::READ));
+
+    // configure transfer request
+    add(ConfigMapper("color-transfer-request", C2_PARAMKEY_COLOR_ASPECTS, "transfer")
+        .limitTo((D::VIDEO | D::IMAGE) & D::DECODER  & D::RAW & D::CONFIG)
+        .withC2Mappers<C2Color::transfer_t>());
 
     // configure source aspects for encoders and read them back on the coded(!) port.
     // This is to ensure muxing the desired aspects into the container.
@@ -1001,11 +1019,14 @@ status_t CCodecConfig::initialize(
                     new C2StreamPixelAspectRatioInfo::output(0u, 1u, 1u),
                     C2_PARAMKEY_PIXEL_ASPECT_RATIO);
             addLocalParam(new C2StreamRotationInfo::output(0u, 0), C2_PARAMKEY_ROTATION);
-            addLocalParam(new C2StreamColorAspectsInfo::output(0u), C2_PARAMKEY_COLOR_ASPECTS);
+            addLocalParam(
+                    new C2StreamColorAspectsTuning::output(0u),
+                    C2_PARAMKEY_DEFAULT_COLOR_ASPECTS);
             addLocalParam<C2StreamDataSpaceInfo::output>(C2_PARAMKEY_DATA_SPACE);
             addLocalParam<C2StreamHdrStaticInfo::output>(C2_PARAMKEY_HDR_STATIC_INFO);
-            addLocalParam(new C2StreamSurfaceScalingInfo::output(0u, VIDEO_SCALING_MODE_SCALE_TO_FIT),
-                          C2_PARAMKEY_SURFACE_SCALING_MODE);
+            addLocalParam(
+                    new C2StreamSurfaceScalingInfo::output(0u, VIDEO_SCALING_MODE_SCALE_TO_FIT),
+                    C2_PARAMKEY_SURFACE_SCALING_MODE);
         } else {
             addLocalParam(new C2StreamColorAspectsInfo::input(0u), C2_PARAMKEY_COLOR_ASPECTS);
         }
@@ -1289,8 +1310,37 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
     }
 
     { // convert color info
+        // move default color to color aspect if not read from the component
+        int32_t tmp;
+        int32_t range;
+        if (msg->findInt32("default-color-range", &range)) {
+            if (!msg->findInt32(KEY_COLOR_RANGE, &tmp)) {
+                msg->setInt32(KEY_COLOR_RANGE, range);
+            }
+            msg->removeEntryAt(msg->findEntryByName("default-color-range"));
+        }
+        int32_t transfer;
+        if (msg->findInt32("default-color-transfer", &transfer)) {
+            if (!msg->findInt32(KEY_COLOR_TRANSFER, &tmp)) {
+                msg->setInt32(KEY_COLOR_TRANSFER, transfer);
+            }
+            msg->removeEntryAt(msg->findEntryByName("default-color-transfer"));
+        }
         C2Color::primaries_t primaries;
+        if (msg->findInt32("default-color-primaries", (int32_t*)&primaries)) {
+            if (!msg->findInt32("color-primaries", &tmp)) {
+                msg->setInt32("color-primaries", primaries);
+            }
+            msg->removeEntryAt(msg->findEntryByName("default-color-primaries"));
+        }
         C2Color::matrix_t matrix;
+        if (msg->findInt32("default-color-matrix", (int32_t*)&matrix)) {
+            if (!msg->findInt32("color-matrix", &tmp)) {
+                msg->setInt32("color-matrix", matrix);
+            }
+            msg->removeEntryAt(msg->findEntryByName("default-color-matrix"));
+        }
+
         if (msg->findInt32("color-primaries", (int32_t*)&primaries)
                 && msg->findInt32("color-matrix", (int32_t*)&matrix)) {
             int32_t standard;
@@ -1382,22 +1432,22 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
                 meta.sType1.mMinDisplayLuminance = hdr.mastering.minLuminance / 0.0001 + 0.5;
                 meta.sType1.mMaxContentLightLevel = hdr.maxCll + 0.5;
                 meta.sType1.mMaxFrameAverageLightLevel = hdr.maxFall + 0.5;
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.red.x"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.red.y"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.green.x"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.green.y"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.blue.x"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.blue.y"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.white.x"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.white.y"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.max-luminance"));
-                msg->removeEntryAt(msg->findEntryByName("smpte2086.min-luminance"));
-                msg->removeEntryAt(msg->findEntryByName("cta861.max-cll"));
-                msg->removeEntryAt(msg->findEntryByName("cta861.max-fall"));
                 msg->setBuffer(KEY_HDR_STATIC_INFO, ABuffer::CreateAsCopy(&meta, sizeof(meta)));
             } else {
                 ALOGD("found invalid HDR static metadata %s", msg->debugString(8).c_str());
             }
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.red.x"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.red.y"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.green.x"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.green.y"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.blue.x"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.blue.y"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.white.x"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.white.y"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.max-luminance"));
+            msg->removeEntryAt(msg->findEntryByName("smpte2086.min-luminance"));
+            msg->removeEntryAt(msg->findEntryByName("cta861.max-cll"));
+            msg->removeEntryAt(msg->findEntryByName("cta861.max-fall"));
         }
     }
 
@@ -1632,8 +1682,8 @@ ReflectedParamUpdater::Dict CCodecConfig::getReflectedFormat(
             }
         }
     }
-    ALOGV("filtered %s to %s", params->debugString(4).c_str(),
-            filtered.debugString(4).c_str());
+    ALOGV("filter src msg %s", params->debugString(4).c_str());
+    ALOGV("filter dst params %s", filtered.debugString(4).c_str());
     return filtered;
 }
 
