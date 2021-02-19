@@ -20,8 +20,6 @@
 
 #include "ARTPWriter.h"
 
-#include <fcntl.h>
-
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -31,6 +29,9 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/ByteOrder.h>
+
+#include <fcntl.h>
+#include <strings.h>
 
 #define PT      97
 #define PT_STR  "97"
@@ -746,21 +747,24 @@ void ARTPWriter::addTMMBN(const sp<ABuffer> &buffer) {
     data[14] = (mOpponentID >> 8) & 0xff;
     data[15] = mOpponentID & 0xff;
 
-    int32_t exp, mantissa;
+    // Find the first bit '1' from left & right side of the value.
+    int32_t leftEnd = 31 - __builtin_clz(mBitrate);
+    int32_t rightEnd = ffs(mBitrate) - 1;
 
-    // Round off to the nearest 2^4th
-    ALOGI("UE -> Op Noti Tx bitrate : %d ", mBitrate & 0xfffffff0);
-    for (exp=4 ; exp < 32 ; exp++)
-        if (((mBitrate >> exp) & 0x01) != 0)
-            break;
-    mantissa = mBitrate >> exp;
+    // Mantissa have only 17bit space by RTCP specification.
+    if ((leftEnd - rightEnd) > 16) {
+        rightEnd = leftEnd - 16;
+    }
+    int32_t mantissa = mBitrate >> rightEnd;
 
-    data[16] = ((exp << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
-    data[17] =                        (mantissa & 0x07f80) >> 7;
-    data[18] =                        (mantissa & 0x0007f) << 1;
+    data[16] = ((rightEnd << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
+    data[17] =                             (mantissa & 0x07f80) >> 7;
+    data[18] =                             (mantissa & 0x0007f) << 1;
     data[19] = 40;              // 40 bytes overhead;
 
     buffer->setRange(buffer->offset(), buffer->size() + 20);
+
+    ALOGI("UE -> Op Noti Tx bitrate : %d ", mantissa << rightEnd);
 }
 
 // static
