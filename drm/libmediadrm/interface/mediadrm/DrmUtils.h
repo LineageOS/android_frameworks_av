@@ -23,8 +23,11 @@
 #include <android/hardware/drm/1.4/types.h>
 #include <media/stagefright/MediaErrors.h>
 #include <utils/Errors.h>  // for status_t
-#include <utils/Vector.h>
+#include <utils/Log.h>
+#include <utils/String8.h>
 #include <utils/StrongPointer.h>
+#include <utils/Vector.h>
+#include <ctime>
 #include <vector>
 
 
@@ -136,6 +139,54 @@ status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
         return DEAD_OBJECT;
     }
     return toStatusT(err);
+}
+
+namespace {
+static inline char logPriorityToChar(::V1_4::LogPriority priority) {
+    char p = 'U';
+    switch (priority) {
+        case ::V1_4::LogPriority::VERBOSE:  p = 'V'; break;
+        case ::V1_4::LogPriority::DEBUG:    p = 'D'; break;
+        case ::V1_4::LogPriority::INFO:     p = 'I'; break;
+        case ::V1_4::LogPriority::WARN:     p = 'W'; break;
+        case ::V1_4::LogPriority::ERROR:    p = 'E'; break;
+        case ::V1_4::LogPriority::FATAL:    p = 'F'; break;
+        default: p = 'U'; break;
+    }
+    return p;
+}
+}
+
+template<typename T>
+std::string GetExceptionMessage(status_t err, const char *msg, const sp<T> &iface) {
+    String8 msg8;
+    if (msg) {
+        msg8 += msg;
+        msg8 += ": ";
+    }
+    auto errStr = StrCryptoError(err);
+    msg8 += errStr.c_str();
+
+    Vector<::V1_4::LogMessage> logs;
+    if (iface->getLogMessages(logs) != NO_ERROR) {
+        return msg8.c_str();
+    }
+
+    for (auto log: logs) {
+        time_t seconds = log.timeMs / 1000;
+        int ms = log.timeMs % 1000;
+        char buf[64] = {0};
+        std::string timeStr = "00-00 00:00:00";
+        if (strftime(buf, sizeof buf, "%m-%d %H:%M:%S", std::localtime(&seconds))) {
+            timeStr = buf;
+        }
+
+        char p = logPriorityToChar(log.priority);
+        msg8 += String8::format("\n%s.%03d %c %s",
+                timeStr.c_str(), ms, p, log.message.c_str());
+    }
+
+    return msg8.c_str();
 }
 
 } // namespace DrmUtils

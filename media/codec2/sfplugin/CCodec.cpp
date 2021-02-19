@@ -924,19 +924,84 @@ void CCodec::configure(const sp<AMessage> &msg) {
         /*
          * Handle desired color format.
          */
+        int32_t defaultColorFormat = COLOR_FormatYUV420Flexible;
         if ((config->mDomain & (Config::IS_VIDEO | Config::IS_IMAGE))) {
-            int32_t format = -1;
+            int32_t format = 0;
+            // Query vendor format for Flexible YUV
+            std::vector<std::unique_ptr<C2Param>> heapParams;
+            C2StoreFlexiblePixelFormatDescriptorsInfo *pixelFormatInfo = nullptr;
+            if (mClient->query(
+                        {},
+                        {C2StoreFlexiblePixelFormatDescriptorsInfo::PARAM_TYPE},
+                        C2_MAY_BLOCK,
+                        &heapParams) == C2_OK
+                    && heapParams.size() == 1u) {
+                pixelFormatInfo = C2StoreFlexiblePixelFormatDescriptorsInfo::From(
+                        heapParams[0].get());
+            } else {
+                pixelFormatInfo = nullptr;
+            }
+            std::optional<uint32_t> flexPixelFormat{};
+            std::optional<uint32_t> flexPlanarPixelFormat{};
+            std::optional<uint32_t> flexSemiPlanarPixelFormat{};
+            if (pixelFormatInfo && *pixelFormatInfo) {
+                for (size_t i = 0; i < pixelFormatInfo->flexCount(); ++i) {
+                    const C2FlexiblePixelFormatDescriptorStruct &desc =
+                        pixelFormatInfo->m.values[i];
+                    if (desc.bitDepth != 8
+                            || desc.subsampling != C2Color::YUV_420
+                            // TODO(b/180076105): some device report wrong layout
+                            // || desc.layout == C2Color::INTERLEAVED_PACKED
+                            // || desc.layout == C2Color::INTERLEAVED_ALIGNED
+                            || desc.layout == C2Color::UNKNOWN_LAYOUT) {
+                        continue;
+                    }
+                    if (!flexPixelFormat) {
+                        flexPixelFormat = desc.pixelFormat;
+                    }
+                    if (desc.layout == C2Color::PLANAR_PACKED && !flexPlanarPixelFormat) {
+                        flexPlanarPixelFormat = desc.pixelFormat;
+                    }
+                    if (desc.layout == C2Color::SEMIPLANAR_PACKED && !flexSemiPlanarPixelFormat) {
+                        flexSemiPlanarPixelFormat = desc.pixelFormat;
+                    }
+                }
+            }
             if (!msg->findInt32(KEY_COLOR_FORMAT, &format)) {
-                /*
-                 * Also handle default color format (encoders require color format, so this is only
-                 * needed for decoders.
-                 */
+                // Also handle default color format (encoders require color format, so this is only
+                // needed for decoders.
                 if (!(config->mDomain & Config::IS_ENCODER)) {
-                    format = (surface == nullptr) ? COLOR_FormatYUV420Planar : COLOR_FormatSurface;
+                    if (surface == nullptr) {
+                        format = flexPixelFormat.value_or(COLOR_FormatYUV420Flexible);
+                    } else {
+                        format = COLOR_FormatSurface;
+                    }
+                    defaultColorFormat = format;
+                }
+            } else {
+                if ((config->mDomain & Config::IS_ENCODER) || !surface) {
+                    switch (format) {
+                        case COLOR_FormatYUV420Flexible:
+                            format = flexPixelFormat.value_or(COLOR_FormatYUV420Planar);
+                            break;
+                        case COLOR_FormatYUV420Planar:
+                        case COLOR_FormatYUV420PackedPlanar:
+                            format = flexPlanarPixelFormat.value_or(
+                                    flexPixelFormat.value_or(format));
+                            break;
+                        case COLOR_FormatYUV420SemiPlanar:
+                        case COLOR_FormatYUV420PackedSemiPlanar:
+                            format = flexSemiPlanarPixelFormat.value_or(
+                                    flexPixelFormat.value_or(format));
+                            break;
+                        default:
+                            // No-op
+                            break;
+                    }
                 }
             }
 
-            if (format >= 0) {
+            if (format != 0) {
                 msg->setInt32("android._color-format", format);
             }
         }
@@ -989,7 +1054,10 @@ void CCodec::configure(const sp<AMessage> &msg) {
         C2StreamMaxBufferSizeInfo::input maxInputSize(0u, 0u);
         C2PrependHeaderModeSetting prepend(PREPEND_HEADER_TO_NONE);
 
+        C2Param::Index colorAspectsRequestIndex =
+            C2StreamColorAspectsInfo::output::PARAM_TYPE | C2Param::CoreIndex::IS_REQUEST_FLAG;
         std::initializer_list<C2Param::Index> indices {
+            colorAspectsRequestIndex.withStream(0u),
         };
         c2_status_t c2err = comp->query(
                 { &usage, &maxInputSize, &prepend },
@@ -998,11 +1066,6 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 &params);
         if (c2err != C2_OK && c2err != C2_BAD_INDEX) {
             ALOGE("Failed to query component interface: %d", c2err);
-            return UNKNOWN_ERROR;
-        }
-        if (params.size() != indices.size()) {
-            ALOGE("Component returns wrong number of params: expected %zu actual %zu",
-                    indices.size(), params.size());
             return UNKNOWN_ERROR;
         }
         if (usage) {
@@ -1089,12 +1152,16 @@ void CCodec::configure(const sp<AMessage> &msg) {
 
             // Set desired color format from configuration parameter
             int32_t format;
-            if (msg->findInt32("android._color-format", &format)) {
-                if (config->mDomain & Config::IS_ENCODER) {
-                    config->mInputFormat->setInt32(KEY_COLOR_FORMAT, format);
-                } else {
-                    config->mOutputFormat->setInt32(KEY_COLOR_FORMAT, format);
+            if (!msg->findInt32(KEY_COLOR_FORMAT, &format)) {
+                format = defaultColorFormat;
+            }
+            if (config->mDomain & Config::IS_ENCODER) {
+                config->mInputFormat->setInt32(KEY_COLOR_FORMAT, format);
+                if (msg->findInt32("android._color-format", &format)) {
+                    config->mInputFormat->setInt32("android._color-format", format);
                 }
+            } else {
+                config->mOutputFormat->setInt32(KEY_COLOR_FORMAT, format);
             }
         }
 
@@ -1120,6 +1187,33 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     config->mOutputFormat->setInt32(KEY_CHANNEL_MASK, mask);
                 }
             }
+        }
+
+        std::unique_ptr<C2Param> colorTransferRequestParam;
+        for (std::unique_ptr<C2Param> &param : params) {
+            if (param->index() == colorAspectsRequestIndex.withStream(0u)) {
+                ALOGI("found color transfer request param");
+                colorTransferRequestParam = std::move(param);
+            }
+        }
+        int32_t colorTransferRequest = 0;
+        if (config->mDomain & (Config::IS_IMAGE | Config::IS_VIDEO)
+                && !sdkParams->findInt32("color-transfer-request", &colorTransferRequest)) {
+            colorTransferRequest = 0;
+        }
+
+        if (colorTransferRequest != 0) {
+            if (colorTransferRequestParam && *colorTransferRequestParam) {
+                C2StreamColorAspectsInfo::output *info =
+                    static_cast<C2StreamColorAspectsInfo::output *>(
+                            colorTransferRequestParam.get());
+                if (!C2Mapper::map(info->transfer, &colorTransferRequest)) {
+                    colorTransferRequest = 0;
+                }
+            } else {
+                colorTransferRequest = 0;
+            }
+            config->mInputFormat->setInt32("color-transfer-request", colorTransferRequest);
         }
 
         ALOGD("setup formats input: %s and output: %s",
@@ -2053,7 +2147,7 @@ public:
             }
             if (param->type() == C2PortAllocatorsTuning::input::PARAM_TYPE) {
                 mInputAllocators.reset(
-                        C2PortAllocatorsTuning::input::From(params[0].get()));
+                        C2PortAllocatorsTuning::input::From(param));
             }
         }
         mInitStatus = OK;
