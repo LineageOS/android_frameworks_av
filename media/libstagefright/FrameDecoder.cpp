@@ -67,6 +67,12 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
     if (trackMeta->findInt32(kKeySARWidth, &sarWidth)
             && trackMeta->findInt32(kKeySARHeight, &sarHeight)
             && sarHeight != 0) {
+        int32_t multVal;
+        if (width < 0 || sarWidth < 0 ||
+            __builtin_mul_overflow(width, sarWidth, &multVal)) {
+            ALOGE("displayWidth overflow %dx%d", width, sarWidth);
+            return NULL;
+        }
         displayWidth = (width * sarWidth) / sarHeight;
         displayHeight = height;
     } else if (trackMeta->findInt32(kKeyDisplayWidth, &displayWidth)
@@ -85,6 +91,16 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         tmp = displayWidth; displayWidth = displayHeight; displayHeight = tmp;
         tmp = tileWidth; tileWidth = tileHeight; tileHeight = tmp;
         rotationAngle = 0;
+    }
+
+    if (!metaOnly) {
+        int32_t multVal;
+        if (width < 0 || height < 0 || dstBpp < 0 ||
+            __builtin_mul_overflow(dstBpp, width, &multVal) ||
+            __builtin_mul_overflow(multVal, height, &multVal)) {
+            ALOGE("Frame size overflow %dx%d bpp %d", width, height, dstBpp);
+            return NULL;
+        }
     }
 
     VideoFrame frame(width, height, displayWidth, displayHeight,
