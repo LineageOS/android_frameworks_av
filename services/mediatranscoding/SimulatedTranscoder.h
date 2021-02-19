@@ -21,6 +21,7 @@
 #include <media/TranscoderInterface.h>
 
 #include <list>
+#include <map>
 #include <mutex>
 
 namespace android {
@@ -70,8 +71,9 @@ private:
     std::list<Event> mQueue GUARDED_BY(mLock);
     bool mLooperReady;
 
-    // Minimum time spent on transcode the video. This is used just for testing.
-    int64_t mSessionProcessingTimeMs = kSessionDurationUs / 1000;
+    using SessionKeyType = std::pair<ClientIdType, SessionIdType>;
+    // map of session's remaining time in microsec.
+    std::map<SessionKeyType, std::chrono::microseconds> mRemainingTimeMap;
 
     static const char* toString(Event::Type type);
     void queueEvent(Event::Type type, ClientIdType clientId, SessionIdType sessionId,
