@@ -2568,6 +2568,14 @@ status_t StagefrightRecorder::getPortId(audio_port_handle_t *portId) const {
     return NO_INIT;
 }
 
+status_t StagefrightRecorder::getRtpDataUsage(uint64_t *bytes) {
+    if (mWriter != 0) {
+        *bytes = mWriter->getAccumulativeBytes();
+        return OK;
+    }
+    return NO_INIT;
+}
+
 status_t StagefrightRecorder::dump(
         int fd, const Vector<String16>& args) const {
     ALOGV("dump");

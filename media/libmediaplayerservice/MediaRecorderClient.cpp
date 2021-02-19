@@ -585,4 +585,13 @@ status_t MediaRecorderClient::getPortId(audio_port_handle_t *portId) {
     }
     return NO_INIT;
 }
+
+status_t MediaRecorderClient::getRtpDataUsage(uint64_t *bytes) {
+    ALOGV("getRtpDataUsage");
+    Mutex::Autolock lock(mLock);
+    if (mRecorder != NULL) {
+        return mRecorder->getRtpDataUsage(bytes);
+    }
+    return NO_INIT;
+}
 }; // namespace android
