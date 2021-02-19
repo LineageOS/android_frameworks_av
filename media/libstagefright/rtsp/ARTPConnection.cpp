@@ -464,6 +464,22 @@ void ARTPConnection::onPollStreams() {
                     ALOGD("Send FIR immediately for lost Packets");
                     send(&*it, buffer);
                 }
+
+                buffer->setRange(0, 0);
+                it->mSources.valueAt(i)->addTMMBR(buffer, mTargetBitrate);
+                mTargetBitrate = -1;
+                if (buffer->size() > 0) {
+                    ALOGV("Sending TMMBR...");
+                    ssize_t n = send(&*it, buffer);
+
+                    if (n != (ssize_t)buffer->size()) {
+                        ALOGW("failed to send RTCP TMMBR (%s).",
+                                n >= 0 ? "connection gone" : strerror(errno));
+
+                        it = mStreams.erase(it);
+                        continue;
+                    }
+                }
             }
 
             ++it;
@@ -509,15 +525,13 @@ void ARTPConnection::onPollStreams() {
 
                 ssize_t n = send(s, buffer);
 
-                if (n <= 0) {
+                if (n != (ssize_t)buffer->size()) {
                     ALOGW("failed to send RTCP receiver report (%s).",
-                         n == 0 ? "connection gone" : strerror(errno));
+                            n >= 0 ? "connection gone" : strerror(errno));
 
                     it = mStreams.erase(it);
                     continue;
                 }
-
-                CHECK_EQ(n, (ssize_t)buffer->size());
 
                 mLastReceiverReportTimeUs = nowUs;
             }
@@ -1079,6 +1093,28 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
         mCumulativeBytes = 0;
         mLastBitrateReportTimeUs = nowUs;
     }
+    else if (mLastEarlyNotifyTimeUs + 100000ll <= nowUs) {
+        int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
+        int32_t bitrate = mCumulativeBytes * 8 / timeDiff;
+        mLastEarlyNotifyTimeUs = nowUs;
+
+        List<StreamInfo>::iterator it = mStreams.begin();
+        while (it != mStreams.end()) {
+            StreamInfo *s = &*it;
+            if (s->mIsInjected) {
+                ++it;
+                continue;
+            }
+            for (size_t i = 0; i < s->mSources.size(); ++i) {
+                sp<ARTPSource> source = s->mSources.valueAt(i);
+                if (source->isNeedToEarlyNotify()) {
+                    source->notifyPktInfo(bitrate, false /* isRegular */);
+                    mLastEarlyNotifyTimeUs = nowUs + (1000000ll * 3600 * 24); // after 1 day
+                }
+            }
+            ++it;
+        }
+    }
     else if (mLastBitrateReportTimeUs + 1000000ll <= nowUs) {
         int32_t timeDiff = (nowUs - mLastBitrateReportTimeUs) / 1000000ll;
         int32_t bitrate = mCumulativeBytes * 8 / timeDiff;
@@ -1101,31 +1137,15 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
             }
 
             buffer->setRange(0, 0);
-
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
-                source->notifyPktInfo(bitrate, nowUs);
-                source->addTMMBR(buffer, mTargetBitrate);
-            }
-            if (buffer->size() > 0) {
-                ALOGV("Sending TMMBR...");
-
-                ssize_t n = send(s, buffer);
-
-                if (n <= 0) {
-                    ALOGW("failed to send RTCP TMMBR (%s).",
-                         n == 0 ? "connection gone" : strerror(errno));
-
-                    it = mStreams.erase(it);
-                    continue;
-                }
-
-                CHECK_EQ(n, (ssize_t)buffer->size());
+                source->notifyPktInfo(bitrate, true /* isRegular */);
             }
             ++it;
         }
         mCumulativeBytes = 0;
         mLastBitrateReportTimeUs = nowUs;
+        mLastEarlyNotifyTimeUs = nowUs;
     }
 }
 void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
