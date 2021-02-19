@@ -34,7 +34,7 @@
 using namespace std;
 
 constexpr uint32_t kMimeSize = 128;
-constexpr uint8_t kMaxTrackCount = 2;
+constexpr uint8_t kMaxTrackCount = 3;
 constexpr uint32_t kMaxCSDStrlen = 16;
 constexpr uint32_t kCodecConfigFlag = 32;
 
@@ -49,25 +49,65 @@ struct ConfigFormat {
 };
 
 struct FrameData {
-    int32_t size;
+    size_t size;
     uint8_t flags;
     int64_t timeUs;
     const uint8_t* buf;
 };
 
-static string supportedMimeTypes[] = {
-    "audio/3gpp",      "audio/amr-wb",        "audio/vorbis",        "audio/opus",
-    "audio/mp4a-latm", "video/avc",           "video/hevc",          "video/mp4v-es",
-    "video/3gpp",      "video/x-vnd.on2.vp8", "video/x-vnd.on2.vp9",
-};
+static string supportedMimeTypes[] = {"audio/3gpp",
+                                      "audio/amr-wb",
+                                      "audio/vorbis",
+                                      "audio/opus",
+                                      "audio/mp4a-latm",
+                                      "audio/mpeg",
+                                      "audio/mpeg-L1",
+                                      "audio/mpeg-L2",
+                                      "audio/midi",
+                                      "audio/qcelp",
+                                      "audio/g711-alaw",
+                                      "audio/g711-mlaw",
+                                      "audio/flac",
+                                      "audio/aac-adts",
+                                      "audio/gsm",
+                                      "audio/ac3",
+                                      "audio/eac3",
+                                      "audio/eac3-joc",
+                                      "audio/ac4",
+                                      "audio/scrambled",
+                                      "audio/alac",
+                                      "audio/x-ms-wma",
+                                      "audio/x-adpcm-ms",
+                                      "audio/x-adpcm-dvi-ima",
+                                      "video/avc",
+                                      "video/hevc",
+                                      "video/mp4v-es",
+                                      "video/3gpp",
+                                      "video/x-vnd.on2.vp8",
+                                      "video/x-vnd.on2.vp9",
+                                      "video/av01",
+                                      "video/mpeg2",
+                                      "video/dolby-vision",
+                                      "video/scrambled",
+                                      "video/divx",
+                                      "video/divx3",
+                                      "video/xvid",
+                                      "video/x-motion-jpeg",
+                                      "text/3gpp-tt",
+                                      "application/x-subrip",
+                                      "text/vtt",
+                                      "text/cea-608",
+                                      "text/cea-708",
+                                      "application/x-id3v4"};
 
-enum {
+enum SampleFlag {
     DEFAULT_FLAG = 0,
     SYNC_FLAG = 1,
     ENCRYPTED_FLAG = 2,
 };
 
-static uint8_t flagTypes[] = {DEFAULT_FLAG, SYNC_FLAG, ENCRYPTED_FLAG};
+static uint8_t flagTypes[] = {SampleFlag::DEFAULT_FLAG, SampleFlag::SYNC_FLAG,
+                              SampleFlag::ENCRYPTED_FLAG};
 
 class WriterFuzzerBase {
    public:
@@ -105,7 +145,10 @@ class WriterFuzzerBase {
 
     void start();
 
-    void sendBuffersToWriter(sp<MediaAdapter>& currentTrack, int32_t trackIndex);
+    void sendBuffersToWriter(sp<MediaAdapter>& currentTrack, int32_t trackIndex,
+                             int32_t startFrameIndex, int32_t endFrameIndex);
+
+    void sendBuffersInterleave(int32_t numTracks, uint8_t numBuffersInterleave);
 
     void initFileWriterAndProcessData(const uint8_t* data, size_t size);
 
@@ -126,7 +169,7 @@ class WriterFuzzerBase {
         void getFrameInfo();
         ConfigFormat getConfigFormat(int32_t trackIndex);
         int32_t getNumCsds(int32_t trackIndex);
-        vector<FrameData> getFrameList(int32_t trackIndex);
+        vector<FrameData>& getFrameList(int32_t trackIndex);
 
        private:
         bool isMarker() { return (memcmp(&mData[mReadIndex], kMarker, kMarkerSize) == 0); }
