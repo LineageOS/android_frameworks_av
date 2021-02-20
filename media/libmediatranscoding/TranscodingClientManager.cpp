@@ -315,6 +315,15 @@ bool TranscodingClientManager::isTrustedCaller(pid_t pid, uid_t uid) {
 status_t TranscodingClientManager::addClient(
         const std::shared_ptr<ITranscodingClientCallback>& callback, const std::string& clientName,
         const std::string& opPackageName, std::shared_ptr<ITranscodingClient>* outClient) {
+    int32_t callingPid = AIBinder_getCallingPid();
+    int32_t callingUid = AIBinder_getCallingUid();
+
+    // Check if client has the permission
+    if (!isTrustedCaller(callingPid, callingUid)) {
+        ALOGE("addClient rejected (clientPid %d, clientUid %d)", callingPid, callingUid);
+        return IMediaTranscodingService::ERROR_PERMISSION_DENIED;
+    }
+
     // Validate the client.
     if (callback == nullptr || clientName.empty() || opPackageName.empty()) {
         ALOGE("Invalid client");
