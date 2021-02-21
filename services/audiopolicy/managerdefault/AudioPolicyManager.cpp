@@ -35,6 +35,10 @@
         "audio_policy_configuration_a2dp_offload_disabled.xml"
 #define AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME \
         "audio_policy_configuration_bluetooth_legacy_hal.xml"
+#ifdef NV_ANDROID_FRAMEWORK_ENHANCEMENTS
+#define AUDIO_POLICY_NVIDIA_ENHANCEMENTS_XML_CONFIG_FILE_NAME \
+        "audio_policy_configuration_nv.xml"
+#endif
 
 #include <algorithm>
 #include <inttypes.h>
@@ -4256,6 +4260,9 @@ static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
     } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false)) {
         fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
     }
+#ifdef NV_ANDROID_FRAMEWORK_ENHANCEMENTS
+    fileNames.push_back(AUDIO_POLICY_NVIDIA_ENHANCEMENTS_XML_CONFIG_FILE_NAME);
+#endif
     fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
 
     for (const char* fileName : fileNames) {
