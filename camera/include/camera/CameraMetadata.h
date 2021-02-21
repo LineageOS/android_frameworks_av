@@ -128,6 +128,11 @@ class CameraMetadata: public Parcelable {
     bool isEmpty() const;
 
     /**
+     * Return the allocated camera metadata buffer size in bytes.
+     */
+    size_t bufferSize() const;
+
+    /**
      * Sort metadata buffer for faster find
      */
     status_t sort();

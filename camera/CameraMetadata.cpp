@@ -169,6 +169,11 @@ bool CameraMetadata::isEmpty() const {
     return entryCount() == 0;
 }
 
+size_t CameraMetadata::bufferSize() const {
+    return (mBuffer == NULL) ? 0 :
+            get_camera_metadata_size(mBuffer);
+}
+
 status_t CameraMetadata::sort() {
     if (mLocked) {
         ALOGE("%s: CameraMetadata is locked", __FUNCTION__);

@@ -29,6 +29,7 @@
 #include <binder/IMemory.h>
 
 #include <camera/CameraBase.h>
+#include <camera/CameraUtils.h>
 
 // needed to instantiate
 #include <camera/Camera.h>
@@ -124,9 +125,7 @@ const sp<::android::hardware::ICameraService> CameraBase<TCam, TCamTraits>::getC
 {
     Mutex::Autolock _l(gLock);
     if (gCameraService.get() == 0) {
-        char value[PROPERTY_VALUE_MAX];
-        property_get("config.disable_cameraservice", value, "0");
-        if (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0) {
+        if (CameraUtils::isCameraServiceDisabled()) {
             return gCameraService;
         }
 

@@ -153,6 +153,19 @@ status_t ZoomRatioMapper::updateCaptureRequest(CameraMetadata* request) {
     entry = request->find(ANDROID_CONTROL_ZOOM_RATIO);
     if (entry.count == 1 && entry.data.f[0] != 1.0f) {
         zoomRatioIs1 = false;
+
+        // If cropRegion is windowboxing, override it with activeArray
+        camera_metadata_entry_t cropRegionEntry = request->find(ANDROID_SCALER_CROP_REGION);
+        if (cropRegionEntry.count == 4) {
+            int cropWidth = cropRegionEntry.data.i32[2];
+            int cropHeight = cropRegionEntry.data.i32[3];
+            if (cropWidth < mArrayWidth && cropHeight < mArrayHeight) {
+                cropRegionEntry.data.i32[0] = 0;
+                cropRegionEntry.data.i32[1] = 0;
+                cropRegionEntry.data.i32[2] = mArrayWidth;
+                cropRegionEntry.data.i32[3] = mArrayHeight;
+            }
+        }
     }
 
     if (mHalSupportsZoomRatio && zoomRatioIs1) {

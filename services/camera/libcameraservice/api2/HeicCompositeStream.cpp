@@ -65,7 +65,6 @@ HeicCompositeStream::HeicCompositeStream(sp<CameraDeviceBase> device,
         mYuvBufferAcquired(false),
         mProducerListener(new ProducerListener()),
         mDequeuedOutputBufferCnt(0),
-        mLockedAppSegmentBufferCnt(0),
         mCodecOutputCounter(0),
         mQuality(-1),
         mGridTimestampUs(0),
@@ -634,7 +633,6 @@ void HeicCompositeStream::compilePendingInputLocked() {
             mAppSegmentConsumer->unlockBuffer(imgBuffer);
         } else {
             mPendingInputFrames[frameNumber].appSegmentBuffer = imgBuffer;
-            mLockedAppSegmentBufferCnt++;
         }
         mInputAppSegmentBuffers.erase(it);
         mAppSegmentFrameNumbers.pop();
@@ -897,10 +895,6 @@ status_t HeicCompositeStream::processInputFrame(int64_t frameNumber,
                         strerror(-res), res);
                 return res;
             }
-        } else if (mLockedAppSegmentBufferCnt == kMaxAcquiredAppSegment) {
-            ALOGE("%s: Out-of-order app segment buffers reaches limit %u", __FUNCTION__,
-                    kMaxAcquiredAppSegment);
-            return INVALID_OPERATION;
         }
     }
 
@@ -1038,7 +1032,6 @@ status_t HeicCompositeStream::processAppSegment(int64_t frameNumber, InputFrame 
     mAppSegmentConsumer->unlockBuffer(inputFrame.appSegmentBuffer);
     inputFrame.appSegmentBuffer.data = nullptr;
     inputFrame.exifError = false;
-    mLockedAppSegmentBufferCnt--;
 
     return OK;
 }
