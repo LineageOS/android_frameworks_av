@@ -113,7 +113,6 @@ public:
     Status getDemuxCaps(TunerDemuxCapabilities* _aidl_return) override;
     Status openDescrambler(int32_t descramblerHandle,
             std::shared_ptr<ITunerDescrambler>* _aidl_return) override;
-    Status updateTunerResources() override;
     Status getTunerHalVersion(int* _aidl_return) override;
 
     // TODO: create a map between resource id and handles.
@@ -131,6 +130,7 @@ public:
 private:
     bool hasITuner();
     bool hasITuner_1_1();
+    void updateTunerResources();
 
     void updateFrontendResources();
     void updateLnbResources();
