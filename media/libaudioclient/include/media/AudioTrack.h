@@ -986,6 +986,11 @@ public:
      */
             audio_port_handle_t getPortId() const { return mPortId; };
 
+    /* Sets the LogSessionId field which is used for metrics association of
+     * this object with other objects.
+     */
+            void setLogSessionId(const char *logSessionId);
+
     /* Sets the playerIId field to associate the AudioTrack with an interface managed by
      * AudioService.
      *
@@ -1271,6 +1276,12 @@ public:
      * For an AudioTrack created by the Java interface, this is generally set once.
      */
     int                     mPlayerIId = -1;  // AudioManager.h PLAYER_PIID_INVALID
+
+    /**
+     * mLogSessionId is a string identifying this AudioTrack for the metrics service.
+     * It may be unique or shared with other objects.
+     */
+    std::string             mLogSessionId{};
 
     mutable Mutex           mLock;
 
