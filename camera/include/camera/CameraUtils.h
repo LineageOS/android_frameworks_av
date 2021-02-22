@@ -47,6 +47,11 @@ class CameraUtils {
          */
         static bool isNativeHandleMetadata(const sp<IMemory>& imageData);
 
+        /**
+         * Check if camera service is disabled on this device
+         */
+        static bool isCameraServiceDisabled();
+
     private:
         CameraUtils();
 };
