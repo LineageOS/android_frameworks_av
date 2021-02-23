@@ -415,52 +415,11 @@ int lvmControl(struct EffectContext* pContext, lvmConfigParams_t* plvmConfigPara
     } else {
         return -EINVAL;
     }
-
-    LVM_Fs_en sampleRate;
-    switch (plvmConfigParams->samplingFreq) {
-        case 8000:
-            sampleRate = LVM_FS_8000;
-            break;
-        case 11025:
-            sampleRate = LVM_FS_11025;
-            break;
-        case 12000:
-            sampleRate = LVM_FS_12000;
-            break;
-        case 16000:
-            sampleRate = LVM_FS_16000;
-            break;
-        case 22050:
-            sampleRate = LVM_FS_22050;
-            break;
-        case 24000:
-            sampleRate = LVM_FS_24000;
-            break;
-        case 32000:
-            sampleRate = LVM_FS_32000;
-            break;
-        case 44100:
-            sampleRate = LVM_FS_44100;
-            break;
-        case 48000:
-            sampleRate = LVM_FS_48000;
-            break;
-        case 88200:
-            sampleRate = LVM_FS_88200;
-            break;
-        case 96000:
-            sampleRate = LVM_FS_96000;
-            break;
-        case 176400:
-            sampleRate = LVM_FS_176400;
-            break;
-        case 192000:
-            sampleRate = LVM_FS_192000;
-            break;
-        default:
-            return -EINVAL;
+    params->SampleRate = lvmFsForSampleRate(plvmConfigParams->samplingFreq);
+    if (params->SampleRate == LVM_FS_INVALID) {
+        ALOGE("lvmControl invalid sampling rate %d", plvmConfigParams->samplingFreq);
+        return -EINVAL;
     }
-    params->SampleRate = sampleRate;
 
     /* Concert Sound parameters */
     params->VirtualizerOperatingMode = plvmConfigParams->csEnable;
