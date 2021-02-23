@@ -135,6 +135,7 @@ private:
 
     static uint64_t GetNowNTP();
 
+    void initState();
     void onRead(const sp<AMessage> &msg);
     void onSendSR(const sp<AMessage> &msg);
 
