@@ -1857,6 +1857,8 @@ status_t AudioTrack::createTrack_l()
         .set(AMEDIAMETRICS_PROP_FLAGS, toString(mFlags).c_str())
         .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
         .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
+        .set(AMEDIAMETRICS_PROP_LOGSESSIONID, mLogSessionId)
+        .set(AMEDIAMETRICS_PROP_PLAYERIID, mPlayerIId)
         .set(AMEDIAMETRICS_PROP_TRACKID, mPortId) // dup from key
         .set(AMEDIAMETRICS_PROP_CONTENTTYPE, toString(mAttributes.content_type).c_str())
         .set(AMEDIAMETRICS_PROP_USAGE, toString(mAttributes.usage).c_str())
@@ -3261,6 +3263,30 @@ uint32_t AudioTrack::getUnderrunFrames() const
 {
     AutoMutex lock(mLock);
     return mProxy->getUnderrunFrames();
+}
+
+void AudioTrack::setLogSessionId(const char *logSessionId)
+{
+     AutoMutex lock(mLock);
+    if (mLogSessionId == logSessionId) return;
+
+     mLogSessionId = logSessionId;
+     mediametrics::LogItem(mMetricsId)
+         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETLOGSESSIONID)
+         .set(AMEDIAMETRICS_PROP_LOGSESSIONID, logSessionId)
+         .record();
+}
+
+void AudioTrack::setPlayerIId(int playerIId)
+{
+    AutoMutex lock(mLock);
+    if (mPlayerIId == playerIId) return;
+
+    mPlayerIId = playerIId;
+    mediametrics::LogItem(mMetricsId)
+        .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYERIID)
+        .set(AMEDIAMETRICS_PROP_PLAYERIID, playerIId)
+        .record();
 }
 
 status_t AudioTrack::addAudioDeviceCallback(const sp<AudioSystem::AudioDeviceCallback>& callback)
