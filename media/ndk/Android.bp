@@ -114,6 +114,7 @@ cc_library_shared {
 
     static_libs: [
         "libgrallocusage",
+        "libnativehelper_lazy",
     ],
 
     header_libs: [
@@ -142,7 +143,6 @@ cc_library_shared {
         "libgui",
         "libui",
         "libmediandk_utils",
-        "libnativehelper",
     ],
 
     export_header_lib_headers: ["jni_headers"],
