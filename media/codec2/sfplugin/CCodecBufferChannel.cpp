@@ -30,6 +30,7 @@
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/drm/1.0/types.h>
+#include <android-base/properties.h>
 #include <android-base/stringprintf.h>
 #include <binder/MemoryBase.h>
 #include <binder/MemoryDealer.h>
@@ -891,7 +892,12 @@ status_t CCodecBufferChannel::renderOutputBuffer(
         }
         return result;
     }
-    ALOGV("[%s] queue buffer successful", mName);
+
+    if(android::base::GetBoolProperty("debug.stagefright.fps", false)) {
+        ALOGD("[%s] queue buffer successful", mName);
+    } else {
+        ALOGV("[%s] queue buffer successful", mName);
+    }
 
     int64_t mediaTimeUs = 0;
     (void)buffer->meta()->findInt64("timeUs", &mediaTimeUs);
