@@ -54,7 +54,7 @@ cc_test {
 
 cc_test {
     name: "reverb_test",
-    host_supported: false,
+    host_supported: true,
     proprietary: true,
 
     include_dirs: [
