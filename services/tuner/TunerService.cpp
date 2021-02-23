@@ -49,7 +49,12 @@ using ::android::hardware::tv::tuner::V1_1::FrontendDtmbCapabilities;
 
 namespace android {
 
-TunerService::TunerService() {}
+TunerService::TunerService() {
+    ::ndk::SpAIBinder binder(AServiceManager_waitForService("tv_tuner_resource_mgr"));
+    mTunerResourceManager = ITunerResourceManager::fromBinder(binder);
+    updateTunerResources();
+}
+
 TunerService::~TunerService() {}
 
 binder_status_t TunerService::instantiate() {
@@ -282,19 +287,15 @@ Status TunerService::openDescrambler(int32_t /*descramblerHandle*/,
     return Status::ok();
 }
 
-Status TunerService::updateTunerResources() {
-    if (!hasITuner()) {
-        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+void TunerService::updateTunerResources() {
+    if (!hasITuner() || mTunerResourceManager == NULL) {
+        ALOGE("Failed to updateTunerResources");
+        return;
     }
-
-    // Connect with Tuner Resource Manager.
-    ::ndk::SpAIBinder binder(AServiceManager_getService("tv_tuner_resource_mgr"));
-    mTunerResourceManager = ITunerResourceManager::fromBinder(binder);
 
     updateFrontendResources();
     updateLnbResources();
     // TODO: update Demux, Descrambler.
-    return Status::ok();
 }
 
 Status TunerService::getTunerHalVersion(int* _aidl_return) {
