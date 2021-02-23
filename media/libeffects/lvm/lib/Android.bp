@@ -140,6 +140,7 @@ cc_library_static {
     },
 
     vendor: true,
+    host_supported: true,
     srcs: [
         "Reverb/src/LVREV_ApplyNewSettings.cpp",
         "Reverb/src/LVREV_ClearAudioBuffers.cpp",

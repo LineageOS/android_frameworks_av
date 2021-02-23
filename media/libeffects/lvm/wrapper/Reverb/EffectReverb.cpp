@@ -190,8 +190,8 @@ int Reverb_paramValueSize(int32_t param);
 
 /* Effect Library Interface Implementation */
 
-extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t sessionId __unused,
-                            int32_t ioId __unused, effect_handle_t* pHandle) {
+extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t /* sessionId __unused */,
+                            int32_t /* ioId __unused */, effect_handle_t* pHandle) {
     int ret;
     int i;
     int length = sizeof(gDescriptors) / sizeof(const effect_descriptor_t*);
