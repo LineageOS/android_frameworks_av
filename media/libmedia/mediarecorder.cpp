@@ -913,4 +913,14 @@ status_t MediaRecorder::getPortId(audio_port_handle_t *portId) const
     return mMediaRecorder->getPortId(portId);
 }
 
+status_t MediaRecorder::getRtpDataUsage(uint64_t *bytes)
+{
+    ALOGV("getRtpDataUsage");
+
+    if (mMediaRecorder == NULL) {
+        ALOGE("media recorder is not initialized yet");
+        return INVALID_OPERATION;
+    }
+    return mMediaRecorder->getRtpDataUsage(bytes);
+}
 } // namespace android
