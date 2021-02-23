@@ -957,51 +957,12 @@ int Effect_setConfig(EffectContext* pContext, effect_config_t* pConfig) {
     pContext->config = *pConfig;
     const LVM_INT16 NrChannels = audio_channel_count_from_out_mask(pConfig->inputCfg.channels);
 
-    switch (pConfig->inputCfg.samplingRate) {
-        case 8000:
-            SampleRate = LVM_FS_8000;
-            pContext->pBundledContext->SamplesPerSecond = 8000 * NrChannels;
-            break;
-        case 16000:
-            SampleRate = LVM_FS_16000;
-            pContext->pBundledContext->SamplesPerSecond = 16000 * NrChannels;
-            break;
-        case 22050:
-            SampleRate = LVM_FS_22050;
-            pContext->pBundledContext->SamplesPerSecond = 22050 * NrChannels;
-            break;
-        case 32000:
-            SampleRate = LVM_FS_32000;
-            pContext->pBundledContext->SamplesPerSecond = 32000 * NrChannels;
-            break;
-        case 44100:
-            SampleRate = LVM_FS_44100;
-            pContext->pBundledContext->SamplesPerSecond = 44100 * NrChannels;
-            break;
-        case 48000:
-            SampleRate = LVM_FS_48000;
-            pContext->pBundledContext->SamplesPerSecond = 48000 * NrChannels;
-            break;
-        case 88200:
-            SampleRate = LVM_FS_88200;
-            pContext->pBundledContext->SamplesPerSecond = 88200 * NrChannels;
-            break;
-        case 96000:
-            SampleRate = LVM_FS_96000;
-            pContext->pBundledContext->SamplesPerSecond = 96000 * NrChannels;
-            break;
-        case 176400:
-            SampleRate = LVM_FS_176400;
-            pContext->pBundledContext->SamplesPerSecond = 176400 * NrChannels;
-            break;
-        case 192000:
-            SampleRate = LVM_FS_192000;
-            pContext->pBundledContext->SamplesPerSecond = 192000 * NrChannels;
-            break;
-        default:
-            ALOGV("\tEffect_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
-            return -EINVAL;
+    SampleRate = lvmFsForSampleRate(pConfig->inputCfg.samplingRate);
+    if (SampleRate == LVM_FS_INVALID) {
+        ALOGV("Effect_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
+        return -EINVAL;
     }
+    pContext->pBundledContext->SamplesPerSecond = pConfig->inputCfg.samplingRate * NrChannels;
 
     if (pContext->pBundledContext->SampleRate != SampleRate ||
         pContext->pBundledContext->ChMask != pConfig->inputCfg.channels) {
