@@ -316,6 +316,7 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     // Append information from the front stash entry to outBuffer.
     (*outBuffer)->meta()->setInt64("timeUs", entry.timestamp);
     (*outBuffer)->meta()->setInt32("flags", entry.flags);
+    (*outBuffer)->meta()->setInt64("frameIndex", entry.ordinal.frameIndex.peekll());
     ALOGV("[%s] popFromStashAndRegister: "
           "out buffer index = %zu [%p] => %p + %zu (%lld)",
           mName, *index, outBuffer->get(),
