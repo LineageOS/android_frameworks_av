@@ -46,14 +46,15 @@ namespace android {
 struct ALooper;
 struct AnotherPacketSource;
 
-const int32_t videoMinBitrate = 192000;
-
 struct NuPlayer::RTPSource : public NuPlayer::Source {
     RTPSource(
             const sp<AMessage> &notify,
             const String8& rtpParams);
 
     enum {
+        RTP_FIRST_PACKET = 100,
+        RTCP_FIRST_PACKET = 101,
+        RTP_QUALITY = 102,
         RTCP_TSFB = 205,
         RTCP_PSFB = 206,
         RTP_CVO = 300,
@@ -79,7 +80,11 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
             int64_t seekTimeUs,
             MediaPlayerSeekMode mode = MediaPlayerSeekMode::SEEK_PREVIOUS_SYNC) override;
 
+    virtual bool isRealTime() const;
+
     void onMessageReceived(const sp<AMessage> &msg);
+
+    virtual void setTargetBitrate(int32_t bitrate) override;
 
 protected:
     virtual ~RTPSource();
@@ -95,6 +100,8 @@ private:
         kWhatPollBuffering = 'poll',
         kWhatSetBufferingSettings = 'sBuS',
     };
+
+    const int64_t kBufferingPollIntervalUs = 1000000ll;
 
     enum State {
         DISCONNECTED,
@@ -118,9 +125,12 @@ private:
         String8 mRemoteIp;
         int32_t mLocalPort;
         int32_t mRemotePort;
+        int64_t mSocketNetwork;
         int32_t mTimeScale;
         int32_t mAS;
 
+        /* RTP jitter buffer time in milliseconds */
+        uint32_t mJbTimeMs;
         /* Unique ID indicates itself */
         uint32_t mSelfID;
         /* extmap:<value> for CVO will be set to here */
@@ -205,6 +215,7 @@ private:
 
     status_t setParameters(const String8 &params);
     status_t setParameter(const String8 &key, const String8 &value);
+    void setSocketNetwork(int64_t networkHandle);
     static void TrimString(String8 *s);
 
     DISALLOW_EVIL_CONSTRUCTORS(RTPSource);

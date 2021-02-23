@@ -27,6 +27,9 @@
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
+#include <android/multinetwork.h>
+#include "TrafficRecorder.h"
+
 #define LOG_TO_FILES    0
 
 namespace android {
@@ -47,6 +50,8 @@ struct ARTPWriter : public MediaWriter {
     virtual status_t pause();
     void updateCVODegrees(int32_t cvoDegrees);
     void updatePayloadType(int32_t payloadType);
+    void updateSocketDscp(int32_t dscp);
+    void updateSocketNetwork(int64_t socketNetwork);
     uint32_t getSequenceNum();
 
     virtual void onMessageReceived(const sp<AMessage> &msg);
@@ -91,11 +96,14 @@ private:
     struct sockaddr_in6 mLocalAddr6;
     struct sockaddr_in6 mRTPAddr6;
     struct sockaddr_in6 mRTCPAddr6;
+    int32_t mRtpLayer3Dscp;
+    net_handle_t mRTPSockNetwork;
 
     AString mProfileLevel;
     AString mSeqParamSet;
     AString mPicParamSet;
 
+    MediaBufferBase *mVPSBuf;
     MediaBufferBase *mSPSBuf;
     MediaBufferBase *mPPSBuf;
 
@@ -110,6 +118,7 @@ private:
 
     uint32_t mOpponentID;
     uint32_t mBitrate;
+    sp<TrafficRecorder<uint32_t, size_t> > mTrafficRec;
 
     int32_t mNumSRsSent;
     int32_t mRTPCVOExtMap;
@@ -137,6 +146,7 @@ private:
     void dumpSessionDesc();
 
     void sendBye();
+    void sendVPSSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
     void sendSPSPPSIfIFrame(MediaBufferBase *mediaBuf, int64_t timeUs);
     void sendHEVCData(MediaBufferBase *mediaBuf);
     void sendAVCData(MediaBufferBase *mediaBuf);
@@ -146,6 +156,7 @@ private:
     void send(const sp<ABuffer> &buffer, bool isRTCP);
     void makeSocketPairAndBind(String8& localIp, int localPort, String8& remoteIp, int remotePort);
 
+    void ModerateInstantTraffic(uint32_t samplePeriod, uint32_t limitBytes);
     DISALLOW_EVIL_CONSTRUCTORS(ARTPWriter);
 };
 

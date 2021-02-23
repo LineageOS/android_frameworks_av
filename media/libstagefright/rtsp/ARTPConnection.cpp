@@ -30,6 +30,8 @@
 #include <media/stagefright/foundation/AString.h>
 #include <media/stagefright/foundation/hexdump.h>
 
+#include <android/multinetwork.h>
+
 #include <arpa/inet.h>
 #include <sys/socket.h>
 
@@ -76,7 +78,9 @@ ARTPConnection::ARTPConnection(uint32_t flags)
     : mFlags(flags),
       mPollEventPending(false),
       mLastReceiverReportTimeUs(-1),
-      mLastBitrateReportTimeUs(-1) {
+      mLastBitrateReportTimeUs(-1),
+      mTargetBitrate(-1),
+      mJbTimeMs(300) {
 }
 
 ARTPConnection::~ARTPConnection() {
@@ -161,7 +165,7 @@ void ARTPConnection::MakePortPair(
 // static
 void ARTPConnection::MakeRTPSocketPair(
         int *rtpSocket, int *rtcpSocket, const char *localIp, const char *remoteIp,
-        unsigned localPort, unsigned remotePort) {
+        unsigned localPort, unsigned remotePort, int64_t socketNetwork) {
     bool isIPv6 = false;
     if (strchr(localIp, ':') != NULL)
         isIPv6 = true;
@@ -173,6 +177,22 @@ void ARTPConnection::MakeRTPSocketPair(
 
     *rtcpSocket = socket(isIPv6 ? AF_INET6 : AF_INET, SOCK_DGRAM, 0);
     CHECK_GE(*rtcpSocket, 0);
+
+    if (socketNetwork != 0) {
+        ALOGD("trying to bind rtp socket(%d) to network(%llu).",
+                *rtpSocket, (unsigned long long)socketNetwork);
+
+        int result = android_setsocknetwork((net_handle_t)socketNetwork, *rtpSocket);
+        if (result != 0) {
+            ALOGW("failed(%d) to bind rtp socket(%d) to network(%llu)",
+                    result, *rtpSocket, (unsigned long long)socketNetwork);
+        }
+        result = android_setsocknetwork((net_handle_t)socketNetwork, *rtcpSocket);
+        if (result != 0) {
+            ALOGW("failed(%d) to bind rtcp socket(%d) to network(%llu)",
+                    result, *rtcpSocket, (unsigned long long)socketNetwork);
+        }
+    }
 
     bumpSocketBufferSize(*rtcpSocket);
 
@@ -417,7 +437,7 @@ void ARTPConnection::onPollStreams() {
             if (err == -ECONNRESET) {
                 // socket failure, this stream is dead, Jim.
                 sp<AMessage> notify = it->mNotifyMsg->dup();
-                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("rtcp-event", 1);
                 notify->setInt32("payload-type", 400);
                 notify->setInt32("feedback-type", 1);
                 notify->setInt32("sender", it->mSources.valueAt(0)->getSelfID());
@@ -426,6 +446,24 @@ void ARTPConnection::onPollStreams() {
                 ALOGW("failed to receive RTP/RTCP datagram.");
                 it = mStreams.erase(it);
                 continue;
+            }
+
+            // add NACK and FIR that needs to be sent immediately.
+            sp<ABuffer> buffer = new ABuffer(kMaxUDPSize);
+            for (size_t i = 0; i < it->mSources.size(); ++i) {
+                buffer->setRange(0, 0);
+                int cnt = it->mSources.valueAt(i)->addNACK(buffer);
+                if (cnt > 0) {
+                    ALOGV("Send NACK for lost %d Packets", cnt);
+                    send(&*it, buffer);
+                }
+
+                buffer->setRange(0, 0);
+                it->mSources.valueAt(i)->addFIR(buffer);
+                if (buffer->size() > 0) {
+                    ALOGD("Send FIR immediately for lost Packets");
+                    send(&*it, buffer);
+                }
             }
 
             ++it;
@@ -513,8 +551,9 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
         (!receiveRTP && s->mNumRTCPPacketsReceived == 0)
             ? sizeSockSt : 0;
 
-    if (mFlags & kViLTEConnection)
+    if (mFlags & kViLTEConnection) {
         remoteAddrLen = 0;
+    }
 
     ssize_t nbytes;
     do {
@@ -597,7 +636,7 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
         return -1;
     }
 
-    if ((data[1] & 0x7f) == 20) {
+    if ((data[1] & 0x7f) == 20 /* decimal */) {
         // Unassigned payload type
         return -1;
     }
@@ -690,6 +729,7 @@ status_t ARTPConnection::parseRTPExt(StreamInfo *s,
     }
 
     const uint8_t *extPayload = extHeader + 4;
+    extLen -= 4;
     size_t offset = 0; //start from first payload of rtp extension.
     // one-byte header parser
     while (isOnebyteHeader && offset < extLen) {
@@ -698,12 +738,13 @@ status_t ARTPConnection::parseRTPExt(StreamInfo *s,
         offset++;
 
         // padding case
-        if(extmapId == 0)
+        if (extmapId == 0)
             continue;
 
-        uint8_t data[length];
-        for (uint8_t j = 0; j < length; j++)
+        uint8_t data[16]; // maximum length value
+        for (uint8_t j = 0; offset + j <= extLen && j < length; j++) {
             data[j] = extPayload[offset + j];
+        }
 
         offset += length;
 
@@ -721,6 +762,13 @@ status_t ARTPConnection::parseRTCP(StreamInfo *s, const sp<ABuffer> &buffer) {
         sp<AMessage> notify = s->mNotifyMsg->dup();
         notify->setInt32("first-rtcp", true);
         notify->post();
+
+        ALOGI("send first-rtcp event to upper layer as ImsRxNotice");
+        sp<AMessage> imsNotify = s->mNotifyMsg->dup();
+        imsNotify->setInt32("rtcp-event", 1);
+        imsNotify->setInt32("payload-type", 101);
+        imsNotify->setInt32("feedback-type", 0);
+        imsNotify->post();
     }
 
     const uint8_t *data = buffer->data();
@@ -847,13 +895,13 @@ status_t ARTPConnection::parseSR(
 
 status_t ARTPConnection::parseTSFB(
         StreamInfo *s, const uint8_t *data, size_t size) {
-    uint8_t msgType = data[0] & 0x1f;
-    uint32_t id = u32at(&data[4]);
-
     if (size < 12) {
         // broken packet
         return -1;
     }
+
+    uint8_t msgType = data[0] & 0x1f;
+    uint32_t id = u32at(&data[4]);
 
     const uint8_t *ptr = &data[12];
     size -= 12;
@@ -907,7 +955,7 @@ status_t ARTPConnection::parseTSFB(
                         MxTBRMantissa, MxTBRExp, bitRate);
 
                 sp<AMessage> notify = s->mNotifyMsg->dup();
-                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("rtcp-event", 1);
                 notify->setInt32("payload-type", 205);
                 notify->setInt32("feedback-type", msgType);
                 notify->setInt32("sender", id);
@@ -929,23 +977,27 @@ status_t ARTPConnection::parseTSFB(
 
 status_t ARTPConnection::parsePSFB(
         StreamInfo *s, const uint8_t *data, size_t size) {
-    uint8_t msgType = data[0] & 0x1f;
-    uint32_t id = u32at(&data[4]);
-
     if (size < 12) {
         // broken packet
         return -1;
     }
 
+    uint8_t msgType = data[0] & 0x1f;
+    uint32_t id = u32at(&data[4]);
+
+    const uint8_t *ptr = &data[12];
     size -= 12;
 
     using namespace std;
     switch(msgType) {
         case 1:     // Picture Loss Indication (PLI)
         {
-            CHECK(size == 0);   // PLI does not need parameters
+            if (size > 0) {
+                // PLI does not need parameters
+                break;
+            };
             sp<AMessage> notify = s->mNotifyMsg->dup();
-            notify->setInt32("IMS-Rx-notice", 1);
+            notify->setInt32("rtcp-event", 1);
             notify->setInt32("payload-type", 206);
             notify->setInt32("feedback-type", msgType);
             notify->setInt32("sender", id);
@@ -955,10 +1007,13 @@ status_t ARTPConnection::parsePSFB(
         }
         case 4:     // Full Intra Request (FIR)
         {
-            uint32_t requestedId = u32at(&data[12]);
+            if (size < 4) {
+                break;
+            }
+            uint32_t requestedId = u32at(&ptr[0]);
             if (requestedId == (uint32_t)mSelfID) {
                 sp<AMessage> notify = s->mNotifyMsg->dup();
-                notify->setInt32("IMS-Rx-notice", 1);
+                notify->setInt32("rtcp-event", 1);
                 notify->setInt32("payload-type", 206);
                 notify->setInt32("feedback-type", msgType);
                 notify->setInt32("sender", id);
@@ -985,8 +1040,12 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
         source = new ARTPSource(
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
+        if (mFlags & kViLTEConnection) {
+            source->setPeriodicFIR(false);
+        }
+
         source->setSelfID(mSelfID);
-        source->setMinMaxBitrate(mMinBitrate, mMaxBitrate);
+        source->setJbTime(mJbTimeMs > 0 ? mJbTimeMs : 300);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
@@ -1006,9 +1065,12 @@ void ARTPConnection::setSelfID(const uint32_t selfID) {
     mSelfID = selfID;
 }
 
-void ARTPConnection::setMinMaxBitrate(int32_t min, int32_t max) {
-    mMinBitrate = min;
-    mMaxBitrate = max;
+void ARTPConnection::setJbTime(const uint32_t jbTimeMs) {
+    mJbTimeMs = jbTimeMs;
+}
+
+void ARTPConnection::setTargetBitrate(int32_t targetBitrate) {
+    mTargetBitrate = targetBitrate;
 }
 
 void ARTPConnection::checkRxBitrate(int64_t nowUs) {
@@ -1041,17 +1103,8 @@ void ARTPConnection::checkRxBitrate(int64_t nowUs) {
 
             for (size_t i = 0; i < s->mSources.size(); ++i) {
                 sp<ARTPSource> source = s->mSources.valueAt(i);
-                source->setBitrateData(bitrate, nowUs);
-                source->setTargetBitrate();
-                source->addTMMBR(buffer);
-                if (source->isNeedToDowngrade()) {
-                    sp<AMessage> notify = s->mNotifyMsg->dup();
-                    notify->setInt32("IMS-Rx-notice", 1);
-                    notify->setInt32("payload-type", 400);
-                    notify->setInt32("feedback-type", 1);
-                    notify->setInt32("sender", source->getSelfID());
-                    notify->post();
-                }
+                source->notifyPktInfo(bitrate, nowUs);
+                source->addTMMBR(buffer, mTargetBitrate);
             }
             if (buffer->size() > 0) {
                 ALOGV("Sending TMMBR...");
@@ -1101,4 +1154,3 @@ void ARTPConnection::onInjectPacket(const sp<AMessage> &msg) {
 }
 
 }  // namespace android
-

@@ -378,6 +378,7 @@ void NuPlayer::setDataSourceAsync(const String8& rtpParams) {
 
     msg->setObject("source", source);
     msg->post();
+    mDataSourceType = DATA_SOURCE_TYPE_RTP;
 }
 
 void NuPlayer::prepareAsync() {
@@ -1701,6 +1702,12 @@ void NuPlayer::updateInternalTimers() {
     updateRebufferingTimer(false /* stopping */, false /* exiting */);
 }
 
+void NuPlayer::setTargetBitrate(int bitrate) {
+    if (mSource != NULL) {
+        mSource->setTargetBitrate(bitrate);
+    }
+}
+
 void NuPlayer::onPause() {
 
     updatePlaybackTimer(true /* stopping */, "onPause");
@@ -1926,6 +1933,11 @@ status_t NuPlayer::instantiateDecoder(
     }
 
     format->setInt32("priority", 0 /* realtime */);
+
+    if (mDataSourceType == DATA_SOURCE_TYPE_RTP) {
+        ALOGV("instantiateDecoder: set decoder error free on stream corrupt.");
+        format->setInt32("corrupt-free", true);
+    }
 
     if (!audio) {
         AString mime;
@@ -2862,6 +2874,27 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
             }
             break;
         }
+        case NuPlayer::RTPSource::RTP_QUALITY:
+        {
+            int32_t feedbackType, bitrate;
+            int32_t highestSeqNum, baseSeqNum, prevExpected;
+            int32_t numBufRecv, prevNumBufRecv;
+            CHECK(msg->findInt32("feedback-type", &feedbackType));
+            CHECK(msg->findInt32("bit-rate", &bitrate));
+            CHECK(msg->findInt32("highest-seq-num", &highestSeqNum));
+            CHECK(msg->findInt32("base-seq-num", &baseSeqNum));
+            CHECK(msg->findInt32("prev-expected", &prevExpected));
+            CHECK(msg->findInt32("num-buf-recv", &numBufRecv));
+            CHECK(msg->findInt32("prev-num-buf-recv", &prevNumBufRecv));
+            in.writeInt32(feedbackType);
+            in.writeInt32(bitrate);
+            in.writeInt32(highestSeqNum);
+            in.writeInt32(baseSeqNum);
+            in.writeInt32(prevExpected);
+            in.writeInt32(numBufRecv);
+            in.writeInt32(prevNumBufRecv);
+            break;
+        }
         case NuPlayer::RTPSource::RTP_CVO:
         {
             int32_t cvo;
@@ -2880,6 +2913,9 @@ const char *NuPlayer::getDataSourceType() {
     switch (mDataSourceType) {
         case DATA_SOURCE_TYPE_HTTP_LIVE:
             return "HTTPLive";
+
+        case DATA_SOURCE_TYPE_RTP:
+            return "RTP";
 
         case DATA_SOURCE_TYPE_RTSP:
             return "RTSP";
