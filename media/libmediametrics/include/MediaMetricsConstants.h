@@ -125,12 +125,14 @@
 #define AMEDIAMETRICS_PROP_INPUTDEVICES   "inputDevices"   // string value
 #define AMEDIAMETRICS_PROP_INTERVALCOUNT  "intervalCount"  // int32
 #define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
+#define AMEDIAMETRICS_PROP_LOGSESSIONID   "logSessionId"   // hex string, "" none
 #define AMEDIAMETRICS_PROP_NAME           "name"           // string value
 #define AMEDIAMETRICS_PROP_ORIGINALFLAGS  "originalFlags"  // int32
 #define AMEDIAMETRICS_PROP_OUTPUTDEVICES  "outputDevices"  // string value
 #define AMEDIAMETRICS_PROP_PERFORMANCEMODE "performanceMode"    // string value, "none", lowLatency"
 #define AMEDIAMETRICS_PROP_PLAYBACK_PITCH "playback.pitch" // double value (AudioTrack)
 #define AMEDIAMETRICS_PROP_PLAYBACK_SPEED "playback.speed" // double value (AudioTrack)
+#define AMEDIAMETRICS_PROP_PLAYERIID      "playerIId"      // int32 (-1 invalid/unset IID)
 #define AMEDIAMETRICS_PROP_ROUTEDDEVICEID "routedDeviceId" // int32
 #define AMEDIAMETRICS_PROP_SAMPLERATE     "sampleRate"     // int32
 #define AMEDIAMETRICS_PROP_SELECTEDDEVICEID "selectedDeviceId" // int32
@@ -181,7 +183,9 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_RESTORE    "restore"
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETMODE    "setMode" // AudioFlinger
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETBUFFERSIZE    "setBufferSize" // AudioTrack
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETLOGSESSIONID  "setLogSessionId" // AudioTrack, Record
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYBACKPARAM "setPlaybackParam" // AudioTrack
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYERIID "setPlayerIId" // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME   "setVoiceVolume" // AudioFlinger
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME  "setVolume"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
