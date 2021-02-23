@@ -40,6 +40,7 @@ cc_defaults {
     ],
 
     shared_libs: [
+        "libandroid_net",
         "libcrypto",
         "libdatasource",
         "libmedia",
@@ -48,6 +49,7 @@ cc_defaults {
     include_dirs: [
         "frameworks/av/media/libstagefright",
         "frameworks/native/include/media/openmax",
+        "frameworks/native/include/android",
     ],
 
     arch: {

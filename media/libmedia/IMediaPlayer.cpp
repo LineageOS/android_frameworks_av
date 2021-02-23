@@ -697,7 +697,7 @@ status_t BnMediaPlayer::onTransact(
         }
         case SET_DATA_SOURCE_RTP: {
             CHECK_INTERFACE(IMediaPlayer, data, reply);
-            const String8& rtpParams = data.readString8();
+            String8 rtpParams = data.readString8();
             reply->writeInt32(setDataSource(rtpParams));
             return NO_ERROR;
         }

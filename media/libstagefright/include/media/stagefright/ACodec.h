@@ -273,6 +273,7 @@ private:
     bool mShutdownInProgress;
     bool mExplicitShutdown;
     bool mIsLegacyVP9Decoder;
+    bool mIsStreamCorruptFree;
     bool mIsLowLatency;
 
     // If "mKeepComponentAllocated" we only transition back to Loaded state

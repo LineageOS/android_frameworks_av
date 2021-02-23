@@ -80,6 +80,9 @@ void NuPlayer::RTPSource::prepareAsync() {
         mLooper->registerHandler(mRTPConn);
     }
 
+    CHECK_EQ(mState, (int)DISCONNECTED);
+    mState = CONNECTING;
+
     setParameters(mRTPParams);
 
     TrackInfo *info = NULL;
@@ -102,7 +105,7 @@ void NuPlayer::RTPSource::prepareAsync() {
 
         int sockRtp, sockRtcp;
         ARTPConnection::MakeRTPSocketPair(&sockRtp, &sockRtcp, info->mLocalIp, info->mRemoteIp,
-                info->mLocalPort, info->mRemotePort);
+                info->mLocalPort, info->mRemotePort, info->mSocketNetwork);
 
         sp<AMessage> notify = new AMessage('accu', this);
 
@@ -111,7 +114,8 @@ void NuPlayer::RTPSource::prepareAsync() {
         // index(i) should be started from 1. 0 is reserved for [root]
         mRTPConn->addStream(sockRtp, sockRtcp, desc, i + 1, notify, false);
         mRTPConn->setSelfID(info->mSelfID);
-        mRTPConn->setMinMaxBitrate(videoMinBitrate, info->mAS * 1000);
+        mRTPConn->setJbTime(
+                (info->mJbTimeMs <= 3000 && info->mJbTimeMs >= 40) ? info->mJbTimeMs : 300);
 
         info->mRTPSocket = sockRtp;
         info->mRTCPSocket = sockRtcp;
@@ -132,15 +136,17 @@ void NuPlayer::RTPSource::prepareAsync() {
 
         if (info->mIsAudio) {
             mAudioTrack = source;
+            info->mTimeScale = 16000;
         } else {
             mVideoTrack = source;
+            info->mTimeScale = 90000;
         }
 
         info->mSource = source;
+        info->mRTPTime = 0;
+        info->mNormalPlaytimeUs = 0;
+        info->mNPTMappingValid = false;
     }
-
-    CHECK_EQ(mState, (int)DISCONNECTED);
-    mState = CONNECTING;
 
     if (mInPreparationPhase) {
         mInPreparationPhase = false;
@@ -280,20 +286,19 @@ status_t NuPlayer::RTPSource::dequeueAccessUnit(
     }
 
     int32_t cvo;
-    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo)) {
-        if (cvo != mLastCVOUpdated) {
-            sp<AMessage> msg = new AMessage();
-            msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
-            msg->setInt32("cvo", cvo);
+    if ((*accessUnit) != NULL && (*accessUnit)->meta()->findInt32("cvo", &cvo) &&
+            cvo != mLastCVOUpdated) {
+        sp<AMessage> msg = new AMessage();
+        msg->setInt32("payload-type", NuPlayer::RTPSource::RTP_CVO);
+        msg->setInt32("cvo", cvo);
 
-            sp<AMessage> notify = dupNotify();
-            notify->setInt32("what", kWhatIMSRxNotice);
-            notify->setMessage("message", msg);
-            notify->post();
+        sp<AMessage> notify = dupNotify();
+        notify->setInt32("what", kWhatIMSRxNotice);
+        notify->setMessage("message", msg);
+        notify->post();
 
-            ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
-            mLastCVOUpdated = cvo;
-        }
+        ALOGV("notify cvo updated (%d)->(%d) to upper layer", mLastCVOUpdated, cvo);
+        mLastCVOUpdated = cvo;
     }
 
     return finalResult;
@@ -340,11 +345,16 @@ status_t NuPlayer::RTPSource::seekTo(int64_t seekTimeUs, MediaPlayerSeekMode mod
 
 void NuPlayer::RTPSource::schedulePollBuffering() {
     sp<AMessage> msg = new AMessage(kWhatPollBuffering, this);
-    msg->post(1000000ll); // 1 second intervals
+    msg->post(kBufferingPollIntervalUs); // 1 second intervals
 }
 
 void NuPlayer::RTPSource::onPollBuffering() {
     schedulePollBuffering();
+}
+
+bool NuPlayer::RTPSource::isRealTime() const {
+    ALOGD("RTPSource::isRealTime=%d", true);
+    return true;
 }
 
 void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
@@ -382,7 +392,7 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             int32_t IMSRxNotice;
-            if (msg->findInt32("IMS-Rx-notice", &IMSRxNotice)) {
+            if (msg->findInt32("rtcp-event", &IMSRxNotice)) {
                 int32_t payloadType, feedbackType;
                 CHECK(msg->findInt32("payload-type", &payloadType));
                 CHECK(msg->findInt32("feedback-type", &feedbackType));
@@ -412,6 +422,8 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
+            // Implicitly assert on valid trackIndex here, which we ensure by
+            // never removing tracks.
             TrackInfo *info = &mTracks.editItemAt(trackIndex);
 
             sp<AnotherPacketSource> source = info->mSource;
@@ -427,7 +439,6 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                     source->queueAccessUnit(accessUnit);
                     break;
                 }
-                */
 
                 int64_t nptUs =
                     ((double)rtpTime - (double)info->mRTPTime)
@@ -435,7 +446,8 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                         * 1000000ll
                         + info->mNormalPlaytimeUs;
 
-                accessUnit->meta()->setInt64("timeUs", nptUs);
+                */
+                accessUnit->meta()->setInt64("timeUs", ALooper::GetNowUs());
 
                 source->queueAccessUnit(accessUnit);
             }
@@ -488,10 +500,16 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
     }
 }
 
+void NuPlayer::RTPSource::setTargetBitrate(int32_t bitrate) {
+    mRTPConn->setTargetBitrate(bitrate);
+}
+
 void NuPlayer::RTPSource::onTimeUpdate(int32_t trackIndex, uint32_t rtpTime, uint64_t ntpTime) {
     ALOGV("onTimeUpdate track %d, rtpTime = 0x%08x, ntpTime = %#016llx",
          trackIndex, rtpTime, (long long)ntpTime);
 
+    // convert ntpTime in Q32 seconds to microseconds. Note: this will not lose precision
+    // because ntpTimeUs is at most 52 bits (double holds 53 bits)
     int64_t ntpTimeUs = (int64_t)(ntpTime * 1E6 / (1ll << 32));
 
     TrackInfo *track = &mTracks.editItemAt(trackIndex);
@@ -652,6 +670,7 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
         newTrackInfo.mIsAudio = isAudioKey;
         mTracks.push(newTrackInfo);
         info = &mTracks.editTop();
+        info->mJbTimeMs = 300;
     }
 
     if (key == "rtp-param-mime-type") {
@@ -659,10 +678,10 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
 
         const char *mime = value.string();
         const char *delimiter = strchr(mime, '/');
-        info->mCodecName = (delimiter + 1);
+        info->mCodecName = delimiter ? (delimiter + 1) : "<none>";
 
         ALOGV("rtp-param-mime-type: mMimeType (%s) => mCodecName (%s)",
-            info->mMimeType.string(), info->mCodecName.string());
+                info->mMimeType.string(), info->mCodecName.string());
     } else if (key == "video-param-decoder-profile") {
         info->mCodecProfile = atoi(value);
     } else if (key == "video-param-decoder-level") {
@@ -691,6 +710,11 @@ status_t NuPlayer::RTPSource::setParameter(const String8 &key, const String8 &va
         info->mSelfID = atoi(value);
     } else if (key == "rtp-param-ext-cvo-extmap") {
         info->mCVOExtMap = atoi(value);
+    } else if (key == "rtp-param-set-socket-network") {
+        int64_t networkHandle = atoll(value);
+        setSocketNetwork(networkHandle);
+    } else if (key == "rtp-param-jitter-buffer-time") {
+        info->mJbTimeMs = atoi(value);
     }
 
     return OK;
@@ -729,6 +753,20 @@ status_t NuPlayer::RTPSource::setParameters(const String8 &params) {
         key_start = semicolon_pos + 1;
     }
     return OK;
+}
+
+void NuPlayer::RTPSource::setSocketNetwork(int64_t networkHandle) {
+    ALOGV("setSocketNetwork: %llu", (unsigned long long)networkHandle);
+
+    TrackInfo *info = NULL;
+    for (size_t i = 0; i < mTracks.size(); ++i) {
+        info = &mTracks.editItemAt(i);
+
+        if (info == NULL)
+            break;
+
+        info->mSocketNetwork = networkHandle;
+    }
 }
 
 // Trim both leading and trailing whitespace from the given string.

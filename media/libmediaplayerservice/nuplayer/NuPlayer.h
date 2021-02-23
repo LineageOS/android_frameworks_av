@@ -102,6 +102,8 @@ struct NuPlayer : public AHandler {
 
     void updateInternalTimers();
 
+    void setTargetBitrate(int bitrate /* bps */);
+
 protected:
     virtual ~NuPlayer();
 
@@ -260,6 +262,7 @@ private:
     typedef enum {
         DATA_SOURCE_TYPE_NONE,
         DATA_SOURCE_TYPE_HTTP_LIVE,
+        DATA_SOURCE_TYPE_RTP,
         DATA_SOURCE_TYPE_RTSP,
         DATA_SOURCE_TYPE_GENERIC_URL,
         DATA_SOURCE_TYPE_GENERIC_FD,
