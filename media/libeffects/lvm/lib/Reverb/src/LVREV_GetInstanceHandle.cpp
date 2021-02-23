@@ -114,7 +114,7 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
      * Set the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL) {
-        *phInstance = InstAlloc_AddMember(&SlowData, sizeof(LVREV_Instance_st));
+        *phInstance = new LVREV_Instance_st;
     }
     pLVREV_Private = (LVREV_Instance_st*)*phInstance;
     pLVREV_Private->MemoryTable = *pMemoryTable;
@@ -269,4 +269,27 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
     return LVREV_SUCCESS;
 }
 
+/****************************************************************************************/
+/*                                                                                      */
+/* FUNCTION:                LVREV_FreeInstance                                          */
+/*                                                                                      */
+/* DESCRIPTION:                                                                         */
+/*  This function is used to free the internal allocations of the module.               */
+/*                                                                                      */
+/* PARAMETERS:                                                                          */
+/*  hInstance               Instance handle                                             */
+/*                                                                                      */
+/* RETURNS:                                                                             */
+/*  LVREV_SUCCESS          free instance succeeded                                      */
+/*  LVREV_NULLADDRESS      Instance is NULL                                             */
+/*                                                                                      */
+/****************************************************************************************/
+LVREV_ReturnStatus_en LVREV_FreeInstance(LVREV_Handle_t hInstance) {
+    if (hInstance == LVM_NULL) {
+        return LVREV_NULLADDRESS;
+    }
+
+    delete (LVREV_Instance_st*)hInstance;
+    return LVREV_SUCCESS;
+}
 /* End of file */
