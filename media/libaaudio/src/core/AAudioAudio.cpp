@@ -348,7 +348,8 @@ AAUDIO_API aaudio_result_t AAudioStream_write(AAudioStream* stream,
 
     // Don't allow writes when playing with a callback.
     if (audioStream->isDataCallbackActive()) {
-        ALOGD("Cannot write to a callback stream when running.");
+        // A developer requested this warning because it would have saved lots of debugging.
+        ALOGW("%s() - Cannot write to a callback stream when running.", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
     }
 
