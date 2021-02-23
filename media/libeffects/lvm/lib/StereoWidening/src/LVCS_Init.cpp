@@ -55,10 +55,7 @@ LVCS_ReturnStatus_en LVCS_Init(LVCS_Handle_t* phInstance, LVCS_Capabilities_t* p
      * Create the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL) {
-        *phInstance = calloc(1, sizeof(*pInstance));
-    }
-    if (*phInstance == LVM_NULL) {
-        return LVCS_NULLADDRESS;
+        *phInstance = new LVCS_Instance_t;
     }
     pInstance = (LVCS_Instance_t*)*phInstance;
 
@@ -123,7 +120,7 @@ void LVCS_DeInit(LVCS_Handle_t* phInstance) {
     if (pInstance == LVM_NULL) {
         return;
     }
-    free(pInstance);
+    delete pInstance;
     *phInstance = LVM_NULL;
     return;
 }
