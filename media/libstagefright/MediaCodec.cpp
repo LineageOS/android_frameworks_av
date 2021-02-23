@@ -424,6 +424,7 @@ enum {
     kWhatSignaledInputEOS    = 'seos',
     kWhatOutputFramesRendered = 'outR',
     kWhatOutputBuffersChanged = 'outC',
+    kWhatFirstTunnelFrameReady = 'ftfR',
 };
 
 class BufferCallback : public CodecBase::BufferCallback {
@@ -486,6 +487,7 @@ public:
     virtual void onSignaledInputEOS(status_t err) override;
     virtual void onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) override;
     virtual void onOutputBuffersChanged() override;
+    virtual void onFirstTunnelFrameReady() override;
 private:
     const sp<AMessage> mNotify;
 };
@@ -603,6 +605,12 @@ void CodecCallback::onOutputFramesRendered(const std::list<FrameRenderTracker::I
 void CodecCallback::onOutputBuffersChanged() {
     sp<AMessage> notify(mNotify->dup());
     notify->setInt32("what", kWhatOutputBuffersChanged);
+    notify->post();
+}
+
+void CodecCallback::onFirstTunnelFrameReady() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatFirstTunnelFrameReady);
     notify->post();
 }
 
@@ -1331,6 +1339,12 @@ status_t MediaCodec::setCallback(const sp<AMessage> &callback) {
 status_t MediaCodec::setOnFrameRenderedNotification(const sp<AMessage> &notify) {
     sp<AMessage> msg = new AMessage(kWhatSetNotification, this);
     msg->setMessage("on-frame-rendered", notify);
+    return msg->post();
+}
+
+status_t MediaCodec::setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &notify) {
+    sp<AMessage> msg = new AMessage(kWhatSetNotification, this);
+    msg->setMessage("first-tunnel-frame-ready", notify);
     return msg->post();
 }
 
@@ -3003,6 +3017,16 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     break;
                 }
 
+                case kWhatFirstTunnelFrameReady:
+                {
+                    if (mState == STARTED && mOnFirstTunnelFrameReadyNotification != nullptr) {
+                        sp<AMessage> notify = mOnFirstTunnelFrameReadyNotification->dup();
+                        notify->setMessage("data", msg);
+                        notify->post();
+                    }
+                    break;
+                }
+
                 case kWhatFillThisBuffer:
                 {
                     /* size_t index = */updateBuffers(kPortIndexInput, msg);
@@ -3220,6 +3244,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             sp<AMessage> notify;
             if (msg->findMessage("on-frame-rendered", &notify)) {
                 mOnFrameRenderedNotification = notify;
+            }
+            if (msg->findMessage("first-tunnel-frame-ready", &notify)) {
+                mOnFirstTunnelFrameReadyNotification = notify;
             }
             break;
         }

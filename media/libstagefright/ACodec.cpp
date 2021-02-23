@@ -1471,6 +1471,10 @@ void ACodec::notifyOfRenderedFrames(bool dropIncomplete, FrameRenderTracker::Inf
     mCallback->onOutputFramesRendered(done);
 }
 
+void ACodec::onFirstTunnelFrameReady() {
+    mCallback->onFirstTunnelFrameReady();
+}
+
 ACodec::BufferInfo *ACodec::dequeueBufferFromNativeWindow() {
     ANativeWindowBuffer *buf;
     CHECK(mNativeWindow.get() != NULL);
@@ -8391,6 +8395,12 @@ bool ACodec::ExecutingState::onOMXEvent(
 
         case OMX_EventBufferFlag:
         {
+            return true;
+        }
+
+        case OMX_EventOnFirstTunnelFrameReady:
+        {
+            mCodec->onFirstTunnelFrameReady();
             return true;
         }
 
