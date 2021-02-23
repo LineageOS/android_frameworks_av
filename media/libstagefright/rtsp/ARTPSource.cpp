@@ -512,10 +512,22 @@ void ARTPSource::setPeriodicFIR(bool enable) {
     mIssueFIRRequests = enable;
 }
 
-void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
+bool ARTPSource::isNeedToEarlyNotify() {
+    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+    int32_t intervalExpectedInNow = expected - mPrevExpected;
+    int32_t intervalReceivedInNow = mNumBuffersReceived - mPrevNumBuffersReceived;
+
+    if (intervalExpectedInNow - intervalReceivedInNow > 5)
+        return true;
+    return false;
+}
+
+void ARTPSource::notifyPktInfo(int32_t bitrate, bool isRegular) {
+    int32_t payloadType = isRegular ? RTP_QUALITY : RTP_QUALITY_EMC;
+
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("rtcp-event", 1);
-    notify->setInt32("payload-type", 102);
+    notify->setInt32("payload-type", payloadType);
     notify->setInt32("feedback-type", 0);
     // sending target bitrate up to application to share rtp quality.
     notify->setInt32("bit-rate", bitrate);
@@ -526,9 +538,11 @@ void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
     notify->setInt32("prev-num-buf-recv", mPrevNumBuffersReceived);
     notify->post();
 
-    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
-    mPrevExpected = expected;
-    mPrevNumBuffersReceived = mNumBuffersReceived;
+    if (isRegular) {
+        uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+        mPrevExpected = expected;
+        mPrevNumBuffersReceived = mNumBuffersReceived;
+    }
 }
 
 void ARTPSource::onIssueFIRByAssembler() {

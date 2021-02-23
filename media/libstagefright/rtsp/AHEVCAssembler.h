@@ -64,12 +64,13 @@ private:
 
     void submitAccessUnit();
 
-    int32_t pickProperSeq(const Queue *queue, uint32_t jit, int64_t play);
-    bool recycleUnit(uint32_t start, uint32_t end, uint32_t conneceted,
+    inline int64_t findRTPTime(const uint32_t& firstRTPTime, const sp<ABuffer>& buffer);
+    int32_t pickProperSeq(const Queue *q, uint32_t first, int64_t play, int64_t jit);
+    bool recycleUnit(uint32_t start, uint32_t end, uint32_t connected,
              size_t avail, float goodRatio);
     int32_t deleteUnitUnderSeq(Queue *queue, uint32_t seq);
     void printNowTimeUs(int64_t start, int64_t now, int64_t play);
-    void printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp);
+    void printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp);
 
     DISALLOW_EVIL_CONSTRUCTORS(AHEVCAssembler);
 };

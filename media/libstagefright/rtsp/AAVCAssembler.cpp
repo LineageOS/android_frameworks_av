@@ -112,24 +112,25 @@ int32_t AAVCAssembler::addNack(
 ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
         const sp<ARTPSource> &source) {
     List<sp<ABuffer> > *queue = source->queue();
+    const uint32_t firstRTPTime = source->mFirstRtpTime;
 
     if (queue->empty()) {
         return NOT_ENOUGH_DATA;
     }
 
     sp<ABuffer> buffer = *queue->begin();
-    uint32_t rtpTime;
-    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
     buffer->meta()->setObject("source", source);
+
+    int64_t rtpTime = findRTPTime(firstRTPTime, buffer);
 
     int64_t startTime = source->mFirstSysTime / 1000;
     int64_t nowTime = ALooper::GetNowUs() / 1000;
     int64_t playedTime = nowTime - startTime;
-    int64_t playedTimeRtp =
-        source->mFirstRtpTime + (((uint32_t)playedTime) * (source->mClockRate / 1000));
-    const uint32_t jitterTime =
-        (uint32_t)(source->mClockRate / ((float)1000 / (source->mJbTimeMs)));
-    uint32_t expiredTimeInJb = rtpTime + jitterTime;
+
+    int64_t playedTimeRtp = source->mFirstRtpTime + playedTime * (int64_t)source->mClockRate / 1000;
+    const int64_t jitterTime = source->mJbTimeMs * (int64_t)source->mClockRate / 1000;
+
+    int64_t expiredTimeInJb = rtpTime + jitterTime;
     bool isExpired = expiredTimeInJb <= (playedTimeRtp);
     bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
     bool isTooLate300 = expiredTimeInJb < (playedTimeRtp - (jitterTime * 3 / 2));
@@ -154,11 +155,11 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
 
     if (isTooLate300) {
         ALOGW("buffer arrived after 300ms ... \t Diff in Jb=%lld \t Seq# %d",
-              ((long long)playedTimeRtp) - expiredTimeInJb, buffer->int32Data());
+                (long long)(playedTimeRtp - expiredTimeInJb), buffer->int32Data());
         printNowTimeUs(startTime, nowTime, playedTime);
         printRTPTime(rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
 
-        mNextExpectedSeqNo = pickProperSeq(queue, jitterTime, playedTimeRtp);
+        mNextExpectedSeqNo = pickProperSeq(queue, firstRTPTime, playedTimeRtp, jitterTime);
     }
 
     if (mNextExpectedSeqNoValid) {
@@ -564,14 +565,25 @@ void AAVCAssembler::submitAccessUnit() {
     msg->post();
 }
 
-int32_t AAVCAssembler::pickProperSeq(const Queue *queue, uint32_t jit, int64_t play) {
+inline int64_t AAVCAssembler::findRTPTime(
+        const uint32_t& firstRTPTime, const sp<ABuffer>& buffer) {
+    /* If you want to +, -, * rtpTime, recommend to declare rtpTime as int64_t.
+       Because rtpTime can be near UINT32_MAX. Beware the overflow. */
+    int64_t rtpTime = 0;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+    // If the first overs 2^31 and rtp unders 2^31, the rtp value is overflowed one.
+    int64_t overflowMask = (firstRTPTime & 0x80000000 & ~rtpTime) << 1;
+    return rtpTime | overflowMask;
+}
+
+int32_t AAVCAssembler::pickProperSeq(const Queue *queue,
+        uint32_t first, int64_t play, int64_t jit) {
     sp<ABuffer> buffer = *(queue->begin());
-    uint32_t rtpTime;
     int32_t nextSeqNo = buffer->int32Data();
 
     Queue::const_iterator it = queue->begin();
     while (it != queue->end()) {
-        CHECK((*it)->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+        int64_t rtpTime = findRTPTime(first, *it);
         // if pkt in time exists, that should be the next pivot
         if (rtpTime + jit >= play) {
             nextSeqNo = (*it)->int32Data();
@@ -613,9 +625,9 @@ inline void AAVCAssembler::printNowTimeUs(int64_t start, int64_t now, int64_t pl
             (long long)start, (long long)now, (long long)play);
 }
 
-inline void AAVCAssembler::printRTPTime(uint32_t rtp, int64_t play, uint32_t exp, bool isExp) {
-    ALOGD("rtp-time(JB)=%u, played-rtp-time(JB)=%lld, expired-rtp-time(JB)=%u isExpired=%d",
-            rtp, (long long)play, exp, isExp);
+inline void AAVCAssembler::printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp) {
+    ALOGD("rtp-time(JB)=%lld, played-rtp-time(JB)=%lld, expired-rtp-time(JB)=%lld expired=%d",
+            (long long)rtp, (long long)play, (long long)exp, isExp);
 }
 
 ARTPAssembler::AssemblyStatus AAVCAssembler::assembleMore(

@@ -135,7 +135,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
     mSPSBuf = NULL;
     mPPSBuf = NULL;
 
-    mSeqNo = seqNo;
+    initState();
+    mSeqNo = seqNo;     // Must use explicit # of seq for RTP continuity
 
 #if LOG_TO_FILES
     mRTPFd = open(
@@ -186,6 +187,29 @@ ARTPWriter::~ARTPWriter() {
     mFd = -1;
 }
 
+void ARTPWriter::initState() {
+    if (mSourceID == 0)
+        mSourceID = rand();
+    mPayloadType = 0;
+    if (mSeqNo == 0)
+        mSeqNo = UniformRand(65536);
+    mRTPTimeBase = 0;
+    mNumRTPSent = 0;
+    mNumRTPOctetsSent = 0;
+    mLastRTPTime = 0;
+    mLastNTPTime = 0;
+
+    mOpponentID = 0;
+    mBitrate = 192000;
+
+    mNumSRsSent = 0;
+    mRTPCVOExtMap = -1;
+    mRTPCVODegrees = 0;
+    mRTPSockNetwork = 0;
+
+    mMode = INVALID;
+}
+
 status_t ARTPWriter::addSource(const sp<MediaSource> &source) {
     mSource = source;
     return OK;
@@ -203,21 +227,7 @@ status_t ARTPWriter::start(MetaData * params) {
     }
 
     mFlags &= ~kFlagEOS;
-    if (mSourceID == 0)
-        mSourceID = rand();
-    if (mSeqNo == 0)
-        mSeqNo = UniformRand(65536);
-    mRTPTimeBase = 0;
-    mNumRTPSent = 0;
-    mNumRTPOctetsSent = 0;
-    mLastRTPTime = 0;
-    mLastNTPTime = 0;
-    mOpponentID = 0;
-    mBitrate = 192000;
-    mNumSRsSent = 0;
-    mRTPCVOExtMap = -1;
-    mRTPCVODegrees = 0;
-    mRTPSockNetwork = 0;
+    initState();
 
     const char *mime;
     CHECK(mSource->getFormat()->findCString(kKeyMIMEType, &mime));
@@ -246,7 +256,6 @@ status_t ARTPWriter::start(MetaData * params) {
     if (params->findInt64(kKeySocketNetwork, &sockNetwork))
         updateSocketNetwork(sockNetwork);
 
-    mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
         mMode = H264;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
