@@ -517,6 +517,9 @@ void Reverb_free(ReverbContext* pContext) {
             }
         }
     }
+
+    LvmStatus = LVREV_FreeInstance(pContext->hInstance);
+    LVM_ERROR_CHECK(LvmStatus, "LVREV_FreeInstance", "Reverb_free")
 } /* end Reverb_free */
 
 //----------------------------------------------------------------------------
