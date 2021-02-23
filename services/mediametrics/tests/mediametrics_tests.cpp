@@ -1082,3 +1082,42 @@ TEST(mediametrics_tests, gc_same_key) {
   //mediaMetrics->dump(fileno(stdout), {} /* args */);
 }
 #endif
+
+// Base64Url and isLogSessionId string utilities can be tested by static asserts.
+static_assert(mediametrics::stringutils::isBase64Url("abc"));
+static_assert(mediametrics::stringutils::InverseBase64UrlTable['A'] == 0);
+static_assert(mediametrics::stringutils::InverseBase64UrlTable['a'] == 26);
+static_assert(mediametrics::stringutils::InverseBase64UrlTable['!'] ==
+        mediametrics::stringutils::Transpose::INVALID_CHAR);
+static_assert(mediametrics::stringutils::InverseBase64UrlTable['@'] ==
+        mediametrics::stringutils::Transpose::INVALID_CHAR);
+static_assert(mediametrics::stringutils::InverseBase64UrlTable['#'] ==
+        mediametrics::stringutils::Transpose::INVALID_CHAR);
+static_assert(!mediametrics::stringutils::isBase64Url("!@#"));
+
+static_assert(mediametrics::stringutils::isLogSessionId("0123456789abcdef"));
+static_assert(!mediametrics::stringutils::isLogSessionId("abc"));
+static_assert(!mediametrics::stringutils::isLogSessionId("!@#"));
+static_assert(!mediametrics::stringutils::isLogSessionId("0123456789abcde!"));
+
+TEST(mediametrics_tests, sanitizeLogSessionId) {
+   // invalid id returns empty string.
+   ASSERT_EQ("", mediametrics::stringutils::sanitizeLogSessionId("abc"));
+
+   // valid id passes through.
+   std::string validId = "fedcba9876543210";
+   ASSERT_EQ(validId, mediametrics::stringutils::sanitizeLogSessionId(validId));
+
+   // one more char makes the id invalid
+   ASSERT_EQ("", mediametrics::stringutils::sanitizeLogSessionId(validId + "A"));
+
+   std::string validId2 = "ZYXWVUT123456789";
+   ASSERT_EQ(validId2, mediametrics::stringutils::sanitizeLogSessionId(validId2));
+
+   // one fewer char makes the id invalid
+   ASSERT_EQ("", mediametrics::stringutils::sanitizeLogSessionId(validId.c_str() + 1));
+
+   // replacing one character with an invalid character makes an invalid id.
+   validId2[3] = '!';
+   ASSERT_EQ("", mediametrics::stringutils::sanitizeLogSessionId(validId2));
+}
