@@ -330,17 +330,6 @@ status_t Camera3Device::initializeCommonLocked() {
         mUsePartialResult = (mNumPartialResults > 1);
     }
 
-    camera_metadata_entry configs =
-            mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
-    for (uint32_t i = 0; i < configs.count; i += 4) {
-        if (configs.data.i32[i] == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-                configs.data.i32[i + 3] ==
-                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_INPUT) {
-            mSupportedOpaqueInputSizes.add(Size(configs.data.i32[i + 1],
-                    configs.data.i32[i + 2]));
-        }
-    }
-
     bool usePrecorrectArray = DistortionMapper::isDistortionSupported(mDeviceInfo);
     if (usePrecorrectArray) {
         res = mDistortionMappers[mId.c_str()].setupStaticInfo(mDeviceInfo);
