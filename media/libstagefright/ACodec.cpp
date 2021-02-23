@@ -6860,6 +6860,7 @@ bool ACodec::UninitializedState::onAllocateComponent(const sp<AMessage> &msg) {
     ALOGV("onAllocateComponent");
 
     CHECK(mCodec->mOMXNode == NULL);
+    mCodec->mFatalError = false;
 
     sp<AMessage> notify = new AMessage(kWhatOMXMessageList, mCodec);
     notify->setInt32("generation", mCodec->mNodeGeneration + 1);
