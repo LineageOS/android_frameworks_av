@@ -270,6 +270,7 @@ public:
     status_t    setPreferredMicrophoneFieldDimension(float zoom);
 
     status_t    getPortId(audio_port_handle_t *portId) const;
+    status_t    getRtpDataUsage(uint64_t *bytes);
 
 private:
     void                    doCleanUp();

@@ -82,6 +82,7 @@ struct StagefrightRecorder : public MediaRecorderBase {
     virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
     virtual status_t setPreferredMicrophoneFieldDimension(float zoom);
             status_t getPortId(audio_port_handle_t *portId) const override;
+    virtual status_t getRtpDataUsage(uint64_t *bytes);
 
 private:
 
