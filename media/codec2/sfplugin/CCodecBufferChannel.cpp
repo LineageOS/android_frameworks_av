@@ -253,6 +253,16 @@ status_t CCodecBufferChannel::queueInputBufferInternal(
             usesFrameReassembler = true;
             input->frameReassembler.process(buffer, &items);
         } else {
+            int32_t cvo = 0;
+            if (buffer->meta()->findInt32("cvo", &cvo)) {
+                int32_t rotation = cvo % 360;
+                // change rotation to counter-clock wise.
+                rotation = ((rotation <= 0) ? 0 : 360) - rotation;
+
+                Mutexed<OutputSurface>::Locked output(mOutputSurface);
+                uint64_t frameIndex = work->input.ordinal.frameIndex.peeku();
+                output->rotation[frameIndex] = rotation;
+            }
             work->input.buffers.push_back(c2buffer);
             if (encryptedBlock) {
                 work->input.infoBuffers.emplace_back(C2InfoBuffer::CreateLinearBuffer(
@@ -747,6 +757,22 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                 c2Buffer->getInfo(C2StreamRotationInfo::output::PARAM_TYPE));
     bool flip = rotation && (rotation->flip & 1);
     uint32_t quarters = ((rotation ? rotation->value : 0) / 90) & 3;
+
+    {
+        Mutexed<OutputSurface>::Locked output(mOutputSurface);
+        if (output->surface == nullptr) {
+            ALOGI("[%s] cannot render buffer without surface", mName);
+            return OK;
+        }
+        int64_t frameIndex;
+        buffer->meta()->findInt64("frameIndex", &frameIndex);
+        if (output->rotation.count(frameIndex) != 0) {
+            auto it = output->rotation.find(frameIndex);
+            quarters = (it->second / 90) & 3;
+            output->rotation.erase(it);
+        }
+    }
+
     uint32_t transform = 0;
     switch (quarters) {
         case 0: // no rotation
@@ -788,14 +814,6 @@ status_t CCodecBufferChannel::renderOutputBuffer(
                 c2Buffer->getInfo(C2StreamHdr10PlusInfo::output::PARAM_TYPE));
     if (hdr10PlusInfo && hdr10PlusInfo->flexCount() == 0) {
         hdr10PlusInfo.reset();
-    }
-
-    {
-        Mutexed<OutputSurface>::Locked output(mOutputSurface);
-        if (output->surface == nullptr) {
-            ALOGI("[%s] cannot render buffer without surface", mName);
-            return OK;
-        }
     }
 
     std::vector<C2ConstGraphicBlock> blocks = c2Buffer->data().graphicBlocks();

@@ -746,9 +746,15 @@ bool NuPlayer::Decoder::handleAnOutputBuffer(
 
     mOutputBuffers.editItemAt(index) = buffer;
 
+    int64_t frameIndex;
+    bool frameIndexFound = buffer->meta()->findInt64("frameIndex", &frameIndex);
+
     buffer->setRange(offset, size);
     buffer->meta()->clear();
     buffer->meta()->setInt64("timeUs", timeUs);
+    if (frameIndexFound) {
+        buffer->meta()->setInt64("frameIndex", frameIndex);
+    }
 
     bool eos = flags & MediaCodec::BUFFER_FLAG_EOS;
     // we do not expect CODECCONFIG or SYNCFRAME for decoder
