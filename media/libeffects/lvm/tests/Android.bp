@@ -47,6 +47,7 @@ cc_test {
     name: "reverb_test",
     host_supported: true,
     proprietary: true,
+    gtest: false,
 
     include_dirs: [
         "frameworks/av/media/libeffects/lvm/wrapper/Reverb",
