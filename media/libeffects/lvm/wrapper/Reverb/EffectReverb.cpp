@@ -190,8 +190,8 @@ int Reverb_paramValueSize(int32_t param);
 
 /* Effect Library Interface Implementation */
 
-extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t sessionId __unused,
-                            int32_t ioId __unused, effect_handle_t* pHandle) {
+extern "C" int EffectCreate(const effect_uuid_t* uuid, int32_t /* sessionId __unused */,
+                            int32_t /* ioId __unused */, effect_handle_t* pHandle) {
     int ret;
     int i;
     int length = sizeof(gDescriptors) / sizeof(const effect_descriptor_t*);
@@ -517,6 +517,9 @@ void Reverb_free(ReverbContext* pContext) {
             }
         }
     }
+
+    LvmStatus = LVREV_FreeInstance(pContext->hInstance);
+    LVM_ERROR_CHECK(LvmStatus, "LVREV_FreeInstance", "Reverb_free")
 } /* end Reverb_free */
 
 //----------------------------------------------------------------------------
@@ -553,40 +556,10 @@ int Reverb_setConfig(ReverbContext* pContext, effect_config_t* pConfig) {
     // ALOGV("\tReverb_setConfig calling memcpy");
     pContext->config = *pConfig;
 
-    switch (pConfig->inputCfg.samplingRate) {
-        case 8000:
-            SampleRate = LVM_FS_8000;
-            break;
-        case 16000:
-            SampleRate = LVM_FS_16000;
-            break;
-        case 22050:
-            SampleRate = LVM_FS_22050;
-            break;
-        case 32000:
-            SampleRate = LVM_FS_32000;
-            break;
-        case 44100:
-            SampleRate = LVM_FS_44100;
-            break;
-        case 48000:
-            SampleRate = LVM_FS_48000;
-            break;
-        case 88200:
-            SampleRate = LVM_FS_88200;
-            break;
-        case 96000:
-            SampleRate = LVM_FS_96000;
-            break;
-        case 176400:
-            SampleRate = LVM_FS_176400;
-            break;
-        case 192000:
-            SampleRate = LVM_FS_192000;
-            break;
-        default:
-            ALOGV("\rReverb_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
-            return -EINVAL;
+    SampleRate = lvmFsForSampleRate(pConfig->inputCfg.samplingRate);
+    if (SampleRate == LVM_FS_INVALID) {
+        ALOGE("Reverb_setConfig invalid sampling rate %d", pConfig->inputCfg.samplingRate);
+        return -EINVAL;
     }
 
     if (pContext->SampleRate != SampleRate) {

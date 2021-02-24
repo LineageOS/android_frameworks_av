@@ -40,6 +40,17 @@ struct ARTPSource : public RefBase {
             const sp<ASessionDescription> &sessionDesc, size_t index,
             const sp<AMessage> &notify);
 
+    enum {
+        RTP_FIRST_PACKET = 100,
+        RTCP_FIRST_PACKET = 101,
+        RTP_QUALITY = 102,
+        RTP_QUALITY_EMC = 103,
+        RTCP_TSFB = 205,
+        RTCP_PSFB = 206,
+        RTP_CVO = 300,
+        RTP_AUTODOWN = 400,
+    };
+
     void processRTPPacket(const sp<ABuffer> &buffer);
     void timeUpdate(uint32_t rtpTime, uint64_t ntpTime);
     void byeReceived();
@@ -55,7 +66,8 @@ struct ARTPSource : public RefBase {
     void setSelfID(const uint32_t selfID);
     void setJbTime(const uint32_t jbTimeMs);
     void setPeriodicFIR(bool enable);
-    void notifyPktInfo(int32_t bitrate, int64_t time);
+    bool isNeedToEarlyNotify();
+    void notifyPktInfo(int32_t bitrate, bool isRegular);
     // FIR needs to be sent by missing packet or broken video image.
     void onIssueFIRByAssembler();
 

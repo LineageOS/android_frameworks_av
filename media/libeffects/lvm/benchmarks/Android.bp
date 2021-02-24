@@ -28,6 +28,7 @@ cc_benchmark {
 cc_benchmark {
     name: "reverb_benchmark",
     vendor: true,
+    host_supported: true,
     include_dirs: [
         "frameworks/av/media/libeffects/lvm/wrapper/Reverb",
     ],

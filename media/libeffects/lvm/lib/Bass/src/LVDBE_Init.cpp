@@ -57,10 +57,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_
      * Create the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL) {
-        *phInstance = calloc(1, sizeof(*pInstance));
-    }
-    if (*phInstance == LVM_NULL) {
-        return LVDBE_NULLADDRESS;
+        *phInstance = new LVDBE_Instance_t;
     }
     pInstance = (LVDBE_Instance_t*)*phInstance;
 
@@ -185,6 +182,6 @@ void LVDBE_DeInit(LVDBE_Handle_t* phInstance) {
         free(pInstance->pData);
         pInstance->pData = LVM_NULL;
     }
-    free(pInstance);
+    delete pInstance;
     *phInstance = LVM_NULL;
 }

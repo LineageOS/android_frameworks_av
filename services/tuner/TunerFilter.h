@@ -92,7 +92,7 @@ const static int IP_V6_LENGTH = 16;
 class TunerFilter : public BnTunerFilter {
 
 public:
-    TunerFilter(sp<IFilter> filter, sp<IFilterCallback> callback, int mainType, int subTyp);
+    TunerFilter(sp<IFilter> filter, int mainType, int subTyp);
     virtual ~TunerFilter();
     Status getId(int32_t* _aidl_return) override;
     Status getId64Bit(int64_t* _aidl_return) override;
@@ -181,7 +181,6 @@ private:
 
     sp<IFilter> mFilter;
     sp<::android::hardware::tv::tuner::V1_1::IFilter> mFilter_1_1;
-    sp<IFilterCallback> mFilterCallback;
     int32_t mId;
     int64_t mId64Bit;
     int mMainType;
