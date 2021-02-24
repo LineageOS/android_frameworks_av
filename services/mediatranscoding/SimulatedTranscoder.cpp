@@ -60,11 +60,18 @@ SimulatedTranscoder::~SimulatedTranscoder() {
 void SimulatedTranscoder::start(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
-    if (request.testConfig.has_value() && request.testConfig->processingTotalTimeMs > 0) {
-        mSessionProcessingTimeMs = request.testConfig->processingTotalTimeMs;
+    {
+        auto lock = std::scoped_lock(mLock);
+        int64_t processingTimeUs = kSessionDurationUs;
+        if (request.testConfig.has_value() && request.testConfig->processingTotalTimeMs > 0) {
+            processingTimeUs = request.testConfig->processingTotalTimeMs * 1000;
+        }
+        ALOGI("%s: session {%lld, %d}: processingTimeUs: %lld", __FUNCTION__, (long long)clientId,
+              sessionId, (long long)processingTimeUs);
+        SessionKeyType key = std::make_pair(clientId, sessionId);
+        mRemainingTimeMap.emplace(key, processingTimeUs);
     }
-    ALOGV("%s: session {%d}: processingTime: %lld", __FUNCTION__, sessionId,
-          (long long)mSessionProcessingTimeMs);
+
     queueEvent(Event::Start, clientId, sessionId, [=] {
         auto callback = mCallback.lock();
         if (callback != nullptr) {
@@ -123,7 +130,6 @@ void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId,
 
 void SimulatedTranscoder::threadLoop() {
     bool running = false;
-    std::chrono::microseconds remainingUs(kSessionDurationUs);
     std::chrono::system_clock::time_point lastRunningTime;
     Event lastRunningEvent;
 
@@ -138,12 +144,16 @@ void SimulatedTranscoder::threadLoop() {
                 continue;
             }
             // If running, wait for the remaining life of this session. Report finish if timed out.
-            std::cv_status status = mCondition.wait_for(lock, remainingUs);
+            SessionKeyType key =
+                    std::make_pair(lastRunningEvent.clientId, lastRunningEvent.sessionId);
+            std::cv_status status = mCondition.wait_for(lock, mRemainingTimeMap[key]);
             if (status == std::cv_status::timeout) {
                 running = false;
 
                 auto callback = mCallback.lock();
                 if (callback != nullptr) {
+                    mRemainingTimeMap.erase(key);
+
                     lock.unlock();
                     callback->onFinish(lastRunningEvent.clientId, lastRunningEvent.sessionId);
                     lock.lock();
@@ -153,7 +163,7 @@ void SimulatedTranscoder::threadLoop() {
                 // against bad events (which will be ignored) or spurious wakeups, in that
                 // case we don't want to wait for the same time again.
                 auto now = std::chrono::system_clock::now();
-                remainingUs -= (now - lastRunningTime);
+                mRemainingTimeMap[key] -= (now - lastRunningTime);
                 lastRunningTime = now;
             }
         }
@@ -162,23 +172,29 @@ void SimulatedTranscoder::threadLoop() {
         Event event = *mQueue.begin();
         mQueue.pop_front();
 
-        ALOGV("%s: session {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId,
+        ALOGD("%s: session {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId,
               event.sessionId, toString(event.type));
 
         if (event.type == Event::Abandon) {
             break;
         }
 
+        SessionKeyType key = std::make_pair(event.clientId, event.sessionId);
         if (!running && (event.type == Event::Start || event.type == Event::Resume)) {
             running = true;
             lastRunningTime = std::chrono::system_clock::now();
             lastRunningEvent = event;
-            if (event.type == Event::Start) {
-                remainingUs = std::chrono::milliseconds(mSessionProcessingTimeMs);
-            }
+            ALOGV("%s: session {%lld, %d}: remaining time: %lld", __FUNCTION__,
+                  (long long)event.clientId, event.sessionId,
+                  (long long)mRemainingTimeMap[key].count());
+
         } else if (running && (event.type == Event::Pause || event.type == Event::Stop)) {
             running = false;
-            remainingUs -= (std::chrono::system_clock::now() - lastRunningTime);
+            if (event.type == Event::Stop) {
+                mRemainingTimeMap.erase(key);
+            } else {
+                mRemainingTimeMap[key] -= (std::chrono::system_clock::now() - lastRunningTime);
+            }
         } else {
             ALOGW("%s: discarding bad event: session {%lld, %d}: %s", __FUNCTION__,
                   (long long)event.clientId, event.sessionId, toString(event.type));
