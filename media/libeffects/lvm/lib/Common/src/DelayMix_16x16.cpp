@@ -26,34 +26,50 @@ void DelayMix_Float(const LVM_FLOAT* src, /* Source 1, to be delayed */
                     LVM_INT16 size,       /* Delay size */
                     LVM_FLOAT* dst,       /* Source/destination */
                     LVM_INT16* pOffset,   /* Delay offset */
-                    LVM_INT16 n)          /* Number of stereo samples */
+                    LVM_INT16 n,          /* Number of samples */
+                    LVM_INT32 NrChannels) /* Number of channels */
 {
     LVM_INT16 i;
     LVM_INT16 Offset = *pOffset;
     LVM_FLOAT temp;
 
     for (i = 0; i < n; i++) {
-        /* Left channel */
-        temp = (LVM_FLOAT)((LVM_FLOAT)(*dst + (LVM_FLOAT)delay[Offset]) / 2.0f);
-        *dst = temp;
-        dst++;
+        if (NrChannels == FCC_1) {
+            temp = (LVM_FLOAT)(*dst + (LVM_FLOAT)delay[Offset]) / 2.0f;
+            *dst = temp;
+            dst++;
 
-        delay[Offset] = *src;
-        Offset++;
-        src++;
+            delay[Offset] = *src;
+            Offset++;
+            src++;
 
-        /* Right channel */
-        temp = (LVM_FLOAT)((LVM_FLOAT)(*dst - (LVM_FLOAT)delay[Offset]) / 2.0f);
-        *dst = temp;
-        dst++;
+            /* Make the reverb delay buffer a circular buffer */
+            if (Offset >= size) {
+                Offset = 0;
+            }
+        } else {
+            /* Left channel */
+            temp = (LVM_FLOAT)(*dst + (LVM_FLOAT)delay[Offset]) / 2.0f;
+            *dst = temp;
+            dst++;
 
-        delay[Offset] = *src;
-        Offset++;
-        src++;
+            delay[Offset] = *src;
+            Offset++;
+            src++;
 
-        /* Make the reverb delay buffer a circular buffer */
-        if (Offset >= size) {
-            Offset = 0;
+            /* Right channel */
+            temp = (LVM_FLOAT)(*dst - (LVM_FLOAT)delay[Offset]) / 2.0f;
+            *dst = temp;
+            dst++;
+
+            delay[Offset] = *src;
+            Offset++;
+            src++;
+
+            /* Make the reverb delay buffer a circular buffer */
+            if (Offset >= size) {
+                Offset = 0;
+            }
         }
     }
 
