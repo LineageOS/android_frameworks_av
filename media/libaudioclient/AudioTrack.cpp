@@ -38,15 +38,6 @@
 #include <media/MediaMetricsItem.h>
 #include <media/TypeConverter.h>
 
-#define VALUE_OR_FATAL(result)                   \
-    ({                                           \
-       auto _tmp = (result);                     \
-       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),           \
-                           "Failed result (%d)", \
-                           _tmp.error());        \
-       std::move(_tmp.value());                  \
-     })
-
 #define WAIT_PERIOD_MS                  10
 #define WAIT_STREAM_END_TIMEOUT_SEC     120
 static const int kMaxLoopCountNotifications = 32;
