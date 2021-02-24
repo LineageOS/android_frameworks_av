@@ -33,18 +33,28 @@ const char* SimulatedTranscoder::toString(Event::Type type) {
         return "Pause";
     case Event::Resume:
         return "Resume";
+    case Event::Stop:
+        return "Stop";
+    case Event::Finished:
+        return "Finished";
+    case Event::Failed:
+        return "Failed";
+    case Event::Abandon:
+        return "Abandon";
     default:
         break;
     }
     return "(unknown)";
 }
 
-SimulatedTranscoder::SimulatedTranscoder() {
-    std::thread(&SimulatedTranscoder::threadLoop, this).detach();
+SimulatedTranscoder::SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                                         int64_t heartBeatUs __unused)
+      : mCallback(cb), mLooperReady(false) {
+    ALOGV("SimulatedTranscoder CTOR: %p", this);
 }
 
-void SimulatedTranscoder::setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) {
-    mCallback = cb;
+SimulatedTranscoder::~SimulatedTranscoder() {
+    ALOGV("SimulatedTranscoder DTOR: %p", this);
 }
 
 void SimulatedTranscoder::start(
@@ -83,8 +93,12 @@ void SimulatedTranscoder::resume(
     });
 }
 
-void SimulatedTranscoder::stop(ClientIdType clientId, SessionIdType sessionId) {
+void SimulatedTranscoder::stop(ClientIdType clientId, SessionIdType sessionId, bool abandon) {
     queueEvent(Event::Stop, clientId, sessionId, nullptr);
+
+    if (abandon) {
+        queueEvent(Event::Abandon, 0, 0, nullptr);
+    }
 }
 
 void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId,
@@ -93,6 +107,15 @@ void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId,
           toString(type));
 
     auto lock = std::scoped_lock(mLock);
+
+    if (!mLooperReady) {
+        // A shared_ptr to ourselves is given to the thread's stack, so that SimulatedTranscoder
+        // object doesn't go away until the thread exits. When a watchdog timeout happens, this
+        // allows the session controller to release its reference to the TranscoderWrapper object
+        // without blocking on the thread exits.
+        std::thread([owner = shared_from_this()]() { owner->threadLoop(); }).detach();
+        mLooperReady = true;
+    }
 
     mQueue.push_back({type, clientId, sessionId, runnable});
     mCondition.notify_one();
@@ -136,34 +159,36 @@ void SimulatedTranscoder::threadLoop() {
         }
 
         // Handle the events, adjust state and send updates to client accordingly.
-        while (!mQueue.empty()) {
-            Event event = *mQueue.begin();
-            mQueue.pop_front();
+        Event event = *mQueue.begin();
+        mQueue.pop_front();
 
-            ALOGV("%s: session {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId,
-                  event.sessionId, toString(event.type));
+        ALOGV("%s: session {%lld, %d}: %s", __FUNCTION__, (long long)event.clientId,
+              event.sessionId, toString(event.type));
 
-            if (!running && (event.type == Event::Start || event.type == Event::Resume)) {
-                running = true;
-                lastRunningTime = std::chrono::system_clock::now();
-                lastRunningEvent = event;
-                if (event.type == Event::Start) {
-                    remainingUs = std::chrono::milliseconds(mSessionProcessingTimeMs);
-                }
-            } else if (running && (event.type == Event::Pause || event.type == Event::Stop)) {
-                running = false;
-                remainingUs -= (std::chrono::system_clock::now() - lastRunningTime);
-            } else {
-                ALOGW("%s: discarding bad event: session {%lld, %d}: %s", __FUNCTION__,
-                      (long long)event.clientId, event.sessionId, toString(event.type));
-                continue;
+        if (event.type == Event::Abandon) {
+            break;
+        }
+
+        if (!running && (event.type == Event::Start || event.type == Event::Resume)) {
+            running = true;
+            lastRunningTime = std::chrono::system_clock::now();
+            lastRunningEvent = event;
+            if (event.type == Event::Start) {
+                remainingUs = std::chrono::milliseconds(mSessionProcessingTimeMs);
             }
+        } else if (running && (event.type == Event::Pause || event.type == Event::Stop)) {
+            running = false;
+            remainingUs -= (std::chrono::system_clock::now() - lastRunningTime);
+        } else {
+            ALOGW("%s: discarding bad event: session {%lld, %d}: %s", __FUNCTION__,
+                  (long long)event.clientId, event.sessionId, toString(event.type));
+            continue;
+        }
 
-            if (event.runnable != nullptr) {
-                lock.unlock();
-                event.runnable();
-                lock.lock();
-            }
+        if (event.runnable != nullptr) {
+            lock.unlock();
+            event.runnable();
+            lock.lock();
         }
     }
 }

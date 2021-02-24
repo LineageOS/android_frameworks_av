@@ -83,12 +83,14 @@ MediaSampleWriter::~MediaSampleWriter() {
     }
 }
 
-bool MediaSampleWriter::init(int fd, const std::weak_ptr<CallbackInterface>& callbacks) {
-    return init(DefaultMuxer::create(fd), callbacks);
+bool MediaSampleWriter::init(int fd, const std::weak_ptr<CallbackInterface>& callbacks,
+                             int64_t heartBeatIntervalUs) {
+    return init(DefaultMuxer::create(fd), callbacks, heartBeatIntervalUs);
 }
 
 bool MediaSampleWriter::init(const std::shared_ptr<MediaSampleWriterMuxerInterface>& muxer,
-                             const std::weak_ptr<CallbackInterface>& callbacks) {
+                             const std::weak_ptr<CallbackInterface>& callbacks,
+                             int64_t heartBeatIntervalUs) {
     if (callbacks.lock() == nullptr) {
         LOG(ERROR) << "Callback object cannot be null";
         return false;
@@ -106,6 +108,7 @@ bool MediaSampleWriter::init(const std::shared_ptr<MediaSampleWriterMuxerInterfa
     mState = INITIALIZED;
     mMuxer = muxer;
     mCallbacks = callbacks;
+    mHeartBeatIntervalUs = heartBeatIntervalUs;
     return true;
 }
 
@@ -219,6 +222,7 @@ media_status_t MediaSampleWriter::writeSamples(bool* wasStopped) {
 media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFETY_ANALYSIS {
     AMediaCodecBufferInfo bufferInfo;
     int32_t lastProgressUpdate = 0;
+    bool progressSinceLastReport = false;
     int trackEosCount = 0;
 
     // Set the "primary" track that will be used to determine progress to the track with longest
@@ -232,6 +236,10 @@ media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFE
         }
     }
 
+    std::chrono::microseconds updateInterval(mHeartBeatIntervalUs);
+    std::chrono::system_clock::time_point nextUpdateTime =
+            std::chrono::system_clock::now() + updateInterval;
+
     while (true) {
         if (trackEosCount >= mTracks.size()) {
             break;
@@ -242,7 +250,21 @@ media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFE
         {
             std::unique_lock lock(mMutex);
             while (mSampleQueue.empty() && mState == STARTED) {
-                mSampleSignal.wait(lock);
+                if (mHeartBeatIntervalUs <= 0) {
+                    mSampleSignal.wait(lock);
+                    continue;
+                }
+
+                if (mSampleSignal.wait_until(lock, nextUpdateTime) == std::cv_status::timeout) {
+                    // Send heart-beat if there is any progress since last update time.
+                    if (progressSinceLastReport) {
+                        if (auto callbacks = mCallbacks.lock()) {
+                            callbacks->onHeartBeat(this);
+                        }
+                        progressSinceLastReport = false;
+                    }
+                    nextUpdateTime += updateInterval;
+                }
             }
 
             if (mState == STOPPED) {
@@ -306,6 +328,7 @@ media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFE
                 }
                 lastProgressUpdate = progress;
             }
+            progressSinceLastReport = true;
         }
     }
 

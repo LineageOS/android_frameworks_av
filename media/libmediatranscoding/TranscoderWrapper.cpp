@@ -113,6 +113,12 @@ std::string TranscoderWrapper::toString(const Event& event) {
     case Event::Progress:
         typeStr = "Progress";
         break;
+    case Event::HeartBeat:
+        typeStr = "HeartBeat";
+        break;
+    case Event::Abandon:
+        typeStr = "Abandon";
+        break;
     default:
         return "(unknown)";
     }
@@ -154,6 +160,13 @@ public:
         }
     }
 
+    virtual void onHeartBeat(const MediaTranscoder* transcoder __unused) override {
+        auto owner = mOwner.lock();
+        if (owner != nullptr) {
+            owner->onHeartBeat(mClientId, mSessionId);
+        }
+    }
+
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
                                      const std::shared_ptr<ndk::ScopedAParcel>& pausedState
                                              __unused) override {
@@ -166,12 +179,18 @@ private:
     SessionIdType mSessionId;
 };
 
-TranscoderWrapper::TranscoderWrapper() : mCurrentClientId(0), mCurrentSessionId(-1) {
-    std::thread(&TranscoderWrapper::threadLoop, this).detach();
+TranscoderWrapper::TranscoderWrapper(const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                                     int64_t heartBeatIntervalUs)
+      : mCallback(cb),
+        mHeartBeatIntervalUs(heartBeatIntervalUs),
+        mCurrentClientId(0),
+        mCurrentSessionId(-1),
+        mLooperReady(false) {
+    ALOGV("TranscoderWrapper CTOR: %p", this);
 }
 
-void TranscoderWrapper::setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) {
-    mCallback = cb;
+TranscoderWrapper::~TranscoderWrapper() {
+    ALOGV("TranscoderWrapper DTOR: %p", this);
 }
 
 static bool isResourceError(media_status_t err) {
@@ -250,7 +269,7 @@ void TranscoderWrapper::resume(ClientIdType clientId, SessionIdType sessionId,
     });
 }
 
-void TranscoderWrapper::stop(ClientIdType clientId, SessionIdType sessionId) {
+void TranscoderWrapper::stop(ClientIdType clientId, SessionIdType sessionId, bool abandon) {
     queueEvent(Event::Stop, clientId, sessionId, [=] {
         if (mTranscoder != nullptr && clientId == mCurrentClientId &&
             sessionId == mCurrentSessionId) {
@@ -268,6 +287,10 @@ void TranscoderWrapper::stop(ClientIdType clientId, SessionIdType sessionId) {
         }
         // No callback needed for stop.
     });
+
+    if (abandon) {
+        queueEvent(Event::Abandon, 0, 0, nullptr);
+    }
 }
 
 void TranscoderWrapper::onFinish(ClientIdType clientId, SessionIdType sessionId) {
@@ -309,6 +332,15 @@ void TranscoderWrapper::onProgress(ClientIdType clientId, SessionIdType sessionI
                 }
             },
             progress);
+}
+
+void TranscoderWrapper::onHeartBeat(ClientIdType clientId, SessionIdType sessionId) {
+    queueEvent(Event::HeartBeat, clientId, sessionId, [=] {
+        auto callback = mCallback.lock();
+        if (callback != nullptr) {
+            callback->onHeartBeat(clientId, sessionId);
+        }
+    });
 }
 
 media_status_t TranscoderWrapper::setupTranscoder(
@@ -353,8 +385,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
     mCurrentClientId = clientId;
     mCurrentSessionId = sessionId;
     mTranscoderCb = std::make_shared<CallbackImpl>(shared_from_this(), clientId, sessionId);
-    mTranscoder = MediaTranscoder::create(mTranscoderCb, request.clientPid, request.clientUid,
-                                          pausedState);
+    mTranscoder = MediaTranscoder::create(mTranscoderCb, mHeartBeatIntervalUs, request.clientPid,
+                                          request.clientUid, pausedState);
     if (mTranscoder == nullptr) {
         ALOGE("failed to create transcoder");
         return AMEDIA_ERROR_UNKNOWN;
@@ -486,6 +518,15 @@ void TranscoderWrapper::queueEvent(Event::Type type, ClientIdType clientId, Sess
                                    const std::function<void()> runnable, int32_t arg) {
     std::scoped_lock lock{mLock};
 
+    if (!mLooperReady) {
+        // A shared_ptr to ourselves is given to the thread's stack, so that the TranscoderWrapper
+        // object doesn't go away until the thread exits. When a watchdog timeout happens, this
+        // allows the session controller to release its reference to the TranscoderWrapper object
+        // without blocking on the thread exits.
+        std::thread([owner = shared_from_this()]() { owner->threadLoop(); }).detach();
+        mLooperReady = true;
+    }
+
     mQueue.push_back({type, clientId, sessionId, runnable, arg});
     mCondition.notify_one();
 }
@@ -504,6 +545,10 @@ void TranscoderWrapper::threadLoop() {
         mQueue.pop_front();
 
         ALOGD("%s: %s", __FUNCTION__, toString(event).c_str());
+
+        if (event.type == Event::Abandon) {
+            break;
+        }
 
         lock.unlock();
         event.runnable();
