@@ -88,6 +88,8 @@ public:
         }
     }
 
+    virtual void onHeartBeat(const MediaTranscoder* transcoder UNUSED_PARAM) override {}
+
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder UNUSED_PARAM,
                                      const shared_ptr<ndk::ScopedAParcel>& pausedState
                                              UNUSED_PARAM) override {}

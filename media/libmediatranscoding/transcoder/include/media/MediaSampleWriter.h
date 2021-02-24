@@ -90,6 +90,9 @@ public:
         /** Sample writer progress update in percent. */
         virtual void onProgressUpdate(const MediaSampleWriter* writer, int32_t progress) = 0;
 
+        /** Sample writer heart-beat signal. */
+        virtual void onHeartBeat(const MediaSampleWriter* writer) = 0;
+
         virtual ~CallbackInterface() = default;
     };
 
@@ -101,18 +104,25 @@ public:
      * @param fd An open file descriptor to write to. The caller is responsible for closing this
      *        file descriptor and it is safe to do so once this method returns.
      * @param callbacks Client callback object that gets called by the sample writer.
+     * @param heartBeatIntervalUs Interval (in microsecond) at which the sample writer should send a
+     *        heart-beat to onProgressUpdate() to indicate it's making progress. Value <=0 indicates
+     *        that the heartbeat is not required.
      * @return True if the writer was successfully initialized.
      */
-    bool init(int fd, const std::weak_ptr<CallbackInterface>& callbacks /* nonnull */);
+    bool init(int fd, const std::weak_ptr<CallbackInterface>& callbacks /* nonnull */,
+              int64_t heartBeatIntervalUs = -1);
 
     /**
      * Initializes the sample writer with a custom muxer interface implementation.
      * @param muxer The custom muxer interface implementation.
      * @param @param callbacks Client callback object that gets called by the sample writer.
+     * @param heartBeatIntervalUs Interval (in microsecond) at which the sample writer should send a
+     *        heart-beat to onProgressUpdate() to indicate it's making progress.
      * @return True if the writer was successfully initialized.
      */
     bool init(const std::shared_ptr<MediaSampleWriterMuxerInterface>& muxer /* nonnull */,
-              const std::weak_ptr<CallbackInterface>& callbacks /* nonnull */);
+              const std::weak_ptr<CallbackInterface>& callbacks /* nonnull */,
+              int64_t heartBeatIntervalUs = -1);
 
     /**
      * Adds a new track to the sample writer. Tracks must be added after the sample writer has been
@@ -185,6 +195,7 @@ private:
 
     std::weak_ptr<CallbackInterface> mCallbacks;
     std::shared_ptr<MediaSampleWriterMuxerInterface> mMuxer;
+    int64_t mHeartBeatIntervalUs;
 
     std::mutex mMutex;  // Protects sample queue and state.
     std::condition_variable mSampleSignal;
