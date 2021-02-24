@@ -546,7 +546,19 @@ c2_status_t C2AllocationGralloc::map(
             status_t err = GraphicBufferMapper::get().lockYCbCr(
                     const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, &ycbcrLayout);
             if (err) {
-                ALOGE("failed transaction: lockYCbCr");
+                ALOGE("failed transaction: lockYCbCr (err=%d)", err);
+                return C2_CORRUPTED;
+            }
+            if (!ycbcrLayout.y || !ycbcrLayout.cb || !ycbcrLayout.cr
+                    || ycbcrLayout.ystride == 0
+                    || ycbcrLayout.cstride == 0
+                    || ycbcrLayout.chroma_step == 0) {
+                ALOGE("invalid layout: lockYCbCr (y=%s cb=%s cr=%s "
+                        "ystride=%zu cstride=%zu chroma_step=%zu)",
+                        ycbcrLayout.y ? "(non-null)" : "(null)",
+                        ycbcrLayout.cb ? "(non-null)" : "(null)",
+                        ycbcrLayout.cr ? "(non-null)" : "(null)",
+                        ycbcrLayout.ystride, ycbcrLayout.cstride, ycbcrLayout.chroma_step);
                 return C2_CORRUPTED;
             }
 
@@ -671,7 +683,10 @@ c2_status_t C2AllocationGralloc::map(
 
             status_t err = GraphicBufferMapper::get().lockYCbCr(
                     const_cast<native_handle_t*>(mBuffer), grallocUsage, rect, &ycbcrLayout);
-            if (err == OK) {
+            if (err == OK && ycbcrLayout.y && ycbcrLayout.cb && ycbcrLayout.cr
+                    && ycbcrLayout.ystride > 0
+                    && ycbcrLayout.cstride > 0
+                    && ycbcrLayout.chroma_step > 0) {
                 addr[C2PlanarLayout::PLANE_Y] = (uint8_t *)ycbcrLayout.y;
                 addr[C2PlanarLayout::PLANE_U] = (uint8_t *)ycbcrLayout.cb;
                 addr[C2PlanarLayout::PLANE_V] = (uint8_t *)ycbcrLayout.cr;
