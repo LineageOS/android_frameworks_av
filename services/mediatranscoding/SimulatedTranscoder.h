@@ -36,10 +36,11 @@ namespace android {
  * Session lifecycle events are reported via progress updates with special progress
  * numbers (equal to the Event's type).
  */
-class SimulatedTranscoder : public TranscoderInterface {
+class SimulatedTranscoder : public TranscoderInterface,
+                            public std::enable_shared_from_this<SimulatedTranscoder> {
 public:
     struct Event {
-        enum Type { NoEvent, Start, Pause, Resume, Stop, Finished, Failed } type;
+        enum Type { NoEvent, Start, Pause, Resume, Stop, Finished, Failed, Abandon } type;
         ClientIdType clientId;
         SessionIdType sessionId;
         std::function<void()> runnable;
@@ -47,10 +48,11 @@ public:
 
     static constexpr int64_t kSessionDurationUs = 1000000;
 
-    SimulatedTranscoder();
+    SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                        int64_t heartBeatUs);
+    ~SimulatedTranscoder();
 
     // TranscoderInterface
-    void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) override;
     void start(ClientIdType clientId, SessionIdType sessionId,
                const TranscodingRequestParcel& request,
                const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
@@ -58,7 +60,7 @@ public:
     void resume(ClientIdType clientId, SessionIdType sessionId,
                 const TranscodingRequestParcel& request,
                 const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
-    void stop(ClientIdType clientId, SessionIdType sessionId) override;
+    void stop(ClientIdType clientId, SessionIdType sessionId, bool abandon = false) override;
     // ~TranscoderInterface
 
 private:
@@ -66,6 +68,7 @@ private:
     std::mutex mLock;
     std::condition_variable mCondition;
     std::list<Event> mQueue GUARDED_BY(mLock);
+    bool mLooperReady;
 
     // Minimum time spent on transcode the video. This is used just for testing.
     int64_t mSessionProcessingTimeMs = kSessionDurationUs / 1000;

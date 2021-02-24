@@ -28,6 +28,7 @@
 #include <utils/Vector.h>
 
 #include <chrono>
+#include <functional>
 #include <list>
 #include <map>
 #include <mutex>
@@ -36,11 +37,13 @@ namespace android {
 using ::aidl::android::media::TranscodingResultParcel;
 using ::aidl::android::media::TranscodingSessionPriority;
 
-class TranscodingSessionController : public UidPolicyCallbackInterface,
-                                     public ControllerClientInterface,
-                                     public TranscoderCallbackInterface,
-                                     public ResourcePolicyCallbackInterface,
-                                     public ThermalPolicyCallbackInterface {
+class TranscodingSessionController
+      : public UidPolicyCallbackInterface,
+        public ControllerClientInterface,
+        public TranscoderCallbackInterface,
+        public ResourcePolicyCallbackInterface,
+        public ThermalPolicyCallbackInterface,
+        public std::enable_shared_from_this<TranscodingSessionController> {
 public:
     virtual ~TranscodingSessionController();
 
@@ -61,6 +64,7 @@ public:
     void onError(ClientIdType clientId, SessionIdType sessionId, TranscodingErrorCode err) override;
     void onProgressUpdate(ClientIdType clientId, SessionIdType sessionId,
                           int32_t progress) override;
+    void onHeartBeat(ClientIdType clientId, SessionIdType sessionId) override;
     void onResourceLost(ClientIdType clientId, SessionIdType sessionId) override;
     // ~TranscoderCallbackInterface
 
@@ -88,6 +92,8 @@ private:
 
     using SessionKeyType = std::pair<ClientIdType, SessionIdType>;
     using SessionQueueType = std::list<SessionKeyType>;
+    using TranscoderFactoryType = std::function<std::shared_ptr<TranscoderInterface>(
+            const std::shared_ptr<TranscoderCallbackInterface>&, int64_t)>;
 
     struct Session {
         enum State {
@@ -121,6 +127,8 @@ private:
         State state = INVALID;
     };
 
+    struct Watchdog;
+
     // TODO(chz): call transcoder without global lock.
     // Use mLock for all entrypoints for now.
     mutable std::mutex mLock;
@@ -136,6 +144,7 @@ private:
     std::list<uid_t>::iterator mOfflineUidIterator;
     std::map<uid_t, std::string> mUidPackageNames;
 
+    TranscoderFactoryType mTranscoderFactory;
     std::shared_ptr<TranscoderInterface> mTranscoder;
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
     std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
@@ -145,9 +154,10 @@ private:
     bool mResourceLost;
     bool mThermalThrottling;
     std::list<Session> mSessionHistory;
+    std::shared_ptr<Watchdog> mWatchdog;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
-    TranscodingSessionController(const std::shared_ptr<TranscoderInterface>& transcoder,
+    TranscodingSessionController(const TranscoderFactoryType& transcoderFactory,
                                  const std::shared_ptr<UidPolicyInterface>& uidPolicy,
                                  const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy,
                                  const std::shared_ptr<ThermalPolicyInterface>& thermalPolicy);
@@ -157,6 +167,7 @@ private:
     void updateCurrentSession_l();
     void removeSession_l(const SessionKeyType& sessionKey, Session::State finalState);
     void moveUidsToTop_l(const std::unordered_set<uid_t>& uids, bool preserveTopUid);
+    void setSessionState_l(Session* session, Session::State state);
     void notifyClient(ClientIdType clientId, SessionIdType sessionId, const char* reason,
                       std::function<void(const SessionKeyType&)> func);
     // Internal state verifier (debug only)
