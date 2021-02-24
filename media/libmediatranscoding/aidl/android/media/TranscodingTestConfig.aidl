@@ -23,12 +23,6 @@
   */
 parcelable TranscodingTestConfig {
     /**
-     * Whether to use SimulatedTranscoder for testing. Note that SimulatedTranscoder does not send
-     * transcoding sessions to real MediaTranscoder.
-     */
-    boolean useSimulatedTranscoder = false;
-
-    /**
      * Passthrough mode used for testing. The transcoding service will assume the destination
      * path already contains the transcoding of the source file and return it to client directly.
      */
