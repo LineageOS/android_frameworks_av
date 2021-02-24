@@ -492,7 +492,10 @@ void RevertOutputFormatIfNeeded(
     // We used to not report changes to these keys to the client.
     const static std::set<std::string> sIgnoredKeys({
             KEY_BIT_RATE,
+            KEY_FRAME_RATE,
             KEY_MAX_BIT_RATE,
+            KEY_MAX_WIDTH,
+            KEY_MAX_HEIGHT,
             "csd-0",
             "csd-1",
             "csd-2",
@@ -1706,7 +1709,9 @@ void CCodec::signalResume() {
     {
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
+        sp<AMessage> outputFormat = config->mOutputFormat;
         config->queryConfiguration(comp);
+        RevertOutputFormatIfNeeded(outputFormat, config->mOutputFormat);
     }
 
     (void)mChannel->start(nullptr, nullptr, [&]{
