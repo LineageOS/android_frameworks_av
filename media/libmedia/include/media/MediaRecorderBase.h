@@ -77,6 +77,7 @@ struct MediaRecorderBase {
     virtual status_t setPreferredMicrophoneDirection(audio_microphone_direction_t direction) = 0;
     virtual status_t setPreferredMicrophoneFieldDimension(float zoom) = 0;
     virtual status_t getPortId(audio_port_handle_t *portId) const = 0;
+    virtual status_t getRtpDataUsage(uint64_t *bytes) = 0;
 
 
 

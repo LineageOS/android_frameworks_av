@@ -39,10 +39,9 @@ namespace android {
 using namespace std;
 
 TunerFilter::TunerFilter(
-        sp<IFilter> filter, sp<IFilterCallback> callback, int mainType, int subType) {
+        sp<IFilter> filter, int mainType, int subType) {
     mFilter = filter;
     mFilter_1_1 = ::android::hardware::tv::tuner::V1_1::IFilter::castFrom(filter);
-    mFilterCallback = callback;
     mMainType = mainType;
     mSubType = subType;
 }
@@ -50,7 +49,6 @@ TunerFilter::TunerFilter(
 TunerFilter::~TunerFilter() {
     mFilter = nullptr;
     mFilter_1_1 = nullptr;
-    mFilterCallback = nullptr;
 }
 
 Status TunerFilter::getQueueDesc(AidlMQDesc* _aidl_return) {

@@ -33,6 +33,7 @@
 #include "AnotherPacketSource.h"
 #include "APacketSource.h"
 #include "ARTPConnection.h"
+#include "ARTPSource.h"
 #include "ASessionDescription.h"
 #include "NuPlayerSource.h"
 
@@ -50,16 +51,6 @@ struct NuPlayer::RTPSource : public NuPlayer::Source {
     RTPSource(
             const sp<AMessage> &notify,
             const String8& rtpParams);
-
-    enum {
-        RTP_FIRST_PACKET = 100,
-        RTCP_FIRST_PACKET = 101,
-        RTP_QUALITY = 102,
-        RTCP_TSFB = 205,
-        RTCP_PSFB = 206,
-        RTP_CVO = 300,
-        RTP_AUTODOWN = 400,
-    };
 
     virtual status_t getBufferingSettings(
             BufferingSettings* buffering /* nonnull */) override;

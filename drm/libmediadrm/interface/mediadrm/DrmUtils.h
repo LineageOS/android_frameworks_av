@@ -127,7 +127,7 @@ status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
     ::V1_4::IDrmPlugin::getLogMessages_cb cb = [&](
             ::V1_4::Status status,
             hidl_vec<::V1_4::LogMessage> hLogs) {
-        if (::V1_4::Status::OK == status) {
+        if (::V1_4::Status::OK != status) {
             err = status;
             return;
         }

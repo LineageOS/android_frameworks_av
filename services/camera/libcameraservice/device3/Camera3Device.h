@@ -470,8 +470,6 @@ class Camera3Device :
         uint32_t height;
         explicit Size(uint32_t w = 0, uint32_t h = 0) : width(w), height(h){}
     };
-    // Map from format to size.
-    Vector<Size>               mSupportedOpaqueInputSizes;
 
     enum Status {
         STATUS_ERROR,
