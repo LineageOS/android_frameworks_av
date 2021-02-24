@@ -340,6 +340,8 @@ class AudioPolicyManagerTestMsd : public AudioPolicyManagerTest,
 
     const size_t mExpectedAudioPatchCount;
     sp<DeviceDescriptor> mSpdifDevice;
+
+    sp<DeviceDescriptor> mHdmiInputDevice;
 };
 
 AudioPolicyManagerTestMsd::AudioPolicyManagerTestMsd()
@@ -366,8 +368,11 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
             AUDIO_FORMAT_PCM_16_BIT, AUDIO_CHANNEL_OUT_STEREO, 48000);
     sp<AudioProfile> ac3OutputProfile = new AudioProfile(
             AUDIO_FORMAT_AC3, AUDIO_CHANNEL_OUT_5POINT1, 48000);
+    sp<AudioProfile> iec958OutputProfile = new AudioProfile(
+            AUDIO_FORMAT_IEC60958, AUDIO_CHANNEL_OUT_STEREO, 48000);
     mMsdOutputDevice->addAudioProfile(pcmOutputProfile);
     mMsdOutputDevice->addAudioProfile(ac3OutputProfile);
+    mMsdOutputDevice->addAudioProfile(iec958OutputProfile);
     mMsdInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_BUS);
     // Match output profile from AudioPolicyConfig::setDefault.
     sp<AudioProfile> pcmInputProfile = new AudioProfile(
@@ -405,6 +410,11 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
             AUDIO_OUTPUT_FLAG_NON_BLOCKING);
     msdCompressedOutputProfile->addSupportedDevice(mMsdOutputDevice);
     msdModule->addOutputProfile(msdCompressedOutputProfile);
+    sp<OutputProfile> msdIec958OutputProfile = new OutputProfile("msd iec958 input");
+    msdIec958OutputProfile->addAudioProfile(iec958OutputProfile);
+    msdIec958OutputProfile->setFlags(AUDIO_OUTPUT_FLAG_DIRECT);
+    msdIec958OutputProfile->addSupportedDevice(mMsdOutputDevice);
+    msdModule->addOutputProfile(msdIec958OutputProfile);
 
     sp<InputProfile> msdInputProfile = new InputProfile("msd output");
     msdInputProfile->addAudioProfile(pcmInputProfile);
@@ -428,6 +438,19 @@ void AudioPolicyManagerTestMsd::SetUpManagerConfig() {
         mSpdifDevice->addAudioProfile(dtsOutputProfile);
         primaryEncodedOutputProfile->addSupportedDevice(mSpdifDevice);
     }
+
+    // Add HDMI input device with IEC60958 profile for HDMI in -> MSD patching.
+    mHdmiInputDevice = new DeviceDescriptor(AUDIO_DEVICE_IN_HDMI);
+    sp<AudioProfile> iec958InputProfile = new AudioProfile(
+            AUDIO_FORMAT_IEC60958, AUDIO_CHANNEL_IN_STEREO, 48000);
+    mHdmiInputDevice->addAudioProfile(iec958InputProfile);
+    config.addDevice(mHdmiInputDevice);
+    sp<InputProfile> hdmiInputProfile = new InputProfile("hdmi input");
+    hdmiInputProfile->addAudioProfile(iec958InputProfile);
+    hdmiInputProfile->setFlags(AUDIO_INPUT_FLAG_DIRECT);
+    hdmiInputProfile->addSupportedDevice(mHdmiInputDevice);
+    config.getHwModules().getModuleFromName(AUDIO_HARDWARE_MODULE_ID_PRIMARY)->
+            addInputProfile(hdmiInputProfile);
 }
 
 void AudioPolicyManagerTestMsd::TearDown() {
@@ -435,6 +458,7 @@ void AudioPolicyManagerTestMsd::TearDown() {
     mMsdInputDevice.clear();
     mDefaultOutputDevice.clear();
     mSpdifDevice.clear();
+    mHdmiInputDevice.clear();
     AudioPolicyManagerTest::TearDown();
 }
 
@@ -455,21 +479,21 @@ TEST_P(AudioPolicyManagerTestMsd, PatchCreationOnSetForceUse) {
     ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
 }
 
-TEST_P(AudioPolicyManagerTestMsd, PatchCreationSetReleaseMsdPatches) {
+TEST_P(AudioPolicyManagerTestMsd, PatchCreationSetReleaseMsdOutputPatches) {
     const PatchCountCheck patchCount = snapshotPatchCount();
     DeviceVector devices = mManager->getAvailableOutputDevices();
     // Remove MSD output device to avoid patching to itself
     devices.remove(mMsdOutputDevice);
     ASSERT_EQ(mExpectedAudioPatchCount, devices.size());
-    mManager->setMsdPatches(&devices);
+    mManager->setMsdOutputPatches(&devices);
     ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
     // Dual patch: exercise creating one new audio patch and reusing another existing audio patch.
     DeviceVector singleDevice(devices[0]);
-    mManager->releaseMsdPatches(singleDevice);
+    mManager->releaseMsdOutputPatches(singleDevice);
     ASSERT_EQ(mExpectedAudioPatchCount - 1, patchCount.deltaFromSnapshot());
-    mManager->setMsdPatches(&devices);
+    mManager->setMsdOutputPatches(&devices);
     ASSERT_EQ(mExpectedAudioPatchCount, patchCount.deltaFromSnapshot());
-    mManager->releaseMsdPatches(devices);
+    mManager->releaseMsdOutputPatches(devices);
     ASSERT_EQ(0, patchCount.deltaFromSnapshot());
 }
 
@@ -548,6 +572,34 @@ TEST_P(AudioPolicyManagerTestMsd, GetOutputForAttrFormatSwitching) {
         ASSERT_EQ(selectedDeviceId, mDefaultOutputDevice->getId());
         ASSERT_EQ(0, patchCount.deltaFromSnapshot());
     }
+}
+
+TEST_P(AudioPolicyManagerTestMsd, PatchCreationFromHdmiInToMsd) {
+    audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
+    uid_t uid = 42;
+    const PatchCountCheck patchCount = snapshotPatchCount();
+    ASSERT_FALSE(mManager->getAvailableInputDevices().isEmpty());
+    PatchBuilder patchBuilder;
+    patchBuilder.
+            addSource(mManager->getAvailableInputDevices().
+                    getDevice(AUDIO_DEVICE_IN_HDMI, String8(""), AUDIO_FORMAT_DEFAULT)).
+            addSink(mManager->getAvailableOutputDevices().
+                    getDevice(AUDIO_DEVICE_OUT_BUS, String8(""), AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(NO_ERROR, mManager->createAudioPatch(patchBuilder.patch(), &handle, uid));
+    ASSERT_NE(AUDIO_PATCH_HANDLE_NONE, handle);
+    AudioPatchCollection patches = mManager->getAudioPatches();
+    sp<AudioPatch> patch = patches.valueFor(handle);
+    ASSERT_EQ(1, patch->mPatch.num_sources);
+    ASSERT_EQ(1, patch->mPatch.num_sinks);
+    ASSERT_EQ(AUDIO_PORT_ROLE_SOURCE, patch->mPatch.sources[0].role);
+    ASSERT_EQ(AUDIO_PORT_ROLE_SINK, patch->mPatch.sinks[0].role);
+    ASSERT_EQ(AUDIO_FORMAT_IEC60958, patch->mPatch.sources[0].format);
+    ASSERT_EQ(AUDIO_FORMAT_IEC60958, patch->mPatch.sinks[0].format);
+    ASSERT_EQ(AUDIO_CHANNEL_IN_STEREO, patch->mPatch.sources[0].channel_mask);
+    ASSERT_EQ(AUDIO_CHANNEL_OUT_STEREO, patch->mPatch.sinks[0].channel_mask);
+    ASSERT_EQ(48000, patch->mPatch.sources[0].sample_rate);
+    ASSERT_EQ(48000, patch->mPatch.sinks[0].sample_rate);
+    ASSERT_EQ(1, patchCount.deltaFromSnapshot());
 }
 
 class AudioPolicyManagerTestWithConfigurationFile : public AudioPolicyManagerTest {
