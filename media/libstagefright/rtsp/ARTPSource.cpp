@@ -34,6 +34,8 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
 
+#include <strings.h>
+
 namespace android {
 
 static uint32_t kSourceID = 0xdeadbeef;
@@ -380,21 +382,24 @@ void ARTPSource::addTMMBR(const sp<ABuffer> &buffer, int32_t targetBitrate) {
     data[14] = (mID >> 8) & 0xff;
     data[15] = mID & 0xff;
 
-    int32_t exp, mantissa;
+    // Find the first bit '1' from left & right side of the value.
+    int32_t leftEnd = 31 - __builtin_clz(targetBitrate);
+    int32_t rightEnd = ffs(targetBitrate) - 1;
 
-    // Round off to the nearest 2^4th
-    ALOGI("UE -> Op Req Rx bitrate : %d ", targetBitrate & 0xfffffff0);
-    for (exp=4 ; exp < 32 ; exp++)
-        if (((targetBitrate >> exp) & 0x01) != 0)
-            break;
-    mantissa = targetBitrate >> exp;
+    // Mantissa have only 17bit space by RTCP specification.
+    if ((leftEnd - rightEnd) > 16) {
+        rightEnd = leftEnd - 16;
+    }
+    int32_t mantissa = targetBitrate >> rightEnd;
 
-    data[16] = ((exp << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
-    data[17] =                        (mantissa & 0x07f80) >> 7;
-    data[18] =                        (mantissa & 0x0007f) << 1;
+    data[16] = ((rightEnd << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
+    data[17] =                             (mantissa & 0x07f80) >> 7;
+    data[18] =                             (mantissa & 0x0007f) << 1;
     data[19] = 40;              // 40 bytes overhead;
 
     buffer->setRange(buffer->offset(), buffer->size() + (data[3] + 1) * sizeof(int32_t));
+
+    ALOGI("UE -> Op Req Rx bitrate : %d ", mantissa << rightEnd);
 }
 
 int ARTPSource::addNACK(const sp<ABuffer> &buffer) {
@@ -512,10 +517,22 @@ void ARTPSource::setPeriodicFIR(bool enable) {
     mIssueFIRRequests = enable;
 }
 
-void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
+bool ARTPSource::isNeedToEarlyNotify() {
+    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+    int32_t intervalExpectedInNow = expected - mPrevExpected;
+    int32_t intervalReceivedInNow = mNumBuffersReceived - mPrevNumBuffersReceived;
+
+    if (intervalExpectedInNow - intervalReceivedInNow > 5)
+        return true;
+    return false;
+}
+
+void ARTPSource::notifyPktInfo(int32_t bitrate, bool isRegular) {
+    int32_t payloadType = isRegular ? RTP_QUALITY : RTP_QUALITY_EMC;
+
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("rtcp-event", 1);
-    notify->setInt32("payload-type", 102);
+    notify->setInt32("payload-type", payloadType);
     notify->setInt32("feedback-type", 0);
     // sending target bitrate up to application to share rtp quality.
     notify->setInt32("bit-rate", bitrate);
@@ -526,9 +543,11 @@ void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t /*time*/) {
     notify->setInt32("prev-num-buf-recv", mPrevNumBuffersReceived);
     notify->post();
 
-    uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
-    mPrevExpected = expected;
-    mPrevNumBuffersReceived = mNumBuffersReceived;
+    if (isRegular) {
+        uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
+        mPrevExpected = expected;
+        mPrevNumBuffersReceived = mNumBuffersReceived;
+    }
 }
 
 void ARTPSource::onIssueFIRByAssembler() {

@@ -20,8 +20,6 @@
 
 #include "ARTPWriter.h"
 
-#include <fcntl.h>
-
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -31,6 +29,9 @@
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MetaData.h>
 #include <utils/ByteOrder.h>
+
+#include <fcntl.h>
+#include <strings.h>
 
 #define PT      97
 #define PT_STR  "97"
@@ -46,10 +47,12 @@
 #define H265_NALU_SPS 0x21
 #define H265_NALU_PPS 0x22
 
-#define LINK_HEADER_SIZE 14
-#define IP_HEADER_SIZE 20
+#define IPV4_HEADER_SIZE 20
+#define IPV6_HEADER_SIZE 40
 #define UDP_HEADER_SIZE 8
-#define TCPIP_HEADER_SIZE (LINK_HEADER_SIZE + IP_HEADER_SIZE + UDP_HEADER_SIZE)
+#define TCPIPV4_HEADER_SIZE (IPV4_HEADER_SIZE + UDP_HEADER_SIZE)
+#define TCPIPV6_HEADER_SIZE (IPV6_HEADER_SIZE + UDP_HEADER_SIZE)
+#define TCPIP_HEADER_SIZE TCPIPV4_HEADER_SIZE
 #define RTP_HEADER_SIZE 12
 #define RTP_HEADER_EXT_SIZE 8
 #define RTP_FU_HEADER_SIZE 2
@@ -62,6 +65,9 @@ namespace android {
 static const size_t kMaxPacketSize = 1280;
 static char kCNAME[255] = "someone@somewhere";
 
+static const size_t kTrafficRecorderMaxEntries = 128;
+static const size_t kTrafficRecorderMaxTimeSpanMs = 2000;
+
 static int UniformRand(int limit) {
     return ((double)rand() * limit) / RAND_MAX;
 }
@@ -71,7 +77,8 @@ ARTPWriter::ARTPWriter(int fd)
       mFd(dup(fd)),
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)),
-      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
+      mTrafficRec(new TrafficRecorder<uint32_t /* Time */, Bytes>(
+              kTrafficRecorderMaxEntries, kTrafficRecorderMaxTimeSpanMs)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -122,7 +129,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
       mFd(dup(fd)),
       mLooper(new ALooper),
       mReflector(new AHandlerReflector<ARTPWriter>(this)),
-      mTrafficRec(new TrafficRecorder<uint32_t, size_t>(128)) {
+      mTrafficRec(new TrafficRecorder<uint32_t /* Time */, Bytes>(
+              kTrafficRecorderMaxEntries, kTrafficRecorderMaxTimeSpanMs)) {
     CHECK_GE(fd, 0);
     mIsIPv6 = false;
 
@@ -135,7 +143,8 @@ ARTPWriter::ARTPWriter(int fd, String8& localIp, int localPort, String8& remoteI
     mSPSBuf = NULL;
     mPPSBuf = NULL;
 
-    mSeqNo = seqNo;
+    initState();
+    mSeqNo = seqNo;     // Must use explicit # of seq for RTP continuity
 
 #if LOG_TO_FILES
     mRTPFd = open(
@@ -186,6 +195,29 @@ ARTPWriter::~ARTPWriter() {
     mFd = -1;
 }
 
+void ARTPWriter::initState() {
+    if (mSourceID == 0)
+        mSourceID = rand();
+    mPayloadType = 0;
+    if (mSeqNo == 0)
+        mSeqNo = UniformRand(65536);
+    mRTPTimeBase = 0;
+    mNumRTPSent = 0;
+    mNumRTPOctetsSent = 0;
+    mLastRTPTime = 0;
+    mLastNTPTime = 0;
+
+    mOpponentID = 0;
+    mBitrate = 192000;
+
+    mNumSRsSent = 0;
+    mRTPCVOExtMap = -1;
+    mRTPCVODegrees = 0;
+    mRTPSockNetwork = 0;
+
+    mMode = INVALID;
+}
+
 status_t ARTPWriter::addSource(const sp<MediaSource> &source) {
     mSource = source;
     return OK;
@@ -203,21 +235,7 @@ status_t ARTPWriter::start(MetaData * params) {
     }
 
     mFlags &= ~kFlagEOS;
-    if (mSourceID == 0)
-        mSourceID = rand();
-    if (mSeqNo == 0)
-        mSeqNo = UniformRand(65536);
-    mRTPTimeBase = 0;
-    mNumRTPSent = 0;
-    mNumRTPOctetsSent = 0;
-    mLastRTPTime = 0;
-    mLastNTPTime = 0;
-    mOpponentID = 0;
-    mBitrate = 192000;
-    mNumSRsSent = 0;
-    mRTPCVOExtMap = -1;
-    mRTPCVODegrees = 0;
-    mRTPSockNetwork = 0;
+    initState();
 
     const char *mime;
     CHECK(mSource->getFormat()->findCString(kKeyMIMEType, &mime));
@@ -246,7 +264,6 @@ status_t ARTPWriter::start(MetaData * params) {
     if (params->findInt64(kKeySocketNetwork, &sockNetwork))
         updateSocketNetwork(sockNetwork);
 
-    mMode = INVALID;
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
         mMode = H264;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
@@ -600,7 +617,8 @@ void ARTPWriter::send(const sp<ABuffer> &buffer, bool isRTCP) {
         ALOGW("packets can not be sent. ret=%d, buf=%d", (int)n, (int)buffer->size());
     } else {
         // Record current traffic & Print bits while last 1sec (1000ms)
-        mTrafficRec->writeBytes(buffer->size());
+        mTrafficRec->writeBytes(buffer->size() +
+                (mIsIPv6 ? TCPIPV6_HEADER_SIZE : TCPIPV4_HEADER_SIZE));
         mTrafficRec->printAccuBitsForLastPeriod(1000, 1000);
     }
 
@@ -729,21 +747,24 @@ void ARTPWriter::addTMMBN(const sp<ABuffer> &buffer) {
     data[14] = (mOpponentID >> 8) & 0xff;
     data[15] = mOpponentID & 0xff;
 
-    int32_t exp, mantissa;
+    // Find the first bit '1' from left & right side of the value.
+    int32_t leftEnd = 31 - __builtin_clz(mBitrate);
+    int32_t rightEnd = ffs(mBitrate) - 1;
 
-    // Round off to the nearest 2^4th
-    ALOGI("UE -> Op Noti Tx bitrate : %d ", mBitrate & 0xfffffff0);
-    for (exp=4 ; exp < 32 ; exp++)
-        if (((mBitrate >> exp) & 0x01) != 0)
-            break;
-    mantissa = mBitrate >> exp;
+    // Mantissa have only 17bit space by RTCP specification.
+    if ((leftEnd - rightEnd) > 16) {
+        rightEnd = leftEnd - 16;
+    }
+    int32_t mantissa = mBitrate >> rightEnd;
 
-    data[16] = ((exp << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
-    data[17] =                        (mantissa & 0x07f80) >> 7;
-    data[18] =                        (mantissa & 0x0007f) << 1;
+    data[16] = ((rightEnd << 2) & 0xfc) | ((mantissa & 0x18000) >> 15);
+    data[17] =                             (mantissa & 0x07f80) >> 7;
+    data[18] =                             (mantissa & 0x0007f) << 1;
     data[19] = 40;              // 40 bytes overhead;
 
     buffer->setRange(buffer->offset(), buffer->size() + 20);
+
+    ALOGI("UE -> Op Noti Tx bitrate : %d ", mantissa << rightEnd);
 }
 
 // static
@@ -1360,6 +1381,10 @@ void ARTPWriter::updateSocketNetwork(int64_t socketNetwork) {
 
 uint32_t ARTPWriter::getSequenceNum() {
     return mSeqNo;
+}
+
+uint64_t ARTPWriter::getAccumulativeBytes() {
+    return mTrafficRec->readBytesForTotal();
 }
 
 static size_t getFrameSize(bool isWide, unsigned FT) {

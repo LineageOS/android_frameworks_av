@@ -146,6 +146,9 @@ sp<ICryptoPlugin> CryptoHal::makeCryptoPlugin(const sp<ICryptoFactory>& factory,
                 plugin = hPlugin;
             }
         );
+    if (!hResult.isOk()) {
+        mInitCheck = DEAD_OBJECT;
+    }
     return plugin;
 }
 
@@ -179,10 +182,8 @@ status_t CryptoHal::createPlugin(const uint8_t uuid[16], const void *data,
         }
     }
 
-    if (mPlugin == NULL) {
-        mInitCheck = ERROR_UNSUPPORTED;
-    } else {
-        mInitCheck = OK;
+    if (mInitCheck == NO_INIT) {
+        mInitCheck = mPlugin == NULL ? ERROR_UNSUPPORTED : OK;
     }
 
     return mInitCheck;

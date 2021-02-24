@@ -58,6 +58,7 @@ struct MediaWriter : public RefBase {
     virtual void updatePayloadType(int32_t /*payloadType*/) {}
     virtual void updateSocketNetwork(int64_t /*socketNetwork*/) {}
     virtual uint32_t getSequenceNum() { return 0; }
+    virtual uint64_t getAccumulativeBytes() { return 0; }
 
 protected:
     virtual ~MediaWriter() {}
