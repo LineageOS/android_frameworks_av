@@ -18,6 +18,15 @@
  * Originally developed and contributed by Ittiam Systems Pvt. Ltd, Bangalore
  */
 
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_media_codecs_mp3dec_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_media_codecs_mp3dec_license"],
+}
+
 cc_fuzz {
     name: "mp3_dec_fuzzer",
     host_supported: true,
