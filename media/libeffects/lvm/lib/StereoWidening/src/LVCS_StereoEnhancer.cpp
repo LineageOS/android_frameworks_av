@@ -55,7 +55,6 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
     LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
     const BiquadA012B12CoefsSP_t* pSESideCoefs;
 
-
     /*
      * If the sample rate or speaker type has changed update the filters
      */
@@ -129,6 +128,8 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t hInstance, const LVM_FLOA
     LVCS_StereoEnhancer_t* pConfig = (LVCS_StereoEnhancer_t*)&pInstance->StereoEnhancer;
     LVM_FLOAT* pScratch;
     pScratch = (LVM_FLOAT*)pInstance->pScratch;
+    LVM_INT32 NumChannels = pInstance->Params.NrChannels;
+    LVM_UINT16 destNumSamples = (NumChannels == FCC_1) ? NumSamples : FCC_2 * NumSamples;
     /*
      * Check if the Stereo Enhancer is enabled
      */
@@ -136,7 +137,12 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t hInstance, const LVM_FLOA
         /*
          * Convert from stereo to middle and side
          */
-        From2iToMS_Float(pInData, pScratch, pScratch + NumSamples, (LVM_INT16)NumSamples);
+        if (NumChannels == 1) {
+            // Copy same input to scratch as Middle data
+            Copy_Float((LVM_FLOAT*)pInData, (LVM_FLOAT*)pScratch, (LVM_INT16)NumSamples);
+        } else {
+            From2iToMS_Float(pInData, pScratch, pScratch + NumSamples, (LVM_INT16)NumSamples);
+        }
 
         /*
          * Apply filter to the middle signal
@@ -159,18 +165,23 @@ LVCS_ReturnStatus_en LVCS_StereoEnhancer(LVCS_Handle_t hInstance, const LVM_FLOA
                                               NumSamples);
         }
 
-        /*
-         * Convert from middle and side to stereo
-         */
-        MSTo2i_Sat_Float(pScratch, pScratch + NumSamples, pOutData, (LVM_INT16)NumSamples);
+        if (NumChannels == 1) {
+            // Copy processed Middle data from scratch to pOutData
+            Copy_Float((LVM_FLOAT*)pScratch, (LVM_FLOAT*)pOutData, (LVM_INT16)NumSamples);
+        } else {
+            /*
+             * Convert from middle and side to stereo
+             */
+            MSTo2i_Sat_Float(pScratch, pScratch + NumSamples, pOutData, (LVM_INT16)NumSamples);
+        }
 
     } else {
         /*
          * The stereo enhancer is disabled so just copy the data
          */
-        Copy_Float((LVM_FLOAT*)pInData,          /* Source */
-                   (LVM_FLOAT*)pOutData,         /* Destination */
-                   (LVM_INT16)(2 * NumSamples)); /* Left and right */
+        Copy_Float((LVM_FLOAT*)pInData,        /* Source */
+                   (LVM_FLOAT*)pOutData,       /* Destination */
+                   (LVM_INT16)destNumSamples); /* Number of frames */
     }
 
     return (LVCS_SUCCESS);

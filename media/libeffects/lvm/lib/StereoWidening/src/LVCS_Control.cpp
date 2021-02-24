@@ -180,7 +180,9 @@ LVCS_ReturnStatus_en LVCS_Control(LVCS_Handle_t hInstance, LVCS_Params_t* pParam
         if (pInstance->bInOperatingModeTransition != LVM_TRUE) {
             pInstance->bTimerDone = LVM_FALSE;
             pInstance->TimerParams.TimeInMs =
-                    (LVM_INT16)(((pInstance->Reverberation.DelaySize << 2) /
+                    (LVM_INT16)(((pInstance->Params.NrChannels == FCC_1
+                                          ? pInstance->Reverberation.DelaySize << 3
+                                          : pInstance->Reverberation.DelaySize << 2) /
                                  pInstance->TimerParams.SamplingRate) +
                                 1);
             LVM_Timer_Init(&pInstance->TimerInstance, &pInstance->TimerParams);

@@ -74,7 +74,8 @@ LVCS_ReturnStatus_en LVCS_EqualiserInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
                 pEqualiserCoefTable[Offset].A0, pEqualiserCoefTable[Offset].A1,
                 pEqualiserCoefTable[Offset].A2, -(pEqualiserCoefTable[Offset].B1),
                 -(pEqualiserCoefTable[Offset].B2)};
-        pInstance->pEqBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_2, coefs));
+        pInstance->pEqBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(
+                (pParams->NrChannels == FCC_1) ? FCC_1 : FCC_2, coefs));
     }
 
     return (LVCS_SUCCESS);
