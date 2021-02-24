@@ -847,14 +847,22 @@ protected:
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
         DeviceVector getMsdAudioOutDevices() const;
-        const AudioPatchCollection getMsdPatches() const;
-        status_t getBestMsdAudioProfileFor(const sp<DeviceDescriptor> &outputDevice,
-                                           bool hwAvSync,
-                                           audio_port_config *sourceConfig,
-                                           audio_port_config *sinkConfig) const;
-        PatchBuilder buildMsdPatch(const sp<DeviceDescriptor> &outputDevice) const;
-        status_t setMsdPatches(const DeviceVector *outputDevices = nullptr);
-        void releaseMsdPatches(const DeviceVector& devices);
+        const AudioPatchCollection getMsdOutputPatches() const;
+        status_t getMsdProfiles(bool hwAvSync,
+                const InputProfileCollection &inputProfiles,
+                const OutputProfileCollection &outputProfiles,
+                const sp<DeviceDescriptor> &sourceDevice,
+                const sp<DeviceDescriptor> &sinkDevice,
+                AudioProfileVector &sourceProfiles,
+                AudioProfileVector &sinkProfiles) const;
+        status_t getBestMsdConfig(bool hwAvSync,
+                const AudioProfileVector &sourceProfiles,
+                const AudioProfileVector &sinkProfiles,
+                audio_port_config *sourceConfig,
+                audio_port_config *sinkConfig) const;
+        PatchBuilder buildMsdPatch(bool msdIsSource, const sp<DeviceDescriptor> &device) const;
+        status_t setMsdOutputPatches(const DeviceVector *outputDevices = nullptr);
+        void releaseMsdOutputPatches(const DeviceVector& devices);
 private:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
