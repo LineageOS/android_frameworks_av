@@ -65,7 +65,6 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t hInstance, LVCS_Para
     LVCS_ReverbGenerator_t* pConfig = (LVCS_ReverbGenerator_t*)&pInstance->Reverberation;
     const BiquadA012B12CoefsSP_t* pReverbCoefTable;
 
-
     /*
      * Initialise the delay and filters if:
      *  - the sample rate has changed
@@ -79,7 +78,8 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t hInstance, LVCS_Para
          */
         Delay = (LVM_UINT16)LVCS_StereoDelayCS[(LVM_UINT16)pParams->SampleRate];
 
-        pConfig->DelaySize = (LVM_INT16)(2 * Delay);
+        pConfig->DelaySize =
+                (pParams->NrChannels == FCC_1) ? (LVM_INT16)Delay : (LVM_INT16)(FCC_2 * Delay);
         pConfig->DelayOffset = 0;
         LoadConst_Float(0,                                      /* Value */
                         (LVM_FLOAT*)&pConfig->StereoSamples[0], /* Destination */
@@ -95,8 +95,8 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t hInstance, LVCS_Para
                 pReverbCoefTable[Offset].A0, pReverbCoefTable[Offset].A1,
                 pReverbCoefTable[Offset].A2, -(pReverbCoefTable[Offset].B1),
                 -(pReverbCoefTable[Offset].B2)};
-        pInstance->pRevBiquad.reset(
-                new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_2, coefs));
+        pInstance->pRevBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(
+                (pParams->NrChannels == FCC_1) ? FCC_1 : FCC_2, coefs));
 
         /*
          * Setup the mixer
@@ -155,6 +155,9 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t hInstance, const LVM_FLO
     LVCS_Instance_t* pInstance = (LVCS_Instance_t*)hInstance;
     LVCS_ReverbGenerator_t* pConfig = (LVCS_ReverbGenerator_t*)&pInstance->Reverberation;
     LVM_FLOAT* pScratch;
+    LVM_INT32 NumChannels = pInstance->Params.NrChannels;
+    LVM_UINT16 destNumSamples =
+            (pInstance->Params.NrChannels == FCC_1) ? NumSamples : FCC_2 * NumSamples;
 
     pScratch = (LVM_FLOAT*)pInstance->pScratch;
 
@@ -165,9 +168,9 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t hInstance, const LVM_FLO
         /*
          * Reverb not required so just copy the data
          */
-        Copy_Float((LVM_FLOAT*)pInData,          /* Source */
-                   (LVM_FLOAT*)pOutData,         /* Destination */
-                   (LVM_INT16)(2 * NumSamples)); /* Left and right */
+        Copy_Float((LVM_FLOAT*)pInData,        /* Source */
+                   (LVM_FLOAT*)pOutData,       /* Destination */
+                   (LVM_INT16)destNumSamples); /* Number of frames */
     }
 
     /*
@@ -188,9 +191,9 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t hInstance, const LVM_FLO
         /*
          * Copy the input data to the scratch memory
          */
-        Copy_Float((LVM_FLOAT*)pInData,          /* Source */
-                   (LVM_FLOAT*)pScratch,         /* Destination */
-                   (LVM_INT16)(2 * NumSamples)); /* Left and right */
+        Copy_Float((LVM_FLOAT*)pInData,        /* Source */
+                   (LVM_FLOAT*)pScratch,       /* Destination */
+                   (LVM_INT16)destNumSamples); /* Number of frames */
 
         /*
          * Filter the data
@@ -198,13 +201,13 @@ LVCS_ReturnStatus_en LVCS_ReverbGenerator(LVCS_Handle_t hInstance, const LVM_FLO
         pInstance->pRevBiquad->process(pScratch, pScratch, NumSamples);
 
         Mult3s_Float((LVM_FLOAT*)pScratch, pConfig->ReverbLevel, (LVM_FLOAT*)pScratch,
-                     (LVM_INT16)(2 * NumSamples));
+                     (LVM_INT16)destNumSamples); /* Number of frames */
 
         /*
          * Apply the delay mix
          */
         DelayMix_Float((LVM_FLOAT*)pScratch, &pConfig->StereoSamples[0], pConfig->DelaySize,
-                       pOutData, &pConfig->DelayOffset, (LVM_INT16)NumSamples);
+                       pOutData, &pConfig->DelayOffset, (LVM_INT16)NumSamples, NumChannels);
     }
 
     return (LVCS_SUCCESS);

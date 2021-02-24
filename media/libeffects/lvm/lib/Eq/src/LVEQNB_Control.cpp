@@ -311,9 +311,8 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t hInstance, LVEQNB_Params_t
     /*
      * Create biquad instance
      */
-    pInstance->eqBiquad.resize(
-            pParams->NBands, android::audio_utils::BiquadFilter<LVM_FLOAT>(
-                                     (FCC_1 == pParams->NrChannels) ? FCC_2 : pParams->NrChannels));
+    pInstance->eqBiquad.resize(pParams->NBands,
+                               android::audio_utils::BiquadFilter<LVM_FLOAT>(pParams->NrChannels));
     LVEQNB_ClearFilterHistory(pInstance);
 
     if (bChange || modeChange) {
