@@ -32,6 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
+#include "StringUtils.h"
 #include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
 
@@ -134,19 +135,26 @@ bool statsd_audiorecord(const mediametrics::Item *item)
         metrics_proto.set_start_count(startcount);
     }
 
-
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize audiorecord metrics");
         return false;
     }
 
+    // Android S
+    // log_session_id (string)
+    std::string logSessionId;
+    (void)item->getString("android.media.audiorecord.logSessionId", &logSessionId);
+    const auto logSessionIdForStats =
+            mediametrics::stringutils::sanitizeLogSessionId(logSessionId);
+
     if (enabled_statsd) {
         android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
         (void)android::util::stats_write(android::util::MEDIAMETRICS_AUDIORECORD_REPORTED,
                                    timestamp, pkgName.c_str(), pkgVersionCode,
                                    mediaApexVersion,
-                                   bf_serialized);
+                                   bf_serialized,
+                                   logSessionIdForStats.c_str());
 
     } else {
         ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
