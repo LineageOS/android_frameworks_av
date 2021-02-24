@@ -55,6 +55,11 @@ bool statsd_codec(const mediametrics::Item *item)
 
     // flesh out the protobuf we'll hand off with our data
     //
+    //android.media.mediacodec.videoSessionId   string
+    std::string sessionId;
+    if (item->getString("android.media.mediacodec.log-session_id", &sessionId)) {
+        metrics_proto.set_log_session_id(std::move(sessionId));
+    }
     // android.media.mediacodec.codec   string
     std::string codec;
     if (item->getString("android.media.mediacodec.codec", &codec)) {
