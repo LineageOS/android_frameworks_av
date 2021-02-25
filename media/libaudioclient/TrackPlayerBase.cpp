@@ -40,6 +40,7 @@ void TrackPlayerBase::init(AudioTrack* pat, player_type_t playerType, audio_usag
     if (mAudioTrack != 0) {
         mSelfAudioDeviceCallback = new SelfAudioDeviceCallback(*this);
         mAudioTrack->addAudioDeviceCallback(mSelfAudioDeviceCallback);
+        mAudioTrack->setPlayerIId(mPIId); // set in PlayerBase::init().
     }
 }
 
