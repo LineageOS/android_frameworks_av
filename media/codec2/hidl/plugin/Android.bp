@@ -1,0 +1,66 @@
+cc_library_headers {
+    name: "libcodec2_hidl_plugin_headers",
+    vendor_available: true,
+    export_include_dirs: [
+        "include",
+    ],
+}
+
+cc_library {
+    name: "libcodec2_hidl_plugin_stub",
+
+    srcs: [
+        "DefaultFilterPlugin.cpp",
+        "FilterWrapperStub.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
+        "liblog",
+        "libutils",
+    ],
+
+    export_include_dirs: [
+        "include",
+        "internal",
+    ],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+    ],
+    min_sdk_version: "29",
+}
+
+cc_library {
+    name: "libcodec2_hidl_plugin",
+    vendor: true,
+
+    srcs: [
+        "DefaultFilterPlugin.cpp",
+        "FilterWrapper.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
+    ],
+
+    shared_libs: [
+        "libbase",
+        "libcodec2",
+        "libcodec2_vndk",
+        "liblog",
+        "libutils",
+    ],
+
+    export_include_dirs: [
+        "include",
+        "internal",
+    ],
+}
