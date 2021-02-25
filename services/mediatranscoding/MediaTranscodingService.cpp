@@ -24,6 +24,7 @@
 #include <cutils/properties.h>
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
+#include <media/TranscodingLogger.h>
 #include <media/TranscodingResourcePolicy.h>
 #include <media/TranscodingSessionController.h>
 #include <media/TranscodingThermalPolicy.h>
@@ -44,15 +45,17 @@ namespace android {
 MediaTranscodingService::MediaTranscodingService(bool simulated)
       : mUidPolicy(new TranscodingUidPolicy()),
         mResourcePolicy(new TranscodingResourcePolicy()),
-        mThermalPolicy(new TranscodingThermalPolicy()) {
+        mThermalPolicy(new TranscodingThermalPolicy()),
+        mLogger(new TranscodingLogger()) {
     ALOGV("MediaTranscodingService is created");
     mSessionController.reset(new TranscodingSessionController(
-            [simulated](const std::shared_ptr<TranscoderCallbackInterface>& cb,
-                        int64_t heartBeatUs) -> std::shared_ptr<TranscoderInterface> {
+            [simulated, logger = mLogger](
+                    const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                    int64_t heartBeatUs) -> std::shared_ptr<TranscoderInterface> {
                 if (simulated) {
                     return std::make_shared<SimulatedTranscoder>(cb, heartBeatUs);
                 }
-                return std::make_shared<TranscoderWrapper>(cb, heartBeatUs);
+                return std::make_shared<TranscoderWrapper>(cb, logger, heartBeatUs);
             },
             mUidPolicy, mResourcePolicy, mThermalPolicy));
     mClientManager.reset(new TranscodingClientManager(mSessionController));

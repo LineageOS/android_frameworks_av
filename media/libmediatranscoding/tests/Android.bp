@@ -72,3 +72,15 @@ cc_test {
 
     srcs: ["AdjustableMaxPriorityQueue_tests.cpp"],
 }
+
+//
+// TranscodingLogger unit test
+//
+cc_test {
+    name: "TranscodingLogger_tests",
+    defaults: ["libmediatranscoding_test_defaults"],
+    shared_libs: ["libmediandk", "libstatssocket#30"],
+    static_libs: ["libmediatranscoder", "libstatslog_media"],
+
+    srcs: ["TranscodingLogger_tests.cpp"],
+}

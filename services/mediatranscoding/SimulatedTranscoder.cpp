@@ -59,6 +59,7 @@ SimulatedTranscoder::~SimulatedTranscoder() {
 
 void SimulatedTranscoder::start(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
+        uid_t /*callingUid*/,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     {
         auto lock = std::scoped_lock(mLock);
@@ -91,6 +92,7 @@ void SimulatedTranscoder::pause(ClientIdType clientId, SessionIdType sessionId) 
 
 void SimulatedTranscoder::resume(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& /*request*/,
+        uid_t /*callingUid*/,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     queueEvent(Event::Resume, clientId, sessionId, [=] {
         auto callback = mCallback.lock();

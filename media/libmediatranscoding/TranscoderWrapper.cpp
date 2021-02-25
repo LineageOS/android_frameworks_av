@@ -56,34 +56,34 @@ static TranscodingErrorCode toTranscodingError(media_status_t status) {
     }
 }
 
-static AMediaFormat* getVideoFormat(
+static std::shared_ptr<AMediaFormat> getVideoFormat(
         const char* originalMime,
         const std::optional<TranscodingVideoTrackFormat>& requestedFormat) {
     if (requestedFormat == std::nullopt) {
         return nullptr;
     }
 
-    AMediaFormat* format = AMediaFormat_new();
+    std::shared_ptr<AMediaFormat> format =
+            std::shared_ptr<AMediaFormat>(AMediaFormat_new(), &AMediaFormat_delete);
     bool changed = false;
     if (requestedFormat->codecType == TranscodingVideoCodecType::kHevc &&
         strcmp(originalMime, AMEDIA_MIMETYPE_VIDEO_HEVC)) {
-        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_HEVC);
+        AMediaFormat_setString(format.get(), AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_HEVC);
         changed = true;
     } else if (requestedFormat->codecType == TranscodingVideoCodecType::kAvc &&
                strcmp(originalMime, AMEDIA_MIMETYPE_VIDEO_AVC)) {
-        AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_AVC);
+        AMediaFormat_setString(format.get(), AMEDIAFORMAT_KEY_MIME, AMEDIA_MIMETYPE_VIDEO_AVC);
         changed = true;
     }
     if (requestedFormat->bitrateBps > 0) {
-        AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_BIT_RATE, requestedFormat->bitrateBps);
+        AMediaFormat_setInt32(format.get(), AMEDIAFORMAT_KEY_BIT_RATE, requestedFormat->bitrateBps);
         changed = true;
     }
     // TODO: translate other fields from requestedFormat to the format for MediaTranscoder.
     // Also need to determine more settings to expose in TranscodingVideoTrackFormat.
     if (!changed) {
-        AMediaFormat_delete(format);
         // Use null format for passthru.
-        format = nullptr;
+        format.reset();
     }
     return format;
 }
@@ -180,8 +180,10 @@ private:
 };
 
 TranscoderWrapper::TranscoderWrapper(const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                                     const std::shared_ptr<TranscodingLogger>& logger,
                                      int64_t heartBeatIntervalUs)
       : mCallback(cb),
+        mLogger(logger),
         mHeartBeatIntervalUs(heartBeatIntervalUs),
         mCurrentClientId(0),
         mCurrentSessionId(-1),
@@ -219,10 +221,10 @@ void TranscoderWrapper::reportError(ClientIdType clientId, SessionIdType session
 }
 
 void TranscoderWrapper::start(ClientIdType clientId, SessionIdType sessionId,
-                              const TranscodingRequestParcel& request,
+                              const TranscodingRequestParcel& request, uid_t callingUid,
                               const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     queueEvent(Event::Start, clientId, sessionId, [=, &request] {
-        media_status_t err = handleStart(clientId, sessionId, request, clientCb);
+        media_status_t err = handleStart(clientId, sessionId, request, callingUid, clientCb);
         if (err != AMEDIA_OK) {
             cleanup();
             reportError(clientId, sessionId, err);
@@ -253,10 +255,10 @@ void TranscoderWrapper::pause(ClientIdType clientId, SessionIdType sessionId) {
 }
 
 void TranscoderWrapper::resume(ClientIdType clientId, SessionIdType sessionId,
-                               const TranscodingRequestParcel& request,
+                               const TranscodingRequestParcel& request, uid_t callingUid,
                                const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     queueEvent(Event::Resume, clientId, sessionId, [=, &request] {
-        media_status_t err = handleResume(clientId, sessionId, request, clientCb);
+        media_status_t err = handleResume(clientId, sessionId, request, callingUid, clientCb);
         if (err != AMEDIA_OK) {
             cleanup();
             reportError(clientId, sessionId, err);
@@ -280,6 +282,7 @@ void TranscoderWrapper::stop(ClientIdType clientId, SessionIdType sessionId, boo
             } else {
                 ALOGI("transcoder stopped");
             }
+            logSessionEnded(TranscodingLogger::SessionEndedReason::CANCELLED, err);
             cleanup();
         } else {
             // For sessions that's not currently running, release any pausedState for the session.
@@ -297,6 +300,7 @@ void TranscoderWrapper::onFinish(ClientIdType clientId, SessionIdType sessionId)
     queueEvent(Event::Finish, clientId, sessionId, [=] {
         if (mTranscoder != nullptr && clientId == mCurrentClientId &&
             sessionId == mCurrentSessionId) {
+            logSessionEnded(TranscodingLogger::SessionEndedReason::FINISHED, AMEDIA_OK);
             cleanup();
         }
 
@@ -314,6 +318,7 @@ void TranscoderWrapper::onError(ClientIdType clientId, SessionIdType sessionId,
             [=] {
                 if (mTranscoder != nullptr && clientId == mCurrentClientId &&
                     sessionId == mCurrentSessionId) {
+                    logSessionEnded(TranscodingLogger::SessionEndedReason::ERROR, error);
                     cleanup();
                 }
                 reportError(clientId, sessionId, error);
@@ -345,7 +350,8 @@ void TranscoderWrapper::onHeartBeat(ClientIdType clientId, SessionIdType session
 
 media_status_t TranscoderWrapper::setupTranscoder(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
-        const std::shared_ptr<ITranscodingClientCallback>& clientCb,
+        uid_t callingUid, const std::shared_ptr<ITranscodingClientCallback>& clientCb,
+        TranscodingLogger::SessionEndedReason* failureReason,
         const std::shared_ptr<ndk::ScopedAParcel>& pausedState) {
     if (clientCb == nullptr) {
         ALOGE("client callback is null");
@@ -364,6 +370,7 @@ media_status_t TranscoderWrapper::setupTranscoder(
         status = clientCb->openFileDescriptor(request.sourceFilePath, "r", &srcFd);
         if (!status.isOk() || srcFd.get() < 0) {
             ALOGE("failed to open source");
+            *failureReason = TranscodingLogger::SessionEndedReason::OPEN_SRC_FD_FAILED;
             return AMEDIA_ERROR_IO;
         }
         srcFdInt = srcFd.get();
@@ -377,6 +384,7 @@ media_status_t TranscoderWrapper::setupTranscoder(
         status = clientCb->openFileDescriptor(request.destinationFilePath, "rw", &dstFd);
         if (!status.isOk() || dstFd.get() < 0) {
             ALOGE("failed to open destination");
+            *failureReason = TranscodingLogger::SessionEndedReason::OPEN_DST_FD_FAILED;
             return AMEDIA_ERROR_IO;
         }
         dstFdInt = dstFd.get();
@@ -384,41 +392,46 @@ media_status_t TranscoderWrapper::setupTranscoder(
 
     mCurrentClientId = clientId;
     mCurrentSessionId = sessionId;
+    mCurrentCallingUid = callingUid;
     mTranscoderCb = std::make_shared<CallbackImpl>(shared_from_this(), clientId, sessionId);
     mTranscoder = MediaTranscoder::create(mTranscoderCb, mHeartBeatIntervalUs, request.clientPid,
                                           request.clientUid, pausedState);
     if (mTranscoder == nullptr) {
         ALOGE("failed to create transcoder");
+        *failureReason = TranscodingLogger::SessionEndedReason::CREATE_FAILED;
         return AMEDIA_ERROR_UNKNOWN;
     }
 
     media_status_t err = mTranscoder->configureSource(srcFdInt);
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure source: %d", err);
+        *failureReason = TranscodingLogger::SessionEndedReason::CONFIG_SRC_FAILED;
         return err;
     }
 
     std::vector<std::shared_ptr<AMediaFormat>> trackFormats = mTranscoder->getTrackFormats();
     if (trackFormats.size() == 0) {
         ALOGE("failed to get track formats!");
+        *failureReason = TranscodingLogger::SessionEndedReason::NO_TRACKS;
         return AMEDIA_ERROR_MALFORMED;
     }
 
     for (int i = 0; i < trackFormats.size(); ++i) {
-        AMediaFormat* format = nullptr;
+        std::shared_ptr<AMediaFormat> format;
         const char* mime = nullptr;
         AMediaFormat_getString(trackFormats[i].get(), AMEDIAFORMAT_KEY_MIME, &mime);
 
         if (!strncmp(mime, "video/", 6)) {
             format = getVideoFormat(mime, request.requestedVideoTrackFormat);
+
+            mSrcFormat = trackFormats[i];
+            mDstFormat = format;
         }
 
-        err = mTranscoder->configureTrackFormat(i, format);
-        if (format != nullptr) {
-            AMediaFormat_delete(format);
-        }
+        err = mTranscoder->configureTrackFormat(i, format.get());
         if (err != AMEDIA_OK) {
             ALOGE("failed to configure track format for track %d: %d", i, err);
+            *failureReason = TranscodingLogger::SessionEndedReason::CONFIG_TRACK_FAILED;
             return err;
         }
     }
@@ -426,6 +439,7 @@ media_status_t TranscoderWrapper::setupTranscoder(
     err = mTranscoder->configureDestination(dstFdInt);
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure dest: %d", err);
+        *failureReason = TranscodingLogger::SessionEndedReason::CONFIG_DST_FAILED;
         return err;
     }
 
@@ -434,17 +448,23 @@ media_status_t TranscoderWrapper::setupTranscoder(
 
 media_status_t TranscoderWrapper::handleStart(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
-        const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
+        uid_t callingUid, const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     ALOGI("%s: setting up transcoder for start", __FUNCTION__);
-    media_status_t err = setupTranscoder(clientId, sessionId, request, clientCb);
+    TranscodingLogger::SessionEndedReason reason = TranscodingLogger::SessionEndedReason::UNKNOWN;
+    media_status_t err =
+            setupTranscoder(clientId, sessionId, request, callingUid, clientCb, &reason);
     if (err != AMEDIA_OK) {
         ALOGI("%s: failed to setup transcoder", __FUNCTION__);
+        logSessionEnded(reason, err);
         return err;
     }
+
+    mTranscodeStartTime = std::chrono::steady_clock::now();
 
     err = mTranscoder->start();
     if (err != AMEDIA_OK) {
         ALOGE("%s: failed to start transcoder: %d", __FUNCTION__, err);
+        logSessionEnded(TranscodingLogger::SessionEndedReason::START_FAILED, err);
         return err;
     }
 
@@ -467,6 +487,7 @@ media_status_t TranscoderWrapper::handlePause(ClientIdType clientId, SessionIdTy
 
     std::shared_ptr<ndk::ScopedAParcel> pauseStates;
     media_status_t err = mTranscoder->pause(&pauseStates);
+    logSessionEnded(TranscodingLogger::SessionEndedReason::PAUSED, err);
     if (err != AMEDIA_OK) {
         ALOGE("%s: failed to pause transcoder: %d", __FUNCTION__, err);
         return err;
@@ -479,7 +500,7 @@ media_status_t TranscoderWrapper::handlePause(ClientIdType clientId, SessionIdTy
 
 media_status_t TranscoderWrapper::handleResume(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
-        const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
+        uid_t callingUid, const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
     std::shared_ptr<ndk::ScopedAParcel> pausedState;
     auto it = mPausedStateMap.find(SessionKeyType(clientId, sessionId));
     if (it != mPausedStateMap.end()) {
@@ -491,15 +512,23 @@ media_status_t TranscoderWrapper::handleResume(
     }
 
     ALOGI("%s: setting up transcoder for resume", __FUNCTION__);
-    media_status_t err = setupTranscoder(clientId, sessionId, request, clientCb, pausedState);
+    TranscodingLogger::SessionEndedReason reason = TranscodingLogger::SessionEndedReason::UNKNOWN;
+    media_status_t err = setupTranscoder(clientId, sessionId, request, callingUid, clientCb,
+                                         &reason, pausedState);
     if (err != AMEDIA_OK) {
         ALOGE("%s: failed to setup transcoder: %d", __FUNCTION__, err);
+        logSessionEnded(reason, err);
         return err;
     }
+
+    // Note: For now resume() will just restart transcoding from the beginning, so there is no need
+    // to distinguish between resume and start from a performance perspective.
+    mTranscodeStartTime = std::chrono::steady_clock::now();
 
     err = mTranscoder->resume();
     if (err != AMEDIA_OK) {
         ALOGE("%s: failed to resume transcoder: %d", __FUNCTION__, err);
+        logSessionEnded(TranscodingLogger::SessionEndedReason::RESUME_FAILED, err);
         return err;
     }
 
@@ -510,8 +539,23 @@ media_status_t TranscoderWrapper::handleResume(
 void TranscoderWrapper::cleanup() {
     mCurrentClientId = 0;
     mCurrentSessionId = -1;
+    mCurrentCallingUid = -1;
     mTranscoderCb = nullptr;
     mTranscoder = nullptr;
+    mSrcFormat = nullptr;
+    mDstFormat = nullptr;
+}
+
+void TranscoderWrapper::logSessionEnded(const TranscodingLogger::SessionEndedReason& reason,
+                                        int error) {
+    std::chrono::microseconds transcodeDuration(-1);
+    if (reason == TranscodingLogger::SessionEndedReason::FINISHED && error == AMEDIA_OK) {
+        transcodeDuration = std::chrono::duration_cast<std::chrono::microseconds>(
+                std::chrono::steady_clock::now() - mTranscodeStartTime);
+    }
+
+    mLogger->logSessionEnded(reason, mCurrentCallingUid, error, transcodeDuration, mSrcFormat.get(),
+                             mDstFormat.get());
 }
 
 void TranscoderWrapper::queueEvent(Event::Type type, ClientIdType clientId, SessionIdType sessionId,
@@ -555,5 +599,4 @@ void TranscoderWrapper::threadLoop() {
         lock.lock();
     }
 }
-
 }  // namespace android
