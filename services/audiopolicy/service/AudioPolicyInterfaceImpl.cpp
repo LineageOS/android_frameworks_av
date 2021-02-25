@@ -197,6 +197,7 @@ Status AudioPolicyService::setPhoneState(media::AudioMode stateAidl, int32_t uid
     mAudioPolicyManager->setPhoneState(state);
     mPhoneState = state;
     mPhoneStateOwnerUid = uid;
+    updateUidStates_l();
     return Status::ok();
 }
 
