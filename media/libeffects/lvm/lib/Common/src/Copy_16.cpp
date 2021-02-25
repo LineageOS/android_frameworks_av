@@ -51,25 +51,32 @@ void Copy_Float_Mc_Stereo(const LVM_FLOAT* src, LVM_FLOAT* dst,
 }
 
 // Merge a multichannel source with stereo contained in StereoOut, to dst.
-void Copy_Float_Stereo_Mc(const LVM_FLOAT* src, LVM_FLOAT* StereoOut, LVM_FLOAT* dst,
+void Copy_Float_Stereo_Mc(const LVM_FLOAT* src, const LVM_FLOAT* StereoOut, LVM_FLOAT* dst,
                           LVM_INT16 NrFrames, /* Number of frames*/
                           LVM_INT32 NrChannels) {
     LVM_INT16 ii, jj;
 
-    // pack dst with stereo information of StereoOut
-    // together with the upper channels of src.
-    StereoOut += 2 * (NrFrames - 1);
-    dst += NrChannels * (NrFrames - 1);
-    src += NrChannels * (NrFrames - 1);
-    for (ii = NrFrames; ii != 0; ii--) {
-        dst[1] = StereoOut[1];
-        dst[0] = StereoOut[0];  // copy 1 before 0 is required for NrChannels == 3.
-        for (jj = 2; jj < NrChannels; jj++) {
-            dst[jj] = src[jj];
+    if (NrChannels >= FCC_2) {
+        // pack dst with stereo information of StereoOut
+        // together with the upper channels of src.
+        StereoOut += 2 * (NrFrames - 1);
+        dst += NrChannels * (NrFrames - 1);
+        src += NrChannels * (NrFrames - 1);
+
+        for (ii = NrFrames; ii != 0; ii--) {
+            dst[1] = StereoOut[1];
+            dst[0] = StereoOut[0];  // copy 1 before 0 is required for NrChannels == 3.
+            for (jj = FCC_2; jj < NrChannels; jj++) {
+                dst[jj] = src[jj];
+            }
+            dst -= NrChannels;
+            src -= NrChannels;
+            StereoOut -= 2;
         }
-        dst -= NrChannels;
-        src -= NrChannels;
-        StereoOut -= 2;
+    } else {
+        Copy_Float((const LVM_FLOAT*)StereoOut, /* Source */
+                   (LVM_FLOAT*)dst,             /* Destination */
+                   (LVM_INT16)NrFrames);        /* Number of frames */
     }
 }
 /**********************************************************************************/

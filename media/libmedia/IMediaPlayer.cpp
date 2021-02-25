@@ -20,6 +20,7 @@
 #include <sys/types.h>
 
 #include <android/IDataSource.h>
+#include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <media/AudioResamplerPublic.h>
@@ -34,59 +35,37 @@ namespace android {
 
 using media::VolumeShaper;
 
-enum {
-    DISCONNECT = IBinder::FIRST_CALL_TRANSACTION,
-    SET_DATA_SOURCE_URL,
-    SET_DATA_SOURCE_FD,
-    SET_DATA_SOURCE_STREAM,
-    SET_DATA_SOURCE_CALLBACK,
-    SET_DATA_SOURCE_RTP,
-    SET_BUFFERING_SETTINGS,
-    GET_BUFFERING_SETTINGS,
-    PREPARE_ASYNC,
-    START,
-    STOP,
-    IS_PLAYING,
-    SET_PLAYBACK_SETTINGS,
-    GET_PLAYBACK_SETTINGS,
-    SET_SYNC_SETTINGS,
-    GET_SYNC_SETTINGS,
-    PAUSE,
-    SEEK_TO,
-    GET_CURRENT_POSITION,
-    GET_DURATION,
-    RESET,
-    NOTIFY_AT,
-    SET_AUDIO_STREAM_TYPE,
-    SET_LOOPING,
-    SET_VOLUME,
-    INVOKE,
-    SET_METADATA_FILTER,
-    GET_METADATA,
-    SET_AUX_EFFECT_SEND_LEVEL,
-    ATTACH_AUX_EFFECT,
-    SET_VIDEO_SURFACETEXTURE,
-    SET_PARAMETER,
-    GET_PARAMETER,
-    SET_RETRANSMIT_ENDPOINT,
-    GET_RETRANSMIT_ENDPOINT,
-    SET_NEXT_PLAYER,
-    APPLY_VOLUME_SHAPER,
-    GET_VOLUME_SHAPER_STATE,
-    // Modular DRM
-    PREPARE_DRM,
-    RELEASE_DRM,
-    // AudioRouting
-    SET_OUTPUT_DEVICE,
-    GET_ROUTED_DEVICE_ID,
-    ENABLE_AUDIO_DEVICE_CALLBACK,
-};
-
 // ModDrm helpers
-static void readVector(const Parcel& reply, Vector<uint8_t>& vector) {
-    uint32_t size = reply.readUint32();
-    vector.insertAt((size_t)0, size);
-    reply.read(vector.editArray(), size);
+static status_t readVector(const Parcel& reply, Vector<uint8_t>& vector) {
+    uint32_t size = 0;
+    status_t status = reply.readUint32(&size);
+    if (status == OK) {
+        status = size <= reply.dataAvail() ? OK : BAD_VALUE;
+    }
+    if (status == OK) {
+        status = vector.insertAt((size_t) 0, size) >= 0 ? OK : NO_MEMORY;
+    }
+    if (status == OK) {
+        status = reply.read(vector.editArray(), size);
+    }
+    if (status != OK) {
+        char errorMsg[100];
+        char buganizerId[] = "173720767";
+        snprintf(errorMsg,
+                sizeof(errorMsg),
+                "%s: failed to read array. Size: %d, status: %d.",
+                __func__,
+                size,
+                status);
+        android_errorWriteWithInfoLog(
+                /* safetyNet tag= */ 0x534e4554,
+                buganizerId,
+                IPCThreadState::self()->getCallingUid(),
+                errorMsg,
+                strlen(errorMsg));
+        ALOGE("%s (b/%s)", errorMsg, buganizerId);
+    }
+    return status;
 }
 
 static void writeVector(Parcel& data, Vector<uint8_t> const& vector) {
@@ -977,8 +956,10 @@ status_t BnMediaPlayer::onTransact(
             uint8_t uuid[16] = {};
             data.read(uuid, sizeof(uuid));
             Vector<uint8_t> drmSessionId;
-            readVector(data, drmSessionId);
-
+            status_t status = readVector(data, drmSessionId);
+            if (status != OK) {
+              return status;
+            }
             uint32_t result = prepareDrm(uuid, drmSessionId);
             reply->writeInt32(result);
             return OK;

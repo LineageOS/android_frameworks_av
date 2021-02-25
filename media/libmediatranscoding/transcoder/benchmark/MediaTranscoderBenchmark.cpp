@@ -60,6 +60,8 @@ public:
     virtual void onProgressUpdate(const MediaTranscoder* transcoder __unused,
                                   int32_t progress __unused) override {}
 
+    virtual void onHeartBeat(const MediaTranscoder* transcoder __unused) override {}
+
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
                                      const std::shared_ptr<ndk::ScopedAParcel>& pausedState
                                              __unused) override {}

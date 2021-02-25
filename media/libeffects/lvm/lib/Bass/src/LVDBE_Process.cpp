@@ -79,11 +79,7 @@ LVDBE_ReturnStatus_en LVDBE_Process(
         const LVM_UINT16 NrFrames)  // updated to use samples = frames * channels.
 {
     LVDBE_Instance_t* pInstance = (LVDBE_Instance_t*)hInstance;
-
-    /*Extract number of Channels info*/
-    // Mono passed in as stereo
-    const LVM_INT32 NrChannels =
-            pInstance->Params.NrChannels == 1 ? 2 : pInstance->Params.NrChannels;
+    const LVM_INT32 NrChannels = pInstance->Params.NrChannels;
     const LVM_INT32 NrSamples = NrChannels * NrFrames;
 
     /* Space to store DBE path computation */

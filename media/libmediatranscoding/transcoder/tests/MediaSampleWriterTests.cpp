@@ -210,6 +210,8 @@ public:
         mLastProgress = progress;
         mProgressUpdateCount++;
     }
+
+    virtual void onHeartBeat(const MediaSampleWriter* writer __unused) override {}
     // ~MediaSampleWriter::CallbackInterface
 
     void waitForWritingFinished() {
