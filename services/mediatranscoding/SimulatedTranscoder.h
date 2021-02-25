@@ -55,11 +55,11 @@ public:
 
     // TranscoderInterface
     void start(ClientIdType clientId, SessionIdType sessionId,
-               const TranscodingRequestParcel& request,
+               const TranscodingRequestParcel& request, uid_t callingUid,
                const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void pause(ClientIdType clientId, SessionIdType sessionId) override;
     void resume(ClientIdType clientId, SessionIdType sessionId,
-                const TranscodingRequestParcel& request,
+                const TranscodingRequestParcel& request, uid_t callingUid,
                 const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void stop(ClientIdType clientId, SessionIdType sessionId, bool abandon = false) override;
     // ~TranscoderInterface

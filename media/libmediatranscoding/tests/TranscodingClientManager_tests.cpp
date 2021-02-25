@@ -135,7 +135,7 @@ struct TestController : public ControllerClientInterface {
 
     virtual ~TestController() { ALOGI("TestController Destroyed"); }
 
-    bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t /*uid*/,
+    bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t /*callingUid*/, uid_t /*uid*/,
                 const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override {
         SessionKeyType sessionKey = std::make_pair(clientId, sessionId);
