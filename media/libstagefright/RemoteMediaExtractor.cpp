@@ -40,6 +40,7 @@ static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 static const char *kExtractorMime = "android.media.mediaextractor.mime";
 static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
 static const char *kExtractorEntryPoint = "android.media.mediaextractor.entry";
+static const char *kExtractorPlaybackId = "android.media.mediaextractor.playbackId";
 
 static const char *kEntryPointSdk = "sdk";
 static const char *kEntryPointWithJvm = "ndk-with-jvm";
@@ -171,6 +172,11 @@ status_t RemoteMediaExtractor::setEntryPoint(EntryPoint entryPoint) {
             return BAD_VALUE;
     }
     mMetricsItem->setCString(kExtractorEntryPoint, entryPointString);
+    return OK;
+}
+
+status_t RemoteMediaExtractor::setPlaybackId(const String8& playbackId) {
+    mMetricsItem->setCString(kExtractorPlaybackId, playbackId.c_str());
     return OK;
 }
 

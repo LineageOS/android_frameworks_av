@@ -39,7 +39,8 @@ enum {
     SETMEDIACAS,
     NAME,
     GETMETRICS,
-    SETENTRYPOINT
+    SETENTRYPOINT,
+    SETPLAYBACKID
 };
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
@@ -150,6 +151,13 @@ public:
         data.writeInt32(static_cast<int32_t>(entryPoint));
         return remote()->transact(SETENTRYPOINT, data, &reply);
     }
+
+    virtual status_t setPlaybackId(const String8& playbackId) {
+        Parcel data, reply;
+        data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
+        data.writeString8(playbackId);
+        return remote()->transact(SETPLAYBACKID, data, &reply);
+    }
 };
 
 IMPLEMENT_META_INTERFACE(MediaExtractor, "android.media.IMediaExtractor");
@@ -249,6 +257,16 @@ status_t BnMediaExtractor::onTransact(
                 setEntryPoint(EntryPoint(entryPoint));
             }
             return err;
+        }
+        case SETPLAYBACKID: {
+            ALOGV("setPlaybackId");
+            CHECK_INTERFACE(IMediaExtractor, data, reply);
+            String8 playbackId;
+            status_t status = data.readString8(&playbackId);
+            if (status == OK) {
+              setPlaybackId(playbackId);
+            }
+            return status;
         }
         default:
             return BBinder::onTransact(code, data, reply, flags);
