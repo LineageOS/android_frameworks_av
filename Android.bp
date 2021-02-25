@@ -1,0 +1,62 @@
+aidl_interface {
+    name: "av-types-aidl",
+    unstable: true,
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        "aidl/android/media/InterpolatorConfig.aidl",
+        "aidl/android/media/InterpolatorType.aidl",
+        "aidl/android/media/MicrophoneInfoData.aidl",
+        "aidl/android/media/VolumeShaperConfiguration.aidl",
+        "aidl/android/media/VolumeShaperConfigurationOptionFlag.aidl",
+        "aidl/android/media/VolumeShaperConfigurationType.aidl",
+        "aidl/android/media/VolumeShaperOperation.aidl",
+        "aidl/android/media/VolumeShaperOperationFlag.aidl",
+        "aidl/android/media/VolumeShaperState.aidl",
+    ],
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.bluetooth.updatable",
+                "com.android.media",
+                "com.android.media.swcodec",
+            ],
+        },
+    },
+}
+
+cc_library_headers {
+    name: "av-headers",
+    export_include_dirs: ["include"],
+    static_libs: [
+        "av-types-aidl-cpp",
+    ],
+    export_static_lib_headers: [
+        "av-types-aidl-cpp",
+    ],
+    header_libs: [
+        "libaudioclient_aidl_conversion_util",
+    ],
+    export_header_lib_headers: [
+        "libaudioclient_aidl_conversion_util",
+    ],
+    host_supported: true,
+    vendor_available: true,
+    double_loadable: true,
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bluetooth.updatable",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+}
