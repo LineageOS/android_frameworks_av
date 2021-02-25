@@ -724,7 +724,7 @@ AudioFlinger::PlaybackThread::Track::Track(
 
     // Once this item is logged by the server, the client can add properties.
     const char * const traits = sharedBuffer == 0 ? "" : "static";
-    mTrackMetrics.logConstructor(creatorPid, uid, traits, streamType);
+    mTrackMetrics.logConstructor(creatorPid, uid, id(), traits, streamType);
 }
 
 AudioFlinger::PlaybackThread::Track::~Track()
@@ -2421,7 +2421,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
 #endif
 
     // Once this item is logged by the server, the client can add properties.
-    mTrackMetrics.logConstructor(creatorPid, uid);
+    mTrackMetrics.logConstructor(creatorPid, uid, id());
 }
 
 AudioFlinger::RecordThread::RecordTrack::~RecordTrack()
@@ -2984,7 +2984,7 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
         mPid(pid), mSilenced(false), mSilencedNotified(false)
 {
     // Once this item is logged by the server, the client can add properties.
-    mTrackMetrics.logConstructor(creatorPid, uid);
+    mTrackMetrics.logConstructor(creatorPid, uid, id());
 }
 
 AudioFlinger::MmapThread::MmapTrack::~MmapTrack()

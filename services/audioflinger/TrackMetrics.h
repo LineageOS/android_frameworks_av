@@ -67,7 +67,7 @@ public:
         mIntervalStartTimeNs = systemTime();
     }
 
-    void logConstructor(pid_t creatorPid, uid_t creatorUid,
+    void logConstructor(pid_t creatorPid, uid_t creatorUid, int32_t internalTrackId,
             const std::string& traits = {},
             audio_stream_type_t streamType = AUDIO_STREAM_DEFAULT) const {
         // Once this item is logged by the server, the client can add properties.
@@ -78,6 +78,7 @@ public:
             .set(AMEDIAMETRICS_PROP_ALLOWUID, (int32_t)creatorUid)
             .set(AMEDIAMETRICS_PROP_EVENT,
                     AMEDIAMETRICS_PROP_PREFIX_SERVER AMEDIAMETRICS_PROP_EVENT_VALUE_CTOR)
+            .set(AMEDIAMETRICS_PROP_INTERNALTRACKID, internalTrackId)
             .set(AMEDIAMETRICS_PROP_TRAITS, traits);
         // log streamType from the service, since client doesn't know chosen streamType.
         if (streamType != AUDIO_STREAM_DEFAULT) {
