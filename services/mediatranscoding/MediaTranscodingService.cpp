@@ -41,16 +41,21 @@ namespace android {
             errorCode,                                \
             String8::format("%s:%d: " errorString, __FUNCTION__, __LINE__, ##__VA_ARGS__))
 
-MediaTranscodingService::MediaTranscodingService(
-        const std::shared_ptr<TranscoderInterface>& transcoder)
+MediaTranscodingService::MediaTranscodingService(bool simulated)
       : mUidPolicy(new TranscodingUidPolicy()),
         mResourcePolicy(new TranscodingResourcePolicy()),
-        mThermalPolicy(new TranscodingThermalPolicy()),
-        mSessionController(new TranscodingSessionController(transcoder, mUidPolicy, mResourcePolicy,
-                                                            mThermalPolicy)),
-        mClientManager(new TranscodingClientManager(mSessionController)) {
+        mThermalPolicy(new TranscodingThermalPolicy()) {
     ALOGV("MediaTranscodingService is created");
-    transcoder->setCallback(mSessionController);
+    mSessionController.reset(new TranscodingSessionController(
+            [simulated](const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                        int64_t heartBeatUs) -> std::shared_ptr<TranscoderInterface> {
+                if (simulated) {
+                    return std::make_shared<SimulatedTranscoder>(cb, heartBeatUs);
+                }
+                return std::make_shared<TranscoderWrapper>(cb, heartBeatUs);
+            },
+            mUidPolicy, mResourcePolicy, mThermalPolicy));
+    mClientManager.reset(new TranscodingClientManager(mSessionController));
     mUidPolicy->setCallback(mSessionController);
     mResourcePolicy->setCallback(mSessionController);
     mThermalPolicy->setCallback(mSessionController);
@@ -94,15 +99,9 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 
 //static
 void MediaTranscodingService::instantiate() {
-    std::shared_ptr<TranscoderInterface> transcoder;
-    if (property_get_bool("debug.transcoding.simulated_transcoder", false)) {
-        transcoder = std::make_shared<SimulatedTranscoder>();
-    } else {
-        transcoder = std::make_shared<TranscoderWrapper>();
-    }
-
     std::shared_ptr<MediaTranscodingService> service =
-            ::ndk::SharedRefBase::make<MediaTranscodingService>(transcoder);
+            ::ndk::SharedRefBase::make<MediaTranscodingService>(
+                    property_get_bool("debug.transcoding.simulated_transcoder", false));
     binder_status_t status =
             AServiceManager_addService(service->asBinder().get(), getServiceName());
     if (status != STATUS_OK) {

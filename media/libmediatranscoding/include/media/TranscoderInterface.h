@@ -32,7 +32,6 @@ class TranscoderCallbackInterface;
 // Interface for the controller to call the transcoder to take actions.
 class TranscoderInterface {
 public:
-    virtual void setCallback(const std::shared_ptr<TranscoderCallbackInterface>& cb) = 0;
     virtual void start(ClientIdType clientId, SessionIdType sessionId,
                        const TranscodingRequestParcel& request,
                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
@@ -40,7 +39,9 @@ public:
     virtual void resume(ClientIdType clientId, SessionIdType sessionId,
                         const TranscodingRequestParcel& request,
                         const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
-    virtual void stop(ClientIdType clientId, SessionIdType sessionId) = 0;
+    // Stop the specified session. If abandon is true, the transcoder wrapper will be discarded
+    // after the session stops.
+    virtual void stop(ClientIdType clientId, SessionIdType sessionId, bool abandon = false) = 0;
 
 protected:
     virtual ~TranscoderInterface() = default;
@@ -59,6 +60,7 @@ public:
                          TranscodingErrorCode err) = 0;
     virtual void onProgressUpdate(ClientIdType clientId, SessionIdType sessionId,
                                   int32_t progress) = 0;
+    virtual void onHeartBeat(ClientIdType clientId, SessionIdType sessionId) = 0;
 
     // Called when transcoding becomes temporarily inaccessible due to loss of resource.
     // If there is any session currently running, it will be paused. When resource contention

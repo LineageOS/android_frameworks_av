@@ -56,10 +56,11 @@ void LVC_MixSoft_1St_MC_float_SAT(LVMixer3_2St_FLOAT_st* ptrInstance, const LVM_
     Mix_Private_FLOAT_st* pInstance[NrChannels];
 
     if (audio_channel_mask_get_representation(ChMask) == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
-        for (int i = 0; i < 2; i++) {
+        int loopLimit = (NrChannels == FCC_1) ? NrChannels : FCC_2;
+        for (int i = 0; i < loopLimit; i++) {
             pInstance[i] = pMixPrivInst[i];
         }
-        for (int i = 2; i < NrChannels; i++) {
+        for (int i = loopLimit; i < NrChannels; i++) {
             pInstance[i] = pMixPrivInst[2];
         }
     } else {

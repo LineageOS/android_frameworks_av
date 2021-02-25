@@ -50,6 +50,9 @@ public:
         /** Transcoder progress update reported in percent from 0 to 100. */
         virtual void onProgressUpdate(const MediaTranscoder* transcoder, int32_t progress) = 0;
 
+        /** Transcoder heart-beat signal. */
+        virtual void onHeartBeat(const MediaTranscoder* transcoder) = 0;
+
         /**
          * Transcoder lost codec resources and paused operations. The client can resume transcoding
          * again when resources are available by either:
@@ -70,7 +73,7 @@ public:
      * possible to change any configurations on a paused transcoder.
      */
     static std::shared_ptr<MediaTranscoder> create(
-            const std::shared_ptr<CallbackInterface>& callbacks,
+            const std::shared_ptr<CallbackInterface>& callbacks, int64_t heartBeatIntervalUs = -1,
             pid_t pid = AMEDIACODEC_CALLING_PID, uid_t uid = AMEDIACODEC_CALLING_UID,
             const std::shared_ptr<ndk::ScopedAParcel>& pausedState = nullptr);
 
@@ -120,7 +123,8 @@ public:
     virtual ~MediaTranscoder() = default;
 
 private:
-    MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks, pid_t pid, uid_t uid);
+    MediaTranscoder(const std::shared_ptr<CallbackInterface>& callbacks,
+                    int64_t heartBeatIntervalUs, pid_t pid, uid_t uid);
 
     // MediaTrackTranscoderCallback
     virtual void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder) override;
@@ -134,6 +138,7 @@ private:
     virtual void onFinished(const MediaSampleWriter* writer, media_status_t status) override;
     virtual void onStopped(const MediaSampleWriter* writer) override;
     virtual void onProgressUpdate(const MediaSampleWriter* writer, int32_t progress) override;
+    virtual void onHeartBeat(const MediaSampleWriter* writer) override;
     // ~MediaSampleWriter::CallbackInterface
 
     void onThreadFinished(const void* thread, media_status_t threadStatus, bool threadStopped);
@@ -147,6 +152,7 @@ private:
     std::vector<std::shared_ptr<MediaTrackTranscoder>> mTrackTranscoders;
     std::mutex mTracksAddedMutex;
     std::unordered_set<const MediaTrackTranscoder*> mTracksAdded GUARDED_BY(mTracksAddedMutex);
+    int64_t mHeartBeatIntervalUs;
     pid_t mPid;
     uid_t mUid;
 

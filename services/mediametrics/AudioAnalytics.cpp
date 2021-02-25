@@ -87,6 +87,7 @@ static constexpr const char * const AudioRecordDeviceUsageFields[] = {
     "selected_device_id",
     "caller",
     "source",
+    "log_session_id",
 };
 
 static constexpr const char * const AudioThreadDeviceUsageFields[] = {
@@ -124,6 +125,7 @@ static constexpr const char * const AudioTrackDeviceUsageFields[] = {
     "content_type",
     "caller",
     "traits",
+    "log_session_id",
 };
 
 static constexpr const char * const AudioDeviceConnectionFields[] = {
@@ -521,12 +523,18 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         std::string source;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_SOURCE, &source);
+        // Android S
+        std::string logSessionId;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_LOGSESSIONID, &logSessionId);
 
         const auto callerNameForStats =
                 types::lookup<types::CALLER_NAME, short_enum_type_t>(callerName);
         const auto encodingForStats = types::lookup<types::ENCODING, short_enum_type_t>(encoding);
         const auto flagsForStats = types::lookup<types::INPUT_FLAG, short_enum_type_t>(flags);
         const auto sourceForStats = types::lookup<types::SOURCE_TYPE, short_enum_type_t>(source);
+        // Android S
+        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
@@ -541,7 +549,9 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << ") packageName:" << packageName
               << " selectedDeviceId:" << selectedDeviceId
               << " callerName:" << callerName << "(" << callerNameForStats
-              << ") source:" << source << "(" << sourceForStats << ")";
+              << ") source:" << source << "(" << sourceForStats
+              << ") logSessionId:" << logSessionId << "(" << logSessionIdForStats
+              << ")";
         if (clientCalled  // only log if client app called AudioRecord.
                 && mAudioAnalytics.mDeliverStatistics) {
             const auto [ result, str ] = sendToStatsd(AudioRecordDeviceUsageFields,
@@ -559,6 +569,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , selectedDeviceId
                     , ENUM_EXTRACT(callerNameForStats)
                     , ENUM_EXTRACT(sourceForStats)
+                    , logSessionIdForStats.c_str()
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
             mAudioAnalytics.mStatsdLog.log("%s", str.c_str());
@@ -659,6 +670,10 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         std::string usage;
         mAudioAnalytics.mAnalyticsState->timeMachine().get(
                 key, AMEDIAMETRICS_PROP_USAGE, &usage);
+        // Android S
+        std::string logSessionId;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_LOGSESSIONID, &logSessionId);
 
         const auto callerNameForStats =
                 types::lookup<types::CALLER_NAME, short_enum_type_t>(callerName);
@@ -671,6 +686,8 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         const auto traitsForStats =
                  types::lookup<types::TRACK_TRAITS, short_enum_type_t>(traits);
         const auto usageForStats = types::lookup<types::USAGE, short_enum_type_t>(usage);
+        // Android S
+        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
@@ -695,6 +712,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
               << " streamType:" << streamType << "(" << streamTypeForStats
               << ") traits:" << traits << "(" << traitsForStats
               << ") usage:" << usage << "(" << usageForStats
+              << ") logSessionId:" << logSessionId << "(" << logSessionIdForStats
               << ")";
         if (clientCalled // only log if client app called AudioTracks
                 && mAudioAnalytics.mDeliverStatistics) {
@@ -719,6 +737,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                     , ENUM_EXTRACT(contentTypeForStats)
                     , ENUM_EXTRACT(callerNameForStats)
                     , ENUM_EXTRACT(traitsForStats)
+                    , logSessionIdForStats.c_str()
                     );
             ALOGV("%s: statsd %s", __func__, str.c_str());
             mAudioAnalytics.mStatsdLog.log("%s", str.c_str());

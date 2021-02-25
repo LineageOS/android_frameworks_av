@@ -81,6 +81,11 @@ public:
         }
     }
 
+    virtual void onHeartBeat(const MediaTranscoder* transcoder __unused) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mHeartBeatCount++;
+    }
+
     virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
                                      const std::shared_ptr<ndk::ScopedAParcel>& pausedState
                                              __unused) override {}
@@ -100,6 +105,7 @@ public:
     }
     media_status_t mStatus = AMEDIA_OK;
     bool mFinished = false;
+    int32_t mHeartBeatCount = 0;
 
 private:
     std::mutex mMutex;
@@ -143,6 +149,7 @@ public:
 
     typedef enum {
         kRunToCompletion,
+        kCheckHeartBeat,
         kCancelAfterProgress,
         kCancelAfterStart,
         kPauseAfterProgress,
@@ -152,8 +159,9 @@ public:
     using FormatConfigurationCallback = std::function<AMediaFormat*(AMediaFormat*)>;
     media_status_t transcodeHelper(const char* srcPath, const char* destPath,
                                    FormatConfigurationCallback formatCallback,
-                                   TranscodeExecutionControl executionControl = kRunToCompletion) {
-        auto transcoder = MediaTranscoder::create(mCallbacks);
+                                   TranscodeExecutionControl executionControl = kRunToCompletion,
+                                   int64_t heartBeatIntervalUs = -1) {
+        auto transcoder = MediaTranscoder::create(mCallbacks, heartBeatIntervalUs);
         EXPECT_NE(transcoder, nullptr);
 
         const int srcFd = open(srcPath, O_RDONLY);
@@ -200,6 +208,18 @@ public:
             case kPauseAfterStart:
                 transcoder->pause(&pausedState);
                 break;
+            case kCheckHeartBeat: {
+                mCallbacks->waitForProgressMade();
+                auto startTime = std::chrono::system_clock::now();
+                mCallbacks->waitForTranscodingFinished();
+                auto finishTime = std::chrono::system_clock::now();
+                int32_t expectedCount =
+                        (finishTime - startTime) / std::chrono::microseconds(heartBeatIntervalUs);
+                // Here we relax the expected count by 1, in case the last heart-beat just
+                // missed the window, other than that the count should be exact.
+                EXPECT_GE(mCallbacks->mHeartBeatCount, expectedCount - 1);
+                break;
+            }
             case kRunToCompletion:
             default:
                 mCallbacks->waitForTranscodingFinished();
@@ -428,6 +448,18 @@ TEST_F(MediaTranscoderTests, TestPauseAfterStart) {
         EXPECT_FALSE(mCallbacks->mFinished);
         mCallbacks = std::make_shared<TestCallbacks>();
     }
+}
+
+TEST_F(MediaTranscoderTests, TestHeartBeat) {
+    const char* srcPath = "/data/local/tmp/TranscodingTestAssets/longtest_15s.mp4";
+    const char* destPath = "/data/local/tmp/MediaTranscoder_HeartBeat.MP4";
+
+    // Use a shorter value of 500ms than the default 1000ms to get more heart beat for testing.
+    const int64_t heartBeatIntervalUs = 500000LL;
+    EXPECT_EQ(transcodeHelper(srcPath, destPath, getAVCVideoFormat, kCheckHeartBeat,
+                              heartBeatIntervalUs),
+              AMEDIA_OK);
+    EXPECT_TRUE(mCallbacks->mFinished);
 }
 
 }  // namespace android

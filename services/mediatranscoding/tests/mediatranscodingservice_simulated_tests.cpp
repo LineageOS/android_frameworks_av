@@ -53,6 +53,7 @@ constexpr const char* kInvalidClientOpPackageName = "";
 
 constexpr int64_t kPaddingUs = 1000000;
 constexpr int64_t kSessionWithPaddingUs = SimulatedTranscoder::kSessionDurationUs + kPaddingUs;
+constexpr int64_t kWatchdogTimeoutUs = 3000000;
 
 constexpr const char* kClientOpPackageName = "TestClientPackage";
 
@@ -385,5 +386,33 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingThermalPolicy) {
 
     ALOGD("TestTranscodingThermalPolicy finished.");
 }
+
+TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingWatchdog) {
+    ALOGD("TestTranscodingWatchdog starting...");
+
+    registerMultipleClients();
+
+    // SimulatedTranscoder itself does not send heartbeat. Its sessions last 1sec
+    // by default, so timeout will not happen normally.
+    // Here we run a session of 4000ms with TranscodingTestConfig. This will trigger
+    // a watchdog timeout on server side. We use it to check that error code is correct.
+    EXPECT_TRUE(mClient1->submit(
+            0, "test_source_file_0", "test_destination_file_0", TranscodingSessionPriority::kNormal,
+            -1 /*bitrateBps*/, -1 /*overridePid*/, -1 /*overrideUid*/, 4000 /*sessionDurationMs*/));
+    EXPECT_EQ(mClient1->pop(100000), EventTracker::Start(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kWatchdogTimeoutUs - 100000), EventTracker::NoEvent);
+    EXPECT_EQ(mClient1->pop(200000), EventTracker::Failed(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->getLastError(), TranscodingErrorCode::kWatchdogTimeout);
+
+    // After the timeout, submit another request and check it's finished.
+    EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file_1"));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
+
+    unregisterMultipleClients();
+
+    ALOGD("TestTranscodingWatchdog finished.");
+}
+
 }  // namespace media
 }  // namespace android
