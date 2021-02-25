@@ -1056,7 +1056,10 @@ void CCodec::configure(const sp<AMessage> &msg) {
         C2StreamMaxBufferSizeInfo::input maxInputSize(0u, 0u);
         C2PrependHeaderModeSetting prepend(PREPEND_HEADER_TO_NONE);
 
+        C2Param::Index colorAspectsRequestIndex =
+            C2StreamColorAspectsInfo::output::PARAM_TYPE | C2Param::CoreIndex::IS_REQUEST_FLAG;
         std::initializer_list<C2Param::Index> indices {
+            colorAspectsRequestIndex.withStream(0u),
         };
         c2_status_t c2err = comp->query(
                 { &usage, &maxInputSize, &prepend },
@@ -1065,11 +1068,6 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 &params);
         if (c2err != C2_OK && c2err != C2_BAD_INDEX) {
             ALOGE("Failed to query component interface: %d", c2err);
-            return UNKNOWN_ERROR;
-        }
-        if (params.size() != indices.size()) {
-            ALOGE("Component returns wrong number of params: expected %zu actual %zu",
-                    indices.size(), params.size());
             return UNKNOWN_ERROR;
         }
         if (usage) {
@@ -1190,6 +1188,33 @@ void CCodec::configure(const sp<AMessage> &msg) {
                     config->mOutputFormat->setInt32(KEY_CHANNEL_MASK, mask);
                 }
             }
+        }
+
+        std::unique_ptr<C2Param> colorTransferRequestParam;
+        for (std::unique_ptr<C2Param> &param : params) {
+            if (param->index() == colorAspectsRequestIndex.withStream(0u)) {
+                ALOGI("found color transfer request param");
+                colorTransferRequestParam = std::move(param);
+            }
+        }
+        int32_t colorTransferRequest = 0;
+        if (config->mDomain & (Config::IS_IMAGE | Config::IS_VIDEO)
+                && !sdkParams->findInt32("color-transfer-request", &colorTransferRequest)) {
+            colorTransferRequest = 0;
+        }
+
+        if (colorTransferRequest != 0) {
+            if (colorTransferRequestParam && *colorTransferRequestParam) {
+                C2StreamColorAspectsInfo::output *info =
+                    static_cast<C2StreamColorAspectsInfo::output *>(
+                            colorTransferRequestParam.get());
+                if (!C2Mapper::map(info->transfer, &colorTransferRequest)) {
+                    colorTransferRequest = 0;
+                }
+            } else {
+                colorTransferRequest = 0;
+            }
+            config->mInputFormat->setInt32("color-transfer-request", colorTransferRequest);
         }
 
         ALOGD("setup formats input: %s and output: %s",
