@@ -1,11 +1,11 @@
-/**
- * Copyright (c) 2019, The Android Open Source Project
+/*
+ * Copyright 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,22 +14,26 @@
  * limitations under the License.
  */
 
-package android.media;
+cc_test {
+    name: "IMediaPlayerTest",
+    test_suites: ["device-tests", "mts"],
+    gtest: true,
 
-/**
- * Type enums of video transcoding errors.
- *
- * {@hide}
- */
-@Backing(type = "int")
-enum TranscodingErrorCode {
-    kNoError = 0,
-    kUnknown = 1,
-    kMalformed = 2,
-    kUnsupported = 3,
-    kInvalidParameter = 4,
-    kInvalidOperation = 5,
-    kErrorIO = 6,
-    kInsufficientResources = 7,
-    kWatchdogTimeout = 8,
+    srcs: [
+        "IMediaPlayerTest.cpp",
+    ],
+
+    shared_libs: [
+        "libbinder",
+        "liblog",
+        "libmedia",
+        "libstagefright",
+        "libstagefright_foundation",
+        "libutils",
+    ],
+    compile_multilib: "first",
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
 }

@@ -102,6 +102,11 @@ do
                     ((++error_count))
                 fi
 
+                # Do not compare cases where -vcBal is in flags and chMask is 0 (due to
+                # stereo computation)
+                if [[ $flags == *"-vcBal:"* ]] && [[ $chMask -eq 0 ]]; then
+                    continue
+                fi
 
                 # two channel files should be identical to higher channel
                 # computation (first 2 channels).

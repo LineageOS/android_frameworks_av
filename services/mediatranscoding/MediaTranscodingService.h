@@ -30,7 +30,6 @@ using ::aidl::android::media::TranscodingRequestParcel;
 using ::aidl::android::media::TranscodingSessionParcel;
 class TranscodingClientManager;
 class TranscodingSessionController;
-class TranscoderInterface;
 class UidPolicyInterface;
 class ResourcePolicyInterface;
 class ThermalPolicyInterface;
@@ -40,7 +39,7 @@ public:
     static constexpr int32_t kInvalidSessionId = -1;
     static constexpr int32_t kInvalidClientId = -1;
 
-    MediaTranscodingService(const std::shared_ptr<TranscoderInterface>& transcoder);
+    MediaTranscodingService(bool simulated);
     virtual ~MediaTranscodingService();
 
     static void instantiate();
