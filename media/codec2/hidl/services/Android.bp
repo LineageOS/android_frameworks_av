@@ -29,6 +29,15 @@
 // The seccomp_policy file name and its content can be modified, but note that
 // vendor.cpp also needs to be updated because it needs the absolute path to the
 // seccomp policy file on the device.
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
 cc_binary {
     name: "android.hardware.media.c2@1.1-default-service",
     vendor: true,
@@ -87,4 +96,3 @@ prebuilt_etc {
     // This may be removed.
     required: ["crash_dump.policy"],
 }
-
