@@ -21,5 +21,9 @@
 namespace android {
 
 status_t deserializeAudioPolicyFile(const char *fileName, AudioPolicyConfig *config);
+// In VTS mode all vendor extensions are ignored. This is done because
+// VTS tests are built using AOSP code and thus can not use vendor overlays
+// of system libraries.
+status_t deserializeAudioPolicyFileForVts(const char *fileName, AudioPolicyConfig *config);
 
 } // namespace android
