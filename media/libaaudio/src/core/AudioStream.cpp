@@ -119,12 +119,16 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
 
 void AudioStream::logOpen() {
     if (mMetricsId.size() > 0) {
-        android::mediametrics::LogItem(mMetricsId)
-                .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
-                     AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
-                .set(AMEDIAMETRICS_PROP_SHARINGMODE,
-                     AudioGlobal_convertSharingModeToText(getSharingMode()))
-                .record();
+        android::mediametrics::LogItem item(mMetricsId);
+        item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN)
+            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+                AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+            .set(AMEDIAMETRICS_PROP_SHARINGMODE,
+                AudioGlobal_convertSharingModeToText(getSharingMode()));
+        if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
+            item.set(AMEDIAMETRICS_PROP_PLAYERIID, mPlayerBase->getPlayerIId());
+        }
+        item.record();
     }
 }
 

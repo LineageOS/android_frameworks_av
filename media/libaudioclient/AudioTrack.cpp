@@ -218,6 +218,7 @@ void AudioTrack::MediaMetrics::gather(const AudioTrack *track)
     mMetricsItem->setCString(MM_PREFIX "encoding", toString(track->mFormat).c_str());
     mMetricsItem->setInt32(MM_PREFIX "frameCount", (int32_t)track->mFrameCount);
     mMetricsItem->setCString(MM_PREFIX "attributes", toString(track->mAttributes).c_str());
+    mMetricsItem->setCString(MM_PREFIX "logSessionId", track->mLogSessionId.c_str());
 }
 
 // hand the user a snapshot of the metrics.
