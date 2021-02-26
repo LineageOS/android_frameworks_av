@@ -71,6 +71,10 @@ protected:
     float mPanMultiplierL, mPanMultiplierR;
     float mVolumeMultiplierL, mVolumeMultiplierR;
 
+    // player interface ID, uniquely identifies the player in the system
+    // effectively const after PlayerBase::init().
+    audio_unique_id_t mPIId;
+
 private:
             // report events to AudioService
             void servicePlayerEvent(player_state_t event, audio_port_handle_t deviceId);
@@ -78,9 +82,6 @@ private:
 
     // native interface to AudioService
     android::sp<android::IAudioManager> mAudioManager;
-
-    // player interface ID, uniquely identifies the player in the system
-    audio_unique_id_t mPIId;
 
     // Mutex for state reporting
     Mutex mPlayerStateLock;
