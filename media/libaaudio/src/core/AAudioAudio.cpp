@@ -209,7 +209,6 @@ AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* 
     AudioStreamBuilder *streamBuilder = COMMON_GET_FROM_BUILDER_OR_RETURN(streamPtr);
     aaudio_result_t result = streamBuilder->build(&audioStream);
     if (result == AAUDIO_OK) {
-        audioStream->registerPlayerBase();
         *streamPtr = (AAudioStream*) audioStream;
         id = audioStream->getId();
     } else {
