@@ -87,6 +87,12 @@ bool statsd_extractor(const mediametrics::Item *item)
       metrics_proto.set_entry_point(entry_point);
     }
 
+    // android.media.mediaextractor.playbackId        string
+    std::string playback_id;
+    if (item->getString("android.media.mediaextractor.playbackId", &playback_id)) {
+        metrics_proto.set_playback_id(std::move(playback_id));
+    }
+
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize extractor metrics");
