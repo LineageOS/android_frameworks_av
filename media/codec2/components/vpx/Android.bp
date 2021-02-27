@@ -1,3 +1,22 @@
+package {
+    default_applicable_licenses: [
+        "frameworks_av_media_codec2_components_vpx_license",
+    ],
+}
+
+// Added automatically by a large-scale-change
+// See: http://go/android-license-faq
+license {
+    name: "frameworks_av_media_codec2_components_vpx_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "NOTICE",
+    ],
+}
+
 cc_library {
     name: "libcodec2_soft_vp9dec",
     defaults: [
@@ -57,4 +76,3 @@ cc_library {
 
     shared_libs: ["libvpx"],
 }
-
