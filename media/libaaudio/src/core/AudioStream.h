@@ -475,6 +475,11 @@ protected:
             return mResult;
         }
 
+        // Returns the playerIId if registered, -1 otherwise.
+        int32_t getPlayerIId() const {
+            return mPIId;
+        }
+
     private:
         // Use a weak pointer so the AudioStream can be deleted.
         std::mutex               mParentLock;

@@ -123,6 +123,7 @@
 
 #define AMEDIAMETRICS_PROP_FRAMECOUNT     "frameCount"     // int32
 #define AMEDIAMETRICS_PROP_INPUTDEVICES   "inputDevices"   // string value
+#define AMEDIAMETRICS_PROP_INTERNALTRACKID "internalTrackId" // int32
 #define AMEDIAMETRICS_PROP_INTERVALCOUNT  "intervalCount"  // int32
 #define AMEDIAMETRICS_PROP_LATENCYMS      "latencyMs"      // double value
 #define AMEDIAMETRICS_PROP_LOGSESSIONID   "logSessionId"   // hex string, "" none
