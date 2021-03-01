@@ -578,6 +578,12 @@ public:
       */
             audio_port_handle_t getPortId() const { return mPortId; };
 
+    /* Sets the LogSessionId field which is used for metrics association of
+     * this object with other objects. A nullptr or empty string clears
+     * the logSessionId.
+     */
+            void setLogSessionId(const char *logSessionId);
+
      /*
       * Dumps the state of an audio record.
       */
@@ -701,6 +707,14 @@ private:
 
     audio_session_t         mSessionId;
     audio_port_handle_t     mPortId;                    // Id from Audio Policy Manager
+
+    /**
+     * mLogSessionId is a string identifying this AudioRecord for the metrics service.
+     * It may be unique or shared with other objects.  An empty string means the
+     * logSessionId is not set.
+     */
+    std::string             mLogSessionId{};
+
     transfer_type           mTransfer;
 
     // Next 5 fields may be changed if IAudioRecord is re-created, but always != 0
