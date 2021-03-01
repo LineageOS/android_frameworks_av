@@ -74,6 +74,11 @@ private:
 
     status_t setDefaultDevice(audio_devices_t device);
 
+    void filterOutputDevicesForStrategy(legacy_strategy strategy,
+                                            DeviceVector& availableOutputDevices,
+                                            const DeviceVector availableInputDevices,
+                                            const SwAudioOutputCollection &outputs) const;
+
     DeviceVector getDevicesForStrategyInt(legacy_strategy strategy,
                                           DeviceVector availableOutputDevices,
                                           DeviceVector availableInputDevices,

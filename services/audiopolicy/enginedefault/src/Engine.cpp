@@ -142,47 +142,19 @@ status_t Engine::setForceUse(audio_policy_force_use_t usage, audio_policy_forced
     return EngineBase::setForceUse(usage, config);
 }
 
-DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
-                                              DeviceVector availableOutputDevices,
-                                              DeviceVector availableInputDevices,
-                                              const SwAudioOutputCollection &outputs) const
+void Engine::filterOutputDevicesForStrategy(legacy_strategy strategy,
+                                            DeviceVector& availableOutputDevices,
+                                            const DeviceVector availableInputDevices,
+                                            const SwAudioOutputCollection &outputs) const
 {
-    DeviceVector devices;
-
     switch (strategy) {
-
-    case STRATEGY_TRANSMITTED_THROUGH_SPEAKER:
-        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
-        break;
-
-    case STRATEGY_SONIFICATION_RESPECTFUL:
-        if (isInCall() || outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_VOICE_CALL))) {
-            devices = getDevicesForStrategyInt(
-                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs);
-        } else {
-            bool media_active_locally =
-                    outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_MUSIC),
-                                            SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
-                    || outputs.isActiveLocally(
-                        toVolumeSource(AUDIO_STREAM_ACCESSIBILITY),
-                        SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY);
+    case STRATEGY_SONIFICATION_RESPECTFUL: {
+        if (!(isInCall() || outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_VOICE_CALL)))) {
             // routing is same as media without the "remote" device
             availableOutputDevices.remove(availableOutputDevices.getDevicesFromType(
                     AUDIO_DEVICE_OUT_REMOTE_SUBMIX));
-            devices = getDevicesForStrategyInt(STRATEGY_MEDIA,
-                    availableOutputDevices,
-                    availableInputDevices, outputs);
-            // if no media is playing on the device, check for mandatory use of "safe" speaker
-            // when media would have played on speaker, and the safe speaker path is available
-            if (!media_active_locally) {
-                devices.replaceDevicesByType(
-                        AUDIO_DEVICE_OUT_SPEAKER,
-                        availableOutputDevices.getDevicesFromType(
-                                AUDIO_DEVICE_OUT_SPEAKER_SAFE));
-            }
         }
-        break;
-
+        } break;
     case STRATEGY_DTMF:
     case STRATEGY_PHONE: {
         // Force use of only devices on primary output if:
@@ -214,6 +186,64 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                 availableOutputDevices = availPrimaryOutputDevices;
             }
         }
+        } break;
+    case STRATEGY_ACCESSIBILITY: {
+        // do not route accessibility prompts to a digital output currently configured with a
+        // compressed format as they would likely not be mixed and dropped.
+        for (size_t i = 0; i < outputs.size(); i++) {
+            sp<AudioOutputDescriptor> desc = outputs.valueAt(i);
+            if (desc->isActive() && !audio_is_linear_pcm(desc->getFormat())) {
+                availableOutputDevices.remove(desc->devices().getDevicesFromTypes({
+                        AUDIO_DEVICE_OUT_HDMI, AUDIO_DEVICE_OUT_SPDIF,
+                        AUDIO_DEVICE_OUT_HDMI_ARC}));
+            }
+        }
+        } break;
+    default:
+        break;
+    }
+}
+
+DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
+                                              DeviceVector availableOutputDevices,
+                                              DeviceVector availableInputDevices,
+                                              const SwAudioOutputCollection &outputs) const
+{
+    DeviceVector devices;
+
+    switch (strategy) {
+
+    case STRATEGY_TRANSMITTED_THROUGH_SPEAKER:
+        devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER);
+        break;
+
+    case STRATEGY_SONIFICATION_RESPECTFUL:
+        if (isInCall() || outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_VOICE_CALL))) {
+            devices = getDevicesForStrategyInt(
+                    STRATEGY_SONIFICATION, availableOutputDevices, availableInputDevices, outputs);
+        } else {
+            bool media_active_locally =
+                    outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_MUSIC),
+                                            SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY)
+                    || outputs.isActiveLocally(
+                        toVolumeSource(AUDIO_STREAM_ACCESSIBILITY),
+                        SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY);
+            devices = getDevicesForStrategyInt(STRATEGY_MEDIA,
+                    availableOutputDevices,
+                    availableInputDevices, outputs);
+            // if no media is playing on the device, check for mandatory use of "safe" speaker
+            // when media would have played on speaker, and the safe speaker path is available
+            if (!media_active_locally) {
+                devices.replaceDevicesByType(
+                        AUDIO_DEVICE_OUT_SPEAKER,
+                        availableOutputDevices.getDevicesFromType(
+                                AUDIO_DEVICE_OUT_SPEAKER_SAFE));
+            }
+        }
+        break;
+
+    case STRATEGY_DTMF:
+    case STRATEGY_PHONE: {
         devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getFirstDevicesFromTypes({
@@ -286,16 +316,6 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
 
     case STRATEGY_ACCESSIBILITY:
         if (strategy == STRATEGY_ACCESSIBILITY) {
-            // do not route accessibility prompts to a digital output currently configured with a
-            // compressed format as they would likely not be mixed and dropped.
-            for (size_t i = 0; i < outputs.size(); i++) {
-                sp<AudioOutputDescriptor> desc = outputs.valueAt(i);
-                if (desc->isActive() && !audio_is_linear_pcm(desc->getFormat())) {
-                    availableOutputDevices.remove(desc->devices().getDevicesFromTypes({
-                            AUDIO_DEVICE_OUT_HDMI, AUDIO_DEVICE_OUT_SPDIF,
-                            AUDIO_DEVICE_OUT_HDMI_ARC}));
-                }
-            }
             if (outputs.isActive(toVolumeSource(AUDIO_STREAM_RING)) ||
                     outputs.isActive(toVolumeSource(AUDIO_STREAM_ALARM))) {
                 return getDevicesForStrategyInt(
@@ -634,11 +654,18 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
     auto legacyStrategy = mLegacyStrategyMap.find(strategy) != end(mLegacyStrategyMap) ?
                           mLegacyStrategyMap.at(strategy) : STRATEGY_NONE;
 
-    // When not in call, STRATEGY_PHONE and STRATEGY_DTMF follow STRATEGY_MEDIA
-    if (!isInCall() && (legacyStrategy == STRATEGY_PHONE || legacyStrategy == STRATEGY_DTMF)) {
+    // When not in call, STRATEGY_DTMF follows STRATEGY_MEDIA
+    if (!isInCall() && legacyStrategy == STRATEGY_DTMF) {
         legacyStrategy = STRATEGY_MEDIA;
         strategy = getProductStrategyFromLegacy(STRATEGY_MEDIA);
     }
+
+    DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
+    const SwAudioOutputCollection& outputs = getApmObserver()->getOutputs();
+
+    filterOutputDevicesForStrategy(legacyStrategy, availableOutputDevices,
+                                   availableInputDevices, outputs);
+
     // check if this strategy has a preferred device that is available,
     // if yes, give priority to it.
     DeviceVector preferredAvailableDevVec =
@@ -646,9 +673,6 @@ DeviceVector Engine::getDevicesForProductStrategy(product_strategy_t strategy) c
     if (!preferredAvailableDevVec.isEmpty()) {
         return preferredAvailableDevVec;
     }
-
-    DeviceVector availableInputDevices = getApmObserver()->getAvailableInputDevices();
-    const SwAudioOutputCollection& outputs = getApmObserver()->getOutputs();
 
     return getDevicesForStrategyInt(legacyStrategy,
                                     availableOutputDevices,
