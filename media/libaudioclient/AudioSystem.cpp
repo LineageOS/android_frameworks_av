@@ -1839,8 +1839,7 @@ status_t AudioSystem::setAudioHalPids(const std::vector<pid_t>& pids) {
 
 status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
                                          audio_format_t* surroundFormats,
-                                         bool* surroundFormatsEnabled,
-                                         bool reported) {
+                                         bool* surroundFormatsEnabled) {
     if (numSurroundFormats == nullptr || (*numSurroundFormats != 0 &&
                                           (surroundFormats == nullptr ||
                                            surroundFormatsEnabled == nullptr))) {
@@ -1855,8 +1854,8 @@ status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
     std::vector<media::audio::common::AudioFormat> surroundFormatsAidl;
     std::vector<bool> surroundFormatsEnabledAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getSurroundFormats(reported, &numSurroundFormatsAidl,
-                                    &surroundFormatsAidl, &surroundFormatsEnabledAidl)));
+            aps->getSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl,
+                                    &surroundFormatsEnabledAidl)));
 
     *numSurroundFormats = VALUE_OR_RETURN_STATUS(
             convertIntegral<unsigned int>(numSurroundFormatsAidl.value));
@@ -1865,6 +1864,29 @@ status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
                          aidl2legacy_AudioFormat_audio_format_t));
     std::copy(surroundFormatsEnabledAidl.begin(), surroundFormatsEnabledAidl.end(),
             surroundFormatsEnabled);
+    return OK;
+}
+
+status_t AudioSystem::getReportedSurroundFormats(unsigned int* numSurroundFormats,
+                                                 audio_format_t* surroundFormats) {
+    if (numSurroundFormats == nullptr || (*numSurroundFormats != 0 && surroundFormats == nullptr)) {
+        return BAD_VALUE;
+    }
+
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+    media::Int numSurroundFormatsAidl;
+    numSurroundFormatsAidl.value =
+            VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
+    std::vector<media::audio::common::AudioFormat> surroundFormatsAidl;
+    RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
+            aps->getReportedSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl)));
+
+    *numSurroundFormats = VALUE_OR_RETURN_STATUS(
+            convertIntegral<unsigned int>(numSurroundFormatsAidl.value));
+    RETURN_STATUS_IF_ERROR(
+            convertRange(surroundFormatsAidl.begin(), surroundFormatsAidl.end(), surroundFormats,
+                         aidl2legacy_AudioFormat_audio_format_t));
     return OK;
 }
 
