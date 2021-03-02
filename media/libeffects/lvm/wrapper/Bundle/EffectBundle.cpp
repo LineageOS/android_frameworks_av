@@ -982,6 +982,16 @@ int Effect_setConfig(EffectContext* pContext, effect_config_t* pConfig) {
         ActiveParams.NrChannels = NrChannels;
         ActiveParams.ChMask = pConfig->inputCfg.channels;
 
+        if (NrChannels == 1) {
+            ActiveParams.SourceFormat = LVM_MONO;
+        } else if (NrChannels == 2) {
+            ActiveParams.SourceFormat = LVM_STEREO;
+        } else if (NrChannels > 2 && NrChannels <= LVM_MAX_CHANNELS) {
+            ActiveParams.SourceFormat = LVM_MULTICHANNEL;
+        } else {
+            return -EINVAL;
+        }
+
         LvmStatus = LVM_SetControlParameters(pContext->pBundledContext->hInstance, &ActiveParams);
 
         LVM_ERROR_CHECK(LvmStatus, "LVM_SetControlParameters", "Effect_setConfig")
