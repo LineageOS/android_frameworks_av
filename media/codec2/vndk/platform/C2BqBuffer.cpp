@@ -167,8 +167,8 @@ int64_t getTimestampNow() {
     return stamp;
 }
 
-bool getGenerationNumber(const sp<HGraphicBufferProducer> &producer,
-                         uint32_t *generation) {
+bool getGenerationNumberAndUsage(const sp<HGraphicBufferProducer> &producer,
+                                 uint32_t *generation, uint64_t *usage) {
     status_t status{};
     int slot{};
     bool bufferNeedsReallocation{};
@@ -202,7 +202,7 @@ bool getGenerationNumber(const sp<HGraphicBufferProducer> &producer,
     // instead of a new allocation.
     transResult = producer->requestBuffer(
             slot,
-            [&status, &slotBuffer, &generation](
+            [&status, &slotBuffer, &generation, &usage](
                     HStatus hStatus,
                     HBuffer const& hBuffer,
                     uint32_t generationNumber){
@@ -210,6 +210,7 @@ bool getGenerationNumber(const sp<HGraphicBufferProducer> &producer,
                         h2b(hBuffer, &slotBuffer) &&
                         slotBuffer) {
                     *generation = generationNumber;
+                    *usage = slotBuffer->getUsage();
                     slotBuffer->setGenerationNumber(generationNumber);
                 } else {
                     status = android::BAD_VALUE;
@@ -460,6 +461,7 @@ public:
     void configureProducer(const sp<HGraphicBufferProducer> &producer) {
         uint64_t producerId = 0;
         uint32_t generation = 0;
+        uint64_t usage = 0;
         bool haveGeneration = false;
         if (producer) {
             Return<uint64_t> transResult = producer->getUniqueId();
@@ -469,7 +471,7 @@ public:
             }
             producerId = static_cast<uint64_t>(transResult);
             // TODO: provide gneration number from parameter.
-            haveGeneration = getGenerationNumber(producer, &generation);
+            haveGeneration = getGenerationNumberAndUsage(producer, &generation, &usage);
             if (!haveGeneration) {
                 ALOGW("get generationNumber failed %llu",
                       (unsigned long long)producerId);
@@ -509,7 +511,7 @@ public:
                             mPoolDatas[i].lock();
                     if (data) {
                         int slot = data->migrate(
-                                mProducer, generation,
+                                mProducer, generation, usage,
                                 producerId, mBuffers[i], oldGeneration);
                         if (slot >= 0) {
                             buffers[slot] = mBuffers[i];
@@ -593,8 +595,8 @@ C2BufferQueueBlockPoolData::type_t C2BufferQueueBlockPoolData::getType() const {
 
 int C2BufferQueueBlockPoolData::migrate(
         const sp<HGraphicBufferProducer>& producer,
-        uint32_t toGeneration, uint64_t toBqId,
-        sp<GraphicBuffer> graphicBuffer, uint32_t oldGeneration) {
+        uint32_t toGeneration, uint64_t toUsage, uint64_t toBqId,
+        sp<GraphicBuffer>& graphicBuffer, uint32_t oldGeneration) {
     std::scoped_lock<std::mutex> l(mLock);
 
     mCurrentBqId = toBqId;
@@ -627,6 +629,19 @@ int C2BufferQueueBlockPoolData::migrate(
         // either transferred or detached.
         ALOGV("buffer is in transfer");
         return -1;
+    }
+
+    if (toUsage != graphicBuffer->getUsage()) {
+        sp<GraphicBuffer> newBuffer = new GraphicBuffer(
+            graphicBuffer->handle, GraphicBuffer::CLONE_HANDLE,
+            graphicBuffer->width, graphicBuffer->height, graphicBuffer->format,
+            graphicBuffer->layerCount, toUsage, graphicBuffer->stride);
+        if (newBuffer->initCheck() == android::NO_ERROR) {
+            graphicBuffer = std::move(newBuffer);
+        } else {
+            ALOGW("%s() failed to update usage, original usage=%" PRIx64 ", toUsage=%" PRIx64,
+                  __func__, graphicBuffer->getUsage(), toUsage);
+        }
     }
     graphicBuffer->setGenerationNumber(toGeneration);
 
