@@ -3175,15 +3175,20 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            // If we're flushing, stopping, configuring or starting  but
+            // If we're flushing, configuring or starting  but
             // received a release request, post the reply for the pending call
             // first, and consider it done. The reply token will be replaced
             // after this, and we'll no longer be able to reply.
-            if (mState == FLUSHING || mState == STOPPING
-                    || mState == CONFIGURING || mState == STARTING) {
+            if (mState == FLUSHING || mState == CONFIGURING || mState == STARTING) {
                 // mReply is always set if in these states.
                 postPendingRepliesAndDeferredMessages(
                         std::string("kWhatRelease:") + stateString(mState));
+            }
+            // If we're stopping but received a release request, post the reply
+            // for the pending call if necessary. Note that the reply may have been
+            // already posted due to an error.
+            if (mState == STOPPING && mReplyID) {
+                postPendingRepliesAndDeferredMessages("kWhatRelease:STOPPING");
             }
 
             if (mFlags & kFlagSawMediaServerDie) {
