@@ -72,7 +72,7 @@ public:
     /**
      * Return number of buffers the client owns.
      */
-    virtual size_t numClientBuffers() const = 0;
+    virtual size_t numActiveSlots() const = 0;
 
     /**
      * Examine image data from the buffer and update the format if necessary.
@@ -584,7 +584,7 @@ public:
      * Return the number of buffers that are sent to the client but not released
      * yet.
      */
-    size_t numClientBuffers() const;
+    size_t numActiveSlots() const;
 
     /**
      * Return the number of buffers that are sent to the component but not
@@ -705,7 +705,7 @@ public:
      * Return the number of buffers that are sent to the client but not released
      * yet.
      */
-    size_t numClientBuffers() const;
+    size_t numActiveSlots() const;
 
     /**
      * Return the size of the array.
@@ -765,7 +765,7 @@ public:
 
     void flush() override;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
@@ -796,7 +796,7 @@ public:
 
     std::unique_ptr<InputBuffers> toArrayMode(size_t size) final;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
 protected:
     sp<Codec2Buffer> createNewBuffer() final;
@@ -826,7 +826,7 @@ public:
 
     std::unique_ptr<InputBuffers> toArrayMode(size_t size) override;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
@@ -894,7 +894,7 @@ public:
 
     std::unique_ptr<InputBuffers> toArrayMode(size_t size) final;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
@@ -924,7 +924,7 @@ public:
     std::unique_ptr<InputBuffers> toArrayMode(
             size_t size) final;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
 protected:
     sp<Codec2Buffer> createNewBuffer() override;
@@ -965,7 +965,7 @@ public:
         array->clear();
     }
 
-    size_t numClientBuffers() const final {
+    size_t numActiveSlots() const final {
         return 0u;
     }
 
@@ -1019,7 +1019,7 @@ public:
 
     void getArray(Vector<sp<MediaCodecBuffer>> *array) const final;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
     /**
      * Reallocate the array, filled with buffers with the same size as given
@@ -1073,7 +1073,7 @@ public:
 
     std::unique_ptr<OutputBuffersArray> toArrayMode(size_t size) override;
 
-    size_t numClientBuffers() const final;
+    size_t numActiveSlots() const final;
 
     /**
      * Return an appropriate Codec2Buffer object for the type of buffers.

@@ -17,6 +17,10 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "SimpleSoftOMXComponent"
 #include <utils/Log.h>
+#include <OMX_Core.h>
+#include <OMX_Audio.h>
+#include <OMX_IndexExt.h>
+#include <OMX_AudioExt.h>
 
 #include <media/stagefright/omx/SimpleSoftOMXComponent.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -74,7 +78,7 @@ bool SimpleSoftOMXComponent::isSetParameterAllowed(
 
     OMX_U32 portIndex;
 
-    switch (index) {
+    switch ((int)index) {
         case OMX_IndexParamPortDefinition:
         {
             const OMX_PARAM_PORTDEFINITIONTYPE *portDefs =
@@ -107,6 +111,19 @@ bool SimpleSoftOMXComponent::isSetParameterAllowed(
             portIndex = aacMode->nPortIndex;
             break;
         }
+
+         case OMX_IndexParamAudioAndroidAacDrcPresentation:
+        {
+            if (mState == OMX_StateInvalid) {
+                return false;
+            }
+            const OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *aacPresParams =
+                            (const OMX_AUDIO_PARAM_ANDROID_AACDRCPRESENTATIONTYPE *)params;
+            if (!isValidOMXParam(aacPresParams)) {
+                return false;
+            }
+            return true;
+         }
 
         default:
             return false;
