@@ -16,13 +16,9 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "DrmHal"
-#include <iomanip>
-
-#include <utils/Log.h>
-
-#include <android/binder_manager.h>
 
 #include <aidl/android/media/BnResourceManagerClient.h>
+#include <android/binder_manager.h>
 #include <android/hardware/drm/1.2/types.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
@@ -40,7 +36,9 @@
 #include <mediadrm/DrmSessionManager.h>
 #include <mediadrm/IDrmMetricsConsumer.h>
 #include <mediadrm/DrmUtils.h>
+#include <utils/Log.h>
 
+#include <iomanip>
 #include <vector>
 
 using drm::V1_0::KeyedVector;
@@ -364,7 +362,7 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
     Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
             [&](Status status, const sp<IDrmPlugin>& hPlugin) {
                 if (status != Status::OK) {
-                    DrmUtils::LOG2BE("Failed to make drm plugin: %d", status);
+                    DrmUtils::LOG2BE(uuid, "Failed to make drm plugin: %d", status);
                     return;
                 }
                 plugin = hPlugin;
@@ -372,7 +370,8 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         );
 
     if (!hResult.isOk()) {
-        DrmUtils::LOG2BE("createPlugin remote call failed");
+        DrmUtils::LOG2BE(uuid, "createPlugin remote call failed: %s",
+                         hResult.description().c_str());
     }
 
     return plugin;
@@ -580,6 +579,7 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
     }
 
     if (mPlugin == NULL) {
+        DrmUtils::LOG2BE(uuid, "No supported hal instance found");
         mInitCheck = ERROR_UNSUPPORTED;
     } else {
         mInitCheck = OK;
