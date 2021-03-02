@@ -158,6 +158,11 @@ OutputBufferQueue::~OutputBufferQueue() {
 bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
                                   uint32_t generation,
                                   uint64_t bqId) {
+    uint64_t consumerUsage = 0;
+    if (igbp->getConsumerUsage(&consumerUsage) != OK) {
+        ALOGW("failed to get consumer usage");
+    }
+
     size_t tryNum = 0;
     size_t success = 0;
     sp<GraphicBuffer> buffers[BufferQueueDefs::NUM_BUFFER_SLOTS];
@@ -183,7 +188,24 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             }
             ++tryNum;
             int bqSlot;
+
+            // Update buffer's generation and usage.
+            if ((mBuffers[i]->getUsage() & consumerUsage) != consumerUsage) {
+                mBuffers[i] = new GraphicBuffer(
+                    mBuffers[i]->handle, GraphicBuffer::CLONE_HANDLE,
+                    mBuffers[i]->width, mBuffers[i]->height,
+                    mBuffers[i]->format, mBuffers[i]->layerCount,
+                    mBuffers[i]->getUsage() | consumerUsage,
+                    mBuffers[i]->stride);
+                if (mBuffers[i]->initCheck() != OK) {
+                    ALOGW("%s() failed to update usage, original usage=%" PRIx64
+                          ", consumer usage=%" PRIx64,
+                          __func__, mBuffers[i]->getUsage(), consumerUsage);
+                    continue;
+                }
+            }
             mBuffers[i]->setGenerationNumber(generation);
+
             status_t result = igbp->attachBuffer(&bqSlot, mBuffers[i]);
             if (result != OK) {
                 continue;
