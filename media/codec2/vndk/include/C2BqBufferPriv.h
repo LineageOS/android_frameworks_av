@@ -20,8 +20,13 @@
 #include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
 
 #include <C2Buffer.h>
+#include <C2BlockInternal.h>
 
 #include <functional>
+
+namespace android {
+class GraphicBuffer;
+}  // namespace android
 
 class C2BufferQueueBlockPool : public C2BlockPool {
 public:
@@ -75,6 +80,68 @@ private:
     std::shared_ptr<Impl> mImpl;
 
     friend struct C2BufferQueueBlockPoolData;
+};
+
+
+struct C2BufferQueueBlockPoolData : public _C2BlockPoolData {
+public:
+    typedef ::android::hardware::graphics::bufferqueue::V2_0::
+            IGraphicBufferProducer HGraphicBufferProducer;
+
+    // Create a remote BlockPoolData.
+    C2BufferQueueBlockPoolData(
+            uint32_t generation, uint64_t bqId, int32_t bqSlot,
+            const std::shared_ptr<int> &owner,
+            const android::sp<HGraphicBufferProducer>& producer);
+
+    // Create a local BlockPoolData.
+    C2BufferQueueBlockPoolData(
+            uint32_t generation, uint64_t bqId, int32_t bqSlot,
+            const android::sp<HGraphicBufferProducer>& producer);
+
+    virtual ~C2BufferQueueBlockPoolData() override;
+
+    virtual type_t getType() const override;
+
+    int migrate(const android::sp<HGraphicBufferProducer>& producer,
+                uint32_t toGeneration, uint64_t toUsage, uint64_t toBqId,
+                android::sp<android::GraphicBuffer>& graphicBuffer, uint32_t oldGeneration);
+
+private:
+    friend struct _C2BlockFactory;
+
+    // Methods delegated from _C2BlockFactory.
+    void getBufferQueueData(uint32_t* generation, uint64_t* bqId, int32_t* bqSlot) const;
+    bool holdBlockFromBufferQueue(const std::shared_ptr<int>& owner,
+                                  const android::sp<HGraphicBufferProducer>& igbp);
+    bool beginTransferBlockToClient();
+    bool endTransferBlockToClient(bool transfer);
+    bool beginAttachBlockToBufferQueue();
+    bool endAttachBlockToBufferQueue(const std::shared_ptr<int>& owner,
+                                     const android::sp<HGraphicBufferProducer>& igbp,
+                                     uint32_t generation, uint64_t bqId, int32_t bqSlot);
+    bool displayBlockToBufferQueue();
+
+    const bool mLocal;
+    bool mHeld;
+
+    // Data of the corresponding buffer.
+    uint32_t mGeneration;
+    uint64_t mBqId;
+    int32_t mBqSlot;
+
+    // Data of the current IGBP, updated at migrate(). If the values are
+    // mismatched, then the corresponding buffer will not be cancelled back to
+    // IGBP at the destructor.
+    uint32_t mCurrentGeneration;
+    uint64_t mCurrentBqId;
+
+    bool mTransfer; // local transfer to remote
+    bool mAttach; // attach on remote
+    bool mDisplay; // display on remote;
+    std::weak_ptr<int> mOwner;
+    android::sp<HGraphicBufferProducer> mIgbp;
+    mutable std::mutex mLock;
 };
 
 #endif // STAGEFRIGHT_CODEC2_BUFFER_PRIV_H_
