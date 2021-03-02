@@ -51,6 +51,16 @@ struct HapticGeneratorParam {
     // A map from track id to haptic intensity.
     std::map<int, os::HapticScale> id2Intensity;
     os::HapticScale maxHapticIntensity; // max intensity will be used to scale haptic data.
+
+    float resonantFrequency;
+    float bpfQ;
+    float slowEnvNormalizationPower;
+    float bsfZeroQ;
+    float bsfPoleQ;
+    float distortionCornerFrequency;
+    float distortionInputGain;
+    float distortionCubeThreshold;
+    float distortionOutputGain;
 };
 
 // A structure to keep all shared pointers for all processors in HapticGenerator.
@@ -58,6 +68,7 @@ struct HapticGeneratorProcessorsRecord {
     std::vector<std::shared_ptr<HapticBiquadFilter>> filters;
     std::vector<std::shared_ptr<Ramp>> ramps;
     std::vector<std::shared_ptr<SlowEnvelope>> slowEnvs;
+    std::vector<std::shared_ptr<Distortion>> distortions;
 };
 
 // A structure to keep all the context for HapticGenerator.
