@@ -105,7 +105,7 @@ public:
 
     int migrate(const android::sp<HGraphicBufferProducer>& producer,
                 uint32_t toGeneration, uint64_t toBqId,
-                android::sp<android::GraphicBuffer> *buffers, uint32_t oldGeneration);
+                android::sp<android::GraphicBuffer> graphicBuffer, uint32_t oldGeneration);
 
 private:
     friend struct _C2BlockFactory;
