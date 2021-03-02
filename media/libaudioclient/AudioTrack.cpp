@@ -3269,6 +3269,7 @@ uint32_t AudioTrack::getUnderrunFrames() const
 void AudioTrack::setLogSessionId(const char *logSessionId)
 {
      AutoMutex lock(mLock);
+    if (logSessionId == nullptr) logSessionId = "";  // an empty string is an unset session id.
     if (mLogSessionId == logSessionId) return;
 
      mLogSessionId = logSessionId;
