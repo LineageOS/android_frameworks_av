@@ -79,7 +79,7 @@ static int decode(
 
     static int64_t kTimeout = 500ll;
 
-    sp<NuMediaExtractor> extractor = new NuMediaExtractor;
+    sp<NuMediaExtractor> extractor = new NuMediaExtractor(NuMediaExtractor::EntryPoint::OTHER);
     if (extractor->setDataSource(NULL /* httpService */, path) != OK) {
         fprintf(stderr, "unable to instantiate extractor.\n");
         return 1;

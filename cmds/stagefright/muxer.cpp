@@ -62,7 +62,7 @@ static int muxing(
         int trimEndTimeMs,
         int rotationDegrees,
         MediaMuxer::OutputFormat container = MediaMuxer::OUTPUT_FORMAT_MPEG_4) {
-    sp<NuMediaExtractor> extractor = new NuMediaExtractor;
+    sp<NuMediaExtractor> extractor = new NuMediaExtractor(NuMediaExtractor::EntryPoint::OTHER);
     if (extractor->setDataSource(NULL /* httpService */, path) != OK) {
         fprintf(stderr, "unable to instantiate extractor. %s\n", path);
         return 1;

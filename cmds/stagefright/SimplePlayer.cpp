@@ -272,7 +272,7 @@ void SimplePlayer::onMessageReceived(const sp<AMessage> &msg) {
 status_t SimplePlayer::onPrepare() {
     CHECK_EQ(mState, UNPREPARED);
 
-    mExtractor = new NuMediaExtractor;
+    mExtractor = new NuMediaExtractor(NuMediaExtractor::EntryPoint::OTHER);
 
     status_t err = mExtractor->setDataSource(
             NULL /* httpService */, mPath.c_str());

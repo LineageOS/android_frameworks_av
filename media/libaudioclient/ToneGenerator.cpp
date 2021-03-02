@@ -853,6 +853,11 @@ const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
                       { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
           .repeatCnt = ToneGenerator::TONEGEN_INF,
           .repeatSegment = 0 },                               // TONE_INDIA_RINGTONE
+        { .segments = { { .duration = 1000, .waveFreq = { 440, 480, 0 }, 0, 0 },
+                        { .duration = 2000, .waveFreq = { 0 }, 0, 0 },
+                        { .duration = 0 , .waveFreq = { 0 }, 0, 0}},
+          .repeatCnt = ToneGenerator::TONEGEN_INF,
+          .repeatSegment = 0 },                               // TONE_TW_RINGTONE
 };
 
 // Used by ToneGenerator::getToneForRegion() to convert user specified supervisory tone type
@@ -937,6 +942,16 @@ const unsigned char /*tone_type*/ ToneGenerator::sToneMappingTable[NUM_REGIONS-1
             TONE_SUP_ERROR,              // TONE_SUP_ERROR
             TONE_INDIA_CALL_WAITING,     // TONE_SUP_CALL_WAITING
             TONE_INDIA_RINGTONE          // TONE_SUP_RINGTONE
+        },
+        {   // TAIWAN
+            TONE_SUP_DIAL,               // TONE_SUP_DIAL
+            TONE_SUP_BUSY,               // TONE_SUP_BUSY
+            TONE_SUP_CONGESTION,         // TONE_SUP_CONGESTION
+            TONE_SUP_RADIO_ACK,          // TONE_SUP_RADIO_ACK
+            TONE_SUP_RADIO_NOTAVAIL,     // TONE_SUP_RADIO_NOTAVAIL
+            TONE_SUP_ERROR,              // TONE_SUP_ERROR
+            TONE_SUP_CALL_WAITING,       // TONE_SUP_CALL_WAITING
+            TONE_TW_RINGTONE             // TONE_SUP_RINGTONE
         }
 };
 
@@ -1010,6 +1025,8 @@ ToneGenerator::ToneGenerator(audio_stream_type_t streamType, float volume, bool 
         mRegion = IRELAND;
     } else if (strstr(value, "in") != NULL) {
         mRegion = INDIA;
+    } else if (strstr(value, "tw") != NULL) {
+        mRegion = TAIWAN;
     } else {
         mRegion = CEPT;
     }

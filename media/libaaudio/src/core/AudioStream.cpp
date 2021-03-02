@@ -404,7 +404,9 @@ void* AudioStream::wrapUserThread() {
 // It converts the 'C' function call to a C++ method call.
 static void* AudioStream_internalThreadProc(void* threadArg) {
     AudioStream *audioStream = (AudioStream *) threadArg;
-    return audioStream->wrapUserThread();
+    // Use an sp<> to prevent the stream from being deleted while running.
+    android::sp<AudioStream> protectedStream(audioStream);
+    return protectedStream->wrapUserThread();
 }
 
 // This is not exposed in the API.
