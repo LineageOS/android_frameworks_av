@@ -114,6 +114,7 @@ void AudioRecord::MediaMetrics::gather(const AudioRecord *record)
         mMetricsItem->setInt32(MM_PREFIX "lastError.code", (int32_t)mLastError);
         mMetricsItem->setCString(MM_PREFIX "lastError.at", mLastErrorFunc.c_str());
     }
+    mMetricsItem->setCString(MM_PREFIX "logSessionId", record->mLogSessionId.c_str());
 }
 
 static const char *stateToString(bool active) {
@@ -953,6 +954,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch, const String
         .set(AMEDIAMETRICS_PROP_ORIGINALFLAGS, toString(mOrigFlags).c_str())
         .set(AMEDIAMETRICS_PROP_SESSIONID, (int32_t)mSessionId)
         .set(AMEDIAMETRICS_PROP_TRACKID, mPortId)
+        .set(AMEDIAMETRICS_PROP_LOGSESSIONID, mLogSessionId)
         .set(AMEDIAMETRICS_PROP_SOURCE, toString(mAttributes.source).c_str())
         .set(AMEDIAMETRICS_PROP_THREADID, (int32_t)output.inputId)
         .set(AMEDIAMETRICS_PROP_SELECTEDDEVICEID, (int32_t)mSelectedDeviceId)
@@ -1572,6 +1574,19 @@ status_t AudioRecord::setPreferredMicrophoneFieldDimension(float zoom) {
     } else {
         return statusTFromBinderStatus(mAudioRecord->setPreferredMicrophoneFieldDimension(zoom));
     }
+}
+
+void AudioRecord::setLogSessionId(const char *logSessionId)
+{
+     AutoMutex lock(mLock);
+    if (logSessionId == nullptr) logSessionId = "";  // an empty string is an unset session id.
+    if (mLogSessionId == logSessionId) return;
+
+     mLogSessionId = logSessionId;
+     mediametrics::LogItem(mMetricsId)
+         .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETLOGSESSIONID)
+         .set(AMEDIAMETRICS_PROP_LOGSESSIONID, logSessionId)
+         .record();
 }
 
 // =========================================================================
