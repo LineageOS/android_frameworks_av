@@ -248,19 +248,14 @@ public:
         }
 
         size_t numSlots = 16;
-        // WORKAROUND: having more slots improve performance while consuming
-        // more memory. This is a temporary workaround to reduce memory for
-        // larger-than-4K scenario.
-        if (mWidth * mHeight > 4096 * 2340) {
-            constexpr OMX_U32 kPortIndexInput = 0;
+        constexpr OMX_U32 kPortIndexInput = 0;
 
-            OMX_PARAM_PORTDEFINITIONTYPE param;
-            param.nPortIndex = kPortIndexInput;
-            status_t err = mNode->getParameter(OMX_IndexParamPortDefinition,
-                                               &param, sizeof(param));
-            if (err == OK) {
-                numSlots = param.nBufferCountActual;
-            }
+        OMX_PARAM_PORTDEFINITIONTYPE param;
+        param.nPortIndex = kPortIndexInput;
+        status_t err = mNode->getParameter(OMX_IndexParamPortDefinition,
+                                           &param, sizeof(param));
+        if (err == OK) {
+            numSlots = param.nBufferCountActual;
         }
 
         for (size_t i = 0; i < numSlots; ++i) {
