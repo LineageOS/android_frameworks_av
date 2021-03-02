@@ -12,7 +12,10 @@ cc_library {
         enabled: true,
     },
     double_loadable: true,
-    srcs: ["AudioParameter.cpp", "TypeConverter.cpp"],
+    srcs: [
+        "AudioParameter.cpp",
+        "TypeConverter.cpp",
+    ],
     cflags: [
         "-Werror",
         "-Wextra",

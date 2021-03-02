@@ -85,6 +85,17 @@ private:
     int32_t mOutputDelayRingBufferWritePos;
     int32_t mOutputDelayRingBufferReadPos;
     int32_t mOutputDelayRingBufferFilled;
+
+    //drc
+    int32_t mDrcCompressMode;
+    int32_t mDrcTargetRefLevel;
+    int32_t mDrcEncTargetLevel;
+    int32_t mDrcBoostFactor;
+    int32_t mDrcAttenuationFactor;
+    int32_t mDrcEffectType;
+    int32_t mDrcAlbumMode;
+    int32_t mDrcOutputLoudness;
+
     bool outputDelayRingBufferPutSamples(INT_PCM *samples, int numSamples);
     int32_t outputDelayRingBufferGetSamples(INT_PCM *samples, int numSamples);
     int32_t outputDelayRingBufferSamplesAvailable();

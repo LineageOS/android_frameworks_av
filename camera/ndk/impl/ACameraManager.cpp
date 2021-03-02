@@ -24,6 +24,7 @@
 #include <utils/Vector.h>
 #include <cutils/properties.h>
 #include <stdlib.h>
+#include <camera/CameraUtils.h>
 #include <camera/VendorTagDescriptor.h>
 
 using namespace android::acam;
@@ -70,12 +71,6 @@ CameraManagerGlobal::~CameraManagerGlobal() {
     mCameraService.clear();
 }
 
-static bool isCameraServiceDisabled() {
-    char value[PROPERTY_VALUE_MAX];
-    property_get("config.disable_cameraservice", value, "0");
-    return (strncmp(value, "0", 2) != 0 && strncasecmp(value, "false", 6) != 0);
-}
-
 sp<hardware::ICameraService> CameraManagerGlobal::getCameraService() {
     Mutex::Autolock _l(mLock);
     return getCameraServiceLocked();
@@ -83,7 +78,7 @@ sp<hardware::ICameraService> CameraManagerGlobal::getCameraService() {
 
 sp<hardware::ICameraService> CameraManagerGlobal::getCameraServiceLocked() {
     if (mCameraService.get() == nullptr) {
-        if (isCameraServiceDisabled()) {
+        if (CameraUtils::isCameraServiceDisabled()) {
             return mCameraService;
         }
 

@@ -26,6 +26,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
 #include <media/AudioEffect.h>
+#include <media/AudioSanitizer.h>
 #include <media/IAudioPolicyService.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
@@ -1710,7 +1711,6 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
-            sanetizeAudioAttributes(&attr);
             audio_session_t session = (audio_session_t)data.readInt32();
             audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
             bool hasStream = data.readInt32() != 0;
@@ -1728,10 +1728,14 @@ status_t BnAudioPolicyService::onTransact(
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
             audio_io_handle_t output = 0;
             std::vector<audio_io_handle_t> secondaryOutputs;
-            status = getOutputForAttr(&attr,
-                    &output, session, &stream, pid, uid,
-                    &config,
-                    flags, &selectedDeviceId, &portId, &secondaryOutputs);
+
+            status = AudioSanitizer::sanitizeAudioAttributes(&attr, "68953950");
+            if (status == NO_ERROR) {
+                status = getOutputForAttr(&attr,
+                                          &output, session, &stream, pid, uid,
+                                          &config,
+                                          flags, &selectedDeviceId, &portId, &secondaryOutputs);
+            }
             reply->writeInt32(status);
             status = reply->write(&attr, sizeof(audio_attributes_t));
             if (status != NO_ERROR) {
@@ -1770,8 +1774,11 @@ status_t BnAudioPolicyService::onTransact(
         case GET_INPUT_FOR_ATTR: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             audio_attributes_t attr = {};
-            data.read(&attr, sizeof(audio_attributes_t));
-            sanetizeAudioAttributes(&attr);
+            status_t status = data.read(&attr, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
+
             audio_io_handle_t input = (audio_io_handle_t)data.readInt32();
             audio_unique_id_t riid = (audio_unique_id_t)data.readInt32();
             audio_session_t session = (audio_session_t)data.readInt32();
@@ -1784,9 +1791,13 @@ status_t BnAudioPolicyService::onTransact(
             audio_input_flags_t flags = (audio_input_flags_t) data.readInt32();
             audio_port_handle_t selectedDeviceId = (audio_port_handle_t) data.readInt32();
             audio_port_handle_t portId = (audio_port_handle_t)data.readInt32();
-            status_t status = getInputForAttr(&attr, &input, riid, session, pid, uid,
-                                              opPackageName, &config,
-                                              flags, &selectedDeviceId, &portId);
+
+            status = AudioSanitizer::sanitizeAudioAttributes(&attr, "68953950");
+            if (status == NO_ERROR) {
+                status = getInputForAttr(&attr, &input, riid, session, pid, uid,
+                                         opPackageName, &config,
+                                         flags, &selectedDeviceId, &portId);
+            }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->writeInt32(input);
@@ -1867,11 +1878,15 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) {
                 return status;
             }
+
             int index = data.readInt32();
             audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
 
-            reply->writeInt32(static_cast <uint32_t>(setVolumeIndexForAttributes(attributes,
-                                                                                 index, device)));
+            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            if (status == NO_ERROR) {
+                status = setVolumeIndexForAttributes(attributes, index, device);
+            }
+            reply->writeInt32(static_cast <int32_t>(status));
             return NO_ERROR;
         } break;
 
@@ -1885,8 +1900,11 @@ status_t BnAudioPolicyService::onTransact(
             audio_devices_t device = static_cast <audio_devices_t>(data.readInt32());
 
             int index = 0;
-            status = getVolumeIndexForAttributes(attributes, index, device);
-            reply->writeInt32(static_cast <uint32_t>(status));
+            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            if (status == NO_ERROR) {
+                status = getVolumeIndexForAttributes(attributes, index, device);
+            }
+            reply->writeInt32(static_cast <int32_t>(status));
             if (status == NO_ERROR) {
                 reply->writeInt32(index);
             }
@@ -1902,8 +1920,11 @@ status_t BnAudioPolicyService::onTransact(
             }
 
             int index = 0;
-            status = getMinVolumeIndexForAttributes(attributes, index);
-            reply->writeInt32(static_cast <uint32_t>(status));
+            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            if (status == NO_ERROR) {
+                status = getMinVolumeIndexForAttributes(attributes, index);
+            }
+            reply->writeInt32(static_cast <int32_t>(status));
             if (status == NO_ERROR) {
                 reply->writeInt32(index);
             }
@@ -1919,8 +1940,11 @@ status_t BnAudioPolicyService::onTransact(
             }
 
             int index = 0;
-            status = getMaxVolumeIndexForAttributes(attributes, index);
-            reply->writeInt32(static_cast <uint32_t>(status));
+            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            if (status == NO_ERROR) {
+                status = getMaxVolumeIndexForAttributes(attributes, index);
+            }
+            reply->writeInt32(static_cast <int32_t>(status));
             if (status == NO_ERROR) {
                 reply->writeInt32(index);
             }
@@ -1938,31 +1962,37 @@ status_t BnAudioPolicyService::onTransact(
         case GET_OUTPUT_FOR_EFFECT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             effect_descriptor_t desc = {};
-            if (data.read(&desc, sizeof(desc)) != NO_ERROR) {
+            status_t status = data.read(&desc, sizeof(desc));
+            if (status != NO_ERROR) {
                 android_errorWriteLog(0x534e4554, "73126106");
+                return status;
             }
-            (void)sanitizeEffectDescriptor(&desc);
-            audio_io_handle_t output = getOutputForEffect(&desc);
-            reply->writeInt32(static_cast <int>(output));
+            audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
+            status = AudioSanitizer::sanitizeEffectDescriptor(&desc, "73126106");
+            if (status == NO_ERROR) {
+                output = getOutputForEffect(&desc);
+            }
+            reply->writeInt32(static_cast <int32_t>(output));
             return NO_ERROR;
         } break;
 
         case REGISTER_EFFECT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             effect_descriptor_t desc = {};
-            if (data.read(&desc, sizeof(desc)) != NO_ERROR) {
+            status_t status = data.read(&desc, sizeof(desc));
+            if (status != NO_ERROR) {
                 android_errorWriteLog(0x534e4554, "73126106");
+                return status;
             }
-            (void)sanitizeEffectDescriptor(&desc);
             audio_io_handle_t io = data.readInt32();
             uint32_t strategy = data.readInt32();
             audio_session_t session = (audio_session_t) data.readInt32();
             int id = data.readInt32();
-            reply->writeInt32(static_cast <int32_t>(registerEffect(&desc,
-                                                                   io,
-                                                                   strategy,
-                                                                   session,
-                                                                   id)));
+            status = AudioSanitizer::sanitizeEffectDescriptor(&desc, "73126106");
+            if (status == NO_ERROR) {
+                status = registerEffect(&desc, io, strategy, session, id);
+            }
+            reply->writeInt32(static_cast <int32_t>(status));
             return NO_ERROR;
         } break;
 
@@ -2071,7 +2101,11 @@ status_t BnAudioPolicyService::onTransact(
             if (status != NO_ERROR) return status;
             status = data.read(&attributes, sizeof(audio_attributes_t));
             if (status != NO_ERROR) return status;
-            reply->writeInt32(isDirectOutputSupported(config, attributes));
+            status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "169572641");
+            if (status == NO_ERROR) {
+                status = isDirectOutputSupported(config, attributes);
+            }
+            reply->writeInt32(static_cast <int32_t>(status));
             return NO_ERROR;
         }
 
@@ -2110,10 +2144,15 @@ status_t BnAudioPolicyService::onTransact(
         case GET_AUDIO_PORT: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             struct audio_port port = {};
-            if (data.read(&port, sizeof(struct audio_port)) != NO_ERROR) {
+            status_t status = data.read(&port, sizeof(struct audio_port));
+            if (status != NO_ERROR) {
                 ALOGE("b/23912202");
+                return status;
             }
-            status_t status = getAudioPort(&port);
+            status = AudioSanitizer::sanitizeAudioPort(&port);
+            if (status == NO_ERROR) {
+                status = getAudioPort(&port);
+            }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&port, sizeof(struct audio_port));
@@ -2124,12 +2163,20 @@ status_t BnAudioPolicyService::onTransact(
         case CREATE_AUDIO_PATCH: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             struct audio_patch patch = {};
-            data.read(&patch, sizeof(struct audio_patch));
-            audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
-            if (data.read(&handle, sizeof(audio_patch_handle_t)) != NO_ERROR) {
-                ALOGE("b/23912202");
+            status_t status = data.read(&patch, sizeof(struct audio_patch));
+            if (status != NO_ERROR) {
+                return status;
             }
-            status_t status = createAudioPatch(&patch, &handle);
+            audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
+            status = data.read(&handle, sizeof(audio_patch_handle_t));
+            if (status != NO_ERROR) {
+                ALOGE("b/23912202");
+                return status;
+            }
+            status = AudioSanitizer::sanitizeAudioPatch(&patch);
+            if (status == NO_ERROR) {
+                status = createAudioPatch(&patch, &handle);
+            }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&handle, sizeof(audio_patch_handle_t));
@@ -2179,9 +2226,12 @@ status_t BnAudioPolicyService::onTransact(
         case SET_AUDIO_PORT_CONFIG: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             struct audio_port_config config = {};
-            data.read(&config, sizeof(struct audio_port_config));
-            (void)sanitizeAudioPortConfig(&config);
-            status_t status = setAudioPortConfig(&config);
+            status_t status = data.read(&config, sizeof(struct audio_port_config));
+            if (status != NO_ERROR) {
+                return status;
+            }
+            (void)AudioSanitizer::sanitizeAudioPortConfig(&config);
+            status = setAudioPortConfig(&config);
             reply->writeInt32(status);
             return NO_ERROR;
         }
@@ -2274,13 +2324,25 @@ status_t BnAudioPolicyService::onTransact(
         case START_AUDIO_SOURCE: {
             CHECK_INTERFACE(IAudioPolicyService, data, reply);
             struct audio_port_config source = {};
-            data.read(&source, sizeof(struct audio_port_config));
-            (void)sanitizeAudioPortConfig(&source);
+            status_t status = data.read(&source, sizeof(struct audio_port_config));
+            if (status != NO_ERROR) {
+                return status;
+            }
             audio_attributes_t attributes = {};
-            data.read(&attributes, sizeof(audio_attributes_t));
-            sanetizeAudioAttributes(&attributes);
+            status = data.read(&attributes, sizeof(audio_attributes_t));
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = AudioSanitizer::sanitizeAudioPortConfig(&source);
+            if (status == NO_ERROR) {
+                // OK to not always sanitize attributes as startAudioSource() is not called if
+                // the port config is invalid.
+                status = AudioSanitizer::sanitizeAudioAttributes(&attributes, "68953950");
+            }
             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
-            status_t status = startAudioSource(&source, &attributes, &portId);
+            if (status == NO_ERROR) {
+                status = startAudioSource(&source, &attributes, &portId);
+            }
             reply->writeInt32(status);
             reply->writeInt32(portId);
             return NO_ERROR;
@@ -2802,44 +2864,6 @@ status_t BnAudioPolicyService::onTransact(
         default:
             return BBinder::onTransact(code, data, reply, flags);
     }
-}
-
-/** returns true if string overflow was prevented by zero termination */
-template <size_t size>
-static bool preventStringOverflow(char (&s)[size]) {
-    if (strnlen(s, size) < size) return false;
-    s[size - 1] = '\0';
-    return true;
-}
-
-void BnAudioPolicyService::sanetizeAudioAttributes(audio_attributes_t* attr)
-{
-    const size_t tagsMaxSize = AUDIO_ATTRIBUTES_TAGS_MAX_SIZE;
-    if (strnlen(attr->tags, tagsMaxSize) >= tagsMaxSize) {
-        android_errorWriteLog(0x534e4554, "68953950"); // SafetyNet logging
-    }
-    attr->tags[tagsMaxSize - 1] = '\0';
-}
-
-/** returns BAD_VALUE if sanitization was required. */
-status_t BnAudioPolicyService::sanitizeEffectDescriptor(effect_descriptor_t* desc)
-{
-    if (preventStringOverflow(desc->name)
-        | /* always */ preventStringOverflow(desc->implementor)) {
-        android_errorWriteLog(0x534e4554, "73126106"); // SafetyNet logging
-        return BAD_VALUE;
-    }
-    return NO_ERROR;
-}
-
-/** returns BAD_VALUE if sanitization was required. */
-status_t BnAudioPolicyService::sanitizeAudioPortConfig(struct audio_port_config* config)
-{
-    if (config->type == AUDIO_PORT_TYPE_DEVICE &&
-        preventStringOverflow(config->ext.device.address)) {
-        return BAD_VALUE;
-    }
-    return NO_ERROR;
 }
 
 // ----------------------------------------------------------------------------
