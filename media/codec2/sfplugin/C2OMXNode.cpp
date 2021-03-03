@@ -209,15 +209,23 @@ status_t C2OMXNode::getParameter(OMX_INDEXTYPE index, void *params, size_t size)
 
             pDef->nBufferCountActual = 16;
 
-            std::shared_ptr<Codec2Client::Component> comp = mComp.lock();
-            C2PortActualDelayTuning::input inputDelay(0);
-            C2ActualPipelineDelayTuning pipelineDelay(0);
-            c2_status_t c2err = comp->query(
-                    {&inputDelay, &pipelineDelay}, {}, C2_DONT_BLOCK, nullptr);
-            if (c2err == C2_OK || c2err == C2_BAD_INDEX) {
-                pDef->nBufferCountActual = 4;
-                pDef->nBufferCountActual += (inputDelay ? inputDelay.value : 0u);
-                pDef->nBufferCountActual += (pipelineDelay ? pipelineDelay.value : 0u);
+            // WORKAROUND: having more slots improve performance while consuming
+            // more memory. This is a temporary workaround to reduce memory for
+            // larger-than-4K scenario.
+            if (mWidth * mHeight > 4096 * 2340) {
+                std::shared_ptr<Codec2Client::Component> comp = mComp.lock();
+                C2PortActualDelayTuning::input inputDelay(0);
+                C2ActualPipelineDelayTuning pipelineDelay(0);
+                c2_status_t c2err = C2_NOT_FOUND;
+                if (comp) {
+                    c2err = comp->query(
+                            {&inputDelay, &pipelineDelay}, {}, C2_DONT_BLOCK, nullptr);
+                }
+                if (c2err == C2_OK || c2err == C2_BAD_INDEX) {
+                    pDef->nBufferCountActual = 4;
+                    pDef->nBufferCountActual += (inputDelay ? inputDelay.value : 0u);
+                    pDef->nBufferCountActual += (pipelineDelay ? pipelineDelay.value : 0u);
+                }
             }
 
             pDef->eDomain = OMX_PortDomainVideo;
