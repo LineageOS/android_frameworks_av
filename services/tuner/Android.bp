@@ -81,6 +81,7 @@ cc_library {
         "android.hardware.tv.tuner@1.0",
         "android.hardware.tv.tuner@1.1",
         "libbase",
+        "libbinder",
         "libbinder_ndk",
         "libcutils",
         "libfmq",
