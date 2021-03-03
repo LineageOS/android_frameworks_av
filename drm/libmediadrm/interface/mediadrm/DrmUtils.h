@@ -27,7 +27,14 @@
 #include <utils/String8.h>
 #include <utils/StrongPointer.h>
 #include <utils/Vector.h>
+#include <algorithm>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <ctime>
+#include <deque>
+#include <iterator>
+#include <mutex>
 #include <vector>
 
 
@@ -41,6 +48,53 @@ struct ICrypto;
 struct IDrm;
 
 namespace DrmUtils {
+
+// Log APIs
+class LogBuffer {
+  public:
+    static const int MAX_CAPACITY = 100;
+    void addLog(const ::V1_4::LogMessage &log);
+    Vector<::V1_4::LogMessage> getLogs();
+
+  private:
+    std::deque<::V1_4::LogMessage> mBuffer;
+    std::mutex mMutex;
+};
+
+extern LogBuffer gLogBuf;
+
+static inline int formatBuffer(char *buf, size_t size, const char *msg) {
+    return snprintf(buf, size, "%s", msg);
+}
+
+template <typename First, typename... Args>
+static inline int formatBuffer(char *buf, size_t size, const char *fmt, First first, Args... args) {
+    return snprintf(buf, size, fmt, first, args...);
+}
+
+template <typename... Args>
+void LogToBuffer(android_LogPriority level, const char *fmt, Args... args) {
+    const int LOG_BUF_SIZE = 256;
+    char buf[LOG_BUF_SIZE];
+    int len = formatBuffer(buf, LOG_BUF_SIZE, fmt, args...);
+    if (len <= 0) {
+        return;
+    }
+    __android_log_write(level, LOG_TAG, buf);
+    if (level >= ANDROID_LOG_INFO) {
+        int64_t epochTimeMs =
+                std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
+        gLogBuf.addLog({epochTimeMs, static_cast<::V1_4::LogPriority>(level), buf});
+    }
+}
+
+#ifndef LOG2BE
+#define LOG2BE(...) LogToBuffer(ANDROID_LOG_ERROR, __VA_ARGS__)
+#define LOG2BW(...) LogToBuffer(ANDROID_LOG_WARN, __VA_ARGS__)
+#define LOG2BI(...) LogToBuffer(ANDROID_LOG_INFO, __VA_ARGS__)
+#define LOG2BD(...) LogToBuffer(ANDROID_LOG_DEBUG, __VA_ARGS__)
+#define LOG2BV(...) LogToBuffer(ANDROID_LOG_VERBOSE, __VA_ARGS__)
+#endif
 
 bool UseDrmService();
 
@@ -119,11 +173,14 @@ inline status_t toStatusT(const android::hardware::Return<T> &status) {
 template<typename T, typename U>
 status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
     sp<T> plugin = T::castFrom(obj);
-    if (plugin == NULL) {
-        return ERROR_UNSUPPORTED;
+    if (obj == NULL) {
+        LOG2BW("%s obj is null", U::descriptor);
+    } else if (plugin == NULL) {
+        LOG2BW("Cannot cast %s obj to %s plugin", U::descriptor, T::descriptor);
     }
 
     ::V1_4::Status err{};
+    std::vector<::V1_4::LogMessage> pluginLogs;
     ::V1_4::IDrmPlugin::getLogMessages_cb cb = [&](
             ::V1_4::Status status,
             hidl_vec<::V1_4::LogMessage> hLogs) {
@@ -131,62 +188,36 @@ status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
             err = status;
             return;
         }
-        logs.appendArray(hLogs.data(), hLogs.size());
+        pluginLogs.assign(hLogs.data(), hLogs.data() + hLogs.size());
     };
 
-    Return<void> hResult = plugin->getLogMessages(cb);
-    if (!hResult.isOk()) {
-        return DEAD_OBJECT;
+    Return<void> hResult;
+    if (plugin != NULL) {
+        hResult = plugin->getLogMessages(cb);
     }
-    return toStatusT(err);
+    if (!hResult.isOk()) {
+        LOG2BW("%s::getLogMessages remote call failed", T::descriptor);
+    }
+
+    auto allLogs(gLogBuf.getLogs());
+    std::copy(pluginLogs.begin(), pluginLogs.end(), std::back_inserter(allLogs));
+    std::sort(allLogs.begin(), allLogs.end(),
+              [](const ::V1_4::LogMessage &a, const ::V1_4::LogMessage &b) {
+                  return a.timeMs < b.timeMs;
+              });
+
+    logs.appendVector(allLogs);
+    return OK;
 }
 
-namespace {
-static inline char logPriorityToChar(::V1_4::LogPriority priority) {
-    char p = 'U';
-    switch (priority) {
-        case ::V1_4::LogPriority::VERBOSE:  p = 'V'; break;
-        case ::V1_4::LogPriority::DEBUG:    p = 'D'; break;
-        case ::V1_4::LogPriority::INFO:     p = 'I'; break;
-        case ::V1_4::LogPriority::WARN:     p = 'W'; break;
-        case ::V1_4::LogPriority::ERROR:    p = 'E'; break;
-        case ::V1_4::LogPriority::FATAL:    p = 'F'; break;
-        default: p = 'U'; break;
-    }
-    return p;
-}
-}
+std::string GetExceptionMessage(status_t err, const char *msg,
+                                const Vector<::V1_4::LogMessage> &logs);
 
 template<typename T>
 std::string GetExceptionMessage(status_t err, const char *msg, const sp<T> &iface) {
-    String8 msg8;
-    if (msg) {
-        msg8 += msg;
-        msg8 += ": ";
-    }
-    auto errStr = StrCryptoError(err);
-    msg8 += errStr.c_str();
-
     Vector<::V1_4::LogMessage> logs;
-    if (iface->getLogMessages(logs) != NO_ERROR) {
-        return msg8.c_str();
-    }
-
-    for (auto log: logs) {
-        time_t seconds = log.timeMs / 1000;
-        int ms = log.timeMs % 1000;
-        char buf[64] = {0};
-        std::string timeStr = "00-00 00:00:00";
-        if (strftime(buf, sizeof buf, "%m-%d %H:%M:%S", std::localtime(&seconds))) {
-            timeStr = buf;
-        }
-
-        char p = logPriorityToChar(log.priority);
-        msg8 += String8::format("\n%s.%03d %c %s",
-                timeStr.c_str(), ms, p, log.message.c_str());
-    }
-
-    return msg8.c_str();
+    iface->getLogMessages(logs);
+    return GetExceptionMessage(err, msg, logs);
 }
 
 } // namespace DrmUtils
