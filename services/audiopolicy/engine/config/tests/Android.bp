@@ -1,0 +1,25 @@
+cc_test {
+    name: "audiopolicy_engineconfig_tests",
+
+    shared_libs: [
+        "libbase",
+        "liblog",
+        "libmedia_helper",
+        "libutils",
+        "libxml2",
+    ],
+    static_libs: [
+        "libaudiopolicyengine_config",
+    ],
+
+    srcs: ["engineconfig_tests.cpp"],
+
+    data: [":audiopolicy_engineconfig_files"],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    test_suites: ["device-tests"],
+}

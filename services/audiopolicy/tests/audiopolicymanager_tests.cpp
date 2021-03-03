@@ -58,6 +58,34 @@ TEST(AudioPolicyManagerTestInit, ClientFailure) {
     ASSERT_EQ(NO_INIT, manager.initCheck());
 }
 
+// Verifies that a failure while loading a config doesn't leave
+// APM config in a "dirty" state. Since AudioPolicyConfig object
+// is a proxy for the data hosted by APM, it isn't possible
+// to "deep copy" it, and thus we have to test its elements
+// individually.
+TEST(AudioPolicyManagerTestInit, ConfigLoadingIsTransactional) {
+    AudioPolicyTestClient client;
+    AudioPolicyTestManager manager(&client);
+    ASSERT_TRUE(manager.getConfig().getHwModules().isEmpty());
+    ASSERT_TRUE(manager.getConfig().getInputDevices().isEmpty());
+    ASSERT_TRUE(manager.getConfig().getOutputDevices().isEmpty());
+    status_t status = deserializeAudioPolicyFile(
+            (base::GetExecutableDirectory() +
+                    "/test_invalid_audio_policy_configuration.xml").c_str(),
+            &manager.getConfig());
+    ASSERT_NE(NO_ERROR, status);
+    EXPECT_TRUE(manager.getConfig().getHwModules().isEmpty());
+    EXPECT_TRUE(manager.getConfig().getInputDevices().isEmpty());
+    EXPECT_TRUE(manager.getConfig().getOutputDevices().isEmpty());
+    status = deserializeAudioPolicyFile(
+            (base::GetExecutableDirectory() + "/test_audio_policy_configuration.xml").c_str(),
+            &manager.getConfig());
+    ASSERT_EQ(NO_ERROR, status);
+    EXPECT_FALSE(manager.getConfig().getHwModules().isEmpty());
+    EXPECT_FALSE(manager.getConfig().getInputDevices().isEmpty());
+    EXPECT_FALSE(manager.getConfig().getOutputDevices().isEmpty());
+}
+
 
 class PatchCountCheck {
   public:

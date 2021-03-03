@@ -111,6 +111,8 @@ struct ParsingResult {
  */
 ParsingResult parse(const char* path = DEFAULT_PATH);
 android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups);
+// Exposed for testing.
+android::status_t parseLegacyVolumeFile(const char* path, VolumeGroups &volumeGroups);
 
 } // namespace engineConfig
 } // namespace android
