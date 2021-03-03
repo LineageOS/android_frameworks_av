@@ -24,6 +24,7 @@
 
 #include <binder/IPCThreadState.h>
 #include <binder/Parcel.h>
+#include <media/AudioSanitizer.h>
 #include <mediautils/ServiceUtilities.h>
 #include <mediautils/TimeCheck.h>
 #include "IAudioFlinger.h"
@@ -1483,10 +1484,15 @@ status_t BnAudioFlinger::onTransact(
         case GET_AUDIO_PORT: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             struct audio_port port = {};
-            if (data.read(&port, sizeof(struct audio_port)) != NO_ERROR) {
+            status_t status = data.read(&port, sizeof(struct audio_port));
+            if (status != NO_ERROR) {
                 ALOGE("b/23905951");
+                return status;
             }
-            status_t status = getAudioPort(&port);
+            status = AudioSanitizer::sanitizeAudioPort(&port);
+            if (status == NO_ERROR) {
+                status = getAudioPort(&port);
+            }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&port, sizeof(struct audio_port));
@@ -1496,12 +1502,20 @@ status_t BnAudioFlinger::onTransact(
         case CREATE_AUDIO_PATCH: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             struct audio_patch patch;
-            data.read(&patch, sizeof(struct audio_patch));
-            audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
-            if (data.read(&handle, sizeof(audio_patch_handle_t)) != NO_ERROR) {
-                ALOGE("b/23905951");
+            status_t status = data.read(&patch, sizeof(struct audio_patch));
+            if (status != NO_ERROR) {
+                return status;
             }
-            status_t status = createAudioPatch(&patch, &handle);
+            audio_patch_handle_t handle = AUDIO_PATCH_HANDLE_NONE;
+            status = data.read(&handle, sizeof(audio_patch_handle_t));
+            if (status != NO_ERROR) {
+                ALOGE("b/23905951");
+                return status;
+            }
+            status = AudioSanitizer::sanitizeAudioPatch(&patch);
+            if (status == NO_ERROR) {
+                status = createAudioPatch(&patch, &handle);
+            }
             reply->writeInt32(status);
             if (status == NO_ERROR) {
                 reply->write(&handle, sizeof(audio_patch_handle_t));
@@ -1546,8 +1560,14 @@ status_t BnAudioFlinger::onTransact(
         case SET_AUDIO_PORT_CONFIG: {
             CHECK_INTERFACE(IAudioFlinger, data, reply);
             struct audio_port_config config;
-            data.read(&config, sizeof(struct audio_port_config));
-            status_t status = setAudioPortConfig(&config);
+            status_t status = data.read(&config, sizeof(struct audio_port_config));
+            if (status != NO_ERROR) {
+                return status;
+            }
+            status = AudioSanitizer::sanitizeAudioPortConfig(&config);
+            if (status == NO_ERROR) {
+                status = setAudioPortConfig(&config);
+            }
             reply->writeInt32(status);
             return NO_ERROR;
         } break;

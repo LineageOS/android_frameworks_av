@@ -253,7 +253,6 @@ private:
 
     // Keep all incoming APP segment Blob buffer pending further processing.
     std::vector<int64_t> mInputAppSegmentBuffers;
-    int32_t           mLockedAppSegmentBufferCnt;
 
     // Keep all incoming HEIC blob buffer pending further processing.
     std::vector<CodecOutputBufferInfo> mCodecOutputBuffers;

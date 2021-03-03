@@ -22,6 +22,7 @@
 #include <media/NdkMediaExtractor.h>
 #include <media/NdkMediaErrorPriv.h>
 #include <media/NdkMediaFormatPriv.h>
+#include "NdkJavaVMHelperPriv.h"
 #include "NdkMediaDataSourcePriv.h"
 
 
@@ -63,7 +64,10 @@ EXPORT
 AMediaExtractor* AMediaExtractor_new() {
     ALOGV("ctor");
     AMediaExtractor *mData = new AMediaExtractor();
-    mData->mImpl = new NuMediaExtractor();
+    mData->mImpl = new NuMediaExtractor(
+        NdkJavaVMHelper::getJNIEnv() != nullptr
+                ? NuMediaExtractor::EntryPoint::NDK_WITH_JVM
+                : NuMediaExtractor::EntryPoint::NDK_NO_JVM );
     return mData;
 }
 

@@ -63,6 +63,15 @@ public:
     virtual status_t setMediaCas(const HInterfaceToken &casToken) = 0;
 
     virtual String8 name() = 0;
+
+    enum class EntryPoint {
+        SDK = 1,
+        NDK_WITH_JVM = 2,
+        NDK_NO_JVM = 3,
+        OTHER = 4,
+    };
+
+    virtual status_t setEntryPoint(EntryPoint entryPoint) = 0;
 };
 
 
