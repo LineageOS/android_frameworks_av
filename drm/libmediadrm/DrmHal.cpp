@@ -345,10 +345,10 @@ std::vector<sp<IDrmFactory>> DrmHal::makeDrmFactories() {
         // must be in passthrough mode, load the default passthrough service
         auto passthrough = IDrmFactory::getService();
         if (passthrough != NULL) {
-            ALOGI("makeDrmFactories: using default passthrough drm instance");
+            DrmUtils::LOG2BI("makeDrmFactories: using default passthrough drm instance");
             factories.push_back(passthrough);
         } else {
-            ALOGE("Failed to find any drm factories");
+            DrmUtils::LOG2BE("Failed to find any drm factories");
         }
     }
     return factories;
@@ -364,7 +364,7 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
     Return<void> hResult = factory->createPlugin(uuid, appPackageName.string(),
             [&](Status status, const sp<IDrmPlugin>& hPlugin) {
                 if (status != Status::OK) {
-                    ALOGE("Failed to make drm plugin");
+                    DrmUtils::LOG2BE("Failed to make drm plugin: %d", status);
                     return;
                 }
                 plugin = hPlugin;
@@ -372,7 +372,7 @@ sp<IDrmPlugin> DrmHal::makeDrmPlugin(const sp<IDrmFactory>& factory,
         );
 
     if (!hResult.isOk()) {
-        ALOGE("createPlugin remote call failed");
+        DrmUtils::LOG2BE("createPlugin remote call failed");
     }
 
     return plugin;
@@ -566,7 +566,8 @@ status_t DrmHal::createPlugin(const uint8_t uuid[16],
     Mutex::Autolock autoLock(mLock);
 
     for (ssize_t i = mFactories.size() - 1; i >= 0; i--) {
-        if (mFactories[i]->isCryptoSchemeSupported(uuid)) {
+        auto hResult = mFactories[i]->isCryptoSchemeSupported(uuid);
+        if (hResult.isOk() && hResult) {
             auto plugin = makeDrmPlugin(mFactories[i], uuid, appPackageName);
             if (plugin != NULL) {
                 mPlugin = plugin;
