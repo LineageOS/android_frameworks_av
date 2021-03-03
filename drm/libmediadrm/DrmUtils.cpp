@@ -255,6 +255,8 @@ status_t toStatusT_1_4(::V1_4::Status status) {
         return ERROR_DRM_PROVISIONING_CONFIG;
     case ::V1_4::Status::PROVISIONING_PARSE_ERROR:
         return ERROR_DRM_PROVISIONING_PARSE;
+    case ::V1_4::Status::PROVISIONING_REQUEST_REJECTED:
+        return ERROR_DRM_PROVISIONING_REQUEST_REJECTED;
     case ::V1_4::Status::RETRYABLE_PROVISIONING_ERROR:
         return ERROR_DRM_PROVISIONING_RETRY;
     case ::V1_4::Status::SECURE_STOP_RELEASE_ERROR:
