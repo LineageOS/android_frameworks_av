@@ -15,7 +15,10 @@ cc_test {
     gtest: true,
     host_supported: true,
     test_suites: ["device-tests"],
-    srcs: ["EffectBundleTest.cpp"],
+    srcs: [
+        "EffectBundleTest.cpp",
+        "EffectTestHelper.cpp",
+    ],
     static_libs: [
         "libaudioutils",
         "libbundlewrapper",
