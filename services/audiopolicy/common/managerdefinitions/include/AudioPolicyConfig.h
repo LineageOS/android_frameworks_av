@@ -33,6 +33,15 @@
 
 namespace android {
 
+// This class gathers together various bits of AudioPolicyManager
+// configuration, which are usually filled out as a result of parsing
+// the audio_policy_configuration.xml file.
+//
+// Note that AudioPolicyConfig doesn't own some of the data,
+// it simply proxies access to the fields of AudioPolicyManager
+// class. Be careful about the fields that are references,
+// e.g. 'mOutputDevices'. This also means that it's impossible
+// to implement "deep copying" of this class without re-designing it.
 class AudioPolicyConfig
 {
 public:
@@ -40,14 +49,24 @@ public:
                       DeviceVector &outputDevices,
                       DeviceVector &inputDevices,
                       sp<DeviceDescriptor> &defaultOutputDevice)
-        : mEngineLibraryNameSuffix(kDefaultEngineLibraryNameSuffix),
-          mHwModules(hwModules),
+        : mHwModules(hwModules),
           mOutputDevices(outputDevices),
           mInputDevices(inputDevices),
-          mDefaultOutputDevice(defaultOutputDevice),
-          mIsSpeakerDrcEnabled(false),
-          mIsCallScreenModeSupported(false)
-    {}
+          mDefaultOutputDevice(defaultOutputDevice) {
+        clear();
+    }
+
+    void clear() {
+        mSource = {};
+        mEngineLibraryNameSuffix = kDefaultEngineLibraryNameSuffix;
+        mHwModules.clear();
+        mOutputDevices.clear();
+        mInputDevices.clear();
+        mDefaultOutputDevice.clear();
+        mIsSpeakerDrcEnabled = false;
+        mIsCallScreenModeSupported = false;
+        mSurroundFormats.clear();
+    }
 
     const std::string& getSource() const {
         return mSource;

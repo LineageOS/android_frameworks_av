@@ -19,7 +19,6 @@
 
 #include "EngineBase.h"
 #include "EngineDefaultConfig.h"
-#include "../include/EngineBase.h"
 #include <TypeConverter.h>
 
 namespace android {

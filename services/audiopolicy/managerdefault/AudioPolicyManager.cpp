@@ -29,30 +29,25 @@
 #define ALOGVV(a...) do { } while(0)
 #endif
 
-#define AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH 128
-#define AUDIO_POLICY_XML_CONFIG_FILE_NAME "audio_policy_configuration.xml"
-#define AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME \
-        "audio_policy_configuration_a2dp_offload_disabled.xml"
-#define AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME \
-        "audio_policy_configuration_bluetooth_legacy_hal.xml"
-
 #include <algorithm>
 #include <inttypes.h>
 #include <math.h>
 #include <set>
 #include <unordered_set>
 #include <vector>
+
+#include <Serializer.h>
 #include <cutils/bitops.h>
 #include <cutils/properties.h>
-#include <utils/Log.h>
 #include <media/AudioParameter.h>
+#include <policy.h>
 #include <private/android_filesystem_config.h>
 #include <system/audio.h>
 #include <system/audio_config.h>
+#include <utils/Log.h>
+
 #include "AudioPolicyManager.h"
-#include <Serializer.h>
 #include "TypeConverter.h"
-#include <policy.h>
 
 namespace android {
 
@@ -4656,37 +4651,15 @@ uint32_t AudioPolicyManager::nextAudioPortGeneration()
 }
 
 static status_t deserializeAudioPolicyXmlConfig(AudioPolicyConfig &config) {
-    char audioPolicyXmlConfigFile[AUDIO_POLICY_XML_CONFIG_FILE_PATH_MAX_LENGTH];
-    std::vector<const char*> fileNames;
-    status_t ret;
-
-    if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false)) {
-        if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false) &&
-            property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-            // Both BluetoothAudio@2.0 and BluetoothA2dp@1.0 (Offlaod) are disabled, and uses
-            // the legacy hardware module for A2DP and hearing aid.
-            fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
-        } else if (property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-            // A2DP offload supported but disabled: try to use special XML file
-            fileNames.push_back(AUDIO_POLICY_A2DP_OFFLOAD_DISABLED_XML_CONFIG_FILE_NAME);
+    if (std::string audioPolicyXmlConfigFile = audio_get_audio_policy_config_file();
+            !audioPolicyXmlConfigFile.empty()) {
+        status_t ret = deserializeAudioPolicyFile(audioPolicyXmlConfigFile.c_str(), &config);
+        if (ret == NO_ERROR) {
+            config.setSource(audioPolicyXmlConfigFile);
         }
-    } else if (property_get_bool("persist.bluetooth.bluetooth_audio_hal.disabled", false)) {
-        fileNames.push_back(AUDIO_POLICY_BLUETOOTH_LEGACY_HAL_XML_CONFIG_FILE_NAME);
+        return ret;
     }
-    fileNames.push_back(AUDIO_POLICY_XML_CONFIG_FILE_NAME);
-
-    for (const char* fileName : fileNames) {
-        for (const auto& path : audio_get_configuration_paths()) {
-            snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
-                     "%s/%s", path.c_str(), fileName);
-            ret = deserializeAudioPolicyFile(audioPolicyXmlConfigFile, &config);
-            if (ret == NO_ERROR) {
-                config.setSource(audioPolicyXmlConfigFile);
-                return ret;
-            }
-        }
-    }
-    return ret;
+    return BAD_VALUE;
 }
 
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface,

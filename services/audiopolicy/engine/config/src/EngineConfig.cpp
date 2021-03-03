@@ -589,6 +589,7 @@ static status_t deserializeLegacyVolumeCollection(_xmlDoc *doc, const _xmlNode *
             }
         }
     }
+    VolumeGroups tempVolumeGroups = volumeGroups;
     for (const auto &volumeMapIter : legacyVolumeMap) {
         // In order to let AudioService setting the min and max (compatibility), set Min and Max
         // to -1 except for private streams
@@ -599,8 +600,10 @@ static status_t deserializeLegacyVolumeCollection(_xmlDoc *doc, const _xmlNode *
         }
         int indexMin = streamType >= AUDIO_STREAM_PUBLIC_CNT ? 0 : -1;
         int indexMax = streamType >= AUDIO_STREAM_PUBLIC_CNT ? 100 : -1;
-        volumeGroups.push_back({ volumeMapIter.first, indexMin, indexMax, volumeMapIter.second });
+        tempVolumeGroups.push_back(
+                { volumeMapIter.first, indexMin, indexMax, volumeMapIter.second });
     }
+    std::swap(tempVolumeGroups, volumeGroups);
     return NO_ERROR;
 }
 
@@ -695,35 +698,14 @@ android::status_t parseLegacyVolumeFile(const char* path, VolumeGroups &volumeGr
     return deserializeLegacyVolumeCollection(doc, cur, volumeGroups, nbSkippedElements);
 }
 
-static const int gApmXmlConfigFilePathMaxLength = 128;
-
-static constexpr const char *apmXmlConfigFileName = "audio_policy_configuration.xml";
-static constexpr const char *apmA2dpOffloadDisabledXmlConfigFileName =
-        "audio_policy_configuration_a2dp_offload_disabled.xml";
-
 android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups) {
-    char audioPolicyXmlConfigFile[gApmXmlConfigFilePathMaxLength];
-    std::vector<const char *> fileNames;
-    status_t ret;
-
-    if (property_get_bool("ro.bluetooth.a2dp_offload.supported", false) &&
-            property_get_bool("persist.bluetooth.a2dp_offload.disabled", false)) {
-        // A2DP offload supported but disabled: try to use special XML file
-        fileNames.push_back(apmA2dpOffloadDisabledXmlConfigFileName);
+    if (std::string audioPolicyXmlConfigFile = audio_get_audio_policy_config_file();
+            !audioPolicyXmlConfigFile.empty()) {
+        return parseLegacyVolumeFile(audioPolicyXmlConfigFile.c_str(), volumeGroups);
+    } else {
+        ALOGE("No readable audio policy config file found");
+        return BAD_VALUE;
     }
-    fileNames.push_back(apmXmlConfigFileName);
-
-    for (const char* fileName : fileNames) {
-        for (const auto& path : audio_get_configuration_paths()) {
-            snprintf(audioPolicyXmlConfigFile, sizeof(audioPolicyXmlConfigFile),
-                     "%s/%s", path.c_str(), fileName);
-            ret = parseLegacyVolumeFile(audioPolicyXmlConfigFile, volumeGroups);
-            if (ret == NO_ERROR) {
-                return ret;
-            }
-        }
-    }
-    return BAD_VALUE;
 }
 
 } // namespace engineConfig

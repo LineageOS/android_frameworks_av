@@ -20,8 +20,8 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <variant>
 
-#include <hidl/Status.h>
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
 #include <media/convert.h>
@@ -36,11 +36,13 @@ namespace android {
 
 namespace {
 
-// TODO(mnaganov): Consider finding an alternative for using HIDL code.
-using hardware::Return;
-using hardware::Status;
-using hardware::Void;
 using utilities::convertTo;
+
+static inline bool maybeVendorExtension(const std::string& s) {
+    // Only checks whether the string starts with the "vendor prefix".
+    static const std::string vendorPrefix = "VX_";
+    return s.size() > vendorPrefix.size() && s.substr(0, vendorPrefix.size()) == vendorPrefix;
+}
 
 template<typename E, typename C>
 struct AndroidCollectionTraits {
@@ -187,7 +189,7 @@ struct ModuleTraits : public AndroidCollectionTraits<HwModule, HwModuleCollectio
 
 struct GlobalConfigTraits
 {
-    typedef void Element;
+    typedef std::monostate Element;
 
     static constexpr const char *tag = "globalConfiguration";
 
@@ -203,7 +205,7 @@ struct GlobalConfigTraits
 
 struct SurroundSoundTraits
 {
-    typedef void Element;
+    typedef std::monostate Element;
 
     static constexpr const char *tag = "surroundSound";
 
@@ -226,14 +228,15 @@ struct SurroundSoundFormatTraits : public StdCollectionTraits<AudioPolicyConfig:
 class PolicySerializer
 {
 public:
-    status_t deserialize(const char *configFile, AudioPolicyConfig *config);
+    status_t deserialize(const char *configFile, AudioPolicyConfig *config,
+            bool ignoreVendorExtensions = false);
 
     template <class Trait>
     status_t deserializeCollection(const xmlNode *cur,
             typename Trait::Collection *collection,
             typename Trait::PtrSerializingCtx serializingContext);
     template <class Trait>
-    Return<typename Trait::Element> deserialize(const xmlNode *cur,
+    std::variant<status_t, typename Trait::Element> deserialize(const xmlNode *cur,
             typename Trait::PtrSerializingCtx serializingContext);
 
 private:
@@ -242,6 +245,7 @@ private:
 
     typedef AudioPolicyConfig Element;
 
+    bool mIgnoreVendorExtensions = false;
     std::string mChannelMasksSeparator = ",";
     std::string mSamplingRatesSeparator = ",";
     std::string mFlagsSeparator = "|";
@@ -253,9 +257,8 @@ template <class T>
 constexpr void (*xmlDeleter)(T* t);
 template <>
 constexpr auto xmlDeleter<xmlDoc> = xmlFreeDoc;
-// http://b/111067277 - Add back constexpr when we switch to C++17.
 template <>
-auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
+constexpr auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
 
 /** @return a unique_ptr with the correct deleter for the libxml2 object. */
 template <class T>
@@ -308,14 +311,17 @@ status_t PolicySerializer::deserializeCollection(const xmlNode *cur,
         }
         for (; child != NULL; child = child->next) {
             if (!xmlStrcmp(child->name, reinterpret_cast<const xmlChar*>(Trait::tag))) {
-                auto element = deserialize<Trait>(child, serializingContext);
-                if (element.isOk()) {
-                    status_t status = Trait::addElementToCollection(element, collection);
+                auto maybeElement = deserialize<Trait>(child, serializingContext);
+                if (maybeElement.index() == 1) {
+                    status_t status = Trait::addElementToCollection(
+                            std::get<1>(maybeElement), collection);
                     if (status != NO_ERROR) {
                         ALOGE("%s: could not add element to %s collection", __func__,
                             Trait::collectionTag);
                         return status;
                     }
+                } else if (mIgnoreVendorExtensions && std::get<status_t>(maybeElement) == NO_INIT) {
+                    // Skip a vendor extension element.
                 } else {
                     return BAD_VALUE;
                 }
@@ -329,8 +335,8 @@ status_t PolicySerializer::deserializeCollection(const xmlNode *cur,
 }
 
 template<>
-Return<AudioGainTraits::Element> PolicySerializer::deserialize<AudioGainTraits>(const xmlNode *cur,
-        AudioGainTraits::PtrSerializingCtx /*serializingContext*/)
+std::variant<status_t, AudioGainTraits::Element> PolicySerializer::deserialize<AudioGainTraits>(
+        const xmlNode *cur, AudioGainTraits::PtrSerializingCtx /*serializingContext*/)
 {
     using Attributes = AudioGainTraits::Attributes;
 
@@ -394,12 +400,13 @@ Return<AudioGainTraits::Element> PolicySerializer::deserialize<AudioGainTraits>(
     if (gain->getMode() != 0) {
         return gain;
     } else {
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
 }
 
 template<>
-Return<AudioProfileTraits::Element> PolicySerializer::deserialize<AudioProfileTraits>(
+std::variant<status_t, AudioProfileTraits::Element>
+PolicySerializer::deserialize<AudioProfileTraits>(
         const xmlNode *cur, AudioProfileTraits::PtrSerializingCtx /*serializingContext*/)
 {
     using Attributes = AudioProfileTraits::Attributes;
@@ -408,6 +415,10 @@ Return<AudioProfileTraits::Element> PolicySerializer::deserialize<AudioProfileTr
     std::string format = getXmlAttribute(cur, Attributes::format);
     std::string channels = getXmlAttribute(cur, Attributes::channelMasks);
 
+    if (mIgnoreVendorExtensions && maybeVendorExtension(format)) {
+        ALOGI("%s: vendor extension format \"%s\" skipped", __func__, format.c_str());
+        return NO_INIT;
+    }
     AudioProfileTraits::Element profile = new AudioProfile(formatFromString(format, gDynamicFormat),
             channelMasksFromString(channels, mChannelMasksSeparator.c_str()),
             samplingRatesFromString(samplingRates, mSamplingRatesSeparator.c_str()));
@@ -420,21 +431,21 @@ Return<AudioProfileTraits::Element> PolicySerializer::deserialize<AudioProfileTr
 }
 
 template<>
-Return<MixPortTraits::Element> PolicySerializer::deserialize<MixPortTraits>(const xmlNode *child,
-        MixPortTraits::PtrSerializingCtx /*serializingContext*/)
+std::variant<status_t, MixPortTraits::Element> PolicySerializer::deserialize<MixPortTraits>(
+        const xmlNode *child, MixPortTraits::PtrSerializingCtx /*serializingContext*/)
 {
     using Attributes = MixPortTraits::Attributes;
 
     std::string name = getXmlAttribute(child, Attributes::name);
     if (name.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::name);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     ALOGV("%s: %s %s=%s", __func__, MixPortTraits::tag, Attributes::name, name.c_str());
     std::string role = getXmlAttribute(child, Attributes::role);
     if (role.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::role);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     ALOGV("%s: Role=%s", __func__, role.c_str());
     audio_port_role_t portRole = (role == Attributes::roleSource) ?
@@ -445,7 +456,7 @@ Return<MixPortTraits::Element> PolicySerializer::deserialize<MixPortTraits>(cons
     AudioProfileTraits::Collection profiles;
     status_t status = deserializeCollection<AudioProfileTraits>(child, &profiles, NULL);
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     if (profiles.empty()) {
         profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
@@ -477,7 +488,7 @@ Return<MixPortTraits::Element> PolicySerializer::deserialize<MixPortTraits>(cons
     AudioGainTraits::Collection gains;
     status = deserializeCollection<AudioGainTraits>(child, &gains, NULL);
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     mixPort->setGains(gains);
 
@@ -485,7 +496,7 @@ Return<MixPortTraits::Element> PolicySerializer::deserialize<MixPortTraits>(cons
 }
 
 template<>
-Return<DevicePortTraits::Element> PolicySerializer::deserialize<DevicePortTraits>(
+std::variant<status_t, DevicePortTraits::Element> PolicySerializer::deserialize<DevicePortTraits>(
         const xmlNode *cur, DevicePortTraits::PtrSerializingCtx /*serializingContext*/)
 {
     using Attributes = DevicePortTraits::Attributes;
@@ -494,30 +505,34 @@ Return<DevicePortTraits::Element> PolicySerializer::deserialize<DevicePortTraits
     std::string name = getXmlAttribute(cur, Attributes::tagName);
     if (name.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::tagName);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     ALOGV("%s: %s %s=%s", __func__, tag, Attributes::tagName, name.c_str());
     std::string typeName = getXmlAttribute(cur, Attributes::type);
     if (typeName.empty()) {
         ALOGE("%s: no type for %s", __func__, name.c_str());
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     ALOGV("%s: %s %s=%s", __func__, tag, Attributes::type, typeName.c_str());
     std::string role = getXmlAttribute(cur, Attributes::role);
     if (role.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::role);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     ALOGV("%s: %s %s=%s", __func__, tag, Attributes::role, role.c_str());
     audio_port_role_t portRole = (role == Attributes::roleSource) ?
                 AUDIO_PORT_ROLE_SOURCE : AUDIO_PORT_ROLE_SINK;
 
+    if (mIgnoreVendorExtensions && maybeVendorExtension(typeName)) {
+        ALOGI("%s: vendor extension device type \"%s\" skipped", __func__, typeName.c_str());
+        return NO_INIT;
+    }
     audio_devices_t type = AUDIO_DEVICE_NONE;
     if (!DeviceConverter::fromString(typeName, type) ||
             (!audio_is_input_device(type) && portRole == AUDIO_PORT_ROLE_SOURCE) ||
             (!audio_is_output_devices(type) && portRole == AUDIO_PORT_ROLE_SINK)) {
         ALOGW("%s: bad type %08x", __func__, type);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     std::string encodedFormatsLiteral = getXmlAttribute(cur, Attributes::encodedFormats);
     ALOGV("%s: %s %s=%s", __func__, tag, Attributes::encodedFormats, encodedFormatsLiteral.c_str());
@@ -532,7 +547,7 @@ Return<DevicePortTraits::Element> PolicySerializer::deserialize<DevicePortTraits
     AudioProfileTraits::Collection profiles;
     status_t status = deserializeCollection<AudioProfileTraits>(cur, &profiles, NULL);
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     if (profiles.empty()) {
         profiles.add(AudioProfile::createFullDynamic(gDynamicFormat));
@@ -545,7 +560,7 @@ Return<DevicePortTraits::Element> PolicySerializer::deserialize<DevicePortTraits
     // Deserialize AudioGain children
     status = deserializeCollection<AudioGainTraits>(cur, &deviceDesc->mGains, NULL);
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     ALOGV("%s: adding device tag %s type %08x address %s", __func__,
           deviceDesc->getName().c_str(), type, deviceDesc->address().c_str());
@@ -553,7 +568,7 @@ Return<DevicePortTraits::Element> PolicySerializer::deserialize<DevicePortTraits
 }
 
 template<>
-Return<RouteTraits::Element> PolicySerializer::deserialize<RouteTraits>(
+std::variant<status_t, RouteTraits::Element> PolicySerializer::deserialize<RouteTraits>(
         const xmlNode *cur, RouteTraits::PtrSerializingCtx ctx)
 {
     using Attributes = RouteTraits::Attributes;
@@ -561,7 +576,7 @@ Return<RouteTraits::Element> PolicySerializer::deserialize<RouteTraits>(
     std::string type = getXmlAttribute(cur, Attributes::type);
     if (type.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::type);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     audio_route_type_t routeType = (type == Attributes::typeMix) ?
                 AUDIO_ROUTE_MIX : AUDIO_ROUTE_MUX;
@@ -572,20 +587,24 @@ Return<RouteTraits::Element> PolicySerializer::deserialize<RouteTraits>(
     std::string sinkAttr = getXmlAttribute(cur, Attributes::sink);
     if (sinkAttr.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::sink);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     // Convert Sink name to port pointer
     sp<PolicyAudioPort> sink = ctx->findPortByTagName(sinkAttr);
-    if (sink == NULL) {
+    if (sink == NULL && !mIgnoreVendorExtensions) {
         ALOGE("%s: no sink found with name=%s", __func__, sinkAttr.c_str());
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
+    } else if (sink == NULL) {
+        ALOGW("Skipping route to sink \"%s\" as it likely has vendor extension type",
+                sinkAttr.c_str());
+        return NO_INIT;
     }
     route->setSink(sink);
 
     std::string sourcesAttr = getXmlAttribute(cur, Attributes::sources);
     if (sourcesAttr.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::sources);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     // Tokenize and Convert Sources name to port pointer
     PolicyAudioPortVector sources;
@@ -595,11 +614,15 @@ Return<RouteTraits::Element> PolicySerializer::deserialize<RouteTraits>(
     while (devTag != NULL) {
         if (strlen(devTag) != 0) {
             sp<PolicyAudioPort> source = ctx->findPortByTagName(devTag);
-            if (source == NULL) {
+            if (source == NULL && !mIgnoreVendorExtensions) {
                 ALOGE("%s: no source found with name=%s", __func__, devTag);
-                return Status::fromStatusT(BAD_VALUE);
+                return BAD_VALUE;
+            } else if (source == NULL) {
+                ALOGW("Skipping route source \"%s\" as it likely has vendor extension type",
+                        devTag);
+            } else {
+                sources.add(source);
             }
-            sources.add(source);
         }
         devTag = strtok(NULL, ",");
     }
@@ -614,7 +637,7 @@ Return<RouteTraits::Element> PolicySerializer::deserialize<RouteTraits>(
 }
 
 template<>
-Return<ModuleTraits::Element> PolicySerializer::deserialize<ModuleTraits>(
+std::variant<status_t, ModuleTraits::Element> PolicySerializer::deserialize<ModuleTraits>(
         const xmlNode *cur, ModuleTraits::PtrSerializingCtx ctx)
 {
     using Attributes = ModuleTraits::Attributes;
@@ -626,7 +649,7 @@ Return<ModuleTraits::Element> PolicySerializer::deserialize<ModuleTraits>(
     std::string name = getXmlAttribute(cur, Attributes::name);
     if (name.empty()) {
         ALOGE("%s: No %s found", __func__, Attributes::name);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     uint32_t versionMajor = 0, versionMinor = 0;
     std::string versionLiteral = getXmlAttribute(cur, Attributes::version);
@@ -644,21 +667,21 @@ Return<ModuleTraits::Element> PolicySerializer::deserialize<ModuleTraits>(
     MixPortTraits::Collection mixPorts;
     status_t status = deserializeCollection<MixPortTraits>(cur, &mixPorts, NULL);
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     module->setProfiles(mixPorts);
 
     DevicePortTraits::Collection devicePorts;
     status = deserializeCollection<DevicePortTraits>(cur, &devicePorts, NULL);
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     module->setDeclaredDevices(devicePorts);
 
     RouteTraits::Collection routes;
     status = deserializeCollection<RouteTraits>(cur, &routes, module.get());
     if (status != NO_ERROR) {
-        return Status::fromStatusT(status);
+        return status;
     }
     module->setRoutes(routes);
 
@@ -678,6 +701,12 @@ Return<ModuleTraits::Element> PolicySerializer::deserialize<ModuleTraits>(
                         sp<DeviceDescriptor> device = module->getDeclaredDevices().
                                 getDeviceFromTagName(std::string(reinterpret_cast<const char*>(
                                                         attachedDevice.get())));
+                        if (device == nullptr && mIgnoreVendorExtensions) {
+                            ALOGW("Skipped attached device \"%s\" because it likely uses a vendor"
+                                    "extension type",
+                                    reinterpret_cast<const char*>(attachedDevice.get()));
+                            continue;
+                        }
                         ctx->addDevice(device);
                     }
                 }
@@ -704,7 +733,8 @@ Return<ModuleTraits::Element> PolicySerializer::deserialize<ModuleTraits>(
 }
 
 template<>
-Return<GlobalConfigTraits::Element> PolicySerializer::deserialize<GlobalConfigTraits>(
+std::variant<status_t, GlobalConfigTraits::Element>
+PolicySerializer::deserialize<GlobalConfigTraits>(
         const xmlNode *root, GlobalConfigTraits::PtrSerializingCtx config)
 {
     using Attributes = GlobalConfigTraits::Attributes;
@@ -726,14 +756,15 @@ Return<GlobalConfigTraits::Element> PolicySerializer::deserialize<GlobalConfigTr
             if (!engineLibrarySuffix.empty()) {
                 config->setEngineLibraryNameSuffix(engineLibrarySuffix);
             }
-            return Void();
+            return NO_ERROR;
         }
     }
-    return Void();
+    return NO_ERROR;
 }
 
 template<>
-Return<SurroundSoundTraits::Element> PolicySerializer::deserialize<SurroundSoundTraits>(
+std::variant<status_t, SurroundSoundTraits::Element>
+PolicySerializer::deserialize<SurroundSoundTraits>(
         const xmlNode *root, SurroundSoundTraits::PtrSerializingCtx config)
 {
     config->setDefaultSurroundFormats();
@@ -746,14 +777,15 @@ Return<SurroundSoundTraits::Element> PolicySerializer::deserialize<SurroundSound
             if (status == NO_ERROR) {
                 config->setSurroundFormats(formats);
             }
-            return Void();
+            return NO_ERROR;
         }
     }
-    return Void();
+    return NO_ERROR;
 }
 
 template<>
-Return<SurroundSoundFormatTraits::Element> PolicySerializer::deserialize<SurroundSoundFormatTraits>(
+std::variant<status_t, SurroundSoundFormatTraits::Element>
+PolicySerializer::deserialize<SurroundSoundFormatTraits>(
         const xmlNode *cur, SurroundSoundFormatTraits::PtrSerializingCtx /*serializingContext*/)
 {
     using Attributes = SurroundSoundFormatTraits::Attributes;
@@ -761,12 +793,16 @@ Return<SurroundSoundFormatTraits::Element> PolicySerializer::deserialize<Surroun
     std::string formatLiteral = getXmlAttribute(cur, Attributes::name);
     if (formatLiteral.empty()) {
         ALOGE("%s: No %s found for a surround format", __func__, Attributes::name);
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
+    }
+    if (mIgnoreVendorExtensions && maybeVendorExtension(formatLiteral)) {
+        ALOGI("%s: vendor extension format \"%s\" skipped", __func__, formatLiteral.c_str());
+        return NO_INIT;
     }
     audio_format_t format = formatFromString(formatLiteral);
     if (format == AUDIO_FORMAT_DEFAULT) {
         ALOGE("%s: Unrecognized format %s", __func__, formatLiteral.c_str());
-        return Status::fromStatusT(BAD_VALUE);
+        return BAD_VALUE;
     }
     SurroundSoundFormatTraits::Element pair = std::make_pair(
             format, SurroundSoundFormatTraits::Collection::mapped_type{});
@@ -778,14 +814,16 @@ Return<SurroundSoundFormatTraits::Element> PolicySerializer::deserialize<Surroun
         auto result = pair.second.insert(subformat);
         if (!result.second) {
             ALOGE("%s: could not add subformat %x to collection", __func__, subformat);
-            return Status::fromStatusT(BAD_VALUE);
+            return BAD_VALUE;
         }
     }
     return pair;
 }
 
-status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig *config)
+status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig *config,
+                                       bool ignoreVendorExtensions)
 {
+    mIgnoreVendorExtensions = ignoreVendorExtensions;
     auto doc = make_xmlUnique(xmlParseFile(configFile));
     if (doc == nullptr) {
         ALOGE("%s: Could not parse %s document.", __func__, configFile);
@@ -841,7 +879,17 @@ status_t PolicySerializer::deserialize(const char *configFile, AudioPolicyConfig
 status_t deserializeAudioPolicyFile(const char *fileName, AudioPolicyConfig *config)
 {
     PolicySerializer serializer;
-    return serializer.deserialize(fileName, config);
+    status_t status = serializer.deserialize(fileName, config);
+    if (status != OK) config->clear();
+    return status;
+}
+
+status_t deserializeAudioPolicyFileForVts(const char *fileName, AudioPolicyConfig *config)
+{
+    PolicySerializer serializer;
+    status_t status = serializer.deserialize(fileName, config, true /*ignoreVendorExtensions*/);
+    if (status != OK) config->clear();
+    return status;
 }
 
 } // namespace android

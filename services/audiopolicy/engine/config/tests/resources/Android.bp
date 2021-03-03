@@ -1,0 +1,7 @@
+filegroup {
+    name: "audiopolicy_engineconfig_files",
+    srcs: [
+        "test_apm_volume_tables.xml",
+        "test_invalid_apm_volume_tables.xml",
+    ],
+}
