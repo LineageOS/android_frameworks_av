@@ -17,6 +17,8 @@
 #define LOG_TAG "TunerService"
 
 #include <android/binder_manager.h>
+#include <android/content/pm/IPackageManagerNative.h>
+#include <binder/IServiceManager.h>
 #include <utils/Log.h>
 #include "TunerService.h"
 #include "TunerFrontend.h"
@@ -50,6 +52,33 @@ using ::android::hardware::tv::tuner::V1_1::FrontendDtmbCapabilities;
 namespace android {
 
 TunerService::TunerService() {
+    sp<IServiceManager> serviceMgr = defaultServiceManager();
+    sp<content::pm::IPackageManagerNative> packageMgr;
+    if (serviceMgr.get() == nullptr) {
+        ALOGE("%s: Cannot find service manager", __func__);
+        return;
+    } else {
+        sp<IBinder> binder = serviceMgr->waitForService(String16("package_native"));
+        packageMgr = interface_cast<content::pm::IPackageManagerNative>(binder);
+    }
+
+    bool hasFeature = false;
+    if (packageMgr != nullptr) {
+        binder::Status status = packageMgr->hasSystemFeature(FEATURE_TUNER, 0, &hasFeature);
+        if (!status.isOk()) {
+            ALOGE("%s: hasSystemFeature failed: %s",
+                    __func__, status.exceptionMessage().c_str());
+            return;
+        }
+        if (!hasFeature) {
+            ALOGD("Current device does not support tuner feaure.");
+            return;
+        }
+    } else {
+        ALOGD("%s: Cannot find package manager.", __func__);
+        return;
+    }
+
     ::ndk::SpAIBinder binder(AServiceManager_waitForService("tv_tuner_resource_mgr"));
     mTunerResourceManager = ITunerResourceManager::fromBinder(binder);
     updateTunerResources();

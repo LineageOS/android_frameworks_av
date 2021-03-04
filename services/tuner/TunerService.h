@@ -72,6 +72,8 @@ namespace android {
 const static int TUNER_HAL_VERSION_UNKNOWN = 0;
 const static int TUNER_HAL_VERSION_1_0 = 1 << 16;
 const static int TUNER_HAL_VERSION_1_1 = (1 << 16) | 1;
+// System Feature defined in PackageManager
+static const ::android::String16 FEATURE_TUNER(::android::String16("android.hardware.tv.tuner"));
 
 typedef enum {
     FRONTEND,
