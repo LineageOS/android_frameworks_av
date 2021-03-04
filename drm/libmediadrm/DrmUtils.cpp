@@ -108,7 +108,7 @@ sp<::V1_0::IDrmPlugin> MakeDrmPlugin(const sp<::V1_0::IDrmFactory> &factory,
     factory->createPlugin(toHidlArray16(uuid), hidl_string(appPackageName),
                           [&](::V1_0::Status status, const sp<::V1_0::IDrmPlugin> &hPlugin) {
                               if (status != ::V1_0::Status::OK) {
-                                  LOG2BE("MakeDrmPlugin failed: %d", status);
+                                  LOG2BE(uuid, "MakeDrmPlugin failed: %d", status);
                                   return;
                               }
                               plugin = hPlugin;
@@ -123,7 +123,7 @@ sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory> &fac
     factory->createPlugin(toHidlArray16(uuid), toHidlVec(initData, initDataSize),
                           [&](::V1_0::Status status, const sp<::V1_0::ICryptoPlugin> &hPlugin) {
                               if (status != ::V1_0::Status::OK) {
-                                  LOG2BE("MakeCryptoPlugin failed: %d", status);
+                                  LOG2BE(uuid, "MakeCryptoPlugin failed: %d", status);
                                   return;
                               }
                               plugin = hPlugin;
