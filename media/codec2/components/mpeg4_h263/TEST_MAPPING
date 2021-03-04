@@ -1,0 +1,6 @@
+// mappings for frameworks/av/media/codec2/components/mpeg4_h263
+{
+  "presubmit": [
+    { "name": "C2SoftMpeg4DecTest" }
+  ]
+}
