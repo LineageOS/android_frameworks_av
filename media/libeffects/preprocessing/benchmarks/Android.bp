@@ -12,13 +12,15 @@ package {
 cc_benchmark {
     name: "preprocessing_benchmark",
     vendor: true,
-    relative_install_path: "soundfx",
     srcs: ["preprocessing_benchmark.cpp"],
     shared_libs: [
-        "libaudiopreprocessing",
         "libaudioutils",
         "liblog",
         "libutils",
+    ],
+    static_libs: [
+        "libaudiopreprocessing",
+        "webrtc_audio_processing",
     ],
     cflags: [
         "-DWEBRTC_POSIX",
