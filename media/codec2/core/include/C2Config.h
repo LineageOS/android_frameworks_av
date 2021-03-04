@@ -187,6 +187,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexPictureType,
     kParamIndexHdr10PlusMetadata,
 
+    kParamIndexQuantization,
+
     /* ------------------------------------ video components ------------------------------------ */
 
     kParamIndexFrameRate = C2_PARAM_INDEX_VIDEO_PARAM_START,
@@ -707,6 +709,38 @@ struct C2ProfileLevelStruct {
 typedef C2StreamParam<C2Info, C2ProfileLevelStruct, kParamIndexProfileLevel>
         C2StreamProfileLevelInfo;
 constexpr char C2_PARAMKEY_PROFILE_LEVEL[] = "coded.pl";
+
+struct C2QuantizationStruct {
+    int32_t iMax;  ///< max/min for I frames
+    int32_t iMin;
+    int32_t pMax;  ///< max/min for P frames
+    int32_t pMin;
+    int32_t bMax;  ///< max/min for B frames
+    int32_t bMin;
+
+    C2QuantizationStruct(
+            int32_t iMax_ = INT32_MAX,
+            int32_t iMin_ = INT32_MIN,
+            int32_t pMax_ = INT32_MAX,
+            int32_t pMin_ = INT32_MIN,
+            int32_t bMax_ = INT32_MAX,
+            int32_t bMin_ = INT32_MIN)
+        : iMax(iMax_), iMin(iMin_),
+          pMax(pMax_), pMin(pMin_),
+          bMax(bMax_), bMin(bMin_) { }
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(Quantization)          // reference?
+    C2FIELD(iMax, "i-max")
+    C2FIELD(iMin, "i-min")
+    C2FIELD(pMax, "p-max")
+    C2FIELD(pMin, "p-min")
+    C2FIELD(bMax, "b-max")
+    C2FIELD(bMin, "b-min")
+};
+
+typedef C2StreamParam<C2Info, C2QuantizationStruct, kParamIndexQuantization>
+        C2StreamQuantizationInfo;
+constexpr char C2_PARAMKEY_QUANTIZATION[] = "coded.qp";
 
 /**
  * Codec-specific initialization data.
