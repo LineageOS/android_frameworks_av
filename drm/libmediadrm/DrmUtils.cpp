@@ -43,6 +43,9 @@
 #include <mediadrm/ICrypto.h>
 #include <mediadrm/IDrm.h>
 
+#include <map>
+#include <string>
+
 using HServiceManager = ::android::hidl::manager::V1_2::IServiceManager;
 using ::android::hardware::hidl_array;
 using ::android::hardware::hidl_string;
@@ -66,8 +69,8 @@ Hal *MakeObject(status_t *pstatus) {
     return obj;
 }
 
-template <typename Hal, typename V>
-void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
+template <typename Hal, typename V, typename M>
+void MakeHidlFactories(const uint8_t uuid[16], V &factories, M& instances) {
     sp<HServiceManager> serviceManager = HServiceManager::getService();
     if (serviceManager == nullptr) {
         LOG2BE("Failed to get service manager");
@@ -78,13 +81,19 @@ void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
         for (const auto &instance : registered) {
             auto factory = Hal::getService(instance);
             if (factory != nullptr) {
-                LOG2BI("found %s %s", Hal::descriptor, instance.c_str());
+                instances[instance.c_str()] = Hal::descriptor;
                 if (!uuid || factory->isCryptoSchemeSupported(uuid)) {
                     factories.push_back(factory);
                 }
             }
         }
     });
+}
+
+template <typename Hal, typename V>
+void MakeHidlFactories(const uint8_t uuid[16], V &factories) {
+    std::map<std::string, std::string> instances;
+    MakeHidlFactories<Hal>(uuid, factories, instances);
 }
 
 hidl_vec<uint8_t> toHidlVec(const void *ptr, size_t size) {
@@ -147,11 +156,15 @@ sp<ICrypto> MakeCrypto(status_t *pstatus) {
 
 std::vector<sp<::V1_0::IDrmFactory>> MakeDrmFactories(const uint8_t uuid[16]) {
     std::vector<sp<::V1_0::IDrmFactory>> drmFactories;
-    MakeHidlFactories<::V1_0::IDrmFactory>(uuid, drmFactories);
-    MakeHidlFactories<::V1_1::IDrmFactory>(uuid, drmFactories);
-    MakeHidlFactories<::V1_2::IDrmFactory>(uuid, drmFactories);
-    MakeHidlFactories<::V1_3::IDrmFactory>(uuid, drmFactories);
-    MakeHidlFactories<::V1_4::IDrmFactory>(uuid, drmFactories);
+    std::map<std::string, std::string> instances;
+    MakeHidlFactories<::V1_0::IDrmFactory>(uuid, drmFactories, instances);
+    MakeHidlFactories<::V1_1::IDrmFactory>(uuid, drmFactories, instances);
+    MakeHidlFactories<::V1_2::IDrmFactory>(uuid, drmFactories, instances);
+    MakeHidlFactories<::V1_3::IDrmFactory>(uuid, drmFactories, instances);
+    MakeHidlFactories<::V1_4::IDrmFactory>(uuid, drmFactories, instances);
+    for (auto const& entry : instances) {
+        LOG2BI("found instance=%s version=%s", entry.first.c_str(), entry.second.c_str());
+    }
     return drmFactories;
 }
 
