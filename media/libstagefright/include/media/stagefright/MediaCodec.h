@@ -528,6 +528,14 @@ private:
     std::deque<BufferFlightTiming_t> mBuffersInFlight;
     Mutex mLatencyLock;
     int64_t mLatencyUnknown;    // buffers for which we couldn't calculate latency
+
+    Mutex mOutputStatsLock;
+    int64_t mBytesEncoded = 0;
+    int64_t mEarliestEncodedPtsUs = INT64_MAX;
+    int64_t mLatestEncodedPtsUs = INT64_MIN;
+    int32_t mFramesEncoded = 0;
+
+
     int64_t mNumLowLatencyEnables;  // how many times low latency mode is enabled
     int64_t mNumLowLatencyDisables;  // how many times low latency mode is disabled
     bool mIsLowLatencyModeOn;  // is low latency mode on currently
@@ -544,7 +552,7 @@ private:
     sp<BatteryChecker> mBatteryChecker;
 
     void statsBufferSent(int64_t presentationUs);
-    void statsBufferReceived(int64_t presentationUs);
+    void statsBufferReceived(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer);
 
     enum {
         // the default shape of our latency histogram buckets

@@ -33,8 +33,10 @@
 #include <cstdint>
 #include <ctime>
 #include <deque>
+#include <endian.h>
 #include <iterator>
 #include <mutex>
+#include <string>
 #include <vector>
 
 
@@ -86,6 +88,14 @@ void LogToBuffer(android_LogPriority level, const char *fmt, Args... args) {
                 std::chrono::system_clock::now().time_since_epoch() / std::chrono::milliseconds(1);
         gLogBuf.addLog({epochTimeMs, static_cast<::V1_4::LogPriority>(level), buf});
     }
+}
+
+template <typename... Args>
+void LogToBuffer(android_LogPriority level, const uint8_t uuid[16], const char *fmt, Args... args) {
+    const uint64_t* uuid2 = reinterpret_cast<const uint64_t*>(uuid);
+    std::string uuidFmt("uuid=[%lx %lx] ");
+    uuidFmt += fmt;
+    LogToBuffer(level, uuidFmt.c_str(), htobe64(uuid2[0]), htobe64(uuid2[1]), args...);
 }
 
 #ifndef LOG2BE
@@ -196,10 +206,13 @@ status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
         hResult = plugin->getLogMessages(cb);
     }
     if (!hResult.isOk()) {
-        LOG2BW("%s::getLogMessages remote call failed", T::descriptor);
+        LOG2BW("%s::getLogMessages remote call failed %s",
+               T::descriptor, hResult.description().c_str());
     }
 
     auto allLogs(gLogBuf.getLogs());
+    LOG2BI("framework logs size %zu; plugin logs size %zu",
+           allLogs.size(), pluginLogs.size());
     std::copy(pluginLogs.begin(), pluginLogs.end(), std::back_inserter(allLogs));
     std::sort(allLogs.begin(), allLogs.end(),
               [](const ::V1_4::LogMessage &a, const ::V1_4::LogMessage &b) {
