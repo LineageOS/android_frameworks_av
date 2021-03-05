@@ -552,13 +552,15 @@ struct CCodec::ClientListener : public Codec2Client::Listener {
         }
 
         // Report to MediaCodec
-        // Note: for now we do not propagate the error code to MediaCodec as we would need
-        // to translate to a MediaCodec error.
+        // Note: for now we do not propagate the error code to MediaCodec
+        // except for C2_NO_MEMORY, as we would need to translate to a MediaCodec error.
         sp<CCodec> codec(mCodec.promote());
         if (!codec || !codec->mCallback) {
             return;
         }
-        codec->mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+        codec->mCallback->onError(
+                errorCode == C2_NO_MEMORY ? NO_MEMORY : UNKNOWN_ERROR,
+                ACTION_CODE_FATAL);
     }
 
     virtual void onDeath(
