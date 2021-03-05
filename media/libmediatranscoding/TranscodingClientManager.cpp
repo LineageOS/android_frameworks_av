@@ -162,8 +162,8 @@ Status TranscodingClientManager::ClientImpl::submitRequest(
 
     int32_t sessionId = mNextSessionId.fetch_add(1);
 
-    *_aidl_return = owner->mSessionController->submit(mClientId, sessionId, in_clientUid,
-                                                      in_request, mClientCallback);
+    *_aidl_return = owner->mSessionController->submit(mClientId, sessionId, callingUid,
+                                                      in_clientUid, in_request, mClientCallback);
 
     if (*_aidl_return) {
         out_session->sessionId = sessionId;

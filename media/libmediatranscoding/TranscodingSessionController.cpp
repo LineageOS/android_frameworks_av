@@ -372,10 +372,12 @@ void TranscodingSessionController::updateCurrentSession_l() {
         if (shouldBeRunning) {
             if (topSession->getState() == Session::NOT_STARTED) {
                 mTranscoder->start(topSession->key.first, topSession->key.second,
-                                   topSession->request, topSession->callback.lock());
+                                   topSession->request, topSession->callingUid,
+                                   topSession->callback.lock());
             } else if (topSession->getState() == Session::PAUSED) {
                 mTranscoder->resume(topSession->key.first, topSession->key.second,
-                                    topSession->request, topSession->callback.lock());
+                                    topSession->request, topSession->callingUid,
+                                    topSession->callback.lock());
             }
             setSessionState_l(topSession, Session::RUNNING);
         }
@@ -393,7 +395,7 @@ void TranscodingSessionController::removeSession_l(const SessionKeyType& session
     }
 
     // Remove session from uid's queue.
-    const uid_t uid = mSessionMap[sessionKey].uid;
+    const uid_t uid = mSessionMap[sessionKey].clientUid;
     SessionQueueType& sessionQueue = mSessionQueues[uid];
     auto it = std::find(sessionQueue.begin(), sessionQueue.end(), sessionKey);
     if (it == sessionQueue.end()) {
@@ -482,13 +484,13 @@ void TranscodingSessionController::moveUidsToTop_l(const std::unordered_set<uid_
 }
 
 bool TranscodingSessionController::submit(
-        ClientIdType clientId, SessionIdType sessionId, uid_t uid,
+        ClientIdType clientId, SessionIdType sessionId, uid_t callingUid, uid_t clientUid,
         const TranscodingRequestParcel& request,
         const std::weak_ptr<ITranscodingClientCallback>& callback) {
     SessionKeyType sessionKey = std::make_pair(clientId, sessionId);
 
     ALOGV("%s: session %s, uid %d, prioirty %d", __FUNCTION__, sessionToString(sessionKey).c_str(),
-          uid, (int32_t)request.priority);
+          clientUid, (int32_t)request.priority);
 
     std::scoped_lock lock{mLock};
 
@@ -498,19 +500,20 @@ bool TranscodingSessionController::submit(
     }
 
     // Add the uid package name to the store of package names we already know.
-    if (mUidPackageNames.count(uid) == 0) {
-        mUidPackageNames.emplace(uid, request.clientPackageName);
+    if (mUidPackageNames.count(clientUid) == 0) {
+        mUidPackageNames.emplace(clientUid, request.clientPackageName);
     }
 
     // TODO(chz): only support offline vs real-time for now. All kUnspecified sessions
     // go to offline queue.
     if (request.priority == TranscodingSessionPriority::kUnspecified) {
-        uid = OFFLINE_UID;
+        clientUid = OFFLINE_UID;
     }
 
     // Add session to session map.
     mSessionMap[sessionKey].key = sessionKey;
-    mSessionMap[sessionKey].uid = uid;
+    mSessionMap[sessionKey].clientUid = clientUid;
+    mSessionMap[sessionKey].callingUid = callingUid;
     mSessionMap[sessionKey].lastProgress = 0;
     mSessionMap[sessionKey].pauseCount = 0;
     mSessionMap[sessionKey].request = request;
@@ -520,25 +523,25 @@ bool TranscodingSessionController::submit(
     // If it's an offline session, the queue was already added in constructor.
     // If it's a real-time sessions, check if a queue is already present for the uid,
     // and add a new queue if needed.
-    if (uid != OFFLINE_UID) {
-        if (mSessionQueues.count(uid) == 0) {
-            mUidPolicy->registerMonitorUid(uid);
-            if (mUidPolicy->isUidOnTop(uid)) {
-                mUidSortedList.push_front(uid);
+    if (clientUid != OFFLINE_UID) {
+        if (mSessionQueues.count(clientUid) == 0) {
+            mUidPolicy->registerMonitorUid(clientUid);
+            if (mUidPolicy->isUidOnTop(clientUid)) {
+                mUidSortedList.push_front(clientUid);
             } else {
                 // Shouldn't be submitting real-time requests from non-top app,
                 // put it in front of the offline queue.
-                mUidSortedList.insert(mOfflineUidIterator, uid);
+                mUidSortedList.insert(mOfflineUidIterator, clientUid);
             }
-        } else if (uid != *mUidSortedList.begin()) {
-            if (mUidPolicy->isUidOnTop(uid)) {
-                mUidSortedList.remove(uid);
-                mUidSortedList.push_front(uid);
+        } else if (clientUid != *mUidSortedList.begin()) {
+            if (mUidPolicy->isUidOnTop(clientUid)) {
+                mUidSortedList.remove(clientUid);
+                mUidSortedList.push_front(clientUid);
             }
         }
     }
     // Append this session to the uid's queue.
-    mSessionQueues[uid].push_back(sessionKey);
+    mSessionQueues[clientUid].push_back(sessionKey);
 
     updateCurrentSession_l();
 
@@ -557,7 +560,7 @@ bool TranscodingSessionController::cancel(ClientIdType clientId, SessionIdType s
 
     if (sessionId < 0) {
         for (auto it = mSessionMap.begin(); it != mSessionMap.end(); ++it) {
-            if (it->first.first == clientId && it->second.uid != OFFLINE_UID) {
+            if (it->first.first == clientId && it->second.clientUid != OFFLINE_UID) {
                 sessionsToRemove.push_back(it->first);
             }
         }
