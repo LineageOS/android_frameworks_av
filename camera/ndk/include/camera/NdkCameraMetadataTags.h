@@ -3868,6 +3868,35 @@ typedef enum acamera_metadata_tag {
      */
     ACAMERA_SCALER_DEFAULT_SECURE_IMAGE_SIZE =                  // int32[2]
             ACAMERA_SCALER_START + 18,
+    /**
+     * <p>The available multi-resolution stream configurations that this
+     * physical camera device supports
+     * (i.e. format, width, height, output/input stream).</p>
+     *
+     * <p>Type: int32[n*4] (acamera_metadata_enum_android_scaler_physical_camera_multi_resolution_stream_configurations_t)</p>
+     *
+     * <p>This tag may appear in:
+     * <ul>
+     *   <li>ACameraMetadata from ACameraManager_getCameraCharacteristics</li>
+     * </ul></p>
+     *
+     * <p>This list contains a subset of the parent logical camera's multi-resolution stream
+     * configurations which belong to this physical camera, and it will advertise and will only
+     * advertise the maximum supported resolutions for a particular format.</p>
+     * <p>If this camera device isn't a physical camera device constituting a logical camera,
+     * but a standalone ULTRA_HIGH_RESOLUTION_SENSOR camera, this field represents the
+     * multi-resolution input/output stream configurations of default mode and max resolution
+     * modes. The sizes will be the maximum resolution of a particular format for default mode
+     * and max resolution mode.</p>
+     * <p>This field will only be advertised if the device is a physical camera of a
+     * logical multi-camera device or an ultra high resolution sensor camera. For a logical
+     * multi-camera, the camera API will derive the logical camera’s multi-resolution stream
+     * configurations from all physical cameras. For an ultra high resolution sensor camera, this
+     * is used directly as the camera’s multi-resolution stream configurations.</p>
+     */
+    ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS = 
+                                                                // int32[n*4] (acamera_metadata_enum_android_scaler_physical_camera_multi_resolution_stream_configurations_t)
+            ACAMERA_SCALER_START + 19,
     ACAMERA_SCALER_END,
 
     /**
@@ -8474,6 +8503,16 @@ typedef enum acamera_metadata_enum_acamera_scaler_rotate_and_crop {
     ACAMERA_SCALER_ROTATE_AND_CROP_AUTO                              = 4,
 
 } acamera_metadata_enum_android_scaler_rotate_and_crop_t;
+
+// ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS
+typedef enum acamera_metadata_enum_acamera_scaler_physical_camera_multi_resolution_stream_configurations {
+    ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS_OUTPUT
+                                                                      = 0,
+
+    ACAMERA_SCALER_PHYSICAL_CAMERA_MULTI_RESOLUTION_STREAM_CONFIGURATIONS_INPUT
+                                                                      = 1,
+
+} acamera_metadata_enum_android_scaler_physical_camera_multi_resolution_stream_configurations_t;
 
 
 // ACAMERA_SENSOR_REFERENCE_ILLUMINANT1
