@@ -114,7 +114,7 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
      * Set the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL) {
-        *phInstance = new LVREV_Instance_st;
+        *phInstance = new LVREV_Instance_st{};
     }
     pLVREV_Private = (LVREV_Instance_st*)*phInstance;
     pLVREV_Private->MemoryTable = *pMemoryTable;
