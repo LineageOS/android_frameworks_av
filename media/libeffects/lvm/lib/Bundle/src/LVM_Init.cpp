@@ -93,7 +93,7 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t* phInstance, LVM_InstPara
     /*
      * Create the instance handle
      */
-    *phInstance = new LVM_Instance_t;
+    *phInstance = new LVM_Instance_t{};
     pInstance = (LVM_Instance_t*)*phInstance;
 
     pInstance->InstParams = *pInstParams;
