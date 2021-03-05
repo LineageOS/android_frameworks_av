@@ -119,6 +119,11 @@ static const char *kCodecQueueInputBufferError = "android.media.mediacodec.queue
 static const char *kCodecNumLowLatencyModeOn = "android.media.mediacodec.low-latency.on";  /* 0..n */
 static const char *kCodecNumLowLatencyModeOff = "android.media.mediacodec.low-latency.off";  /* 0..n */
 static const char *kCodecFirstFrameIndexLowLatencyModeOn = "android.media.mediacodec.low-latency.first-frame";  /* 0..n */
+static const char *kCodecChannelCount = "android.media.mediacodec.channelCount";
+static const char *kCodecSampleRate = "android.media.mediacodec.sampleRate";
+static const char *kCodecVideoEncodedBytes = "android.media.mediacodec.vencode.bytes";
+static const char *kCodecVideoEncodedFrames = "android.media.mediacodec.vencode.frames";
+static const char *kCodecVideoEncodedDurationUs = "android.media.mediacodec.vencode.durationUs";
 
 // the kCodecRecent* fields appear only in getMetrics() results
 static const char *kCodecRecentLatencyMax = "android.media.mediacodec.recent.max";      /* in us */
@@ -696,6 +701,10 @@ MediaCodec::MediaCodec(
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
       mLatencyUnknown(0),
+      mBytesEncoded(0),
+      mEarliestEncodedPtsUs(INT64_MAX),
+      mLatestEncodedPtsUs(INT64_MIN),
+      mFramesEncoded(0),
       mNumLowLatencyEnables(0),
       mNumLowLatencyDisables(0),
       mIsLowLatencyModeOn(false),
@@ -801,6 +810,18 @@ void MediaCodec::updateMediametrics() {
         nsecs_t lifetime = systemTime(SYSTEM_TIME_MONOTONIC) - mLifetimeStartNs;
         lifetime = lifetime / (1000 * 1000);    // emitted in ms, truncated not rounded
         mediametrics_setInt64(mMetricsHandle, kCodecLifetimeMs, lifetime);
+    }
+
+    if (mBytesEncoded) {
+        Mutex::Autolock al(mOutputStatsLock);
+
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoEncodedBytes, mBytesEncoded);
+        int64_t duration = 0;
+        if (mLatestEncodedPtsUs > mEarliestEncodedPtsUs) {
+            duration = mLatestEncodedPtsUs - mEarliestEncodedPtsUs;
+        }
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoEncodedDurationUs, duration);
+        mediametrics_setInt64(mMetricsHandle, kCodecVideoEncodedFrames, mFramesEncoded);
     }
 
     {
@@ -1006,9 +1027,33 @@ void MediaCodec::statsBufferSent(int64_t presentationUs) {
 }
 
 // when we get a buffer back from the codec
-void MediaCodec::statsBufferReceived(int64_t presentationUs) {
+void MediaCodec::statsBufferReceived(int64_t presentationUs, const sp<MediaCodecBuffer> &buffer) {
 
     CHECK_NE(mState, UNINITIALIZED);
+
+    if (mIsVideo && (mFlags & kFlagIsEncoder)) {
+        int32_t flags = 0;
+        (void) buffer->meta()->findInt32("flags", &flags);
+
+        // some of these frames, we don't want to count
+        // standalone EOS.... has an invalid timestamp
+        if ((flags & (BUFFER_FLAG_CODECCONFIG|BUFFER_FLAG_EOS)) == 0) {
+            mBytesEncoded += buffer->size();
+            mFramesEncoded++;
+
+            Mutex::Autolock al(mOutputStatsLock);
+            int64_t timeUs = 0;
+            if (buffer->meta()->findInt64("timeUs", &timeUs)) {
+                if (timeUs > mLatestEncodedPtsUs) {
+                    mLatestEncodedPtsUs = timeUs;
+                }
+                // can't chain as an else-if or this never triggers
+                if (timeUs < mEarliestEncodedPtsUs) {
+                    mEarliestEncodedPtsUs = timeUs;
+                }
+            }
+        }
+    }
 
     // mutex access to mBuffersInFlight and other stats
     Mutex::Autolock al(mLatencyLock);
@@ -1065,7 +1110,7 @@ void MediaCodec::statsBufferReceived(int64_t presentationUs) {
         return;
     }
 
-    // nowNs start our calculations
+    // now start our calculations
     const int64_t nowNs = systemTime(SYSTEM_TIME_MONOTONIC);
     int64_t latencyUs = (nowNs - startdata.startedNs + 500) / 1000;
 
@@ -1340,6 +1385,17 @@ status_t MediaCodec::configure(
                (uint64_t)mVideoWidth * mVideoHeight > (uint64_t)INT32_MAX / 4) {
             ALOGE("Invalid size(s), width=%d, height=%d", mVideoWidth, mVideoHeight);
             return BAD_VALUE;
+        }
+    } else {
+        if (mMetricsHandle != 0) {
+            int32_t channelCount;
+            if (format->findInt32(KEY_CHANNEL_COUNT, &channelCount)) {
+                mediametrics_setInt32(mMetricsHandle, kCodecChannelCount, channelCount);
+            }
+            int32_t sampleRate;
+            if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
+                mediametrics_setInt32(mMetricsHandle, kCodecSampleRate, sampleRate);
+            }
         }
     }
 
@@ -2187,14 +2243,15 @@ bool MediaCodec::handleDequeueOutputBuffer(const sp<AReplyToken> &replyID, bool 
         int64_t timeUs;
         CHECK(buffer->meta()->findInt64("timeUs", &timeUs));
 
-        statsBufferReceived(timeUs);
-
         response->setInt64("timeUs", timeUs);
 
         int32_t flags;
         CHECK(buffer->meta()->findInt32("flags", &flags));
 
         response->setInt32("flags", flags);
+
+        statsBufferReceived(timeUs, buffer);
+
         response->postReply(replyID);
     }
 
@@ -4341,12 +4398,12 @@ void MediaCodec::onOutputBufferAvailable() {
 
         msg->setInt64("timeUs", timeUs);
 
-        statsBufferReceived(timeUs);
-
         int32_t flags;
         CHECK(buffer->meta()->findInt32("flags", &flags));
 
         msg->setInt32("flags", flags);
+
+        statsBufferReceived(timeUs, buffer);
 
         msg->post();
     }
