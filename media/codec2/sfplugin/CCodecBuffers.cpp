@@ -331,7 +331,7 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
     *c2Buffer = entry.buffer;
     sp<AMessage> outputFormat = entry.format;
 
-    if (entry.notify && mFormat != outputFormat) {
+    if (entry.notify && outputFormat && mFormat != outputFormat) {
         updateSkipCutBuffer(outputFormat);
         // Trigger image data processing to the new format
         mLastImageData.clear();
