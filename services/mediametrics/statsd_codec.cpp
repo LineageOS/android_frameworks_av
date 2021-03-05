@@ -186,6 +186,16 @@ bool statsd_codec(const mediametrics::Item *item)
         metrics_proto.set_lifetime_millis(lifetimeMs);
     }
 
+    // new for S; need to plumb through to westworld
+    // android.media.mediacodec.channelCount int32
+    // android.media.mediacodec.sampleRate int32
+
+    // new for S; need to plumb through to westworld
+    // TODO PWG may want these fuzzed up a bit to obscure some precision
+    // android.media.mediacodec.vencode.bytes int64
+    // android.media.mediacodec.vencode.frames int64
+    // android.media.mediacodec.vencode.durationUs int64
+
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize codec metrics");
