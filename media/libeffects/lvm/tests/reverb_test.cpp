@@ -312,9 +312,6 @@ int main(int argc, const char* argv[]) {
     config.inputCfg.samplingRate = config.outputCfg.samplingRate = revConfigParams.sampleRate;
     config.inputCfg.channels = config.outputCfg.channels = revConfigParams.chMask;
     config.inputCfg.format = config.outputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
-    if (AUDIO_CHANNEL_OUT_MONO == revConfigParams.chMask) {
-        config.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
-    }
     if (int status = reverbCreateEffect(&effectHandle, &config, sessionId, ioId,
                                         revConfigParams.auxiliary);
         status != 0) {
@@ -346,19 +343,11 @@ int main(int argc, const char* argv[]) {
     const int ioChannelCount = revConfigParams.fChannels;
     const int ioFrameSize = ioChannelCount * sizeof(short);
     const int maxChannelCount = std::max(channelCount, ioChannelCount);
-    /*
-     * Mono input will be converted to 2 channels internally in the process call
-     * by copying the same data into the second channel.
-     * Hence when channelCount is 1, output buffer should be allocated for
-     * 2 channels. The outChannelCount takes care of allocation of sufficient
-     * memory for the output buffer.
-     */
-    const int outChannelCount = (channelCount == 1 ? 2 : channelCount);
 
     std::vector<short> in(frameLength * maxChannelCount);
-    std::vector<short> out(frameLength * outChannelCount);
+    std::vector<short> out(frameLength * maxChannelCount);
     std::vector<float> floatIn(frameLength * channelCount);
-    std::vector<float> floatOut(frameLength * outChannelCount);
+    std::vector<float> floatOut(frameLength * channelCount);
 
     int frameCounter = 0;
 
@@ -392,11 +381,11 @@ int main(int argc, const char* argv[]) {
 #else
         memcpy(floatOut.data(), floatIn.data(), frameLength * frameSize);
 #endif
-        memcpy_to_i16_from_float(out.data(), floatOut.data(), frameLength * outChannelCount);
+        memcpy_to_i16_from_float(out.data(), floatOut.data(), frameLength * channelCount);
 
-        if (ioChannelCount != outChannelCount) {
-            adjust_channels(out.data(), outChannelCount, out.data(), ioChannelCount, sizeof(short),
-                            frameLength * outChannelCount * sizeof(short));
+        if (ioChannelCount != channelCount) {
+            adjust_channels(out.data(), channelCount, out.data(), ioChannelCount, sizeof(short),
+                            frameLength * channelCount * sizeof(short));
         }
         (void)fwrite(out.data(), ioFrameSize, frameLength, outputFp.get());
         frameCounter += frameLength;
