@@ -32,3 +32,7 @@ adb shell /data/nativetest/AdjustableMaxPriorityQueue_tests/AdjustableMaxPriorit
 echo "testing TranscodingSessionController"
 #adb shell /data/nativetest64/TranscodingSessionController_tests/TranscodingSessionController_tests
 adb shell /data/nativetest/TranscodingSessionController_tests/TranscodingSessionController_tests
+
+echo "testing TranscodingLogger"
+#adb shell /data/nativetest64/TranscodingLogger_tests/TranscodingLogger_tests
+adb shell /data/nativetest/TranscodingLogger_tests/TranscodingLogger_tests
