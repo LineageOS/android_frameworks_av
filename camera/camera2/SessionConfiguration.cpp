@@ -55,6 +55,12 @@ status_t SessionConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    bool inputIsMultiResolution = false;
+    if ((err = parcel->readBool(&inputIsMultiResolution)) != OK) {
+        ALOGE("%s: Failed to read input multi-resolution flag from parcel", __FUNCTION__);
+        return err;
+    }
+
     std::vector<OutputConfiguration> outputStreams;
     if ((err = parcel->readParcelableVector(&outputStreams)) != OK) {
         ALOGE("%s: Failed to read output configurations from parcel", __FUNCTION__);
@@ -65,6 +71,7 @@ status_t SessionConfiguration::readFromParcel(const android::Parcel* parcel) {
     mInputWidth = inputWidth;
     mInputHeight = inputHeight;
     mInputFormat = inputFormat;
+    mInputIsMultiResolution = inputIsMultiResolution;
     for (auto& stream : outputStreams) {
         mOutputStreams.push_back(stream);
     }
@@ -88,6 +95,9 @@ status_t SessionConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeInt32(mInputFormat);
+    if (err != OK) return err;
+
+    err = parcel->writeBool(mInputIsMultiResolution);
     if (err != OK) return err;
 
     err = parcel->writeParcelableVector(mOutputStreams);

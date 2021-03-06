@@ -46,6 +46,7 @@ namespace camera3 {
         uint32_t num_streams;
         camera_stream_t **streams;
         uint32_t operation_mode;
+        bool input_is_multi_resolution;
     } camera_stream_configuration_t;
 
     typedef struct camera_capture_request {
@@ -57,6 +58,8 @@ namespace camera3 {
         uint32_t num_physcam_settings;
         const char **physcam_id;
         const camera_metadata_t **physcam_settings;
+        int32_t input_width;
+        int32_t input_height;
     } camera_capture_request_t;
 
     typedef struct camera_capture_result {

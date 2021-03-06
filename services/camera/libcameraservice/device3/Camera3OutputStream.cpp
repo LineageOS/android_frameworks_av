@@ -44,10 +44,10 @@ Camera3OutputStream::Camera3OutputStream(int id,
         uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
         nsecs_t timestampOffset, const String8& physicalCameraId,
-        int setId) :
+        int setId, bool isMultiResolution) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
-                            physicalCameraId, setId),
+                            physicalCameraId, setId, isMultiResolution),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -70,9 +70,11 @@ Camera3OutputStream::Camera3OutputStream(int id,
         sp<Surface> consumer,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
-        nsecs_t timestampOffset, const String8& physicalCameraId, int setId) :
+        nsecs_t timestampOffset, const String8& physicalCameraId, int setId,
+        bool isMultiResolution) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height, maxSize,
-                            format, dataSpace, rotation, physicalCameraId, setId),
+                            format, dataSpace, rotation, physicalCameraId, setId,
+                            isMultiResolution),
         mConsumer(consumer),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -102,10 +104,10 @@ Camera3OutputStream::Camera3OutputStream(int id,
         uint32_t width, uint32_t height, int format,
         uint64_t consumerUsage, android_dataspace dataSpace,
         camera_stream_rotation_t rotation, nsecs_t timestampOffset,
-        const String8& physicalCameraId, int setId) :
+        const String8& physicalCameraId, int setId, bool isMultiResolution) :
         Camera3IOStreamBase(id, CAMERA_STREAM_OUTPUT, width, height,
                             /*maxSize*/0, format, dataSpace, rotation,
-                            physicalCameraId, setId),
+                            physicalCameraId, setId, isMultiResolution),
         mConsumer(nullptr),
         mTransform(0),
         mTraceFirstBuffer(true),
@@ -141,11 +143,11 @@ Camera3OutputStream::Camera3OutputStream(int id, camera_stream_type_t type,
                                          camera_stream_rotation_t rotation,
                                          const String8& physicalCameraId,
                                          uint64_t consumerUsage, nsecs_t timestampOffset,
-                                         int setId) :
+                                         int setId, bool isMultiResolution) :
         Camera3IOStreamBase(id, type, width, height,
                             /*maxSize*/0,
                             format, dataSpace, rotation,
-                            physicalCameraId, setId),
+                            physicalCameraId, setId, isMultiResolution),
         mTransform(0),
         mTraceFirstBuffer(true),
         mUseMonoTimestamp(false),
@@ -570,10 +572,12 @@ status_t Camera3OutputStream::configureConsumerQueueLocked() {
             !(isConsumedByHWComposer() || isConsumedByHWTexture())) {
         uint64_t consumerUsage = 0;
         getEndpointUsage(&consumerUsage);
+        uint32_t width = (mMaxSize == 0) ? getWidth() : mMaxSize;
+        uint32_t height = (mMaxSize == 0) ? getHeight() : 1;
         StreamInfo streamInfo(
-                getId(), getStreamSetId(), getWidth(), getHeight(), getFormat(), getDataSpace(),
+                getId(), getStreamSetId(), width, height, getFormat(), getDataSpace(),
                 mUsage | consumerUsage, mTotalBufferCount,
-                /*isConfigured*/true);
+                /*isConfigured*/true, isMultiResolution());
         wp<Camera3OutputStream> weakThis(this);
         res = mBufferManager->registerStream(weakThis,
                 streamInfo);
@@ -604,7 +608,8 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
 
     if (mUseBufferManager) {
         sp<GraphicBuffer> gb;
-        res = mBufferManager->getBufferForStream(getId(), getStreamSetId(), &gb, fenceFd);
+        res = mBufferManager->getBufferForStream(getId(), getStreamSetId(),
+                isMultiResolution(), &gb, fenceFd);
         if (res == OK) {
             // Attach this buffer to the bufferQueue: the buffer will be in dequeue state after a
             // successful return.
@@ -693,7 +698,8 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
 
             sp<GraphicBuffer> gb;
             res = mBufferManager->getBufferForStream(
-                    getId(), getStreamSetId(), &gb, fenceFd, /*noFreeBuffer*/true);
+                    getId(), getStreamSetId(), isMultiResolution(),
+                    &gb, fenceFd, /*noFreeBuffer*/true);
 
             if (res == OK) {
                 // Attach this buffer to the bufferQueue: the buffer will be in dequeue state after
@@ -740,7 +746,8 @@ void Camera3OutputStream::checkRemovedBuffersLocked(bool notifyBufferManager) {
         onBuffersRemovedLocked(removedBuffers);
 
         if (notifyBufferManager && mUseBufferManager && removedBuffers.size() > 0) {
-            mBufferManager->onBuffersRemoved(getId(), getStreamSetId(), removedBuffers.size());
+            mBufferManager->onBuffersRemoved(getId(), getStreamSetId(), isMultiResolution(),
+                    removedBuffers.size());
         }
     }
 }
@@ -802,7 +809,7 @@ status_t Camera3OutputStream::disconnectLocked() {
     // Since device is already idle, there is no getBuffer call to buffer manager, unregister the
     // stream at this point should be safe.
     if (mUseBufferManager) {
-        res = mBufferManager->unregisterStream(getId(), getStreamSetId());
+        res = mBufferManager->unregisterStream(getId(), getStreamSetId(), isMultiResolution());
         if (res != OK) {
             ALOGE("%s: Unable to unregister stream %d from buffer manager "
                     "(error %d %s)", __FUNCTION__, mId, res, strerror(-res));
@@ -914,7 +921,8 @@ void Camera3OutputStream::BufferProducerListener::onBufferReleased() {
     ALOGV("Stream %d: Buffer released", stream->getId());
     bool shouldFreeBuffer = false;
     status_t res = stream->mBufferManager->onBufferReleased(
-        stream->getId(), stream->getStreamSetId(), &shouldFreeBuffer);
+        stream->getId(), stream->getStreamSetId(), stream->isMultiResolution(),
+        &shouldFreeBuffer);
     if (res != OK) {
         ALOGE("%s: signaling buffer release to buffer manager failed: %s (%d).", __FUNCTION__,
                 strerror(-res), res);
@@ -927,7 +935,7 @@ void Camera3OutputStream::BufferProducerListener::onBufferReleased() {
         stream->detachBufferLocked(&buffer, /*fenceFd*/ nullptr);
         if (buffer.get() != nullptr) {
             stream->mBufferManager->notifyBufferRemoved(
-                    stream->getId(), stream->getStreamSetId());
+                    stream->getId(), stream->getStreamSetId(), stream->isMultiResolution());
         }
     }
 }
@@ -945,7 +953,7 @@ void Camera3OutputStream::BufferProducerListener::onBuffersDiscarded(
         stream->onBuffersRemovedLocked(buffers);
         if (stream->mUseBufferManager) {
             stream->mBufferManager->onBuffersRemoved(stream->getId(),
-                    stream->getStreamSetId(), buffers.size());
+                    stream->getStreamSetId(), stream->isMultiResolution(), buffers.size());
         }
         ALOGV("Stream %d: %zu Buffers discarded.", stream->getId(), buffers.size());
     }

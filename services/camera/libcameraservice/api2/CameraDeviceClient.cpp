@@ -584,7 +584,7 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
         ALOGE("%s: %s", __FUNCTION__, msg.string());
         return STATUS_ERROR(CameraService::ERROR_ILLEGAL_ARGUMENT, msg.string());
     }
-    hardware::camera::device::V3_4::StreamConfiguration streamConfiguration;
+    hardware::camera::device::V3_7::StreamConfiguration streamConfiguration;
     bool earlyExit = false;
     metadataGetter getMetadata = [this](const String8 &id) {return mDevice->infoPhysical(id);};
     std::vector<std::string> physicalCameraIds;
@@ -738,6 +738,7 @@ binder::Status CameraDeviceClient::createStream(
     bool isShared = outputConfiguration.isShared();
     String8 physicalCameraId = String8(outputConfiguration.getPhysicalCameraId());
     bool deferredConsumerOnly = deferredConsumer && numBufferProducers == 0;
+    bool isMultiResolution = outputConfiguration.isMultiResolution();
 
     res = SessionConfigurationUtils::checkSurfaceType(numBufferProducers, deferredConsumer,
             outputConfiguration.getSurfaceType());
@@ -809,7 +810,7 @@ binder::Status CameraDeviceClient::createStream(
                 streamInfo.height, streamInfo.format,
                 static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
-                isShared);
+                isShared, isMultiResolution);
         if (err == OK) {
             mCompositeStreamMap.add(IInterface::asBinder(surfaces[0]->getIGraphicBufferProducer()),
                     compositeStream);
@@ -819,7 +820,7 @@ binder::Status CameraDeviceClient::createStream(
                 streamInfo.height, streamInfo.format, streamInfo.dataSpace,
                 static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
                 &streamId, physicalCameraId, &surfaceIds, outputConfiguration.getSurfaceSetID(),
-                isShared);
+                isShared, isMultiResolution);
     }
 
     if (err != OK) {
@@ -888,7 +889,7 @@ binder::Status CameraDeviceClient::createDeferredSurfaceStreamLocked(
             static_cast<camera_stream_rotation_t>(outputConfiguration.getRotation()),
             &streamId, physicalCameraId, &surfaceIds,
             outputConfiguration.getSurfaceSetID(), isShared,
-            consumerUsage);
+            outputConfiguration.isMultiResolution(), consumerUsage);
 
     if (err != OK) {
         res = STATUS_ERROR_FMT(CameraService::ERROR_INVALID_OPERATION,
@@ -943,12 +944,13 @@ binder::Status CameraDeviceClient::setStreamTransformLocked(int streamId) {
 }
 
 binder::Status CameraDeviceClient::createInputStream(
-        int width, int height, int format,
+        int width, int height, int format, bool isMultiResolution,
         /*out*/
         int32_t* newStreamId) {
 
     ATRACE_CALL();
-    ALOGV("%s (w = %d, h = %d, f = 0x%x)", __FUNCTION__, width, height, format);
+    ALOGV("%s (w = %d, h = %d, f = 0x%x, isMultiResolution %d)", __FUNCTION__,
+            width, height, format, isMultiResolution);
 
     binder::Status res;
     if (!(res = checkPidStatus(__FUNCTION__)).isOk()) return res;
@@ -967,7 +969,7 @@ binder::Status CameraDeviceClient::createInputStream(
     }
 
     int streamId = -1;
-    status_t err = mDevice->createInputStream(width, height, format, &streamId);
+    status_t err = mDevice->createInputStream(width, height, format, isMultiResolution, &streamId);
     if (err == OK) {
         mInputStream.configured = true;
         mInputStream.width = width;
