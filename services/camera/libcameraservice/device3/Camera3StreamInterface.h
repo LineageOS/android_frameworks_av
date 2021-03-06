@@ -72,6 +72,12 @@ typedef struct camera_stream_buffer {
     int release_fence;
 } camera_stream_buffer_t;
 
+struct Size {
+    uint32_t width;
+    uint32_t height;
+    explicit Size(uint32_t w = 0, uint32_t h = 0) : width(w), height(h){}
+};
+
 enum {
     /**
      * This stream set ID indicates that the set ID is invalid, and this stream doesn't intend to
@@ -352,7 +358,8 @@ class Camera3StreamInterface : public virtual RefBase {
      * Normally this call will block until the handed out buffer count is less than the stream
      * max buffer count; if respectHalLimit is set to false, this is ignored.
      */
-    virtual status_t getInputBuffer(camera_stream_buffer *buffer, bool respectHalLimit = true) = 0;
+    virtual status_t getInputBuffer(camera_stream_buffer *buffer,
+            Size *size, bool respectHalLimit = true) = 0;
 
     /**
      * Return a buffer to the stream after use by the HAL.

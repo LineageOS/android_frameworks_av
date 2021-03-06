@@ -21,7 +21,7 @@
 #include <camera/camera2/OutputConfiguration.h>
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
-#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.7/types.h>
 
 #include <device3/Camera3StreamInterface.h>
 
@@ -53,8 +53,8 @@ public:
         const String8 &cameraId, const CameraMetadata &physicalCameraMetadata);
 
     static void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
-            camera3::camera_stream_rotation_t rotation, String8 physicalId,
-            hardware::camera::device::V3_4::Stream *stream /*out*/);
+            camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
+            hardware::camera::device::V3_7::Stream *stream /*out*/);
 
     // Check that the physicalCameraId passed in is spported by the camera
     // device.
@@ -76,8 +76,15 @@ public:
     convertToHALStreamCombination(const SessionConfiguration& sessionConfiguration,
             const String8 &cameraId, const CameraMetadata &deviceInfo,
             metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-            hardware::camera::device::V3_4::StreamConfiguration &streamConfiguration,
+            hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
             bool *earlyExit);
+
+    // Utility function to convert a V3_7::StreamConfiguration to
+    // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
+    // be used by older version HAL.
+    static bool convertHALStreamCombinationFromV37ToV34(
+            hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
+            const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37);
 
     static const int32_t MAX_SURFACES_PER_STREAM = 4;
 
