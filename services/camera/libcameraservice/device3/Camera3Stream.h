@@ -147,6 +147,14 @@ class Camera3Stream :
      * Get the output stream set id.
      */
     int              getStreamSetId() const;
+    /**
+     * Is this stream part of a multi-resolution stream set
+     */
+    bool             isMultiResolution() const;
+    /**
+     * Get the HAL stream group id for a multi-resolution stream set
+     */
+    int              getHalStreamGroupId() const;
 
     /**
      * Get the stream's dimensions and format
@@ -356,10 +364,13 @@ class Camera3Stream :
      * For bidirectional streams, this method applies to the input-side
      * buffers.
      *
+     * This method also returns the size of the returned input buffer.
+     *
      * Normally this call will block until the handed out buffer count is less than the stream
      * max buffer count; if respectHalLimit is set to false, this is ignored.
      */
-    status_t         getInputBuffer(camera_stream_buffer *buffer, bool respectHalLimit = true);
+    status_t         getInputBuffer(camera_stream_buffer *buffer,
+                             Size* size, bool respectHalLimit = true);
 
     /**
      * Return a buffer to the stream after use by the HAL.
@@ -487,7 +498,7 @@ class Camera3Stream :
     Camera3Stream(int id, camera_stream_type type,
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
-            const String8& physicalCameraId, int setId);
+            const String8& physicalCameraId, int setId, bool isMultiResolution);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 
@@ -509,7 +520,7 @@ class Camera3Stream :
 
     virtual status_t getBuffersLocked(std::vector<OutstandingBuffer>*);
 
-    virtual status_t getInputBufferLocked(camera_stream_buffer *buffer);
+    virtual status_t getInputBufferLocked(camera_stream_buffer *buffer, Size* size);
 
     virtual status_t returnInputBufferLocked(
             const camera_stream_buffer &buffer);
@@ -608,6 +619,7 @@ class Camera3Stream :
     String8 mPhysicalCameraId;
     nsecs_t mLastTimestamp;
 
+    bool mIsMultiResolution = false;
     bool mSupportOfflineProcessing = false;
 }; // class Camera3Stream
 

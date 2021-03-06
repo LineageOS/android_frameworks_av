@@ -20,7 +20,7 @@
 
 #include "CameraProviderManager.h"
 
-#include <android/hardware/camera/device/3.5/ICameraDevice.h>
+#include <android/hardware/camera/device/3.7/ICameraDevice.h>
 
 #include <algorithm>
 #include <chrono>
@@ -28,7 +28,6 @@
 #include <dlfcn.h>
 #include <future>
 #include <inttypes.h>
-#include <hardware/camera_common.h>
 #include <android/hidl/manager/1.2/IServiceManager.h>
 #include <hidl/ServiceManagement.h>
 #include <functional>
@@ -49,7 +48,7 @@ using namespace ::android::hardware::camera;
 using namespace ::android::hardware::camera::common::V1_0;
 using std::literals::chrono_literals::operator""s;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
-using hardware::camera::provider::V2_6::CameraIdAndStreamCombination;
+using hardware::camera::provider::V2_7::CameraIdAndStreamCombination;
 
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
@@ -267,7 +266,7 @@ status_t CameraProviderManager::getCameraInfo(const std::string &id,
 }
 
 status_t CameraProviderManager::isSessionConfigurationSupported(const std::string& id,
-        const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+        const hardware::camera::device::V3_7::StreamConfiguration &configuration,
         bool *status /*out*/) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     auto deviceInfo = findDeviceInfoLocked(id);
@@ -1302,6 +1301,14 @@ status_t CameraProviderManager::ProviderInfo::initialize(
                 mMinorVersion = 5;
             }
         }
+    } else {
+        auto cast2_7 = provider::V2_7::ICameraProvider::castFrom(interface);
+        if (cast2_7.isOk()) {
+            sp<provider::V2_7::ICameraProvider> interface2_7 = cast2_7;
+            if (interface2_7 != nullptr) {
+                mMinorVersion = 7;
+            }
+        }
     }
 
     // cameraDeviceStatusChange callbacks may be called (and causing new devices added)
@@ -1973,38 +1980,67 @@ status_t CameraProviderManager::ProviderInfo::isConcurrentSessionConfigurationSu
             // TODO: This might be some other problem
             return INVALID_OPERATION;
         }
-        auto castResult = provider::V2_6::ICameraProvider::castFrom(interface);
-        if (castResult.isOk()) {
-            sp<provider::V2_6::ICameraProvider> interface_2_6 = castResult;
-            if (interface_2_6 != nullptr) {
-                Status callStatus;
-                auto cb =
-                        [&isSupported, &callStatus](Status s, bool supported) {
-                              callStatus = s;
-                              *isSupported = supported; };
+        auto castResult2_6 = provider::V2_6::ICameraProvider::castFrom(interface);
+        auto castResult2_7 = provider::V2_7::ICameraProvider::castFrom(interface);
+        Status callStatus;
+        auto cb =
+                [&isSupported, &callStatus](Status s, bool supported) {
+                      callStatus = s;
+                      *isSupported = supported; };
 
-                auto ret =  interface_2_6->isConcurrentStreamCombinationSupported(
-                            halCameraIdsAndStreamCombinations, cb);
-                if (ret.isOk()) {
-                    switch (callStatus) {
-                        case Status::OK:
-                            // Expected case, do nothing.
-                            res = OK;
-                            break;
-                        case Status::METHOD_NOT_SUPPORTED:
-                            res = INVALID_OPERATION;
-                            break;
-                        default:
-                            ALOGE("%s: Session configuration query failed: %d", __FUNCTION__,
-                                      callStatus);
-                            res = UNKNOWN_ERROR;
-                    }
-                } else {
-                    ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.description().c_str());
-                    res = UNKNOWN_ERROR;
-                }
-                return res;
+        ::android::hardware::Return<void> ret;
+        sp<provider::V2_7::ICameraProvider> interface_2_7;
+        sp<provider::V2_6::ICameraProvider> interface_2_6;
+        if (mMinorVersion >= 7 && castResult2_7.isOk()) {
+            interface_2_7 = castResult2_7;
+            if (interface_2_7 != nullptr) {
+                ret = interface_2_7->isConcurrentStreamCombinationSupported_2_7(
+                        halCameraIdsAndStreamCombinations, cb);
             }
+        } else if (mMinorVersion == 6 && castResult2_6.isOk()) {
+            interface_2_6 = castResult2_6;
+            if (interface_2_6 != nullptr) {
+                hardware::hidl_vec<provider::V2_6::CameraIdAndStreamCombination>
+                        halCameraIdsAndStreamCombinations_2_6;
+                size_t numStreams = halCameraIdsAndStreamCombinations.size();
+                halCameraIdsAndStreamCombinations_2_6.resize(numStreams);
+                for (size_t i = 0; i < numStreams; i++) {
+                    auto const& combination = halCameraIdsAndStreamCombinations[i];
+                    halCameraIdsAndStreamCombinations_2_6[i].cameraId = combination.cameraId;
+                    bool success =
+                            SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+                            halCameraIdsAndStreamCombinations_2_6[i].streamConfiguration,
+                            combination.streamConfiguration);
+                    if (!success) {
+                        *isSupported = false;
+                        return OK;
+                    }
+                }
+                ret = interface_2_6->isConcurrentStreamCombinationSupported(
+                        halCameraIdsAndStreamCombinations_2_6, cb);
+            }
+        }
+
+        if (interface_2_7 != nullptr || interface_2_6 != nullptr) {
+            if (ret.isOk()) {
+                switch (callStatus) {
+                    case Status::OK:
+                        // Expected case, do nothing.
+                        res = OK;
+                        break;
+                    case Status::METHOD_NOT_SUPPORTED:
+                        res = INVALID_OPERATION;
+                        break;
+                    default:
+                        ALOGE("%s: Session configuration query failed: %d", __FUNCTION__,
+                                  callStatus);
+                        res = UNKNOWN_ERROR;
+                }
+            } else {
+                ALOGE("%s: Unexpected binder error: %s", __FUNCTION__, ret.description().c_str());
+                res = UNKNOWN_ERROR;
+            }
+            return res;
         }
     }
     // unsupported operation
@@ -2374,7 +2410,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getPhysicalCameraChar
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfigurationSupported(
-        const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+        const hardware::camera::device::V3_7::StreamConfiguration &configuration,
         bool *status /*out*/) {
 
     const sp<CameraProviderManager::ProviderInfo::DeviceInfo3::InterfaceT> interface =
@@ -2382,19 +2418,37 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
     if (interface == nullptr) {
         return DEAD_OBJECT;
     }
-    auto castResult = device::V3_5::ICameraDevice::castFrom(interface);
-    sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult;
-    if (interface_3_5 == nullptr) {
-        return INVALID_OPERATION;
-    }
+    auto castResult_3_5 = device::V3_5::ICameraDevice::castFrom(interface);
+    sp<hardware::camera::device::V3_5::ICameraDevice> interface_3_5 = castResult_3_5;
+    auto castResult_3_7 = device::V3_7::ICameraDevice::castFrom(interface);
+    sp<hardware::camera::device::V3_7::ICameraDevice> interface_3_7 = castResult_3_7;
 
     status_t res;
     Status callStatus;
-    auto ret =  interface_3_5->isStreamCombinationSupported(configuration,
+    ::android::hardware::Return<void> ret;
+    if (interface_3_7 != nullptr) {
+        ret = interface_3_7->isStreamCombinationSupported_3_7(configuration,
             [&callStatus, &status] (Status s, bool combStatus) {
                 callStatus = s;
                 *status = combStatus;
             });
+    } else if (interface_3_5 != nullptr) {
+        hardware::camera::device::V3_4::StreamConfiguration configuration_3_4;
+        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+                configuration_3_4, configuration);
+        if (!success) {
+            *status = false;
+            return OK;
+        }
+
+        ret = interface_3_5->isStreamCombinationSupported(configuration_3_4,
+            [&callStatus, &status] (Status s, bool combStatus) {
+                callStatus = s;
+                *status = combStatus;
+            });
+    } else {
+        return INVALID_OPERATION;
+    }
     if (ret.isOk()) {
         switch (callStatus) {
             case Status::OK:
@@ -2769,7 +2823,7 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
     bool shouldExit = false;
     status_t res = OK;
     for (auto &cameraIdAndSessionConfig : cameraIdsAndSessionConfigs) {
-        hardware::camera::device::V3_4::StreamConfiguration streamConfiguration;
+        hardware::camera::device::V3_7::StreamConfiguration streamConfiguration;
         CameraMetadata deviceInfo;
         res = getCameraCharacteristicsLocked(cameraIdAndSessionConfig.mCameraId, &deviceInfo);
         if (res != OK) {

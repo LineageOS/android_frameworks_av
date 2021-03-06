@@ -68,6 +68,10 @@ String16 OutputConfiguration::getPhysicalCameraId() const {
     return mPhysicalCameraId;
 }
 
+bool OutputConfiguration::isMultiResolution() const {
+    return mIsMultiResolution;
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
@@ -75,7 +79,8 @@ OutputConfiguration::OutputConfiguration() :
         mWidth(0),
         mHeight(0),
         mIsDeferred(false),
-        mIsShared(false) {
+        mIsShared(false),
+        mIsMultiResolution(false) {
 }
 
 OutputConfiguration::OutputConfiguration(const android::Parcel& parcel) :
@@ -145,6 +150,12 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
 
     parcel->readString16(&mPhysicalCameraId);
 
+    int isMultiResolution = 0;
+    if ((err = parcel->readInt32(&isMultiResolution)) != OK) {
+        ALOGE("%s: Failed to read surface isMultiResolution flag from parcel", __FUNCTION__);
+        return err;
+    }
+
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -152,6 +163,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     mHeight = height;
     mIsDeferred = isDeferred != 0;
     mIsShared = isShared != 0;
+    mIsMultiResolution = isMultiResolution != 0;
     for (auto& surface : surfaceShims) {
         ALOGV("%s: OutputConfiguration: %p, name %s", __FUNCTION__,
                 surface.graphicBufferProducer.get(),
@@ -160,8 +172,8 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     }
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
-          " physicalCameraId = %s", __FUNCTION__, mRotation, mSurfaceSetID,
-          mSurfaceType, String8(mPhysicalCameraId).string());
+          " physicalCameraId = %s, isMultiResolution = %d", __FUNCTION__, mRotation,
+          mSurfaceSetID, mSurfaceType, String8(mPhysicalCameraId).string(), mIsMultiResolution);
 
     return err;
 }
@@ -175,6 +187,7 @@ OutputConfiguration::OutputConfiguration(sp<IGraphicBufferProducer>& gbp, int ro
     mIsDeferred = false;
     mIsShared = isShared;
     mPhysicalCameraId = physicalId;
+    mIsMultiResolution = false;
 }
 
 OutputConfiguration::OutputConfiguration(
@@ -183,7 +196,7 @@ OutputConfiguration::OutputConfiguration(
     int width, int height, bool isShared)
   : mGbps(gbps), mRotation(rotation), mSurfaceSetID(surfaceSetID), mSurfaceType(surfaceType),
     mWidth(width), mHeight(height), mIsDeferred(false), mIsShared(isShared),
-    mPhysicalCameraId(physicalCameraId) { }
+    mPhysicalCameraId(physicalCameraId), mIsMultiResolution(false) { }
 
 status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
 
@@ -222,6 +235,9 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     if (err != OK) return err;
 
     err = parcel->writeString16(mPhysicalCameraId);
+    if (err != OK) return err;
+
+    err = parcel->writeInt32(mIsMultiResolution ? 1 : 0);
     if (err != OK) return err;
 
     return OK;
