@@ -727,6 +727,19 @@ void CCodecConfig::initializeStandardParams() {
             return C2Value();
         }));
 
+    add(ConfigMapper(KEY_VIDEO_QP_I_MAX, C2_PARAMKEY_QUANTIZATION, "i-max")
+        .limitTo(D::VIDEO & D::ENCODER));
+    add(ConfigMapper(KEY_VIDEO_QP_I_MIN, C2_PARAMKEY_QUANTIZATION, "i-min")
+        .limitTo(D::VIDEO & D::ENCODER));
+    add(ConfigMapper(KEY_VIDEO_QP_P_MAX, C2_PARAMKEY_QUANTIZATION, "p-max")
+        .limitTo(D::VIDEO & D::ENCODER));
+    add(ConfigMapper(KEY_VIDEO_QP_P_MIN, C2_PARAMKEY_QUANTIZATION, "p-min")
+        .limitTo(D::VIDEO & D::ENCODER));
+    add(ConfigMapper(KEY_VIDEO_QP_B_MAX, C2_PARAMKEY_QUANTIZATION, "b-max")
+        .limitTo(D::VIDEO & D::ENCODER));
+    add(ConfigMapper(KEY_VIDEO_QP_B_MIN, C2_PARAMKEY_QUANTIZATION, "b-min")
+        .limitTo(D::VIDEO & D::ENCODER));
+
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_DRC_TARGET_REFERENCE_LEVEL, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL, "value")
         .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))

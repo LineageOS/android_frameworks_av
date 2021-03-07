@@ -192,6 +192,7 @@ private:
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+    std::shared_ptr<C2StreamQuantizationInfo::output> mQuantization;
 
     uint32_t mOutBufferSize;
     UWORD32 mHeaderGenerated;
