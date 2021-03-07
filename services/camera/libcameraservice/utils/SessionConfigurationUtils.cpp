@@ -262,23 +262,24 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
 
 void SessionConfigurationUtils::mapStreamInfo(const OutputStreamInfo &streamInfo,
             camera3::camera_stream_rotation_t rotation, String8 physicalId,
-            hardware::camera::device::V3_4::Stream *stream /*out*/) {
+            int32_t groupId, hardware::camera::device::V3_7::Stream *stream /*out*/) {
     if (stream == nullptr) {
         return;
     }
 
-    stream->v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
-    stream->v3_2.width = streamInfo.width;
-    stream->v3_2.height = streamInfo.height;
-    stream->v3_2.format = Camera3Device::mapToPixelFormat(streamInfo.format);
+    stream->v3_4.v3_2.streamType = hardware::camera::device::V3_2::StreamType::OUTPUT;
+    stream->v3_4.v3_2.width = streamInfo.width;
+    stream->v3_4.v3_2.height = streamInfo.height;
+    stream->v3_4.v3_2.format = Camera3Device::mapToPixelFormat(streamInfo.format);
     auto u = streamInfo.consumerUsage;
     camera3::Camera3OutputStream::applyZSLUsageQuirk(streamInfo.format, &u);
-    stream->v3_2.usage = Camera3Device::mapToConsumerUsage(u);
-    stream->v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
-    stream->v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
-    stream->v3_2.id = -1; // Invalid stream id
-    stream->physicalCameraId = std::string(physicalId.string());
-    stream->bufferSize = 0;
+    stream->v3_4.v3_2.usage = Camera3Device::mapToConsumerUsage(u);
+    stream->v3_4.v3_2.dataSpace = Camera3Device::mapToHidlDataspace(streamInfo.dataSpace);
+    stream->v3_4.v3_2.rotation = Camera3Device::mapToStreamRotation(rotation);
+    stream->v3_4.v3_2.id = -1; // Invalid stream id
+    stream->v3_4.physicalCameraId = std::string(physicalId.string());
+    stream->v3_4.bufferSize = 0;
+    stream->groupId = groupId;
 }
 
 binder::Status SessionConfigurationUtils::checkPhysicalCameraId(
@@ -358,7 +359,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         const SessionConfiguration& sessionConfiguration,
         const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
-        hardware::camera::device::V3_4::StreamConfiguration &streamConfiguration, bool *earlyExit) {
+        hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration, bool *earlyExit) {
 
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo, logicalCameraId);
@@ -393,14 +394,16 @@ SessionConfigurationUtils::convertToHALStreamCombination(
     streamConfiguration.streams.resize(streamCount);
     size_t streamIdx = 0;
     if (isInputValid) {
-        streamConfiguration.streams[streamIdx++] = {{/*streamId*/0,
+        streamConfiguration.streams[streamIdx++] = {{{/*streamId*/0,
                 hardware::camera::device::V3_2::StreamType::INPUT,
                 static_cast<uint32_t> (sessionConfiguration.getInputWidth()),
                 static_cast<uint32_t> (sessionConfiguration.getInputHeight()),
                 Camera3Device::mapToPixelFormat(sessionConfiguration.getInputFormat()),
                 /*usage*/ 0, HAL_DATASPACE_UNKNOWN,
                 hardware::camera::device::V3_2::StreamRotation::ROTATION_0},
-                /*physicalId*/ nullptr, /*bufferSize*/0};
+                /*physicalId*/ nullptr, /*bufferSize*/0}, /*groupId*/-1};
+        streamConfiguration.multiResolutionInputImage =
+                sessionConfiguration.inputIsMultiResolution();
     }
 
     for (const auto &it : outputConfigs) {
@@ -410,6 +413,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         String8 physicalCameraId = String8(it.getPhysicalCameraId());
         size_t numBufferProducers = bufferProducers.size();
         bool isStreamInfoValid = false;
+        int32_t groupId = it.isMultiResolution() ? it.getSurfaceSetID() : -1;
         OutputStreamInfo streamInfo;
 
         res = checkSurfaceType(numBufferProducers, deferredConsumer, it.getSurfaceType());
@@ -432,7 +436,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
             if (surfaceType == OutputConfiguration::SURFACE_TYPE_SURFACE_VIEW) {
                 streamInfo.consumerUsage |= GraphicBuffer::USAGE_HW_COMPOSER;
             }
-            mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId,
+            mapStreamInfo(streamInfo, camera3::CAMERA_STREAM_ROTATION_0, physicalCameraId, groupId,
                     &streamConfiguration.streams[streamIdx++]);
             isStreamInfoValid = true;
 
@@ -488,12 +492,13 @@ SessionConfigurationUtils::convertToHALStreamCombination(
                     for (const auto& compositeStream : compositeStreams) {
                         mapStreamInfo(compositeStream,
                                 static_cast<camera_stream_rotation_t> (it.getRotation()),
-                                physicalCameraId, &streamConfiguration.streams[streamIdx++]);
+                                physicalCameraId, groupId,
+                                &streamConfiguration.streams[streamIdx++]);
                     }
                 } else {
                     mapStreamInfo(streamInfo,
                             static_cast<camera_stream_rotation_t> (it.getRotation()),
-                            physicalCameraId, &streamConfiguration.streams[streamIdx++]);
+                            physicalCameraId, groupId, &streamConfiguration.streams[streamIdx++]);
                 }
                 isStreamInfoValid = true;
             }
@@ -501,6 +506,29 @@ SessionConfigurationUtils::convertToHALStreamCombination(
     }
     return binder::Status::ok();
 
+}
+
+bool SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+        hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
+        const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37) {
+    if (streamConfigV37.multiResolutionInputImage) {
+        // ICameraDevice older than 3.7 doesn't support multi-resolution input image.
+        return false;
+    }
+
+    streamConfigV34.streams.resize(streamConfigV37.streams.size());
+    for (size_t i = 0; i < streamConfigV37.streams.size(); i++) {
+        if (streamConfigV37.streams[i].groupId != -1) {
+            // ICameraDevice older than 3.7 doesn't support multi-resolution output
+            // image
+            return false;
+        }
+        streamConfigV34.streams[i] = streamConfigV37.streams[i].v3_4;
+    }
+    streamConfigV34.operationMode = streamConfigV37.operationMode;
+    streamConfigV34.sessionParams = streamConfigV37.sessionParams;
+
+    return true;
 }
 
 }// namespace android

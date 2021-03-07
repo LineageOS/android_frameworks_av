@@ -33,7 +33,8 @@
 #include <android/hardware/camera/provider/2.5/ICameraProvider.h>
 #include <android/hardware/camera/provider/2.6/ICameraProviderCallback.h>
 #include <android/hardware/camera/provider/2.6/ICameraProvider.h>
-#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
+#include <android/hardware/camera/provider/2.7/ICameraProvider.h>
+#include <android/hardware/camera/device/3.7/types.h>
 #include <android/hidl/manager/1.0/IServiceNotification.h>
 #include <camera/VendorTagDescriptor.h>
 
@@ -77,6 +78,16 @@ enum SystemCameraKind {
     */
    HIDDEN_SECURE_CAMERA
 };
+
+#define CAMERA_DEVICE_API_VERSION_1_0 HARDWARE_DEVICE_API_VERSION(1, 0)
+#define CAMERA_DEVICE_API_VERSION_3_0 HARDWARE_DEVICE_API_VERSION(3, 0)
+#define CAMERA_DEVICE_API_VERSION_3_1 HARDWARE_DEVICE_API_VERSION(3, 1)
+#define CAMERA_DEVICE_API_VERSION_3_2 HARDWARE_DEVICE_API_VERSION(3, 2)
+#define CAMERA_DEVICE_API_VERSION_3_3 HARDWARE_DEVICE_API_VERSION(3, 3)
+#define CAMERA_DEVICE_API_VERSION_3_4 HARDWARE_DEVICE_API_VERSION(3, 4)
+#define CAMERA_DEVICE_API_VERSION_3_5 HARDWARE_DEVICE_API_VERSION(3, 5)
+#define CAMERA_DEVICE_API_VERSION_3_6 HARDWARE_DEVICE_API_VERSION(3, 6)
+#define CAMERA_DEVICE_API_VERSION_3_7 HARDWARE_DEVICE_API_VERSION(3, 7)
 
 /**
  * A manager for all camera providers available on an Android device.
@@ -227,7 +238,7 @@ public:
      * Check for device support of specific stream combination.
      */
     status_t isSessionConfigurationSupported(const std::string& id,
-            const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+            const hardware::camera::device::V3_7::StreamConfiguration &configuration,
             bool *status /*out*/) const;
 
     /**
@@ -430,7 +441,7 @@ private:
          */
         status_t isConcurrentSessionConfigurationSupported(
                 const hardware::hidl_vec<
-                        hardware::camera::provider::V2_6::CameraIdAndStreamCombination>
+                        hardware::camera::provider::V2_7::CameraIdAndStreamCombination>
                                 &halCameraIdsAndStreamCombinations,
                 bool *isSupported);
 
@@ -470,7 +481,7 @@ private:
             }
 
             virtual status_t isSessionConfigurationSupported(
-                    const hardware::camera::device::V3_4::StreamConfiguration &/*configuration*/,
+                    const hardware::camera::device::V3_7::StreamConfiguration &/*configuration*/,
                     bool * /*status*/) {
                 return INVALID_OPERATION;
             }
@@ -529,7 +540,7 @@ private:
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
                     CameraMetadata *characteristics) const override;
             virtual status_t isSessionConfigurationSupported(
-                    const hardware::camera::device::V3_4::StreamConfiguration &configuration,
+                    const hardware::camera::device::V3_7::StreamConfiguration &configuration,
                     bool *status /*out*/)
                     override;
 
@@ -684,7 +695,7 @@ private:
     status_t convertToHALStreamCombinationAndCameraIdsLocked(
               const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>
                       &cameraIdsAndSessionConfigs,
-              hardware::hidl_vec<hardware::camera::provider::V2_6::CameraIdAndStreamCombination>
+              hardware::hidl_vec<hardware::camera::provider::V2_7::CameraIdAndStreamCombination>
                       *halCameraIdsAndStreamCombinations,
               bool *earlyExit);
 };

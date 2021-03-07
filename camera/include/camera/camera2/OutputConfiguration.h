@@ -47,6 +47,8 @@ public:
     bool                       isDeferred() const;
     bool                       isShared() const;
     String16                   getPhysicalCameraId() const;
+    bool                       isMultiResolution() const;
+
     /**
      * Keep impl up-to-date with OutputConfiguration.java in frameworks/base
      */
@@ -83,7 +85,8 @@ public:
                 mIsDeferred == other.mIsDeferred &&
                 mIsShared == other.mIsShared &&
                 gbpsEqual(other) &&
-                mPhysicalCameraId == other.mPhysicalCameraId );
+                mPhysicalCameraId == other.mPhysicalCameraId &&
+                mIsMultiResolution == other.mIsMultiResolution);
     }
     bool operator != (const OutputConfiguration& other) const {
         return !(*this == other);
@@ -114,6 +117,9 @@ public:
         if (mPhysicalCameraId != other.mPhysicalCameraId) {
             return mPhysicalCameraId < other.mPhysicalCameraId;
         }
+        if (mIsMultiResolution != other.mIsMultiResolution) {
+            return mIsMultiResolution < other.mIsMultiResolution;
+        }
         return gbpsLessThan(other);
     }
     bool operator > (const OutputConfiguration& other) const {
@@ -133,6 +139,7 @@ private:
     bool                       mIsDeferred;
     bool                       mIsShared;
     String16                   mPhysicalCameraId;
+    bool                       mIsMultiResolution;
 };
 } // namespace params
 } // namespace camera2

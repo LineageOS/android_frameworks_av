@@ -35,6 +35,7 @@
 #include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.6/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
 #include <android/hardware/camera/device/3.2/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.4/ICameraDeviceCallback.h>
 #include <android/hardware/camera/device/3.5/ICameraDeviceCallback.h>
@@ -52,6 +53,7 @@
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3OutputInterface.h"
 #include "device3/Camera3OfflineSession.h"
+#include "device3/Camera3StreamInterface.h"
 #include "utils/TagMonitor.h"
 #include "utils/LatencyHistogram.h"
 #include <camera_metadata_hidden.h>
@@ -71,7 +73,6 @@ namespace camera3 {
 
 class Camera3Stream;
 class Camera3ZslStream;
-class Camera3OutputStreamInterface;
 class Camera3StreamInterface;
 
 } // namespace camera3
@@ -133,17 +134,19 @@ class Camera3Device :
             const String8& physicalCameraId,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint64_t consumerUsage = 0) override;
+            bool isShared = false, bool isMultiResolution = false,
+            uint64_t consumerUsage = 0) override;
     status_t createStream(const std::vector<sp<Surface>>& consumers,
             bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
             std::vector<int> *surfaceIds = nullptr,
             int streamSetId = camera3::CAMERA3_STREAM_SET_ID_INVALID,
-            bool isShared = false, uint64_t consumerUsage = 0) override;
+            bool isShared = false, bool isMultiResolution = false,
+            uint64_t consumerUsage = 0) override;
 
     status_t createInputStream(
-            uint32_t width, uint32_t height, int format,
+            uint32_t width, uint32_t height, int format, bool isMultiResolution,
             int *id) override;
 
     status_t getStreamInfo(int id, StreamInfo *streamInfo) override;
@@ -418,6 +421,8 @@ class Camera3Device :
         sp<hardware::camera::device::V3_5::ICameraDeviceSession> mHidlSession_3_5;
         // Valid if ICameraDeviceSession is @3.6 or newer
         sp<hardware::camera::device::V3_6::ICameraDeviceSession> mHidlSession_3_6;
+        // Valid if ICameraDeviceSession is @3.7 or newer
+        sp<hardware::camera::device::V3_7::ICameraDeviceSession> mHidlSession_3_7;
 
         std::shared_ptr<RequestMetadataQueue> mRequestMetadataQueue;
 
@@ -490,6 +495,7 @@ class Camera3Device :
 
     camera3::StreamSet         mOutputStreams;
     sp<camera3::Camera3Stream> mInputStream;
+    bool                       mIsInputStreamMultiResolution;
     SessionStatsBuilder        mSessionStatsBuilder;
 
     int                        mNextStreamId;
@@ -523,6 +529,7 @@ class Camera3Device :
         PhysicalCameraSettingsList          mSettingsList;
         sp<camera3::Camera3Stream>          mInputStream;
         camera_stream_buffer_t              mInputBuffer;
+        camera3::Size                       mInputBufferSize;
         Vector<sp<camera3::Camera3OutputStreamInterface> >
                                             mOutputStreams;
         SurfaceMap                          mOutputSurfaces;
@@ -748,7 +755,7 @@ class Camera3Device :
      * Helper function to get the largest Jpeg resolution (in area)
      * Return Size(0, 0) if static metatdata is invalid
      */
-    Size getMaxJpegResolution() const;
+    camera3::Size getMaxJpegResolution() const;
 
     /**
      * Helper function to get the offset between MONOTONIC and BOOTTIME
