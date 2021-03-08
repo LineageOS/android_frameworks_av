@@ -285,10 +285,11 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
     // 1) Client thread calls stop(); MediaCodec looper thread calls
     //    initiateShutdown(); shutdown is being handled at the component thread.
     // 2) Error occurred, but the shutdown operation is still being done.
-    // 3) MediaCodec looper thread handles the error.
-    // 4) Client releases the codec upon the error; previous shutdown is still
+    // 3) Another error occurred during the shutdown operation.
+    // 4) MediaCodec looper thread handles the error.
+    // 5) Client releases the codec upon the error; previous shutdown is still
     //    going on.
-    // 5) Component thread completes shutdown and posts onStopCompleted();
+    // 6) Component thread completes shutdown and posts onStopCompleted();
     //    Shutdown from release also completes.
 
     static const AString kCodecName{"test.codec"};
@@ -317,6 +318,9 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
                 });
             ON_CALL(*mockCodec, initiateShutdown(true))
                 .WillByDefault([mockCodec](bool) {
+                    // 2)
+                    mockCodec->callback()->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
+                    // 3)
                     mockCodec->callback()->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
                 });
             ON_CALL(*mockCodec, initiateShutdown(false))
@@ -339,6 +343,8 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
     codec->start();
     // stop() will fail because of the error
     EXPECT_NE(OK, codec->stop());
+    // sleep here so that the looper thread can handle all the errors.
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     // upon receiving the error, client tries to release the codec.
     codec->release();
     looper->stop();
