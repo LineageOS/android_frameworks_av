@@ -1,6 +1,6 @@
 /******************************************************************************
  *
- * Copyright (C) 2021 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,43 +21,45 @@
 package {
     // See: http://go/android-license-faq
     // A large-scale-change added 'default_applicable_licenses' to import
-    // all of the 'license_kinds' from "frameworks_av_services_camera_libcameraservice_license"
+    // all of the 'license_kinds' from "frameworks_av_license"
     // to get the below license kinds:
     //   SPDX-license-identifier-Apache-2.0
-    default_applicable_licenses: [
-        "frameworks_av_services_camera_libcameraservice_license",
-    ],
+    default_applicable_licenses: ["frameworks_av_license"],
 }
 
 cc_fuzz {
-    name: "camera_service_fuzzer",
+    name: "oboeservice_fuzzer",
     srcs: [
-        "camera_service_fuzzer.cpp",
-    ],
-    header_libs: [
-        "libmedia_headers",
+        "oboeservice_fuzzer.cpp",
     ],
     shared_libs: [
-        "libbinder",
+        "libaaudio_internal",
+        "libaudioclient",
+        "libaudioflinger",
+        "libaudioutils",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
         "libbase",
-        "libutils",
+        "libbinder",
         "libcutils",
-        "libcameraservice",
-        "libcamera_client",
-        "libui",
-        "libgui",
-        "android.hardware.camera.common@1.0",
-        "android.hardware.camera.provider@2.4",
-        "android.hardware.camera.provider@2.5",
-        "android.hardware.camera.provider@2.6",
-        "android.hardware.camera.provider@2.7",
-        "android.hardware.camera.device@1.0",
-        "android.hardware.camera.device@3.2",
-        "android.hardware.camera.device@3.3",
-        "android.hardware.camera.device@3.4",
-        "android.hardware.camera.device@3.5",
-        "android.hardware.camera.device@3.6",
-        "android.hardware.camera.device@3.7",
+        "liblog",
+        "libutils",
+        "aaudio-aidl-cpp",
+    ],
+    static_libs: [
+        "libaaudioservice",
+    ],
+    include_dirs: [
+        "frameworks/av/services/oboeservice",
+    ],
+    header_libs: [
+        "libaudiohal_headers",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wno-unused-parameter",
     ],
     fuzz_config: {
         cc: [

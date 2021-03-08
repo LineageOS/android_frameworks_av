@@ -38,6 +38,7 @@ public:
     int getInputHeight() const { return mInputHeight; }
     int getInputFormat() const { return mInputFormat; }
     int getOperatingMode() const { return mOperatingMode; }
+    bool inputIsMultiResolution() const { return mInputIsMultiResolution; }
 
     virtual status_t writeToParcel(android::Parcel* parcel) const override;
     virtual status_t readFromParcel(const android::Parcel* parcel) override;
@@ -61,7 +62,8 @@ public:
                 mInputWidth == other.mInputWidth &&
                 mInputHeight == other.mInputHeight &&
                 mInputFormat == other.mInputFormat &&
-                mOperatingMode == other.mOperatingMode);
+                mOperatingMode == other.mOperatingMode &&
+                mInputIsMultiResolution == other.mInputIsMultiResolution);
     }
 
     bool operator != (const SessionConfiguration& other) const {
@@ -81,6 +83,10 @@ public:
 
         if (mInputFormat != other.mInputFormat) {
             return mInputFormat < other.mInputFormat;
+        }
+
+        if (mInputIsMultiResolution != other.mInputIsMultiResolution) {
+            return mInputIsMultiResolution < other.mInputIsMultiResolution;
         }
 
         if (mOperatingMode != other.mOperatingMode) {
@@ -104,6 +110,7 @@ private:
 
     std::vector<OutputConfiguration> mOutputStreams;
     int                              mInputWidth, mInputHeight, mInputFormat, mOperatingMode;
+    bool                             mInputIsMultiResolution = false;
 };
 } // namespace params
 } // namespace camera2

@@ -115,6 +115,7 @@ public:
 
     // Create an input stream of width, height, and format.
     virtual binder::Status createInputStream(int width, int height, int format,
+            bool isMultiResolution,
             /*out*/
             int32_t* newStreamId = NULL) override;
 

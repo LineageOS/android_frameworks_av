@@ -49,7 +49,7 @@ Camera3Stream::Camera3Stream(int id,
         camera_stream_type type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
-        const String8& physicalCameraId, int setId) :
+        const String8& physicalCameraId, int setId, bool isMultiResolution) :
     camera_stream(),
     mId(id),
     mSetId(setId),
@@ -73,7 +73,8 @@ Camera3Stream::Camera3Stream(int id,
     mDataSpaceOverridden(false),
     mOriginalDataSpace(dataSpace),
     mPhysicalCameraId(physicalCameraId),
-    mLastTimestamp(0) {
+    mLastTimestamp(0),
+    mIsMultiResolution(isMultiResolution) {
 
     camera_stream::stream_type = type;
     camera_stream::width = width;
@@ -97,6 +98,14 @@ int Camera3Stream::getId() const {
 
 int Camera3Stream::getStreamSetId() const {
     return mSetId;
+}
+
+int Camera3Stream::getHalStreamGroupId() const {
+    return mIsMultiResolution ? mSetId : -1;
+}
+
+bool Camera3Stream::isMultiResolution() const {
+    return mIsMultiResolution;
 }
 
 uint32_t Camera3Stream::getWidth() const {
@@ -743,11 +752,16 @@ status_t Camera3Stream::returnBuffer(const camera_stream_buffer &buffer,
     return res;
 }
 
-status_t Camera3Stream::getInputBuffer(camera_stream_buffer *buffer, bool respectHalLimit) {
+status_t Camera3Stream::getInputBuffer(camera_stream_buffer *buffer,
+        Size* size, bool respectHalLimit) {
     ATRACE_CALL();
     Mutex::Autolock l(mLock);
     status_t res = OK;
 
+    if (size == nullptr) {
+        ALOGE("%s: size must not be null", __FUNCTION__);
+        return BAD_VALUE;
+    }
     // This function should be only called when the stream is configured already.
     if (mState != STATE_CONFIGURED) {
         ALOGE("%s: Stream %d: Can't get input buffers if stream is not in CONFIGURED state %d",
@@ -769,7 +783,7 @@ status_t Camera3Stream::getInputBuffer(camera_stream_buffer *buffer, bool respec
         }
     }
 
-    res = getInputBufferLocked(buffer);
+    res = getInputBufferLocked(buffer, size);
     if (res == OK) {
         fireBufferListenersLocked(*buffer, /*acquired*/true, /*output*/false);
         if (buffer->buffer) {
@@ -918,7 +932,7 @@ status_t Camera3Stream::returnBufferLocked(const camera_stream_buffer &,
     ALOGE("%s: This type of stream does not support output", __FUNCTION__);
     return INVALID_OPERATION;
 }
-status_t Camera3Stream::getInputBufferLocked(camera_stream_buffer *) {
+status_t Camera3Stream::getInputBufferLocked(camera_stream_buffer *, Size *) {
     ALOGE("%s: This type of stream does not support input", __FUNCTION__);
     return INVALID_OPERATION;
 }

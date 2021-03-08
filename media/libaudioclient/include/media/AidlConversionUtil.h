@@ -48,6 +48,15 @@ using ConversionResult = base::expected<T, status_t>;
        std::move(_tmp.value());             \
      })
 
+#define VALUE_OR_FATAL(result)                                        \
+    ({                                                                \
+       auto _tmp = (result);                                          \
+       LOG_ALWAYS_FATAL_IF(!_tmp.ok(),                                \
+                           "Function: %s Line: %d Failed result (%d)",\
+                           __FUNCTION__, __LINE__, _tmp.error());     \
+       std::move(_tmp.value());                                       \
+     })
+
 /**
  * A generic template to safely cast between integral types, respecting limits of the destination
  * type.

@@ -52,7 +52,7 @@ LVEQNB_ReturnStatus_en LVEQNB_Init(LVEQNB_Handle_t* phInstance,
                                    LVEQNB_Capabilities_t* pCapabilities, void* pScratch) {
     LVEQNB_Instance_t* pInstance;
 
-    *phInstance = new LVEQNB_Instance_t;
+    *phInstance = new LVEQNB_Instance_t{};
     pInstance = (LVEQNB_Instance_t*)*phInstance;
 
     pInstance->Capabilities = *pCapabilities;
