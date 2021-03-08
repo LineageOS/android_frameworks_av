@@ -196,6 +196,7 @@ private:
     std::shared_ptr<C2StreamFrameRateInfo::output> mFrameRate;
     std::shared_ptr<C2StreamBitrateInfo::output> mBitrate;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+    std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
 
     uint32_t mOutBufferSize;
     UWORD32 mHeaderGenerated;
@@ -229,6 +230,7 @@ private:
     c2_status_t setProfileParams();
     c2_status_t setDeblockParams();
     c2_status_t setVbvParams();
+    c2_status_t setVuiParams();
     void logVersion();
     c2_status_t setEncodeArgs(
             ive_video_encode_ip_t *ps_encode_ip,
