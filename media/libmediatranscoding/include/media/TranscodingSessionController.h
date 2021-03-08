@@ -48,7 +48,7 @@ public:
     virtual ~TranscodingSessionController();
 
     // ControllerClientInterface
-    bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t uid,
+    bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t callingUid, uid_t clientUid,
                 const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override;
     bool cancel(ClientIdType clientId, SessionIdType sessionId) override;
@@ -108,7 +108,8 @@ private:
             ERROR,
         };
         SessionKeyType key;
-        uid_t uid;
+        uid_t clientUid;
+        uid_t callingUid;
         int32_t lastProgress;
         int32_t pauseCount;
         std::chrono::time_point<std::chrono::system_clock> stateEnterTime;
