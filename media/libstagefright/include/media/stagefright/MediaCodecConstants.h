@@ -752,7 +752,7 @@ constexpr char KEY_CA_SESSION_ID[] = "ca-session-id";
 constexpr char KEY_CA_SYSTEM_ID[] = "ca-system-id";
 constexpr char KEY_CA_PRIVATE_DATA[] = "ca-private-data";
 constexpr char KEY_CAPTURE_RATE[] = "capture-rate";
-constexpr char KEY_CHANNEL_COUNT[] = "channel-count";
+constexpr char KEY_CHANNEL_COUNT[] = "channel-count";   // value N, eq to range 1..N
 constexpr char KEY_CHANNEL_MASK[] = "channel-mask";
 constexpr char KEY_COLOR_FORMAT[] = "color-format";
 constexpr char KEY_COLOR_RANGE[] = "color-range";
@@ -807,6 +807,14 @@ constexpr char KEY_TEMPORAL_LAYERING[] = "ts-schema";
 constexpr char KEY_TILE_HEIGHT[] = "tile-height";
 constexpr char KEY_TILE_WIDTH[] = "tile-width";
 constexpr char KEY_TRACK_ID[] = "track-id";
+constexpr char KEY_VIDEO_QP_B_MAX[] = "video-qp-b-max";
+constexpr char KEY_VIDEO_QP_B_MIN[] = "video-qp-b-min";
+constexpr char KEY_VIDEO_QP_I_MAX[] = "video-qp-i-max";
+constexpr char KEY_VIDEO_QP_I_MIN[] = "video-qp-i-min";
+constexpr char KEY_VIDEO_QP_MAX[] = "video-qp-max";
+constexpr char KEY_VIDEO_QP_MIN[] = "video-qp-min";
+constexpr char KEY_VIDEO_QP_P_MAX[] = "video-qp-p-max";
+constexpr char KEY_VIDEO_QP_P_MIN[] = "video-qp-p-min";
 constexpr char KEY_WIDTH[] = "width";
 
 // from MediaCodec.java
