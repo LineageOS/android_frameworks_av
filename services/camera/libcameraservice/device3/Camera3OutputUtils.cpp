@@ -484,6 +484,20 @@ void removeInFlightRequestIfReadyLocked(CaptureOutputStates& states, int idx) {
     states.inflightIntf.checkInflightMapLengthLocked();
 }
 
+// Erase the subset of physicalCameraIds that contains id
+bool erasePhysicalCameraIdSet(
+        std::set<std::set<String8>>& physicalCameraIds, const String8& id) {
+    bool found = false;
+    for (auto iter = physicalCameraIds.begin(); iter != physicalCameraIds.end(); iter++) {
+        if (iter->count(id) == 1) {
+            physicalCameraIds.erase(iter);
+            found = true;
+            break;
+        }
+    }
+    return found;
+}
+
 void processCaptureResult(CaptureOutputStates& states, const camera_capture_result *result) {
     ATRACE_CALL();
 
@@ -583,12 +597,10 @@ void processCaptureResult(CaptureOutputStates& states, const camera_capture_resu
             }
             for (uint32_t i = 0; i < result->num_physcam_metadata; i++) {
                 String8 physicalId(result->physcam_ids[i]);
-                std::set<String8>::iterator cameraIdIter =
-                        request.physicalCameraIds.find(physicalId);
-                if (cameraIdIter != request.physicalCameraIds.end()) {
-                    request.physicalCameraIds.erase(cameraIdIter);
-                } else {
-                    SET_ERR("Total result for frame %d has already returned for camera %s",
+                bool validPhysicalCameraMetadata =
+                        erasePhysicalCameraIdSet(request.physicalCameraIds, physicalId);
+                if (!validPhysicalCameraMetadata) {
+                    SET_ERR("Unexpected total result for frame %d camera %s",
                             frameNumber, physicalId.c_str());
                     return;
                 }
@@ -1083,14 +1095,14 @@ void notifyError(CaptureOutputStates& states, const camera_error_msg_t &msg) {
                             errorCode) {
                         if (physicalCameraId.size() > 0) {
                             String8 cameraId(physicalCameraId);
-                            auto iter = r.physicalCameraIds.find(cameraId);
-                            if (iter == r.physicalCameraIds.end()) {
+                            bool validPhysicalCameraId =
+                                    erasePhysicalCameraIdSet(r.physicalCameraIds, cameraId);
+                            if (!validPhysicalCameraId) {
                                 ALOGE("%s: Reported result failure for physical camera device: %s "
                                         " which is not part of the respective request!",
                                         __FUNCTION__, cameraId.string());
                                 break;
                             }
-                            r.physicalCameraIds.erase(iter);
                             resultExtras.errorPhysicalCameraId = physicalCameraId;
                             physicalDeviceResultError = true;
                         }

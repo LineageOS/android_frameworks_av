@@ -2611,6 +2611,7 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         config.input_is_multi_resolution = mIsInputStreamMultiResolution;
     }
 
+    mGroupIdPhysicalCameraMap.clear();
     for (size_t i = 0; i < mOutputStreams.size(); i++) {
 
         // Don't configure bidi streams twice, nor add them twice to the list
@@ -2643,6 +2644,12 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
                 ALOGW("%s: Blob dataSpace %d not supported",
                         __FUNCTION__, outputStream->data_space);
             }
+        }
+
+        if (mOutputStreams[i]->isMultiResolution()) {
+            int32_t streamGroupId = mOutputStreams[i]->getHalStreamGroupId();
+            const String8& physicalCameraId = mOutputStreams[i]->getPhysicalCameraId();
+            mGroupIdPhysicalCameraMap[streamGroupId].insert(physicalCameraId);
         }
     }
 
@@ -2714,7 +2721,8 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
     // Request thread needs to know to avoid using repeat-last-settings protocol
     // across configure_streams() calls
     if (notifyRequestThread) {
-        mRequestThread->configurationComplete(mIsConstrainedHighSpeedConfiguration, sessionParams);
+        mRequestThread->configurationComplete(mIsConstrainedHighSpeedConfiguration,
+                sessionParams, mGroupIdPhysicalCameraMap);
     }
 
     char value[PROPERTY_VALUE_MAX];
@@ -2887,8 +2895,9 @@ void Camera3Device::setErrorStateLockedV(const char *fmt, va_list args) {
 status_t Camera3Device::registerInFlight(uint32_t frameNumber,
         int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
         bool hasAppCallback, nsecs_t maxExpectedDuration,
-        std::set<String8>& physicalCameraIds, bool isStillCapture,
-        bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& cameraIdsWithZoom,
+        const std::set<std::set<String8>>& physicalCameraIds,
+        bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
+        const std::set<std::string>& cameraIdsWithZoom,
         const SurfaceMap& outputSurfaces, nsecs_t requestTimeNs) {
     ATRACE_CALL();
     std::lock_guard<std::mutex> l(mInFlightLock);
@@ -3962,11 +3971,13 @@ void Camera3Device::RequestThread::setNotificationListener(
 }
 
 void Camera3Device::RequestThread::configurationComplete(bool isConstrainedHighSpeed,
-        const CameraMetadata& sessionParams) {
+        const CameraMetadata& sessionParams,
+        const std::map<int32_t, std::set<String8>>& groupIdPhysicalCameraMap) {
     ATRACE_CALL();
     Mutex::Autolock l(mRequestLock);
     mReconfigured = true;
     mLatestSessionParams = sessionParams;
+    mGroupIdPhysicalCameraMap = groupIdPhysicalCameraMap;
     // Prepare video stream for high speed recording.
     mPrepareVideoStream = isConstrainedHighSpeed;
     mConstrainedMode = isConstrainedHighSpeed;
@@ -4725,7 +4736,7 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
         outputBuffers->insertAt(camera_stream_buffer_t(), 0,
                 captureRequest->mOutputStreams.size());
         halRequest->output_buffers = outputBuffers->array();
-        std::set<String8> requestedPhysicalCameras;
+        std::set<std::set<String8>> requestedPhysicalCameras;
 
         sp<Camera3Device> parent = mParent.promote();
         if (parent == NULL) {
@@ -4820,8 +4831,11 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             String8 physicalCameraId = outputStream->getPhysicalCameraId();
-            if (!physicalCameraId.isEmpty()) {
-                requestedPhysicalCameras.insert(physicalCameraId);
+            int32_t streamGroupId = outputStream->getHalStreamGroupId();
+            if (streamGroupId != -1 && mGroupIdPhysicalCameraMap.count(streamGroupId) == 1) {
+                requestedPhysicalCameras.insert(mGroupIdPhysicalCameraMap[streamGroupId]);
+            } else if (!physicalCameraId.isEmpty()) {
+                requestedPhysicalCameras.insert(std::set<String8>({physicalCameraId}));
             }
             halRequest->num_output_buffers++;
         }
