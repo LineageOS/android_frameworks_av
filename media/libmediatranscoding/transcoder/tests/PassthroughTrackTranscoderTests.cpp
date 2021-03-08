@@ -29,7 +29,7 @@
 
 #include <vector>
 
-#include "TrackTranscoderTestUtils.h"
+#include "TranscoderTestUtils.h"
 
 namespace android {
 
@@ -152,7 +152,7 @@ TEST_F(PassthroughTrackTranscoderTests, SampleEquality) {
     }
 
     // Create and start the transcoder.
-    std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
+    auto callback = std::make_shared<TestTrackTranscoderCallback>();
     PassthroughTrackTranscoder transcoder{callback};
 
     std::shared_ptr<MediaSampleReader> mediaSampleReader =
