@@ -5,7 +5,7 @@ cc_library_headers {
     export_include_dirs: ["include"],
 }
 
-cc_library_shared {
+cc_library {
     name: "libcodec2",
     vendor_available: true,
     min_sdk_version: "29",
