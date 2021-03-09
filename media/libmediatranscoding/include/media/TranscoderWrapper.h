@@ -18,8 +18,11 @@
 #define ANDROID_TRANSCODER_WRAPPER_H
 
 #include <media/NdkMediaError.h>
+#include <media/NdkMediaFormat.h>
 #include <media/TranscoderInterface.h>
+#include <media/TranscodingLogger.h>
 
+#include <chrono>
 #include <list>
 #include <map>
 #include <mutex>
@@ -37,16 +40,17 @@ class TranscoderWrapper : public TranscoderInterface,
                           public std::enable_shared_from_this<TranscoderWrapper> {
 public:
     TranscoderWrapper(const std::shared_ptr<TranscoderCallbackInterface>& cb,
+                      const std::shared_ptr<TranscodingLogger>& logger,
                       int64_t heartBeatIntervalUs);
     ~TranscoderWrapper();
 
     // TranscoderInterface
     void start(ClientIdType clientId, SessionIdType sessionId,
-               const TranscodingRequestParcel& request,
+               const TranscodingRequestParcel& request, uid_t callingUid,
                const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void pause(ClientIdType clientId, SessionIdType sessionId) override;
     void resume(ClientIdType clientId, SessionIdType sessionId,
-                const TranscodingRequestParcel& request,
+                const TranscodingRequestParcel& request, uid_t callingUid,
                 const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void stop(ClientIdType clientId, SessionIdType sessionId, bool abandon = false) override;
     // ~TranscoderInterface
@@ -76,6 +80,9 @@ private:
     std::shared_ptr<CallbackImpl> mTranscoderCb;
     std::shared_ptr<MediaTranscoder> mTranscoder;
     std::weak_ptr<TranscoderCallbackInterface> mCallback;
+    std::shared_ptr<TranscodingLogger> mLogger;
+    std::shared_ptr<AMediaFormat> mSrcFormat;
+    std::shared_ptr<AMediaFormat> mDstFormat;
     int64_t mHeartBeatIntervalUs;
     std::mutex mLock;
     std::condition_variable mCondition;
@@ -83,6 +90,9 @@ private:
     std::map<SessionKeyType, std::shared_ptr<ndk::ScopedAParcel>> mPausedStateMap;
     ClientIdType mCurrentClientId;
     SessionIdType mCurrentSessionId;
+    uid_t mCurrentCallingUid;
+    std::chrono::steady_clock::time_point mTranscodeStartTime;
+
     // Whether the looper has been created.
     bool mLooperReady;
 
@@ -93,18 +103,20 @@ private:
     void onHeartBeat(ClientIdType clientId, SessionIdType sessionId);
 
     media_status_t handleStart(ClientIdType clientId, SessionIdType sessionId,
-                               const TranscodingRequestParcel& request,
+                               const TranscodingRequestParcel& request, uid_t callingUid,
                                const std::shared_ptr<ITranscodingClientCallback>& callback);
     media_status_t handlePause(ClientIdType clientId, SessionIdType sessionId);
     media_status_t handleResume(ClientIdType clientId, SessionIdType sessionId,
-                                const TranscodingRequestParcel& request,
+                                const TranscodingRequestParcel& request, uid_t callingUid,
                                 const std::shared_ptr<ITranscodingClientCallback>& callback);
     media_status_t setupTranscoder(
             ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
-            const std::shared_ptr<ITranscodingClientCallback>& callback,
+            uid_t callingUid, const std::shared_ptr<ITranscodingClientCallback>& callback,
+            TranscodingLogger::SessionEndedReason* failureReason /* nonnull */,
             const std::shared_ptr<ndk::ScopedAParcel>& pausedState = nullptr);
 
     void cleanup();
+    void logSessionEnded(const TranscodingLogger::SessionEndedReason& reason, int error);
     void reportError(ClientIdType clientId, SessionIdType sessionId, media_status_t err);
     void queueEvent(Event::Type type, ClientIdType clientId, SessionIdType sessionId,
                     const std::function<void()> runnable, int32_t arg = 0);

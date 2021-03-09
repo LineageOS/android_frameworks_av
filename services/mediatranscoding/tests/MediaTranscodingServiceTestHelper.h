@@ -208,7 +208,9 @@ struct EventTracker {
         std::unique_lock lock(mLock);
 
         mEventQueue.push_back(event);
-        mLastErr = err;
+        if (err != TranscodingErrorCode::kNoError) {
+            mLastErrQueue.push_back(err);
+        }
         mCondition.notify_one();
     }
 
@@ -226,7 +228,12 @@ struct EventTracker {
 
     TranscodingErrorCode getLastError() {
         std::unique_lock lock(mLock);
-        return mLastErr;
+        if (mLastErrQueue.empty()) {
+            return TranscodingErrorCode::kNoError;
+        }
+        TranscodingErrorCode err = mLastErrQueue.front();
+        mLastErrQueue.pop_front();
+        return err;
     }
 
 private:
@@ -234,7 +241,7 @@ private:
     std::condition_variable mCondition;
     Event mPoppedEvent;
     std::list<Event> mEventQueue;
-    TranscodingErrorCode mLastErr;
+    std::list<TranscodingErrorCode> mLastErrQueue;
     int mUpdateCount = 0;
     int mLastProgress = -1;
 };

@@ -88,5 +88,7 @@ void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* 
 bool SetDefaultFormatValueFloat(const char* key, AMediaFormat* format, float value);
 bool SetDefaultFormatValueInt32(const char* key, AMediaFormat* format, int32_t value);
 
+bool VideoIsHdr(AMediaFormat* format);
+
 }  // namespace AMediaFormatUtils
 #endif  // ANDROID_MEDIA_TRANSCODING_NDK_COMMON_H

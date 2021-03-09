@@ -49,17 +49,16 @@ public:
 
     static constexpr int64_t kSessionDurationUs = 1000000;
 
-    SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb,
-                        int64_t heartBeatUs);
+    SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb);
     ~SimulatedTranscoder();
 
     // TranscoderInterface
     void start(ClientIdType clientId, SessionIdType sessionId,
-               const TranscodingRequestParcel& request,
+               const TranscodingRequestParcel& request, uid_t callingUid,
                const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void pause(ClientIdType clientId, SessionIdType sessionId) override;
     void resume(ClientIdType clientId, SessionIdType sessionId,
-                const TranscodingRequestParcel& request,
+                const TranscodingRequestParcel& request, uid_t callingUid,
                 const std::shared_ptr<ITranscodingClientCallback>& clientCallback) override;
     void stop(ClientIdType clientId, SessionIdType sessionId, bool abandon = false) override;
     // ~TranscoderInterface
