@@ -49,8 +49,7 @@ public:
 
     static constexpr int64_t kSessionDurationUs = 1000000;
 
-    SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb,
-                        int64_t heartBeatUs);
+    SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb);
     ~SimulatedTranscoder();
 
     // TranscoderInterface
