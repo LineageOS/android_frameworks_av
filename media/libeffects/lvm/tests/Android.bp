@@ -13,7 +13,7 @@ cc_test {
     name: "EffectReverbTest",
     vendor: true,
     gtest: true,
-    host_supported: false,
+    host_supported: true,
     srcs: [
         "EffectReverbTest.cpp",
         "EffectTestHelper.cpp",
