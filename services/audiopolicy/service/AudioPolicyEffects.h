@@ -207,7 +207,7 @@ private:
             mDeviceType(device), mDeviceAddress(address) {}
         /*virtual*/ ~DeviceEffects() = default;
 
-        std::vector<std::unique_ptr<AudioEffect>> mEffects;
+        std::vector< sp<AudioEffect> > mEffects;
         audio_devices_t getDeviceType() const { return mDeviceType; }
         std::string getDeviceAddress() const { return mDeviceAddress; }
         const std::unique_ptr<EffectDescVector> mEffectDescriptors;
