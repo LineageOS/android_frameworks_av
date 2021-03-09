@@ -970,7 +970,7 @@ void AudioPolicyEffects::initDefaultDeviceEffects()
     for (const auto& deviceEffectsIter : mDeviceEffects) {
         const auto& deviceEffects =  deviceEffectsIter.second;
         for (const auto& effectDesc : deviceEffects->mEffectDescriptors->mEffects) {
-            auto fx = std::make_unique<AudioEffect>(String16("android"));
+            sp<AudioEffect> fx = new AudioEffect(String16("android"));
             fx->set(EFFECT_UUID_NULL, &effectDesc->mUuid, 0, nullptr,
                     nullptr, AUDIO_SESSION_DEVICE, AUDIO_IO_HANDLE_NONE,
                     AudioDeviceTypeAddr{deviceEffects->getDeviceType(),
@@ -987,7 +987,7 @@ void AudioPolicyEffects::initDefaultDeviceEffects()
             ALOGV("%s(): create Fx %s added on port type=%d address=%s", __func__,
                   effectDesc->mName, deviceEffects->getDeviceType(),
                   deviceEffects->getDeviceAddress().c_str());
-            deviceEffects->mEffects.push_back(std::move(fx));
+            deviceEffects->mEffects.push_back(fx);
         }
     }
 }
