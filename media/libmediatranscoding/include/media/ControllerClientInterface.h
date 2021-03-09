@@ -36,8 +36,8 @@ public:
      * Returns true on success and false on failure. This call will fail is a session identified
      * by <clientId, sessionId> already exists.
      */
-    virtual bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t uid,
-                        const TranscodingRequestParcel& request,
+    virtual bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t callingUid,
+                        uid_t clientUid, const TranscodingRequestParcel& request,
                         const std::weak_ptr<ITranscodingClientCallback>& clientCallback) = 0;
 
     /**

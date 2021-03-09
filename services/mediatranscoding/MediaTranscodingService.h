@@ -29,6 +29,7 @@ using ::aidl::android::media::ITranscodingClientCallback;
 using ::aidl::android::media::TranscodingRequestParcel;
 using ::aidl::android::media::TranscodingSessionParcel;
 class TranscodingClientManager;
+class TranscodingLogger;
 class TranscodingSessionController;
 class UidPolicyInterface;
 class ResourcePolicyInterface;
@@ -39,7 +40,7 @@ public:
     static constexpr int32_t kInvalidSessionId = -1;
     static constexpr int32_t kInvalidClientId = -1;
 
-    MediaTranscodingService(bool simulated);
+    MediaTranscodingService();
     virtual ~MediaTranscodingService();
 
     static void instantiate();
@@ -62,6 +63,7 @@ private:
     std::shared_ptr<UidPolicyInterface> mUidPolicy;
     std::shared_ptr<ResourcePolicyInterface> mResourcePolicy;
     std::shared_ptr<ThermalPolicyInterface> mThermalPolicy;
+    std::shared_ptr<TranscodingLogger> mLogger;
     std::shared_ptr<TranscodingSessionController> mSessionController;
     std::shared_ptr<TranscodingClientManager> mClientManager;
 };

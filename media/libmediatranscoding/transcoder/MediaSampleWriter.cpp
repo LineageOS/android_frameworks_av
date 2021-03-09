@@ -237,8 +237,8 @@ media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFE
     }
 
     std::chrono::microseconds updateInterval(mHeartBeatIntervalUs);
-    std::chrono::system_clock::time_point nextUpdateTime =
-            std::chrono::system_clock::now() + updateInterval;
+    std::chrono::steady_clock::time_point nextUpdateTime =
+            std::chrono::steady_clock::now() + updateInterval;
 
     while (true) {
         if (trackEosCount >= mTracks.size()) {
