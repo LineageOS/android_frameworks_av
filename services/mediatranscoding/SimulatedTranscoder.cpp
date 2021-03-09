@@ -47,8 +47,7 @@ const char* SimulatedTranscoder::toString(Event::Type type) {
     return "(unknown)";
 }
 
-SimulatedTranscoder::SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb,
-                                         int64_t heartBeatUs __unused)
+SimulatedTranscoder::SimulatedTranscoder(const std::shared_ptr<TranscoderCallbackInterface>& cb)
       : mCallback(cb), mLooperReady(false) {
     ALOGV("SimulatedTranscoder CTOR: %p", this);
 }
@@ -59,6 +58,7 @@ SimulatedTranscoder::~SimulatedTranscoder() {
 
 void SimulatedTranscoder::start(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& request,
+        uid_t /*callingUid*/,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     {
         auto lock = std::scoped_lock(mLock);
@@ -91,6 +91,7 @@ void SimulatedTranscoder::pause(ClientIdType clientId, SessionIdType sessionId) 
 
 void SimulatedTranscoder::resume(
         ClientIdType clientId, SessionIdType sessionId, const TranscodingRequestParcel& /*request*/,
+        uid_t /*callingUid*/,
         const std::shared_ptr<ITranscodingClientCallback>& /*clientCallback*/) {
     queueEvent(Event::Resume, clientId, sessionId, [=] {
         auto callback = mCallback.lock();
@@ -130,7 +131,7 @@ void SimulatedTranscoder::queueEvent(Event::Type type, ClientIdType clientId,
 
 void SimulatedTranscoder::threadLoop() {
     bool running = false;
-    std::chrono::system_clock::time_point lastRunningTime;
+    std::chrono::steady_clock::time_point lastRunningTime;
     Event lastRunningEvent;
 
     std::unique_lock<std::mutex> lock(mLock);
@@ -162,8 +163,9 @@ void SimulatedTranscoder::threadLoop() {
                 // Advance last running time and remaining time. This is needed to guard
                 // against bad events (which will be ignored) or spurious wakeups, in that
                 // case we don't want to wait for the same time again.
-                auto now = std::chrono::system_clock::now();
-                mRemainingTimeMap[key] -= (now - lastRunningTime);
+                auto now = std::chrono::steady_clock::now();
+                mRemainingTimeMap[key] -= std::chrono::duration_cast<std::chrono::microseconds>(
+                        now - lastRunningTime);
                 lastRunningTime = now;
             }
         }
@@ -182,7 +184,7 @@ void SimulatedTranscoder::threadLoop() {
         SessionKeyType key = std::make_pair(event.clientId, event.sessionId);
         if (!running && (event.type == Event::Start || event.type == Event::Resume)) {
             running = true;
-            lastRunningTime = std::chrono::system_clock::now();
+            lastRunningTime = std::chrono::steady_clock::now();
             lastRunningEvent = event;
             ALOGV("%s: session {%lld, %d}: remaining time: %lld", __FUNCTION__,
                   (long long)event.clientId, event.sessionId,
@@ -193,7 +195,8 @@ void SimulatedTranscoder::threadLoop() {
             if (event.type == Event::Stop) {
                 mRemainingTimeMap.erase(key);
             } else {
-                mRemainingTimeMap[key] -= (std::chrono::system_clock::now() - lastRunningTime);
+                mRemainingTimeMap[key] -= std::chrono::duration_cast<std::chrono::microseconds>(
+                        std::chrono::steady_clock::now() - lastRunningTime);
             }
         } else {
             ALOGW("%s: discarding bad event: session {%lld, %d}: %s", __FUNCTION__,

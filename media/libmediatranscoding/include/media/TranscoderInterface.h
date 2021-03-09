@@ -33,11 +33,11 @@ class TranscoderCallbackInterface;
 class TranscoderInterface {
 public:
     virtual void start(ClientIdType clientId, SessionIdType sessionId,
-                       const TranscodingRequestParcel& request,
+                       const TranscodingRequestParcel& request, uid_t callingUid,
                        const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
     virtual void pause(ClientIdType clientId, SessionIdType sessionId) = 0;
     virtual void resume(ClientIdType clientId, SessionIdType sessionId,
-                        const TranscodingRequestParcel& request,
+                        const TranscodingRequestParcel& request, uid_t callingUid,
                         const std::shared_ptr<ITranscodingClientCallback>& clientCallback) = 0;
     // Stop the specified session. If abandon is true, the transcoder wrapper will be discarded
     // after the session stops.
