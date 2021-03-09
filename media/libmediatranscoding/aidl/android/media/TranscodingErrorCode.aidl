@@ -23,13 +23,19 @@ package android.media;
  */
 @Backing(type = "int")
 enum TranscodingErrorCode {
+    // Errors exposed to client side.
     kNoError = 0,
-    kUnknown = 1,
-    kMalformed = 2,
-    kUnsupported = 3,
-    kInvalidParameter = 4,
-    kInvalidOperation = 5,
-    kErrorIO = 6,
-    kInsufficientResources = 7,
-    kWatchdogTimeout = 8,
+    kDroppedByService = 1,
+    kServiceUnavailable = 2,
+
+    // Other private errors.
+    kPrivateErrorFirst     = 1000,
+    kUnknown               = kPrivateErrorFirst + 0,
+    kMalformed             = kPrivateErrorFirst + 1,
+    kUnsupported           = kPrivateErrorFirst + 2,
+    kInvalidParameter      = kPrivateErrorFirst + 3,
+    kInvalidOperation      = kPrivateErrorFirst + 4,
+    kErrorIO               = kPrivateErrorFirst + 5,
+    kInsufficientResources = kPrivateErrorFirst + 6,
+    kWatchdogTimeout       = kPrivateErrorFirst + 7,
 }

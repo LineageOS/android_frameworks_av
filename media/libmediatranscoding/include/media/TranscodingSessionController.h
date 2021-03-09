@@ -93,7 +93,18 @@ private:
     using SessionKeyType = std::pair<ClientIdType, SessionIdType>;
     using SessionQueueType = std::list<SessionKeyType>;
     using TranscoderFactoryType = std::function<std::shared_ptr<TranscoderInterface>(
-            const std::shared_ptr<TranscoderCallbackInterface>&, int64_t)>;
+            const std::shared_ptr<TranscoderCallbackInterface>&)>;
+
+    struct ControllerConfig {
+        // Watchdog timeout.
+        int64_t watchdogTimeoutUs = 3000000LL;
+        // Threshold of time between finish/start below which a back-to-back start is counted.
+        int32_t pacerBurstThresholdMs = 1000;
+        // Maximum allowed back-to-back start count.
+        int32_t pacerBurstCountQuota = 10;
+        // Maximum allowed back-to-back running time.
+        int32_t pacerBurstTimeQuotaSeconds = 180;  // 3-min
+    };
 
     struct Session {
         enum State {
@@ -106,16 +117,17 @@ private:
             FINISHED,
             CANCELED,
             ERROR,
+            DROPPED_BY_PACER,
         };
         SessionKeyType key;
         uid_t clientUid;
         uid_t callingUid;
-        int32_t lastProgress;
-        int32_t pauseCount;
-        std::chrono::time_point<std::chrono::system_clock> stateEnterTime;
-        std::chrono::microseconds waitingTime;
-        std::chrono::microseconds runningTime;
-        std::chrono::microseconds pausedTime;
+        int32_t lastProgress = 0;
+        int32_t pauseCount = 0;
+        std::chrono::time_point<std::chrono::steady_clock> stateEnterTime;
+        std::chrono::microseconds waitingTime{0};
+        std::chrono::microseconds runningTime{0};
+        std::chrono::microseconds pausedTime{0};
 
         TranscodingRequest request;
         std::weak_ptr<ITranscodingClientCallback> callback;
@@ -123,12 +135,16 @@ private:
         // Must use setState to change state.
         void setState(Session::State state);
         State getState() const { return state; }
+        bool isRunning() { return state == RUNNING; }
 
     private:
         State state = INVALID;
     };
 
     struct Watchdog;
+    struct Pacer;
+
+    ControllerConfig mConfig;
 
     // TODO(chz): call transcoder without global lock.
     // Use mLock for all entrypoints for now.
@@ -156,12 +172,14 @@ private:
     bool mThermalThrottling;
     std::list<Session> mSessionHistory;
     std::shared_ptr<Watchdog> mWatchdog;
+    std::shared_ptr<Pacer> mPacer;
 
     // Only allow MediaTranscodingService and unit tests to instantiate.
     TranscodingSessionController(const TranscoderFactoryType& transcoderFactory,
                                  const std::shared_ptr<UidPolicyInterface>& uidPolicy,
                                  const std::shared_ptr<ResourcePolicyInterface>& resourcePolicy,
-                                 const std::shared_ptr<ThermalPolicyInterface>& thermalPolicy);
+                                 const std::shared_ptr<ThermalPolicyInterface>& thermalPolicy,
+                                 const ControllerConfig* config = nullptr);
 
     void dumpSession_l(const Session& session, String8& result, bool closedSession = false);
     Session* getTopSession_l();
