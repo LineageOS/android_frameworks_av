@@ -729,9 +729,22 @@ protected:
                     String8(devices.itemAt(0)->address().c_str()) : String8("");
         }
 
-        uint32_t updateCallRouting(const DeviceVector &rxDevices, uint32_t delayMs = 0);
+        status_t updateCallRouting(
+                bool fromCache, uint32_t delayMs = 0, uint32_t *waitMs = nullptr);
+        status_t updateCallRoutingInternal(
+                const DeviceVector &rxDevices, uint32_t delayMs, uint32_t *waitMs);
         sp<AudioPatch> createTelephonyPatch(bool isRx, const sp<DeviceDescriptor> &device,
                                             uint32_t delayMs);
+        /**
+         * @brief selectBestRxSinkDevicesForCall: if the primary module host both Telephony Rx/Tx
+         * devices, and it declares also supporting a HW bridge between the Telephony Rx and the
+         * given sink device for Voice Call audio attributes, select this device in prio.
+         * Otherwise, getNewOutputDevices() is called on the primary output to select sink device.
+         * @param fromCache true to prevent engine reconsidering all product strategies and retrieve
+         * from engine cache.
+         * @return vector of devices, empty if none is found.
+         */
+        DeviceVector selectBestRxSinkDevicesForCall(bool fromCache);
         bool isDeviceOfModule(const sp<DeviceDescriptor>& devDesc, const char *moduleId) const;
 
         status_t startSource(const sp<SwAudioOutputDescriptor>& outputDesc,
