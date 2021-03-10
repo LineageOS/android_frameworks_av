@@ -212,7 +212,9 @@ int main(int argc, const char* argv[]) {
         printUsage();
         return EXIT_FAILURE;
     }
-
+    for (int i = 1; i < argc; i++) {
+        printf("%s ", argv[i]);
+    }
     reverbConfigParams_t revConfigParams{};  // default initialize
     const char* inputFile = nullptr;
     const char* outputFile = nullptr;
