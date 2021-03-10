@@ -277,13 +277,15 @@ LVDBE_ReturnStatus_en LVDBE_Control(LVDBE_Handle_t hInstance, LVDBE_Params_t* pP
     /*
      * Create biquad instance
      */
-    pInstance->pHPFBiquad.reset(
-            new android::audio_utils::BiquadFilter<LVM_FLOAT>(pParams->NrChannels));
-
+    if (pInstance->Params.NrChannels != pParams->NrChannels) {
+        pInstance->pHPFBiquad.reset(
+                new android::audio_utils::BiquadFilter<LVM_FLOAT>(pParams->NrChannels));
+    }
     /*
      * Update the filters
      */
     if ((pInstance->Params.SampleRate != pParams->SampleRate) ||
+        (pInstance->Params.NrChannels != pParams->NrChannels) ||
         (pInstance->Params.CentreFrequency != pParams->CentreFrequency)) {
         LVDBE_SetFilters(pInstance, /* Instance pointer */
                          pParams);  /* New parameters */
