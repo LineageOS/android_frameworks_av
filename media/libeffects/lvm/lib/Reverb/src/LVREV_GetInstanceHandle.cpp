@@ -21,7 +21,6 @@
 /*                                                                                      */
 /****************************************************************************************/
 #include "LVREV_Private.h"
-#include "InstAlloc.h"
 
 /****************************************************************************************/
 /*                                                                                      */
@@ -34,7 +33,6 @@
 /*                                                                                      */
 /* PARAMETERS:                                                                          */
 /*  phInstance              pointer to the instance handle                              */
-/*  pMemoryTable            Pointer to the memory definition table                      */
 /*  pInstanceParams         Pointer to the instance parameters                          */
 /*                                                                                      */
 /* RETURNS:                                                                             */
@@ -46,12 +44,7 @@
 /*                                                                                      */
 /****************************************************************************************/
 LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
-                                              LVREV_MemoryTable_st* pMemoryTable,
                                               LVREV_InstanceParams_st* pInstanceParams) {
-    INST_ALLOC SlowData;
-    INST_ALLOC FastData;
-    INST_ALLOC FastCoef;
-    INST_ALLOC Temporary;
     LVREV_Instance_st* pLVREV_Private;
     LVM_INT16 i;
     LVM_UINT16 MaxBlockSize;
@@ -60,18 +53,9 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
      * Check for error conditions
      */
     /* Check for NULL pointers */
-    if ((phInstance == LVM_NULL) || (pMemoryTable == LVM_NULL) || (pInstanceParams == LVM_NULL)) {
+    if ((phInstance == LVM_NULL) || (pInstanceParams == LVM_NULL)) {
         return LVREV_NULLADDRESS;
     }
-    /* Check the memory table for NULL pointers */
-    for (i = 0; i < LVREV_NR_MEMORY_REGIONS; i++) {
-        if (pMemoryTable->Region[i].Size != 0) {
-            if (pMemoryTable->Region[i].pBaseAddress == LVM_NULL) {
-                return (LVREV_NULLADDRESS);
-            }
-        }
-    }
-
     /*
      * Check all instance parameters are in range
      */
@@ -88,36 +72,12 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
     }
 
     /*
-     * Initialise the InstAlloc instances
-     */
-    InstAlloc_Init(&SlowData, pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress);
-    InstAlloc_Init(&FastData, pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress);
-    InstAlloc_Init(&FastCoef, pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress);
-    InstAlloc_Init(&Temporary, pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress);
-
-    /*
-     * Zero all memory regions
-     */
-    LoadConst_Float(
-            0, (LVM_FLOAT*)pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].pBaseAddress,
-            (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_SLOW_DATA].Size) / sizeof(LVM_FLOAT)));
-    LoadConst_Float(
-            0, (LVM_FLOAT*)pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].pBaseAddress,
-            (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_DATA].Size) / sizeof(LVM_FLOAT)));
-    LoadConst_Float(
-            0, (LVM_FLOAT*)pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].pBaseAddress,
-            (LVM_INT16)((pMemoryTable->Region[LVM_PERSISTENT_FAST_COEF].Size) / sizeof(LVM_FLOAT)));
-    LoadConst_Float(
-            0, (LVM_FLOAT*)pMemoryTable->Region[LVM_TEMPORARY_FAST].pBaseAddress,
-            (LVM_INT16)((pMemoryTable->Region[LVM_TEMPORARY_FAST].Size) / sizeof(LVM_FLOAT)));
-    /*
      * Set the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL) {
         *phInstance = new LVREV_Instance_st{};
     }
     pLVREV_Private = (LVREV_Instance_st*)*phInstance;
-    pLVREV_Private->MemoryTable = *pMemoryTable;
 
     if (pInstanceParams->NumDelays == LVREV_DELAYLINES_4) {
         MaxBlockSize = LVREV_MAX_AP_DELAY[3];
@@ -135,12 +95,9 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
      * Set the data, coefficient and temporary memory pointers
      */
     for (size_t i = 0; i < pInstanceParams->NumDelays; i++) {
-        pLVREV_Private->pDelay_T[i] = (LVM_FLOAT*)InstAlloc_AddMember(
-                &FastData, LVREV_MAX_T_DELAY[i] * sizeof(LVM_FLOAT));
+        pLVREV_Private->pDelay_T[i] = (LVM_FLOAT*)calloc(LVREV_MAX_T_DELAY[i], sizeof(LVM_FLOAT));
         /* Scratch for each delay line output */
-        pLVREV_Private->pScratchDelayLine[i] =
-                (LVM_FLOAT*)InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
-        LoadConst_Float(0, pLVREV_Private->pDelay_T[i], LVREV_MAX_T_DELAY[i]);
+        pLVREV_Private->pScratchDelayLine[i] = (LVM_FLOAT*)calloc(MaxBlockSize, sizeof(LVM_FLOAT));
     }
     /* All-pass delay buffer addresses and sizes */
     for (size_t i = 0; i < LVREV_DELAYLINES_4; i++) {
@@ -149,12 +106,9 @@ LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
     pLVREV_Private->AB_Selection = 1; /* Select smoothing A to B */
 
     /* General purpose scratch */
-    pLVREV_Private->pScratch =
-            (LVM_FLOAT*)InstAlloc_AddMember(&Temporary, sizeof(LVM_FLOAT) * MaxBlockSize);
+    pLVREV_Private->pScratch = (LVM_FLOAT*)calloc(MaxBlockSize, sizeof(LVM_FLOAT));
     /* Mono->stereo input save for end mix */
-    pLVREV_Private->pInputSave =
-            (LVM_FLOAT*)InstAlloc_AddMember(&Temporary, 2 * sizeof(LVM_FLOAT) * MaxBlockSize);
-    LoadConst_Float(0, pLVREV_Private->pInputSave, (LVM_INT16)(MaxBlockSize * 2));
+    pLVREV_Private->pInputSave = (LVM_FLOAT*)calloc(FCC_2 * MaxBlockSize, sizeof(LVM_FLOAT));
 
     /*
      * Save the instance parameters in the instance structure
@@ -289,7 +243,28 @@ LVREV_ReturnStatus_en LVREV_FreeInstance(LVREV_Handle_t hInstance) {
         return LVREV_NULLADDRESS;
     }
 
-    delete (LVREV_Instance_st*)hInstance;
+    LVREV_Instance_st* pLVREV_Private = (LVREV_Instance_st*)hInstance;
+
+    for (size_t i = 0; i < pLVREV_Private->InstanceParams.NumDelays; i++) {
+        if (pLVREV_Private->pDelay_T[i]) {
+            free(pLVREV_Private->pDelay_T[i]);
+            pLVREV_Private->pDelay_T[i] = LVM_NULL;
+        }
+        if (pLVREV_Private->pScratchDelayLine[i]) {
+            free(pLVREV_Private->pScratchDelayLine[i]);
+            pLVREV_Private->pScratchDelayLine[i] = LVM_NULL;
+        }
+    }
+    if (pLVREV_Private->pScratch) {
+        free(pLVREV_Private->pScratch);
+        pLVREV_Private->pScratch = LVM_NULL;
+    }
+    if (pLVREV_Private->pInputSave) {
+        free(pLVREV_Private->pInputSave);
+        pLVREV_Private->pInputSave = LVM_NULL;
+    }
+
+    delete pLVREV_Private;
     return LVREV_SUCCESS;
 }
 /* End of file */

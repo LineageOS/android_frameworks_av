@@ -516,25 +516,6 @@ int process(effect_buffer_t* pIn, effect_buffer_t* pOut, int frameCount, ReverbC
 
 void Reverb_free(ReverbContext* pContext) {
     LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
-    LVREV_MemoryTable_st MemTab;
-
-    /* Free the algorithm memory */
-    LvmStatus = LVREV_GetMemoryTable(pContext->hInstance, &MemTab, LVM_NULL);
-
-    LVM_ERROR_CHECK(LvmStatus, "LVM_GetMemoryTable", "Reverb_free")
-
-    for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
-        if (MemTab.Region[i].Size != 0) {
-            if (MemTab.Region[i].pBaseAddress != NULL) {
-                free(MemTab.Region[i].pBaseAddress);
-            } else {
-                ALOGV("\tLVM_ERROR : free() - trying to free with NULL pointer %" PRIu32
-                      " bytes "
-                      "for region %u at %p ERROR\n",
-                      MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-            }
-        }
-    }
 
     LvmStatus = LVREV_FreeInstance(pContext->hInstance);
     LVM_ERROR_CHECK(LvmStatus, "LVREV_FreeInstance", "Reverb_free")
@@ -677,65 +658,17 @@ int Reverb_init(ReverbContext* pContext) {
     LVREV_ReturnStatus_en LvmStatus = LVREV_SUCCESS; /* Function call status */
     LVREV_ControlParams_st params;                   /* Control Parameters */
     LVREV_InstanceParams_st InstParams;              /* Instance parameters */
-    LVREV_MemoryTable_st MemTab;                     /* Memory allocation table */
-    bool bMallocFailure = LVM_FALSE;
 
     /* Set the capabilities */
     InstParams.MaxBlockSize = MAX_CALL_SIZE;
     InstParams.SourceFormat = LVM_STEREO;  // Max format, could be mono during process
     InstParams.NumDelays = LVREV_DELAYLINES_4;
 
-    /* Allocate memory, forcing alignment */
-    LvmStatus = LVREV_GetMemoryTable(LVM_NULL, &MemTab, &InstParams);
-
-    LVM_ERROR_CHECK(LvmStatus, "LVREV_GetMemoryTable", "Reverb_init")
-    if (LvmStatus != LVREV_SUCCESS) return -EINVAL;
-
-    ALOGV("\tCreateInstance Successfully called LVM_GetMemoryTable\n");
-
-    /* Allocate memory */
-    for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
-        if (MemTab.Region[i].Size != 0) {
-            MemTab.Region[i].pBaseAddress = calloc(1, MemTab.Region[i].Size);
-
-            if (MemTab.Region[i].pBaseAddress == LVM_NULL) {
-                ALOGV("\tLVREV_ERROR :Reverb_init CreateInstance Failed to allocate %" PRIu32
-                      " bytes for region %u\n",
-                      MemTab.Region[i].Size, i);
-                bMallocFailure = LVM_TRUE;
-            } else {
-                ALOGV("\tReverb_init CreateInstance allocate %" PRIu32
-                      " bytes for region %u at %p\n",
-                      MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-            }
-        }
-    }
-
-    /* If one or more of the memory regions failed to allocate, free the regions that were
-     * succesfully allocated and return with an error
-     */
-    if (bMallocFailure == LVM_TRUE) {
-        for (int i = 0; i < LVM_NR_MEMORY_REGIONS; i++) {
-            if (MemTab.Region[i].pBaseAddress == LVM_NULL) {
-                ALOGV("\tLVM_ERROR :Reverb_init CreateInstance Failed to allocate %" PRIu32
-                      " bytes for region %u - Not freeing\n",
-                      MemTab.Region[i].Size, i);
-            } else {
-                ALOGV("\tLVM_ERROR :Reverb_init CreateInstance Failed: but allocated %" PRIu32
-                      " bytes for region %u at %p- free\n",
-                      MemTab.Region[i].Size, i, MemTab.Region[i].pBaseAddress);
-                free(MemTab.Region[i].pBaseAddress);
-            }
-        }
-        return -EINVAL;
-    }
-    ALOGV("\tReverb_init CreateInstance Successfully malloc'd memory\n");
-
     /* Initialise */
     pContext->hInstance = LVM_NULL;
 
     /* Init sets the instance handle */
-    LvmStatus = LVREV_GetInstanceHandle(&pContext->hInstance, &MemTab, &InstParams);
+    LvmStatus = LVREV_GetInstanceHandle(&pContext->hInstance, &InstParams);
 
     LVM_ERROR_CHECK(LvmStatus, "LVM_GetInstanceHandle", "Reverb_init")
     if (LvmStatus != LVREV_SUCCESS) return -EINVAL;

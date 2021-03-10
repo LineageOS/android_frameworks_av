@@ -103,11 +103,9 @@
 /*                                                                                      */
 /****************************************************************************************/
 
-
 typedef struct {
     /* General */
     LVREV_InstanceParams_st InstanceParams; /* Initialisation time instance parameters */
-    LVREV_MemoryTable_st MemoryTable;       /* Memory table */
     LVREV_ControlParams_st CurrentParams;   /* Parameters being used */
     LVREV_ControlParams_st NewParams;       /* New parameters from the \
                                                calling application */
