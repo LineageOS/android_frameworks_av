@@ -78,11 +78,6 @@ typedef enum {
 /*                                                                                      */
 /****************************************************************************************/
 
-/* Memory table containing the region definitions */
-typedef struct {
-    LVM_MemoryRegion_st Region[LVREV_NR_MEMORY_REGIONS]; /* One definition for each region */
-} LVREV_MemoryTable_st;
-
 /* Control Parameter structure */
 typedef struct {
     /* General parameters */
@@ -121,46 +116,6 @@ typedef struct {
 
 /****************************************************************************************/
 /*                                                                                      */
-/* FUNCTION:                LVREV_GetMemoryTable                                        */
-/*                                                                                      */
-/* DESCRIPTION:                                                                         */
-/*  This function is used to obtain the LVREV module memory requirements to support     */
-/*  memory allocation. It can also be used to return the memory base address provided   */
-/*  during memory allocation to support freeing of memory when the LVREV module is no   */
-/*  longer required. It is called in two ways:                                          */
-/*                                                                                      */
-/*  hInstance = NULL                Returns the memory requirements                     */
-/*  hInstance = Instance handle     Returns the memory requirements and allocated       */
-/*                                  base addresses.                                     */
-/*                                                                                      */
-/*  When this function is called with hInstance = NULL the memory base address pointers */
-/*  will be NULL on return.                                                             */
-/*                                                                                      */
-/*  When the function is called for freeing memory, hInstance = Instance Handle the     */
-/*  memory table returns the allocated memory and base addresses used during            */
-/*  initialisation.                                                                     */
-/*                                                                                      */
-/* PARAMETERS:                                                                          */
-/*  hInstance               Instance Handle                                             */
-/*  pMemoryTable            Pointer to an empty memory table                            */
-/*  pInstanceParams         Pointer to the instance parameters                          */
-/*                                                                                      */
-/* RETURNS:                                                                             */
-/*  LVREV_SUCCESS           Succeeded                                                   */
-/*  LVREV_NULLADDRESS       When pMemoryTable is NULL                                   */
-/*  LVREV_NULLADDRESS       When requesting memory requirements and pInstanceParams     */
-/*                          is NULL                                                     */
-/*                                                                                      */
-/* NOTES:                                                                               */
-/*  1.  This function may be interrupted by the LVREV_Process function                  */
-/*                                                                                      */
-/****************************************************************************************/
-LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
-                                           LVREV_MemoryTable_st* pMemoryTable,
-                                           LVREV_InstanceParams_st* pInstanceParams);
-
-/****************************************************************************************/
-/*                                                                                      */
 /* FUNCTION:                LVREV_GetInstanceHandle                                     */
 /*                                                                                      */
 /* DESCRIPTION:                                                                         */
@@ -174,7 +129,6 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
 /*                                                                                      */
 /* PARAMETERS:                                                                          */
 /*  phInstance              Pointer to the instance handle                              */
-/*  pMemoryTable            Pointer to the memory definition table                      */
 /*  pInstanceParams         Pointer to the instance parameters                          */
 /*                                                                                      */
 /* RETURNS:                                                                             */
@@ -186,7 +140,6 @@ LVREV_ReturnStatus_en LVREV_GetMemoryTable(LVREV_Handle_t hInstance,
 /*                                                                                      */
 /****************************************************************************************/
 LVREV_ReturnStatus_en LVREV_GetInstanceHandle(LVREV_Handle_t* phInstance,
-                                              LVREV_MemoryTable_st* pMemoryTable,
                                               LVREV_InstanceParams_st* pInstanceParams);
 
 /****************************************************************************************/
