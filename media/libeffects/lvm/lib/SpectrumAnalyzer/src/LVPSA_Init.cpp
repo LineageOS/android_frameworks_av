@@ -49,7 +49,7 @@ LVPSA_RETURN LVPSA_Init(pLVPSA_Handle_t* phInstance, LVPSA_InitParams_t* pInitPa
     LVM_UINT32 BufferLength = 0;
 
     /* Set the instance handle if not already initialised */
-    *phInstance = new LVPSA_InstancePr_t;
+    *phInstance = new LVPSA_InstancePr_t{};
     pLVPSA_Inst = (LVPSA_InstancePr_t*)*phInstance;
 
     pLVPSA_Inst->pScratch = pScratch;

@@ -57,7 +57,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_
      * Create the instance handle if not already initialised
      */
     if (*phInstance == LVM_NULL) {
-        *phInstance = new LVDBE_Instance_t;
+        *phInstance = new LVDBE_Instance_t{};
     }
     pInstance = (LVDBE_Instance_t*)*phInstance;
 
