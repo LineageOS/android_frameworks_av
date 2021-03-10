@@ -119,10 +119,11 @@ interface ICameraDeviceUser
      * @param width Width of the input buffers
      * @param height Height of the input buffers
      * @param format Format of the input buffers. One of HAL_PIXEL_FORMAT_*.
+     * @param isMultiResolution Whether the input stream supports variable resolution image.
      *
      * @return new stream ID
      */
-    int createInputStream(int width, int height, int format);
+    int createInputStream(int width, int height, int format, boolean isMultiResolution);
 
     /**
      * Get the surface of the input stream.

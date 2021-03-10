@@ -29,7 +29,6 @@
 
 #include "Parameters.h"
 #include "system/camera.h"
-#include "hardware/camera_common.h"
 #include <android/hardware/ICamera.h>
 #include <media/MediaProfiles.h>
 #include <media/mediarecorder.h>
