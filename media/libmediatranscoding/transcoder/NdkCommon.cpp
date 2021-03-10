@@ -90,4 +90,29 @@ void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* 
 DEFINE_SET_DEFAULT_FORMAT_VALUE_FUNC(float, Float);
 DEFINE_SET_DEFAULT_FORMAT_VALUE_FUNC(int32_t, Int32);
 
+// Determines whether a track format describes HDR video content or not. The
+// logic is based on isHdr() in libstagefright/Utils.cpp.
+bool VideoIsHdr(AMediaFormat* format) {
+    // If VUI signals HDR content, this internal flag is set by the extractor.
+    int32_t isHdr;
+    if (AMediaFormat_getInt32(format, "android._is-hdr", &isHdr)) {
+        return isHdr;
+    }
+
+    // If container supplied HDR static info without transfer set, assume HDR.
+    const char* hdrInfo;
+    int32_t transfer;
+    if ((AMediaFormat_getString(format, AMEDIAFORMAT_KEY_HDR_STATIC_INFO, &hdrInfo) ||
+         AMediaFormat_getString(format, "hdr10-plus-info", &hdrInfo)) &&
+        !AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_COLOR_TRANSFER, &transfer)) {
+        return true;
+    }
+
+    // Otherwise, check if an HDR transfer function is set.
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_KEY_COLOR_TRANSFER, &transfer)) {
+        return transfer == COLOR_TRANSFER_ST2084 || transfer == COLOR_TRANSFER_HLG;
+    }
+
+    return false;
+}
 }  // namespace AMediaFormatUtils
