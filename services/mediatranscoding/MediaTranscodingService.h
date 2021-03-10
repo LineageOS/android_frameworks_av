@@ -40,7 +40,7 @@ public:
     static constexpr int32_t kInvalidSessionId = -1;
     static constexpr int32_t kInvalidClientId = -1;
 
-    MediaTranscodingService(bool simulated);
+    MediaTranscodingService();
     virtual ~MediaTranscodingService();
 
     static void instantiate();
