@@ -134,27 +134,6 @@ static inline LVM_Fs_en lvmFsForSampleRate(int sampleRate) {
     return LVM_FS_INVALID;
 }
 
-/* Memory Types */
-typedef enum {
-    LVM_PERSISTENT_SLOW_DATA = LVM_MEMREGION_PERSISTENT_SLOW_DATA,
-    LVM_PERSISTENT_FAST_DATA = LVM_MEMREGION_PERSISTENT_FAST_DATA,
-    LVM_PERSISTENT_FAST_COEF = LVM_MEMREGION_PERSISTENT_FAST_COEF,
-    LVM_TEMPORARY_FAST = LVM_MEMREGION_TEMPORARY_FAST,
-    LVM_MEMORYTYPE_DUMMY = LVM_MAXENUM
-} LVM_MemoryTypes_en;
-
-/* Memory region definition */
-typedef struct {
-    LVM_UINT32 Size;         /* Region size in bytes */
-    LVM_MemoryTypes_en Type; /* Region type */
-    void* pBaseAddress;      /* Pointer to the region base address */
-} LVM_MemoryRegion_st;
-
-/* Memory table containing the region definitions */
-typedef struct {
-    LVM_MemoryRegion_st Region[LVM_NR_MEMORY_REGIONS]; /* One definition for each region */
-} LVM_MemoryTable_st;
-
 /****************************************************************************************/
 /*                                                                                      */
 /*  Standard Function Prototypes                                                        */
