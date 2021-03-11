@@ -23,6 +23,7 @@
 #include <media/IAudioFlinger.h>
 #include <media/AudioSystem.h>
 #include <system/audio_effect.h>
+#include <android/media/permission/Identity.h>
 
 #include <utils/RefBase.h>
 #include <utils/Errors.h>
@@ -30,7 +31,6 @@
 
 #include "android/media/IEffect.h"
 #include "android/media/BnEffectClient.h"
-
 
 namespace android {
 
@@ -337,9 +337,9 @@ public:
      *
      * Parameters:
      *
-     * opPackageName:      The package name used for app op checks.
+     * client:      Identity for app-op checks
      */
-    explicit AudioEffect(const String16& opPackageName);
+    explicit AudioEffect(const media::permission::Identity& client);
 
     /* Terminates the AudioEffect and unregisters it from AudioFlinger.
      * The effect engine is also destroyed if this AudioEffect was the last controlling
@@ -531,7 +531,7 @@ public:
      static const uint32_t kMaxPreProcessing = 10;
 
 protected:
-     const String16          mOpPackageName;     // The package name used for app op checks.
+     media::permission::Identity mClientIdentity; // Identity used for app op checks.
      bool                    mEnabled = false;   // enable state
      audio_session_t         mSessionId = AUDIO_SESSION_OUTPUT_MIX; // audio session ID
      int32_t                 mPriority = 0;      // priority for effect control
@@ -606,8 +606,6 @@ private:
     sp<EffectClient>        mIEffectClient;     // IEffectClient implementation
     sp<IMemory>             mCblkMemory;        // shared memory for deferred parameter setting
     effect_param_cblk_t*    mCblk = nullptr;    // control block for deferred parameter setting
-    pid_t                   mClientPid = (pid_t)-1;
-    uid_t                   mClientUid = (uid_t)-1;
 };
 
 

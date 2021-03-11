@@ -39,6 +39,7 @@ cc_test {
         "libstagefright",
         "libstagefright_foundation",
         "libutils",
+        "media_permission-aidl-cpp",
     ],
     compile_multilib: "first",
     cflags: [

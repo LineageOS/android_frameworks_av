@@ -24,6 +24,7 @@
 #include <mutex>
 #include <sstream>
 #include <utility/AAudioUtilities.h>
+#include <media/AidlConversion.h>
 
 #include "AAudioClientTracker.h"
 #include "AAudioEndpointManager.h"
@@ -182,7 +183,9 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
             // and START calls. This will help preserve app compatibility.
             // An app can avoid having this happen by closing their streams when
             // the app is paused.
-            AAudioClientTracker::getInstance().setExclusiveEnabled(request.getProcessId(), false);
+            pid_t pid = VALUE_OR_FATAL(
+                aidl2legacy_int32_t_pid_t(request.getIdentity().pid));
+            AAudioClientTracker::getInstance().setExclusiveEnabled(pid, false);
             endpointToSteal = endpoint; // return it to caller
         }
         return nullptr;
