@@ -68,7 +68,7 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
 
         std::array<LVM_FLOAT, android::audio_utils::kBiquadNumCoefs> coefs = {
                 LVCS_SEMidCoefTable[Offset].A0, LVCS_SEMidCoefTable[Offset].A1, 0.0,
-                -(LVCS_SEMidCoefTable[Offset].B1), 0.0};
+                LVCS_SEMidCoefTable[Offset].B1, 0.0};
         pInstance->pSEMidBiquad.reset(
                 new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
 
@@ -77,7 +77,7 @@ LVCS_ReturnStatus_en LVCS_SEnhancerInit(LVCS_Handle_t hInstance, LVCS_Params_t* 
 
         /* Side filter */
         coefs = {pSESideCoefs[Offset].A0, pSESideCoefs[Offset].A1, pSESideCoefs[Offset].A2,
-                 -(pSESideCoefs[Offset].B1), -(pSESideCoefs[Offset].B2)};
+                 pSESideCoefs[Offset].B1, pSESideCoefs[Offset].B2};
         pInstance->pSESideBiquad.reset(
                 new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1, coefs));
     }
