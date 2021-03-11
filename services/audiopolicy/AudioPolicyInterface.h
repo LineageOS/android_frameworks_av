@@ -272,8 +272,11 @@ public:
 
     virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
                                         audio_format_t *surroundFormats,
-                                        bool *surroundFormatsEnabled,
-                                        bool reported) = 0;
+                                        bool *surroundFormatsEnabled) = 0;
+
+    virtual status_t getReportedSurroundFormats(unsigned int *numSurroundFormats,
+                                                audio_format_t *surroundFormats) = 0;
+
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
 
     virtual bool     isHapticPlaybackSupported() = 0;
