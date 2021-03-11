@@ -3690,8 +3690,8 @@ status_t Camera3Device::HalInterface::processBatchCaptureRequests(
                         physicalCameraSettings[j].fmqSettingsSize = 0u;
                     }
                 } else {
-                    captureRequests_3_4[i].physicalCameraSettings[j].fmqSettingsSize = 0u;
-                    captureRequests_3_4[i].physicalCameraSettings[j].settings.resize(0);
+                    physicalCameraSettings[j].fmqSettingsSize = 0u;
+                    physicalCameraSettings[j].settings.resize(0);
                 }
                 physicalCameraSettings[j].physicalCameraId = request->physcam_id[j];
             }
