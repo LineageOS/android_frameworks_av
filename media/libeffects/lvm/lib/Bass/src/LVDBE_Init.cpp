@@ -79,6 +79,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_
     pInstance->Params.SampleRate = LVDBE_FS_8000;
     pInstance->Params.VolumeControl = LVDBE_VOLUME_OFF;
     pInstance->Params.VolumedB = 0;
+    pInstance->Params.NrChannels = FCC_2;
 
     /*
      * Create pointer to data and coef memory
@@ -91,7 +92,7 @@ LVDBE_ReturnStatus_en LVDBE_Init(LVDBE_Handle_t* phInstance, LVDBE_Capabilities_
      * Create biquad instance
      */
     pInstance->pHPFBiquad.reset(
-            new android::audio_utils::BiquadFilter<LVM_FLOAT>(LVM_MAX_CHANNELS));
+            new android::audio_utils::BiquadFilter<LVM_FLOAT>(pInstance->Params.NrChannels));
     pInstance->pBPFBiquad.reset(new android::audio_utils::BiquadFilter<LVM_FLOAT>(FCC_1));
 
     /*

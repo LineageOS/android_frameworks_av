@@ -1,0 +1,33 @@
+package {
+    // See: http://go/android-license-faq
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_binary {
+    name: "transcode",
+    srcs: ["Transcode.cpp"],
+
+    shared_libs: [
+        "libmediandk",
+        "libmediatranscoder",
+    ],
+
+    header_libs: [
+        "libbase_headers",
+    ],
+
+    compile_multilib: "32",
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+}
