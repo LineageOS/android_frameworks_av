@@ -1085,6 +1085,45 @@ void CCodec::configure(const sp<AMessage> &msg) {
             configUpdate.push_back(std::move(gop));
         }
 
+        if ((config->mDomain & Config::IS_ENCODER)
+                && (config->mDomain & Config::IS_VIDEO)) {
+            // we may not use all 3 of these entries
+            std::unique_ptr<C2StreamPictureQuantizationTuning::output> qp =
+                C2StreamPictureQuantizationTuning::output::AllocUnique(3 /* flexCount */,
+                                                                       0u /* stream */);
+
+            int ix = 0;
+
+            int32_t iMax = INT32_MAX;
+            int32_t iMin = INT32_MIN;
+            (void) sdkParams->findInt32(KEY_VIDEO_QP_I_MAX, &iMax);
+            (void) sdkParams->findInt32(KEY_VIDEO_QP_I_MIN, &iMin);
+            if (iMax != INT32_MAX || iMin != INT32_MIN) {
+                qp->m.values[ix++] = {I_FRAME, iMin, iMax};
+            }
+
+            int32_t pMax = INT32_MAX;
+            int32_t pMin = INT32_MIN;
+            (void) sdkParams->findInt32(KEY_VIDEO_QP_P_MAX, &pMax);
+            (void) sdkParams->findInt32(KEY_VIDEO_QP_P_MIN, &pMin);
+            if (pMax != INT32_MAX || pMin != INT32_MIN) {
+                qp->m.values[ix++] = {P_FRAME, pMin, pMax};
+            }
+
+            int32_t bMax = INT32_MAX;
+            int32_t bMin = INT32_MIN;
+            (void) sdkParams->findInt32(KEY_VIDEO_QP_B_MAX, &bMax);
+            (void) sdkParams->findInt32(KEY_VIDEO_QP_B_MIN, &bMin);
+            if (bMax != INT32_MAX || bMin != INT32_MIN) {
+                qp->m.values[ix++] = {B_FRAME, bMin, bMax};
+            }
+
+            // adjust to reflect actual use.
+            qp->setFlexCount(ix);
+
+            configUpdate.push_back(std::move(qp));
+        }
+
         err = config->setParameters(comp, configUpdate, C2_DONT_BLOCK);
         if (err != OK) {
             ALOGW("failed to configure c2 params");
