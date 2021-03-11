@@ -352,7 +352,7 @@ aidl_interface {
         "aidl/android/media/ExtraAudioDescriptor.aidl",
     ],
     imports: [
-        "audio_common-aidl",
+        "android.media.audio.common.types",
         "media_permission-aidl",
     ],
     backend: {
@@ -362,6 +362,9 @@ aidl_interface {
                 "//apex_available:platform",
                 "com.android.media",
             ],
+        },
+        java: {
+            sdk_version: "module_current",
         },
     },
 }
@@ -390,7 +393,7 @@ aidl_interface {
         "aidl/android/media/SoundTriggerSession.aidl",
     ],
     imports: [
-        "audio_common-aidl",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
     ],
     backend: {
@@ -400,6 +403,9 @@ aidl_interface {
                 "//apex_available:platform",
                 "com.android.media",
             ],
+        },
+        java: {
+            sdk_version: "module_current",
         },
     },
 }
@@ -430,7 +436,7 @@ aidl_interface {
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     imports: [
-        "audio_common-aidl",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "av-types-aidl",
         "effect-aidl",
@@ -445,6 +451,9 @@ aidl_interface {
                 "//apex_available:platform",
                 "com.android.media",
             ],
+        },
+        java: {
+            sdk_version: "module_current",
         },
     },
 }
@@ -465,7 +474,7 @@ aidl_interface {
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
     ],
     imports: [
-        "audio_common-aidl",
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",
@@ -479,6 +488,9 @@ aidl_interface {
                 "//apex_available:platform",
                 "com.android.media",
             ],
+        },
+        java: {
+            sdk_version: "module_current",
         },
     },
 }
