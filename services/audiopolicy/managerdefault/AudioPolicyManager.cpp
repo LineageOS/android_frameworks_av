@@ -4524,68 +4524,28 @@ float AudioPolicyManager::getStreamVolumeDB(
 
 status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats,
                                                 audio_format_t *surroundFormats,
-                                                bool *surroundFormatsEnabled,
-                                                bool reported)
+                                                bool *surroundFormatsEnabled)
 {
-    if (numSurroundFormats == NULL || (*numSurroundFormats != 0 &&
-            (surroundFormats == NULL || surroundFormatsEnabled == NULL))) {
+    if (numSurroundFormats == nullptr || (*numSurroundFormats != 0 &&
+            (surroundFormats == nullptr || surroundFormatsEnabled == nullptr))) {
         return BAD_VALUE;
     }
-    ALOGV("%s() numSurroundFormats %d surroundFormats %p surroundFormatsEnabled %p reported %d",
-            __func__, *numSurroundFormats, surroundFormats, surroundFormatsEnabled, reported);
+    ALOGV("%s() numSurroundFormats %d surroundFormats %p surroundFormatsEnabled %p",
+            __func__, *numSurroundFormats, surroundFormats, surroundFormatsEnabled);
 
     size_t formatsWritten = 0;
     size_t formatsMax = *numSurroundFormats;
-    std::unordered_set<audio_format_t> formats; // Uses primary surround formats only
-    if (reported) {
-        // Return formats from all device profiles that have already been resolved by
-        // checkOutputsForDevice().
-        for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
-            sp<DeviceDescriptor> device = mAvailableOutputDevices[i];
-            audio_devices_t deviceType = device->type();
-            // Enabling/disabling formats are applied to only HDMI devices. So, this function
-            // returns formats reported by HDMI devices.
-            if (deviceType != AUDIO_DEVICE_OUT_HDMI) {
-                continue;
-            }
-            // Formats reported by sink devices
-            std::unordered_set<audio_format_t> formatset;
-            if (auto it = mReportedFormatsMap.find(device); it != mReportedFormatsMap.end()) {
-                formatset.insert(it->second.begin(), it->second.end());
-            }
 
-            // Formats hard-coded in the in policy configuration file (if any).
-            FormatVector encodedFormats = device->encodedFormats();
-            formatset.insert(encodedFormats.begin(), encodedFormats.end());
-            // Filter the formats which are supported by the vendor hardware.
-            for (auto it = formatset.begin(); it != formatset.end(); ++it) {
-                if (mConfig.getSurroundFormats().count(*it) != 0) {
-                    formats.insert(*it);
-                } else {
-                    for (const auto& pair : mConfig.getSurroundFormats()) {
-                        if (pair.second.count(*it) != 0) {
-                            formats.insert(pair.first);
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-    } else {
-        for (const auto& pair : mConfig.getSurroundFormats()) {
-            formats.insert(pair.first);
-        }
-    }
-    *numSurroundFormats = formats.size();
+    *numSurroundFormats = mConfig.getSurroundFormats().size();
     audio_policy_forced_cfg_t forceUse = mEngine->getForceUse(
             AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND);
-    for (const auto& format: formats) {
+    for (const auto& format: mConfig.getSurroundFormats()) {
         if (formatsWritten < formatsMax) {
-            surroundFormats[formatsWritten] = format;
+            surroundFormats[formatsWritten] = format.first;
             bool formatEnabled = true;
             switch (forceUse) {
                 case AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL:
-                    formatEnabled = mManualSurroundFormats.count(format) != 0;
+                    formatEnabled = mManualSurroundFormats.count(format.first) != 0;
                     break;
                 case AUDIO_POLICY_FORCE_ENCODED_SURROUND_NEVER:
                     formatEnabled = false;
@@ -4594,6 +4554,60 @@ status_t AudioPolicyManager::getSurroundFormats(unsigned int *numSurroundFormats
                     break;
             }
             surroundFormatsEnabled[formatsWritten++] = formatEnabled;
+        }
+    }
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::getReportedSurroundFormats(unsigned int *numSurroundFormats,
+                                                        audio_format_t *surroundFormats) {
+    if (numSurroundFormats == nullptr || (*numSurroundFormats != 0 && surroundFormats == nullptr)) {
+        return BAD_VALUE;
+    }
+    ALOGV("%s() numSurroundFormats %d surroundFormats %p",
+            __func__, *numSurroundFormats, surroundFormats);
+
+    size_t formatsWritten = 0;
+    size_t formatsMax = *numSurroundFormats;
+    std::unordered_set<audio_format_t> formats; // Uses primary surround formats only
+
+    // Return formats from all device profiles that have already been resolved by
+    // checkOutputsForDevice().
+    for (size_t i = 0; i < mAvailableOutputDevices.size(); i++) {
+        sp<DeviceDescriptor> device = mAvailableOutputDevices[i];
+        audio_devices_t deviceType = device->type();
+        // Enabling/disabling formats are applied to only HDMI devices. So, this function
+        // returns formats reported by HDMI devices.
+        if (deviceType != AUDIO_DEVICE_OUT_HDMI) {
+            continue;
+        }
+        // Formats reported by sink devices
+        std::unordered_set<audio_format_t> formatset;
+        if (auto it = mReportedFormatsMap.find(device); it != mReportedFormatsMap.end()) {
+            formatset.insert(it->second.begin(), it->second.end());
+        }
+
+        // Formats hard-coded in the in policy configuration file (if any).
+        FormatVector encodedFormats = device->encodedFormats();
+        formatset.insert(encodedFormats.begin(), encodedFormats.end());
+        // Filter the formats which are supported by the vendor hardware.
+        for (auto it = formatset.begin(); it != formatset.end(); ++it) {
+            if (mConfig.getSurroundFormats().count(*it) != 0) {
+                formats.insert(*it);
+            } else {
+                for (const auto& pair : mConfig.getSurroundFormats()) {
+                    if (pair.second.count(*it) != 0) {
+                        formats.insert(pair.first);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    *numSurroundFormats = formats.size();
+    for (const auto& format: formats) {
+        if (formatsWritten < formatsMax) {
+            surroundFormats[formatsWritten++] = format;
         }
     }
     return NO_ERROR;
