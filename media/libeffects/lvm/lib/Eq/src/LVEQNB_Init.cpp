@@ -24,7 +24,6 @@
 #include <stdlib.h>
 #include "LVEQNB.h"
 #include "LVEQNB_Private.h"
-#include "InstAlloc.h"
 #include <string.h> /* For memset */
 
 /****************************************************************************************/

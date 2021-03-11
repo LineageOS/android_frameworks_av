@@ -25,7 +25,6 @@
 #include "LVM_Private.h"
 #include "LVM_Tables.h"
 #include "VectorArithmetic.h"
-#include "InstAlloc.h"
 
 /****************************************************************************************/
 /*                                                                                      */
