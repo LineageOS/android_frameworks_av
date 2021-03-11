@@ -348,7 +348,7 @@ std::pair<std::string, int32_t> AudioAnalytics::dump(
             } else {
                 ss << "Statsd atoms:\n" << statsd;
             }
-            ll -= n;
+            ll -= (int32_t)n;
         }
     }
 
@@ -737,7 +737,7 @@ void AudioAnalytics::DeviceConnection::createPatch(
         mA2dpConnectionServiceNs = 0;
         ++mA2dpConnectionSuccesses;
 
-        const auto connectionTimeMs = float(timeDiffNs * 1e-6);
+        const auto connectionTimeMs = float((double)timeDiffNs * 1e-6);
 
         const auto outputDeviceBits = types::lookup<types::OUTPUT_DEVICE, long_enum_type_t>(
                 "AUDIO_DEVICE_OUT_BLUETOOTH_A2DP");
