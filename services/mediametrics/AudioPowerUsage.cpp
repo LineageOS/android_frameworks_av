@@ -174,8 +174,8 @@ bool AudioPowerUsage::saveAsItem_l(
         if (item_device == device && item_type == type) {
             int64_t final_duration_ns = item_duration_ns + duration_ns;
             double final_volume = (device & INPUT_DEVICE_BIT) ? 1.0:
-                            ((item_volume * item_duration_ns +
-                            average_vol * duration_ns) / final_duration_ns);
+                            ((item_volume * (double)item_duration_ns +
+                            average_vol * (double)duration_ns) / (double)final_duration_ns);
 
             item->setInt64(AUDIO_POWER_USAGE_PROP_DURATION_NS, final_duration_ns);
             item->setDouble(AUDIO_POWER_USAGE_PROP_VOLUME, final_volume);
@@ -289,7 +289,7 @@ void AudioPowerUsage::checkMode(const std::shared_ptr<const mediametrics::Item>&
         const int64_t durationNs = endCallNs - mDeviceTimeNs;
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
-                    mVoiceVolume * double(endCallNs - mVolumeTimeNs)) / durationNs;
+                    mVoiceVolume * double(endCallNs - mVolumeTimeNs)) / (double)durationNs;
             saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
         }
     } else if (mode == "AUDIO_MODE_IN_CALL") { // entering call mode
@@ -317,7 +317,7 @@ void AudioPowerUsage::checkVoiceVolume(const std::shared_ptr<const mediametrics:
         const int64_t durationNs = timeNs - mDeviceTimeNs;
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
-                    mVoiceVolume * double(timeNs - mVolumeTimeNs)) / durationNs;
+                    mVoiceVolume * double(timeNs - mVolumeTimeNs)) / (double)durationNs;
             mVolumeTimeNs = timeNs;
         }
     }
@@ -348,7 +348,7 @@ void AudioPowerUsage::checkCreatePatch(const std::shared_ptr<const mediametrics:
         const int64_t durationNs = endDeviceNs - mDeviceTimeNs;
         if (durationNs > 0) {
             mDeviceVolume = (mDeviceVolume * double(mVolumeTimeNs - mDeviceTimeNs) +
-                    mVoiceVolume * double(endDeviceNs - mVolumeTimeNs)) / durationNs;
+                    mVoiceVolume * double(endDeviceNs - mVolumeTimeNs)) / (double)durationNs;
             saveAsItems_l(mPrimaryDevice, durationNs, VOICE_CALL_TYPE, mDeviceVolume);
         }
         // reset statistics
