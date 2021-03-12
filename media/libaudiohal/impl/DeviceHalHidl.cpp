@@ -246,6 +246,10 @@ status_t DeviceHalHidl::openInputStream(
         return status;
     }
     CoreUtils::AudioInputFlags hidlFlags;
+#if MAJOR_VERSION <= 5
+    // Some flags were specific to framework and must not leak to the HAL.
+    flags = static_cast<audio_input_flags_t>(flags & ~AUDIO_INPUT_FLAG_DIRECT);
+#endif
     if (status_t status = CoreUtils::audioInputFlagsFromHal(flags, &hidlFlags); status != OK) {
         return status;
     }
@@ -277,10 +281,6 @@ status_t DeviceHalHidl::openInputStream(
         }
         sinkMetadata.tracks[0].destination.device(std::move(hidlOutputDevice));
     }
-#endif
-#if MAJOR_VERSION <= 5
-    // Some flags were specific to framework and must not leak to the HAL.
-    flags = static_cast<audio_input_flags_t>(flags & ~AUDIO_INPUT_FLAG_DIRECT);
 #endif
     Return<void> ret = mDevice->openInputStream(
             handle, hidlDevice, hidlConfig, hidlFlags, sinkMetadata,
