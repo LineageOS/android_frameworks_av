@@ -182,9 +182,11 @@ public:
     binder::Status getMasterMono(bool* _aidl_return) override;
     binder::Status getStreamVolumeDB(media::AudioStreamType stream, int32_t index, int32_t device,
                                      float* _aidl_return) override;
-    binder::Status getSurroundFormats(bool reported, media::Int* count,
+    binder::Status getSurroundFormats(media::Int* count,
                                       std::vector<media::audio::common::AudioFormat>* formats,
                                       std::vector<bool>* formatsEnabled) override;
+    binder::Status getReportedSurroundFormats(
+            media::Int* count, std::vector<media::audio::common::AudioFormat>* formats) override;
     binder::Status getHwOffloadEncodingFormatsSupportedForA2DP(
             std::vector<media::audio::common::AudioFormat>* _aidl_return) override;
     binder::Status setSurroundFormatEnabled(media::audio::common::AudioFormat audioFormat,
