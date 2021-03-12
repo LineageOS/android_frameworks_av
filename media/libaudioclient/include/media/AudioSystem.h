@@ -417,8 +417,9 @@ public:
     // populated. The actual number of surround formats should be returned at numSurroundFormats.
     static status_t getSurroundFormats(unsigned int *numSurroundFormats,
                                        audio_format_t *surroundFormats,
-                                       bool *surroundFormatsEnabled,
-                                       bool reported);
+                                       bool *surroundFormatsEnabled);
+    static status_t getReportedSurroundFormats(unsigned int *numSurroundFormats,
+                                               audio_format_t *surroundFormats);
     static status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled);
 
     static status_t setAssistantUid(uid_t uid);

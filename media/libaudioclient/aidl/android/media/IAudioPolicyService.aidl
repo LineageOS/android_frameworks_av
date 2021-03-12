@@ -279,10 +279,20 @@ interface IAudioPolicyService {
      * Passing '0' on input and inspecting the value on output is a common way of determining the
      * number of elements without actually retrieving them.
      */
-    void getSurroundFormats(boolean reported,
-                            inout Int count,
+    void getSurroundFormats(inout Int count,
                             out AudioFormat[] formats,
                             out boolean[] formatsEnabled);
+
+    /**
+     * Populates the surround formats reported by the HDMI devices in formats.
+     *
+     * On input, count represents the maximum length of the returned array.
+     * On output, count is the total number of elements, which may be larger than the array size.
+     * Passing '0' on input and inspecting the value on output is a common way of determining the
+     * number of elements without actually retrieving them.
+     */
+    void getReportedSurroundFormats(inout Int count,
+                                    out AudioFormat[] formats);
 
     AudioFormat[] getHwOffloadEncodingFormatsSupportedForA2DP();
 
