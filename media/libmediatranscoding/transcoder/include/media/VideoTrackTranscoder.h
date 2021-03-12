@@ -83,8 +83,8 @@ private:
     // Dequeues an encoded buffer from the encoder and adds it to the output queue.
     void dequeueOutputSample(int32_t bufferIndex, AMediaCodecBufferInfo bufferInfo);
 
-    // Updates the video track's actual format based on encoder output format.
-    void updateTrackFormat(AMediaFormat* outputFormat);
+    // Updates the video track's actual format based on encoder and decoder output format.
+    void updateTrackFormat(AMediaFormat* outputFormat, bool fromDecoder);
 
     AMediaCodec* mDecoder = nullptr;
     std::shared_ptr<CodecWrapper> mEncoder;
