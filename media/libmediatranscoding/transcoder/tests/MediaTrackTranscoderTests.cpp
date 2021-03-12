@@ -28,7 +28,7 @@
 #include <media/PassthroughTrackTranscoder.h>
 #include <media/VideoTrackTranscoder.h>
 
-#include "TrackTranscoderTestUtils.h"
+#include "TranscoderTestUtils.h"
 
 namespace android {
 
@@ -49,7 +49,7 @@ public:
         // (b/155663561).
         ABinderProcess_startThreadPool();
 
-        mCallback = std::make_shared<TestCallback>();
+        mCallback = std::make_shared<TestTrackTranscoderCallback>();
 
         switch (GetParam()) {
         case VIDEO:
@@ -134,7 +134,7 @@ public:
 
 protected:
     std::shared_ptr<MediaTrackTranscoder> mTranscoder;
-    std::shared_ptr<TestCallback> mCallback;
+    std::shared_ptr<TestTrackTranscoderCallback> mCallback;
 
     std::shared_ptr<MediaSampleReader> mMediaSampleReader;
     int mTrackIndex;

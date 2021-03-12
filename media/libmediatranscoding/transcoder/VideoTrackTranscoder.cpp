@@ -145,12 +145,12 @@ struct AsyncCodecCallbackDispatch {
         VideoTrackTranscoder::CodecWrapper* wrapper =
                 static_cast<VideoTrackTranscoder::CodecWrapper*>(userdata);
         if (auto transcoder = wrapper->getTranscoder()) {
-            const char* kCodecName = (codec == transcoder->mDecoder ? "Decoder" : "Encoder");
+            const bool isDecoder = codec == transcoder->mDecoder;
+            const char* kCodecName = (isDecoder ? "Decoder" : "Encoder");
             LOG(DEBUG) << kCodecName << " format changed: " << AMediaFormat_toString(format);
-            if (codec == transcoder->mEncoder->getCodec()) {
-                transcoder->mCodecMessageQueue.push(
-                        [transcoder, format] { transcoder->updateTrackFormat(format); });
-            }
+            transcoder->mCodecMessageQueue.push([transcoder, format, isDecoder] {
+                transcoder->updateTrackFormat(format, isDecoder);
+            });
         }
     }
 
@@ -507,7 +507,25 @@ void VideoTrackTranscoder::dequeueOutputSample(int32_t bufferIndex,
     }
 }
 
-void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
+void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat, bool fromDecoder) {
+    if (fromDecoder) {
+        static const AMediaFormatUtils::EntryCopier kValuesToCopy[] = {
+                ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_RANGE, Int32),
+                ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_STANDARD, Int32),
+                ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_TRANSFER, Int32),
+        };
+        AMediaFormat* params = AMediaFormat_new();
+        if (params != nullptr) {
+            AMediaFormatUtils::CopyFormatEntries(outputFormat, params, kValuesToCopy,
+                                                 std::size(kValuesToCopy));
+            if (AMediaCodec_setParameters(mEncoder->getCodec(), params) != AMEDIA_OK) {
+                LOG(WARNING) << "Unable to update encoder with color information";
+            }
+            AMediaFormat_delete(params);
+        }
+        return;
+    }
+
     if (mActualOutputFormat != nullptr) {
         LOG(WARNING) << "Ignoring duplicate format change.";
         return;
@@ -571,6 +589,7 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat) {
     // TODO: transfer other fields as required.
 
     mActualOutputFormat = std::shared_ptr<AMediaFormat>(formatCopy, &AMediaFormat_delete);
+    LOG(DEBUG) << "Actual output format: " << AMediaFormat_toString(formatCopy);
 
     notifyTrackFormatAvailable();
 }
