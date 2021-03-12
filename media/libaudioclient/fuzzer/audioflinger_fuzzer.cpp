@@ -23,8 +23,10 @@
  */
 
 #include <android_audio_policy_configuration_V7_0-enums.h>
+#include <android/media/permission/Identity.h>
 #include <binder/IServiceManager.h>
 #include <binder/MemoryDealer.h>
+#include <media/AidlConversion.h>
 #include <media/AudioEffect.h>
 #include <media/AudioRecord.h>
 #include <media/AudioSystem.h>
@@ -45,6 +47,8 @@ using namespace android;
 namespace xsd {
 using namespace ::android::audio::policy::configuration::V7_0;
 }
+
+using media::permission::Identity;
 
 constexpr audio_unique_id_use_t kUniqueIds[] = {
     AUDIO_UNIQUE_ID_USE_UNSPECIFIED, AUDIO_UNIQUE_ID_USE_SESSION, AUDIO_UNIQUE_ID_USE_MODULE,
@@ -221,11 +225,15 @@ void AudioFlingerFuzzer::invokeAudioTrack() {
     attributes.usage = usage;
     sp<AudioTrack> track = new AudioTrack();
 
+    // TODO b/182392769: use identity util
+    Identity i;
+    i.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+    i.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
     track->set(AUDIO_STREAM_DEFAULT, sampleRate, format, channelMask, frameCount, flags, nullptr,
                nullptr, notificationFrames, sharedBuffer, false, sessionId,
                ((fast && sharedBuffer == 0) || offload) ? AudioTrack::TRANSFER_CALLBACK
                                                         : AudioTrack::TRANSFER_DEFAULT,
-               offload ? &offloadInfo : nullptr, getuid(), getpid(), &attributes, false, 1.0f,
+               offload ? &offloadInfo : nullptr, i, &attributes, false, 1.0f,
                AUDIO_PORT_HANDLE_NONE);
 
     status_t status = track->initCheck();
@@ -300,7 +308,10 @@ void AudioFlingerFuzzer::invokeAudioRecord() {
 
     attributes.source = inputSource;
 
-    sp<AudioRecord> record = new AudioRecord(String16(mFdp.ConsumeRandomLengthString().c_str()));
+    // TODO b/182392769: use identity util
+    Identity i;
+    i.packageName = std::string(mFdp.ConsumeRandomLengthString().c_str());
+    sp<AudioRecord> record = new AudioRecord(i);
     record->set(AUDIO_SOURCE_DEFAULT, sampleRate, format, channelMask, frameCount, nullptr, nullptr,
                 notificationFrames, false, sessionId,
                 fast ? AudioRecord::TRANSFER_CALLBACK : AudioRecord::TRANSFER_DEFAULT, flags,
@@ -391,7 +402,7 @@ status_t AudioFlingerFuzzer::invokeAudioEffect() {
     const int32_t priority = mFdp.ConsumeIntegral<int32_t>();
     audio_session_t sessionId = static_cast<audio_session_t>(mFdp.ConsumeIntegral<int32_t>());
     const audio_io_handle_t io = mFdp.ConsumeIntegral<int32_t>();
-    String16 opPackageName = static_cast<String16>(mFdp.ConsumeRandomLengthString().c_str());
+    std::string opPackageName = static_cast<std::string>(mFdp.ConsumeRandomLengthString().c_str());
     AudioDeviceTypeAddr device;
 
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
@@ -407,8 +418,9 @@ status_t AudioFlingerFuzzer::invokeAudioEffect() {
     request.output = io;
     request.sessionId = sessionId;
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(device));
-    request.opPackageName = VALUE_OR_RETURN_STATUS(legacy2aidl_String16_string(opPackageName));
-    request.pid = getpid();
+    // TODO b/182392769: use identity util
+    request.identity.packageName = opPackageName;
+    request.identity.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(getpid()));
     request.probe = false;
 
     media::CreateEffectResponse response{};

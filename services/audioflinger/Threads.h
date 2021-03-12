@@ -882,12 +882,11 @@ public:
                                 audio_session_t sessionId,
                                 audio_output_flags_t *flags,
                                 pid_t creatorPid,
+                                const media::permission::Identity& identity,
                                 pid_t tid,
-                                uid_t uid,
                                 status_t *status /*non-NULL*/,
                                 audio_port_handle_t portId,
-                                const sp<media::IAudioTrackCallback>& callback,
-                                const std::string& opPackageName);
+                                const sp<media::IAudioTrackCallback>& callback);
 
                 AudioStreamOut* getOutput() const;
                 AudioStreamOut* clearOutput();
@@ -1642,12 +1641,11 @@ public:
                     audio_session_t sessionId,
                     size_t *pNotificationFrameCount,
                     pid_t creatorPid,
-                    uid_t uid,
+                    const media::permission::Identity& identity,
                     audio_input_flags_t *flags,
                     pid_t tid,
                     status_t *status /*non-NULL*/,
-                    audio_port_handle_t portId,
-                    const String16& opPackageName);
+                    audio_port_handle_t portId);
 
             status_t    start(RecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,

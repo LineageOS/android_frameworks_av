@@ -30,6 +30,7 @@ cc_defaults {
         "libgui",
         "libbinder",
         "liblog",
+        "media_permission-aidl-cpp",
     ],
     include_dirs: [
         "frameworks/av/media/libstagefright",
