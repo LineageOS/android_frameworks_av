@@ -1960,6 +1960,39 @@ void CCodec::signalRequestIDRFrame() {
     config->setParameters(comp, params, C2_MAY_BLOCK);
 }
 
+status_t CCodec::querySupportedParameters(std::vector<std::string> *names) {
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->querySupportedParameters(names);
+}
+
+status_t CCodec::describeParameter(
+        const std::string &name, CodecParameterDescriptor *desc) {
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->describe(name, desc);
+}
+
+status_t CCodec::subscribeToParameters(const std::vector<std::string> &names) {
+    std::shared_ptr<Codec2Client::Component> comp = mState.lock()->comp;
+    if (!comp) {
+        return INVALID_OPERATION;
+    }
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->subscribeToVendorConfigUpdate(comp, names);
+}
+
+status_t CCodec::unsubscribeFromParameters(const std::vector<std::string> &names) {
+    std::shared_ptr<Codec2Client::Component> comp = mState.lock()->comp;
+    if (!comp) {
+        return INVALID_OPERATION;
+    }
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->unsubscribeFromVendorConfigUpdate(comp, names);
+}
+
 void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
     if (!workItems.empty()) {
         Mutexed<std::list<std::unique_ptr<C2Work>>>::Locked queue(mWorkDoneQueue);

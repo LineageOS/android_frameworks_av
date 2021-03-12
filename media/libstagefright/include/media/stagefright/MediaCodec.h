@@ -50,6 +50,7 @@ struct AString;
 struct BatteryChecker;
 class BufferChannelBase;
 struct CodecBase;
+struct CodecParameterDescriptor;
 class IBatteryStats;
 struct ICrypto;
 class MediaCodecBuffer;
@@ -245,6 +246,11 @@ struct MediaCodec : public AHandler {
     status_t getMetrics(mediametrics_handle_t &reply);
 
     status_t setParameters(const sp<AMessage> &params);
+
+    status_t querySupportedVendorParameters(std::vector<std::string> *names);
+    status_t describeParameter(const std::string &name, CodecParameterDescriptor *desc);
+    status_t subscribeToVendorParameters(const std::vector<std::string> &names);
+    status_t unsubscribeFromVendorParameters(const std::vector<std::string> &names);
 
     // Create a MediaCodec notification message from a list of rendered or dropped render infos
     // by adding rendered frame information to a base notification message. Returns the number

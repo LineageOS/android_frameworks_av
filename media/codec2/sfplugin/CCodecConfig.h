@@ -35,6 +35,7 @@
 namespace android {
 
 struct AMessage;
+struct CodecParameterDescriptor;
 class NativeHandle;
 struct StandardParams;
 
@@ -137,8 +138,8 @@ struct CCodecConfig {
     /// For now support a validation function.
     std::map<C2Param::Index, LocalParamValidator> mLocalParams;
 
-    /// Vendor field name -> index map.
-    std::map<std::string, C2Param::Index> mVendorParamIndices;
+    /// Vendor field name -> desc map.
+    std::map<std::string, std::shared_ptr<C2ParamDescriptor>> mVendorParams;
 
     std::set<std::string> mLastConfig;
 
@@ -325,6 +326,41 @@ struct CCodecConfig {
         }
         return Watcher<T>(index, this);
     }
+
+    /**
+     * Queries supported parameters and put the keys to |names|.
+     * TODO: currently this method queries vendor parameter keys only.
+     *
+     * \return OK if successful.
+     *         BAD_VALUE if |names| is nullptr.
+     */
+    status_t querySupportedParameters(std::vector<std::string> *names);
+
+    /**
+     * Describe the parameter with |name|, filling the information into |desc|
+     * TODO: currently this method works only for vendor parameters.
+     *
+     * \return OK if successful.
+     *         BAD_VALUE if |desc| is nullptr.
+     *         NAME_NOT_FOUND if |name| is not a recognized parameter name.
+     */
+    status_t describe(const std::string &name, CodecParameterDescriptor *desc);
+
+    /**
+     * Find corresponding indices for |names| and subscribe to them.
+     */
+    status_t subscribeToVendorConfigUpdate(
+            const std::shared_ptr<Codec2Client::Configurable> &configurable,
+            const std::vector<std::string> &names,
+            c2_blocking_t blocking = C2_DONT_BLOCK);
+
+    /**
+     * Find corresponding indices for |names| and unsubscribe from them.
+     */
+    status_t unsubscribeFromVendorConfigUpdate(
+            const std::shared_ptr<Codec2Client::Configurable> &configurable,
+            const std::vector<std::string> &names,
+            c2_blocking_t blocking = C2_DONT_BLOCK);
 
 private:
 
