@@ -16,11 +16,12 @@
 
 #include <gtest/gtest.h>
 
-#include <C2AllocatorIon.h>
 #include <C2AllocatorGralloc.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
+#include <C2Config.h>
 #include <C2ParamDef.h>
+#include <C2PlatformSupport.h>
 
 #include <system/graphics.h>
 
@@ -233,10 +234,10 @@ class C2BufferTest : public ::testing::Test {
 public:
     C2BufferTest()
         : mBlockPoolId(C2BlockPool::PLATFORM_START),
-          mLinearAllocator(std::make_shared<C2AllocatorIon>('i')),
           mSize(0u),
           mAddr(nullptr),
           mGraphicAllocator(std::make_shared<C2AllocatorGralloc>('g')) {
+        getLinearAllocator(&mLinearAllocator);
     }
 
     ~C2BufferTest() = default;
@@ -329,6 +330,11 @@ public:
     }
 
 private:
+    void getLinearAllocator(std::shared_ptr<C2Allocator>* mLinearAllocator) {
+        std::shared_ptr<C2AllocatorStore> store = android::GetCodec2PlatformAllocatorStore();
+        ASSERT_EQ(store->fetchAllocator(C2AllocatorStore::DEFAULT_LINEAR, mLinearAllocator), C2_OK);
+    }
+
     C2BlockPool::local_id_t mBlockPoolId;
     std::shared_ptr<C2Allocator> mLinearAllocator;
     std::shared_ptr<C2LinearAllocation> mLinearAllocation;
