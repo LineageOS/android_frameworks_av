@@ -925,6 +925,7 @@ status_t AudioPolicyService::onTransact(
         case TRANSACTION_registerPolicyMixes:
         case TRANSACTION_setMasterMono:
         case TRANSACTION_getSurroundFormats:
+        case TRANSACTION_getReportedSurroundFormats:
         case TRANSACTION_setSurroundFormatEnabled:
         case TRANSACTION_setAssistantUid:
         case TRANSACTION_setA11yServicesUids:
