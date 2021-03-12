@@ -1133,10 +1133,10 @@ void CCodec::configure(const sp<AMessage> &msg) {
         int32_t clientPrepend;
         if ((config->mDomain & Config::IS_VIDEO)
                 && (config->mDomain & Config::IS_ENCODER)
-                && msg->findInt32(KEY_PREPEND_HEADERS_TO_SYNC_FRAMES, &clientPrepend)
+                && msg->findInt32(KEY_PREPEND_HEADER_TO_SYNC_FRAMES, &clientPrepend)
                 && clientPrepend
                 && (!prepend || prepend.value != PREPEND_HEADER_TO_ALL_SYNC)) {
-            ALOGE("Failed to set KEY_PREPEND_HEADERS_TO_SYNC_FRAMES");
+            ALOGE("Failed to set KEY_PREPEND_HEADER_TO_SYNC_FRAMES");
             return BAD_VALUE;
         }
 
