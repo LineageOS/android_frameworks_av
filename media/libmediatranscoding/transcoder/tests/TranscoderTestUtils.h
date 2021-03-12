@@ -16,6 +16,7 @@
 
 #include <media/MediaTrackTranscoder.h>
 #include <media/MediaTrackTranscoderCallback.h>
+#include <media/MediaTranscoder.h>
 
 #include <condition_variable>
 #include <memory>
@@ -24,8 +25,39 @@
 namespace android {
 
 //
-// This file contains test utilities used by more than one track transcoder test.
+// This file contains transcoding test utilities.
 //
+
+namespace TranscoderTestUtils {
+
+std::shared_ptr<AMediaFormat> GetVideoFormat(const std::string& path,
+                                             std::string* mimeOut = nullptr) {
+    int fd = open(path.c_str(), O_RDONLY);
+    EXPECT_GT(fd, 0);
+    ssize_t fileSize = lseek(fd, 0, SEEK_END);
+    lseek(fd, 0, SEEK_SET);
+
+    auto sampleReader = MediaSampleReaderNDK::createFromFd(fd, 0, fileSize);
+    EXPECT_NE(sampleReader, nullptr);
+
+    for (size_t i = 0; i < sampleReader->getTrackCount(); ++i) {
+        AMediaFormat* format = sampleReader->getTrackFormat(i);
+
+        const char* mime = nullptr;
+        AMediaFormat_getString(format, AMEDIAFORMAT_KEY_MIME, &mime);
+        if (strncmp(mime, "video/", 6) == 0) {
+            if (mimeOut != nullptr) {
+                mimeOut->assign(mime);
+            }
+            return std::shared_ptr<AMediaFormat>(format, &AMediaFormat_delete);
+        }
+
+        AMediaFormat_delete(format);
+    }
+    return nullptr;
+}
+
+};  // namespace TranscoderTestUtils
 
 class TrackTranscoderTestUtils {
 public:
@@ -46,10 +78,10 @@ public:
     }
 };
 
-class TestCallback : public MediaTrackTranscoderCallback {
+class TestTrackTranscoderCallback : public MediaTrackTranscoderCallback {
 public:
-    TestCallback() = default;
-    ~TestCallback() = default;
+    TestTrackTranscoderCallback() = default;
+    ~TestTrackTranscoderCallback() = default;
 
     // MediaTrackTranscoderCallback
     void onTrackFormatAvailable(const MediaTrackTranscoder* transcoder __unused) {
@@ -107,6 +139,66 @@ private:
     bool mTranscodingFinished = false;
     bool mTranscodingStopped = false;
     bool mTrackFormatAvailable = false;
+};
+
+class TestTranscoderCallbacks : public MediaTranscoder::CallbackInterface {
+public:
+    virtual void onFinished(const MediaTranscoder* transcoder __unused) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        EXPECT_FALSE(mFinished);
+        mFinished = true;
+        mCondition.notify_all();
+    }
+
+    virtual void onError(const MediaTranscoder* transcoder __unused,
+                         media_status_t error) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        EXPECT_NE(error, AMEDIA_OK);
+        EXPECT_FALSE(mFinished);
+        mFinished = true;
+        mStatus = error;
+        mCondition.notify_all();
+    }
+
+    virtual void onProgressUpdate(const MediaTranscoder* transcoder __unused,
+                                  int32_t progress) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        if (progress > 0 && !mProgressMade) {
+            mProgressMade = true;
+            mCondition.notify_all();
+        }
+    }
+
+    virtual void onHeartBeat(const MediaTranscoder* transcoder __unused) override {
+        std::unique_lock<std::mutex> lock(mMutex);
+        mHeartBeatCount++;
+    }
+
+    virtual void onCodecResourceLost(const MediaTranscoder* transcoder __unused,
+                                     const std::shared_ptr<ndk::ScopedAParcel>& pausedState
+                                             __unused) override {}
+
+    void waitForTranscodingFinished() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (!mFinished) {
+            mCondition.wait(lock);
+        }
+    }
+
+    void waitForProgressMade() {
+        std::unique_lock<std::mutex> lock(mMutex);
+        while (!mProgressMade && !mFinished) {
+            mCondition.wait(lock);
+        }
+    }
+    media_status_t mStatus = AMEDIA_OK;
+    bool mFinished = false;
+    int32_t mHeartBeatCount = 0;
+
+private:
+    std::mutex mMutex;
+    std::condition_variable mCondition;
+    bool mProgressMade = false;
 };
 
 class OneShotSemaphore {
