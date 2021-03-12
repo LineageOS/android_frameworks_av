@@ -507,7 +507,7 @@ void CCodecConfig::initializeStandardParams() {
     add(ConfigMapper(std::string(KEY_FEATURE_) + FEATURE_SecurePlayback,
                      C2_PARAMKEY_SECURE_MODE, "value"));
 
-    add(ConfigMapper(KEY_PREPEND_HEADERS_TO_SYNC_FRAMES,
+    add(ConfigMapper(KEY_PREPEND_HEADER_TO_SYNC_FRAMES,
                      C2_PARAMKEY_PREPEND_HEADER_MODE, "value")
         .limitTo(D::ENCODER & D::VIDEO)
         .withMappers([](C2Value v) -> C2Value {
@@ -531,7 +531,7 @@ void CCodecConfig::initializeStandardParams() {
             return C2Value();
         }));
     // remove when codecs switch to PARAMKEY
-    deprecated(ConfigMapper(KEY_PREPEND_HEADERS_TO_SYNC_FRAMES,
+    deprecated(ConfigMapper(KEY_PREPEND_HEADER_TO_SYNC_FRAMES,
                             "coding.add-csd-to-sync-frames", "value")
                .limitTo(D::ENCODER & D::VIDEO));
     // convert to timestamp base
