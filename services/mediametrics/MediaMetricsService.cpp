@@ -107,7 +107,7 @@ MediaMetricsService::~MediaMetricsService()
 {
     ALOGD("%s", __func__);
     // the class destructor clears anyhow, but we enforce clearing items first.
-    mItemsDiscarded += mItems.size();
+    mItemsDiscarded += (int64_t)mItems.size();
     mItems.clear();
 }
 
@@ -287,7 +287,7 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
         std::lock_guard _l(mLock);
 
         if (clear) {
-            mItemsDiscarded += mItems.size();
+            mItemsDiscarded += (int64_t)mItems.size();
             mItems.clear();
             mAudioAnalytics.clear();
         } else {
@@ -416,10 +416,10 @@ bool MediaMetricsService::expirations(const std::shared_ptr<const mediametrics::
 
     if (const size_t toErase = overlimit + expired;
             toErase > 0) {
-        mItemsDiscardedCount += overlimit;
-        mItemsDiscardedExpire += expired;
-        mItemsDiscarded += toErase;
-        mItems.erase(mItems.begin(), mItems.begin() + toErase); // erase from front
+        mItemsDiscardedCount += (int64_t)overlimit;
+        mItemsDiscardedExpire += (int64_t)expired;
+        mItemsDiscarded += (int64_t)toErase;
+        mItems.erase(mItems.begin(), mItems.begin() + (ptrdiff_t)toErase); // erase from front
     }
     return more;
 }
