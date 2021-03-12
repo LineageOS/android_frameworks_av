@@ -48,6 +48,7 @@ import android.media.GetOutputForAttrResponse;
 import android.media.IAudioPolicyServiceClient;
 import android.media.ICaptureStateListener;
 import android.media.Int;
+import android.media.permission.Identity;
 import android.media.SoundTriggerSession;
 
 /**
@@ -80,8 +81,7 @@ interface IAudioPolicyService {
 
     GetOutputForAttrResponse getOutputForAttr(in AudioAttributesInternal attr,
                                               int /* audio_session_t */ session,
-                                              int /* pid_t */ pid,
-                                              int /* uid_t */ uid,
+                                              in Identity identity,
                                               in AudioConfig config,
                                               int /* Bitmask, indexed by AudioOutputFlags */ flags,
                                               int /* audio_port_handle_t */ selectedDeviceId);
@@ -96,9 +96,7 @@ interface IAudioPolicyService {
                                             int /* audio_io_handle_t */ input,
                                             int /* audio_unique_id_t */ riid,
                                             int /* audio_session_t */ session,
-                                            int /* pid_t */ pid,
-                                            int /* uid_t */ uid,
-                                            @utf8InCpp String opPackageName,
+                                            in Identity identity,
                                             in AudioConfigBase config,
                                             int /* Bitmask, indexed by AudioInputFlags */ flags,
                                             int /* audio_port_handle_t */ selectedDeviceId);

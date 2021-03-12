@@ -124,12 +124,10 @@ status_t MediaRecorderClient::setAudioSource(int as)
         ALOGE("Invalid audio source: %d", as);
         return BAD_VALUE;
     }
-    pid_t pid = IPCThreadState::self()->getCallingPid();
-    uid_t uid = IPCThreadState::self()->getCallingUid();
 
     if ((as == AUDIO_SOURCE_FM_TUNER
-            && !(captureAudioOutputAllowed(pid, uid) || captureTunerAudioInputAllowed(pid, uid)))
-            || !recordingAllowed(String16(""), pid, uid)) {
+            && !(captureAudioOutputAllowed(mIdentity) || captureTunerAudioInputAllowed(mIdentity)))
+            || !recordingAllowed(mIdentity)) {
         return PERMISSION_DENIED;
     }
     Mutex::Autolock lock(mLock);
@@ -378,12 +376,13 @@ status_t MediaRecorderClient::release()
     return NO_ERROR;
 }
 
-MediaRecorderClient::MediaRecorderClient(const sp<MediaPlayerService>& service, pid_t pid,
-        const String16& opPackageName)
+MediaRecorderClient::MediaRecorderClient(const sp<MediaPlayerService>& service,
+        const Identity& identity)
 {
     ALOGV("Client constructor");
-    mPid = pid;
-    mRecorder = new StagefrightRecorder(opPackageName);
+    // identity already validated in createMediaRecorder
+    mIdentity = identity;
+    mRecorder = new StagefrightRecorder(identity);
     mMediaPlayerService = service;
 }
 

@@ -22,7 +22,9 @@
 #include <iostream>
 #include <sstream>
 
+#include <android/media/permission/Identity.h>
 #include <aaudio/AAudio.h>
+#include <media/AidlConversion.h>
 #include <mediautils/ServiceUtilities.h>
 #include <utils/String16.h>
 
@@ -39,16 +41,24 @@ using namespace aaudio;
 #define MAX_STREAMS_PER_PROCESS   8
 #define AIDL_RETURN(x) *_aidl_return = (x); return Status::ok();
 
+#define VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(x) \
+    ({ auto _tmp = (x); \
+       if (!_tmp.ok()) AIDL_RETURN(AAUDIO_ERROR_ILLEGAL_ARGUMENT); \
+       std::move(_tmp.value()); })
 
 using android::AAudioService;
+using android::media::permission::Identity;
 using binder::Status;
 
 android::AAudioService::AAudioService()
     : BnAAudioService(),
       mAdapter(this) {
-    mAudioClient.clientUid = getuid();   // TODO consider using geteuid()
-    mAudioClient.clientPid = getpid();
-    mAudioClient.packageName = String16("");
+    // TODO consider using geteuid()
+    // TODO b/182392769: use identity util
+    mAudioClient.identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+    mAudioClient.identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
+    mAudioClient.identity.packageName = std::nullopt;
+    mAudioClient.identity.attributionTag = std::nullopt;
     AAudioClientTracker::getInstance().setAAudioService(this);
 }
 
@@ -105,8 +115,14 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
     aaudio_sharing_mode_t sharingMode = configurationInput.getSharingMode();
 
     // Enforce limit on client processes.
-    pid_t pid = request.getProcessId();
-    if (pid != mAudioClient.clientPid) {
+    Identity callingIdentity = request.getIdentity();
+    callingIdentity.pid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
+        legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
+    callingIdentity.uid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
+        legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
+    pid_t pid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
+        aidl2legacy_int32_t_pid_t(callingIdentity.pid));
+    if (callingIdentity.pid != mAudioClient.identity.pid) {
         int32_t count = AAudioClientTracker::getInstance().getStreamCount(pid);
         if (count >= MAX_STREAMS_PER_PROCESS) {
             ALOGE("openStream(): exceeded max streams per process %d >= %d",
@@ -121,7 +137,7 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
     }
 
     if (sharingMode == AAUDIO_SHARING_MODE_EXCLUSIVE
-        && AAudioClientTracker::getInstance().isExclusiveEnabled(request.getProcessId())) {
+        && AAudioClientTracker::getInstance().isExclusiveEnabled(pid)) {
         // only trust audioserver for in service indication
         bool inService = false;
         if (isCallerInService()) {
@@ -154,7 +170,6 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
     } else {
         aaudio_handle_t handle = mStreamTracker.addStreamForHandle(serviceStream.get());
         serviceStream->setHandle(handle);
-        pid_t pid = request.getProcessId();
         AAudioClientTracker::getInstance().registerClientStream(pid, serviceStream);
         paramsOut.copyFrom(*serviceStream);
         *_paramsOut = std::move(paramsOut).parcelable();
@@ -266,8 +281,10 @@ Status AAudioService::unregisterAudioThread(int32_t streamHandle, int32_t client
 }
 
 bool AAudioService::isCallerInService() {
-    return mAudioClient.clientPid == IPCThreadState::self()->getCallingPid() &&
-        mAudioClient.clientUid == IPCThreadState::self()->getCallingUid();
+    pid_t clientPid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mAudioClient.identity.pid));
+    uid_t clientUid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mAudioClient.identity.uid));
+    return clientPid == IPCThreadState::self()->getCallingPid() &&
+        clientUid == IPCThreadState::self()->getCallingUid();
 }
 
 aaudio_result_t AAudioService::closeStream(sp<AAudioServiceStreamBase> serviceStream) {
@@ -290,9 +307,11 @@ sp<AAudioServiceStreamBase> AAudioService::convertHandleToServiceStream(
         // Only allow owner or the aaudio service to access the stream.
         const uid_t callingUserId = IPCThreadState::self()->getCallingUid();
         const uid_t ownerUserId = serviceStream->getOwnerUserId();
+        const uid_t clientUid = VALUE_OR_FATAL(
+            aidl2legacy_int32_t_uid_t(mAudioClient.identity.uid));
         bool callerOwnsIt = callingUserId == ownerUserId;
-        bool serverCalling = callingUserId == mAudioClient.clientUid;
-        bool serverOwnsIt = ownerUserId == mAudioClient.clientUid;
+        bool serverCalling = callingUserId == clientUid;
+        bool serverOwnsIt = ownerUserId == clientUid;
         bool allowed = callerOwnsIt || serverCalling || serverOwnsIt;
         if (!allowed) {
             ALOGE("AAudioService: calling uid %d cannot access stream 0x%08X owned by %d",

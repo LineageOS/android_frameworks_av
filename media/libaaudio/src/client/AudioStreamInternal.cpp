@@ -28,7 +28,6 @@
 #include <cutils/properties.h>
 
 #include <media/MediaMetricsItem.h>
-#include <utils/String16.h>
 #include <utils/Trace.h>
 
 #include "AudioEndpointParcelable.h"
@@ -39,6 +38,7 @@
 #include "core/AudioStreamBuilder.h"
 #include "fifo/FifoBuffer.h"
 #include "utility/AudioClock.h"
+#include <media/AidlConversion.h>
 
 #include "AudioStreamInternal.h"
 
@@ -49,9 +49,9 @@
 // This is needed to make sense of the logs more easily.
 #define LOG_TAG (mInService ? "AudioStreamInternal_Service" : "AudioStreamInternal_Client")
 
-using android::String16;
 using android::Mutex;
 using android::WrappingBuffer;
+using android::media::permission::Identity;
 
 using namespace aaudio;
 
@@ -107,9 +107,15 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     // Request FLOAT for the shared mixer or the device.
     request.getConfiguration().setFormat(AUDIO_FORMAT_PCM_FLOAT);
 
+    // TODO b/182392769: use identity util
+    Identity identity;
+    identity.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
+    identity.pid = VALUE_OR_FATAL(android::legacy2aidl_pid_t_int32_t(getpid()));
+    identity.packageName = builder.getOpPackageName();
+    identity.attributionTag = builder.getAttributionTag();
+
     // Build the request to send to the server.
-    request.setUserId(getuid());
-    request.setProcessId(getpid());
+    request.setIdentity(identity);
     request.setSharingModeMatchRequired(isSharingModeMatchRequired());
     request.setInService(isInService());
 

@@ -35,6 +35,8 @@ cc_library {
         "android.hardware.media.c2@1.0",
         "android.hardware.media.omx@1.0",
         "av-types-aidl-cpp",
+        "media_permission-aidl-cpp",
+        "libaudioclient_aidl_conversion",
         "libbase",
         "libandroid_net",
         "libaudioclient",
@@ -73,9 +75,13 @@ cc_library {
         "libstagefright_nuplayer",
         "libstagefright_rtsp",
         "libstagefright_timedtext",
+        "media_permission-aidl-cpp",
     ],
 
-    export_shared_lib_headers: ["libmedia"],
+    export_shared_lib_headers: [
+        "libmedia",
+        "media_permission-aidl-cpp",
+    ],
 
     include_dirs: [
         "frameworks/av/media/libstagefright/rtsp",

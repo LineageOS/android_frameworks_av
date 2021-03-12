@@ -59,7 +59,10 @@ class StagefrightRecorderTest
     }
 
     void SetUp() override {
-        mStfRecorder = new StagefrightRecorder(String16(LOG_TAG));
+        // TODO b/182392769: use identity util
+        Identity identity;
+        identity.packageName = std::string(LOG_TAG);
+        mStfRecorder = new StagefrightRecorder(identity);
         ASSERT_NE(mStfRecorder, nullptr) << "Failed to create the instance of recorder";
 
         mOutputAudioFp = fopen(OUTPUT_FILE_NAME_AUDIO, "wb");
