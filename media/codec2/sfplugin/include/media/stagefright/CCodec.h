@@ -126,6 +126,11 @@ private:
             const std::chrono::milliseconds &timeout,
             const char *name);
 
+    status_t configureTunneledVideoPlayback(
+            const std::shared_ptr<Codec2Client::Component> comp,
+            sp<NativeHandle> *sidebandHandle,
+            const sp<AMessage> &msg);
+
     enum {
         kWhatAllocate,
         kWhatConfigure,
