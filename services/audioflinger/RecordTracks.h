@@ -26,10 +26,10 @@ public:
     bool hasOpRecordAudio() const;
 
     static sp<OpRecordAudioMonitor> createIfNeeded
-        (uid_t uid, const audio_attributes_t& attr, const String16& opPackageName);
+        (const media::permission::Identity& identity, const audio_attributes_t& attr);
 
 private:
-    OpRecordAudioMonitor(uid_t uid, const String16& opPackageName);
+    explicit OpRecordAudioMonitor(const media::permission::Identity& identity);
     void onFirstRef() override;
 
     AppOpsManager mAppOpsManager;
@@ -49,8 +49,7 @@ private:
     void checkRecordAudio();
 
     std::atomic_bool mHasOpRecordAudio;
-    const uid_t mUid;
-    const String16 mPackage;
+    const media::permission::Identity mIdentity;
 };
 
 // record track
@@ -67,10 +66,9 @@ public:
                                 size_t bufferSize,
                                 audio_session_t sessionId,
                                 pid_t creatorPid,
-                                uid_t uid,
+                                const media::permission::Identity& identity,
                                 audio_input_flags_t flags,
                                 track_type type,
-                                const String16& opPackageName,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~RecordTrack();
     virtual status_t    initCheck() const;
@@ -149,7 +147,7 @@ private:
 
             // used to enforce OP_RECORD_AUDIO
             uid_t                              mUid;
-            String16                           mOpPackageName;
+            media::permission::Identity        mIdentity;
             sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
 };
 

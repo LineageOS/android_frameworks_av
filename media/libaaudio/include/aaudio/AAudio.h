@@ -580,6 +580,37 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
 AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
                                                 int32_t deviceId) __INTRODUCED_IN(26);
 
+// TODO b/182392769: reexamine if Identity can be used
+/**
+ * Declare the name of the package creating the stream.
+ *
+ * This is usually {@code Context#getPackageName()}.
+ *
+ * The default, if you do not call this function, is a random package in the calling uid.
+ *
+ * Available since API level 31.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param packageName packageName of the calling app.
+ */
+AAUDIO_API void AAudioStreamBuilder_setPackageName(AAudioStreamBuilder* builder,
+                                                   const char * packageName) __INTRODUCED_IN(31);
+
+/**
+ * Declare the attribution tag of the context creating the stream.
+ *
+ * This is usually {@code Context#getAttributionTag()}.
+ *
+ * The default, if you do not call this function, is the default attribution tag.
+ *
+ * Available since API level 31.
+ *
+ * @param builder reference provided by AAudio_createStreamBuilder()
+ * @param attributionTag attributionTag of the calling context.
+ */
+AAUDIO_API void AAudioStreamBuilder_setAttributionTag(AAudioStreamBuilder* builder,
+        const char * attributionTag) __INTRODUCED_IN(31);
+
 /**
  * Request a sample rate in Hertz.
  *

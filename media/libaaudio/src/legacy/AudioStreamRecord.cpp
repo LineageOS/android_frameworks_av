@@ -22,6 +22,7 @@
 
 #include <aaudio/AAudio.h>
 #include <audio_utils/primitives.h>
+#include <media/AidlConversion.h>
 #include <media/AudioRecord.h>
 #include <utils/String16.h>
 
@@ -29,6 +30,8 @@
 #include "legacy/AudioStreamRecord.h"
 #include "utility/AudioClock.h"
 #include "utility/FixedBlockWriter.h"
+
+using android::media::permission::Identity;
 
 using namespace android;
 using namespace aaudio;
@@ -152,13 +155,20 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .tags = ""
     };
 
+    // TODO b/182392769: use identity util
+    Identity identity;
+    identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+    identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
+    identity.packageName = builder.getOpPackageName();
+    identity.attributionTag = builder.getAttributionTag();
+
     // ----------- open the AudioRecord ---------------------
     // Might retry, but never more than once.
     for (int i = 0; i < 2; i ++) {
         const audio_format_t requestedInternalFormat = getDeviceFormat();
 
         mAudioRecord = new AudioRecord(
-                mOpPackageName // const String16& opPackageName TODO does not compile
+                identity
         );
         mAudioRecord->set(
                 AUDIO_SOURCE_DEFAULT, // ignored because we pass attributes below

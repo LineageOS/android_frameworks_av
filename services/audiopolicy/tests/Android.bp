@@ -25,6 +25,7 @@ cc_test {
         "libmedia_helper",
         "libutils",
         "libxml2",
+        "media_permission-aidl-cpp",
     ],
 
     static_libs: [

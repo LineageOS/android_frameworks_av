@@ -190,6 +190,27 @@ ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy
     return std::string(String8(legacy).c_str());
 }
 
+// TODO b/182392769: create an optional -> optional util
+ConversionResult<std::optional<String16>>
+aidl2legacy_optional_string_view_optional_String16(std::optional<std::string_view> aidl) {
+    if (!aidl.has_value()) {
+        return std::nullopt;
+    }
+    ConversionResult<String16> conversion =
+        VALUE_OR_RETURN(aidl2legacy_string_view_String16(aidl.value()));
+    return conversion.value();
+}
+
+ConversionResult<std::optional<std::string_view>>
+legacy2aidl_optional_String16_optional_string(std::optional<String16> legacy) {
+  if (!legacy.has_value()) {
+    return std::nullopt;
+  }
+  ConversionResult<std::string> conversion =
+      VALUE_OR_RETURN(legacy2aidl_String16_string(legacy.value()));
+  return conversion.value();
+}
+
 ConversionResult<String8> aidl2legacy_string_view_String8(std::string_view aidl) {
     return String8(aidl.data(), aidl.size());
 }
@@ -1160,20 +1181,16 @@ ConversionResult<media::AudioIoDescriptor> legacy2aidl_AudioIoDescriptor_AudioIo
 ConversionResult<AudioClient> aidl2legacy_AudioClient_AudioClient(
         const media::AudioClient& aidl) {
     AudioClient legacy;
-    legacy.clientUid = VALUE_OR_RETURN(aidl2legacy_int32_t_uid_t(aidl.clientUid));
-    legacy.clientPid = VALUE_OR_RETURN(aidl2legacy_int32_t_pid_t(aidl.clientPid));
     legacy.clientTid = VALUE_OR_RETURN(aidl2legacy_int32_t_pid_t(aidl.clientTid));
-    legacy.packageName = VALUE_OR_RETURN(aidl2legacy_string_view_String16(aidl.packageName));
+    legacy.identity = aidl.identity;
     return legacy;
 }
 
 ConversionResult<media::AudioClient> legacy2aidl_AudioClient_AudioClient(
         const AudioClient& legacy) {
     media::AudioClient aidl;
-    aidl.clientUid = VALUE_OR_RETURN(legacy2aidl_uid_t_int32_t(legacy.clientUid));
-    aidl.clientPid = VALUE_OR_RETURN(legacy2aidl_pid_t_int32_t(legacy.clientPid));
     aidl.clientTid = VALUE_OR_RETURN(legacy2aidl_pid_t_int32_t(legacy.clientTid));
-    aidl.packageName = VALUE_OR_RETURN(legacy2aidl_String16_string(legacy.packageName));
+    aidl.identity = legacy.identity;
     return aidl;
 }
 

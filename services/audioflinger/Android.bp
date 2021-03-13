@@ -80,6 +80,7 @@ cc_library_shared {
         "libmedia_helper",
         "libshmemcompat",
         "libvibrator",
+        "media_permission-aidl-cpp",
     ],
 
     static_libs: [
@@ -91,6 +92,10 @@ cc_library_shared {
         "libaudioclient_headers",
         "libaudiohal_headers",
         "libmedia_headers",
+    ],
+
+    export_shared_lib_headers: [
+        "media_permission-aidl-cpp",
     ],
 
     cflags: [

@@ -19,6 +19,7 @@ package android.media;
 import android.media.AudioAttributesInternal;
 import android.media.AudioClient;
 import android.media.AudioConfigBase;
+import android.media.permission.Identity;
 
 /**
  * CreateRecordRequest contains all input arguments sent by AudioRecord to AudioFlinger
@@ -31,7 +32,6 @@ parcelable CreateRecordRequest {
     AudioAttributesInternal attr;
     AudioConfigBase config;
     AudioClient clientInfo;
-    @utf8InCpp String opPackageName;
     /** Interpreted as audio_unique_id_t. */
     int riid;
     /** Bitmask, indexed by AudioInputFlags. */

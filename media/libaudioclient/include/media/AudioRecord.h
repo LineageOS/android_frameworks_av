@@ -32,6 +32,7 @@
 #include <utils/threads.h>
 
 #include "android/media/IAudioRecord.h"
+#include <android/media/permission/Identity.h>
 
 namespace android {
 
@@ -148,9 +149,9 @@ public:
      *
      * Parameters:
      *
-     * opPackageName:      The package name used for app ops.
+     * clientIdentity:          The identity of the owner of the record
      */
-                        AudioRecord(const String16& opPackageName);
+                        AudioRecord(const media::permission::Identity& clientIdentity);
 
     /* Creates an AudioRecord object and registers it with AudioFlinger.
      * Once created, the track needs to be started before it can be used.
@@ -163,7 +164,7 @@ public:
      * format:             Audio format (e.g AUDIO_FORMAT_PCM_16_BIT for signed
      *                     16 bits per sample).
      * channelMask:        Channel mask, such that audio_is_input_channel(channelMask) is true.
-     * opPackageName:      The package name used for app ops.
+     * client:             The identity of the owner of the record
      * frameCount:         Minimum size of track PCM buffer in frames. This defines the
      *                     application's contribution to the
      *                     latency of the track.  The actual size selected by the AudioRecord could
@@ -186,7 +187,7 @@ public:
                                     uint32_t sampleRate,
                                     audio_format_t format,
                                     audio_channel_mask_t channelMask,
-                                    const String16& opPackageName,
+                                    const media::permission::Identity& clientIdentity,
                                     size_t frameCount = 0,
                                     callback_t cbf = NULL,
                                     void* user = NULL,
@@ -194,8 +195,6 @@ public:
                                     audio_session_t sessionId = AUDIO_SESSION_ALLOCATE,
                                     transfer_type transferType = TRANSFER_DEFAULT,
                                     audio_input_flags_t flags = AUDIO_INPUT_FLAG_NONE,
-                                    uid_t uid = AUDIO_UID_INVALID,
-                                    pid_t pid = -1,
                                     const audio_attributes_t* pAttributes = NULL,
                                     audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
                                     audio_microphone_direction_t
@@ -638,7 +637,7 @@ private:
 
             // caller must hold lock on mLock for all _l methods
 
-            status_t createRecord_l(const Modulo<uint32_t> &epoch, const String16& opPackageName);
+            status_t createRecord_l(const Modulo<uint32_t> &epoch);
 
             // FIXME enum is faster than strcmp() for parameter 'from'
             status_t restoreRecord_l(const char *from);
@@ -679,7 +678,7 @@ private:
 
     status_t                mStatus;
 
-    String16                mOpPackageName;         // The package name used for app ops.
+    media::permission::Identity mClientIdentity;    // The identity of the owner of this record
 
     size_t                  mFrameCount;            // corresponds to current IAudioRecord, value is
                                                     // reported back by AudioFlinger to the client
@@ -754,8 +753,6 @@ private:
 
     sp<DeathNotifier>       mDeathNotifier;
     uint32_t                mSequence;              // incremented for each new IAudioRecord attempt
-    uid_t                   mClientUid;
-    pid_t                   mClientPid;
     audio_attributes_t      mAttributes;
 
     // For Device Selection API
