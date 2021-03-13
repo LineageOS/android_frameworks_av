@@ -317,8 +317,7 @@ void DrmHal::cleanup() {
     closeOpenSessions();
 
     Mutex::Autolock autoLock(mLock);
-    reportPluginMetrics();
-    reportFrameworkMetrics();
+    reportFrameworkMetrics(reportPluginMetrics());
 
     setListener(NULL);
     mInitCheck = NO_INIT;
@@ -1464,7 +1463,7 @@ status_t DrmHal::signRSA(Vector<uint8_t> const &sessionId,
     return hResult.isOk() ? err : DEAD_OBJECT;
 }
 
-void DrmHal::reportFrameworkMetrics() const
+std::string DrmHal::reportFrameworkMetrics(const std::string& pluginMetrics) const
 {
     mediametrics_handle_t item(mediametrics_create("mediadrm"));
     mediametrics_setUid(item, mMetrics.GetAppUid());
@@ -1493,21 +1492,26 @@ void DrmHal::reportFrameworkMetrics() const
     if (!b64EncodedMetrics.empty()) {
         mediametrics_setCString(item, "serialized_metrics", b64EncodedMetrics.c_str());
     }
+    if (!pluginMetrics.empty()) {
+        mediametrics_setCString(item, "plugin_metrics", pluginMetrics.c_str());
+    }
     if (!mediametrics_selfRecord(item)) {
         ALOGE("Failed to self record framework metrics");
     }
     mediametrics_delete(item);
+    return serializedMetrics;
 }
 
-void DrmHal::reportPluginMetrics() const
+std::string DrmHal::reportPluginMetrics() const
 {
     Vector<uint8_t> metricsVector;
     String8 vendor;
     String8 description;
+    std::string metricsString;
     if (getPropertyStringInternal(String8("vendor"), vendor) == OK &&
             getPropertyStringInternal(String8("description"), description) == OK &&
             getPropertyByteArrayInternal(String8("metrics"), metricsVector) == OK) {
-        std::string metricsString = toBase64StringNoPad(metricsVector.array(),
+        metricsString = toBase64StringNoPad(metricsVector.array(),
                                                         metricsVector.size());
         status_t res = android::reportDrmPluginMetrics(metricsString, vendor,
                                                        description, mMetrics.GetAppUid());
@@ -1515,6 +1519,7 @@ void DrmHal::reportPluginMetrics() const
             ALOGE("Metrics were retrieved but could not be reported: %d", res);
         }
     }
+    return metricsString;
 }
 
 bool DrmHal::requiresSecureDecoder(const char *mime) const {
