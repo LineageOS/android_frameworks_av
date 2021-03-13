@@ -33,6 +33,8 @@
 
 namespace android {
 
+using media::permission::Identity;
+
 status_t MediaRecorder::setCamera(const sp<hardware::ICamera>& camera,
         const sp<ICameraRecordingProxy>& proxy)
 {
@@ -758,13 +760,13 @@ status_t MediaRecorder::release()
     return INVALID_OPERATION;
 }
 
-MediaRecorder::MediaRecorder(const String16& opPackageName) : mSurfaceMediaSource(NULL)
+MediaRecorder::MediaRecorder(const Identity &identity) : mSurfaceMediaSource(NULL)
 {
     ALOGV("constructor");
 
     const sp<IMediaPlayerService> service(getMediaPlayerService());
     if (service != NULL) {
-        mMediaRecorder = service->createMediaRecorder(opPackageName);
+        mMediaRecorder = service->createMediaRecorder(identity);
     }
     if (mMediaRecorder != NULL) {
         mCurrentState = MEDIA_RECORDER_IDLE;

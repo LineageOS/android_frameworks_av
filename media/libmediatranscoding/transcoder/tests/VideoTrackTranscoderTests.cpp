@@ -27,7 +27,7 @@
 #include <media/VideoTrackTranscoder.h>
 #include <utils/Timers.h>
 
-#include "TrackTranscoderTestUtils.h"
+#include "TranscoderTestUtils.h"
 
 namespace android {
 
@@ -94,7 +94,7 @@ public:
 
 TEST_F(VideoTrackTranscoderTests, SampleSoundness) {
     LOG(DEBUG) << "Testing SampleSoundness";
-    std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
+    auto callback = std::make_shared<TestTrackTranscoderCallback>();
     auto transcoder = VideoTrackTranscoder::create(callback);
 
     EXPECT_EQ(mMediaSampleReader->selectTrack(mTrackIndex), AMEDIA_OK);
@@ -139,7 +139,7 @@ TEST_F(VideoTrackTranscoderTests, SampleSoundness) {
 
 TEST_F(VideoTrackTranscoderTests, PreserveBitrate) {
     LOG(DEBUG) << "Testing PreserveBitrate";
-    std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
+    auto callback = std::make_shared<TestTrackTranscoderCallback>();
     std::shared_ptr<MediaTrackTranscoder> transcoder = VideoTrackTranscoder::create(callback);
 
     auto destFormat = TrackTranscoderTestUtils::getDefaultVideoDestinationFormat(
@@ -171,7 +171,7 @@ TEST_F(VideoTrackTranscoderTests, PreserveBitrate) {
 // VideoTrackTranscoder needs a valid destination format.
 TEST_F(VideoTrackTranscoderTests, NullDestinationFormat) {
     LOG(DEBUG) << "Testing NullDestinationFormat";
-    std::shared_ptr<TestCallback> callback = std::make_shared<TestCallback>();
+    auto callback = std::make_shared<TestTrackTranscoderCallback>();
     std::shared_ptr<AMediaFormat> nullFormat;
 
     auto transcoder = VideoTrackTranscoder::create(callback);
@@ -181,7 +181,7 @@ TEST_F(VideoTrackTranscoderTests, NullDestinationFormat) {
 
 TEST_F(VideoTrackTranscoderTests, LingeringEncoder) {
     OneShotSemaphore semaphore;
-    auto callback = std::make_shared<TestCallback>();
+    auto callback = std::make_shared<TestTrackTranscoderCallback>();
     auto transcoder = VideoTrackTranscoder::create(callback);
 
     EXPECT_EQ(mMediaSampleReader->selectTrack(mTrackIndex), AMEDIA_OK);

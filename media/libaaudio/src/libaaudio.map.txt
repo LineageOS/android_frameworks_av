@@ -23,6 +23,8 @@ LIBAAUDIO {
     AAudioStreamBuilder_setAllowedCapturePolicy; # introduced=29
     AAudioStreamBuilder_setSessionId;   # introduced=28
     AAudioStreamBuilder_setPrivacySensitive;   # introduced=30
+    AAudioStreamBuilder_setPackageName;   # introduced=31
+    AAudioStreamBuilder_setAttributionTag;   # introduced=31
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;

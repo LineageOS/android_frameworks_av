@@ -25,6 +25,7 @@
 #include <cutils/multiuser.h>
 #include <private/android_filesystem_config.h>
 #include <system/audio-hal-enums.h>
+#include <android/media/permission/Identity.h>
 
 #include <map>
 #include <optional>
@@ -79,22 +80,25 @@ static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
     }
 }
 
-bool recordingAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
-bool startRecording(const String16& opPackageName, pid_t pid, uid_t uid, audio_source_t source);
-void finishRecording(const String16& opPackageName, uid_t uid, audio_source_t source);
-bool captureAudioOutputAllowed(pid_t pid, uid_t uid);
-bool captureMediaOutputAllowed(pid_t pid, uid_t uid);
-bool captureTunerAudioInputAllowed(pid_t pid, uid_t uid);
-bool captureVoiceCommunicationOutputAllowed(pid_t pid, uid_t uid);
-bool captureHotwordAllowed(const String16& opPackageName, pid_t pid, uid_t uid);
+bool recordingAllowed(const media::permission::Identity& identity);
+bool startRecording(const media::permission::Identity& identity,
+    const String16& msg, audio_source_t source);
+void finishRecording(const media::permission::Identity& identity, audio_source_t source);
+bool captureAudioOutputAllowed(const media::permission::Identity& identity);
+bool captureMediaOutputAllowed(const media::permission::Identity& identity);
+bool captureTunerAudioInputAllowed(const media::permission::Identity& identity);
+bool captureVoiceCommunicationOutputAllowed(const media::permission::Identity& identity);
+bool captureHotwordAllowed(const media::permission::Identity& identity);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
-bool modifyAudioRoutingAllowed(pid_t pid, uid_t uid);
+bool modifyAudioRoutingAllowed(const media::permission::Identity& identity);
 bool modifyDefaultAudioEffectsAllowed();
-bool modifyDefaultAudioEffectsAllowed(pid_t pid, uid_t uid);
+bool modifyDefaultAudioEffectsAllowed(const media::permission::Identity& identity);
 bool dumpAllowed();
-bool modifyPhoneStateAllowed(pid_t pid, uid_t uid);
-bool bypassInterruptionPolicyAllowed(pid_t pid, uid_t uid);
+bool modifyPhoneStateAllowed(const media::permission::Identity& identity);
+bool bypassInterruptionPolicyAllowed(const media::permission::Identity& identity);
+
+media::permission::Identity getCallingIdentity();
 
 status_t checkIMemory(const sp<IMemory>& iMemory);
 

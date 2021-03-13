@@ -27,12 +27,13 @@
 #include <utils/String8.h>
 #include <utils/Vector.h>
 
+#include <media/AidlConversion.h>
 #include <media/AudioResamplerPublic.h>
 #include <media/AudioSystem.h>
 #include <media/MediaPlayerInterface.h>
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/ABase.h>
-
+#include <android/media/permission/Identity.h>
 
 #include <system/audio.h>
 
@@ -79,11 +80,9 @@ class MediaPlayerService : public BnMediaPlayerService
      public:
                                 AudioOutput(
                                         audio_session_t sessionId,
-                                        uid_t uid,
-                                        int pid,
+                                        const media::permission::Identity& identity,
                                         const audio_attributes_t * attr,
-                                        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback,
-                                        const std::string& opPackageName);
+                                        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback);
         virtual                 ~AudioOutput();
 
         virtual bool            ready() const { return mTrack != 0; }
@@ -170,8 +169,7 @@ class MediaPlayerService : public BnMediaPlayerService
         float                   mMsecsPerFrame;
         size_t                  mFrameSize;
         audio_session_t         mSessionId;
-        uid_t                   mUid;
-        int                     mPid;
+        media::permission::Identity mIdentity;
         float                   mSendLevel;
         int                     mAuxEffectId;
         audio_output_flags_t    mFlags;
@@ -181,7 +179,6 @@ class MediaPlayerService : public BnMediaPlayerService
         bool                    mDeviceCallbackEnabled;
         wp<AudioSystem::AudioDeviceCallback>        mDeviceCallback;
         mutable Mutex           mLock;
-        const std::string       mOpPackageName;
 
         // static variables below not protected by mutex
         static bool             mIsOnEmulator;
@@ -234,13 +231,13 @@ public:
     static  void                instantiate();
 
     // IMediaPlayerService interface
-    virtual sp<IMediaRecorder>  createMediaRecorder(const String16 &opPackageName);
+    virtual sp<IMediaRecorder>  createMediaRecorder(const media::permission::Identity &identity);
     void    removeMediaRecorderClient(const wp<MediaRecorderClient>& client);
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever();
 
     virtual sp<IMediaPlayer>    create(const sp<IMediaPlayerClient>& client,
                                        audio_session_t audioSessionId,
-                                       const std::string opPackageName);
+                                       const media::permission::Identity& identity);
 
     virtual sp<IMediaCodecList> getCodecList() const;
 
@@ -382,7 +379,9 @@ private:
 
                 void            notify(int msg, int ext1, int ext2, const Parcel *obj);
 
-                pid_t           pid() const { return mPid; }
+                pid_t           pid() const {
+                    return VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mIdentity.pid));
+                }
         virtual status_t        dump(int fd, const Vector<String16>& args);
 
                 audio_session_t getAudioSessionId() { return mAudioSessionId; }
@@ -412,12 +411,10 @@ private:
 
         friend class MediaPlayerService;
                                 Client( const sp<MediaPlayerService>& service,
-                                        pid_t pid,
+                                        const media::permission::Identity& identity,
                                         int32_t connId,
                                         const sp<IMediaPlayerClient>& client,
-                                        audio_session_t audioSessionId,
-                                        uid_t uid,
-                                        const std::string& opPackageName);
+                                        audio_session_t audioSessionId);
                                 Client();
         virtual                 ~Client();
 
@@ -461,20 +458,18 @@ private:
                     sp<MediaPlayerService>        mService;
                     sp<IMediaPlayerClient>        mClient;
                     sp<AudioOutput>               mAudioOutput;
-                    pid_t                         mPid;
+                    const media::permission::Identity mIdentity;
                     status_t                      mStatus;
                     bool                          mLoop;
                     int32_t                       mConnId;
                     audio_session_t               mAudioSessionId;
                     audio_attributes_t *          mAudioAttributes;
-                    uid_t                         mUid;
                     sp<ANativeWindow>             mConnectedWindow;
                     sp<IBinder>                   mConnectedWindowBinder;
                     struct sockaddr_in            mRetransmitEndpoint;
                     bool                          mRetransmitEndpointValid;
                     sp<Client>                    mNextClient;
                     sp<MediaPlayerBase::Listener> mListener;
-                    const std::string             mOpPackageName;
 
         // Metadata filters.
         media::Metadata::Filter mMetadataAllow;  // protected by mLock
