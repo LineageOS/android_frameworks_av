@@ -31,19 +31,15 @@ using namespace aaudio;
 
 AAudioStreamRequest::AAudioStreamRequest(const StreamRequest& parcelable) :
         mConfiguration(std::move(parcelable.params)),
-        mUserId(parcelable.userId),
-        mProcessId(parcelable.processId),
+        mIdentity(parcelable.identity),
         mSharingModeMatchRequired(parcelable.sharingModeMatchRequired),
         mInService(parcelable.inService) {
-    static_assert(sizeof(mUserId) == sizeof(parcelable.userId));
-    static_assert(sizeof(mProcessId) == sizeof(parcelable.processId));
 }
 
 StreamRequest AAudioStreamRequest::parcelable() const {
     StreamRequest result;
     result.params = std::move(mConfiguration).parcelable();
-    result.userId = mUserId;
-    result.processId = mProcessId;
+    result.identity = mIdentity;
     result.sharingModeMatchRequired = mSharingModeMatchRequired;
     result.inService = mInService;
     return result;
@@ -54,8 +50,7 @@ aaudio_result_t AAudioStreamRequest::validate() const {
 }
 
 void AAudioStreamRequest::dump() const {
-    ALOGD("mUserId    = %d", mUserId);
-    ALOGD("mProcessId = %d", mProcessId);
+    ALOGD("mIdentity  = %s", mIdentity.toString().c_str());
     ALOGD("mSharingModeMatchRequired = %d", mSharingModeMatchRequired);
     ALOGD("mInService = %d", mInService);
     mConfiguration.dump();

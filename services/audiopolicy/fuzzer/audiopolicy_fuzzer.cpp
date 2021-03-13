@@ -26,6 +26,7 @@
 
 #include <Serializer.h>
 #include <android-base/file.h>
+#include <android/media/permission/Identity.h>
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
 #include <media/AudioPolicy.h>
@@ -45,6 +46,8 @@ using namespace android;
 namespace xsd {
 using namespace ::android::audio::policy::configuration::V7_0;
 }
+
+using media::permission::Identity;
 
 static const std::vector<audio_format_t> kAudioFormats = [] {
     std::vector<audio_format_t> result;
@@ -246,7 +249,10 @@ bool AudioPolicyManagerFuzzer::getOutputForAttr(
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
 
-    if (mManager->getOutputForAttr(&attr, output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config,
+    // TODO b/182392769: use identity util
+    Identity i;
+    i.uid = 0;
+    if (mManager->getOutputForAttr(&attr, output, AUDIO_SESSION_NONE, &stream, i, &config,
                                    &flags, selectedDeviceId, portId, {}, &outputType) != OK) {
         return false;
     }
@@ -270,7 +276,9 @@ bool AudioPolicyManagerFuzzer::getInputForAttr(
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::input_type_t inputType;
 
-    if (mManager->getInputForAttr(&attr, &input, riid, AUDIO_SESSION_NONE, 0 /*uid*/, &config,
+    Identity i;
+    i.uid = 0;
+    if (mManager->getInputForAttr(&attr, &input, riid, AUDIO_SESSION_NONE, i, &config,
                                   flags, selectedDeviceId, &inputType, portId) != OK) {
         return false;
     }

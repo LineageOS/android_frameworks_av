@@ -87,6 +87,22 @@ AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
     streamBuilder->setDeviceId(deviceId);
 }
 
+AAUDIO_API void AAudioStreamBuilder_setPackageName(AAudioStreamBuilder* builder,
+                                                   const char* packageName)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    // Only system apps can read the op package name. For regular apps the regular package name
+    // is a sufficient replacement
+    streamBuilder->setOpPackageName(packageName);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setAttributionTag(AAudioStreamBuilder* builder,
+                                                      const char* attributionTag)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setAttributionTag(attributionTag);
+}
+
 AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
                                               int32_t sampleRate)
 {

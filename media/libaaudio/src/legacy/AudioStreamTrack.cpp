@@ -31,6 +31,8 @@
 using namespace android;
 using namespace aaudio;
 
+using media::permission::Identity;
+
 // Arbitrary and somewhat generous number of bursts.
 #define DEFAULT_BURSTS_PER_BUFFER_CAPACITY     8
 
@@ -147,6 +149,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
     };
 
     mAudioTrack = new AudioTrack();
+    // TODO b/182392769: use identity util
     mAudioTrack->set(
             AUDIO_STREAM_DEFAULT,  // ignored because we pass attributes below
             getSampleRate(),
@@ -162,8 +165,7 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             sessionId,
             streamTransferType,
             NULL,    // DEFAULT audio_offload_info_t
-            AUDIO_UID_INVALID, // DEFAULT uid
-            -1,      // DEFAULT pid
+            Identity(), // DEFAULT uid and pid
             &attributes,
             // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging
             // headphones a few times.

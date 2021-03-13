@@ -132,10 +132,12 @@ cc_library {
         "libshmemcompat",
         "libutils",
         "libvibrator",
+        "media_permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
+        "media_permission-aidl-cpp",
         "libbinder",
     ],
 
@@ -162,6 +164,7 @@ cc_library {
         // for memory heap analysis
         "libc_malloc_debug_backtrace",
         "shared-file-region-aidl-cpp",
+        "media_permission-aidl-cpp",
     ],
     cflags: [
         "-Wall",
@@ -229,6 +232,7 @@ cc_library {
         "libshmemcompat",
         "libutils",
         "shared-file-region-aidl-cpp",
+        "media_permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "audioclient-types-aidl-cpp",
@@ -346,6 +350,7 @@ aidl_interface {
     ],
     imports: [
         "audio_common-aidl",
+        "media_permission-aidl",
     ],
     backend: {
         cpp: {
@@ -427,6 +432,7 @@ aidl_interface {
         "av-types-aidl",
         "effect-aidl",
         "shared-file-region-aidl",
+        "media_permission-aidl",
     ],
     double_loadable: true,
     backend: {
@@ -460,6 +466,7 @@ aidl_interface {
         "audioclient-types-aidl",
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",
+        "media_permission-aidl",
     ],
     double_loadable: true,
     backend: {

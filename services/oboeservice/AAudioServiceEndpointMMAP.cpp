@@ -73,9 +73,12 @@ std::string AAudioServiceEndpointMMAP::dump() const {
 aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAUDIO_OK;
     copyFrom(request.getConstantConfiguration());
-    mMmapClient.clientUid = request.getUserId();
-    mMmapClient.clientPid = request.getProcessId();
-    mMmapClient.packageName.setTo(String16(""));
+    mMmapClient.identity = request.getIdentity();
+    // TODO b/182392769: use identity util
+    mMmapClient.identity.uid = VALUE_OR_FATAL(
+        legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
+    mMmapClient.identity.pid = VALUE_OR_FATAL(
+        legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
 
     audio_format_t audioFormat = getFormat();
 
@@ -159,8 +162,8 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
                                                           this, // callback
                                                           mMmapStream,
                                                           &mPortHandle);
-    ALOGD("%s() mMapClient.uid = %d, pid = %d => portHandle = %d\n",
-          __func__, mMmapClient.clientUid,  mMmapClient.clientPid, mPortHandle);
+    ALOGD("%s() mMapClient.identity = %s => portHandle = %d\n",
+          __func__, mMmapClient.identity.toString().c_str(), mPortHandle);
     if (status != OK) {
         // This can happen if the resource is busy or the config does
         // not match the hardware.
@@ -208,8 +211,9 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
     setBufferCapacity(mMmapBufferinfo.buffer_size_frames);
     if (!isBufferShareable) {
         // Exclusive mode can only be used by the service because the FD cannot be shared.
-        uid_t audioServiceUid = getuid();
-        if ((mMmapClient.clientUid != audioServiceUid) &&
+        int32_t audioServiceUid =
+            VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+        if ((mMmapClient.identity.uid != audioServiceUid) &&
             getSharingMode() == AAUDIO_SHARING_MODE_EXCLUSIVE) {
             ALOGW("%s() - exclusive FD cannot be used by client", __func__);
             result = AAUDIO_ERROR_UNAVAILABLE;

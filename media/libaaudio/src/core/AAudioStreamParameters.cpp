@@ -48,6 +48,8 @@ void AAudioStreamParameters::copyFrom(const AAudioStreamParameters &other) {
     mInputPreset          = other.mInputPreset;
     mAllowedCapturePolicy = other.mAllowedCapturePolicy;
     mIsPrivacySensitive   = other.mIsPrivacySensitive;
+    mOpPackageName        = other.mOpPackageName;
+    mAttributionTag       = other.mAttributionTag;
 }
 
 static aaudio_result_t isFormatValid(audio_format_t format) {
@@ -203,4 +205,8 @@ void AAudioStreamParameters::dump() const {
     ALOGD("mInputPreset          = %6d", mInputPreset);
     ALOGD("mAllowedCapturePolicy = %6d", mAllowedCapturePolicy);
     ALOGD("mIsPrivacySensitive   = %s", mIsPrivacySensitive ? "true" : "false");
+    ALOGD("mOpPackageName        = %s", !mOpPackageName.has_value() ?
+        "(null)" : mOpPackageName.value().c_str());
+    ALOGD("mAttributionTag       = %s", !mAttributionTag.has_value() ?
+        "(null)" : mAttributionTag.value().c_str());
 }

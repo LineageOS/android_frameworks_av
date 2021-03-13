@@ -22,6 +22,7 @@
 
 #include <media/AudioSystem.h>
 #include <media/IMediaRecorder.h>
+#include <android/media/permission/Identity.h>
 
 #include <vector>
 
@@ -93,14 +94,13 @@ private:
 
                            MediaRecorderClient(
                                    const sp<MediaPlayerService>& service,
-                                                               pid_t pid,
-                                                               const String16& opPackageName);
+                                   const media::permission::Identity& identity);
     virtual                ~MediaRecorderClient();
 
     std::vector<DeathNotifier> mDeathNotifiers;
     sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedNotifier;
 
-    pid_t                  mPid;
+    media::permission::Identity mIdentity;
     mutable Mutex          mLock;
     MediaRecorderBase      *mRecorder;
     sp<MediaPlayerService> mMediaPlayerService;
