@@ -108,6 +108,11 @@ ConversionResult<std::string> legacy2aidl_String8_string(const String8& legacy);
 ConversionResult<String16> aidl2legacy_string_view_String16(std::string_view aidl);
 ConversionResult<std::string> legacy2aidl_String16_string(const String16& legacy);
 
+ConversionResult<std::optional<String16>>
+aidl2legacy_optional_string_view_optional_String16(std::optional<std::string_view> aidl);
+ConversionResult<std::optional<std::string_view>>
+legacy2aidl_optional_String16_optional_string(std::optional<String16> legacy);
+
 ConversionResult<audio_io_config_event> aidl2legacy_AudioIoConfigEvent_audio_io_config_event(
         media::AudioIoConfigEvent aidl);
 ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_AudioIoConfigEvent(

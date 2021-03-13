@@ -37,6 +37,7 @@
 
 #include <android/media/BnAudioFlingerService.h>
 #include <android/media/BpAudioFlingerService.h>
+#include <android/media/permission/Identity.h>
 #include "android/media/CreateEffectRequest.h"
 #include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
@@ -78,7 +79,6 @@ public:
         uint32_t notificationsPerBuffer;
         float speed;
         sp<media::IAudioTrackCallback> audioTrackCallback;
-        std::string opPackageName;
 
         /* input/output */
         audio_output_flags_t flags;
@@ -127,7 +127,7 @@ public:
         audio_attributes_t attr;
         audio_config_base_t config;
         AudioClient clientInfo;
-        String16 opPackageName;
+        media::permission::Identity identity;
         audio_unique_id_t riid;
 
         /* input/output */

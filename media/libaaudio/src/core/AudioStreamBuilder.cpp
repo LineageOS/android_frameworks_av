@@ -282,4 +282,8 @@ void AudioStreamBuilder::logParameters() const {
     ALOGI("usage  = %6d, contentType = %d, inputPreset = %d, allowedCapturePolicy = %d",
           getUsage(), getContentType(), getInputPreset(), getAllowedCapturePolicy());
     ALOGI("privacy sensitive = %s", isPrivacySensitive() ? "true" : "false");
+    ALOGI("opPackageName = %s", !getOpPackageName().has_value() ?
+        "(null)" : getOpPackageName().value().c_str());
+    ALOGI("attributionTag = %s", !getAttributionTag().has_value() ?
+        "(null)" : getAttributionTag().value().c_str());
 }

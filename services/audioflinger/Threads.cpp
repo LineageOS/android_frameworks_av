@@ -108,6 +108,7 @@
 
 // TODO: Move these macro/inlines to a header file.
 #define max(a, b) ((a) > (b) ? (a) : (b))
+
 template <typename T>
 static inline T min(const T& a, const T& b)
 {
@@ -117,6 +118,7 @@ static inline T min(const T& a, const T& b)
 namespace android {
 
 using media::IEffectClient;
+using media::permission::Identity;
 
 // retry counts for buffer fill timeout
 // 50 * ~20msecs = 1 second
@@ -2076,12 +2078,11 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         audio_session_t sessionId,
         audio_output_flags_t *flags,
         pid_t creatorPid,
+        const Identity& identity,
         pid_t tid,
-        uid_t uid,
         status_t *status,
         audio_port_handle_t portId,
-        const sp<media::IAudioTrackCallback>& callback,
-        const std::string& opPackageName)
+        const sp<media::IAudioTrackCallback>& callback)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -2172,8 +2173,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
                 "sampleRate=%u mSampleRate=%u "
                 "hasFastMixer=%d tid=%d fastTrackAvailMask=%#x",
                 sharedBuffer.get(), frameCount, mFrameCount, format, mFormat,
-                audio_is_linear_pcm(format),
-                channelMask, sampleRate, mSampleRate, hasFastMixer(), tid, mFastTrackAvailMask);
+                audio_is_linear_pcm(format), channelMask, sampleRate,
+                mSampleRate, hasFastMixer(), tid, mFastTrackAvailMask);
         *flags = (audio_output_flags_t)(*flags & ~AUDIO_OUTPUT_FLAG_FAST);
       }
     }
@@ -2372,8 +2373,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         track = new Track(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
-                          sessionId, creatorPid, uid, trackFlags, TrackBase::TYPE_DEFAULT, portId,
-                          SIZE_MAX /*frameCountToBeReady*/, opPackageName);
+                          sessionId, creatorPid, identity, trackFlags, TrackBase::TYPE_DEFAULT,
+                          portId, SIZE_MAX /*frameCountToBeReady*/);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
@@ -6812,13 +6813,19 @@ void AudioFlinger::DuplicatingThread::addOutputTrack(MixerThread *thread)
     // from different OutputTracks and their associated MixerThreads (e.g. one may
     // nearly empty and the other may be dropping data).
 
+    // TODO b/182392769: use identity util, move to server edge
+    Identity identity = Identity();
+    identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(
+        IPCThreadState::self()->getCallingUid()));
+    identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(
+      IPCThreadState::self()->getCallingPid()));
     sp<OutputTrack> outputTrack = new OutputTrack(thread,
                                             this,
                                             mSampleRate,
                                             mFormat,
                                             mChannelMask,
                                             frameCount,
-                                            IPCThreadState::self()->getCallingUid());
+                                            identity);
     status_t status = outputTrack != 0 ? outputTrack->initCheck() : (status_t) NO_MEMORY;
     if (status != NO_ERROR) {
         ALOGE("addOutputTrack() initCheck failed %d", status);
@@ -7730,12 +7737,11 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         audio_session_t sessionId,
         size_t *pNotificationFrameCount,
         pid_t creatorPid,
-        uid_t uid,
+        const Identity& identity,
         audio_input_flags_t *flags,
         pid_t tid,
         status_t *status,
-        audio_port_handle_t portId,
-        const String16& opPackageName)
+        audio_port_handle_t portId)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -7868,8 +7874,8 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
-                      nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid, uid,
-                      *flags, TrackBase::TYPE_DEFAULT, opPackageName, portId);
+                      nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid,
+                      identity, *flags, TrackBase::TYPE_DEFAULT, portId);
 
         lStatus = track->initCheck();
         if (lStatus != NO_ERROR) {
@@ -8884,7 +8890,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                          audio_port_handle_t *handle)
 {
     ALOGV("%s clientUid %d mStandby %d mPortId %d *handle %d", __FUNCTION__,
-          client.clientUid, mStandby, mPortId, *handle);
+          client.identity.uid, mStandby, mPortId, *handle);
     if (mHalStream == 0) {
         return NO_INIT;
     }
@@ -8916,8 +8922,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
-                                            client.clientPid,
-                                            client.clientUid,
+                                            client.identity,
                                             &config,
                                             flags,
                                             &deviceId,
@@ -8934,9 +8939,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         ret = AudioSystem::getInputForAttr(&mAttr, &io,
                                               RECORD_RIID_INVALID,
                                               mSessionId,
-                                              client.clientPid,
-                                              client.clientUid,
-                                              client.packageName,
+                                              client.identity,
                                               &config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ,
                                               &deviceId,
@@ -8976,16 +8979,15 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
     sp<MmapTrack> track = new MmapTrack(this, attr == nullptr ? mAttr : *attr, mSampleRate, mFormat,
-                                        mChannelMask, mSessionId, isOutput(), client.clientUid,
-                                        client.clientPid, IPCThreadState::self()->getCallingPid(),
-                                        portId);
+                                        mChannelMask, mSessionId, isOutput(), client.identity,
+                                        IPCThreadState::self()->getCallingPid(), portId);
 
     if (isOutput()) {
         // force volume update when a new track is added
         mHalVolFloat = -1.0f;
     } else if (!track->isSilenced_l()) {
         for (const sp<MmapTrack> &t : mActiveTracks) {
-            if (t->isSilenced_l() && t->uid() != client.clientUid)
+            if (t->isSilenced_l() && t->uid() != client.identity.uid)
                 t->invalidate();
         }
     }

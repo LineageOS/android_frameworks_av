@@ -89,6 +89,13 @@ cc_test {
     srcs: ["MediaSampleWriterTests.cpp"],
 }
 
+// HDR Transcode unit test
+cc_test {
+    name: "HdrTranscodeTests",
+    defaults: ["testdefaults"],
+    srcs: ["HdrTranscodeTests.cpp"],
+}
+
 // MediaTranscoder unit test
 cc_test {
     name: "MediaTranscoderTests",

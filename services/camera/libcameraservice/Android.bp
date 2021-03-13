@@ -149,11 +149,13 @@ cc_library_shared {
         "android.hardware.camera.device@3.4",
         "android.hardware.camera.device@3.5",
         "android.hardware.camera.device@3.6",
-        "android.hardware.camera.device@3.7"
+        "android.hardware.camera.device@3.7",
+        "media_permission-aidl-cpp",
     ],
 
     static_libs: [
         "libbinderthreadstateutils",
+        "media_permission-aidl-cpp",
     ],
 
     export_shared_lib_headers: [
