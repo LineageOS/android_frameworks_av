@@ -910,7 +910,7 @@ int Session_ReleaseEffect(preproc_session_t* session, preproc_effect_t* fx) {
         session->apm = NULL;
         delete session->inBuf;
         session->inBuf = NULL;
-        delete session->outBuf;
+        free(session->outBuf);
         session->outBuf = NULL;
         delete session->revBuf;
         session->revBuf = NULL;
