@@ -241,8 +241,8 @@ private:
 
     void writeByteArray(Parcel &obj, const hidl_vec<uint8_t>& array);
 
-    void reportPluginMetrics() const;
-    void reportFrameworkMetrics() const;
+    std::string reportPluginMetrics() const;
+    std::string reportFrameworkMetrics(const std::string& pluginMetrics) const;
     status_t getPropertyStringInternal(String8 const &name, String8 &value) const;
     status_t getPropertyByteArrayInternal(String8 const &name,
                                           Vector<uint8_t> &value) const;
