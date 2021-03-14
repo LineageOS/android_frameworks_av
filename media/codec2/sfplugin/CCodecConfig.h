@@ -35,6 +35,7 @@
 namespace android {
 
 struct AMessage;
+class NativeHandle;
 struct StandardParams;
 
 /**
@@ -140,6 +141,10 @@ struct CCodecConfig {
     std::map<std::string, C2Param::Index> mVendorParamIndices;
 
     std::set<std::string> mLastConfig;
+
+    /// Tunneled codecs
+    bool mTunneled;
+    sp<NativeHandle> mSidebandHandle;
 
     CCodecConfig();
 
