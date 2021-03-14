@@ -18,6 +18,7 @@
 #define LOG_TAG "CCodecConfig"
 #include <cutils/properties.h>
 #include <log/log.h>
+#include <utils/NativeHandle.h>
 
 #include <C2Component.h>
 #include <C2Param.h>
@@ -321,7 +322,8 @@ const std::vector<ConfigMapper> StandardParams::NO_MAPPERS;
 CCodecConfig::CCodecConfig()
     : mInputFormat(new AMessage),
       mOutputFormat(new AMessage),
-      mUsingSurface(false) { }
+      mUsingSurface(false),
+      mTunneled(false) { }
 
 void CCodecConfig::initializeStandardParams() {
     typedef Domain D;
