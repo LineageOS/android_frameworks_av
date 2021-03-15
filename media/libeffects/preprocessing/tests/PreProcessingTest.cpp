@@ -24,6 +24,7 @@
 #include <audio_effects/effect_agc.h>
 #include <audio_effects/effect_agc2.h>
 #include <audio_effects/effect_ns.h>
+#include <audio_utils/channels.h>
 #include <log/log.h>
 
 // This is the only symbol that needs to be imported
@@ -55,7 +56,9 @@ enum PreProcParams {
     ARG_NS_LVL,
     ARG_AGC2_GAIN,
     ARG_AGC2_LVL,
-    ARG_AGC2_SAT_MGN
+    ARG_AGC2_SAT_MGN,
+    ARG_FILE_CHANNELS,
+    ARG_MONO_MODE
 };
 
 struct preProcConfigParams_t {
@@ -68,6 +71,8 @@ struct preProcConfigParams_t {
     float agc2SaturationMargin = 2.f;  // in dB
     int agc2Level = 0;                 // either kRms(0) or kPeak(1)
     int aecDelay = 0;  // in ms
+    int fileChannels = 1;
+    int monoMode = 0;
 };
 
 const effect_uuid_t kPreProcUuids[PREPROC_NUM_EFFECTS] = {
@@ -106,7 +111,7 @@ void printUsage() {
     printf("\n           Prints this usage information");
     printf("\n     --fs <sampling_freq>");
     printf("\n           Sampling frequency in Hz, default 16000.");
-    printf("\n     -ch_mask <channel_mask>\n");
+    printf("\n     --ch_mask <channel_mask>\n");
     printf("\n         0  - AUDIO_CHANNEL_IN_MONO");
     printf("\n         1  - AUDIO_CHANNEL_IN_STEREO");
     printf("\n         2  - AUDIO_CHANNEL_IN_FRONT_BACK");
@@ -144,6 +149,10 @@ void printUsage() {
     printf("\n           AGC Adaptive Digital Saturation Margin in dB, default value 2dB");
     printf("\n     --aec_delay <delay>");
     printf("\n           AEC delay value in ms, default value 0ms");
+    printf("\n     --fch <fileChannels>");
+    printf("\n           number of channels in the input file");
+    printf("\n     --mono <Mono Mode>");
+    printf("\n           Mode to make data of all channels the same as first channel");
     printf("\n");
 }
 
@@ -189,10 +198,17 @@ int main(int argc, const char* argv[]) {
         printUsage();
         return EXIT_FAILURE;
     }
+
+    // Print the arguments passed
+    for (int i = 1; i < argc; i++) {
+        printf("%s ", argv[i]);
+    }
+
     const char* inputFile = nullptr;
     const char* outputFile = nullptr;
     const char* farFile = nullptr;
     int effectEn[PREPROC_NUM_EFFECTS] = {0};
+    struct preProcConfigParams_t preProcCfgParams {};
 
     const option long_opts[] = {
             {"help", no_argument, nullptr, ARG_HELP},
@@ -212,9 +228,10 @@ int main(int argc, const char* argv[]) {
             {"agc", no_argument, &effectEn[PREPROC_AGC], 1},
             {"agc2", no_argument, &effectEn[PREPROC_AGC2], 1},
             {"ns", no_argument, &effectEn[PREPROC_NS], 1},
+            {"fch", required_argument, nullptr, ARG_FILE_CHANNELS},
+            {"mono", no_argument, &preProcCfgParams.monoMode, 1},
             {nullptr, 0, nullptr, 0},
     };
-    struct preProcConfigParams_t preProcCfgParams {};
 
     while (true) {
         const int opt = getopt_long(argc, (char* const*)argv, "i:o:", long_opts, nullptr);
@@ -277,6 +294,14 @@ int main(int argc, const char* argv[]) {
             }
             case ARG_NS_LVL: {
                 preProcCfgParams.nsLevel = atoi(optarg);
+                break;
+            }
+            case ARG_FILE_CHANNELS: {
+                preProcCfgParams.fileChannels = atoi(optarg);
+                break;
+            }
+            case ARG_MONO_MODE: {
+                preProcCfgParams.monoMode = 1;
                 break;
             }
             default:
@@ -402,15 +427,27 @@ int main(int argc, const char* argv[]) {
     // Process Call
     const int frameLength = (int)(preProcCfgParams.samplingFreq * kTenMilliSecVal);
     const int ioChannelCount = audio_channel_count_from_in_mask(preProcCfgParams.chMask);
+    const int fileChannelCount = preProcCfgParams.fileChannels;
     const int ioFrameSize = ioChannelCount * sizeof(short);
+    const int inFrameSize = fileChannelCount * sizeof(short);
     int frameCounter = 0;
     while (true) {
         std::vector<short> in(frameLength * ioChannelCount);
         std::vector<short> out(frameLength * ioChannelCount);
         std::vector<short> farIn(frameLength * ioChannelCount);
-        size_t samplesRead = fread(in.data(), ioFrameSize, frameLength, inputFp.get());
+        size_t samplesRead = fread(in.data(), inFrameSize, frameLength, inputFp.get());
         if (samplesRead == 0) {
             break;
+        }
+        if (fileChannelCount != ioChannelCount) {
+            adjust_channels(in.data(), fileChannelCount, in.data(), ioChannelCount, sizeof(short),
+                            frameLength * inFrameSize);
+            if (preProcCfgParams.monoMode == 1) {
+                for (int i = 0; i < frameLength; ++i) {
+                    auto* fp = &in[i * ioChannelCount];
+                    std::fill(fp + 1, fp + ioChannelCount, *fp);  // replicate ch 0
+                }
+            }
         }
         audio_buffer_t inputBuffer, outputBuffer;
         audio_buffer_t farInBuffer{};
@@ -420,10 +457,21 @@ int main(int argc, const char* argv[]) {
         outputBuffer.s16 = out.data();
 
         if (farFp != nullptr) {
-            samplesRead = fread(farIn.data(), ioFrameSize, frameLength, farFp.get());
+            samplesRead = fread(farIn.data(), inFrameSize, frameLength, farFp.get());
             if (samplesRead == 0) {
                 break;
             }
+            if (fileChannelCount != ioChannelCount) {
+                adjust_channels(farIn.data(), fileChannelCount, farIn.data(), ioChannelCount,
+                                sizeof(short), frameLength * inFrameSize);
+                if (preProcCfgParams.monoMode == 1) {
+                    for (int i = 0; i < frameLength; ++i) {
+                        auto* fp = &farIn[i * ioChannelCount];
+                        std::fill(fp + 1, fp + ioChannelCount, *fp);  // replicate ch 0
+                    }
+                }
+            }
+
             farInBuffer.frameCount = samplesRead;
             farInBuffer.s16 = farIn.data();
         }
@@ -458,8 +506,12 @@ int main(int argc, const char* argv[]) {
             }
         }
         if (outputFp != nullptr) {
+            if (fileChannelCount != ioChannelCount) {
+                adjust_channels(out.data(), ioChannelCount, out.data(), fileChannelCount,
+                                sizeof(short), frameLength * ioFrameSize);
+            }
             size_t samplesWritten =
-                    fwrite(out.data(), ioFrameSize, outputBuffer.frameCount, outputFp.get());
+                    fwrite(out.data(), inFrameSize, outputBuffer.frameCount, outputFp.get());
             if (samplesWritten != outputBuffer.frameCount) {
                 ALOGE("\nError: Output file writing failed");
                 break;
