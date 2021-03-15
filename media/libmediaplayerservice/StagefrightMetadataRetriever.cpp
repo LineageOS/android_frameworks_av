@@ -233,7 +233,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
-        sp<ImageDecoder> decoder = new ImageDecoder(componentName, trackMeta, source);
+        sp<MediaImageDecoder> decoder = new MediaImageDecoder(componentName, trackMeta, source);
         int64_t frameTimeUs = thumbnail ? -1 : 0;
         if (decoder->init(frameTimeUs, 0 /*option*/, colorFormat) == OK) {
             sp<IMemory> frame = decoder->extractFrame(rect);
