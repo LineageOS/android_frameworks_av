@@ -1822,8 +1822,7 @@ MediaPlayerService::AudioOutput::~AudioOutput()
 //static
 void MediaPlayerService::AudioOutput::setMinBufferCount()
 {
-    char value[PROPERTY_VALUE_MAX];
-    if (property_get("ro.kernel.qemu", value, 0)) {
+    if (property_get_bool("ro.boot.qemu", false)) {
         mIsOnEmulator = true;
         mMinBufferCount = 12;  // to prevent systematic buffer underrun for emulator
     }
