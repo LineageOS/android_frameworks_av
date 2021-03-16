@@ -48,4 +48,9 @@ cc_library {
         "libhardware_headers",
         "libwebrtc_absl_headers",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }

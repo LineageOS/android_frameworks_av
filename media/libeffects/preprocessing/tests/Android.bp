@@ -29,6 +29,11 @@ cc_test {
         "libaudioeffects",
         "libhardware_headers",
     ],
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 }
 
 cc_test {
