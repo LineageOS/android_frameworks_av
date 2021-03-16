@@ -261,6 +261,17 @@ struct AMessage : public RefBase {
      */
     status_t removeEntryAt(size_t index);
 
+    /**
+     * Removes an entry based on name.
+     *
+     * \param name  name of the entry
+     *
+     * \retval OK the entry was removed successfully
+     * \retval BAD_VALUE name is invalid (null)
+     * \retval BAD_INDEX name not found
+     */
+    status_t removeEntryByName(const char *name);
+
 protected:
     virtual ~AMessage();
 
