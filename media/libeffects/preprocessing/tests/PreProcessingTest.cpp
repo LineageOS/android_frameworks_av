@@ -451,8 +451,8 @@ int main(int argc, const char* argv[]) {
         }
         audio_buffer_t inputBuffer, outputBuffer;
         audio_buffer_t farInBuffer{};
-        inputBuffer.frameCount = samplesRead;
-        outputBuffer.frameCount = samplesRead;
+        inputBuffer.frameCount = frameLength;
+        outputBuffer.frameCount = frameLength;
         inputBuffer.s16 = in.data();
         outputBuffer.s16 = out.data();
 
@@ -472,7 +472,7 @@ int main(int argc, const char* argv[]) {
                 }
             }
 
-            farInBuffer.frameCount = samplesRead;
+            farInBuffer.frameCount = frameLength;
             farInBuffer.s16 = farIn.data();
         }
 
@@ -519,6 +519,7 @@ int main(int argc, const char* argv[]) {
         }
         frameCounter += frameLength;
     }
+    printf("frameCounter: [%d]\n", frameCounter);
     // Release all the effect handles created
     for (int i = 0; i < PREPROC_NUM_EFFECTS; i++) {
         if (int status = AUDIO_EFFECT_LIBRARY_INFO_SYM.release_effect(effectHandle[i]);
