@@ -524,11 +524,9 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
     }
 
     /* check bit rate */
-    /* set max bit rate */
     for (i = 0; i < encParams->nLayers; i++)
     {
         encParams->LayerBitRate[i] = encOption->bitRate[i];
-        encParams->LayerMaxBitRate[i] = encOption->bitRate[i];
     }
     if (encParams->nLayers > 1)
     {
@@ -3302,6 +3300,3 @@ Bool SetProfile_BufferSize(VideoEncData *video, float delay, Int bInitialized)
 }
 
 #endif /* #ifndef ORIGINAL_VERSION */
-
-
-
