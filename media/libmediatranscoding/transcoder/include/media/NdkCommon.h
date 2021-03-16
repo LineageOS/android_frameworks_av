@@ -19,6 +19,8 @@
 
 #include <media/NdkMediaFormat.h>
 
+#include <vector>
+
 extern const char* AMEDIA_MIMETYPE_VIDEO_VP8;
 extern const char* AMEDIA_MIMETYPE_VIDEO_VP9;
 extern const char* AMEDIA_MIMETYPE_VIDEO_AV1;
@@ -82,8 +84,8 @@ bool CopyFormatEntryInt64(const char* key, AMediaFormat* from, AMediaFormat* to)
 bool CopyFormatEntryInt32(const char* key, AMediaFormat* from, AMediaFormat* to);
 bool CopyFormatEntryFloat(const char* key, AMediaFormat* from, AMediaFormat* to);
 
-void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* entries,
-                       size_t entryCount);
+void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to,
+                       const std::vector<EntryCopier>& entries);
 
 bool SetDefaultFormatValueFloat(const char* key, AMediaFormat* format, float value);
 bool SetDefaultFormatValueInt32(const char* key, AMediaFormat* format, int32_t value);

@@ -60,19 +60,19 @@ DEFINE_FORMAT_VALUE_COPY_FUNC(int64_t, Int64);
 DEFINE_FORMAT_VALUE_COPY_FUNC(int32_t, Int32);
 DEFINE_FORMAT_VALUE_COPY_FUNC(float, Float);
 
-void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to, const EntryCopier* entries,
-                       size_t entryCount) {
+void CopyFormatEntries(AMediaFormat* from, AMediaFormat* to,
+                       const std::vector<EntryCopier>& entries) {
     if (from == nullptr || to == nullptr) {
         LOG(ERROR) << "Cannot copy null formats";
         return;
-    } else if (entries == nullptr || entryCount < 1) {
+    } else if (entries.empty()) {
         LOG(WARNING) << "No entries to copy";
         return;
     }
 
-    for (size_t i = 0; i < entryCount; ++i) {
-        if (!entries[i].copy(entries[i].key, from, to) && entries[i].copy2 != nullptr) {
-            entries[i].copy2(entries[i].key, from, to);
+    for (auto& entry : entries) {
+        if (!entry.copy(entry.key, from, to) && entry.copy2 != nullptr) {
+            entry.copy2(entry.key, from, to);
         }
     }
 }
