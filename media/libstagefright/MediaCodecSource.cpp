@@ -30,6 +30,7 @@
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/ALooper.h>
 #include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/foundation/ColorUtils.h>
 #include <media/stagefright/MediaBuffer.h>
 #include <media/stagefright/MediaCodec.h>
 #include <media/stagefright/MediaCodecConstants.h>
@@ -768,6 +769,26 @@ status_t MediaCodecSource::feedEncoderInputBuffers() {
             memcpy(inbuf->data(), mbuf->data(), size);
 
             if (mIsVideo) {
+                int32_t ds = 0;
+                if (mbuf->meta_data().findInt32(kKeyColorSpace, &ds)
+                        && ds != HAL_DATASPACE_UNKNOWN) {
+                    android_dataspace dataspace = static_cast<android_dataspace>(ds);
+                    ColorUtils::convertDataSpaceToV0(dataspace);
+                    ALOGD("Updating dataspace to %x", dataspace);
+                    int32_t standard = (int32_t(dataspace) & HAL_DATASPACE_STANDARD_MASK)
+                        >> HAL_DATASPACE_STANDARD_SHIFT;
+                    int32_t transfer = (int32_t(dataspace) & HAL_DATASPACE_TRANSFER_MASK)
+                        >> HAL_DATASPACE_TRANSFER_SHIFT;
+                    int32_t range = (int32_t(dataspace) & HAL_DATASPACE_RANGE_MASK)
+                        >> HAL_DATASPACE_RANGE_SHIFT;
+                    sp<AMessage> msg = new AMessage;
+                    msg->setInt32(KEY_COLOR_STANDARD, standard);
+                    msg->setInt32(KEY_COLOR_TRANSFER, transfer);
+                    msg->setInt32(KEY_COLOR_RANGE, range);
+                    msg->setInt32("android._dataspace", dataspace);
+                    mEncoder->setParameters(msg);
+                }
+
                 // video encoder will release MediaBuffer when done
                 // with underlying data.
                 inbuf->meta()->setObject("mediaBufferHolder", new MediaBufferHolder(mbuf));
