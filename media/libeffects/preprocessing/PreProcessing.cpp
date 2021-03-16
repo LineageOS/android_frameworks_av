@@ -670,8 +670,8 @@ int NsCreate(preproc_effect_t* effect) {
     return 0;
 }
 
-int NsGetParameter(preproc_effect_t* effect __unused, void* pParam __unused,
-                   uint32_t* pValueSize __unused, void* pValue __unused) {
+int NsGetParameter(preproc_effect_t* /*effect __unused*/, void* /*pParam __unused*/,
+                   uint32_t* /*pValueSize __unused*/, void* /*pValue __unused*/) {
     int status = 0;
     return status;
 }
@@ -1551,7 +1551,7 @@ int PreProcessingFx_GetDescriptor(effect_handle_t self, effect_descriptor_t* pDe
 }
 
 int PreProcessingFx_ProcessReverse(effect_handle_t self, audio_buffer_t* inBuffer,
-                                   audio_buffer_t* outBuffer __unused) {
+                                   audio_buffer_t* outBuffer) {
     preproc_effect_t* effect = (preproc_effect_t*)self;
 
     if (effect == NULL) {
