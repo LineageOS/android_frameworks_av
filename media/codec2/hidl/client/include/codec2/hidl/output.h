@@ -19,16 +19,17 @@
 
 #include <gui/IGraphicBufferProducer.h>
 #include <codec2/hidl/1.0/types.h>
+#include <codec2/hidl/1.2/types.h>
 #include <C2Work.h>
 
 struct C2_HIDE _C2BlockPoolData;
+class C2SurfaceSyncMemory;
 
 namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
-namespace utils {
+
 
 // BufferQueue-Based Block Operations
 // ==================================
@@ -45,7 +46,8 @@ struct OutputBufferQueue {
     // Graphic blocks from older surface will be migrated to new surface.
     bool configure(const sp<IGraphicBufferProducer>& igbp,
                    uint32_t generation,
-                   uint64_t bqId);
+                   uint64_t bqId,
+                   std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj);
 
     // Render a graphic block to current surface.
     status_t outputBuffer(
@@ -61,22 +63,27 @@ struct OutputBufferQueue {
     void holdBufferQueueBlocks(
             const std::list<std::unique_ptr<C2Work>>& workList);
 
+    // Update # of max dequeue buffer from BQ. If # of max dequeued buffer is shared
+    // via shared memory between HAL and framework, Update # of max dequeued buffer
+    // and synchronize.
+    void updateMaxDequeueBufferCount(int maxDequeueBufferCount);
+
 private:
 
     std::mutex mMutex;
     sp<IGraphicBufferProducer> mIgbp;
     uint32_t mGeneration;
     uint64_t mBqId;
+    int32_t mMaxDequeueBufferCount;
     std::shared_ptr<int> mOwner;
     // To migrate existing buffers
     sp<GraphicBuffer> mBuffers[BufferQueueDefs::NUM_BUFFER_SLOTS]; // find a better way
     std::weak_ptr<_C2BlockPoolData> mPoolDatas[BufferQueueDefs::NUM_BUFFER_SLOTS];
+    std::shared_ptr<C2SurfaceSyncMemory> mSyncMem;
 
     bool registerBuffer(const C2ConstGraphicBlock& block);
 };
 
-}  // namespace utils
-}  // namespace V1_0
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware
