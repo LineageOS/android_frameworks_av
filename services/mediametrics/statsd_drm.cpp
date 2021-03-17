@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "statsd_drm"
 #include <utils/Log.h>
+#include <media/stagefright/foundation/base64.h>
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -37,6 +38,7 @@
 
 #include <array>
 #include <string>
+#include <vector>
 
 namespace android {
 
@@ -115,6 +117,67 @@ bool statsd_drmmanager(const mediametrics::Item *item)
                                methodCounts[9], methodCounts[10], methodCounts[11],
                                methodCounts[12]);
 
+    return true;
+}
+
+namespace {
+std::vector<uint8_t> base64DecodeNoPad(std::string& str) {
+    if (str.empty()) {
+        return {};
+    }
+
+    switch (str.length() % 4) {
+    case 3: str += "="; break;
+    case 2: str += "=="; break;
+    case 1: str += "==="; break;
+    case 0: /* unchanged */ break;
+    }
+
+    std::vector<uint8_t> buf(str.length() / 4 * 3, 0);
+    size_t size = buf.size();
+    if (decodeBase64(buf.data(), &size, str.c_str()) && size <= buf.size()) {
+        buf.erase(buf.begin() + size, buf.end());
+        return buf;
+    }
+    return {};
+}
+} // namespace
+
+// |out| and its contents are memory-managed by statsd.
+bool statsd_mediadrm_puller(const mediametrics::Item* item, AStatsEventList* out)
+{
+    if (item == nullptr) {
+        return false;
+    }
+
+    if (!enabled_statsd) {
+        ALOGV("NOT pulling: mediadrm activity");
+        return true;
+    }
+
+    std::string serialized_metrics;
+    (void) item->getString("serialized_metrics", &serialized_metrics);
+    const auto framework_raw(base64DecodeNoPad(serialized_metrics));
+
+    std::string plugin_metrics;
+    (void) item->getString("plugin_metrics", &plugin_metrics);
+    const auto plugin_raw(base64DecodeNoPad(plugin_metrics));
+
+    std::string vendor;
+    (void) item->getString("vendor", &vendor);
+    std::string description;
+    (void) item->getString("description", &description);
+
+    // Memory for |event| is internally managed by statsd.
+    AStatsEvent* event = AStatsEventList_addStatsEvent(out);
+    AStatsEvent_setAtomId(event, android::util::MEDIA_DRM_ACTIVITY_INFO);
+    AStatsEvent_writeString(event, item->getPkgName().c_str());
+    AStatsEvent_writeInt64(event, item->getPkgVersionCode());
+    AStatsEvent_writeString(event, vendor.c_str());
+    AStatsEvent_writeString(event, description.c_str());
+    AStatsEvent_writeByteArray(event, framework_raw.data(), framework_raw.size());
+    AStatsEvent_writeByteArray(event, plugin_raw.data(), plugin_raw.size());
+    AStatsEvent_build(event);
     return true;
 }
 
