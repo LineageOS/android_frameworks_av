@@ -188,11 +188,11 @@ void MediaExtractorFactory::RegisterExtractor(const sp<ExtractorPlugin> &plugin,
     // sanity check check struct version, uuid, name
     if (plugin->def.def_version != EXTRACTORDEF_VERSION_NDK_V1 &&
             plugin->def.def_version != EXTRACTORDEF_VERSION_NDK_V2) {
-        ALOGE("don't understand extractor format %u, ignoring.", plugin->def.def_version);
+        ALOGW("don't understand extractor format %u, ignoring.", plugin->def.def_version);
         return;
     }
     if (memcmp(&plugin->def.extractor_uuid, "\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", 16) == 0) {
-        ALOGE("invalid UUID, ignoring");
+        ALOGW("invalid UUID, ignoring");
         return;
     }
     if (plugin->def.extractor_name == NULL || strlen(plugin->def.extractor_name) == 0) {
@@ -244,13 +244,17 @@ void MediaExtractorFactory::RegisterExtractors(
             void *libHandle = android_dlopen_ext(
                     libPath.string(),
                     RTLD_NOW | RTLD_LOCAL, dlextinfo);
-            CHECK(libHandle != nullptr)
-                    << "couldn't dlopen(" << libPath.string() << ") " << strerror(errno);
+            if (libHandle == nullptr) {
+                ALOGI("dlopen(%s) reported error %s", libPath.string(), strerror(errno));
+                continue;
+            }
 
             GetExtractorDef getDef =
                 (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
-            CHECK(getDef != nullptr)
-                    << libPath.string() << " does not contain sniffer";
+            if (getDef == nullptr) {
+                ALOGI("no sniffer found in %s", libPath.string());
+                continue;
+            }
 
             ALOGV("registering sniffer for %s", libPath.string());
             RegisterExtractor(
@@ -258,7 +262,7 @@ void MediaExtractorFactory::RegisterExtractors(
         }
         closedir(libDir);
     } else {
-        ALOGE("couldn't opendir(%s)", libDirPath);
+        ALOGI("plugin directory not present (%s)", libDirPath);
     }
 }
 

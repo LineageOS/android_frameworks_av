@@ -39,7 +39,7 @@ using namespace android;
 using namespace aaudio;
 
 #define MAX_STREAMS_PER_PROCESS   8
-#define AIDL_RETURN(x) *_aidl_return = (x); return Status::ok();
+#define AIDL_RETURN(x) { *_aidl_return = (x); return Status::ok(); }
 
 #define VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(x) \
     ({ auto _tmp = (x); \
@@ -116,12 +116,11 @@ AAudioService::openStream(const StreamRequest &_request, StreamParameters* _para
 
     // Enforce limit on client processes.
     Identity callingIdentity = request.getIdentity();
+    pid_t pid = IPCThreadState::self()->getCallingPid();
     callingIdentity.pid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
-        legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
+        legacy2aidl_pid_t_int32_t(pid));
     callingIdentity.uid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
         legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
-    pid_t pid = VALUE_OR_RETURN_ILLEGAL_ARG_STATUS(
-        aidl2legacy_int32_t_pid_t(callingIdentity.pid));
     if (callingIdentity.pid != mAudioClient.identity.pid) {
         int32_t count = AAudioClientTracker::getInstance().getStreamCount(pid);
         if (count >= MAX_STREAMS_PER_PROCESS) {
