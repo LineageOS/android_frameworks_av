@@ -91,16 +91,24 @@ AAUDIO_API void AAudioStreamBuilder_setPackageName(AAudioStreamBuilder* builder,
                                                    const char* packageName)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    // Only system apps can read the op package name. For regular apps the regular package name
-    // is a sufficient replacement
-    streamBuilder->setOpPackageName(packageName);
+    std::optional<std::string> optionalPackageName;
+    if (packageName != nullptr) {
+      optionalPackageName = std::string(packageName);
+    }
+    // Only system apps can read the op package name. For regular apps the
+    // regular package name is a sufficient replacement
+    streamBuilder->setOpPackageName(optionalPackageName);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setAttributionTag(AAudioStreamBuilder* builder,
                                                       const char* attributionTag)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    streamBuilder->setAttributionTag(attributionTag);
+    std::optional<std::string> optionalAttrTag;
+    if (attributionTag != nullptr) {
+      optionalAttrTag = std::string(attributionTag);
+    }
+    streamBuilder->setAttributionTag(optionalAttrTag);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setSampleRate(AAudioStreamBuilder* builder,
