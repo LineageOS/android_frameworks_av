@@ -14,7 +14,13 @@
  * limitations under the License.
  */
 
+#include <memory>
+#include <stats_event.h>
+
 namespace android {
+namespace mediametrics {
+class Item;
+}
 
 extern bool enabled_statsd;
 
@@ -30,7 +36,12 @@ extern bool statsd_nuplayer(const mediametrics::Item *);
 extern bool statsd_recorder(const mediametrics::Item *);
 
 extern bool statsd_mediadrm(const mediametrics::Item *);
-extern bool statsd_widevineCDM(const mediametrics::Item *);
 extern bool statsd_drmmanager(const mediametrics::Item *);
+
+// component specific pullers
+extern bool statsd_mediadrm_puller(const mediametrics::Item *, AStatsEventList *);
+
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item);
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out);
 
 } // namespace android
