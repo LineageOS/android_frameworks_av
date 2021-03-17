@@ -29,24 +29,37 @@
 
 namespace android {
 
-static AMediaFormat* mergeMediaFormats(AMediaFormat* base, AMediaFormat* overlay) {
-    if (base == nullptr || overlay == nullptr) {
+static std::shared_ptr<AMediaFormat> createVideoTrackFormat(AMediaFormat* srcFormat,
+                                                            AMediaFormat* options) {
+    if (srcFormat == nullptr || options == nullptr) {
         LOG(ERROR) << "Cannot merge null formats";
         return nullptr;
     }
 
-    AMediaFormat* format = AMediaFormat_new();
-    if (AMediaFormat_copy(format, base) != AMEDIA_OK) {
-        AMediaFormat_delete(format);
-        return nullptr;
+    // ------- Define parameters to copy from the source track format -------
+    std::vector<AMediaFormatUtils::EntryCopier> srcParamsToCopy{
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_MIME, String),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_DURATION, Int64),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_WIDTH, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_HEIGHT, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_FRAME_RATE, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_RANGE, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_STANDARD, Int32),
+            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_TRANSFER, Int32),
+    };
+
+    // If the destination codec is the same as the source codec, we can preserve profile and level
+    // from the source track as default values. Otherwise leave them unspecified.
+    const char *srcMime, *dstMime;
+    AMediaFormat_getString(srcFormat, AMEDIAFORMAT_KEY_MIME, &srcMime);
+    if (!AMediaFormat_getString(options, AMEDIAFORMAT_KEY_MIME, &dstMime) ||
+        strcmp(srcMime, dstMime) == 0) {
+        srcParamsToCopy.push_back(ENTRY_COPIER(AMEDIAFORMAT_KEY_PROFILE, String));
+        srcParamsToCopy.push_back(ENTRY_COPIER(AMEDIAFORMAT_KEY_LEVEL, String));
     }
 
-    // Note: AMediaFormat does not expose a function for appending values from another format or for
-    // iterating over all values and keys in a format. Instead we define a static list of known keys
-    // along with their value types and copy the ones that are present. A better solution would be
-    // to either implement required functions in NDK or to parse the overlay format's string
-    // representation and copy all existing keys.
-    static const AMediaFormatUtils::EntryCopier kSupportedFormatEntries[] = {
+    // ------- Define parameters to copy from the caller's options -------
+    static const std::vector<AMediaFormatUtils::EntryCopier> kSupportedOptions{
             ENTRY_COPIER(AMEDIAFORMAT_KEY_MIME, String),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_DURATION, Int64),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_WIDTH, Int32),
@@ -54,7 +67,6 @@ static AMediaFormat* mergeMediaFormats(AMediaFormat* base, AMediaFormat* overlay
             ENTRY_COPIER(AMEDIAFORMAT_KEY_BIT_RATE, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_PROFILE, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_LEVEL, Int32),
-            ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_FORMAT, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_RANGE, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_STANDARD, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_COLOR_TRANSFER, Int32),
@@ -63,10 +75,12 @@ static AMediaFormat* mergeMediaFormats(AMediaFormat* base, AMediaFormat* overlay
             ENTRY_COPIER(AMEDIAFORMAT_KEY_PRIORITY, Int32),
             ENTRY_COPIER2(AMEDIAFORMAT_KEY_OPERATING_RATE, Float, Int32),
     };
-    const size_t entryCount = sizeof(kSupportedFormatEntries) / sizeof(kSupportedFormatEntries[0]);
 
-    AMediaFormatUtils::CopyFormatEntries(overlay, format, kSupportedFormatEntries, entryCount);
-    return format;
+    // ------- Copy parameters from source and options to the destination -------
+    auto trackFormat = std::shared_ptr<AMediaFormat>(AMediaFormat_new(), &AMediaFormat_delete);
+    AMediaFormatUtils::CopyFormatEntries(srcFormat, trackFormat.get(), srcParamsToCopy);
+    AMediaFormatUtils::CopyFormatEntries(options, trackFormat.get(), kSupportedOptions);
+    return trackFormat;
 }
 
 void MediaTranscoder::onThreadFinished(const void* thread, media_status_t threadStatus,
@@ -270,7 +284,8 @@ std::vector<std::shared_ptr<AMediaFormat>> MediaTranscoder::getTrackFormats() co
     return trackFormats;
 }
 
-media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFormat* trackFormat) {
+media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex,
+                                                     AMediaFormat* destinationOptions) {
     if (mSampleReader == nullptr) {
         LOG(ERROR) << "Source must be configured before tracks";
         return AMEDIA_ERROR_INVALID_OPERATION;
@@ -281,14 +296,15 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
     }
 
     std::shared_ptr<MediaTrackTranscoder> transcoder;
-    std::shared_ptr<AMediaFormat> format;
+    std::shared_ptr<AMediaFormat> trackFormat;
 
-    if (trackFormat == nullptr) {
+    if (destinationOptions == nullptr) {
         transcoder = std::make_shared<PassthroughTrackTranscoder>(shared_from_this());
     } else {
+        AMediaFormat* srcTrackFormat = mSourceTrackFormats[trackIndex].get();
+
         const char* srcMime = nullptr;
-        if (!AMediaFormat_getString(mSourceTrackFormats[trackIndex].get(), AMEDIAFORMAT_KEY_MIME,
-                                    &srcMime)) {
+        if (!AMediaFormat_getString(srcTrackFormat, AMEDIAFORMAT_KEY_MIME, &srcMime)) {
             LOG(ERROR) << "Source track #" << trackIndex << " has no mime type";
             return AMEDIA_ERROR_MALFORMED;
         }
@@ -301,7 +317,7 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         }
 
         const char* dstMime = nullptr;
-        if (AMediaFormat_getString(trackFormat, AMEDIAFORMAT_KEY_MIME, &dstMime)) {
+        if (AMediaFormat_getString(destinationOptions, AMEDIAFORMAT_KEY_MIME, &dstMime)) {
             if (strncmp(dstMime, "video/", 6) != 0) {
                 LOG(ERROR) << "Unable to convert media types for track #" << trackIndex << ", from "
                            << srcMime << " to " << dstMime;
@@ -311,14 +327,11 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
 
         transcoder = VideoTrackTranscoder::create(shared_from_this(), mPid, mUid);
 
-        AMediaFormat* mergedFormat =
-                mergeMediaFormats(mSourceTrackFormats[trackIndex].get(), trackFormat);
-        if (mergedFormat == nullptr) {
-            LOG(ERROR) << "Unable to merge source and destination formats";
+        trackFormat = createVideoTrackFormat(srcTrackFormat, destinationOptions);
+        if (trackFormat == nullptr) {
+            LOG(ERROR) << "Unable to create video track format";
             return AMEDIA_ERROR_UNKNOWN;
         }
-
-        format = std::shared_ptr<AMediaFormat>(mergedFormat, &AMediaFormat_delete);
     }
 
     media_status_t status = mSampleReader->selectTrack(trackIndex);
@@ -327,7 +340,7 @@ media_status_t MediaTranscoder::configureTrackFormat(size_t trackIndex, AMediaFo
         return status;
     }
 
-    status = transcoder->configure(mSampleReader, trackIndex, format);
+    status = transcoder->configure(mSampleReader, trackIndex, trackFormat);
     if (status != AMEDIA_OK) {
         LOG(ERROR) << "Configure track transcoder for track #" << trackIndex << " returned error "
                    << status;
