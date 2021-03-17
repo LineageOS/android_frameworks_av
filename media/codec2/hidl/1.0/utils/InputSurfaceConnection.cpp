@@ -201,6 +201,8 @@ struct InputSurfaceConnection::Impl : public ComponentWrapper {
         c2_status_t err = mAllocator->priorGraphicAllocation(handle, &alloc);
         mAllocatorMutex.unlock();
         if (err != OK) {
+            native_handle_close(handle);
+            native_handle_delete(handle);
             return UNKNOWN_ERROR;
         }
         std::shared_ptr<C2GraphicBlock> block =

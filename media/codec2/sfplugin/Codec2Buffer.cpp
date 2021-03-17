@@ -713,6 +713,8 @@ std::shared_ptr<C2Buffer> GraphicMetadataBuffer::asC2Buffer() {
     c2_status_t err = mAlloc->priorGraphicAllocation(handle, &alloc);
     if (err != C2_OK) {
         ALOGD("Failed to wrap VideoNativeMetadata into C2GraphicAllocation");
+        native_handle_close(handle);
+        native_handle_delete(handle);
         return nullptr;
     }
     std::shared_ptr<C2GraphicBlock> block = _C2BlockFactory::CreateGraphicBlock(alloc);

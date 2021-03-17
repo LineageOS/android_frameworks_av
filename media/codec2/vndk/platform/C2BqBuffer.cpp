@@ -364,6 +364,8 @@ private:
                 std::shared_ptr<C2GraphicAllocation> alloc;
                 c2_status_t err = mAllocator->priorGraphicAllocation(c2Handle, &alloc);
                 if (err != C2_OK) {
+                    native_handle_close(c2Handle);
+                    native_handle_delete(c2Handle);
                     return err;
                 }
                 std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
