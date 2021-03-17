@@ -93,8 +93,6 @@ struct C2OMXNode : public BnOMXNode {
      */
     void onInputBufferDone(c2_cntr64_t index);
 
-    android_dataspace getDataspace();
-
 private:
     std::weak_ptr<Codec2Client::Component> mComp;
     sp<IOMXBufferSource> mBufferSource;
@@ -103,7 +101,6 @@ private:
     uint32_t mWidth;
     uint32_t mHeight;
     uint64_t mUsage;
-    Mutexed<android_dataspace> mDataspace;
 
     // WORKAROUND: timestamp adjustment
 
