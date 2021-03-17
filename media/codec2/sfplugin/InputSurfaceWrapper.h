@@ -106,8 +106,6 @@ public:
      */
     virtual void onInputBufferDone(c2_cntr64_t /* index */) {}
 
-    virtual android_dataspace getDataspace() { return mDataSpace; }
-
 protected:
     android_dataspace mDataSpace;
 };
