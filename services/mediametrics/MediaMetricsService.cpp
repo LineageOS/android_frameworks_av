@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include "MediaMetricsService.h"
+#include "iface_statsd.h"
 
 #include <pwd.h> //getpwuid
 
@@ -30,6 +31,9 @@
 #include <mediautils/MemoryLeakTrackUtil.h>
 #include <memunreachable/memunreachable.h>
 #include <private/android_filesystem_config.h> // UID
+#include <statslog.h>
+
+#include <set>
 
 namespace android {
 
@@ -200,7 +204,6 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
 
     (void)mAudioAnalytics.submit(sitem, isTrusted);
 
-    extern bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item);
     (void)dump2Statsd(sitem);  // failure should be logged in function.
     saveItem(sitem);
     return NO_ERROR;
@@ -440,6 +443,10 @@ void MediaMetricsService::saveItem(const std::shared_ptr<const mediametrics::Ite
     std::lock_guard _l(mLock);
     // we assume the items are roughly in time order.
     mItems.emplace_back(item);
+    if (isPullable(item->getKey())) {
+        registerStatsdCallbacksIfNeeded();
+        mPullableItems[item->getKey()].emplace_back(item);
+    }
     ++mItemsFinalized;
     if (expirations(item)
             && (!mExpireFuture.valid()
@@ -486,4 +493,57 @@ bool MediaMetricsService::isRateLimited(mediametrics::Item *) const
     return false;
 }
 
+void MediaMetricsService::registerStatsdCallbacksIfNeeded()
+{
+    if (mStatsdRegistered.test_and_set()) {
+        return;
+    }
+    auto tag = android::util::MEDIA_DRM_ACTIVITY_INFO;
+    auto cb = MediaMetricsService::pullAtomCallback;
+    AStatsManager_setPullAtomCallback(tag, /* metadata */ nullptr, cb, this);
+}
+
+/* static */
+bool MediaMetricsService::isPullable(const std::string &key)
+{
+    static const std::set<std::string> pullableKeys{
+        "mediadrm",
+    };
+    return pullableKeys.count(key);
+}
+
+/* static */
+std::string MediaMetricsService::atomTagToKey(int32_t atomTag)
+{
+    switch (atomTag) {
+    case android::util::MEDIA_DRM_ACTIVITY_INFO:
+        return "mediadrm";
+    }
+    return {};
+}
+
+/* static */
+AStatsManager_PullAtomCallbackReturn MediaMetricsService::pullAtomCallback(
+        int32_t atomTag, AStatsEventList* data, void* cookie)
+{
+    MediaMetricsService* svc = reinterpret_cast<MediaMetricsService*>(cookie);
+    return svc->pullItems(atomTag, data);
+}
+
+AStatsManager_PullAtomCallbackReturn MediaMetricsService::pullItems(
+        int32_t atomTag, AStatsEventList* data)
+{
+    const std::string key(atomTagToKey(atomTag));
+    if (key.empty()) {
+        return AStatsManager_PULL_SKIP;
+    }
+    std::lock_guard _l(mLock);
+    for (auto &item : mPullableItems[key]) {
+        if (const auto sitem = item.lock()) {
+            dump2Statsd(sitem, data);
+        }
+    }
+    mPullableItems[key].clear();
+    return AStatsManager_PULL_SUCCESS;
+}
 } // namespace android
