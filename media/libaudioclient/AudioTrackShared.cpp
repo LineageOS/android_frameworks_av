@@ -17,6 +17,7 @@
 #define LOG_TAG "AudioTrackShared"
 //#define LOG_NDEBUG 0
 
+#include <atomic>
 #include <android-base/macros.h>
 #include <private/media/AudioTrackShared.h>
 #include <utils/Log.h>
@@ -31,6 +32,21 @@ namespace android {
 template <typename T>
 size_t clampToSize(T x) {
     return sizeof(T) > sizeof(size_t) && x > (T) SIZE_MAX ? SIZE_MAX : x < 0 ? 0 : (size_t) x;
+}
+
+// compile-time safe atomics. TODO: update all methods to use it
+template <typename T>
+T android_atomic_load(const volatile T* addr) {
+    static_assert(sizeof(T) == sizeof(std::atomic<T>)); // no extra sync data required.
+    static_assert(std::atomic<T>::is_always_lock_free); // no hash lock somewhere.
+    return atomic_load((std::atomic<T>*)addr);          // memory_order_seq_cst
+}
+
+template <typename T>
+void android_atomic_store(const volatile T* addr, T value) {
+    static_assert(sizeof(T) == sizeof(std::atomic<T>)); // no extra sync data required.
+    static_assert(std::atomic<T>::is_always_lock_free); // no hash lock somewhere.
+    atomic_store((std::atomic<T>*)addr, value);         // memory_order_seq_cst
 }
 
 // incrementSequence is used to determine the next sequence value
@@ -51,6 +67,7 @@ audio_track_cblk_t::audio_track_cblk_t()
     : mServer(0), mFutex(0), mMinimum(0)
     , mVolumeLR(GAIN_MINIFLOAT_PACKED_UNITY), mSampleRate(0), mSendLevel(0)
     , mBufferSizeInFrames(0)
+    , mStartThresholdInFrames(0) // filled in by the server.
     , mFlags(0)
 {
     memset(&u, 0, sizeof(u));
@@ -64,6 +81,26 @@ Proxy::Proxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCount, size_t 
       mFrameCountP2(roundup(frameCount)), mIsOut(isOut), mClientInServer(clientInServer),
       mIsShutdown(false), mUnreleased(0)
 {
+}
+
+uint32_t Proxy::getStartThresholdInFrames() const
+{
+    const uint32_t startThresholdInFrames =
+           android_atomic_load(&mCblk->mStartThresholdInFrames);
+    if (startThresholdInFrames == 0 || startThresholdInFrames > mFrameCount) {
+        ALOGD("%s: startThresholdInFrames %u not between 1 and frameCount %zu, "
+                "setting to frameCount",
+                __func__, startThresholdInFrames, mFrameCount);
+        return mFrameCount;
+    }
+    return startThresholdInFrames;
+}
+
+uint32_t Proxy::setStartThresholdInFrames(uint32_t startThresholdInFrames)
+{
+    const uint32_t actual = std::min((size_t)startThresholdInFrames, frameCount());
+    android_atomic_store(&mCblk->mStartThresholdInFrames, actual);
+    return actual;
 }
 
 // ---------------------------------------------------------------------------
@@ -663,6 +700,7 @@ ServerProxy::ServerProxy(audio_track_cblk_t* cblk, void *buffers, size_t frameCo
     , mTimestampMutator(&cblk->mExtendedTimestampQueue)
 {
     cblk->mBufferSizeInFrames = frameCount;
+    cblk->mStartThresholdInFrames = frameCount;
 }
 
 __attribute__((no_sanitize("integer")))
