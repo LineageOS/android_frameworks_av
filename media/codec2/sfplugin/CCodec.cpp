@@ -211,6 +211,8 @@ public:
                 (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
                 &usage, sizeof(usage));
 
+        // NOTE: we do not use/pass through color aspects from GraphicBufferSource as we
+        // communicate that directly to the component.
         mSource->configure(
                 mOmxNode, static_cast<hardware::graphics::common::V1_0::Dataspace>(mDataSpace));
         return OK;
@@ -407,10 +409,6 @@ public:
 
     void onInputBufferDone(c2_cntr64_t index) override {
         mNode->onInputBufferDone(index);
-    }
-
-    android_dataspace getDataspace() override {
-        return mNode->getDataspace();
     }
 
 private:
@@ -1030,9 +1028,6 @@ void CCodec::configure(const sp<AMessage> &msg) {
             }
         }
 
-        // get color aspects
-        getColorAspectsFromFormat(msg, config->mClientColorAspects);
-
         /*
          * Handle dataspace
          */
@@ -1042,12 +1037,12 @@ void CCodec::configure(const sp<AMessage> &msg) {
             int32_t width, height;
             if (msg->findInt32("width", &width)
                     && msg->findInt32("height", &height)) {
-                setDefaultCodecColorAspectsIfNeeded(config->mClientColorAspects, width, height);
+                ColorAspects aspects;
+                getColorAspectsFromFormat(msg, aspects);
+                setDefaultCodecColorAspectsIfNeeded(aspects, width, height);
                 // TODO: read dataspace / color aspect from the component
-                setColorAspectsIntoFormat(
-                        config->mClientColorAspects, const_cast<sp<AMessage> &>(msg));
-                dataSpace = getDataSpaceForColorAspects(
-                        config->mClientColorAspects, true /* mayexpand */);
+                setColorAspectsIntoFormat(aspects, const_cast<sp<AMessage> &>(msg));
+                dataSpace = getDataSpaceForColorAspects(aspects, true /* mayexpand */);
             }
             msg->setInt32("android._dataspace", (int32_t)dataSpace);
             ALOGD("setting dataspace to %x", dataSpace);
@@ -1985,44 +1980,6 @@ void CCodec::onInputBufferDone(uint64_t frameIndex, size_t arrayIndex) {
     }
 }
 
-static void HandleDataspace(
-        android_dataspace dataspace, ColorAspects *colorAspects, sp<AMessage> *format) {
-    ColorUtils::convertDataSpaceToV0(dataspace);
-    int32_t range, standard, transfer;
-    range = (dataspace & HAL_DATASPACE_RANGE_MASK) >> HAL_DATASPACE_RANGE_SHIFT;
-    if (range == 0) {
-        range = ColorUtils::wrapColorAspectsIntoColorRange(
-                colorAspects->mRange);
-    }
-    standard = (dataspace & HAL_DATASPACE_STANDARD_MASK) >> HAL_DATASPACE_STANDARD_SHIFT;
-    if (standard == 0) {
-        standard = ColorUtils::wrapColorAspectsIntoColorStandard(
-                colorAspects->mPrimaries,
-                colorAspects->mMatrixCoeffs);
-    }
-    transfer = (dataspace & HAL_DATASPACE_TRANSFER_MASK) >> HAL_DATASPACE_TRANSFER_SHIFT;
-    if (transfer == 0) {
-        transfer = ColorUtils::wrapColorAspectsIntoColorTransfer(
-                colorAspects->mTransfer);
-    }
-    ColorAspects newColorAspects;
-    ColorUtils::convertPlatformColorAspectsToCodecAspects(
-            range, standard, transfer, newColorAspects);
-    if (ColorUtils::checkIfAspectsChangedAndUnspecifyThem(
-            newColorAspects, *colorAspects)) {
-        *format = (*format)->dup();
-        (*format)->setInt32(KEY_COLOR_RANGE, range);
-        (*format)->setInt32(KEY_COLOR_STANDARD, standard);
-        (*format)->setInt32(KEY_COLOR_TRANSFER, transfer);
-        // Record current color aspects into |colorAspects|.
-        // NOTE: newColorAspects could have been modified by
-        //       checkIfAspectsChangedAndUnspecifyThem() above,
-        //       so *colorAspects = newColorAspects does not work as intended.
-        ColorUtils::convertPlatformColorAspectsToCodecAspects(
-                range, standard, transfer, *colorAspects);
-    }
-}
-
 void CCodec::onMessageReceived(const sp<AMessage> &msg) {
     TimePoint now = std::chrono::steady_clock::now();
     CCodecWatchdog::getInstance()->watch(this);
@@ -2137,10 +2094,6 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 sp<AMessage> outputFormat = config->mOutputFormat;
                 config->updateConfiguration(updates, config->mOutputDomain);
-                if (config->mInputSurface) {
-                    android_dataspace ds = config->mInputSurface->getDataspace();
-                    HandleDataspace(ds, &config->mClientColorAspects, &config->mOutputFormat);
-                }
                 RevertOutputFormatIfNeeded(outputFormat, config->mOutputFormat);
 
                 // copy standard infos to graphic buffers if not already present (otherwise, we
