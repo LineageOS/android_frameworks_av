@@ -11,27 +11,10 @@ package {
 
 cc_benchmark {
     name: "preprocessing_benchmark",
-    vendor: true,
+    defaults: ["libaudiopreprocessing-defaults"],
     srcs: ["preprocessing_benchmark.cpp"],
-    shared_libs: [
-        "libaudioutils",
-        "liblog",
-        "libutils",
-    ],
     static_libs: [
         "libaudiopreprocessing",
-        "webrtc_audio_processing",
-    ],
-    cflags: [
-        "-DWEBRTC_POSIX",
-        "-fvisibility=default",
-        "-Wall",
-        "-Werror",
-        "-Wextra",
-    ],
-    header_libs: [
-        "libaudioeffects",
-        "libhardware_headers",
-        "libwebrtc_absl_headers",
+        "libaudioutils",
     ],
 }
