@@ -60,7 +60,6 @@ static constexpr struct statsd_hooks statsd_handlers[] =
     { "audiothread", statsd_audiothread },
     { "audiotrack", statsd_audiotrack },
     { "codec", statsd_codec},
-    { "drm.vendor.Google.WidevineCDM", statsd_widevineCDM },
     { "drmmanager", statsd_drmmanager },
     { "extractor", statsd_extractor },
     { "mediadrm", statsd_mediadrm },

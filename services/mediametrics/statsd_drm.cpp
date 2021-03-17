@@ -54,12 +54,12 @@ bool statsd_mediadrm(const mediametrics::Item *item)
     (void) item->getString("vendor", &vendor);
     std::string description;
     (void) item->getString("description", &description);
-    std::string serialized_metrics;
-    (void) item->getString("serialized_metrics", &serialized_metrics);
 
     if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics.c_str(),
-                                                serialized_metrics.size());
+        // This field is left here for backward compatibility.
+        // This field is not used anymore.
+        const std::string  kUnusedField("unused");
+        android::util::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
         android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
                                    timestamp, pkgName.c_str(), pkgVersionCode,
                                    mediaApexVersion,
@@ -67,34 +67,7 @@ bool statsd_mediadrm(const mediametrics::Item *item)
                                    description.c_str(),
                                    bf_serialized);
     } else {
-        ALOGV("NOT sending: mediadrm private data (len=%zu)", serialized_metrics.size());
-    }
-
-    return true;
-}
-
-// widevineCDM
-bool statsd_widevineCDM(const mediametrics::Item *item)
-{
-    if (item == nullptr) return false;
-
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
-    std::string serialized_metrics;
-    (void) item->getString("serialized_metrics", &serialized_metrics);
-
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics.c_str(),
-                                                serialized_metrics.size());
-        android::util::stats_write(android::util::MEDIAMETRICS_DRM_WIDEVINE_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
-    } else {
-        ALOGV("NOT sending: widevine private data (len=%zu)", serialized_metrics.size());
+        ALOGV("NOT sending: mediadrm data(%s, %s)", vendor.c_str(), description.c_str());
     }
 
     return true;
