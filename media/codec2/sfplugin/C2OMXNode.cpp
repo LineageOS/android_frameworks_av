@@ -421,6 +421,8 @@ status_t C2OMXNode::emptyBuffer(
         if (err != OK) {
             (void)fd0.release();
             (void)fd1.release();
+            native_handle_close(handle);
+            native_handle_delete(handle);
             return UNKNOWN_ERROR;
         }
         block = _C2BlockFactory::CreateGraphicBlock(alloc);
