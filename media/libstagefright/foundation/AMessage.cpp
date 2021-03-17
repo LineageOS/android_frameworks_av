@@ -1078,6 +1078,17 @@ status_t AMessage::removeEntryAt(size_t index) {
     return OK;
 }
 
+status_t AMessage::removeEntryByName(const char *name) {
+    if (name == nullptr) {
+        return BAD_VALUE;
+    }
+    size_t index = findEntryByName(name);
+    if (index >= mNumItems) {
+        return BAD_INDEX;
+    }
+    return removeEntryAt(index);
+}
+
 void AMessage::setItem(const char *name, const ItemData &item) {
     if (item.used()) {
         Item *it = allocateItem(name);
