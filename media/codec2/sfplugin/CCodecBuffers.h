@@ -86,6 +86,9 @@ protected:
     // Format to be used for creating MediaCodec-facing buffers.
     sp<AMessage> mFormat;
 
+    sp<ABuffer> mLastImageData;
+    sp<AMessage> mFormatWithImageData;
+
 private:
     DISALLOW_EVIL_CONSTRUCTORS(CCodecBuffers);
 };
