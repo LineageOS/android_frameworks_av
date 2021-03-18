@@ -261,6 +261,12 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
         }
         registered = mPolicyRegistered;
         enabled = mPolicyEnabled;
+        // The simultaneous release of two EffectHandles with the same EffectModule
+        // may cause us to call this method at the same time.
+        // This may deadlock under some circumstances (b/180941720).  Avoid this.
+        if (!doRegister && !(registered && doEnable)) {
+            return NO_ERROR;
+        }
         mPolicyLock.lock();
     }
     ALOGV("%s name %s id %d session %d doRegister %d registered %d doEnable %d enabled %d",
