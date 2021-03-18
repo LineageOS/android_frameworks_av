@@ -497,6 +497,8 @@ class Camera3Device :
     sp<camera3::Camera3Stream> mInputStream;
     bool                       mIsInputStreamMultiResolution;
     SessionStatsBuilder        mSessionStatsBuilder;
+    // Map from stream group ID to physical cameras backing the stream group
+    std::map<int32_t, std::set<String8>> mGroupIdPhysicalCameraMap;
 
     int                        mNextStreamId;
     bool                       mNeedConfig;
@@ -800,7 +802,8 @@ class Camera3Device :
          * Call after stream (re)-configuration is completed.
          */
         void     configurationComplete(bool isConstrainedHighSpeed,
-                const CameraMetadata& sessionParams);
+                const CameraMetadata& sessionParams,
+                const std::map<int32_t, std::set<String8>>& groupIdPhysicalCameraMap);
 
         /**
          * Set or clear the list of repeating requests. Does not block
@@ -1057,6 +1060,8 @@ class Camera3Device :
         Vector<int32_t>    mSessionParamKeys;
         CameraMetadata     mLatestSessionParams;
 
+        std::map<int32_t, std::set<String8>> mGroupIdPhysicalCameraMap;
+
         const bool         mUseHalBufManager;
     };
     sp<RequestThread> mRequestThread;
@@ -1076,7 +1081,8 @@ class Camera3Device :
 
     status_t registerInFlight(uint32_t frameNumber,
             int32_t numBuffers, CaptureResultExtras resultExtras, bool hasInput,
-            bool callback, nsecs_t maxExpectedDuration, std::set<String8>& physicalCameraIds,
+            bool callback, nsecs_t maxExpectedDuration,
+            const std::set<std::set<String8>>& physicalCameraIds,
             bool isStillCapture, bool isZslCapture, bool rotateAndCropAuto,
             const std::set<std::string>& cameraIdsWithZoom, const SurfaceMap& outputSurfaces,
             nsecs_t requestTimeNs);

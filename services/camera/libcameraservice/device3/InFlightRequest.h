@@ -96,7 +96,10 @@ struct InFlightRequest {
     ERROR_BUF_STRATEGY errorBufStrategy;
 
     // The physical camera ids being requested.
-    std::set<String8> physicalCameraIds;
+    // For request on a physical camera stream, the inside set contains one Id
+    // For request on a stream group containing physical camera streams, the
+    // inside set contains all stream Ids in the group.
+    std::set<std::set<String8>> physicalCameraIds;
 
     // Map of physicalCameraId <-> Metadata
     std::vector<PhysicalCaptureResultInfo> physicalMetadatas;
@@ -142,7 +145,7 @@ struct InFlightRequest {
 
     InFlightRequest(int numBuffers, CaptureResultExtras extras, bool hasInput,
             bool hasAppCallback, nsecs_t maxDuration,
-            const std::set<String8>& physicalCameraIdSet, bool isStillCapture,
+            const std::set<std::set<String8>>& physicalCameraIdSet, bool isStillCapture,
             bool isZslCapture, bool rotateAndCropAuto, const std::set<std::string>& idsWithZoom,
             nsecs_t requestNs, const SurfaceMap& outSurfaces = SurfaceMap{}) :
             shutterTimestamp(0),
