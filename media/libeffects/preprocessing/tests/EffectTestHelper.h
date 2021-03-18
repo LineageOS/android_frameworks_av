@@ -88,7 +88,8 @@ class EffectTestHelper {
 
     static constexpr size_t kNumChMasks = std::size(kChMasks);
 
-    static constexpr size_t kSampleRates[] = {8000, 16000, 24000, 32000, 48000};
+    static constexpr size_t kSampleRates[] = {8000,  11025, 12000, 16000, 22050,
+                                              24000, 32000, 44100, 48000};
 
     static constexpr size_t kNumSampleRates = std::size(kSampleRates);
 
