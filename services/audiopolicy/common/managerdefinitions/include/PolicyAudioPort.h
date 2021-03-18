@@ -44,7 +44,7 @@ public:
 
     bool equals(const sp<PolicyAudioPort> &right) const
     {
-        return getTagName() == right->getTagName();
+        return right != 0 && getTagName() == right->getTagName();
     }
 
     virtual sp<AudioPort> asAudioPort() const = 0;
