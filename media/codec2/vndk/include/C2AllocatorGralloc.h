@@ -37,7 +37,8 @@ native_handle_t *UnwrapNativeCodec2GrallocHandle(const C2Handle *const handle);
  * Wrap the gralloc handle and metadata into Codec2 handle recognized by
  * C2AllocatorGralloc.
  *
- * @return a new NON-OWNING C2Handle that must be deleted using native_handle_delete.
+ * @return a new NON-OWNING C2Handle that must be closed and deleted using native_handle_close and
+ * native_handle_delete.
  */
 C2Handle *WrapNativeCodec2GrallocHandle(
         const native_handle_t *const handle,

@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "statsd_drm"
 #include <utils/Log.h>
+#include <media/stagefright/foundation/base64.h>
 
 #include <stdint.h>
 #include <inttypes.h>
@@ -37,6 +38,7 @@
 
 #include <array>
 #include <string>
+#include <vector>
 
 namespace android {
 
@@ -54,12 +56,12 @@ bool statsd_mediadrm(const mediametrics::Item *item)
     (void) item->getString("vendor", &vendor);
     std::string description;
     (void) item->getString("description", &description);
-    std::string serialized_metrics;
-    (void) item->getString("serialized_metrics", &serialized_metrics);
 
     if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics.c_str(),
-                                                serialized_metrics.size());
+        // This field is left here for backward compatibility.
+        // This field is not used anymore.
+        const std::string  kUnusedField("unused");
+        android::util::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
         android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
                                    timestamp, pkgName.c_str(), pkgVersionCode,
                                    mediaApexVersion,
@@ -67,34 +69,7 @@ bool statsd_mediadrm(const mediametrics::Item *item)
                                    description.c_str(),
                                    bf_serialized);
     } else {
-        ALOGV("NOT sending: mediadrm private data (len=%zu)", serialized_metrics.size());
-    }
-
-    return true;
-}
-
-// widevineCDM
-bool statsd_widevineCDM(const mediametrics::Item *item)
-{
-    if (item == nullptr) return false;
-
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
-    std::string serialized_metrics;
-    (void) item->getString("serialized_metrics", &serialized_metrics);
-
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized(serialized_metrics.c_str(),
-                                                serialized_metrics.size());
-        android::util::stats_write(android::util::MEDIAMETRICS_DRM_WIDEVINE_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
-    } else {
-        ALOGV("NOT sending: widevine private data (len=%zu)", serialized_metrics.size());
+        ALOGV("NOT sending: mediadrm data(%s, %s)", vendor.c_str(), description.c_str());
     }
 
     return true;
@@ -142,6 +117,67 @@ bool statsd_drmmanager(const mediametrics::Item *item)
                                methodCounts[9], methodCounts[10], methodCounts[11],
                                methodCounts[12]);
 
+    return true;
+}
+
+namespace {
+std::vector<uint8_t> base64DecodeNoPad(std::string& str) {
+    if (str.empty()) {
+        return {};
+    }
+
+    switch (str.length() % 4) {
+    case 3: str += "="; break;
+    case 2: str += "=="; break;
+    case 1: str += "==="; break;
+    case 0: /* unchanged */ break;
+    }
+
+    std::vector<uint8_t> buf(str.length() / 4 * 3, 0);
+    size_t size = buf.size();
+    if (decodeBase64(buf.data(), &size, str.c_str()) && size <= buf.size()) {
+        buf.erase(buf.begin() + size, buf.end());
+        return buf;
+    }
+    return {};
+}
+} // namespace
+
+// |out| and its contents are memory-managed by statsd.
+bool statsd_mediadrm_puller(const mediametrics::Item* item, AStatsEventList* out)
+{
+    if (item == nullptr) {
+        return false;
+    }
+
+    if (!enabled_statsd) {
+        ALOGV("NOT pulling: mediadrm activity");
+        return true;
+    }
+
+    std::string serialized_metrics;
+    (void) item->getString("serialized_metrics", &serialized_metrics);
+    const auto framework_raw(base64DecodeNoPad(serialized_metrics));
+
+    std::string plugin_metrics;
+    (void) item->getString("plugin_metrics", &plugin_metrics);
+    const auto plugin_raw(base64DecodeNoPad(plugin_metrics));
+
+    std::string vendor;
+    (void) item->getString("vendor", &vendor);
+    std::string description;
+    (void) item->getString("description", &description);
+
+    // Memory for |event| is internally managed by statsd.
+    AStatsEvent* event = AStatsEventList_addStatsEvent(out);
+    AStatsEvent_setAtomId(event, android::util::MEDIA_DRM_ACTIVITY_INFO);
+    AStatsEvent_writeString(event, item->getPkgName().c_str());
+    AStatsEvent_writeInt64(event, item->getPkgVersionCode());
+    AStatsEvent_writeString(event, vendor.c_str());
+    AStatsEvent_writeString(event, description.c_str());
+    AStatsEvent_writeByteArray(event, framework_raw.data(), framework_raw.size());
+    AStatsEvent_writeByteArray(event, plugin_raw.data(), plugin_raw.size());
+    AStatsEvent_build(event);
     return true;
 }
 
