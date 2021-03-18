@@ -105,9 +105,8 @@ struct preproc_session_s {
     webrtc::AudioProcessing* apm;  // handle on webRTC audio processing module (APM)
     // Audio Processing module builder
     webrtc::AudioProcessingBuilder ap_builder;
-    size_t apmFrameCount;      // buffer size for webRTC process (10 ms)
-    uint32_t apmSamplingRate;  // webRTC APM sampling rate (8/16 or 32 kHz)
-    size_t frameCount;         // buffer size before input resampler ( <=> apmFrameCount)
+    // frameCount represents the size of the buffers used for processing, and must represent 10ms.
+    size_t frameCount;
     uint32_t samplingRate;     // sampling rate at effect process interface
     uint32_t inChannelCount;   // input channel count
     uint32_t outChannelCount;  // output channel count
@@ -119,21 +118,12 @@ struct preproc_session_s {
     webrtc::AudioProcessing::Config config;
     webrtc::StreamConfig inputConfig;   // input stream configuration
     webrtc::StreamConfig outputConfig;  // output stream configuration
-    int16_t* inBuf;    // input buffer used when resampling
-    size_t inBufSize;  // input buffer size in frames
-    size_t framesIn;   // number of frames in input buffer
-    int16_t* outBuf;    // output buffer used when resampling
-    size_t outBufSize;  // output buffer size in frames
-    size_t framesOut;   // number of frames in output buffer
     uint32_t revChannelCount;  // number of channels on reverse stream
     uint32_t revEnabledMsk;    // bit field containing IDs of enabled pre processors
                                // with reverse channel
     uint32_t revProcessedMsk;  // bit field containing IDs of pre processors with reverse
                                // channel already processed in current round
     webrtc::StreamConfig revConfig;     // reverse stream configuration.
-    int16_t* revBuf;    // reverse channel input buffer
-    size_t revBufSize;  // reverse channel input buffer size
-    size_t framesRev;   // number of frames in reverse channel input buffer
 };
 
 #ifdef DUAL_MIC_TEST
@@ -862,9 +852,7 @@ extern "C" int Session_CreateEffect(preproc_session_t* session, int32_t procId,
             ALOGW("Session_CreateEffect could not get apm engine");
             goto error;
         }
-        session->apmSamplingRate = kPreprocDefaultSr;
-        session->apmFrameCount = (kPreprocDefaultSr) / 100;
-        session->frameCount = session->apmFrameCount;
+        session->frameCount = kPreprocDefaultSr / 100;
         session->samplingRate = kPreprocDefaultSr;
         session->inChannelCount = kPreProcDefaultCnl;
         session->outChannelCount = kPreProcDefaultCnl;
@@ -879,12 +867,6 @@ extern "C" int Session_CreateEffect(preproc_session_t* session, int32_t procId,
         session->processedMsk = 0;
         session->revEnabledMsk = 0;
         session->revProcessedMsk = 0;
-        session->inBuf = NULL;
-        session->inBufSize = 0;
-        session->outBuf = NULL;
-        session->outBufSize = 0;
-        session->revBuf = NULL;
-        session->revBufSize = 0;
     }
     status = Effect_Create(&session->effects[procId], session, interface);
     if (status < 0) {
@@ -908,13 +890,6 @@ int Session_ReleaseEffect(preproc_session_t* session, preproc_effect_t* fx) {
     if (session->createdMsk == 0) {
         delete session->apm;
         session->apm = NULL;
-        delete session->inBuf;
-        session->inBuf = NULL;
-        free(session->outBuf);
-        session->outBuf = NULL;
-        delete session->revBuf;
-        session->revBuf = NULL;
-
         session->id = 0;
     }
 
@@ -934,24 +909,8 @@ int Session_SetConfig(preproc_session_t* session, effect_config_t* config) {
     ALOGV("Session_SetConfig sr %d cnl %08x", config->inputCfg.samplingRate,
           config->inputCfg.channels);
 
-    // AEC implementation is limited to 16kHz
-    if (config->inputCfg.samplingRate >= 32000 && !(session->createdMsk & (1 << PREPROC_AEC))) {
-        session->apmSamplingRate = 32000;
-    } else if (config->inputCfg.samplingRate >= 16000) {
-        session->apmSamplingRate = 16000;
-    } else if (config->inputCfg.samplingRate >= 8000) {
-        session->apmSamplingRate = 8000;
-    }
-
-
     session->samplingRate = config->inputCfg.samplingRate;
-    session->apmFrameCount = session->apmSamplingRate / 100;
-    if (session->samplingRate == session->apmSamplingRate) {
-        session->frameCount = session->apmFrameCount;
-    } else {
-        session->frameCount =
-                (session->apmFrameCount * session->samplingRate) / session->apmSamplingRate;
-    }
+    session->frameCount = session->samplingRate / 100;
     session->inChannelCount = inCnl;
     session->outChannelCount = outCnl;
     session->inputConfig.set_sample_rate_hz(session->samplingRate);
@@ -962,13 +921,6 @@ int Session_SetConfig(preproc_session_t* session, effect_config_t* config) {
     session->revChannelCount = inCnl;
     session->revConfig.set_sample_rate_hz(session->samplingRate);
     session->revConfig.set_num_channels(inCnl);
-
-    // force process buffer reallocation
-    session->inBufSize = 0;
-    session->outBufSize = 0;
-    session->framesIn = 0;
-    session->framesOut = 0;
-
 
     session->state = PREPROC_SESSION_STATE_CONFIG;
     return 0;
@@ -1004,9 +956,6 @@ int Session_SetReverseConfig(preproc_session_t* session, effect_config_t* config
     }
     uint32_t inCnl = audio_channel_count_from_out_mask(config->inputCfg.channels);
     session->revChannelCount = inCnl;
-    // force process buffer reallocation
-    session->revBufSize = 0;
-    session->framesRev = 0;
 
     return 0;
 }
@@ -1023,12 +972,8 @@ void Session_GetReverseConfig(preproc_session_t* session, effect_config_t* confi
 
 void Session_SetProcEnabled(preproc_session_t* session, uint32_t procId, bool enabled) {
     if (enabled) {
-        if (session->enabledMsk == 0) {
-            session->framesIn = 0;
-        }
         session->enabledMsk |= (1 << procId);
         if (HasReverseStream(procId)) {
-            session->framesRev = 0;
             session->revEnabledMsk |= (1 << procId);
         }
     } else {
@@ -1117,43 +1062,24 @@ int PreProcessingFx_Process(effect_handle_t self, audio_buffer_t* inBuffer,
         return -EINVAL;
     }
 
+    if (inBuffer->frameCount != outBuffer->frameCount) {
+        ALOGW("inBuffer->frameCount %zu is not equal to outBuffer->frameCount %zu",
+              inBuffer->frameCount, outBuffer->frameCount);
+        return -EINVAL;
+    }
+
+    if (inBuffer->frameCount != session->frameCount) {
+        ALOGW("inBuffer->frameCount %zu != %zu representing 10ms at sampling rate %d",
+              inBuffer->frameCount, session->frameCount, session->samplingRate);
+        return -EINVAL;
+    }
+
     session->processedMsk |= (1 << effect->procId);
 
     //    ALOGV("PreProcessingFx_Process In %d frames enabledMsk %08x processedMsk %08x",
     //         inBuffer->frameCount, session->enabledMsk, session->processedMsk);
-
     if ((session->processedMsk & session->enabledMsk) == session->enabledMsk) {
         effect->session->processedMsk = 0;
-        size_t framesRq = outBuffer->frameCount;
-        size_t framesWr = 0;
-        if (session->framesOut) {
-            size_t fr = session->framesOut;
-            if (outBuffer->frameCount < fr) {
-                fr = outBuffer->frameCount;
-            }
-            memcpy(outBuffer->s16, session->outBuf,
-                   fr * session->outChannelCount * sizeof(int16_t));
-            memmove(session->outBuf, session->outBuf + fr * session->outChannelCount,
-                    (session->framesOut - fr) * session->outChannelCount * sizeof(int16_t));
-            session->framesOut -= fr;
-            framesWr += fr;
-        }
-        outBuffer->frameCount = framesWr;
-        if (framesWr == framesRq) {
-            inBuffer->frameCount = 0;
-            return 0;
-        }
-
-        size_t fr = session->frameCount - session->framesIn;
-        if (inBuffer->frameCount < fr) {
-            fr = inBuffer->frameCount;
-        }
-        session->framesIn += fr;
-        inBuffer->frameCount = fr;
-        if (session->framesIn < session->frameCount) {
-            return 0;
-        }
-        session->framesIn = 0;
         if (int status = effect->session->apm->ProcessStream(
                     (const int16_t* const)inBuffer->s16,
                     (const webrtc::StreamConfig)effect->session->inputConfig,
@@ -1163,34 +1089,6 @@ int PreProcessingFx_Process(effect_handle_t self, audio_buffer_t* inBuffer,
             ALOGE("Process Stream failed with error %d\n", status);
             return status;
         }
-        outBuffer->frameCount = inBuffer->frameCount;
-
-        if (session->outBufSize < session->framesOut + session->frameCount) {
-            int16_t* buf;
-            session->outBufSize = session->framesOut + session->frameCount;
-            buf = (int16_t*)realloc(
-                    session->outBuf,
-                    session->outBufSize * session->outChannelCount * sizeof(int16_t));
-            if (buf == NULL) {
-                session->framesOut = 0;
-                free(session->outBuf);
-                session->outBuf = NULL;
-                return -ENOMEM;
-            }
-            session->outBuf = buf;
-        }
-
-        fr = session->framesOut;
-        if (framesRq - framesWr < fr) {
-            fr = framesRq - framesWr;
-        }
-        memcpy(outBuffer->s16 + framesWr * session->outChannelCount, session->outBuf,
-               fr * session->outChannelCount * sizeof(int16_t));
-        memmove(session->outBuf, session->outBuf + fr * session->outChannelCount,
-                (session->framesOut - fr) * session->outChannelCount * sizeof(int16_t));
-        session->framesOut -= fr;
-        outBuffer->frameCount += fr;
-
         return 0;
     } else {
         return -ENODATA;
@@ -1565,6 +1463,18 @@ int PreProcessingFx_ProcessReverse(effect_handle_t self, audio_buffer_t* inBuffe
         return -EINVAL;
     }
 
+    if (inBuffer->frameCount != outBuffer->frameCount) {
+        ALOGW("inBuffer->frameCount %zu is not equal to outBuffer->frameCount %zu",
+              inBuffer->frameCount, outBuffer->frameCount);
+        return -EINVAL;
+    }
+
+    if (inBuffer->frameCount != session->frameCount) {
+        ALOGW("inBuffer->frameCount %zu != %zu representing 10ms at sampling rate %d",
+              inBuffer->frameCount, session->frameCount, session->samplingRate);
+        return -EINVAL;
+    }
+
     session->revProcessedMsk |= (1 << effect->procId);
 
     //    ALOGV("PreProcessingFx_ProcessReverse In %d frames revEnabledMsk %08x revProcessedMsk
@@ -1573,16 +1483,6 @@ int PreProcessingFx_ProcessReverse(effect_handle_t self, audio_buffer_t* inBuffe
 
     if ((session->revProcessedMsk & session->revEnabledMsk) == session->revEnabledMsk) {
         effect->session->revProcessedMsk = 0;
-        size_t fr = session->frameCount - session->framesRev;
-        if (inBuffer->frameCount < fr) {
-            fr = inBuffer->frameCount;
-        }
-        session->framesRev += fr;
-        inBuffer->frameCount = fr;
-        if (session->framesRev < session->frameCount) {
-            return 0;
-        }
-        session->framesRev = 0;
         if (int status = effect->session->apm->ProcessReverseStream(
                     (const int16_t* const)inBuffer->s16,
                     (const webrtc::StreamConfig)effect->session->revConfig,
