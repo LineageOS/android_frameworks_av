@@ -77,39 +77,34 @@ sp<AMessage> CCodecBuffers::dupFormat() {
 void CCodecBuffers::handleImageData(const sp<Codec2Buffer> &buffer) {
     sp<ABuffer> imageDataCandidate = buffer->getImageData();
     if (imageDataCandidate == nullptr) {
-        if (mFormatWithImageData) {
-            // We previously sent the format with image data, so use the same format.
-            buffer->setFormat(mFormatWithImageData);
-        }
         return;
     }
-    if (!mLastImageData
-            || imageDataCandidate->size() != mLastImageData->size()
-            || memcmp(imageDataCandidate->data(),
-                      mLastImageData->data(),
-                      mLastImageData->size()) != 0) {
+    sp<ABuffer> imageData;
+    if (!mFormat->findBuffer("image-data", &imageData)
+            || imageDataCandidate->size() != imageData->size()
+            || memcmp(imageDataCandidate->data(), imageData->data(), imageData->size()) != 0) {
         ALOGD("[%s] updating image-data", mName);
-        mFormatWithImageData = dupFormat();
-        mLastImageData = imageDataCandidate;
-        mFormatWithImageData->setBuffer("image-data", imageDataCandidate);
+        sp<AMessage> newFormat = dupFormat();
+        newFormat->setBuffer("image-data", imageDataCandidate);
         MediaImage2 *img = (MediaImage2*)imageDataCandidate->data();
         if (img->mNumPlanes > 0 && img->mType != img->MEDIA_IMAGE_TYPE_UNKNOWN) {
             int32_t stride = img->mPlane[0].mRowInc;
-            mFormatWithImageData->setInt32(KEY_STRIDE, stride);
+            newFormat->setInt32(KEY_STRIDE, stride);
             ALOGD("[%s] updating stride = %d", mName, stride);
             if (img->mNumPlanes > 1 && stride > 0) {
                 int64_t offsetDelta =
                     (int64_t)img->mPlane[1].mOffset - (int64_t)img->mPlane[0].mOffset;
                 int32_t vstride = int32_t(offsetDelta / stride);
-                mFormatWithImageData->setInt32(KEY_SLICE_HEIGHT, vstride);
+                newFormat->setInt32(KEY_SLICE_HEIGHT, vstride);
                 ALOGD("[%s] updating vstride = %d", mName, vstride);
                 buffer->setRange(
                         img->mPlane[0].mOffset,
                         buffer->size() - img->mPlane[0].mOffset);
             }
         }
+        setFormat(newFormat);
+        buffer->setFormat(newFormat);
     }
-    buffer->setFormat(mFormatWithImageData);
 }
 
 // InputBuffers
@@ -278,12 +273,22 @@ OutputBuffers::BufferAction OutputBuffers::popFromStashAndRegister(
 
     if (entry.notify && mFormat != outputFormat) {
         updateSkipCutBuffer(outputFormat);
-        // Trigger image data processing to the new format
-        mLastImageData.clear();
+        sp<ABuffer> imageData;
+        if (mFormat->findBuffer("image-data", &imageData)) {
+            outputFormat->setBuffer("image-data", imageData);
+        }
+        int32_t stride;
+        if (mFormat->findInt32(KEY_STRIDE, &stride)) {
+            outputFormat->setInt32(KEY_STRIDE, stride);
+        }
+        int32_t sliceHeight;
+        if (mFormat->findInt32(KEY_SLICE_HEIGHT, &sliceHeight)) {
+            outputFormat->setInt32(KEY_SLICE_HEIGHT, sliceHeight);
+        }
         ALOGV("[%s] popFromStashAndRegister: output format reference changed: %p -> %p",
                 mName, mFormat.get(), outputFormat.get());
-        ALOGD("[%s] popFromStashAndRegister: at %lldus, output format changed to %s",
-                mName, (long long)entry.timestamp, outputFormat->debugString().c_str());
+        ALOGD("[%s] popFromStashAndRegister: output format changed to %s",
+                mName, outputFormat->debugString().c_str());
         setFormat(outputFormat);
     }
 
