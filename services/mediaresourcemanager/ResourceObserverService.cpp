@@ -165,6 +165,10 @@ Status ResourceObserverService::registerObserver(
         return Status::fromServiceSpecificError(PERMISSION_DENIED);
     }
 
+    if (in_observer == nullptr) {
+        return Status::fromServiceSpecificError(BAD_VALUE);
+    }
+
     ::ndk::SpAIBinder binder = in_observer->asBinder();
 
     {
@@ -218,6 +222,10 @@ Status ResourceObserverService::unregisterObserver(
                 AIBinder_getCallingPid(),
                 AIBinder_getCallingUid());
         return Status::fromServiceSpecificError(PERMISSION_DENIED);
+    }
+
+    if (in_observer == nullptr) {
+        return Status::fromServiceSpecificError(BAD_VALUE);
     }
 
     ::ndk::SpAIBinder binder = in_observer->asBinder();

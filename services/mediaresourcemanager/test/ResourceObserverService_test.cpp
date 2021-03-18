@@ -182,6 +182,11 @@ TEST_F(ResourceObserverServiceTest, testRegisterObserver) {
     std::vector<MediaObservableFilter> filters1;
     Status status;
 
+    // Register with null observer should fail.
+    status = mObserverService->registerObserver(nullptr, filters1);
+    EXPECT_FALSE(status.isOk());
+    EXPECT_EQ(status.getServiceSpecificError(), BAD_VALUE);
+
     // Register with empty observables should fail.
     status = mObserverService->registerObserver(mTestObserver1, filters1);
     EXPECT_FALSE(status.isOk());
