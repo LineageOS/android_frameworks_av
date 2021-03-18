@@ -12,9 +12,8 @@ package {
 
 cc_test {
     name: "EffectPreprocessingTest",
-    vendor: true,
+    defaults: ["libaudiopreprocessing-defaults"],
     gtest: true,
-    host_supported: true,
     test_suites: ["device-tests"],
     srcs: [
         "EffectPreprocessingTest.cpp",
@@ -23,46 +22,18 @@ cc_test {
     static_libs: [
         "libaudiopreprocessing",
         "libaudioutils",
-        "webrtc_audio_processing",
     ],
-    shared_libs: [
-        "liblog",
-    ],
-    header_libs: [
-        "libaudioeffects",
-        "libhardware_headers",
-    ],
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
 }
 
 cc_test {
     name: "AudioPreProcessingTest",
-    vendor: true,
-    host_supported: true,
+    defaults: ["libaudiopreprocessing-defaults"],
     gtest: false,
     srcs: ["PreProcessingTest.cpp"],
-    shared_libs: [
-        "libaudioutils",
-        "liblog",
-        "libutils",
-    ],
     static_libs: [
         "libaudiopreprocessing",
-        "webrtc_audio_processing",
+        "libaudioutils",
     ],
-    header_libs: [
-        "libaudioeffects",
-        "libhardware_headers",
-    ],
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
 }
 
 cc_test {
