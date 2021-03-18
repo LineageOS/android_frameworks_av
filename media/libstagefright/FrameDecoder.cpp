@@ -644,6 +644,10 @@ status_t VideoFrameDecoder::onOutputReceived(
                 0,
                 dstBpp(),
                 mCaptureLayer != nullptr /*allocRotated*/);
+        if (frameMem == nullptr) {
+            return NO_MEMORY;
+        }
+
         mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);
@@ -886,6 +890,11 @@ status_t ImageDecoder::onOutputReceived(
     if (mFrame == NULL) {
         sp<IMemory> frameMem = allocVideoFrame(
                 trackMeta(), mWidth, mHeight, mTileWidth, mTileHeight, dstBpp());
+
+        if (frameMem == nullptr) {
+            return NO_MEMORY;
+        }
+
         mFrame = static_cast<VideoFrame*>(frameMem->unsecurePointer());
 
         setFrame(frameMem);

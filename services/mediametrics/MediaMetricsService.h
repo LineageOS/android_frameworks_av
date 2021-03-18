@@ -26,6 +26,7 @@
 #include <android-base/thread_annotations.h>
 #include <android/media/BnMediaMetricsService.h>
 #include <mediautils/ServiceUtilities.h>
+#include <stats_pull_atom_callback.h>
 #include <utils/String8.h>
 
 #include "AudioAnalytics.h"
@@ -102,6 +103,15 @@ private:
     void dumpQueue(String8 &result, int64_t sinceNs, const char* prefix) REQUIRES(mLock);
     void dumpHeaders(String8 &result, int64_t sinceNs, const char* prefix) REQUIRES(mLock);
 
+    // support statsd pushed atoms
+    static bool isPullable(const std::string &key);
+    static std::string atomTagToKey(int32_t atomTag);
+    static AStatsManager_PullAtomCallbackReturn pullAtomCallback(
+            int32_t atomTag, AStatsEventList* data, void* cookie);
+    AStatsManager_PullAtomCallbackReturn pullItems(int32_t atomTag, AStatsEventList* data);
+    void registerStatsdCallbacksIfNeeded();
+    std::atomic_flag mStatsdRegistered = ATOMIC_FLAG_INIT;
+
     // The following variables accessed without mLock
 
     // limit how many records we'll retain
@@ -130,6 +140,12 @@ private:
     // TODO: Make separate class, use segmented queue, write lock only end.
     // Note: Another analytics module might have ownership of an item longer than the log.
     std::deque<std::shared_ptr<const mediametrics::Item>> mItems GUARDED_BY(mLock);
+
+    // Queues per item key, pending to be pulled by statsd.
+    // Use weak_ptr such that a pullable item can still expire.
+    using ItemKey = std::string;
+    using WeakItemQueue = std::deque<std::weak_ptr<const mediametrics::Item>>;
+    std::unordered_map<ItemKey, WeakItemQueue> mPullableItems GUARDED_BY(mLock);
 };
 
 } // namespace android

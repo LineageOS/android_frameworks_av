@@ -448,6 +448,20 @@ void C2SoftMpeg4Enc::process(
         work->worklets.front()->output.configUpdate.push_back(std::move(csd));
     }
 
+    // handle dynamic bitrate change
+    {
+        IntfImpl::Lock lock = mIntf->lock();
+        std::shared_ptr<C2StreamBitrateInfo::output> bitrate = mIntf->getBitrate_l();
+        lock.unlock();
+
+        if (bitrate != mBitrate) {
+            mBitrate = bitrate;
+            int layerBitrate[2] = {static_cast<int>(mBitrate->value), 0};
+            ALOGV("Calling PVUpdateBitRate %d", layerBitrate[0]);
+            PVUpdateBitRate(mHandle, layerBitrate);
+        }
+    }
+
     std::shared_ptr<const C2GraphicView> rView;
     std::shared_ptr<C2Buffer> inputBuffer;
     bool eos = ((work->input.flags & C2FrameData::FLAG_END_OF_STREAM) != 0);
