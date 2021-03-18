@@ -18,15 +18,10 @@ license {
     ],
 }
 
-cc_library {
-    name: "libaudiopreprocessing",
+cc_defaults {
+    name: "libaudiopreprocessing-defaults",
     vendor: true,
-    relative_install_path: "soundfx",
     host_supported: true,
-    srcs: ["PreProcessing.cpp"],
-    local_include_dirs: [
-        ".",
-    ],
     cflags: [
         "-Wall",
         "-Werror",
@@ -46,11 +41,20 @@ cc_library {
     header_libs: [
         "libaudioeffects",
         "libhardware_headers",
-        "libwebrtc_absl_headers",
     ],
     target: {
         darwin: {
             enabled: false,
         },
     },
+}
+
+cc_library {
+    name: "libaudiopreprocessing",
+    defaults: ["libaudiopreprocessing-defaults"],
+    relative_install_path: "soundfx",
+    srcs: ["PreProcessing.cpp"],
+    header_libs: [
+        "libwebrtc_absl_headers",
+    ],
 }
