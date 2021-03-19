@@ -18,10 +18,14 @@
 #define ANDROID_MEDIA_TRANSCODING_REQUEST_H
 
 #include <aidl/android/media/TranscodingRequestParcel.h>
+#include <android/binder_parcel.h>
 
 namespace android {
 
 using ::aidl::android::media::TranscodingRequestParcel;
+
+// TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
+#define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
 
 // Helper class for duplicating a TranscodingRequestParcel
 class TranscodingRequest : public TranscodingRequestParcel {
@@ -36,20 +40,28 @@ public:
 
 private:
     void setTo(const TranscodingRequestParcel& parcel) {
-        sourceFilePath = parcel.sourceFilePath;
-        sourceFd = ndk::ScopedFileDescriptor(dup(parcel.sourceFd.get()));
-        destinationFilePath = parcel.destinationFilePath;
-        destinationFd = ndk::ScopedFileDescriptor(dup(parcel.destinationFd.get()));
-        clientUid = parcel.clientUid;
-        clientPid = parcel.clientPid;
-        clientPackageName = parcel.clientPackageName;
-        transcodingType = parcel.transcodingType;
-        requestedVideoTrackFormat = parcel.requestedVideoTrackFormat;
-        priority = parcel.priority;
-        requestProgressUpdate = parcel.requestProgressUpdate;
-        requestSessionEventUpdate = parcel.requestSessionEventUpdate;
-        isForTesting = parcel.isForTesting;
-        testConfig = parcel.testConfig;
+        if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+            AParcel* p = AParcel_create();
+            parcel.writeToParcel(p);
+            AParcel_setDataPosition(p, 0);
+            readFromParcel(p);
+            AParcel_delete(p);
+        } else {
+            sourceFilePath = parcel.sourceFilePath;
+            sourceFd = ndk::ScopedFileDescriptor(dup(parcel.sourceFd.get()));
+            destinationFilePath = parcel.destinationFilePath;
+            destinationFd = ndk::ScopedFileDescriptor(dup(parcel.destinationFd.get()));
+            clientUid = parcel.clientUid;
+            clientPid = parcel.clientPid;
+            clientPackageName = parcel.clientPackageName;
+            transcodingType = parcel.transcodingType;
+            requestedVideoTrackFormat = parcel.requestedVideoTrackFormat;
+            priority = parcel.priority;
+            requestProgressUpdate = parcel.requestProgressUpdate;
+            requestSessionEventUpdate = parcel.requestSessionEventUpdate;
+            isForTesting = parcel.isForTesting;
+            testConfig = parcel.testConfig;
+        }
     }
 };
 
