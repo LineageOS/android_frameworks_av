@@ -5552,8 +5552,6 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
                                                        status_t& status)
 {
     bool reconfig = false;
-    bool a2dpDeviceChanged = false;
-
     status = NO_ERROR;
 
     AutoPark<FastMixer> park(mFastMixer);
@@ -5625,7 +5623,7 @@ bool AudioFlinger::MixerThread::checkForNewParameter_l(const String8& keyValuePa
         }
     }
 
-    return reconfig || a2dpDeviceChanged;
+    return reconfig;
 }
 
 
@@ -6086,8 +6084,6 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
                                                               status_t& status)
 {
     bool reconfig = false;
-    bool a2dpDeviceChanged = false;
-
     status = NO_ERROR;
 
     AudioParameter param = AudioParameter(keyValuePair);
@@ -6122,7 +6118,7 @@ bool AudioFlinger::DirectOutputThread::checkForNewParameter_l(const String8& key
         }
     }
 
-    return reconfig || a2dpDeviceChanged;
+    return reconfig;
 }
 
 uint32_t AudioFlinger::DirectOutputThread::activeSleepTimeUs() const
