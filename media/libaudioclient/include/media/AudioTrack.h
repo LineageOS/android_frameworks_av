@@ -429,6 +429,19 @@ public:
      */
             ssize_t     setBufferSizeInFrames(size_t size);
 
+    /* Returns the start threshold on the buffer for audio streaming
+     * or a negative value if the AudioTrack is not initialized.
+     */
+            ssize_t     getStartThresholdInFrames() const;
+
+    /* Sets the start threshold in frames on the buffer for audio streaming.
+     *
+     * May be clamped internally. Returns the actual value set, or a negative
+     * value if the AudioTrack is not initialized or if the input
+     * is zero or greater than INT_MAX.
+     */
+            ssize_t     setStartThresholdInFrames(size_t startThresholdInFrames);
+
     /* Return the static buffer specified in constructor or set(), or 0 for streaming mode */
             sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
 
