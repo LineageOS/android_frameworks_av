@@ -11,29 +11,29 @@ package {
 }
 
 cc_test {
-    name: "AudioPreProcessingTest",
-    vendor: true,
-    host_supported: true,
-    gtest: false,
-    srcs: ["PreProcessingTest.cpp"],
-    shared_libs: [
-        "libaudioutils",
-        "liblog",
-        "libutils",
+    name: "EffectPreprocessingTest",
+    defaults: ["libaudiopreprocessing-defaults"],
+    gtest: true,
+    test_suites: ["device-tests"],
+    srcs: [
+        "EffectPreprocessingTest.cpp",
+        "EffectTestHelper.cpp",
     ],
     static_libs: [
         "libaudiopreprocessing",
-        "webrtc_audio_processing",
+        "libaudioutils",
     ],
-    header_libs: [
-        "libaudioeffects",
-        "libhardware_headers",
+}
+
+cc_test {
+    name: "AudioPreProcessingTest",
+    defaults: ["libaudiopreprocessing-defaults"],
+    gtest: false,
+    srcs: ["PreProcessingTest.cpp"],
+    static_libs: [
+        "libaudiopreprocessing",
+        "libaudioutils",
     ],
-    target: {
-        darwin: {
-            enabled: false,
-        },
-    },
 }
 
 cc_test {

@@ -102,6 +102,8 @@ struct NuMediaExtractor : public RefBase {
 
     status_t setPlaybackId(const String8& playbackId);
 
+    const char* getName() const;
+
 protected:
     virtual ~NuMediaExtractor();
 

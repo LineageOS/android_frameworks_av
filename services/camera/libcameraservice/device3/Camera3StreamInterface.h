@@ -135,6 +135,16 @@ class Camera3StreamInterface : public virtual RefBase {
     virtual int      getStreamSetId() const = 0;
 
     /**
+     * Is this stream part of a multi-resolution stream set
+     */
+    virtual bool     isMultiResolution() const = 0;
+
+    /**
+     * Get the HAL stream group id for a multi-resolution stream set
+     */
+    virtual int      getHalStreamGroupId() const = 0;
+
+    /**
      * Get the stream's dimensions and format
      */
     virtual uint32_t getWidth() const = 0;
