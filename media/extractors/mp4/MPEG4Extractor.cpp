@@ -6263,7 +6263,8 @@ media_status_t MPEG4Source::read(
                         meta, "sample-file-offset" /*AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET*/,
                         offset);
 
-                if (mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
+                if (mSampleTable != nullptr &&
+                        mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
                     AMediaFormat_setInt64(
                     meta,
                     "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
@@ -6422,7 +6423,8 @@ media_status_t MPEG4Source::read(
         AMediaFormat_setInt64(
                 meta, "sample-file-offset" /*AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET*/, offset);
 
-        if (mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
+        if (mSampleTable != nullptr &&
+                mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
             AMediaFormat_setInt64(
                     meta,
                     "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
