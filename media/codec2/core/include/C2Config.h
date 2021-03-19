@@ -75,6 +75,10 @@ struct C2Config {
     enum tiling_mode_t : uint32_t;          ///< tiling modes
 };
 
+struct C2PlatformConfig {
+    enum encoding_quality_level_t : uint32_t; ///< encoding quality level
+};
+
 namespace {
 
 enum C2ParamIndexKind : C2Param::type_index_t {
@@ -257,7 +261,11 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTunnelHandle, // int32[]
     kParamIndexTunnelSystemTime, // int64
 
+    // dmabuf allocator
     kParamIndexStoreDmaBufUsage,  // store, struct
+
+    // encoding quality requirements
+    kParamIndexEncodingQualityLevel, // encoders, enum
 };
 
 }
@@ -2303,6 +2311,23 @@ constexpr char C2_PARAMKEY_OUTPUT_TUNNEL_HANDLE[] = "output.tunnel-handle";
 typedef C2PortParam<C2Info, C2SimpleValueStruct<int64_t>, kParamIndexTunnelSystemTime>
         C2PortTunnelSystemTime;
 constexpr char C2_PARAMKEY_OUTPUT_RENDER_TIME[] = "output.render-time";
+
+C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
+    NONE,
+    S_HANDHELD,
+    S_HANDHELD_PC
+);
+
+namespace android {
+
+/**
+ * Encoding quality level signaling.
+ */
+typedef C2GlobalParam<C2Setting,
+        C2SimpleValueStruct<C2EasyEnum<C2PlatformConfig::encoding_quality_level_t>>,
+        kParamIndexEncodingQualityLevel> C2EncodingQualityLevel;
+
+}
 
 /// @}
 
