@@ -22,6 +22,7 @@
 #include <media/MediaTranscoder.h>
 #include <media/NdkCommon.h>
 #include <media/TranscoderWrapper.h>
+#include <media/TranscodingRequest.h>
 #include <utils/Log.h>
 
 #include <thread>
@@ -221,9 +222,10 @@ void TranscoderWrapper::reportError(ClientIdType clientId, SessionIdType session
 }
 
 void TranscoderWrapper::start(ClientIdType clientId, SessionIdType sessionId,
-                              const TranscodingRequestParcel& request, uid_t callingUid,
+                              const TranscodingRequestParcel& requestParcel, uid_t callingUid,
                               const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
-    queueEvent(Event::Start, clientId, sessionId, [=, &request] {
+    TranscodingRequest request{requestParcel};
+    queueEvent(Event::Start, clientId, sessionId, [=] {
         media_status_t err = handleStart(clientId, sessionId, request, callingUid, clientCb);
         if (err != AMEDIA_OK) {
             cleanup();
@@ -255,9 +257,10 @@ void TranscoderWrapper::pause(ClientIdType clientId, SessionIdType sessionId) {
 }
 
 void TranscoderWrapper::resume(ClientIdType clientId, SessionIdType sessionId,
-                               const TranscodingRequestParcel& request, uid_t callingUid,
+                               const TranscodingRequestParcel& requestParcel, uid_t callingUid,
                                const std::shared_ptr<ITranscodingClientCallback>& clientCb) {
-    queueEvent(Event::Resume, clientId, sessionId, [=, &request] {
+    TranscodingRequest request{requestParcel};
+    queueEvent(Event::Resume, clientId, sessionId, [=] {
         media_status_t err = handleResume(clientId, sessionId, request, callingUid, clientCb);
         if (err != AMEDIA_OK) {
             cleanup();
