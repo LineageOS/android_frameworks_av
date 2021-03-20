@@ -284,8 +284,6 @@ protected:
     };
     sp<AudioVibrationController> mAudioVibrationController;
     sp<os::ExternalVibration>    mExternalVibration;
-    /** How many frames should be in the buffer before the track is considered ready */
-    const size_t        mFrameCountToBeReady;
 
     audio_dual_mono_mode_t mDualMonoMode = AUDIO_DUAL_MONO_MODE_OFF;
     float               mAudioDescriptionMixLevel = -std::numeric_limits<float>::infinity();

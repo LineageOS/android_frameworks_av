@@ -182,6 +182,7 @@ private:
                 // This is set by AudioTrack.setBufferSizeInFrames().
                 // A write will not fill the buffer above this limit.
     volatile    uint32_t   mBufferSizeInFrames;  // effective size of the buffer
+    volatile    uint32_t   mStartThresholdInFrames; // min frames in buffer to start streaming
 
 public:
 
@@ -216,6 +217,8 @@ public:
     };
 
     size_t frameCount() const { return mFrameCount; }
+    uint32_t getStartThresholdInFrames() const;
+    uint32_t setStartThresholdInFrames(uint32_t startThresholdInFrames);
 
 protected:
     // These refer to shared memory, and are virtual addresses with respect to the current process.
