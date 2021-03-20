@@ -142,6 +142,7 @@
 #define AMEDIAMETRICS_PROP_SESSIONID      "sessionId"      // int32
 #define AMEDIAMETRICS_PROP_SHARINGMODE    "sharingMode"    // string value, "exclusive", shared"
 #define AMEDIAMETRICS_PROP_SOURCE         "source"         // string (AudioAttributes)
+#define AMEDIAMETRICS_PROP_STARTTHRESHOLDFRAMES "startThresholdFrames" // int32 (AudioTrack)
 #define AMEDIAMETRICS_PROP_STARTUPMS      "startupMs"      // double value
 // State is "ACTIVE" or "STOPPED" for AudioRecord
 #define AMEDIAMETRICS_PROP_STATE          "state"          // string
@@ -187,6 +188,7 @@
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETLOGSESSIONID  "setLogSessionId" // AudioTrack, Record
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYBACKPARAM "setPlaybackParam" // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETPLAYERIID "setPlayerIId" // AudioTrack
+#define AMEDIAMETRICS_PROP_EVENT_VALUE_SETSTARTTHRESHOLD "setStartThreshold" // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOICEVOLUME   "setVoiceVolume" // AudioFlinger
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_SETVOLUME  "setVolume"  // AudioTrack
 #define AMEDIAMETRICS_PROP_EVENT_VALUE_START      "start"  // AudioTrack, AudioRecord
