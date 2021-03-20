@@ -1249,6 +1249,46 @@ ssize_t AudioTrack::setBufferSizeInFrames(size_t bufferSizeInFrames)
     return finalBufferSize;
 }
 
+ssize_t AudioTrack::getStartThresholdInFrames() const
+{
+    AutoMutex lock(mLock);
+    if (mOutput == AUDIO_IO_HANDLE_NONE || mProxy.get() == 0) {
+        return NO_INIT;
+    }
+    return (ssize_t) mProxy->getStartThresholdInFrames();
+}
+
+ssize_t AudioTrack::setStartThresholdInFrames(size_t startThresholdInFrames)
+{
+    if (startThresholdInFrames > INT32_MAX || startThresholdInFrames == 0) {
+        // contractually we could simply return the current threshold in frames
+        // to indicate the request was ignored, but we return an error here.
+        return BAD_VALUE;
+    }
+    AutoMutex lock(mLock);
+    // We do not permit calling setStartThresholdInFrames() between the AudioTrack
+    // default ctor AudioTrack() and set(...) but rather fail such an attempt.
+    // (To do so would require a cached mOrigStartThresholdInFrames and we may
+    // not have proper validation for the actual set value).
+    if (mOutput == AUDIO_IO_HANDLE_NONE || mProxy.get() == 0) {
+        return NO_INIT;
+    }
+    const uint32_t original = mProxy->getStartThresholdInFrames();
+    const uint32_t final = mProxy->setStartThresholdInFrames(startThresholdInFrames);
+    if (original != final) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETSTARTTHRESHOLD)
+                .set(AMEDIAMETRICS_PROP_STARTTHRESHOLDFRAMES, (int32_t)final)
+                .record();
+        if (original > final) {
+            // restart track if it was disabled by audioflinger due to previous underrun
+            // and we reduced the number of frames for the threshold.
+            restartIfDisabled();
+        }
+    }
+    return final;
+}
+
 status_t AudioTrack::setLoop(uint32_t loopStart, uint32_t loopEnd, int loopCount)
 {
     if (mSharedBuffer == 0 || isOffloadedOrDirect()) {
@@ -2562,6 +2602,10 @@ status_t AudioTrack::restoreTrack_l(const char *from)
         staticPosition = mStaticProxy->getPosition().unsignedValue();
     }
 
+    // save the old startThreshold and framecount
+    const uint32_t originalStartThresholdInFrames = mProxy->getStartThresholdInFrames();
+    const uint32_t originalFrameCount = mProxy->frameCount();
+
     // See b/74409267. Connecting to a BT A2DP device supporting multiple codecs
     // causes a lot of churn on the service side, and it can reject starting
     // playback of a previously created track. May also apply to other cases.
@@ -2616,6 +2660,18 @@ retry:
             return mAudioTrack->applyVolumeShaper(shaper.mConfiguration, operationToEnd);
         });
 
+        // restore the original start threshold if different than frameCount.
+        if (originalStartThresholdInFrames != originalFrameCount) {
+            // Note: mProxy->setStartThresholdInFrames() call is in the Proxy
+            // and does not trigger a restart.
+            // (Also CBLK_DISABLED is not set, buffers are empty after track recreation).
+            // Any start would be triggered on the mState == ACTIVE check below.
+            const uint32_t currentThreshold =
+                    mProxy->setStartThresholdInFrames(originalStartThresholdInFrames);
+            ALOGD_IF(originalStartThresholdInFrames != currentThreshold,
+                    "%s(%d) startThresholdInFrames changing from %u to %u",
+                    __func__, mPortId, originalStartThresholdInFrames, currentThreshold);
+        }
         if (mState == STATE_ACTIVE) {
             result = mAudioTrack->start();
         }
