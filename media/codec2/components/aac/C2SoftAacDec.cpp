@@ -55,6 +55,8 @@
 namespace android {
 
 constexpr char COMPONENT_NAME[] = "c2.android.aac.decoder";
+constexpr size_t kDefaultOutputPortDelay = 2;
+constexpr size_t kMaxOutputPortDelay = 16;
 
 class C2SoftAacDec::IntfImpl : public SimpleInterface<void>::BaseParams {
 public:
@@ -73,7 +75,9 @@ public:
 
         addParameter(
                 DefineParam(mActualOutputDelay, C2_PARAMKEY_OUTPUT_DELAY)
-                .withConstValue(new C2PortActualDelayTuning::output(2u))
+                .withDefault(new C2PortActualDelayTuning::output(kDefaultOutputPortDelay))
+                .withFields({C2F(mActualOutputDelay, value).inRange(0, kMaxOutputPortDelay)})
+                .withSetter(Setter<decltype(*mActualOutputDelay)>::StrictValueWithNoDeps)
                 .build());
 
         addParameter(
@@ -263,6 +267,7 @@ C2SoftAacDec::C2SoftAacDec(
       mAACDecoder(nullptr),
       mStreamInfo(nullptr),
       mSignalledError(false),
+      mOutputPortDelay(kDefaultOutputPortDelay),
       mOutputDelayRingBuffer(nullptr) {
 }
 
@@ -911,6 +916,29 @@ void C2SoftAacDec::process(
 
     int32_t outputDelay = mStreamInfo->outputDelay * mStreamInfo->numChannels;
 
+    size_t numSamplesInOutput = mStreamInfo->frameSize * mStreamInfo->numChannels;
+    if (numSamplesInOutput > 0) {
+        size_t actualOutputPortDelay = (outputDelay + numSamplesInOutput - 1) / numSamplesInOutput;
+        if (actualOutputPortDelay > mOutputPortDelay) {
+            mOutputPortDelay = actualOutputPortDelay;
+            ALOGV("New Output port delay %zu ", mOutputPortDelay);
+
+            C2PortActualDelayTuning::output outputPortDelay(mOutputPortDelay);
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            c2_status_t err =
+                mIntf->config({&outputPortDelay}, C2_MAY_BLOCK, &failures);
+            if (err == OK) {
+                work->worklets.front()->output.configUpdate.push_back(
+                    C2Param::Copy(outputPortDelay));
+            } else {
+                ALOGE("Cannot set output delay");
+                mSignalledError = true;
+                work->workletsProcessed = 1u;
+                work->result = C2_CORRUPTED;
+                return;
+            }
+        }
+    }
     mBuffersInfo.push_back(std::move(inInfo));
     work->workletsProcessed = 0u;
     if (!eos && mOutputDelayCompensated < outputDelay) {
