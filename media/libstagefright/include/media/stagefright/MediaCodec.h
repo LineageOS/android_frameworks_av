@@ -409,6 +409,17 @@ private:
     // configure parameter
     sp<AMessage> mConfigureMsg;
 
+    // rewrites the format description during configure() for encoding.
+    // format and flags as they exist within configure()
+    // the (possibly) updated format is returned in place.
+    status_t shapeMediaFormat(
+            const sp<AMessage> &format,
+            uint32_t flags);
+
+    // populate the format shaper library with information for this codec encoding
+    // for the indicated media type
+    status_t setupFormatShaper(AString mediaType);
+
     // Used only to synchronize asynchronous getBufferAndFormat
     // across all the other (synchronous) buffer state change
     // operations, such as de/queueIn/OutputBuffer, start and
