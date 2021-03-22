@@ -1555,7 +1555,7 @@ static bool connectFormatShaper() {
         }
 
         if (sShaperOps != nullptr) {
-            ALOGI("connectFormatShaper: connected to library %s", libraryName.c_str());
+            ALOGV("connectFormatShaper: connected to library %s", libraryName.c_str());
         }
 
     });
@@ -1746,7 +1746,7 @@ static void mapFormat(AString componentName, const sp<AMessage> &format, const c
     mediaformatshaper::shaperHandle_t shaperHandle;
     shaperHandle = sShaperOps->findShaper(componentName.c_str(), mediaType.c_str());
     if (shaperHandle == nullptr) {
-        ALOGW("mapFormat: no shaper handle");
+        ALOGV("mapFormat: no shaper handle");
         return;
     }
 
