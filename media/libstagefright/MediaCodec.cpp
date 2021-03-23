@@ -20,9 +20,11 @@
 #include <utils/Log.h>
 
 #include <set>
+#include <stdlib.h>
 
 #include <inttypes.h>
 #include <stdlib.h>
+#include <dlfcn.h>
 
 #include <C2Buffer.h>
 
@@ -35,6 +37,7 @@
 #include <aidl/android/media/IResourceManagerService.h>
 #include <android/binder_ibinder.h>
 #include <android/binder_manager.h>
+#include <android/dlext.h>
 #include <binder/IMemory.h>
 #include <binder/MemoryDealer.h>
 #include <cutils/properties.h>
@@ -47,6 +50,10 @@
 #include <media/MediaCodecInfo.h>
 #include <media/MediaMetricsItem.h>
 #include <media/MediaResource.h>
+#include <media/NdkMediaErrorPriv.h>
+#include <media/NdkMediaFormat.h>
+#include <media/NdkMediaFormatPriv.h>
+#include <media/formatshaper/FormatShaper.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -68,6 +75,7 @@
 #include <media/stagefright/OMXClient.h>
 #include <media/stagefright/PersistentSurface.h>
 #include <media/stagefright/SurfaceUtils.h>
+#include <nativeloader/dlext_namespaces.h>
 #include <private/android_filesystem_config.h>
 #include <utils/Singleton.h>
 
@@ -1326,6 +1334,9 @@ status_t MediaCodec::setOnFrameRenderedNotification(const sp<AMessage> &notify) 
     return msg->post();
 }
 
+static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
+                      bool reverse);
+
 status_t MediaCodec::configure(
         const sp<AMessage> &format,
         const sp<Surface> &nativeWindow,
@@ -1382,6 +1393,7 @@ status_t MediaCodec::configure(
             ALOGE("Invalid size(s), width=%d, height=%d", mVideoWidth, mVideoHeight);
             return BAD_VALUE;
         }
+
     } else {
         if (mMetricsHandle != 0) {
             int32_t channelCount;
@@ -1392,6 +1404,19 @@ status_t MediaCodec::configure(
             if (format->findInt32(KEY_SAMPLE_RATE, &sampleRate)) {
                 mediametrics_setInt32(mMetricsHandle, kCodecSampleRate, sampleRate);
             }
+        }
+    }
+
+    // apply framework level modifications to the mediaformat for encoding
+    // XXX: default off for a while during dogfooding
+    static const char *enable_property = "debug.stagefright.enableshaping";
+    int8_t enableShaping = property_get_bool(enable_property, 0);
+    if (!enableShaping) {
+        ALOGD("format shaping disabled via property '%s'", enable_property);
+    } else {
+        if (flags & CONFIGURE_FLAG_ENCODE) {
+            (void) shapeMediaFormat(format, flags);
+            mapFormat(mComponentName, format, nullptr, false);
         }
     }
 
@@ -1463,6 +1488,316 @@ status_t MediaCodec::configure(
 
     return err;
 }
+
+// Media Format Shaping support
+//
+
+static android::mediaformatshaper::FormatShaperOps_t *sShaperOps = NULL;
+
+static bool connectFormatShaper() {
+    static std::once_flag sCheckOnce;
+    static void *libHandle = NULL;
+
+    std::call_once(sCheckOnce, [&](){
+
+        // prefer any copy in the mainline module
+        //
+        android_namespace_t *mediaNs = android_get_exported_namespace("com_android_media");
+        AString libraryName = "libmediaformatshaper.so";
+
+        if (mediaNs != NULL) {
+            static const android_dlextinfo dlextinfo = {
+                .flags = ANDROID_DLEXT_USE_NAMESPACE,
+                .library_namespace = mediaNs,
+            };
+
+            AString libraryMainline = "/apex/com.android.media/";
+#if __LP64__
+            libraryMainline.append("lib64/");
+#else
+            libraryMainline.append("lib/");
+#endif
+            libraryMainline.append(libraryName);
+
+            libHandle = android_dlopen_ext(libraryMainline.c_str(), RTLD_NOW|RTLD_NODELETE,
+                                                 &dlextinfo);
+
+            if (libHandle != NULL) {
+                sShaperOps = (android::mediaformatshaper::FormatShaperOps_t*)
+                                dlsym(libHandle, "shaper_ops");
+            } else {
+                ALOGW("connectFormatShaper: unable to load mainline formatshaper %s",
+                      libraryMainline.c_str());
+            }
+        } else {
+            ALOGV("connectFormatShaper: couldn't find media namespace.");
+        }
+
+        // fall back to the system partition, if present.
+        //
+        if (sShaperOps == NULL) {
+
+            libHandle = dlopen(libraryName.c_str(), RTLD_NOW|RTLD_NODELETE);
+
+            if (libHandle != NULL) {
+                sShaperOps = (android::mediaformatshaper::FormatShaperOps_t*)
+                                dlsym(libHandle, "shaper_ops");
+            } else {
+                ALOGW("connectFormatShaper: unable to load formatshaper %s", libraryName.c_str());
+            }
+        }
+
+        if (sShaperOps != nullptr
+            && sShaperOps->version != android::mediaformatshaper::SHAPER_VERSION_V1) {
+            ALOGW("connectFormatShaper: unhandled version ShaperOps: %d, DISABLED",
+                  sShaperOps->version);
+            sShaperOps = nullptr;
+        }
+
+        if (sShaperOps != nullptr) {
+            ALOGV("connectFormatShaper: connected to library %s", libraryName.c_str());
+        }
+
+    });
+
+    return true;
+}
+
+// a construct to force the above dlopen() to run very early.
+// goal: so the dlopen() doesn't happen on critical path of latency sensitive apps
+// failure of this means that cold start of those apps is slower by the time to dlopen()
+//
+static bool forceEarlyLoadingShaper = connectFormatShaper();
+
+// parse the codec's properties: mapping, whether it meets min quality, etc
+// and pass them into the video quality code
+//
+status_t MediaCodec::setupFormatShaper(AString mediaType) {
+    ALOGV("setupFormatShaper: initializing shaper data for codec %s mediaType %s",
+          mComponentName.c_str(), mediaType.c_str());
+
+    nsecs_t mapping_started = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    // see if the shaper is already present, if so return
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle != nullptr) {
+        ALOGV("shaperhandle %p -- no initialization needed", shaperHandle);
+        return OK;
+    }
+
+    // not there, so we get to build & register one
+    shaperHandle = sShaperOps->createShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr) {
+        ALOGW("unable to create a shaper for cocodec %s mediaType %s",
+              mComponentName.c_str(), mediaType.c_str());
+        return OK;
+    }
+
+    sp<MediaCodecInfo::Capabilities> capabilities =
+                    mCodecInfo->getCapabilitiesFor(mediaType.c_str());
+    if (capabilities == nullptr) {
+        ALOGI("no capabilities as part of the codec?");
+    } else {
+        const sp<AMessage> &details = capabilities->getDetails();
+        AString mapTarget;
+        int count = details->countEntries();
+        for(int ix = 0; ix < count; ix++) {
+            AMessage::Type entryType;
+            const char *mapSrc = details->getEntryNameAt(ix, &entryType);
+            // XXX: re-use ix from getEntryAt() to avoid additional findXXX() invocation
+            //
+            static const char *featurePrefix = "feature-";
+            static const int featurePrefixLen = strlen(featurePrefix);
+            static const char *mappingPrefix = "mapping-";
+            static const int mappingPrefixLen = strlen(mappingPrefix);
+
+            if (mapSrc == NULL) {
+                continue;
+            } else if (!strncmp(mapSrc, featurePrefix, featurePrefixLen)) {
+                int32_t intValue;
+                if (details->findInt32(mapSrc, &intValue)) {
+                    ALOGV("-- feature '%s' -> %d", mapSrc, intValue);
+                    (void)(sShaperOps->setFeature)(shaperHandle, &mapSrc[featurePrefixLen],
+                                                   intValue);
+                }
+                continue;
+            } else if (!strncmp(mapSrc, mappingPrefix, mappingPrefixLen)) {
+                AString target;
+                if (details->findString(mapSrc, &target)) {
+                    ALOGV("-- mapping %s: map %s to %s", mapSrc, &mapSrc[mappingPrefixLen],
+                          target.c_str());
+                    // key is really "kind-key"
+                    // separate that, so setMap() sees the triple  kind, key, value
+                    const char *kind = &mapSrc[mappingPrefixLen];
+                    const char *sep = strchr(kind, '-');
+                    const char *key = sep+1;
+                    if (sep != NULL) {
+                         std::string xkind = std::string(kind, sep-kind);
+                        (void)(sShaperOps->setMap)(shaperHandle, xkind.c_str(),
+                                                   key, target.c_str());
+                    }
+                }
+            }
+        }
+    }
+    shaperHandle = sShaperOps->registerShaper(shaperHandle,
+                                              mComponentName.c_str(), mediaType.c_str());
+
+    nsecs_t mapping_finished = systemTime(SYSTEM_TIME_MONOTONIC);
+    ALOGD("setupFormatShaper: populated shaper node for codec %s: %" PRId64 " us",
+          mComponentName.c_str(), (mapping_finished - mapping_started)/1000);
+
+    return OK;
+}
+
+
+// Format Shaping
+//      Mapping and Manipulation of encoding parameters
+//
+
+status_t MediaCodec::shapeMediaFormat(
+            const sp<AMessage> &format,
+            uint32_t flags) {
+    ALOGV("shapeMediaFormat entry");
+
+    if (!(flags & CONFIGURE_FLAG_ENCODE)) {
+        ALOGW("shapeMediaFormat: not encoder");
+        return OK;
+    }
+    if (mCodecInfo == NULL) {
+        ALOGW("shapeMediaFormat: no codecinfo");
+        return OK;
+    }
+
+    AString mediaType;
+    if (!format->findString("mime", &mediaType)) {
+        ALOGW("shapeMediaFormat: no mediaType information");
+        return OK;
+    }
+
+    // make sure we have the function entry points for the shaper library
+    //
+
+    connectFormatShaper();
+    if (sShaperOps == nullptr) {
+        ALOGW("shapeMediaFormat: no MediaFormatShaper hooks available");
+        return OK;
+    }
+
+    // find the shaper information for this codec+mediaType pair
+    //
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr)  {
+        setupFormatShaper(mediaType);
+        shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    }
+    if (shaperHandle == nullptr) {
+        ALOGW("shapeMediaFormat: no handler for codec %s mediatype %s",
+              mComponentName.c_str(), mediaType.c_str());
+        return OK;
+    }
+
+    // run the shaper
+    //
+
+    ALOGV("Shaping input: %s", format->debugString(0).c_str());
+
+    sp<AMessage> updatedFormat = format->dup();
+    AMediaFormat *updatedNdkFormat = AMediaFormat_fromMsg(&updatedFormat);
+
+    int result = (*sShaperOps->shapeFormat)(shaperHandle, updatedNdkFormat, flags);
+    if (result == 0) {
+        AMediaFormat_getFormat(updatedNdkFormat, &updatedFormat);
+
+        sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
+        ALOGD("shapeMediaFormat: deltas: %s", deltas->debugString(2).c_str());
+
+        // note that this means that for anything in both, the copy in deltas wins
+        format->extend(deltas);
+    }
+
+    AMediaFormat_delete(updatedNdkFormat);
+    return OK;
+}
+
+static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
+                      bool reverse) {
+    AString mediaType;
+    if (!format->findString("mime", &mediaType)) {
+        ALOGW("mapFormat: no mediaType information");
+        return;
+    }
+    ALOGV("mapFormat: codec %s mediatype %s kind %s reverse %d", componentName.c_str(),
+          mediaType.c_str(), kind ? kind : "<all>", reverse);
+
+    // make sure we have the function entry points for the shaper library
+    //
+
+    connectFormatShaper();
+    if (sShaperOps == nullptr) {
+        ALOGW("mapFormat: no MediaFormatShaper hooks available");
+        return;
+    }
+
+    // find the shaper information for this codec+mediaType pair
+    //
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(componentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr) {
+        ALOGV("mapFormat: no shaper handle");
+        return;
+    }
+
+    const char **mappings;
+    if (reverse)
+        mappings = sShaperOps->getReverseMappings(shaperHandle, kind);
+    else
+        mappings = sShaperOps->getMappings(shaperHandle, kind);
+
+    if (mappings == nullptr) {
+        ALOGV("no mappings returned");
+        return;
+    }
+
+    ALOGV("Pre-mapping: %s",  format->debugString(2).c_str());
+    // do the mapping
+    //
+    int entries = format->countEntries();
+    for (int i = 0; ; i += 2) {
+        if (mappings[i] == nullptr) {
+            break;
+        }
+
+        size_t ix = format->findEntryByName(mappings[i]);
+        if (ix < entries) {
+            ALOGV("map '%s' to '%s'", mappings[i], mappings[i+1]);
+            status_t status = format->setEntryNameAt(ix, mappings[i+1]);
+            if (status != OK) {
+                ALOGW("Unable to map from '%s' to '%s': status %d",
+                      mappings[i], mappings[i+1], status);
+            }
+        }
+    }
+    ALOGV("Post-mapping: %s",  format->debugString(2).c_str());
+
+
+    // reclaim the mapping memory
+    for (int i = 0; ; i += 2) {
+        if (mappings[i] == nullptr) {
+            break;
+        }
+        free((void*)mappings[i]);
+        free((void*)mappings[i + 1]);
+    }
+    free(mappings);
+    mappings = nullptr;
+}
+
+//
+// end of Format Shaping hooks within MediaCodec
+//
 
 status_t MediaCodec::releaseCrypto()
 {
@@ -3691,6 +4026,7 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         buffer->meta()->setObject("changedKeys", changedKeys);
     }
     mOutputFormat = format;
+    mapFormat(mComponentName, format, nullptr, true);
     ALOGV("[%s] output format changed to: %s",
             mComponentName.c_str(), mOutputFormat->debugString(4).c_str());
 
@@ -4469,6 +4805,7 @@ status_t MediaCodec::setParameters(const sp<AMessage> &params) {
 
 status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
     updateLowLatency(params);
+    mapFormat(mComponentName, params, nullptr, false);
     mCodec->signalSetParameters(params);
 
     return OK;

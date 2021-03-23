@@ -61,6 +61,7 @@ tidy_errors = [
     "-bugprone-unhandled-self-assignment", // found in TimeMachine.h
     "-bugprone-suspicious-string-compare", // found in TimeMachine.h
     "-cert-oop54-cpp", // found in TransactionLog.h
+    "-bugprone-narrowing-conversions", // b/182410845
 ]
 
 cc_defaults {
