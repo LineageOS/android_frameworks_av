@@ -116,6 +116,16 @@ int EffectProxyCreate(const effect_uuid_t *uuid,
         pContext->sube[SUB_FX_OFFLOAD] = sube[1];
         pContext->desc[SUB_FX_OFFLOAD] = desc[1];
         pContext->aeli[SUB_FX_OFFLOAD] = aeli[1];
+    } else {
+        ALOGE("Both effects have (or don't have) EFFECT_FLAG_HW_ACC_TUNNEL flag");
+        delete[] sube;
+        delete[] desc;
+        delete[] aeli;
+        delete[] pContext->sube;
+        delete[] pContext->desc;
+        delete[] pContext->aeli;
+        delete pContext;
+        return -EINVAL;
     }
     delete[] desc;
     delete[] aeli;

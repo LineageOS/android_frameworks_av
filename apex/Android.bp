@@ -51,7 +51,10 @@ apex_defaults {
         },
     },
     // JNI
-    native_shared_libs: ["libmediaparser-jni"],
+    native_shared_libs: [
+        "libmediaparser-jni",
+        "libmediaformatshaper",
+    ],
     compile_multilib: "both",
     prebuilts: [
         "code_coverage.policy",
