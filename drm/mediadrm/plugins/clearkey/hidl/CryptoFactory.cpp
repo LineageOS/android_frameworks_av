@@ -27,11 +27,11 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_3 {
+namespace V1_4 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::Status;
-using ::android::hardware::drm::V1_2::clearkey::CryptoPlugin;
+using ::android::hardware::drm::V1_4::clearkey::CryptoPlugin;
 
 Return<bool> CryptoFactory::isCryptoSchemeSupported(
     const hidl_array<uint8_t, 16> &uuid)
@@ -63,7 +63,7 @@ Return<void> CryptoFactory::createPlugin(
 }
 
 } // namespace clearkey
-} // namespace V1_3
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android
