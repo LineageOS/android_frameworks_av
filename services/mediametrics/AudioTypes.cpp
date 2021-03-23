@@ -158,9 +158,9 @@ const std::unordered_map<std::string, int32_t>& getAAudioDirection() {
     // DO NOT MODIFY VALUES(OK to add new ones).
     // This may be found in frameworks/av/media/libaaudio/include/aaudio/AAudio.h
     static std::unordered_map<std::string, int32_t> map {
-        // UNKNOWN is -1
-        {"AAUDIO_DIRECTION_OUTPUT",    0},
-        {"AAUDIO_DIRECTION_INPUT",     1},
+        // UNKNOWN is 0
+        {"AAUDIO_DIRECTION_OUTPUT",    1 /* AAUDIO_DIRECTION_OUTPUT + 1 */},
+        {"AAUDIO_DIRECTION_INPUT",     2 /* AAUDIO_DIRECTION_INPUT + 1*/},
     };
     return map;
 }
@@ -169,7 +169,7 @@ const std::unordered_map<std::string, int32_t>& getAAudioPerformanceMode() {
     // DO NOT MODIFY VALUES(OK to add new ones).
     // This may be found in frameworks/av/media/libaaudio/include/aaudio/AAudio.h
     static std::unordered_map<std::string, int32_t> map {
-        // UNKNOWN is -1
+        // UNKNOWN is 0
         {"AAUDIO_PERFORMANCE_MODE_NONE",            10},
         {"AAUDIO_PERFORMANCE_MODE_POWER_SAVING",    11},
         {"AAUDIO_PERFORMANCE_MODE_LOW_LATENCY",     12},
@@ -181,9 +181,9 @@ const std::unordered_map<std::string, int32_t>& getAAudioSharingMode() {
     // DO NOT MODIFY VALUES(OK to add new ones).
     // This may be found in frameworks/av/media/libaaudio/include/aaudio/AAudio.h
     static std::unordered_map<std::string, int32_t> map {
-        // UNKNOWN is -1
-        {"AAUDIO_SHARING_MODE_EXCLUSIVE",    0},
-        {"AAUDIO_SHARING_MODE_SHARED",       1},
+        // UNKNOWN is 0
+        {"AAUDIO_SHARING_MODE_EXCLUSIVE",    1 /* AAUDIO_SHARING_MODE_EXCLUSIVE + 1 */},
+        {"AAUDIO_SHARING_MODE_SHARED",       2 /* AAUDIO_SHARING_MODE_SHARED + 1 */},
     };
     return map;
 }
@@ -484,7 +484,7 @@ int32_t lookup<AAUDIO_DIRECTION>(const std::string &direction)
     auto& map = getAAudioDirection();
     auto it = map.find(direction);
     if (it == map.end()) {
-        return -1; // return unknown
+        return 0; // return unknown
     }
     return it->second;
 }
@@ -506,7 +506,7 @@ int32_t lookup<AAUDIO_PERFORMANCE_MODE>(const std::string &performanceMode)
     auto& map = getAAudioPerformanceMode();
     auto it = map.find(performanceMode);
     if (it == map.end()) {
-        return -1; // return unknown
+        return 0; // return unknown
     }
     return it->second;
 }
@@ -528,7 +528,7 @@ int32_t lookup<AAUDIO_SHARING_MODE>(const std::string &sharingMode)
     auto& map = getAAudioSharingMode();
     auto it = map.find(sharingMode);
     if (it == map.end()) {
-        return -1; // return unknown
+        return 0; // return unknown
     }
     return it->second;
 }
