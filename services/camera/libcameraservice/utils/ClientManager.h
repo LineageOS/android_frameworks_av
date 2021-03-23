@@ -31,6 +31,31 @@
 namespace android {
 namespace resource_policy {
 
+// Values from frameworks/base/services/core/java/com/android/server/am/ProcessList.java
+const int32_t INVALID_ADJ = -10000;
+const int32_t UNKNOWN_ADJ = 1001;
+const int32_t CACHED_APP_MAX_ADJ = 999;
+const int32_t CACHED_APP_MIN_ADJ = 900;
+const int32_t CACHED_APP_LMK_FIRST_ADJ = 950;
+const int32_t CACHED_APP_IMPORTANCE_LEVELS = 5;
+const int32_t SERVICE_B_ADJ = 800;
+const int32_t PREVIOUS_APP_ADJ = 700;
+const int32_t HOME_APP_ADJ = 600;
+const int32_t SERVICE_ADJ = 500;
+const int32_t HEAVY_WEIGHT_APP_ADJ = 400;
+const int32_t BACKUP_APP_ADJ = 300;
+const int32_t PERCEPTIBLE_LOW_APP_ADJ = 250;
+const int32_t PERCEPTIBLE_MEDIUM_APP_ADJ = 225;
+const int32_t PERCEPTIBLE_APP_ADJ = 200;
+const int32_t VISIBLE_APP_ADJ = 100;
+const int32_t VISIBLE_APP_LAYER_MAX = PERCEPTIBLE_APP_ADJ - VISIBLE_APP_ADJ - 1;
+const int32_t PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ = 50;
+const int32_t FOREGROUND_APP_ADJ = 0;
+const int32_t PERSISTENT_SERVICE_ADJ = -700;
+const int32_t PERSISTENT_PROC_ADJ = -800;
+const int32_t SYSTEM_ADJ = -900;
+const int32_t NATIVE_ADJ = -1000;
+
 class ClientPriority {
 public:
     /**
@@ -40,7 +65,9 @@ public:
      * hwbinder thread.
      */
     ClientPriority(int32_t score, int32_t state, bool isVendorClient) :
-            mScore(score), mState(state), mIsVendorClient(isVendorClient) { }
+            mScore((score == INVALID_ADJ) ? UNKNOWN_ADJ : score),
+            mState(state),
+            mIsVendorClient(isVendorClient) { }
 
     int32_t getScore() const { return mScore; }
     int32_t getState() const { return mState; }
@@ -50,7 +77,7 @@ public:
         // construction. Otherwise, it can get reset each time cameraserver
         // queries ActivityManagerService for oom_adj scores / states .
         if (!mIsVendorClient) {
-            mScore = score;
+            mScore = (score == INVALID_ADJ) ? UNKNOWN_ADJ : score;
         }
     }
 
