@@ -57,6 +57,7 @@ private:
     size_t mInputBufferCount;
     size_t mOutputBufferCount;
     bool mSignalledError;
+    size_t mOutputPortDelay;
     struct Info {
         uint64_t frameIndex;
         size_t bufferSize;
