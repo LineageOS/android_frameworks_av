@@ -579,6 +579,8 @@ private:
     void notifyOfRenderedFrames(
             bool dropIncomplete = false, FrameRenderTracker::Info *until = NULL);
 
+    void onFirstTunnelFrameReady();
+
     // Pass |expectedFormat| to print a warning if the format differs from it.
     // Using sp<> instead of const sp<>& because expectedFormat is likely the current mOutputFormat
     // which will get updated inside.

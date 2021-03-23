@@ -128,6 +128,8 @@ struct MediaCodec : public AHandler {
 
     status_t setOnFrameRenderedNotification(const sp<AMessage> &notify);
 
+    status_t setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &notify);
+
     status_t createInputSurface(sp<IGraphicBufferProducer>* bufferProducer);
 
     status_t setInputSurface(const sp<PersistentSurface> &surface);
@@ -393,6 +395,7 @@ private:
     sp<AMessage> mCallback;
     sp<AMessage> mOnFrameRenderedNotification;
     sp<AMessage> mAsyncReleaseCompleteNotification;
+    sp<AMessage> mOnFirstTunnelFrameReadyNotification;
 
     sp<ResourceManagerServiceProxy> mResourceManagerProxy;
 
