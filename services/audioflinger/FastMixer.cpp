@@ -353,7 +353,8 @@ void FastMixer::onWork()
 #endif
         //ALOGD("Eric FastMixer::onWork() mIsWarm");
     } else {
-        dumpState->mTimestampVerifier.discontinuity();
+        dumpState->mTimestampVerifier.discontinuity(
+            dumpState->mTimestampVerifier.DISCONTINUITY_MODE_CONTINUOUS);
         // See comment in if block.
 #ifdef FASTMIXER_LOG_HIST_TS
         LOG_AUDIO_STATE();
