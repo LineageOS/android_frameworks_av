@@ -518,6 +518,7 @@ private:
     status_t setLowLatency(int32_t lowLatency);
     status_t setLatency(uint32_t latency);
     status_t getLatency(uint32_t *latency);
+    status_t setTunnelPeek(int32_t tunnelPeek);
     status_t setAudioPresentation(int32_t presentationId, int32_t programId);
     status_t setOperatingRate(float rateFloat, bool isVideo);
     status_t getIntraRefreshPeriod(uint32_t *intraRefreshPeriod);
