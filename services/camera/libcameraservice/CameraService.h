@@ -213,7 +213,8 @@ public:
 
     /////////////////////////////////////////////////////////////////////
     // CameraDeviceFactory functionality
-    int                 getDeviceVersion(const String8& cameraId, int* facing = NULL);
+    int                 getDeviceVersion(const String8& cameraId, int* facing = nullptr,
+            int* orientation = nullptr);
 
     /////////////////////////////////////////////////////////////////////
     // Shared utilities
