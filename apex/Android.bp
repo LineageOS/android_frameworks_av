@@ -110,6 +110,7 @@ apex_defaults {
     native_shared_libs: [
         "libcodec2_hidl@1.0",
         "libcodec2_hidl@1.1",
+        "libcodec2_hidl@1.2",
         "libstagefright_foundation",
     ],
     prebuilts: [
