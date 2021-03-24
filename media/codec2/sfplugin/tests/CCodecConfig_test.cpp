@@ -208,6 +208,24 @@ public:
                         .withSetter(Setter<C2StreamPixelAspectRatioInfo::output>)
                         .build());
 
+                if (isEncoder) {
+                    addParameter(
+                            DefineParam(mInputBitrate, C2_PARAMKEY_BITRATE)
+                            .withDefault(new C2StreamBitrateInfo::input(0u))
+                            .withFields({C2F(mInputBitrate, value).any()})
+                            .withSetter(Setter<C2StreamBitrateInfo::input>)
+                            .build());
+
+                    addParameter(
+                            DefineParam(mOutputBitrate, C2_PARAMKEY_BITRATE)
+                            .withDefault(new C2StreamBitrateInfo::output(0u))
+                            .withFields({C2F(mOutputBitrate, value).any()})
+                            .calculatedAs(
+                                Copy<C2StreamBitrateInfo::output, C2StreamBitrateInfo::input>,
+                                mInputBitrate)
+                            .build());
+                }
+
                 // TODO: more SDK params
             }
         private:
@@ -221,9 +239,17 @@ public:
             std::shared_ptr<C2StreamVendorInt64Info::output> mInt64Output;
             std::shared_ptr<C2PortVendorStringInfo::input> mStringInput;
             std::shared_ptr<C2StreamPixelAspectRatioInfo::output> mPixelAspectRatio;
+            std::shared_ptr<C2StreamBitrateInfo::input> mInputBitrate;
+            std::shared_ptr<C2StreamBitrateInfo::output> mOutputBitrate;
 
             template<typename T>
             static C2R Setter(bool, C2P<T> &) {
+                return C2R::Ok();
+            }
+
+            template<typename ME, typename DEP>
+            static C2R Copy(bool, C2P<ME> &me, const C2P<DEP> &dep) {
+                me.set().value = dep.v.value;
                 return C2R::Ok();
             }
         };
@@ -455,6 +481,99 @@ TEST_F(CCodecConfigTest, PixelAspectRatioUpdate) {
     ASSERT_EQ(11, parHeight);
     ASSERT_FALSE(mConfig.mInputFormat->findInt32(KEY_PIXEL_ASPECT_RATIO_HEIGHT, &parHeight))
             << "mInputFormat = " << mConfig.mInputFormat->debugString().c_str();
+}
+
+TEST_F(CCodecConfigTest, DataspaceUpdate) {
+    init(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER, MIMETYPE_VIDEO_AVC);
+
+    ASSERT_EQ(OK, mConfig.initialize(mReflector, mConfigurable));
+    class InputSurfaceStub : public InputSurfaceWrapper {
+    public:
+        ~InputSurfaceStub() override = default;
+        status_t connect(const std::shared_ptr<Codec2Client::Component> &) override {
+            return OK;
+        }
+        void disconnect() override {}
+        status_t start() override { return OK; }
+        status_t signalEndOfInputStream() override { return OK; }
+        status_t configure(Config &) override { return OK; }
+    };
+    mConfig.mInputSurface = std::make_shared<InputSurfaceStub>();
+
+    sp<AMessage> format{new AMessage};
+    format->setInt32(KEY_COLOR_RANGE, COLOR_RANGE_LIMITED);
+    format->setInt32(KEY_COLOR_STANDARD, COLOR_STANDARD_BT709);
+    format->setInt32(KEY_COLOR_TRANSFER, COLOR_TRANSFER_SDR_VIDEO);
+    format->setInt32(KEY_BIT_RATE, 100);
+
+    std::vector<std::unique_ptr<C2Param>> configUpdate;
+    ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(
+            mConfigurable, format, D::ALL, C2_MAY_BLOCK, &configUpdate));
+    ASSERT_TRUE(mConfig.updateConfiguration(configUpdate, D::ALL));
+
+    int32_t range{0};
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_RANGE, &range))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_RANGE_LIMITED, range)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    int32_t standard{0};
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_STANDARD, &standard))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_STANDARD_BT709, standard)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    int32_t transfer{0};
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_TRANSFER, &transfer))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_TRANSFER_SDR_VIDEO, transfer)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    mConfig.mInputSurface->setDataSpace(HAL_DATASPACE_BT2020_PQ);
+
+    // Dataspace from input surface should override the configured setting
+    mConfig.updateFormats(D::ALL);
+
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_RANGE, &range))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_RANGE_FULL, range)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_STANDARD, &standard))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_STANDARD_BT2020, standard)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_TRANSFER, &transfer))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_TRANSFER_ST2084, transfer)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    // Simulate bitrate update
+    format = new AMessage;
+    format->setInt32(KEY_BIT_RATE, 200);
+    configUpdate.clear();
+    ASSERT_EQ(OK, mConfig.getConfigUpdateFromSdkParams(
+            mConfigurable, format, D::ALL, C2_MAY_BLOCK, &configUpdate));
+    ASSERT_EQ(OK, mConfig.setParameters(mConfigurable, configUpdate, C2_MAY_BLOCK));
+
+    // Color information should remain the same
+    mConfig.updateFormats(D::ALL);
+
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_RANGE, &range))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_RANGE_FULL, range)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_STANDARD, &standard))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_STANDARD_BT2020, standard)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+
+    ASSERT_TRUE(mConfig.mOutputFormat->findInt32(KEY_COLOR_TRANSFER, &transfer))
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
+    EXPECT_EQ(COLOR_TRANSFER_ST2084, transfer)
+            << "mOutputFormat = " << mConfig.mOutputFormat->debugString().c_str();
 }
 
 } // namespace android

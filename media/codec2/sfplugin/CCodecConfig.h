@@ -124,6 +124,7 @@ struct CCodecConfig {
 
     std::shared_ptr<InputSurfaceWrapper> mInputSurface;
     std::unique_ptr<InputSurfaceWrapper::Config> mISConfig;
+    android_dataspace mInputSurfaceDataspace;
 
     /// the current configuration. Updated after configure() and based on configUpdate in
     /// onWorkDone
