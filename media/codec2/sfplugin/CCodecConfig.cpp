@@ -1151,11 +1151,14 @@ bool CCodecConfig::updateFormats(Domain domain) {
 
     bool changed = false;
     if (domain & mInputDomain) {
-        sp<AMessage> oldFormat = mInputFormat->dup();
+        sp<AMessage> oldFormat = mInputFormat;
+        mInputFormat = mInputFormat->dup(); // trigger format changed
         mInputFormat->extend(getFormatForDomain(reflected, mInputDomain));
         if (mInputFormat->countEntries() != oldFormat->countEntries()
                 || mInputFormat->changesFrom(oldFormat)->countEntries() > 0) {
             changed = true;
+        } else {
+            mInputFormat = oldFormat; // no change
         }
     }
     if (domain & mOutputDomain) {
