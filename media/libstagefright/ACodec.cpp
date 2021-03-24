@@ -5683,15 +5683,18 @@ void ACodec::onDataSpaceChanged(android_dataspace dataSpace, const ColorAspects 
     int32_t range, standard, transfer;
     convertCodecColorAspectsToPlatformAspects(aspects, &range, &standard, &transfer);
 
+    int32_t dsRange, dsStandard, dsTransfer;
+    getColorConfigFromDataSpace(dataSpace, &dsRange, &dsStandard, &dsTransfer);
+
     // if some aspects are unspecified, use dataspace fields
     if (range == 0) {
-        range = (dataSpace & HAL_DATASPACE_RANGE_MASK) >> HAL_DATASPACE_RANGE_SHIFT;
+        range = dsRange;
     }
     if (standard == 0) {
-        standard = (dataSpace & HAL_DATASPACE_STANDARD_MASK) >> HAL_DATASPACE_STANDARD_SHIFT;
+        standard = dsStandard;
     }
     if (transfer == 0) {
-        transfer = (dataSpace & HAL_DATASPACE_TRANSFER_MASK) >> HAL_DATASPACE_TRANSFER_SHIFT;
+        transfer = dsTransfer;
     }
 
     mOutputFormat = mOutputFormat->dup(); // trigger an output format changed event
