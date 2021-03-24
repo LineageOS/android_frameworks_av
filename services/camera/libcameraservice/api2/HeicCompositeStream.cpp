@@ -36,6 +36,7 @@
 
 #include "common/CameraDeviceBase.h"
 #include "utils/ExifUtils.h"
+#include "utils/SessionConfigurationUtils.h"
 #include "HeicEncoderInfoManager.h"
 #include "HeicCompositeStream.h"
 
@@ -115,7 +116,9 @@ bool HeicCompositeStream::isHeicCompositeStream(const sp<Surface> &surface) {
 status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface>>& consumers,
         bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
         camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
-        std::vector<int> *surfaceIds, int /*streamSetId*/, bool /*isShared*/) {
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        std::vector<int> *surfaceIds,
+        int /*streamSetId*/, bool /*isShared*/) {
 
     sp<CameraDeviceBase> device = mDevice.promote();
     if (!device.get()) {
@@ -141,7 +144,8 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
     mStaticInfo = device->info();
 
     res = device->createStream(mAppSegmentSurface, mAppSegmentMaxSize, 1, format,
-            kAppSegmentDataSpace, rotation, &mAppSegmentStreamId, physicalCameraId, surfaceIds);
+            kAppSegmentDataSpace, rotation, &mAppSegmentStreamId, physicalCameraId,
+            sensorPixelModesUsed,surfaceIds);
     if (res == OK) {
         mAppSegmentSurfaceId = (*surfaceIds)[0];
     } else {
@@ -177,7 +181,7 @@ status_t HeicCompositeStream::createInternalStreams(const std::vector<sp<Surface
     int srcStreamFmt = mUseGrid ? HAL_PIXEL_FORMAT_YCbCr_420_888 :
             HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED;
     res = device->createStream(mMainImageSurface, width, height, srcStreamFmt, kHeifDataSpace,
-            rotation, id, physicalCameraId, &sourceSurfaceId);
+            rotation, id, physicalCameraId, sensorPixelModesUsed, &sourceSurfaceId);
     if (res == OK) {
         mMainImageSurfaceId = sourceSurfaceId[0];
         mMainImageStreamId = *id;

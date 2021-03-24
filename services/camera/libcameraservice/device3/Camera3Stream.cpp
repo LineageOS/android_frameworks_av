@@ -49,7 +49,9 @@ Camera3Stream::Camera3Stream(int id,
         camera_stream_type type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation,
-        const String8& physicalCameraId, int setId, bool isMultiResolution) :
+        const String8& physicalCameraId,
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        int setId, bool isMultiResolution) :
     camera_stream(),
     mId(id),
     mSetId(setId),
@@ -84,6 +86,7 @@ Camera3Stream::Camera3Stream(int id,
     camera_stream::rotation = rotation;
     camera_stream::max_buffers = 0;
     camera_stream::physical_camera_id = mPhysicalCameraId.string();
+    camera_stream::sensor_pixel_modes_used = sensorPixelModesUsed;
 
     if ((format == HAL_PIXEL_FORMAT_BLOB || format == HAL_PIXEL_FORMAT_RAW_OPAQUE) &&
             maxSize == 0) {

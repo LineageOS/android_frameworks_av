@@ -261,7 +261,7 @@ status_t ZslProcessor::updateStream(const Parameters &params) {
         res = device->createStream(outSurface, params.fastInfo.maxZslSize.width,
             params.fastInfo.maxZslSize.height, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED,
             HAL_DATASPACE_UNKNOWN, CAMERA_STREAM_ROTATION_0, &mZslStreamId,
-            String8());
+            String8(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create ZSL stream: "
                     "%s (%d)", __FUNCTION__, client->getCameraId(),
