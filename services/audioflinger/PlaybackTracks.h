@@ -336,7 +336,7 @@ public:
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
-                                android::media::permission::Identity& identity);
+                                const android::media::permission::Identity& identity);
     virtual             ~OutputTrack();
 
     virtual status_t    start(AudioSystem::sync_event_t event =
