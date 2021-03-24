@@ -128,6 +128,8 @@ struct MediaCodec : public AHandler {
 
     status_t setOnFrameRenderedNotification(const sp<AMessage> &notify);
 
+    status_t setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &notify);
+
     status_t createInputSurface(sp<IGraphicBufferProducer>* bufferProducer);
 
     status_t setInputSurface(const sp<PersistentSurface> &surface);
@@ -361,6 +363,22 @@ private:
         bool mOwnedByClient;
     };
 
+    // This type is used to track the tunnel mode video peek state machine:
+    //
+    // DisabledNoBuffer -> EnabledNoBuffer  when tunnel-peek = true
+    // EnabledNoBuffer  -> DisabledNoBuffer when tunnel-peek = false
+    // DisabledNoBuffer -> BufferDecoded    when kWhatFirstTunnelFrameReady
+    // EnabledNoBuffer  -> BufferDecoded    when kWhatFirstTunnelFrameReady
+    // BufferDecoded    -> BufferRendered   when kWhatFrameRendered
+    // <all states>     -> EnabledNoBuffer  when flush
+    // <all states>     -> EnabledNoBuffer  when stop then configure then start
+    enum struct TunnelPeekState {
+        kDisabledNoBuffer,
+        kEnabledNoBuffer,
+        kBufferDecoded,
+        kBufferRendered,
+    };
+
     struct ResourceManagerServiceProxy;
 
     State mState;
@@ -387,12 +405,15 @@ private:
     void flushMediametrics();
     void updateEphemeralMediametrics(mediametrics_handle_t item);
     void updateLowLatency(const sp<AMessage> &msg);
+    constexpr const char *asString(TunnelPeekState state, const char *default_string="?");
+    void updateTunnelPeek(const sp<AMessage> &msg);
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
     sp<AMessage> mCallback;
     sp<AMessage> mOnFrameRenderedNotification;
     sp<AMessage> mAsyncReleaseCompleteNotification;
+    sp<AMessage> mOnFirstTunnelFrameReadyNotification;
 
     sp<ResourceManagerServiceProxy> mResourceManagerProxy;
 
@@ -440,6 +461,7 @@ private:
     int32_t mTunneledInputWidth;
     int32_t mTunneledInputHeight;
     bool mTunneled;
+    TunnelPeekState mTunnelPeekState;
 
     sp<IDescrambler> mDescrambler;
 

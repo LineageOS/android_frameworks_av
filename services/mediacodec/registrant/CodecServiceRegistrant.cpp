@@ -25,8 +25,9 @@
 #include <C2PlatformSupport.h>
 #include <codec2/hidl/1.0/ComponentStore.h>
 #include <codec2/hidl/1.1/ComponentStore.h>
-#include <codec2/hidl/1.1/Configurable.h>
-#include <codec2/hidl/1.1/types.h>
+#include <codec2/hidl/1.2/ComponentStore.h>
+#include <codec2/hidl/1.2/Configurable.h>
+#include <codec2/hidl/1.2/types.h>
 #include <hidl/HidlSupport.h>
 #include <media/CodecServiceRegistrant.h>
 
@@ -37,8 +38,8 @@ using ::android::hardware::hidl_string;
 using ::android::hardware::Return;
 using ::android::hardware::Void;
 using ::android::sp;
-using namespace ::android::hardware::media::c2::V1_1;
-using namespace ::android::hardware::media::c2::V1_1::utils;
+using namespace ::android::hardware::media::c2::V1_2;
+using namespace ::android::hardware::media::c2::V1_2::utils;
 
 constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
 
@@ -420,11 +421,20 @@ extern "C" void RegisterCodecServices() {
     // STOPSHIP: Remove code name checking once platform version bumps up to 30.
     std::string codeName =
         android::base::GetProperty("ro.build.version.codename", "");
-    if (codeName == "R") {
-        platformVersion = 30;
+    if (codeName == "S") {
+        platformVersion = 31;
     }
 
     switch (platformVersion) {
+        case 31: {
+            android::sp<V1_2::IComponentStore> storeV1_2 =
+                new V1_2::utils::ComponentStore(store);
+            if (storeV1_2->registerAsService("software") != android::OK) {
+                LOG(ERROR) << "Cannot register software Codec2 v1.2 service.";
+                return;
+            }
+            break;
+        }
         case 30: {
             android::sp<V1_1::IComponentStore> storeV1_1 =
                 new V1_1::utils::ComponentStore(store);

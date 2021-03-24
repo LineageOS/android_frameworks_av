@@ -425,6 +425,7 @@ enum {
     kWhatSignaledInputEOS    = 'seos',
     kWhatOutputFramesRendered = 'outR',
     kWhatOutputBuffersChanged = 'outC',
+    kWhatFirstTunnelFrameReady = 'ftfR',
 };
 
 class BufferCallback : public CodecBase::BufferCallback {
@@ -487,6 +488,7 @@ public:
     virtual void onSignaledInputEOS(status_t err) override;
     virtual void onOutputFramesRendered(const std::list<FrameRenderTracker::Info> &done) override;
     virtual void onOutputBuffersChanged() override;
+    virtual void onFirstTunnelFrameReady() override;
 private:
     const sp<AMessage> mNotify;
 };
@@ -607,6 +609,12 @@ void CodecCallback::onOutputBuffersChanged() {
     notify->post();
 }
 
+void CodecCallback::onFirstTunnelFrameReady() {
+    sp<AMessage> notify(mNotify->dup());
+    notify->setInt32("what", kWhatFirstTunnelFrameReady);
+    notify->post();
+}
+
 }  // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -705,6 +713,7 @@ MediaCodec::MediaCodec(
       mTunneledInputWidth(0),
       mTunneledInputHeight(0),
       mTunneled(false),
+      mTunnelPeekState(TunnelPeekState::kEnabledNoBuffer),
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
@@ -908,6 +917,47 @@ void MediaCodec::updateLowLatency(const sp<AMessage> &msg) {
             mIsLowLatencyModeOn = false;
         }
     }
+}
+
+constexpr const char *MediaCodec::asString(TunnelPeekState state, const char *default_string){
+    switch(state) {
+        case TunnelPeekState::kEnabledNoBuffer:
+            return "EnabledNoBuffer";
+        case TunnelPeekState::kDisabledNoBuffer:
+            return "DisabledNoBuffer";
+        case TunnelPeekState::kBufferDecoded:
+            return "BufferDecoded";
+        case TunnelPeekState::kBufferRendered:
+            return "BufferRendered";
+        default:
+            return default_string;
+    }
+}
+
+void MediaCodec::updateTunnelPeek(const sp<AMessage> &msg) {
+    int32_t tunnelPeek = 0;
+    if (!msg->findInt32("tunnel-peek", &tunnelPeek)){
+        return;
+    }
+    if(tunnelPeek == 0){
+        if (mTunnelPeekState == TunnelPeekState::kEnabledNoBuffer) {
+            mTunnelPeekState = TunnelPeekState::kDisabledNoBuffer;
+            ALOGV("TunnelPeekState: %s -> %s",
+                  asString(TunnelPeekState::kEnabledNoBuffer),
+                  asString(TunnelPeekState::kDisabledNoBuffer));
+            return;
+        }
+    } else {
+        if (mTunnelPeekState == TunnelPeekState::kDisabledNoBuffer) {
+            mTunnelPeekState = TunnelPeekState::kEnabledNoBuffer;
+            ALOGV("TunnelPeekState: %s -> %s",
+                  asString(TunnelPeekState::kDisabledNoBuffer),
+                  asString(TunnelPeekState::kEnabledNoBuffer));
+            return;
+        }
+    }
+
+    ALOGV("Ignoring tunnel-peek=%d for %s", tunnelPeek, asString(mTunnelPeekState));
 }
 
 bool MediaCodec::Histogram::setup(int nbuckets, int64_t width, int64_t floor)
@@ -1332,6 +1382,12 @@ status_t MediaCodec::setCallback(const sp<AMessage> &callback) {
 status_t MediaCodec::setOnFrameRenderedNotification(const sp<AMessage> &notify) {
     sp<AMessage> msg = new AMessage(kWhatSetNotification, this);
     msg->setMessage("on-frame-rendered", notify);
+    return msg->post();
+}
+
+status_t MediaCodec::setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &notify) {
+    sp<AMessage> msg = new AMessage(kWhatSetNotification, this);
+    msg->setMessage("first-tunnel-frame-ready", notify);
     return msg->post();
 }
 
@@ -2997,10 +3053,53 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
                 case kWhatOutputFramesRendered:
                 {
-                    // ignore these in all states except running, and check that we have a
-                    // notification set
-                    if (mState == STARTED && mOnFrameRenderedNotification != NULL) {
+                    // ignore these in all states except running
+                    if (mState != STARTED) {
+                        break;
+                    }
+                    TunnelPeekState previousState = mTunnelPeekState;
+                    mTunnelPeekState = TunnelPeekState::kBufferRendered;
+                    ALOGV("TunnelPeekState: %s -> %s",
+                          asString(previousState),
+                          asString(TunnelPeekState::kBufferRendered));
+                    // check that we have a notification set
+                    if (mOnFrameRenderedNotification != NULL) {
                         sp<AMessage> notify = mOnFrameRenderedNotification->dup();
+                        notify->setMessage("data", msg);
+                        notify->post();
+                    }
+                    break;
+                }
+
+                case kWhatFirstTunnelFrameReady:
+                {
+                    if (mState != STARTED) {
+                        break;
+                    }
+                    switch(mTunnelPeekState) {
+                        case TunnelPeekState::kDisabledNoBuffer:
+                            mTunnelPeekState = TunnelPeekState::kBufferDecoded;
+                            ALOGV("TunnelPeekState: %s -> %s",
+                                  asString(TunnelPeekState::kDisabledNoBuffer),
+                                  asString(TunnelPeekState::kBufferDecoded));
+                            break;
+                        case TunnelPeekState::kEnabledNoBuffer:
+                            mTunnelPeekState = TunnelPeekState::kBufferDecoded;
+                            ALOGV("TunnelPeekState: %s -> %s",
+                                  asString(TunnelPeekState::kEnabledNoBuffer),
+                                  asString(TunnelPeekState::kBufferDecoded));
+                            {
+                                sp<AMessage> parameters = new AMessage();
+                                parameters->setInt32("android._trigger-tunnel-peek", 1);
+                                mCodec->signalSetParameters(parameters);
+                            }
+                            break;
+                        default:
+                            break;
+                    }
+
+                    if (mOnFirstTunnelFrameReadyNotification != nullptr) {
+                        sp<AMessage> notify = mOnFirstTunnelFrameReadyNotification->dup();
                         notify->setMessage("data", msg);
                         notify->post();
                     }
@@ -3224,6 +3323,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             sp<AMessage> notify;
             if (msg->findMessage("on-frame-rendered", &notify)) {
                 mOnFrameRenderedNotification = notify;
+            }
+            if (msg->findMessage("first-tunnel-frame-ready", &notify)) {
+                mOnFirstTunnelFrameReadyNotification = notify;
             }
             break;
         }
@@ -3466,6 +3568,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
             sp<AReplyToken> replyID;
             CHECK(msg->senderAwaitsResponse(&replyID));
+            TunnelPeekState previousState = mTunnelPeekState;
+            mTunnelPeekState = TunnelPeekState::kEnabledNoBuffer;
+            ALOGV("TunnelPeekState: %s -> %s",
+                  asString(previousState),
+                  asString(TunnelPeekState::kEnabledNoBuffer));
 
             mReplyID = replyID;
             setState(STARTING);
@@ -3900,6 +4007,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
 
             mCodec->signalFlush();
             returnBuffersToCodec();
+            TunnelPeekState previousState = mTunnelPeekState;
+            mTunnelPeekState = TunnelPeekState::kEnabledNoBuffer;
+            ALOGV("TunnelPeekState: %s -> %s",
+                  asString(previousState),
+                  asString(TunnelPeekState::kEnabledNoBuffer));
             break;
         }
 
@@ -4810,6 +4922,7 @@ status_t MediaCodec::setParameters(const sp<AMessage> &params) {
 status_t MediaCodec::onSetParameters(const sp<AMessage> &params) {
     updateLowLatency(params);
     mapFormat(mComponentName, params, nullptr, false);
+    updateTunnelPeek(params);
     mCodec->signalSetParameters(params);
 
     return OK;
