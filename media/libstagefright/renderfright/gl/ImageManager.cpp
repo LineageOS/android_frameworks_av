@@ -32,14 +32,16 @@ namespace gl {
 
 ImageManager::ImageManager(GLESRenderEngine* engine) : mEngine(engine) {}
 
-void ImageManager::initThread() {
+void ImageManager::initThread(bool realtime) {
     mThread = std::thread([this]() { threadMain(); });
     pthread_setname_np(mThread.native_handle(), "ImageManager");
-    // Use SCHED_FIFO to minimize jitter
-    struct sched_param param = {0};
-    param.sched_priority = 2;
-    if (pthread_setschedparam(mThread.native_handle(), SCHED_FIFO, &param) != 0) {
-        ALOGE("Couldn't set SCHED_FIFO for ImageManager");
+    if (realtime) {
+        // Use SCHED_FIFO to minimize jitter
+        struct sched_param param = {0};
+        param.sched_priority = 2;
+        if (pthread_setschedparam(mThread.native_handle(), SCHED_FIFO, &param) != 0) {
+            ALOGE("Couldn't set SCHED_FIFO for ImageManager");
+        }
     }
 }
 
