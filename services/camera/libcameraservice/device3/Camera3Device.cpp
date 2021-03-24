@@ -60,6 +60,7 @@
 #include "device3/Camera3SharedOutputStream.h"
 #include "CameraService.h"
 #include "utils/CameraThreadState.h"
+#include "utils/SessionConfigurationUtils.h"
 #include "utils/TraceHFR.h"
 #include "utils/CameraServiceProxyWrapper.h"
 
@@ -69,6 +70,7 @@
 using namespace android::camera3;
 using namespace android::hardware::camera;
 using namespace android::hardware::camera::device::V3_2;
+using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensorPixelMode;
 
 namespace android {
 
@@ -489,8 +491,13 @@ camera3::Size Camera3Device::getMaxJpegResolution() const {
     const int STREAM_WIDTH_OFFSET = 1;
     const int STREAM_HEIGHT_OFFSET = 2;
     const int STREAM_IS_INPUT_OFFSET = 3;
+    bool isHighResolutionSensor =
+            camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mDeviceInfo);
+    int32_t scalerSizesTag = isHighResolutionSensor ?
+            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION :
+                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS;
     camera_metadata_ro_entry_t availableStreamConfigs =
-            mDeviceInfo.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+            mDeviceInfo.find(scalerSizesTag);
     if (availableStreamConfigs.count == 0 ||
             availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
         return camera3::Size(0, 0);
@@ -628,6 +635,8 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
     ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
             kMinJpegBufferSize;
     if (jpegBufferSize > maxJpegBufferSize) {
+        ALOGI("%s: jpeg buffer size calculated is > maxJpeg bufferSize(%zd), clamping",
+                  __FUNCTION__, maxJpegBufferSize);
         jpegBufferSize = maxJpegBufferSize;
     }
 
@@ -647,13 +656,17 @@ ssize_t Camera3Device::getPointCloudBufferSize() const {
     return maxBytesForPointCloud;
 }
 
-ssize_t Camera3Device::getRawOpaqueBufferSize(int32_t width, int32_t height) const {
+ssize_t Camera3Device::getRawOpaqueBufferSize(int32_t width, int32_t height,
+        bool maxResolution) const {
     const int PER_CONFIGURATION_SIZE = 3;
     const int WIDTH_OFFSET = 0;
     const int HEIGHT_OFFSET = 1;
     const int SIZE_OFFSET = 2;
     camera_metadata_ro_entry rawOpaqueSizes =
-        mDeviceInfo.find(ANDROID_SENSOR_OPAQUE_RAW_SIZE);
+        mDeviceInfo.find(
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_SENSOR_OPAQUE_RAW_SIZE,
+                    maxResolution));
     size_t count = rawOpaqueSizes.count;
     if (count == 0 || (count % PER_CONFIGURATION_SIZE)) {
         ALOGE("%s: Camera %s: bad opaque RAW size static metadata length(%zu)!",
@@ -1325,8 +1338,9 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
             uint32_t width, uint32_t height, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
             const String8& physicalCameraId,
-            std::vector<int> *surfaceIds, int streamSetId, bool isShared,
-            bool isMultiResolution, uint64_t consumerUsage) {
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
+            uint64_t consumerUsage) {
     ATRACE_CALL();
 
     if (consumer == nullptr) {
@@ -1338,14 +1352,26 @@ status_t Camera3Device::createStream(sp<Surface> consumer,
     consumers.push_back(consumer);
 
     return createStream(consumers, /*hasDeferredConsumer*/ false, width, height,
-            format, dataSpace, rotation, id, physicalCameraId, surfaceIds, streamSetId,
-            isShared, isMultiResolution, consumerUsage);
+            format, dataSpace, rotation, id, physicalCameraId, sensorPixelModesUsed, surfaceIds,
+            streamSetId, isShared, isMultiResolution, consumerUsage);
+}
+
+static bool isRawFormat(int format) {
+    switch (format) {
+        case HAL_PIXEL_FORMAT_RAW16:
+        case HAL_PIXEL_FORMAT_RAW12:
+        case HAL_PIXEL_FORMAT_RAW10:
+        case HAL_PIXEL_FORMAT_RAW_OPAQUE:
+            return true;
+        default:
+            return false;
+    }
 }
 
 status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
         android_dataspace dataSpace, camera_stream_rotation_t rotation, int *id,
-        const String8& physicalCameraId,
+        const String8& physicalCameraId, const std::unordered_set<int32_t> &sensorPixelModesUsed,
         std::vector<int> *surfaceIds, int streamSetId, bool isShared, bool isMultiResolution,
         uint64_t consumerUsage) {
     ATRACE_CALL();
@@ -1399,6 +1425,12 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         return BAD_VALUE;
     }
 
+    if (isRawFormat(format) && sensorPixelModesUsed.size() > 1) {
+        // We can't use one stream with a raw format in both sensor pixel modes since its going to
+        // be found in only one sensor pixel mode.
+        ALOGE("%s: RAW opaque stream cannot be used with > 1 sensor pixel modes", __FUNCTION__);
+        return BAD_VALUE;
+    }
     if (format == HAL_PIXEL_FORMAT_BLOB) {
         ssize_t blobBufferSize;
         if (dataSpace == HAL_DATASPACE_DEPTH) {
@@ -1418,28 +1450,36 @@ status_t Camera3Device::createStream(const std::vector<sp<Surface>>& consumers,
         }
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, blobBufferSize, format, dataSpace, rotation,
-                mTimestampOffset, physicalCameraId, streamSetId, isMultiResolution);
+                mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
+                isMultiResolution);
     } else if (format == HAL_PIXEL_FORMAT_RAW_OPAQUE) {
-        ssize_t rawOpaqueBufferSize = getRawOpaqueBufferSize(width, height);
+        bool maxResolution =
+                sensorPixelModesUsed.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
+                        sensorPixelModesUsed.end();
+        ssize_t rawOpaqueBufferSize = getRawOpaqueBufferSize(width, height, maxResolution);
         if (rawOpaqueBufferSize <= 0) {
             SET_ERR_L("Invalid RAW opaque buffer size %zd", rawOpaqueBufferSize);
             return BAD_VALUE;
         }
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, rawOpaqueBufferSize, format, dataSpace, rotation,
-                mTimestampOffset, physicalCameraId, streamSetId, isMultiResolution);
+                mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
+                isMultiResolution);
     } else if (isShared) {
         newStream = new Camera3SharedOutputStream(mNextStreamId, consumers,
                 width, height, format, consumerUsage, dataSpace, rotation,
-                mTimestampOffset, physicalCameraId, streamSetId, mUseHalBufManager);
+                mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
+                mUseHalBufManager);
     } else if (consumers.size() == 0 && hasDeferredConsumer) {
         newStream = new Camera3OutputStream(mNextStreamId,
                 width, height, format, consumerUsage, dataSpace, rotation,
-                mTimestampOffset, physicalCameraId, streamSetId, isMultiResolution);
+                mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
+                isMultiResolution);
     } else {
         newStream = new Camera3OutputStream(mNextStreamId, consumers[0],
                 width, height, format, dataSpace, rotation,
-                mTimestampOffset, physicalCameraId, streamSetId, isMultiResolution);
+                mTimestampOffset, physicalCameraId, sensorPixelModesUsed, streamSetId,
+                isMultiResolution);
     }
 
     size_t consumerCount = consumers.size();
@@ -3221,7 +3261,7 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         dst3_2.usage = mapToConsumerUsage(cam3stream->getUsage());
         dst3_2.rotation = mapToStreamRotation((camera_stream_rotation_t) src->rotation);
         // For HidlSession version 3.5 or newer, the format and dataSpace sent
-        // to HAL are original, not the overriden ones.
+        // to HAL are original, not the overridden ones.
         if (mHidlSession_3_5 != nullptr) {
             dst3_2.format = mapToPixelFormat(cam3stream->isFormatOverridden() ?
                     cam3stream->getOriginalFormat() : src->format);
@@ -3238,7 +3278,12 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
         }
         dst3_7.v3_4 = dst3_4;
         dst3_7.groupId = cam3stream->getHalStreamGroupId();
-
+        dst3_7.sensorPixelModesUsed.resize(src->sensor_pixel_modes_used.size());
+        size_t j = 0;
+        for (int mode : src->sensor_pixel_modes_used) {
+            dst3_7.sensorPixelModesUsed[j++] =
+                    static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
+        }
         activeStreams.insert(streamId);
         // Create Buffer ID map if necessary
         mBufferRecords.tryCreateBufferCache(streamId);
@@ -3255,13 +3300,15 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
     }
     requestedConfiguration3_2.operationMode = operationMode;
     requestedConfiguration3_4.operationMode = operationMode;
+    requestedConfiguration3_7.operationMode = operationMode;
+    size_t sessionParamSize = get_camera_metadata_size(sessionParams);
     requestedConfiguration3_4.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
-            get_camera_metadata_size(sessionParams));
+            sessionParamSize);
     requestedConfiguration3_7.operationMode = operationMode;
     requestedConfiguration3_7.sessionParams.setToExternal(
             reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
-            get_camera_metadata_size(sessionParams));
+            sessionParamSize);
 
     // Invoke configureStreams
     device::V3_3::HalStreamConfiguration finalConfiguration;

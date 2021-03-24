@@ -56,7 +56,7 @@ struct Parameters {
     int previewTransform; // set by CAMERA_CMD_SET_DISPLAY_ORIENTATION
 
     int pictureWidth, pictureHeight;
-    // Store the picture size before they are overriden by video snapshot
+    // Store the picture size before they are overridden by video snapshot
     int pictureWidthLastSet, pictureHeightLastSet;
     bool pictureSizeOverriden;
 
