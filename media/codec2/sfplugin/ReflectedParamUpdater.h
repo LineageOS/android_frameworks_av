@@ -176,6 +176,14 @@ public:
             std::vector<std::string> *keys /* nonnull */) const;
 
     /**
+     * Get field type for the given name
+     *
+     * \param key[in]   field name
+     * \return type of the field, or type_t(~0) if not found.
+     */
+    C2FieldDescriptor::type_t getTypeForKey(const std::string &name) const;
+
+    /**
      * Update C2Param objects from field name and value in AMessage object.
      *
      * \param params[in]    Dict object with field name to value pairs.

@@ -61,6 +61,11 @@ struct SharedBuffer;
 
 using hardware::cas::native::V1_0::IDescrambler;
 
+struct CodecParameterDescriptor {
+    std::string name;
+    AMessage::Type type;
+};
+
 struct CodecBase : public AHandler, /* static */ ColorUtils {
     /**
      * This interface defines events firing from CodecBase back to MediaCodec.
@@ -232,6 +237,64 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
     virtual void signalRequestIDRFrame() = 0;
     virtual void signalSetParameters(const sp<AMessage> &msg) = 0;
     virtual void signalEndOfInputStream() = 0;
+
+    /**
+     * Query supported parameters from this instance, and fill |names| with the
+     * names of the parameters.
+     *
+     * \param names string vector to fill with supported parameters.
+     * \return OK if successful;
+     *         BAD_VALUE if |names| is null;
+     *         INVALID_OPERATION if already released;
+     *         ERROR_UNSUPPORTED if not supported.
+     */
+    virtual status_t querySupportedParameters([[maybe_unused]] std::vector<std::string> *names) {
+        return ERROR_UNSUPPORTED;
+    }
+    /**
+     * Fill |desc| with description of the parameter with |name|.
+     *
+     * \param name name of the parameter to describe
+     * \param desc pointer to CodecParameterDescriptor to be filled
+     * \return OK if successful;
+     *         BAD_VALUE if |desc| is null;
+     *         NAME_NOT_FOUND if |name| is not recognized by the component;
+     *         INVALID_OPERATION if already released;
+     *         ERROR_UNSUPPORTED if not supported.
+     */
+    virtual status_t describeParameter(
+            [[maybe_unused]] const std::string &name,
+            [[maybe_unused]] CodecParameterDescriptor *desc) {
+        return ERROR_UNSUPPORTED;
+    }
+    /**
+     * Subscribe to parameters in |names| and get output format change event
+     * when they change.
+     * Unrecognized / already subscribed parameters are ignored.
+     *
+     * \param names names of parameters to subscribe
+     * \return OK if successful;
+     *         INVALID_OPERATION if already released;
+     *         ERROR_UNSUPPORTED if not supported.
+     */
+    virtual status_t subscribeToParameters(
+            [[maybe_unused]] const std::vector<std::string> &names) {
+        return ERROR_UNSUPPORTED;
+    }
+    /**
+     * Unsubscribe from parameters in |names| and no longer get
+     * output format change event when they change.
+     * Unrecognized / already unsubscribed parameters are ignored.
+     *
+     * \param names names of parameters to unsubscribe
+     * \return OK if successful;
+     *         INVALID_OPERATION if already released;
+     *         ERROR_UNSUPPORTED if not supported.
+     */
+    virtual status_t unsubscribeFromParameters(
+            [[maybe_unused]] const std::vector<std::string> &names) {
+        return ERROR_UNSUPPORTED;
+    }
 
     typedef CodecBase *(*CreateCodecFunc)(void);
     typedef PersistentSurface *(*CreateInputSurfaceFunc)(void);
