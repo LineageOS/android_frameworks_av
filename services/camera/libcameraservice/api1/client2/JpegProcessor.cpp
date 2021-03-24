@@ -151,7 +151,7 @@ status_t JpegProcessor::updateStream(const Parameters &params) {
                 params.pictureWidth, params.pictureHeight,
                 HAL_PIXEL_FORMAT_BLOB, HAL_DATASPACE_V0_JFIF,
                 CAMERA_STREAM_ROTATION_0, &mCaptureStreamId,
-                String8());
+                String8(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for capture: "
                     "%s (%d)", __FUNCTION__, mId,

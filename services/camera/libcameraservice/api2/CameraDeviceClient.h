@@ -28,6 +28,7 @@
 #include "common/FrameProcessorBase.h"
 #include "common/Camera2ClientBase.h"
 #include "CompositeStream.h"
+#include "utils/SessionConfigurationUtils.h"
 
 using android::camera3::OutputStreamInfo;
 using android::camera3::CompositeStream;
@@ -222,6 +223,13 @@ protected:
     // Calculate the ANativeWindow transform from android.sensor.orientation
     status_t              getRotationTransformLocked(/*out*/int32_t* transform);
 
+    bool isUltraHighResolutionSensor(const String8 &cameraId);
+
+    bool isSensorPixelModeConsistent(const std::list<int> &streamIdList,
+            const CameraMetadata &settings);
+
+    const CameraMetadata &getStaticInfo(const String8 &cameraId);
+
 private:
     // StreamSurfaceId encapsulates streamId + surfaceId for a particular surface.
     // streamId specifies the index of the stream the surface belongs to, and the
@@ -305,6 +313,8 @@ private:
 
     int32_t mRequestIdCounter;
 
+    std::vector<std::string> mPhysicalCameraIds;
+
     // The list of output streams whose surfaces are deferred. We have to track them separately
     // as there are no surfaces available and can not be put into mStreamMap. Once the deferred
     // Surface is configured, the stream id will be moved to mStreamMap.
@@ -312,6 +322,12 @@ private:
 
     // stream ID -> outputStreamInfo mapping
     std::unordered_map<int32_t, OutputStreamInfo> mStreamInfoMap;
+
+    // map high resolution camera id (logical / physical) -> list of stream ids configured
+    std::unordered_map<std::string, std::unordered_set<int>> mHighResolutionCameraIdToStreamIdSet;
+
+    // set of high resolution camera id (logical / physical)
+    std::unordered_set<std::string> mHighResolutionSensors;
 
     KeyedVector<sp<IBinder>, sp<CompositeStream>> mCompositeStreamMap;
 

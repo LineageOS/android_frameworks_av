@@ -556,8 +556,8 @@ private:
             void queryPhysicalCameraIds();
             SystemCameraKind getSystemCameraKind();
             status_t fixupMonochromeTags();
-            status_t addDynamicDepthTags();
-            status_t deriveHeicTags();
+            status_t addDynamicDepthTags(bool maxResolution = false);
+            status_t deriveHeicTags(bool maxResolution = false);
             status_t addRotateCropTags();
             status_t addPreCorrectionActiveArraySize();
 
