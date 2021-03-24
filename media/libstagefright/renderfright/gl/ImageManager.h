@@ -42,7 +42,7 @@ public:
     // Starts the background thread for the ImageManager
     // We need this to guarantee that the class is fully-constructed before the
     // thread begins running.
-    void initThread();
+    void initThread(bool realtime);
     void cacheAsync(const sp<GraphicBuffer>& buffer, const std::shared_ptr<Barrier>& barrier)
             EXCLUDES(mMutex);
     status_t cache(const sp<GraphicBuffer>& buffer);

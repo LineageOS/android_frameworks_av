@@ -37,6 +37,7 @@
 #include <codec2/hidl/1.0/types.h>
 #include <codec2/hidl/1.1/OutputBufferQueue.h>
 #include <codec2/hidl/1.1/types.h>
+#include <codec2/hidl/1.2/types.h>
 
 #include <cutils/native_handle.h>
 #include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
@@ -612,6 +613,7 @@ Codec2Client::Codec2Client(sp<Base> const& base,
         },
         mBase1_0{base},
         mBase1_1{Base1_1::castFrom(base)},
+        mBase1_2{Base1_2::castFrom(base)},
         mServiceIndex{serviceIndex} {
     Return<sp<IClientManager>> transResult = base->getPoolClientManager();
     if (!transResult.isOk()) {
@@ -633,6 +635,10 @@ sp<Codec2Client::Base1_1> const& Codec2Client::getBase1_1() const {
     return mBase1_1;
 }
 
+sp<Codec2Client::Base1_2> const& Codec2Client::getBase1_2() const {
+    return mBase1_2;
+}
+
 std::string const& Codec2Client::getServiceName() const {
     return GetServiceNames()[mServiceIndex];
 }
@@ -645,8 +651,9 @@ c2_status_t Codec2Client::createComponent(
     c2_status_t status;
     sp<Component::HidlListener> hidlListener = new Component::HidlListener{};
     hidlListener->base = listener;
-    Return<void> transStatus = mBase1_1 ?
-        mBase1_1->createComponent_1_1(
+    Return<void> transStatus;
+    if (mBase1_2) {
+        transStatus = mBase1_2->createComponent_1_2(
             name,
             hidlListener,
             ClientManager::getInstance(),
@@ -659,8 +666,25 @@ c2_status_t Codec2Client::createComponent(
                 }
                 *component = std::make_shared<Codec2Client::Component>(c);
                 hidlListener->component = *component;
-            }) :
-        mBase1_0->createComponent(
+            });
+    }
+    else if (mBase1_1) {
+        transStatus = mBase1_1->createComponent_1_1(
+            name,
+            hidlListener,
+            ClientManager::getInstance(),
+            [&status, component, hidlListener](
+                    Status s,
+                    const sp<IComponent>& c) {
+                status = static_cast<c2_status_t>(s);
+                if (status != C2_OK) {
+                    return;
+                }
+                *component = std::make_shared<Codec2Client::Component>(c);
+                hidlListener->component = *component;
+            });
+    } else if (mBase1_0) { // ver1_0
+        transStatus = mBase1_0->createComponent(
             name,
             hidlListener,
             ClientManager::getInstance(),
@@ -674,6 +698,9 @@ c2_status_t Codec2Client::createComponent(
                 *component = std::make_shared<Codec2Client::Component>(c);
                 hidlListener->component = *component;
             });
+    } else {
+        status = C2_CORRUPTED;
+    }
     if (!transStatus.isOk()) {
         LOG(ERROR) << "createComponent(" << name.c_str()
                    << ") -- transaction failed.";
@@ -1193,6 +1220,7 @@ Codec2Client::Component::Component(const sp<Base>& base)
         },
         mBase1_0{base},
         mBase1_1{Base1_1::castFrom(base)},
+        mBase1_2{Base1_2::castFrom(base)},
         mBufferPoolSender{std::make_unique<BufferPoolSender>()},
         mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
 }
@@ -1215,6 +1243,30 @@ Codec2Client::Component::Component(const sp<Base1_1>& base)
         },
         mBase1_0{base},
         mBase1_1{base},
+        mBase1_2{Base1_2::castFrom(base)},
+        mBufferPoolSender{std::make_unique<BufferPoolSender>()},
+        mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
+}
+
+Codec2Client::Component::Component(const sp<Base1_2>& base)
+      : Configurable{
+            [base]() -> sp<IConfigurable> {
+                Return<sp<IComponentInterface>> transResult1 =
+                        base->getInterface();
+                if (!transResult1.isOk()) {
+                    return nullptr;
+                }
+                Return<sp<IConfigurable>> transResult2 =
+                        static_cast<sp<IComponentInterface>>(transResult1)->
+                        getConfigurable();
+                return transResult2.isOk() ?
+                        static_cast<sp<IConfigurable>>(transResult2) :
+                        nullptr;
+            }()
+        },
+        mBase1_0{base},
+        mBase1_1{base},
+        mBase1_2{base},
         mBufferPoolSender{std::make_unique<BufferPoolSender>()},
         mOutputBufferQueue{std::make_unique<OutputBufferQueue>()} {
 }
@@ -1452,6 +1504,7 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     }
     ALOGD("generation remote change %u", generation);
 
+    (void)mBase1_2;
     Return<Status> transStatus = mBase1_0->setOutputSurface(
             static_cast<uint64_t>(blockPoolId),
             bqId == 0 ? nullHgbp : igbp);
