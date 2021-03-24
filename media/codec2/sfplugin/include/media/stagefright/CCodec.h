@@ -65,6 +65,12 @@ public:
     virtual void signalEndOfInputStream() override;
     virtual void signalRequestIDRFrame() override;
 
+    virtual status_t querySupportedParameters(std::vector<std::string> *names) override;
+    virtual status_t describeParameter(
+            const std::string &name, CodecParameterDescriptor *desc) override;
+    virtual status_t subscribeToParameters(const std::vector<std::string> &names) override;
+    virtual status_t unsubscribeFromParameters(const std::vector<std::string> &names) override;
+
     void initiateReleaseIfStuck();
     void onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems);
     void onInputBufferDone(uint64_t frameIndex, size_t arrayIndex);
