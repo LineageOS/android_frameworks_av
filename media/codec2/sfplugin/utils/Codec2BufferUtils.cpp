@@ -121,33 +121,45 @@ status_t ImageCopy(uint8_t *imgBase, const MediaImage2 *img, const C2GraphicView
     if (view.crop().width != img->mWidth || view.crop().height != img->mHeight) {
         return BAD_VALUE;
     }
+    const uint8_t* src_y = view.data()[0];
+    const uint8_t* src_u = view.data()[1];
+    const uint8_t* src_v = view.data()[2];
+    int32_t src_stride_y = view.layout().planes[0].rowInc;
+    int32_t src_stride_u = view.layout().planes[1].rowInc;
+    int32_t src_stride_v = view.layout().planes[2].rowInc;
+    uint8_t* dst_y = imgBase + img->mPlane[0].mOffset;
+    uint8_t* dst_u = imgBase + img->mPlane[1].mOffset;
+    uint8_t* dst_v = imgBase + img->mPlane[2].mOffset;
+    int32_t dst_stride_y = img->mPlane[0].mRowInc;
+    int32_t dst_stride_u = img->mPlane[1].mRowInc;
+    int32_t dst_stride_v = img->mPlane[2].mRowInc;
+    int width = view.crop().width;
+    int height = view.crop().height;
+
     if ((IsNV12(view) && IsI420(img)) || (IsI420(view) && IsNV12(img))) {
         // Take shortcuts to use libyuv functions between NV12 and I420 conversion.
-        const uint8_t* src_y = view.data()[0];
-        const uint8_t* src_u = view.data()[1];
-        const uint8_t* src_v = view.data()[2];
-        int32_t src_stride_y = view.layout().planes[0].rowInc;
-        int32_t src_stride_u = view.layout().planes[1].rowInc;
-        int32_t src_stride_v = view.layout().planes[2].rowInc;
-        uint8_t* dst_y = imgBase + img->mPlane[0].mOffset;
-        uint8_t* dst_u = imgBase + img->mPlane[1].mOffset;
-        uint8_t* dst_v = imgBase + img->mPlane[2].mOffset;
-        int32_t dst_stride_y = img->mPlane[0].mRowInc;
-        int32_t dst_stride_u = img->mPlane[1].mRowInc;
-        int32_t dst_stride_v = img->mPlane[2].mRowInc;
         if (IsNV12(view) && IsI420(img)) {
             if (!libyuv::NV12ToI420(src_y, src_stride_y, src_u, src_stride_u, dst_y, dst_stride_y,
-                                    dst_u, dst_stride_u, dst_v, dst_stride_v, view.crop().width,
-                                    view.crop().height)) {
+                                    dst_u, dst_stride_u, dst_v, dst_stride_v, width, height)) {
                 return OK;
             }
         } else {
             if (!libyuv::I420ToNV12(src_y, src_stride_y, src_u, src_stride_u, src_v, src_stride_v,
-                                    dst_y, dst_stride_y, dst_u, dst_stride_u, view.crop().width,
-                                    view.crop().height)) {
+                                    dst_y, dst_stride_y, dst_u, dst_stride_u, width, height)) {
                 return OK;
             }
         }
+    }
+    if (IsNV12(view) && IsNV12(img)) {
+        libyuv::CopyPlane(src_y, src_stride_y, dst_y, dst_stride_y, width, height);
+        libyuv::CopyPlane(src_u, src_stride_u, dst_u, dst_stride_u, width, height / 2);
+        return OK;
+    }
+    if (IsI420(view) && IsI420(img)) {
+        libyuv::CopyPlane(src_y, src_stride_y, dst_y, dst_stride_y, width, height);
+        libyuv::CopyPlane(src_u, src_stride_u, dst_u, dst_stride_u, width / 2, height / 2);
+        libyuv::CopyPlane(src_v, src_stride_v, dst_v, dst_stride_v, width / 2, height / 2);
+        return OK;
     }
     return _ImageCopy<true>(view, img, imgBase);
 }
@@ -156,33 +168,46 @@ status_t ImageCopy(C2GraphicView &view, const uint8_t *imgBase, const MediaImage
     if (view.crop().width != img->mWidth || view.crop().height != img->mHeight) {
         return BAD_VALUE;
     }
+    const uint8_t* src_y = imgBase + img->mPlane[0].mOffset;
+    const uint8_t* src_u = imgBase + img->mPlane[1].mOffset;
+    const uint8_t* src_v = imgBase + img->mPlane[2].mOffset;
+    int32_t src_stride_y = img->mPlane[0].mRowInc;
+    int32_t src_stride_u = img->mPlane[1].mRowInc;
+    int32_t src_stride_v = img->mPlane[2].mRowInc;
+    uint8_t* dst_y = view.data()[0];
+    uint8_t* dst_u = view.data()[1];
+    uint8_t* dst_v = view.data()[2];
+    int32_t dst_stride_y = view.layout().planes[0].rowInc;
+    int32_t dst_stride_u = view.layout().planes[1].rowInc;
+    int32_t dst_stride_v = view.layout().planes[2].rowInc;
+    int width = view.crop().width;
+    int height = view.crop().height;
     if ((IsNV12(img) && IsI420(view)) || (IsI420(img) && IsNV12(view))) {
         // Take shortcuts to use libyuv functions between NV12 and I420 conversion.
-        const uint8_t* src_y = imgBase + img->mPlane[0].mOffset;
-        const uint8_t* src_u = imgBase + img->mPlane[1].mOffset;
-        const uint8_t* src_v = imgBase + img->mPlane[2].mOffset;
-        int32_t src_stride_y = img->mPlane[0].mRowInc;
-        int32_t src_stride_u = img->mPlane[1].mRowInc;
-        int32_t src_stride_v = img->mPlane[2].mRowInc;
-        uint8_t* dst_y = view.data()[0];
-        uint8_t* dst_u = view.data()[1];
-        uint8_t* dst_v = view.data()[2];
-        int32_t dst_stride_y = view.layout().planes[0].rowInc;
-        int32_t dst_stride_u = view.layout().planes[1].rowInc;
-        int32_t dst_stride_v = view.layout().planes[2].rowInc;
         if (IsNV12(img) && IsI420(view)) {
             if (!libyuv::NV12ToI420(src_y, src_stride_y, src_u, src_stride_u, dst_y, dst_stride_y,
-                                    dst_u, dst_stride_u, dst_v, dst_stride_v, view.width(),
-                                    view.height())) {
+                                    dst_u, dst_stride_u, dst_v, dst_stride_v, width, height)) {
                 return OK;
             }
         } else {
             if (!libyuv::I420ToNV12(src_y, src_stride_y, src_u, src_stride_u, src_v, src_stride_v,
-                                    dst_y, dst_stride_y, dst_u, dst_stride_u, view.width(),
-                                    view.height())) {
+                                    dst_y, dst_stride_y, dst_u, dst_stride_u, width, height)) {
                 return OK;
             }
         }
+    }
+    if (IsNV12(img) && IsNV12(view)) {
+        // For NV12, copy Y and UV plane
+        libyuv::CopyPlane(src_y, src_stride_y, dst_y, dst_stride_y, width, height);
+        libyuv::CopyPlane(src_u, src_stride_u, dst_u, dst_stride_u, width, height / 2);
+        return OK;
+    }
+    if (IsI420(img) && IsI420(view)) {
+        // For I420, copy Y, U and V plane.
+        libyuv::CopyPlane(src_y, src_stride_y, dst_y, dst_stride_y, width, height);
+        libyuv::CopyPlane(src_u, src_stride_u, dst_u, dst_stride_u, width / 2, height / 2);
+        libyuv::CopyPlane(src_v, src_stride_v, dst_v, dst_stride_v, width / 2, height / 2);
+        return OK;
     }
     return _ImageCopy<false>(view, img, imgBase);
 }
