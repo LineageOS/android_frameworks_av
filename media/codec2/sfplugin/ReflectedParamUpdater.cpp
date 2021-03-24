@@ -288,6 +288,20 @@ void ReflectedParamUpdater::getKeysForParamIndex(
     }
 }
 
+C2FieldDescriptor::type_t ReflectedParamUpdater::getTypeForKey(
+        const std::string &key) const {
+    auto it = mMap.find(key);
+    if (it == mMap.end()) {
+        return C2FieldDescriptor::type_t(~0);
+    }
+
+    if (it->second.fieldDesc) {
+        return it->second.fieldDesc->type();
+    }
+    // whole param is exposed as a blob
+    return C2FieldDescriptor::BLOB;
+}
+
 void ReflectedParamUpdater::updateParamsFromMessage(
         const Dict &params,
         std::vector<std::unique_ptr<C2Param>> *vec /* nonnull */) const {
