@@ -6258,19 +6258,6 @@ media_status_t MPEG4Source::read(
                 if (isSyncSample) {
                     AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
                 }
-
-                AMediaFormat_setInt64(
-                        meta, "sample-file-offset" /*AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET*/,
-                        offset);
-
-                if (mSampleTable != nullptr &&
-                        mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
-                    AMediaFormat_setInt64(
-                    meta,
-                    "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
-                    mSampleTable->getLastSampleIndexInChunk());
-                }
-
                 ++mCurrentSampleIndex;
             }
         }
@@ -6418,17 +6405,6 @@ media_status_t MPEG4Source::read(
 
         if (isSyncSample) {
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
-        }
-
-        AMediaFormat_setInt64(
-                meta, "sample-file-offset" /*AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET*/, offset);
-
-        if (mSampleTable != nullptr &&
-                mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
-            AMediaFormat_setInt64(
-                    meta,
-                    "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
-                    mSampleTable->getLastSampleIndexInChunk());
         }
 
         ++mCurrentSampleIndex;

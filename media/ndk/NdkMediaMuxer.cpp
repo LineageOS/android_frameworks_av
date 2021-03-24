@@ -17,24 +17,28 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaMuxer"
 
-#include <android_util_Binder.h>
-#include <jni.h>
-#include <media/IMediaHTTPService.h>
+
+#include <media/NdkMediaMuxer.h>
 #include <media/NdkMediaCodec.h>
 #include <media/NdkMediaErrorPriv.h>
 #include <media/NdkMediaFormatPriv.h>
-#include <media/NdkMediaMuxer.h>
-#include <media/stagefright/MediaAppender.h>
-#include <media/stagefright/MediaMuxer.h>
-#include <media/stagefright/foundation/ABuffer.h>
-#include <media/stagefright/foundation/AMessage.h>
+
+
 #include <utils/Log.h>
 #include <utils/StrongPointer.h>
+#include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/AMessage.h>
+#include <media/stagefright/MediaMuxer.h>
+#include <media/IMediaHTTPService.h>
+#include <android_util_Binder.h>
+
+#include <jni.h>
 
 using namespace android;
 
 struct AMediaMuxer {
-    sp<MediaMuxerBase> mImpl;
+    sp<MediaMuxer> mImpl;
+
 };
 
 extern "C" {
@@ -42,15 +46,8 @@ extern "C" {
 EXPORT
 AMediaMuxer* AMediaMuxer_new(int fd, OutputFormat format) {
     ALOGV("ctor");
-    AMediaMuxer *mData = new (std::nothrow) AMediaMuxer();
-    if (mData == nullptr) {
-        return nullptr;
-    }
-    mData->mImpl = new (std::nothrow) MediaMuxer(fd, (android::MediaMuxer::OutputFormat)format);
-    if (mData->mImpl == nullptr) {
-        delete mData;
-        return nullptr;
-    }
+    AMediaMuxer *mData = new AMediaMuxer();
+    mData->mImpl = new MediaMuxer(fd, (android::MediaMuxer::OutputFormat)format);
     return mData;
 }
 
@@ -97,34 +94,6 @@ media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
             muxer->mImpl->writeSampleData(buf, trackIdx, info->presentationTimeUs, info->flags));
 }
 
-EXPORT
-AMediaMuxer* AMediaMuxer_append(int fd, AppendMode mode) {
-    ALOGV("append");
-    AMediaMuxer* mData = new (std::nothrow) AMediaMuxer();
-    if (mData == nullptr) {
-        return nullptr;
-    }
-    mData->mImpl = MediaAppender::create(fd, (android::MediaAppender::AppendMode)mode);
-    if (mData->mImpl == nullptr) {
-        delete mData;
-        return nullptr;
-    }
-    return mData;
-}
-
-EXPORT
-ssize_t AMediaMuxer_getTrackCount(AMediaMuxer* muxer) {
-    return muxer->mImpl->getTrackCount();
-}
-
-EXPORT
-AMediaFormat* AMediaMuxer_getTrackFormat(AMediaMuxer* muxer, size_t idx) {
-    sp<AMessage> format = muxer->mImpl->getTrackFormat(idx);
-    if (format != nullptr) {
-        return AMediaFormat_fromMsg(&format);
-    }
-    return nullptr;
-}
 
 } // extern "C"
 
