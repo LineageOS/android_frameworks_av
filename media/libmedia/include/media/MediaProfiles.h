@@ -21,6 +21,8 @@
 #include <utils/threads.h>
 #include <media/mediarecorder.h>
 
+#include <vector>
+
 namespace android {
 
 enum camcorder_quality {
@@ -252,30 +254,18 @@ private:
             : mCameraId(0),
               mFileFormat(OUTPUT_FORMAT_THREE_GPP),
               mQuality(CAMCORDER_QUALITY_HIGH),
-              mDuration(0),
-              mVideoCodec(0),
-              mAudioCodec(0) {}
+              mDuration(0) {}
 
-        CamcorderProfile(const CamcorderProfile& copy) {
-            mCameraId = copy.mCameraId;
-            mFileFormat = copy.mFileFormat;
-            mQuality = copy.mQuality;
-            mDuration = copy.mDuration;
-            mVideoCodec = new VideoCodec(*copy.mVideoCodec);
-            mAudioCodec = new AudioCodec(*copy.mAudioCodec);
-        }
+        CamcorderProfile(const CamcorderProfile& copy) = default;
 
-        ~CamcorderProfile() {
-            delete mVideoCodec;
-            delete mAudioCodec;
-        }
+        ~CamcorderProfile() = default;
 
         int mCameraId;
         output_format mFileFormat;
         camcorder_quality mQuality;
         int mDuration;
-        VideoCodec *mVideoCodec;
-        AudioCodec *mAudioCodec;
+        std::vector<VideoCodec> mVideoCodecs;
+        std::vector<AudioCodec> mAudioCodecs;
     };
 
     struct VideoEncoderCap {
@@ -363,8 +353,8 @@ private:
     // from the xml
     static MediaProfiles* createInstanceFromXmlFile(const char *xml);
     static output_format createEncoderOutputFileFormat(const char **atts);
-    static VideoCodec* createVideoCodec(const char **atts, MediaProfiles *profiles);
-    static AudioCodec* createAudioCodec(const char **atts, MediaProfiles *profiles);
+    static void createVideoCodec(const char **atts, MediaProfiles *profiles);
+    static void createAudioCodec(const char **atts, MediaProfiles *profiles);
     static AudioDecoderCap* createAudioDecoderCap(const char **atts);
     static VideoDecoderCap* createVideoDecoderCap(const char **atts);
     static VideoEncoderCap* createVideoEncoderCap(const char **atts);
