@@ -1,5 +1,5 @@
 /*
- * Copyright 2019 The Android Open Source Project
+ * Copyright 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,12 +15,12 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "Codec2-ComponentStore@1.1"
+#define LOG_TAG "Codec2-ComponentStore@1.2"
 #include <android-base/logging.h>
 
-#include <codec2/hidl/1.1/ComponentStore.h>
-#include <codec2/hidl/1.1/InputSurface.h>
-#include <codec2/hidl/1.1/types.h>
+#include <codec2/hidl/1.2/ComponentStore.h>
+#include <codec2/hidl/1.2/InputSurface.h>
+#include <codec2/hidl/1.2/types.h>
 
 #include <android-base/file.h>
 #include <media/stagefright/bqhelper/GraphicBufferSource.h>
@@ -47,7 +47,7 @@ namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_1 {
+namespace V1_2 {
 namespace utils {
 
 using namespace ::android;
@@ -389,6 +389,42 @@ Return<void> ComponentStore::createComponent_1_1(
     return Void();
 }
 
+// Methods from ::android::hardware::media::c2::V1_2::IComponentStore
+Return<void> ComponentStore::createComponent_1_2(
+        const hidl_string& name,
+        const sp<IComponentListener>& listener,
+        const sp<IClientManager>& pool,
+        createComponent_1_2_cb _hidl_cb) {
+
+    sp<Component> component;
+    std::shared_ptr<C2Component> c2component;
+    Status status = static_cast<Status>(
+            mStore->createComponent(name, &c2component));
+
+    if (status == Status::OK) {
+#ifndef __ANDROID_APEX__
+        c2component = GetFilterWrapper()->maybeWrapComponent(c2component);
+#endif
+        onInterfaceLoaded(c2component->intf());
+        component = new Component(c2component, listener, this, pool);
+        if (!component) {
+            status = Status::CORRUPTED;
+        } else {
+            reportComponentBirth(component.get());
+            if (component->status() != C2_OK) {
+                status = static_cast<Status>(component->status());
+            } else {
+                component->initListener(component);
+                if (component->status() != C2_OK) {
+                    status = static_cast<Status>(component->status());
+                }
+            }
+        }
+    }
+    _hidl_cb(status, component);
+    return Void();
+}
+
 // Called from createComponent() after a successful creation of `component`.
 void ComponentStore::reportComponentBirth(Component* component) {
     ComponentStatus componentStatus;
@@ -519,7 +555,7 @@ Return<void> ComponentStore::debug(
 }
 
 } // namespace utils
-} // namespace V1_1
+} // namespace V1_2
 } // namespace c2
 } // namespace media
 } // namespace hardware

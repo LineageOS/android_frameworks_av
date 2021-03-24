@@ -128,10 +128,9 @@ static const String16
 static const String16 sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 
-// Matches with PERCEPTIBLE_APP_ADJ in ProcessList.java
-static constexpr int32_t kVendorClientScore = 200;
-// Matches with PROCESS_STATE_PERSISTENT_UI in ActivityManager.java
-static constexpr int32_t kVendorClientState = 1;
+static constexpr int32_t kVendorClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
+static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PERSISTENT_UI;
+
 const String8 CameraService::kOfflineDevice("offline-");
 
 CameraService::CameraService() :

@@ -404,7 +404,7 @@ GLESRenderEngine::GLESRenderEngine(const RenderEngineCreationArgs& args, EGLDisp
     }
 
     mImageManager = std::make_unique<ImageManager>(this);
-    mImageManager->initThread();
+    mImageManager->initThread(args.realtime);
     mDrawingBuffer = createFramebuffer();
     sp<GraphicBuffer> buf =
             new GraphicBuffer(1, 1, PIXEL_FORMAT_RGBA_8888, 1,
