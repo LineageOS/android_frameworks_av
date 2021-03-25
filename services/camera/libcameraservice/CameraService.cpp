@@ -743,7 +743,7 @@ Status CameraService::getCameraVendorTagCache(
     return Status::ok();
 }
 
-int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
+int CameraService::getDeviceVersion(const String8& cameraId, int* facing, int* orientation) {
     ATRACE_CALL();
 
     int deviceVersion = 0;
@@ -760,6 +760,9 @@ int CameraService::getDeviceVersion(const String8& cameraId, int* facing) {
         res = mCameraProviderManager->getCameraInfo(cameraId.string(), &info);
         if (res != OK) return -1;
         *facing = info.facing;
+        if (orientation) {
+            *orientation = info.orientation;
+        }
     }
 
     return deviceVersion;
@@ -1555,6 +1558,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
     sp<CLIENT> client = nullptr;
     int facing = -1;
+    int orientation = 0;
     bool isNdk = (clientPackageName.size() == 0);
     {
         // Acquire mServiceLock and prevent other clients from connecting
@@ -1620,7 +1624,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // give flashlight a chance to close devices if necessary.
         mFlashlight->prepareDeviceOpen(cameraId);
 
-        int deviceVersion = getDeviceVersion(cameraId, /*out*/&facing);
+        int deviceVersion = getDeviceVersion(cameraId, /*out*/&facing, /*out*/&orientation);
         if (facing == -1) {
             ALOGE("%s: Unable to get camera device \"%s\"  facing", __FUNCTION__, cameraId.string());
             return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
@@ -1688,6 +1692,9 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         // Set rotate-and-crop override behavior
         if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) {
             client->setRotateAndCropOverride(mOverrideRotateAndCropMode);
+        } else if (CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(clientPackageName,
+                    orientation, facing)) {
+            client->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_90);
         }
 
         // Set camera muting behavior
