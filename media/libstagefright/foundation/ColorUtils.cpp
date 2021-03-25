@@ -613,6 +613,35 @@ android_dataspace ColorUtils::getDataSpaceForColorAspects(ColorAspects &aspects,
 }
 
 // static
+void ColorUtils::getColorConfigFromDataSpace(
+        const android_dataspace &dataspace, int32_t *range, int32_t *standard, int32_t *transfer) {
+    uint32_t gfxRange =
+        (dataspace & HAL_DATASPACE_RANGE_MASK) >> HAL_DATASPACE_RANGE_SHIFT;
+    uint32_t gfxStandard =
+        (dataspace & HAL_DATASPACE_STANDARD_MASK) >> HAL_DATASPACE_STANDARD_SHIFT;
+    uint32_t gfxTransfer =
+        (dataspace & HAL_DATASPACE_TRANSFER_MASK) >> HAL_DATASPACE_TRANSFER_SHIFT;
+
+    // assume 1-to-1 mapping to HAL values (to deal with potential vendor extensions)
+    CU::ColorRange    cuRange    = CU::kColorRangeUnspecified;
+    CU::ColorStandard cuStandard = CU::kColorStandardUnspecified;
+    CU::ColorTransfer cuTransfer = CU::kColorTransferUnspecified;
+    // TRICKY: use & to ensure all three mappings are completed
+    if (!(sGfxRanges.map(gfxRange, &cuRange) & sGfxStandards.map(gfxStandard, &cuStandard)
+            & sGfxTransfers.map(gfxTransfer, &cuTransfer))) {
+        ALOGW("could not safely map graphics dataspace (R:%u S:%u T:%u) to "
+              "platform color aspects (R:%u(%s) S:%u(%s) T:%u(%s)",
+              gfxRange, gfxStandard, gfxTransfer,
+              cuRange,    asString(cuRange),
+              cuStandard, asString(cuStandard),
+              cuTransfer, asString(cuTransfer));
+    }
+    *range    = cuRange;
+    *standard = cuStandard;
+    *transfer = cuTransfer;
+}
+
+// static
 void ColorUtils::getColorConfigFromFormat(
         const sp<AMessage> &format, int32_t *range, int32_t *standard, int32_t *transfer) {
     if (!format->findInt32("color-range", range)) {

@@ -156,6 +156,10 @@ struct ColorUtils {
     // suited to blending. This requires implicit color space conversion on part of the device.
     static android_dataspace getDataSpaceForColorAspects(ColorAspects &aspects, bool mayExpand);
 
+    // it returns the platform color configs from given |dataspace|.
+    static void getColorConfigFromDataSpace(
+            const android_dataspace &dataspace, int *range, int *standard, int *transfer);
+
     // converts |dataSpace| to a V0 enum, and returns true if dataSpace is an aspect-only value
     static bool convertDataSpaceToV0(android_dataspace &dataSpace);
 
