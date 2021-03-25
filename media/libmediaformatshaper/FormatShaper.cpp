@@ -93,19 +93,9 @@ int setFeature(shaperHandle_t shaper, const char *feature, int value) {
         return -1;
     }
 
-    if (!strcmp(feature, "vq-minimum-quality")) {
-        codec->setSupportedMinimumQuality(value);
-    } else if (!strcmp(feature, "vq-supports-qp")) {
-        codec->setSupportsQp(value != 0);
-    } else if (!strcmp(feature, "vq-target-qpmax")) {
-        codec->setTargetQpMax(value);
-    } else if (!strcmp(feature, "vq-target-bppx100")) {
-        double bpp = value / 100.0;
-        codec->setBpp(bpp);
-    } else {
-        // changed nothing, don't mark as configured
-        return 0;
-    }
+    // save a map of all features
+    codec->setFeatureValue(feature, value);
+
     return 0;
 }
 
@@ -120,6 +110,9 @@ shaperHandle_t findShaper(const char *codecName, const char *mediaType) {
 
 shaperHandle_t createShaper(const char *codecName, const char *mediaType) {
     CodecProperties *codec = new CodecProperties(codecName, mediaType);
+    if (codec != nullptr) {
+        codec->Seed();
+    }
     return (shaperHandle_t) codec;
 }
 
@@ -134,6 +127,12 @@ shaperHandle_t registerShaper(shaperHandle_t shaper, const char *codecName, cons
         return nullptr;
     }
 
+    // any final cleanup for the parameters. This allows us to override
+    // bad parameters from a devices XML file.
+    codec->Finish();
+
+    // may return a different codec, if we lost a race.
+    // if so, registerCodec() reclaims the one we tried to register for us.
     codec = registerCodec(codec, codecName, mediaType);
     return (shaperHandle_t) codec;
 }

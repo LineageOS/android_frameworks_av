@@ -26,6 +26,7 @@ namespace android {
 namespace mediaformatshaper {
 
 CodecProperties::CodecProperties(std::string name, std::string mediaType) {
+    ALOGV("CodecProperties(%s, %s)", name.c_str(), mediaType.c_str());
     mName = name;
     mMediaType = mediaType;
 }
@@ -57,6 +58,38 @@ void CodecProperties::setTargetQpMax(int qpMax) {
 int CodecProperties::supportedApi() {
     return mApi;
 }
+
+void CodecProperties::setFeatureValue(std::string key, int32_t value) {
+    ALOGD("setFeatureValue(%s,%d)", key.c_str(), value);
+    mFeatures.insert({key, value});
+
+    if (!strcmp(key.c_str(), "vq-minimum-quality")) {
+        setSupportedMinimumQuality(value);
+    } else if (!strcmp(key.c_str(), "vq-supports-qp")) {      // key from prototyping
+        setSupportsQp(1);
+    } else if (!strcmp(key.c_str(), "qp-bounds")) {           // official key
+        setSupportsQp(1);
+    } else if (!strcmp(key.c_str(), "vq-target-qpmax")) {
+        setTargetQpMax(value);
+    } else if (!strcmp(key.c_str(), "vq-target-bppx100")) {
+        double bpp = value / 100.0;
+        setBpp(bpp);
+    }
+}
+
+bool CodecProperties::getFeatureValue(std::string key, int32_t *valuep) {
+    ALOGV("getFeatureValue(%s)", key.c_str());
+    if (valuep == nullptr) {
+        return false;
+    }
+    auto mapped = mFeatures.find(key);
+    if (mapped != mFeatures.end()) {
+        *valuep = mapped->second;
+        return true;
+    }
+    return false;
+}
+
 
 std::string CodecProperties::getMapping(std::string key, std::string kind) {
     ALOGV("getMapping(key %s, kind %s )", key.c_str(), kind.c_str());

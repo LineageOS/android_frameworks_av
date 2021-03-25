@@ -44,42 +44,60 @@ namespace mediaformatshaper {
 #define	AMEDIAFORMAT_VIDEO_QP_P_MAX	"video-qp-p-max"
 #define	AMEDIAFORMAT_VIDEO_QP_P_MIN	"video-qp-p-min"
 
+// defined in the SDK, but not in the NDK
+//
+static const int BITRATE_MODE_VBR = 1;
+
 //
 // Caller retains ownership of and responsibility for inFormat
 //
 int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int flags) {
     ALOGV("codecName %s inFormat %p flags x%x", codec->getName().c_str(), inFormat, flags);
 
-    if (codec->supportedMinimumQuality() > 0) {
-        // allow the codec provided minimum quality behavior to work at it
-        ALOGD("minquality(codec): codec says %d", codec->supportedMinimumQuality());
+    int32_t bitRateMode = -1;
+    if (AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_BITRATE_MODE, &bitRateMode)
+        && bitRateMode != BITRATE_MODE_VBR) {
+        ALOGD("minquality: applies only to VBR encoding");
         return 0;
     }
 
-    ALOGD("considering other ways to improve quality...");
+    if (codec->supportedMinimumQuality() > 0) {
+        // allow the codec provided minimum quality behavior to work at it
+        ALOGD("minquality: codec claims to implement minquality=%d",
+              codec->supportedMinimumQuality());
+        return 0;
+    }
 
     //
     // apply any and all tools that we have.
     // -- qp
     // -- minimum bits-per-pixel
     //
-    if (codec->supportsQp()) {
+    if (!codec->supportsQp()) {
+        ALOGD("minquality: no qp bounding in codec %s", codec->getName().c_str());
+    } else {
         // use a (configurable) QP value to force better quality
         //
-        // XXX: augment this so that we don't lower an existing QP setting
-        // (e.g. if user set it to 40, we don't want to set it back to 45)
-        int qpmax = codec->targetQpMax();
-        if (qpmax <= 0) {
-                qpmax = 45;
-                ALOGD("use default substitute QpMax == %d", qpmax);
+        int32_t qpmax = codec->targetQpMax();
+        int32_t qpmaxUser = INT32_MAX;
+        if (hasQp(inFormat)) {
+            (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, &qpmaxUser);
+            ALOGD("minquality by QP: format already sets QP");
         }
-        ALOGD("minquality by QP: inject %s=%d", AMEDIAFORMAT_VIDEO_QP_MAX, qpmax);
-        AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, qpmax);
 
-        // force spreading the QP across frame types, since we imposing a value
-        qpSpreadMaxPerFrameType(inFormat, info->qpDelta, info->qpMax, /* override */ true);
-    } else {
-        ALOGD("codec %s: no qp bounding", codec->getName().c_str());
+        // if the system didn't do one, use what the user provided
+        if (qpmax == 0 && qpmaxUser != INT32_MAX) {
+                qpmax = qpmaxUser;
+        }
+        // XXX: if both said something, how do we want to reconcile that
+
+        if (qpmax > 0) {
+            ALOGD("minquality by QP: inject %s=%d", AMEDIAFORMAT_VIDEO_QP_MAX, qpmax);
+            AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, qpmax);
+
+            // force spreading the QP across frame types, since we imposing a value
+            qpSpreadMaxPerFrameType(inFormat, info->qpDelta, info->qpMax, /* override */ true);
+        }
     }
 
     double bpp = codec->getBpp();
@@ -108,7 +126,7 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
               bitrateConfigured, bitrateFloor, codec->getBpp(), height, width);
 
         if (bitrateConfigured < bitrateFloor) {
-            ALOGD("minquality/target bitrate raised from %d to %" PRId64 " to maintain quality",
+            ALOGD("minquality/target bitrate raised from %d to %" PRId64 " bps",
                   bitrateConfigured, bitrateFloor);
             AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_KEY_BIT_RATE, (int32_t)bitrateFloor);
         }
@@ -121,16 +139,16 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
 bool hasQpPerFrameType(AMediaFormat *format) {
     int32_t value;
 
-    if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, &value)
-        || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, &value)) {
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, &value)
+        || AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, &value)) {
         return true;
     }
-    if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MAX, &value)
-        || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, &value)) {
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MAX, &value)
+        || AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, &value)) {
         return true;
     }
-    if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MAX, &value)
-        || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, &value)) {
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MAX, &value)
+        || AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, &value)) {
         return true;
     }
     return false;
@@ -138,8 +156,8 @@ bool hasQpPerFrameType(AMediaFormat *format) {
 
 bool hasQp(AMediaFormat *format) {
     int32_t value;
-    if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MAX, &value)
-        || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MIN, &value)) {
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MAX, &value)
+        || AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MIN, &value)) {
         return true;
     }
     return hasQpPerFrameType(format);
