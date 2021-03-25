@@ -147,7 +147,6 @@ private:
 
             // used to enforce OP_RECORD_AUDIO
             uid_t                              mUid;
-            media::permission::Identity        mIdentity;
             sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
 };
 
