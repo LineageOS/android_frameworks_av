@@ -777,6 +777,7 @@ int C2BufferQueueBlockPoolData::migrate(
     }
     if (oldGeneration != mGeneration) {
         ALOGV("cannot migrate stale buffer");
+        return -1;
     }
     if (mTransfer) {
         // either transferred or detached.
