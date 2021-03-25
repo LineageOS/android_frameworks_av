@@ -61,6 +61,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
         const String8& cameraId,
         int api1CameraId,
         int cameraFacing,
+        int sensorOrientation,
         int clientPid,
         uid_t clientUid,
         int servicePid) :
@@ -70,6 +71,7 @@ CameraDeviceClientBase::CameraDeviceClientBase(
             clientFeatureId,
             cameraId,
             cameraFacing,
+            sensorOrientation,
             clientPid,
             clientUid,
             servicePid),
@@ -86,12 +88,13 @@ CameraDeviceClient::CameraDeviceClient(const sp<CameraService>& cameraService,
         const std::optional<String16>& clientFeatureId,
         const String8& cameraId,
         int cameraFacing,
+        int sensorOrientation,
         int clientPid,
         uid_t clientUid,
         int servicePid) :
     Camera2ClientBase(cameraService, remoteCallback, clientPackageName, clientFeatureId,
                 cameraId, /*API1 camera ID*/ -1,
-                cameraFacing, clientPid, clientUid, servicePid),
+                cameraFacing, sensorOrientation, clientPid, clientUid, servicePid),
     mInputStream(),
     mStreamingRequestId(REQUEST_ID_NONE),
     mRequestIdCounter(0) {
@@ -1711,7 +1714,8 @@ binder::Status CameraDeviceClient::switchToOffline(
     if (offlineSession.get() != nullptr) {
         offlineClient = new CameraOfflineSessionClient(sCameraService,
                 offlineSession, offlineCompositeStreamMap, cameraCb, mClientPackageName,
-                mClientFeatureId, mCameraIdStr, mCameraFacing, mClientPid, mClientUid, mServicePid);
+                mClientFeatureId, mCameraIdStr, mCameraFacing, mOrientation, mClientPid, mClientUid,
+                mServicePid);
         ret = sCameraService->addOfflineClient(mCameraIdStr, offlineClient);
     }
 

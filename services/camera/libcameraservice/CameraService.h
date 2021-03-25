@@ -167,6 +167,8 @@ public:
 
     virtual binder::Status    notifyDeviceStateChange(int64_t newState);
 
+    virtual binder::Status    notifyDisplayConfigurationChange();
+
     // OK = supports api of that version, -EOPNOTSUPP = does not support
     virtual binder::Status    supportsCameraApi(
             const String16& cameraId, int32_t apiVersion,
@@ -246,6 +248,12 @@ public:
         // Return the package name for this client
         virtual String16 getPackageName() const;
 
+        // Return the camera facing for this client
+        virtual int getCameraFacing() const;
+
+        // Return the camera orientation for this client
+        virtual int getCameraOrientation() const;
+
         // Notify client about a fatal error
         virtual void notifyError(int32_t errorCode,
                 const CaptureResultExtras& resultExtras) = 0;
@@ -292,6 +300,7 @@ public:
                 const std::optional<String16>& clientFeatureId,
                 const String8& cameraIdStr,
                 int cameraFacing,
+                int sensorOrientation,
                 int clientPid,
                 uid_t clientUid,
                 int servicePid);
@@ -308,6 +317,7 @@ public:
         static sp<CameraService>        sCameraService;
         const String8                   mCameraIdStr;
         const int                       mCameraFacing;
+        const int                       mOrientation;
         String16                        mClientPackageName;
         std::optional<String16>         mClientFeatureId;
         pid_t                           mClientPid;
@@ -385,6 +395,7 @@ public:
                 const String8& cameraIdStr,
                 int api1CameraId,
                 int cameraFacing,
+                int sensorOrientation,
                 int clientPid,
                 uid_t clientUid,
                 int servicePid);
@@ -1073,7 +1084,7 @@ private:
     static binder::Status makeClient(const sp<CameraService>& cameraService,
             const sp<IInterface>& cameraCb, const String16& packageName,
             const std::optional<String16>& featureId, const String8& cameraId, int api1CameraId,
-            int facing, int clientPid, uid_t clientUid, int servicePid,
+            int facing, int sensorOrientation, int clientPid, uid_t clientUid, int servicePid,
             int deviceVersion, apiLevel effectiveApiLevel,
             /*out*/sp<BasicClient>* client);
 
@@ -1102,7 +1113,7 @@ private:
     // Aggreated audio restriction mode for all camera clients
     int32_t mAudioRestriction;
 
-    // Current override rotate-and-crop mode
+    // Current override cmd rotate-and-crop mode; AUTO means no override
     uint8_t mOverrideRotateAndCropMode = ANDROID_SCALER_ROTATE_AND_CROP_AUTO;
 
     // Current image dump mask
