@@ -328,8 +328,8 @@ media_status_t MediaSampleWriter::runWriterLoop(bool* wasStopped) NO_THREAD_SAFE
                 }
                 lastProgressUpdate = progress;
             }
-            progressSinceLastReport = true;
         }
+        progressSinceLastReport = true;
     }
 
     return AMEDIA_OK;

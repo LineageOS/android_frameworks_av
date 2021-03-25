@@ -366,6 +366,12 @@ media_status_t TranscoderWrapper::setupTranscoder(
         return AMEDIA_ERROR_INVALID_OPERATION;
     }
 
+    // Unwrap the callback and send heartbeats to the client after each operation during setup.
+    auto callback = mCallback.lock();
+    if (callback == nullptr) {
+        return AMEDIA_ERROR_INVALID_OPERATION;
+    }
+
     Status status;
     ::ndk::ScopedFileDescriptor srcFd, dstFd;
     int srcFdInt = request.sourceFd.get();
@@ -378,6 +384,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
         }
         srcFdInt = srcFd.get();
     }
+
+    callback->onHeartBeat(clientId, sessionId);
 
     int dstFdInt = request.destinationFd.get();
     if (dstFdInt < 0) {
@@ -393,6 +401,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
         dstFdInt = dstFd.get();
     }
 
+    callback->onHeartBeat(clientId, sessionId);
+
     mCurrentClientId = clientId;
     mCurrentSessionId = sessionId;
     mCurrentCallingUid = callingUid;
@@ -405,6 +415,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
         return AMEDIA_ERROR_UNKNOWN;
     }
 
+    callback->onHeartBeat(clientId, sessionId);
+
     media_status_t err = mTranscoder->configureSource(srcFdInt);
     if (err != AMEDIA_OK) {
         ALOGE("failed to configure source: %d", err);
@@ -412,12 +424,16 @@ media_status_t TranscoderWrapper::setupTranscoder(
         return err;
     }
 
+    callback->onHeartBeat(clientId, sessionId);
+
     std::vector<std::shared_ptr<AMediaFormat>> trackFormats = mTranscoder->getTrackFormats();
     if (trackFormats.size() == 0) {
         ALOGE("failed to get track formats!");
         *failureReason = TranscodingLogger::SessionEndedReason::NO_TRACKS;
         return AMEDIA_ERROR_MALFORMED;
     }
+
+    callback->onHeartBeat(clientId, sessionId);
 
     for (int i = 0; i < trackFormats.size(); ++i) {
         std::shared_ptr<AMediaFormat> format;
@@ -437,6 +453,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
             *failureReason = TranscodingLogger::SessionEndedReason::CONFIG_TRACK_FAILED;
             return err;
         }
+
+        callback->onHeartBeat(clientId, sessionId);
     }
 
     err = mTranscoder->configureDestination(dstFdInt);
@@ -445,6 +463,8 @@ media_status_t TranscoderWrapper::setupTranscoder(
         *failureReason = TranscodingLogger::SessionEndedReason::CONFIG_DST_FAILED;
         return err;
     }
+
+    callback->onHeartBeat(clientId, sessionId);
 
     return AMEDIA_OK;
 }
