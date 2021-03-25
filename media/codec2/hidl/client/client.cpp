@@ -33,16 +33,16 @@
 
 #include <android-base/properties.h>
 #include <bufferpool/ClientManager.h>
-#include <codec2/hidl/1.0/OutputBufferQueue.h>
 #include <codec2/hidl/1.0/types.h>
-#include <codec2/hidl/1.1/OutputBufferQueue.h>
 #include <codec2/hidl/1.1/types.h>
 #include <codec2/hidl/1.2/types.h>
+#include <codec2/hidl/output.h>
 
 #include <cutils/native_handle.h>
 #include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
 #include <gui/bufferqueue/2.0/H2BGraphicBufferProducer.h>
 #include <hidl/HidlSupport.h>
+
 
 #include <deque>
 #include <iterator>
@@ -74,6 +74,7 @@ using B2HGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
         V2_0::utils::B2HGraphicBufferProducer;
 using H2BGraphicBufferProducer2 = ::android::hardware::graphics::bufferqueue::
         V2_0::utils::H2BGraphicBufferProducer;
+using ::android::hardware::media::c2::V1_2::SurfaceSyncObj;
 
 namespace /* unnamed */ {
 
@@ -593,9 +594,9 @@ struct Codec2Client::Component::BufferPoolSender :
 
 // Codec2Client::Component::OutputBufferQueue
 struct Codec2Client::Component::OutputBufferQueue :
-        hardware::media::c2::V1_1::utils::OutputBufferQueue {
+        hardware::media::c2::OutputBufferQueue {
     OutputBufferQueue()
-          : hardware::media::c2::V1_1::utils::OutputBufferQueue() {
+          : hardware::media::c2::OutputBufferQueue() {
     }
 };
 
@@ -1492,22 +1493,29 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         igbp = new B2HGraphicBufferProducer2(surface);
     }
 
+    std::shared_ptr<SurfaceSyncObj> syncObj;
+
     if (!surface) {
-        mOutputBufferQueue->configure(nullIgbp, generation, 0);
+        mOutputBufferQueue->configure(nullIgbp, generation, 0, nullptr);
     } else if (surface->getUniqueId(&bqId) != OK) {
         LOG(ERROR) << "setOutputSurface -- "
                    "cannot obtain bufferqueue id.";
         bqId = 0;
-        mOutputBufferQueue->configure(nullIgbp, generation, 0);
+        mOutputBufferQueue->configure(nullIgbp, generation, 0, nullptr);
     } else {
-        mOutputBufferQueue->configure(surface, generation, bqId);
+        mOutputBufferQueue->configure(surface, generation, bqId,
+                                      mBase1_2 ? &syncObj : nullptr);
     }
-    ALOGD("generation remote change %u", generation);
+    ALOGD("surface generation remote change %u HAL ver: %s",
+          generation, syncObj ? "1.2" : "1.0");
 
-    (void)mBase1_2;
-    Return<Status> transStatus = mBase1_0->setOutputSurface(
-            static_cast<uint64_t>(blockPoolId),
-            bqId == 0 ? nullHgbp : igbp);
+    Return<Status> transStatus = syncObj ?
+            mBase1_2->setOutputSurfaceWithSyncObj(
+                    static_cast<uint64_t>(blockPoolId),
+                    bqId == 0 ? nullHgbp : igbp, *syncObj) :
+            mBase1_0->setOutputSurface(
+                    static_cast<uint64_t>(blockPoolId),
+                    bqId == 0 ? nullHgbp : igbp);
     if (!transStatus.isOk()) {
         LOG(ERROR) << "setOutputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1517,6 +1525,7 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     if (status != C2_OK) {
         LOG(DEBUG) << "setOutputSurface -- call failed: " << status << ".";
     }
+    ALOGD("Surface configure completed");
     return status;
 }
 
@@ -1525,6 +1534,11 @@ status_t Codec2Client::Component::queueToOutputSurface(
         const QueueBufferInput& input,
         QueueBufferOutput* output) {
     return mOutputBufferQueue->outputBuffer(block, input, output);
+}
+
+void Codec2Client::Component::setOutputSurfaceMaxDequeueCount(
+        int maxDequeueCount) {
+    mOutputBufferQueue->updateMaxDequeueBufferCount(maxDequeueCount);
 }
 
 c2_status_t Codec2Client::Component::connectToInputSurface(

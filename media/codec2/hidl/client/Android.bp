@@ -12,6 +12,11 @@ cc_library {
 
     srcs: [
         "client.cpp",
+        "output.cpp",
+    ],
+
+    header_libs: [
+        "libcodec2_internal", // private
     ],
 
     shared_libs: [

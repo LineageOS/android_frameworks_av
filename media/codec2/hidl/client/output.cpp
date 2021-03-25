@@ -19,13 +19,16 @@
 #include <android-base/logging.h>
 
 #include <android/hardware/graphics/bufferqueue/2.0/IGraphicBufferProducer.h>
-#include <codec2/hidl/1.0/OutputBufferQueue.h>
+#include <codec2/hidl/output.h>
+#include <cutils/ashmem.h>
 #include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
+#include <sys/mman.h>
 
 #include <C2AllocatorGralloc.h>
 #include <C2BlockInternal.h>
 #include <C2Buffer.h>
 #include <C2PlatformSupport.h>
+#include <C2SurfaceSyncObj.h>
 
 #include <iomanip>
 
@@ -33,8 +36,6 @@ namespace android {
 namespace hardware {
 namespace media {
 namespace c2 {
-namespace V1_0 {
-namespace utils {
 
 using HGraphicBufferProducer = ::android::hardware::graphics::bufferqueue::
         V2_0::IGraphicBufferProducer;
@@ -105,7 +106,8 @@ sp<HGraphicBufferProducer> getHgbp(const sp<IGraphicBufferProducer>& igbp) {
 status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
                              const sp<IGraphicBufferProducer>& igbp,
                              uint32_t generation,
-                             int32_t* bqSlot) {
+                             int32_t* bqSlot,
+                             std::shared_ptr<C2SurfaceSyncMemory> syncMem) {
     if (!igbp) {
         LOG(WARNING) << "attachToBufferQueue -- null producer.";
         return NO_INIT;
@@ -126,7 +128,25 @@ status_t attachToBufferQueue(const C2ConstGraphicBlock& block,
             << ", stride " << graphicBuffer->getStride()
             << ", generation " << graphicBuffer->getGenerationNumber();
 
-    status_t result = igbp->attachBuffer(bqSlot, graphicBuffer);
+    C2SyncVariables *syncVar = syncMem ? syncMem->mem() : nullptr;
+    status_t result = OK;
+    if (syncVar) {
+        syncVar->lock();
+        if (!syncVar->isDequeueableLocked() ||
+            syncVar->getSyncStatusLocked() == C2SyncVariables::STATUS_SWITCHING) {
+            syncVar->unlock();
+            LOG(WARNING) << "attachToBufferQueue -- attachBuffer failed: "
+                            "status = " << INVALID_OPERATION << ".";
+            return INVALID_OPERATION;
+        }
+        result = igbp->attachBuffer(bqSlot, graphicBuffer);
+        if (result == OK) {
+            syncVar->notifyDequeuedLocked();
+        }
+        syncVar->unlock();
+    } else {
+        result = igbp->attachBuffer(bqSlot, graphicBuffer);
+    }
     if (result != OK) {
         LOG(WARNING) << "attachToBufferQueue -- attachBuffer failed: "
                         "status = " << result << ".";
@@ -157,10 +177,38 @@ OutputBufferQueue::~OutputBufferQueue() {
 
 bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
                                   uint32_t generation,
-                                  uint64_t bqId) {
+                                  uint64_t bqId,
+                                  std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj) {
     uint64_t consumerUsage = 0;
     if (igbp->getConsumerUsage(&consumerUsage) != OK) {
         ALOGW("failed to get consumer usage");
+    }
+
+    // TODO : Abstract creation process into C2SurfaceSyncMemory class.
+    // use C2LinearBlock instead ashmem.
+    std::shared_ptr<C2SurfaceSyncMemory> syncMem;
+    if (syncObj && igbp) {
+        bool mapped = false;
+        int memFd = ashmem_create_region("C2SurfaceMem", sizeof(C2SyncVariables));
+        size_t memSize = memFd < 0 ? 0 : ashmem_get_size_region(memFd);
+        if (memSize > 0) {
+            syncMem = C2SurfaceSyncMemory::Create(memFd, memSize);
+            if (syncMem) {
+                mapped = true;
+                *syncObj = std::make_shared<V1_2::SurfaceSyncObj>();
+                (*syncObj)->syncMemory = syncMem->handle();
+                (*syncObj)->bqId = bqId;
+                (*syncObj)->generationId = generation;
+                (*syncObj)->consumerUsage = consumerUsage;
+                ALOGD("C2SurfaceSyncMemory created %zu(%zu)", sizeof(C2SyncVariables), memSize);
+            }
+        }
+        if (!mapped) {
+            if (memFd >= 0) {
+                ::close(memFd);
+            }
+            ALOGW("SurfaceSyncObj creation failure");
+        }
     }
 
     size_t tryNum = 0;
@@ -173,6 +221,19 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
         if (generation == mGeneration) {
             return false;
         }
+        std::shared_ptr<C2SurfaceSyncMemory> oldMem = mSyncMem;
+        C2SyncVariables *oldSync = mSyncMem ? mSyncMem->mem() : nullptr;
+        if (oldSync) {
+            oldSync->lock();
+            oldSync->setSyncStatusLocked(C2SyncVariables::STATUS_SWITCHING);
+            oldSync->unlock();
+        }
+        mSyncMem.reset();
+        if (syncMem) {
+            mSyncMem = syncMem;
+        }
+        C2SyncVariables *newSync = mSyncMem ? mSyncMem->mem() : nullptr;
+
         mIgbp = igbp;
         mGeneration = generation;
         mBqId = bqId;
@@ -212,7 +273,7 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             }
             bool attach =
                     _C2BlockFactory::EndAttachBlockToBufferQueue(
-                            data, mOwner, getHgbp(mIgbp),
+                            data, mOwner, getHgbp(mIgbp), mSyncMem,
                             generation, bqId, bqSlot);
             if (!attach) {
                 igbp->cancelBuffer(bqSlot, Fence::NO_FENCE);
@@ -226,8 +287,12 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             mBuffers[i] = buffers[i];
             mPoolDatas[i] = poolDatas[i];
         }
+        if (newSync) {
+            newSync->setInitialDequeueCount(mMaxDequeueBufferCount, success);
+        }
     }
-    ALOGD("remote graphic buffer migration %zu/%zu", success, tryNum);
+    ALOGD("remote graphic buffer migration %zu/%zu",
+          success, tryNum);
     return true;
 }
 
@@ -258,7 +323,7 @@ bool OutputBufferQueue::registerBuffer(const C2ConstGraphicBlock& block) {
                      << ", bqSlot " << oldSlot
                      << ", generation " << mGeneration
                      << ".";
-        _C2BlockFactory::HoldBlockFromBufferQueue(data, mOwner, getHgbp(mIgbp));
+        _C2BlockFactory::HoldBlockFromBufferQueue(data, mOwner, getHgbp(mIgbp), mSyncMem);
         mPoolDatas[oldSlot] = data;
         mBuffers[oldSlot] = createGraphicBuffer(block);
         mBuffers[oldSlot]->setGenerationNumber(mGeneration);
@@ -278,25 +343,39 @@ status_t OutputBufferQueue::outputBuffer(
     uint32_t generation;
     uint64_t bqId;
     int32_t bqSlot;
-    bool display = displayBufferQueueBlock(block);
+    bool display = V1_0::utils::displayBufferQueueBlock(block);
     if (!getBufferQueueAssignment(block, &generation, &bqId, &bqSlot) ||
         bqId == 0) {
         // Block not from bufferqueue -- it must be attached before queuing.
 
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem;
         mMutex.lock();
         sp<IGraphicBufferProducer> outputIgbp = mIgbp;
         uint32_t outputGeneration = mGeneration;
+        syncMem = mSyncMem;
         mMutex.unlock();
 
         status_t status = attachToBufferQueue(
-                block, outputIgbp, outputGeneration, &bqSlot);
+                block, outputIgbp, outputGeneration, &bqSlot, syncMem);
+
         if (status != OK) {
             LOG(WARNING) << "outputBuffer -- attaching failed.";
             return INVALID_OPERATION;
         }
 
-        status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
-                                     input, output);
+        auto syncVar = syncMem ? syncMem->mem() : nullptr;
+        if(syncVar) {
+            syncVar->lock();
+            status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+                                         input, output);
+            if (status == OK) {
+                syncVar->notifyQueuedLocked();
+            }
+            syncVar->unlock();
+        } else {
+            status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+                                         input, output);
+        }
         if (status != OK) {
             LOG(ERROR) << "outputBuffer -- queueBuffer() failed "
                        "on non-bufferqueue-based block. "
@@ -306,10 +385,12 @@ status_t OutputBufferQueue::outputBuffer(
         return OK;
     }
 
+    std::shared_ptr<C2SurfaceSyncMemory> syncMem;
     mMutex.lock();
     sp<IGraphicBufferProducer> outputIgbp = mIgbp;
     uint32_t outputGeneration = mGeneration;
     uint64_t outputBqId = mBqId;
+    syncMem = mSyncMem;
     mMutex.unlock();
 
     if (!outputIgbp) {
@@ -330,8 +411,21 @@ status_t OutputBufferQueue::outputBuffer(
         return DEAD_OBJECT;
     }
 
-    status_t status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
-                                          input, output);
+    auto syncVar = syncMem ? syncMem->mem() : nullptr;
+    status_t status = OK;
+    if (syncVar) {
+        syncVar->lock();
+        status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+                                                  input, output);
+        if (status == OK) {
+            syncVar->notifyQueuedLocked();
+        }
+        syncVar->unlock();
+    } else {
+        status = outputIgbp->queueBuffer(static_cast<int>(bqSlot),
+                                                  input, output);
+    }
+
     if (status != OK) {
         LOG(ERROR) << "outputBuffer -- queueBuffer() failed "
                    "on bufferqueue-based block. "
@@ -348,8 +442,18 @@ void OutputBufferQueue::holdBufferQueueBlocks(
                            this, std::placeholders::_1));
 }
 
-}  // namespace utils
-}  // namespace V1_0
+void OutputBufferQueue::updateMaxDequeueBufferCount(int maxDequeueBufferCount) {
+    mMutex.lock();
+    mMaxDequeueBufferCount = maxDequeueBufferCount;
+    auto syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
+    if (syncVar) {
+        syncVar->lock();
+        syncVar->updateMaxDequeueCountLocked(maxDequeueBufferCount);
+        syncVar->unlock();
+    }
+    mMutex.unlock();
+}
+
 }  // namespace c2
 }  // namespace media
 }  // namespace hardware

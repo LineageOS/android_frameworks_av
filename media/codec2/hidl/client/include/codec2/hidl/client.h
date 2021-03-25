@@ -407,6 +407,9 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
             const QueueBufferInput& input,
             QueueBufferOutput* output);
 
+    // Set max dequeue count for output surface.
+    void setOutputSurfaceMaxDequeueCount(int maxDequeueCount);
+
     // Connect to a given InputSurface.
     c2_status_t connectToInputSurface(
             const std::shared_ptr<InputSurface>& inputSurface,
