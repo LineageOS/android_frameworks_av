@@ -24,6 +24,7 @@
 #include <C2Param.h>
 #include <util/C2InterfaceHelper.h>
 
+#include <media/stagefright/CodecBase.h>
 #include <media/stagefright/MediaCodecConstants.h>
 
 #include "CCodecConfig.h"
@@ -290,8 +291,8 @@ struct StandardParams {
     std::vector<std::string> getPathsForDomain(
             Domain any, Domain all = Domain::ALL) const {
         std::vector<std::string> res;
-        for (const std::pair<std::string, std::vector<ConfigMapper>> &el : mConfigMappers) {
-            for (const ConfigMapper &cm : el.second) {
+        for (const auto &[key, mappers] : mConfigMappers) {
+            for (const ConfigMapper &cm : mappers) {
                 ALOGV("filtering %s %x %x %x %x", cm.path().c_str(), cm.domain(), any,
                         (cm.domain() & any), (cm.domain() & any & all));
                 if ((cm.domain() & any) && ((cm.domain() & any & all) == (any & all))) {
@@ -1061,7 +1062,7 @@ status_t CCodecConfig::initialize(
             std::vector<std::string> keys;
             mParamUpdater->getKeysForParamIndex(desc->index(), &keys);
             for (const std::string &key : keys) {
-                mVendorParamIndices.insert_or_assign(key, desc->index());
+                mVendorParams.insert_or_assign(key, desc);
             }
         }
     }
@@ -1128,6 +1129,12 @@ bool CCodecConfig::updateConfiguration(
             insertion.first->second = std::move(p);
         }
     }
+    if (mInputSurface
+            && (domain & mOutputDomain)
+            && mInputSurfaceDataspace != mInputSurface->getDataspace()) {
+        changed = true;
+        mInputSurfaceDataspace = mInputSurface->getDataspace();
+    }
 
     ALOGV("updated configuration has %zu params (%s)", mCurrentConfig.size(),
             changed ? "CHANGED" : "no change");
@@ -1193,8 +1200,8 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
         const ReflectedParamUpdater::Dict &reflected,
         Domain portDomain) const {
     sp<AMessage> msg = new AMessage;
-    for (const std::pair<std::string, std::vector<ConfigMapper>> &el : mStandardParams->getKeys()) {
-        for (const ConfigMapper &cm : el.second) {
+    for (const auto &[key, mappers] : mStandardParams->getKeys()) {
+        for (const ConfigMapper &cm : mappers) {
             if ((cm.domain() & portDomain) == 0 // input-output-coded-raw
                 || (cm.domain() & mDomain) != mDomain // component domain + kind (these must match)
                 || (cm.domain() & IS_READ) == 0) {
@@ -1218,26 +1225,26 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
                 ALOGD("unexpected untyped query value for key: %s", cm.path().c_str());
                 continue;
             }
-            msg->setItem(el.first.c_str(), item);
+            msg->setItem(key.c_str(), item);
         }
     }
 
     bool input = (portDomain & Domain::IS_INPUT);
     std::vector<std::string> vendorKeys;
-    for (const std::pair<std::string, ReflectedParamUpdater::Value> &entry : reflected) {
-        auto it = mVendorParamIndices.find(entry.first);
-        if (it == mVendorParamIndices.end()) {
+    for (const auto &[key, value] : reflected) {
+        auto it = mVendorParams.find(key);
+        if (it == mVendorParams.end()) {
             continue;
         }
-        if (mSubscribedIndices.count(it->second) == 0) {
+        C2Param::Index index = it->second->index();
+        if (mSubscribedIndices.count(index) == 0) {
             continue;
         }
         // For vendor parameters, we only care about direction
-        if ((input && !it->second.forInput())
-                || (!input && !it->second.forOutput())) {
+        if ((input && !index.forInput())
+                || (!input && !index.forOutput())) {
             continue;
         }
-        const ReflectedParamUpdater::Value &value = entry.second;
         C2Value c2Value;
         sp<ABuffer> bufValue;
         AString strValue;
@@ -1249,10 +1256,10 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
         } else if (value.find(&strValue)) {
             item.set(strValue);
         } else {
-            ALOGD("unexpected untyped query value for key: %s", entry.first.c_str());
+            ALOGD("unexpected untyped query value for key: %s", key.c_str());
             continue;
         }
-        msg->setItem(entry.first.c_str(), item);
+        msg->setItem(key.c_str(), item);
     }
 
     { // convert from Codec 2.0 rect to MediaFormat rect and add crop rect if not present
@@ -1356,7 +1363,6 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
             msg->removeEntryAt(msg->findEntryByName("color-matrix"));
         }
 
-
         // calculate dataspace for raw graphic buffers if not specified by component, or if
         // using surface with unspecified aspects (as those must be defaulted which may change
         // the dataspace)
@@ -1392,6 +1398,23 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
                 dataspace = ColorUtils::getDataSpaceForColorAspects(aspects, true /* mayExpand */);
                 msg->setInt32("android._dataspace", dataspace);
             }
+        }
+
+        if (mInputSurface) {
+            android_dataspace dataspace = mInputSurface->getDataspace();
+            ColorUtils::convertDataSpaceToV0(dataspace);
+            int32_t standard;
+            ColorUtils::getColorConfigFromDataSpace(dataspace, &range, &standard, &transfer);
+            if (range != 0) {
+                msg->setInt32(KEY_COLOR_RANGE, range);
+            }
+            if (standard != 0) {
+                msg->setInt32(KEY_COLOR_STANDARD, standard);
+            }
+            if (transfer != 0) {
+                msg->setInt32(KEY_COLOR_TRANSFER, transfer);
+            }
+            msg->setInt32("android._dataspace", dataspace);
         }
 
         // HDR static info
@@ -1811,8 +1834,81 @@ const C2Param *CCodecConfig::getConfigParameterValue(C2Param::Index index) const
 status_t CCodecConfig::subscribeToAllVendorParams(
         const std::shared_ptr<Codec2Client::Configurable> &configurable,
         c2_blocking_t blocking) {
-    for (const std::pair<std::string, C2Param::Index> &entry : mVendorParamIndices) {
-        mSubscribedIndices.insert(entry.second);
+    for (const auto &[path, desc] : mVendorParams) {
+        mSubscribedIndices.insert(desc->index());
+    }
+    return subscribeToConfigUpdate(configurable, {}, blocking);
+}
+
+status_t CCodecConfig::querySupportedParameters(std::vector<std::string> *names) {
+    if (!names) {
+        return BAD_VALUE;
+    }
+    names->clear();
+    // TODO: expand to standard params
+    for (const auto &[key, desc] : mVendorParams) {
+        names->push_back(key);
+    }
+    return OK;
+}
+
+status_t CCodecConfig::describe(const std::string &name, CodecParameterDescriptor *desc) {
+    if (!desc) {
+        return BAD_VALUE;
+    }
+    // TODO: expand to standard params
+    desc->name = name;
+    switch (mParamUpdater->getTypeForKey(name)) {
+        case C2FieldDescriptor::INT32:
+        case C2FieldDescriptor::UINT32:
+        case C2FieldDescriptor::CNTR32:
+            desc->type = AMessage::kTypeInt32;
+            return OK;
+        case C2FieldDescriptor::INT64:
+        case C2FieldDescriptor::UINT64:
+        case C2FieldDescriptor::CNTR64:
+            desc->type = AMessage::kTypeInt64;
+            return OK;
+        case C2FieldDescriptor::FLOAT:
+            desc->type = AMessage::kTypeFloat;
+            return OK;
+        case C2FieldDescriptor::STRING:
+            desc->type = AMessage::kTypeString;
+            return OK;
+        case C2FieldDescriptor::BLOB:
+            desc->type = AMessage::kTypeBuffer;
+            return OK;
+        default:
+            return NAME_NOT_FOUND;
+    }
+}
+
+status_t CCodecConfig::subscribeToVendorConfigUpdate(
+        const std::shared_ptr<Codec2Client::Configurable> &configurable,
+        const std::vector<std::string> &names,
+        c2_blocking_t blocking) {
+    for (const std::string &name : names) {
+        auto it = mVendorParams.find(name);
+        if (it == mVendorParams.end()) {
+            ALOGD("%s is not a recognized vendor parameter; ignored.", name.c_str());
+            continue;
+        }
+        mSubscribedIndices.insert(it->second->index());
+    }
+    return subscribeToConfigUpdate(configurable, {}, blocking);
+}
+
+status_t CCodecConfig::unsubscribeFromVendorConfigUpdate(
+        const std::shared_ptr<Codec2Client::Configurable> &configurable,
+        const std::vector<std::string> &names,
+        c2_blocking_t blocking) {
+    for (const std::string &name : names) {
+        auto it = mVendorParams.find(name);
+        if (it == mVendorParams.end()) {
+            ALOGD("%s is not a recognized vendor parameter; ignored.", name.c_str());
+            continue;
+        }
+        mSubscribedIndices.erase(it->second->index());
     }
     return subscribeToConfigUpdate(configurable, {}, blocking);
 }

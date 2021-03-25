@@ -16,11 +16,13 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2DmaBufAllocator"
+
 #include <BufferAllocator/BufferAllocator.h>
 #include <C2Buffer.h>
 #include <C2Debug.h>
 #include <C2DmaBufAllocator.h>
 #include <C2ErrnoUtils.h>
+
 #include <linux/ion.h>
 #include <sys/mman.h>
 #include <unistd.h>  // getpagesize, size_t, close, dup
@@ -28,14 +30,15 @@
 
 #include <list>
 
-#ifdef __ANDROID_APEX__
 #include <android-base/properties.h>
-#endif
 
 namespace android {
 
 namespace {
-constexpr size_t USAGE_LRU_CACHE_SIZE = 1024;
+    constexpr size_t USAGE_LRU_CACHE_SIZE = 1024;
+
+    // max padding after ion/dmabuf allocations in bytes
+    constexpr uint32_t MAX_PADDING = 0x8000; // 32KB
 }
 
 /* =========================== BUFFER HANDLE =========================== */
@@ -249,9 +252,23 @@ C2DmaBufAllocation::C2DmaBufAllocation(BufferAllocator& alloc, size_t size, C2St
     int bufferFd = -1;
     int ret = 0;
 
-    bufferFd = alloc.Alloc(heap_name, size, flags);
-    if (bufferFd < 0) ret = bufferFd;
+    // NOTE: read this property directly from the property as this code has to run on
+    // Android Q, but the sysprop was only introduced in Android S.
+    static size_t sPadding =
+        base::GetUintProperty("media.c2.dmabuf.padding", (uint32_t)0, MAX_PADDING);
+    if (sPadding > SIZE_MAX - size) {
+        // size would overflow
+        ALOGD("dmabuf_alloc: size #%zx cannot accommodate padding #%zx", size, sPadding);
+        ret = -ENOMEM;
+    } else {
+        size_t allocSize = size + sPadding;
+        bufferFd = alloc.Alloc(heap_name, allocSize, flags);
+        if (bufferFd < 0) {
+            ret = bufferFd;
+        }
+    }
 
+    // this may be a non-working handle if bufferFd is negative
     mHandle = C2HandleBuf(bufferFd, size);
     mId = id;
     mInit = c2_status_t(c2_map_errno<ENOMEM, EACCES, EINVAL>(ret));

@@ -211,8 +211,6 @@ public:
                 (OMX_INDEXTYPE)OMX_IndexParamConsumerUsageBits,
                 &usage, sizeof(usage));
 
-        // NOTE: we do not use/pass through color aspects from GraphicBufferSource as we
-        // communicate that directly to the component.
         mSource->configure(
                 mOmxNode, static_cast<hardware::graphics::common::V1_0::Dataspace>(mDataSpace));
         return OK;
@@ -409,6 +407,10 @@ public:
 
     void onInputBufferDone(c2_cntr64_t index) override {
         mNode->onInputBufferDone(index);
+    }
+
+    android_dataspace getDataspace() override {
+        return mNode->getDataspace();
     }
 
 private:
@@ -1612,6 +1614,7 @@ void CCodec::start() {
         outputFormat = config->mOutputFormat = config->mOutputFormat->dup();
         if (config->mInputSurface) {
             err2 = config->mInputSurface->start();
+            config->mInputSurfaceDataspace = config->mInputSurface->getDataspace();
         }
         buffersBoundToCodec = config->mBuffersBoundToCodec;
     }
@@ -1699,6 +1702,7 @@ void CCodec::stop() {
         if (config->mInputSurface) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
+            config->mInputSurfaceDataspace = HAL_DATASPACE_UNKNOWN;
         }
     }
     {
@@ -1748,6 +1752,7 @@ void CCodec::initiateRelease(bool sendCallback /* = true */) {
         if (config->mInputSurface) {
             config->mInputSurface->disconnect();
             config->mInputSurface = nullptr;
+            config->mInputSurfaceDataspace = HAL_DATASPACE_UNKNOWN;
         }
     }
 
@@ -1999,6 +2004,39 @@ void CCodec::signalRequestIDRFrame() {
     params.push_back(
             std::make_unique<C2StreamRequestSyncFrameTuning::output>(0u, true));
     config->setParameters(comp, params, C2_MAY_BLOCK);
+}
+
+status_t CCodec::querySupportedParameters(std::vector<std::string> *names) {
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->querySupportedParameters(names);
+}
+
+status_t CCodec::describeParameter(
+        const std::string &name, CodecParameterDescriptor *desc) {
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->describe(name, desc);
+}
+
+status_t CCodec::subscribeToParameters(const std::vector<std::string> &names) {
+    std::shared_ptr<Codec2Client::Component> comp = mState.lock()->comp;
+    if (!comp) {
+        return INVALID_OPERATION;
+    }
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->subscribeToVendorConfigUpdate(comp, names);
+}
+
+status_t CCodec::unsubscribeFromParameters(const std::vector<std::string> &names) {
+    std::shared_ptr<Codec2Client::Component> comp = mState.lock()->comp;
+    if (!comp) {
+        return INVALID_OPERATION;
+    }
+    Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
+    const std::unique_ptr<Config> &config = *configLocked;
+    return config->unsubscribeFromVendorConfigUpdate(comp, names);
 }
 
 void CCodec::onWorkDone(std::list<std::unique_ptr<C2Work>> &workItems) {
