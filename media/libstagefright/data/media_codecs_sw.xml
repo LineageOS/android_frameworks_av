@@ -274,6 +274,9 @@
                 <Limit name="bitrate" range="1-2000000" />
             </Variant>
             <Feature name="intra-refresh" />
+            <!-- Video Quality control -->
+                    <!-- supports QP bounding with standard keys -->
+            <Feature name="qp-bounds" />
         </MediaCodec>
         <MediaCodec name="c2.android.vp8.encoder" type="video/x-vnd.on2.vp8" variant="slow-cpu,!slow-cpu">
             <Alias name="OMX.google.vp8.encoder" />
