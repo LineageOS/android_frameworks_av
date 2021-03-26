@@ -480,9 +480,31 @@ Return<void> Component::configureVideoTunnel(
 Return<Status> Component::setOutputSurfaceWithSyncObj(
         uint64_t blockPoolId, const sp<HGraphicBufferProducer2>& surface,
         const SurfaceSyncObj& syncObject) {
-    (void) blockPoolId;
-    (void) surface;
-    (void) syncObject;
+    std::shared_ptr<C2BlockPool> pool;
+    GetCodec2BlockPool(blockPoolId, mComponent, &pool);
+    if (pool && pool->getAllocatorId() == C2PlatformAllocatorStore::BUFFERQUEUE) {
+        std::shared_ptr<C2BufferQueueBlockPool> bqPool =
+                std::static_pointer_cast<C2BufferQueueBlockPool>(pool);
+        C2BufferQueueBlockPool::OnRenderCallback cb =
+            [this](uint64_t producer, int32_t slot, int64_t nsecs) {
+                // TODO: batch this
+                hidl_vec<IComponentListener::RenderedFrame> rendered;
+                rendered.resize(1);
+                rendered[0] = { producer, slot, nsecs };
+                (void)mListener->onFramesRendered(rendered).isOk();
+        };
+        if (bqPool) {
+            const native_handle_t *h = syncObject.syncMemory;
+            native_handle_t *syncMemory = h ? native_handle_clone(h) : nullptr;
+            uint64_t bqId = syncObject.bqId;
+            uint32_t generationId = syncObject.generationId;
+            uint64_t consumerUsage = syncObject.consumerUsage;
+
+            bqPool->setRenderCallback(cb);
+            bqPool->configureProducer(surface, syncMemory, bqId,
+                                      generationId, consumerUsage);
+        }
+    }
     return Status::OK;
 }
 

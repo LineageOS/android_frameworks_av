@@ -20,6 +20,7 @@
 
 #include "api1/client2/JpegProcessor.h"
 #include "common/CameraProviderManager.h"
+#include "utils/SessionConfigurationUtils.h"
 #include <gui/Surface.h>
 #include <utils/Log.h>
 #include <utils/Trace.h>
@@ -78,7 +79,10 @@ DepthCompositeStream::DepthCompositeStream(sp<CameraDeviceBase> device,
             }
         }
 
-        getSupportedDepthSizes(staticInfo, &mSupportedDepthSizes);
+        getSupportedDepthSizes(staticInfo, /*maxResolution*/false, &mSupportedDepthSizes);
+        if (SessionConfigurationUtils::isUltraHighResolutionSensor(staticInfo)) {
+            getSupportedDepthSizes(staticInfo, true, &mSupportedDepthSizesMaximumResolution);
+        }
     }
 }
 
@@ -484,17 +488,82 @@ bool DepthCompositeStream::isDepthCompositeStream(const sp<Surface> &surface) {
     return false;
 }
 
+static bool setContains(std::unordered_set<int32_t> containerSet, int32_t value) {
+    return containerSet.find(value) != containerSet.end();
+}
+
+status_t DepthCompositeStream::checkAndGetMatchingDepthSize(size_t width, size_t height,
+        const std::vector<std::tuple<size_t, size_t>> &depthSizes,
+        const std::vector<std::tuple<size_t, size_t>> &depthSizesMaximumResolution,
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        size_t *depthWidth, size_t *depthHeight) {
+    if (depthWidth == nullptr || depthHeight == nullptr) {
+        return BAD_VALUE;
+    }
+    size_t chosenDepthWidth = 0, chosenDepthHeight = 0;
+    bool hasDefaultSensorPixelMode =
+            setContains(sensorPixelModesUsed, ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
+
+    bool hasMaximumResolutionSensorPixelMode =
+        setContains(sensorPixelModesUsed, ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION);
+
+    if (!hasDefaultSensorPixelMode && !hasMaximumResolutionSensorPixelMode) {
+        ALOGE("%s: sensor pixel modes don't contain either maximum resolution or default modes",
+                __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    if (hasDefaultSensorPixelMode) {
+        auto ret = getMatchingDepthSize(width, height, depthSizes, &chosenDepthWidth,
+                &chosenDepthHeight);
+        if (ret != OK) {
+            ALOGE("%s: No matching depth stream size found", __FUNCTION__);
+            return ret;
+        }
+    }
+
+    if (hasMaximumResolutionSensorPixelMode) {
+        size_t depthWidth = 0, depthHeight = 0;
+        auto ret = getMatchingDepthSize(width, height,
+                depthSizesMaximumResolution, &depthWidth, &depthHeight);
+        if (ret != OK) {
+            ALOGE("%s: No matching max resolution depth stream size found", __FUNCTION__);
+            return ret;
+        }
+        // Both matching depth sizes should be the same.
+        if (chosenDepthWidth != 0 && chosenDepthWidth != depthWidth &&
+                chosenDepthHeight != depthHeight) {
+            ALOGE("%s: Maximum resolution sensor pixel mode and default sensor pixel mode don't"
+                    " have matching depth sizes", __FUNCTION__);
+            return BAD_VALUE;
+        }
+        if (chosenDepthWidth == 0) {
+            chosenDepthWidth = depthWidth;
+            chosenDepthHeight = depthHeight;
+        }
+    }
+    *depthWidth = chosenDepthWidth;
+    *depthHeight = chosenDepthHeight;
+    return OK;
+}
+
+
 status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surface>>& consumers,
         bool /*hasDeferredConsumer*/, uint32_t width, uint32_t height, int format,
         camera_stream_rotation_t rotation, int *id, const String8& physicalCameraId,
-        std::vector<int> *surfaceIds, int /*streamSetId*/, bool /*isShared*/) {
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        std::vector<int> *surfaceIds,
+        int /*streamSetId*/, bool /*isShared*/) {
     if (mSupportedDepthSizes.empty()) {
         ALOGE("%s: This camera device doesn't support any depth map streams!", __FUNCTION__);
         return INVALID_OPERATION;
     }
 
     size_t depthWidth, depthHeight;
-    auto ret = getMatchingDepthSize(width, height, mSupportedDepthSizes, &depthWidth, &depthHeight);
+    auto ret =
+            checkAndGetMatchingDepthSize(width, height, mSupportedDepthSizes,
+                    mSupportedDepthSizesMaximumResolution, sensorPixelModesUsed, &depthWidth,
+                    &depthHeight);
     if (ret != OK) {
         ALOGE("%s: Failed to find an appropriate depth stream size!", __FUNCTION__);
         return ret;
@@ -515,7 +584,7 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surfac
     mBlobSurface = new Surface(producer);
 
     ret = device->createStream(mBlobSurface, width, height, format, kJpegDataSpace, rotation,
-            id, physicalCameraId, surfaceIds);
+            id, physicalCameraId, sensorPixelModesUsed, surfaceIds);
     if (ret == OK) {
         mBlobStreamId = *id;
         mBlobSurfaceId = (*surfaceIds)[0];
@@ -531,7 +600,8 @@ status_t DepthCompositeStream::createInternalStreams(const std::vector<sp<Surfac
     mDepthSurface = new Surface(producer);
     std::vector<int> depthSurfaceId;
     ret = device->createStream(mDepthSurface, depthWidth, depthHeight, kDepthMapPixelFormat,
-            kDepthMapDataSpace, rotation, &mDepthStreamId, physicalCameraId, &depthSurfaceId);
+            kDepthMapDataSpace, rotation, &mDepthStreamId, physicalCameraId, sensorPixelModesUsed,
+            &depthSurfaceId);
     if (ret == OK) {
         mDepthSurfaceId = depthSurfaceId[0];
     } else {
@@ -749,13 +819,15 @@ status_t DepthCompositeStream::getMatchingDepthSize(size_t width, size_t height,
     return ((*depthWidth > 0) && (*depthHeight > 0)) ? OK : BAD_VALUE;
 }
 
-void DepthCompositeStream::getSupportedDepthSizes(const CameraMetadata& ch,
+void DepthCompositeStream::getSupportedDepthSizes(const CameraMetadata& ch, bool maxResolution,
         std::vector<std::tuple<size_t, size_t>>* depthSizes /*out*/) {
     if (depthSizes == nullptr) {
         return;
     }
 
-    auto entry = ch.find(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS);
+    auto entry = ch.find(
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS, maxResolution));
     if (entry.count > 0) {
         // Depth stream dimensions have four int32_t components
         // (pixelformat, width, height, type)
@@ -779,30 +851,43 @@ status_t DepthCompositeStream::getCompositeStreamInfo(const OutputStreamInfo &st
     }
 
     std::vector<std::tuple<size_t, size_t>> depthSizes;
-    getSupportedDepthSizes(ch, &depthSizes);
+    std::vector<std::tuple<size_t, size_t>> depthSizesMaximumResolution;
+    getSupportedDepthSizes(ch, /*maxResolution*/false, &depthSizes);
     if (depthSizes.empty()) {
         ALOGE("%s: No depth stream configurations present", __FUNCTION__);
         return BAD_VALUE;
     }
 
-    size_t depthWidth, depthHeight;
-    auto ret = getMatchingDepthSize(streamInfo.width, streamInfo.height, depthSizes, &depthWidth,
-            &depthHeight);
+    if (SessionConfigurationUtils::isUltraHighResolutionSensor(ch)) {
+        getSupportedDepthSizes(ch, /*maxResolution*/true, &depthSizesMaximumResolution);
+        if (depthSizesMaximumResolution.empty()) {
+            ALOGE("%s: No depth stream configurations for maximum resolution present",
+                    __FUNCTION__);
+            return BAD_VALUE;
+        }
+    }
+
+    size_t chosenDepthWidth = 0, chosenDepthHeight = 0;
+    auto ret = checkAndGetMatchingDepthSize(streamInfo.width, streamInfo.height, depthSizes,
+            depthSizesMaximumResolution, streamInfo.sensorPixelModesUsed, &chosenDepthWidth,
+            &chosenDepthHeight);
+
     if (ret != OK) {
-        ALOGE("%s: No matching depth stream size found", __FUNCTION__);
+        ALOGE("%s: Couldn't get matching depth sizes", __FUNCTION__);
         return ret;
     }
 
     compositeOutput->clear();
     compositeOutput->insert(compositeOutput->end(), 2, streamInfo);
 
+    // Sensor pixel modes should stay the same here. They're already overridden.
     // Jpeg/Blob stream info
     (*compositeOutput)[0].dataSpace = kJpegDataSpace;
     (*compositeOutput)[0].consumerUsage = GRALLOC_USAGE_SW_READ_OFTEN;
 
     // Depth stream info
-    (*compositeOutput)[1].width = depthWidth;
-    (*compositeOutput)[1].height = depthHeight;
+    (*compositeOutput)[1].width = chosenDepthWidth;
+    (*compositeOutput)[1].height = chosenDepthHeight;
     (*compositeOutput)[1].format = kDepthMapPixelFormat;
     (*compositeOutput)[1].dataSpace = kDepthMapDataSpace;
     (*compositeOutput)[1].consumerUsage = GRALLOC_USAGE_SW_READ_OFTEN;

@@ -498,7 +498,9 @@ class Camera3Stream :
     Camera3Stream(int id, camera_stream_type type,
             uint32_t width, uint32_t height, size_t maxSize, int format,
             android_dataspace dataSpace, camera_stream_rotation_t rotation,
-            const String8& physicalCameraId, int setId, bool isMultiResolution);
+            const String8& physicalCameraId,
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            int setId, bool isMultiResolution);
 
     wp<Camera3StreamBufferFreedListener> mBufferFreedListener;
 

@@ -29,6 +29,8 @@
 #include <C2AllocatorGralloc.h>
 #include <C2BqBufferPriv.h>
 #include <C2BlockInternal.h>
+#include <C2FenceFactory.h>
+#include <C2SurfaceSyncObj.h>
 
 #include <list>
 #include <map>
@@ -69,10 +71,11 @@ bool _C2BlockFactory::GetBufferQueueData(
 bool _C2BlockFactory::HoldBlockFromBufferQueue(
         const std::shared_ptr<_C2BlockPoolData>& data,
         const std::shared_ptr<int>& owner,
-        const sp<HGraphicBufferProducer>& igbp) {
+        const sp<HGraphicBufferProducer>& igbp,
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem) {
     const std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
             std::static_pointer_cast<C2BufferQueueBlockPoolData>(data);
-    return poolData->holdBlockFromBufferQueue(owner, igbp);
+    return poolData->holdBlockFromBufferQueue(owner, igbp, syncMem);
 }
 
 bool _C2BlockFactory::BeginTransferBlockToClient(
@@ -102,12 +105,13 @@ bool _C2BlockFactory::EndAttachBlockToBufferQueue(
         const std::shared_ptr<_C2BlockPoolData>& data,
         const std::shared_ptr<int>& owner,
         const sp<HGraphicBufferProducer>& igbp,
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem,
         uint32_t generation,
         uint64_t bqId,
         int32_t bqSlot) {
     const std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
             std::static_pointer_cast<C2BufferQueueBlockPoolData>(data);
-    return poolData->endAttachBlockToBufferQueue(owner, igbp, generation, bqId, bqSlot);
+    return poolData->endAttachBlockToBufferQueue(owner, igbp, syncMem, generation, bqId, bqSlot);
 }
 
 bool _C2BlockFactory::DisplayBlockToBufferQueue(
@@ -231,12 +235,58 @@ bool getGenerationNumberAndUsage(const sp<HGraphicBufferProducer> &producer,
 class C2BufferQueueBlockPool::Impl
         : public std::enable_shared_from_this<C2BufferQueueBlockPool::Impl> {
 private:
+    c2_status_t dequeueBuffer(
+            uint32_t width,
+            uint32_t height,
+            uint32_t format,
+            C2AndroidMemoryUsage androidUsage,
+            int *slot, bool *needsRealloc, sp<Fence> *fence) {
+        status_t status{};
+        using Input = HGraphicBufferProducer::DequeueBufferInput;
+        using Output = HGraphicBufferProducer::DequeueBufferOutput;
+        Return<void> transResult = mProducer->dequeueBuffer(
+                Input{
+                    width,
+                    height,
+                    format,
+                    androidUsage.asGrallocUsage()},
+                [&status, slot, needsRealloc,
+                 fence](HStatus hStatus,
+                         int32_t hSlot,
+                         Output const& hOutput) {
+                    *slot = static_cast<int>(hSlot);
+                    if (!h2b(hStatus, &status) ||
+                            !h2b(hOutput.fence, fence)) {
+                        status = ::android::BAD_VALUE;
+                    } else {
+                        *needsRealloc =
+                                hOutput.bufferNeedsReallocation;
+                    }
+                });
+        if (!transResult.isOk() || status != android::OK) {
+            if (transResult.isOk()) {
+                ++mDqFailure;
+                if (status == android::INVALID_OPERATION ||
+                    status == android::TIMED_OUT ||
+                    status == android::WOULD_BLOCK) {
+                    // Dequeue buffer is blocked temporarily. Retrying is
+                    // required.
+                    return C2_BLOCKING;
+                }
+            }
+            ALOGD("cannot dequeue buffer %d", status);
+            return C2_BAD_VALUE;
+        }
+        return C2_OK;
+    }
+
     c2_status_t fetchFromIgbp_l(
             uint32_t width,
             uint32_t height,
             uint32_t format,
             C2MemoryUsage usage,
-            std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
+            std::shared_ptr<C2GraphicBlock> *block /* nonnull */,
+            C2Fence *c2Fence) {
         // We have an IGBP now.
         C2AndroidMemoryUsage androidUsage = usage;
         status_t status{};
@@ -245,41 +295,39 @@ private:
         sp<Fence> fence = new Fence();
         ALOGV("tries to dequeue buffer");
 
+        C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem(): nullptr;
         { // Call dequeueBuffer().
-            using Input = HGraphicBufferProducer::DequeueBufferInput;
-            using Output = HGraphicBufferProducer::DequeueBufferOutput;
-            Return<void> transResult = mProducer->dequeueBuffer(
-                    Input{
-                        width,
-                        height,
-                        format,
-                        androidUsage.asGrallocUsage()},
-                    [&status, &slot, &bufferNeedsReallocation,
-                     &fence](HStatus hStatus,
-                             int32_t hSlot,
-                             Output const& hOutput) {
-                        slot = static_cast<int>(hSlot);
-                        if (!h2b(hStatus, &status) ||
-                                !h2b(hOutput.fence, &fence)) {
-                            status = ::android::BAD_VALUE;
-                        } else {
-                            bufferNeedsReallocation =
-                                    hOutput.bufferNeedsReallocation;
-                        }
-                    });
-            if (!transResult.isOk() || status != android::OK) {
-                if (transResult.isOk()) {
-                    ++mDqFailure;
-                    if (status == android::INVALID_OPERATION ||
-                        status == android::TIMED_OUT ||
-                        status == android::WOULD_BLOCK) {
-                        // Dequeue buffer is blocked temporarily. Retrying is
-                        // required.
-                        return C2_BLOCKING;
+            c2_status_t c2Status;
+            if (syncVar) {
+                uint32_t waitId;
+                syncVar->lock();
+                if (!syncVar->isDequeueableLocked(&waitId)) {
+                    syncVar->unlock();
+                    if (c2Fence) {
+                        *c2Fence = _C2FenceFactory::CreateSurfaceFence(mSyncMem, waitId);
                     }
+                    return C2_BLOCKING;
                 }
-                ALOGD("cannot dequeue buffer %d", status);
-                return C2_BAD_VALUE;
+                if (syncVar->getSyncStatusLocked() != C2SyncVariables::STATUS_ACTIVE) {
+                    waitId = syncVar->getWaitIdLocked();
+                    syncVar->unlock();
+                    if (c2Fence) {
+                        *c2Fence = _C2FenceFactory::CreateSurfaceFence(mSyncMem, waitId);
+                    }
+                    return C2_BLOCKING;
+                }
+                c2Status = dequeueBuffer(width, height, format, androidUsage,
+                              &slot, &bufferNeedsReallocation, &fence);
+                if (c2Status == C2_OK) {
+                    syncVar->notifyDequeuedLocked();
+                }
+                syncVar->unlock();
+            } else {
+                c2Status = dequeueBuffer(width, height, format, usage,
+                              &slot, &bufferNeedsReallocation, &fence);
+            }
+            if (c2Status != C2_OK) {
+                return c2Status;
             }
             mDqFailure = 0;
             mLastDqTs = getTimestampNow();
@@ -290,18 +338,41 @@ private:
             return C2_BAD_VALUE;
         }
         ALOGV("dequeued a buffer successfully");
+        bool dequeueable = false;
+        uint32_t waitId;
         if (fence) {
             static constexpr int kFenceWaitTimeMs = 10;
 
             status_t status = fence->wait(kFenceWaitTimeMs);
             if (status == -ETIME) {
                 // fence is not signalled yet.
-                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                if (syncVar) {
+                    syncVar->lock();
+                    (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                    dequeueable = syncVar->notifyQueuedLocked(&waitId);
+                    syncVar->unlock();
+                    if (c2Fence) {
+                        *c2Fence = dequeueable ? C2Fence() :
+                                _C2FenceFactory::CreateSurfaceFence(mSyncMem, waitId);
+                    }
+                } else {
+                    (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                }
                 return C2_BLOCKING;
             }
             if (status != android::NO_ERROR) {
                 ALOGD("buffer fence wait error %d", status);
-                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                if (syncVar) {
+                    syncVar->lock();
+                    (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                    syncVar->notifyQueuedLocked();
+                    syncVar->unlock();
+                    if (c2Fence) {
+                        *c2Fence = C2Fence();
+                    }
+                } else {
+                    (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                }
                 return C2_BAD_VALUE;
             } else if (mRenderCallback) {
                 nsecs_t signalTime = fence->getSignalTime();
@@ -341,7 +412,17 @@ private:
                 return C2_BAD_VALUE;
             } else if (status != android::NO_ERROR) {
                 slotBuffer.clear();
-                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                if (syncVar) {
+                    syncVar->lock();
+                    (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                    syncVar->notifyQueuedLocked();
+                    syncVar->unlock();
+                    if (c2Fence) {
+                        *c2Fence = C2Fence();
+                    }
+                } else {
+                    (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                }
                 return C2_BAD_VALUE;
             }
             if (mGeneration == 0) {
@@ -372,14 +453,28 @@ private:
                         std::make_shared<C2BufferQueueBlockPoolData>(
                                 slotBuffer->getGenerationNumber(),
                                 mProducerId, slot,
-                                mProducer);
+                                mProducer, mSyncMem, 0);
                 mPoolDatas[slot] = poolData;
                 *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
                 return C2_OK;
             }
             // Block was not created. call requestBuffer# again next time.
             slotBuffer.clear();
-            (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+            if (syncVar) {
+                syncVar->lock();
+                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+                syncVar->notifyQueuedLocked();
+                syncVar->unlock();
+                if (c2Fence) {
+                    *c2Fence = C2Fence();
+                }
+            } else {
+                (void)mProducer->cancelBuffer(slot, hFenceWrapper.getHandle()).isOk();
+            }
+            return C2_BAD_VALUE;
+        }
+        if (c2Fence) {
+            *c2Fence = C2Fence();
         }
         return C2_BAD_VALUE;
     }
@@ -409,7 +504,8 @@ public:
             uint32_t height,
             uint32_t format,
             C2MemoryUsage usage,
-            std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
+            std::shared_ptr<C2GraphicBlock> *block /* nonnull */,
+            C2Fence *fence) {
         block->reset();
         if (mInit != C2_OK) {
             return mInit;
@@ -440,17 +536,19 @@ public:
             }
             std::shared_ptr<C2BufferQueueBlockPoolData> poolData =
                     std::make_shared<C2BufferQueueBlockPoolData>(
-                            0, (uint64_t)0, ~0, nullptr);
+                            0, (uint64_t)0, ~0, nullptr, nullptr, 0);
             *block = _C2BlockFactory::CreateGraphicBlock(alloc, poolData);
             ALOGV("allocated a buffer successfully");
 
             return C2_OK;
         }
-        c2_status_t status = fetchFromIgbp_l(width, height, format, usage, block);
+        c2_status_t status = fetchFromIgbp_l(width, height, format, usage, block, fence);
         if (status == C2_BLOCKING) {
             lock.unlock();
-            // in order not to drain cpu from component's spinning
-            ::usleep(kMaxIgbpRetryDelayUs);
+            if (!fence) {
+                // in order not to drain cpu from component's spinning
+                ::usleep(kMaxIgbpRetryDelayUs);
+            }
         }
         return status;
     }
@@ -460,11 +558,12 @@ public:
         mRenderCallback = renderCallback;
     }
 
+    /* This is for Old HAL request for compatibility */
     void configureProducer(const sp<HGraphicBufferProducer> &producer) {
         uint64_t producerId = 0;
         uint32_t generation = 0;
         uint64_t usage = 0;
-        bool haveGeneration = false;
+        bool bqInformation = false;
         if (producer) {
             Return<uint64_t> transResult = producer->getUniqueId();
             if (!transResult.isOk()) {
@@ -472,14 +571,32 @@ public:
                 return;
             }
             producerId = static_cast<uint64_t>(transResult);
-            // TODO: provide gneration number from parameter.
-            haveGeneration = getGenerationNumberAndUsage(producer, &generation, &usage);
-            if (!haveGeneration) {
+            bqInformation = getGenerationNumberAndUsage(producer, &generation, &usage);
+            if (!bqInformation) {
                 ALOGW("get generationNumber failed %llu",
                       (unsigned long long)producerId);
             }
         }
+        configureProducer(producer, nullptr, producerId, generation, usage, bqInformation);
+    }
+
+    void configureProducer(const sp<HGraphicBufferProducer> &producer,
+                           native_handle_t *syncHandle,
+                           uint64_t producerId,
+                           uint32_t generation,
+                           uint64_t usage,
+                           bool bqInformation) {
+        std::shared_ptr<C2SurfaceSyncMemory> c2SyncMem;
+        if (syncHandle) {
+            if (!producer) {
+                native_handle_close(syncHandle);
+                native_handle_delete(syncHandle);
+            } else {
+                c2SyncMem = C2SurfaceSyncMemory::Import(syncHandle);
+            }
+        }
         int migrated = 0;
+        std::shared_ptr<C2SurfaceSyncMemory> oldMem;
         // poolDatas dtor should not be called during lock is held.
         std::shared_ptr<C2BufferQueueBlockPoolData>
                 poolDatas[NUM_BUFFER_SLOTS];
@@ -499,22 +616,30 @@ public:
             if (producer) {
                 mProducer = producer;
                 mProducerId = producerId;
-                mGeneration = haveGeneration ? generation : 0;
+                mGeneration = bqInformation ? generation : 0;
             } else {
                 mProducer = nullptr;
                 mProducerId = 0;
                 mGeneration = 0;
                 ALOGW("invalid producer producer(%d), generation(%d)",
-                      (bool)producer, haveGeneration);
+                      (bool)producer, bqInformation);
             }
-            if (mProducer && haveGeneration) { // migrate buffers
+            oldMem = mSyncMem; // preven destruction while locked.
+            mSyncMem = c2SyncMem;
+            C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
+            if (syncVar) {
+                syncVar->lock();
+                syncVar->setSyncStatusLocked(C2SyncVariables::STATUS_ACTIVE);
+                syncVar->unlock();
+            }
+            if (mProducer && bqInformation) { // migrate buffers
                 for (int i = 0; i < NUM_BUFFER_SLOTS; ++i) {
                     std::shared_ptr<C2BufferQueueBlockPoolData> data =
                             mPoolDatas[i].lock();
                     if (data) {
                         int slot = data->migrate(
                                 mProducer, generation, usage,
-                                producerId, mBuffers[i], oldGeneration);
+                                producerId, mBuffers[i], oldGeneration, mSyncMem);
                         if (slot >= 0) {
                             buffers[slot] = mBuffers[i];
                             poolDatas[slot] = data;
@@ -528,7 +653,7 @@ public:
                 mPoolDatas[i] = poolDatas[i];
             }
         }
-        if (producer && haveGeneration) {
+        if (producer && bqInformation) {
             ALOGD("local generation change %u , "
                   "bqId: %llu migrated buffers # %d",
                   generation, (unsigned long long)producerId, migrated);
@@ -555,6 +680,8 @@ private:
 
     sp<GraphicBuffer> mBuffers[NUM_BUFFER_SLOTS];
     std::weak_ptr<C2BufferQueueBlockPoolData> mPoolDatas[NUM_BUFFER_SLOTS];
+
+    std::shared_ptr<C2SurfaceSyncMemory> mSyncMem;
 };
 
 C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
@@ -570,11 +697,14 @@ C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
 
 C2BufferQueueBlockPoolData::C2BufferQueueBlockPoolData(
         uint32_t generation, uint64_t bqId, int32_t bqSlot,
-        const android::sp<HGraphicBufferProducer>& producer) :
+        const android::sp<HGraphicBufferProducer>& producer,
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem, int noUse) :
         mLocal(true), mHeld(true),
         mGeneration(generation), mBqId(bqId), mBqSlot(bqSlot),
         mCurrentGeneration(generation), mCurrentBqId(bqId),
-        mTransfer(false), mAttach(false), mDisplay(false), mIgbp(producer) {
+        mTransfer(false), mAttach(false), mDisplay(false),
+        mIgbp(producer), mSyncMem(syncMem) {
+            (void)noUse;
 }
 
 C2BufferQueueBlockPoolData::~C2BufferQueueBlockPoolData() {
@@ -584,10 +714,30 @@ C2BufferQueueBlockPoolData::~C2BufferQueueBlockPoolData() {
 
     if (mLocal) {
         if (mGeneration == mCurrentGeneration && mBqId == mCurrentBqId) {
-            mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
+            C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
+            if (syncVar) {
+                syncVar->lock();
+                if (syncVar->getSyncStatusLocked() == C2SyncVariables::STATUS_ACTIVE) {
+                    mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
+                    syncVar->notifyQueuedLocked();
+                }
+                syncVar->unlock();
+            } else {
+                mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
+            }
         }
     } else if (!mOwner.expired()) {
-        mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
+        C2SyncVariables *syncVar = mSyncMem ? mSyncMem->mem() : nullptr;
+        if (syncVar) {
+            syncVar->lock();
+            if (syncVar->getSyncStatusLocked() != C2SyncVariables::STATUS_SWITCHING) {
+                mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
+                syncVar->notifyQueuedLocked();
+            }
+            syncVar->unlock();
+        } else {
+            mIgbp->cancelBuffer(mBqSlot, hidl_handle{}).isOk();
+        }
     }
 }
 
@@ -598,7 +748,8 @@ C2BufferQueueBlockPoolData::type_t C2BufferQueueBlockPoolData::getType() const {
 int C2BufferQueueBlockPoolData::migrate(
         const sp<HGraphicBufferProducer>& producer,
         uint32_t toGeneration, uint64_t toUsage, uint64_t toBqId,
-        sp<GraphicBuffer>& graphicBuffer, uint32_t oldGeneration) {
+        sp<GraphicBuffer>& graphicBuffer, uint32_t oldGeneration,
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem) {
     std::scoped_lock<std::mutex> l(mLock);
 
     mCurrentBqId = toBqId;
@@ -626,6 +777,7 @@ int C2BufferQueueBlockPoolData::migrate(
     }
     if (oldGeneration != mGeneration) {
         ALOGV("cannot migrate stale buffer");
+        return -1;
     }
     if (mTransfer) {
         // either transferred or detached.
@@ -678,6 +830,14 @@ int C2BufferQueueBlockPoolData::migrate(
     mGeneration = toGeneration;
     mBqId = toBqId;
     mBqSlot = slot;
+    mSyncMem = syncMem;
+
+    C2SyncVariables *syncVar = syncMem ? syncMem->mem() : nullptr;
+    if (syncVar) {
+        syncVar->lock();
+        syncVar->notifyDequeuedLocked();
+        syncVar->unlock();
+    }
     return slot;
 }
 
@@ -697,11 +857,13 @@ void C2BufferQueueBlockPoolData::getBufferQueueData(
 
 bool C2BufferQueueBlockPoolData::holdBlockFromBufferQueue(
         const std::shared_ptr<int>& owner,
-        const sp<HGraphicBufferProducer>& igbp) {
+        const sp<HGraphicBufferProducer>& igbp,
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem) {
     std::scoped_lock<std::mutex> lock(mLock);
     if (!mLocal) {
         mOwner = owner;
         mIgbp = igbp;
+        mSyncMem = syncMem;
     }
     if (mHeld) {
         return false;
@@ -741,6 +903,7 @@ bool C2BufferQueueBlockPoolData::beginAttachBlockToBufferQueue() {
 bool C2BufferQueueBlockPoolData::endAttachBlockToBufferQueue(
         const std::shared_ptr<int>& owner,
         const sp<HGraphicBufferProducer>& igbp,
+        std::shared_ptr<C2SurfaceSyncMemory> syncMem,
         uint32_t generation,
         uint64_t bqId,
         int32_t bqSlot) {
@@ -757,6 +920,7 @@ bool C2BufferQueueBlockPoolData::endAttachBlockToBufferQueue(
     mHeld = true;
     mOwner = owner;
     mIgbp = igbp;
+    mSyncMem = syncMem;
     mGeneration = generation;
     mBqId = bqId;
     mBqSlot = bqSlot;
@@ -792,7 +956,20 @@ c2_status_t C2BufferQueueBlockPool::fetchGraphicBlock(
         C2MemoryUsage usage,
         std::shared_ptr<C2GraphicBlock> *block /* nonnull */) {
     if (mImpl) {
-        return mImpl->fetchGraphicBlock(width, height, format, usage, block);
+        return mImpl->fetchGraphicBlock(width, height, format, usage, block, nullptr);
+    }
+    return C2_CORRUPTED;
+}
+
+c2_status_t C2BufferQueueBlockPool::fetchGraphicBlock(
+        uint32_t width,
+        uint32_t height,
+        uint32_t format,
+        C2MemoryUsage usage,
+        std::shared_ptr<C2GraphicBlock> *block /* nonnull */,
+        C2Fence *fence /* nonnull */) {
+    if (mImpl) {
+        return mImpl->fetchGraphicBlock(width, height, format, usage, block, fence);
     }
     return C2_CORRUPTED;
 }
@@ -800,6 +977,18 @@ c2_status_t C2BufferQueueBlockPool::fetchGraphicBlock(
 void C2BufferQueueBlockPool::configureProducer(const sp<HGraphicBufferProducer> &producer) {
     if (mImpl) {
         mImpl->configureProducer(producer);
+    }
+}
+
+void C2BufferQueueBlockPool::configureProducer(
+        const sp<HGraphicBufferProducer> &producer,
+        native_handle_t *syncMemory,
+        uint64_t bqId,
+        uint32_t generationId,
+        uint64_t consumerUsage) {
+    if (mImpl) {
+        mImpl->configureProducer(
+               producer, syncMemory, bqId, generationId, consumerUsage, true);
     }
 }
 

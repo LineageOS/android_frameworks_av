@@ -90,6 +90,10 @@ public:
 
     // Ping camera service proxy for user update
     static void pingCameraServiceProxy();
+
+    // Check whether the current top activity needs a rotate and crop override.
+    static bool isRotateAndCropOverrideNeeded(String16 packageName, int sensorOrientation,
+            int lensFacing);
 };
 
 } // android

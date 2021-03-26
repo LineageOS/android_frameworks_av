@@ -22,24 +22,60 @@
 #include <camera/camera2/SessionConfiguration.h>
 #include <camera/camera2/SubmitInfo.h>
 #include <android/hardware/camera/device/3.7/types.h>
+#include <android/hardware/camera/device/3.4/ICameraDeviceSession.h>
+#include <android/hardware/camera/device/3.7/ICameraDeviceSession.h>
 
 #include <device3/Camera3StreamInterface.h>
 
 #include <stdint.h>
 
+// Convenience methods for constructing binder::Status objects for error returns
+
+#define STATUS_ERROR(errorCode, errorString) \
+    binder::Status::fromServiceSpecificError(errorCode, \
+            String8::format("%s:%d: %s", __FUNCTION__, __LINE__, errorString))
+
+#define STATUS_ERROR_FMT(errorCode, errorString, ...) \
+    binder::Status::fromServiceSpecificError(errorCode, \
+            String8::format("%s:%d: " errorString, __FUNCTION__, __LINE__, \
+                    __VA_ARGS__))
+
 namespace android {
+namespace camera3 {
 
 typedef std::function<CameraMetadata (const String8 &)> metadataGetter;
 
+class StreamConfiguration {
+public:
+    int32_t format;
+    int32_t width;
+    int32_t height;
+    int32_t isInput;
+    static void getStreamConfigurations(
+            const CameraMetadata &static_info, bool maxRes,
+            std::unordered_map<int, std::vector<StreamConfiguration>> *scm);
+    static void getStreamConfigurations(
+            const CameraMetadata &static_info, int configuration,
+            std::unordered_map<int, std::vector<StreamConfiguration>> *scm);
+};
+
+// Holds the default StreamConfigurationMap and Maximum resolution
+// StreamConfigurationMap for a camera device.
+struct StreamConfigurationPair {
+    std::unordered_map<int, std::vector<camera3::StreamConfiguration>>
+            mDefaultStreamConfigurationMap;
+    std::unordered_map<int, std::vector<camera3::StreamConfiguration>>
+            mMaximumResolutionStreamConfigurationMap;
+};
+
 class SessionConfigurationUtils {
 public:
-
     static int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
     // Find the closest dimensions for a given format in available stream configurations with
     // a width <= ROUNDING_WIDTH_CAP
     static bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
-            android_dataspace dataSpace, const CameraMetadata& info,
+            android_dataspace dataSpace, const CameraMetadata& info, bool maxResolution,
             /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
 
     //check if format is not custom format
@@ -50,7 +86,8 @@ public:
     static binder::Status createSurfaceFromGbp(
         camera3::OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
-        const String8 &cameraId, const CameraMetadata &physicalCameraMetadata);
+        const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
+        const std::vector<int32_t> &sensorPixelModesUsed);
 
     static void mapStreamInfo(const camera3::OutputStreamInfo &streamInfo,
             camera3::camera_stream_rotation_t rotation, String8 physicalId, int32_t groupId,
@@ -86,10 +123,23 @@ public:
             hardware::camera::device::V3_4::StreamConfiguration &streamConfigV34,
             const hardware::camera::device::V3_7::StreamConfiguration &streamConfigV37);
 
+    static StreamConfigurationPair getStreamConfigurationPair(const CameraMetadata &metadata);
+
+    static status_t checkAndOverrideSensorPixelModesUsed(
+            const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
+            const CameraMetadata &staticInfo, bool flexibleConsumer,
+            std::unordered_set<int32_t> *overriddenSensorPixelModesUsed);
+
+    static bool isUltraHighResolutionSensor(const CameraMetadata &deviceInfo);
+
+    static int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution = false);
+
     static const int32_t MAX_SURFACES_PER_STREAM = 4;
 
     static const int32_t ROUNDING_WIDTH_CAP = 1920;
+
 };
 
+} // camera3
 } // android
 #endif
