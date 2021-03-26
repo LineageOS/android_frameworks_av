@@ -199,10 +199,21 @@ AudioFlinger::AudioFlinger()
       mDeviceEffectManager(this),
       mSystemReady(false)
 {
+    // Move the audio session unique ID generator start base as time passes to limit risk of
+    // generating the same ID again after an audioserver restart.
+    // This is important because clients will reuse previously allocated audio session IDs
+    // when reconnecting after an audioserver restart and newly allocated IDs may conflict with
+    // active clients.
+    // Moving the base by 1 for each elapsed second is a good compromise between avoiding overlap
+    // between allocation ranges and not reaching wrap around too soon.
+    timespec ts{};
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    // zero ID has a special meaning, so start allocation at least at AUDIO_UNIQUE_ID_USE_MAX
+    uint32_t sessionBase = (uint32_t)std::max((long)1, ts.tv_sec);
     // unsigned instead of audio_unique_id_use_t, because ++ operator is unavailable for enum
     for (unsigned use = AUDIO_UNIQUE_ID_USE_UNSPECIFIED; use < AUDIO_UNIQUE_ID_USE_MAX; use++) {
-        // zero ID has a special meaning, so unavailable
-        mNextUniqueIds[use] = AUDIO_UNIQUE_ID_USE_MAX;
+        mNextUniqueIds[use] =
+                ((use == AUDIO_UNIQUE_ID_USE_SESSION) ? sessionBase : 1) * AUDIO_UNIQUE_ID_USE_MAX;
     }
 
 #if 1
