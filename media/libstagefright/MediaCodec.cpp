@@ -1390,6 +1390,11 @@ status_t MediaCodec::setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &
     return msg->post();
 }
 
+/*
+ * MediaFormat Shaping forward declarations
+ * including the property name we use for control.
+ */
+static const char enableMediaFormatShapingProperty[] = "debug.stagefright.enableshaping";
 static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
                       bool reverse);
 
@@ -1463,15 +1468,13 @@ status_t MediaCodec::configure(
         }
     }
 
-    // apply framework level modifications to the mediaformat for encoding
-    // XXX: default off for a while during dogfooding
-    static const char *enable_property = "debug.stagefright.enableshaping";
-    int8_t enableShaping = property_get_bool(enable_property, 0);
-    if (!enableShaping) {
-        ALOGD("format shaping disabled via property '%s'", enable_property);
-    } else {
-        if (flags & CONFIGURE_FLAG_ENCODE) {
+    if (flags & CONFIGURE_FLAG_ENCODE) {
+        int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty, 0);
+        if (!enableShaping) {
+            ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
+        } else {
             (void) shapeMediaFormat(format, flags);
+            // XXX: do we want to do this regardless of shaping enablement?
             mapFormat(mComponentName, format, nullptr, false);
         }
     }
@@ -1552,9 +1555,24 @@ static android::mediaformatshaper::FormatShaperOps_t *sShaperOps = NULL;
 
 static bool connectFormatShaper() {
     static std::once_flag sCheckOnce;
-    static void *libHandle = NULL;
+
+#if 0
+    // an early return if the property says disabled means we skip loading.
+    // that saves memory.
+
+    // apply framework level modifications to the mediaformat for encoding
+    // XXX: default off for a while during dogfooding
+    int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty, 0);
+
+    if (!enableShaping) {
+        return true;
+    }
+#endif
 
     std::call_once(sCheckOnce, [&](){
+
+        void *libHandle = NULL;
+        nsecs_t loading_started = systemTime(SYSTEM_TIME_MONOTONIC);
 
         // prefer any copy in the mainline module
         //
@@ -1614,44 +1632,33 @@ static bool connectFormatShaper() {
             ALOGV("connectFormatShaper: connected to library %s", libraryName.c_str());
         }
 
+        nsecs_t loading_finished = systemTime(SYSTEM_TIME_MONOTONIC);
+        ALOGV("connectFormatShaper: loaded libraries: %" PRId64 " us",
+              (loading_finished - loading_started)/1000);
+
     });
 
     return true;
 }
 
+
+#if 0
 // a construct to force the above dlopen() to run very early.
 // goal: so the dlopen() doesn't happen on critical path of latency sensitive apps
 // failure of this means that cold start of those apps is slower by the time to dlopen()
+// TODO(b/183454066): tradeoffs between memory of early loading vs latency of late loading
 //
 static bool forceEarlyLoadingShaper = connectFormatShaper();
+#endif
 
 // parse the codec's properties: mapping, whether it meets min quality, etc
 // and pass them into the video quality code
 //
-status_t MediaCodec::setupFormatShaper(AString mediaType) {
-    ALOGV("setupFormatShaper: initializing shaper data for codec %s mediaType %s",
-          mComponentName.c_str(), mediaType.c_str());
-
-    nsecs_t mapping_started = systemTime(SYSTEM_TIME_MONOTONIC);
-
-    // see if the shaper is already present, if so return
-    mediaformatshaper::shaperHandle_t shaperHandle;
-    shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
-    if (shaperHandle != nullptr) {
-        ALOGV("shaperhandle %p -- no initialization needed", shaperHandle);
-        return OK;
-    }
-
-    // not there, so we get to build & register one
-    shaperHandle = sShaperOps->createShaper(mComponentName.c_str(), mediaType.c_str());
-    if (shaperHandle == nullptr) {
-        ALOGW("unable to create a shaper for cocodec %s mediaType %s",
-              mComponentName.c_str(), mediaType.c_str());
-        return OK;
-    }
+static void loadCodecProperties(mediaformatshaper::shaperHandle_t shaperHandle,
+                                  sp<MediaCodecInfo> codecInfo, AString mediaType) {
 
     sp<MediaCodecInfo::Capabilities> capabilities =
-                    mCodecInfo->getCapabilitiesFor(mediaType.c_str());
+                    codecInfo->getCapabilitiesFor(mediaType.c_str());
     if (capabilities == nullptr) {
         ALOGI("no capabilities as part of the codec?");
     } else {
@@ -1697,11 +1704,37 @@ status_t MediaCodec::setupFormatShaper(AString mediaType) {
             }
         }
     }
+}
+
+status_t MediaCodec::setupFormatShaper(AString mediaType) {
+    ALOGV("setupFormatShaper: initializing shaper data for codec %s mediaType %s",
+          mComponentName.c_str(), mediaType.c_str());
+
+    nsecs_t mapping_started = systemTime(SYSTEM_TIME_MONOTONIC);
+
+    // someone might have beaten us to it.
+    mediaformatshaper::shaperHandle_t shaperHandle;
+    shaperHandle = sShaperOps->findShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle != nullptr) {
+        ALOGV("shaperhandle %p -- no initialization needed", shaperHandle);
+        return OK;
+    }
+
+    // we get to build & register one
+    shaperHandle = sShaperOps->createShaper(mComponentName.c_str(), mediaType.c_str());
+    if (shaperHandle == nullptr) {
+        ALOGW("unable to create a shaper for cocodec %s mediaType %s",
+              mComponentName.c_str(), mediaType.c_str());
+        return OK;
+    }
+
+    (void) loadCodecProperties(shaperHandle, mCodecInfo, mediaType);
+
     shaperHandle = sShaperOps->registerShaper(shaperHandle,
                                               mComponentName.c_str(), mediaType.c_str());
 
     nsecs_t mapping_finished = systemTime(SYSTEM_TIME_MONOTONIC);
-    ALOGD("setupFormatShaper: populated shaper node for codec %s: %" PRId64 " us",
+    ALOGV("setupFormatShaper: populated shaper node for codec %s: %" PRId64 " us",
           mComponentName.c_str(), (mapping_finished - mapping_started)/1000);
 
     return OK;
@@ -1791,9 +1824,12 @@ static void mapFormat(AString componentName, const sp<AMessage> &format, const c
     // make sure we have the function entry points for the shaper library
     //
 
+#if 0
+    // let's play the faster "only do mapping if we've already loaded the library
     connectFormatShaper();
+#endif
     if (sShaperOps == nullptr) {
-        ALOGW("mapFormat: no MediaFormatShaper hooks available");
+        ALOGV("mapFormat: no MediaFormatShaper hooks available");
         return;
     }
 

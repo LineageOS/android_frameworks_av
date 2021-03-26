@@ -36,6 +36,7 @@ cc_defaults {
     name: "libmediaformatshaper_defaults",
     srcs: [
         "CodecProperties.cpp",
+        "CodecSeeding.cpp",
         "FormatShaper.cpp",
         "ManageShapingCodecs.cpp",
         "VideoShaper.cpp",
