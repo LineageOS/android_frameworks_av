@@ -253,6 +253,7 @@ void MediaExtractorFactory::RegisterExtractors(
                 (GetExtractorDef) dlsym(libHandle, "GETEXTRACTORDEF");
             if (getDef == nullptr) {
                 ALOGI("no sniffer found in %s", libPath.string());
+                dlclose(libHandle);
                 continue;
             }
 

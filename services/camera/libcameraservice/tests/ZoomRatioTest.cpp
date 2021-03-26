@@ -182,7 +182,7 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
 
     // Verify 1.0x zoom doesn't change the coordinates
     auto coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f, false /*clamp*/);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f, false /*clamp*/, width, height);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_EQ(coords[i], originalCoords[i]);
     }
@@ -199,7 +199,7 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
             (width - 1) * 5.0f / 4.0f, (height - 1) / 2.0f, // middle-right after 1.33x zoom
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, false /*clamp*/);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, false /*clamp*/, width, height);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expected2xCoords[i]), kMaxAllowedPixelError);
     }
@@ -216,7 +216,7 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
             width - 1.0f,  (height - 1) / 2.0f, // middle-right after 1.33x zoom
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, true /*clamp*/);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, true /*clamp*/, width, height);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expected2xCoordsClampedInc[i]), kMaxAllowedPixelError);
     }
@@ -233,7 +233,7 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
             width - 1.0f,  height / 2.0f, // middle-right after 1.33x zoom
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, true /*clamp*/);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 2.0f, true /*clamp*/, width, height);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expected2xCoordsClampedExc[i]), kMaxAllowedPixelError);
     }
@@ -250,7 +250,7 @@ void subScaleCoordinatesTest(bool usePreCorrectArray) {
             (width - 1) * 5 / 8.0f, (height - 1) / 2.0f, // middle-right after 1.33x zoom-in
     };
     coords = originalCoords;
-    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f/3, false /*clamp*/);
+    mapper.scaleCoordinates(coords.data(), coords.size()/2, 1.0f/3, false /*clamp*/, width, height);
     for (size_t i = 0; i < coords.size(); i++) {
         EXPECT_LE(std::abs(coords[i] - expectedZoomOutCoords[i]), kMaxAllowedPixelError);
     }

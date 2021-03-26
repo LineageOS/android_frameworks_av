@@ -52,6 +52,8 @@ protected:
 
 struct C2BufferQueueBlockPoolData;
 
+class C2SurfaceSyncMemory;
+
 /**
  * Internal only interface for creating blocks by block pool/buffer passing implementations.
  *
@@ -279,6 +281,8 @@ struct _C2BlockFactory {
      *                 anymore.
      * \param igbp     \c IGraphicBufferProducer instance to be assigned to the
      *                 block. This is not needed when the block is local.
+     * \param syncMem  Memory block which will support synchronization
+     *                 between Framework and HAL.
      *
      * \return The previous held status.
      */
@@ -287,7 +291,8 @@ struct _C2BlockFactory {
             const std::shared_ptr<_C2BlockPoolData>& poolData,
             const std::shared_ptr<int>& owner,
             const ::android::sp<::android::hardware::graphics::bufferqueue::
-                                V2_0::IGraphicBufferProducer>& igbp = nullptr);
+                                V2_0::IGraphicBufferProducer>& igbp = nullptr,
+            std::shared_ptr<C2SurfaceSyncMemory> syncMem = nullptr);
 
     /**
      * Prepare a block to be transferred to other process. This blocks
@@ -358,6 +363,7 @@ struct _C2BlockFactory {
             const std::shared_ptr<int>& owner,
             const ::android::sp<::android::hardware::graphics::bufferqueue::
                                 V2_0::IGraphicBufferProducer>& igbp,
+            std::shared_ptr<C2SurfaceSyncMemory>,
             uint32_t generation,
             uint64_t bqId,
             int32_t bqSlot);
