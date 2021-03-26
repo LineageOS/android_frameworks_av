@@ -58,10 +58,18 @@ AudioProfile::AudioProfile(audio_format_t format,
 AudioProfile::AudioProfile(audio_format_t format,
                            const ChannelMaskSet &channelMasks,
                            const SampleRateSet &samplingRateCollection) :
+        AudioProfile(format, channelMasks, samplingRateCollection,
+                     AUDIO_ENCAPSULATION_TYPE_NONE) {}
+
+AudioProfile::AudioProfile(audio_format_t format,
+                           const ChannelMaskSet &channelMasks,
+                           const SampleRateSet &samplingRateCollection,
+                           audio_encapsulation_type_t encapsulationType) :
         mName(""),
         mFormat(format),
         mChannelMasks(channelMasks),
-        mSamplingRates(samplingRateCollection) {}
+        mSamplingRates(samplingRateCollection),
+        mEncapsulationType(encapsulationType) {}
 
 void AudioProfile::setChannels(const ChannelMaskSet &channelMasks)
 {
@@ -116,6 +124,9 @@ void AudioProfile::dump(std::string *dst, int spaces) const
         }
         dst->append("\n");
     }
+
+    dst->append(base::StringPrintf(
+            "%*s- encapsulation type: %#x\n", spaces, "", mEncapsulationType));
 }
 
 bool AudioProfile::equals(const sp<AudioProfile>& other) const
@@ -127,7 +138,8 @@ bool AudioProfile::equals(const sp<AudioProfile>& other) const
            mSamplingRates == other->getSampleRates() &&
            mIsDynamicFormat == other->isDynamicFormat() &&
            mIsDynamicChannels == other->isDynamicChannels() &&
-           mIsDynamicRate == other->isDynamicRate();
+           mIsDynamicRate == other->isDynamicRate() &&
+           mEncapsulationType == other->getEncapsulationType();
 }
 
 AudioProfile& AudioProfile::operator=(const AudioProfile& other) {
@@ -135,6 +147,7 @@ AudioProfile& AudioProfile::operator=(const AudioProfile& other) {
     mFormat = other.mFormat;
     mChannelMasks = other.mChannelMasks;
     mSamplingRates = other.mSamplingRates;
+    mEncapsulationType = other.mEncapsulationType;
     mIsDynamicFormat = other.mIsDynamicFormat;
     mIsDynamicChannels = other.mIsDynamicChannels;
     mIsDynamicRate = other.mIsDynamicRate;
@@ -160,6 +173,8 @@ AudioProfile::toParcelable() const {
     parcelable.isDynamicFormat = mIsDynamicFormat;
     parcelable.isDynamicChannels = mIsDynamicChannels;
     parcelable.isDynamicRate = mIsDynamicRate;
+    parcelable.encapsulationType = VALUE_OR_RETURN(
+            legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(mEncapsulationType));
     return parcelable;
 }
 
@@ -186,6 +201,9 @@ AudioProfile::fromParcelable(const media::AudioProfile& parcelable) {
     legacy->mIsDynamicFormat = parcelable.isDynamicFormat;
     legacy->mIsDynamicChannels = parcelable.isDynamicChannels;
     legacy->mIsDynamicRate = parcelable.isDynamicRate;
+    legacy->mEncapsulationType = VALUE_OR_RETURN(
+            aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(
+                    parcelable.encapsulationType));
     return legacy;
 }
 
