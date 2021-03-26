@@ -68,22 +68,31 @@ class ZoomRatioMapper : public CoordinateMapper {
 
   public: // Visible for testing. Do not use concurently.
     void scaleCoordinates(int32_t* coordPairs, int coordCount,
-            float scaleRatio, bool clamp);
+            float scaleRatio, bool clamp, int32_t arrayWidth, int32_t arrayHeight);
 
     bool isValid() { return mIsValid; }
   private:
     // const after construction
     bool mHalSupportsZoomRatio;
-    // active array / pre-correction array dimension
+
+    // active array / pre-correction array dimension for default and maximum
+    // resolution modes.
     int32_t mArrayWidth, mArrayHeight;
+    int32_t mArrayWidthMaximumResolution, mArrayHeightMaximumResolution;
 
     bool mIsValid = false;
 
-    float deriveZoomRatio(const CameraMetadata* metadata);
-    void scaleRects(int32_t* rects, int rectCount, float scaleRatio);
+    status_t deriveZoomRatio(const CameraMetadata* metadata, float *zoomRatio, int arrayWidth,
+            int arrayHeight);
+    void scaleRects(int32_t* rects, int rectCount, float scaleRatio, int32_t arrayWidth,
+            int32_t arrayHeight);
 
-    status_t separateZoomFromCropLocked(CameraMetadata* metadata, bool isResult);
-    status_t combineZoomAndCropLocked(CameraMetadata* metadata, bool isResult);
+    status_t separateZoomFromCropLocked(CameraMetadata* metadata, bool isResult, int arrayWidth,
+            int arrayHeight);
+    status_t combineZoomAndCropLocked(CameraMetadata* metadata, bool isResult, int arrayWidth,
+            int arrayHeight);
+    status_t getArrayDimensionsToBeUsed(const CameraMetadata *settings, int32_t *arrayWidth,
+            int32_t *arrayHeight);
 };
 
 } // namespace camera3

@@ -686,9 +686,39 @@ void CameraProviderManager::ProviderInfo::DeviceInfo3::getSupportedDynamicDepthS
     }
 }
 
-status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags() {
-    uint32_t depthExclTag = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE;
-    uint32_t depthSizesTag = ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS;
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags(
+        bool maxResolution) {
+    const int32_t depthExclTag = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE;
+
+    const int32_t scalerSizesTag =
+              camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                      ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
+    const int32_t scalerMinFrameDurationsTag =
+            ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS;
+    const int32_t scalerStallDurationsTag =
+                 camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                        ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, maxResolution);
+
+    const int32_t depthSizesTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS, maxResolution);
+    const int32_t depthStallDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS, maxResolution);
+    const int32_t depthMinFrameDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS, maxResolution);
+
+    const int32_t dynamicDepthSizesTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS, maxResolution);
+    const int32_t dynamicDepthStallDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS, maxResolution);
+    const int32_t dynamicDepthMinFrameDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                 ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS, maxResolution);
+
     auto& c = mCameraCharacteristics;
     std::vector<std::tuple<size_t, size_t>> supportedBlobSizes, supportedDepthSizes,
             supportedDynamicDepthSizes, internalDepthSizes;
@@ -718,7 +748,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
         return BAD_VALUE;
     }
 
-    getSupportedSizes(c, ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, HAL_PIXEL_FORMAT_BLOB,
+    getSupportedSizes(c, scalerSizesTag, HAL_PIXEL_FORMAT_BLOB,
             &supportedBlobSizes);
     getSupportedSizes(c, depthSizesTag, HAL_PIXEL_FORMAT_Y16, &supportedDepthSizes);
     if (supportedBlobSizes.empty() || supportedDepthSizes.empty()) {
@@ -745,10 +775,10 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     std::vector<int64_t> blobMinDurations, blobStallDurations;
     std::vector<int64_t> dynamicDepthMinDurations, dynamicDepthStallDurations;
 
-    getSupportedDurations(c, ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS,
-            HAL_PIXEL_FORMAT_Y16, internalDepthSizes, &depthMinDurations);
-    getSupportedDurations(c, ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
-            HAL_PIXEL_FORMAT_BLOB, supportedDynamicDepthSizes, &blobMinDurations);
+    getSupportedDurations(c, depthMinFrameDurationsTag, HAL_PIXEL_FORMAT_Y16, internalDepthSizes,
+                          &depthMinDurations);
+    getSupportedDurations(c, scalerMinFrameDurationsTag, HAL_PIXEL_FORMAT_BLOB,
+                          supportedDynamicDepthSizes, &blobMinDurations);
     if (blobMinDurations.empty() || depthMinDurations.empty() ||
             (depthMinDurations.size() != blobMinDurations.size())) {
         ALOGE("%s: Unexpected number of available depth min durations! %zu vs. %zu",
@@ -756,10 +786,10 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
         return BAD_VALUE;
     }
 
-    getSupportedDurations(c, ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS,
-            HAL_PIXEL_FORMAT_Y16, internalDepthSizes, &depthStallDurations);
-    getSupportedDurations(c, ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
-            HAL_PIXEL_FORMAT_BLOB, supportedDynamicDepthSizes, &blobStallDurations);
+    getSupportedDurations(c, depthStallDurationsTag, HAL_PIXEL_FORMAT_Y16, internalDepthSizes,
+            &depthStallDurations);
+    getSupportedDurations(c, scalerStallDurationsTag, HAL_PIXEL_FORMAT_BLOB,
+            supportedDynamicDepthSizes, &blobStallDurations);
     if (blobStallDurations.empty() || depthStallDurations.empty() ||
             (depthStallDurations.size() != blobStallDurations.size())) {
         ALOGE("%s: Unexpected number of available depth stall durations! %zu vs. %zu",
@@ -804,15 +834,14 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags()
     supportedChTags.reserve(chTags.count + 3);
     supportedChTags.insert(supportedChTags.end(), chTags.data.i32,
             chTags.data.i32 + chTags.count);
-    supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS);
-    supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS);
-    supportedChTags.push_back(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS);
-    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS,
-            dynamicDepthEntries.data(), dynamicDepthEntries.size());
-    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS,
-            dynamicDepthMinDurationEntries.data(), dynamicDepthMinDurationEntries.size());
-    c.update(ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS,
-            dynamicDepthStallDurationEntries.data(), dynamicDepthStallDurationEntries.size());
+    supportedChTags.push_back(dynamicDepthSizesTag);
+    supportedChTags.push_back(dynamicDepthMinFrameDurationsTag);
+    supportedChTags.push_back(dynamicDepthStallDurationsTag);
+    c.update(dynamicDepthSizesTag, dynamicDepthEntries.data(), dynamicDepthEntries.size());
+    c.update(dynamicDepthMinFrameDurationsTag, dynamicDepthMinDurationEntries.data(),
+            dynamicDepthMinDurationEntries.size());
+    c.update(dynamicDepthStallDurationsTag, dynamicDepthStallDurationEntries.data(),
+             dynamicDepthStallDurationEntries.size());
     c.update(ANDROID_REQUEST_AVAILABLE_CHARACTERISTICS_KEYS, supportedChTags.data(),
             supportedChTags.size());
 
@@ -1046,7 +1075,24 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fillHeicStreamCombina
     return OK;
 }
 
-status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags() {
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags(bool maxResolution) {
+    int32_t scalerStreamSizesTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
+    int32_t scalerMinFrameDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, maxResolution);
+
+    int32_t heicStreamSizesTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, maxResolution);
+    int32_t heicMinFrameDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS, maxResolution);
+    int32_t heicStallDurationsTag =
+            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                    ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS, maxResolution);
+
     auto& c = mCameraCharacteristics;
 
     camera_metadata_entry halHeicSupport = c.find(ANDROID_HEIC_INFO_SUPPORTED);
@@ -1075,10 +1121,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags() {
     std::vector<int64_t> heicDurations;
     std::vector<int64_t> heicStallDurations;
 
-    camera_metadata_entry halStreamConfigs =
-            c.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
-    camera_metadata_entry minFrameDurations =
-            c.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+    camera_metadata_entry halStreamConfigs = c.find(scalerStreamSizesTag);
+    camera_metadata_entry minFrameDurations = c.find(scalerMinFrameDurationsTag);
 
     status_t res = fillHeicStreamCombinations(&heicOutputs, &heicDurations, &heicStallDurations,
             halStreamConfigs, minFrameDurations);
@@ -1088,12 +1132,9 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags() {
         return res;
     }
 
-    c.update(ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS,
-           heicOutputs.data(), heicOutputs.size());
-    c.update(ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS,
-            heicDurations.data(), heicDurations.size());
-    c.update(ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS,
-            heicStallDurations.data(), heicStallDurations.size());
+    c.update(heicStreamSizesTag, heicOutputs.data(), heicOutputs.size());
+    c.update(heicMinFrameDurationsTag, heicDurations.data(), heicDurations.size());
+    c.update(heicStallDurationsTag, heicStallDurations.data(), heicStallDurations.size());
 
     return OK;
 }
@@ -2005,16 +2046,20 @@ status_t CameraProviderManager::ProviderInfo::isConcurrentSessionConfigurationSu
                 size_t numStreams = halCameraIdsAndStreamCombinations.size();
                 halCameraIdsAndStreamCombinations_2_6.resize(numStreams);
                 for (size_t i = 0; i < numStreams; i++) {
+                    using namespace camera3;
                     auto const& combination = halCameraIdsAndStreamCombinations[i];
                     halCameraIdsAndStreamCombinations_2_6[i].cameraId = combination.cameraId;
                     bool success =
                             SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
-                            halCameraIdsAndStreamCombinations_2_6[i].streamConfiguration,
-                            combination.streamConfiguration);
+                                    halCameraIdsAndStreamCombinations_2_6[i].streamConfiguration,
+                                    combination.streamConfiguration);
                     if (!success) {
                         *isSupported = false;
                         return OK;
                     }
+                    camera3::SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+                            halCameraIdsAndStreamCombinations_2_6[i].streamConfiguration,
+                            combination.streamConfiguration);
                 }
                 ret = interface_2_6->isConcurrentStreamCombinationSupported(
                         halCameraIdsAndStreamCombinations_2_6, cb);
@@ -2220,6 +2265,21 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
         ALOGE("%s: Unable to derive HEIC tags based on camera and media capabilities: %s (%d)",
                 __FUNCTION__, strerror(-res), res);
     }
+
+    if (camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mCameraCharacteristics)) {
+        status_t status = addDynamicDepthTags(/*maxResolution*/true);
+        if (OK != status) {
+            ALOGE("%s: Failed appending dynamic depth tags for maximum resolution mode: %s (%d)",
+                    __FUNCTION__, strerror(-status), status);
+        }
+
+        status = deriveHeicTags(/*maxResolution*/true);
+        if (OK != status) {
+            ALOGE("%s: Unable to derive HEIC tags based on camera and media capabilities for"
+                    "maximum resolution mode: %s (%d)", __FUNCTION__, strerror(-status), status);
+        }
+    }
+
     res = addRotateCropTags();
     if (OK != res) {
         ALOGE("%s: Unable to add default SCALER_ROTATE_AND_CROP tags: %s (%d)", __FUNCTION__,
@@ -2426,26 +2486,22 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
     status_t res;
     Status callStatus;
     ::android::hardware::Return<void> ret;
-    if (interface_3_7 != nullptr) {
-        ret = interface_3_7->isStreamCombinationSupported_3_7(configuration,
+    auto halCb =
             [&callStatus, &status] (Status s, bool combStatus) {
                 callStatus = s;
                 *status = combStatus;
-            });
+            };
+    if (interface_3_7 != nullptr) {
+        ret = interface_3_7->isStreamCombinationSupported_3_7(configuration, halCb);
     } else if (interface_3_5 != nullptr) {
         hardware::camera::device::V3_4::StreamConfiguration configuration_3_4;
-        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+        bool success = camera3::SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
                 configuration_3_4, configuration);
         if (!success) {
             *status = false;
             return OK;
         }
-
-        ret = interface_3_5->isStreamCombinationSupported(configuration_3_4,
-            [&callStatus, &status] (Status s, bool combStatus) {
-                callStatus = s;
-                *status = combStatus;
-            });
+        ret = interface_3_5->isStreamCombinationSupported(configuration_3_4, halCb);
     } else {
         return INVALID_OPERATION;
     }
@@ -2829,7 +2885,7 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
         if (res != OK) {
             return res;
         }
-        metadataGetter getMetadata =
+        camera3::metadataGetter getMetadata =
                 [this](const String8 &id) {
                     CameraMetadata physicalDeviceInfo;
                     getCameraCharacteristicsLocked(id.string(), &physicalDeviceInfo);
@@ -2838,7 +2894,7 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
         std::vector<std::string> physicalCameraIds;
         isLogicalCameraLocked(cameraIdAndSessionConfig.mCameraId, &physicalCameraIds);
         bStatus =
-            SessionConfigurationUtils::convertToHALStreamCombination(
+            camera3::SessionConfigurationUtils::convertToHALStreamCombination(
                     cameraIdAndSessionConfig.mSessionConfiguration,
                     String8(cameraIdAndSessionConfig.mCameraId.c_str()), deviceInfo, getMetadata,
                     physicalCameraIds, streamConfiguration, &shouldExit);

@@ -35,4 +35,10 @@ interface ICameraServiceProxy
      * Update the status of a camera device.
      */
     oneway void notifyCameraState(in CameraSessionStats cameraSessionStats);
+
+    /**
+     * Reports whether the top activity needs a rotate and crop override.
+     */
+    boolean isRotateAndCropOverrideNeeded(String packageName, int sensorOrientation,
+            int lensFacing);
 }

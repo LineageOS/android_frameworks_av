@@ -1177,9 +1177,10 @@ status_t CCodecBufferChannel::start(
     if (outputFormat != nullptr) {
         sp<IGraphicBufferProducer> outputSurface;
         uint32_t outputGeneration;
+        int maxDequeueCount = 0;
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
-            output->maxDequeueBuffers = numOutputSlots +
+            maxDequeueCount = output->maxDequeueBuffers = numOutputSlots +
                     reorderDepth.value + kRenderingDepth;
             outputSurface = output->surface ?
                     output->surface->getIGraphicBufferProducer() : nullptr;
@@ -1187,6 +1188,9 @@ status_t CCodecBufferChannel::start(
                 output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
             }
             outputGeneration = output->generation;
+        }
+        if (maxDequeueCount > 0) {
+            mComponent->setOutputSurfaceMaxDequeueCount(maxDequeueCount);
         }
 
         bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
@@ -1766,15 +1770,22 @@ bool CCodecBufferChannel::handleWork(
     if (needMaxDequeueBufferCountUpdate) {
         size_t numOutputSlots = 0;
         uint32_t reorderDepth = 0;
+        int maxDequeueCount = 0;
         {
             Mutexed<Output>::Locked output(mOutput);
             numOutputSlots = output->numSlots;
             reorderDepth = output->buffers->getReorderDepth();
         }
-        Mutexed<OutputSurface>::Locked output(mOutputSurface);
-        output->maxDequeueBuffers = numOutputSlots + reorderDepth + kRenderingDepth;
-        if (output->surface) {
-            output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+        {
+            Mutexed<OutputSurface>::Locked output(mOutputSurface);
+            maxDequeueCount = output->maxDequeueBuffers =
+                    numOutputSlots + reorderDepth + kRenderingDepth;
+            if (output->surface) {
+                output->surface->setMaxDequeuedBufferCount(output->maxDequeueBuffers);
+            }
+        }
+        if (maxDequeueCount > 0) {
+            mComponent->setOutputSurfaceMaxDequeueCount(maxDequeueCount);
         }
     }
 

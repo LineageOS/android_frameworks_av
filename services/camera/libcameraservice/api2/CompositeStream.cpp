@@ -47,7 +47,9 @@ CompositeStream::CompositeStream(sp<CameraDeviceBase> device,
 status_t CompositeStream::createStream(const std::vector<sp<Surface>>& consumers,
         bool hasDeferredConsumer, uint32_t width, uint32_t height, int format,
         camera_stream_rotation_t rotation, int * id, const String8& physicalCameraId,
-        std::vector<int> * surfaceIds, int streamSetId, bool isShared, bool isMultiResolution) {
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        std::vector<int> * surfaceIds,
+        int streamSetId, bool isShared, bool isMultiResolution) {
     if (hasDeferredConsumer) {
         ALOGE("%s: Deferred consumers not supported in case of composite streams!",
                 __FUNCTION__);
@@ -72,8 +74,8 @@ status_t CompositeStream::createStream(const std::vector<sp<Surface>>& consumers
         return BAD_VALUE;
     }
 
-    return createInternalStreams(consumers, hasDeferredConsumer, width, height, format, rotation, id,
-            physicalCameraId, surfaceIds, streamSetId, isShared);
+    return createInternalStreams(consumers, hasDeferredConsumer, width, height, format, rotation,
+            id, physicalCameraId, sensorPixelModesUsed, surfaceIds, streamSetId, isShared);
 }
 
 status_t CompositeStream::deleteStream() {

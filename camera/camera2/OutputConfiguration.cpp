@@ -72,6 +72,10 @@ bool OutputConfiguration::isMultiResolution() const {
     return mIsMultiResolution;
 }
 
+const std::vector<int32_t> &OutputConfiguration::getSensorPixelModesUsed() const {
+    return mSensorPixelModesUsed;
+}
+
 OutputConfiguration::OutputConfiguration() :
         mRotation(INVALID_ROTATION),
         mSurfaceSetID(INVALID_SET_ID),
@@ -156,6 +160,11 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
         return err;
     }
 
+    std::vector<int32_t> sensorPixelModesUsed;
+    if ((err = parcel->readParcelableVector(&sensorPixelModesUsed)) != OK) {
+        ALOGE("%s: Failed to read sensor pixel mode(s) from parcel", __FUNCTION__);
+        return err;
+    }
     mRotation = rotation;
     mSurfaceSetID = setID;
     mSurfaceType = surfaceType;
@@ -170,6 +179,8 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
                 String8(surface.name).string());
         mGbps.push_back(surface.graphicBufferProducer);
     }
+
+    mSensorPixelModesUsed = std::move(sensorPixelModesUsed);
 
     ALOGV("%s: OutputConfiguration: rotation = %d, setId = %d, surfaceType = %d,"
           " physicalCameraId = %s, isMultiResolution = %d", __FUNCTION__, mRotation,
@@ -240,24 +251,51 @@ status_t OutputConfiguration::writeToParcel(android::Parcel* parcel) const {
     err = parcel->writeInt32(mIsMultiResolution ? 1 : 0);
     if (err != OK) return err;
 
+    err = parcel->writeParcelableVector(mSensorPixelModesUsed);
+    if (err != OK) return err;
+
     return OK;
+}
+
+template <typename T>
+static bool simpleVectorsEqual(T first, T second) {
+    if (first.size() != second.size()) {
+        return false;
+    }
+
+    for (size_t i = 0; i < first.size(); i++) {
+        if (first[i] != second[i]) {
+            return false;
+        }
+    }
+    return true;
 }
 
 bool OutputConfiguration::gbpsEqual(const OutputConfiguration& other) const {
     const std::vector<sp<IGraphicBufferProducer> >& otherGbps =
             other.getGraphicBufferProducers();
+    return simpleVectorsEqual(otherGbps, mGbps);
+}
 
-    if (mGbps.size() != otherGbps.size()) {
-        return false;
+bool OutputConfiguration::sensorPixelModesUsedEqual(const OutputConfiguration& other) const {
+    const std::vector<int32_t>& othersensorPixelModesUsed = other.getSensorPixelModesUsed();
+    return simpleVectorsEqual(othersensorPixelModesUsed, mSensorPixelModesUsed);
+}
+
+bool OutputConfiguration::sensorPixelModesUsedLessThan(const OutputConfiguration& other) const {
+    const std::vector<int32_t>& spms = other.getSensorPixelModesUsed();
+
+    if (mSensorPixelModesUsed.size() !=  spms.size()) {
+        return mSensorPixelModesUsed.size() < spms.size();
     }
 
-    for (size_t i = 0; i < mGbps.size(); i++) {
-        if (mGbps[i] != otherGbps[i]) {
-            return false;
+    for (size_t i = 0; i < spms.size(); i++) {
+        if (mSensorPixelModesUsed[i] != spms[i]) {
+            return mSensorPixelModesUsed[i] < spms[i];
         }
     }
 
-    return true;
+    return false;
 }
 
 bool OutputConfiguration::gbpsLessThan(const OutputConfiguration& other) const {

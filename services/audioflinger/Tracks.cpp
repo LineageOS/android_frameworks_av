@@ -239,9 +239,10 @@ AudioFlinger::ThreadBase::TrackBase::TrackBase(
 }
 
 // TODO b/182392769: use identity util
-Identity audioServerIdentity() {
-   Identity i = Identity();
+static Identity audioServerIdentity(pid_t pid) {
+   Identity i{};
    i.uid = AID_AUDIOSERVER;
+   i.pid = pid;
    return i;
 }
 
@@ -1846,7 +1847,7 @@ AudioFlinger::PlaybackThread::OutputTrack::OutputTrack(
             audio_format_t format,
             audio_channel_mask_t channelMask,
             size_t frameCount,
-            Identity& identity)
+            const Identity& identity)
     :   Track(playbackThread, NULL, AUDIO_STREAM_PATCH,
               audio_attributes_t{} /* currently unused for output track */,
               sampleRate, format, channelMask, frameCount,
@@ -2081,7 +2082,7 @@ AudioFlinger::PlaybackThread::PatchTrack::PatchTrack(PlaybackThread *playbackThr
               audio_attributes_t{} /* currently unused for patch track */,
               sampleRate, format, channelMask, frameCount,
               buffer, bufferSize, nullptr /* sharedBuffer */,
-              AUDIO_SESSION_NONE, getpid(), audioServerIdentity(), flags,
+              AUDIO_SESSION_NONE, getpid(), audioServerIdentity(getpid()), flags,
               TYPE_PATCH, AUDIO_PORT_HANDLE_NONE, frameCountToBeReady),
         PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, true, true),
                        *playbackThread, timeout)
@@ -2414,7 +2415,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         mRecordBufferConverter(NULL),
         mFlags(flags),
         mSilenced(false),
-        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(mIdentity, attr))
+        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(identity, attr))
 {
     if (mCblk == NULL) {
         return;
@@ -2455,9 +2456,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
 #endif
 
     // Once this item is logged by the server, the client can add properties.
-    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mIdentity.pid));
-    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mIdentity.uid));
-    mTrackMetrics.logConstructor(pid, uid, id());
+    mTrackMetrics.logConstructor(creatorPid, uid(), id());
 }
 
 AudioFlinger::RecordThread::RecordTrack::~RecordTrack()
@@ -2729,11 +2728,10 @@ AudioFlinger::RecordThread::PatchRecord::PatchRecord(RecordThread *recordThread,
                 audio_attributes_t{} /* currently unused for patch track */,
                 sampleRate, format, channelMask, frameCount,
                 buffer, bufferSize, AUDIO_SESSION_NONE, getpid(),
-                audioServerIdentity(), flags, TYPE_PATCH),
+                audioServerIdentity(getpid()), flags, TYPE_PATCH),
         PatchTrackBase(new ClientProxy(mCblk, mBuffer, frameCount, mFrameSize, false, true),
                        *recordThread, timeout)
 {
-    mIdentity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
     ALOGV("%s(%d): sampleRate %d mPeerTimeout %d.%03d sec",
                                       __func__, mId, sampleRate,
                                       (int)mPeerTimeout.tv_sec,
@@ -3023,8 +3021,7 @@ AudioFlinger::MmapThread::MmapTrack::MmapTrack(ThreadBase *thread,
             mSilenced(false), mSilencedNotified(false)
 {
     // Once this item is logged by the server, the client can add properties.
-    mTrackMetrics.logConstructor(creatorPid,
-        VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(identity.uid)), id());
+    mTrackMetrics.logConstructor(creatorPid, uid(), id());
 }
 
 AudioFlinger::MmapThread::MmapTrack::~MmapTrack()

@@ -158,6 +158,11 @@ void MediaTranscoder::onTrackFormatAvailable(const MediaTrackTranscoder* transco
         return;
     }
 
+    // The sample writer is not yet started so notify the caller that progress is still made.
+    if (mHeartBeatIntervalUs > 0) {
+        mCallbacks->onHeartBeat(this);
+    }
+
     MediaTrackTranscoder* mutableTranscoder = const_cast<MediaTrackTranscoder*>(transcoder);
     mutableTranscoder->setSampleConsumer(consumer);
 
