@@ -16,7 +16,9 @@
 #define LOG_TAG "AudioPort"
 
 #include <algorithm>
+#include <utility>
 
+#include <android/media/ExtraAudioDescriptor.h>
 #include <android-base/stringprintf.h>
 #include <media/AudioPort.h>
 #include <utils/Log.h>
@@ -46,9 +48,24 @@ void AudioPort::importAudioPort(const audio_port_v7 &port) {
                         port.audio_profiles->num_channel_masks),
                 SampleRateSet(port.audio_profiles[i].sample_rates,
                         port.audio_profiles[i].sample_rates +
-                        port.audio_profiles[i].num_sample_rates));
+                        port.audio_profiles[i].num_sample_rates),
+                port.audio_profiles[i].encapsulation_type);
         if (!mProfiles.contains(profile)) {
             addAudioProfile(profile);
+        }
+    }
+
+    for (size_t i = 0; i < port.num_extra_audio_descriptors; ++i) {
+        auto convertedResult = legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(
+                port.extra_audio_descriptors[i]);
+        if (!convertedResult.ok()) {
+            ALOGE("%s, failed to convert extra audio descriptor", __func__);
+            continue;
+        }
+        if (std::find(mExtraAudioDescriptors.begin(),
+                      mExtraAudioDescriptors.end(),
+                      convertedResult.value()) == mExtraAudioDescriptors.end()) {
+            mExtraAudioDescriptors.push_back(std::move(convertedResult.value()));
         }
     }
 }
@@ -98,7 +115,7 @@ void AudioPort::toAudioPort(struct audio_port_v7 *port) const {
                     channelMasks.size() > AUDIO_PORT_MAX_CHANNEL_MASKS ||
                     port->num_audio_profiles >= AUDIO_PORT_MAX_AUDIO_PROFILES) {
                 ALOGE("%s: bailing out: cannot export profiles to port config", __func__);
-                return;
+                break;
             }
 
             auto& dstProfile = port->audio_profiles[port->num_audio_profiles++];
@@ -109,7 +126,24 @@ void AudioPort::toAudioPort(struct audio_port_v7 *port) const {
             dstProfile.num_channel_masks = channelMasks.size();
             std::copy(channelMasks.begin(), channelMasks.end(),
                     std::begin(dstProfile.channel_masks));
+            dstProfile.encapsulation_type = profile->getEncapsulationType();
         }
+    }
+
+    port->num_extra_audio_descriptors = 0;
+    for (const auto& desc : mExtraAudioDescriptors) {
+        if (port->num_extra_audio_descriptors >= AUDIO_PORT_MAX_EXTRA_AUDIO_DESCRIPTORS) {
+            ALOGE("%s: bailing out: cannot export extra audio descriptor to port config", __func__);
+            return;
+        }
+
+        auto convertedResult = aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor(desc);
+        if (!convertedResult.ok()) {
+            ALOGE("%s: failed to convert extra audio descriptor", __func__);
+            continue;
+        }
+        port->extra_audio_descriptors[port->num_extra_audio_descriptors++] =
+                std::move(convertedResult.value());
     }
 }
 
@@ -121,6 +155,22 @@ void AudioPort::dump(std::string *dst, int spaces, bool verbose) const {
         std::string profilesStr;
         mProfiles.dump(&profilesStr, spaces);
         dst->append(profilesStr);
+        if (!mExtraAudioDescriptors.empty()) {
+            dst->append(base::StringPrintf("%*s- extra audio descriptors: \n", spaces, ""));
+            const int eadSpaces = spaces + 4;
+            const int descSpaces = eadSpaces + 4;
+            for (size_t i = 0; i < mExtraAudioDescriptors.size(); i++) {
+                dst->append(
+                        base::StringPrintf("%*s extra audio descriptor %zu:\n", eadSpaces, "", i));
+                dst->append(base::StringPrintf(
+                    "%*s- standard: %u\n", descSpaces, "", mExtraAudioDescriptors[i].standard));
+                dst->append(base::StringPrintf("%*s- descriptor:", descSpaces, ""));
+                for (auto v : mExtraAudioDescriptors[i].audioDescriptor) {
+                    dst->append(base::StringPrintf(" %02x", v));
+                }
+                dst->append("\n");
+            }
+        }
 
         if (mGains.size() != 0) {
             dst->append(base::StringPrintf("%*s- gains:\n", spaces, ""));
@@ -145,7 +195,8 @@ bool AudioPort::equals(const sp<AudioPort> &other) const
            mName.compare(other->getName()) == 0 &&
            mType == other->getType() &&
            mRole == other->getRole() &&
-           mProfiles.equals(other->getAudioProfiles());
+           mProfiles.equals(other->getAudioProfiles()) &&
+           mExtraAudioDescriptors == other->getExtraAudioDescriptors();
 }
 
 status_t AudioPort::writeToParcel(Parcel *parcel) const
@@ -160,6 +211,7 @@ status_t AudioPort::writeToParcelable(media::AudioPort* parcelable) const {
     parcelable->type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_type_t_AudioPortType(mType));
     parcelable->role = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_role_t_AudioPortRole(mRole));
     parcelable->profiles = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioProfileVector(mProfiles));
+    parcelable->extraAudioDescriptors = mExtraAudioDescriptors;
     parcelable->gains = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioGains(mGains));
     return OK;
 }
@@ -175,6 +227,7 @@ status_t AudioPort::readFromParcelable(const media::AudioPort& parcelable) {
     mType = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortType_audio_port_type_t(parcelable.type));
     mRole = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioPortRole_audio_port_role_t(parcelable.role));
     mProfiles = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioProfileVector(parcelable.profiles));
+    mExtraAudioDescriptors = parcelable.extraAudioDescriptors;
     mGains = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioGains(parcelable.gains));
     return OK;
 }
