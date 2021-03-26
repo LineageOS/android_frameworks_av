@@ -1,0 +1,10 @@
+cc_fuzz {
+  name: "libmedia_metadata_fuzzer",
+  srcs: [
+    "libmedia_metadata_fuzzer.cpp",
+  ],
+  shared_libs: [
+    "libmedia",
+    "libbinder",
+  ],
+}
