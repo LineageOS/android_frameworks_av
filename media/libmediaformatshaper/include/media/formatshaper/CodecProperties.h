@@ -31,6 +31,12 @@ class CodecProperties {
   public:
     CodecProperties(std::string name, std::string mediaType);
 
+    // seed the codec with some preconfigured values
+    // (e.g. mediaType-granularity defaults)
+    // runs from the constructor
+    void Seed();
+    void Finish();
+
     std::string getName();
     std::string getMediaType();
 
@@ -46,8 +52,9 @@ class CodecProperties {
     // and 'reverse' describes which strings are to be on which side.
     const char **getMappings(std::string kind, bool reverse);
 
-    // debugging of what's in the mapping dictionary
-    void showMappings();
+    // keep a map of all features and their parameters
+    void setFeatureValue(std::string key, int32_t value);
+    bool getFeatureValue(std::string key, int32_t *valuep);
 
     // does the codec support the Android S minimum quality rules
     void setSupportedMinimumQuality(int vmaf);
@@ -88,9 +95,13 @@ class CodecProperties {
     std::mutex mMappingLock;
     // XXX figure out why I'm having problems getting compiler to like GUARDED_BY
     std::map<std::string, std::string> mMappings /*GUARDED_BY(mMappingLock)*/ ;
-    std::map<std::string, std::string> mUnMappings /*GUARDED_BY(mMappingLock)*/ ;
+
+    std::map<std::string, int32_t> mFeatures /*GUARDED_BY(mMappingLock)*/ ;
 
     bool mIsRegistered = false;
+
+    // debugging of what's in the mapping dictionary
+    void showMappings();
 
     // DISALLOW_EVIL_CONSTRUCTORS(CodecProperties);
 };
