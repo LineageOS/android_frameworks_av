@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2020 The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,21 +16,14 @@
 
 package android.media;
 
-import android.media.AudioEncapsulationType;
-import android.media.audio.common.AudioFormat;
-
 /**
+ * Audio encapsulation type is used to describe if the audio data should be sent with a particular
+ * encapsulation type or not.
+ *
  * {@hide}
  */
-parcelable AudioProfile {
-    @utf8InCpp String name;
-    /** The format for an audio profile should only be set when initialized. */
-    AudioFormat format;
-    /** Interpreted as audio_channel_mask_t. */
-    int[] channelMasks;
-    int[] samplingRates;
-    boolean isDynamicFormat;
-    boolean isDynamicChannels;
-    boolean isDynamicRate;
-    AudioEncapsulationType encapsulationType;
+@Backing(type="int")
+enum AudioEncapsulationType {
+    NONE     = 0,
+    IEC61937 = 1,
 }
