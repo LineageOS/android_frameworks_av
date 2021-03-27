@@ -1918,6 +1918,9 @@ aidl2legacy_AudioProfile_audio_profile(const media::AudioProfile& aidl) {
             convertRange(aidl.channelMasks.begin(), aidl.channelMasks.end(), legacy.channel_masks,
                          aidl2legacy_int32_t_audio_channel_mask_t));
     legacy.num_channel_masks = aidl.channelMasks.size();
+
+    legacy.encapsulation_type = VALUE_OR_RETURN(
+            aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(aidl.encapsulationType));
     return legacy;
 }
 
@@ -1941,6 +1944,10 @@ legacy2aidl_audio_profile_AudioProfile(const audio_profile& legacy) {
             convertRange(legacy.channel_masks, legacy.channel_masks + legacy.num_channel_masks,
                          std::back_inserter(aidl.channelMasks),
                          legacy2aidl_audio_channel_mask_t_int32_t));
+
+    aidl.encapsulationType = VALUE_OR_RETURN(
+            legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
+                    legacy.encapsulation_type));
     return aidl;
 }
 
@@ -1989,6 +1996,15 @@ aidl2legacy_AudioPort_audio_port_v7(const media::AudioPort& aidl) {
                                  aidl2legacy_AudioProfile_audio_profile));
     legacy.num_audio_profiles = aidl.profiles.size();
 
+    if (aidl.extraAudioDescriptors.size() > std::size(legacy.extra_audio_descriptors)) {
+        return unexpected(BAD_VALUE);
+    }
+    RETURN_IF_ERROR(
+            convertRange(aidl.extraAudioDescriptors.begin(), aidl.extraAudioDescriptors.end(),
+                         legacy.extra_audio_descriptors,
+                         aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor));
+    legacy.num_extra_audio_descriptors = aidl.extraAudioDescriptors.size();
+
     if (aidl.gains.size() > std::size(legacy.gains)) {
         return unexpected(BAD_VALUE);
     }
@@ -2017,6 +2033,15 @@ legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy) {
             convertRange(legacy.audio_profiles, legacy.audio_profiles + legacy.num_audio_profiles,
                          std::back_inserter(aidl.profiles),
                          legacy2aidl_audio_profile_AudioProfile));
+
+    if (legacy.num_extra_audio_descriptors > std::size(legacy.extra_audio_descriptors)) {
+        return unexpected(BAD_VALUE);
+    }
+    RETURN_IF_ERROR(
+            convertRange(legacy.extra_audio_descriptors,
+                    legacy.extra_audio_descriptors + legacy.num_extra_audio_descriptors,
+                    std::back_inserter(aidl.extraAudioDescriptors),
+                    legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor));
 
     if (legacy.num_gains > std::size(legacy.gains)) {
         return unexpected(BAD_VALUE);
@@ -2216,6 +2241,86 @@ legacy2aidl_audio_playback_rate_t_AudioPlaybackRate(const audio_playback_rate_t&
     aidl.stretchMode = VALUE_OR_RETURN(
             legacy2aidl_audio_timestretch_stretch_mode_t_int32_t(legacy.mStretchMode));
     return aidl;
+}
+
+ConversionResult<audio_standard_t>
+aidl2legacy_AudioStandard_audio_standard_t(media::AudioStandard aidl) {
+    switch (aidl) {
+        case media::AudioStandard::NONE:
+            return AUDIO_STANDARD_NONE;
+        case media::AudioStandard::EDID:
+            return AUDIO_STANDARD_EDID;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioStandard>
+legacy2aidl_audio_standard_t_AudioStandard(audio_standard_t legacy) {
+    switch (legacy) {
+        case AUDIO_STANDARD_NONE:
+            return media::AudioStandard::NONE;
+        case AUDIO_STANDARD_EDID:
+            return media::AudioStandard::EDID;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<audio_extra_audio_descriptor>
+aidl2legacy_ExtraAudioDescriptor_audio_extra_audio_descriptor(
+        const media::ExtraAudioDescriptor& aidl) {
+    audio_extra_audio_descriptor legacy;
+    legacy.standard = VALUE_OR_RETURN(aidl2legacy_AudioStandard_audio_standard_t(aidl.standard));
+    if (aidl.audioDescriptor.size() > EXTRA_AUDIO_DESCRIPTOR_SIZE) {
+        return unexpected(BAD_VALUE);
+    }
+    legacy.descriptor_length = aidl.audioDescriptor.size();
+    std::copy(aidl.audioDescriptor.begin(), aidl.audioDescriptor.end(),
+              std::begin(legacy.descriptor));
+    legacy.encapsulation_type =
+            VALUE_OR_RETURN(aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(
+                    aidl.encapsulationType));
+    return legacy;
+}
+
+ConversionResult<media::ExtraAudioDescriptor>
+legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(
+        const audio_extra_audio_descriptor& legacy) {
+    media::ExtraAudioDescriptor aidl;
+    aidl.standard = VALUE_OR_RETURN(legacy2aidl_audio_standard_t_AudioStandard(legacy.standard));
+    if (legacy.descriptor_length > EXTRA_AUDIO_DESCRIPTOR_SIZE) {
+        return unexpected(BAD_VALUE);
+    }
+    aidl.audioDescriptor.resize(legacy.descriptor_length);
+    std::copy(legacy.descriptor, legacy.descriptor + legacy.descriptor_length,
+              aidl.audioDescriptor.begin());
+    aidl.encapsulationType =
+            VALUE_OR_RETURN(legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
+                    legacy.encapsulation_type));
+    return aidl;
+}
+
+ConversionResult<audio_encapsulation_type_t>
+aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(
+        const media::AudioEncapsulationType& aidl) {
+    switch (aidl) {
+        case media::AudioEncapsulationType::NONE:
+            return AUDIO_ENCAPSULATION_TYPE_NONE;
+        case media::AudioEncapsulationType::IEC61937:
+            return AUDIO_ENCAPSULATION_TYPE_IEC61937;
+    }
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioEncapsulationType>
+legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
+        const audio_encapsulation_type_t & legacy) {
+    switch (legacy) {
+        case AUDIO_ENCAPSULATION_TYPE_NONE:
+            return media::AudioEncapsulationType::NONE;
+        case AUDIO_ENCAPSULATION_TYPE_IEC61937:
+            return media::AudioEncapsulationType::IEC61937;
+    }
+    return unexpected(BAD_VALUE);
 }
 
 }  // namespace android

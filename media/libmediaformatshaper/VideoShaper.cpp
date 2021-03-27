@@ -83,7 +83,7 @@ int videoShaper(CodecProperties *codec, AMediaFormat* inFormat, int flags) {
     // apply any quality transforms in here..
     (void) VQApply(codec, info, inFormat, flags);
 
-    // We must always spread and map any QP parameters.
+    // We must always spread any QP parameters.
     // Sometimes it's something we inserted here, sometimes it's a value that the user injected.
     //
     qpSpreadPerFrameType(inFormat, info->qpDelta, info->qpMin, info->qpMax, /* override */ false);

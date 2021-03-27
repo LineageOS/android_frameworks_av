@@ -48,6 +48,52 @@ static std::vector<std::tuple<std::string, std::string, std::string>> kCsdFlushT
 // Resource directory
 static std::string sResourceDir = "";
 
+struct CompToURL {
+    std::string mime;
+    std::string mURL;
+    std::string info;
+    std::string chksum;
+};
+std::vector<CompToURL> kCompToURL = {
+    {"avc",
+     "bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_176x144_300kbps_60fps.info",
+     "bbb_avc_176x144_300kbps_60fps_chksum.md5"},
+    {"avc",
+     "bbb_avc_640x360_768kbps_30fps.h264", "bbb_avc_640x360_768kbps_30fps.info",
+     "bbb_avc_640x360_768kbps_30fps_chksum.md5"},
+    {"hevc",
+     "bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_176x144_176kbps_60fps.info",
+     "bbb_hevc_176x144_176kbps_60fps_chksum.md5"},
+    {"hevc",
+     "bbb_hevc_640x360_1600kbps_30fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.info",
+     "bbb_hevc_640x360_1600kbps_30fps_chksum.md5"},
+    {"mpeg2",
+     "bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_176x144_105kbps_25fps.info", ""},
+    {"mpeg2",
+     "bbb_mpeg2_352x288_1mbps_60fps.m2v","bbb_mpeg2_352x288_1mbps_60fps.info", ""},
+    {"3gpp",
+     "bbb_h263_352x288_300kbps_12fps.h263", "bbb_h263_352x288_300kbps_12fps.info", ""},
+    {"mp4v-es",
+     "bbb_mpeg4_352x288_512kbps_30fps.m4v", "bbb_mpeg4_352x288_512kbps_30fps.info", ""},
+    {"vp8",
+     "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info", ""},
+    {"vp8",
+     "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
+     "bbb_vp8_640x360_2mbps_30fps_chksm.md5"},
+    {"vp9",
+     "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info", ""},
+    {"vp9",
+     "bbb_vp9_640x360_1600kbps_30fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.info",
+     "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
+    {"vp9",
+     "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
+     "bbb_vp9_704x480_280kbps_24fps_altref_2.info", ""},
+    {"av01",
+     "bbb_av1_640_360.av1", "bbb_av1_640_360.info", "bbb_av1_640_360_chksum.md5"},
+    {"av01",
+     "bbb_av1_176_144.av1", "bbb_av1_176_144.info", "bbb_av1_176_144_chksm.md5"},
+};
+
 class LinearBuffer : public C2Buffer {
   public:
     explicit LinearBuffer(const std::shared_ptr<C2LinearBlock>& block)
@@ -85,26 +131,11 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
         ASSERT_NE(mLinearPool, nullptr);
 
-        mCompName = unknown_comp;
-        struct StringToName {
-            const char* Name;
-            standardComp CompName;
-        };
+        std::vector<std::unique_ptr<C2Param>> queried;
+        mComponent->query({}, {C2PortMediaTypeSetting::input::PARAM_TYPE}, C2_DONT_BLOCK, &queried);
+        ASSERT_GT(queried.size(), 0);
 
-        const StringToName kStringToName[] = {
-                {"h263", h263}, {"avc", avc}, {"mpeg2", mpeg2}, {"mpeg4", mpeg4},
-                {"hevc", hevc}, {"vp8", vp8}, {"vp9", vp9},     {"av1", av1},
-        };
-
-        const size_t kNumStringToName = sizeof(kStringToName) / sizeof(kStringToName[0]);
-
-        // Find the component type
-        for (size_t i = 0; i < kNumStringToName; ++i) {
-            if (strcasestr(mComponentName.c_str(), kStringToName[i].Name)) {
-                mCompName = kStringToName[i].CompName;
-                break;
-            }
-        }
+        mMime = ((C2PortMediaTypeSetting::input*)queried[0].get())->m.value;
         mEos = false;
         mFramesReceived = 0;
         mTimestampUs = 0u;
@@ -114,11 +145,11 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         mMd5Offset = 0;
         mMd5Enable = false;
         mRefMd5 = nullptr;
-        if (mCompName == unknown_comp) mDisableTest = true;
 
         C2SecureModeTuning secureModeTuning{};
         mComponent->query({&secureModeTuning}, {}, C2_MAY_BLOCK, nullptr);
-        if (secureModeTuning.value == C2Config::SM_READ_PROTECTED) {
+        if (secureModeTuning.value == C2Config::SM_READ_PROTECTED ||
+            secureModeTuning.value == C2Config::SM_READ_PROTECTED_WITH_ENCRYPTED) {
             mDisableTest = true;
         }
 
@@ -135,6 +166,9 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
 
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
+
+    void GetURLChksmForComponent(char* mURL, char* info, char* chksum, size_t streamIndex);
+    void GetURLForComponent(char* mURL, char* info, size_t streamIndex = 0);
 
     /* Calculate the CKSUM for the data in inbuf */
     void calc_md5_cksum(uint8_t* pu1_inbuf, uint32_t u4_stride, uint32_t u4_width,
@@ -267,18 +301,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
         }
     }
 
-    enum standardComp {
-        h263,
-        avc,
-        mpeg2,
-        mpeg4,
-        hevc,
-        vp8,
-        vp9,
-        av1,
-        unknown_comp,
-    };
-
+    std::string mMime;
     std::string mInstanceName;
     std::string mComponentName;
 
@@ -291,7 +314,6 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     char* mRefMd5;
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
-    standardComp mCompName;
 
     int32_t mWorkResult;
     int32_t mReorderDepth;
@@ -324,7 +346,7 @@ class Codec2VideoDecHidlTest
 };
 
 void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& component,
-                       Codec2VideoDecHidlTest::standardComp compName, bool& disableTest) {
+                       bool& disableTest) {
     // Validate its a C2 Component
     if (component->getName().find("c2") == std::string::npos) {
         ALOGE("Not a c2 component");
@@ -351,83 +373,32 @@ void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& 
             return;
         }
     }
-
-    // Validates component name
-    if (compName == Codec2VideoDecHidlTest::unknown_comp) {
-        ALOGE("Component InValid");
-        disableTest = true;
-        return;
-    }
     ALOGV("Component Valid");
 }
 
 // number of elementary streams per component
 #define STREAM_COUNT 3
 // LookUpTable of clips, metadata and chksum for component testing
-void GetURLChksmForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, char* info,
-                             char* chksum, size_t streamIndex = 1) {
-    struct CompToURL {
-        Codec2VideoDecHidlTest::standardComp comp;
-        const char mURL[STREAM_COUNT][512];
-        const char info[STREAM_COUNT][512];
-        const char chksum[STREAM_COUNT][512];
-    };
-    ASSERT_TRUE(streamIndex < STREAM_COUNT);
-
-    static const CompToURL kCompToURL[] = {
-            {Codec2VideoDecHidlTest::standardComp::avc,
-             {"bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_640x360_768kbps_30fps.h264", ""},
-             {"bbb_avc_176x144_300kbps_60fps.info", "bbb_avc_640x360_768kbps_30fps.info", ""},
-             {"bbb_avc_176x144_300kbps_60fps_chksum.md5",
-              "bbb_avc_640x360_768kbps_30fps_chksum.md5", ""}},
-            {Codec2VideoDecHidlTest::standardComp::hevc,
-             {"bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.hevc", ""},
-             {"bbb_hevc_176x144_176kbps_60fps.info", "bbb_hevc_640x360_1600kbps_30fps.info", ""},
-             {"bbb_hevc_176x144_176kbps_60fps_chksum.md5",
-              "bbb_hevc_640x360_1600kbps_30fps_chksum.md5", ""}},
-            {Codec2VideoDecHidlTest::standardComp::mpeg2,
-             {"bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_352x288_1mbps_60fps.m2v", ""},
-             {"bbb_mpeg2_176x144_105kbps_25fps.info", "bbb_mpeg2_352x288_1mbps_60fps.info", ""},
-             {"", "", ""}},
-            {Codec2VideoDecHidlTest::standardComp::h263,
-             {"", "bbb_h263_352x288_300kbps_12fps.h263", ""},
-             {"", "bbb_h263_352x288_300kbps_12fps.info", ""},
-             {"", "", ""}},
-            {Codec2VideoDecHidlTest::standardComp::mpeg4,
-             {"", "bbb_mpeg4_352x288_512kbps_30fps.m4v", ""},
-             {"", "bbb_mpeg4_352x288_512kbps_30fps.info", ""},
-             {"", "", ""}},
-            {Codec2VideoDecHidlTest::standardComp::vp8,
-             {"bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", ""},
-             {"bbb_vp8_176x144_240kbps_60fps.info", "bbb_vp8_640x360_2mbps_30fps.info", ""},
-             {"", "bbb_vp8_640x360_2mbps_30fps_chksm.md5", ""}},
-            {Codec2VideoDecHidlTest::standardComp::vp9,
-             {"bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9",
-              "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9"},
-             {"bbb_vp9_176x144_285kbps_60fps.info", "bbb_vp9_640x360_1600kbps_30fps.info",
-              "bbb_vp9_704x480_280kbps_24fps_altref_2.info"},
-             {"", "bbb_vp9_640x360_1600kbps_30fps_chksm.md5", ""}},
-            {Codec2VideoDecHidlTest::standardComp::av1,
-             {"bbb_av1_640_360.av1", "bbb_av1_176_144.av1", ""},
-             {"bbb_av1_640_360.info", "bbb_av1_176_144.info", ""},
-             {"bbb_av1_640_360_chksum.md5", "bbb_av1_176_144_chksm.md5", ""}},
-    };
-
-    for (size_t i = 0; i < sizeof(kCompToURL) / sizeof(kCompToURL[0]); ++i) {
-        if (kCompToURL[i].comp == comp) {
-            strcat(mURL, kCompToURL[i].mURL[streamIndex]);
-            strcat(info, kCompToURL[i].info[streamIndex]);
-            strcat(chksum, kCompToURL[i].chksum[streamIndex]);
-            return;
+void Codec2VideoDecHidlTestBase::GetURLChksmForComponent(char* mURL, char* info, char* chksum,
+                                                         size_t streamIndex) {
+    int streamCount = 0;
+    for (size_t i = 0; i < kCompToURL.size(); ++i) {
+        if (mMime.find(kCompToURL[i].mime) != std::string::npos) {
+            if (streamCount == streamIndex) {
+                strcat(mURL, kCompToURL[i].mURL.c_str());
+                strcat(info, kCompToURL[i].info.c_str());
+                strcat(chksum, kCompToURL[i].chksum.c_str());
+                return;
+            }
+            streamCount++;
         }
     }
 }
 
-void GetURLForComponent(Codec2VideoDecHidlTest::standardComp comp, char* mURL, char* info,
-                        size_t streamIndex = 1) {
+void Codec2VideoDecHidlTestBase::GetURLForComponent(char* mURL, char* info, size_t streamIndex) {
     char chksum[512];
     strcpy(chksum, sResourceDir.c_str());
-    GetURLChksmForComponent(comp, mURL, info, chksum, streamIndex);
+    GetURLChksmForComponent(mURL, info, chksum, streamIndex);
 }
 
 void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
@@ -517,7 +488,7 @@ void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
 TEST_P(Codec2VideoDecHidlTest, validateCompName) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ALOGV("Checks if the given component is a valid video component");
-    validateComponent(mComponent, mCompName, mDisableTest);
+    validateComponent(mComponent, mDisableTest);
     ASSERT_EQ(mDisableTest, false);
 }
 
@@ -599,7 +570,7 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     strcpy(info, sResourceDir.c_str());
     strcpy(chksum, sResourceDir.c_str());
 
-    GetURLChksmForComponent(mCompName, mURL, info, chksum, streamIndex);
+    GetURLChksmForComponent(mURL, info, chksum, streamIndex);
     if (!(strcmp(mURL, sResourceDir.c_str())) || !(strcmp(info, sResourceDir.c_str()))) {
         ALOGV("Skipping Test, Stream not available");
         return;
@@ -688,9 +659,11 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
 TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     description("Adaptive Decode Test");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
-    if (!(mCompName == avc || mCompName == hevc || mCompName == vp8 || mCompName == vp9 ||
-          mCompName == mpeg2))
+    if (!(strcasestr(mMime.c_str(), "avc") || strcasestr(mMime.c_str(), "hevc") ||
+        strcasestr(mMime.c_str(), "vp8") || strcasestr(mMime.c_str(), "vp9") ||
+        strcasestr(mMime.c_str(), "mpeg2"))) {
         return;
+    }
 
     typedef std::unique_lock<std::mutex> ULock;
     ASSERT_EQ(mComponent->start(), C2_OK);
@@ -705,7 +678,7 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
 
         strcpy(mURL, sResourceDir.c_str());
         strcpy(info, sResourceDir.c_str());
-        GetURLForComponent(mCompName, mURL, info, i % STREAM_COUNT);
+        GetURLForComponent(mURL, info, i % STREAM_COUNT);
         if (!(strcmp(mURL, sResourceDir.c_str())) || !(strcmp(info, sResourceDir.c_str()))) {
             ALOGV("Stream not available, skipping this index");
             continue;
@@ -801,7 +774,7 @@ TEST_P(Codec2VideoDecHidlTest, ThumbnailTest) {
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL, info);
+    GetURLForComponent(mURL, info);
 
     int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
     ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
@@ -888,7 +861,7 @@ TEST_P(Codec2VideoDecHidlTest, FlushTest) {
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL, info);
+    GetURLForComponent(mURL, info);
 
     mFlushedIndices.clear();
 
@@ -964,7 +937,7 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL, info);
+    GetURLForComponent(mURL, info);
 
     eleInfo.open(info);
     ASSERT_EQ(eleInfo.is_open(), true) << mURL << " - file not found";
@@ -1038,7 +1011,7 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
 
     strcpy(mURL, sResourceDir.c_str());
     strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL, info);
+    GetURLForComponent(mURL, info);
 
     int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
     ASSERT_GE(numCsds, 0) << "Error in parsing input info file";

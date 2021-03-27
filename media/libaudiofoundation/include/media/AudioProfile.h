@@ -38,6 +38,10 @@ public:
     AudioProfile(audio_format_t format,
                  const ChannelMaskSet &channelMasks,
                  const SampleRateSet &samplingRateCollection);
+    AudioProfile(audio_format_t format,
+                 const ChannelMaskSet &channelMasks,
+                 const SampleRateSet &samplingRateCollection,
+                 audio_encapsulation_type_t encapsulationType);
 
     audio_format_t getFormat() const { return mFormat; }
     const ChannelMaskSet &getChannels() const { return mChannelMasks; }
@@ -68,6 +72,11 @@ public:
 
     bool isDynamic() { return mIsDynamicFormat || mIsDynamicChannels || mIsDynamicRate; }
 
+    audio_encapsulation_type_t getEncapsulationType() const { return mEncapsulationType; }
+    void setEncapsulationType(audio_encapsulation_type_t encapsulationType) {
+        mEncapsulationType = encapsulationType;
+    }
+
     void dump(std::string *dst, int spaces) const;
 
     bool equals(const sp<AudioProfile>& other) const;
@@ -79,6 +88,7 @@ public:
     static ConversionResult<sp<AudioProfile>> fromParcelable(const media::AudioProfile& parcelable);
 
 private:
+
     std::string  mName;
     audio_format_t mFormat; // The format for an audio profile should only be set when initialized.
     ChannelMaskSet mChannelMasks;
@@ -87,6 +97,8 @@ private:
     bool mIsDynamicFormat = false;
     bool mIsDynamicChannels = false;
     bool mIsDynamicRate = false;
+
+    audio_encapsulation_type_t mEncapsulationType;
 
     AudioProfile() = default;
     AudioProfile& operator=(const AudioProfile& other);

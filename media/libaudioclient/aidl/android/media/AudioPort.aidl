@@ -22,6 +22,7 @@ import android.media.AudioPortExt;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProfile;
+import android.media.ExtraAudioDescriptor;
 
 /**
  * {@hide}
@@ -36,6 +37,11 @@ parcelable AudioPort {
     @utf8InCpp String name;
     /** AudioProfiles supported by this port (format, Rates, Channels). */
     AudioProfile[] profiles;
+    /**
+     * ExtraAudioDescriptors supported by this port. The format is not unrecognized to the
+     * platform. The audio capability is described by a hardware descriptor.
+     */
+    ExtraAudioDescriptor[] extraAudioDescriptors;
     /** Gain controllers. */
     AudioGain[] gains;
     /** Current audio port configuration. */
