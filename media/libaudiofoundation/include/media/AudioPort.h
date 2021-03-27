@@ -21,6 +21,7 @@
 
 #include <android/media/AudioPort.h>
 #include <android/media/AudioPortConfig.h>
+#include <android/media/ExtraAudioDescriptor.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioGain.h>
@@ -67,6 +68,14 @@ public:
     void setAudioProfiles(const AudioProfileVector &profiles) { mProfiles = profiles; }
     AudioProfileVector &getAudioProfiles() { return mProfiles; }
 
+    void setExtraAudioDescriptors(
+            const std::vector<media::ExtraAudioDescriptor> extraAudioDescriptors) {
+        mExtraAudioDescriptors = extraAudioDescriptors;
+    }
+    std::vector<media::ExtraAudioDescriptor> &getExtraAudioDescriptors() {
+        return mExtraAudioDescriptors;
+    }
+
     virtual void importAudioPort(const sp<AudioPort>& port, bool force = false);
 
     virtual void importAudioPort(const audio_port_v7& port);
@@ -102,6 +111,10 @@ protected:
     audio_port_type_t mType;
     audio_port_role_t mRole;
     AudioProfileVector mProfiles; // AudioProfiles supported by this port (format, Rates, Channels)
+
+    // Audio capabilities that are defined by hardware descriptors when the format is unrecognized
+    // by the platform, e.g. short audio descriptor in EDID for HDMI.
+    std::vector<media::ExtraAudioDescriptor> mExtraAudioDescriptors;
 private:
     template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
                                         || std::is_same<T, struct audio_port_v7>::value, int> = 0>
