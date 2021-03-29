@@ -45,9 +45,6 @@ static std::vector<std::tuple<std::string, std::string, std::string, std::string
 
 static std::vector<std::tuple<std::string, std::string, std::string>> kCsdFlushTestParameters;
 
-// Resource directory
-static std::string sResourceDir = "";
-
 struct CompToURL {
     std::string mime;
     std::string mURL;
@@ -1110,6 +1107,7 @@ INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2VideoDecCsdInputTests,
 
 // TODO : Video specific configuration Test
 int main(int argc, char** argv) {
+    parseArgs(argc, argv);
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER);
     for (auto params : kTestParameters) {
         kDecodeTestParameters.push_back(
@@ -1129,15 +1127,6 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
         kCsdFlushTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
-    }
-
-    // Set the resource directory based on command line args.
-    // Test will fail to set up if the argument is not set.
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-P") == 0 && i < argc - 1) {
-            sResourceDir = argv[i + 1];
-            break;
-        }
     }
 
     ::testing::InitGoogleTest(&argc, argv);
