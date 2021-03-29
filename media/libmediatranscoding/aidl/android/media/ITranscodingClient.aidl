@@ -55,6 +55,31 @@ interface ITranscodingClient {
     boolean getSessionWithId(in int sessionId, out TranscodingSessionParcel session);
 
     /**
+     * Add an additional client uid requesting a session.
+     *
+     * @sessionId the session id to which to add the additional client uid.
+     * @clientUid the additional client uid to be added.
+     * @return false if the session doesn't exist or the client is already requesting the
+     * session, true otherwise.
+     */
+    boolean addClientUid(in int sessionId, int clientUid);
+
+    /**
+     * Retrieves the (unsorted) list of all clients requesting a session.
+     *
+     * Note that if a session was submitted with offline priority (
+     * TranscodingSessionPriority::kUnspecified), it initially will not be considered requested
+     * by any particular client, because the client could go away any time after the submission.
+     * However, additional uids could be added via addClientUid() after the submission, which
+     * essentially make the request a real-time request instead of an offline request.
+     *
+     * @sessionId the session id for which to retrieve the client uid list.
+     * @clientUids array to hold the retrieved client uid list.
+     * @return false if the session doesn't exist, true otherwise.
+     */
+    boolean getClientUids(in int sessionId, out int[] clientUids);
+
+    /**
     * Unregister the client with the MediaTranscodingService.
     *
     * Client will not be able to perform any more transcoding after unregister.

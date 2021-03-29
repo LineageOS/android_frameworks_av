@@ -36,6 +36,7 @@
 
 #include <iostream>
 #include <list>
+#include <unordered_set>
 
 #include "MediaTranscodingServiceTestHelper.h"
 #include "SimulatedTranscoder.h"
@@ -255,6 +256,54 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestGetSessions) {
     unregisterMultipleClients();
 }
 
+TEST_F(MediaTranscodingServiceSimulatedTest, TestAddGetClientUids) {
+    registerMultipleClients();
+
+    std::vector<int32_t> clientUids;
+    TranscodingRequestParcel request;
+    TranscodingSessionParcel session;
+    uid_t ownUid = ::getuid();
+
+    // Submit one real-time session.
+    EXPECT_TRUE(mClient1->submit(0, "test_source_file_0", "test_destination_file"));
+
+    // Should have mClientUid in client uid list.
+    EXPECT_TRUE(mClient1->getClientUids(0, &clientUids));
+    EXPECT_EQ(clientUids.size(), 1u);
+    EXPECT_EQ(clientUids[0], (int32_t)mClient1->mClientUid);
+
+    // Adding invalid client uid should fail.
+    EXPECT_TRUE(mClient1->addClientUid<fail>(0, kInvalidClientUid));
+
+    // Adding mClientUid again should fail.
+    EXPECT_TRUE(mClient1->addClientUid<fail>(0, mClient1->mClientUid));
+
+    // Submit one offline session.
+    EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file_1",
+                                 TranscodingSessionPriority::kUnspecified));
+
+    // Should not have any uids in client uid list.
+    EXPECT_TRUE(mClient1->getClientUids(1, &clientUids));
+    EXPECT_EQ(clientUids.size(), 0u);
+
+    // Add own uid (with IMediaTranscodingService::USE_CALLING_UID), should succeed.
+    EXPECT_TRUE(mClient1->addClientUid(1, IMediaTranscodingService::USE_CALLING_UID));
+    EXPECT_TRUE(mClient1->getClientUids(1, &clientUids));
+    EXPECT_EQ(clientUids.size(), 1u);
+    EXPECT_EQ(clientUids[0], (int32_t)ownUid);
+
+    // Adding mClientUid should succeed.
+    EXPECT_TRUE(mClient1->addClientUid(1, mClient1->mClientUid));
+    EXPECT_TRUE(mClient1->getClientUids(1, &clientUids));
+    std::unordered_set<uid_t> uidSet;
+    uidSet.insert(clientUids.begin(), clientUids.end());
+    EXPECT_EQ(uidSet.size(), 2u);
+    EXPECT_EQ(uidSet.count(ownUid), 1u);
+    EXPECT_EQ(uidSet.count(mClient1->mClientUid), 1u);
+
+    unregisterMultipleClients();
+}
+
 TEST_F(MediaTranscodingServiceSimulatedTest, TestSubmitCancelWithOfflineSessions) {
     registerMultipleClients();
 
@@ -376,6 +425,53 @@ TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingUidPolicy) {
     EXPECT_TRUE(ShellHelper::Stop(kClientPackageC));
 
     ALOGD("TestTranscodingUidPolicy finished.");
+}
+
+TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingUidPolicyWithMultipleClientUids) {
+    ALOGD("TestTranscodingUidPolicyWithMultipleClientUids starting...");
+
+    EXPECT_TRUE(ShellHelper::RunCmd("input keyevent KEYCODE_WAKEUP"));
+    EXPECT_TRUE(ShellHelper::RunCmd("wm dismiss-keyguard"));
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageC));
+
+    registerMultipleClients();
+
+    ALOGD("Moving app A to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
+
+    // Submit 3 requests.
+    ALOGD("Submitting session to client1 (app A)...");
+    EXPECT_TRUE(mClient1->submit(0, "test_source_file_0", "test_destination_file_0"));
+    EXPECT_TRUE(mClient1->submit(1, "test_source_file_1", "test_destination_file_1"));
+    EXPECT_TRUE(mClient1->submit(2, "test_source_file_2", "test_destination_file_2"));
+
+    // mClient1's Session 0 should start immediately.
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
+
+    // Add client2 (app B)'s uid to mClient1's session 1.
+    EXPECT_TRUE(mClient1->addClientUid(1, mClient2->mClientUid));
+
+    ALOGD("Moving app B to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageB, kTestActivityName));
+
+    // mClient1's session 0 should pause, session 1 should start.
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Pause(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 1));
+
+    ALOGD("Moving app A back to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
+    EXPECT_EQ(mClient1->pop(kSessionWithPaddingUs), EventTracker::Finished(CLIENT(1), 1));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Resume(CLIENT(1), 0));
+
+    unregisterMultipleClients();
+
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageC));
+
+    ALOGD("TestTranscodingUidPolicyWithMultipleClientUids finished.");
 }
 
 TEST_F(MediaTranscodingServiceSimulatedTest, TestTranscodingThermalPolicy) {
