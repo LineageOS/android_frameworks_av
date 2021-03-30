@@ -2311,7 +2311,13 @@ void CCodec::initiateReleaseIfStuck() {
         return;
     }
 
-    ALOGW("previous call to %s exceeded timeout", name.c_str());
+    C2String compName;
+    {
+        Mutexed<State>::Locked state(mState);
+        compName = state->comp->getName();
+    }
+    ALOGW("[%s] previous call to %s exceeded timeout", compName.c_str(), name.c_str());
+
     initiateRelease(false);
     mCallback->onError(UNKNOWN_ERROR, ACTION_CODE_FATAL);
 }
