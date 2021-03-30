@@ -2169,7 +2169,7 @@ status_t getAudioOffloadInfo(const sp<MetaData>& meta, bool hasVideo,
     }
     info->duration_us = duration;
 
-    int32_t brate = -1;
+    int32_t brate = 0;
     if (!meta->findInt32(kKeyBitRate, &brate)) {
         ALOGV("track of type '%s' does not publish bitrate", mime);
     }

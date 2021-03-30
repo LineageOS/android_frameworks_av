@@ -62,7 +62,7 @@ bool AWakeLock::acquire() {
             binder::Status status = mPowerManager->acquireWakeLock(
                     binder, POWERMANAGER_PARTIAL_WAKE_LOCK,
                     String16("AWakeLock"), String16("media"),
-                    {} /* workSource */, {} /* historyTag */);
+                    {} /* workSource */, {} /* historyTag */, -1 /* displayId */);
             IPCThreadState::self()->restoreCallingIdentity(token);
             if (status.isOk()) {
                 mWakeLockToken = binder;
