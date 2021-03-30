@@ -151,7 +151,7 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
 
     auto result = engineConfig::parse();
     if (result.parsedConfig == nullptr) {
-        ALOGW("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
+        ALOGD("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
         engineConfig::Config config = gDefaultEngineConfig;
         android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
         result = {std::make_unique<engineConfig::Config>(config),
