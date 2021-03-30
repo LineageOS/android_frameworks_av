@@ -267,6 +267,8 @@ public:
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids);
 
+    virtual status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
+
     status_t onPreTransact(TransactionCode code, const Parcel& data, uint32_t flags) override;
 
     // end of IAudioFlinger interface
@@ -295,6 +297,8 @@ public:
 
     void updateDownStreamPatches_l(const struct audio_patch *patch,
                                    const std::set<audio_io_handle_t> streams);
+
+    const media::AudioVibratorInfo* getDefaultVibratorInfo_l();
 
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
@@ -970,6 +974,8 @@ private:
     SimpleLog  mRejectedSetParameterLog;
     SimpleLog  mAppSetParameterLog;
     SimpleLog  mSystemSetParameterLog;
+
+    std::vector<media::AudioVibratorInfo> mAudioVibratorInfos;
 
     static inline constexpr const char *mMetricsId = AMEDIAMETRICS_KEY_AUDIO_FLINGER;
 };
