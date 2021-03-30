@@ -1962,7 +1962,7 @@ status_t NuPlayer::Renderer::onOpenAudioSink(
             ALOGV("Mime \"%s\" mapped to audio_format 0x%x",
                     mime.c_str(), audioFormat);
 
-            int avgBitRate = -1;
+            int avgBitRate = 0;
             format->findInt32("bitrate", &avgBitRate);
 
             int32_t aacProfile = -1;
