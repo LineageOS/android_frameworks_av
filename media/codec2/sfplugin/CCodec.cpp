@@ -1894,6 +1894,12 @@ void CCodec::signalSetParameters(const sp<AMessage> &msg) {
         params->removeEntryAt(params->findEntryByName(KEY_BIT_RATE));
     }
 
+    int32_t syncId = 0;
+    if (params->findInt32("audio-hw-sync", &syncId)
+            || params->findInt32("hw-av-sync-id", &syncId)) {
+        configureTunneledVideoPlayback(comp, nullptr, params);
+    }
+
     Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
     const std::unique_ptr<Config> &config = *configLocked;
 
@@ -2215,6 +2221,10 @@ status_t CCodec::configureTunneledVideoPlayback(
     c2_status_t c2err = comp->config({ tunneledPlayback.get() }, C2_MAY_BLOCK, &failures);
     if (c2err != C2_OK) {
         return UNKNOWN_ERROR;
+    }
+
+    if (sidebandHandle == nullptr) {
+        return OK;
     }
 
     std::vector<std::unique_ptr<C2Param>> params;
