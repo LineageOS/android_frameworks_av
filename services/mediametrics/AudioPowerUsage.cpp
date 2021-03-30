@@ -127,14 +127,13 @@ int32_t AudioPowerUsage::deviceFromStringPairs(const std::string& device_strings
     return deviceMask;
 }
 
-/* static */
-void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& item)
+void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& item) const
 {
     int32_t type;
     if (!item->getInt32(AUDIO_POWER_USAGE_PROP_TYPE, &type)) return;
 
-    int32_t device;
-    if (!item->getInt32(AUDIO_POWER_USAGE_PROP_DEVICE, &device)) return;
+    int32_t audio_device;
+    if (!item->getInt32(AUDIO_POWER_USAGE_PROP_DEVICE, &audio_device)) return;
 
     int64_t duration_ns;
     if (!item->getInt64(AUDIO_POWER_USAGE_PROP_DURATION_NS, &duration_ns)) return;
@@ -142,11 +141,24 @@ void AudioPowerUsage::sendItem(const std::shared_ptr<const mediametrics::Item>& 
     double volume;
     if (!item->getDouble(AUDIO_POWER_USAGE_PROP_VOLUME, &volume)) return;
 
-    (void)android::util::stats_write(android::util::AUDIO_POWER_USAGE_DATA_REPORTED,
-                                         device,
-                                         (int32_t)(duration_ns / NANOS_PER_SECOND),
-                                         (float)volume,
+    const int32_t duration_secs = (int32_t)(duration_ns / NANOS_PER_SECOND);
+    const float average_volume = (float)volume;
+    const int result = android::util::stats_write(android::util::AUDIO_POWER_USAGE_DATA_REPORTED,
+                                         audio_device,
+                                         duration_secs,
+                                         average_volume,
                                          type);
+
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_audio_power_usage_data_reported:"
+            << android::util::AUDIO_POWER_USAGE_DATA_REPORTED
+            << " audio_device:" << audio_device
+            << " duration_secs:" << duration_secs
+            << " average_volume:" << average_volume
+            << " type:" << type
+            << " }";
+    mStatsdLog->log(android::util::AUDIO_POWER_USAGE_DATA_REPORTED, log.str());
 }
 
 bool AudioPowerUsage::saveAsItem_l(
@@ -360,8 +372,10 @@ void AudioPowerUsage::checkCreatePatch(const std::shared_ptr<const mediametrics:
     mPrimaryDevice = device;
 }
 
-AudioPowerUsage::AudioPowerUsage(AudioAnalytics *audioAnalytics)
+AudioPowerUsage::AudioPowerUsage(
+        AudioAnalytics *audioAnalytics, const std::shared_ptr<StatsdLog>& statsdLog)
     : mAudioAnalytics(audioAnalytics)
+    , mStatsdLog(statsdLog)
     , mDisabled(property_get_bool(PROP_AUDIO_METRICS_DISABLED, AUDIO_METRICS_DISABLED_DEFAULT))
     , mIntervalHours(property_get_int32(PROP_AUDIO_METRICS_INTERVAL_HR, INTERVAL_HR_DEFAULT))
 {

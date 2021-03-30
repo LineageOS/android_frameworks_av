@@ -124,7 +124,14 @@ private:
 
     std::atomic<int64_t> mItemsSubmitted{}; // accessed outside of lock.
 
-    mediametrics::AudioAnalytics mAudioAnalytics; // mAudioAnalytics is locked internally.
+    // mStatsdLog is locked internally (thread-safe) and shows the last atoms logged
+    static constexpr size_t STATSD_LOG_LINES_MAX = 30; // recent log lines to keep
+    static constexpr size_t STATSD_LOG_LINES_DUMP = 4; // normal amount of lines to dump
+    const std::shared_ptr<mediametrics::StatsdLog> mStatsdLog{
+            std::make_shared<mediametrics::StatsdLog>(STATSD_LOG_LINES_MAX)};
+
+    // mAudioAnalytics is locked internally.
+    mediametrics::AudioAnalytics mAudioAnalytics{mStatsdLog};
 
     std::mutex mLock;
     // statistics about our analytics

@@ -43,53 +43,60 @@
 namespace android {
 
 // mediadrm
-bool statsd_mediadrm(const mediametrics::Item *item)
+bool statsd_mediadrm(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) return false;
 
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     std::string vendor;
     (void) item->getString("vendor", &vendor);
     std::string description;
     (void) item->getString("description", &description);
 
-    if (enabled_statsd) {
-        // This field is left here for backward compatibility.
-        // This field is not used anymore.
-        const std::string  kUnusedField("unused");
-        android::util::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
-        android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   vendor.c_str(),
-                                   description.c_str(),
-                                   bf_serialized);
-    } else {
-        ALOGV("NOT sending: mediadrm data(%s, %s)", vendor.c_str(), description.c_str());
-    }
+    // This field is left here for backward compatibility.
+    // This field is not used anymore.
+    const std::string  kUnusedField("unused");
+    android::util::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
+        timestamp_nanos, package_name.c_str(), package_version_code,
+        media_apex_version,
+        vendor.c_str(),
+        description.c_str(),
+        bf_serialized);
 
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_mediadrm_reported:"
+            << android::util::MEDIAMETRICS_MEDIADRM_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
+
+            << " vendor:" << vendor
+            << " description:" << description
+            // omitting serialized
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_MEDIADRM_REPORTED, log.str());
     return true;
 }
 
 // drmmanager
-bool statsd_drmmanager(const mediametrics::Item *item)
+bool statsd_drmmanager(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     using namespace std::string_literals;
     if (item == nullptr) return false;
 
-    if (!enabled_statsd) {
-        ALOGV("NOT sending: drmmanager data");
-        return true;
-    }
-
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     std::string plugin_id;
     (void) item->getString("plugin_id", &plugin_id);
@@ -107,8 +114,9 @@ bool statsd_drmmanager(const mediametrics::Item *item)
         item->getInt64(("method"s + std::to_string(i)).c_str(), &methodCounts[i]);
     }
 
-    android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
-                               timestamp, pkgName.c_str(), pkgVersionCode, mediaApexVersion,
+    const int result = android::util::stats_write(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED,
+                               timestamp_nanos, package_name.c_str(), package_version_code,
+                               media_apex_version,
                                plugin_id.c_str(), description.c_str(),
                                method_id, mime_types.c_str(),
                                methodCounts[0], methodCounts[1], methodCounts[2],
@@ -117,6 +125,25 @@ bool statsd_drmmanager(const mediametrics::Item *item)
                                methodCounts[9], methodCounts[10], methodCounts[11],
                                methodCounts[12]);
 
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_drmmanager_reported:"
+            << android::util::MEDIAMETRICS_DRMMANAGER_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
+
+            << " plugin_id:" << plugin_id
+            << " description:" << description
+            << " method_id:" << method_id
+            << " mime_types:" << mime_types;
+
+    for (size_t i = 0; i < methodCounts.size(); ++i) {
+        log << " method_" << i << ":" << methodCounts[i];
+    }
+    log << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_DRMMANAGER_REPORTED, log.str());
     return true;
 }
 
@@ -144,15 +171,11 @@ std::vector<uint8_t> base64DecodeNoPad(std::string& str) {
 } // namespace
 
 // |out| and its contents are memory-managed by statsd.
-bool statsd_mediadrm_puller(const mediametrics::Item* item, AStatsEventList* out)
+bool statsd_mediadrm_puller(
+        const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out)
 {
     if (item == nullptr) {
         return false;
-    }
-
-    if (!enabled_statsd) {
-        ALOGV("NOT pulling: mediadrm activity");
-        return true;
     }
 
     std::string serialized_metrics;
