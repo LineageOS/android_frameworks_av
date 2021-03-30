@@ -360,6 +360,7 @@ INSTANTIATE_TEST_CASE_P(NonStdInputs, Codec2ComponentInputTests,
 // TODO: Add test for Invalid work,
 // TODO: Add test for Invalid states
 int main(int argc, char** argv) {
+    parseArgs(argc, argv);
     kTestParameters = getTestParameters();
     for (auto params : kTestParameters) {
         kInputTestParameters.push_back(
