@@ -140,7 +140,6 @@ static constexpr const char * const AudioDeviceConnectionFields[] = {
 
 static constexpr const char * const AAudioStreamFields[] {
     "mediametrics_aaudiostream_reported",
-    "caller_name",
     "path",
     "direction",
     "frames_per_burst",
@@ -156,6 +155,8 @@ static constexpr const char * const AAudioStreamFields[] {
     "format_app",
     "format_device",
     "log_session_id",
+    "sample_rate",
+    "content_type",
 };
 
 /**
@@ -932,12 +933,6 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
         const std::shared_ptr<const android::mediametrics::Item> &item, CallerPath path) const {
     const std::string& key = item->getKey();
 
-    std::string callerNameStr;
-    mAudioAnalytics.mAnalyticsState->timeMachine().get(
-            key, AMEDIAMETRICS_PROP_CALLERNAME, &callerNameStr);
-
-    const auto callerName = types::lookup<types::CALLER_NAME, int32_t>(callerNameStr);
-
     std::string directionStr;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
             key, AMEDIAMETRICS_PROP_DIRECTION, &directionStr);
@@ -994,8 +989,16 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
     std::string logSessionId;
     // TODO: log logSessionId
 
+    int32_t sampleRate = 0;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SAMPLERATE, &sampleRate);
+
+    std::string contentTypeStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_CONTENTTYPE, &contentTypeStr);
+    const auto contentType = types::lookup<types::CONTENT_TYPE, int32_t>(contentTypeStr);
+
     LOG(LOG_LEVEL) << "key:" << key
-            << " caller_name:" << callerName << "(" << callerNameStr << ")"
             << " path:" << path
             << " direction:" << direction << "(" << directionStr << ")"
             << " frames_per_burst:" << framesPerBurst
@@ -1010,14 +1013,15 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
             << " device_type:" << serializedDeviceTypes
             << " format_app:" << formatApp
             << " format_device: " << formatDevice << "(" << formatDeviceStr << ")"
-            << " log_session_id: " << logSessionId;
+            << " log_session_id: " << logSessionId
+            << " sample_rate: " << sampleRate
+            << " content_type: " << contentType << "(" << contentTypeStr << ")";
 
     if (mAudioAnalytics.mDeliverStatistics) {
         android::util::BytesField bf_serialized(
             serializedDeviceTypes.c_str(), serializedDeviceTypes.size());
         const auto result = sendToStatsd(
                 CONDITION(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED)
-                , callerName
                 , path
                 , direction
                 , framesPerBurst
@@ -1033,12 +1037,13 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , formatApp
                 , formatDevice
                 , logSessionId.c_str()
+                , sampleRate
+                , contentType
                 );
         std::stringstream ss;
         ss << "result:" << result;
         const auto fieldsStr = printFields(AAudioStreamFields,
                 CONDITION(android::util::MEDIAMETRICS_AAUDIOSTREAM_REPORTED)
-                , callerName
                 , path
                 , direction
                 , framesPerBurst
@@ -1054,6 +1059,8 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , formatApp
                 , formatDevice
                 , logSessionId.c_str()
+                , sampleRate
+                , contentType
                 );
         ss << " " << fieldsStr;
         std::string str = ss.str();
