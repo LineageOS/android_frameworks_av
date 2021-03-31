@@ -180,6 +180,22 @@ status_t DeviceHalLocal::getAudioPort(struct audio_port *port) {
     return mDev->get_audio_port(mDev, port);
 }
 
+status_t DeviceHalLocal::getAudioPort(struct audio_port_v7 *port) {
+#if MAJOR_VERSION >= 7
+    if (version() >= AUDIO_DEVICE_API_VERSION_3_2) {
+        // get_audio_port_v7 is mandatory if legacy HAL support this API version.
+        return mDev->get_audio_port_v7(mDev, port);
+    }
+#endif
+    struct audio_port audioPort = {};
+    audio_populate_audio_port(port, &audioPort);
+    status_t status = getAudioPort(&audioPort);
+    if (status == NO_ERROR) {
+        audio_populate_audio_port_v7(&audioPort, port);
+    }
+    return status;
+}
+
 status_t DeviceHalLocal::setAudioPortConfig(const struct audio_port_config *config) {
     if (version() >= AUDIO_DEVICE_API_VERSION_3_0)
         return mDev->set_audio_port_config(mDev, config);
