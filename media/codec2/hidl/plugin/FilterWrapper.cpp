@@ -19,7 +19,6 @@
 #include <android-base/logging.h>
 
 #include <set>
-#include <sstream>
 
 #include <dlfcn.h>
 
@@ -383,6 +382,9 @@ private:
         // Configure the next interface with the params.
         std::vector<C2Param *> configParams;
         for (size_t i = 0; i < heapParams.size(); ++i) {
+            if (!heapParams[i]) {
+                continue;
+            }
             if (heapParams[i]->forStream()) {
                 heapParams[i] = C2Param::CopyAsStream(
                         *heapParams[i], false /* output */, heapParams[i]->stream());
@@ -782,10 +784,7 @@ std::vector<FilterWrapper::Component> FilterWrapper::createFilters() {
         if (C2_OK != mStore->createComponent(filter.traits.name, &comp)) {
             return {};
         }
-        if (C2_OK != mStore->createInterface(filter.traits.name, &intf)) {
-            return {};
-        }
-        filters.push_back({comp, intf, filter.traits, filter.desc});
+        filters.push_back({comp, comp->intf(), filter.traits, filter.desc});
     }
     return filters;
 }
@@ -869,7 +868,7 @@ std::shared_ptr<C2Component> FilterWrapper::maybeWrapComponent(
     }
     std::vector<Component> filters = createFilters();
     std::shared_ptr wrapped = std::make_shared<WrappedDecoder>(
-            comp, std::move(filters), weak_from_this());
+            comp, std::vector(filters), weak_from_this());
     {
         std::unique_lock lock(mWrappedComponentsMutex);
         std::vector<std::weak_ptr<const C2Component>> &components =
