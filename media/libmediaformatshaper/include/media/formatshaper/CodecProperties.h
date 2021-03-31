@@ -56,6 +56,10 @@ class CodecProperties {
     void setFeatureValue(std::string key, int32_t value);
     bool getFeatureValue(std::string key, int32_t *valuep);
 
+    // keep a map of all tunings and their parameters
+    void setTuningValue(std::string key, std::string value);
+    bool getTuningValue(std::string key, std::string &value);
+
     // does the codec support the Android S minimum quality rules
     void setSupportedMinimumQuality(int vmaf);
     int supportedMinimumQuality();
@@ -97,6 +101,10 @@ class CodecProperties {
     std::map<std::string, std::string> mMappings /*GUARDED_BY(mMappingLock)*/ ;
 
     std::map<std::string, int32_t> mFeatures /*GUARDED_BY(mMappingLock)*/ ;
+    std::map<std::string, std::string> mTunings /*GUARDED_BY(mMappingLock)*/ ;
+
+    // Seed() and Finish() use this as the underlying implementation
+    void addMediaDefaults(bool overrideable);
 
     bool mIsRegistered = false;
 

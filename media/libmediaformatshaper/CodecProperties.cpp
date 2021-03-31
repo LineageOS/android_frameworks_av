@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include <string>
+#include <stdlib.h>
 
 #include <media/formatshaper/CodecProperties.h>
 
@@ -63,17 +64,12 @@ void CodecProperties::setFeatureValue(std::string key, int32_t value) {
     ALOGD("setFeatureValue(%s,%d)", key.c_str(), value);
     mFeatures.insert({key, value});
 
-    if (!strcmp(key.c_str(), "vq-minimum-quality")) {
-        setSupportedMinimumQuality(value);
-    } else if (!strcmp(key.c_str(), "vq-supports-qp")) {      // key from prototyping
+    if (!strcmp(key.c_str(), "qp-bounds")) {               // official key
         setSupportsQp(1);
-    } else if (!strcmp(key.c_str(), "qp-bounds")) {           // official key
+    } else if (!strcmp(key.c_str(), "vq-supports-qp")) {   // key from prototyping
         setSupportsQp(1);
-    } else if (!strcmp(key.c_str(), "vq-target-qpmax")) {
-        setTargetQpMax(value);
-    } else if (!strcmp(key.c_str(), "vq-target-bppx100")) {
-        double bpp = value / 100.0;
-        setBpp(bpp);
+    } else if (!strcmp(key.c_str(), "vq-minimum-quality")) {
+        setSupportedMinimumQuality(1);
     }
 }
 
@@ -85,6 +81,63 @@ bool CodecProperties::getFeatureValue(std::string key, int32_t *valuep) {
     auto mapped = mFeatures.find(key);
     if (mapped != mFeatures.end()) {
         *valuep = mapped->second;
+        return true;
+    }
+    return false;
+}
+
+// Tuning values (which differ from Features)
+// this is where we set up things like target bitrates and QP ranges
+// NB the tuning values arrive as a string, allowing us to convert it into an appropriate
+// format (int, float, ranges, other combinations)
+//
+void CodecProperties::setTuningValue(std::string key, std::string value) {
+    ALOGD("setTuningValue(%s,%s)", key.c_str(), value.c_str());
+    mTunings.insert({key, value});
+
+    bool legal = false;
+    // NB: old school strtol() because std::stoi() throws exceptions
+    if (!strcmp(key.c_str(), "vq-target-qpmax")) {
+        const char *p = value.c_str();
+        char *q;
+        int32_t iValue =  strtol(p, &q, 0);
+        if (q != p) {
+            setTargetQpMax(iValue);
+            legal = true;
+        }
+    } else if (!strcmp(key.c_str(), "vq-target-bpp")) {
+        const char *p = value.c_str();
+        char *q;
+        double bpp = strtod(p, &q);
+        if (q != p) {
+            setBpp(bpp);
+            legal = true;
+        }
+    } else if (!strcmp(key.c_str(), "vq-target-bppx100")) {
+        const char *p = value.c_str();
+        char *q;
+        int32_t iValue =  strtol(p, &q, 0);
+        if (q != p) {
+            double bpp = iValue / 100.0;
+            setBpp(bpp);
+            legal = true;
+        }
+    } else {
+        legal = true;
+    }
+
+    if (!legal) {
+        ALOGW("setTuningValue() unable to apply tuning '%s' with value '%s'",
+              key.c_str(), value.c_str());
+    }
+    return;
+}
+
+bool CodecProperties::getTuningValue(std::string key, std::string &value) {
+    ALOGV("getTuningValue(%s)", key.c_str());
+    auto mapped = mFeatures.find(key);
+    if (mapped != mFeatures.end()) {
+        value = mapped->second;
         return true;
     }
     return false;
