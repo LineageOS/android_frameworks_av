@@ -996,7 +996,15 @@ void CCodec::configure(const sp<AMessage> &msg) {
                 // needed for decoders.
                 if (!(config->mDomain & Config::IS_ENCODER)) {
                     if (surface == nullptr) {
-                        format = flexPixelFormat.value_or(COLOR_FormatYUV420Flexible);
+                        const char *prefix = "";
+                        if (flexSemiPlanarPixelFormat) {
+                            format = COLOR_FormatYUV420SemiPlanar;
+                            prefix = "semi-";
+                        } else {
+                            format = COLOR_FormatYUV420Planar;
+                        }
+                        ALOGD("Client requested ByteBuffer mode decoder w/o color format set: "
+                                "using default %splanar color format", prefix);
                     } else {
                         format = COLOR_FormatSurface;
                     }
