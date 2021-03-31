@@ -234,10 +234,13 @@ bool operator==(const TestTranscoder::Event& lhs, const TestTranscoder::Event& r
 }
 
 struct TestClientCallback : public BnTranscodingClientCallback {
-    TestClientCallback(TestTranscoder* owner, int64_t clientId)
-          : mOwner(owner), mClientId(clientId) {
+    TestClientCallback(TestTranscoder* owner, ClientIdType clientId, uid_t clientUid)
+          : mOwner(owner), mClientId(clientId), mClientUid(clientUid) {
         ALOGD("TestClient Created");
     }
+
+    ClientIdType clientId() const { return mClientId; }
+    uid_t clientUid() const { return mClientUid; }
 
     Status openFileDescriptor(const std::string& /*in_fileUri*/, const std::string& /*in_mode*/,
                               ::ndk::ScopedFileDescriptor* /*_aidl_return*/) override {
@@ -277,7 +280,8 @@ struct TestClientCallback : public BnTranscodingClientCallback {
 
 private:
     TestTranscoder* mOwner;
-    int64_t mClientId;
+    ClientIdType mClientId;
+    uid_t mClientUid;
     TestClientCallback(const TestClientCallback&) = delete;
     TestClientCallback& operator=(const TestClientCallback&) = delete;
 };
@@ -313,14 +317,14 @@ public:
         // Set priority only, ignore other fields for now.
         mOfflineRequest.priority = TranscodingSessionPriority::kUnspecified;
         mRealtimeRequest.priority = TranscodingSessionPriority::kHigh;
-        mClientCallback0 =
-                ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(), CLIENT(0));
-        mClientCallback1 =
-                ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(), CLIENT(1));
-        mClientCallback2 =
-                ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(), CLIENT(2));
-        mClientCallback3 =
-                ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(), CLIENT(3));
+        mClientCallback0 = ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(),
+                                                                          CLIENT(0), UID(0));
+        mClientCallback1 = ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(),
+                                                                          CLIENT(1), UID(1));
+        mClientCallback2 = ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(),
+                                                                          CLIENT(2), UID(2));
+        mClientCallback3 = ::ndk::SharedRefBase::make<TestClientCallback>(mTranscoder.get(),
+                                                                          CLIENT(3), UID(3));
     }
 
     void TearDown() override { ALOGI("TranscodingSessionControllerTest tear down"); }
@@ -337,34 +341,51 @@ public:
 
     void testPacerHelper(int numSubmits, int sessionDurationMs, int expectedSuccess,
                          bool pauseLastSuccessSession = false) {
+        testPacerHelper(numSubmits, sessionDurationMs, expectedSuccess, mClientCallback0, {},
+                        pauseLastSuccessSession);
+    }
+
+    void testPacerHelper(int numSubmits, int sessionDurationMs, int expectedSuccess,
+                         const std::shared_ptr<TestClientCallback>& client,
+                         const std::vector<int>& additionalClientUids,
+                         bool pauseLastSuccessSession) {
         for (int i = 0; i < numSubmits; i++) {
-            mController->submit(CLIENT(0), SESSION(i), UID(0), UID(0),
-                                mRealtimeRequest, mClientCallback0);
+            mController->submit(client->clientId(), SESSION(i), client->clientUid(),
+                                client->clientUid(), mRealtimeRequest, client);
+            for (int additionalUid : additionalClientUids) {
+                mController->addClientUid(client->clientId(), SESSION(i), additionalUid);
+            }
         }
         for (int i = 0; i < expectedSuccess; i++) {
-            EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(i)));
+            EXPECT_EQ(mTranscoder->popEvent(),
+                      TestTranscoder::Start(client->clientId(), SESSION(i)));
             if ((i == expectedSuccess - 1) && pauseLastSuccessSession) {
                 // Insert a pause of 3 sec to the last success running session
                 mController->onThrottlingStarted();
-                EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(i)));
+                EXPECT_EQ(mTranscoder->popEvent(),
+                          TestTranscoder::Pause(client->clientId(), SESSION(i)));
                 sleep(3);
                 mController->onThrottlingStopped();
-                EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(i)));
+                EXPECT_EQ(mTranscoder->popEvent(),
+                          TestTranscoder::Resume(client->clientId(), SESSION(i)));
             }
             usleep(sessionDurationMs * 1000);
             // Test half of Finish and half of Error, both should be counted as burst runs.
             if (i & 1) {
-                mController->onFinish(CLIENT(0), SESSION(i));
-                EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Finished(CLIENT(0), SESSION(i)));
+                mController->onFinish(client->clientId(), SESSION(i));
+                EXPECT_EQ(mTranscoder->popEvent(),
+                          TestTranscoder::Finished(client->clientId(), SESSION(i)));
             } else {
-                mController->onError(CLIENT(0), SESSION(i), TranscodingErrorCode::kUnknown);
+                mController->onError(client->clientId(), SESSION(i),
+                                     TranscodingErrorCode::kUnknown);
                 EXPECT_EQ(mTranscoder->popEvent(100000),
-                          TestTranscoder::Failed(CLIENT(0), SESSION(i)));
+                          TestTranscoder::Failed(client->clientId(), SESSION(i)));
                 EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kUnknown);
             }
         }
         for (int i = expectedSuccess; i < numSubmits; i++) {
-            EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Failed(CLIENT(0), SESSION(i)));
+            EXPECT_EQ(mTranscoder->popEvent(),
+                      TestTranscoder::Failed(client->clientId(), SESSION(i)));
             EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kDroppedByService);
         }
     }
@@ -470,6 +491,83 @@ TEST_F(TranscodingSessionControllerTest, TestCancelSession) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(3)));
 }
 
+TEST_F(TranscodingSessionControllerTest, TestCancelSessionWithMultipleUids) {
+    ALOGD("TestCancelSessionWithMultipleUids");
+    std::vector<int32_t> clientUids;
+
+    // Submit real-time session SESSION(0), should start immediately.
+    mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit real-time session SESSION(1), should not start.
+    mController->submit(CLIENT(0), SESSION(1), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Submit offline session SESSION(2), should not start.
+    mController->submit(CLIENT(0), SESSION(2), UID(0), UID(0), mOfflineRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // UID(1) moves to top.
+    mUidPolicy->setTop(UID(1));
+
+    // Add UID(1) to the offline SESSION(2), SESSION(2) should start and SESSION(0) should pause.
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(2), UID(1)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(2)));
+
+    // Add UID(1) to SESSION(1) as well.
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(1), UID(1)));
+
+    // Cancel SESSION(2), should be cancelled and SESSION(1) should start.
+    EXPECT_TRUE(mController->cancel(CLIENT(0), SESSION(2)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(2), &clientUids));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(2)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(1)));
+
+    // Cancel SESSION(1), should be cancelled and SESSION(0) should resume.
+    EXPECT_TRUE(mController->cancel(CLIENT(0), SESSION(1)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(1)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(0)));
+}
+
+TEST_F(TranscodingSessionControllerTest, TestCancelAllSessionsForClient) {
+    // Submit real-time session SESSION(0), should start immediately.
+    mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit real-time session SESSION(1), should not start.
+    mController->submit(CLIENT(0), SESSION(1), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Submit offline session SESSION(2), should not start.
+    mController->submit(CLIENT(0), SESSION(2), UID(0), UID(0), mOfflineRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    std::vector<int32_t> clientUids;
+    // Make some more uids blocked on the sessions.
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(0), UID(1)));
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(1), UID(1)));
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(2), UID(1)));
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(0), &clientUids));
+    EXPECT_EQ(clientUids.size(), 2);
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+    EXPECT_EQ(clientUids.size(), 2);
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(2), &clientUids));
+    EXPECT_EQ(clientUids.size(), 1);
+
+    // Cancel all sessions for CLIENT(0) with -1.
+    // Expect SESSION(0) and SESSION(1) to be gone.
+    // Expect SESSION(2) still there with empty client uid list (only kept for offline) and start.
+    EXPECT_TRUE(mController->cancel(CLIENT(0), -1));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(0)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(0), &clientUids));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(2), &clientUids));
+    EXPECT_EQ(clientUids.size(), 0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(2)));
+}
+
 TEST_F(TranscodingSessionControllerTest, TestFinishSession) {
     ALOGD("TestFinishSession");
 
@@ -525,6 +623,45 @@ TEST_F(TranscodingSessionControllerTest, TestFinishSession) {
     // Duplicate finish for last session, should be ignored.
     mController->onFinish(CLIENT(0), SESSION(0));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+}
+
+TEST_F(TranscodingSessionControllerTest, TestFinishSessionWithMultipleUids) {
+    ALOGD("TestFinishSessionWithMultipleUids");
+    std::vector<int32_t> clientUids;
+
+    // Start with unspecified top uid.
+    // Submit real-time session SESSION(0), should start immediately.
+    mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit real-time session SESSION(1), should not start.
+    mController->submit(CLIENT(0), SESSION(1), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(1), UID(1)));
+
+    // Submit real-time session SESSION(2), should not start.
+    mController->submit(CLIENT(0), SESSION(2), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(2), UID(1)));
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(2), UID(2)));
+
+    // UID(1) moves to top.
+    mUidPolicy->setTop(UID(1));
+    // SESSION(0) should pause, SESSION(1) should start.
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(1)));
+
+    // Finish SESSION(1), SESSION(2) (next in line for UID(1)) should start.
+    mController->onFinish(CLIENT(0), SESSION(1));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Finished(CLIENT(0), SESSION(1)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(2)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+
+    // Finish SESSION(2), SESSION(0) should resume.
+    mController->onFinish(CLIENT(0), SESSION(2));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Finished(CLIENT(0), SESSION(2)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(0)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(2), &clientUids));
 }
 
 TEST_F(TranscodingSessionControllerTest, TestFailSession) {
@@ -588,6 +725,49 @@ TEST_F(TranscodingSessionControllerTest, TestFailSession) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
 }
 
+TEST_F(TranscodingSessionControllerTest, TestFailSessionWithMultipleUids) {
+    ALOGD("TestFailSessionWithMultipleUids");
+    std::vector<int32_t> clientUids;
+
+    // Start with unspecified top uid.
+    // Submit real-time session SESSION(0), should start immediately.
+    mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit real-time session SESSION(1), should not start.
+    mController->submit(CLIENT(0), SESSION(1), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(1), UID(1)));
+
+    // Submit real-time session SESSION(2), should not start.
+    mController->submit(CLIENT(0), SESSION(2), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // UID(1) moves to top.
+    mUidPolicy->setTop(UID(1));
+    // SESSION(0) should pause, SESSION(1) should start.
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(1)));
+
+    // Add UID(1) and UID(2) to SESSION(2).
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(2), UID(1)));
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(2), UID(2)));
+
+    // Fail SESSION(1), SESSION(2) (next in line for UID(1)) should start.
+    mController->onError(CLIENT(0), SESSION(1), TranscodingErrorCode::kUnknown);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Failed(CLIENT(0), SESSION(1)));
+    EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kUnknown);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(2)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+
+    // Fail SESSION(2), SESSION(0) should resume.
+    mController->onError(CLIENT(0), SESSION(2), TranscodingErrorCode::kInvalidOperation);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Failed(CLIENT(0), SESSION(2)));
+    EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kInvalidOperation);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(0)));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(2), &clientUids));
+}
+
 TEST_F(TranscodingSessionControllerTest, TestTopUidChanged) {
     ALOGD("TestTopUidChanged");
 
@@ -630,8 +810,59 @@ TEST_F(TranscodingSessionControllerTest, TestTopUidChanged) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(1), SESSION(0)));
 }
 
+TEST_F(TranscodingSessionControllerTest, TestTopUidChangedMultipleUids) {
+    ALOGD("TestTopUidChangedMultipleUids");
+
+    // Start with unspecified top UID.
+    // Submit real-time session to CLIENT(0), session should start immediately.
+    mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Submit offline session to CLIENT(0), should not start.
+    mController->submit(CLIENT(1), SESSION(0), UID(1), UID(0), mOfflineRequest, mClientCallback1);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Bring UID(1) to top.
+    mUidPolicy->setTop(UID(1));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Add UID(1) to SESSION(0), SESSION(0) should continue to run
+    // (no pause&resume of the same session).
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(0), UID(1)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Bring UID(0) back to top, SESSION(0) should continue to run
+    // (no pause&resume of the same session).
+    mUidPolicy->setTop(UID(0));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Bring UID(2) to top.
+    mUidPolicy->setTop(UID(2));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    // Add UID(2) to the offline session, it should be started.
+    EXPECT_TRUE(mController->addClientUid(CLIENT(1), SESSION(0), UID(2)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(1), SESSION(0)));
+
+    // ADD UID(3) to SESSION(0).
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(0), UID(3)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    // Bring UID(3) to top, SESSION(0) should resume.
+    mUidPolicy->setTop(UID(3));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(1), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Resume(CLIENT(0), SESSION(0)));
+
+    // Now make UID(2) also blocked on CLIENT(0), SESSION(0).
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(0), UID(2)));
+
+    // Bring UID(2) back to top, CLIENT(0), SESSION(0) should continue to run (even if it's
+    // added to UID(2)'s queue later than CLIENT(1)'s SESSION(0)).
+    mUidPolicy->setTop(UID(2));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+}
+
 TEST_F(TranscodingSessionControllerTest, TestTopUidSetChanged) {
-    ALOGD("TestTopUidChanged_MultipleUids");
+    ALOGD("TestTopUidSetChanged");
 
     // Start with unspecified top UID.
     // Submit real-time session to CLIENT(0), session should start immediately.
@@ -682,6 +913,54 @@ TEST_F(TranscodingSessionControllerTest, TestTopUidSetChanged) {
     mController->onFinish(CLIENT(2), SESSION(0));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Finished(CLIENT(2), SESSION(0)));
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(1), SESSION(0)));
+}
+
+TEST_F(TranscodingSessionControllerTest, TestAddGetClientUids) {
+    ALOGD("TestAddGetClientUids");
+
+    // Add/get client uids with non-existent session, should fail.
+    std::vector<int32_t> clientUids;
+    uid_t ownUid = ::getuid();
+    EXPECT_FALSE(mController->addClientUid(CLIENT(0), SESSION(0), ownUid));
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(0), &clientUids));
+
+    // Submit a real-time request.
+    EXPECT_TRUE(mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest,
+                                    mClientCallback0));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    // Should have own uid in client uids.
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(0), &clientUids));
+    EXPECT_EQ(clientUids.size(), 1);
+    EXPECT_EQ(clientUids[0], UID(0));
+
+    // Add UID(0) again should fail.
+    EXPECT_FALSE(mController->addClientUid(CLIENT(0), SESSION(0), UID(0)));
+
+    // Add own uid should succeed.
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(0), ownUid));
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(0), &clientUids));
+    std::unordered_set<uid_t> uidSet;
+    uidSet.insert(clientUids.begin(), clientUids.end());
+    EXPECT_EQ(uidSet.size(), 2);
+    EXPECT_EQ(uidSet.count(UID(0)), 1);
+    EXPECT_EQ(uidSet.count(ownUid), 1);
+
+    // Submit an offline request.
+    EXPECT_TRUE(mController->submit(CLIENT(0), SESSION(1), UID(0), UID(0), mOfflineRequest,
+                                    mClientCallback0));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+
+    // Should not have own uid in client uids.
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+    EXPECT_EQ(clientUids.size(), 0);
+
+    // Move UID(1) to top.
+    mUidPolicy->setTop(UID(1));
+    // Add UID(1) to offline session, offline session should start and SESSION(0) should pause.
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(1), UID(1)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(1)));
 }
 
 /* Test resource lost without thermal throttling */
@@ -971,6 +1250,26 @@ TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerWithPause) {
     ALOGD("TestTranscoderPacerDuringPause");
     testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/,
                     true /*pauseLastSuccessSession*/);
+}
+
+/*
+ * Test the case where multiple client uids request the same session. Session should only
+ * be dropped when all clients are over quota.
+ */
+TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerMultipleUids) {
+    ALOGD("TestTranscoderPacerMultipleUids");
+    // First, run mClientCallback0 to the point of no quota.
+    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/,
+                    mClientCallback0, {}, false /*pauseLastSuccessSession*/);
+    // Make UID(0) block on Client1's sessions too, Client1's quota should not be affected.
+    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/,
+                    mClientCallback1, {UID(0)}, false /*pauseLastSuccessSession*/);
+    // Make UID(10) block on Client2's sessions. We expect to see 11 succeeds (instead of 10),
+    // because the addClientUid() is called after the submit, and first session is already
+    // started by the time UID(10) is added. UID(10) allowed us to run the 11th session,
+    // after that both UID(10) and UID(2) are out of quota.
+    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 11 /*expectedSuccess*/,
+                    mClientCallback2, {UID(10)}, false /*pauseLastSuccessSession*/);
 }
 
 }  // namespace android
