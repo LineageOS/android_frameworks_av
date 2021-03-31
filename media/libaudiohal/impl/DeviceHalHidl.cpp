@@ -354,7 +354,8 @@ status_t DeviceHalHidl::releaseAudioPatch(audio_patch_handle_t patch) {
     return processReturn("releaseAudioPatch", mDevice->releaseAudioPatch(patch));
 }
 
-status_t DeviceHalHidl::getAudioPort(struct audio_port *port) {
+template <typename HalPort>
+status_t DeviceHalHidl::getAudioPortImpl(HalPort *port) {
     if (mDevice == 0) return NO_INIT;
     AudioPort hidlPort;
     HidlUtils::audioPortFromHal(*port, &hidlPort);
@@ -368,6 +369,30 @@ status_t DeviceHalHidl::getAudioPort(struct audio_port *port) {
                 }
             });
     return processReturn("getAudioPort", ret, retval);
+}
+
+status_t DeviceHalHidl::getAudioPort(struct audio_port *port) {
+    return getAudioPortImpl(port);
+}
+
+status_t DeviceHalHidl::getAudioPort(struct audio_port_v7 *port) {
+#if MAJOR_VERSION >= 7
+    return getAudioPortImpl(port);
+#else
+    struct audio_port audioPort = {};
+    status_t result = NO_ERROR;
+    if (!audio_populate_audio_port(port, &audioPort)) {
+        ALOGE("Failed to populate legacy audio port from audio_port_v7");
+        result = BAD_VALUE;
+    }
+    status_t status = getAudioPort(&audioPort);
+    if (status == NO_ERROR) {
+        audio_populate_audio_port_v7(&audioPort, port);
+    } else {
+        result = status;
+    }
+    return result;
+#endif
 }
 
 status_t DeviceHalHidl::setAudioPortConfig(const struct audio_port_config *config) {
