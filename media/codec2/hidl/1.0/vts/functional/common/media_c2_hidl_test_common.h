@@ -42,6 +42,12 @@ using namespace ::std::chrono;
 
 static std::vector<std::tuple<std::string, std::string>> kTestParameters;
 
+// Resource directory
+extern std::string sResourceDir;
+
+// Component name prefix
+extern std::string sComponentNamePrefix;
+
 struct FrameInfo {
     int bytesCount;
     uint32_t flags;
@@ -104,6 +110,8 @@ struct CodecListener : public android::Codec2Client::Listener {
     // std::list<std::unique_ptr<C2Work>> mWorkQueue;
     std::function<void(std::list<std::unique_ptr<C2Work>>& workItems)> callBack;
 };
+
+void parseArgs(int argc, char** argv);
 
 // Return all test parameters, a list of tuple of <instance, component>.
 const std::vector<std::tuple<std::string, std::string>>& getTestParameters();

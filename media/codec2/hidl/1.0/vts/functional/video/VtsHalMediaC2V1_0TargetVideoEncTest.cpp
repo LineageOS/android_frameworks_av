@@ -46,9 +46,6 @@ static std::vector<std::tuple<std::string, std::string, std::string, std::string
 static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
         kEncodeResolutionTestParameters;
 
-// Resource directory
-static std::string sResourceDir = "";
-
 namespace {
 
 class Codec2VideoEncHidlTestBase : public ::testing::Test {
@@ -842,6 +839,7 @@ TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
+    parseArgs(argc, argv);
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
     for (auto params : kTestParameters) {
         constexpr char const* kBoolString[] = { "false", "true" };
@@ -865,15 +863,6 @@ int main(int argc, char** argv) {
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "852", "608"));
         kEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), "1400", "442"));
-    }
-
-    // Set the resource directory based on command line args.
-    // Test will fail to set up if the argument is not set.
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "-P") == 0 && i < argc - 1) {
-            sResourceDir = argv[i + 1];
-            break;
-        }
     }
 
     ::testing::InitGoogleTest(&argc, argv);
