@@ -131,6 +131,8 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
 
     // The destructor automatically closes the device.
     virtual ~DeviceHalHidl();
+
+    template <typename HalPort> status_t getAudioPortImpl(HalPort *port);
 };
 
 } // namespace CPP_VERSION
