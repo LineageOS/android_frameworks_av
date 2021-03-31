@@ -138,6 +138,12 @@ void XMLParseTest::setUpDatabase() {
                    pair<string, string>("mapping-fire-from", "to"),
            },
            {}, "");
+    setCodecProperties("test11.encoder", true, 11, {}, {}, {}, "video/av01",
+           {
+                   pair<string, string>("tuning-hungry", "yes"),
+                   pair<string, string>("tuning-pi", "3.1415"),
+           },
+           {}, "");
 
     setRoleProperties("audio_decoder.mp3", false, 1, "audio/mpeg", "test1.decoder",
                       {pair<string, string>("attribute::disabled", "present"),
@@ -179,6 +185,11 @@ void XMLParseTest::setUpDatabase() {
 
     setRoleProperties("video_encoder.hevc", true, 10, "video/hevc", "test10.encoder",
                        { pair<string, string>("mapping-fire-from", "to")});
+
+    setRoleProperties("video_encoder.av01", true, 11, "video/av01", "test11.encoder",
+                       {pair<string, string>("tuning-hungry", "yes"),
+                        pair<string, string>("tuning-pi", "3.1415")
+                       });
 
     setServiceAttribute(
             {pair<string, string>("domain-telephony", "0"), pair<string, string>("domain-tv", "0"),
