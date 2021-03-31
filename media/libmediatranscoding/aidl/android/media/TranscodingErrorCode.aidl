@@ -38,4 +38,5 @@ enum TranscodingErrorCode {
     kErrorIO               = kPrivateErrorFirst + 5,
     kInsufficientResources = kPrivateErrorFirst + 6,
     kWatchdogTimeout       = kPrivateErrorFirst + 7,
+    kUidGoneCancelled      = kPrivateErrorFirst + 8,
 }
