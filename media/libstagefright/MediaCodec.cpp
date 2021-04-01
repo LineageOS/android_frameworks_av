@@ -110,6 +110,7 @@ static const char *kCodecProfile = "android.media.mediacodec.profile";  /* 0..n 
 static const char *kCodecLevel = "android.media.mediacodec.level";  /* 0..n */
 static const char *kCodecBitrateMode = "android.media.mediacodec.bitrate_mode";  /* CQ/VBR/CBR */
 static const char *kCodecBitrate = "android.media.mediacodec.bitrate";  /* 0..n */
+static const char *kCodecOriginalBitrate = "android.media.mediacodec.original.bitrate";  /* 0..n */
 static const char *kCodecMaxWidth = "android.media.mediacodec.maxwidth";  /* 0..n */
 static const char *kCodecMaxHeight = "android.media.mediacodec.maxheight";  /* 0..n */
 static const char *kCodecError = "android.media.mediacodec.errcode";
@@ -139,6 +140,8 @@ static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min
 static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
 static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
+
+static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";    /* 0/1 */
 
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
@@ -1560,18 +1563,7 @@ static android::mediaformatshaper::FormatShaperOps_t *sShaperOps = NULL;
 static bool connectFormatShaper() {
     static std::once_flag sCheckOnce;
 
-#if 0
-    // an early return if the property says disabled means we skip loading.
-    // that saves memory.
-
-    // apply framework level modifications to the mediaformat for encoding
-    // XXX: default off for a while during dogfooding
-    int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty, 0);
-
-    if (!enableShaping) {
-        return true;
-    }
-#endif
+    ALOGV("connectFormatShaper...");
 
     std::call_once(sCheckOnce, [&](){
 
@@ -1676,6 +1668,8 @@ static void loadCodecProperties(mediaformatshaper::shaperHandle_t shaperHandle,
             //
             static const char *featurePrefix = "feature-";
             static const int featurePrefixLen = strlen(featurePrefix);
+            static const char *tuningPrefix = "tuning-";
+            static const int tuningPrefixLen = strlen(tuningPrefix);
             static const char *mappingPrefix = "mapping-";
             static const int mappingPrefixLen = strlen(mappingPrefix);
 
@@ -1687,6 +1681,14 @@ static void loadCodecProperties(mediaformatshaper::shaperHandle_t shaperHandle,
                     ALOGV("-- feature '%s' -> %d", mapSrc, intValue);
                     (void)(sShaperOps->setFeature)(shaperHandle, &mapSrc[featurePrefixLen],
                                                    intValue);
+                }
+                continue;
+            } else if (!strncmp(mapSrc, tuningPrefix, tuningPrefixLen)) {
+                AString value;
+                if (details->findString(mapSrc, &value)) {
+                    ALOGV("-- tuning '%s' -> '%s'", mapSrc, value.c_str());
+                    (void)(sShaperOps->setTuning)(shaperHandle, &mapSrc[tuningPrefixLen],
+                                                   value.c_str());
                 }
                 continue;
             } else if (!strncmp(mapSrc, mappingPrefix, mappingPrefixLen)) {
@@ -1805,10 +1807,20 @@ status_t MediaCodec::shapeMediaFormat(
         AMediaFormat_getFormat(updatedNdkFormat, &updatedFormat);
 
         sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
-        ALOGD("shapeMediaFormat: deltas: %s", deltas->debugString(2).c_str());
-
-        // note that this means that for anything in both, the copy in deltas wins
-        format->extend(deltas);
+        size_t changeCount = deltas->countEntries();
+        ALOGD("shapeMediaFormat: deltas(%zu): %s", changeCount, deltas->debugString(2).c_str());
+        if (changeCount > 0) {
+            if (mMetricsHandle != 0) {
+                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
+                // save some old properties before we fold in the new ones
+                int32_t bitrate;
+                if (format->findInt32(KEY_BIT_RATE, &bitrate)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalBitrate, bitrate);
+                }
+            }
+            // NB: for any field in both format and deltas, the deltas copy wins
+            format->extend(deltas);
+        }
     }
 
     AMediaFormat_delete(updatedNdkFormat);

@@ -50,6 +50,7 @@ constexpr const char* kInvalidClientPackage = "";
 
 constexpr const char* kClientName = "TestClientName";
 constexpr const char* kClientPackage = "TestClientPackage";
+constexpr uid_t OFFLINE_UID = -1;
 
 #define SESSION(n) (n)
 
@@ -135,8 +136,8 @@ struct TestController : public ControllerClientInterface {
 
     virtual ~TestController() { ALOGI("TestController Destroyed"); }
 
-    bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t /*callingUid*/, uid_t /*uid*/,
-                const TranscodingRequestParcel& request,
+    bool submit(ClientIdType clientId, SessionIdType sessionId, uid_t /*callingUid*/,
+                uid_t clientUid, const TranscodingRequestParcel& request,
                 const std::weak_ptr<ITranscodingClientCallback>& clientCallback) override {
         SessionKeyType sessionKey = std::make_pair(clientId, sessionId);
         if (mSessions.count(sessionKey) > 0) {
@@ -149,10 +150,44 @@ struct TestController : public ControllerClientInterface {
             return false;
         }
 
+        if (request.priority == TranscodingSessionPriority::kUnspecified) {
+            clientUid = OFFLINE_UID;
+        }
+
         mSessions[sessionKey].request = request;
         mSessions[sessionKey].callback = clientCallback;
+        mSessions[sessionKey].allClientUids.insert(clientUid);
 
         mLastSession = sessionKey;
+        return true;
+    }
+
+    bool addClientUid(ClientIdType clientId, SessionIdType sessionId, uid_t clientUid) override {
+        SessionKeyType sessionKey = std::make_pair(clientId, sessionId);
+
+        if (mSessions.count(sessionKey) == 0) {
+            return false;
+        }
+        if (mSessions[sessionKey].allClientUids.count(clientUid) > 0) {
+            return false;
+        }
+        mSessions[sessionKey].allClientUids.insert(clientUid);
+        return true;
+    }
+
+    bool getClientUids(ClientIdType clientId, SessionIdType sessionId,
+                       std::vector<int32_t>* out_clientUids) override {
+        SessionKeyType sessionKey = std::make_pair(clientId, sessionId);
+
+        if (mSessions.count(sessionKey) == 0) {
+            return false;
+        }
+        out_clientUids->clear();
+        for (uid_t uid : mSessions[sessionKey].allClientUids) {
+            if (uid != OFFLINE_UID) {
+                out_clientUids->push_back(uid);
+            }
+        }
         return true;
     }
 
@@ -211,6 +246,7 @@ struct TestController : public ControllerClientInterface {
     struct Session {
         TranscodingRequest request;
         std::weak_ptr<ITranscodingClientCallback> callback;
+        std::unordered_set<uid_t> allClientUids;
     };
 
     typedef std::pair<ClientIdType, SessionIdType> SessionKeyType;
@@ -535,6 +571,95 @@ TEST_F(TranscodingClientManagerTest, TestUseAfterUnregister) {
     status = client->getSessionWithId(SESSION(2), &session, &result);
     EXPECT_FALSE(status.isOk());
     EXPECT_EQ(status.getServiceSpecificError(), IMediaTranscodingService::ERROR_DISCONNECTED);
+}
+
+TEST_F(TranscodingClientManagerTest, TestAddGetClientUidsInvalidArgs) {
+    addMultipleClients();
+
+    bool result;
+    std::vector<int32_t> clientUids;
+    TranscodingRequestParcel request;
+    TranscodingSessionParcel session;
+    uid_t ownUid = ::getuid();
+
+    // Add/Get clients with invalid session id fails.
+    EXPECT_TRUE(mClient1->addClientUid(-1, ownUid, &result).isOk());
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(mClient1->addClientUid(SESSION(0), ownUid, &result).isOk());
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(mClient1->getClientUids(-1, &clientUids, &result).isOk());
+    EXPECT_FALSE(result);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(0), &clientUids, &result).isOk());
+    EXPECT_FALSE(result);
+
+    unregisterMultipleClients();
+}
+
+TEST_F(TranscodingClientManagerTest, TestAddGetClientUids) {
+    addMultipleClients();
+
+    bool result;
+    std::vector<int32_t> clientUids;
+    TranscodingRequestParcel request;
+    TranscodingSessionParcel session;
+    uid_t ownUid = ::getuid();
+
+    // Submit one real-time session.
+    request.sourceFilePath = "test_source_file_0";
+    request.destinationFilePath = "test_desintaion_file_0";
+    request.priority = TranscodingSessionPriority::kNormal;
+    EXPECT_TRUE(mClient1->submitRequest(request, &session, &result).isOk());
+    EXPECT_TRUE(result);
+
+    // Should have own uid in client uid list.
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(0), &clientUids, &result).isOk());
+    EXPECT_TRUE(result);
+    EXPECT_EQ(clientUids.size(), 1);
+    EXPECT_EQ(clientUids[0], ownUid);
+
+    // Adding invalid client uid should fail.
+    EXPECT_TRUE(mClient1->addClientUid(SESSION(0), kInvalidClientUid, &result).isOk());
+    EXPECT_FALSE(result);
+
+    // Adding own uid again should fail.
+    EXPECT_TRUE(mClient1->addClientUid(SESSION(0), ownUid, &result).isOk());
+    EXPECT_FALSE(result);
+
+    // Submit one offline session.
+    request.sourceFilePath = "test_source_file_1";
+    request.destinationFilePath = "test_desintaion_file_1";
+    request.priority = TranscodingSessionPriority::kUnspecified;
+    EXPECT_TRUE(mClient1->submitRequest(request, &session, &result).isOk());
+    EXPECT_TRUE(result);
+
+    // Should not have own uid in client uid list.
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids, &result).isOk());
+    EXPECT_TRUE(result);
+    EXPECT_EQ(clientUids.size(), 0);
+
+    // Add own uid (with IMediaTranscodingService::USE_CALLING_UID) again, should succeed.
+    EXPECT_TRUE(
+            mClient1->addClientUid(SESSION(1), IMediaTranscodingService::USE_CALLING_UID, &result)
+                    .isOk());
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids, &result).isOk());
+    EXPECT_TRUE(result);
+    EXPECT_EQ(clientUids.size(), 1);
+    EXPECT_EQ(clientUids[0], ownUid);
+
+    // Add more uids, should succeed.
+    int32_t kFakeUid = ::getuid() ^ 0x1;
+    EXPECT_TRUE(mClient1->addClientUid(SESSION(1), kFakeUid, &result).isOk());
+    EXPECT_TRUE(result);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids, &result).isOk());
+    EXPECT_TRUE(result);
+    std::unordered_set<uid_t> uidSet;
+    uidSet.insert(clientUids.begin(), clientUids.end());
+    EXPECT_EQ(uidSet.size(), 2);
+    EXPECT_EQ(uidSet.count(ownUid), 1);
+    EXPECT_EQ(uidSet.count(kFakeUid), 1);
+
+    unregisterMultipleClients();
 }
 
 }  // namespace android
