@@ -320,14 +320,15 @@ void ProductStrategyMap::dump(String8 *dst, int spaces) const
     }
 }
 
-void ProductStrategyPreferredRoutingMap::dump(android::String8* dst, int spaces) const {
-    dst->appendFormat("\n%*sPreferred devices per product strategy dump:", spaces, "");
-    for (const auto& iter : *this) {
-        dst->appendFormat("\n%*sStrategy %u %s",
-                          spaces + 2, "",
-                          (uint32_t) iter.first,
-                          dumpAudioDeviceTypeAddrVector(iter.second, true /*includeSensitiveInfo*/)
-                                  .c_str());
+void dumpProductStrategyDevicesRoleMap(
+        const ProductStrategyDevicesRoleMap& productStrategyDeviceRoleMap,
+        String8 *dst,
+        int spaces) {
+    dst->appendFormat("\n%*sDevice role per product strategy dump:", spaces, "");
+    for (const auto& [strategyRolePair, devices] : productStrategyDeviceRoleMap) {
+        dst->appendFormat("\n%*sStrategy(%u) Device Role(%u) Devices(%s)", spaces + 2, "",
+                strategyRolePair.first, strategyRolePair.second,
+                dumpAudioDeviceTypeAddrVector(devices, true /*includeSensitiveInfo*/).c_str());
     }
     dst->appendFormat("\n");
 }
