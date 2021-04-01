@@ -643,7 +643,11 @@ ParsingResult parse(const char* path) {
     xmlDocPtr doc;
     doc = xmlParseFile(path);
     if (doc == NULL) {
-        ALOGE("%s: Could not parse document %s", __FUNCTION__, path);
+        // It is OK not to find an engine config file at the default location
+        // as the caller will default to hardcoded default config
+        if (strncmp(path, DEFAULT_PATH, strlen(DEFAULT_PATH))) {
+            ALOGW("%s: Could not parse document %s", __FUNCTION__, path);
+        }
         return {nullptr, 0};
     }
     xmlNodePtr cur = xmlDocGetRootElement(doc);

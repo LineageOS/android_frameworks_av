@@ -434,6 +434,30 @@ struct TestClientCallback : public BnTranscodingClientCallback,
                                    session.request.destinationFilePath == destinationFilePath));
     }
 
+    template <bool expectation = success>
+    bool addClientUid(int32_t sessionId, uid_t clientUid) {
+        constexpr bool shouldSucceed = (expectation == success);
+        bool result;
+        Status status = mClient->addClientUid(sessionId, clientUid, &result);
+
+        EXPECT_TRUE(status.isOk());
+        EXPECT_EQ(result, shouldSucceed);
+
+        return status.isOk() && (result == shouldSucceed);
+    }
+
+    template <bool expectation = success>
+    bool getClientUids(int32_t sessionId, std::vector<int32_t>* clientUids) {
+        constexpr bool shouldSucceed = (expectation == success);
+        bool result;
+        Status status = mClient->getClientUids(sessionId, clientUids, &result);
+
+        EXPECT_TRUE(status.isOk());
+        EXPECT_EQ(result, shouldSucceed);
+
+        return status.isOk() && (result == shouldSucceed);
+    }
+
     int32_t mClientId;
     pid_t mClientPid;
     uid_t mClientUid;

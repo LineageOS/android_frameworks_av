@@ -94,6 +94,12 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     Status getSessionWithId(int32_t /*in_sessionId*/, TranscodingSessionParcel* /*out_session*/,
                             bool* /*_aidl_return*/) override;
 
+    Status addClientUid(int32_t /*in_sessionId*/, int32_t /*in_clientUid*/,
+                        bool* /*_aidl_return*/) override;
+
+    Status getClientUids(int32_t /*in_sessionId*/, std::vector<int32_t>* /*out_clientUids*/,
+                         bool* /*_aidl_return*/) override;
+
     Status unregister() override;
 };
 
@@ -214,6 +220,61 @@ Status TranscodingClientManager::ClientImpl::getSessionWithId(int32_t in_session
         out_session->sessionId = in_sessionId;
         out_session->awaitNumberOfSessions = 0;
     }
+    return Status::ok();
+}
+
+Status TranscodingClientManager::ClientImpl::addClientUid(int32_t in_sessionId,
+                                                          int32_t in_clientUid,
+                                                          bool* _aidl_return) {
+    *_aidl_return = false;
+
+    std::shared_ptr<TranscodingClientManager> owner;
+    if (mAbandoned || (owner = mOwner.lock()) == nullptr) {
+        return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
+    }
+
+    if (in_sessionId < 0) {
+        return Status::ok();
+    }
+
+    int32_t callingPid = AIBinder_getCallingPid();
+    int32_t callingUid = AIBinder_getCallingUid();
+
+    // Check if we can trust clientUid. Only privilege caller could add uid to existing sessions.
+    if (in_clientUid == IMediaTranscodingService::USE_CALLING_UID) {
+        in_clientUid = callingUid;
+    } else if (in_clientUid < 0) {
+        return Status::ok();
+    } else if (in_clientUid != callingUid && !owner->isTrustedCaller(callingPid, callingUid)) {
+        ALOGE("addClientUid rejected (clientUid %d) "
+              "(don't trust callingUid %d)",
+              in_clientUid, callingUid);
+        return STATUS_ERROR_FMT(IMediaTranscodingService::ERROR_PERMISSION_DENIED,
+                                "addClientUid rejected (clientUid %d) "
+                                "(don't trust callingUid %d)",
+                                in_clientUid, callingUid);
+    }
+
+    *_aidl_return = owner->mSessionController->addClientUid(mClientId, in_sessionId, in_clientUid);
+    return Status::ok();
+}
+
+Status TranscodingClientManager::ClientImpl::getClientUids(int32_t in_sessionId,
+                                                           std::vector<int32_t>* out_clientUids,
+                                                           bool* _aidl_return) {
+    *_aidl_return = false;
+
+    std::shared_ptr<TranscodingClientManager> owner;
+    if (mAbandoned || (owner = mOwner.lock()) == nullptr) {
+        return Status::fromServiceSpecificError(IMediaTranscodingService::ERROR_DISCONNECTED);
+    }
+
+    if (in_sessionId < 0) {
+        return Status::ok();
+    }
+
+    *_aidl_return =
+            owner->mSessionController->getClientUids(mClientId, in_sessionId, out_clientUids);
     return Status::ok();
 }
 

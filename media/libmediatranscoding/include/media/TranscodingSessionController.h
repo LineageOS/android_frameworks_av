@@ -54,6 +54,9 @@ public:
     bool cancel(ClientIdType clientId, SessionIdType sessionId) override;
     bool getSession(ClientIdType clientId, SessionIdType sessionId,
                     TranscodingRequestParcel* request) override;
+    bool addClientUid(ClientIdType clientId, SessionIdType sessionId, uid_t clientUid) override;
+    bool getClientUids(ClientIdType clientId, SessionIdType sessionId,
+                       std::vector<int32_t>* out_clientUids) override;
     // ~ControllerClientInterface
 
     // TranscoderCallbackInterface
@@ -120,8 +123,8 @@ private:
             DROPPED_BY_PACER,
         };
         SessionKeyType key;
-        uid_t clientUid;
         uid_t callingUid;
+        std::unordered_set<uid_t> allClientUids;
         int32_t lastProgress = 0;
         int32_t pauseCount = 0;
         std::chrono::time_point<std::chrono::steady_clock> stateEnterTime;
@@ -184,7 +187,9 @@ private:
     void dumpSession_l(const Session& session, String8& result, bool closedSession = false);
     Session* getTopSession_l();
     void updateCurrentSession_l();
-    void removeSession_l(const SessionKeyType& sessionKey, Session::State finalState);
+    void addUidToSession_l(uid_t uid, const SessionKeyType& sessionKey);
+    void removeSession_l(const SessionKeyType& sessionKey, Session::State finalState,
+                         bool keepForOffline = false);
     void moveUidsToTop_l(const std::unordered_set<uid_t>& uids, bool preserveTopUid);
     void setSessionState_l(Session* session, Session::State state);
     void notifyClient(ClientIdType clientId, SessionIdType sessionId, const char* reason,

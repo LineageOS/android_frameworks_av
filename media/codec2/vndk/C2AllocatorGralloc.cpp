@@ -42,7 +42,9 @@ namespace /* unnamed */ {
          * Usage mask that is passed through from gralloc to Codec 2.0 usage.
          */
         PASSTHROUGH_USAGE_MASK =
-            ~(GRALLOC_USAGE_SW_READ_MASK | GRALLOC_USAGE_SW_WRITE_MASK | GRALLOC_USAGE_PROTECTED)
+            ~static_cast<uint64_t>(GRALLOC_USAGE_SW_READ_MASK |
+                                   GRALLOC_USAGE_SW_WRITE_MASK |
+                                   GRALLOC_USAGE_PROTECTED)
     };
 
     // verify that passthrough mask is within the platform mask
