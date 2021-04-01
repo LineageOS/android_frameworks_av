@@ -1082,29 +1082,31 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
 
     /* Getting MemRecords Attributes */
     {
-        iv_fill_mem_rec_ip_t s_fill_mem_rec_ip;
-        iv_fill_mem_rec_op_t s_fill_mem_rec_op;
+        ih264e_fill_mem_rec_ip_t s_ih264e_mem_rec_ip = {};
+        ih264e_fill_mem_rec_op_t s_ih264e_mem_rec_op = {};
+        iv_fill_mem_rec_ip_t *ps_fill_mem_rec_ip = &s_ih264e_mem_rec_ip.s_ive_ip;
+        iv_fill_mem_rec_op_t *ps_fill_mem_rec_op = &s_ih264e_mem_rec_op.s_ive_op;
 
-        s_fill_mem_rec_ip.u4_size = sizeof(iv_fill_mem_rec_ip_t);
-        s_fill_mem_rec_op.u4_size = sizeof(iv_fill_mem_rec_op_t);
+        ps_fill_mem_rec_ip->u4_size = sizeof(ih264e_fill_mem_rec_ip_t);
+        ps_fill_mem_rec_op->u4_size = sizeof(ih264e_fill_mem_rec_op_t);
 
-        s_fill_mem_rec_ip.e_cmd = IV_CMD_FILL_NUM_MEM_REC;
-        s_fill_mem_rec_ip.ps_mem_rec = mMemRecords;
-        s_fill_mem_rec_ip.u4_num_mem_rec = mNumMemRecords;
-        s_fill_mem_rec_ip.u4_max_wd = width;
-        s_fill_mem_rec_ip.u4_max_ht = height;
-        s_fill_mem_rec_ip.u4_max_level = mAVCEncLevel;
-        s_fill_mem_rec_ip.e_color_format = DEFAULT_INP_COLOR_FORMAT;
-        s_fill_mem_rec_ip.u4_max_ref_cnt = DEFAULT_MAX_REF_FRM;
-        s_fill_mem_rec_ip.u4_max_reorder_cnt = DEFAULT_MAX_REORDER_FRM;
-        s_fill_mem_rec_ip.u4_max_srch_rng_x = DEFAULT_MAX_SRCH_RANGE_X;
-        s_fill_mem_rec_ip.u4_max_srch_rng_y = DEFAULT_MAX_SRCH_RANGE_Y;
+        ps_fill_mem_rec_ip->e_cmd = IV_CMD_FILL_NUM_MEM_REC;
+        ps_fill_mem_rec_ip->ps_mem_rec = mMemRecords;
+        ps_fill_mem_rec_ip->u4_num_mem_rec = mNumMemRecords;
+        ps_fill_mem_rec_ip->u4_max_wd = width;
+        ps_fill_mem_rec_ip->u4_max_ht = height;
+        ps_fill_mem_rec_ip->u4_max_level = mAVCEncLevel;
+        ps_fill_mem_rec_ip->e_color_format = DEFAULT_INP_COLOR_FORMAT;
+        ps_fill_mem_rec_ip->u4_max_ref_cnt = DEFAULT_MAX_REF_FRM;
+        ps_fill_mem_rec_ip->u4_max_reorder_cnt = DEFAULT_MAX_REORDER_FRM;
+        ps_fill_mem_rec_ip->u4_max_srch_rng_x = DEFAULT_MAX_SRCH_RANGE_X;
+        ps_fill_mem_rec_ip->u4_max_srch_rng_y = DEFAULT_MAX_SRCH_RANGE_Y;
 
-        status = ive_api_function(nullptr, &s_fill_mem_rec_ip, &s_fill_mem_rec_op);
+        status = ive_api_function(nullptr, &s_ih264e_mem_rec_ip, &s_ih264e_mem_rec_op);
 
         if (status != IV_SUCCESS) {
             ALOGE("Fill memory records failed = 0x%x\n",
-                    s_fill_mem_rec_op.u4_error_code);
+                    ps_fill_mem_rec_op->u4_error_code);
             return C2_CORRUPTED;
         }
     }
@@ -1133,48 +1135,51 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
 
     /* Codec Instance Creation */
     {
-        ive_init_ip_t s_init_ip;
-        ive_init_op_t s_init_op;
+        ih264e_init_ip_t s_enc_ip = {};
+        ih264e_init_op_t s_enc_op = {};
+
+        ive_init_ip_t *ps_init_ip = &s_enc_ip.s_ive_ip;
+        ive_init_op_t *ps_init_op = &s_enc_op.s_ive_op;
 
         mCodecCtx = (iv_obj_t *)mMemRecords[0].pv_base;
         mCodecCtx->u4_size = sizeof(iv_obj_t);
         mCodecCtx->pv_fxns = (void *)ive_api_function;
 
-        s_init_ip.u4_size = sizeof(ive_init_ip_t);
-        s_init_op.u4_size = sizeof(ive_init_op_t);
+        ps_init_ip->u4_size = sizeof(ih264e_init_ip_t);
+        ps_init_op->u4_size = sizeof(ih264e_init_op_t);
 
-        s_init_ip.e_cmd = IV_CMD_INIT;
-        s_init_ip.u4_num_mem_rec = mNumMemRecords;
-        s_init_ip.ps_mem_rec = mMemRecords;
-        s_init_ip.u4_max_wd = width;
-        s_init_ip.u4_max_ht = height;
-        s_init_ip.u4_max_ref_cnt = DEFAULT_MAX_REF_FRM;
-        s_init_ip.u4_max_reorder_cnt = DEFAULT_MAX_REORDER_FRM;
-        s_init_ip.u4_max_level = mAVCEncLevel;
-        s_init_ip.e_inp_color_fmt = mIvVideoColorFormat;
+        ps_init_ip->e_cmd = IV_CMD_INIT;
+        ps_init_ip->u4_num_mem_rec = mNumMemRecords;
+        ps_init_ip->ps_mem_rec = mMemRecords;
+        ps_init_ip->u4_max_wd = width;
+        ps_init_ip->u4_max_ht = height;
+        ps_init_ip->u4_max_ref_cnt = DEFAULT_MAX_REF_FRM;
+        ps_init_ip->u4_max_reorder_cnt = DEFAULT_MAX_REORDER_FRM;
+        ps_init_ip->u4_max_level = mAVCEncLevel;
+        ps_init_ip->e_inp_color_fmt = mIvVideoColorFormat;
 
         if (mReconEnable || mPSNREnable) {
-            s_init_ip.u4_enable_recon = 1;
+            ps_init_ip->u4_enable_recon = 1;
         } else {
-            s_init_ip.u4_enable_recon = 0;
+            ps_init_ip->u4_enable_recon = 0;
         }
-        s_init_ip.e_recon_color_fmt = DEFAULT_RECON_COLOR_FORMAT;
-        s_init_ip.e_rc_mode = DEFAULT_RC_MODE;
-        s_init_ip.u4_max_framerate = DEFAULT_MAX_FRAMERATE;
-        s_init_ip.u4_max_bitrate = DEFAULT_MAX_BITRATE;
-        s_init_ip.u4_num_bframes = mBframes;
-        s_init_ip.e_content_type = IV_PROGRESSIVE;
-        s_init_ip.u4_max_srch_rng_x = DEFAULT_MAX_SRCH_RANGE_X;
-        s_init_ip.u4_max_srch_rng_y = DEFAULT_MAX_SRCH_RANGE_Y;
-        s_init_ip.e_slice_mode = mSliceMode;
-        s_init_ip.u4_slice_param = mSliceParam;
-        s_init_ip.e_arch = mArch;
-        s_init_ip.e_soc = DEFAULT_SOC;
+        ps_init_ip->e_recon_color_fmt = DEFAULT_RECON_COLOR_FORMAT;
+        ps_init_ip->e_rc_mode = DEFAULT_RC_MODE;
+        ps_init_ip->u4_max_framerate = DEFAULT_MAX_FRAMERATE;
+        ps_init_ip->u4_max_bitrate = DEFAULT_MAX_BITRATE;
+        ps_init_ip->u4_num_bframes = mBframes;
+        ps_init_ip->e_content_type = IV_PROGRESSIVE;
+        ps_init_ip->u4_max_srch_rng_x = DEFAULT_MAX_SRCH_RANGE_X;
+        ps_init_ip->u4_max_srch_rng_y = DEFAULT_MAX_SRCH_RANGE_Y;
+        ps_init_ip->e_slice_mode = mSliceMode;
+        ps_init_ip->u4_slice_param = mSliceParam;
+        ps_init_ip->e_arch = mArch;
+        ps_init_ip->e_soc = DEFAULT_SOC;
 
-        status = ive_api_function(mCodecCtx, &s_init_ip, &s_init_op);
+        status = ive_api_function(mCodecCtx, &s_enc_ip, &s_enc_op);
 
         if (status != IV_SUCCESS) {
-            ALOGE("Init encoder failed = 0x%x\n", s_init_op.u4_error_code);
+            ALOGE("Init encoder failed = 0x%x\n", ps_init_op->u4_error_code);
             return C2_CORRUPTED;
         }
     }
@@ -1502,15 +1507,17 @@ void C2SoftAvcEnc::process(
     }
     // while (!mSawOutputEOS && !outQueue.empty()) {
     c2_status_t error;
-    ive_video_encode_ip_t s_encode_ip;
-    ive_video_encode_op_t s_encode_op;
-    memset(&s_encode_op, 0, sizeof(s_encode_op));
+    ih264e_video_encode_ip_t s_video_encode_ip = {};
+    ih264e_video_encode_op_t s_video_encode_op = {};
+    ive_video_encode_ip_t *ps_encode_ip = &s_video_encode_ip.s_ive_ip;
+    ive_video_encode_op_t *ps_encode_op = &s_video_encode_op.s_ive_op;
+    memset(ps_encode_op, 0, sizeof(*ps_encode_op));
 
     if (!mSpsPpsHeaderReceived) {
         constexpr uint32_t kHeaderLength = MIN_STREAM_SIZE;
         uint8_t header[kHeaderLength];
         error = setEncodeArgs(
-                &s_encode_ip, &s_encode_op, nullptr, header, kHeaderLength, workIndex);
+                ps_encode_ip, ps_encode_op, nullptr, header, kHeaderLength, workIndex);
         if (error != C2_OK) {
             ALOGE("setEncodeArgs failed: %d", error);
             mSignalledError = true;
@@ -1518,22 +1525,22 @@ void C2SoftAvcEnc::process(
             work->workletsProcessed = 1u;
             return;
         }
-        status = ive_api_function(mCodecCtx, &s_encode_ip, &s_encode_op);
+        status = ive_api_function(mCodecCtx, ps_encode_ip, ps_encode_op);
 
         if (IV_SUCCESS != status) {
             ALOGE("Encode header failed = 0x%x\n",
-                    s_encode_op.u4_error_code);
+                    ps_encode_op->u4_error_code);
             work->workletsProcessed = 1u;
             return;
         } else {
             ALOGV("Bytes Generated in header %d\n",
-                    s_encode_op.s_out_buf.u4_bytes);
+                    ps_encode_op->s_out_buf.u4_bytes);
         }
 
         mSpsPpsHeaderReceived = true;
 
         std::unique_ptr<C2StreamInitDataInfo::output> csd =
-            C2StreamInitDataInfo::output::AllocUnique(s_encode_op.s_out_buf.u4_bytes, 0u);
+            C2StreamInitDataInfo::output::AllocUnique(ps_encode_op->s_out_buf.u4_bytes, 0u);
         if (!csd) {
             ALOGE("CSD allocation failed");
             mSignalledError = true;
@@ -1541,7 +1548,7 @@ void C2SoftAvcEnc::process(
             work->workletsProcessed = 1u;
             return;
         }
-        memcpy(csd->m.value, header, s_encode_op.s_out_buf.u4_bytes);
+        memcpy(csd->m.value, header, ps_encode_op->s_out_buf.u4_bytes);
         work->worklets.front()->output.configUpdate.push_back(std::move(csd));
 
         DUMP_TO_FILE(
@@ -1635,7 +1642,7 @@ void C2SoftAvcEnc::process(
         }
 
         error = setEncodeArgs(
-                &s_encode_ip, &s_encode_op, view.get(), wView.base(), wView.capacity(), workIndex);
+                ps_encode_ip, ps_encode_op, view.get(), wView.base(), wView.capacity(), workIndex);
         if (error != C2_OK) {
             ALOGE("setEncodeArgs failed : %d", error);
             mSignalledError = true;
@@ -1652,17 +1659,17 @@ void C2SoftAvcEnc::process(
         /* Compute time elapsed between end of previous decode()
          * to start of current decode() */
         TIME_DIFF(mTimeEnd, mTimeStart, timeDelay);
-        status = ive_api_function(mCodecCtx, &s_encode_ip, &s_encode_op);
+        status = ive_api_function(mCodecCtx, &s_video_encode_ip, &s_video_encode_op);
 
         if (IV_SUCCESS != status) {
-            if ((s_encode_op.u4_error_code & 0xFF) == IH264E_BITSTREAM_BUFFER_OVERFLOW) {
+            if ((ps_encode_op->u4_error_code & 0xFF) == IH264E_BITSTREAM_BUFFER_OVERFLOW) {
                 // TODO: use IVE_CMD_CTL_GETBUFINFO for proper max input size?
                 mOutBufferSize *= 2;
                 mOutBlock.reset();
                 continue;
             }
             ALOGE("Encode Frame failed = 0x%x\n",
-                    s_encode_op.u4_error_code);
+                    ps_encode_op->u4_error_code);
             mSignalledError = true;
             work->result = C2_CORRUPTED;
             work->workletsProcessed = 1u;
@@ -1672,7 +1679,7 @@ void C2SoftAvcEnc::process(
 
     // Hold input buffer reference
     if (inputBuffer) {
-        mBuffers[s_encode_ip.s_inp_buf.apv_bufs[0]] = inputBuffer;
+        mBuffers[ps_encode_ip->s_inp_buf.apv_bufs[0]] = inputBuffer;
     }
 
     GETTIME(&mTimeEnd, nullptr);
@@ -1680,9 +1687,9 @@ void C2SoftAvcEnc::process(
     TIME_DIFF(mTimeStart, mTimeEnd, timeTaken);
 
     ALOGV("timeTaken=%6d delay=%6d numBytes=%6d", timeTaken, timeDelay,
-            s_encode_op.s_out_buf.u4_bytes);
+            ps_encode_op->s_out_buf.u4_bytes);
 
-    void *freed = s_encode_op.s_inp_buf.apv_bufs[0];
+    void *freed = ps_encode_op->s_inp_buf.apv_bufs[0];
     /* If encoder frees up an input buffer, mark it as free */
     if (freed != nullptr) {
         if (mBuffers.count(freed) == 0u) {
@@ -1694,17 +1701,17 @@ void C2SoftAvcEnc::process(
         }
     }
 
-    if (s_encode_op.output_present) {
-        if (!s_encode_op.s_out_buf.u4_bytes) {
+    if (ps_encode_op->output_present) {
+        if (!ps_encode_op->s_out_buf.u4_bytes) {
             ALOGE("Error: Output present but bytes generated is zero");
             mSignalledError = true;
             work->result = C2_CORRUPTED;
             work->workletsProcessed = 1u;
             return;
         }
-        uint64_t workId = ((uint64_t)s_encode_op.u4_timestamp_high << 32) |
-                      s_encode_op.u4_timestamp_low;
-        finishWork(workId, work, &s_encode_op);
+        uint64_t workId = ((uint64_t)ps_encode_op->u4_timestamp_high << 32) |
+                      ps_encode_op->u4_timestamp_low;
+        finishWork(workId, work, ps_encode_op);
     }
     if (mSawInputEOS) {
         drainInternal(DRAIN_COMPONENT_WITH_EOS, pool, work);
@@ -1744,9 +1751,11 @@ c2_status_t C2SoftAvcEnc::drainInternal(
             ALOGE("graphic view map failed %d", wView.error());
             return C2_CORRUPTED;
         }
-        ive_video_encode_ip_t s_encode_ip;
-        ive_video_encode_op_t s_encode_op;
-        if (C2_OK != setEncodeArgs(&s_encode_ip, &s_encode_op, nullptr,
+        ih264e_video_encode_ip_t s_video_encode_ip = {};
+        ih264e_video_encode_op_t s_video_encode_op = {};
+        ive_video_encode_ip_t *ps_encode_ip = &s_video_encode_ip.s_ive_ip;
+        ive_video_encode_op_t *ps_encode_op = &s_video_encode_op.s_ive_op;
+        if (C2_OK != setEncodeArgs(ps_encode_ip, ps_encode_op, nullptr,
                                    wView.base(), wView.capacity(), 0)) {
             ALOGE("setEncodeArgs failed for drainInternal");
             mSignalledError = true;
@@ -1754,9 +1763,9 @@ c2_status_t C2SoftAvcEnc::drainInternal(
             work->workletsProcessed = 1u;
             return C2_CORRUPTED;
         }
-        (void)ive_api_function(mCodecCtx, &s_encode_ip, &s_encode_op);
+        (void)ive_api_function(mCodecCtx, &s_video_encode_ip, &s_video_encode_op);
 
-        void *freed = s_encode_op.s_inp_buf.apv_bufs[0];
+        void *freed = ps_encode_op->s_inp_buf.apv_bufs[0];
         /* If encoder frees up an input buffer, mark it as free */
         if (freed != nullptr) {
             if (mBuffers.count(freed) == 0u) {
@@ -1768,10 +1777,10 @@ c2_status_t C2SoftAvcEnc::drainInternal(
             }
         }
 
-        if (s_encode_op.output_present) {
-            uint64_t workId = ((uint64_t)s_encode_op.u4_timestamp_high << 32) |
-                          s_encode_op.u4_timestamp_low;
-            finishWork(workId, work, &s_encode_op);
+        if (ps_encode_op->output_present) {
+            uint64_t workId = ((uint64_t)ps_encode_op->u4_timestamp_high << 32) |
+                          ps_encode_op->u4_timestamp_low;
+            finishWork(workId, work, ps_encode_op);
         } else {
             if (work->workletsProcessed != 1u) {
                 work->worklets.front()->output.flags = work->input.flags;
