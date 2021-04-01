@@ -151,7 +151,7 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
 
     auto result = engineConfig::parse();
     if (result.parsedConfig == nullptr) {
-        ALOGW("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
+        ALOGD("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
         engineConfig::Config config = gDefaultEngineConfig;
         android::status_t ret = engineConfig::parseLegacyVolumes(config.volumeGroups);
         result = {std::make_unique<engineConfig::Config>(config),
@@ -356,7 +356,7 @@ status_t EngineBase::setDevicesRoleForStrategy(product_strategy_t strategy, devi
         mProductStrategyPreferredDevices[strategy] = devices;
         break;
     case DEVICE_ROLE_DISABLED:
-        // TODO: support set devices role as disabled for strategy.
+        // TODO (b/184065221): support set devices role as disabled for strategy.
         ALOGI("%s no implemented for role as %d", __func__, role);
         break;
     case DEVICE_ROLE_NONE:
@@ -384,7 +384,7 @@ status_t EngineBase::removeDevicesRoleForStrategy(product_strategy_t strategy, d
         }
         break;
     case DEVICE_ROLE_DISABLED:
-        // TODO: support remove devices role as disabled for strategy.
+        // TODO (b/184065221): support remove devices role as disabled for strategy.
         ALOGI("%s no implemented for role as %d", __func__, role);
         break;
     case DEVICE_ROLE_NONE:
@@ -417,6 +417,10 @@ status_t EngineBase::getDevicesForRoleAndStrategy(product_strategy_t strategy, d
 
         devices = devIt->second;
     } break;
+    case DEVICE_ROLE_DISABLED:
+        // TODO (b/184065221): support devices role as disabled for strategy.
+        ALOGV("%s no implemented for role as %d", __func__, role);
+        break;
     case DEVICE_ROLE_NONE:
         // Intentionally fall-through as the DEVICE_ROLE_NONE is never set
     default:
