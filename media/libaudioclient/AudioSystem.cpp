@@ -2258,6 +2258,15 @@ status_t AudioSystem::registerSoundTriggerCaptureStateListener(
     return NO_ERROR;
 }
 
+status_t AudioSystem::setVibratorInfos(
+        const std::vector<media::AudioVibratorInfo>& vibratorInfos) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->setVibratorInfos(vibratorInfos);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
