@@ -73,6 +73,7 @@ public:
 
     // UidPolicyCallbackInterface
     void onTopUidsChanged(const std::unordered_set<uid_t>& uids) override;
+    void onUidGone(uid_t goneUid) override;
     // ~UidPolicyCallbackInterface
 
     // ResourcePolicyCallbackInterface
@@ -189,7 +190,7 @@ private:
     void updateCurrentSession_l();
     void addUidToSession_l(uid_t uid, const SessionKeyType& sessionKey);
     void removeSession_l(const SessionKeyType& sessionKey, Session::State finalState,
-                         bool keepForOffline = false);
+                         const std::shared_ptr<std::function<bool(uid_t uid)>>& keepUid = nullptr);
     void moveUidsToTop_l(const std::unordered_set<uid_t>& uids, bool preserveTopUid);
     void setSessionState_l(Session* session, Session::State state);
     void notifyClient(ClientIdType clientId, SessionIdType sessionId, const char* reason,
