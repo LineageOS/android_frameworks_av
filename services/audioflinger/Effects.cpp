@@ -1585,6 +1585,34 @@ status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
     return status;
 }
 
+status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorInfo* vibratorInfo)
+{
+    if (mStatus != NO_ERROR) {
+        return mStatus;
+    }
+    if (!isHapticGenerator()) {
+        ALOGW("Should not set vibrator info for effects that are not HapticGenerator");
+        return INVALID_OPERATION;
+    }
+
+    std::vector<uint8_t> request(
+            sizeof(effect_param_t) + sizeof(int32_t) + 2 * sizeof(float));
+    effect_param_t *param = (effect_param_t*) request.data();
+    param->psize = sizeof(int32_t);
+    param->vsize = 2 * sizeof(float);
+    *(int32_t*)param->data = HG_PARAM_VIBRATOR_INFO;
+    float* vibratorInfoPtr = reinterpret_cast<float*>(param->data + sizeof(int32_t));
+    vibratorInfoPtr[0] = vibratorInfo->resonantFrequency;
+    vibratorInfoPtr[1] = vibratorInfo->qFactor;
+    std::vector<uint8_t> response;
+    status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
+    if (status == NO_ERROR) {
+        LOG_ALWAYS_FATAL_IF(response.size() != sizeof(status_t));
+        status = *reinterpret_cast<const status_t*>(response.data());
+    }
+    return status;
+}
+
 static std::string dumpInOutBuffer(bool isInput, const sp<EffectBufferHalInterface> &buffer) {
     std::stringstream ss;
 

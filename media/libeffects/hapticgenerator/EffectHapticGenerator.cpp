@@ -26,10 +26,15 @@
 
 #include <errno.h>
 #include <inttypes.h>
+#include <math.h>
 
 #include <audio_effects/effect_hapticgenerator.h>
 #include <audio_utils/format.h>
 #include <system/audio.h>
+
+static constexpr float DEFAULT_RESONANT_FREQUENCY = 150.0f;
+static constexpr float DEFAULT_BSF_ZERO_Q = 8.0f;
+static constexpr float DEFAULT_BSF_POLE_Q = 4.0f;
 
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -101,11 +106,11 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->param.audioChannelCount = 0;
     context->param.maxHapticIntensity = os::HapticScale::MUTE;
 
-    context->param.resonantFrequency = 150.0f;
+    context->param.resonantFrequency = DEFAULT_RESONANT_FREQUENCY;
     context->param.bpfQ = 1.0f;
     context->param.slowEnvNormalizationPower = -0.8f;
-    context->param.bsfZeroQ = 8.0f;
-    context->param.bsfPoleQ = 4.0f;
+    context->param.bsfZeroQ = DEFAULT_BSF_ZERO_Q;
+    context->param.bsfPoleQ = DEFAULT_BSF_POLE_Q;
     context->param.distortionCornerFrequency = 300.0f;
     context->param.distortionInputGain = 0.3f;
     context->param.distortionCubeThreshold = 0.1f;
@@ -173,6 +178,7 @@ void HapticGenerator_buildProcessingChain(
     addBiquadFilter(processingChain, processorsRecord, lpf);
 
     auto bpf = createBPF(param->resonantFrequency, param->bpfQ, sampleRate, channelCount);
+    processorsRecord.bpf = bpf;
     addBiquadFilter(processingChain, processorsRecord, bpf);
 
     float normalizationPower = param->slowEnvNormalizationPower;
@@ -191,6 +197,7 @@ void HapticGenerator_buildProcessingChain(
 
     auto bsf = createBSF(
             param->resonantFrequency, param->bsfZeroQ, param->bsfPoleQ, sampleRate, channelCount);
+    processorsRecord.bsf = bsf;
     addBiquadFilter(processingChain, processorsRecord, bsf);
 
     // The process chain captures the shared pointer of the Distortion in lambda. It will
@@ -279,7 +286,32 @@ int HapticGenerator_SetParameter(struct HapticGeneratorContext *context,
         }
         break;
     }
+    case HG_PARAM_VIBRATOR_INFO: {
+        if (value == nullptr || size != 2 * sizeof(float)) {
+            return -EINVAL;
+        }
+        const float resonantFrequency = *(float*) value;
+        const float qFactor = *((float *) value + 1);
+        context->param.resonantFrequency =
+                isnan(resonantFrequency) ? DEFAULT_RESONANT_FREQUENCY : resonantFrequency;
+        context->param.bsfZeroQ = isnan(qFactor) ? DEFAULT_BSF_POLE_Q : qFactor;
+        context->param.bsfPoleQ = context->param.bsfZeroQ / 2.0f;
 
+        if (context->processorsRecord.bpf != nullptr) {
+            context->processorsRecord.bpf->setCoefficients(
+                    bpfCoefs(context->param.resonantFrequency,
+                             context->param.bpfQ,
+                             context->config.inputCfg.samplingRate));
+        }
+        if (context->processorsRecord.bsf != nullptr) {
+            context->processorsRecord.bsf->setCoefficients(
+                    bsfCoefs(context->param.resonantFrequency,
+                             context->param.bsfZeroQ,
+                             context->param.bsfPoleQ,
+                             context->config.inputCfg.samplingRate));
+        }
+        HapticGenerator_Reset(context);
+    } break;
     default:
         ALOGW("Unknown param: %d", param);
         return -EINVAL;

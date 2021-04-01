@@ -733,6 +733,11 @@ status_t AudioFlingerClientAdapter::setAudioHalPids(const std::vector<pid_t>& pi
     return statusTFromBinderStatus(mDelegate->setAudioHalPids(pidsAidl));
 }
 
+status_t AudioFlingerClientAdapter::setVibratorInfos(
+        const std::vector<media::AudioVibratorInfo>& vibratorInfos) {
+    return statusTFromBinderStatus(mDelegate->setVibratorInfos(vibratorInfos));
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
@@ -1172,6 +1177,11 @@ Status AudioFlingerServerAdapter::setAudioHalPids(const std::vector<int32_t>& pi
             convertContainer<std::vector<pid_t>>(pids, aidl2legacy_int32_t_pid_t));
     RETURN_BINDER_IF_ERROR(mDelegate->setAudioHalPids(pidsLegacy));
     return Status::ok();
+}
+
+Status AudioFlingerServerAdapter::setVibratorInfos(
+        const std::vector<media::AudioVibratorInfo>& vibratorInfos) {
+    return Status::fromStatusT(mDelegate->setVibratorInfos(vibratorInfos));
 }
 
 } // namespace android

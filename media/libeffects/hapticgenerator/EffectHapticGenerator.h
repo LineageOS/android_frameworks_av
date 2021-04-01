@@ -69,6 +69,11 @@ struct HapticGeneratorProcessorsRecord {
     std::vector<std::shared_ptr<Ramp>> ramps;
     std::vector<std::shared_ptr<SlowEnvelope>> slowEnvs;
     std::vector<std::shared_ptr<Distortion>> distortions;
+
+    // Cache band-pass filter and band-stop filter for updating parameters
+    // according to vibrator info
+    std::shared_ptr<HapticBiquadFilter> bpf;
+    std::shared_ptr<HapticBiquadFilter> bsf;
 };
 
 // A structure to keep all the context for HapticGenerator.

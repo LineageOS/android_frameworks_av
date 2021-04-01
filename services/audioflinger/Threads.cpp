@@ -1439,6 +1439,16 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
             effect->setMode(mAudioFlinger->getMode());
             effect->setAudioSource(mAudioSource);
         }
+        if (effect->isHapticGenerator()) {
+            // TODO(b/184194057): Use the vibrator information from the vibrator that will be used
+            // for the HapticGenerator.
+            const media::AudioVibratorInfo* defaultVibratorInfo =
+                    mAudioFlinger->getDefaultVibratorInfo_l();
+            if (defaultVibratorInfo != nullptr) {
+                // Only set the vibrator info when it is a valid one.
+                effect->setVibratorInfo(defaultVibratorInfo);
+            }
+        }
         // create effect handle and connect it to effect module
         handle = new EffectHandle(effect, client, effectClient, priority);
         lStatus = handle->initCheck();
