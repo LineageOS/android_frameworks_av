@@ -38,4 +38,8 @@
         </activity>
     </application>
 
+    <instrumentation android:name="androidx.test.runner.AndroidJUnitRunner"
+        android:targetPackage="com.android.media.samplevideoencoder"
+        android:label="SampleVideoEncoder Test"/>
+
 </manifest>
