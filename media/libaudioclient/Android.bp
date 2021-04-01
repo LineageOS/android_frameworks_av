@@ -348,6 +348,7 @@ aidl_interface {
         "aidl/android/media/AudioUniqueIdUse.aidl",
         "aidl/android/media/AudioUsage.aidl",
         "aidl/android/media/AudioUuid.aidl",
+        "aidl/android/media/AudioVibratorInfo.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
         "aidl/android/media/ExtraAudioDescriptor.aidl",
     ],

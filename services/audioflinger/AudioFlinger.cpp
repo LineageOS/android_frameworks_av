@@ -278,6 +278,21 @@ status_t AudioFlinger::setAudioHalPids(const std::vector<pid_t>& pids) {
   return NO_ERROR;
 }
 
+status_t AudioFlinger::setVibratorInfos(
+        const std::vector<media::AudioVibratorInfo>& vibratorInfos) {
+    Mutex::Autolock _l(mLock);
+    mAudioVibratorInfos = vibratorInfos;
+    return NO_ERROR;
+}
+
+// getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
+const media::AudioVibratorInfo* AudioFlinger::getDefaultVibratorInfo_l() {
+    if (mAudioVibratorInfos.empty()) {
+        return nullptr;
+    }
+    return &mAudioVibratorInfos.front();
+}
+
 AudioFlinger::~AudioFlinger()
 {
     while (!mRecordThreads.isEmpty()) {
@@ -4122,7 +4137,8 @@ status_t AudioFlinger::onPreTransact(
         case TransactionCode::SET_MIC_MUTE:
         case TransactionCode::SET_LOW_RAM_DEVICE:
         case TransactionCode::SYSTEM_READY:
-        case TransactionCode::SET_AUDIO_HAL_PIDS: {
+        case TransactionCode::SET_AUDIO_HAL_PIDS:
+        case TransactionCode::SET_VIBRATOR_INFOS: {
             if (!isServiceUid(IPCThreadState::self()->getCallingUid())) {
                 ALOGW("%s: transaction %d received from PID %d unauthorized UID %d",
                       __func__, code, IPCThreadState::self()->getCallingPid(),
