@@ -37,6 +37,7 @@ cc_library {
     ],
     static_libs: [
         "libc_malloc_debug_backtrace",
+        "libbatterystats_aidl",
     ],
     shared_libs: [
         "libaudioutils", // for clock.h
@@ -47,6 +48,9 @@ cc_library {
         "libhidlbase",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
+    ],
+    export_static_lib_headers: [
+        "libbatterystats_aidl",
     ],
 
     logtags: ["EventLogTags.logtags"],

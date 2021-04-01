@@ -10,6 +10,7 @@ package {
 cc_defaults {
     name: "libmediautils_fuzzer_defaults",
     shared_libs: [
+        "libbatterystats_aidl",
         "libbinder",
         "libcutils",
         "liblog",
