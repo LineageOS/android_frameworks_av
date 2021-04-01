@@ -39,12 +39,12 @@ extern statsd_pusher statsd_mediadrm;
 extern statsd_pusher statsd_drmmanager;
 
 using statsd_puller = bool (const std::shared_ptr<const mediametrics::Item>& item,
-        AStatsEventList *);
+        AStatsEventList *, const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
 // component specific pullers
 extern statsd_puller statsd_mediadrm_puller;
 
 bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item,
         const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
-bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out);
-
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog);
 } // namespace android
