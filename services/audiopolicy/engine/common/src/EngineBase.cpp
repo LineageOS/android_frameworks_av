@@ -17,6 +17,8 @@
 #define LOG_TAG "APM::AudioPolicyEngine/Base"
 //#define LOG_NDEBUG 0
 
+#include <sys/stat.h>
+
 #include "EngineBase.h"
 #include "EngineDefaultConfig.h"
 #include <TypeConverter.h>
@@ -147,8 +149,13 @@ engineConfig::ParsingResult EngineBase::loadAudioPolicyEngineConfig()
         });
         return iter != end(volumeGroups);
     };
+    auto fileExists = [](const char* path) {
+        struct stat fileStat;
+        return stat(path, &fileStat) == 0 && S_ISREG(fileStat.st_mode);
+    };
 
-    auto result = engineConfig::parse();
+    auto result = fileExists(engineConfig::DEFAULT_PATH) ?
+            engineConfig::parse(engineConfig::DEFAULT_PATH) : engineConfig::ParsingResult{};
     if (result.parsedConfig == nullptr) {
         ALOGW("%s: No configuration found, using default matching phone experience.", __FUNCTION__);
         engineConfig::Config config = gDefaultEngineConfig;
