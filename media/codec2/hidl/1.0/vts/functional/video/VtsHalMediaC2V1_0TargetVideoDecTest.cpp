@@ -52,43 +52,30 @@ struct CompToURL {
     std::string chksum;
 };
 std::vector<CompToURL> kCompToURL = {
-    {"avc",
-     "bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_176x144_300kbps_60fps.info",
-     "bbb_avc_176x144_300kbps_60fps_chksum.md5"},
-    {"avc",
-     "bbb_avc_640x360_768kbps_30fps.h264", "bbb_avc_640x360_768kbps_30fps.info",
-     "bbb_avc_640x360_768kbps_30fps_chksum.md5"},
-    {"hevc",
-     "bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_176x144_176kbps_60fps.info",
-     "bbb_hevc_176x144_176kbps_60fps_chksum.md5"},
-    {"hevc",
-     "bbb_hevc_640x360_1600kbps_30fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.info",
-     "bbb_hevc_640x360_1600kbps_30fps_chksum.md5"},
-    {"mpeg2",
-     "bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_176x144_105kbps_25fps.info", ""},
-    {"mpeg2",
-     "bbb_mpeg2_352x288_1mbps_60fps.m2v","bbb_mpeg2_352x288_1mbps_60fps.info", ""},
-    {"3gpp",
-     "bbb_h263_352x288_300kbps_12fps.h263", "bbb_h263_352x288_300kbps_12fps.info", ""},
-    {"mp4v-es",
-     "bbb_mpeg4_352x288_512kbps_30fps.m4v", "bbb_mpeg4_352x288_512kbps_30fps.info", ""},
-    {"vp8",
-     "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info", ""},
-    {"vp8",
-     "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
-     "bbb_vp8_640x360_2mbps_30fps_chksm.md5"},
-    {"vp9",
-     "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info", ""},
-    {"vp9",
-     "bbb_vp9_640x360_1600kbps_30fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.info",
-     "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
-    {"vp9",
-     "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
-     "bbb_vp9_704x480_280kbps_24fps_altref_2.info", ""},
-    {"av01",
-     "bbb_av1_640_360.av1", "bbb_av1_640_360.info", "bbb_av1_640_360_chksum.md5"},
-    {"av01",
-     "bbb_av1_176_144.av1", "bbb_av1_176_144.info", "bbb_av1_176_144_chksm.md5"},
+        {"avc", "bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_176x144_300kbps_60fps.info",
+         "bbb_avc_176x144_300kbps_60fps_chksum.md5"},
+        {"avc", "bbb_avc_640x360_768kbps_30fps.h264", "bbb_avc_640x360_768kbps_30fps.info",
+         "bbb_avc_640x360_768kbps_30fps_chksum.md5"},
+        {"hevc", "bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_176x144_176kbps_60fps.info",
+         "bbb_hevc_176x144_176kbps_60fps_chksum.md5"},
+        {"hevc", "bbb_hevc_640x360_1600kbps_30fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.info",
+         "bbb_hevc_640x360_1600kbps_30fps_chksum.md5"},
+        {"mpeg2", "bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_176x144_105kbps_25fps.info",
+         ""},
+        {"mpeg2", "bbb_mpeg2_352x288_1mbps_60fps.m2v", "bbb_mpeg2_352x288_1mbps_60fps.info", ""},
+        {"3gpp", "bbb_h263_352x288_300kbps_12fps.h263", "bbb_h263_352x288_300kbps_12fps.info", ""},
+        {"mp4v-es", "bbb_mpeg4_352x288_512kbps_30fps.m4v", "bbb_mpeg4_352x288_512kbps_30fps.info",
+         ""},
+        {"vp8", "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info", ""},
+        {"vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
+         "bbb_vp8_640x360_2mbps_30fps_chksm.md5"},
+        {"vp9", "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info", ""},
+        {"vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.info",
+         "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
+        {"vp9", "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
+         "bbb_vp9_704x480_280kbps_24fps_altref_2.info", ""},
+        {"av01", "bbb_av1_640_360.av1", "bbb_av1_640_360.info", "bbb_av1_640_360_chksum.md5"},
+        {"av01", "bbb_av1_176_144.av1", "bbb_av1_176_144.info", "bbb_av1_176_144_chksm.md5"},
 };
 
 class LinearBuffer : public C2Buffer {
@@ -251,8 +238,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                 if (!codecConfig && !work->worklets.front()->output.buffers.empty()) {
                     if (mReorderDepth < 0) {
                         C2PortReorderBufferDepthTuning::output reorderBufferDepth;
-                        mComponent->query({&reorderBufferDepth}, {}, C2_MAY_BLOCK,
-                                          nullptr);
+                        mComponent->query({&reorderBufferDepth}, {}, C2_MAY_BLOCK, nullptr);
                         mReorderDepth = reorderBufferDepth.value;
                         if (mReorderDepth > 0) {
                             // TODO: Add validation for reordered output
@@ -657,8 +643,8 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     description("Adaptive Decode Test");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     if (!(strcasestr(mMime.c_str(), "avc") || strcasestr(mMime.c_str(), "hevc") ||
-        strcasestr(mMime.c_str(), "vp8") || strcasestr(mMime.c_str(), "vp9") ||
-        strcasestr(mMime.c_str(), "mpeg2"))) {
+          strcasestr(mMime.c_str(), "vp8") || strcasestr(mMime.c_str(), "vp9") ||
+          strcasestr(mMime.c_str(), "mpeg2"))) {
         return;
     }
 
