@@ -186,6 +186,23 @@ public:
                 .build());
 
         addParameter(
+                DefineParam(mQuantization, C2_PARAMKEY_QUANTIZATION)
+                .withDefault(new C2StreamQuantizationInfo::output(0u,
+                                      DEFAULT_QP_MAX, DEFAULT_QP_MIN,
+                                      DEFAULT_QP_MAX, DEFAULT_QP_MIN,
+                                      DEFAULT_QP_MAX, DEFAULT_QP_MIN))
+                .withFields({
+                        C2F(mQuantization, iMax).inRange(1, 51),
+                        C2F(mQuantization, iMin).inRange(1, 51),
+                        C2F(mQuantization, pMax).inRange(1, 51),
+                        C2F(mQuantization, pMin).inRange(1, 51),
+                        C2F(mQuantization, bMax).inRange(1, 51),
+                        C2F(mQuantization, bMin).inRange(1, 51),
+                 })
+                .withSetter(QuantizationSetter)
+                .build());
+
+        addParameter(
                 DefineParam(mRequestSync, C2_PARAMKEY_REQUEST_SYNC_FRAME)
                 .withDefault(new C2StreamRequestSyncFrameTuning::output(0u, C2_FALSE))
                 .withFields({C2F(mRequestSync, value).oneOf({ C2_FALSE, C2_TRUE }) })
@@ -217,6 +234,71 @@ public:
         if (me.v.value <= 4096) {
             me.set().value = 4096;
         }
+        return res;
+    }
+
+    static C2R QuantizationSetter(bool mayBlock, C2P<C2StreamQuantizationInfo::output> &me) {
+        (void)mayBlock;
+        (void)me;
+        C2R res = C2R::Ok();
+
+        ALOGV("QuantizationSetter enters max/min i %d/%d p %d/%d b %d/%d",
+              me.v.iMax, me.v.iMin, me.v.pMax, me.v.pMin, me.v.bMax, me.v.bMin);
+
+        // bounds checking
+        constexpr int qp_lowest = 1;
+        constexpr int qp_highest = 51;
+
+        if (me.v.iMax < qp_lowest) {
+            me.set().iMax = qp_lowest;
+        } else if (me.v.iMax > qp_highest) {
+            me.set().iMax = qp_highest;
+        }
+
+        if (me.v.iMin < qp_lowest) {
+            me.set().iMin = qp_lowest;
+        } else if (me.v.iMin > qp_highest) {
+            me.set().iMin = qp_highest;
+        }
+
+        if (me.v.pMax < qp_lowest) {
+            me.set().pMax = qp_lowest;
+        } else if (me.v.pMax > qp_highest) {
+            me.set().pMax = qp_highest;
+        }
+
+        if (me.v.pMin < qp_lowest) {
+            me.set().pMin = qp_lowest;
+        } else if (me.v.pMin > qp_highest) {
+            me.set().pMin = qp_highest;
+        }
+
+        if (me.v.bMax < qp_lowest) {
+            me.set().bMax = qp_lowest;
+        } else if (me.v.bMax > qp_highest) {
+            me.set().bMax = qp_highest;
+        }
+
+        if (me.v.bMin < qp_lowest) {
+            me.set().bMin = qp_lowest;
+        } else if (me.v.bMin > qp_highest) {
+            me.set().bMin = qp_highest;
+        }
+
+        // consistency checking, e.g. min<max
+        //
+        if (me.v.iMax < me.v.iMin) {
+            me.set().iMax = me.v.iMin;
+        }
+        if (me.v.pMax < me.v.pMin) {
+            me.set().pMax = me.v.pMin;
+        }
+        if (me.v.bMax < me.v.bMin) {
+            me.set().bMax = me.v.bMin;
+        }
+
+        // TODO: enforce any sort of i_max < p_max < b_max?
+
         return res;
     }
 
@@ -393,6 +475,7 @@ public:
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
     std::shared_ptr<C2StreamGopTuning::output> getGop_l() const { return mGop; }
+    std::shared_ptr<C2StreamQuantizationInfo::output> getQuantization_l() const { return mQuantization; }
 
 private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
@@ -404,6 +487,7 @@ private:
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
     std::shared_ptr<C2StreamGopTuning::output> mGop;
+    std::shared_ptr<C2StreamQuantizationInfo::output> mQuantization;
 };
 
 #define ive_api_function  ih264e_api_function
@@ -664,6 +748,7 @@ c2_status_t C2SoftAvcEnc::setQp() {
     ive_ctl_set_qp_op_t s_qp_op;
     IV_STATUS_T status;
 
+    // set the defaults
     s_qp_ip.e_cmd = IVE_CMD_VIDEO_CTL;
     s_qp_ip.e_sub_cmd = IVE_CMD_CTL_SET_QP;
 
@@ -678,6 +763,21 @@ c2_status_t C2SoftAvcEnc::setQp() {
     s_qp_ip.u4_b_qp = DEFAULT_P_QP;
     s_qp_ip.u4_b_qp_max = DEFAULT_QP_MAX;
     s_qp_ip.u4_b_qp_min = DEFAULT_QP_MIN;
+
+    // parameter parsing ensured proper range 1..51, so only worry about ordering
+    bool valid = true;
+    if (mQuantization->iMax < mQuantization->iMin) valid = false;
+    if (mQuantization->pMax < mQuantization->pMin) valid = false;
+    if (mQuantization->bMax < mQuantization->bMin) valid = false;
+
+    if (valid) {
+        s_qp_ip.u4_i_qp_max = mQuantization->iMax;
+        s_qp_ip.u4_i_qp_min = mQuantization->iMin;
+        s_qp_ip.u4_p_qp_max = mQuantization->pMax;
+        s_qp_ip.u4_p_qp_min = mQuantization->pMin;
+        s_qp_ip.u4_b_qp_max = mQuantization->bMax;
+        s_qp_ip.u4_b_qp_min = mQuantization->bMin;
+    }
 
     s_qp_ip.u4_timestamp_high = -1;
     s_qp_ip.u4_timestamp_low = -1;
@@ -926,6 +1026,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         mIInterval = mIntf->getSyncFramePeriod_l();
         mIDRInterval = mIntf->getSyncFramePeriod_l();
         gop = mIntf->getGop_l();
+        mQuantization = mIntf->getQuantization_l();
     }
     if (gop && gop->flexCount() > 0) {
         uint32_t syncInterval = 1;
