@@ -268,7 +268,7 @@ void *AudioStreamInternalCapture::callbackLoop() {
 
         if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
             ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
-            result = systemStopFromCallback();
+            result = systemStopInternal();
             break;
         }
     }
