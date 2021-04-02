@@ -41,7 +41,6 @@
 #include <binder/MemoryBase.h>
 #include <binder/MemoryHeapBase.h>
 #include <binder/PermissionController.h>
-#include <binder/ProcessInfoService.h>
 #include <binder/IResultReceiver.h>
 #include <binderthreadstate/CallerUtils.h>
 #include <cutils/atomic.h>
@@ -57,6 +56,7 @@
 #include <media/IMediaHTTPService.h>
 #include <media/mediaplayer.h>
 #include <mediautils/BatteryNotifier.h>
+#include <processinfo/ProcessInfoService.h>
 #include <utils/Errors.h>
 #include <utils/Log.h>
 #include <utils/String16.h>

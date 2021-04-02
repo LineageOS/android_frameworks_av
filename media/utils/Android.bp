@@ -38,6 +38,7 @@ cc_library {
     static_libs: [
         "libc_malloc_debug_backtrace",
         "libbatterystats_aidl",
+        "libprocessinfoservice_aidl",
     ],
     shared_libs: [
         "libaudioutils", // for clock.h
