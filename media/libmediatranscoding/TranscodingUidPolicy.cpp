@@ -141,43 +141,45 @@ std::unordered_set<uid_t> TranscodingUidPolicy::getTopUids() const {
 }
 
 void TranscodingUidPolicy::onUidStateChanged(uid_t uid, int32_t procState) {
-    ALOGV("onUidStateChanged: %u, procState %d", uid, procState);
+    ALOGV("onUidStateChanged: uid %u, procState %d", uid, procState);
 
     bool topUidSetChanged = false;
+    bool isUidGone = false;
     std::unordered_set<uid_t> topUids;
     {
         Mutex::Autolock _l(mUidLock);
         auto it = mUidStateMap.find(uid);
         if (it != mUidStateMap.end() && it->second != procState) {
-            // Top set changed if 1) the uid is in the current top uid set, or 2) the
-            // new procState is at least the same priority as the current top uid state.
-            bool isUidCurrentTop =
-                    mTopUidState != IMPORTANCE_UNKNOWN && mStateUidMap[mTopUidState].count(uid) > 0;
-            bool isNewStateHigherThanTop =
-                    procState != IMPORTANCE_UNKNOWN &&
-                    (procState <= mTopUidState || mTopUidState == IMPORTANCE_UNKNOWN);
-            topUidSetChanged = (isUidCurrentTop || isNewStateHigherThanTop);
+            isUidGone = (procState == AACTIVITYMANAGER_IMPORTANCE_GONE);
+
+            topUids = mStateUidMap[mTopUidState];
 
             // Move uid to the new procState.
             mStateUidMap[it->second].erase(uid);
             mStateUidMap[procState].insert(uid);
             it->second = procState;
 
-            if (topUidSetChanged) {
-                updateTopUid_l();
-
+            updateTopUid_l();
+            if (topUids != mStateUidMap[mTopUidState]) {
                 // Make a copy of the uid set for callback.
                 topUids = mStateUidMap[mTopUidState];
+                topUidSetChanged = true;
             }
         }
     }
 
-    ALOGV("topUidSetChanged: %d", topUidSetChanged);
+    ALOGV("topUidSetChanged: %d, isUidGone %d", topUidSetChanged, isUidGone);
 
     if (topUidSetChanged) {
         auto callback = mUidPolicyCallback.lock();
         if (callback != nullptr) {
             callback->onTopUidsChanged(topUids);
+        }
+    }
+    if (isUidGone) {
+        auto callback = mUidPolicyCallback.lock();
+        if (callback != nullptr) {
+            callback->onUidGone(uid);
         }
     }
 }

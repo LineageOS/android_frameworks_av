@@ -915,6 +915,52 @@ TEST_F(TranscodingSessionControllerTest, TestTopUidSetChanged) {
     EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(1), SESSION(0)));
 }
 
+TEST_F(TranscodingSessionControllerTest, TestUidGone) {
+    ALOGD("TestUidGone");
+
+    mUidPolicy->setTop(UID(0));
+    // Start with unspecified top UID.
+    // Submit real-time sessions to CLIENT(0), session should start immediately.
+    mController->submit(CLIENT(0), SESSION(0), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(0)));
+
+    mController->submit(CLIENT(0), SESSION(1), UID(0), UID(0), mRealtimeRequest, mClientCallback0);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    EXPECT_TRUE(mController->addClientUid(CLIENT(0), SESSION(1), UID(1)));
+
+    // Submit real-time session to CLIENT(1), should not start.
+    mController->submit(CLIENT(1), SESSION(0), UID(1), UID(1), mOfflineRequest, mClientCallback1);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::NoEvent);
+    EXPECT_TRUE(mController->addClientUid(CLIENT(1), SESSION(0), UID(1)));
+
+    // Tell the controller that UID(0) is gone.
+    mUidPolicy->setTop(UID(1));
+    // CLIENT(0)'s SESSION(1) should start, SESSION(0) should be cancelled.
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Pause(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(0), SESSION(1)));
+    mController->onUidGone(UID(0));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Failed(CLIENT(0), SESSION(0)));
+    EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+
+    std::vector<int32_t> clientUids;
+    EXPECT_FALSE(mController->getClientUids(CLIENT(0), SESSION(0), &clientUids));
+    EXPECT_TRUE(mController->getClientUids(CLIENT(0), SESSION(1), &clientUids));
+    EXPECT_EQ(clientUids.size(), 1);
+    EXPECT_EQ(clientUids[0], UID(1));
+
+    // Tell the controller that UID(1) is gone too.
+    mController->onUidGone(UID(1));
+    // CLIENT(1)'s SESSION(0) should start, CLIENT(0)'s SESSION(1) should be cancelled.
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Stop(CLIENT(0), SESSION(1)));
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Failed(CLIENT(0), SESSION(1)));
+    EXPECT_EQ(mTranscoder->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+    EXPECT_EQ(mTranscoder->popEvent(), TestTranscoder::Start(CLIENT(1), SESSION(0)));
+    // CLIENT(1) SESSION(0) should not have any client uids as it's only kept for offline.
+    EXPECT_TRUE(mController->getClientUids(CLIENT(1), SESSION(0), &clientUids));
+    EXPECT_EQ(clientUids.size(), 0);
+}
+
 TEST_F(TranscodingSessionControllerTest, TestAddGetClientUids) {
     ALOGD("TestAddGetClientUids");
 

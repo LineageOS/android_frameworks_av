@@ -102,9 +102,9 @@ BiquadFilterCoefficients bpfCoefs(const float ringingFrequency,
                                   const float sampleRate);
 
 BiquadFilterCoefficients bsfCoefs(const float ringingFrequency,
-                                  const float sampleRate,
                                   const float zq,
-                                  const float pq);
+                                  const float pq,
+                                  const float sampleRate);
 
 std::shared_ptr<HapticBiquadFilter> createLPF(const float cornerFrequency,
                                         const float sampleRate,

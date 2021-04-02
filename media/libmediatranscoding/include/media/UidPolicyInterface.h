@@ -48,6 +48,9 @@ public:
     // has changed. The receiver of this callback should adjust accordingly.
     virtual void onTopUidsChanged(const std::unordered_set<uid_t>& uids) = 0;
 
+    // Called when a uid is gone.
+    virtual void onUidGone(uid_t goneUid) = 0;
+
 protected:
     virtual ~UidPolicyCallbackInterface() = default;
 };

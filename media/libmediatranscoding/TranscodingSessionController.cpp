@@ -195,6 +195,7 @@ struct TranscodingSessionController::Pacer {
 
     bool onSessionStarted(uid_t uid);
     void onSessionCompleted(uid_t uid, std::chrono::microseconds runningTime);
+    void onSessionCancelled(uid_t uid);
 
 private:
     // Threshold of time between finish/start below which a back-to-back start is counted.
@@ -265,6 +266,18 @@ void TranscodingSessionController::Pacer::onSessionCompleted(
     mUidHistoryMap[uid].burstCount++;
     mUidHistoryMap[uid].burstDuration += runningTime;
     mUidHistoryMap[uid].lastCompletedTime = std::chrono::steady_clock::now();
+}
+
+void TranscodingSessionController::Pacer::onSessionCancelled(uid_t uid) {
+    if (mUidHistoryMap.find(uid) == mUidHistoryMap.end()) {
+        ALOGV("Pacer::onSessionCancelled: uid %d: not present", uid);
+        return;
+    }
+    // This is only called if a uid is removed from a session (due to it being killed
+    // or the original submitting client was gone but session was kept for offline use).
+    // Since the uid is going to miss the onSessionCompleted(), we can't track this
+    // session, and have to check back at next onSessionStarted().
+    mUidHistoryMap[uid].sessionActive = false;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -539,8 +552,9 @@ void TranscodingSessionController::addUidToSession_l(uid_t clientUid,
     mSessionQueues[clientUid].push_back(sessionKey);
 }
 
-void TranscodingSessionController::removeSession_l(const SessionKeyType& sessionKey,
-                                                   Session::State finalState, bool keepForOffline) {
+void TranscodingSessionController::removeSession_l(
+        const SessionKeyType& sessionKey, Session::State finalState,
+        const std::shared_ptr<std::function<bool(uid_t uid)>>& keepUid) {
     ALOGV("%s: session %s", __FUNCTION__, sessionToString(sessionKey).c_str());
 
     if (mSessionMap.count(sessionKey) == 0) {
@@ -550,9 +564,17 @@ void TranscodingSessionController::removeSession_l(const SessionKeyType& session
 
     // Remove session from uid's queue.
     bool uidQueueRemoved = false;
+    std::unordered_set<uid_t> remainingUids;
     for (uid_t uid : mSessionMap[sessionKey].allClientUids) {
-        if (keepForOffline && uid == OFFLINE_UID) {
-            continue;
+        if (keepUid != nullptr) {
+            if ((*keepUid)(uid)) {
+                remainingUids.insert(uid);
+                continue;
+            }
+            // If we have uids to keep, the session is not going to any final
+            // state we can't use onSessionCompleted as the running time will
+            // not be valid. Only notify pacer to stop tracking this session.
+            mPacer->onSessionCancelled(uid);
         }
         SessionQueueType& sessionQueue = mSessionQueues[uid];
         auto it = std::find(sessionQueue.begin(), sessionQueue.end(), sessionKey);
@@ -578,8 +600,8 @@ void TranscodingSessionController::removeSession_l(const SessionKeyType& session
         moveUidsToTop_l(topUids, false /*preserveTopUid*/);
     }
 
-    if (keepForOffline) {
-        mSessionMap[sessionKey].allClientUids = {OFFLINE_UID};
+    if (keepUid != nullptr) {
+        mSessionMap[sessionKey].allClientUids = remainingUids;
         return;
     }
 
@@ -590,10 +612,10 @@ void TranscodingSessionController::removeSession_l(const SessionKeyType& session
 
     setSessionState_l(&mSessionMap[sessionKey], finalState);
 
-    if (finalState == Session::FINISHED || finalState == Session::ERROR) {
-        for (uid_t uid : mSessionMap[sessionKey].allClientUids) {
-            mPacer->onSessionCompleted(uid, mSessionMap[sessionKey].runningTime);
-        }
+    // We can use onSessionCompleted() even for CANCELLED, because runningTime is
+    // now updated by setSessionState_l().
+    for (uid_t uid : mSessionMap[sessionKey].allClientUids) {
+        mPacer->onSessionCompleted(uid, mSessionMap[sessionKey].runningTime);
     }
 
     mSessionHistory.push_back(mSessionMap[sessionKey]);
@@ -743,8 +765,10 @@ bool TranscodingSessionController::cancel(ClientIdType clientId, SessionIdType s
         removeSession_l(*it, Session::CANCELED);
     }
 
+    auto keepUid = std::make_shared<std::function<bool(uid_t)>>(
+            [](uid_t uid) { return uid == OFFLINE_UID; });
     for (auto it = sessionsForOffline.begin(); it != sessionsForOffline.end(); ++it) {
-        removeSession_l(*it, Session::CANCELED, true /*keepForOffline*/);
+        removeSession_l(*it, Session::CANCELED, keepUid);
     }
 
     // Start next session.
@@ -985,6 +1009,58 @@ void TranscodingSessionController::onTopUidsChanged(const std::unordered_set<uid
 
     moveUidsToTop_l(uids, true /*preserveTopUid*/);
 
+    updateCurrentSession_l();
+
+    validateState_l();
+}
+
+void TranscodingSessionController::onUidGone(uid_t goneUid) {
+    ALOGD("%s: gone uid %u", __FUNCTION__, goneUid);
+
+    std::list<SessionKeyType> sessionsToRemove, sessionsForOtherUids;
+
+    std::scoped_lock lock{mLock};
+
+    for (auto it = mSessionMap.begin(); it != mSessionMap.end(); ++it) {
+        if (it->second.allClientUids.count(goneUid) > 0) {
+            // If goneUid is the only uid, remove the session; otherwise, only
+            // remove the uid from the session.
+            if (it->second.allClientUids.size() > 1) {
+                sessionsForOtherUids.push_back(it->first);
+            } else {
+                sessionsToRemove.push_back(it->first);
+            }
+        }
+    }
+
+    for (auto it = sessionsToRemove.begin(); it != sessionsToRemove.end(); ++it) {
+        // If the session has ever been started, stop it now.
+        // Note that stop() is needed even if the session is currently paused. This instructs
+        // the transcoder to discard any states for the session, otherwise the states may
+        // never be discarded.
+        if (mSessionMap[*it].getState() != Session::NOT_STARTED) {
+            mTranscoder->stop(it->first, it->second);
+        }
+
+        {
+            auto clientCallback = mSessionMap[*it].callback.lock();
+            if (clientCallback != nullptr) {
+                clientCallback->onTranscodingFailed(it->second,
+                                                    TranscodingErrorCode::kUidGoneCancelled);
+            }
+        }
+
+        // Remove the session.
+        removeSession_l(*it, Session::CANCELED);
+    }
+
+    auto keepUid = std::make_shared<std::function<bool(uid_t)>>(
+            [goneUid](uid_t uid) { return uid != goneUid; });
+    for (auto it = sessionsForOtherUids.begin(); it != sessionsForOtherUids.end(); ++it) {
+        removeSession_l(*it, Session::CANCELED, keepUid);
+    }
+
+    // Start next session.
     updateCurrentSession_l();
 
     validateState_l();

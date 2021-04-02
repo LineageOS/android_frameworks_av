@@ -35,6 +35,7 @@
 #include <string>
 #include <vector>
 
+#include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerService.h>
 #include <android/media/BpAudioFlingerService.h>
 #include <android/media/permission/Identity.h>
@@ -331,6 +332,11 @@ public:
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones) = 0;
 
     virtual status_t setAudioHalPids(const std::vector<pid_t>& pids) = 0;
+
+    // Set vibrators' information.
+    // The values will be used to initialize HapticGenerator.
+    virtual status_t setVibratorInfos(
+            const std::vector<media::AudioVibratorInfo>& vibratorInfos) = 0;
 };
 
 /**
@@ -422,6 +428,7 @@ public:
     size_t frameCountHAL(audio_io_handle_t ioHandle) const override;
     status_t getMicrophones(std::vector<media::MicrophoneInfo>* microphones) override;
     status_t setAudioHalPids(const std::vector<pid_t>& pids) override;
+    status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -504,6 +511,7 @@ public:
             GET_MASTER_BALANCE = media::BnAudioFlingerService::TRANSACTION_getMasterBalance,
             SET_EFFECT_SUSPENDED = media::BnAudioFlingerService::TRANSACTION_setEffectSuspended,
             SET_AUDIO_HAL_PIDS = media::BnAudioFlingerService::TRANSACTION_setAudioHalPids,
+            SET_VIBRATOR_INFOS = media::BnAudioFlingerService::TRANSACTION_setVibratorInfos,
         };
 
         /**
@@ -605,6 +613,7 @@ public:
     Status frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) override;
     Status getMicrophones(std::vector<media::MicrophoneInfoData>* _aidl_return) override;
     Status setAudioHalPids(const std::vector<int32_t>& pids) override;
+    Status setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
 
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;

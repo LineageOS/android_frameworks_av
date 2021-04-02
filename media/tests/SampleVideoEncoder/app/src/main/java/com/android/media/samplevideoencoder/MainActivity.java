@@ -56,6 +56,7 @@ import java.io.IOException;
 import android.util.Log;
 import android.util.Size;
 import android.widget.RadioGroup;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.lang.ref.WeakReference;
@@ -80,6 +81,14 @@ public class MainActivity extends AppCompatActivity
     private static final int VIDEO_BITRATE = 8000000 /* 8 Mbps */;
     private static final int VIDEO_FRAMERATE = 30;
 
+    /**
+     * Constant values to frame types assigned here are internal to this app.
+     * These values does not correspond to the actual values defined in avc/hevc specifications.
+     */
+    public static final int FRAME_TYPE_I = 0;
+    public static final int FRAME_TYPE_P = 1;
+    public static final int FRAME_TYPE_B = 2;
+
     private String mMime = MediaFormat.MIMETYPE_VIDEO_AVC;
     private String mOutputVideoPath = null;
 
@@ -89,6 +98,7 @@ public class MainActivity extends AppCompatActivity
     private boolean mIsRecording;
 
     private AutoFitTextureView mTextureView;
+    private TextView mTextView;
     private CameraDevice mCameraDevice;
     private CameraCaptureSession mPreviewSession;
     private CaptureRequest.Builder mPreviewBuilder;
@@ -100,6 +110,8 @@ public class MainActivity extends AppCompatActivity
     private HandlerThread mBackgroundThread;
 
     private Button mStartButton;
+
+    private int[] mFrameTypeOccurrences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -129,6 +141,8 @@ public class MainActivity extends AppCompatActivity
         final CheckBox checkBox_mr = findViewById(R.id.checkBox_media_recorder);
         final CheckBox checkBox_mc = findViewById(R.id.checkBox_media_codec);
         mTextureView = findViewById(R.id.texture);
+        mTextView = findViewById(R.id.textViewResults);
+
         checkBox_mr.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -162,6 +176,7 @@ public class MainActivity extends AppCompatActivity
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.start_button) {
+            mTextView.setText(null);
             if (mIsMediaRecorder) {
                 if (mIsRecording) {
                     stopRecordingVideo();
@@ -198,6 +213,7 @@ public class MainActivity extends AppCompatActivity
                             mainActivity.mOutputVideoPath);
             try {
                 encodingStatus = codecSurfaceEncoder.startEncodingSurface();
+                mainActivity.mFrameTypeOccurrences = codecSurfaceEncoder.getFrameTypes();
             } catch (IOException | InterruptedException e) {
                 e.printStackTrace();
             }
@@ -211,6 +227,13 @@ public class MainActivity extends AppCompatActivity
             if (encodingStatus == 0) {
                 Toast.makeText(mainActivity.getApplicationContext(), "Encoding Completed",
                         Toast.LENGTH_SHORT).show();
+                mainActivity.mTextView.append("\n Encoded stream contains: ");
+                mainActivity.mTextView.append("\n Number of I-Frames: " +
+                        mainActivity.mFrameTypeOccurrences[FRAME_TYPE_I]);
+                mainActivity.mTextView.append("\n Number of P-Frames: " +
+                        mainActivity.mFrameTypeOccurrences[FRAME_TYPE_P]);
+                mainActivity.mTextView.append("\n Number of B-Frames: " +
+                        mainActivity.mFrameTypeOccurrences[FRAME_TYPE_B]);
             } else {
                 Toast.makeText(mainActivity.getApplicationContext(),
                         "Error occurred while " + "encoding", Toast.LENGTH_SHORT).show();
