@@ -72,30 +72,17 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
         mLinearPool = std::make_shared<C2PooledBlockPool>(mLinearAllocator, mBlockPoolId++);
         ASSERT_NE(mLinearPool, nullptr);
 
-        mCompName = unknown_comp;
-        struct StringToName {
-            const char* Name;
-            standardComp CompName;
-        };
-        const StringToName kStringToName[] = {
-                {"aac", aac}, {"flac", flac}, {"opus", opus}, {"amrnb", amrnb}, {"amrwb", amrwb},
-        };
-        const size_t kNumStringToName = sizeof(kStringToName) / sizeof(kStringToName[0]);
+        std::vector<std::unique_ptr<C2Param>> queried;
+        mComponent->query({}, {C2PortMediaTypeSetting::output::PARAM_TYPE}, C2_DONT_BLOCK,
+                          &queried);
+        ASSERT_GT(queried.size(), 0);
 
-        // Find the component type
-        for (size_t i = 0; i < kNumStringToName; ++i) {
-            if (strcasestr(mComponentName.c_str(), kStringToName[i].Name)) {
-                mCompName = kStringToName[i].CompName;
-                break;
-            }
-        }
+        mMime = ((C2PortMediaTypeSetting::output*)queried[0].get())->m.value;
         mEos = false;
         mCsd = false;
         mFramesReceived = 0;
         mWorkResult = C2_OK;
         mOutputSize = 0u;
-        if (mCompName == unknown_comp) mDisableTest = true;
-        if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
         getInputMaxBufSize();
     }
 
@@ -109,6 +96,8 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
 
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
+
+    void GetURLForComponent(char* mURL);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -130,21 +119,13 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
             }
         }
     }
-    enum standardComp {
-        aac,
-        flac,
-        opus,
-        amrnb,
-        amrwb,
-        unknown_comp,
-    };
 
+    std::string mMime;
     std::string mInstanceName;
     std::string mComponentName;
     bool mEos;
     bool mCsd;
     bool mDisableTest;
-    standardComp mCompName;
 
     int32_t mWorkResult;
     uint32_t mFramesReceived;
@@ -199,7 +180,7 @@ class Codec2AudioEncHidlTest
 };
 
 void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& component,
-                       Codec2AudioEncHidlTest::standardComp compName, bool& disableTest) {
+                       bool& disableTest) {
     // Validate its a C2 Component
     if (component->getName().find("c2") == std::string::npos) {
         ALOGE("Not a c2 component");
@@ -226,13 +207,6 @@ void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& 
             return;
         }
     }
-
-    // Validates component name
-    if (compName == Codec2AudioEncHidlTest::unknown_comp) {
-        ALOGE("Component InValid");
-        disableTest = true;
-        return;
-    }
     ALOGV("Component Valid");
 }
 
@@ -250,56 +224,49 @@ bool setupConfigParam(const std::shared_ptr<android::Codec2Client::Component>& c
 }
 
 // Get config params for a component
-bool getConfigParams(Codec2AudioEncHidlTest::standardComp compName, int32_t* nChannels,
-                     int32_t* nSampleRate, int32_t* samplesPerFrame) {
-    switch (compName) {
-        case Codec2AudioEncHidlTest::aac:
-            *nChannels = 2;
-            *nSampleRate = 48000;
-            *samplesPerFrame = 1024;
-            break;
-        case Codec2AudioEncHidlTest::flac:
-            *nChannels = 2;
-            *nSampleRate = 48000;
-            *samplesPerFrame = 1152;
-            break;
-        case Codec2AudioEncHidlTest::opus:
-            *nChannels = 2;
-            *nSampleRate = 48000;
-            *samplesPerFrame = 960;
-            break;
-        case Codec2AudioEncHidlTest::amrnb:
-            *nChannels = 1;
-            *nSampleRate = 8000;
-            *samplesPerFrame = 160;
-            break;
-        case Codec2AudioEncHidlTest::amrwb:
-            *nChannels = 1;
-            *nSampleRate = 16000;
-            *samplesPerFrame = 160;
-            break;
-        default:
-            return false;
-    }
+bool getConfigParams(std::string mime, int32_t* nChannels, int32_t* nSampleRate,
+                     int32_t* samplesPerFrame) {
+    if (mime.find("mp4a-latm") != std::string::npos) {
+        *nChannels = 2;
+        *nSampleRate = 48000;
+        *samplesPerFrame = 1024;
+    } else if (mime.find("flac") != std::string::npos) {
+        *nChannels = 2;
+        *nSampleRate = 48000;
+        *samplesPerFrame = 1152;
+    } else if (mime.find("opus") != std::string::npos) {
+        *nChannels = 2;
+        *nSampleRate = 48000;
+        *samplesPerFrame = 960;
+    } else if (mime.find("3gpp") != std::string::npos) {
+        *nChannels = 1;
+        *nSampleRate = 8000;
+        *samplesPerFrame = 160;
+    } else if (mime.find("amr-wb") != std::string::npos) {
+        *nChannels = 1;
+        *nSampleRate = 16000;
+        *samplesPerFrame = 160;
+    } else return false;
+
     return true;
 }
 
 // LookUpTable of clips and metadata for component testing
-void GetURLForComponent(Codec2AudioEncHidlTest::standardComp comp, char* mURL) {
+void Codec2AudioEncHidlTestBase::GetURLForComponent(char* mURL) {
     struct CompToURL {
-        Codec2AudioEncHidlTest::standardComp comp;
+        std::string mime;
         const char* mURL;
     };
     static const CompToURL kCompToURL[] = {
-            {Codec2AudioEncHidlTest::standardComp::aac, "bbb_raw_2ch_48khz_s16le.raw"},
-            {Codec2AudioEncHidlTest::standardComp::amrnb, "bbb_raw_1ch_8khz_s16le.raw"},
-            {Codec2AudioEncHidlTest::standardComp::amrwb, "bbb_raw_1ch_16khz_s16le.raw"},
-            {Codec2AudioEncHidlTest::standardComp::flac, "bbb_raw_2ch_48khz_s16le.raw"},
-            {Codec2AudioEncHidlTest::standardComp::opus, "bbb_raw_2ch_48khz_s16le.raw"},
+            {"mp4a-latm", "bbb_raw_2ch_48khz_s16le.raw"},
+            {"3gpp", "bbb_raw_1ch_8khz_s16le.raw"},
+            {"amr-wb", "bbb_raw_1ch_16khz_s16le.raw"},
+            {"flac", "bbb_raw_2ch_48khz_s16le.raw"},
+            {"opus", "bbb_raw_2ch_48khz_s16le.raw"},
     };
 
     for (size_t i = 0; i < sizeof(kCompToURL) / sizeof(kCompToURL[0]); ++i) {
-        if (kCompToURL[i].comp == comp) {
+        if (mMime.find(kCompToURL[i].mime) != std::string::npos) {
             strcat(mURL, kCompToURL[i].mURL);
             return;
         }
@@ -392,7 +359,7 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
 TEST_P(Codec2AudioEncHidlTest, validateCompName) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     ALOGV("Checks if the given component is a valid audio component");
-    validateComponent(mComponent, mCompName, mDisableTest);
+    validateComponent(mComponent, mDisableTest);
     ASSERT_EQ(mDisableTest, false);
 }
 
@@ -411,7 +378,7 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     char mURL[512];
     strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL);
+    GetURLForComponent(mURL);
     bool signalEOS = !std::get<2>(GetParam()).compare("true");
     // Ratio w.r.t to mInputMaxBufSize
     int32_t inputMaxBufRatio = std::stoi(std::get<3>(GetParam()));
@@ -420,8 +387,8 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     int32_t nSampleRate;
     int32_t samplesPerFrame;
 
-    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
-        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
@@ -461,11 +428,10 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
         ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
         ASSERT_TRUE(false);
     }
-    if ((mCompName == flac || mCompName == opus || mCompName == aac)) {
-        if (!mCsd) {
-            ALOGE("CSD buffer missing");
-            ASSERT_TRUE(false);
-        }
+    if ((mMime.find("flac") != std::string::npos) ||
+        (mMime.find("opus") != std::string::npos) ||
+        (mMime.find("mp4a-latm") != std::string::npos)) {
+        ASSERT_TRUE(mCsd) << "CSD buffer missing";
     }
     ASSERT_EQ(mEos, true);
     ASSERT_EQ(mComponent->stop(), C2_OK);
@@ -519,15 +485,15 @@ TEST_P(Codec2AudioEncHidlTest, FlushTest) {
 
     char mURL[512];
     strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL);
+    GetURLForComponent(mURL);
 
     mFlushedIndices.clear();
     int32_t nChannels;
     int32_t nSampleRate;
     int32_t samplesPerFrame;
 
-    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
-        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
@@ -584,7 +550,7 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
 
     char mURL[512];
     strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL);
+    GetURLForComponent(mURL);
 
     std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
@@ -597,8 +563,8 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
     int32_t numFrames = 16;
     int32_t maxChannelCount = 8;
 
-    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
-        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
@@ -608,7 +574,7 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
 
     // Looping through the maximum number of channel count supported by encoder
     for (nChannels = 1; nChannels < maxChannelCount; nChannels++) {
-        ALOGV("Configuring %u encoder for channel count = %d", mCompName, nChannels);
+        ALOGV("Configuring encoder %s  for channel count = %d", mComponentName.c_str(), nChannels);
         if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
             std::cout << "[   WARN   ] Test Skipped \n";
             return;
@@ -665,7 +631,9 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
             ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
             ASSERT_TRUE(false);
         }
-        if ((mCompName == flac || mCompName == opus || mCompName == aac)) {
+        if ((mMime.find("flac") != std::string::npos) ||
+            (mMime.find("opus") != std::string::npos) ||
+            (mMime.find("mp4a-latm") != std::string::npos)) {
             ASSERT_TRUE(mCsd) << "CSD buffer missing";
         }
         ASSERT_TRUE(mEos);
@@ -684,7 +652,7 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
 
     char mURL[512];
     strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mCompName, mURL);
+    GetURLForComponent(mURL);
 
     std::ifstream eleStream;
     eleStream.open(mURL, std::ifstream::binary);
@@ -696,8 +664,8 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
     int32_t nChannels;
     int32_t numFrames = 16;
 
-    if (!getConfigParams(mCompName, &nChannels, &nSampleRate, &samplesPerFrame)) {
-        std::cout << "Failed to get the config params for " << mCompName << " component\n";
+    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+        std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
@@ -708,7 +676,7 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
     uint32_t prevSampleRate = 0u;
 
     for (int32_t nSampleRate : sampleRateValues) {
-        ALOGV("Configuring %u encoder for SampleRate = %d", mCompName, nSampleRate);
+        ALOGV("Configuring encoder %s  for SampleRate = %d", mComponentName.c_str(), nSampleRate);
         if (!setupConfigParam(mComponent, nChannels, nSampleRate)) {
             std::cout << "[   WARN   ] Test Skipped \n";
             return;
@@ -769,7 +737,9 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
             ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
             ASSERT_TRUE(false);
         }
-        if ((mCompName == flac || mCompName == opus || mCompName == aac)) {
+        if ((mMime.find("flac") != std::string::npos) ||
+            (mMime.find("opus") != std::string::npos) ||
+            (mMime.find("mp4a-latm") != std::string::npos)) {
             ASSERT_TRUE(mCsd) << "CSD buffer missing";
         }
         ASSERT_TRUE(mEos);
