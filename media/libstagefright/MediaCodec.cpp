@@ -4506,8 +4506,8 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
     }
     const CryptoPlugin::SubSample *subSamples;
     size_t numSubSamples;
-    const uint8_t *key;
-    const uint8_t *iv;
+    const uint8_t *key = NULL;
+    const uint8_t *iv = NULL;
     CryptoPlugin::Mode mode = CryptoPlugin::kMode_Unencrypted;
 
     // We allow the simpler queueInputBuffer API to be used even in
@@ -4522,8 +4522,6 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
             subSamples = &ss;
             numSubSamples = 1;
-            key = NULL;
-            iv = NULL;
             pattern.mEncryptBlocks = 0;
             pattern.mSkipBlocks = 0;
         }
