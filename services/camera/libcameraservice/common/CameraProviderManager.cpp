@@ -1243,7 +1243,9 @@ status_t CameraProviderManager::addProviderLocked(const std::string& newProvider
     interface = mServiceProxy->tryGetService(newProvider);
 
     if (interface == nullptr) {
-        ALOGE("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
+        // The interface may not be started yet. In that case, this is not a
+        // fatal error.
+        ALOGW("%s: Camera provider HAL '%s' is not actually available", __FUNCTION__,
                 newProvider.c_str());
         return BAD_VALUE;
     }
