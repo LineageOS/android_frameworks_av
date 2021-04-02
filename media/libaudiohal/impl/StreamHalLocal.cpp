@@ -45,31 +45,15 @@ StreamHalLocal::~StreamHalLocal() {
     mDevice.clear();
 }
 
-status_t StreamHalLocal::getSampleRate(uint32_t *rate) {
-    *rate = mStream->get_sample_rate(mStream);
-    return OK;
-}
-
 status_t StreamHalLocal::getBufferSize(size_t *size) {
     *size = mStream->get_buffer_size(mStream);
     return OK;
 }
 
-status_t StreamHalLocal::getChannelMask(audio_channel_mask_t *mask) {
-    *mask = mStream->get_channels(mStream);
-    return OK;
-}
-
-status_t StreamHalLocal::getFormat(audio_format_t *format) {
-    *format = mStream->get_format(mStream);
-    return OK;
-}
-
-status_t StreamHalLocal::getAudioProperties(
-        uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format) {
-    *sampleRate = mStream->get_sample_rate(mStream);
-    *mask = mStream->get_channels(mStream);
-    *format = mStream->get_format(mStream);
+status_t StreamHalLocal::getAudioProperties(audio_config_base_t *configBase) {
+    configBase->sample_rate = mStream->get_sample_rate(mStream);
+    configBase->channel_mask = mStream->get_channels(mStream);
+    configBase->format = mStream->get_format(mStream);
     return OK;
 }
 
