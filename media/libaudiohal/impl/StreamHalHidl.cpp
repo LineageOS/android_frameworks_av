@@ -57,22 +57,13 @@ StreamHalHidl::StreamHalHidl(IStream *stream)
     // Note: This assumes channel mask, format, and sample rate do not change after creation.
     audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
     if (/* mStreamPowerLog.isUserDebugOrEngBuild() && */
-        StreamHalHidl::getAudioProperties(
-                &config.sample_rate, &config.channel_mask, &config.format) == NO_ERROR) {
+        StreamHalHidl::getAudioProperties(&config) == NO_ERROR) {
         mStreamPowerLog.init(config.sample_rate, config.channel_mask, config.format);
     }
 }
 
 StreamHalHidl::~StreamHalHidl() {
     mStream = nullptr;
-}
-
-// Note: this method will be removed
-status_t StreamHalHidl::getSampleRate(uint32_t *rate) {
-    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
-    status_t status = getAudioProperties(&config.sample_rate, &config.channel_mask, &config.format);
-    *rate = config.sample_rate;
-    return status;
 }
 
 status_t StreamHalHidl::getBufferSize(size_t *size) {
@@ -84,48 +75,28 @@ status_t StreamHalHidl::getBufferSize(size_t *size) {
     return status;
 }
 
-// Note: this method will be removed
-status_t StreamHalHidl::getChannelMask(audio_channel_mask_t *mask) {
-    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
-    status_t status = getAudioProperties(&config.sample_rate, &config.channel_mask, &config.format);
-    *mask = config.channel_mask;
-    return status;
-}
-
-// Note: this method will be removed
-status_t StreamHalHidl::getFormat(audio_format_t *format) {
-    audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
-    status_t status = getAudioProperties(&config.sample_rate, &config.channel_mask, &config.format);
-    *format = config.format;
-    return status;
-}
-
-status_t StreamHalHidl::getAudioProperties(
-        uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format) {
+status_t StreamHalHidl::getAudioProperties(audio_config_base_t *configBase) {
+    *configBase = AUDIO_CONFIG_BASE_INITIALIZER;
     if (!mStream) return NO_INIT;
 #if MAJOR_VERSION <= 6
     Return<void> ret = mStream->getAudioProperties(
             [&](uint32_t sr, auto m, auto f) {
-                *sampleRate = sr;
-                *mask = static_cast<audio_channel_mask_t>(m);
-                *format = static_cast<audio_format_t>(f);
+                configBase->sample_rate = sr;
+                configBase->channel_mask = static_cast<audio_channel_mask_t>(m);
+                configBase->format = static_cast<audio_format_t>(f);
             });
     return processReturn("getAudioProperties", ret);
 #else
     Result retval;
     status_t conversionStatus = BAD_VALUE;
-    audio_config_base_t halConfig = AUDIO_CONFIG_BASE_INITIALIZER;
     Return<void> ret = mStream->getAudioProperties(
             [&](Result r, const AudioConfigBase& config) {
                 retval = r;
                 if (retval == Result::OK) {
-                    conversionStatus = HidlUtils::audioConfigBaseToHal(config, &halConfig);
+                    conversionStatus = HidlUtils::audioConfigBaseToHal(config, configBase);
                 }
             });
     if (status_t status = processReturn("getAudioProperties", ret, retval); status == NO_ERROR) {
-        *sampleRate = halConfig.sample_rate;
-        *mask = halConfig.channel_mask;
-        *format = halConfig.format;
         return conversionStatus;
     } else {
         return status;
