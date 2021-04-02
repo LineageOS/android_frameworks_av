@@ -22,6 +22,7 @@
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include <binder/IMediaResourceMonitor.h>
+#include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 #include <cutils/sched_policy.h>
 #include <dirent.h>
