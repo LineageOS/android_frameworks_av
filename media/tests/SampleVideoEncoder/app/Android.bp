@@ -23,7 +23,7 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
-android_app {
+android_test {
     name: "SampleVideoEncoder",
 
     manifest: "src/main/AndroidManifest.xml",
@@ -41,6 +41,10 @@ android_app {
         "androidx.annotation_annotation",
         "androidx.appcompat_appcompat",
         "androidx-constraintlayout_constraintlayout",
+        "junit",
+        "androidx.test.core",
+        "androidx.test.runner",
+        "hamcrest-library",
     ],
 
     javacflags: [

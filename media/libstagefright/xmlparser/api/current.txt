@@ -87,6 +87,7 @@ package media.codecs {
     method public String getName();
     method public java.util.List<media.codecs.Quirk> getQuirk_optional();
     method public String getRank();
+    method public java.util.List<media.codecs.Tuning> getTuning_optional();
     method public String getType();
     method public java.util.List<media.codecs.Type> getType_optional();
     method public String getUpdate();
@@ -134,6 +135,14 @@ package media.codecs {
     method public java.util.List<media.codecs.Setting> getDomain_optional();
     method public java.util.List<media.codecs.Setting> getSetting_optional();
     method public java.util.List<media.codecs.Setting> getVariant_optional();
+  }
+
+  public class Tuning {
+    ctor public Tuning();
+    method public String getName();
+    method public String getValue();
+    method public void setName(String);
+    method public void setValue(String);
   }
 
   public class Type {

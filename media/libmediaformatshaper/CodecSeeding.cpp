@@ -26,56 +26,63 @@ namespace android {
 namespace mediaformatshaper {
 
 /*
- * a block of pre-loads; things the library seeds into the codecproperties based
+ * a block of pre-loaded tunings for codecs.
+ *
+ * things the library seeds into the codecproperties based
  * on the mediaType.
  * XXX: parsing from a file is likely better than embedding in code.
  */
 typedef struct {
+    bool overrideable;
     const char *key;
-    int32_t value;
-} preloadFeature_t;
+    const char *value;
+} preloadTuning_t;
 
 typedef struct {
     const char *mediaType;
-    preloadFeature_t *features;
-} preloadProperties_t;
+    preloadTuning_t *features;
+} preloadTunings_t;
 
 /*
  * 240 = 2.4 bits per pixel-per-second == 5mbps@1080, 2.3mbps@720p, which is about where
  * we want our initial floor for now.
  */
 
-static preloadFeature_t featuresAvc[] = {
-      {"vq-target-bppx100", 240},
-      {nullptr, 0}
+static preloadTuning_t featuresAvc[] = {
+      {true, "vq-target-bpp", "2.45"},
+      {true, "vq-target-qpmax", "41"},
+      {true, nullptr, 0}
 };
 
-static preloadFeature_t featuresHevc[] = {
-      {"vq-target-bppx100", 240},
-      {nullptr, 0}
+static preloadTuning_t featuresHevc[] = {
+      {true, "vq-target-bpp", "2.30"},
+      {true, "vq-target-qpmax", "42"}, // nop, since hevc codecs don't declare qp support
+      {true, nullptr, 0}
 };
 
-static preloadFeature_t featuresGenericVideo[] = {
-      {"vq-target-bppx100", 240},
-      {nullptr, 0}
+static preloadTuning_t featuresGenericVideo[] = {
+      {true, "vq-target-bpp", "2.40"},
+      {true, nullptr, 0}
 };
 
-static preloadProperties_t preloadProperties[] = {
+static preloadTunings_t preloadTunings[] = {
     { "video/avc", featuresAvc},
     { "video/hevc", &featuresHevc[0]},
 
     // wildcard for any video format not already captured
     { "video/*", &featuresGenericVideo[0]},
+
     { nullptr, nullptr}
 };
 
-void CodecProperties::Seed() {
-    ALOGV("Seed: for codec %s, mediatype %s", mName.c_str(), mMediaType.c_str());
+void CodecProperties::addMediaDefaults(bool overrideable) {
+    ALOGD("Seed: codec %s, mediatype %s, overrideable %d",
+          mName.c_str(), mMediaType.c_str(), overrideable);
 
     // load me up with initial configuration data
     int count = 0;
-    for (int i=0;; i++) {
-        preloadProperties_t *p = &preloadProperties[i];
+    for (int i = 0; ; i++) {
+        preloadTunings_t *p = &preloadTunings[i];
         if (p->mediaType == nullptr) {
             break;
         }
@@ -100,11 +107,14 @@ void CodecProperties::Seed() {
         // walk through, filling things
         if (p->features != nullptr) {
             for (int j=0;; j++) {
-                preloadFeature_t *q = &p->features[j];
+                preloadTuning_t *q = &p->features[j];
                 if (q->key == nullptr) {
                     break;
                 }
-                setFeatureValue(q->key, q->value);
+                if (q->overrideable != overrideable) {
+                    continue;
+                }
+                setTuningValue(q->key, q->value);
                 count++;
             }
             break;
@@ -113,13 +123,18 @@ void CodecProperties::Seed() {
     ALOGV("loaded %d preset values", count);
 }
 
-// a chance, as we register the codec and accept no further updates, to
-// override any poor configuration that arrived from the device's XML files.
+// a chance, as we create the codec to inject any default behaviors we want.
+// XXX: consider whether we need pre/post or just post. it affects what can be
+// overridden by way of the codec XML
 //
+void CodecProperties::Seed() {
+    ALOGV("Seed: for codec %s, mediatype %s", mName.c_str(), mMediaType.c_str());
+    addMediaDefaults(true);
+}
+
 void CodecProperties::Finish() {
     ALOGV("Finish: for codec %s, mediatype %s", mName.c_str(), mMediaType.c_str());
-
-    // currently a no-op
+    addMediaDefaults(false);
 }
 
 } // namespace mediaformatshaper

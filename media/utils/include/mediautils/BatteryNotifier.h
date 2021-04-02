@@ -17,7 +17,7 @@
 #ifndef MEDIA_BATTERY_NOTIFIER_H
 #define MEDIA_BATTERY_NOTIFIER_H
 
-#include <binder/IBatteryStats.h>
+#include <batterystats/IBatteryStats.h>
 #include <utils/Singleton.h>
 #include <utils/String8.h>
 

@@ -99,6 +99,23 @@ int setFeature(shaperHandle_t shaper, const char *feature, int value) {
     return 0;
 }
 
+int setTuning(shaperHandle_t shaper, const char *tuning, const char *value) {
+    ALOGV("setTuning: tuning %s value %s", tuning, value);
+    CodecProperties *codec = (CodecProperties*) shaper;
+    if (codec == nullptr) {
+        return -1;
+    }
+    // must not yet be registered
+    if (codec->isRegistered()) {
+        return -1;
+    }
+
+    // save a map of all features
+    codec->setTuningValue(tuning, value);
+
+    return 0;
+}
+
 /*
  * The routines that manage finding, creating, and registering the shapers.
  */
@@ -176,6 +193,8 @@ extern "C" FormatShaperOps_t shaper_ops = {
     .shapeFormat = shapeFormat,
     .getMappings = getMappings,
     .getReverseMappings = getReverseMappings,
+
+    .setTuning = setTuning,
 };
 
 }  // namespace mediaformatshaper
