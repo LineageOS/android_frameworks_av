@@ -187,7 +187,7 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexPictureType,
     kParamIndexHdr10PlusMetadata,
 
-    kParamIndexQuantization,
+    kParamIndexPictureQuantization,
 
     /* ------------------------------------ video components ------------------------------------ */
 
@@ -709,38 +709,6 @@ struct C2ProfileLevelStruct {
 typedef C2StreamParam<C2Info, C2ProfileLevelStruct, kParamIndexProfileLevel>
         C2StreamProfileLevelInfo;
 constexpr char C2_PARAMKEY_PROFILE_LEVEL[] = "coded.pl";
-
-struct C2QuantizationStruct {
-    int32_t iMax;  ///< max/min for I frames
-    int32_t iMin;
-    int32_t pMax;  ///< max/min for P frames
-    int32_t pMin;
-    int32_t bMax;  ///< max/min for B frames
-    int32_t bMin;
-
-    C2QuantizationStruct(
-            int32_t iMax_ = INT32_MAX,
-            int32_t iMin_ = INT32_MIN,
-            int32_t pMax_ = INT32_MAX,
-            int32_t pMin_ = INT32_MIN,
-            int32_t bMax_ = INT32_MAX,
-            int32_t bMin_ = INT32_MIN)
-        : iMax(iMax_), iMin(iMin_),
-          pMax(pMax_), pMin(pMin_),
-          bMax(bMax_), bMin(bMin_) { }
-
-    DEFINE_AND_DESCRIBE_C2STRUCT(Quantization)          // reference?
-    C2FIELD(iMax, "i-max")
-    C2FIELD(iMin, "i-min")
-    C2FIELD(pMax, "p-max")
-    C2FIELD(pMin, "p-min")
-    C2FIELD(bMax, "b-max")
-    C2FIELD(bMin, "b-min")
-};
-
-typedef C2StreamParam<C2Info, C2QuantizationStruct, kParamIndexQuantization>
-        C2StreamQuantizationInfo;
-constexpr char C2_PARAMKEY_QUANTIZATION[] = "coded.qp";
 
 /**
  * Codec-specific initialization data.
@@ -1731,6 +1699,31 @@ struct C2GopLayerStruct {
 typedef C2StreamParam<C2Tuning, C2SimpleArrayStruct<C2GopLayerStruct>, kParamIndexGop>
         C2StreamGopTuning;
 constexpr char C2_PARAMKEY_GOP[] = "coding.gop";
+
+/**
+ * Quantization
+ * min/max for each picture type
+ *
+ */
+struct C2PictureQuantizationStruct {
+    C2PictureQuantizationStruct() : type_((C2Config::picture_type_t)0),
+                                         min(INT32_MIN), max(INT32_MAX) {}
+    C2PictureQuantizationStruct(C2Config::picture_type_t type, int32_t min_, int32_t max_)
+        : type_(type), min(min_), max(max_) { }
+
+    C2Config::picture_type_t type_;
+    int32_t min;      // INT32_MIN == 'no lower bound specified'
+    int32_t max;      // INT32_MAX == 'no upper bound specified'
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(PictureQuantization)
+    C2FIELD(type_, "type")
+    C2FIELD(min, "min")
+    C2FIELD(max, "max")
+};
+
+typedef C2StreamParam<C2Tuning, C2SimpleArrayStruct<C2PictureQuantizationStruct>,
+        kParamIndexPictureQuantization> C2StreamPictureQuantizationTuning;
+constexpr char C2_PARAMKEY_PICTURE_QUANTIZATION[] = "coding.qp";
 
 /**
  * Sync frame can be requested on demand by the client.
