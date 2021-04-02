@@ -705,6 +705,9 @@ void MediaCodecSource::resume(int64_t resumeStartTimeUs) {
 status_t MediaCodecSource::feedEncoderInputBuffers() {
     MediaBufferBase* mbuf = NULL;
     while (!mAvailEncoderInputIndices.empty() && mPuller->readBuffer(&mbuf)) {
+        if (!mEncoder) {
+            return BAD_VALUE;
+        }
         size_t bufferIndex = *mAvailEncoderInputIndices.begin();
         mAvailEncoderInputIndices.erase(mAvailEncoderInputIndices.begin());
 
@@ -1133,7 +1136,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64(PARAMETER_KEY_OFFSET_TIME, mInputBufferTimeOffsetUs);
-            err = mEncoder->setParameters(params);
+            err = mEncoder ? mEncoder->setParameters(params) : BAD_VALUE;
         }
 
         sp<AMessage> response = new AMessage;
@@ -1153,7 +1156,7 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
         if (mFlags & FLAG_USE_SURFACE_INPUT) {
             sp<AMessage> params = new AMessage;
             params->setInt64("stop-time-us", stopTimeUs);
-            err = mEncoder->setParameters(params);
+            err = mEncoder ? mEncoder->setParameters(params) : BAD_VALUE;
         } else {
             err = mPuller->setStopTimeUs(stopTimeUs);
         }
