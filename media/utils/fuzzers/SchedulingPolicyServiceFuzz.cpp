@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 #define LOG_TAG "BatteryNotifierFuzzer"
-#include <binder/IBatteryStats.h>
+#include <batterystats/IBatteryStats.h>
 #include <binder/IServiceManager.h>
 #include <utils/String16.h>
 #include <android/log.h>

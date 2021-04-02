@@ -84,6 +84,12 @@ typedef int (*setMap_t)(shaperHandle_t shaper, const char *kind, const char *fro
 typedef int (*setFeature_t)(shaperHandle_t shaper, const char *feature, int value);
 
 /*
+ * establishes that codec "codecName" encoding for "mediaType" supports the indicated
+ * tuning at the indicated value
+ */
+typedef int (*setTuning_t)(shaperHandle_t shaper, const char *feature, const char * value);
+
+/*
  * The expectation is that the client will implement a flow similar to the following when
  * setting up an encoding.
  *
@@ -118,6 +124,10 @@ typedef struct FormatShaperOps {
     shapeFormat_t shapeFormat;
     getMappings_t getMappings;
     getMappings_t getReverseMappings;
+
+    setTuning_t setTuning;
+
+    // additions happen at the end of the structure
 } FormatShaperOps_t;
 
 // versioninf information

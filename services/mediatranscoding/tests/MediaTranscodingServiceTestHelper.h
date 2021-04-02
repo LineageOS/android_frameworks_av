@@ -524,7 +524,23 @@ public:
         EXPECT_TRUE(mClient3->unregisterClient().isOk());
     }
 
+    const char* prepareOutputFile(const char* path) {
+        deleteFile(path);
+        return path;
+    }
+
     void deleteFile(const char* path) { unlink(path); }
+
+    void dismissKeyguard() {
+        EXPECT_TRUE(ShellHelper::RunCmd("input keyevent KEYCODE_WAKEUP"));
+        EXPECT_TRUE(ShellHelper::RunCmd("wm dismiss-keyguard"));
+    }
+
+    void stopAppPackages() {
+        EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
+        EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
+        EXPECT_TRUE(ShellHelper::Stop(kClientPackageC));
+    }
 
     std::shared_ptr<IMediaTranscodingService> mService;
     std::shared_ptr<TestClientCallback> mClient1;
