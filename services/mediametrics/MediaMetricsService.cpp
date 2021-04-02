@@ -23,6 +23,7 @@
 
 #include <pwd.h> //getpwuid
 
+#include <android-base/stringprintf.h>
 #include <android/content/pm/IPackageManagerNative.h>  // package info
 #include <audio_utils/clock.h>                 // clock conversions
 #include <binder/IPCThreadState.h>             // get calling uid
@@ -37,6 +38,7 @@
 
 namespace android {
 
+using base::StringPrintf;
 using mediametrics::Item;
 using mediametrics::startsWith;
 
@@ -211,14 +213,12 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
 
 status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
 {
-    String8 result;
-
     if (checkCallingPermission(String16("android.permission.DUMP")) == false) {
-        result.appendFormat("Permission Denial: "
+        const std::string result = StringPrintf("Permission Denial: "
                 "can't dump MediaMetricsService from pid=%d, uid=%d\n",
                 IPCThreadState::self()->getCallingPid(),
                 IPCThreadState::self()->getCallingUid());
-        write(fd, result.string(), result.size());
+        write(fd, result.c_str(), result.size());
         return NO_ERROR;
     }
 
@@ -250,17 +250,18 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             // dumpsys media.metrics audiotrack,codec
             // or dumpsys media.metrics audiotrack codec
 
-            result.append("Recognized parameters:\n");
-            result.append("--all         show all records\n");
-            result.append("--clear       clear out saved records\n");
-            result.append("--heap        show heap usage (top 100)\n");
-            result.append("--help        display help\n");
-            result.append("--prefix X    process records for component X\n");
-            result.append("--since X     X < 0: records from -X seconds in the past\n");
-            result.append("              X = 0: ignore\n");
-            result.append("              X > 0: records from X seconds since Unix epoch\n");
-            result.append("--unreachable show unreachable memory (leaks)\n");
-            write(fd, result.string(), result.size());
+            static constexpr char result[] =
+                    "Recognized parameters:\n"
+                    "--all         show all records\n"
+                    "--clear       clear out saved records\n"
+                    "--heap        show heap usage (top 100)\n"
+                    "--help        display help\n"
+                    "--prefix X    process records for component X\n"
+                    "--since X     X < 0: records from -X seconds in the past\n"
+                    "              X = 0: ignore\n"
+                    "              X > 0: records from X seconds since Unix epoch\n"
+                    "--unreachable show unreachable memory (leaks)\n";
+            write(fd, result, std::size(result));
             return NO_ERROR;
         } else if (args[i] == prefixOption) {
             ++i;
@@ -286,7 +287,7 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             unreachable = true;
         }
     }
-
+    std::stringstream result;
     {
         std::lock_guard _l(mLock);
 
@@ -295,21 +296,22 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             mItems.clear();
             mAudioAnalytics.clear();
         } else {
-            result.appendFormat("Dump of the %s process:\n", kServiceName);
+            result << StringPrintf("Dump of the %s process:\n", kServiceName);
             const char *prefixptr = prefix.size() > 0 ? prefix.c_str() : nullptr;
-            dumpHeaders(result, sinceNs, prefixptr);
-            dumpQueue(result, sinceNs, prefixptr);
+            result << dumpHeaders(sinceNs, prefixptr);
+            result << dumpQueue(sinceNs, prefixptr);
 
             // TODO: maybe consider a better way of dumping audio analytics info.
             const int32_t linesToDump = all ? INT32_MAX : 1000;
             auto [ dumpString, lines ] = mAudioAnalytics.dump(linesToDump, sinceNs, prefixptr);
-            result.append(dumpString.c_str());
+            result << dumpString;
             if (lines == linesToDump) {
-                result.append("-- some lines may be truncated --\n");
+                result << "-- some lines may be truncated --\n";
             }
         }
     }
-    write(fd, result.string(), result.size());
+    const std::string str = result.str();
+    write(fd, str.c_str(), str.size());
 
     // Check heap and unreachable memory outside of lock.
     if (heap) {
@@ -327,38 +329,37 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
 }
 
 // dump headers
-void MediaMetricsService::dumpHeaders(String8 &result, int64_t sinceNs, const char* prefix)
+std::string MediaMetricsService::dumpHeaders(int64_t sinceNs, const char* prefix)
 {
+    std::stringstream result;
     if (mediametrics::Item::isEnabled()) {
-        result.append("Metrics gathering: enabled\n");
+        result << "Metrics gathering: enabled\n";
     } else {
-        result.append("Metrics gathering: DISABLED via property\n");
+        result << "Metrics gathering: DISABLED via property\n";
     }
-    result.appendFormat(
+    result << StringPrintf(
             "Since Boot: Submissions: %lld Accepted: %lld\n",
             (long long)mItemsSubmitted.load(), (long long)mItemsFinalized);
-    result.appendFormat(
+    result << StringPrintf(
             "Records Discarded: %lld (by Count: %lld by Expiration: %lld)\n",
             (long long)mItemsDiscarded, (long long)mItemsDiscardedCount,
             (long long)mItemsDiscardedExpire);
     if (prefix != nullptr) {
-        result.appendFormat("Restricting to prefix %s", prefix);
+        result << "Restricting to prefix " << prefix << "\n";
     }
     if (sinceNs != 0) {
-        result.appendFormat(
-            "Emitting Queue entries more recent than: %lld\n",
-            (long long)sinceNs);
+        result << "Emitting Queue entries more recent than: " << sinceNs << "\n";
     }
+    return result.str();
 }
 
 // TODO: should prefix be a set<string>?
-void MediaMetricsService::dumpQueue(String8 &result, int64_t sinceNs, const char* prefix)
+std::string MediaMetricsService::dumpQueue(int64_t sinceNs, const char* prefix)
 {
     if (mItems.empty()) {
-        result.append("empty\n");
-        return;
+        return "empty\n";
     }
-
+    std::stringstream result;
     int slot = 0;
     for (const auto &item : mItems) {         // TODO: consider std::lower_bound() on mItems
         if (item->getTimestamp() < sinceNs) { // sinceNs == 0 means all items shown
@@ -369,9 +370,10 @@ void MediaMetricsService::dumpQueue(String8 &result, int64_t sinceNs, const char
                     __func__, item->getKey().c_str(), prefix);
             continue;
         }
-        result.appendFormat("%5d: %s\n", slot, item->toString().c_str());
+        result << StringPrintf("%5d: %s\n", slot, item->toString().c_str());
         slot++;
     }
+    return result.str();
 }
 
 //
