@@ -28,21 +28,14 @@ class DeviceHalLocal;
 class StreamHalLocal : public virtual StreamHalInterface
 {
   public:
-    // Return the sampling rate in Hz - eg. 44100.
-    virtual status_t getSampleRate(uint32_t *rate);
-
     // Return size of input/output buffer in bytes for this stream - eg. 4800.
     virtual status_t getBufferSize(size_t *size);
 
-    // Return the channel mask.
-    virtual status_t getChannelMask(audio_channel_mask_t *mask);
-
-    // Return the audio format - e.g. AUDIO_FORMAT_PCM_16_BIT.
-    virtual status_t getFormat(audio_format_t *format);
-
-    // Convenience method.
-    virtual status_t getAudioProperties(
-            uint32_t *sampleRate, audio_channel_mask_t *mask, audio_format_t *format);
+    // Return the base configuration of the stream:
+    //   - channel mask;
+    //   - format - e.g. AUDIO_FORMAT_PCM_16_BIT;
+    //   - sampling rate in Hz - eg. 44100.
+    virtual status_t getAudioProperties(audio_config_base_t *configBase);
 
     // Set audio stream parameters.
     virtual status_t setParameters(const String8& kvPairs);
