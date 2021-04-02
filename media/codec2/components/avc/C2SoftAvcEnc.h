@@ -99,6 +99,11 @@ namespace android {
 #define STRLENGTH                   500
 #define DEFAULT_CONSTRAINED_INTRA   0
 
+/** limits as specified by h264 */
+#define CODEC_QP_MIN                0
+#define CODEC_QP_MAX                51
+
+
 #define MIN(a, b) ((a) < (b))? (a) : (b)
 #define MAX(a, b) ((a) > (b))? (a) : (b)
 #define ALIGN16(x) ((((x) + 15) >> 4) << 4)

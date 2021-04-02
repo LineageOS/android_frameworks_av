@@ -19,6 +19,8 @@
 #include <log/log.h>
 #include <utils/misc.h>
 
+#include <algorithm>
+
 #include <media/hardware/VideoAPI.h>
 #include <media/stagefright/MediaDefs.h>
 #include <media/stagefright/MediaErrors.h>
@@ -121,6 +123,19 @@ public:
                 .build());
 
         addParameter(
+                DefineParam(mPictureQuantization, C2_PARAMKEY_PICTURE_QUANTIZATION)
+                .withDefault(C2StreamPictureQuantizationTuning::output::AllocShared(
+                        0 /* flexCount */, 0u /* stream */))
+                .withFields({C2F(mPictureQuantization, m.values[0].type_).oneOf(
+                                {C2Config::picture_type_t(I_FRAME),
+                                  C2Config::picture_type_t(P_FRAME),
+                                  C2Config::picture_type_t(B_FRAME)}),
+                             C2F(mPictureQuantization, m.values[0].min).any(),
+                             C2F(mPictureQuantization, m.values[0].max).any()})
+                .withSetter(PictureQuantizationSetter)
+                .build());
+
+        addParameter(
                 DefineParam(mActualInputDelay, C2_PARAMKEY_INPUT_DELAY)
                 .withDefault(new C2PortActualDelayTuning::input(DEFAULT_B_FRAMES))
                 .withFields({C2F(mActualInputDelay, value).inRange(0, MAX_B_FRAMES)})
@@ -219,6 +234,7 @@ public:
         }
         return res;
     }
+
 
     static C2R SizeSetter(bool mayBlock, const C2P<C2StreamPictureSizeInfo::input> &oldMe,
                           C2P<C2StreamPictureSizeInfo::input> &me) {
@@ -336,6 +352,13 @@ public:
         return C2R::Ok();
     }
 
+    static C2R PictureQuantizationSetter(bool mayBlock,
+                                         C2P<C2StreamPictureQuantizationTuning::output> &me) {
+        (void)mayBlock;
+        (void)me;
+        return C2R::Ok();
+    }
+
     IV_PROFILE_T getProfile_l() const {
         switch (mProfileLevel->profile) {
         case PROFILE_AVC_CONSTRAINED_BASELINE:  [[fallthrough]];
@@ -393,6 +416,8 @@ public:
     std::shared_ptr<C2StreamBitrateInfo::output> getBitrate_l() const { return mBitrate; }
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
     std::shared_ptr<C2StreamGopTuning::output> getGop_l() const { return mGop; }
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> getPictureQuantization_l() const
+    { return mPictureQuantization; }
 
 private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
@@ -404,6 +429,7 @@ private:
     std::shared_ptr<C2StreamProfileLevelInfo::output> mProfileLevel;
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
     std::shared_ptr<C2StreamGopTuning::output> mGop;
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> mPictureQuantization;
 };
 
 #define ive_api_function  ih264e_api_function
@@ -664,20 +690,67 @@ c2_status_t C2SoftAvcEnc::setQp() {
     ive_ctl_set_qp_op_t s_qp_op;
     IV_STATUS_T status;
 
+    ALOGV("in setQp()");
+
+    // set the defaults
     s_qp_ip.e_cmd = IVE_CMD_VIDEO_CTL;
     s_qp_ip.e_sub_cmd = IVE_CMD_CTL_SET_QP;
 
-    s_qp_ip.u4_i_qp = DEFAULT_I_QP;
-    s_qp_ip.u4_i_qp_max = DEFAULT_QP_MAX;
-    s_qp_ip.u4_i_qp_min = DEFAULT_QP_MIN;
+    // these are the ones we're going to set, so want them to default ....
+    // to the DEFAULT values for the codec instea dof CODEC_ bounding
+    int32_t iMin = INT32_MIN, pMin = INT32_MIN, bMin = INT32_MIN;
+    int32_t iMax = INT32_MAX, pMax = INT32_MAX, bMax = INT32_MAX;
 
-    s_qp_ip.u4_p_qp = DEFAULT_P_QP;
-    s_qp_ip.u4_p_qp_max = DEFAULT_QP_MAX;
-    s_qp_ip.u4_p_qp_min = DEFAULT_QP_MIN;
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> qp =
+                    mIntf->getPictureQuantization_l();
+    for (size_t i = 0; i < qp->flexCount(); ++i) {
+        const C2PictureQuantizationStruct &layer = qp->m.values[i];
 
-    s_qp_ip.u4_b_qp = DEFAULT_P_QP;
-    s_qp_ip.u4_b_qp_max = DEFAULT_QP_MAX;
-    s_qp_ip.u4_b_qp_min = DEFAULT_QP_MIN;
+        if (layer.type_ == C2Config::picture_type_t(I_FRAME)) {
+            iMax = layer.max;
+            iMin = layer.min;
+            ALOGV("iMin %d iMax %d", iMin, iMax);
+        } else if (layer.type_ == C2Config::picture_type_t(P_FRAME)) {
+            pMax = layer.max;
+            pMin = layer.min;
+            ALOGV("pMin %d pMax %d", pMin, pMax);
+        } else if (layer.type_ == C2Config::picture_type_t(B_FRAME)) {
+            bMax = layer.max;
+            bMin = layer.min;
+            ALOGV("bMin %d bMax %d", bMin, bMax);
+        }
+    }
+
+    // INT32_{MIN,MAX} means unspecified, so use the codec's default
+    if (iMax == INT32_MAX) iMax = DEFAULT_I_QP_MAX;
+    if (iMin == INT32_MIN) iMin = DEFAULT_I_QP_MIN;
+    if (pMax == INT32_MAX) pMax = DEFAULT_P_QP_MAX;
+    if (pMin == INT32_MIN) pMin = DEFAULT_P_QP_MIN;
+    if (bMax == INT32_MAX) bMax = DEFAULT_B_QP_MAX;
+    if (bMin == INT32_MIN) bMin = DEFAULT_B_QP_MIN;
+
+    // ensure we have legal values
+    iMax = std::clamp(iMax, CODEC_QP_MIN, CODEC_QP_MAX);
+    iMin = std::clamp(iMin, CODEC_QP_MIN, CODEC_QP_MAX);
+    pMax = std::clamp(pMax, CODEC_QP_MIN, CODEC_QP_MAX);
+    pMin = std::clamp(pMin, CODEC_QP_MIN, CODEC_QP_MAX);
+    bMax = std::clamp(bMax, CODEC_QP_MIN, CODEC_QP_MAX);
+    bMin = std::clamp(bMin, CODEC_QP_MIN, CODEC_QP_MAX);
+
+    s_qp_ip.u4_i_qp_max = iMax;
+    s_qp_ip.u4_i_qp_min = iMin;
+    s_qp_ip.u4_p_qp_max = pMax;
+    s_qp_ip.u4_p_qp_min = pMin;
+    s_qp_ip.u4_b_qp_max = bMax;
+    s_qp_ip.u4_b_qp_min = bMin;
+
+    // ensure initial qp values are within our newly configured bounds...
+    s_qp_ip.u4_i_qp = std::clamp(DEFAULT_I_QP, iMin, iMax);
+    s_qp_ip.u4_p_qp = std::clamp(DEFAULT_P_QP, pMin, pMax);
+    s_qp_ip.u4_b_qp = std::clamp(DEFAULT_B_QP, bMin, bMax);
+
+    ALOGV("setting QP: i %d-%d p %d-%d b %d-%d", iMin, iMax, pMin, pMax, bMin, bMax);
+
 
     s_qp_ip.u4_timestamp_high = -1;
     s_qp_ip.u4_timestamp_low = -1;

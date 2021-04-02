@@ -187,6 +187,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexPictureType,
     kParamIndexHdr10PlusMetadata,
 
+    kParamIndexPictureQuantization,
+
     /* ------------------------------------ video components ------------------------------------ */
 
     kParamIndexFrameRate = C2_PARAM_INDEX_VIDEO_PARAM_START,
@@ -1697,6 +1699,31 @@ struct C2GopLayerStruct {
 typedef C2StreamParam<C2Tuning, C2SimpleArrayStruct<C2GopLayerStruct>, kParamIndexGop>
         C2StreamGopTuning;
 constexpr char C2_PARAMKEY_GOP[] = "coding.gop";
+
+/**
+ * Quantization
+ * min/max for each picture type
+ *
+ */
+struct C2PictureQuantizationStruct {
+    C2PictureQuantizationStruct() : type_((C2Config::picture_type_t)0),
+                                         min(INT32_MIN), max(INT32_MAX) {}
+    C2PictureQuantizationStruct(C2Config::picture_type_t type, int32_t min_, int32_t max_)
+        : type_(type), min(min_), max(max_) { }
+
+    C2Config::picture_type_t type_;
+    int32_t min;      // INT32_MIN == 'no lower bound specified'
+    int32_t max;      // INT32_MAX == 'no upper bound specified'
+
+    DEFINE_AND_DESCRIBE_C2STRUCT(PictureQuantization)
+    C2FIELD(type_, "type")
+    C2FIELD(min, "min")
+    C2FIELD(max, "max")
+};
+
+typedef C2StreamParam<C2Tuning, C2SimpleArrayStruct<C2PictureQuantizationStruct>,
+        kParamIndexPictureQuantization> C2StreamPictureQuantizationTuning;
+constexpr char C2_PARAMKEY_PICTURE_QUANTIZATION[] = "coding.qp";
 
 /**
  * Sync frame can be requested on demand by the client.
