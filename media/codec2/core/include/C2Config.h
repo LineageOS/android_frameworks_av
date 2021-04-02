@@ -1901,7 +1901,9 @@ constexpr char C2_PARAMKEY_MAX_CODED_CHANNEL_COUNT[] = "coded.max-channel-count"
 C2ENUM(C2Config::pcm_encoding_t, uint32_t,
     PCM_16,
     PCM_8,
-    PCM_FLOAT
+    PCM_FLOAT,
+    PCM_24,
+    PCM_32
 )
 
 typedef C2StreamParam<C2Info, C2SimpleValueStruct<C2Config::pcm_encoding_t>, kParamIndexPcmEncoding>
