@@ -2728,8 +2728,9 @@ void AudioFlinger::PlaybackThread::resetDraining(uint32_t sequence)
 void AudioFlinger::PlaybackThread::readOutputParameters_l()
 {
     // unfortunately we have no way of recovering from errors here, hence the LOG_ALWAYS_FATAL
-    mSampleRate = mOutput->getSampleRate();
-    mChannelMask = mOutput->getChannelMask();
+    const audio_config_base_t audioConfig = mOutput->getAudioProperties();
+    mSampleRate = audioConfig.sample_rate;
+    mChannelMask = audioConfig.channel_mask;
     if (!audio_is_output_channel(mChannelMask)) {
         LOG_ALWAYS_FATAL("HAL channel mask %#x not valid for output", mChannelMask);
     }
@@ -2742,11 +2743,11 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     mBalance.setChannelMask(mChannelMask);
 
     // Get actual HAL format.
-    status_t result = mOutput->stream->getFormat(&mHALFormat);
+    status_t result = mOutput->stream->getAudioProperties(nullptr, nullptr, &mHALFormat);
     LOG_ALWAYS_FATAL_IF(result != OK, "Error when retrieving output stream format: %d", result);
     // Get format from the shim, which will be different than the HAL format
     // if playing compressed audio over HDMI passthrough.
-    mFormat = mOutput->getFormat();
+    mFormat = audioConfig.format;
     if (!audio_is_valid_format(mFormat)) {
         LOG_ALWAYS_FATAL("HAL format %#x not valid for output", mFormat);
     }
@@ -8370,13 +8371,11 @@ bool AudioFlinger::RecordThread::checkForNewParameter_l(const String8& keyValueP
         }
         if (reconfig) {
             if (status == BAD_VALUE) {
-                uint32_t sRate;
-                audio_channel_mask_t channelMask;
-                audio_format_t format;
-                if (mInput->stream->getAudioProperties(&sRate, &channelMask, &format) == OK &&
-                        audio_is_linear_pcm(format) && audio_is_linear_pcm(reqFormat) &&
-                        sRate <= (AUDIO_RESAMPLER_DOWN_RATIO_MAX * samplingRate) &&
-                        audio_channel_count_from_in_mask(channelMask) <= FCC_8) {
+                audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
+                if (mInput->stream->getAudioProperties(&config) == OK &&
+                        audio_is_linear_pcm(config.format) && audio_is_linear_pcm(reqFormat) &&
+                        config.sample_rate <= (AUDIO_RESAMPLER_DOWN_RATIO_MAX * samplingRate) &&
+                        audio_channel_count_from_in_mask(config.channel_mask) <= FCC_8) {
                     status = NO_ERROR;
                 }
             }
