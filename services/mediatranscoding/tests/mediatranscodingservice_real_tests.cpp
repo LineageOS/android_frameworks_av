@@ -33,7 +33,7 @@ namespace android {
 
 namespace media {
 
-constexpr int64_t kPaddingUs = 400000;
+constexpr int64_t kPaddingUs = 1000000;
 constexpr int64_t kSessionWithPaddingUs = 10000000 + kPaddingUs;
 constexpr int32_t kBitRate = 8 * 1000 * 1000;  // 8Mbs
 
@@ -56,8 +56,7 @@ TEST_F(MediaTranscodingServiceRealTest, TestInvalidSource) {
     registerMultipleClients();
 
     const char* srcPath = "bad_file_uri";
-    const char* dstPath = OUTPATH(TestInvalidSource);
-    deleteFile(dstPath);
+    const char* dstPath = prepareOutputFile(OUTPATH(TestInvalidSource));
 
     // Submit one session.
     EXPECT_TRUE(
@@ -73,8 +72,7 @@ TEST_F(MediaTranscodingServiceRealTest, TestInvalidSource) {
 TEST_F(MediaTranscodingServiceRealTest, TestPassthru) {
     registerMultipleClients();
 
-    const char* dstPath = OUTPATH(TestPassthru);
-    deleteFile(dstPath);
+    const char* dstPath = prepareOutputFile(OUTPATH(TestPassthru));
 
     // Submit one session.
     EXPECT_TRUE(mClient1->submit(0, kShortSrcPath, dstPath));
@@ -89,8 +87,7 @@ TEST_F(MediaTranscodingServiceRealTest, TestPassthru) {
 TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideo) {
     registerMultipleClients();
 
-    const char* dstPath = OUTPATH(TestTranscodeVideo);
-    deleteFile(dstPath);
+    const char* dstPath = prepareOutputFile(OUTPATH(TestTranscodeVideo));
 
     // Submit one session.
     EXPECT_TRUE(mClient1->submit(0, kShortSrcPath, dstPath, TranscodingSessionPriority::kNormal,
@@ -106,8 +103,7 @@ TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideo) {
 TEST_F(MediaTranscodingServiceRealTest, TestTranscodeVideoProgress) {
     registerMultipleClients();
 
-    const char* dstPath = OUTPATH(TestTranscodeVideoProgress);
-    deleteFile(dstPath);
+    const char* dstPath = prepareOutputFile(OUTPATH(TestTranscodeVideoProgress));
 
     // Submit one session.
     EXPECT_TRUE(mClient1->submit(0, kLongSrcPath, dstPath, TranscodingSessionPriority::kNormal,
@@ -134,11 +130,9 @@ TEST_F(MediaTranscodingServiceRealTest, TestCancelImmediately) {
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestCancelImmediately_Session0);
-    const char* dstPath1 = OUTPATH(TestCancelImmediately_Session1);
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestCancelImmediately_Session0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestCancelImmediately_Session1));
 
-    deleteFile(dstPath0);
-    deleteFile(dstPath1);
     // Submit one session, should start immediately.
     EXPECT_TRUE(
             mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
@@ -166,11 +160,9 @@ TEST_F(MediaTranscodingServiceRealTest, TestCancelWhileRunning) {
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestCancelWhileRunning_Session0);
-    const char* dstPath1 = OUTPATH(TestCancelWhileRunning_Session1);
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestCancelWhileRunning_Session0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestCancelWhileRunning_Session1));
 
-    deleteFile(dstPath0);
-    deleteFile(dstPath1);
     // Submit two sessions, session 0 should start immediately, session 1 should be queued.
     EXPECT_TRUE(
             mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kNormal, kBitRate));
@@ -197,10 +189,8 @@ TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeSingleClient) {
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestPauseResumeSingleClient_Session0);
-    const char* dstPath1 = OUTPATH(TestPauseResumeSingleClient_Session1);
-    deleteFile(dstPath0);
-    deleteFile(dstPath1);
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestPauseResumeSingleClient_Session0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestPauseResumeSingleClient_Session1));
 
     // Submit one offline session, should start immediately.
     EXPECT_TRUE(mClient1->submit(0, srcPath0, dstPath0, TranscodingSessionPriority::kUnspecified,
@@ -244,20 +234,15 @@ TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeSingleClient) {
 TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeMultiClients) {
     ALOGD("TestPauseResumeMultiClients starting...");
 
-    EXPECT_TRUE(ShellHelper::RunCmd("input keyevent KEYCODE_WAKEUP"));
-    EXPECT_TRUE(ShellHelper::RunCmd("wm dismiss-keyguard"));
-    EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
-    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
-    EXPECT_TRUE(ShellHelper::Stop(kClientPackageC));
+    dismissKeyguard();
+    stopAppPackages();
 
     registerMultipleClients();
 
     const char* srcPath0 = kLongSrcPath;
     const char* srcPath1 = kShortSrcPath;
-    const char* dstPath0 = OUTPATH(TestPauseResumeMultiClients_Client0);
-    const char* dstPath1 = OUTPATH(TestPauseResumeMultiClients_Client1);
-    deleteFile(dstPath0);
-    deleteFile(dstPath1);
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestPauseResumeMultiClients_Client0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestPauseResumeMultiClients_Client1));
 
     ALOGD("Moving app A to top...");
     EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
@@ -294,11 +279,176 @@ TEST_F(MediaTranscodingServiceRealTest, TestPauseResumeMultiClients) {
 
     unregisterMultipleClients();
 
-    EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
-    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
-    EXPECT_TRUE(ShellHelper::Stop(kClientPackageC));
+    stopAppPackages();
 
     ALOGD("TestPauseResumeMultiClients finished.");
+}
+
+TEST_F(MediaTranscodingServiceRealTest, TestUidGoneForeground) {
+    ALOGD("TestUidGoneForeground starting...");
+
+    dismissKeyguard();
+    stopAppPackages();
+
+    registerMultipleClients();
+
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession1));
+
+    // Test kill foreground app, using only 1 uid.
+    ALOGD("Moving app A to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
+
+    // Submit sessions to Client1 (app A).
+    ALOGD("Submitting sessions to client1 (app A) ...");
+    EXPECT_TRUE(mClient1->submit(0, kLongSrcPath, dstPath0, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
+    EXPECT_TRUE(mClient1->submit(1, kLongSrcPath, dstPath1, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::NoEvent);
+
+    // Kill app A, expect to see A's session pause followed by B's session start,
+    // then A's session cancelled with error code kUidGoneCancelled.
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Failed(CLIENT(1), 0));
+    EXPECT_EQ(mClient1->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Failed(CLIENT(1), 1));
+    EXPECT_EQ(mClient1->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+
+    unregisterMultipleClients();
+
+    stopAppPackages();
+
+    ALOGD("TestUidGoneForeground finished.");
+}
+
+TEST_F(MediaTranscodingServiceRealTest, TestUidGoneForegroundMultiUids) {
+    ALOGD("TestUidGoneForegroundMultiUids starting...");
+
+    dismissKeyguard();
+    stopAppPackages();
+
+    registerMultipleClients();
+
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession1));
+
+    // Test kill foreground app, using two uids.
+    ALOGD("Moving app B to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageB, kTestActivityName));
+    EXPECT_TRUE(mClient2->submit(0, kLongSrcPath, dstPath0, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 0));
+    EXPECT_TRUE(mClient2->submit(1, kLongSrcPath, dstPath1, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::NoEvent);
+    // Make app A also requesting session 1.
+    EXPECT_TRUE(mClient2->addClientUid(1, mClient1->mClientUid));
+
+    ALOGD("Moving app A to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Pause(CLIENT(2), 0));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 1));
+
+    // Kill app A, CLIENT(2)'s session 1 should continue because it's also requested by app B.
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageA));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::NoEvent);
+
+    // Kill app B, sessions should be cancelled.
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Failed(CLIENT(2), 0));
+    EXPECT_EQ(mClient2->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Failed(CLIENT(2), 1));
+    EXPECT_EQ(mClient2->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+
+    unregisterMultipleClients();
+
+    stopAppPackages();
+
+    ALOGD("TestUidGoneForegroundMultiUids finished.");
+}
+TEST_F(MediaTranscodingServiceRealTest, TestUidGoneBackground) {
+    ALOGD("TestUidGoneBackground starting...");
+
+    dismissKeyguard();
+    stopAppPackages();
+
+    registerMultipleClients();
+
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession1));
+
+    // Test kill background app, using two uids.
+    ALOGD("Moving app B to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageB, kTestActivityName));
+    EXPECT_TRUE(mClient2->submit(0, kLongSrcPath, dstPath0, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 0));
+    EXPECT_TRUE(mClient2->submit(1, kLongSrcPath, dstPath1, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::NoEvent);
+
+    ALOGD("Moving app A to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
+    EXPECT_TRUE(mClient1->submit(0, kLongSrcPath, dstPath0, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Pause(CLIENT(2), 0));
+    EXPECT_EQ(mClient1->pop(kPaddingUs), EventTracker::Start(CLIENT(1), 0));
+
+    // Kill app B, all its sessions should be cancelled.
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Failed(CLIENT(2), 0));
+    EXPECT_EQ(mClient2->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Failed(CLIENT(2), 1));
+    EXPECT_EQ(mClient2->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+
+    unregisterMultipleClients();
+
+    stopAppPackages();
+
+    ALOGD("TestUidGoneBackground finished.");
+}
+
+TEST_F(MediaTranscodingServiceRealTest, TestUidGoneBackgroundMultiUids) {
+    ALOGD("TestUidGoneBackgroundMultiUids starting...");
+
+    dismissKeyguard();
+    stopAppPackages();
+
+    registerMultipleClients();
+
+    const char* dstPath0 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession0));
+    const char* dstPath1 = prepareOutputFile(OUTPATH(TestUidGoneForegroundSession1));
+
+    // Test kill background app, using two uids.
+    ALOGD("Moving app B to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageB, kTestActivityName));
+    EXPECT_TRUE(mClient2->submit(0, kLongSrcPath, dstPath0, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 0));
+    EXPECT_TRUE(mClient2->submit(1, kLongSrcPath, dstPath1, TranscodingSessionPriority::kNormal,
+                                 kBitRate));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::NoEvent);
+    // Make app A also requesting session 1.
+    EXPECT_TRUE(mClient2->addClientUid(1, mClient1->mClientUid));
+
+    ALOGD("Moving app A to top...");
+    EXPECT_TRUE(ShellHelper::Start(kClientPackageA, kTestActivityName));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Pause(CLIENT(2), 0));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Start(CLIENT(2), 1));
+
+    // Kill app B, CLIENT(2)'s session 1 should continue to run, session 0 on
+    // the other hand should be cancelled.
+    EXPECT_TRUE(ShellHelper::Stop(kClientPackageB));
+    EXPECT_EQ(mClient2->pop(kPaddingUs), EventTracker::Failed(CLIENT(2), 0));
+    EXPECT_EQ(mClient2->getLastError(), TranscodingErrorCode::kUidGoneCancelled);
+
+    unregisterMultipleClients();
+
+    stopAppPackages();
+
+    ALOGD("TestUidGoneBackgroundMultiUids finished.");
 }
 
 }  // namespace media

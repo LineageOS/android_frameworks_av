@@ -83,5 +83,10 @@
         <MediaCodec name="test10.encoder" type="video/hevc" >
             <Mapping kind="fire" name="from" value="to"/>
         </MediaCodec>
+        <!-- entry for testing Tuning -->
+        <MediaCodec name="test11.encoder" type="video/av01" >
+            <Tuning name="hungry" value="yes"/>
+            <Tuning name="pi" value="3.1415"/>
+        </MediaCodec>
     </Encoders>
 </Included>
