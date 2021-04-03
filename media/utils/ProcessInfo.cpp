@@ -21,9 +21,9 @@
 #include <media/stagefright/ProcessInfo.h>
 
 #include <binder/IPCThreadState.h>
-#include <binder/IProcessInfoService.h>
 #include <binder/IServiceManager.h>
 #include <private/android_filesystem_config.h>
+#include <processinfo/IProcessInfoService.h>
 
 namespace android {
 
