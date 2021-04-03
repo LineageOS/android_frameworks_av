@@ -100,8 +100,8 @@ private:
     bool expirations(const std::shared_ptr<const mediametrics::Item>& item) REQUIRES(mLock);
 
     // support for generating output
-    void dumpQueue(String8 &result, int64_t sinceNs, const char* prefix) REQUIRES(mLock);
-    void dumpHeaders(String8 &result, int64_t sinceNs, const char* prefix) REQUIRES(mLock);
+    std::string dumpQueue(int64_t sinceNs, const char* prefix) REQUIRES(mLock);
+    std::string dumpHeaders(int64_t sinceNs, const char* prefix) REQUIRES(mLock);
 
     // support statsd pushed atoms
     static bool isPullable(const std::string &key);

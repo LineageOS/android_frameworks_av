@@ -23,6 +23,7 @@ import android.media.AudioPortConfig;
 import android.media.AudioStreamType;
 import android.media.AudioUniqueIdUse;
 import android.media.AudioUuid;
+import android.media.AudioVibratorInfo;
 import android.media.CreateEffectRequest;
 import android.media.CreateEffectResponse;
 import android.media.CreateRecordRequest;
@@ -202,4 +203,8 @@ interface IAudioFlingerService {
     MicrophoneInfoData[] getMicrophones();
 
     void setAudioHalPids(in int[] /* pid_t[] */ pids);
+
+    // Set vibrators' information.
+    // The value will be used to initialize HapticGenerator.
+    void setVibratorInfos(in AudioVibratorInfo[] vibratorInfos);
 }
