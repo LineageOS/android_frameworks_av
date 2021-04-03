@@ -74,6 +74,9 @@ cc_library {
         "ResourceManagerService.cpp",
         "ResourceObserverService.cpp",
         "ServiceLog.cpp",
+
+        // TODO: convert to AIDL?
+        "IMediaResourceMonitor.cpp",
     ],
 
     shared_libs: [
