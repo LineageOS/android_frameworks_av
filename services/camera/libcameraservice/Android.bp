@@ -154,6 +154,7 @@ cc_library_shared {
     ],
 
     static_libs: [
+        "libprocessinfoservice_aidl",
         "libbinderthreadstateutils",
         "media_permission-aidl-cpp",
     ],
