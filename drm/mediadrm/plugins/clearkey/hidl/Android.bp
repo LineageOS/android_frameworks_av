@@ -50,11 +50,7 @@ cc_defaults {
 
     relative_install_path: "hw",
 
-    cflags: [
-        "-Wall",
-        "-Werror",
-        "-Wthread-safety",
-    ],
+    cflags: ["-Wall", "-Werror", "-Wthread-safety"],
 
     shared_libs: [
         "android.hardware.drm@1.0",
