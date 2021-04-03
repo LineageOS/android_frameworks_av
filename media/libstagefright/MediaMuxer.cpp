@@ -76,6 +76,7 @@ MediaMuxer::~MediaMuxer() {
     mFileMeta.clear();
     mWriter.clear();
     mTrackList.clear();
+    mFormatList.clear();
 }
 
 ssize_t MediaMuxer::addTrack(const sp<AMessage> &format) {
@@ -109,6 +110,8 @@ ssize_t MediaMuxer::addTrack(const sp<AMessage> &format) {
             ALOGW("addTrack() setCaptureRate failed :%d", result);
         }
     }
+
+    mFormatList.add(format);
     return mTrackList.add(newTrack);
 }
 
@@ -224,9 +227,42 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
         ALOGV("BUFFER_FLAG_EOS");
     }
 
+    sp<AMessage> bufMeta = buffer->meta();
+    int64_t val64;
+    if (bufMeta->findInt64("sample-file-offset", &val64)) {
+        sampleMetaData.setInt64(kKeySampleFileOffset, val64);
+    }
+    if (bufMeta->findInt64(
+                "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
+                &val64)) {
+        sampleMetaData.setInt64(kKeyLastSampleIndexInChunk, val64);
+    }
+
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];
     // This pushBuffer will wait until the mediaBuffer is consumed.
     return currentTrack->pushBuffer(mediaBuffer);
+}
+
+ssize_t MediaMuxer::getTrackCount() {
+    Mutex::Autolock autoLock(mMuxerLock);
+    if (mState != INITIALIZED && mState != STARTED) {
+        ALOGE("getTrackCount() must be called either in INITIALIZED or STARTED state");
+        return -1;
+    }
+    return mTrackList.size();
+}
+
+sp<AMessage> MediaMuxer::getTrackFormat([[maybe_unused]] size_t idx) {
+    Mutex::Autolock autoLock(mMuxerLock);
+    if (mState != INITIALIZED && mState != STARTED) {
+        ALOGE("getTrackFormat() must be called either in INITIALIZED or STARTED state");
+        return nullptr;
+    }
+    if (idx < 0 || idx >= mFormatList.size()) {
+        ALOGE("getTrackFormat() idx is out of range");
+        return nullptr;
+    }
+    return mFormatList[idx];
 }
 
 }  // namespace android

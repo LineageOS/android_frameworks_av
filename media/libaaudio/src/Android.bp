@@ -175,19 +175,14 @@ aidl_interface {
         "binding/aidl/aaudio/IAAudioService.aidl",
     ],
     imports: [
-        "audio_common-aidl",
+        "android.media.audio.common.types",
         "shared-file-region-aidl",
         "media_permission-aidl",
     ],
     backend:
     {
-        cpp: {
-            enabled: true,
-        },
         java: {
-            // TODO: need to have audio_common-aidl available in Java to enable
-            //       this.
-            enabled: false,
+            sdk_version: "module_current",
         },
     },
 }

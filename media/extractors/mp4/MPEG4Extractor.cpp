@@ -4568,6 +4568,9 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
 
     if (objectTypeIndication == 0x6B || objectTypeIndication == 0x69) {
         // mp3 audio
+        if (mLastTrack == NULL)
+            return ERROR_MALFORMED;
+
         AMediaFormat_setString(mLastTrack->meta,AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_MPEG);
         return OK;
     }
@@ -4656,6 +4659,10 @@ status_t MPEG4Extractor::updateAudioTrackInfoFromESDS_MPEG4Audio(
             return ERROR_MALFORMED;
         }
         if (offset >= csd_size || csd[offset] != 0x01) {
+            return ERROR_MALFORMED;
+        }
+
+        if (mLastTrack == NULL) {
             return ERROR_MALFORMED;
         }
         // formerly kKeyVorbisInfo
@@ -6258,6 +6265,19 @@ media_status_t MPEG4Source::read(
                 if (isSyncSample) {
                     AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
                 }
+
+                AMediaFormat_setInt64(
+                        meta, "sample-file-offset" /*AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET*/,
+                        offset);
+
+                if (mSampleTable != nullptr &&
+                        mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
+                    AMediaFormat_setInt64(
+                    meta,
+                    "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
+                    mSampleTable->getLastSampleIndexInChunk());
+                }
+
                 ++mCurrentSampleIndex;
             }
         }
@@ -6405,6 +6425,17 @@ media_status_t MPEG4Source::read(
 
         if (isSyncSample) {
             AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_SYNC_FRAME, 1);
+        }
+
+        AMediaFormat_setInt64(
+                meta, "sample-file-offset" /*AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET*/, offset);
+
+        if (mSampleTable != nullptr &&
+                mCurrentSampleIndex == mSampleTable->getLastSampleIndexInChunk()) {
+            AMediaFormat_setInt64(
+                    meta,
+                    "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
+                    mSampleTable->getLastSampleIndexInChunk());
         }
 
         ++mCurrentSampleIndex;
