@@ -44,13 +44,11 @@ ssize_t AudioStreamOutSink::negotiate(const NBAIO_Format offers[], size_t numOff
         status_t result;
         result = mStream->getBufferSize(&mStreamBufferSizeBytes);
         if (result != OK) return result;
-        audio_format_t streamFormat;
-        uint32_t sampleRate;
-        audio_channel_mask_t channelMask;
-        result = mStream->getAudioProperties(&sampleRate, &channelMask, &streamFormat);
+        audio_config_base_t config = AUDIO_CONFIG_BASE_INITIALIZER;
+        result = mStream->getAudioProperties(&config);
         if (result != OK) return result;
-        mFormat = Format_from_SR_C(sampleRate,
-                audio_channel_count_from_out_mask(channelMask), streamFormat);
+        mFormat = Format_from_SR_C(config.sample_rate,
+                audio_channel_count_from_out_mask(config.channel_mask), config.format);
         mFrameSize = Format_frameSize(mFormat);
     }
     return NBAIO_Sink::negotiate(offers, numOffers, counterOffers, numCounterOffers);

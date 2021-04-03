@@ -211,9 +211,9 @@ BiquadFilterCoefficients bpfCoefs(const float ringingFrequency,
 }
 
 BiquadFilterCoefficients bsfCoefs(const float ringingFrequency,
-                                  const float sampleRate,
                                   const float zq,
-                                  const float pq) {
+                                  const float pq,
+                                  const float sampleRate) {
     BiquadFilterCoefficients coefficient;
     const auto [zeroReal, zeroImg] = getComplexPoleZ(ringingFrequency, zq, sampleRate);
     float zeroCoeff1 = -2 * zeroReal;
@@ -275,7 +275,7 @@ std::shared_ptr<HapticBiquadFilter> createBSF(const float ringingFrequency,
                                         const float pq,
                                         const float sampleRate,
                                         const size_t channelCount) {
-    BiquadFilterCoefficients coefficient = bsfCoefs(ringingFrequency, sampleRate, zq, pq);
+    BiquadFilterCoefficients coefficient = bsfCoefs(ringingFrequency, zq, pq, sampleRate);
     return std::make_shared<HapticBiquadFilter>(channelCount, coefficient);
 }
 

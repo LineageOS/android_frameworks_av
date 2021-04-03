@@ -5,7 +5,9 @@
 #ifndef CLEARKEY_MEMORY_FILE_SYSTEM_H_
 #define CLEARKEY_MEMORY_FILE_SYSTEM_H_
 
+#include <android-base/thread_annotations.h>
 #include <map>
+#include <mutex>
 #include <string>
 
 #include "ClearKeyTypes.h"
@@ -49,10 +51,12 @@ class MemoryFileSystem {
     size_t Write(const std::string& pathName, const MemoryFile& memoryFile);
 
  private:
+    mutable std::mutex mMemoryFileSystemLock;
+
     // License file name is made up of a unique keySetId, therefore,
     // the filename can be used as the key to locate licenses in the
     // memory file system.
-    std::map<std::string, MemoryFile> mMemoryFileSystem;
+    std::map<std::string, MemoryFile> mMemoryFileSystem GUARDED_BY(mMemoryFileSystemLock);
 
     std::string GetFileName(const std::string& path);
 

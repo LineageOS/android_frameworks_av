@@ -284,7 +284,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                 setOutputDevices(desc, newDevices, force, 0);
             }
             if (!desc->isDuplicated() && desc->mProfile->hasDynamicAudioProfile() &&
-                    desc->devices() != activeMediaDevices &&
+                    !activeMediaDevices.empty() && desc->devices() != activeMediaDevices &&
                     desc->supportsDevicesForPlayback(activeMediaDevices)) {
                 // Reopen the output to query the dynamic profiles when there is not active
                 // clients or all active clients will be rerouted. Otherwise, set the flag
