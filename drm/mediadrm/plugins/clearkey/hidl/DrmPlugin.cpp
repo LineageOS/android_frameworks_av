@@ -565,7 +565,6 @@ Return<Status> DrmPlugin::setPropertyByteArray(
 Return<void> DrmPlugin::queryKeyStatus(
         const hidl_vec<uint8_t>& sessionId,
         queryKeyStatus_cb _hidl_cb) {
-
     if (sessionId.size() == 0) {
         // Returns empty key status KeyValue pair
         _hidl_cb(Status::BAD_VALUE, hidl_vec<KeyValue>());
@@ -575,12 +574,14 @@ Return<void> DrmPlugin::queryKeyStatus(
     std::vector<KeyValue> infoMapVec;
     infoMapVec.clear();
 
+    mPlayPolicyLock.lock();
     KeyValue keyValuePair;
     for (size_t i = 0; i < mPlayPolicy.size(); ++i) {
         keyValuePair.key = mPlayPolicy[i].key;
         keyValuePair.value = mPlayPolicy[i].value;
         infoMapVec.push_back(keyValuePair);
     }
+    mPlayPolicyLock.unlock();
     _hidl_cb(Status::OK, toHidlVec(infoMapVec));
     return Void();
 }
