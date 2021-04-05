@@ -19,6 +19,7 @@ LOCAL_HEADER_LIBRARIES := \
     libaudiopolicymanager_interface_headers
 
 LOCAL_SHARED_LIBRARIES := \
+    libactivitymanager_aidl \
     libcutils \
     libutils \
     liblog \
@@ -36,6 +37,7 @@ LOCAL_SHARED_LIBRARIES := \
     capture_state_listener-aidl-cpp
 
 LOCAL_EXPORT_SHARED_LIBRARY_HEADERS := \
+    libactivitymanager_aidl \
     libsensorprivacy
 
 LOCAL_STATIC_LIBRARIES := \
