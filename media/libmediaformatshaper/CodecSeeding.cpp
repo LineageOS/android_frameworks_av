@@ -50,13 +50,16 @@ typedef struct {
 
 static preloadTuning_t featuresAvc[] = {
       {true, "vq-target-bpp", "2.45"},
-      {true, "vq-target-qpmax", "41"},
+      {true, "vq-target-bpp-1080p", "2.40"},
+      {true, "vq-target-bpp-540p", "2.60"},
+      {true, "vq-target-bpp-480p", "3.00"},
+      {true, "vq-target-qpmax", "40"},
       {true, nullptr, 0}
 };
 
 static preloadTuning_t featuresHevc[] = {
       {true, "vq-target-bpp", "2.30"},
-      {true, "vq-target-qpmax", "42"}, // nop, since hevc codecs don't declare qp support
+      {true, "vq-target-qpmax", "40"}, // nop, since hevc codecs don't declare qp support
       {true, nullptr, 0}
 };
 
