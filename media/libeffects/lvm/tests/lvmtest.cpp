@@ -79,6 +79,7 @@ struct lvmConfigParams_t {
     int bassEffectLevel = 0;
     int eqPresetLevel = 0;
     int frameLength = 256;
+    int trebleEffectLevel = 0;
     LVM_BE_Mode_en bassEnable = LVM_BE_OFF;
     LVM_TE_Mode_en trebleEnable = LVM_TE_OFF;
     LVM_EQNB_Mode_en eqEnable = LVM_EQNB_OFF;
@@ -303,10 +304,6 @@ int LvmBundle_init(struct EffectContext* pContext, LVM_ControlParams_t* params) 
     params->PSA_Enable = LVM_PSA_OFF;
     params->PSA_PeakDecayRate = LVM_PSA_SPEED_MEDIUM;
 
-    /* TE Control parameters */
-    params->TE_OperatingMode = LVM_TE_OFF;
-    params->TE_EffectLevel = 0;
-
     /* Activate the initial settings */
     LvmStatus = LVM_SetControlParameters(pContext->pBundledContext->hInstance, params);
 
@@ -445,6 +442,7 @@ int lvmControl(struct EffectContext* pContext, lvmConfigParams_t* plvmConfigPara
 
     /* Treble Enhancement parameters */
     params->TE_OperatingMode = plvmConfigParams->trebleEnable;
+    params->TE_EffectLevel = plvmConfigParams->trebleEffectLevel;
 
     /* PSA Control parameters */
     params->PSA_Enable = LVM_PSA_ON;
@@ -604,6 +602,15 @@ int main(int argc, const char* argv[]) {
                 return -1;
             }
             lvmConfigParams.eqPresetLevel = eqPresetLevel;
+        } else if (!strncmp(argv[i], "-trebleLvl:", 11)) {
+            const int trebleEffectLevel = atoi(argv[i] + 11);
+            if (trebleEffectLevel > LVM_TE_MAX_EFFECTLEVEL ||
+                trebleEffectLevel < LVM_TE_MIN_EFFECTLEVEL) {
+                printf("Error: Unsupported Treble Effect Level : %d\n", trebleEffectLevel);
+                printUsage();
+                return -1;
+            }
+            lvmConfigParams.trebleEffectLevel = trebleEffectLevel;
         } else if (!strcmp(argv[i], "-bE")) {
             lvmConfigParams.bassEnable = LVM_BE_ON;
         } else if (!strcmp(argv[i], "-eqE")) {
