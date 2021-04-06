@@ -36,7 +36,8 @@ cc_binary {
 
     relative_install_path: "hw",
 
-    cflags: ["-Wall", "-Werror"],
+    cflags: ["-Wall", "-Werror", "-Wthread-safety"],
+
     init_rc: ["android.hardware.drm@1.1-service.clearkey.rc"],
 
     shared_libs: [
