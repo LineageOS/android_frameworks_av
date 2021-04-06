@@ -53,16 +53,16 @@ fi
 flags_arr=(
     "-csE"
     "-eqE"
-    "-tE"
-    "-csE -tE -eqE"
+    "-tE -trebleLvl:15"
+    "-csE -tE -trebleLvl:15 -eqE"
     "-bE -M"
-    "-csE -tE"
-    "-csE -eqE" "-tE -eqE"
-    "-csE -tE -bE -M -eqE"
-    "-tE -eqE -vcBal:96 -M"
-    "-tE -eqE -vcBal:-96 -M"
-    "-tE -eqE -vcBal:0 -M"
-    "-tE -eqE -bE -vcBal:30 -M"
+    "-csE -tE -trebleLvl:15"
+    "-csE -eqE" "-tE -trebleLvl:15 -eqE"
+    "-csE -tE -trebleLvl:15 -bE -M -eqE"
+    "-tE -trebleLvl:15 -eqE -vcBal:96 -M"
+    "-tE -trebleLvl:15 -eqE -vcBal:-96 -M"
+    "-tE -trebleLvl:15 -eqE -vcBal:0 -M"
+    "-tE -trebleLvl:15 -eqE -bE -vcBal:30 -M"
 )
 
 fs_arr=(

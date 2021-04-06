@@ -37,6 +37,8 @@ Return<void> CryptoPlugin::setSharedBufferBase(
     sp<IMemory> hidlMemory = mapMemory(base);
     ALOGE_IF(hidlMemory == nullptr, "mapMemory returns nullptr");
 
+    std::lock_guard<std::mutex> shared_buffer_lock(mSharedBufferLock);
+
     // allow mapMemory to return nullptr
     mSharedBufferMap[bufferId] = hidlMemory;
     return Void();
@@ -94,6 +96,7 @@ Return<void> CryptoPlugin::decrypt_1_2(
         return Void();
     }
 
+    std::unique_lock<std::mutex> shared_buffer_lock(mSharedBufferLock);
     if (mSharedBufferMap.find(source.bufferId) == mSharedBufferMap.end()) {
       _hidl_cb(Status_V1_2::ERROR_DRM_CANNOT_HANDLE, 0,
                "source decrypt buffer base not set");
@@ -146,8 +149,10 @@ Return<void> CryptoPlugin::decrypt_1_2(
         _hidl_cb(Status_V1_2::ERROR_DRM_FRAME_TOO_LARGE, 0, "invalid buffer size");
         return Void();
     }
-    destPtr = static_cast<void *>(base + destination.nonsecureMemory.offset);
+    destPtr = static_cast<void*>(base + destination.nonsecureMemory.offset);
 
+    // release mSharedBufferLock
+    shared_buffer_lock.unlock();
 
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
