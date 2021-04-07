@@ -111,7 +111,7 @@ static void *aaudio_endpoint_thread_proc(void *arg) {
     if (!endpoint->isConnected()) {
         ALOGD("%s() call safeReleaseCloseFromCallback()", __func__);
         // Release and close under a lock with no check for callback collisions.
-        endpoint->getStreamInternal()->safeReleaseCloseFromCallback();
+        endpoint->getStreamInternal()->safeReleaseCloseInternal();
     }
 
     return result;

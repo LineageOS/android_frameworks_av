@@ -124,7 +124,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                               __func__, callbackResult);
                     }
                     audioBuffer->size = 0;
-                    systemStopFromCallback();
+                    systemStopInternal();
                     // Disable the callback just in case the system keeps trying to call us.
                     mCallbackEnabled.store(false);
                 }
