@@ -23,6 +23,7 @@
 #include <system/audio.h>
 
 #include "LVM_Private.h"
+#include "ScalarArithmetic.h"
 #include "VectorArithmetic.h"
 #include "LVM_Coeffs.h"
 
@@ -178,6 +179,9 @@ LVM_ReturnStatus_en LVM_Process(LVM_Handle_t hInstance, const LVM_FLOAT* pInData
                  * Apply the filter
                  */
                 pInstance->pTEBiquad->process(pProcessed, pProcessed, NrFrames);
+                for (auto i = 0; i < NrChannels * NrFrames; i++) {
+                    pProcessed[i] = LVM_Clamp(pProcessed[i]);
+                }
             }
             /*
              * Volume balance
