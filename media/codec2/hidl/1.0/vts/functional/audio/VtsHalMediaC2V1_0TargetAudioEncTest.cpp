@@ -595,8 +595,11 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
         }
 
         // To check if the input stream is sufficient to encode for the higher channel count
+        struct stat buf;
+        stat(mURL, &buf);
+        size_t fileSize = buf.st_size;
         int32_t bytesCount = (samplesPerFrame * nChannels * 2) * numFrames;
-        if (eleStream.gcount() < bytesCount) {
+        if (fileSize < bytesCount) {
             std::cout << "[   WARN   ] Test Skipped for ChannelCount " << nChannels
                       << " because of insufficient input data\n";
             continue;
@@ -620,9 +623,6 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
         // blocking call to ensures application to Wait till all the inputs are consumed
         waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
-        // Validate output size based on chosen ChannelCount
-        EXPECT_GE(mOutputSize, prevOutputSize);
-
         prevChannelCount = nChannels;
         prevOutputSize = mOutputSize;
 
@@ -637,7 +637,8 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
             ASSERT_TRUE(mCsd) << "CSD buffer missing";
         }
         ASSERT_TRUE(mEos);
-        ASSERT_EQ(mComponent->stop(), C2_OK);
+        // TODO(b/147348711) Use reset instead of stop when using the same instance of codec.
+        ASSERT_EQ(mComponent->reset(), C2_OK);
         mFramesReceived = 0;
         mOutputSize = 0;
         mEos = false;
@@ -698,8 +699,11 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
         }
 
         // To check if the input stream is sufficient to encode for the higher SampleRate
+        struct stat buf;
+        stat(mURL, &buf);
+        size_t fileSize = buf.st_size;
         int32_t bytesCount = (samplesPerFrame * nChannels * 2) * numFrames;
-        if (eleStream.gcount() < bytesCount) {
+        if (fileSize < bytesCount) {
             std::cout << "[   WARN   ] Test Skipped for SampleRate " << nSampleRate
                       << " because of insufficient input data\n";
             continue;
@@ -723,12 +727,6 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
         // blocking call to ensures application to Wait till all the inputs are consumed
         waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
-        // Validate output size based on chosen samplerate
-        if (prevSampleRate >= nSampleRate) {
-            EXPECT_LE(mOutputSize, prevOutputSize);
-        } else {
-            EXPECT_GT(mOutputSize, prevOutputSize);
-        }
         prevSampleRate = nSampleRate;
         prevOutputSize = mOutputSize;
 
@@ -743,7 +741,8 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
             ASSERT_TRUE(mCsd) << "CSD buffer missing";
         }
         ASSERT_TRUE(mEos);
-        ASSERT_EQ(mComponent->stop(), C2_OK);
+        // TODO(b/147348711) Use reset instead of stop when using the same instance of codec.
+        ASSERT_EQ(mComponent->reset(), C2_OK);
         mFramesReceived = 0;
         mOutputSize = 0;
         mEos = false;
