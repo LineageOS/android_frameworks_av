@@ -408,7 +408,7 @@ public:
     /**
      * This is called internally when an app callback returns AAUDIO_CALLBACK_RESULT_STOP.
      */
-    aaudio_result_t systemStopFromCallback();
+    aaudio_result_t systemStopInternal();
 
     /**
      * Safely RELEASE a stream after taking mStreamLock and checking
@@ -424,7 +424,7 @@ public:
      */
     aaudio_result_t safeReleaseClose();
 
-    aaudio_result_t safeReleaseCloseFromCallback();
+    aaudio_result_t safeReleaseCloseInternal();
 
 protected:
 
