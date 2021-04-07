@@ -1,11 +1,11 @@
 /*
- * Copyright 2013, The Android Open Source Project
+ * Copyright (C) 2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *      http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -14,31 +14,16 @@
  * limitations under the License.
  */
 
-#ifndef MEDIA_MUXER_H_
-#define MEDIA_MUXER_H_
+#ifndef MEDIA_MUXER_BASE_H_
+#define MEDIA_MUXER_BASE_H_
 
-#include <utils/Errors.h>
 #include <utils/RefBase.h>
-#include <utils/Vector.h>
-#include <utils/threads.h>
-
-#include <map>
-#include <mutex>
-#include <vector>
-
 #include "media/stagefright/foundation/ABase.h"
-#include "MediaMuxerBase.h"
 
 namespace android {
 
 struct ABuffer;
 struct AMessage;
-struct MediaAdapter;
-class MediaBuffer;
-struct MediaSource;
-class MetaData;
-struct MediaWriter;
-struct NuMediaExtractor;
 
 // MediaMuxer is used to mux multiple tracks into a video. Currently, we only
 // support a mp4 file as the output.
@@ -46,13 +31,24 @@ struct NuMediaExtractor;
 // Constructor -> addTrack+ -> start -> writeSampleData+ -> stop
 // If muxing operation need to be cancelled, the app is responsible for
 // deleting the output file after stop.
-struct MediaMuxer : public MediaMuxerBase {
+struct MediaMuxerBase : public RefBase {
 public:
+    // Please update media/java/android/media/MediaMuxer.java if the
+    // OutputFormat is updated.
+    enum OutputFormat {
+        OUTPUT_FORMAT_MPEG_4      = 0,
+        OUTPUT_FORMAT_WEBM        = 1,
+        OUTPUT_FORMAT_THREE_GPP   = 2,
+        OUTPUT_FORMAT_HEIF        = 3,
+        OUTPUT_FORMAT_OGG         = 4,
+        OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
+    };
+
     // Construct the muxer with the file descriptor. Note that the MediaMuxer
     // will close this file at stop().
-    MediaMuxer(int fd, OutputFormat format);
+    MediaMuxerBase() {};
 
-    virtual ~MediaMuxer();
+    virtual ~MediaMuxerBase() {};
 
     /**
      * Add a track with its format information. This should be
@@ -60,13 +56,13 @@ public:
      * @param format the track's format.
      * @return the track's index or negative number if error.
      */
-    ssize_t addTrack(const sp<AMessage> &format);
+    virtual ssize_t addTrack(const sp<AMessage> &format) = 0;
 
     /**
      * Start muxing. Make sure all the tracks have been added before
      * calling this.
      */
-    status_t start();
+    virtual status_t start() = 0;
 
     /**
      * Set the orientation hint.
@@ -74,7 +70,7 @@ public:
      *                90, 180 or 270.
      * @return OK if no error.
      */
-    status_t setOrientationHint(int degrees);
+    virtual status_t setOrientationHint(int degrees) = 0;
 
     /**
      * Set the location.
@@ -84,7 +80,7 @@ public:
      * [-1800000, 1800000].
      * @return OK if no error.
      */
-    status_t setLocation(int latitude, int longitude);
+    virtual status_t setLocation(int latitude, int longitude) = 0;
 
     /**
      * Stop muxing.
@@ -94,7 +90,7 @@ public:
      * not recommended for launching this call.
      * @return OK if no error.
      */
-    status_t stop();
+    virtual status_t stop() = 0;
 
     /**
      * Send a sample buffer for muxing.
@@ -109,43 +105,29 @@ public:
      *              MediaCodec::BUFFER_FLAG_SYNCFRAME.
      * @return OK if no error.
      */
-    status_t writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
-                             int64_t timeUs, uint32_t flags) ;
+    virtual status_t writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
+                             int64_t timeUs, uint32_t flags) = 0 ;
 
     /**
      * Gets the number of tracks added successfully.  Should be called in
      * INITIALIZED(after constructor) or STARTED(after start()) state.
      * @return the number of tracks or -1 in wrong state.
      */
-    ssize_t getTrackCount();
+    virtual ssize_t getTrackCount() = 0;
 
     /**
      * Gets the format of the track by their index.
      * @param idx : index of the track whose format is wanted.
      * @return smart pointer to AMessage containing the format details.
      */
-    sp<AMessage> getTrackFormat(size_t idx);
+    virtual sp<AMessage> getTrackFormat(size_t idx) = 0;
 
 private:
-    const OutputFormat mFormat;
-    sp<MediaWriter> mWriter;
-    Vector< sp<MediaAdapter> > mTrackList;  // Each track has its MediaAdapter.
-    Vector< sp<AMessage> > mFormatList; // Format of each track.
-    sp<MetaData> mFileMeta;  // Metadata for the whole file.
-    Mutex mMuxerLock;
 
-    enum State {
-        UNINITIALIZED,
-        INITIALIZED,
-        STARTED,
-        STOPPED
-    };
-    State mState;
-
-    DISALLOW_EVIL_CONSTRUCTORS(MediaMuxer);
+    DISALLOW_EVIL_CONSTRUCTORS(MediaMuxerBase);
 };
 
 }  // namespace android
 
-#endif  // MEDIA_MUXER_H_
+#endif  // MEDIA_MUXER_BASE_H_
 
