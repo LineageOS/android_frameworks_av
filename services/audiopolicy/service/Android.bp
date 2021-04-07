@@ -23,6 +23,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "libactivitymanager_aidl",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
@@ -67,6 +68,7 @@ cc_library_shared {
     ],
 
     export_shared_lib_headers: [
+        "libactivitymanager_aidl",
         "libsensorprivacy",
         "media_permission-aidl-cpp",
     ],
