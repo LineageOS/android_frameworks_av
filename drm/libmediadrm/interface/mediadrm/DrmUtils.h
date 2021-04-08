@@ -211,7 +211,7 @@ status_t GetLogMessages(const sp<U> &obj, Vector<::V1_4::LogMessage> &logs) {
     }
 
     auto allLogs(gLogBuf.getLogs());
-    LOG2BI("framework logs size %zu; plugin logs size %zu",
+    LOG2BD("framework logs size %zu; plugin logs size %zu",
            allLogs.size(), pluginLogs.size());
     std::copy(pluginLogs.begin(), pluginLogs.end(), std::back_inserter(allLogs));
     std::sort(allLogs.begin(), allLogs.end(),
