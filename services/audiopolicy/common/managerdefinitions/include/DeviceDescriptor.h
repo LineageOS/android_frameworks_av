@@ -218,7 +218,9 @@ public:
             add(devices);
             return size();
         }
-        return SortedVector::merge(devices);
+        ssize_t ret = SortedVector::merge(devices);
+        refreshTypes();
+        return ret;
     }
 
     /**
