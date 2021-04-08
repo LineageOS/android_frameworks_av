@@ -33,11 +33,13 @@ cc_library {
         "libcodec2_vndk",
         "libcutils",
         "liblog",
+        "libnativewindow",
         "libstagefright_foundation",
         "libutils",
     ],
 
     static_libs: [
+        "libarect",
         "libyuv_static",
     ],
 
