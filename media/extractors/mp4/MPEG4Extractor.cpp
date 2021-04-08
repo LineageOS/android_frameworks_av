@@ -2345,7 +2345,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            AMediaFormat_setBuffer(mLastTrack->meta, 
+            AMediaFormat_setBuffer(mLastTrack->meta,
                     AMEDIAFORMAT_KEY_ESDS, &buffer[4], chunk_data_size - 4);
 
             if (mPath.size() >= 2
@@ -2427,7 +2427,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            AMediaFormat_setBuffer(mLastTrack->meta, 
+            AMediaFormat_setBuffer(mLastTrack->meta,
                     AMEDIAFORMAT_KEY_CSD_AVC, buffer.get(), chunk_data_size);
 
             break;
@@ -2449,7 +2449,7 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
             if (mLastTrack == NULL)
                 return ERROR_MALFORMED;
 
-            AMediaFormat_setBuffer(mLastTrack->meta, 
+            AMediaFormat_setBuffer(mLastTrack->meta,
                     AMEDIAFORMAT_KEY_CSD_HEVC, buffer.get(), chunk_data_size);
 
             *offset += chunk_size;
@@ -4021,13 +4021,13 @@ status_t MPEG4Extractor::parseITunesMetaData(off64_t offset, size_t size) {
                 // custom genre string
                 buffer[size] = '\0';
 
-                AMediaFormat_setString(mFileMetaData, 
+                AMediaFormat_setString(mFileMetaData,
                         metadataKey, (const char *)buffer + 8);
             }
         } else {
             buffer[size] = '\0';
 
-            AMediaFormat_setString(mFileMetaData, 
+            AMediaFormat_setString(mFileMetaData,
                     metadataKey, (const char *)buffer + 8);
         }
     }
@@ -6194,9 +6194,11 @@ media_status_t MPEG4Source::read(
         if (newBuffer) {
             if (mIsPcm) {
                 // The twos' PCM block reader assumes that all samples has the same size.
-
-                uint32_t samplesToRead = mSampleTable->getLastSampleIndexInChunk()
-                                                      - mCurrentSampleIndex + 1;
+                uint32_t lastSampleIndexInChunk = mSampleTable->getLastSampleIndexInChunk();
+                if (lastSampleIndexInChunk < mCurrentSampleIndex) {
+                    return AMEDIA_ERROR_UNKNOWN;
+                }
+                uint32_t samplesToRead = lastSampleIndexInChunk - mCurrentSampleIndex + 1;
                 if (samplesToRead > kMaxPcmFrameSize) {
                     samplesToRead = kMaxPcmFrameSize;
                 }
@@ -6205,7 +6207,12 @@ media_status_t MPEG4Source::read(
                       samplesToRead, size, mCurrentSampleIndex,
                       mSampleTable->getLastSampleIndexInChunk());
 
-               size_t totalSize = samplesToRead * size;
+                size_t totalSize = samplesToRead * size;
+                if (mBuffer->size() < totalSize) {
+                    mBuffer->release();
+                    mBuffer = nullptr;
+                    return AMEDIA_ERROR_UNKNOWN;
+                }
                 uint8_t* buf = (uint8_t *)mBuffer->data();
                 ssize_t bytesRead = mDataSource->readAt(offset, buf, totalSize);
                 if (bytesRead < (ssize_t)totalSize) {
