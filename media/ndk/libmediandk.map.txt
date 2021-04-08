@@ -109,6 +109,7 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_IS_SYNC_FRAME; # var introduced=29
     AMEDIAFORMAT_KEY_I_FRAME_INTERVAL; # var introduced=21
     AMEDIAFORMAT_KEY_LANGUAGE; # var introduced=21
+    AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK; # var introduced=31
     AMEDIAFORMAT_KEY_LATENCY; # var introduced=28
     AMEDIAFORMAT_KEY_LEVEL; # var introduced=28
     AMEDIAFORMAT_KEY_LOCATION; # var introduced=29
@@ -134,6 +135,8 @@ LIBMEDIANDK {
     AMEDIAFORMAT_KEY_PUSH_BLANK_BUFFERS_ON_STOP; # var introduced=21
     AMEDIAFORMAT_KEY_REPEAT_PREVIOUS_FRAME_AFTER; # var introduced=21
     AMEDIAFORMAT_KEY_ROTATION; # var introduced=28
+    AMEDIAFORMAT_KEY_SAMPLE_FILE_OFFSET; # var introduced=31
+    AMEDIAFORMAT_KEY_SAMPLE_TIME_BEFORE_APPEND; # var introduced=31
     AMEDIAFORMAT_KEY_SAMPLE_RATE; # var introduced=21
     AMEDIAFORMAT_KEY_SAR_HEIGHT; # var introduced=29
     AMEDIAFORMAT_KEY_SAR_WIDTH; # var introduced=29
@@ -286,7 +289,10 @@ LIBMEDIANDK {
     AMediaFormat_setString;
     AMediaFormat_toString;
     AMediaMuxer_addTrack;
+    AMediaMuxer_append; # introduced=31
     AMediaMuxer_delete;
+    AMediaMuxer_getTrackCount; # introduced=31
+    AMediaMuxer_getTrackFormat; # introduced=31
     AMediaMuxer_new;
     AMediaMuxer_setLocation;
     AMediaMuxer_setOrientationHint;
