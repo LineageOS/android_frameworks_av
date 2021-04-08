@@ -51,8 +51,6 @@ AAudioServiceEndpointMMAP::AAudioServiceEndpointMMAP(AAudioService &audioService
         : mMmapStream(nullptr)
         , mAAudioService(audioService) {}
 
-AAudioServiceEndpointMMAP::~AAudioServiceEndpointMMAP() {}
-
 std::string AAudioServiceEndpointMMAP::dump() const {
     std::stringstream result;
 
@@ -357,7 +355,10 @@ void AAudioServiceEndpointMMAP::handleTearDownAsync(audio_port_handle_t portHand
 // This is called by AudioFlinger when it wants to destroy a stream.
 void AAudioServiceEndpointMMAP::onTearDown(audio_port_handle_t portHandle) {
     ALOGD("%s(portHandle = %d) called", __func__, portHandle);
-    std::thread asyncTask(&AAudioServiceEndpointMMAP::handleTearDownAsync, this, portHandle);
+    android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+    std::thread asyncTask([holdEndpoint, portHandle]() {
+        holdEndpoint->handleTearDownAsync(portHandle);
+    });
     asyncTask.detach();
 }
 
@@ -378,9 +379,11 @@ void AAudioServiceEndpointMMAP::onRoutingChanged(audio_port_handle_t portHandle)
     ALOGD("%s() called with dev %d, old = %d", __func__, deviceId, getDeviceId());
     if (getDeviceId() != deviceId) {
         if (getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
-            std::thread asyncTask([this, deviceId]() {
-                disconnectRegisteredStreams();
-                setDeviceId(deviceId);
+            android::sp<AAudioServiceEndpointMMAP> holdEndpoint(this);
+            std::thread asyncTask([holdEndpoint, deviceId]() {
+                ALOGD("onRoutingChanged() asyncTask launched");
+                holdEndpoint->disconnectRegisteredStreams();
+                holdEndpoint->setDeviceId(deviceId);
             });
             asyncTask.detach();
         } else {
