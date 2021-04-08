@@ -700,6 +700,13 @@ status_t AudioFlinger::ThreadBase::sendUpdateOutDeviceConfigEvent(
     return sendConfigEvent_l(configEvent);
 }
 
+void AudioFlinger::ThreadBase::sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs)
+{
+    ALOG_ASSERT(type() == RECORD, "sendResizeBufferConfigEvent_l() called on non record thread");
+    sp<ConfigEvent> configEvent =
+            (ConfigEvent *)new ResizeBufferConfigEvent(maxSharedAudioHistoryMs);
+    sendConfigEvent_l(configEvent);
+}
 
 // post condition: mConfigEvents.isEmpty()
 void AudioFlinger::ThreadBase::processConfigEvents_l()
@@ -757,6 +764,11 @@ void AudioFlinger::ThreadBase::processConfigEvents_l()
             UpdateOutDevicesConfigEventData *data =
                     (UpdateOutDevicesConfigEventData *)event->mData.get();
             updateOutDevices(data->mOutDevices);
+        } break;
+        case CFG_EVENT_RESIZE_BUFFER: {
+            ResizeBufferConfigEventData *data =
+                    (ResizeBufferConfigEventData *)event->mData.get();
+            resizeInputBuffer_l(data->mMaxSharedAudioHistoryMs);
         } break;
         default:
             ALOG_ASSERT(false, "processConfigEvents_l() unknown event type %d", event->mType);
@@ -1075,6 +1087,11 @@ void AudioFlinger::ThreadBase::clearPowerManager()
 
 void AudioFlinger::ThreadBase::updateOutDevices(
         const DeviceDescriptorBaseVector& outDevices __unused)
+{
+    ALOGE("%s should only be called in RecordThread", __func__);
+}
+
+void AudioFlinger::ThreadBase::resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs __unused)
 {
     ALOGE("%s should only be called in RecordThread", __func__);
 }
@@ -7766,7 +7783,8 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         audio_input_flags_t *flags,
         pid_t tid,
         status_t *status,
-        audio_port_handle_t portId)
+        audio_port_handle_t portId,
+        int32_t maxSharedAudioHistoryMs)
 {
     size_t frameCount = *pFrameCount;
     size_t notificationFrameCount = *pNotificationFrameCount;
@@ -7775,6 +7793,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     audio_input_flags_t inputFlags = mInput->flags;
     audio_input_flags_t requestedFlags = *flags;
     uint32_t sampleRate;
+    Identity checkedIdentity = AudioFlinger::checkIdentityPackage(identity);
 
     lStatus = initCheck();
     if (lStatus != NO_ERROR) {
@@ -7788,6 +7807,23 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         goto Exit;
     }
 
+    if (maxSharedAudioHistoryMs != 0) {
+        if (!captureHotwordAllowed(checkedIdentity)) {
+            lStatus = PERMISSION_DENIED;
+            goto Exit;
+        }
+        //TODO: b/185972521 allow resampling buffer resizing on fast mixers by pausing
+        // the fast mixer thread while resizing the buffer in the normal thread
+        if (hasFastCapture()) {
+            lStatus = BAD_VALUE;
+            goto Exit;
+        }
+        if (maxSharedAudioHistoryMs < 0
+                || maxSharedAudioHistoryMs > AudioFlinger::kMaxSharedAudioHistoryMs) {
+            lStatus = BAD_VALUE;
+            goto Exit;
+        }
+    }
     if (*pSampleRate == 0) {
         *pSampleRate = mSampleRate;
     }
@@ -7896,11 +7932,18 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
 
     { // scope for mLock
         Mutex::Autolock _l(mLock);
+        long startTimeMs = -1;
+        if (!mSharedAudioPackageName.empty()
+                && mSharedAudioPackageName == checkedIdentity.packageName
+                && mSharedAudioSessionId == sessionId
+                && captureHotwordAllowed(checkedIdentity)) {
+            startTimeMs = mSharedAudioStartMs;
+        }
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid,
-                      identity, *flags, TrackBase::TYPE_DEFAULT, portId);
+                      checkedIdentity, *flags, TrackBase::TYPE_DEFAULT, portId, startTimeMs);
 
         lStatus = track->initCheck();
         if (lStatus != NO_ERROR) {
@@ -7916,6 +7959,11 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
             // so ask activity manager to do this on our behalf
             sendPrioConfigEvent_l(callingPid, tid, kPriorityAudioApp, true /*forApp*/);
         }
+
+        if (maxSharedAudioHistoryMs != 0) {
+            sendResizeBufferConfigEvent_l(maxSharedAudioHistoryMs);
+        }
+
     }
 
     lStatus = NO_ERROR;
@@ -8136,6 +8184,37 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneFieldDimension(float 
     return mInput->stream->setPreferredMicrophoneFieldDimension(zoom);
 }
 
+status_t AudioFlinger::RecordThread::shareAudioHistory(
+        const std::string& sharedAudioPackageName, audio_session_t sharedSessionId,
+        int64_t sharedAudioStartMs) {
+    AutoMutex _l(mLock);
+    return shareAudioHistory_l(sharedAudioPackageName, sharedSessionId, sharedAudioStartMs);
+}
+
+status_t AudioFlinger::RecordThread::shareAudioHistory_l(
+        const std::string& sharedAudioPackageName, audio_session_t sharedSessionId,
+        int64_t sharedAudioStartMs) {
+    if (hasFastCapture()) {
+        return BAD_VALUE;
+    }
+    if ((hasAudioSession_l(sharedSessionId) & ThreadBase::TRACK_SESSION) == 0) {
+        return BAD_VALUE;
+    }
+    if (sharedAudioStartMs < 0 || sharedAudioStartMs * mSampleRate / 1000 > mRsmpInRear) {
+        return BAD_VALUE;
+    }
+
+    mSharedAudioPackageName = sharedAudioPackageName;
+    if (mSharedAudioPackageName.empty()) {
+        mSharedAudioSessionId = AUDIO_SESSION_NONE;
+        mSharedAudioStartMs = -1;
+    } else {
+        mSharedAudioSessionId = sharedSessionId;
+        mSharedAudioStartMs = sharedAudioStartMs;
+    }
+    return NO_ERROR;
+}
+
 void AudioFlinger::RecordThread::updateMetadata_l()
 {
     if (mInput == nullptr || mInput->stream == nullptr ||
@@ -8167,6 +8246,7 @@ void AudioFlinger::RecordThread::destroyTrack_l(const sp<RecordTrack>& track)
 {
     track->terminate();
     track->mState = TrackBase::STOPPED;
+
     // active tracks are removed by threadLoop()
     if (mActiveTracks.indexOf(track) < 0) {
         removeTrack_l(track);
@@ -8274,8 +8354,23 @@ void AudioFlinger::RecordThread::ResamplerBufferProvider::reset()
 {
     sp<ThreadBase> threadBase = mRecordTrack->mThread.promote();
     RecordThread *recordThread = (RecordThread *) threadBase.get();
-    mRsmpInFront = recordThread->mRsmpInRear;
     mRsmpInUnrel = 0;
+    const int32_t rear = recordThread->mRsmpInRear;
+    ssize_t deltaFrames = 0;
+    if (mRecordTrack->startTimeMs() >= 0) {
+        int32_t startFrames = mRecordTrack->startTimeMs() * recordThread->sampleRate()  / 1000;
+        // start frame has to be in the past
+        //TODO: b/185972521 fix in case rear or startFrames wrap around
+        if (startFrames > rear) {
+            startFrames = rear;
+        }
+        deltaFrames = rear - startFrames;
+        // start frame cannot be further in the past than start of resampling buffer
+        if ((size_t) deltaFrames > recordThread->mRsmpInFrames) {
+            deltaFrames = recordThread->mRsmpInFrames;
+        }
+    }
+    mRsmpInFront = audio_utils::safe_sub_overflow(rear, static_cast<int32_t>(deltaFrames));
 }
 
 void AudioFlinger::RecordThread::ResamplerBufferProvider::sync(
@@ -8540,31 +8635,10 @@ void AudioFlinger::RecordThread::readInputParameters_l()
     ALOGV("%p RecordThread params: mChannelCount=%u, mFormat=%#x, mFrameSize=%zu, "
             "mBufferSize=%zu, mFrameCount=%zu",
             this, mChannelCount, mFormat, mFrameSize, mBufferSize, mFrameCount);
-    // This is the formula for calculating the temporary buffer size.
-    // With 7 HAL buffers, we can guarantee ability to down-sample the input by ratio of 6:1 to
-    // 1 full output buffer, regardless of the alignment of the available input.
-    // The value is somewhat arbitrary, and could probably be even larger.
-    // A larger value should allow more old data to be read after a track calls start(),
-    // without increasing latency.
-    //
-    // Note this is independent of the maximum downsampling ratio permitted for capture.
-    mRsmpInFrames = mFrameCount * 7;
-    mRsmpInFramesP2 = roundup(mRsmpInFrames);
-    free(mRsmpInBuffer);
-    mRsmpInBuffer = NULL;
 
-    // TODO optimize audio capture buffer sizes ...
-    // Here we calculate the size of the sliding buffer used as a source
-    // for resampling.  mRsmpInFramesP2 is currently roundup(mFrameCount * 7).
-    // For current HAL frame counts, this is usually 2048 = 40 ms.  It would
-    // be better to have it derived from the pipe depth in the long term.
-    // The current value is higher than necessary.  However it should not add to latency.
-
-    // Over-allocate beyond mRsmpInFramesP2 to permit a HAL read past end of buffer
-    mRsmpInFramesOA = mRsmpInFramesP2 + mFrameCount - 1;
-    (void)posix_memalign(&mRsmpInBuffer, 32, mRsmpInFramesOA * mFrameSize);
-    // if posix_memalign fails, will segv here.
-    memset(mRsmpInBuffer, 0, mRsmpInFramesOA * mFrameSize);
+    // mRsmpInFrames must be 0 before calling resizeInputBuffer_l for the first time
+    mRsmpInFrames = 0;
+    resizeInputBuffer_l();
 
     // AudioRecord mSampleRate and mChannelCount are constant due to AudioRecord API constraints.
     // But if thread's mSampleRate or mChannelCount changes, how will that affect active tracks?
@@ -8745,6 +8819,124 @@ void AudioFlinger::RecordThread::updateOutDevices(const DeviceDescriptorBaseVect
     for (size_t i = 0; i < mEffectChains.size(); i++) {
         mEffectChains[i]->setDevices_l(outDeviceTypeAddrs());
     }
+}
+
+int32_t AudioFlinger::RecordThread::getOldestFront_l()
+{
+    if (mTracks.size() == 0) {
+        return 0;
+    }
+    //TODO: b/185972521 fix in case of wrap around on one track:
+    //  want the max(rear - front) for all tracks.
+    int32_t front = INT_MAX;
+    for (size_t i = 0; i < mTracks.size(); i++) {
+        front = std::min(front, mTracks[i]->mResamplerBufferProvider->getFront());
+    }
+    // discard any audio past the buffer size
+    if (audio_utils::safe_add_overflow(front, (int32_t)mRsmpInFrames) < mRsmpInRear) {
+        front = audio_utils::safe_sub_overflow(mRsmpInRear, (int32_t)mRsmpInFrames);
+    }
+    return front;
+}
+
+void AudioFlinger::RecordThread::updateFronts_l(int32_t offset)
+{
+    if (offset == 0) {
+        return;
+    }
+    for (size_t i = 0; i < mTracks.size(); i++) {
+        int32_t front = mTracks[i]->mResamplerBufferProvider->getFront();
+        front = audio_utils::safe_sub_overflow(front, offset);
+        mTracks[i]->mResamplerBufferProvider->setFront(front);
+    }
+}
+
+void AudioFlinger::RecordThread::resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs)
+{
+    // This is the formula for calculating the temporary buffer size.
+    // With 7 HAL buffers, we can guarantee ability to down-sample the input by ratio of 6:1 to
+    // 1 full output buffer, regardless of the alignment of the available input.
+    // The value is somewhat arbitrary, and could probably be even larger.
+    // A larger value should allow more old data to be read after a track calls start(),
+    // without increasing latency.
+    //
+    // Note this is independent of the maximum downsampling ratio permitted for capture.
+    size_t minRsmpInFrames = mFrameCount * 7;
+
+    // maxSharedAudioHistoryMs != 0 indicates a request to possibly make some part of the audio
+    // capture history available to another client using the same session ID:
+    // dimension the resampler input buffer accordingly.
+
+    // Get oldest client read position:  getOldestFront_l() must be called before altering
+    // mRsmpInRear, or mRsmpInFrames
+    int32_t previousFront = getOldestFront_l();
+    size_t previousRsmpInFramesP2 = mRsmpInFramesP2;
+    int32_t previousRear = mRsmpInRear;
+    mRsmpInRear = 0;
+
+    if (maxSharedAudioHistoryMs != 0) {
+        // resizeInputBuffer_l should never be called with a non zero shared history if the
+        // buffer was not already allocated
+        ALOG_ASSERT(mRsmpInBuffer != nullptr && mRsmpInFrames != 0,
+                "resizeInputBuffer_l() called with shared history and unallocated buffer");
+        size_t rsmpInFrames = (size_t)maxSharedAudioHistoryMs * mSampleRate / 1000;
+        // never reduce resampler input buffer size
+        if (rsmpInFrames < mRsmpInFrames) {
+            return;
+        }
+        mRsmpInFrames = rsmpInFrames;
+    }
+    // Note: mRsmpInFrames is 0 when called with maxSharedAudioHistoryMs equals to 0 so it is always
+    // initialized
+    if (mRsmpInFrames < minRsmpInFrames) {
+        mRsmpInFrames = minRsmpInFrames;
+    }
+    mRsmpInFramesP2 = roundup(mRsmpInFrames);
+
+    // TODO optimize audio capture buffer sizes ...
+    // Here we calculate the size of the sliding buffer used as a source
+    // for resampling.  mRsmpInFramesP2 is currently roundup(mFrameCount * 7).
+    // For current HAL frame counts, this is usually 2048 = 40 ms.  It would
+    // be better to have it derived from the pipe depth in the long term.
+    // The current value is higher than necessary.  However it should not add to latency.
+
+    // Over-allocate beyond mRsmpInFramesP2 to permit a HAL read past end of buffer
+    mRsmpInFramesOA = mRsmpInFramesP2 + mFrameCount - 1;
+
+    void *rsmpInBuffer;
+    (void)posix_memalign(&rsmpInBuffer, 32, mRsmpInFramesOA * mFrameSize);
+    // if posix_memalign fails, will segv here.
+    memset(rsmpInBuffer, 0, mRsmpInFramesOA * mFrameSize);
+
+    // Copy audio history if any from old buffer before freeing it
+    if (previousRear != 0) {
+        ALOG_ASSERT(mRsmpInBuffer != nullptr,
+                "resizeInputBuffer_l() called with null buffer but frames already read from HAL");
+
+        ssize_t unread = audio_utils::safe_sub_overflow(previousRear, previousFront);
+        previousFront &= previousRsmpInFramesP2 - 1;
+        size_t part1 = previousRsmpInFramesP2 - previousFront;
+        if (part1 > (size_t) unread) {
+            part1 = unread;
+        }
+        if (part1 != 0) {
+            memcpy(rsmpInBuffer, (const uint8_t*)mRsmpInBuffer + previousFront * mFrameSize,
+                   part1 * mFrameSize);
+            mRsmpInRear = part1;
+            part1 = unread - part1;
+            if (part1 != 0) {
+                memcpy((uint8_t*)rsmpInBuffer + mRsmpInRear * mFrameSize,
+                       (const uint8_t*)mRsmpInBuffer, part1 * mFrameSize);
+                mRsmpInRear += part1;
+            }
+        }
+        // Update front for all clients according to new rear
+        updateFronts_l(audio_utils::safe_sub_overflow(previousRear, mRsmpInRear));
+    } else {
+        mRsmpInRear = 0;
+    }
+    free(mRsmpInBuffer);
+    mRsmpInBuffer = rsmpInBuffer;
 }
 
 void AudioFlinger::RecordThread::addPatchTrack(const sp<PatchRecord>& record)

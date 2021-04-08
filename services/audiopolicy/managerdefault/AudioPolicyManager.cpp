@@ -2347,6 +2347,21 @@ audio_io_handle_t AudioPolicyManager::getInputForDevice(const sp<DeviceDescripto
         return input;
     }
 
+    // Reuse an already opened input if a client with the same session ID already exists
+    // on that input
+    for (size_t i = 0; i < mInputs.size(); i++) {
+        sp <AudioInputDescriptor> desc = mInputs.valueAt(i);
+        if (desc->mProfile != profile) {
+            continue;
+        }
+        RecordClientVector clients = desc->clientsList();
+        for (const auto &client : clients) {
+            if (session == client->session()) {
+                return desc->mIoHandle;
+            }
+        }
+    }
+
     if (!profile->canOpenNewIo()) {
         for (size_t i = 0; i < mInputs.size(); ) {
             sp<AudioInputDescriptor> desc = mInputs.valueAt(i);
