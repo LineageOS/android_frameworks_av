@@ -519,12 +519,12 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     mSendNotify = false;
     mWriteSeekErr = false;
     mFallocateErr = false;
-
     // Reset following variables for all the sessions and they will be
     // initialized in start(MetaData *param).
     mIsRealTimeRecording = true;
     mUse4ByteNalLength = true;
     mOffset = 0;
+    mMaxOffsetAppend = 0;
     mPreAllocateFileEndOffset = 0;
     mMdatOffset = 0;
     mMdatEndOffset = 0;
@@ -992,6 +992,19 @@ status_t MPEG4Writer::start(MetaData *param) {
         seekOrPostError(mFd, mFreeBoxOffset, SEEK_SET);
         writeInt32(mInMemoryCacheSize);
         write("free", 4);
+        if (mInMemoryCacheSize >= 8) {
+            off64_t bufSize = mInMemoryCacheSize - 8;
+            char* zeroBuffer = new (std::nothrow) char[bufSize];
+            if (zeroBuffer) {
+                std::fill_n(zeroBuffer, bufSize, '0');
+                writeOrPostError(mFd, zeroBuffer, bufSize);
+                delete [] zeroBuffer;
+            } else {
+                ALOGW("freebox in file isn't initialized to 0");
+            }
+        } else {
+            ALOGW("freebox size is less than 8:%" PRId64, mInMemoryCacheSize);
+        }
         mMdatOffset = mFreeBoxOffset + mInMemoryCacheSize;
     } else {
         mMdatOffset = mOffset;
@@ -1541,6 +1554,26 @@ off64_t MPEG4Writer::addSample_l(
         MediaBuffer *buffer, bool usePrefix,
         uint32_t tiffHdrOffset, size_t *bytesWritten) {
     off64_t old_offset = mOffset;
+    int64_t offset;
+    ALOGV("buffer->range_length:%lld", (long long)buffer->range_length());
+    if (buffer->meta_data().findInt64(kKeySampleFileOffset, &offset)) {
+        ALOGV("offset:%lld, old_offset:%lld", (long long)offset, (long long)old_offset);
+        if (old_offset == offset) {
+            mOffset += buffer->range_length();
+        } else {
+            ALOGV("offset and old_offset are not equal! diff:%lld", (long long)offset - old_offset);
+            mOffset = offset + buffer->range_length();
+            // mOffset += buffer->range_length() + offset - old_offset;
+        }
+        *bytesWritten = buffer->range_length();
+        ALOGV("mOffset:%lld, mMaxOffsetAppend:%lld, bytesWritten:%lld", (long long)mOffset,
+                  (long long)mMaxOffsetAppend, (long long)*bytesWritten);
+        mMaxOffsetAppend = std::max(mOffset, mMaxOffsetAppend);
+        seekOrPostError(mFd, mMaxOffsetAppend, SEEK_SET);
+        return offset;
+    }
+
+    ALOGV("mOffset:%lld, mMaxOffsetAppend:%lld", (long long)mOffset, (long long)mMaxOffsetAppend);
 
     if (usePrefix) {
         addMultipleLengthPrefixedSamples_l(buffer);
@@ -1557,6 +1590,10 @@ off64_t MPEG4Writer::addSample_l(
         mOffset += buffer->range_length();
     }
     *bytesWritten = mOffset - old_offset;
+
+    ALOGV("mOffset:%lld, old_offset:%lld, bytesWritten:%lld", (long long)mOffset,
+          (long long)old_offset, (long long)*bytesWritten);
+
     return old_offset;
 }
 
@@ -1569,6 +1606,7 @@ static void StripStartcode(MediaBuffer *buffer) {
         (const uint8_t *)buffer->data() + buffer->range_offset();
 
     if (!memcmp(ptr, "\x00\x00\x00\x01", 4)) {
+        ALOGV("stripping start code");
         buffer->set_range(
                 buffer->range_offset() + 4, buffer->range_length() - 4);
     }
@@ -1599,8 +1637,10 @@ void MPEG4Writer::addMultipleLengthPrefixedSamples_l(MediaBuffer *buffer) {
 }
 
 void MPEG4Writer::addLengthPrefixedSample_l(MediaBuffer *buffer) {
+    ALOGV("alp:buffer->range_length:%lld", (long long)buffer->range_length());
     size_t length = buffer->range_length();
     if (mUse4ByteNalLength) {
+        ALOGV("mUse4ByteNalLength");
         uint8_t x[4];
         x[0] = length >> 24;
         x[1] = (length >> 16) & 0xff;
@@ -1610,6 +1650,7 @@ void MPEG4Writer::addLengthPrefixedSample_l(MediaBuffer *buffer) {
         writeOrPostError(mFd, (const uint8_t*)buffer->data() + buffer->range_offset(), length);
         mOffset += length + 4;
     } else {
+        ALOGV("mUse2ByteNalLength");
         CHECK_LT(length, 65536u);
 
         uint8_t x[2];
@@ -2762,6 +2803,9 @@ void MPEG4Writer::threadFunc() {
     }
 
     writeAllChunks();
+    ALOGV("threadFunc mOffset:%lld, mMaxOffsetAppend:%lld", (long long)mOffset,
+          (long long)mMaxOffsetAppend);
+    mOffset = std::max(mOffset, mMaxOffsetAppend);
 }
 
 status_t MPEG4Writer::startWriterThread() {
@@ -3323,6 +3367,7 @@ status_t MPEG4Writer::Track::threadEntry() {
     uint32_t lastSamplesPerChunk = 0;
     int64_t lastSampleDurationUs = -1;      // Duration calculated from EOS buffer and its timestamp
     int64_t lastSampleDurationTicks = -1;   // Timescale based ticks
+    int64_t sampleFileOffset = -1;
 
     if (mIsAudio) {
         prctl(PR_SET_NAME, (unsigned long)"MP4WtrAudTrkThread", 0, 0, 0);
@@ -3342,6 +3387,7 @@ status_t MPEG4Writer::Track::threadEntry() {
     MediaBufferBase *buffer;
     const char *trackName = getTrackType();
     while (!mDone && (err = mSource->read(&buffer)) == OK) {
+        ALOGV("read:buffer->range_length:%lld", (long long)buffer->range_length());
         int32_t isEOS = false;
         if (buffer->range_length() == 0) {
             if (buffer->meta_data().findInt32(kKeyIsEndOfStream, &isEOS) && isEOS) {
@@ -3448,6 +3494,14 @@ status_t MPEG4Writer::Track::threadEntry() {
                 continue;
             }
         }
+        if (!buffer->meta_data().findInt64(kKeySampleFileOffset, &sampleFileOffset)) {
+            sampleFileOffset = -1;
+        }
+        int64_t lastSample = -1;
+        if (!buffer->meta_data().findInt64(kKeyLastSampleIndexInChunk, &lastSample)) {
+            lastSample = -1;
+        }
+        ALOGV("sampleFileOffset:%lld", (long long)sampleFileOffset);
 
         /*
          * Reserve space in the file for the current sample + to be written MOOV box. If reservation
@@ -3455,7 +3509,7 @@ status_t MPEG4Writer::Track::threadEntry() {
          * write MOOV box successfully as space for the same was reserved in the prior call.
          * Release the current buffer/sample here.
          */
-        if (!mOwner->preAllocate(buffer->range_length())) {
+        if (sampleFileOffset == -1 && !mOwner->preAllocate(buffer->range_length())) {
             buffer->release();
             buffer = nullptr;
             break;
@@ -3466,9 +3520,14 @@ status_t MPEG4Writer::Track::threadEntry() {
         // Make a deep copy of the MediaBuffer and Metadata and release
         // the original as soon as we can
         MediaBuffer *copy = new MediaBuffer(buffer->range_length());
-        memcpy(copy->data(), (uint8_t *)buffer->data() + buffer->range_offset(),
-                buffer->range_length());
+        if (sampleFileOffset != -1) {
+            copy->meta_data().setInt64(kKeySampleFileOffset, sampleFileOffset);
+        } else {
+            memcpy(copy->data(), (uint8_t*)buffer->data() + buffer->range_offset(),
+                   buffer->range_length());
+        }
         copy->set_range(0, buffer->range_length());
+
         meta_data = new MetaData(buffer->meta_data());
         buffer->release();
         buffer = NULL;
@@ -3476,14 +3535,16 @@ status_t MPEG4Writer::Track::threadEntry() {
             copy->meta_data().setInt32(kKeyExifTiffOffset, tiffHdrOffset);
         }
         bool usePrefix = this->usePrefix() && !isExif;
-
-        if (usePrefix) StripStartcode(copy);
-
+        if (sampleFileOffset == -1 && usePrefix) {
+            StripStartcode(copy);
+        }
         size_t sampleSize = copy->range_length();
-        if (usePrefix) {
+        if (sampleFileOffset == -1 && usePrefix) {
             if (mOwner->useNalLengthFour()) {
+                ALOGV("nallength4");
                 sampleSize += 4;
             } else {
+                ALOGV("nallength2");
                 sampleSize += 2;
             }
         }
@@ -3778,7 +3839,8 @@ status_t MPEG4Writer::Track::threadEntry() {
                 chunkTimestampUs = timestampUs;
             } else {
                 int64_t chunkDurationUs = timestampUs - chunkTimestampUs;
-                if (chunkDurationUs > interleaveDurationUs) {
+                if (chunkDurationUs > interleaveDurationUs || lastSample > 1) {
+                    ALOGV("lastSample:%lld", (long long)lastSample);
                     if (chunkDurationUs > mMaxChunkDurationUs) {
                         mMaxChunkDurationUs = chunkDurationUs;
                     }

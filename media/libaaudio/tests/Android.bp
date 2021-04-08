@@ -250,3 +250,16 @@ cc_test {
         "libutils",
     ],
 }
+
+
+cc_test {
+    name: "test_disconnect_race",
+    defaults: ["libaaudio_tests_defaults"],
+    srcs: ["test_disconnect_race.cpp"],
+    shared_libs: [
+        "libaaudio",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
