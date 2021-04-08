@@ -109,7 +109,7 @@ void PipelineWatcher::flush() {
     mFramesInPipeline.clear();
 }
 
-bool PipelineWatcher::pipelineFull() const {
+bool PipelineWatcher::pipelineFull(size_t *pipelineRoom) const {
     if (mFramesInPipeline.size() >=
             mInputDelay + mPipelineDelay + mOutputDelay + mSmoothnessFactor) {
         ALOGV("pipelineFull: too many frames in pipeline (%zu)", mFramesInPipeline.size());
@@ -141,6 +141,10 @@ bool PipelineWatcher::pipelineFull() const {
     }
     ALOGV("pipeline has room (total: %zu, input released: %zu)",
           mFramesInPipeline.size(), sizeWithInputReleased);
+    if (pipelineRoom) {
+        *pipelineRoom = mInputDelay + mPipelineDelay + mOutputDelay + mSmoothnessFactor
+                                - mFramesInPipeline.size();
+    }
     return false;
 }
 
