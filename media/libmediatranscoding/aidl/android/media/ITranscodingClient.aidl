@@ -77,7 +77,8 @@ interface ITranscodingClient {
      * @clientUids array to hold the retrieved client uid list.
      * @return false if the session doesn't exist, true otherwise.
      */
-    boolean getClientUids(in int sessionId, out int[] clientUids);
+    @nullable
+    int[] getClientUids(in int sessionId);
 
     /**
     * Unregister the client with the MediaTranscodingService.
