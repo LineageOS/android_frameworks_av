@@ -1422,6 +1422,7 @@ status_t MediaCodec::setOnFirstTunnelFrameReadyNotification(const sp<AMessage> &
  * MediaFormat Shaping forward declarations
  * including the property name we use for control.
  */
+static int enableMediaFormatShapingDefault = 1;
 static const char enableMediaFormatShapingProperty[] = "debug.stagefright.enableshaping";
 static void mapFormat(AString componentName, const sp<AMessage> &format, const char *kind,
                       bool reverse);
@@ -1497,7 +1498,8 @@ status_t MediaCodec::configure(
     }
 
     if (flags & CONFIGURE_FLAG_ENCODE) {
-        int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty, 0);
+        int8_t enableShaping = property_get_bool(enableMediaFormatShapingProperty,
+                                                 enableMediaFormatShapingDefault);
         if (!enableShaping) {
             ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
         } else {
