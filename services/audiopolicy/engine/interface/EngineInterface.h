@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include <AudioPolicyManagerObserver.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
@@ -35,7 +37,7 @@ using DeviceStrategyMap = std::map<product_strategy_t, DeviceVector>;
 using StrategyVector = std::vector<product_strategy_t>;
 using VolumeGroupVector = std::vector<volume_group_t>;
 using CapturePresetDevicesRoleMap =
-        std::map<audio_source_t, std::map<device_role_t, AudioDeviceTypeAddrVector>>;
+        std::map<std::pair<audio_source_t, device_role_t>, AudioDeviceTypeAddrVector>;
 
 /**
  * This interface is dedicated to the policy manager that a Policy Engine shall implement.
