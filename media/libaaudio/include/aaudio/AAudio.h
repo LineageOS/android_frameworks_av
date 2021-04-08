@@ -74,8 +74,9 @@ enum {
      * The nominal range of the data is [-1.0f, 1.0f).
      * Values outside that range may be clipped.
      *
-     * See also 'floatData' at
-     * https://developer.android.com/reference/android/media/AudioTrack#write(float[],%20int,%20int,%20int)
+     * See also the float Data in
+     * <a href="/reference/android/media/AudioTrack#write(float[],%20int,%20int,%20int)">
+     *   write(float[], int, int, int)</a>.
      */
     AAUDIO_FORMAT_PCM_FLOAT,
 
@@ -196,21 +197,69 @@ enum {
 };
 typedef int32_t  aaudio_result_t;
 
+/**
+ * AAudio Stream states, for details, refer to
+ * <a href="/ndk/guides/audio/aaudio/aaudio#using-streams">Using an Audio Stream</a>
+ */
 enum
 {
+
+    /**
+     * The stream is created but not initialized yet.
+     */
     AAUDIO_STREAM_STATE_UNINITIALIZED = 0,
+    /**
+     * The stream is in an unrecognized state.
+     */
     AAUDIO_STREAM_STATE_UNKNOWN,
+
+    /**
+     * The stream is open and ready to use.
+     */
     AAUDIO_STREAM_STATE_OPEN,
+    /**
+     * The stream is just starting up.
+     */
     AAUDIO_STREAM_STATE_STARTING,
+    /**
+     * The stream has started.
+     */
     AAUDIO_STREAM_STATE_STARTED,
+    /**
+     * The stream is pausing.
+     */
     AAUDIO_STREAM_STATE_PAUSING,
+    /**
+     * The stream has paused, could be restarted or flushed.
+     */
     AAUDIO_STREAM_STATE_PAUSED,
+    /**
+     * The stream is being flushed.
+     */
     AAUDIO_STREAM_STATE_FLUSHING,
+    /**
+     * The stream is flushed, ready to be restarted.
+     */
     AAUDIO_STREAM_STATE_FLUSHED,
+    /**
+     * The stream is stopping.
+     */
     AAUDIO_STREAM_STATE_STOPPING,
+    /**
+     * The stream has been stopped.
+     */
     AAUDIO_STREAM_STATE_STOPPED,
+    /**
+     * The stream is closing.
+     */
     AAUDIO_STREAM_STATE_CLOSING,
+    /**
+     * The stream has been closed.
+     */
     AAUDIO_STREAM_STATE_CLOSED,
+    /**
+     * The stream is disconnected from audio device.
+     */
     AAUDIO_STREAM_STATE_DISCONNECTED
 };
 typedef int32_t aaudio_stream_state_t;
@@ -260,7 +309,8 @@ typedef int32_t aaudio_performance_mode_t;
  * This information is used by certain platforms or routing policies
  * to make more refined volume or routing decisions.
  *
- * Note that these match the equivalent values in {@link android.media.AudioAttributes}
+ * Note that these match the equivalent values in
+ * <a href="/reference/android/media/AudioAttributes">AudioAttributes</a>
  * in the Android Java API.
  *
  * Added in API level 28.
@@ -361,7 +411,8 @@ typedef int32_t aaudio_usage_t;
  * an audio book application) this information might be used by the audio framework to
  * enforce audio focus.
  *
- * Note that these match the equivalent values in {@link android.media.AudioAttributes}
+ * Note that these match the equivalent values in
+ * <a href="/reference/android/media/AudioAttributes">AudioAttributes</a>
  * in the Android Java API.
  *
  * Added in API level 28.
@@ -441,7 +492,8 @@ typedef int32_t aaudio_input_preset_t;
 /**
  * Specifying if audio may or may not be captured by other apps or the system.
  *
- * Note that these match the equivalent values in {@link android.media.AudioAttributes}
+ * Note that these match the equivalent values in
+ * <a href="/reference/android/media/AudioAttributes">AudioAttributes</a>
  * in the Android Java API.
  *
  * Added in API level 29.
@@ -453,10 +505,11 @@ enum {
      * For privacy, the following usages can not be recorded: AAUDIO_VOICE_COMMUNICATION*,
      * AAUDIO_USAGE_NOTIFICATION*, AAUDIO_USAGE_ASSISTANCE* and {@link #AAUDIO_USAGE_ASSISTANT}.
      *
-     * On {@link android.os.Build.VERSION_CODES#Q}, this means only {@link #AAUDIO_USAGE_MEDIA}
-     * and {@link #AAUDIO_USAGE_GAME} may be captured.
+     * On <a href="/reference/android/os/Build.VERSION_CODES#Q">Build.VERSION_CODES</a>,
+     * this means only {@link #AAUDIO_USAGE_MEDIA} and {@link #AAUDIO_USAGE_GAME} may be captured.
      *
-     * See {@link android.media.AudioAttributes#ALLOW_CAPTURE_BY_ALL}.
+     * See <a href="/reference/android/media/AudioAttributes.html#ALLOW_CAPTURE_BY_ALL">
+     * ALLOW_CAPTURE_BY_ALL</a>.
      */
     AAUDIO_ALLOW_CAPTURE_BY_ALL = 1,
     /**
@@ -464,8 +517,9 @@ enum {
      *
      * System apps can capture for many purposes like accessibility, user guidance...
      * but have strong restriction. See
-     * {@link android.media.AudioAttributes#ALLOW_CAPTURE_BY_SYSTEM} for what the system apps
-     * can do with the capture audio.
+     * <a href="/reference/android/media/AudioAttributes.html#ALLOW_CAPTURE_BY_SYSTEM">
+     * ALLOW_CAPTURE_BY_SYSTEM</a>
+     * for what the system apps can do with the capture audio.
      */
     AAUDIO_ALLOW_CAPTURE_BY_SYSTEM = 2,
     /**
@@ -473,7 +527,8 @@ enum {
      *
      * It is encouraged to use {@link #AAUDIO_ALLOW_CAPTURE_BY_SYSTEM} instead of this value as system apps
      * provide significant and useful features for the user (eg. accessibility).
-     * See {@link android.media.AudioAttributes#ALLOW_CAPTURE_BY_NONE}.
+     * See <a href="/reference/android/media/AudioAttributes.html#ALLOW_CAPTURE_BY_NONE">
+     * ALLOW_CAPTURE_BY_NONE</a>.
      */
     AAUDIO_ALLOW_CAPTURE_BY_NONE = 3,
 };
@@ -803,7 +858,9 @@ AAUDIO_API void AAudioStreamBuilder_setInputPreset(AAudioStreamBuilder* builder,
  * The default is {@link #AAUDIO_ALLOW_CAPTURE_BY_ALL}.
  *
  * Note that an application can also set its global policy, in which case the most restrictive
- * policy is always applied. See {@link android.media.AudioAttributes#setAllowedCapturePolicy(int)}
+ * policy is always applied. See
+ * <a href="/reference/android/media/AudioManager#setAllowedCapturePolicy(int)">
+ * setAllowedCapturePolicy(int)</a>
  *
  * Available since API level 29.
  *
