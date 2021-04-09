@@ -449,13 +449,17 @@ struct TestClientCallback : public BnTranscodingClientCallback,
     template <bool expectation = success>
     bool getClientUids(int32_t sessionId, std::vector<int32_t>* clientUids) {
         constexpr bool shouldSucceed = (expectation == success);
-        bool result;
-        Status status = mClient->getClientUids(sessionId, clientUids, &result);
+        std::optional<std::vector<int32_t>> aidl_return;
+        Status status = mClient->getClientUids(sessionId, &aidl_return);
 
         EXPECT_TRUE(status.isOk());
-        EXPECT_EQ(result, shouldSucceed);
+        bool success = (aidl_return != std::nullopt);
+        if (success) {
+            *clientUids = *aidl_return;
+        }
+        EXPECT_EQ(success, shouldSucceed);
 
-        return status.isOk() && (result == shouldSucceed);
+        return status.isOk() && (success == shouldSucceed);
     }
 
     int32_t mClientId;

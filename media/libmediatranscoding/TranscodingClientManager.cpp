@@ -97,8 +97,8 @@ struct TranscodingClientManager::ClientImpl : public BnTranscodingClient {
     Status addClientUid(int32_t /*in_sessionId*/, int32_t /*in_clientUid*/,
                         bool* /*_aidl_return*/) override;
 
-    Status getClientUids(int32_t /*in_sessionId*/, std::vector<int32_t>* /*out_clientUids*/,
-                         bool* /*_aidl_return*/) override;
+    Status getClientUids(int32_t /*in_sessionId*/,
+                         std::optional<std::vector<int32_t>>* /*_aidl_return*/) override;
 
     Status unregister() override;
 };
@@ -259,10 +259,9 @@ Status TranscodingClientManager::ClientImpl::addClientUid(int32_t in_sessionId,
     return Status::ok();
 }
 
-Status TranscodingClientManager::ClientImpl::getClientUids(int32_t in_sessionId,
-                                                           std::vector<int32_t>* out_clientUids,
-                                                           bool* _aidl_return) {
-    *_aidl_return = false;
+Status TranscodingClientManager::ClientImpl::getClientUids(
+        int32_t in_sessionId, std::optional<std::vector<int32_t>>* _aidl_return) {
+    *_aidl_return = std::nullopt;
 
     std::shared_ptr<TranscodingClientManager> owner;
     if (mAbandoned || (owner = mOwner.lock()) == nullptr) {
@@ -273,8 +272,11 @@ Status TranscodingClientManager::ClientImpl::getClientUids(int32_t in_sessionId,
         return Status::ok();
     }
 
-    *_aidl_return =
-            owner->mSessionController->getClientUids(mClientId, in_sessionId, out_clientUids);
+    std::vector<int32_t> result;
+
+    if (owner->mSessionController->getClientUids(mClientId, in_sessionId, &result)) {
+        *_aidl_return = result;
+    }
     return Status::ok();
 }
 
