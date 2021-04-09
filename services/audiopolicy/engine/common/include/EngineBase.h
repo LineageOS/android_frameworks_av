@@ -170,11 +170,13 @@ private:
     status_t getMediaDevicesForRole(device_role_t role, const DeviceVector& availableDevices,
             DeviceVector& devices) const;
 
+    void dumpCapturePresetDevicesRoleMap(String8 *dst, int spaces) const;
+
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
-    ProductStrategyPreferredRoutingMap mProductStrategyPreferredDevices;
-    CapturePresetDevicesRoleMap mCapturePresetDevicesRole;
+    ProductStrategyDevicesRoleMap mProductStrategyDeviceRoleMap;
+    CapturePresetDevicesRoleMap mCapturePresetDevicesRoleMap;
     VolumeGroupMap mVolumeGroups;
     LastRemovableMediaDevices mLastRemovableMediaDevices;
     audio_mode_t mPhoneState = AUDIO_MODE_NORMAL;  /**< current phone state. */
