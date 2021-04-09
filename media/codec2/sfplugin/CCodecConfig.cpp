@@ -1319,6 +1319,14 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
         }
     }
 
+    // Remove KEY_AAC_SBR_MODE from SDK message if it is outside supported range
+    // as SDK doesn't have a way to signal default sbr mode based on profile and
+    // requires that the key isn't present in format to signal that
+    int sbrMode;
+    if (msg->findInt32(KEY_AAC_SBR_MODE, &sbrMode) && (sbrMode < 0 || sbrMode > 2)) {
+        msg->removeEntryAt(msg->findEntryByName(KEY_AAC_SBR_MODE));
+    }
+
     { // convert color info
         // move default color to color aspect if not read from the component
         int32_t tmp;
