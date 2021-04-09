@@ -577,7 +577,7 @@ TEST_F(TranscodingClientManagerTest, TestAddGetClientUidsInvalidArgs) {
     addMultipleClients();
 
     bool result;
-    std::vector<int32_t> clientUids;
+    std::optional<std::vector<int32_t>> clientUids;
     TranscodingRequestParcel request;
     TranscodingSessionParcel session;
     uid_t ownUid = ::getuid();
@@ -587,10 +587,10 @@ TEST_F(TranscodingClientManagerTest, TestAddGetClientUidsInvalidArgs) {
     EXPECT_FALSE(result);
     EXPECT_TRUE(mClient1->addClientUid(SESSION(0), ownUid, &result).isOk());
     EXPECT_FALSE(result);
-    EXPECT_TRUE(mClient1->getClientUids(-1, &clientUids, &result).isOk());
-    EXPECT_FALSE(result);
-    EXPECT_TRUE(mClient1->getClientUids(SESSION(0), &clientUids, &result).isOk());
-    EXPECT_FALSE(result);
+    EXPECT_TRUE(mClient1->getClientUids(-1, &clientUids).isOk());
+    EXPECT_EQ(clientUids, std::nullopt);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(0), &clientUids).isOk());
+    EXPECT_EQ(clientUids, std::nullopt);
 
     unregisterMultipleClients();
 }
@@ -599,7 +599,7 @@ TEST_F(TranscodingClientManagerTest, TestAddGetClientUids) {
     addMultipleClients();
 
     bool result;
-    std::vector<int32_t> clientUids;
+    std::optional<std::vector<int32_t>> clientUids;
     TranscodingRequestParcel request;
     TranscodingSessionParcel session;
     uid_t ownUid = ::getuid();
@@ -612,10 +612,10 @@ TEST_F(TranscodingClientManagerTest, TestAddGetClientUids) {
     EXPECT_TRUE(result);
 
     // Should have own uid in client uid list.
-    EXPECT_TRUE(mClient1->getClientUids(SESSION(0), &clientUids, &result).isOk());
-    EXPECT_TRUE(result);
-    EXPECT_EQ(clientUids.size(), 1);
-    EXPECT_EQ(clientUids[0], ownUid);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(0), &clientUids).isOk());
+    EXPECT_NE(clientUids, std::nullopt);
+    EXPECT_EQ(clientUids->size(), 1);
+    EXPECT_EQ((*clientUids)[0], ownUid);
 
     // Adding invalid client uid should fail.
     EXPECT_TRUE(mClient1->addClientUid(SESSION(0), kInvalidClientUid, &result).isOk());
@@ -633,28 +633,28 @@ TEST_F(TranscodingClientManagerTest, TestAddGetClientUids) {
     EXPECT_TRUE(result);
 
     // Should not have own uid in client uid list.
-    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids, &result).isOk());
-    EXPECT_TRUE(result);
-    EXPECT_EQ(clientUids.size(), 0);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids).isOk());
+    EXPECT_NE(clientUids, std::nullopt);
+    EXPECT_EQ(clientUids->size(), 0);
 
     // Add own uid (with IMediaTranscodingService::USE_CALLING_UID) again, should succeed.
     EXPECT_TRUE(
             mClient1->addClientUid(SESSION(1), IMediaTranscodingService::USE_CALLING_UID, &result)
                     .isOk());
     EXPECT_TRUE(result);
-    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids, &result).isOk());
-    EXPECT_TRUE(result);
-    EXPECT_EQ(clientUids.size(), 1);
-    EXPECT_EQ(clientUids[0], ownUid);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids).isOk());
+    EXPECT_NE(clientUids, std::nullopt);
+    EXPECT_EQ(clientUids->size(), 1);
+    EXPECT_EQ((*clientUids)[0], ownUid);
 
     // Add more uids, should succeed.
     int32_t kFakeUid = ::getuid() ^ 0x1;
     EXPECT_TRUE(mClient1->addClientUid(SESSION(1), kFakeUid, &result).isOk());
     EXPECT_TRUE(result);
-    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids, &result).isOk());
-    EXPECT_TRUE(result);
+    EXPECT_TRUE(mClient1->getClientUids(SESSION(1), &clientUids).isOk());
+    EXPECT_NE(clientUids, std::nullopt);
     std::unordered_set<uid_t> uidSet;
-    uidSet.insert(clientUids.begin(), clientUids.end());
+    uidSet.insert(clientUids->begin(), clientUids->end());
     EXPECT_EQ(uidSet.size(), 2);
     EXPECT_EQ(uidSet.count(ownUid), 1);
     EXPECT_EQ(uidSet.count(kFakeUid), 1);
