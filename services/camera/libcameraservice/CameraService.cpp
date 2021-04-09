@@ -145,6 +145,7 @@ CameraService::CameraService() :
 
 void CameraService::onFirstRef()
 {
+
     ALOGI("CameraService process starting");
 
     BnCameraService::onFirstRef();
@@ -741,6 +742,10 @@ Status CameraService::getCameraVendorTagCache(
         *cache = *(globalCache.get());
     }
     return Status::ok();
+}
+
+void CameraService::clearCachedVariables() {
+    BasicClient::BasicClient::sCameraService = nullptr;
 }
 
 int CameraService::getDeviceVersion(const String8& cameraId, int* facing, int* orientation) {
@@ -2097,10 +2102,15 @@ Status CameraService::addListener(const sp<ICameraServiceListener>& listener,
     return addListenerHelper(listener, cameraStatuses);
 }
 
+binder::Status CameraService::addListenerTest(const sp<hardware::ICameraServiceListener>& listener,
+            std::vector<hardware::CameraStatus>* cameraStatuses) {
+    return addListenerHelper(listener, cameraStatuses, false, true);
+}
+
 Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listener,
         /*out*/
         std::vector<hardware::CameraStatus> *cameraStatuses,
-        bool isVendorListener) {
+        bool isVendorListener, bool isProcessLocalTest) {
 
     ATRACE_CALL();
 
@@ -2131,7 +2141,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         sp<ServiceListener> serviceListener =
                 new ServiceListener(this, listener, clientUid, clientPid, isVendorListener,
                         openCloseCallbackAllowed);
-        auto ret = serviceListener->initialize();
+        auto ret = serviceListener->initialize(isProcessLocalTest);
         if (ret != NO_ERROR) {
             String8 msg = String8::format("Failed to initialize service listener: %s (%d)",
                     strerror(-ret), ret);
