@@ -48,6 +48,15 @@ namespace mediaformatshaper {
 //
 static const int BITRATE_MODE_VBR = 1;
 
+
+// constants we use within the calculations
+//
+constexpr double BITRATE_LEAVE_UNTOUCHED = 2.0;
+constexpr double BITRATE_QP_UNAVAILABLE = 1.20;
+// 10% didn't work so hot on bonito (with no QP support)
+// 15% is next.. still leaves a few short
+// 20% ? this is on the edge of what I want do do
+
 //
 // Caller retains ownership of and responsibility for inFormat
 //
@@ -69,67 +78,80 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
     }
 
     //
-    // apply any and all tools that we have.
+    // consider any and all tools available
     // -- qp
     // -- minimum bits-per-pixel
     //
-    if (!codec->supportsQp()) {
-        ALOGD("minquality: no qp bounding in codec %s", codec->getName().c_str());
-    } else {
-        // use a (configurable) QP value to force better quality
-        //
+    int64_t bitrateChosen = 0;
+    int32_t qpChosen = INT32_MAX;
+
+    int64_t bitrateConfigured = 0;
+    int32_t bitrateConfiguredTmp = 0;
+    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_BIT_RATE, &bitrateConfiguredTmp);
+    bitrateConfigured = bitrateConfiguredTmp;
+    bitrateChosen = bitrateConfigured;
+
+    int32_t width = 0;
+    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_WIDTH, &width);
+    int32_t height = 0;
+    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_HEIGHT, &height);
+    int64_t pixels = ((int64_t)width) * height;
+    double minimumBpp = codec->getBpp(width, height);
+
+    int64_t bitrateFloor = pixels * minimumBpp;
+    if (bitrateFloor > INT32_MAX) bitrateFloor = INT32_MAX;
+
+    // if we are far enough above the target bpp, leave it alone
+    //
+    ALOGV("bitrate: configured %" PRId64 " floor %" PRId64, bitrateConfigured, bitrateFloor);
+    if (bitrateConfigured >= BITRATE_LEAVE_UNTOUCHED * bitrateFloor) {
+        ALOGV("high enough bitrate: configured %" PRId64 " >= %f * floor %" PRId64,
+                bitrateConfigured, BITRATE_LEAVE_UNTOUCHED, bitrateFloor);
+        return 0;
+    }
+
+    // raise anything below the bitrate floor
+    if (bitrateConfigured < bitrateFloor) {
+        ALOGD("raise bitrate: configured %" PRId64 " to floor %" PRId64,
+                bitrateConfigured, bitrateFloor);
+        bitrateChosen = bitrateFloor;
+    }
+
+    bool qpPresent = hasQp(inFormat);
+
+    // add QP, if not already present
+    if (!qpPresent) {
         int32_t qpmax = codec->targetQpMax();
-        int32_t qpmaxUser = INT32_MAX;
-        if (hasQp(inFormat)) {
-            (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, &qpmaxUser);
-            ALOGD("minquality by QP: format already sets QP");
-        }
-
-        // if the system didn't do one, use what the user provided
-        if (qpmax == 0 && qpmaxUser != INT32_MAX) {
-                qpmax = qpmaxUser;
-        }
-        // XXX: if both said something, how do we want to reconcile that
-
-        if (qpmax > 0) {
-            ALOGD("minquality by QP: inject %s=%d", AMEDIAFORMAT_VIDEO_QP_MAX, qpmax);
-            AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, qpmax);
-
-            // force spreading the QP across frame types, since we imposing a value
-            qpSpreadMaxPerFrameType(inFormat, info->qpDelta, info->qpMax, /* override */ true);
+        if (qpmax != INT32_MAX) {
+            ALOGV("choosing qp=%d", qpmax);
+            qpChosen = qpmax;
         }
     }
 
-    double bpp = codec->getBpp();
-    if (bpp > 0.0) {
-        // if we've decided to use bits-per-pixel (per second) to drive the quality
-        //
-        // (properly phrased as 'bits per second per pixel' so that it's resolution
-        // and framerate agnostic
-        //
-        // all of these is structured so that a missing value cleanly gets us to a
-        // non-faulting value of '0' for the minimum bits-per-pixel.
-        //
-        int32_t width = 0;
-        (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_WIDTH, &width);
-        int32_t height = 0;
-        (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_HEIGHT, &height);
-        int32_t bitrateConfigured = 0;
-        (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_BIT_RATE, &bitrateConfigured);
-
-        int64_t pixels = ((int64_t)width) * height;
-        int64_t bitrateFloor = pixels * bpp;
-
-        if (bitrateFloor > INT32_MAX) bitrateFloor = INT32_MAX;
-
-        ALOGD("minquality/bitrate: target %d floor %" PRId64 "(%.3f bpp * (%d w * %d h)",
-              bitrateConfigured, bitrateFloor, codec->getBpp(), height, width);
-
-        if (bitrateConfigured < bitrateFloor) {
-            ALOGD("minquality/target bitrate raised from %d to %" PRId64 " bps",
-                  bitrateConfigured, bitrateFloor);
-            AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_KEY_BIT_RATE, (int32_t)bitrateFloor);
+    // if QP is desired but not supported, compensate with additional bits
+    if (!codec->supportsQp()) {
+        if (qpPresent || qpChosen != INT32_MAX) {
+            ALOGD("minquality: desired QP, but unsupported, boost bitrate %" PRId64 " to %" PRId64,
+                bitrateChosen, (int64_t)(bitrateChosen * BITRATE_QP_UNAVAILABLE));
+            bitrateChosen =  bitrateChosen * BITRATE_QP_UNAVAILABLE;
+            qpChosen = INT32_MAX;
         }
+    }
+
+    // apply our chosen values
+    //
+    if (qpChosen != INT32_MAX) {
+        ALOGD("minquality by QP: inject %s=%d", AMEDIAFORMAT_VIDEO_QP_MAX, qpChosen);
+        AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, qpChosen);
+
+        // force spreading the QP across frame types, since we are imposing a value
+        qpSpreadMaxPerFrameType(inFormat, info->qpDelta, info->qpMax, /* override */ true);
+    }
+
+    if (bitrateChosen != bitrateConfigured) {
+        ALOGD("minquality/target bitrate raised from %" PRId64 " to %" PRId64 " bps",
+              bitrateConfigured, bitrateChosen);
+        AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_KEY_BIT_RATE, (int32_t)bitrateChosen);
     }
 
     return 0;

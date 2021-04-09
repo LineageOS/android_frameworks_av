@@ -18,20 +18,20 @@
 
 #include "VolumeGroup.h"
 
-#include <system/audio.h>
-#include <utils/RefBase.h>
-#include <HandleGenerator.h>
-#include <string>
-#include <vector>
 #include <map>
-#include <utils/Errors.h>
-#include <utils/String8.h>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <HandleGenerator.h>
 #include <media/AudioAttributes.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
-
-#include <vector>
+#include <system/audio.h>
+#include <utils/Errors.h>
+#include <utils/RefBase.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -170,11 +170,12 @@ private:
     product_strategy_t mDefaultStrategy = PRODUCT_STRATEGY_NONE;
 };
 
-class ProductStrategyPreferredRoutingMap : public std::map<product_strategy_t,
-                                                           AudioDeviceTypeAddrVector>
-{
-public:
-    void dump(String8 *dst, int spaces = 0) const;
-};
+using ProductStrategyDevicesRoleMap =
+        std::map<std::pair<product_strategy_t, device_role_t>, AudioDeviceTypeAddrVector>;
+
+void dumpProductStrategyDevicesRoleMap(
+        const ProductStrategyDevicesRoleMap& productStrategyDeviceRoleMap,
+        String8 *dst,
+        int spaces);
 
 } // namespace android
