@@ -113,6 +113,7 @@ cc_library_shared {
         "libutilscallstack",
         "libutils",
         "libbinder",
+        "libactivitymanager_aidl",
         "libcutils",
         "libmedia",
         "libmediautils",
@@ -161,6 +162,7 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libbinder",
+        "libactivitymanager_aidl",
         "libcamera_client",
         "libfmq",
         "libsensorprivacy",
