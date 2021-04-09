@@ -172,12 +172,6 @@ def parseAndroidAudioFile(androidaudiobaseheaderFile):
         logging.info("added stub input device mask")
 
     # Transform input source in inclusive criterion
-    shift = len(all_component_types['OutputDevicesMask'])
-    if shift > 32:
-        logging.critical("OutputDevicesMask incompatible with criterion representation on 32 bits")
-        logging.info("EXIT ON FAILURE")
-        exit(1)
-
     for component_types in all_component_types:
         values = ','.join('{}:{}'.format(value, key) for key, value in all_component_types[component_types].items())
         logging.info("{}: <{}>".format(component_types, values))
