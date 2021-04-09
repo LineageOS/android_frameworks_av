@@ -262,8 +262,26 @@ public:
                                     const audio_attributes_t* pAttributes = NULL,
                                     bool doNotReconnect = false,
                                     float maxRequiredSpeed = 1.0f,
-                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
-                                    const std::string& opPackageName = "");
+                                    audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE);
+                        AudioTrack( audio_stream_type_t streamType,
+                                    uint32_t sampleRate,
+                                    audio_format_t format,
+                                    audio_channel_mask_t channelMask,
+                                    size_t frameCount,
+                                    audio_output_flags_t flags,
+                                    callback_t cbf,
+                                    void* user,
+                                    int32_t notificationFrames,
+                                    audio_session_t sessionId,
+                                    transfer_type transferType,
+                                    const audio_offload_info_t *offloadInfo,
+                                    uid_t uid,
+                                    pid_t pid,
+                                    const audio_attributes_t* pAttributes,
+                                    bool doNotReconnect,
+                                    float maxRequiredSpeed,
+                                    audio_port_handle_t selectedDeviceId,
+                                    const std::string& opPackageName);
 
     /* Creates an audio track and registers it with AudioFlinger.
      * With this constructor, the track is configured for static buffer mode.

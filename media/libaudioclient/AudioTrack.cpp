@@ -249,6 +249,41 @@ AudioTrack::AudioTrack(
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
+        audio_port_handle_t selectedDeviceId)
+    : mStatus(NO_INIT),
+      mState(STATE_STOPPED),
+      mPreviousPriority(ANDROID_PRIORITY_NORMAL),
+      mPreviousSchedulingGroup(SP_DEFAULT),
+      mPausedPosition(0),
+      mOpPackageName(""),
+      mAudioTrackCallback(new AudioTrackCallback())
+{
+    mAttributes = AUDIO_ATTRIBUTES_INITIALIZER;
+
+    (void)set(streamType, sampleRate, format, channelMask,
+            frameCount, flags, cbf, user, notificationFrames,
+            0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType,
+            offloadInfo, uid, pid, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+}
+
+AudioTrack::AudioTrack(
+        audio_stream_type_t streamType,
+        uint32_t sampleRate,
+        audio_format_t format,
+        audio_channel_mask_t channelMask,
+        size_t frameCount,
+        audio_output_flags_t flags,
+        callback_t cbf,
+        void* user,
+        int32_t notificationFrames,
+        audio_session_t sessionId,
+        transfer_type transferType,
+        const audio_offload_info_t *offloadInfo,
+        uid_t uid,
+        pid_t pid,
+        const audio_attributes_t* pAttributes,
+        bool doNotReconnect,
+        float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId,
         const std::string& opPackageName)
     : mStatus(NO_INIT),
