@@ -27,13 +27,13 @@ std::string sResourceDir = "";
 std::string sComponentNamePrefix = "";
 
 static constexpr struct option kArgOptions[] = {
-    {"res", required_argument, 0, 'P'},
-    {"prefix", required_argument, 0, 'p'},
-    {"help", required_argument, 0, 'h'},
-    {nullptr, 0, nullptr, 0},
+        {"res", required_argument, 0, 'P'},
+        {"prefix", required_argument, 0, 'p'},
+        {"help", required_argument, 0, 'h'},
+        {nullptr, 0, nullptr, 0},
 };
 
-void printUsage(char *me) {
+void printUsage(char* me) {
     std::cerr << "VTS tests to test codec2 components \n";
     std::cerr << "Usage: " << me << " [options] \n";
     std::cerr << "\t -P,  --res:    Mandatory path to a folder that contains test resources \n";
@@ -49,17 +49,17 @@ void parseArgs(int argc, char** argv) {
     int option_index;
     while ((arg = getopt_long(argc, argv, ":P:p:h", kArgOptions, &option_index)) != -1) {
         switch (arg) {
-        case 'P':
-            sResourceDir = optarg;
-            break;
-        case 'p':
-            sComponentNamePrefix = optarg;
-            break;
-        case 'h':
-            printUsage(argv[0]);
-            break;
-        default:
-            break;
+            case 'P':
+                sResourceDir = optarg;
+                break;
+            case 'p':
+                sComponentNamePrefix = optarg;
+                break;
+            case 'h':
+                printUsage(argv[0]);
+                break;
+            default:
+                break;
         }
     }
 }
@@ -134,8 +134,7 @@ void workDone(const std::shared_ptr<android::Codec2Client::Component>& component
         for (size_t i = 0; i < updates.size(); ++i) {
             C2Param* param = updates[i].get();
             if (param->index() == C2StreamInitDataInfo::output::PARAM_TYPE) {
-                C2StreamInitDataInfo::output* csdBuffer =
-                        (C2StreamInitDataInfo::output*)(param);
+                C2StreamInitDataInfo::output* csdBuffer = (C2StreamInitDataInfo::output*)(param);
                 size_t csdSize = csdBuffer->flexCount();
                 if (csdSize > 0) csd = true;
             } else if ((param->index() == C2StreamSampleRateInfo::output::PARAM_TYPE) ||
@@ -160,8 +159,7 @@ void workDone(const std::shared_ptr<android::Codec2Client::Component>& component
             typedef std::unique_lock<std::mutex> ULock;
             ULock l(queueLock);
             workQueue.push_back(std::move(work));
-            if (!flushedIndices.empty() &&
-                (frameIndexIt != flushedIndices.end())) {
+            if (!flushedIndices.empty() && (frameIndexIt != flushedIndices.end())) {
                 flushedIndices.erase(frameIndexIt);
             }
             queueCondition.notify_all();
