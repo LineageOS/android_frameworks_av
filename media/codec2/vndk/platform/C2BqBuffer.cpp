@@ -316,12 +316,15 @@ private:
                     }
                     return C2_BLOCKING;
                 }
+                syncVar->notifyDequeuedLocked();
+                syncVar->unlock();
                 c2Status = dequeueBuffer(width, height, format, androidUsage,
                               &slot, &bufferNeedsReallocation, &fence);
-                if (c2Status == C2_OK) {
-                    syncVar->notifyDequeuedLocked();
+                if (c2Status != C2_OK) {
+                    syncVar->lock();
+                    syncVar->notifyQueuedLocked();
+                    syncVar->unlock();
                 }
-                syncVar->unlock();
             } else {
                 c2Status = dequeueBuffer(width, height, format, usage,
                               &slot, &bufferNeedsReallocation, &fence);
@@ -789,7 +792,7 @@ int C2BufferQueueBlockPoolData::migrate(
         sp<GraphicBuffer> newBuffer = new GraphicBuffer(
             graphicBuffer->handle, GraphicBuffer::CLONE_HANDLE,
             graphicBuffer->width, graphicBuffer->height, graphicBuffer->format,
-            graphicBuffer->layerCount, toUsage, graphicBuffer->stride);
+            graphicBuffer->layerCount, toUsage | graphicBuffer->getUsage(), graphicBuffer->stride);
         if (newBuffer->initCheck() == android::NO_ERROR) {
             graphicBuffer = std::move(newBuffer);
         } else {

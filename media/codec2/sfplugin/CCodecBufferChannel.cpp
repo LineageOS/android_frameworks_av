@@ -1189,9 +1189,6 @@ status_t CCodecBufferChannel::start(
             }
             outputGeneration = output->generation;
         }
-        if (maxDequeueCount > 0) {
-            mComponent->setOutputSurfaceMaxDequeueCount(maxDequeueCount);
-        }
 
         bool graphic = (oStreamFormat.value == C2BufferData::GRAPHIC);
         C2BlockPool::local_id_t outputPoolId_;
@@ -1331,7 +1328,8 @@ status_t CCodecBufferChannel::start(
             mComponent->setOutputSurface(
                     outputPoolId_,
                     outputSurface,
-                    outputGeneration);
+                    outputGeneration,
+                    maxDequeueCount);
         }
 
         if (oStreamFormat.value == C2BufferData::LINEAR) {
@@ -1947,10 +1945,11 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
                 & ((1 << 10) - 1));
 
     sp<IGraphicBufferProducer> producer;
+    int maxDequeueCount = mOutputSurface.lock()->maxDequeueBuffers;
     if (newSurface) {
         newSurface->setScalingMode(NATIVE_WINDOW_SCALING_MODE_SCALE_TO_WINDOW);
         newSurface->setDequeueTimeout(kDequeueTimeoutNs);
-        newSurface->setMaxDequeuedBufferCount(mOutputSurface.lock()->maxDequeueBuffers);
+        newSurface->setMaxDequeuedBufferCount(maxDequeueCount);
         producer = newSurface->getIGraphicBufferProducer();
         producer->setGenerationNumber(generation);
     } else {
@@ -1970,7 +1969,8 @@ status_t CCodecBufferChannel::setSurface(const sp<Surface> &newSurface) {
         if (mComponent->setOutputSurface(
                 outputPoolId,
                 producer,
-                generation) != C2_OK) {
+                generation,
+                maxDequeueCount) != C2_OK) {
             ALOGI("[%s] setSurface: component setOutputSurface failed", mName);
             return INVALID_OPERATION;
         }

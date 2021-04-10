@@ -53,7 +53,7 @@ struct C2SyncVariables {
      * \param maxDequeueCount           Initial value of # of max dequeued buffer count
      * \param curDequeueCount           Initial value of # of current dequeued buffer count
      */
-    void setInitialDequeueCount(int32_t maxDequeueCount, int32_t curDequeueCount);
+    void setInitialDequeueCountLocked(int32_t maxDequeueCount, int32_t curDequeueCount);
 
     /**
      * Get a waitId which will be used to implement fence.
