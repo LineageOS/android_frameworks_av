@@ -143,6 +143,7 @@ c2_status_t FrameReassembler::process(
 
     if (buffer->size() > 0) {
         mCurrentOrdinal.timestamp = timeUs;
+        mCurrentOrdinal.customOrdinal = timeUs;
     }
 
     size_t frameSizeBytes = mFrameSize.value() * mChannelCount * bytesPerSample();
@@ -219,6 +220,7 @@ void FrameReassembler::finishCurrentBlock(std::list<std::unique_ptr<C2Work>> *it
 
     ++mCurrentOrdinal.frameIndex;
     mCurrentOrdinal.timestamp += mFrameSize.value() * 1000000 / mSampleRate;
+    mCurrentOrdinal.customOrdinal = mCurrentOrdinal.timestamp;
     mCurrentBlock.reset();
     mWriteView.reset();
 }
