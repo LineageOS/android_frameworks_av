@@ -35,8 +35,9 @@ using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
 
-static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
-        kEncodeTestParameters;
+using EncodeTestParameters = std::tuple<std::string, std::string, bool, int32_t>;
+
+static std::vector<EncodeTestParameters> kEncodeTestParameters;
 
 class LinearBuffer : public C2Buffer {
   public:
@@ -170,9 +171,8 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     }
 };
 
-class Codec2AudioEncHidlTest
-    : public Codec2AudioEncHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+class Codec2AudioEncHidlTest : public Codec2AudioEncHidlTestBase,
+                               public ::testing::WithParamInterface<TestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -246,7 +246,8 @@ bool getConfigParams(std::string mime, int32_t* nChannels, int32_t* nSampleRate,
         *nChannels = 1;
         *nSampleRate = 16000;
         *samplesPerFrame = 160;
-    } else return false;
+    } else
+        return false;
 
     return true;
 }
@@ -258,10 +259,8 @@ void Codec2AudioEncHidlTestBase::GetURLForComponent(char* mURL) {
         const char* mURL;
     };
     static const CompToURL kCompToURL[] = {
-            {"mp4a-latm", "bbb_raw_2ch_48khz_s16le.raw"},
-            {"3gpp", "bbb_raw_1ch_8khz_s16le.raw"},
-            {"amr-wb", "bbb_raw_1ch_16khz_s16le.raw"},
-            {"flac", "bbb_raw_2ch_48khz_s16le.raw"},
+            {"mp4a-latm", "bbb_raw_2ch_48khz_s16le.raw"}, {"3gpp", "bbb_raw_1ch_8khz_s16le.raw"},
+            {"amr-wb", "bbb_raw_1ch_16khz_s16le.raw"},    {"flac", "bbb_raw_2ch_48khz_s16le.raw"},
             {"opus", "bbb_raw_2ch_48khz_s16le.raw"},
     };
 
@@ -363,10 +362,8 @@ TEST_P(Codec2AudioEncHidlTest, validateCompName) {
     ASSERT_EQ(mDisableTest, false);
 }
 
-class Codec2AudioEncEncodeTest
-    : public Codec2AudioEncHidlTestBase,
-      public ::testing::WithParamInterface<
-              std::tuple<std::string, std::string, std::string, std::string>> {
+class Codec2AudioEncEncodeTest : public Codec2AudioEncHidlTestBase,
+                                 public ::testing::WithParamInterface<EncodeTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -379,9 +376,9 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     char mURL[512];
     strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mURL);
-    bool signalEOS = !std::get<2>(GetParam()).compare("true");
+    bool signalEOS = std::get<2>(GetParam());
     // Ratio w.r.t to mInputMaxBufSize
-    int32_t inputMaxBufRatio = std::stoi(std::get<3>(GetParam()));
+    int32_t inputMaxBufRatio = std::get<3>(GetParam());
 
     int32_t nChannels;
     int32_t nSampleRate;
@@ -428,8 +425,7 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
         ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
         ASSERT_TRUE(false);
     }
-    if ((mMime.find("flac") != std::string::npos) ||
-        (mMime.find("opus") != std::string::npos) ||
+    if ((mMime.find("flac") != std::string::npos) || (mMime.find("opus") != std::string::npos) ||
         (mMime.find("mp4a-latm") != std::string::npos)) {
         ASSERT_TRUE(mCsd) << "CSD buffer missing";
     }
@@ -753,13 +749,13 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(kTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 // EncodeTest with EOS / No EOS and inputMaxBufRatio
 // inputMaxBufRatio is ratio w.r.t. to mInputMaxBufSize
 INSTANTIATE_TEST_SUITE_P(EncodeTest, Codec2AudioEncEncodeTest,
                          testing::ValuesIn(kEncodeTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
@@ -768,13 +764,13 @@ int main(int argc, char** argv) {
     kTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_ENCODER);
     for (auto params : kTestParameters) {
         kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "1"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), false, 1));
         kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false", "2"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), false, 2));
         kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "1"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), true, 1));
         kEncodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true", "2"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), true, 2));
     }
 
     ::testing::InitGoogleTest(&argc, argv);

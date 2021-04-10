@@ -40,10 +40,11 @@ using android::C2AllocatorIon;
 #include "media_c2_hidl_test_common.h"
 #include "media_c2_video_hidl_test_common.h"
 
-static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
-        kDecodeTestParameters;
+using DecodeTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
+static std::vector<DecodeTestParameters> kDecodeTestParameters;
 
-static std::vector<std::tuple<std::string, std::string, std::string>> kCsdFlushTestParameters;
+using CsdFlushTestParameters = std::tuple<std::string, std::string, bool>;
+static std::vector<CsdFlushTestParameters> kCsdFlushTestParameters;
 
 struct CompToURL {
     std::string mime;
@@ -52,43 +53,30 @@ struct CompToURL {
     std::string chksum;
 };
 std::vector<CompToURL> kCompToURL = {
-    {"avc",
-     "bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_176x144_300kbps_60fps.info",
-     "bbb_avc_176x144_300kbps_60fps_chksum.md5"},
-    {"avc",
-     "bbb_avc_640x360_768kbps_30fps.h264", "bbb_avc_640x360_768kbps_30fps.info",
-     "bbb_avc_640x360_768kbps_30fps_chksum.md5"},
-    {"hevc",
-     "bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_176x144_176kbps_60fps.info",
-     "bbb_hevc_176x144_176kbps_60fps_chksum.md5"},
-    {"hevc",
-     "bbb_hevc_640x360_1600kbps_30fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.info",
-     "bbb_hevc_640x360_1600kbps_30fps_chksum.md5"},
-    {"mpeg2",
-     "bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_176x144_105kbps_25fps.info", ""},
-    {"mpeg2",
-     "bbb_mpeg2_352x288_1mbps_60fps.m2v","bbb_mpeg2_352x288_1mbps_60fps.info", ""},
-    {"3gpp",
-     "bbb_h263_352x288_300kbps_12fps.h263", "bbb_h263_352x288_300kbps_12fps.info", ""},
-    {"mp4v-es",
-     "bbb_mpeg4_352x288_512kbps_30fps.m4v", "bbb_mpeg4_352x288_512kbps_30fps.info", ""},
-    {"vp8",
-     "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info", ""},
-    {"vp8",
-     "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
-     "bbb_vp8_640x360_2mbps_30fps_chksm.md5"},
-    {"vp9",
-     "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info", ""},
-    {"vp9",
-     "bbb_vp9_640x360_1600kbps_30fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.info",
-     "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
-    {"vp9",
-     "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
-     "bbb_vp9_704x480_280kbps_24fps_altref_2.info", ""},
-    {"av01",
-     "bbb_av1_640_360.av1", "bbb_av1_640_360.info", "bbb_av1_640_360_chksum.md5"},
-    {"av01",
-     "bbb_av1_176_144.av1", "bbb_av1_176_144.info", "bbb_av1_176_144_chksm.md5"},
+        {"avc", "bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_176x144_300kbps_60fps.info",
+         "bbb_avc_176x144_300kbps_60fps_chksum.md5"},
+        {"avc", "bbb_avc_640x360_768kbps_30fps.h264", "bbb_avc_640x360_768kbps_30fps.info",
+         "bbb_avc_640x360_768kbps_30fps_chksum.md5"},
+        {"hevc", "bbb_hevc_176x144_176kbps_60fps.hevc", "bbb_hevc_176x144_176kbps_60fps.info",
+         "bbb_hevc_176x144_176kbps_60fps_chksum.md5"},
+        {"hevc", "bbb_hevc_640x360_1600kbps_30fps.hevc", "bbb_hevc_640x360_1600kbps_30fps.info",
+         "bbb_hevc_640x360_1600kbps_30fps_chksum.md5"},
+        {"mpeg2", "bbb_mpeg2_176x144_105kbps_25fps.m2v", "bbb_mpeg2_176x144_105kbps_25fps.info",
+         ""},
+        {"mpeg2", "bbb_mpeg2_352x288_1mbps_60fps.m2v", "bbb_mpeg2_352x288_1mbps_60fps.info", ""},
+        {"3gpp", "bbb_h263_352x288_300kbps_12fps.h263", "bbb_h263_352x288_300kbps_12fps.info", ""},
+        {"mp4v-es", "bbb_mpeg4_352x288_512kbps_30fps.m4v", "bbb_mpeg4_352x288_512kbps_30fps.info",
+         ""},
+        {"vp8", "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info", ""},
+        {"vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
+         "bbb_vp8_640x360_2mbps_30fps_chksm.md5"},
+        {"vp9", "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info", ""},
+        {"vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.info",
+         "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
+        {"vp9", "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
+         "bbb_vp9_704x480_280kbps_24fps_altref_2.info", ""},
+        {"av01", "bbb_av1_640_360.av1", "bbb_av1_640_360.info", "bbb_av1_640_360_chksum.md5"},
+        {"av01", "bbb_av1_176_144.av1", "bbb_av1_176_144.info", "bbb_av1_176_144_chksm.md5"},
 };
 
 class LinearBuffer : public C2Buffer {
@@ -251,8 +239,7 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
                 if (!codecConfig && !work->worklets.front()->output.buffers.empty()) {
                     if (mReorderDepth < 0) {
                         C2PortReorderBufferDepthTuning::output reorderBufferDepth;
-                        mComponent->query({&reorderBufferDepth}, {}, C2_MAY_BLOCK,
-                                          nullptr);
+                        mComponent->query({&reorderBufferDepth}, {}, C2_MAY_BLOCK, nullptr);
                         mReorderDepth = reorderBufferDepth.value;
                         if (mReorderDepth > 0) {
                             // TODO: Add validation for reordered output
@@ -333,9 +320,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     }
 };
 
-class Codec2VideoDecHidlTest
-    : public Codec2VideoDecHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+class Codec2VideoDecHidlTest : public Codec2VideoDecHidlTestBase,
+                               public ::testing::WithParamInterface<TestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -541,10 +527,8 @@ bool Codec2VideoDecHidlTestBase::configPixelFormat(uint32_t format) {
     return false;
 }
 
-class Codec2VideoDecDecodeTest
-    : public Codec2VideoDecHidlTestBase,
-      public ::testing::WithParamInterface<
-              std::tuple<std::string, std::string, std::string, std::string>> {
+class Codec2VideoDecDecodeTest : public Codec2VideoDecHidlTestBase,
+                                 public ::testing::WithParamInterface<DecodeTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -556,8 +540,8 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    uint32_t streamIndex = std::stoi(std::get<2>(GetParam()));
-    bool signalEOS = !std::get<2>(GetParam()).compare("true");
+    uint32_t streamIndex = std::get<2>(GetParam());
+    bool signalEOS = std::get<3>(GetParam());
     mTimestampDevTest = true;
 
     char mURL[512], info[512], chksum[512];
@@ -657,8 +641,8 @@ TEST_P(Codec2VideoDecHidlTest, AdaptiveDecodeTest) {
     description("Adaptive Decode Test");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     if (!(strcasestr(mMime.c_str(), "avc") || strcasestr(mMime.c_str(), "hevc") ||
-        strcasestr(mMime.c_str(), "vp8") || strcasestr(mMime.c_str(), "vp9") ||
-        strcasestr(mMime.c_str(), "mpeg2"))) {
+          strcasestr(mMime.c_str(), "vp8") || strcasestr(mMime.c_str(), "vp9") ||
+          strcasestr(mMime.c_str(), "mpeg2"))) {
         return;
     }
 
@@ -987,9 +971,8 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
     }
 }
 
-class Codec2VideoDecCsdInputTests
-    : public Codec2VideoDecHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {
+class Codec2VideoDecCsdInputTests : public Codec2VideoDecHidlTestBase,
+                                    public ::testing::WithParamInterface<CsdFlushTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -1022,7 +1005,7 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
     bool flushedDecoder = false;
     bool signalEOS = false;
     bool keyFrame = false;
-    bool flushCsd = !std::get<2>(GetParam()).compare("true");
+    bool flushCsd = std::get<2>(GetParam());
 
     ALOGV("sending %d csd data ", numCsds);
     int framesToDecode = numCsds;
@@ -1092,16 +1075,16 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoDecHidlTest, testing::ValuesIn(kTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 // DecodeTest with StreamIndex and EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(StreamIndexAndEOS, Codec2VideoDecDecodeTest,
                          testing::ValuesIn(kDecodeTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2VideoDecCsdInputTests,
                          testing::ValuesIn(kCsdFlushTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
@@ -1111,22 +1094,22 @@ int main(int argc, char** argv) {
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER);
     for (auto params : kTestParameters) {
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 1, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 1, true));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "2", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 2, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "2", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 2, true));
 
         kCsdFlushTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), true));
         kCsdFlushTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), false));
     }
 
     ::testing::InitGoogleTest(&argc, argv);
