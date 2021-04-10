@@ -246,7 +246,8 @@ bool getConfigParams(std::string mime, int32_t* nChannels, int32_t* nSampleRate,
         *nChannels = 1;
         *nSampleRate = 16000;
         *samplesPerFrame = 160;
-    } else return false;
+    } else
+        return false;
 
     return true;
 }
@@ -258,10 +259,8 @@ void Codec2AudioEncHidlTestBase::GetURLForComponent(char* mURL) {
         const char* mURL;
     };
     static const CompToURL kCompToURL[] = {
-            {"mp4a-latm", "bbb_raw_2ch_48khz_s16le.raw"},
-            {"3gpp", "bbb_raw_1ch_8khz_s16le.raw"},
-            {"amr-wb", "bbb_raw_1ch_16khz_s16le.raw"},
-            {"flac", "bbb_raw_2ch_48khz_s16le.raw"},
+            {"mp4a-latm", "bbb_raw_2ch_48khz_s16le.raw"}, {"3gpp", "bbb_raw_1ch_8khz_s16le.raw"},
+            {"amr-wb", "bbb_raw_1ch_16khz_s16le.raw"},    {"flac", "bbb_raw_2ch_48khz_s16le.raw"},
             {"opus", "bbb_raw_2ch_48khz_s16le.raw"},
     };
 
@@ -428,8 +427,7 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
         ALOGE("framesReceived : %d inputFrames : %u", mFramesReceived, numFrames);
         ASSERT_TRUE(false);
     }
-    if ((mMime.find("flac") != std::string::npos) ||
-        (mMime.find("opus") != std::string::npos) ||
+    if ((mMime.find("flac") != std::string::npos) || (mMime.find("opus") != std::string::npos) ||
         (mMime.find("mp4a-latm") != std::string::npos)) {
         ASSERT_TRUE(mCsd) << "CSD buffer missing";
     }

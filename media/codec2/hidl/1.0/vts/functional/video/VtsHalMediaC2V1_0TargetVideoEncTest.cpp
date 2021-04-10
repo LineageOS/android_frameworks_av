@@ -484,8 +484,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         ASSERT_TRUE(false);
     }
 
-    if ((mMime.find("vp8") != std::string::npos) ||
-        (mMime.find("3gpp") != std::string::npos)) {
+    if ((mMime.find("vp8") != std::string::npos) || (mMime.find("3gpp") != std::string::npos)) {
         ASSERT_FALSE(mCsd) << "CSD Buffer not expected";
     } else if (mMime.find("vp9") == std::string::npos) {
         ASSERT_TRUE(mCsd) << "CSD Buffer not received";
@@ -812,13 +811,11 @@ int main(int argc, char** argv) {
     parseArgs(argc, argv);
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
     for (auto params : kTestParameters) {
-        constexpr char const* kBoolString[] = { "false", "true" };
+        constexpr char const* kBoolString[] = {"false", "true"};
         for (size_t i = 0; i < 1 << 3; ++i) {
-            kEncodeTestParameters.push_back(std::make_tuple(
-                    std::get<0>(params), std::get<1>(params),
-                    kBoolString[i & 1],
-                    kBoolString[(i >> 1) & 1],
-                    kBoolString[(i >> 2) & 1]));
+            kEncodeTestParameters.push_back(
+                    std::make_tuple(std::get<0>(params), std::get<1>(params), kBoolString[i & 1],
+                                    kBoolString[(i >> 1) & 1], kBoolString[(i >> 2) & 1]));
         }
 
         kEncodeResolutionTestParameters.push_back(
