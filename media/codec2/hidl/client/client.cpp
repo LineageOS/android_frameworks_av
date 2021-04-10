@@ -1503,8 +1503,7 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         bqId = 0;
         mOutputBufferQueue->configure(nullIgbp, generation, 0, nullptr);
     } else {
-        mOutputBufferQueue->configure(surface, generation, bqId,
-                                      mBase1_2 ? &syncObj : nullptr);
+        mOutputBufferQueue->configure(surface, generation, bqId, nullptr);
     }
     ALOGD("surface generation remote change %u HAL ver: %s",
           generation, syncObj ? "1.2" : "1.0");
