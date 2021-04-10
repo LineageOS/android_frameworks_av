@@ -391,6 +391,7 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForOutput(
 sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
         audio_source_t inputSource,
         const DeviceVector &availDevices,
+        uid_t uid,
         sp<AudioPolicyMix> *policyMix) const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -402,7 +403,11 @@ sp<DeviceDescriptor> AudioPolicyMixCollection::getDeviceAndMixForInputSource(
             if ((RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET == mix->mCriteria[j].mRule &&
                     mix->mCriteria[j].mValue.mSource == inputSource) ||
                (RULE_EXCLUDE_ATTRIBUTE_CAPTURE_PRESET == mix->mCriteria[j].mRule &&
-                    mix->mCriteria[j].mValue.mSource != inputSource)) {
+                    mix->mCriteria[j].mValue.mSource != inputSource) ||
+               (RULE_MATCH_UID == mix->mCriteria[j].mRule &&
+                    mix->mCriteria[j].mValue.mUid == uid) ||
+               (RULE_EXCLUDE_UID == mix->mCriteria[j].mRule &&
+                    mix->mCriteria[j].mValue.mUid != uid)) {
                 // assuming PolicyMix only for remote submix for input
                 // so mix->mDeviceType can only be AUDIO_DEVICE_OUT_REMOTE_SUBMIX
                 audio_devices_t device = AUDIO_DEVICE_IN_REMOTE_SUBMIX;
