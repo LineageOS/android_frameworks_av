@@ -176,15 +176,15 @@ int64_t getNowUs() {
 }
 
 // Return all test parameters, a list of tuple of <instance, component>
-const std::vector<std::tuple<std::string, std::string>>& getTestParameters() {
+const std::vector<TestParameters>& getTestParameters() {
     return getTestParameters(C2Component::DOMAIN_OTHER, C2Component::KIND_OTHER);
 }
 
 // Return all test parameters, a list of tuple of <instance, component> with matching domain and
 // kind.
-const std::vector<std::tuple<std::string, std::string>>& getTestParameters(
-        C2Component::domain_t domain, C2Component::kind_t kind) {
-    static std::vector<std::tuple<std::string, std::string>> parameters;
+const std::vector<TestParameters>& getTestParameters(C2Component::domain_t domain,
+                                                     C2Component::kind_t kind) {
+    static std::vector<TestParameters> parameters;
 
     auto instances = android::Codec2Client::GetServiceNames();
     for (std::string instance : instances) {
