@@ -53,9 +53,8 @@
     }
 
 namespace {
-
-static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
-        kInputTestParameters;
+using InputTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
+static std::vector<InputTestParameters> kInputTestParameters;
 
 // google.codec2 Component test setup
 class Codec2ComponentHidlTestBase : public ::testing::Test {
@@ -120,9 +119,8 @@ class Codec2ComponentHidlTestBase : public ::testing::Test {
     }
 };
 
-class Codec2ComponentHidlTest
-    : public Codec2ComponentHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+class Codec2ComponentHidlTest : public Codec2ComponentHidlTestBase,
+                                public ::testing::WithParamInterface<TestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -317,10 +315,8 @@ TEST_P(Codec2ComponentHidlTest, Timeout) {
     ASSERT_EQ(err, C2_OK);
 }
 
-class Codec2ComponentInputTests
-    : public Codec2ComponentHidlTestBase,
-      public ::testing::WithParamInterface<
-              std::tuple<std::string, std::string, std::string, std::string>> {
+class Codec2ComponentInputTests : public Codec2ComponentHidlTestBase,
+                                  public ::testing::WithParamInterface<InputTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -330,8 +326,8 @@ class Codec2ComponentInputTests
 TEST_P(Codec2ComponentInputTests, InputBufferTest) {
     description("Tests for different inputs");
 
-    uint32_t flags = std::stoul(std::get<2>(GetParam()));
-    bool isNullBuffer = !std::get<3>(GetParam()).compare("true");
+    uint32_t flags = std::get<2>(GetParam());
+    bool isNullBuffer = std::get<3>(GetParam());
     if (isNullBuffer)
         ALOGD("Testing for null input buffer with flag : %u", flags);
     else
@@ -350,11 +346,10 @@ TEST_P(Codec2ComponentInputTests, InputBufferTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2ComponentHidlTest, testing::ValuesIn(kTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_CASE_P(NonStdInputs, Codec2ComponentInputTests,
-                        testing::ValuesIn(kInputTestParameters),
-                        android::hardware::PrintInstanceTupleNameToString<>);
+                        testing::ValuesIn(kInputTestParameters), PrintInstanceTupleNameToString<>);
 }  // anonymous namespace
 
 // TODO: Add test for Invalid work,
@@ -364,18 +359,15 @@ int main(int argc, char** argv) {
     kTestParameters = getTestParameters();
     for (auto params : kTestParameters) {
         kInputTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
+        kInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
+                                                       C2FrameData::FLAG_END_OF_STREAM, true));
         kInputTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params),
-                                std::to_string(C2FrameData::FLAG_END_OF_STREAM), "true"));
-        kInputTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "false"));
-        kInputTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params),
-                                std::to_string(C2FrameData::FLAG_CODEC_CONFIG), "false"));
-        kInputTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params),
-                                std::to_string(C2FrameData::FLAG_END_OF_STREAM), "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
+        kInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
+                                                       C2FrameData::FLAG_CODEC_CONFIG, false));
+        kInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
+                                                       C2FrameData::FLAG_END_OF_STREAM, false));
     }
 
     ::testing::InitGoogleTest(&argc, argv);

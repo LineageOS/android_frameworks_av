@@ -40,10 +40,11 @@ using android::C2AllocatorIon;
 #include "media_c2_hidl_test_common.h"
 #include "media_c2_video_hidl_test_common.h"
 
-static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
-        kDecodeTestParameters;
+using DecodeTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
+static std::vector<DecodeTestParameters> kDecodeTestParameters;
 
-static std::vector<std::tuple<std::string, std::string, std::string>> kCsdFlushTestParameters;
+using CsdFlushTestParameters = std::tuple<std::string, std::string, bool>;
+static std::vector<CsdFlushTestParameters> kCsdFlushTestParameters;
 
 struct CompToURL {
     std::string mime;
@@ -319,9 +320,8 @@ class Codec2VideoDecHidlTestBase : public ::testing::Test {
     }
 };
 
-class Codec2VideoDecHidlTest
-    : public Codec2VideoDecHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+class Codec2VideoDecHidlTest : public Codec2VideoDecHidlTestBase,
+                               public ::testing::WithParamInterface<TestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -527,10 +527,8 @@ bool Codec2VideoDecHidlTestBase::configPixelFormat(uint32_t format) {
     return false;
 }
 
-class Codec2VideoDecDecodeTest
-    : public Codec2VideoDecHidlTestBase,
-      public ::testing::WithParamInterface<
-              std::tuple<std::string, std::string, std::string, std::string>> {
+class Codec2VideoDecDecodeTest : public Codec2VideoDecHidlTestBase,
+                                 public ::testing::WithParamInterface<DecodeTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -542,8 +540,8 @@ TEST_P(Codec2VideoDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    uint32_t streamIndex = std::stoi(std::get<2>(GetParam()));
-    bool signalEOS = !std::get<2>(GetParam()).compare("true");
+    uint32_t streamIndex = std::get<2>(GetParam());
+    bool signalEOS = std::get<3>(GetParam());
     mTimestampDevTest = true;
 
     char mURL[512], info[512], chksum[512];
@@ -973,9 +971,8 @@ TEST_P(Codec2VideoDecHidlTest, DecodeTestEmptyBuffersInserted) {
     }
 }
 
-class Codec2VideoDecCsdInputTests
-    : public Codec2VideoDecHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {
+class Codec2VideoDecCsdInputTests : public Codec2VideoDecHidlTestBase,
+                                    public ::testing::WithParamInterface<CsdFlushTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -1008,7 +1005,7 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
     bool flushedDecoder = false;
     bool signalEOS = false;
     bool keyFrame = false;
-    bool flushCsd = !std::get<2>(GetParam()).compare("true");
+    bool flushCsd = std::get<2>(GetParam());
 
     ALOGV("sending %d csd data ", numCsds);
     int framesToDecode = numCsds;
@@ -1078,16 +1075,16 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoDecHidlTest, testing::ValuesIn(kTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 // DecodeTest with StreamIndex and EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(StreamIndexAndEOS, Codec2VideoDecDecodeTest,
                          testing::ValuesIn(kDecodeTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2VideoDecCsdInputTests,
                          testing::ValuesIn(kCsdFlushTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
@@ -1097,22 +1094,22 @@ int main(int argc, char** argv) {
     kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER);
     for (auto params : kTestParameters) {
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 1, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 1, true));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "2", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 2, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "2", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 2, true));
 
         kCsdFlushTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), true));
         kCsdFlushTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), false));
     }
 
     ::testing::InitGoogleTest(&argc, argv);
