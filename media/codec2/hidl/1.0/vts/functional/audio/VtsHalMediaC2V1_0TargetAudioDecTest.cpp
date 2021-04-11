@@ -33,11 +33,11 @@
 using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
+using DecodeTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
+static std::vector<DecodeTestParameters> kDecodeTestParameters;
 
-static std::vector<std::tuple<std::string, std::string, std::string, std::string>>
-        kDecodeTestParameters;
-
-static std::vector<std::tuple<std::string, std::string, std::string>> kCsdFlushTestParameters;
+using CsdFlushTestParameters = std::tuple<std::string, std::string, bool>;
+static std::vector<CsdFlushTestParameters> kCsdFlushTestParameters;
 
 struct CompToURL {
     std::string mime;
@@ -46,36 +46,26 @@ struct CompToURL {
 };
 
 std::vector<CompToURL> kCompToURL = {
-    {"mp4a-latm",
-     "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz.info"},
-    {"mp4a-latm",
-     "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz_multi_frame.info"},
-    {"audio/mpeg",
-     "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
-    {"audio/mpeg",
-     "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz_multi_frame.info"},
-    {"3gpp",
-     "sine_amrnb_1ch_12kbps_8000hz.amrnb", "sine_amrnb_1ch_12kbps_8000hz.info"},
-    {"3gpp",
-     "sine_amrnb_1ch_12kbps_8000hz.amrnb", "sine_amrnb_1ch_12kbps_8000hz_multi_frame.info"},
-    {"amr-wb",
-     "bbb_amrwb_1ch_14kbps_16000hz.amrwb", "bbb_amrwb_1ch_14kbps_16000hz.info"},
-    {"amr-wb",
-     "bbb_amrwb_1ch_14kbps_16000hz.amrwb", "bbb_amrwb_1ch_14kbps_16000hz_multi_frame.info"},
-    {"vorbis",
-     "bbb_vorbis_stereo_128kbps_48000hz.vorbis", "bbb_vorbis_stereo_128kbps_48000hz.info"},
-    {"opus",
-     "bbb_opus_stereo_128kbps_48000hz.opus", "bbb_opus_stereo_128kbps_48000hz.info"},
-    {"g711-alaw",
-     "bbb_g711alaw_1ch_8khz.raw", "bbb_g711alaw_1ch_8khz.info"},
-    {"g711-mlaw",
-     "bbb_g711mulaw_1ch_8khz.raw", "bbb_g711mulaw_1ch_8khz.info"},
-    {"gsm",
-     "bbb_gsm_1ch_8khz_13kbps.raw", "bbb_gsm_1ch_8khz_13kbps.info"},
-    {"raw",
-     "bbb_raw_1ch_8khz_s32le.raw", "bbb_raw_1ch_8khz_s32le.info"},
-    {"flac",
-     "bbb_flac_stereo_680kbps_48000hz.flac", "bbb_flac_stereo_680kbps_48000hz.info"},
+        {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz.info"},
+        {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac",
+         "bbb_aac_stereo_128kbps_48000hz_multi_frame.info"},
+        {"audio/mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
+        {"audio/mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3",
+         "bbb_mp3_stereo_192kbps_48000hz_multi_frame.info"},
+        {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb", "sine_amrnb_1ch_12kbps_8000hz.info"},
+        {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb",
+         "sine_amrnb_1ch_12kbps_8000hz_multi_frame.info"},
+        {"amr-wb", "bbb_amrwb_1ch_14kbps_16000hz.amrwb", "bbb_amrwb_1ch_14kbps_16000hz.info"},
+        {"amr-wb", "bbb_amrwb_1ch_14kbps_16000hz.amrwb",
+         "bbb_amrwb_1ch_14kbps_16000hz_multi_frame.info"},
+        {"vorbis", "bbb_vorbis_stereo_128kbps_48000hz.vorbis",
+         "bbb_vorbis_stereo_128kbps_48000hz.info"},
+        {"opus", "bbb_opus_stereo_128kbps_48000hz.opus", "bbb_opus_stereo_128kbps_48000hz.info"},
+        {"g711-alaw", "bbb_g711alaw_1ch_8khz.raw", "bbb_g711alaw_1ch_8khz.info"},
+        {"g711-mlaw", "bbb_g711mulaw_1ch_8khz.raw", "bbb_g711mulaw_1ch_8khz.info"},
+        {"gsm", "bbb_gsm_1ch_8khz_13kbps.raw", "bbb_gsm_1ch_8khz_13kbps.info"},
+        {"raw", "bbb_raw_1ch_8khz_s32le.raw", "bbb_raw_1ch_8khz_s32le.info"},
+        {"flac", "bbb_flac_stereo_680kbps_48000hz.flac", "bbb_flac_stereo_680kbps_48000hz.info"},
 };
 
 class LinearBuffer : public C2Buffer {
@@ -212,9 +202,8 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
     }
 };
 
-class Codec2AudioDecHidlTest
-    : public Codec2AudioDecHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {
+class Codec2AudioDecHidlTest : public Codec2AudioDecHidlTestBase,
+                               public ::testing::WithParamInterface<TestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -438,10 +427,8 @@ TEST_P(Codec2AudioDecHidlTest, configComp) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-class Codec2AudioDecDecodeTest
-    : public Codec2AudioDecHidlTestBase,
-      public ::testing::WithParamInterface<
-              std::tuple<std::string, std::string, std::string, std::string>> {
+class Codec2AudioDecDecodeTest : public Codec2AudioDecHidlTestBase,
+                                 public ::testing::WithParamInterface<DecodeTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -452,9 +439,8 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    uint32_t streamIndex = std::stoi(std::get<2>(GetParam()));
-    ;
-    bool signalEOS = !std::get<3>(GetParam()).compare("true");
+    uint32_t streamIndex = std::get<2>(GetParam());
+    bool signalEOS = std::get<3>(GetParam());
     mTimestampDevTest = true;
     char mURL[512], info[512];
     android::Vector<FrameInfo> Info;
@@ -771,9 +757,8 @@ TEST_P(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-class Codec2AudioDecCsdInputTests
-    : public Codec2AudioDecHidlTestBase,
-      public ::testing::WithParamInterface<std::tuple<std::string, std::string, std::string>> {
+class Codec2AudioDecCsdInputTests : public Codec2AudioDecHidlTestBase,
+                                    public ::testing::WithParamInterface<CsdFlushTestParameters> {
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
@@ -819,7 +804,7 @@ TEST_P(Codec2AudioDecCsdInputTests, CSDFlushTest) {
     ASSERT_EQ(eleStream.is_open(), true);
 
     bool signalEOS = false;
-    bool flushCsd = !std::get<2>(GetParam()).compare("true");
+    bool flushCsd = std::get<2>(GetParam());
     ALOGV("sending %d csd data ", numCsds);
     int framesToDecode = numCsds;
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
@@ -875,16 +860,16 @@ TEST_P(Codec2AudioDecCsdInputTests, CSDFlushTest) {
 }
 
 INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioDecHidlTest, testing::ValuesIn(kTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 // DecodeTest with StreamIndex and EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(StreamIndexAndEOS, Codec2AudioDecDecodeTest,
                          testing::ValuesIn(kDecodeTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2AudioDecCsdInputTests,
                          testing::ValuesIn(kCsdFlushTestParameters),
-                         android::hardware::PrintInstanceTupleNameToString<>);
+                         PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
@@ -893,18 +878,18 @@ int main(int argc, char** argv) {
     kTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER);
     for (auto params : kTestParameters) {
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "0", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 1, false));
         kDecodeTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "1", "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), 1, true));
 
         kCsdFlushTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "true"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), true));
         kCsdFlushTestParameters.push_back(
-                std::make_tuple(std::get<0>(params), std::get<1>(params), "false"));
+                std::make_tuple(std::get<0>(params), std::get<1>(params), false));
     }
 
     ::testing::InitGoogleTest(&argc, argv);
