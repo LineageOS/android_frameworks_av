@@ -22,7 +22,6 @@
 
 #include <C2Debug.h>
 #include <C2PlatformSupport.h>
-#include <Codec2BufferUtils.h>
 #include <Codec2Mapper.h>
 #include <SimpleC2Interface.h>
 
@@ -332,14 +331,6 @@ static void ivd_aligned_free(void *ctxt, void *mem) {
     free(mem);
 }
 
-static IV_COLOR_FORMAT_T GetIvColorFormat() {
-    static IV_COLOR_FORMAT_T sColorFormat =
-        (GetYuv420FlexibleLayout() == FLEX_LAYOUT_SEMIPLANAR_UV) ? IV_YUV_420SP_UV :
-        (GetYuv420FlexibleLayout() == FLEX_LAYOUT_SEMIPLANAR_VU) ? IV_YUV_420SP_VU :
-        IV_YUV_420P;
-    return sColorFormat;
-}
-
 C2SoftAvcDec::C2SoftAvcDec(
         const char *name,
         c2_node_id_t id,
@@ -348,6 +339,7 @@ C2SoftAvcDec::C2SoftAvcDec(
       mIntf(intfImpl),
       mDecHandle(nullptr),
       mOutBufferFlush(nullptr),
+      mIvColorFormat(IV_YUV_420P),
       mOutputDelay(kDefaultOutputDelay),
       mWidth(320),
       mHeight(240),
@@ -426,13 +418,7 @@ status_t C2SoftAvcDec::createDecoder() {
     s_create_ip.s_ivd_create_ip_t.u4_size = sizeof(ivdext_create_ip_t);
     s_create_ip.s_ivd_create_ip_t.e_cmd = IVD_CMD_CREATE;
     s_create_ip.s_ivd_create_ip_t.u4_share_disp_buf = 0;
-    s_create_ip.s_ivd_create_ip_t.e_output_format = GetIvColorFormat();
-    switch (s_create_ip.s_ivd_create_ip_t.e_output_format) {
-        case IV_YUV_420P:       ALOGD("Flex Planar");           break;
-        case IV_YUV_420SP_UV:   ALOGD("Flex Semi-planar UV");   break;
-        case IV_YUV_420SP_VU:   ALOGD("Flex Semi-planar VU");   break;
-        default:                ALOGD("Unknown");               break;
-    }
+    s_create_ip.s_ivd_create_ip_t.e_output_format = mIvColorFormat;
     s_create_ip.s_ivd_create_ip_t.pf_aligned_alloc = ivd_aligned_malloc;
     s_create_ip.s_ivd_create_ip_t.pf_aligned_free = ivd_aligned_free;
     s_create_ip.s_ivd_create_ip_t.pv_mem_ctxt = nullptr;
@@ -569,12 +555,8 @@ bool C2SoftAvcDec::setDecodeArgs(ivd_video_decode_ip_t *ps_decode_ip,
         ps_decode_ip->u4_num_Bytes = 0;
     }
     ps_decode_ip->s_out_buffer.u4_min_out_buf_size[0] = lumaSize;
-    if (GetIvColorFormat() == IV_YUV_420P) {
-        ps_decode_ip->s_out_buffer.u4_min_out_buf_size[1] = chromaSize;
-        ps_decode_ip->s_out_buffer.u4_min_out_buf_size[2] = chromaSize;
-    } else {
-        ps_decode_ip->s_out_buffer.u4_min_out_buf_size[1] = chromaSize * 2;
-    }
+    ps_decode_ip->s_out_buffer.u4_min_out_buf_size[1] = chromaSize;
+    ps_decode_ip->s_out_buffer.u4_min_out_buf_size[2] = chromaSize;
     if (outBuffer) {
         if (outBuffer->height() < displayHeight) {
             ALOGE("Output buffer too small: provided (%dx%d) required (%ux%u)",
@@ -583,23 +565,13 @@ bool C2SoftAvcDec::setDecodeArgs(ivd_video_decode_ip_t *ps_decode_ip,
         }
         ps_decode_ip->s_out_buffer.pu1_bufs[0] = outBuffer->data()[C2PlanarLayout::PLANE_Y];
         ps_decode_ip->s_out_buffer.pu1_bufs[1] = outBuffer->data()[C2PlanarLayout::PLANE_U];
-        if (GetIvColorFormat() == IV_YUV_420P) {
-            ps_decode_ip->s_out_buffer.pu1_bufs[2] = outBuffer->data()[C2PlanarLayout::PLANE_V];
-        } else if (GetIvColorFormat() == IV_YUV_420SP_VU) {
-            ps_decode_ip->s_out_buffer.pu1_bufs[1] = outBuffer->data()[C2PlanarLayout::PLANE_V];
-        }
+        ps_decode_ip->s_out_buffer.pu1_bufs[2] = outBuffer->data()[C2PlanarLayout::PLANE_V];
     } else {
         ps_decode_ip->s_out_buffer.pu1_bufs[0] = mOutBufferFlush;
         ps_decode_ip->s_out_buffer.pu1_bufs[1] = mOutBufferFlush + lumaSize;
-        if (GetIvColorFormat() == IV_YUV_420P) {
-            ps_decode_ip->s_out_buffer.pu1_bufs[2] = mOutBufferFlush + lumaSize + chromaSize;
-        }
+        ps_decode_ip->s_out_buffer.pu1_bufs[2] = mOutBufferFlush + lumaSize + chromaSize;
     }
-    if (GetIvColorFormat() == IV_YUV_420P) {
-        ps_decode_ip->s_out_buffer.u4_num_bufs = 3;
-    } else {
-        ps_decode_ip->s_out_buffer.u4_num_bufs = 2;
-    }
+    ps_decode_ip->s_out_buffer.u4_num_bufs = 3;
     ps_decode_op->u4_size = sizeof(ih264d_video_decode_op_t);
 
     return true;
@@ -809,7 +781,7 @@ c2_status_t C2SoftAvcDec::ensureDecoderState(const std::shared_ptr<C2BlockPool> 
         mOutBlock.reset();
     }
     if (!mOutBlock) {
-        uint32_t format = HAL_PIXEL_FORMAT_YCBCR_420_888;
+        uint32_t format = HAL_PIXEL_FORMAT_YV12;
         C2MemoryUsage usage = { C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE };
         c2_status_t err =
             pool->fetchGraphicBlock(ALIGN32(mWidth), mHeight, format, usage, &mOutBlock);
@@ -825,6 +797,8 @@ c2_status_t C2SoftAvcDec::ensureDecoderState(const std::shared_ptr<C2BlockPool> 
 }
 
 // TODO: can overall error checking be improved?
+// TODO: allow configuration of color format and usage for graphic buffers instead
+//       of hard coding them to HAL_PIXEL_FORMAT_YV12
 // TODO: pass coloraspects information to surface
 // TODO: test support for dynamic change in resolution
 // TODO: verify if the decoder sent back all frames
