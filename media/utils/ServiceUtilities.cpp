@@ -73,6 +73,8 @@ static int32_t getOpForSource(audio_source_t source) {
       return AppOpsManager::OP_RECORD_AUDIO_HOTWORD;
     case AUDIO_SOURCE_REMOTE_SUBMIX:
       return AppOpsManager::OP_RECORD_AUDIO_OUTPUT;
+    case AUDIO_SOURCE_VOICE_DOWNLINK:
+      return AppOpsManager::OP_RECORD_INCOMING_PHONE_AUDIO;
     case AUDIO_SOURCE_DEFAULT:
     default:
       return AppOpsManager::OP_RECORD_AUDIO;
