@@ -8083,6 +8083,9 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
 {
     ALOGV("RecordThread::getActiveMicrophones");
     AutoMutex _l(mLock);
+    if (mInput == nullptr || mInput->stream == nullptr) {
+        return NO_INIT;
+    }
     status_t status = mInput->stream->getActiveMicrophones(activeMicrophones);
     return status;
 }
@@ -8092,6 +8095,9 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneDirection(
 {
     ALOGV("setPreferredMicrophoneDirection(%d)", direction);
     AutoMutex _l(mLock);
+    if (mInput == nullptr || mInput->stream == nullptr) {
+        return NO_INIT;
+    }
     return mInput->stream->setPreferredMicrophoneDirection(direction);
 }
 
@@ -8099,6 +8105,9 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneFieldDimension(float 
 {
     ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
     AutoMutex _l(mLock);
+    if (mInput == nullptr || mInput->stream == nullptr) {
+        return NO_INIT;
+    }
     return mInput->stream->setPreferredMicrophoneFieldDimension(zoom);
 }
 
