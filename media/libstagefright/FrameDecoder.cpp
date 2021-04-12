@@ -113,7 +113,7 @@ sp<IMemory> allocVideoFrame(const sp<MetaData>& trackMeta,
         return NULL;
     }
     sp<IMemory> frameMem = new MemoryBase(heap, 0, size);
-    if (frameMem == NULL) {
+    if (frameMem == NULL || frameMem->unsecurePointer() == NULL) {
         ALOGE("not enough memory for VideoFrame size=%zu", size);
         return NULL;
     }
