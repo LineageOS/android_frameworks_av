@@ -38,16 +38,16 @@
 
 namespace android {
 
-bool statsd_codec(const mediametrics::Item *item)
+bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     // the rest into our own proto
     //
@@ -58,39 +58,39 @@ bool statsd_codec(const mediametrics::Item *item)
     // android.media.mediacodec.codec   string
     std::string codec;
     if (item->getString("android.media.mediacodec.codec", &codec)) {
-        metrics_proto.set_codec(std::move(codec));
+        metrics_proto.set_codec(codec);
     }
-    // android.media.mediacodec.mime    string
+
     std::string mime;
     if (item->getString("android.media.mediacodec.mime", &mime)) {
-        metrics_proto.set_mime(std::move(mime));
+        metrics_proto.set_mime(mime);
     }
-    // android.media.mediacodec.mode    string
+
     std::string mode;
     if ( item->getString("android.media.mediacodec.mode", &mode)) {
-        metrics_proto.set_mode(std::move(mode));
+        metrics_proto.set_mode(mode);
     }
-    // android.media.mediacodec.encoder int32
+
     int32_t encoder = -1;
     if ( item->getInt32("android.media.mediacodec.encoder", &encoder)) {
         metrics_proto.set_encoder(encoder);
     }
-    // android.media.mediacodec.secure  int32
+
     int32_t secure = -1;
     if ( item->getInt32("android.media.mediacodec.secure", &secure)) {
         metrics_proto.set_secure(secure);
     }
-    // android.media.mediacodec.width   int32
+
     int32_t width = -1;
     if ( item->getInt32("android.media.mediacodec.width", &width)) {
         metrics_proto.set_width(width);
     }
-    // android.media.mediacodec.height  int32
+
     int32_t height = -1;
     if ( item->getInt32("android.media.mediacodec.height", &height)) {
         metrics_proto.set_height(height);
     }
-    // android.media.mediacodec.rotation-degrees        int32
+
     int32_t rotation = -1;
     if ( item->getInt32("android.media.mediacodec.rotation-degrees", &rotation)) {
         metrics_proto.set_rotation(rotation);
@@ -100,90 +100,89 @@ bool statsd_codec(const mediametrics::Item *item)
     if ( item->getInt32("android.media.mediacodec.crypto", &crypto)) {
         metrics_proto.set_crypto(crypto);
     }
-    // android.media.mediacodec.profile int32
+
     int32_t profile = -1;
     if ( item->getInt32("android.media.mediacodec.profile", &profile)) {
         metrics_proto.set_profile(profile);
     }
-    // android.media.mediacodec.level   int32
+
     int32_t level = -1;
     if ( item->getInt32("android.media.mediacodec.level", &level)) {
         metrics_proto.set_level(level);
     }
-    // android.media.mediacodec.maxwidth        int32
-    int32_t maxwidth = -1;
-    if ( item->getInt32("android.media.mediacodec.maxwidth", &maxwidth)) {
-        metrics_proto.set_max_width(maxwidth);
+
+    int32_t max_width = -1;
+    if ( item->getInt32("android.media.mediacodec.maxwidth", &max_width)) {
+        metrics_proto.set_max_width(max_width);
     }
-    // android.media.mediacodec.maxheight       int32
-    int32_t maxheight = -1;
-    if ( item->getInt32("android.media.mediacodec.maxheight", &maxheight)) {
-        metrics_proto.set_max_height(maxheight);
+
+    int32_t max_height = -1;
+    if ( item->getInt32("android.media.mediacodec.maxheight", &max_height)) {
+        metrics_proto.set_max_height(max_height);
     }
-    // android.media.mediacodec.errcode         int32
-    int32_t errcode = -1;
-    if ( item->getInt32("android.media.mediacodec.errcode", &errcode)) {
-        metrics_proto.set_error_code(errcode);
+
+    int32_t error_code = -1;
+    if ( item->getInt32("android.media.mediacodec.errcode", &error_code)) {
+        metrics_proto.set_error_code(error_code);
     }
-    // android.media.mediacodec.errstate        string
-    std::string errstate;
-    if ( item->getString("android.media.mediacodec.errstate", &errstate)) {
-        metrics_proto.set_error_state(std::move(errstate));
+
+    std::string error_state;
+    if ( item->getString("android.media.mediacodec.errstate", &error_state)) {
+        metrics_proto.set_error_state(error_state);
     }
-    // android.media.mediacodec.latency.max  int64
+
     int64_t latency_max = -1;
     if ( item->getInt64("android.media.mediacodec.latency.max", &latency_max)) {
         metrics_proto.set_latency_max(latency_max);
     }
-    // android.media.mediacodec.latency.min  int64
+
     int64_t latency_min = -1;
     if ( item->getInt64("android.media.mediacodec.latency.min", &latency_min)) {
         metrics_proto.set_latency_min(latency_min);
     }
-    // android.media.mediacodec.latency.avg  int64
+
     int64_t latency_avg = -1;
     if ( item->getInt64("android.media.mediacodec.latency.avg", &latency_avg)) {
         metrics_proto.set_latency_avg(latency_avg);
     }
-    // android.media.mediacodec.latency.n    int64
+
     int64_t latency_count = -1;
     if ( item->getInt64("android.media.mediacodec.latency.n", &latency_count)) {
         metrics_proto.set_latency_count(latency_count);
     }
-    // android.media.mediacodec.latency.unknown    int64
+
     int64_t latency_unknown = -1;
     if ( item->getInt64("android.media.mediacodec.latency.unknown", &latency_unknown)) {
         metrics_proto.set_latency_unknown(latency_unknown);
     }
-    // android.media.mediacodec.queueSecureInputBufferError  int32
-    if (int32_t queueSecureInputBufferError = -1;
-        item->getInt32("android.media.mediacodec.queueSecureInputBufferError",
-                &queueSecureInputBufferError)) {
-        metrics_proto.set_queue_secure_input_buffer_error(queueSecureInputBufferError);
+
+    int32_t queue_secure_input_buffer_error = -1;
+    if (item->getInt32("android.media.mediacodec.queueSecureInputBufferError",
+                &queue_secure_input_buffer_error)) {
+        metrics_proto.set_queue_secure_input_buffer_error(queue_secure_input_buffer_error);
     }
-    // android.media.mediacodec.queueInputBufferError  int32
-    if (int32_t queueInputBufferError = -1;
-        item->getInt32("android.media.mediacodec.queueInputBufferError",
-                &queueInputBufferError)) {
-        metrics_proto.set_queue_input_buffer_error(queueInputBufferError);
+
+    int32_t queue_input_buffer_error = -1;
+    if (item->getInt32("android.media.mediacodec.queueInputBufferError",
+                &queue_input_buffer_error)) {
+        metrics_proto.set_queue_input_buffer_error(queue_input_buffer_error);
     }
     // android.media.mediacodec.latency.hist    NOT EMITTED
 
-    // android.media.mediacodec.bitrate_mode string
     std::string bitrate_mode;
     if (item->getString("android.media.mediacodec.bitrate_mode", &bitrate_mode)) {
-        metrics_proto.set_bitrate_mode(std::move(bitrate_mode));
+        metrics_proto.set_bitrate_mode(bitrate_mode);
     }
-    // android.media.mediacodec.bitrate int32
+
     int32_t bitrate = -1;
     if (item->getInt32("android.media.mediacodec.bitrate", &bitrate)) {
         metrics_proto.set_bitrate(bitrate);
     }
-    // android.media.mediacodec.lifetimeMs int64
-    int64_t lifetimeMs = -1;
-    if ( item->getInt64("android.media.mediacodec.lifetimeMs", &lifetimeMs)) {
-        lifetimeMs = mediametrics::bucket_time_minutes(lifetimeMs);
-        metrics_proto.set_lifetime_millis(lifetimeMs);
+
+    int64_t lifetime_millis = -1;
+    if (item->getInt64("android.media.mediacodec.lifetimeMs", &lifetime_millis)) {
+        lifetime_millis = mediametrics::bucket_time_minutes(lifetime_millis);
+        metrics_proto.set_lifetime_millis(lifetime_millis);
     }
 
     // new for S; need to plumb through to westworld
@@ -201,18 +200,51 @@ bool statsd_codec(const mediametrics::Item *item)
         ALOGE("Failed to serialize codec metrics");
         return false;
     }
+    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_CODEC_REPORTED,
+                               timestamp_nanos, package_name.c_str(), package_version_code,
+                               media_apex_version,
+                               bf_serialized);
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_codec_reported:"
+            << android::util::MEDIAMETRICS_CODEC_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
 
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-        (void)android::util::stats_write(android::util::MEDIAMETRICS_CODEC_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
+            << " codec:" << codec
+            << " mime:" << mime
+            << " mode:" << mode
+            << " encoder:" << encoder
+            << " secure:" << secure
+            << " width:" << width
+            << " height:" << height
+            << " rotation:" << rotation
+            << " crypto:" << crypto
+            << " profile:" << profile
 
-    } else {
-        ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
-    }
+            << " level:" << level
+            << " max_width:" << max_width
+            << " max_height:" << max_height
+            << " error_code:" << error_code
+            << " error_state:" << error_state
+            << " latency_max:" << latency_max
+            << " latency_min:" << latency_min
+            << " latency_avg:" << latency_avg
+            << " latency_count:" << latency_count
+            << " latency_unknown:" << latency_unknown
 
+            << " queue_input_buffer_error:" << queue_input_buffer_error
+            << " queue_secure_input_buffer_error:" << queue_secure_input_buffer_error
+            << " bitrate_mode:" << bitrate_mode
+            << " bitrate:" << bitrate
+            << " lifetime_millis:" << lifetime_millis
+            // TODO: add when log_session_id is merged.
+            // << " log_session_id:" << log_session_id
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_CODEC_REPORTED, log.str());
     return true;
 }
 
