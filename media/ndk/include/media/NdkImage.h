@@ -50,7 +50,10 @@ __BEGIN_DECLS
  */
 typedef struct AImage AImage;
 
-// Formats not listed here will not be supported by AImageReader
+/**
+ * AImage supported formats: AImageReader only guarantees the support for the formats
+ * listed here.
+ */
 enum AIMAGE_FORMATS {
     /**
      * 32 bits RGBA format, 8 bits for each of the four channels.
@@ -813,7 +816,7 @@ void AImage_deleteAsync(AImage* image, int releaseFenceFd) __INTRODUCED_IN(26);
  * Available since API level 26.
  *
  * @param image the {@link AImage} of interest.
- * @param outBuffer The memory area pointed to by buffer will contain the acquired AHardwareBuffer
+ * @param buffer The memory area pointed to by buffer will contain the acquired AHardwareBuffer
  *         handle.
  * @return <ul>
  *         <li>{@link AMEDIA_OK} if the method call succeeds.</li>
