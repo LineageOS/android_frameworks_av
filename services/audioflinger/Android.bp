@@ -74,6 +74,7 @@ cc_library_shared {
         "libmediautils",
         "libnbaio",
         "libnblog",
+        "libpermission",
         "libpowermanager",
         "libmediautils",
         "libmemunreachable",
@@ -95,6 +96,7 @@ cc_library_shared {
     ],
 
     export_shared_lib_headers: [
+        "libpermission",
         "media_permission-aidl-cpp",
     ],
 
