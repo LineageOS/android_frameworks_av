@@ -471,7 +471,7 @@ Status TunerFilter::getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_ret
         res = r;
         if (res == Result::SUCCESS) {
             TunerFilterSharedHandleInfo info{
-                .handle = dupToAidl(hidl_handle(avMemory.getNativeHandle())),
+                .handle = dupToAidl(avMemory),
                 .size = static_cast<int64_t>(avMemSize),
             };
             *_aidl_return = move(info);
@@ -480,7 +480,10 @@ Status TunerFilter::getAvSharedHandleInfo(TunerFilterSharedHandleInfo* _aidl_ret
         }
     });
 
-    return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    if (res != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
 }
 
 Status TunerFilter::releaseAvHandle(
@@ -496,7 +499,6 @@ Status TunerFilter::releaseAvHandle(
     }
     return Status::ok();
 }
-
 
 Status TunerFilter::start() {
     if (mFilter == nullptr) {

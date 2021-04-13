@@ -48,7 +48,10 @@ Status TunerLnb::setCallback(
 
     sp<ILnbCallback> lnbCallback = new LnbCallback(tunerLnbCallback);
     Result status = mLnb->setCallback(lnbCallback);
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerLnb::setVoltage(int voltage) {
@@ -58,7 +61,10 @@ Status TunerLnb::setVoltage(int voltage) {
     }
 
     Result status = mLnb->setVoltage(static_cast<LnbVoltage>(voltage));
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerLnb::setTone(int tone) {
@@ -68,7 +74,10 @@ Status TunerLnb::setTone(int tone) {
     }
 
     Result status = mLnb->setTone(static_cast<LnbTone>(tone));
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerLnb::setSatellitePosition(int position) {
@@ -78,7 +87,10 @@ Status TunerLnb::setSatellitePosition(int position) {
     }
 
     Result status = mLnb->setSatellitePosition(static_cast<LnbPosition>(position));
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerLnb::sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) {
@@ -88,7 +100,10 @@ Status TunerLnb::sendDiseqcMessage(const vector<uint8_t>& diseqcMessage) {
     }
 
     Result status = mLnb->sendDiseqcMessage(diseqcMessage);
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerLnb::close() {
