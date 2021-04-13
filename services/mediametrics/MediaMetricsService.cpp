@@ -206,7 +206,7 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
 
     (void)mAudioAnalytics.submit(sitem, isTrusted);
 
-    (void)dump2Statsd(sitem);  // failure should be logged in function.
+    (void)dump2Statsd(sitem, mStatsdLog);  // failure should be logged in function.
     saveItem(sitem);
     return NO_ERROR;
 }
@@ -308,6 +308,11 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             if (lines == linesToDump) {
                 result << "-- some lines may be truncated --\n";
             }
+
+            // Dump the statsd atoms we sent out.
+            result << "Statsd atoms:\n"
+                   << mStatsdLog->dumpToString("  " /* prefix */,
+                           all ? STATSD_LOG_LINES_MAX : STATSD_LOG_LINES_DUMP);
         }
     }
     const std::string str = result.str();
