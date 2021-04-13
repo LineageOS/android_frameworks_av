@@ -220,16 +220,15 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-    int32_t bitrate;
-    if (!AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, &bitrate)) {
-        status = mMediaSampleReader->getEstimatedBitrateForTrack(mTrackIndex, &bitrate);
+    if (!AMediaFormat_getInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, &mConfiguredBitrate)) {
+        status = mMediaSampleReader->getEstimatedBitrateForTrack(mTrackIndex, &mConfiguredBitrate);
         if (status != AMEDIA_OK) {
             LOG(ERROR) << "Unable to estimate bitrate. Using default " << kDefaultBitrateMbps;
-            bitrate = kDefaultBitrateMbps;
+            mConfiguredBitrate = kDefaultBitrateMbps;
         }
 
-        LOG(INFO) << "Configuring bitrate " << bitrate;
-        AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, bitrate);
+        LOG(INFO) << "Configuring bitrate " << mConfiguredBitrate;
+        AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_BIT_RATE, mConfiguredBitrate);
     }
 
     SetDefaultFormatValueFloat(AMEDIAFORMAT_KEY_I_FRAME_INTERVAL, encoderFormat,
