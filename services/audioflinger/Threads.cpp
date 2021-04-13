@@ -5880,8 +5880,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
         sp<Track> l = mActiveTracks.getLatest();
         bool last = l.get() == track;
 
-        if (track->isPausing()) {
-            track->setPaused();
+        if (track->isPausePending()) {
+            track->pauseAck();
+            // It is possible a track might have been flushed or stopped.
+            // Other operations such as flush pending might occur on the next prepare.
+            if (track->isPausing()) {
+                track->setPaused();
+            }
+            // Always perform pause, as an immediate flush will change
+            // the pause state to be no longer isPausing().
             if (mHwSupportsPause && last && !mHwPaused) {
                 doHwPause = true;
                 mHwPaused = true;
@@ -6423,8 +6430,15 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
             continue;
         }
 
-        if (track->isPausing()) {
-            track->setPaused();
+        if (track->isPausePending()) {
+            track->pauseAck();
+            // It is possible a track might have been flushed or stopped.
+            // Other operations such as flush pending might occur on the next prepare.
+            if (track->isPausing()) {
+                track->setPaused();
+            }
+            // Always perform pause if last, as an immediate flush will change
+            // the pause state to be no longer isPausing().
             if (last) {
                 if (mHwSupportsPause && !mHwPaused) {
                     doHwPause = true;
@@ -8094,6 +8108,9 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
 {
     ALOGV("RecordThread::getActiveMicrophones");
     AutoMutex _l(mLock);
+    if (mInput == nullptr || mInput->stream == nullptr) {
+        return NO_INIT;
+    }
     status_t status = mInput->stream->getActiveMicrophones(activeMicrophones);
     return status;
 }
@@ -8103,6 +8120,9 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneDirection(
 {
     ALOGV("setPreferredMicrophoneDirection(%d)", direction);
     AutoMutex _l(mLock);
+    if (mInput == nullptr || mInput->stream == nullptr) {
+        return NO_INIT;
+    }
     return mInput->stream->setPreferredMicrophoneDirection(direction);
 }
 
@@ -8110,6 +8130,9 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneFieldDimension(float 
 {
     ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
     AutoMutex _l(mLock);
+    if (mInput == nullptr || mInput->stream == nullptr) {
+        return NO_INIT;
+    }
     return mInput->stream->setPreferredMicrophoneFieldDimension(zoom);
 }
 
