@@ -48,10 +48,7 @@ namespace android {
 // has its own routine to handle this.
 //
 
-bool enabled_statsd = true;
-
-using statsd_pusher = bool (*)(const mediametrics::Item *);
-using statsd_puller = bool (*)(const mediametrics::Item *, AStatsEventList *);
+static bool enabled_statsd = true;
 
 namespace {
 template<typename Handler, typename... Args>
@@ -68,15 +65,17 @@ bool dump2StatsdInternal(const std::map<std::string, Handler>& handlers,
     }
 
     if (handlers.count(key)) {
-        return (handlers.at(key))(item.get(), args...);
+        return (handlers.at(key))(item, args...);
     }
     return false;
 }
 } // namespace
 
 // give me a record, I'll look at the type and upload appropriately
-bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item) {
-    static const std::map<std::string, statsd_pusher> statsd_pushers =
+bool dump2Statsd(
+        const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog) {
+    static const std::map<std::string, statsd_pusher*> statsd_pushers =
     {
         { "audiopolicy", statsd_audiopolicy },
         { "audiorecord", statsd_audiorecord },
@@ -91,11 +90,11 @@ bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item) {
         { "nuplayer2", statsd_nuplayer },
         { "recorder", statsd_recorder },
     };
-    return dump2StatsdInternal(statsd_pushers, item);
+    return dump2StatsdInternal(statsd_pushers, item, statsdLog);
 }
 
 bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out) {
-    static const std::map<std::string, statsd_puller> statsd_pullers =
+    static const std::map<std::string, statsd_puller*> statsd_pullers =
     {
         { "mediadrm", statsd_mediadrm_puller },
     };
