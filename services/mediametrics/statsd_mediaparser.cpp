@@ -36,16 +36,15 @@
 
 namespace android {
 
-bool statsd_mediaparser(const mediametrics::Item *item)
+bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
-    if (item == nullptr) {
-        return false;
-    }
+    static constexpr bool enabled_statsd = true; // TODO: Remove, dup with dump2StatsdInternal().
+    if (item == nullptr) return false;
 
-    // statsd wrapper data.
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
 
     std::string parserName;
     item->getString("android.media.mediaparser.parserName", &parserName);
@@ -82,9 +81,9 @@ bool statsd_mediaparser(const mediametrics::Item *item)
 
     if (enabled_statsd) {
         (void) android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
-                                   timestamp,
-                                   pkgName.c_str(),
-                                   pkgVersionCode,
+                                   timestamp_nanos,
+                                   package_name.c_str(),
+                                   package_version_code,
                                    parserName.c_str(),
                                    createdByName,
                                    parserPool.c_str(),
@@ -99,7 +98,29 @@ bool statsd_mediaparser(const mediametrics::Item *item)
     } else {
         ALOGV("NOT sending MediaParser media metrics.");
     }
-
+    // TODO: Cleanup after playback_id is merged.
+    std::stringstream log;
+    log << "result:" << "(result)" << " {"
+            << " mediametrics_mediaparser_reported:"
+            << android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " parser_name:" << parserName
+            << " created_by_name:" << createdByName
+            << " parser_pool:" << parserPool
+            << " last_exception:" << lastException
+            << " resource_byte_count:" << resourceByteCount
+            << " duration_millis:" << durationMillis
+            << " track_mime_types:" << trackMimeTypes
+            << " track_codecs:" << trackCodecs
+            << " altered_parameters:" << alteredParameters
+            << " video_width:" << videoWidth
+            << " video_height:" << videoHeight
+            // TODO: Add MediaParser playback_id
+            // << " playback_id:" << playbackId
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED, log.str());
     return true;
 }
 
