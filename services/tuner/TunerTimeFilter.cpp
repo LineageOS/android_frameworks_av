@@ -38,7 +38,10 @@ Status TunerTimeFilter::setTimeStamp(int64_t timeStamp) {
     }
 
     Result status = mTimeFilter->setTimeStamp(timeStamp);
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerTimeFilter::clearTimeStamp() {
@@ -48,7 +51,10 @@ Status TunerTimeFilter::clearTimeStamp() {
     }
 
     Result status = mTimeFilter->clearTimeStamp();
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    if (status != Result::SUCCESS) {
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    }
+    return Status::ok();
 }
 
 Status TunerTimeFilter::getSourceTime(int64_t* _aidl_return) {
@@ -66,8 +72,9 @@ Status TunerTimeFilter::getSourceTime(int64_t* _aidl_return) {
             });
     if (status != Result::SUCCESS) {
         *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
     }
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    return Status::ok();
 }
 
 Status TunerTimeFilter::getTimeStamp(int64_t* _aidl_return) {
@@ -85,8 +92,9 @@ Status TunerTimeFilter::getTimeStamp(int64_t* _aidl_return) {
             });
     if (status != Result::SUCCESS) {
         *_aidl_return = (int64_t)Constant64Bit::INVALID_PRESENTATION_TIME_STAMP;
+        return Status::fromServiceSpecificError(static_cast<int32_t>(status));
     }
-    return Status::fromServiceSpecificError(static_cast<int32_t>(status));
+    return Status::ok();
 }
 
 Status TunerTimeFilter::close() {
