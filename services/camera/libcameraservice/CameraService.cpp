@@ -800,8 +800,8 @@ Status CameraService::filterGetInfoErrorCode(status_t err) {
 Status CameraService::makeClient(const sp<CameraService>& cameraService,
         const sp<IInterface>& cameraCb, const String16& packageName,
         const std::optional<String16>& featureId,  const String8& cameraId,
-        int api1CameraId, int facing, int clientPid, uid_t clientUid, int servicePid,
-        int deviceVersion, apiLevel effectiveApiLevel,
+        int api1CameraId, int facing, int sensorOrientation, int clientPid, uid_t clientUid,
+        int servicePid, int deviceVersion, apiLevel effectiveApiLevel,
         /*out*/sp<BasicClient>* client) {
 
     // Create CameraClient based on device version reported by the HAL.
@@ -824,13 +824,13 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
                 sp<ICameraClient> tmp = static_cast<ICameraClient*>(cameraCb.get());
                 *client = new Camera2Client(cameraService, tmp, packageName, featureId,
                         cameraId, api1CameraId,
-                        facing, clientPid, clientUid,
+                        facing, sensorOrientation, clientPid, clientUid,
                         servicePid);
             } else { // Camera2 API route
                 sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                         static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
                 *client = new CameraDeviceClient(cameraService, tmp, packageName, featureId,
-                        cameraId, facing, clientPid, clientUid, servicePid);
+                        cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid);
             }
             break;
         default:
@@ -1645,7 +1645,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
         sp<BasicClient> tmp = nullptr;
         if(!(ret = makeClient(this, cameraCb, clientPackageName, clientFeatureId,
-                cameraId, api1CameraId, facing,
+                cameraId, api1CameraId, facing, orientation,
                 clientPid, clientUid, getpid(),
                 deviceVersion, effectiveApiLevel,
                 /*out*/&tmp)).isOk()) {
@@ -2030,7 +2030,50 @@ Status CameraService::notifyDeviceStateChange(int64_t newState) {
     return Status::ok();
 }
 
- Status CameraService::getConcurrentCameraIds(
+Status CameraService::notifyDisplayConfigurationChange() {
+    ATRACE_CALL();
+    const int callingPid = CameraThreadState::getCallingPid();
+    const int selfPid = getpid();
+
+    // Permission checks
+    if (callingPid != selfPid) {
+        // Ensure we're being called by system_server, or similar process with
+        // permissions to notify the camera service about system events
+        if (!checkCallingPermission(sCameraSendSystemEventsPermission)) {
+            const int uid = CameraThreadState::getCallingUid();
+            ALOGE("Permission Denial: cannot send updates to camera service about orientation"
+                    " changes from pid=%d, uid=%d", callingPid, uid);
+            return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
+                    "No permission to send updates to camera service about orientation"
+                    " changes from pid=%d, uid=%d", callingPid, uid);
+        }
+    }
+
+    Mutex::Autolock lock(mServiceLock);
+
+    // Don't do anything if rotate-and-crop override via cmd is active
+    if (mOverrideRotateAndCropMode != ANDROID_SCALER_ROTATE_AND_CROP_AUTO) return Status::ok();
+
+    const auto clients = mActiveClientManager.getAll();
+    for (auto& current : clients) {
+        if (current != nullptr) {
+            const auto basicClient = current->getValue();
+            if (basicClient.get() != nullptr) {
+                if (CameraServiceProxyWrapper::isRotateAndCropOverrideNeeded(
+                            basicClient->getPackageName(), basicClient->getCameraOrientation(),
+                            basicClient->getCameraFacing())) {
+                    basicClient->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_90);
+                } else {
+                    basicClient->setRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE);
+                }
+            }
+        }
+    }
+
+    return Status::ok();
+}
+
+Status CameraService::getConcurrentCameraIds(
         std::vector<ConcurrentCameraIdCombination>* concurrentCameraIds) {
     ATRACE_CALL();
     if (!concurrentCameraIds) {
@@ -2690,13 +2733,13 @@ CameraService::Client::Client(const sp<CameraService>& cameraService,
         const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId,
         const String8& cameraIdStr,
-        int api1CameraId, int cameraFacing,
+        int api1CameraId, int cameraFacing, int sensorOrientation,
         int clientPid, uid_t clientUid,
         int servicePid) :
         CameraService::BasicClient(cameraService,
                 IInterface::asBinder(cameraClient),
                 clientPackageName, clientFeatureId,
-                cameraIdStr, cameraFacing,
+                cameraIdStr, cameraFacing, sensorOrientation,
                 clientPid, clientUid,
                 servicePid),
         mCameraId(api1CameraId)
@@ -2726,10 +2769,10 @@ sp<CameraService> CameraService::BasicClient::BasicClient::sCameraService;
 CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         const sp<IBinder>& remoteCallback,
         const String16& clientPackageName, const std::optional<String16>& clientFeatureId,
-        const String8& cameraIdStr, int cameraFacing,
+        const String8& cameraIdStr, int cameraFacing, int sensorOrientation,
         int clientPid, uid_t clientUid,
         int servicePid):
-        mCameraIdStr(cameraIdStr), mCameraFacing(cameraFacing),
+        mCameraIdStr(cameraIdStr), mCameraFacing(cameraFacing), mOrientation(sensorOrientation),
         mClientPackageName(clientPackageName), mClientFeatureId(clientFeatureId),
         mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
@@ -2826,6 +2869,13 @@ String16 CameraService::BasicClient::getPackageName() const {
     return mClientPackageName;
 }
 
+int CameraService::BasicClient::getCameraFacing() const {
+    return mCameraFacing;
+}
+
+int CameraService::BasicClient::getCameraOrientation() const {
+    return mOrientation;
+}
 
 int CameraService::BasicClient::getClientPid() const {
     return mClientPid;
