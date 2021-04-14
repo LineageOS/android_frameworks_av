@@ -109,6 +109,7 @@ status_t DrmPlugin::getKeyRequest(
 }
 
 void DrmPlugin::setPlayPolicy() {
+    android::Mutex::Autolock lock(mPlayPolicyLock);
     mPlayPolicy.clear();
     mPlayPolicy.add(kQueryKeyLicenseType, kStreaming);
     mPlayPolicy.add(kQueryKeyPlayAllowed, kTrue);
