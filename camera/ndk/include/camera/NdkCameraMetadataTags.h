@@ -1868,7 +1868,7 @@ typedef enum acamera_metadata_tag {
      * <li>If the camera device has BURST_CAPTURE capability, the frame rate requirement of
      * BURST_CAPTURE must still be met.</li>
      * <li>All streams not larger than the maximum streaming dimension for BOKEH_STILL_CAPTURE mode
-     * (queried via {@link ACAMERA_CONTROL_AVAILABLE_EXTENDED_SCENE_MODE_CAPABILITIES })
+     * (queried via {@link ACAMERA_CONTROL_AVAILABLE_EXTENDED_SCENE_MODE_MAX_SIZES })
      * will have preview bokeh effect applied.</li>
      * </ul>
      * <p>When set to BOKEH_CONTINUOUS mode, configured streams dimension should not exceed this mode's
