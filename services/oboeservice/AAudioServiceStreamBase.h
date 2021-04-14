@@ -80,7 +80,7 @@ public:
     // because we had to wait until we generated the handle.
     void logOpen(aaudio_handle_t streamHandle);
 
-    aaudio_result_t close();
+    aaudio_result_t close() EXCLUDES(mLock);
 
     /**
      * Start the flow of audio data.
@@ -88,7 +88,7 @@ public:
      * This is not guaranteed to be synchronous but it currently is.
      * An AAUDIO_SERVICE_EVENT_STARTED will be sent to the client when complete.
      */
-    aaudio_result_t start();
+    aaudio_result_t start() EXCLUDES(mLock);
 
     /**
      * Stop the flow of data so that start() can resume without loss of data.
@@ -96,7 +96,7 @@ public:
      * This is not guaranteed to be synchronous but it currently is.
      * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
     */
-    aaudio_result_t pause();
+    aaudio_result_t pause() EXCLUDES(mLock);
 
     /**
      * Stop the flow of data after the currently queued data has finished playing.
@@ -105,14 +105,14 @@ public:
      * An AAUDIO_SERVICE_EVENT_STOPPED will be sent to the client when complete.
      *
      */
-    aaudio_result_t stop();
+    aaudio_result_t stop() EXCLUDES(mLock);
 
     /**
      * Discard any data held by the underlying HAL or Service.
      *
      * An AAUDIO_SERVICE_EVENT_FLUSHED will be sent to the client when complete.
      */
-    aaudio_result_t flush();
+    aaudio_result_t flush() EXCLUDES(mLock);
 
     virtual aaudio_result_t startClient(const android::AudioClient& client,
                                         const audio_attributes_t *attr __unused,
@@ -126,9 +126,9 @@ public:
         return AAUDIO_ERROR_UNAVAILABLE;
     }
 
-    aaudio_result_t registerAudioThread(pid_t clientThreadId, int priority);
+    aaudio_result_t registerAudioThread(pid_t clientThreadId, int priority) EXCLUDES(mLock);
 
-    aaudio_result_t unregisterAudioThread(pid_t clientThreadId);
+    aaudio_result_t unregisterAudioThread(pid_t clientThreadId) EXCLUDES(mLock);
 
     bool isRunning() const {
         return mState == AAUDIO_STREAM_STATE_STARTED;
@@ -137,7 +137,7 @@ public:
     /**
      * Fill in a parcelable description of stream.
      */
-    aaudio_result_t getDescription(AudioEndpointParcelable &parcelable);
+    aaudio_result_t getDescription(AudioEndpointParcelable &parcelable) EXCLUDES(mLock);
 
     void setRegisteredThread(pid_t pid) {
         mRegisteredClientThread = pid;
@@ -153,7 +153,7 @@ public:
 
     void run() override; // to implement Runnable
 
-    void disconnect();
+    void disconnect() EXCLUDES(mLock);
 
     const android::AudioClient &getAudioClient() {
         return mMmapClient;
@@ -248,7 +248,7 @@ protected:
 
     aaudio_result_t writeUpMessageQueue(AAudioServiceMessage *command);
 
-    aaudio_result_t sendCurrentTimestamp();
+    aaudio_result_t sendCurrentTimestamp() EXCLUDES(mLock);
 
     aaudio_result_t sendXRunCount(int32_t xRunCount);
 
