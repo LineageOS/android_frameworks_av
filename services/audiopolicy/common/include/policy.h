@@ -226,6 +226,8 @@ static inline audio_devices_t apm_extract_one_audio_device(
             return AUDIO_DEVICE_OUT_SPEAKER_SAFE;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_ARC) != 0) {
             return AUDIO_DEVICE_OUT_HDMI_ARC;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_EARC) != 0) {
+            return AUDIO_DEVICE_OUT_HDMI_EARC;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_AUX_LINE) != 0) {
             return AUDIO_DEVICE_OUT_AUX_LINE;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPDIF) != 0) {

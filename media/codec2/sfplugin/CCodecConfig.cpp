@@ -733,6 +733,17 @@ void CCodecConfig::initializeStandardParams() {
             return C2Value();
         }));
 
+    add(ConfigMapper(KEY_AAC_PROFILE, C2_PARAMKEY_PROFILE_LEVEL, "profile")
+        .limitTo(D::AUDIO & D::ENCODER & (D::CONFIG | D::PARAM))
+        .withMapper([mapper](C2Value v) -> C2Value {
+            C2Config::profile_t c2 = PROFILE_UNUSED;
+            int32_t sdk;
+            if (mapper && v.get(&sdk) && mapper->mapProfile(sdk, &c2)) {
+                return c2;
+            }
+            return PROFILE_UNUSED;
+        }));
+
     // convert to dBFS and add default
     add(ConfigMapper(KEY_AAC_DRC_TARGET_REFERENCE_LEVEL, C2_PARAMKEY_DRC_TARGET_REFERENCE_LEVEL, "value")
         .limitTo(D::AUDIO & D::DECODER & (D::CONFIG | D::PARAM | D::READ))
@@ -1323,6 +1334,14 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
             }
             msg->removeEntryAt(msg->findEntryByName(C2_PARAMKEY_TEMPORAL_LAYERING));
         }
+    }
+
+    // Remove KEY_AAC_SBR_MODE from SDK message if it is outside supported range
+    // as SDK doesn't have a way to signal default sbr mode based on profile and
+    // requires that the key isn't present in format to signal that
+    int sbrMode;
+    if (msg->findInt32(KEY_AAC_SBR_MODE, &sbrMode) && (sbrMode < 0 || sbrMode > 2)) {
+        msg->removeEntryAt(msg->findEntryByName(KEY_AAC_SBR_MODE));
     }
 
     { // convert color info

@@ -365,6 +365,7 @@ private:
             virtual public hardware::hidl_death_recipient
     {
         const std::string mProviderName;
+        const std::string mProviderInstance;
         const metadata_vendor_id_t mProviderTagid;
         int mMinorVersion;
         sp<VendorTagDescriptor> mVendorTagDescriptor;
@@ -379,7 +380,7 @@ private:
 
         sp<hardware::camera::provider::V2_4::ICameraProvider> mSavedInterface;
 
-        ProviderInfo(const std::string &providerName,
+        ProviderInfo(const std::string &providerName, const std::string &providerInstance,
                 CameraProviderManager *manager);
         ~ProviderInfo();
 
@@ -657,7 +658,10 @@ private:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
-    status_t addProviderLocked(const std::string& newProvider);
+    status_t addProviderLocked(const std::string& newProvider, bool preexisting = false);
+
+    status_t tryToInitializeProviderLocked(const std::string& providerName,
+            const sp<ProviderInfo>& providerInfo);
 
     bool isLogicalCameraLocked(const std::string& id, std::vector<std::string>* physicalCameraIds);
 
@@ -666,6 +670,7 @@ private:
 
     bool isValidDeviceLocked(const std::string &id, uint16_t majorVersion) const;
 
+    size_t mProviderInstanceId = 0;
     std::vector<sp<ProviderInfo>> mProviders;
 
     void addProviderToMap(

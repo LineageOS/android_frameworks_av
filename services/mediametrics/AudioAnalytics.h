@@ -17,10 +17,10 @@
 #pragma once
 
 #include <android-base/thread_annotations.h>
-#include <audio_utils/SimpleLog.h>
 #include "AnalyticsActions.h"
 #include "AnalyticsState.h"
 #include "AudioPowerUsage.h"
+#include "StatsdLog.h"
 #include "TimedAction.h"
 #include "Wrap.h"
 
@@ -32,7 +32,7 @@ class AudioAnalytics
     friend AudioPowerUsage;
 
 public:
-    AudioAnalytics();
+    explicit AudioAnalytics(const std::shared_ptr<StatsdLog>& statsdLog);
     ~AudioAnalytics();
 
     /**
@@ -122,8 +122,7 @@ private:
     SharedPtrWrap<AnalyticsState> mPreviousAnalyticsState;
 
     TimedAction mTimedAction; // locked internally
-
-    SimpleLog mStatsdLog{16 /* log lines */}; // locked internally
+    const std::shared_ptr<StatsdLog> mStatsdLog; // locked internally, ok for multiple threads.
 
     // DeviceUse is a nested class which handles audio device usage accounting.
     // We define this class at the end to ensure prior variables all properly constructed.
@@ -212,7 +211,7 @@ private:
         AudioAnalytics &mAudioAnalytics;
     } mAAudioStreamInfo{*this};
 
-    AudioPowerUsage mAudioPowerUsage{this};
+    AudioPowerUsage mAudioPowerUsage;
 };
 
 } // namespace android::mediametrics

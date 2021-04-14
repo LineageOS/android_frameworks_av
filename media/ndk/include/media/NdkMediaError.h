@@ -40,7 +40,11 @@
 
 __BEGIN_DECLS
 
+/**
+ * Media error message types returned from NDK media functions.
+ */
 typedef enum {
+    /** The requested media operation completed successfully. */
     AMEDIA_OK = 0,
 
     /**
@@ -55,14 +59,34 @@ typedef enum {
     AMEDIACODEC_ERROR_RECLAIMED             = 1101,
 
     AMEDIA_ERROR_BASE                  = -10000,
+
+    /** The called media function failed with an unknown error. */
     AMEDIA_ERROR_UNKNOWN               = AMEDIA_ERROR_BASE,
+
+    /** The input media data is corrupt or incomplete. */
     AMEDIA_ERROR_MALFORMED             = AMEDIA_ERROR_BASE - 1,
+
+    /** The required operation or media formats are not supported. */
     AMEDIA_ERROR_UNSUPPORTED           = AMEDIA_ERROR_BASE - 2,
+
+    /** An invalid (or already closed) object is used in the function call. */
     AMEDIA_ERROR_INVALID_OBJECT        = AMEDIA_ERROR_BASE - 3,
+
+    /** At least one of the invalid parameters is used. */
     AMEDIA_ERROR_INVALID_PARAMETER     = AMEDIA_ERROR_BASE - 4,
+
+    /** The media object is not in the right state for the required operation. */
     AMEDIA_ERROR_INVALID_OPERATION     = AMEDIA_ERROR_BASE - 5,
+
+    /** Media stream ends while processing the requested operation. */
     AMEDIA_ERROR_END_OF_STREAM         = AMEDIA_ERROR_BASE - 6,
+
+    /** An Error occurred when the Media object is carrying IO operation. */
     AMEDIA_ERROR_IO                    = AMEDIA_ERROR_BASE - 7,
+
+    /** The required operation would have to be blocked (on I/O or others),
+     *   but blocking is not enabled.
+     */
     AMEDIA_ERROR_WOULD_BLOCK           = AMEDIA_ERROR_BASE - 8,
 
     AMEDIA_DRM_ERROR_BASE              = -20000,
@@ -77,10 +101,20 @@ typedef enum {
     AMEDIA_DRM_LICENSE_EXPIRED         = AMEDIA_DRM_ERROR_BASE - 9,
 
     AMEDIA_IMGREADER_ERROR_BASE          = -30000,
+
+    /** There are no more image buffers to read/write image data. */
     AMEDIA_IMGREADER_NO_BUFFER_AVAILABLE = AMEDIA_IMGREADER_ERROR_BASE - 1,
+
+    /** The AImage object has used up the allowed maximum image buffers. */
     AMEDIA_IMGREADER_MAX_IMAGES_ACQUIRED = AMEDIA_IMGREADER_ERROR_BASE - 2,
+
+    /** The required image buffer could not be locked to read. */
     AMEDIA_IMGREADER_CANNOT_LOCK_IMAGE   = AMEDIA_IMGREADER_ERROR_BASE - 3,
+
+    /** The media data or buffer could not be unlocked. */
     AMEDIA_IMGREADER_CANNOT_UNLOCK_IMAGE = AMEDIA_IMGREADER_ERROR_BASE - 4,
+
+    /** The media/buffer needs to be locked to perform the required operation. */
     AMEDIA_IMGREADER_IMAGE_NOT_LOCKED    = AMEDIA_IMGREADER_ERROR_BASE - 5,
 
 } media_status_t;
