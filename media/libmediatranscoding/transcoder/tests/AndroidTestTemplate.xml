@@ -24,7 +24,7 @@
     <test class="com.android.tradefed.testtype.GTest" >
         <option name="native-test-device-path" value="/data/local/tmp" />
         <option name="module-name" value="{MODULE}" />
-        <option name="native-test-timeout" value="10m" />
+        <option name="native-test-timeout" value="30m" />
     </test>
 </configuration>
 
