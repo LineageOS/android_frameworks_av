@@ -55,6 +55,7 @@ protected:
             const String8& cameraId,
             int api1CameraId,
             int cameraFacing,
+            int sensorOrientation,
             int clientPid,
             uid_t clientUid,
             int servicePid);
@@ -181,6 +182,7 @@ public:
             const std::optional<String16>& clientFeatureId,
             const String8& cameraId,
             int cameraFacing,
+            int sensorOrientation,
             int clientPid,
             uid_t clientUid,
             int servicePid);

@@ -49,13 +49,13 @@ public:
             const sp<ICameraDeviceCallbacks>& remoteCallback,
             const String16& clientPackageName,
             const std::optional<String16>& clientFeatureId,
-            const String8& cameraIdStr, int cameraFacing,
+            const String8& cameraIdStr, int cameraFacing, int sensorOrientation,
             int clientPid, uid_t clientUid, int servicePid) :
             CameraService::BasicClient(
                     cameraService,
                     IInterface::asBinder(remoteCallback),
                     clientPackageName, clientFeatureId,
-                    cameraIdStr, cameraFacing, clientPid, clientUid, servicePid),
+                    cameraIdStr, cameraFacing, sensorOrientation, clientPid, clientUid, servicePid),
             mRemoteCallback(remoteCallback), mOfflineSession(session),
             mCompositeStreamMap(offlineCompositeStreamMap) {}
 
