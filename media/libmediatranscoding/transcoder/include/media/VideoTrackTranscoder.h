@@ -45,6 +45,7 @@ public:
 
 private:
     friend struct AsyncCodecCallbackDispatch;
+    friend class VideoTrackTranscoderTests;
 
     // Minimal blocking queue used as a message queue by VideoTrackTranscoder.
     template <typename T>
@@ -101,6 +102,7 @@ private:
     uid_t mUid;
     uint64_t mInputFrameCount = 0;
     uint64_t mOutputFrameCount = 0;
+    int32_t mConfiguredBitrate = 0;
 };
 
 }  // namespace android
