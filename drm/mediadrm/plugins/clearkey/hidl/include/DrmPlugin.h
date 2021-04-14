@@ -406,6 +406,7 @@ private:
     int64_t mCloseSessionOkCount;
     int64_t mCloseSessionNotOpenedCount;
     uint32_t mNextSecureStopId;
+    android::Mutex mPlayPolicyLock;
 
     // set by property to mock error scenarios
     Status_V1_2 mMockError;
