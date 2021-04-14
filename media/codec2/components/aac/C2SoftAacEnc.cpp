@@ -272,8 +272,9 @@ status_t C2SoftAacEnc::setAudioParams() {
         return UNKNOWN_ERROR;
     }
 
-    if (sbrMode != -1 && aacProfile == C2Config::PROFILE_AAC_ELD) {
-        if (AACENC_OK != aacEncoder_SetParam(mAACEncoder, AACENC_SBR_MODE, sbrMode)) {
+    if (sbrMode != C2Config::AAC_SBR_AUTO && aacProfile == C2Config::PROFILE_AAC_ELD) {
+        int aacSbrMode = sbrMode != C2Config::AAC_SBR_OFF;
+        if (AACENC_OK != aacEncoder_SetParam(mAACEncoder, AACENC_SBR_MODE, aacSbrMode)) {
             ALOGE("Failed to set AAC encoder parameters");
             return UNKNOWN_ERROR;
         }
