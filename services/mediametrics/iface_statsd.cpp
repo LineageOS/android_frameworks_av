@@ -93,12 +93,13 @@ bool dump2Statsd(
     return dump2StatsdInternal(statsd_pushers, item, statsdLog);
 }
 
-bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out) {
+bool dump2Statsd(const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog) {
     static const std::map<std::string, statsd_puller*> statsd_pullers =
     {
         { "mediadrm", statsd_mediadrm_puller },
     };
-    return dump2StatsdInternal(statsd_pullers, item, out);
+    return dump2StatsdInternal(statsd_pullers, item, out, statsdLog);
 }
 
 } // namespace android
