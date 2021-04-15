@@ -32,6 +32,7 @@
 #include <pwd.h>
 
 #include "MediaMetricsService.h"
+#include "StringUtils.h"
 #include "iface_statsd.h"
 
 #include <statslog.h>
@@ -172,7 +173,8 @@ std::vector<uint8_t> base64DecodeNoPad(std::string& str) {
 
 // |out| and its contents are memory-managed by statsd.
 bool statsd_mediadrm_puller(
-        const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out)
+        const std::shared_ptr<const mediametrics::Item>& item, AStatsEventList* out,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) {
         return false;
@@ -201,6 +203,19 @@ bool statsd_mediadrm_puller(
     AStatsEvent_writeByteArray(event, framework_raw.data(), framework_raw.size());
     AStatsEvent_writeByteArray(event, plugin_raw.data(), plugin_raw.size());
     AStatsEvent_build(event);
+
+    std::stringstream log;
+    log << "pulled:" << " {"
+            << " media_drm_activity_info:"
+            << android::util::MEDIA_DRM_ACTIVITY_INFO
+            << " package_name:" << item->getPkgName()
+            << " package_version_code:" << item->getPkgVersionCode()
+            << " vendor:" << vendor
+            << " description:" << description
+            << " framework_metrics:" << mediametrics::stringutils::bytesToString(framework_raw, 8)
+            << " vendor_metrics:" <<  mediametrics::stringutils::bytesToString(plugin_raw, 8)
+            << " }";
+    statsdLog->log(android::util::MEDIA_DRM_ACTIVITY_INFO, log.str());
     return true;
 }
 

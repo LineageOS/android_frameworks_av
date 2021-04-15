@@ -101,6 +101,7 @@ public:
             const String8& cameraDeviceId,
             int api1CameraId,
             int cameraFacing,
+            int sensorOrientation,
             int clientPid,
             uid_t clientUid,
             int servicePid);
