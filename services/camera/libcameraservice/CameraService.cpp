@@ -29,6 +29,7 @@
 #include <inttypes.h>
 #include <pthread.h>
 
+#include <android/content/pm/IPackageManagerNative.h>
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
 
@@ -242,10 +243,6 @@ CameraService::~CameraService() {
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
     mUidPolicy->unregisterSelf();
     mSensorPrivacyPolicy->unregisterSelf();
-
-    for (auto const& [_, policy] : mCameraSensorPrivacyPolicies) {
-        policy->unregisterSelf();
-    }
 }
 
 void CameraService::onNewProviderRegistered() {
@@ -1711,8 +1708,9 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
 
         // Set camera muting behavior
         if (client->supportsCameraMute()) {
-            client->setCameraMute(mOverrideCameraMuteMode ||
-                    isUserSensorPrivacyEnabledForUid(clientUid));
+            bool isCameraPrivacyEnabled =
+                    mSensorPrivacyPolicy->isCameraPrivacyEnabled(multiuser_get_user_id(clientUid));
+            client->setCameraMute(mOverrideCameraMuteMode || isCameraPrivacyEnabled);
         }
 
         if (shimUpdateOnly) {
@@ -2945,10 +2943,17 @@ status_t CameraService::BasicClient::startCameraOps() {
         // If the calling Uid is trusted (a native service), the AppOpsManager could
         // return MODE_IGNORED. Do not treat such case as error.
         if (!mUidIsTrusted && res == AppOpsManager::MODE_IGNORED) {
-            ALOGI("Camera %s: Access for \"%s\" has been restricted",
-                    mCameraIdStr.string(), String8(mClientPackageName).string());
-            // Return the same error as for device policy manager rejection
-            return -EACCES;
+            bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid,
+                    mClientPackageName);
+            bool isCameraPrivacyEnabled =
+                    sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled(
+                            multiuser_get_user_id(mClientUid));
+            if (!isUidActive || !isCameraPrivacyEnabled) {
+                ALOGI("Camera %s: Access for \"%s\" has been restricted",
+                        mCameraIdStr.string(), String8(mClientPackageName).string());
+                // Return the same error as for device policy manager rejection
+                return -EACCES;
+            }
         }
     }
 
@@ -3026,15 +3031,22 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
         block();
     } else if (res == AppOpsManager::MODE_IGNORED) {
         bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid, mClientPackageName);
+        bool isCameraPrivacyEnabled =
+                sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled(
+                        multiuser_get_user_id(mClientUid));
         ALOGI("Camera %s: Access for \"%s\" has been restricted, isUidTrusted %d, isUidActive %d",
                 mCameraIdStr.string(), String8(mClientPackageName).string(),
                 mUidIsTrusted, isUidActive);
         // If the calling Uid is trusted (a native service), or the client Uid is active (WAR for
         // b/175320666), the AppOpsManager could return MODE_IGNORED. Do not treat such cases as
         // error.
-        if (!mUidIsTrusted && !isUidActive) {
+        if (!mUidIsTrusted && isUidActive && isCameraPrivacyEnabled) {
+            setCameraMute(true);
+        } else if (!mUidIsTrusted && !isUidActive) {
             block();
         }
+    } else if (res == AppOpsManager::MODE_ALLOWED) {
+        setCameraMute(sCameraService->mOverrideCameraMuteMode);
     }
 }
 
@@ -3307,6 +3319,7 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
     if (mRegistered) {
         return;
     }
+    hasCameraPrivacyFeature(); // Called so the result is cached
     mSpm.addSensorPrivacyListener(this);
     mSensorPrivacyEnabled = mSpm.isSensorPrivacyEnabled();
     status_t res = mSpm.linkToDeath(this);
@@ -3314,39 +3327,6 @@ void CameraService::SensorPrivacyPolicy::registerSelf() {
         mRegistered = true;
         ALOGV("SensorPrivacyPolicy: Registered with SensorPrivacyManager");
     }
-}
-
-status_t CameraService::SensorPrivacyPolicy::registerSelfForIndividual(int userId) {
-    Mutex::Autolock _l(mSensorPrivacyLock);
-    if (mRegistered) {
-        return OK;
-    }
-
-    status_t res = mSpm.addIndividualSensorPrivacyListener(userId,
-            SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA, this);
-    if (res != OK) {
-        ALOGE("Unable to register camera privacy listener: %s (%d)", strerror(-res), res);
-        return res;
-    }
-
-    res = mSpm.isIndividualSensorPrivacyEnabled(userId,
-        SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA, mSensorPrivacyEnabled);
-    if (res != OK) {
-        ALOGE("Unable to check camera privacy: %s (%d)", strerror(-res), res);
-        return res;
-    }
-
-    res = mSpm.linkToDeath(this);
-    if (res != OK) {
-        ALOGE("Register link to death failed for sensor privacy: %s (%d)", strerror(-res), res);
-        return res;
-    }
-
-    mRegistered = true;
-    mIsIndividual = true;
-    mUserId = userId;
-    ALOGV("SensorPrivacyPolicy: Registered with SensorPrivacyManager");
-    return OK;
 }
 
 void CameraService::SensorPrivacyPolicy::unregisterSelf() {
@@ -3362,20 +3342,24 @@ bool CameraService::SensorPrivacyPolicy::isSensorPrivacyEnabled() {
     return mSensorPrivacyEnabled;
 }
 
+bool CameraService::SensorPrivacyPolicy::isCameraPrivacyEnabled(userid_t userId) {
+    if (!hasCameraPrivacyFeature()) {
+        return false;
+    }
+    return mSpm.isIndividualSensorPrivacyEnabled(userId,
+        SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA);
+}
+
 binder::Status CameraService::SensorPrivacyPolicy::onSensorPrivacyChanged(bool enabled) {
     {
         Mutex::Autolock _l(mSensorPrivacyLock);
         mSensorPrivacyEnabled = enabled;
     }
     // if sensor privacy is enabled then block all clients from accessing the camera
-    sp<CameraService> service = mService.promote();
-    if (service != nullptr) {
-        if (mIsIndividual) {
-            service->setMuteForAllClients(mUserId, enabled);
-        } else {
-            if (enabled) {
-                service->blockAllClients();
-            }
+    if (enabled) {
+        sp<CameraService> service = mService.promote();
+        if (service != nullptr) {
+            service->blockAllClients();
         }
     }
     return binder::Status::ok();
@@ -3385,6 +3369,31 @@ void CameraService::SensorPrivacyPolicy::binderDied(const wp<IBinder>& /*who*/) 
     Mutex::Autolock _l(mSensorPrivacyLock);
     ALOGV("SensorPrivacyPolicy: SensorPrivacyManager has died");
     mRegistered = false;
+}
+
+bool CameraService::SensorPrivacyPolicy::hasCameraPrivacyFeature() {
+    if (!mNeedToCheckCameraPrivacyFeature) {
+        return mHasCameraPrivacyFeature;
+    }
+    bool hasCameraPrivacyFeature = false;
+    sp<IBinder> binder = defaultServiceManager()->getService(String16("package_native"));
+    if (binder != nullptr) {
+        sp<content::pm::IPackageManagerNative> packageManager =
+                interface_cast<content::pm::IPackageManagerNative>(binder);
+        if (packageManager != nullptr) {
+            binder::Status status = packageManager->hasSystemFeature(
+                    String16("android.hardware.camera.toggle"), 0, &hasCameraPrivacyFeature);
+
+            if (status.isOk()) {
+                mNeedToCheckCameraPrivacyFeature = false;
+                mHasCameraPrivacyFeature = hasCameraPrivacyFeature;
+            } else {
+                ALOGE("Unable to check if camera privacy feature is supported");
+            }
+        }
+    }
+
+    return hasCameraPrivacyFeature;
 }
 
 // ----------------------------------------------------------------------------
@@ -4006,19 +4015,6 @@ void CameraService::blockAllClients() {
     }
 }
 
-void CameraService::setMuteForAllClients(userid_t userId, bool enabled) {
-    const auto clients = mActiveClientManager.getAll();
-    for (auto& current : clients) {
-        if (current != nullptr) {
-            const auto basicClient = current->getValue();
-            if (basicClient.get() != nullptr
-                    && multiuser_get_user_id(basicClient->getClientUid()) == userId) {
-                basicClient->setCameraMute(enabled);
-            }
-        }
-    }
-}
-
 // NOTE: This is a remote API - make sure all args are validated
 status_t CameraService::shellCommand(int in, int out, int err, const Vector<String16>& args) {
     if (!checkCallingPermission(sManageCameraPermission, nullptr, nullptr)) {
@@ -4223,18 +4219,6 @@ int32_t CameraService::updateAudioRestrictionLocked() {
         mAppOps.setCameraAudioRestriction(mode);
     }
     return mode;
-}
-
-bool CameraService::isUserSensorPrivacyEnabledForUid(uid_t uid) {
-    userid_t userId = multiuser_get_user_id(uid);
-    if (mCameraSensorPrivacyPolicies.find(userId) == mCameraSensorPrivacyPolicies.end()) {
-        sp<SensorPrivacyPolicy> userPolicy = new SensorPrivacyPolicy(this);
-        if (userPolicy->registerSelfForIndividual(userId) != OK) {
-            return false;
-        }
-        mCameraSensorPrivacyPolicies[userId] = userPolicy;
-    }
-    return mCameraSensorPrivacyPolicies[userId]->isSensorPrivacyEnabled();
 }
 
 }; // namespace android
