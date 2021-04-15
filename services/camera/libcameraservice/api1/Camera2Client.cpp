@@ -55,11 +55,12 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         const String8& cameraDeviceId,
         int api1CameraId,
         int cameraFacing,
+        int sensorOrientation,
         int clientPid,
         uid_t clientUid,
         int servicePid):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName, clientFeatureId,
-                cameraDeviceId, api1CameraId, cameraFacing,
+                cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation,
                 clientPid, clientUid, servicePid),
         mParameters(api1CameraId, cameraFacing)
 {

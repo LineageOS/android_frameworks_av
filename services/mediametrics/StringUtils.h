@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -144,6 +146,25 @@ inline constexpr bool isLogSessionId(const char *s) {
 inline std::string sanitizeLogSessionId(const std::string& string) {
     if (isLogSessionId(string.c_str())) return string;
     return {}; // if not a logSessionId, return an empty string.
+}
+
+inline std::string bytesToString(const std::vector<uint8_t>& bytes, size_t maxSize = SIZE_MAX) {
+    if (bytes.size() == 0) {
+        return "{}";
+    }
+    std::stringstream ss;
+    ss << "{";
+    ss << std::hex << std::setfill('0');
+    maxSize = std::min(maxSize, bytes.size());
+    for (size_t i = 0; i < maxSize; ++i) {
+        ss << " " << std::setw(2) << (int)bytes[i];
+    }
+    if (maxSize != bytes.size()) {
+        ss << " ... }";
+    } else {
+        ss << " }";
+    }
+    return ss.str();
 }
 
 } // namespace android::mediametrics::stringutils

@@ -547,7 +547,7 @@ AStatsManager_PullAtomCallbackReturn MediaMetricsService::pullItems(
     std::lock_guard _l(mLock);
     for (auto &item : mPullableItems[key]) {
         if (const auto sitem = item.lock()) {
-            dump2Statsd(sitem, data);
+            dump2Statsd(sitem, data, mStatsdLog);
         }
     }
     mPullableItems[key].clear();
