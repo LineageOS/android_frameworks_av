@@ -174,6 +174,13 @@ interface ICameraService
     oneway void notifySystemEvent(int eventId, in int[] args);
 
     /**
+     * Notify the camera service of a display configuration change.
+     *
+     * Callers require the android.permission.CAMERA_SEND_SYSTEM_EVENTS permission.
+     */
+    oneway void notifyDisplayConfigurationChange();
+
+    /**
      * Notify the camera service of a device physical status change. May only be called from
      * a privileged process.
      *
