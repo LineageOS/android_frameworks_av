@@ -95,6 +95,7 @@ void PipelineWatcher::onWorkDone(uint64_t frameIndex) {
 }
 
 void PipelineWatcher::flush() {
+    ALOGV("flush");
     mFramesInPipeline.clear();
 }
 
