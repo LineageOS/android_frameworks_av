@@ -24,8 +24,6 @@
     VARIOUS FUNCTIONS
 ***********************************************************************************/
 
-void LoadConst_Float(const LVM_FLOAT val, LVM_FLOAT* dst, LVM_INT16 n);
-
 void Copy_Float(const LVM_FLOAT* src, LVM_FLOAT* dst, LVM_INT16 n);
 void Copy_Float_Mc_Stereo(const LVM_FLOAT* src, LVM_FLOAT* dst, LVM_INT16 NrFrames,
                           LVM_INT32 NrChannels);

@@ -81,10 +81,7 @@ LVCS_ReturnStatus_en LVCS_ReverbGeneratorInit(LVCS_Handle_t hInstance, LVCS_Para
         pConfig->DelaySize =
                 (pParams->NrChannels == FCC_1) ? (LVM_INT16)Delay : (LVM_INT16)(FCC_2 * Delay);
         pConfig->DelayOffset = 0;
-        LoadConst_Float(0,                                      /* Value */
-                        (LVM_FLOAT*)&pConfig->StereoSamples[0], /* Destination */
-                        /* Number of words */
-                        (LVM_UINT16)(sizeof(pConfig->StereoSamples) / sizeof(LVM_FLOAT)));
+        memset(pConfig->StereoSamples, 0, sizeof(pConfig->StereoSamples));
         /*
          * Setup the filters
          */
