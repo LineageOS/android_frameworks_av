@@ -256,10 +256,12 @@ bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
 
 /**
  * Return a {@link ACameraMetadata} that references the same data as
- * {@link cameraMetadata}, which is an instance of
- * {@link android.hardware.camera2.CameraMetadata} (e.g., a
- * {@link android.hardware.camera2.CameraCharacteristics} or
- * {@link android.hardware.camera2.CaptureResult}).
+ * <a href="/reference/android/hardware/camera2/CameraMetadata">
+ *     android.hardware.camera2.CameraMetadata</a> from Java API. (e.g., a
+ * <a href="/reference/android/hardware/camera2/CameraCharacteristics">
+ *     android.hardware.camera2.CameraCharacteristics</a>
+ * or <a href="/reference/android/hardware/camera2/CaptureResult">
+ *     android.hardware.camera2.CaptureResult</a>).
  *
  * <p>The returned ACameraMetadata must be freed by the application by {@link ACameraMetadata_free}
  * after application is done using it.</p>
@@ -269,11 +271,13 @@ bool ACameraMetadata_isLogicalMultiCamera(const ACameraMetadata* staticMetadata,
  * the Java metadata is garbage collected.
  *
  * @param env the JNI environment.
- * @param cameraMetadata the source {@link android.hardware.camera2.CameraMetadata} from which the
+ * @param cameraMetadata the source <a href="/reference/android/hardware/camera2/CameraMetadata">
+                         android.hardware.camera2.CameraMetadata </a>from which the
  *                       returned {@link ACameraMetadata} is a view.
  *
- * @return a valid ACameraMetadata pointer or NULL if {@link cameraMetadata} is null or not a valid
- *         instance of {@link android.hardware.camera2.CameraMetadata}.
+ * @return a valid ACameraMetadata pointer or NULL if cameraMetadata is null or not a valid
+ *         instance of <a href="android/hardware/camera2/CameraMetadata">
+ *         android.hardware.camera2.CameraMetadata</a>.
  *
  */
 ACameraMetadata* ACameraMetadata_fromCameraMetadata(JNIEnv* env, jobject cameraMetadata)
