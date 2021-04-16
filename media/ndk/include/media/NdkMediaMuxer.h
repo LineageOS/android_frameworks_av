@@ -152,12 +152,17 @@ media_status_t AMediaMuxer_writeSampleData(AMediaMuxer *muxer,
 /**
  * Creates a new media muxer for appending data to an existing MPEG4 file.
  * This is a synchronous API call and could take a while to return if the existing file is large.
- * Works for only MPEG4 files that contain a) a single audio track, b) a single video track,
- * c) a single audio and a single video track.
- * @param(fd): needs to be opened with read and write permission.  Does not take ownership of
+ * Only works for MPEG4 files matching one of the following characteristics:
+ * <ul>
+ *    <li>a single audio track.</li>
+ *    <li>a single video track.</li>
+ *    <li>a single audio and a single video track.</li>
+ * </ul>
+ * @param fd Must be opened with read and write permission. Does not take ownership of
  * this fd i.e., caller is responsible for closing fd.
- * @param(mode): AppendMode is an enum that specifies one of the modes of appending data.
- * @return : Pointer to AMediaMuxer if the file(fd) has tracks already, otherwise, nullptr.
+ * @param mode Specifies how data will be appended; the AppendMode enum describes
+ *             the possible methods for appending..
+ * @return Pointer to AMediaMuxer if the file(fd) has tracks already, otherwise, nullptr.
  * {@link AMediaMuxer_delete} should be used to free the returned pointer.
  *
  * Available since API level 31.
