@@ -650,13 +650,13 @@ private:
         public:
             explicit SensorPrivacyPolicy(wp<CameraService> service)
                     : mService(service), mSensorPrivacyEnabled(false), mRegistered(false),
-                      mIsIndividual(false), mUserId(0) {}
+                    mHasCameraPrivacyFeature(false), mNeedToCheckCameraPrivacyFeature(true) {}
 
             void registerSelf();
-            status_t registerSelfForIndividual(int userId);
             void unregisterSelf();
 
             bool isSensorPrivacyEnabled();
+            bool isCameraPrivacyEnabled(userid_t userId);
 
             binder::Status onSensorPrivacyChanged(bool enabled);
 
@@ -669,8 +669,10 @@ private:
             Mutex mSensorPrivacyLock;
             bool mSensorPrivacyEnabled;
             bool mRegistered;
-            bool mIsIndividual;
-            userid_t mUserId;
+            bool mHasCameraPrivacyFeature;
+            bool mNeedToCheckCameraPrivacyFeature;
+
+            bool hasCameraPrivacyFeature();
     };
 
     sp<UidPolicy> mUidPolicy;
@@ -1046,9 +1048,6 @@ private:
     // Blocks all active clients.
     void blockAllClients();
 
-    // Mutes all active clients for a user.
-    void setMuteForAllClients(userid_t userId, bool enabled);
-
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(const Vector<String16>& args, int err);
 
@@ -1121,12 +1120,6 @@ private:
 
     // Current camera mute mode
     bool mOverrideCameraMuteMode = false;
-
-    // Map from user to sensor privacy policy
-    std::map<userid_t, sp<SensorPrivacyPolicy>> mCameraSensorPrivacyPolicies;
-
-    // Checks if the sensor privacy is enabled for the uid
-    bool isUserSensorPrivacyEnabledForUid(uid_t uid);
 };
 
 } // namespace android
