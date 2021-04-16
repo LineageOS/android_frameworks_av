@@ -326,7 +326,7 @@ typedef void (*ACameraManager_AccessPrioritiesChangedCallback)(void* context);
  * @see ACameraManager_registerExtendedAvailabilityCallback
  */
 typedef struct ACameraManager_ExtendedAvailabilityListener {
-    ///
+    /// Called when a camera becomes available or unavailable
     ACameraManager_AvailabilityCallbacks availabilityCallbacks;
 
     /// Called when there is camera access permission change
