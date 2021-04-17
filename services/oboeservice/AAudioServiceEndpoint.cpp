@@ -38,6 +38,10 @@
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
+AAudioServiceEndpoint::~AAudioServiceEndpoint() {
+    ALOGD("%s() called", __func__);
+}
+
 std::string AAudioServiceEndpoint::dump() const NO_THREAD_SAFETY_ANALYSIS {
     std::stringstream result;
 
