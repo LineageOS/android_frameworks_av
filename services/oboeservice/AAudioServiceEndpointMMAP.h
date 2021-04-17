@@ -44,7 +44,7 @@ class AAudioServiceEndpointMMAP
 public:
     explicit AAudioServiceEndpointMMAP(android::AAudioService &audioService);
 
-    virtual ~AAudioServiceEndpointMMAP();
+    virtual ~AAudioServiceEndpointMMAP() = default;
 
     std::string dump() const override;
 
