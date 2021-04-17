@@ -60,7 +60,8 @@ LVREV_ReturnStatus_en LVREV_ClearAudioBuffers(LVREV_Handle_t hInstance) {
     pLVREV_Private->pRevLPFBiquad->clear();
     for (size_t i = 0; i < pLVREV_Private->InstanceParams.NumDelays; i++) {
         pLVREV_Private->revLPFBiquad[i]->clear();
-        LoadConst_Float(0, pLVREV_Private->pDelay_T[i], LVREV_MAX_T_DELAY[i]);
+        memset(pLVREV_Private->pDelay_T[i], 0, LVREV_MAX_T_DELAY[i] *
+                sizeof(pLVREV_Private->pDelay_T[i][0]));
     }
     return LVREV_SUCCESS;
 }
