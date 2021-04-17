@@ -275,12 +275,17 @@ void CameraOfflineSessionClient::notifyShutter(const CaptureResultExtras& result
     }
 }
 
+status_t CameraOfflineSessionClient::notifyActive() {
+    return startCameraStreamingOps();
+}
+
 void CameraOfflineSessionClient::notifyIdle(
         int64_t /*requestCount*/, int64_t /*resultErrorCount*/, bool /*deviceError*/,
         const std::vector<hardware::CameraStreamStats>& /*streamStats*/) {
     if (mRemoteCallback.get() != nullptr) {
         mRemoteCallback->onDeviceIdle();
     }
+    finishCameraStreamingOps();
 }
 
 void CameraOfflineSessionClient::notifyAutoFocus(uint8_t newState, int triggerId) {
