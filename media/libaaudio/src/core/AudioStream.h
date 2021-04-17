@@ -146,13 +146,7 @@ protected:
      * Free any resources not already freed by release_l().
      * Assume release_l() already called.
      */
-    virtual void close_l() REQUIRES(mStreamLock) {
-        // Releasing the stream will set the state to CLOSING.
-        assert(getState() == AAUDIO_STREAM_STATE_CLOSING);
-        // setState() prevents a transition from CLOSING to any state other than CLOSED.
-        // State is checked by destructor.
-        setState(AAUDIO_STREAM_STATE_CLOSED);
-    }
+    virtual void close_l() REQUIRES(mStreamLock);
 
 public:
     // This is only used to identify a stream in the logs without
