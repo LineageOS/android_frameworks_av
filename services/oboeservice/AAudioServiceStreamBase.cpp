@@ -67,8 +67,7 @@ AAudioServiceStreamBase::~AAudioServiceStreamBase() {
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
-                        || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED
-                        || getState() == AAUDIO_STREAM_STATE_DISCONNECTED),
+                        || getState() == AAUDIO_STREAM_STATE_UNINITIALIZED),
                         "service stream %p still open, state = %d",
                         this, getState());
 }
@@ -229,7 +228,7 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     aaudio_result_t result = AAUDIO_OK;
 
     if (auto state = getState();
-        state == AAUDIO_STREAM_STATE_CLOSED || state == AAUDIO_STREAM_STATE_DISCONNECTED) {
+        state == AAUDIO_STREAM_STATE_CLOSED || isDisconnected_l()) {
         ALOGW("%s() already CLOSED, returns INVALID_STATE, handle = %d",
                 __func__, getHandle());
         return AAUDIO_ERROR_INVALID_STATE;
@@ -261,8 +260,14 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
     setState(AAUDIO_STREAM_STATE_STARTED);
     mThreadEnabled.store(true);
+    // Make sure this object does not get deleted before the run() method
+    // can protect it by making a strong pointer.
+    incStrong(nullptr); // See run() method.
     result = mTimestampThread.start(this);
-    if (result != AAUDIO_OK) goto error;
+    if (result != AAUDIO_OK) {
+        decStrong(nullptr); // run() can't do it so we have to do it here.
+        goto error;
+    }
 
     return result;
 
@@ -336,7 +341,12 @@ aaudio_result_t AAudioServiceStreamBase::stop_l() {
 
     setState(AAUDIO_STREAM_STATE_STOPPING);
 
+    // Temporarily unlock because we are joining the timestamp thread and it may try
+    // to acquire mLock.
+    mLock.unlock();
     result = stopTimestampThread();
+    mLock.lock();
+
     if (result != AAUDIO_OK) {
         disconnect_l();
         return result;
@@ -396,7 +406,12 @@ aaudio_result_t AAudioServiceStreamBase::flush() {
 __attribute__((no_sanitize("integer")))
 void AAudioServiceStreamBase::run() {
     ALOGD("%s() %s entering >>>>>>>>>>>>>> TIMESTAMPS", __func__, getTypeText());
+    // Hold onto the ref counted stream until the end.
+    android::sp<AAudioServiceStreamBase> holdStream(this);
     TimestampScheduler timestampScheduler;
+    // Balance the incStrong from when the thread was launched.
+    holdStream->decStrong(nullptr);
+
     timestampScheduler.setBurstPeriod(mFramesPerBurst, getSampleRate());
     timestampScheduler.start(AudioClock::getNanoseconds());
     int64_t nextTime = timestampScheduler.nextAbsoluteTime();
@@ -432,8 +447,7 @@ void AAudioServiceStreamBase::disconnect() {
 }
 
 void AAudioServiceStreamBase::disconnect_l() {
-    if (getState() != AAUDIO_STREAM_STATE_DISCONNECTED
-        && getState() != AAUDIO_STREAM_STATE_CLOSED) {
+    if (!isDisconnected_l() && getState() != AAUDIO_STREAM_STATE_CLOSED) {
 
         mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_DISCONNECT)
@@ -441,7 +455,7 @@ void AAudioServiceStreamBase::disconnect_l() {
             .record();
 
         sendServiceEvent(AAUDIO_SERVICE_EVENT_DISCONNECTED);
-        setState(AAUDIO_STREAM_STATE_DISCONNECTED);
+        setDisconnected_l(true);
     }
 }
 
