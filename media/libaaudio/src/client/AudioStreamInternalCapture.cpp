@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <audio_utils/primitives.h>
 #include <aaudio/AAudio.h>
+#include <media/MediaMetricsItem.h>
 
 #include "client/AudioStreamInternalCapture.h"
 #include "utility/AudioClock.h"
