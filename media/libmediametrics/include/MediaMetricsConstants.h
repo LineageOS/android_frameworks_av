@@ -160,6 +160,12 @@
 #define AMEDIAMETRICS_PROP_VOLUME_LEFT    "volume.left"    // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_VOLUME_RIGHT   "volume.right"   // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_WHERE          "where"          // string value
+// EncodingRequested is the encoding format requested by the app
+#define AMEDIAMETRICS_PROP_ENCODINGREQUESTED "encodingRequested" // string
+// PerformanceModeActual is the actual selected performance mode, could be "none', "loeLatency" or
+// "powerSaving"
+#define AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL "performanceModeActual" // string
+#define AMEDIAMETRICS_PROP_FRAMESTRANSFERRED "framesTransferred" // int64_t, transferred frames
 
 // Timing values: millisecond values are suffixed with MS and the type is double
 // nanosecond values are suffixed with NS and the type is int64.
