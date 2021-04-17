@@ -57,10 +57,10 @@ Status TunerFilter::getQueueDesc(AidlMQDesc* _aidl_return) {
         return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    MQDesc dvrMQDesc;
+    MQDesc filterMQDesc;
     Result res;
     mFilter->getQueueDesc([&](Result r, const MQDesc& desc) {
-        dvrMQDesc = desc;
+        filterMQDesc = desc;
         res = r;
     });
     if (res != Result::SUCCESS) {
@@ -69,7 +69,7 @@ Status TunerFilter::getQueueDesc(AidlMQDesc* _aidl_return) {
 
     AidlMQDesc aidlMQDesc;
     unsafeHidlToAidlMQDescriptor<uint8_t, int8_t, SynchronizedReadWrite>(
-                dvrMQDesc,  &aidlMQDesc);
+                filterMQDesc,  &aidlMQDesc);
     *_aidl_return = move(aidlMQDesc);
     return Status::ok();
 }
