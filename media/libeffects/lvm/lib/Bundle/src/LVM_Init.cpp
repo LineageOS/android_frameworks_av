@@ -137,9 +137,9 @@ LVM_ReturnStatus_en LVM_GetInstanceHandle(LVM_Handle_t* phInstance, LVM_InstPara
 
         pInstance->pBufferManagement->pScratch = (LVM_FLOAT*)pInstance->pScratch;
 
-        LoadConst_Float(0, /* Clear the input delay buffer */
-                        (LVM_FLOAT*)&pInstance->pBufferManagement->InDelayBuffer,
-                        (LVM_INT16)(LVM_MAX_CHANNELS * MIN_INTERNAL_BLOCKSIZE));
+        memset(pInstance->pBufferManagement->InDelayBuffer, 0,
+                LVM_MAX_CHANNELS * MIN_INTERNAL_BLOCKSIZE *
+                sizeof(pInstance->pBufferManagement->InDelayBuffer[0]));
         pInstance->pBufferManagement->InDelaySamples =
                 MIN_INTERNAL_BLOCKSIZE;                    /* Set the number of delay samples */
         pInstance->pBufferManagement->OutDelaySamples = 0; /* No samples in the output buffer */

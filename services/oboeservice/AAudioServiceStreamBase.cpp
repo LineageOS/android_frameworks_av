@@ -261,8 +261,14 @@ aaudio_result_t AAudioServiceStreamBase::start() {
     sendServiceEvent(AAUDIO_SERVICE_EVENT_STARTED);
     setState(AAUDIO_STREAM_STATE_STARTED);
     mThreadEnabled.store(true);
+    // Make sure this object does not get deleted before the run() method
+    // can protect it by making a strong pointer.
+    incStrong(nullptr); // See run() method.
     result = mTimestampThread.start(this);
-    if (result != AAUDIO_OK) goto error;
+    if (result != AAUDIO_OK) {
+        decStrong(nullptr); // run() can't do it so we have to do it here.
+        goto error;
+    }
 
     return result;
 
@@ -396,7 +402,12 @@ aaudio_result_t AAudioServiceStreamBase::flush() {
 __attribute__((no_sanitize("integer")))
 void AAudioServiceStreamBase::run() {
     ALOGD("%s() %s entering >>>>>>>>>>>>>> TIMESTAMPS", __func__, getTypeText());
+    // Hold onto the ref counted stream until the end.
+    android::sp<AAudioServiceStreamBase> holdStream(this);
     TimestampScheduler timestampScheduler;
+    // Balance the incStrong from when the thread was launched.
+    holdStream->decStrong(nullptr);
+
     timestampScheduler.setBurstPeriod(mFramesPerBurst, getSampleRate());
     timestampScheduler.start(AudioClock::getNanoseconds());
     int64_t nextTime = timestampScheduler.nextAbsoluteTime();
