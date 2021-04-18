@@ -59,6 +59,10 @@ AudioStream::~AudioStream() {
     if (!mMetricsId.empty()) {
         android::mediametrics::LogItem(mMetricsId)
                 .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM)
+                .set(AMEDIAMETRICS_PROP_ENCODINGREQUESTED,
+                     android::toString(mDeviceFormat).c_str())
+                .set(AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL,
+                     AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
                 .record();
     }
 
@@ -124,7 +128,12 @@ void AudioStream::logOpen() {
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
                 AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
             .set(AMEDIAMETRICS_PROP_SHARINGMODE,
-                AudioGlobal_convertSharingModeToText(getSharingMode()));
+                AudioGlobal_convertSharingModeToText(getSharingMode()))
+            .set(AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, getBufferCapacity())
+            .set(AMEDIAMETRICS_PROP_BURSTFRAMES, getFramesPerBurst())
+            .set(AMEDIAMETRICS_PROP_DIRECTION,
+                AudioGlobal_convertDirectionToText(getDirection()));
+
         if (getDirection() == AAUDIO_DIRECTION_OUTPUT) {
             item.set(AMEDIAMETRICS_PROP_PLAYERIID, mPlayerBase->getPlayerIId());
         }
@@ -336,6 +345,22 @@ aaudio_result_t AudioStream::safeReleaseCloseInternal() {
     std::lock_guard<std::mutex> lock(mStreamLock);
     releaseCloseFinal_l();
     return AAUDIO_OK;
+}
+
+void AudioStream::close_l() {
+    // Releasing the stream will set the state to CLOSING.
+    assert(getState() == AAUDIO_STREAM_STATE_CLOSING);
+    // setState() prevents a transition from CLOSING to any state other than CLOSED.
+    // State is checked by destructor.
+    setState(AAUDIO_STREAM_STATE_CLOSED);
+
+    if (!mMetricsId.empty()) {
+        android::mediametrics::LogItem(mMetricsId)
+                .set(AMEDIAMETRICS_PROP_FRAMESTRANSFERRED,
+                        getDirection() == AAUDIO_DIRECTION_INPUT ? getFramesWritten()
+                                                                 : getFramesRead())
+                .record();
+    }
 }
 
 void AudioStream::setState(aaudio_stream_state_t state) {
