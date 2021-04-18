@@ -19,6 +19,7 @@
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
+#include <media/MediaMetricsItem.h>
 #include <utils/Trace.h>
 
 #include "client/AudioStreamInternalPlay.h"
