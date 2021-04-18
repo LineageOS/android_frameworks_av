@@ -265,6 +265,13 @@ protected:
 
     aaudio_stream_state_t   mState = AAUDIO_STREAM_STATE_UNINITIALIZED;
 
+    bool isDisconnected_l() const REQUIRES(mLock) {
+        return mDisconnected;
+    }
+    void setDisconnected_l(bool flag) REQUIRES(mLock) {
+        mDisconnected = flag;
+    }
+
     pid_t                   mRegisteredClientThread = ILLEGAL_THREAD_ID;
 
     std::mutex              mUpMessageQueueLock;
@@ -321,6 +328,8 @@ private:
     // This indicate that a running stream should not be processed because of an error,
     // for example a full message queue. Note that this atomic is unrelated to mCloseNeeded.
     std::atomic<bool>       mSuspended{false};
+
+    bool                    mDisconnected GUARDED_BY(mLock) {false};
 
 protected:
     // Locking order is important.
