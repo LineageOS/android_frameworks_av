@@ -545,12 +545,13 @@ AStatsManager_PullAtomCallbackReturn MediaMetricsService::pullItems(
         return AStatsManager_PULL_SKIP;
     }
     std::lock_guard _l(mLock);
+    bool dumped = false;
     for (auto &item : mPullableItems[key]) {
         if (const auto sitem = item.lock()) {
-            dump2Statsd(sitem, data, mStatsdLog);
+            dumped |= dump2Statsd(sitem, data, mStatsdLog);
         }
     }
     mPullableItems[key].clear();
-    return AStatsManager_PULL_SUCCESS;
+    return dumped ? AStatsManager_PULL_SUCCESS : AStatsManager_PULL_SKIP;
 }
 } // namespace android
