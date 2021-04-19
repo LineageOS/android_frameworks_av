@@ -19,6 +19,7 @@
 
 #define VALIDATE_STATE 1
 
+#include <android/permission_manager.h>
 #include <inttypes.h>
 #include <media/TranscodingSessionController.h>
 #include <media/TranscodingUidPolicy.h>
@@ -193,7 +194,7 @@ struct TranscodingSessionController::Pacer {
 
     ~Pacer() = default;
 
-    bool onSessionStarted(uid_t uid);
+    bool onSessionStarted(uid_t uid, uid_t callingUid);
     void onSessionCompleted(uid_t uid, std::chrono::microseconds runningTime);
     void onSessionCancelled(uid_t uid);
 
@@ -212,9 +213,49 @@ private:
         std::chrono::steady_clock::time_point lastCompletedTime;
     };
     std::map<uid_t, UidHistoryEntry> mUidHistoryMap;
+    std::unordered_set<uid_t> mMtpUids;
+    std::unordered_set<uid_t> mNonMtpUids;
+
+    bool isSubjectToQuota(uid_t uid, uid_t callingUid);
 };
 
-bool TranscodingSessionController::Pacer::onSessionStarted(uid_t uid) {
+bool TranscodingSessionController::Pacer::isSubjectToQuota(uid_t uid, uid_t callingUid) {
+    // Submitting with self uid is not limited (which can only happen if it's used as an
+    // app-facing API). MediaProvider usage always submit on behalf of other uids.
+    if (uid == callingUid) {
+        return false;
+    }
+
+    if (mMtpUids.find(uid) != mMtpUids.end()) {
+        return false;
+    }
+
+    if (mNonMtpUids.find(uid) != mNonMtpUids.end()) {
+        return true;
+    }
+
+    // We don't have MTP permission info about this uid yet, check permission and save the result.
+    int32_t result;
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+        if (APermissionManager_checkPermission("android.permission.ACCESS_MTP", -1 /*pid*/, uid,
+                                               &result) == PERMISSION_MANAGER_STATUS_OK &&
+            result == PERMISSION_MANAGER_PERMISSION_GRANTED) {
+            mMtpUids.insert(uid);
+            return false;
+        }
+    }
+
+    mNonMtpUids.insert(uid);
+    return true;
+}
+
+bool TranscodingSessionController::Pacer::onSessionStarted(uid_t uid, uid_t callingUid) {
+    if (!isSubjectToQuota(uid, callingUid)) {
+        ALOGI("Pacer::onSessionStarted: uid %d (caling uid: %d): not subject to quota", uid,
+              callingUid);
+        return true;
+    }
+
     // If uid doesn't exist, only insert the entry and mark session active. Skip quota checking.
     if (mUidHistoryMap.find(uid) == mUidHistoryMap.end()) {
         mUidHistoryMap.emplace(uid, UidHistoryEntry{});
@@ -494,7 +535,7 @@ void TranscodingSessionController::updateCurrentSession_l() {
             // Check if at least one client has quota to start the session.
             bool keepForClient = false;
             for (uid_t uid : topSession->allClientUids) {
-                if (mPacer->onSessionStarted(uid)) {
+                if (mPacer->onSessionStarted(uid, topSession->callingUid)) {
                     keepForClient = true;
                     // DO NOT break here, because book-keeping still needs to happen
                     // for the other uids.
