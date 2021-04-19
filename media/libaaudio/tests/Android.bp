@@ -209,9 +209,9 @@ cc_test {
 }
 
 cc_test {
-    name: "test_stop_hang",
+    name: "test_callback_race",
     defaults: ["libaaudio_tests_defaults"],
-    srcs: ["test_stop_hang.cpp"],
+    srcs: ["test_callback_race.cpp"],
     shared_libs: [
         "libaaudio",
         "libbinder",
