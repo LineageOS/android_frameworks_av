@@ -188,6 +188,11 @@ bool statsd_mediadrm_puller(
     (void) item->getString("plugin_metrics", &plugin_metrics);
     const auto plugin_raw(base64DecodeNoPad(plugin_metrics));
 
+    if (serialized_metrics.size() == 0 && plugin_metrics.size() == 0) {
+        ALOGD("statsd_mediadrm_puller skipping empty entry");
+        return false;
+    }
+
     std::string vendor;
     (void) item->getString("vendor", &vendor);
     std::string description;
