@@ -253,6 +253,18 @@ private:
     // Children: ModulesTraits, VolumeTraits, SurroundSoundTraits (optional)
 };
 
+// Deleter using free() for use with std::unique_ptr<>. See also UniqueCPtr<> below.
+struct FreeDelete {
+    // NOTE: Deleting a const object is valid but free() takes a non-const pointer.
+    void operator()(const void* ptr) const {
+        free(const_cast<void*>(ptr));
+    }
+};
+
+// Alias for std::unique_ptr<> that uses the C function free() to delete objects.
+template <typename T>
+using UniqueCPtr = std::unique_ptr<T, FreeDelete>;
+
 template <class T>
 constexpr void (*xmlDeleter)(T* t);
 template <>
@@ -608,7 +620,7 @@ std::variant<status_t, RouteTraits::Element> PolicySerializer::deserialize<Route
     }
     // Tokenize and Convert Sources name to port pointer
     PolicyAudioPortVector sources;
-    std::unique_ptr<char[]> sourcesLiteral{strndup(
+    UniqueCPtr<char> sourcesLiteral{strndup(
                 sourcesAttr.c_str(), strlen(sourcesAttr.c_str()))};
     char *devTag = strtok(sourcesLiteral.get(), ",");
     while (devTag != NULL) {
