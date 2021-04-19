@@ -181,21 +181,9 @@ AudioRecord::~AudioRecord()
         .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
         .record();
 
+    stopAndJoinCallbacks(); // checks mStatus
+
     if (mStatus == NO_ERROR) {
-        // Make sure that callback function exits in the case where
-        // it is looping on buffer empty condition in obtainBuffer().
-        // Otherwise the callback thread will never exit.
-        stop();
-        if (mAudioRecordThread != 0) {
-            mProxy->interrupt();
-            mAudioRecordThread->requestExit();  // see comment in AudioRecord.h
-            mAudioRecordThread->requestExitAndWait();
-            mAudioRecordThread.clear();
-        }
-        // No lock here: worst case we remove a NULL callback which will be a nop
-        if (mDeviceCallback != 0 && mInput != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::removeAudioDeviceCallback(this, mInput, mPortId);
-        }
         IInterface::asBinder(mAudioRecord)->unlinkToDeath(mDeathNotifier, this);
         mAudioRecord.clear();
         mCblkMemory.clear();
@@ -208,6 +196,27 @@ AudioRecord::~AudioRecord()
     }
 }
 
+void AudioRecord::stopAndJoinCallbacks() {
+    // Prevent nullptr crash if it did not open properly.
+    if (mStatus != NO_ERROR) return;
+
+    // Make sure that callback function exits in the case where
+    // it is looping on buffer empty condition in obtainBuffer().
+    // Otherwise the callback thread will never exit.
+    stop();
+    if (mAudioRecordThread != 0) {
+        mProxy->interrupt();
+        mAudioRecordThread->requestExit();  // see comment in AudioRecord.h
+        mAudioRecordThread->requestExitAndWait();
+        mAudioRecordThread.clear();
+    }
+    // No lock here: worst case we remove a NULL callback which will be a nop
+    if (mDeviceCallback != 0 && mInput != AUDIO_IO_HANDLE_NONE) {
+        // This may not stop all of these device callbacks!
+        // TODO: Add some sort of protection.
+        AudioSystem::removeAudioDeviceCallback(this, mInput, mPortId);
+    }
+}
 status_t AudioRecord::set(
         audio_source_t inputSource,
         uint32_t sampleRate,
