@@ -259,12 +259,18 @@ aaudio_result_t AudioStreamTrack::release_l() {
 }
 
 void AudioStreamTrack::close_l() {
-    // Stop callbacks before deleting mFixedBlockReader memory.
+    // The callbacks are normally joined in the AudioTrack destructor.
+    // But if another object has a reference to the AudioTrack then
+    // it will not get deleted here.
+    // So we should join callbacks explicitly before returning.
+    // Unlock around the join to avoid deadlocks if the callback tries to lock.
+    // This can happen if the callback returns AAUDIO_CALLBACK_RESULT_STOP
+    mStreamLock.unlock();
+    mAudioTrack->stopAndJoinCallbacks();
+    mStreamLock.lock();
     mAudioTrack.clear();
-    // Do not close mFixedBlockReader because a data callback
-    // thread might still be running if someone else has a reference
-    // to mAudioRecord.
-    // It has a unique_ptr to its buffer so it will clean up by itself.
+    // Do not close mFixedBlockReader. It has a unique_ptr to its buffer
+    // so it will clean up by itself.
     AudioStream::close_l();
 }
 
