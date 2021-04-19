@@ -45,6 +45,7 @@ cc_library {
         "libbinder",
         "libcutils",
         "liblog",
+        "libpermission",
         "libutils",
         "libhidlbase",
         "android.hardware.graphics.bufferqueue@1.0",
