@@ -111,11 +111,11 @@ DemuxPid TunerDescrambler::getHidlDemuxPid(const TunerDemuxPid& pid) {
     DemuxPid hidlPid;
     switch (pid.getTag()) {
         case TunerDemuxPid::tPid: {
-            hidlPid.tPid((uint16_t)pid.tPid);
+            hidlPid.tPid((uint16_t)pid.get<TunerDemuxPid::tPid>());
             break;
         }
         case TunerDemuxPid::mmtpPid: {
-            hidlPid.mmtpPid((uint16_t)pid.mmtpPid);
+            hidlPid.mmtpPid((uint16_t)pid.get<TunerDemuxPid::mmtpPid>());
             break;
         }
     }
