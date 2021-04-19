@@ -27,7 +27,7 @@ parcelable TunerFrontendIsdbs3Settings {
      */
     int frequency;
 
-    int streamId;
+    char streamId;
 
     int streamIdType;
 

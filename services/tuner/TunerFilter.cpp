@@ -685,7 +685,7 @@ void TunerFilter::FilterCallback::getMediaEvent(
         DemuxFilterMediaEvent mediaEvent = e.media();
         TunerFilterMediaEvent tunerMedia;
 
-        tunerMedia.streamId = static_cast<int>(mediaEvent.streamId);
+        tunerMedia.streamId = static_cast<char16_t>(mediaEvent.streamId);
         tunerMedia.isPtsPresent = mediaEvent.isPtsPresent;
         tunerMedia.pts = static_cast<long>(mediaEvent.pts);
         tunerMedia.dataLength = static_cast<int>(mediaEvent.dataLength);
@@ -750,7 +750,7 @@ void TunerFilter::FilterCallback::getPesEvent(
         TunerFilterPesEvent tunerPes;
 
         tunerPes.streamId = static_cast<char16_t>(pesEvent.streamId);
-        tunerPes.dataLength = static_cast<int>(pesEvent.dataLength);
+        tunerPes.dataLength = static_cast<char16_t>(pesEvent.dataLength);
         tunerPes.mpuSequenceNumber = static_cast<int>(pesEvent.mpuSequenceNumber);
 
         TunerFilterEvent tunerEvent;

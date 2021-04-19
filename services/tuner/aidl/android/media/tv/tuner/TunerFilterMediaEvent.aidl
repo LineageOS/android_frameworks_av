@@ -25,7 +25,7 @@ import android.media.tv.tuner.TunerAudioExtraMetaData;
  * {@hide}
  */
 parcelable TunerFilterMediaEvent {
-    int streamId;
+    char streamId;
 
     /**
      * true if PTS is present in PES header.
