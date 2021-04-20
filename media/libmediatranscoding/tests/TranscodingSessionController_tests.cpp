@@ -339,19 +339,37 @@ public:
         EXPECT_EQ(mTranscoder.use_count(), 2);
     }
 
-    void testPacerHelper(int numSubmits, int sessionDurationMs, int expectedSuccess,
-                         bool pauseLastSuccessSession = false) {
+    void testPacerHelper(int numSubmits, int sessionDurationMs, int expectedSuccess) {
         testPacerHelper(numSubmits, sessionDurationMs, expectedSuccess, mClientCallback0, {},
-                        pauseLastSuccessSession);
+                        false /*pauseLastSuccessSession*/, true /*useRealCallingUid*/);
+    }
+
+    void testPacerHelperWithPause(int numSubmits, int sessionDurationMs, int expectedSuccess) {
+        testPacerHelper(numSubmits, sessionDurationMs, expectedSuccess, mClientCallback0, {},
+                        true /*pauseLastSuccessSession*/, true /*useRealCallingUid*/);
+    }
+
+    void testPacerHelperWithMultipleUids(int numSubmits, int sessionDurationMs, int expectedSuccess,
+                                         const std::shared_ptr<TestClientCallback>& client,
+                                         const std::vector<int>& additionalClientUids) {
+        testPacerHelper(numSubmits, sessionDurationMs, expectedSuccess, client,
+                        additionalClientUids, false /*pauseLastSuccessSession*/,
+                        true /*useRealCallingUid*/);
+    }
+
+    void testPacerHelperWithSelfUid(int numSubmits, int sessionDurationMs, int expectedSuccess) {
+        testPacerHelper(numSubmits, sessionDurationMs, expectedSuccess, mClientCallback0, {},
+                        false /*pauseLastSuccessSession*/, false /*useRealCallingUid*/);
     }
 
     void testPacerHelper(int numSubmits, int sessionDurationMs, int expectedSuccess,
                          const std::shared_ptr<TestClientCallback>& client,
-                         const std::vector<int>& additionalClientUids,
-                         bool pauseLastSuccessSession) {
+                         const std::vector<int>& additionalClientUids, bool pauseLastSuccessSession,
+                         bool useRealCallingUid) {
+        uid_t callingUid = useRealCallingUid ? ::getuid() : client->clientUid();
         for (int i = 0; i < numSubmits; i++) {
-            mController->submit(client->clientId(), SESSION(i), client->clientUid(),
-                                client->clientUid(), mRealtimeRequest, client);
+            mController->submit(client->clientId(), SESSION(i), callingUid, client->clientUid(),
+                                mRealtimeRequest, client);
             for (int additionalUid : additionalClientUids) {
                 mController->addClientUid(client->clientId(), SESSION(i), additionalUid);
             }
@@ -1294,8 +1312,7 @@ TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerOverQuota) {
 
 TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerWithPause) {
     ALOGD("TestTranscoderPacerDuringPause");
-    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/,
-                    true /*pauseLastSuccessSession*/);
+    testPacerHelperWithPause(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/);
 }
 
 /*
@@ -1305,17 +1322,26 @@ TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerWithPause) {
 TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerMultipleUids) {
     ALOGD("TestTranscoderPacerMultipleUids");
     // First, run mClientCallback0 to the point of no quota.
-    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/,
-                    mClientCallback0, {}, false /*pauseLastSuccessSession*/);
+    testPacerHelperWithMultipleUids(12 /*numSubmits*/, 400 /*sessionDurationMs*/,
+                                    10 /*expectedSuccess*/, mClientCallback0, {});
     // Make UID(0) block on Client1's sessions too, Client1's quota should not be affected.
-    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 10 /*expectedSuccess*/,
-                    mClientCallback1, {UID(0)}, false /*pauseLastSuccessSession*/);
+    testPacerHelperWithMultipleUids(12 /*numSubmits*/, 400 /*sessionDurationMs*/,
+                                    10 /*expectedSuccess*/, mClientCallback1, {UID(0)});
     // Make UID(10) block on Client2's sessions. We expect to see 11 succeeds (instead of 10),
     // because the addClientUid() is called after the submit, and first session is already
     // started by the time UID(10) is added. UID(10) allowed us to run the 11th session,
     // after that both UID(10) and UID(2) are out of quota.
-    testPacerHelper(12 /*numSubmits*/, 400 /*sessionDurationMs*/, 11 /*expectedSuccess*/,
-                    mClientCallback2, {UID(10)}, false /*pauseLastSuccessSession*/);
+    testPacerHelperWithMultipleUids(12 /*numSubmits*/, 400 /*sessionDurationMs*/,
+                                    11 /*expectedSuccess*/, mClientCallback2, {UID(10)});
+}
+
+/*
+ * Use same uid for clientUid and callingUid, should not be limited by quota.
+ */
+TEST_F(TranscodingSessionControllerTest, TestTranscoderPacerSelfUid) {
+    ALOGD("TestTranscoderPacerSelfUid");
+    testPacerHelperWithSelfUid(12 /*numSubmits*/, 400 /*sessionDurationMs*/,
+                               12 /*expectedSuccess*/);
 }
 
 }  // namespace android
