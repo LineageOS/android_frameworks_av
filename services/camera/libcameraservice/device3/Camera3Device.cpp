@@ -49,6 +49,7 @@
 #include <utils/Timers.h>
 #include <cutils/properties.h>
 
+#include <android/hardware/camera/device/3.7/ICameraInjectionSession.h>
 #include <android/hardware/camera2/ICameraDeviceUser.h>
 
 #include "utils/CameraTraces.h"
@@ -358,6 +359,8 @@ status_t Camera3Device::initializeCommonLocked() {
         }
     }
 
+    mInjectionMethods = new Camera3DeviceInjectionMethods(this);
+
     return OK;
 }
 
@@ -429,6 +432,10 @@ status_t Camera3Device::disconnectImpl() {
         Mutex::Autolock il(mInterfaceLock);
         if (mStatusTracker != NULL) {
             mStatusTracker->join();
+        }
+
+        if (mInjectionMethods->isInjecting()) {
+            mInjectionMethods->stopInjection();
         }
 
         HalInterface* interface;
@@ -1829,7 +1836,6 @@ status_t Camera3Device::waitUntilDrainedLocked(nsecs_t maxExpectedDuration) {
     return res;
 }
 
-
 void Camera3Device::internalUpdateStatusLocked(Status status) {
     mStatus = status;
     mRecentStatusUpdates.add(mStatus);
@@ -2820,6 +2826,19 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         mRequestBufferSM.onStreamsConfigured();
     }
 
+    // Since the streams configuration of the injection camera is based on the internal camera, we
+    // must wait until the internal camera configure streams before calling injectCamera() to
+    // configure the injection streams.
+    if (mInjectionMethods->isInjecting()) {
+        ALOGV("%s: Injection camera %s: Start to configure streams.",
+              __FUNCTION__, mInjectionMethods->getInjectedCamId().string());
+        res = mInjectionMethods->injectCamera(config, bufferSizes);
+        if (res != OK) {
+            ALOGE("Can't finish inject camera process!");
+            return res;
+        }
+    }
+
     return OK;
 }
 
@@ -3519,6 +3538,146 @@ status_t Camera3Device::HalInterface::configureStreams(const camera_metadata_t *
                     mapProducerToFrameworkUsage(src.v3_2.producerUsage));
         }
         dst->max_buffers = src.v3_2.maxBuffers;
+    }
+
+    return res;
+}
+
+status_t Camera3Device::HalInterface::configureInjectedStreams(
+        const camera_metadata_t* sessionParams, camera_stream_configuration* config,
+        const std::vector<uint32_t>& bufferSizes,
+        const CameraMetadata& cameraCharacteristics) {
+    ATRACE_NAME("InjectionCameraHal::configureStreams");
+    if (!valid()) return INVALID_OPERATION;
+    status_t res = OK;
+
+    if (config->input_is_multi_resolution) {
+        ALOGE("%s: Injection camera device doesn't support multi-resolution input "
+                "stream", __FUNCTION__);
+        return BAD_VALUE;
+    }
+
+    // Convert stream config to HIDL
+    std::set<int> activeStreams;
+    device::V3_2::StreamConfiguration requestedConfiguration3_2;
+    device::V3_4::StreamConfiguration requestedConfiguration3_4;
+    device::V3_7::StreamConfiguration requestedConfiguration3_7;
+    requestedConfiguration3_2.streams.resize(config->num_streams);
+    requestedConfiguration3_4.streams.resize(config->num_streams);
+    requestedConfiguration3_7.streams.resize(config->num_streams);
+    for (size_t i = 0; i < config->num_streams; i++) {
+        device::V3_2::Stream& dst3_2 = requestedConfiguration3_2.streams[i];
+        device::V3_4::Stream& dst3_4 = requestedConfiguration3_4.streams[i];
+        device::V3_7::Stream& dst3_7 = requestedConfiguration3_7.streams[i];
+        camera3::camera_stream_t* src = config->streams[i];
+
+        Camera3Stream* cam3stream = Camera3Stream::cast(src);
+        cam3stream->setBufferFreedListener(this);
+        int streamId = cam3stream->getId();
+        StreamType streamType;
+        switch (src->stream_type) {
+            case CAMERA_STREAM_OUTPUT:
+                streamType = StreamType::OUTPUT;
+                break;
+            case CAMERA_STREAM_INPUT:
+                streamType = StreamType::INPUT;
+                break;
+            default:
+                ALOGE("%s: Stream %d: Unsupported stream type %d", __FUNCTION__,
+                        streamId, config->streams[i]->stream_type);
+            return BAD_VALUE;
+        }
+        dst3_2.id = streamId;
+        dst3_2.streamType = streamType;
+        dst3_2.width = src->width;
+        dst3_2.height = src->height;
+        dst3_2.usage = mapToConsumerUsage(cam3stream->getUsage());
+        dst3_2.rotation =
+                mapToStreamRotation((camera_stream_rotation_t)src->rotation);
+        // For HidlSession version 3.5 or newer, the format and dataSpace sent
+        // to HAL are original, not the overridden ones.
+        if (mHidlSession_3_5 != nullptr) {
+            dst3_2.format = mapToPixelFormat(cam3stream->isFormatOverridden()
+                                            ? cam3stream->getOriginalFormat()
+                                            : src->format);
+            dst3_2.dataSpace =
+                    mapToHidlDataspace(cam3stream->isDataSpaceOverridden()
+                                    ? cam3stream->getOriginalDataSpace()
+                                    : src->data_space);
+        } else {
+            dst3_2.format = mapToPixelFormat(src->format);
+            dst3_2.dataSpace = mapToHidlDataspace(src->data_space);
+        }
+        dst3_4.v3_2 = dst3_2;
+        dst3_4.bufferSize = bufferSizes[i];
+        if (src->physical_camera_id != nullptr) {
+            dst3_4.physicalCameraId = src->physical_camera_id;
+        }
+        dst3_7.v3_4 = dst3_4;
+        dst3_7.groupId = cam3stream->getHalStreamGroupId();
+        dst3_7.sensorPixelModesUsed.resize(src->sensor_pixel_modes_used.size());
+        size_t j = 0;
+        for (int mode : src->sensor_pixel_modes_used) {
+            dst3_7.sensorPixelModesUsed[j++] =
+                    static_cast<CameraMetadataEnumAndroidSensorPixelMode>(mode);
+        }
+        activeStreams.insert(streamId);
+        // Create Buffer ID map if necessary
+        mBufferRecords.tryCreateBufferCache(streamId);
+    }
+    // remove BufferIdMap for deleted streams
+    mBufferRecords.removeInactiveBufferCaches(activeStreams);
+
+    StreamConfigurationMode operationMode;
+    res = mapToStreamConfigurationMode(
+            (camera_stream_configuration_mode_t)config->operation_mode,
+            /*out*/ &operationMode);
+    if (res != OK) {
+        return res;
+    }
+    requestedConfiguration3_7.operationMode = operationMode;
+    size_t sessionParamSize = get_camera_metadata_size(sessionParams);
+    requestedConfiguration3_7.operationMode = operationMode;
+    requestedConfiguration3_7.sessionParams.setToExternal(
+            reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(sessionParams)),
+            sessionParamSize);
+
+    // See which version of HAL we have
+    if (mHidlSession_3_7 != nullptr) {
+        requestedConfiguration3_7.streamConfigCounter = mNextStreamConfigCounter++;
+        requestedConfiguration3_7.multiResolutionInputImage =
+                config->input_is_multi_resolution;
+
+        const camera_metadata_t* rawMetadata = cameraCharacteristics.getAndLock();
+        ::android::hardware::camera::device::V3_2::CameraMetadata hidlChars = {};
+        hidlChars.setToExternal(
+                reinterpret_cast<uint8_t*>(const_cast<camera_metadata_t*>(rawMetadata)),
+                get_camera_metadata_size(rawMetadata));
+        cameraCharacteristics.unlock(rawMetadata);
+
+        sp<hardware::camera::device::V3_7::ICameraInjectionSession>
+                hidlInjectionSession_3_7;
+        auto castInjectionResult_3_7 =
+                device::V3_7::ICameraInjectionSession::castFrom(mHidlSession_3_7);
+        if (castInjectionResult_3_7.isOk()) {
+            hidlInjectionSession_3_7 = castInjectionResult_3_7;
+        } else {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__,
+                    castInjectionResult_3_7.description().c_str());
+            return DEAD_OBJECT;
+        }
+
+        auto err = hidlInjectionSession_3_7->configureInjectionStreams(
+                requestedConfiguration3_7, hidlChars);
+        if (!err.isOk()) {
+            ALOGE("%s: Transaction error: %s", __FUNCTION__,
+                    err.description().c_str());
+            return DEAD_OBJECT;
+        }
+    } else {
+        ALOGE("%s: mHidlSession_3_7 does not exist, the lowest version of injection "
+                "session is 3.7", __FUNCTION__);
+        return DEAD_OBJECT;
     }
 
     return res;
@@ -5724,6 +5883,18 @@ bool Camera3Device::RequestThread::overrideTestPattern(
     return changed;
 }
 
+status_t Camera3Device::RequestThread::setHalInterface(
+        sp<HalInterface> newHalInterface) {
+    if (newHalInterface.get() == nullptr) {
+        ALOGE("%s: The newHalInterface does not exist!", __FUNCTION__);
+        return DEAD_OBJECT;
+    }
+
+    mInterface = newHalInterface;
+
+    return OK;
+}
+
 /**
  * PreparerThread inner class methods
  */
@@ -6365,6 +6536,60 @@ status_t Camera3Device::setCameraMute(bool enabled) {
         return INVALID_OPERATION;
     }
     return mRequestThread->setCameraMute(enabled);
+}
+
+status_t Camera3Device::injectCamera(const String8& injectedCamId,
+                                     sp<CameraProviderManager> manager) {
+    ALOGI("%s Injection camera: injectedCamId = %s", __FUNCTION__, injectedCamId.string());
+    ATRACE_CALL();
+    Mutex::Autolock il(mInterfaceLock);
+
+    status_t res = NO_ERROR;
+    if (mInjectionMethods->isInjecting()) {
+        if (injectedCamId == mInjectionMethods->getInjectedCamId()) {
+            return OK;
+        } else {
+            res = mInjectionMethods->stopInjection();
+            if (res != OK) {
+                ALOGE("%s: Failed to stop the injection camera! ret != NO_ERROR: %d",
+                        __FUNCTION__, res);
+                return res;
+            }
+        }
+    }
+
+    res = mInjectionMethods->injectionInitialize(injectedCamId, manager, this);
+    if (res != OK) {
+        ALOGE("%s: Failed to initialize the injection camera! ret != NO_ERROR: %d",
+                __FUNCTION__, res);
+        return res;
+    }
+
+    camera3::camera_stream_configuration injectionConfig;
+    std::vector<uint32_t> injectionBufferSizes;
+    mInjectionMethods->getInjectionConfig(&injectionConfig, &injectionBufferSizes);
+    // When the second display of android is cast to the remote device, and the opened camera is
+    // also cast to the second display, in this case, because the camera has configured the streams
+    // at this time, we can directly call injectCamera() to replace the internal camera with
+    // injection camera.
+    if (mOperatingMode >= 0 && injectionConfig.num_streams > 0
+                && injectionBufferSizes.size() > 0) {
+        ALOGV("%s: The opened camera is directly cast to the remote device.", __FUNCTION__);
+        res = mInjectionMethods->injectCamera(
+                injectionConfig, injectionBufferSizes);
+        if (res != OK) {
+            ALOGE("Can't finish inject camera process!");
+            return res;
+        }
+    }
+
+    return OK;
+}
+
+status_t Camera3Device::stopInjection() {
+    ALOGI("%s: Injection camera: stopInjection", __FUNCTION__);
+    Mutex::Autolock il(mInterfaceLock);
+    return mInjectionMethods->stopInjection();
 }
 
 }; // namespace android
