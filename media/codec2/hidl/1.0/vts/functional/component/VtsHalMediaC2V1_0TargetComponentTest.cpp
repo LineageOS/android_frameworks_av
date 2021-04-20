@@ -54,7 +54,7 @@
 
 namespace {
 using InputTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
-static std::vector<InputTestParameters> kInputTestParameters;
+static std::vector<InputTestParameters> gInputTestParameters;
 
 // google.codec2 Component test setup
 class Codec2ComponentHidlTestBase : public ::testing::Test {
@@ -345,28 +345,28 @@ TEST_P(Codec2ComponentInputTests, InputBufferTest) {
     ASSERT_EQ(mComponent->reset(), C2_OK);
 }
 
-INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2ComponentHidlTest, testing::ValuesIn(kTestParameters),
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2ComponentHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_CASE_P(NonStdInputs, Codec2ComponentInputTests,
-                        testing::ValuesIn(kInputTestParameters), PrintInstanceTupleNameToString<>);
+                        testing::ValuesIn(gInputTestParameters), PrintInstanceTupleNameToString<>);
 }  // anonymous namespace
 
 // TODO: Add test for Invalid work,
 // TODO: Add test for Invalid states
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    kTestParameters = getTestParameters();
-    for (auto params : kTestParameters) {
-        kInputTestParameters.push_back(
+    gTestParameters = getTestParameters();
+    for (auto params : gTestParameters) {
+        gInputTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
-        kInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
+        gInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
                                                        C2FrameData::FLAG_END_OF_STREAM, true));
-        kInputTestParameters.push_back(
+        gInputTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
-        kInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
+        gInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
                                                        C2FrameData::FLAG_CODEC_CONFIG, false));
-        kInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
+        gInputTestParameters.push_back(std::make_tuple(std::get<0>(params), std::get<1>(params),
                                                        C2FrameData::FLAG_END_OF_STREAM, false));
     }
 
