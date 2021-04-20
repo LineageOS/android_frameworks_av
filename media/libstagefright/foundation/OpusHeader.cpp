@@ -146,6 +146,10 @@ bool ParseOpusHeader(const uint8_t* data, size_t data_size, OpusHeader* header) 
 int WriteOpusHeader(const OpusHeader &header, int input_sample_rate,
                     uint8_t* output, size_t output_size) {
     // See https://wiki.xiph.org/OggOpus#ID_Header.
+    if (header.channels < 1 || header.channels > kMaxChannels) {
+        ALOGE("Invalid channel count: %d", header.channels);
+        return -1;
+    }
     const size_t total_size = kOpusHeaderStreamMapOffset + header.channels;
     if (output_size < total_size) {
         ALOGE("Output buffer too small for header.");

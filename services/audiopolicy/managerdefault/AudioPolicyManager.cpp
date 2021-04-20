@@ -2229,7 +2229,8 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
             // Prevent from storing invalid requested device id in clients
             requestedDeviceId = AUDIO_PORT_HANDLE_NONE;
             device = mEngine->getInputDeviceForAttributes(attributes, uid, &policyMix);
-            ALOGV("%s found device type is 0x%X", __FUNCTION__, device->type());
+            ALOGV_IF(device != nullptr, "%s found device type is 0x%X",
+                __FUNCTION__, device->type());
         }
         if (device == nullptr) {
             ALOGW("getInputForAttr() could not find device for source %d", attributes.source);

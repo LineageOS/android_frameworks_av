@@ -303,6 +303,19 @@ public:
             void        stop();
             bool        stopped() const;
 
+    /* Calls stop() and then wait for all of the callbacks to return.
+     * It is safe to call this if stop() or pause() has already been called.
+     *
+     * This function is called from the destructor. But since AudioRecord
+     * is ref counted, the destructor may be called later than desired.
+     * This can be called explicitly as part of closing an AudioRecord
+     * if you want to be certain that callbacks have completely finished.
+     *
+     * This is not thread safe and should only be called from one thread,
+     * ideally as the AudioRecord is being closed.
+     */
+            void        stopAndJoinCallbacks();
+
     /* Return the sink sample rate for this record track in Hz.
      * If specified as zero in constructor or set(), this will be the source sample rate.
      * Unlike AudioTrack, the sample rate is const after initialization, so doesn't need a lock.
