@@ -21,7 +21,9 @@
 #include <string>
 #include <stdlib.h>
 
-#include <media/formatshaper/CodecProperties.h>
+#include "CodecProperties.h"
+
+#include <media/stagefright/MediaCodecConstants.h>
 
 
 // we aren't going to mess with shaping points dimensions beyond this
@@ -68,11 +70,11 @@ void CodecProperties::setFeatureValue(std::string key, int32_t value) {
     ALOGD("setFeatureValue(%s,%d)", key.c_str(), value);
     mFeatures.insert({key, value});
 
-    if (!strcmp(key.c_str(), "qp-bounds")) {               // official key
+    if (!strcmp(key.c_str(), FEATURE_QpBounds)) {
         setSupportsQp(1);
-    } else if (!strcmp(key.c_str(), "vq-supports-qp")) {   // key from prototyping
-        setSupportsQp(1);
-    } else if (!strcmp(key.c_str(), "vq-minimum-quality")) {
+    } else if (!strcmp(key.c_str(), "video-minimum-quality")) {
+        setSupportedMinimumQuality(1);
+    } else if (!strcmp(key.c_str(), "vq-minimum-quality")) { // from prototyping
         setSupportedMinimumQuality(1);
     }
 }

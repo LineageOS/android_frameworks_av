@@ -23,7 +23,8 @@
 #include <inttypes.h>
 
 #include <media/NdkMediaFormat.h>
-#include <media/formatshaper/CodecProperties.h>
+
+#include "CodecProperties.h"
 
 namespace android {
 namespace mediaformatshaper {
