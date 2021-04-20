@@ -649,8 +649,7 @@ private:
             public virtual IBinder::DeathRecipient {
         public:
             explicit SensorPrivacyPolicy(wp<CameraService> service)
-                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false),
-                    mHasCameraPrivacyFeature(false), mNeedToCheckCameraPrivacyFeature(true) {}
+                    : mService(service), mSensorPrivacyEnabled(false), mRegistered(false) {}
 
             void registerSelf();
             void unregisterSelf();
@@ -669,8 +668,6 @@ private:
             Mutex mSensorPrivacyLock;
             bool mSensorPrivacyEnabled;
             bool mRegistered;
-            bool mHasCameraPrivacyFeature;
-            bool mNeedToCheckCameraPrivacyFeature;
 
             bool hasCameraPrivacyFeature();
     };
