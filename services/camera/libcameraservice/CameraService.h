@@ -190,7 +190,8 @@ public:
 
     binder::Status      addListenerHelper(const sp<hardware::ICameraServiceListener>& listener,
             /*out*/
-            std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false);
+            std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false,
+            bool isProcessLocalTest = false);
 
     // Monitored UIDs availability notification
     void                notifyMonitoredUids();
@@ -219,6 +220,19 @@ public:
             int* orientation = nullptr);
 
     /////////////////////////////////////////////////////////////////////
+    // Methods to be used in CameraService class tests only
+    //
+    // CameraService class test method only - clear static variables in the
+    // cameraserver process, which otherwise might affect multiple test runs.
+    void                clearCachedVariables();
+
+    // Add test listener, linkToDeath won't be called since this is for process
+    // local testing.
+    binder::Status    addListenerTest(const sp<hardware::ICameraServiceListener>& listener,
+            /*out*/
+            std::vector<hardware::CameraStatus>* cameraStatuses);
+
+    /////////////////////////////////////////////////////////////////////
     // Shared utilities
     static binder::Status filterGetInfoErrorCode(status_t err);
 
@@ -226,6 +240,7 @@ public:
     // CameraClient functionality
 
     class BasicClient : public virtual RefBase {
+    friend class CameraService;
     public:
         virtual status_t       initialize(sp<CameraProviderManager> manager,
                 const String8& monitorTags) = 0;
@@ -928,7 +943,10 @@ private:
                       mIsVendorListener(isVendorClient),
                       mOpenCloseCallbackAllowed(openCloseCallbackAllowed) { }
 
-            status_t initialize() {
+            status_t initialize(bool isProcessLocalTest) {
+                if (isProcessLocalTest) {
+                    return OK;
+                }
                 return IInterface::asBinder(mListener)->linkToDeath(this);
             }
 

@@ -44,6 +44,7 @@ cc_fuzz {
         "libcutils",
         "libcameraservice",
         "libcamera_client",
+        "liblog",
         "libui",
         "libgui",
         "android.hardware.camera.common@1.0",
