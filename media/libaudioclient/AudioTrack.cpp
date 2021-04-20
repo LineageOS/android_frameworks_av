@@ -327,21 +327,9 @@ AudioTrack::~AudioTrack()
         .set(AMEDIAMETRICS_PROP_STATUS, (int32_t)mStatus)
         .record();
 
+    stopAndJoinCallbacks(); // checks mStatus
+
     if (mStatus == NO_ERROR) {
-        // Make sure that callback function exits in the case where
-        // it is looping on buffer full condition in obtainBuffer().
-        // Otherwise the callback thread will never exit.
-        stop();
-        if (mAudioTrackThread != 0) {
-            mProxy->interrupt();
-            mAudioTrackThread->requestExit();   // see comment in AudioTrack.h
-            mAudioTrackThread->requestExitAndWait();
-            mAudioTrackThread.clear();
-        }
-        // No lock here: worst case we remove a NULL callback which will be a nop
-        if (mDeviceCallback != 0 && mOutput != AUDIO_IO_HANDLE_NONE) {
-            AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
-        }
         IInterface::asBinder(mAudioTrack)->unlinkToDeath(mDeathNotifier, this);
         mAudioTrack.clear();
         mCblkMemory.clear();
@@ -352,6 +340,29 @@ AudioTrack::~AudioTrack()
                 __func__, mPortId,
                 mSessionId, IPCThreadState::self()->getCallingPid(), clientPid);
         AudioSystem::releaseAudioSessionId(mSessionId, clientPid);
+    }
+}
+
+void AudioTrack::stopAndJoinCallbacks() {
+    // Prevent nullptr crash if it did not open properly.
+    if (mStatus != NO_ERROR) return;
+
+    // Make sure that callback function exits in the case where
+    // it is looping on buffer full condition in obtainBuffer().
+    // Otherwise the callback thread will never exit.
+    stop();
+    if (mAudioTrackThread != 0) { // not thread safe
+        mProxy->interrupt();
+        mAudioTrackThread->requestExit();   // see comment in AudioTrack.h
+        mAudioTrackThread->requestExitAndWait();
+        mAudioTrackThread.clear();
+    }
+    // No lock here: worst case we remove a NULL callback which will be a nop
+    if (mDeviceCallback != 0 && mOutput != AUDIO_IO_HANDLE_NONE) {
+        // This may not stop all of these device callbacks!
+        // TODO: Add some sort of protection.
+        AudioSystem::removeAudioDeviceCallback(this, mOutput, mPortId);
+        mDeviceCallback.clear();
     }
 }
 

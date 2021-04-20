@@ -479,6 +479,19 @@ public:
             void        stop();
             bool        stopped() const;
 
+    /* Call stop() and then wait for all of the callbacks to return.
+     * It is safe to call this if stop() or pause() has already been called.
+     *
+     * This function is called from the destructor. But since AudioTrack
+     * is ref counted, the destructor may be called later than desired.
+     * This can be called explicitly as part of closing an AudioTrack
+     * if you want to be certain that callbacks have completely finished.
+     *
+     * This is not thread safe and should only be called from one thread,
+     * ideally as the AudioTrack is being closed.
+     */
+            void        stopAndJoinCallbacks();
+
     /* Flush a stopped or paused track. All previously buffered data is discarded immediately.
      * This has the effect of draining the buffers without mixing or output.
      * Flush is intended for streaming mode, for example before switching to non-contiguous content.
