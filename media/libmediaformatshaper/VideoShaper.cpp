@@ -23,9 +23,9 @@
 
 #include <media/NdkMediaFormat.h>
 
-#include <media/formatshaper/VQops.h>
-#include <media/formatshaper/CodecProperties.h>
-#include <media/formatshaper/VideoShaper.h>
+#include "CodecProperties.h"
+#include "VideoShaper.h"
+#include "VQops.h"
 
 namespace android {
 namespace mediaformatshaper {
@@ -83,10 +83,10 @@ int videoShaper(CodecProperties *codec, AMediaFormat* inFormat, int flags) {
     // apply any quality transforms in here..
     (void) VQApply(codec, info, inFormat, flags);
 
-    // We must always spread any QP parameters.
+    // We always spread any QP parameters.
     // Sometimes it's something we inserted here, sometimes it's a value that the user injected.
     //
-    qpSpreadPerFrameType(inFormat, info->qpDelta, info->qpMin, info->qpMax, /* override */ false);
+    qpSpreadPerFrameType(inFormat, info->qpDelta, info->qpMin, info->qpMax, /* override */ true);
 
     //
     return 0;
