@@ -6196,6 +6196,8 @@ media_status_t MPEG4Source::read(
                 // The twos' PCM block reader assumes that all samples has the same size.
                 uint32_t lastSampleIndexInChunk = mSampleTable->getLastSampleIndexInChunk();
                 if (lastSampleIndexInChunk < mCurrentSampleIndex) {
+                    mBuffer->release();
+                    mBuffer = nullptr;
                     return AMEDIA_ERROR_UNKNOWN;
                 }
                 uint32_t samplesToRead = lastSampleIndexInChunk - mCurrentSampleIndex + 1;
@@ -6218,7 +6220,6 @@ media_status_t MPEG4Source::read(
                 if (bytesRead < (ssize_t)totalSize) {
                     mBuffer->release();
                     mBuffer = NULL;
-
                     return AMEDIA_ERROR_IO;
                 }
 
