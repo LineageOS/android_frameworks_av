@@ -2189,31 +2189,40 @@ void Camera3Device::notifyStatus(bool idle) {
         std::lock_guard<std::mutex> l(mOutputLock);
         listener = mListener.promote();
     }
-    if (idle && listener != NULL) {
-        // Get session stats from the builder, and notify the listener.
-        int64_t requestCount, resultErrorCount;
-        bool deviceError;
-        std::map<int, StreamStats> streamStatsMap;
-        mSessionStatsBuilder.buildAndReset(&requestCount, &resultErrorCount,
-                &deviceError, &streamStatsMap);
-        for (size_t i = 0; i < streamIds.size(); i++) {
-            int streamId = streamIds[i];
-            auto stats = streamStatsMap.find(streamId);
-            if (stats != streamStatsMap.end()) {
-                streamStats[i].mRequestCount = stats->second.mRequestedFrameCount;
-                streamStats[i].mErrorCount = stats->second.mDroppedFrameCount;
-                streamStats[i].mStartLatencyMs = stats->second.mStartLatencyMs;
-                streamStats[i].mHistogramType =
-                        hardware::CameraStreamStats::HISTOGRAM_TYPE_CAPTURE_LATENCY;
-                streamStats[i].mHistogramBins.assign(
-                        stats->second.mCaptureLatencyBins.begin(),
-                        stats->second.mCaptureLatencyBins.end());
-                streamStats[i].mHistogramCounts.assign(
-                        stats->second.mCaptureLatencyHistogram.begin(),
-                        stats->second.mCaptureLatencyHistogram.end());
+    status_t res = OK;
+    if (listener != nullptr) {
+        if (idle) {
+            // Get session stats from the builder, and notify the listener.
+            int64_t requestCount, resultErrorCount;
+            bool deviceError;
+            std::map<int, StreamStats> streamStatsMap;
+            mSessionStatsBuilder.buildAndReset(&requestCount, &resultErrorCount,
+                    &deviceError, &streamStatsMap);
+            for (size_t i = 0; i < streamIds.size(); i++) {
+                int streamId = streamIds[i];
+                auto stats = streamStatsMap.find(streamId);
+                if (stats != streamStatsMap.end()) {
+                    streamStats[i].mRequestCount = stats->second.mRequestedFrameCount;
+                    streamStats[i].mErrorCount = stats->second.mDroppedFrameCount;
+                    streamStats[i].mStartLatencyMs = stats->second.mStartLatencyMs;
+                    streamStats[i].mHistogramType =
+                            hardware::CameraStreamStats::HISTOGRAM_TYPE_CAPTURE_LATENCY;
+                    streamStats[i].mHistogramBins.assign(
+                            stats->second.mCaptureLatencyBins.begin(),
+                            stats->second.mCaptureLatencyBins.end());
+                    streamStats[i].mHistogramCounts.assign(
+                           stats->second.mCaptureLatencyHistogram.begin(),
+                           stats->second.mCaptureLatencyHistogram.end());
+                }
             }
+            listener->notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
+        } else {
+            res = listener->notifyActive();
         }
-        listener->notifyIdle(requestCount, resultErrorCount, deviceError, streamStats);
+    }
+    if (res != OK) {
+        SET_ERR("Camera access permission lost mid-operation: %s (%d)",
+                strerror(-res), res);
     }
 }
 
