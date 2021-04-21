@@ -17,7 +17,7 @@
 #ifndef LIBMEDIAFORMATSHAPER_VQOPS_H_
 #define LIBMEDIAFORMATSHAPER_VQOPS_H_
 
-#include <media/formatshaper/CodecProperties.h>
+#include "CodecProperties.h"
 #include <media/NdkMediaFormat.h>
 
 namespace android {
@@ -39,10 +39,12 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
 void qpSpreadPerFrameType(AMediaFormat *format, int delta, int qplow, int qphigh, bool override);
 void qpSpreadMaxPerFrameType(AMediaFormat *format, int delta, int qphigh, bool override);
 void qpSpreadMinPerFrameType(AMediaFormat *format, int qplow, bool override);
+void qpVerifyMinMaxOrdering(AMediaFormat *format);
 
 // does the format have QP bounding entries
-bool hasQp(AMediaFormat *format);
-bool hasQpPerFrameType(AMediaFormat *format);
+bool hasQpMax(AMediaFormat *format);
+bool hasQpMaxGlobal(AMediaFormat *format);
+bool hasQpMaxPerFrameType(AMediaFormat *format);
 
 }  // namespace mediaformatshaper
 }  // namespace android
