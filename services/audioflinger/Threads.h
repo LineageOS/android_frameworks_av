@@ -53,6 +53,7 @@ public:
         CFG_EVENT_CREATE_AUDIO_PATCH,
         CFG_EVENT_RELEASE_AUDIO_PATCH,
         CFG_EVENT_UPDATE_OUT_DEVICE,
+        CFG_EVENT_RESIZE_BUFFER
     };
 
     class ConfigEventData: public RefBase {
@@ -242,6 +243,28 @@ public:
         virtual ~UpdateOutDevicesConfigEvent();
     };
 
+    class ResizeBufferConfigEventData : public ConfigEventData {
+    public:
+        explicit ResizeBufferConfigEventData(int32_t maxSharedAudioHistoryMs) :
+            mMaxSharedAudioHistoryMs(maxSharedAudioHistoryMs) {}
+
+        virtual void dump(char *buffer, size_t size) {
+            snprintf(buffer, size, "mMaxSharedAudioHistoryMs: %d", mMaxSharedAudioHistoryMs);
+        }
+
+        int32_t mMaxSharedAudioHistoryMs;
+    };
+
+    class ResizeBufferConfigEvent : public ConfigEvent {
+    public:
+        explicit ResizeBufferConfigEvent(int32_t maxSharedAudioHistoryMs) :
+            ConfigEvent(CFG_EVENT_RESIZE_BUFFER) {
+            mData = new ResizeBufferConfigEventData(maxSharedAudioHistoryMs);
+        }
+
+        virtual ~ResizeBufferConfigEvent() {}
+    };
+
     class PMDeathRecipient : public IBinder::DeathRecipient {
     public:
         explicit    PMDeathRecipient(const wp<ThreadBase>& thread) : mThread(thread) {}
@@ -306,6 +329,7 @@ public:
                 status_t    sendReleaseAudioPatchConfigEvent(audio_patch_handle_t handle);
                 status_t    sendUpdateOutDeviceConfigEvent(
                                     const DeviceDescriptorBaseVector& outDevices);
+                void        sendResizeBufferConfigEvent_l(int32_t maxSharedAudioHistoryMs);
                 void        processConfigEvents_l();
     virtual     void        cacheParameters_l() = 0;
     virtual     status_t    createAudioPatch_l(const struct audio_patch *patch,
@@ -313,6 +337,9 @@ public:
     virtual     status_t    releaseAudioPatch_l(const audio_patch_handle_t handle) = 0;
     virtual     void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices);
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
+
+    virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs = 0);
+
 
 
                 // see note at declaration of mStandby, mOutDevice and mInDevice
@@ -1613,6 +1640,9 @@ public:
         // AudioBufferProvider interface
         virtual status_t    getNextBuffer(AudioBufferProvider::Buffer* buffer);
         virtual void        releaseBuffer(AudioBufferProvider::Buffer* buffer);
+
+                int32_t     getFront() const { return mRsmpInFront; }
+                void        setFront(int32_t front) { mRsmpInFront = front; }
     private:
         RecordTrack * const mRecordTrack;
         size_t              mRsmpInUnrel;   // unreleased frames remaining from
@@ -1662,7 +1692,8 @@ public:
                     audio_input_flags_t *flags,
                     pid_t tid,
                     status_t *status /*non-NULL*/,
-                    audio_port_handle_t portId);
+                    audio_port_handle_t portId,
+                    int32_t maxSharedAudioHistoryMs);
 
             status_t    start(RecordTrack* recordTrack,
                               AudioSystem::sync_event_t event,
@@ -1686,6 +1717,7 @@ public:
                                            audio_patch_handle_t *handle);
     virtual status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
             void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices) override;
+            void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs = 0) override;
 
             void        addPatchTrack(const sp<PatchRecord>& record);
             void        deletePatchTrack(const sp<PatchRecord>& record);
@@ -1741,6 +1773,13 @@ public:
                                     && inDeviceType() == mTimestampCorrectedDevice;
                         }
 
+            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
+                                          audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
+                                          int64_t sharedAudioStartMs = -1);
+            status_t    shareAudioHistory_l(const std::string& sharedAudioPackageName,
+                                          audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
+                                          int64_t sharedAudioStartMs = -1);
+
 protected:
             void        dumpInternals_l(int fd, const Vector<String16>& args) override;
             void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1753,6 +1792,9 @@ private:
             void    inputStandBy();
 
             void    checkBtNrec_l();
+
+            int32_t getOldestFront_l();
+            void    updateFronts_l(int32_t offset);
 
             AudioStreamIn                       *mInput;
             Source                              *mSource;
@@ -1819,6 +1861,10 @@ private:
             int64_t                             mFramesRead = 0;    // continuous running counter.
 
             DeviceDescriptorBaseVector          mOutDevices;
+
+            std::string                         mSharedAudioPackageName = {};
+            long                                mSharedAudioStartMs = 0;
+            audio_session_t                     mSharedAudioSessionId = AUDIO_SESSION_NONE;
 };
 
 class MmapThread : public ThreadBase

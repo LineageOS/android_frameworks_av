@@ -163,6 +163,33 @@ class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
     }
 };
 
+// TODO b/182392769: use identity util
+/* static */
+media::permission::Identity AudioFlinger::checkIdentityPackage(
+        const media::permission::Identity& identity) {
+    Vector<String16> packages;
+    PermissionController{}.getPackagesForUid(identity.uid, packages);
+
+    Identity checkedIdentity = identity;
+    if (!identity.packageName.has_value() || identity.packageName.value().size() == 0) {
+        if (!packages.isEmpty()) {
+            checkedIdentity.packageName =
+                std::move(legacy2aidl_String16_string(packages[0]).value());
+        }
+    } else {
+        String16 opPackageLegacy = VALUE_OR_FATAL(
+            aidl2legacy_string_view_String16(identity.packageName.value_or("")));
+        if (std::find_if(packages.begin(), packages.end(),
+                [&opPackageLegacy](const auto& package) {
+                return opPackageLegacy == package; }) == packages.end()) {
+            ALOGW("The package name(%s) provided does not correspond to the uid %d",
+                    identity.packageName.value_or("").c_str(), identity.uid);
+            checkedIdentity.packageName = std::optional<std::string>();
+        }
+    }
+    return checkedIdentity;
+}
+
 // ----------------------------------------------------------------------------
 
 std::string formatToString(audio_format_t format) {
@@ -2157,7 +2184,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                                                   &output.notificationFrameCount,
                                                   callingPid, adjIdentity, &output.flags,
                                                   input.clientInfo.clientTid,
-                                                  &lStatus, portId);
+                                                  &lStatus, portId, input.maxSharedAudioHistoryMs);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));
 
         // lStatus == BAD_TYPE means FAST flag was rejected: request a new input from

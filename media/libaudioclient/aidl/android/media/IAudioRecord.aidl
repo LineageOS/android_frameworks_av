@@ -48,4 +48,6 @@ interface IAudioRecord {
   /* Set the microphone zoom (for processing).
    */
   void setPreferredMicrophoneFieldDimension(float zoom);
+
+  void shareAudioHistory(@utf8InCpp String sharedAudioPackageName, long sharedAudioStartMs);
 }
