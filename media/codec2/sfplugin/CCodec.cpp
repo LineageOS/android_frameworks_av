@@ -2151,7 +2151,7 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
             }
 
             // handle configuration changes in work done
-            const C2StreamInitDataInfo::output *initData = nullptr;
+            std::unique_ptr<C2Param> initData;
             sp<AMessage> outputFormat = nullptr;
             {
                 Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
@@ -2229,10 +2229,14 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                 if (config->mInputSurface) {
                     config->mInputSurface->onInputBufferDone(work->input.ordinal.frameIndex);
                 }
-                initData = initDataWatcher.hasChanged() ? initDataWatcher.update().get() : nullptr;
+                if (initDataWatcher.hasChanged()) {
+                    initData = C2Param::Copy(*initDataWatcher.update().get());
+                }
                 outputFormat = config->mOutputFormat;
             }
-            mChannel->onWorkDone(std::move(work), outputFormat, initData);
+            mChannel->onWorkDone(
+                    std::move(work), outputFormat,
+                    initData ? (C2StreamInitDataInfo::output *)initData.get() : nullptr);
             break;
         }
         case kWhatWatch: {
