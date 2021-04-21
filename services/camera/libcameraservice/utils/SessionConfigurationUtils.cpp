@@ -291,7 +291,8 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
         OutputStreamInfo& streamInfo, bool isStreamInfoValid,
         sp<Surface>& surface, const sp<IGraphicBufferProducer>& gbp,
         const String8 &logicalCameraId, const CameraMetadata &physicalCameraMetadata,
-        const std::vector<int32_t> &sensorPixelModesUsed){
+        const std::vector<int32_t> &sensorPixelModesUsed,
+        bool isPriviledgedClient){
     // bufferProducer must be non-null
     if (gbp == nullptr) {
         String8 msg = String8::format("Camera %s: Surface is NULL", logicalCameraId.string());
@@ -321,7 +322,7 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
     uint64_t allowedFlags = GraphicBuffer::USAGE_SW_READ_MASK |
                            GraphicBuffer::USAGE_HW_TEXTURE |
                            GraphicBuffer::USAGE_HW_COMPOSER;
-    bool flexibleConsumer = (consumerUsage & disallowedFlags) == 0 &&
+    bool flexibleConsumer = !isPriviledgedClient && (consumerUsage & disallowedFlags) == 0 &&
             (consumerUsage & allowedFlags) != 0;
 
     surface = new Surface(gbp, useAsync);
@@ -378,6 +379,7 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
         // we can use the default stream configuration map
         foundInMaxRes = true;
     }
+
     // Round dimensions to the nearest dimensions available for this format
     if (flexibleConsumer && isPublicFormat(format) &&
             !SessionConfigurationUtils::roundBufferDimensionNearest(width, height,
