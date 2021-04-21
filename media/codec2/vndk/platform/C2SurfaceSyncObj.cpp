@@ -157,12 +157,10 @@ int C2SyncVariables::unlock() {
     return 0;
 }
 
-void C2SyncVariables::setInitialDequeueCount(
+void C2SyncVariables::setInitialDequeueCountLocked(
         int32_t maxDequeueCount, int32_t curDequeueCount) {
-    lock();
     mMaxDequeueCount = maxDequeueCount;
     mCurDequeueCount = curDequeueCount;
-    unlock();
 }
 
 uint32_t C2SyncVariables::getWaitIdLocked() {
