@@ -21,6 +21,7 @@
 #include <android-base/properties.h>
 #include <media/NdkCommon.h>
 #include <media/VideoTrackTranscoder.h>
+#include <sys/prctl.h>
 
 using namespace AMediaFormatUtils;
 
@@ -588,6 +589,8 @@ void VideoTrackTranscoder::updateTrackFormat(AMediaFormat* outputFormat, bool fr
 }
 
 media_status_t VideoTrackTranscoder::runTranscodeLoop(bool* stopped) {
+    prctl(PR_SET_NAME, (unsigned long)"VideTranscodTrd", 0, 0, 0);
+
     // Push start decoder and encoder as two messages, so that these are subject to the
     // stop request as well. If the session is cancelled (or paused) immediately after start,
     // we don't need to waste time start then stop the codecs.
