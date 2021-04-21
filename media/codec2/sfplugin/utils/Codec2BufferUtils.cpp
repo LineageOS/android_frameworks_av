@@ -346,7 +346,7 @@ bool IsNV12(const MediaImage2 *img) {
     }
     return (img->mPlane[1].mColInc == 2
             && img->mPlane[2].mColInc == 2
-            && (img->mPlane[2].mOffset - img->mPlane[1].mOffset == 1));
+            && (img->mPlane[2].mOffset == img->mPlane[1].mOffset + 1));
 }
 
 bool IsNV21(const MediaImage2 *img) {
@@ -355,7 +355,7 @@ bool IsNV21(const MediaImage2 *img) {
     }
     return (img->mPlane[1].mColInc == 2
             && img->mPlane[2].mColInc == 2
-            && (img->mPlane[1].mOffset - img->mPlane[2].mOffset == 1));
+            && (img->mPlane[1].mOffset == img->mPlane[2].mOffset + 1));
 }
 
 bool IsI420(const MediaImage2 *img) {
