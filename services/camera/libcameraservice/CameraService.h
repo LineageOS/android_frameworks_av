@@ -347,9 +347,18 @@ public:
         // - The app-side Binder interface to receive callbacks from us
         sp<IBinder>                     mRemoteBinder;   // immutable after constructor
 
-        // permissions management
+        // Permissions management methods for camera lifecycle
+
+        // Notify rest of system/apps about camera opening, and check appops
         virtual status_t                startCameraOps();
+        // Notify rest of system/apps about camera starting to stream data, and confirm appops
+        virtual status_t                startCameraStreamingOps();
+        // Notify rest of system/apps about camera stopping streaming data
+        virtual status_t                finishCameraStreamingOps();
+        // Notify rest of system/apps about camera closing
         virtual status_t                finishCameraOps();
+        // Handle errors for start/checkOps
+        virtual status_t                handleAppOpMode(int32_t mode);
 
         std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
 
@@ -364,9 +373,12 @@ public:
         }; // class OpsCallback
 
         sp<OpsCallback> mOpsCallback;
-        // Track whether startCameraOps was called successfully, to avoid
-        // finishing what we didn't start.
+        // Track whether checkOps was called successfully, to avoid
+        // finishing what we didn't start, on camera open.
         bool            mOpsActive;
+        // Track whether startOps was called successfully on start of
+        // camera streaming.
+        bool            mOpsStreaming;
 
         // IAppOpsCallback interface, indirected through opListener
         virtual void opChanged(int32_t op, const String16& packageName);
