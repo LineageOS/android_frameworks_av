@@ -241,7 +241,8 @@ public:
                             audio_port_handle_t selectedDeviceId = AUDIO_PORT_HANDLE_NONE,
                             audio_microphone_direction_t
                                 selectedMicDirection = MIC_DIRECTION_UNSPECIFIED,
-                            float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT);
+                            float selectedMicFieldDimension = MIC_FIELD_DIMENSION_DEFAULT,
+                            int32_t maxSharedAudioHistoryMs = 0);
 
     /* Result of constructing the AudioRecord. This must be checked for successful initialization
      * before using any AudioRecord API (except for set()), because using
@@ -596,6 +597,10 @@ public:
      */
             void setLogSessionId(const char *logSessionId);
 
+
+            status_t shareAudioHistory(const std::string& sharedPackageName,
+                                       int64_t sharedStartMs);
+
      /*
       * Dumps the state of an audio record.
       */
@@ -778,6 +783,10 @@ private:
 
     audio_microphone_direction_t mSelectedMicDirection;
     float mSelectedMicFieldDimension;
+
+    int32_t                    mMaxSharedAudioHistoryMs = 0;
+    std::string                mSharedAudioPackageName = {};
+    int64_t                    mSharedAudioStartMs = 0;
 
 private:
     class MediaMetrics {

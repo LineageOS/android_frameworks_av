@@ -130,6 +130,7 @@ public:
         AudioClient clientInfo;
         media::permission::Identity identity;
         audio_unique_id_t riid;
+        int32_t maxSharedAudioHistoryMs;
 
         /* input/output */
         audio_input_flags_t flags;

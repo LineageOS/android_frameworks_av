@@ -34,6 +34,7 @@ parcelable CreateRecordRequest {
     AudioClient clientInfo;
     /** Interpreted as audio_unique_id_t. */
     int riid;
+    int maxSharedAudioHistoryMs;
     /** Bitmask, indexed by AudioInputFlags. */
     int flags;
     long frameCount;

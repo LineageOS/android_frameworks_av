@@ -235,7 +235,8 @@ status_t AudioRecord::set(
         const audio_attributes_t* pAttributes,
         audio_port_handle_t selectedDeviceId,
         audio_microphone_direction_t selectedMicDirection,
-        float microphoneFieldDimension)
+        float microphoneFieldDimension,
+        int32_t maxSharedAudioHistoryMs)
 {
     status_t status = NO_ERROR;
     uint32_t channelCount;
@@ -268,6 +269,7 @@ status_t AudioRecord::set(
     mSelectedDeviceId = selectedDeviceId;
     mSelectedMicDirection = selectedMicDirection;
     mSelectedMicFieldDimension = microphoneFieldDimension;
+    mMaxSharedAudioHistoryMs = maxSharedAudioHistoryMs;
 
     switch (transferType) {
     case TRANSFER_DEFAULT:
@@ -816,6 +818,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
     input.selectedDeviceId = mSelectedDeviceId;
     input.sessionId = mSessionId;
     originalSessionId = mSessionId;
+    input.maxSharedAudioHistoryMs = mMaxSharedAudioHistoryMs;
 
     do {
         media::CreateRecordResponse response;
@@ -837,7 +840,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
         usleep((20 + rand() % 30) * 10000);
     } while (1);
 
-    ALOG_ASSERT(record != 0);
+    ALOG_ASSERT(output.audioRecord != 0);
 
     // AudioFlinger now owns the reference to the I/O handle,
     // so we are no longer responsible for releasing it.
@@ -923,6 +926,10 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
             AudioSystem::removeAudioDeviceCallback(this, mInput, mPortId);
         }
         AudioSystem::addAudioDeviceCallback(this, output.inputId, output.portId);
+    }
+
+    if (!mSharedAudioPackageName.empty()) {
+        mAudioRecord->shareAudioHistory(mSharedAudioPackageName, mSharedAudioStartMs);
     }
 
     mPortId = output.portId;
@@ -1578,7 +1585,7 @@ status_t AudioRecord::setPreferredMicrophoneFieldDimension(float zoom) {
 
 void AudioRecord::setLogSessionId(const char *logSessionId)
 {
-     AutoMutex lock(mLock);
+    AutoMutex lock(mLock);
     if (logSessionId == nullptr) logSessionId = "";  // an empty string is an unset session id.
     if (mLogSessionId == logSessionId) return;
 
@@ -1587,6 +1594,22 @@ void AudioRecord::setLogSessionId(const char *logSessionId)
          .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_SETLOGSESSIONID)
          .set(AMEDIAMETRICS_PROP_LOGSESSIONID, logSessionId)
          .record();
+}
+
+status_t AudioRecord::shareAudioHistory(const std::string& sharedPackageName,
+                                        int64_t sharedStartMs)
+{
+    AutoMutex lock(mLock);
+    if (mAudioRecord == 0) {
+        return NO_INIT;
+    }
+    status_t status = statusTFromBinderStatus(
+            mAudioRecord->shareAudioHistory(sharedPackageName, sharedStartMs));
+    if (status == NO_ERROR) {
+        mSharedAudioPackageName = sharedPackageName;
+        mSharedAudioStartMs = sharedStartMs;
+    }
+    return status;
 }
 
 // =========================================================================

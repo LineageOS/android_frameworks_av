@@ -212,8 +212,10 @@ bool captureHotwordAllowed(const Identity& identity) {
 
     if (ok) {
         static const String16 sCaptureHotwordAllowed("android.permission.CAPTURE_AUDIO_HOTWORD");
-        // IMPORTANT: Use PermissionCache - not a runtime permission and may not change.
-        ok = PermissionCache::checkPermission(sCaptureHotwordAllowed, pid, uid);
+        //TODO: b/185972521: see if permission cache can be used with shell identity for CTS
+        PermissionController permissionController;
+        ok = permissionController.checkPermission(sCaptureHotwordAllowed,
+            pid, uid);
     }
     if (!ok) ALOGV("android.permission.CAPTURE_AUDIO_HOTWORD");
     return ok;

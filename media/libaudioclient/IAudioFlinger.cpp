@@ -138,6 +138,8 @@ IAudioFlinger::CreateRecordInput::toAidl() const {
     aidl.config = VALUE_OR_RETURN(legacy2aidl_audio_config_base_t_AudioConfigBase(config));
     aidl.clientInfo = VALUE_OR_RETURN(legacy2aidl_AudioClient_AudioClient(clientInfo));
     aidl.riid = VALUE_OR_RETURN(legacy2aidl_audio_unique_id_t_int32_t(riid));
+    aidl.maxSharedAudioHistoryMs = VALUE_OR_RETURN(
+            convertIntegral<int32_t>(maxSharedAudioHistoryMs));
     aidl.flags = VALUE_OR_RETURN(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
     aidl.frameCount = VALUE_OR_RETURN(convertIntegral<int64_t>(frameCount));
     aidl.notificationFrameCount = VALUE_OR_RETURN(convertIntegral<int64_t>(notificationFrameCount));
@@ -151,10 +153,13 @@ ConversionResult<IAudioFlinger::CreateRecordInput>
 IAudioFlinger::CreateRecordInput::fromAidl(
         const media::CreateRecordRequest& aidl) {
     IAudioFlinger::CreateRecordInput legacy;
-    legacy.attr = VALUE_OR_RETURN(aidl2legacy_AudioAttributesInternal_audio_attributes_t(aidl.attr));
+    legacy.attr = VALUE_OR_RETURN(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(aidl.attr));
     legacy.config = VALUE_OR_RETURN(aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.config));
     legacy.clientInfo = VALUE_OR_RETURN(aidl2legacy_AudioClient_AudioClient(aidl.clientInfo));
     legacy.riid = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_unique_id_t(aidl.riid));
+    legacy.maxSharedAudioHistoryMs = VALUE_OR_RETURN(
+            convertIntegral<int32_t>(aidl.maxSharedAudioHistoryMs));
     legacy.flags = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_input_flags_t_mask(aidl.flags));
     legacy.frameCount = VALUE_OR_RETURN(convertIntegral<size_t>(aidl.frameCount));
     legacy.notificationFrameCount = VALUE_OR_RETURN(
