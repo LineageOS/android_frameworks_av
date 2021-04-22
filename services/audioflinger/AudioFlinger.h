@@ -129,6 +129,9 @@ class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 public:
     static void instantiate() ANDROID_API;
 
+    static media::permission::Identity checkIdentityPackage(
+                                            const media::permission::Identity& identity);
+
     status_t dump(int fd, const Vector<String16>& args) override;
 
     // IAudioFlinger interface, in binder opcode order
@@ -673,6 +676,8 @@ using effect_buffer_t = int16_t;
         virtual binder::Status   setPreferredMicrophoneDirection(
                 int /*audio_microphone_direction_t*/ direction);
         virtual binder::Status   setPreferredMicrophoneFieldDimension(float zoom);
+        virtual binder::Status   shareAudioHistory(const std::string& sharedAudioPackageName,
+                                                   int64_t sharedAudioStartMs);
 
     private:
         const sp<RecordThread::RecordTrack> mRecordTrack;
@@ -978,6 +983,9 @@ private:
     std::vector<media::AudioVibratorInfo> mAudioVibratorInfos;
 
     static inline constexpr const char *mMetricsId = AMEDIAMETRICS_KEY_AUDIO_FLINGER;
+
+    // Keep in sync with java definition in media/java/android/media/AudioRecord.java
+    static constexpr int32_t kMaxSharedAudioHistoryMs = 5000;
 };
 
 #undef INCLUDING_FROM_AUDIOFLINGER_H

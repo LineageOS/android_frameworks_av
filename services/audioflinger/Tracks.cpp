@@ -525,31 +525,8 @@ AudioFlinger::PlaybackThread::OpPlayAudioMonitor::createIfNeeded(
         return nullptr;
     }
 
-    // TODO b/182392769: use identity util
-    std::optional<std::string> opPackageNameStr = identity.packageName;
-    if (!identity.packageName.has_value()) {
-        // If no package name is provided by the client, use the first associated with the uid
-        if (!packages.isEmpty()) {
-            opPackageNameStr =
-                VALUE_OR_FATAL(legacy2aidl_String16_string(packages[0]));
-        }
-    } else {
-        // If the provided package name is invalid, we force app ops denial by clearing the package
-        // name passed to OpPlayAudioMonitor
-        String16 opPackageLegacy = VALUE_OR_FATAL(
-            aidl2legacy_string_view_String16(opPackageNameStr.value_or("")));
-        if (std::find_if(packages.begin(), packages.end(),
-                [&opPackageLegacy](const auto& package) {
-                return opPackageLegacy == package; }) == packages.end()) {
-            ALOGW("The package name(%s) provided does not correspond to the uid %d, "
-                  "force muting the track", opPackageNameStr.value().c_str(), uid);
-            // Set null package name so hasOpPlayAudio will always return false.
-            opPackageNameStr = std::optional<std::string>();
-        }
-    }
-    Identity adjIdentity = identity;
-    adjIdentity.packageName = opPackageNameStr;
-    return new OpPlayAudioMonitor(adjIdentity, attr.usage, id);
+    Identity checkedIdentity = AudioFlinger::checkIdentityPackage(identity);
+    return new OpPlayAudioMonitor(checkedIdentity, attr.usage, id);
 }
 
 AudioFlinger::PlaybackThread::OpPlayAudioMonitor::OpPlayAudioMonitor(
@@ -2243,24 +2220,12 @@ AudioFlinger::RecordThread::OpRecordAudioMonitor::createIfNeeded(
         return nullptr;
     }
 
-    if (!identity.packageName.has_value() || identity.packageName.value().size() == 0) {
-        Vector<String16> packages;
-        // no package name, happens with SL ES clients
-        // query package manager to find one
-        PermissionController permissionController;
-        permissionController.getPackagesForUid(identity.uid, packages);
-        if (packages.isEmpty()) {
-            return nullptr;
-        } else {
-            Identity adjIdentity = identity;
-            adjIdentity.packageName =
-                VALUE_OR_FATAL(legacy2aidl_String16_string(packages[0]));
-            ALOGV("using identity:%s", adjIdentity.toString().c_str());
-            return new OpRecordAudioMonitor(adjIdentity);
-        }
+    Identity checkedIdentity = AudioFlinger::checkIdentityPackage(identity);
+    if (!checkedIdentity.packageName.has_value()
+            || checkedIdentity.packageName.value().size() == 0) {
+        return nullptr;
     }
-
-    return new OpRecordAudioMonitor(identity);
+    return new OpRecordAudioMonitor(checkedIdentity);
 }
 
 AudioFlinger::RecordThread::OpRecordAudioMonitor::OpRecordAudioMonitor(
@@ -2386,6 +2351,12 @@ binder::Status AudioFlinger::RecordHandle::setPreferredMicrophoneFieldDimension(
     return binderStatusFromStatusT(mRecordTrack->setPreferredMicrophoneFieldDimension(zoom));
 }
 
+binder::Status AudioFlinger::RecordHandle::shareAudioHistory(
+        const std::string& sharedAudioPackageName, int64_t sharedAudioStartMs) {
+    return binderStatusFromStatusT(
+            mRecordTrack->shareAudioHistory(sharedAudioPackageName, sharedAudioStartMs));
+}
+
 // ----------------------------------------------------------------------------
 #undef LOG_TAG
 #define LOG_TAG "AF::RecordTrack"
@@ -2406,7 +2377,8 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             const Identity& identity,
             audio_input_flags_t flags,
             track_type type,
-            audio_port_handle_t portId)
+            audio_port_handle_t portId,
+            int64_t startTimeMs)
     :   TrackBase(thread, client, attr, sampleRate, format,
                   channelMask, frameCount, buffer, bufferSize, sessionId,
                   creatorPid,
@@ -2423,7 +2395,8 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         mRecordBufferConverter(NULL),
         mFlags(flags),
         mSilenced(false),
-        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(identity, attr))
+        mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(identity, attr)),
+        mStartTimeMs(startTimeMs)
 {
     if (mCblk == NULL) {
         return;
@@ -2533,6 +2506,9 @@ void AudioFlinger::RecordThread::RecordTrack::destroy()
             Mutex::Autolock _l(thread->mLock);
             RecordThread *recordThread = (RecordThread *) thread.get();
             priorState = mState;
+            if (!mSharedAudioPackageName.empty()) {
+                recordThread->shareAudioHistory_l("");
+            }
             recordThread->destroyTrack_l(this); // move mState to STOPPED, terminate
         }
         // APM portid/client management done outside of lock.
@@ -2718,6 +2694,37 @@ status_t AudioFlinger::RecordThread::RecordTrack::setPreferredMicrophoneFieldDim
         return BAD_VALUE;
     }
 }
+
+status_t AudioFlinger::RecordThread::RecordTrack::shareAudioHistory(
+        const std::string& sharedAudioPackageName, int64_t sharedAudioStartMs) {
+
+    const uid_t callingUid = IPCThreadState::self()->getCallingUid();
+    const pid_t callingPid = IPCThreadState::self()->getCallingPid();
+    if (callingUid != mUid || callingPid != mCreatorPid) {
+        return PERMISSION_DENIED;
+    }
+
+    Identity identity{};
+    identity.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+    identity.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingPid));
+    if (!captureHotwordAllowed(identity)) {
+        return PERMISSION_DENIED;
+    }
+
+    sp<ThreadBase> thread = mThread.promote();
+    if (thread != 0) {
+        RecordThread *recordThread = (RecordThread *)thread.get();
+        status_t status = recordThread->shareAudioHistory(
+                sharedAudioPackageName, mSessionId, sharedAudioStartMs);
+        if (status == NO_ERROR) {
+            mSharedAudioPackageName = sharedAudioPackageName;
+        }
+        return status;
+    } else {
+        return BAD_VALUE;
+    }
+}
+
 
 // ----------------------------------------------------------------------------
 #undef LOG_TAG

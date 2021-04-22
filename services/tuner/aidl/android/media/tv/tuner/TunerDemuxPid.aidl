@@ -22,7 +22,7 @@ package android.media.tv.tuner;
  * {@hide}
  */
 union TunerDemuxPid {
-    int tPid;
+    char tPid;
 
-    int mmtpPid;
+    char mmtpPid;
 }
