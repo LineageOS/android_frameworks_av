@@ -27,7 +27,7 @@ parcelable TunerFilterPesEvent {
     /**
      * Data size in bytes of PES data
      */
-    int dataLength;
+    char dataLength;
 
     /**
      * MPU sequence number of filtered data

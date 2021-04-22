@@ -27,7 +27,7 @@ parcelable TunerFrontendIsdbsSettings {
      */
     int frequency;
 
-    int streamId;
+    char streamId;
 
     int streamIdType;
 

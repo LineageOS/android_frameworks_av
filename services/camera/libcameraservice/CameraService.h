@@ -190,7 +190,8 @@ public:
 
     binder::Status      addListenerHelper(const sp<hardware::ICameraServiceListener>& listener,
             /*out*/
-            std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false);
+            std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false,
+            bool isProcessLocalTest = false);
 
     // Monitored UIDs availability notification
     void                notifyMonitoredUids();
@@ -219,6 +220,19 @@ public:
             int* orientation = nullptr);
 
     /////////////////////////////////////////////////////////////////////
+    // Methods to be used in CameraService class tests only
+    //
+    // CameraService class test method only - clear static variables in the
+    // cameraserver process, which otherwise might affect multiple test runs.
+    void                clearCachedVariables();
+
+    // Add test listener, linkToDeath won't be called since this is for process
+    // local testing.
+    binder::Status    addListenerTest(const sp<hardware::ICameraServiceListener>& listener,
+            /*out*/
+            std::vector<hardware::CameraStatus>* cameraStatuses);
+
+    /////////////////////////////////////////////////////////////////////
     // Shared utilities
     static binder::Status filterGetInfoErrorCode(status_t err);
 
@@ -226,6 +240,7 @@ public:
     // CameraClient functionality
 
     class BasicClient : public virtual RefBase {
+    friend class CameraService;
     public:
         virtual status_t       initialize(sp<CameraProviderManager> manager,
                 const String8& monitorTags) = 0;
@@ -332,9 +347,18 @@ public:
         // - The app-side Binder interface to receive callbacks from us
         sp<IBinder>                     mRemoteBinder;   // immutable after constructor
 
-        // permissions management
+        // Permissions management methods for camera lifecycle
+
+        // Notify rest of system/apps about camera opening, and check appops
         virtual status_t                startCameraOps();
+        // Notify rest of system/apps about camera starting to stream data, and confirm appops
+        virtual status_t                startCameraStreamingOps();
+        // Notify rest of system/apps about camera stopping streaming data
+        virtual status_t                finishCameraStreamingOps();
+        // Notify rest of system/apps about camera closing
         virtual status_t                finishCameraOps();
+        // Handle errors for start/checkOps
+        virtual status_t                handleAppOpMode(int32_t mode);
 
         std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
 
@@ -349,9 +373,12 @@ public:
         }; // class OpsCallback
 
         sp<OpsCallback> mOpsCallback;
-        // Track whether startCameraOps was called successfully, to avoid
-        // finishing what we didn't start.
+        // Track whether checkOps was called successfully, to avoid
+        // finishing what we didn't start, on camera open.
         bool            mOpsActive;
+        // Track whether startOps was called successfully on start of
+        // camera streaming.
+        bool            mOpsStreaming;
 
         // IAppOpsCallback interface, indirected through opListener
         virtual void opChanged(int32_t op, const String16& packageName);
@@ -928,7 +955,10 @@ private:
                       mIsVendorListener(isVendorClient),
                       mOpenCloseCallbackAllowed(openCloseCallbackAllowed) { }
 
-            status_t initialize() {
+            status_t initialize(bool isProcessLocalTest) {
+                if (isProcessLocalTest) {
+                    return OK;
+                }
                 return IInterface::asBinder(mListener)->linkToDeath(this);
             }
 

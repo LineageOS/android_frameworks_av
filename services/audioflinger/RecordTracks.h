@@ -69,7 +69,8 @@ public:
                                 const media::permission::Identity& identity,
                                 audio_input_flags_t flags,
                                 track_type type,
-                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
+                                audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
+                                int64_t startTimeMs = -1);
     virtual             ~RecordTrack();
     virtual status_t    initCheck() const;
 
@@ -107,6 +108,9 @@ public:
 
             status_t    setPreferredMicrophoneDirection(audio_microphone_direction_t direction);
             status_t    setPreferredMicrophoneFieldDimension(float zoom);
+            status_t    shareAudioHistory(const std::string& sharedAudioPackageName,
+                                          int64_t sharedAudioStartMs);
+            int64_t     startTimeMs() { return mStartTimeMs; }
 
     static  bool        checkServerLatencySupported(
                                 audio_format_t format, audio_input_flags_t flags) {
@@ -146,8 +150,9 @@ private:
             bool                               mSilenced;
 
             // used to enforce OP_RECORD_AUDIO
-            uid_t                              mUid;
             sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
+            std::string                        mSharedAudioPackageName = {};
+            int64_t                            mStartTimeMs = -1;
 };
 
 // playback track, used by PatchPanel
