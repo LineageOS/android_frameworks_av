@@ -146,6 +146,7 @@ CameraService::CameraService() :
 
 void CameraService::onFirstRef()
 {
+
     ALOGI("CameraService process starting");
 
     BnCameraService::onFirstRef();
@@ -750,6 +751,10 @@ Status CameraService::getCameraVendorTagCache(
         *cache = *(globalCache.get());
     }
     return Status::ok();
+}
+
+void CameraService::clearCachedVariables() {
+    BasicClient::BasicClient::sCameraService = nullptr;
 }
 
 int CameraService::getDeviceVersion(const String8& cameraId, int* facing, int* orientation) {
@@ -2154,10 +2159,15 @@ Status CameraService::addListener(const sp<ICameraServiceListener>& listener,
     return addListenerHelper(listener, cameraStatuses);
 }
 
+binder::Status CameraService::addListenerTest(const sp<hardware::ICameraServiceListener>& listener,
+            std::vector<hardware::CameraStatus>* cameraStatuses) {
+    return addListenerHelper(listener, cameraStatuses, false, true);
+}
+
 Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listener,
         /*out*/
         std::vector<hardware::CameraStatus> *cameraStatuses,
-        bool isVendorListener) {
+        bool isVendorListener, bool isProcessLocalTest) {
 
     ATRACE_CALL();
 
@@ -2188,7 +2198,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         sp<ServiceListener> serviceListener =
                 new ServiceListener(this, listener, clientUid, clientPid, isVendorListener,
                         openCloseCallbackAllowed);
-        auto ret = serviceListener->initialize();
+        auto ret = serviceListener->initialize(isProcessLocalTest);
         if (ret != NO_ERROR) {
             String8 msg = String8::format("Failed to initialize service listener: %s (%d)",
                     strerror(-ret), ret);
@@ -2770,19 +2780,20 @@ CameraService::BasicClient::BasicClient(const sp<CameraService>& cameraService,
         const String8& cameraIdStr, int cameraFacing, int sensorOrientation,
         int clientPid, uid_t clientUid,
         int servicePid):
+        mDestructionStarted(false),
         mCameraIdStr(cameraIdStr), mCameraFacing(cameraFacing), mOrientation(sensorOrientation),
         mClientPackageName(clientPackageName), mClientFeatureId(clientFeatureId),
         mClientPid(clientPid), mClientUid(clientUid),
         mServicePid(servicePid),
         mDisconnected(false), mUidIsTrusted(false),
         mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE),
-        mRemoteBinder(remoteCallback)
+        mRemoteBinder(remoteCallback),
+        mOpsActive(false),
+        mOpsStreaming(false)
 {
     if (sCameraService == nullptr) {
         sCameraService = cameraService;
     }
-    mOpsActive = false;
-    mDestructionStarted = false;
 
     // In some cases the calling code has no access to the package it runs under.
     // For example, NDK camera API.
@@ -2917,6 +2928,29 @@ bool CameraService::BasicClient::isValidAudioRestriction(int32_t mode) {
     }
 }
 
+status_t CameraService::BasicClient::handleAppOpMode(int32_t mode) {
+    if (mode == AppOpsManager::MODE_ERRORED) {
+        ALOGI("Camera %s: Access for \"%s\" has been revoked",
+                mCameraIdStr.string(), String8(mClientPackageName).string());
+        return PERMISSION_DENIED;
+    } else if (!mUidIsTrusted && mode == AppOpsManager::MODE_IGNORED) {
+        // If the calling Uid is trusted (a native service), the AppOpsManager could
+        // return MODE_IGNORED. Do not treat such case as error.
+        bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid,
+                mClientPackageName);
+        bool isCameraPrivacyEnabled =
+                sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled(
+                    multiuser_get_user_id(mClientUid));
+        if (!isUidActive || !isCameraPrivacyEnabled) {
+            ALOGI("Camera %s: Access for \"%s\" has been restricted",
+                    mCameraIdStr.string(), String8(mClientPackageName).string());
+            // Return the same error as for device policy manager rejection
+            return -EACCES;
+        }
+    }
+    return OK;
+}
+
 status_t CameraService::BasicClient::startCameraOps() {
     ATRACE_CALL();
 
@@ -2927,33 +2961,16 @@ status_t CameraService::BasicClient::startCameraOps() {
     if (mAppOpsManager != nullptr) {
         // Notify app ops that the camera is not available
         mOpsCallback = new OpsCallback(this);
-        int32_t res;
         mAppOpsManager->startWatchingMode(AppOpsManager::OP_CAMERA,
                 mClientPackageName, mOpsCallback);
-        res = mAppOpsManager->startOpNoThrow(AppOpsManager::OP_CAMERA, mClientUid,
-                mClientPackageName, /*startIfModeDefault*/ false, mClientFeatureId,
-                String16("start camera ") + String16(mCameraIdStr));
 
-        if (res == AppOpsManager::MODE_ERRORED) {
-            ALOGI("Camera %s: Access for \"%s\" has been revoked",
-                    mCameraIdStr.string(), String8(mClientPackageName).string());
-            return PERMISSION_DENIED;
-        }
-
-        // If the calling Uid is trusted (a native service), the AppOpsManager could
-        // return MODE_IGNORED. Do not treat such case as error.
-        if (!mUidIsTrusted && res == AppOpsManager::MODE_IGNORED) {
-            bool isUidActive = sCameraService->mUidPolicy->isUidActive(mClientUid,
-                    mClientPackageName);
-            bool isCameraPrivacyEnabled =
-                    sCameraService->mSensorPrivacyPolicy->isCameraPrivacyEnabled(
-                            multiuser_get_user_id(mClientUid));
-            if (!isUidActive || !isCameraPrivacyEnabled) {
-                ALOGI("Camera %s: Access for \"%s\" has been restricted",
-                        mCameraIdStr.string(), String8(mClientPackageName).string());
-                // Return the same error as for device policy manager rejection
-                return -EACCES;
-            }
+        // Just check for camera acccess here on open - delay startOp until
+        // camera frames start streaming in startCameraStreamingOps
+        int32_t mode = mAppOpsManager->checkOp(AppOpsManager::OP_CAMERA, mClientUid,
+                mClientPackageName);
+        status_t res = handleAppOpMode(mode);
+        if (res != OK) {
+            return res;
         }
     }
 
@@ -2970,17 +2987,69 @@ status_t CameraService::BasicClient::startCameraOps() {
     return OK;
 }
 
+status_t CameraService::BasicClient::startCameraStreamingOps() {
+    ATRACE_CALL();
+
+    if (!mOpsActive) {
+        ALOGE("%s: Calling streaming start when not yet active", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+    if (mOpsStreaming) {
+        ALOGV("%s: Streaming already active!", __FUNCTION__);
+        return OK;
+    }
+
+    ALOGV("%s: Start camera streaming ops, package name = %s, client UID = %d",
+            __FUNCTION__, String8(mClientPackageName).string(), mClientUid);
+
+    if (mAppOpsManager != nullptr) {
+        int32_t mode = mAppOpsManager->startOpNoThrow(AppOpsManager::OP_CAMERA, mClientUid,
+                mClientPackageName, /*startIfModeDefault*/ false, mClientFeatureId,
+                String16("start camera ") + String16(mCameraIdStr));
+        status_t res = handleAppOpMode(mode);
+        if (res != OK) {
+            return res;
+        }
+    }
+
+    mOpsStreaming = true;
+
+    return OK;
+}
+
+status_t CameraService::BasicClient::finishCameraStreamingOps() {
+    ATRACE_CALL();
+
+    if (!mOpsActive) {
+        ALOGE("%s: Calling streaming start when not yet active", __FUNCTION__);
+        return INVALID_OPERATION;
+    }
+    if (!mOpsStreaming) {
+        ALOGV("%s: Streaming not active!", __FUNCTION__);
+        return OK;
+    }
+
+    if (mAppOpsManager != nullptr) {
+        mAppOpsManager->finishOp(AppOpsManager::OP_CAMERA, mClientUid,
+                mClientPackageName, mClientFeatureId);
+        mOpsStreaming = false;
+    }
+
+    return OK;
+}
+
 status_t CameraService::BasicClient::finishCameraOps() {
     ATRACE_CALL();
 
+    if (mOpsStreaming) {
+        // Make sure we've notified everyone about camera stopping
+        finishCameraStreamingOps();
+    }
+
     // Check if startCameraOps succeeded, and if so, finish the camera op
     if (mOpsActive) {
-        // Notify app ops that the camera is available again
-        if (mAppOpsManager != nullptr) {
-            mAppOpsManager->finishOp(AppOpsManager::OP_CAMERA, mClientUid,
-                    mClientPackageName, mClientFeatureId);
-            mOpsActive = false;
-        }
+        mOpsActive = false;
+
         // This function is called when a client disconnects. This should
         // release the camera, but actually only if it was in a proper
         // functional state, i.e. with status NOT_AVAILABLE
