@@ -250,10 +250,32 @@ void Camera2ClientBase<TClientBase>::notifyError(
 }
 
 template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::notifyActive() {
+    if (!mDeviceActive) {
+        status_t res = TClientBase::startCameraStreamingOps();
+        if (res != OK) {
+            ALOGE("%s: Camera %s: Error starting camera streaming ops: %d", __FUNCTION__,
+                    TClientBase::mCameraIdStr.string(), res);
+            return res;
+        }
+        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr);
+    }
+    mDeviceActive = true;
+
+    ALOGV("Camera device is now active");
+    return OK;
+}
+
+template <typename TClientBase>
 void Camera2ClientBase<TClientBase>::notifyIdle(
         int64_t requestCount, int64_t resultErrorCount, bool deviceError,
         const std::vector<hardware::CameraStreamStats>& streamStats) {
     if (mDeviceActive) {
+        status_t res = TClientBase::finishCameraStreamingOps();
+        if (res != OK) {
+            ALOGE("%s: Camera %s: Error finishing streaming ops: %d", __FUNCTION__,
+                    TClientBase::mCameraIdStr.string(), res);
+        }
         CameraServiceProxyWrapper::logIdle(TClientBase::mCameraIdStr,
                 requestCount, resultErrorCount, deviceError, streamStats);
     }
@@ -267,11 +289,6 @@ void Camera2ClientBase<TClientBase>::notifyShutter(const CaptureResultExtras& re
                                                    nsecs_t timestamp) {
     (void)resultExtras;
     (void)timestamp;
-
-    if (!mDeviceActive) {
-        CameraServiceProxyWrapper::logActive(TClientBase::mCameraIdStr);
-    }
-    mDeviceActive = true;
 
     ALOGV("%s: Shutter notification for request id %" PRId32 " at time %" PRId64,
             __FUNCTION__, resultExtras.requestId, timestamp);

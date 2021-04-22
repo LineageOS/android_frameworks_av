@@ -178,6 +178,7 @@ OutputBufferQueue::~OutputBufferQueue() {
 bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
                                   uint32_t generation,
                                   uint64_t bqId,
+                                  int maxDequeueBufferCount,
                                   std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj) {
     uint64_t consumerUsage = 0;
     if (igbp->getConsumerUsage(&consumerUsage) != OK) {
@@ -219,6 +220,20 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
     {
         std::scoped_lock<std::mutex> l(mMutex);
         if (generation == mGeneration) {
+            // case of old BlockPool destruction
+            C2SyncVariables *var = mSyncMem ? mSyncMem->mem() : nullptr;
+            if (var) {
+                *syncObj = std::make_shared<V1_2::SurfaceSyncObj>();
+                (*syncObj)->bqId = bqId;
+                (*syncObj)->syncMemory = mSyncMem->handle();
+                (*syncObj)->generationId = generation;
+                (*syncObj)->consumerUsage = consumerUsage;
+                mMaxDequeueBufferCount = maxDequeueBufferCount;
+                var->lock();
+                var->setSyncStatusLocked(C2SyncVariables::STATUS_INIT);
+                var->setInitialDequeueCountLocked(mMaxDequeueBufferCount, 0);
+                var->unlock();
+            }
             return false;
         }
         std::shared_ptr<C2SurfaceSyncMemory> oldMem = mSyncMem;
@@ -238,6 +253,7 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
         mGeneration = generation;
         mBqId = bqId;
         mOwner = std::make_shared<int>(0);
+        mMaxDequeueBufferCount = maxDequeueBufferCount;
         for (int i = 0; i < BufferQueueDefs::NUM_BUFFER_SLOTS; ++i) {
             if (mBqId == 0 || !mBuffers[i]) {
                 continue;
@@ -288,7 +304,9 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
             mPoolDatas[i] = poolDatas[i];
         }
         if (newSync) {
-            newSync->setInitialDequeueCount(mMaxDequeueBufferCount, success);
+            newSync->lock();
+            newSync->setInitialDequeueCountLocked(mMaxDequeueBufferCount, success);
+            newSync->unlock();
         }
     }
     ALOGD("remote graphic buffer migration %zu/%zu",
@@ -452,6 +470,7 @@ void OutputBufferQueue::updateMaxDequeueBufferCount(int maxDequeueBufferCount) {
         syncVar->unlock();
     }
     mMutex.unlock();
+    ALOGD("set max dequeue count %d from update", maxDequeueBufferCount);
 }
 
 }  // namespace c2
