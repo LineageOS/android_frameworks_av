@@ -29,7 +29,6 @@
 #include <inttypes.h>
 #include <pthread.h>
 
-#include <android/content/pm/IPackageManagerNative.h>
 #include <android/hardware/ICamera.h>
 #include <android/hardware/ICameraClient.h>
 
@@ -3441,28 +3440,7 @@ void CameraService::SensorPrivacyPolicy::binderDied(const wp<IBinder>& /*who*/) 
 }
 
 bool CameraService::SensorPrivacyPolicy::hasCameraPrivacyFeature() {
-    if (!mNeedToCheckCameraPrivacyFeature) {
-        return mHasCameraPrivacyFeature;
-    }
-    bool hasCameraPrivacyFeature = false;
-    sp<IBinder> binder = defaultServiceManager()->getService(String16("package_native"));
-    if (binder != nullptr) {
-        sp<content::pm::IPackageManagerNative> packageManager =
-                interface_cast<content::pm::IPackageManagerNative>(binder);
-        if (packageManager != nullptr) {
-            binder::Status status = packageManager->hasSystemFeature(
-                    String16("android.hardware.camera.toggle"), 0, &hasCameraPrivacyFeature);
-
-            if (status.isOk()) {
-                mNeedToCheckCameraPrivacyFeature = false;
-                mHasCameraPrivacyFeature = hasCameraPrivacyFeature;
-            } else {
-                ALOGE("Unable to check if camera privacy feature is supported");
-            }
-        }
-    }
-
-    return hasCameraPrivacyFeature;
+    return mSpm.supportsSensorToggle(SensorPrivacyManager::INDIVIDUAL_SENSOR_CAMERA);
 }
 
 // ----------------------------------------------------------------------------
