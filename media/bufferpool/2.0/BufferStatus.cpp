@@ -21,6 +21,21 @@
 #include <time.h>
 #include "BufferStatus.h"
 
+// This is added to preserve ABI for b/184963385
+template bool android::hardware::MessageQueue<
+    android::hardware::media::bufferpool::V2_0::BufferStatusMessage,
+    android::hardware::kSynchronizedReadWrite>::
+    write(
+        const android::hardware::media::bufferpool::V2_0::BufferStatusMessage *,
+        size_t count);
+#ifndef __aarch64__
+template bool android::hardware::MessageQueue<
+    android::hardware::media::bufferpool::V2_0::BufferInvalidationMessage,
+    android::hardware::kUnsynchronizedWrite>::
+    write(const android::hardware::media::bufferpool::V2_0::
+              BufferInvalidationMessage *,
+          size_t count);
+#endif
 namespace android {
 namespace hardware {
 namespace media {
