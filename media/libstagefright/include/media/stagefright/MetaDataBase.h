@@ -127,6 +127,8 @@ enum {
     kKeyTrackTimeStatus   = 'tktm',  // int64_t
 
     kKeyRealTimeRecording = 'rtrc',  // bool (int32_t)
+    kKeyBackgroundMode = 'bkmd',  // bool (int32_t)
+
     kKeyNumBuffers        = 'nbbf',  // int32_t
 
     // Ogg files can be tagged to be automatically looping...
