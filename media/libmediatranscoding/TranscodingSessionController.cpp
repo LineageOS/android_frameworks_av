@@ -23,6 +23,7 @@
 #include <inttypes.h>
 #include <media/TranscodingSessionController.h>
 #include <media/TranscodingUidPolicy.h>
+#include <utils/AndroidThreads.h>
 #include <utils/Log.h>
 
 #include <thread>
@@ -162,6 +163,7 @@ void TranscodingSessionController::Watchdog::updateTimer_l() NO_THREAD_SAFETY_AN
 
 // Unfortunately std::unique_lock is incompatible with -Wthread-safety.
 void TranscodingSessionController::Watchdog::threadLoop() NO_THREAD_SAFETY_ANALYSIS {
+    androidSetThreadPriority(0 /*tid (0 = current) */, ANDROID_PRIORITY_BACKGROUND);
     std::unique_lock<std::mutex> lock{mLock};
 
     while (!mAbort) {
