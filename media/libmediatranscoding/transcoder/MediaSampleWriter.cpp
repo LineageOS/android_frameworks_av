@@ -19,6 +19,7 @@
 
 #include <android-base/logging.h>
 #include <media/MediaSampleWriter.h>
+#include <media/NdkCommon.h>
 #include <media/NdkMediaMuxer.h>
 #include <sys/prctl.h>
 #include <utils/AndroidThreads.h>
@@ -126,7 +127,15 @@ MediaSampleWriter::MediaSampleConsumerFunction MediaSampleWriter::addTrack(
         LOG(ERROR) << "Muxer needs to be initialized when adding tracks.";
         return nullptr;
     }
-    ssize_t trackIndexOrError = mMuxer->addTrack(trackFormat.get());
+
+    AMediaFormat* trackFormatCopy = AMediaFormat_new();
+    AMediaFormat_copy(trackFormatCopy, trackFormat.get());
+    // Request muxer to use background priorities by default.
+    AMediaFormatUtils::SetDefaultFormatValueInt32(TBD_AMEDIACODEC_PARAMETER_KEY_BACKGROUND_MODE,
+                                                  trackFormatCopy, 1 /* true */);
+
+    ssize_t trackIndexOrError = mMuxer->addTrack(trackFormatCopy);
+    AMediaFormat_delete(trackFormatCopy);
     if (trackIndexOrError < 0) {
         LOG(ERROR) << "Failed to add media track to muxer: " << trackIndexOrError;
         return nullptr;
