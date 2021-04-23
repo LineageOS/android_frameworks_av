@@ -21,6 +21,7 @@
 #include <media/MediaSampleWriter.h>
 #include <media/NdkMediaMuxer.h>
 #include <sys/prctl.h>
+#include <utils/AndroidThreads.h>
 
 namespace android {
 
@@ -174,6 +175,7 @@ bool MediaSampleWriter::start() {
 
     mState = STARTED;
     std::thread([this] {
+        androidSetThreadPriority(0 /* tid (0 = current) */, ANDROID_PRIORITY_BACKGROUND);
         prctl(PR_SET_NAME, (unsigned long)"SampleWriterTrd", 0, 0, 0);
 
         bool wasStopped = false;
