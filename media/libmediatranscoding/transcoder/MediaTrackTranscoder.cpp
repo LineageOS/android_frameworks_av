@@ -20,6 +20,7 @@
 #include <android-base/logging.h>
 #include <media/MediaTrackTranscoder.h>
 #include <media/MediaTrackTranscoderCallback.h>
+#include <utils/AndroidThreads.h>
 
 namespace android {
 
@@ -72,6 +73,7 @@ bool MediaTrackTranscoder::start() {
     mState = STARTED;
 
     std::thread([this] {
+        androidSetThreadPriority(0 /* tid (0 = current) */, ANDROID_PRIORITY_BACKGROUND);
         bool stopped = false;
         media_status_t status = runTranscodeLoop(&stopped);
 
