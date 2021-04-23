@@ -42,6 +42,7 @@ const char* TBD_AMEDIACODEC_PARAMETER_KEY_MAX_B_FRAMES = "max-bframes";
 
 /* TODO(lnilsson): Finalize value or adopt AMediaFormat key once available. */
 const char* TBD_AMEDIACODEC_PARAMETER_KEY_COLOR_TRANSFER_REQUEST = "color-transfer-request";
+const char* TBD_AMEDIACODEC_PARAMETER_KEY_BACKGROUND_MODE = "android._background-mode";
 
 namespace AMediaFormatUtils {
 
