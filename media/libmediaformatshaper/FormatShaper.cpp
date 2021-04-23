@@ -23,10 +23,11 @@
 
 #include <media/NdkMediaFormat.h>
 
-#include <media/formatshaper/VQops.h>
-#include <media/formatshaper/CodecProperties.h>
+#include "CodecProperties.h"
+#include "VideoShaper.h"
+#include "VQops.h"
+
 #include <media/formatshaper/FormatShaper.h>
-#include <media/formatshaper/VideoShaper.h>
 
 namespace android {
 namespace mediaformatshaper {

@@ -384,7 +384,8 @@ struct Codec2Client::Component : public Codec2Client::Configurable {
     c2_status_t setOutputSurface(
             C2BlockPool::local_id_t blockPoolId,
             const sp<IGraphicBufferProducer>& surface,
-            uint32_t generation);
+            uint32_t generation,
+            int maxDequeueBufferCount);
 
     // Extract a slot number from of the block, then call
     // IGraphicBufferProducer::queueBuffer().

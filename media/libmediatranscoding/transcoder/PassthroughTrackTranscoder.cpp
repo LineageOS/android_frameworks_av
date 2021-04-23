@@ -19,6 +19,7 @@
 
 #include <android-base/logging.h>
 #include <media/PassthroughTrackTranscoder.h>
+#include <sys/prctl.h>
 
 namespace android {
 
@@ -94,6 +95,8 @@ media_status_t PassthroughTrackTranscoder::configureDestinationFormat(
 }
 
 media_status_t PassthroughTrackTranscoder::runTranscodeLoop(bool* stopped) {
+    prctl(PR_SET_NAME, (unsigned long)"PassthruThread", 0, 0, 0);
+
     MediaSampleInfo info;
     std::shared_ptr<MediaSample> sample;
     bool eosReached = false;

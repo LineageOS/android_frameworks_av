@@ -23,9 +23,9 @@
 
 #include <media/NdkMediaFormat.h>
 
-#include <media/formatshaper/VQops.h>
-#include <media/formatshaper/CodecProperties.h>
-#include <media/formatshaper/VideoShaper.h>
+#include "VQops.h"
+#include "CodecProperties.h"
+#include "VideoShaper.h"
 
 namespace android {
 namespace mediaformatshaper {
@@ -51,17 +51,18 @@ static const int BITRATE_MODE_VBR = 1;
 
 // constants we use within the calculations
 //
-constexpr double BITRATE_LEAVE_UNTOUCHED = 2.0;
-constexpr double BITRATE_QP_UNAVAILABLE = 1.20;
-// 10% didn't work so hot on bonito (with no QP support)
-// 15% is next.. still leaves a few short
-// 20% ? this is on the edge of what I want do do
+constexpr double BITRATE_LEAVE_UNTOUCHED = 1.75;
+
+// 20% bump if QP is configured but it is unavailable
+constexpr double BITRATE_QP_UNAVAILABLE_BOOST = 0.20;
+
 
 //
 // Caller retains ownership of and responsibility for inFormat
 //
 int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int flags) {
     ALOGV("codecName %s inFormat %p flags x%x", codec->getName().c_str(), inFormat, flags);
+    (void) info; // unused for now
 
     int32_t bitRateMode = -1;
     if (AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_BITRATE_MODE, &bitRateMode)
@@ -99,14 +100,16 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
     double minimumBpp = codec->getBpp(width, height);
 
     int64_t bitrateFloor = pixels * minimumBpp;
+    int64_t bitrateCeiling = bitrateFloor * BITRATE_LEAVE_UNTOUCHED;
     if (bitrateFloor > INT32_MAX) bitrateFloor = INT32_MAX;
+    if (bitrateCeiling > INT32_MAX) bitrateCeiling = INT32_MAX;
 
     // if we are far enough above the target bpp, leave it alone
     //
     ALOGV("bitrate: configured %" PRId64 " floor %" PRId64, bitrateConfigured, bitrateFloor);
-    if (bitrateConfigured >= BITRATE_LEAVE_UNTOUCHED * bitrateFloor) {
-        ALOGV("high enough bitrate: configured %" PRId64 " >= %f * floor %" PRId64,
-                bitrateConfigured, BITRATE_LEAVE_UNTOUCHED, bitrateFloor);
+    if (bitrateConfigured >= bitrateCeiling) {
+        ALOGV("high enough bitrate: configured %" PRId64 " >= ceiling %" PRId64,
+                bitrateConfigured, bitrateCeiling);
         return 0;
     }
 
@@ -117,38 +120,54 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
         bitrateChosen = bitrateFloor;
     }
 
-    bool qpPresent = hasQp(inFormat);
+    bool qpPresent = hasQpMax(inFormat);
 
-    // add QP, if not already present
+    // calculate a target QP value
+    int32_t qpmax = codec->targetQpMax();
     if (!qpPresent) {
-        int32_t qpmax = codec->targetQpMax();
+        // user didn't, so shaper wins
         if (qpmax != INT32_MAX) {
             ALOGV("choosing qp=%d", qpmax);
             qpChosen = qpmax;
         }
+    } else if (qpmax == INT32_MAX) {
+        // shaper didn't so user wins
+        qpChosen = INT32_MAX;
+        AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, &qpChosen);
+    } else {
+        // both sides want it, choose most restrictive
+        int32_t value = INT32_MAX;
+        AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, &value);
+        qpChosen = std::min(qpmax, value);
     }
 
     // if QP is desired but not supported, compensate with additional bits
     if (!codec->supportsQp()) {
-        if (qpPresent || qpChosen != INT32_MAX) {
-            ALOGD("minquality: desired QP, but unsupported, boost bitrate %" PRId64 " to %" PRId64,
-                bitrateChosen, (int64_t)(bitrateChosen * BITRATE_QP_UNAVAILABLE));
-            bitrateChosen =  bitrateChosen * BITRATE_QP_UNAVAILABLE;
+        if (qpChosen != INT32_MAX) {
+            int64_t boost = 0;
+            boost = bitrateChosen * BITRATE_QP_UNAVAILABLE_BOOST;
+            ALOGD("minquality: requested QP unsupported, boost bitrate %" PRId64 " by %" PRId64,
+                bitrateChosen, boost);
+            bitrateChosen =  bitrateChosen + boost;
             qpChosen = INT32_MAX;
         }
     }
 
+    // limits
     // apply our chosen values
     //
     if (qpChosen != INT32_MAX) {
         ALOGD("minquality by QP: inject %s=%d", AMEDIAFORMAT_VIDEO_QP_MAX, qpChosen);
         AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_VIDEO_QP_MAX, qpChosen);
 
-        // force spreading the QP across frame types, since we are imposing a value
-        qpSpreadMaxPerFrameType(inFormat, info->qpDelta, info->qpMax, /* override */ true);
+        // caller (VideoShaper) handles spreading this across the subframes
     }
 
     if (bitrateChosen != bitrateConfigured) {
+        if (bitrateChosen > bitrateCeiling) {
+            ALOGD("minquality: bitrate clamped at ceiling %" PRId64,  bitrateCeiling);
+            bitrateChosen = bitrateCeiling;
+        }
         ALOGD("minquality/target bitrate raised from %" PRId64 " to %" PRId64 " bps",
               bitrateConfigured, bitrateChosen);
         AMediaFormat_setInt32(inFormat, AMEDIAFORMAT_KEY_BIT_RATE, (int32_t)bitrateChosen);
@@ -158,7 +177,7 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
 }
 
 
-bool hasQpPerFrameType(AMediaFormat *format) {
+bool hasQpMaxPerFrameType(AMediaFormat *format) {
     int32_t value;
 
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, &value)
@@ -176,19 +195,29 @@ bool hasQpPerFrameType(AMediaFormat *format) {
     return false;
 }
 
-bool hasQp(AMediaFormat *format) {
+bool hasQpMaxGlobal(AMediaFormat *format) {
     int32_t value;
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MAX, &value)
         || AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MIN, &value)) {
         return true;
     }
-    return hasQpPerFrameType(format);
+    return false;
+}
+
+bool hasQpMax(AMediaFormat *format) {
+    if (hasQpMaxGlobal(format)) {
+        return true;
+    }
+    return hasQpMaxPerFrameType(format);
 }
 
 void qpSpreadPerFrameType(AMediaFormat *format, int delta,
                            int qplow, int qphigh, bool override) {
-     qpSpreadMaxPerFrameType(format, delta, qphigh, override);
+
      qpSpreadMinPerFrameType(format, qplow, override);
+     qpSpreadMaxPerFrameType(format, delta, qphigh, override);
+     // make sure that min<max for all the QP fields.
+     qpVerifyMinMaxOrdering(format);
 }
 
 void qpSpreadMaxPerFrameType(AMediaFormat *format, int delta, int qphigh, bool override) {
@@ -196,20 +225,26 @@ void qpSpreadMaxPerFrameType(AMediaFormat *format, int delta, int qphigh, bool o
 
     int32_t qpOffered = 0;
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MAX, &qpOffered)) {
-        // propagate to otherwise unspecified frame-specific keys
-        int32_t maxI;
-        if (override || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, &maxI)) {
-            int32_t value = std::min(qphigh, qpOffered);
+        // propagate to frame-specific keys, choosing most restrictive
+        // ensure that we don't violate min<=max rules
+        {
+            int32_t maxI = INT32_MAX;
+            AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, &maxI);
+            int32_t value = std::min({qpOffered, qphigh, maxI});
             AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, value);
         }
-        int32_t maxP;
-        if (override || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MAX, &maxP)) {
-            int32_t value = std::min(qphigh, (std::min(qpOffered, INT32_MAX-delta) + delta));
+        {
+            int32_t maxP = INT32_MAX;
+            AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MAX, &maxP);
+            int32_t value = std::min({(std::min(qpOffered, INT32_MAX-1*delta) + 1*delta),
+                                     qphigh, maxP});
             AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MAX, value);
         }
-        int32_t maxB;
-        if (override || !AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MAX, &maxB)) {
-            int32_t value = std::min(qphigh, (std::min(qpOffered, INT32_MAX-2*delta) + 2*delta));
+        {
+            int32_t maxB = INT32_MAX;
+            AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MAX, &maxB);
+            int32_t value = std::min({(std::min(qpOffered, INT32_MAX-2*delta) + 2*delta),
+                                     qphigh, maxB});
             AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MAX, value);
         }
     }
@@ -221,19 +256,47 @@ void qpSpreadMinPerFrameType(AMediaFormat *format, int qplow, bool override) {
     int32_t qpOffered = 0;
     if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_MIN, &qpOffered)) {
         int value = std::max(qplow, qpOffered);
-        // propagate to otherwise unspecified frame-specific keys
-        int32_t minI;
-        if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, &minI)) {
-            AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, value);
-        }
-        int32_t minP;
-        if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, &minP)) {
-            AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, value);
-        }
-        int32_t minB;
-        if (!AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, &minB)) {
-            AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, value);
-        }
+        // propagate to frame-specific keys, use lowest of this and existing per-frame value
+        int32_t minI = INT32_MAX;
+        AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, &minI);
+        int32_t setI = std::min(value, minI);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, setI);
+
+        int32_t minP = INT32_MAX;
+        AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, &minP);
+        int32_t setP = std::min(value, minP);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, setP);
+
+        int32_t minB = INT32_MAX;
+        AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, &minB);
+        int32_t setB = std::min(value, minB);
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, setB);
+    }
+}
+
+// XXX whether we allow min==max, or if we'll insist that min<max
+void qpVerifyMinMaxOrdering(AMediaFormat *format) {
+    // ensure that we don't violate min<=max rules
+    int32_t maxI = INT32_MAX;
+    int32_t minI = INT32_MIN;
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MAX, &maxI)
+        && AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, &minI)
+        && minI > maxI) {
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_I_MIN, maxI);
+    }
+    int32_t maxP = INT32_MAX;
+    int32_t minP = INT32_MIN;
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MAX, &maxP)
+        && AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, &minP)
+        && minP > maxP) {
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_P_MIN, maxP);
+    }
+    int32_t maxB = INT32_MAX;
+    int32_t minB = INT32_MIN;
+    if (AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MAX, &maxB)
+        && AMediaFormat_getInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, &minB)
+        && minB > maxB) {
+        AMediaFormat_setInt32(format, AMEDIAFORMAT_VIDEO_QP_B_MIN, maxB);
     }
 }
 

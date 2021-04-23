@@ -25,6 +25,7 @@
 #include <media/NdkCommon.h>
 #include <media/PassthroughTrackTranscoder.h>
 #include <media/VideoTrackTranscoder.h>
+#include <sys/prctl.h>
 #include <unistd.h>
 
 namespace android {
@@ -125,6 +126,8 @@ void MediaTranscoder::onThreadFinished(const void* thread, media_status_t thread
         std::thread asyncNotificationThread{[this, self = shared_from_this(),
                                              status = mTranscoderStatus,
                                              stopped = mTranscoderStopped] {
+            prctl(PR_SET_NAME, (unsigned long)"TranscodCallbk", 0, 0, 0);
+
             // If the transcoder was stopped that means a caller is waiting in stop or pause
             // in which case we don't send a callback.
             if (status != AMEDIA_OK) {
