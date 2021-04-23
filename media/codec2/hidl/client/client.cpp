@@ -1482,7 +1482,8 @@ c2_status_t Codec2Client::Component::configureVideoTunnel(
 c2_status_t Codec2Client::Component::setOutputSurface(
         C2BlockPool::local_id_t blockPoolId,
         const sp<IGraphicBufferProducer>& surface,
-        uint32_t generation) {
+        uint32_t generation,
+        int maxDequeueCount) {
     uint64_t bqId = 0;
     sp<IGraphicBufferProducer> nullIgbp;
     sp<HGraphicBufferProducer2> nullHgbp;
@@ -1496,14 +1497,15 @@ c2_status_t Codec2Client::Component::setOutputSurface(
     std::shared_ptr<SurfaceSyncObj> syncObj;
 
     if (!surface) {
-        mOutputBufferQueue->configure(nullIgbp, generation, 0, nullptr);
+        mOutputBufferQueue->configure(nullIgbp, generation, 0, maxDequeueCount, nullptr);
     } else if (surface->getUniqueId(&bqId) != OK) {
         LOG(ERROR) << "setOutputSurface -- "
                    "cannot obtain bufferqueue id.";
         bqId = 0;
-        mOutputBufferQueue->configure(nullIgbp, generation, 0, nullptr);
+        mOutputBufferQueue->configure(nullIgbp, generation, 0, maxDequeueCount, nullptr);
     } else {
-        mOutputBufferQueue->configure(surface, generation, bqId, nullptr);
+        mOutputBufferQueue->configure(surface, generation, bqId, maxDequeueCount, mBase1_2 ?
+                                      &syncObj : nullptr);
     }
     ALOGD("surface generation remote change %u HAL ver: %s",
           generation, syncObj ? "1.2" : "1.0");

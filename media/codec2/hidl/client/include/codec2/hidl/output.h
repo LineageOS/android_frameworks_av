@@ -47,6 +47,7 @@ struct OutputBufferQueue {
     bool configure(const sp<IGraphicBufferProducer>& igbp,
                    uint32_t generation,
                    uint64_t bqId,
+                   int maxDequeueBufferCount,
                    std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj);
 
     // Render a graphic block to current surface.
