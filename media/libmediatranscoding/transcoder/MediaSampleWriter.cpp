@@ -20,6 +20,7 @@
 #include <android-base/logging.h>
 #include <media/MediaSampleWriter.h>
 #include <media/NdkMediaMuxer.h>
+#include <sys/prctl.h>
 
 namespace android {
 
@@ -173,6 +174,8 @@ bool MediaSampleWriter::start() {
 
     mState = STARTED;
     std::thread([this] {
+        prctl(PR_SET_NAME, (unsigned long)"SampleWriterTrd", 0, 0, 0);
+
         bool wasStopped = false;
         media_status_t status = writeSamples(&wasStopped);
         if (auto callbacks = mCallbacks.lock()) {
