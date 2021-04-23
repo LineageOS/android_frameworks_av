@@ -97,6 +97,7 @@ private:
     sp<MetaData> mStartMeta;
     status_t mInitCheck;
     bool mIsRealTimeRecording;
+    bool mIsBackgroundMode;
     bool mUse4ByteNalLength;
     bool mIsFileSizeLimitExplicitlyRequested;
     bool mPaused;
@@ -274,6 +275,10 @@ private:
     // drained the chunks yet.
     // By default, real time recording is on.
     bool isRealTimeRecording() const;
+
+    // Return whether the writer is used in background mode for media
+    // transcoding.
+    bool isBackgroundMode() const;
 
     void lock();
     void unlock();

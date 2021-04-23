@@ -1707,6 +1707,12 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         meta->setInt32(kKeyIsSyncFrame, 1);
     }
 
+    // Mode for media transcoding.
+    int32_t isBackgroundMode;
+    if (msg->findInt32("android._background-mode", &isBackgroundMode) && isBackgroundMode != 0) {
+        meta->setInt32(isBackgroundMode, 1);
+    }
+
     int32_t avgBitrate = 0;
     int32_t maxBitrate;
     if (msg->findInt32("bitrate", &avgBitrate) && avgBitrate > 0) {
