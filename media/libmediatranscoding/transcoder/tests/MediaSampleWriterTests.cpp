@@ -117,8 +117,9 @@ bool operator==(const AMediaCodecBufferInfo& lhs, const AMediaCodecBufferInfo& r
 }
 
 bool operator==(const TestMuxer::Event& lhs, const TestMuxer::Event& rhs) {
-    return lhs.type == rhs.type && lhs.format == rhs.format && lhs.trackIndex == rhs.trackIndex &&
-           lhs.data == rhs.data && lhs.info == rhs.info;
+    // Don't test format pointer equality since the writer can make a copy.
+    return lhs.type == rhs.type /*&& lhs.format == rhs.format*/ &&
+           lhs.trackIndex == rhs.trackIndex && lhs.data == rhs.data && lhs.info == rhs.info;
 }
 
 /** Represents a media source file. */

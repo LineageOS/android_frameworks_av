@@ -3522,6 +3522,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                 mTunneled = false;
             }
 
+            int32_t background = 0;
+            if (format->findInt32("android._background-mode", &background) && background) {
+                androidSetThreadPriority(gettid(), ANDROID_PRIORITY_BACKGROUND);
+            }
+
             mCodec->initiateConfigureComponent(format);
             break;
         }
