@@ -2724,6 +2724,11 @@ void CameraService::playSound(sound_kind kind) {
     ATRACE_CALL();
 
     LOG1("playSound(%d)", kind);
+    if (kind < 0 || kind >= NUM_SOUNDS) {
+        ALOGE("%s: Invalid sound id requested: %d", __FUNCTION__, kind);
+        return;
+    }
+
     Mutex::Autolock lock(mSoundLock);
     loadSoundLocked(kind);
     sp<MediaPlayer> player = mSoundPlayer[kind];
