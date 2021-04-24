@@ -3578,7 +3578,7 @@ typedef enum acamera_metadata_tag {
      * android.scaler.availableInputOutputFormatsMap.</p>
      * <p>The following table describes the minimum required output stream
      * configurations based on the hardware level
-     * (ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL):</p>
+     * (ACAMERA_INFO_SUPPORTED_HARDWARE_LEVEL), prior to Android 12:</p>
      * <p>Format         | Size                                         | Hardware Level | Notes
      * :-------------:|:--------------------------------------------:|:--------------:|:--------------:
      * JPEG           | ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE          | Any            |
@@ -3588,6 +3588,21 @@ typedef enum acamera_metadata_tag {
      * JPEG           | 320x240 (240p)                               | Any            | if 240p &lt;= activeArraySize
      * YUV_420_888    | all output sizes available for JPEG          | FULL           |
      * YUV_420_888    | all output sizes available for JPEG, up to the maximum video size | LIMITED        |
+     * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
+     * <p>Starting from Android 12, the camera device may not support JPEG sizes smaller than the
+     * minimum of 1080p and the camera sensor active array size. The requirements for
+     * IMPLEMENTATION_DEFINED and YUV_420_888 stay the same. This new minimum required output
+     * stream configurations are illustrated by the table below:</p>
+     * <p>Format         | Size                                         | Hardware Level | Notes
+     * :-------------:|:--------------------------------------------:|:--------------:|:--------------:
+     * JPEG           | ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE          | Any            |
+     * JPEG           | 1920x1080 (1080p)                            | Any            | if 1080p &lt;= activeArraySize
+     * YUV_420_888    | ACAMERA_SENSOR_INFO_ACTIVE_ARRAY_SIZE          | FULL           |
+     * YUV_420_888    | 1920x1080 (1080p)                            | FULL           | if 1080p &lt;= activeArraySize
+     * YUV_420_888    | 1280x720 (720)                               | FULL           | if 720p &lt;= activeArraySize
+     * YUV_420_888    | 640x480 (480p)                               | FULL           | if 480p &lt;= activeArraySize
+     * YUV_420_888    | 320x240 (240p)                               | FULL           | if 240p &lt;= activeArraySize
+     * YUV_420_888    | all output sizes available for FULL hardware level, up to the maximum video size | LIMITED        |
      * IMPLEMENTATION_DEFINED | same as YUV_420_888                  | Any            |</p>
      * <p>Refer to ACAMERA_REQUEST_AVAILABLE_CAPABILITIES for additional
      * mandatory stream configurations on a per-capability basis.</p>
