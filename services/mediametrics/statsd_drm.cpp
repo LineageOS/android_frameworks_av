@@ -59,9 +59,16 @@ bool statsd_mediadrm(const std::shared_ptr<const mediametrics::Item>& item,
     std::string description;
     (void) item->getString("description", &description);
 
+    std::string serialized_metrics;
+    (void) item->getString("serialized_metrics", &serialized_metrics);
+    if (serialized_metrics.empty()) {
+        ALOGD("statsd_mediadrm skipping empty entry");
+        return false;
+    }
+
     // This field is left here for backward compatibility.
     // This field is not used anymore.
-    const std::string  kUnusedField("unused");
+    const std::string  kUnusedField("");
     android::util::BytesField bf_serialized(kUnusedField.c_str(), kUnusedField.size());
     int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIADRM_REPORTED,
         timestamp_nanos, package_name.c_str(), package_version_code,
