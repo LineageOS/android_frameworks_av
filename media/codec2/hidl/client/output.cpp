@@ -222,7 +222,7 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
         if (generation == mGeneration) {
             // case of old BlockPool destruction
             C2SyncVariables *var = mSyncMem ? mSyncMem->mem() : nullptr;
-            if (var) {
+            if (syncObj && var) {
                 *syncObj = std::make_shared<V1_2::SurfaceSyncObj>();
                 (*syncObj)->bqId = bqId;
                 (*syncObj)->syncMemory = mSyncMem->handle();
