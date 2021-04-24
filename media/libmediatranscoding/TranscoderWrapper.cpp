@@ -23,6 +23,7 @@
 #include <media/NdkCommon.h>
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingRequest.h>
+#include <utils/AndroidThreads.h>
 #include <utils/Log.h>
 
 #include <thread>
@@ -599,6 +600,7 @@ void TranscoderWrapper::queueEvent(Event::Type type, ClientIdType clientId, Sess
 }
 
 void TranscoderWrapper::threadLoop() {
+    androidSetThreadPriority(0 /*tid (0 = current) */, ANDROID_PRIORITY_BACKGROUND);
     std::unique_lock<std::mutex> lock{mLock};
     // TranscoderWrapper currently lives in the transcoding service, as long as
     // MediaTranscodingService itself.

@@ -522,6 +522,7 @@ void MPEG4Writer::initInternal(int fd, bool isFirstSession) {
     // Reset following variables for all the sessions and they will be
     // initialized in start(MetaData *param).
     mIsRealTimeRecording = true;
+    mIsBackgroundMode = false;
     mUse4ByteNalLength = true;
     mOffset = 0;
     mMaxOffsetAppend = 0;
@@ -661,6 +662,14 @@ status_t MPEG4Writer::addSource(const sp<MediaSource> &source) {
     const char *mime = NULL;
     sp<MetaData> meta = source->getFormat();
     meta->findCString(kKeyMIMEType, &mime);
+
+
+    // Background mode for media transcoding. If either audio or video track signal this is in
+    // background mode, we will set all the threads to run in background priority.
+    int32_t isBackgroundMode;
+    if (meta && meta->findInt32(kKeyBackgroundMode, &isBackgroundMode)) {
+        mIsBackgroundMode |= isBackgroundMode;
+    }
 
     if (Track::getFourCCForMime(mime) == NULL) {
         ALOGE("Unsupported mime '%s'", mime);
@@ -2309,7 +2318,11 @@ status_t MPEG4Writer::setupAndStartLooper() {
     if (mLooper == nullptr) {
         mLooper = new ALooper;
         mLooper->setName("MP4WtrCtrlHlpLooper");
-        err = mLooper->start();
+        if (mIsBackgroundMode) {
+            err = mLooper->start(false, false, ANDROID_PRIORITY_BACKGROUND);
+        } else {
+            err = mLooper->start();
+        }
         mReflector = new AHandlerReflector<MPEG4Writer>(this);
         mLooper->registerHandler(mReflector);
     }
@@ -2777,6 +2790,11 @@ void MPEG4Writer::threadFunc() {
     ALOGV("threadFunc");
 
     prctl(PR_SET_NAME, (unsigned long)"MPEG4Writer", 0, 0, 0);
+
+    if (mIsBackgroundMode) {
+        // Background priority for media transcoding.
+        androidSetThreadPriority(0 /* tid (0 = current) */, ANDROID_PRIORITY_BACKGROUND);
+    }
 
     Mutex::Autolock autoLock(mLock);
     while (!mDone) {
@@ -3379,6 +3397,9 @@ status_t MPEG4Writer::Track::threadEntry() {
 
     if (mOwner->isRealTimeRecording()) {
         androidSetThreadPriority(0, ANDROID_PRIORITY_AUDIO);
+    } else if (mOwner->isBackgroundMode()) {
+        // Background priority for media transcoding.
+        androidSetThreadPriority(0 /* tid (0 = current) */, ANDROID_PRIORITY_BACKGROUND);
     }
 
     sp<MetaData> meta_data;
@@ -4074,6 +4095,10 @@ int64_t MPEG4Writer::getDriftTimeUs() {
 
 bool MPEG4Writer::isRealTimeRecording() const {
     return mIsRealTimeRecording;
+}
+
+bool MPEG4Writer::isBackgroundMode() const {
+    return mIsBackgroundMode;
 }
 
 bool MPEG4Writer::useNalLengthFour() {
