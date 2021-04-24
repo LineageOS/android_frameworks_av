@@ -90,6 +90,10 @@ public:
         }
     }
 
+    void setPriority(int priority) {
+        androidSetThreadPriority(getTid(), priority);
+    }
+
 protected:
     bool threadLoop() override {
         constexpr nsecs_t kIntervalNs = nsecs_t(10) * 1000 * 1000;  // 10ms
@@ -527,6 +531,10 @@ void C2OMXNode::onInputBufferDone(c2_cntr64_t index) {
 
 android_dataspace C2OMXNode::getDataspace() {
     return *mDataspace.lock();
+}
+
+void C2OMXNode::setPriority(int priority) {
+    mQueueThread->setPriority(priority);
 }
 
 }  // namespace android

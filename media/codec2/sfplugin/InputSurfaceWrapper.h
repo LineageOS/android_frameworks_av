@@ -79,6 +79,7 @@ public:
         float mFixedAdjustedFps = 0.0; // fixed fps via PTS manipulation
         float mMinAdjustedFps = 0.0; // minimum fps via PTS manipulation
         uint64_t mUsage = 0; // consumer usage
+        int mPriority = INT_MAX; // priority of queue thread (if any); INT_MAX for no-op
     };
 
     /**

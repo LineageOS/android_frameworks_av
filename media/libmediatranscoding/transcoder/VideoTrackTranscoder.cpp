@@ -253,6 +253,10 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     // MediaSampleWriter track format, and MediaSampleWriter will call AMediaMuxer_setOrientationHint.
     AMediaFormat_setInt32(encoderFormat, AMEDIAFORMAT_KEY_ROTATION, 0);
 
+    // Request encoder to use background priorities by default.
+    SetDefaultFormatValueInt32(TBD_AMEDIACODEC_PARAMETER_KEY_BACKGROUND_MODE, encoderFormat,
+                               1 /* true */);
+
     mDestinationFormat = std::shared_ptr<AMediaFormat>(encoderFormat, &AMediaFormat_delete);
 
     // Create and configure the encoder.
@@ -334,6 +338,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
     static const std::vector<EntryCopier> kEncoderEntriesToCopy{
             ENTRY_COPIER2(AMEDIAFORMAT_KEY_OPERATING_RATE, Float, Int32),
             ENTRY_COPIER(AMEDIAFORMAT_KEY_PRIORITY, Int32),
+            ENTRY_COPIER(TBD_AMEDIACODEC_PARAMETER_KEY_BACKGROUND_MODE, Int32),
     };
     CopyFormatEntries(mDestinationFormat.get(), decoderFormat.get(), kEncoderEntriesToCopy);
 
