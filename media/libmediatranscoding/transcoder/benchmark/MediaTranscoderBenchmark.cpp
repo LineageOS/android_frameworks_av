@@ -113,6 +113,16 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
     // Asset directory
     static const std::string kAssetDirectory = "/data/local/tmp/TranscodingBenchmark/";
 
+    // Transcoding configuration params to be logged
+    int64_t trackDurationUs = 0;
+    int32_t width = 0;
+    int32_t height = 0;
+    std::string sourceMime = "NA";
+    std::string targetMime = "NA";
+    bool includeAudio = false;
+    bool transcodeVideo = false;
+    int32_t targetBitrate = 0;
+
     int srcFd = 0;
     int dstFd = 0;
 
@@ -163,10 +173,30 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
                     state.counters[PARAM_VIDEO_FRAME_RATE] = benchmark::Counter(
                             frameCount, benchmark::Counter::kIsIterationInvariantRate);
                 }
+                if (!AMediaFormat_getInt32(srcFormat, AMEDIAFORMAT_KEY_WIDTH, &width)) {
+                    state.SkipWithError("Video source track format does not have width");
+                    goto exit;
+                }
+                if (!AMediaFormat_getInt32(srcFormat, AMEDIAFORMAT_KEY_HEIGHT, &height)) {
+                    state.SkipWithError("Video source track format does not have height");
+                    goto exit;
+                }
+                AMediaFormat_getInt64(srcFormat, AMEDIAFORMAT_KEY_DURATION, &trackDurationUs);
+                sourceMime = mime;
             }
 
             if (trackSelectionCallback(mime, &dstFormat)) {
                 status = transcoder->configureTrackFormat(i, dstFormat);
+                if (strncmp(mime, "video/", 6) == 0 && dstFormat != nullptr) {
+                    const char* mime = nullptr;
+                    if (AMediaFormat_getString(dstFormat, AMEDIAFORMAT_KEY_MIME, &mime)) {
+                        targetMime = mime;
+                    }
+                    AMediaFormat_getInt32(dstFormat, AMEDIAFORMAT_KEY_BIT_RATE, &targetBitrate);
+                    transcodeVideo = true;
+                } else if (strncmp(mime, "audio/", 6) == 0) {
+                    includeAudio = true;
+                }
             }
 
             if (dstFormat != nullptr) {
@@ -194,6 +224,17 @@ static void TranscodeMediaFile(benchmark::State& state, const std::string& srcFi
             goto exit;
         }
     }
+
+    // Set transcoding configuration params in benchmark label
+    state.SetLabel(srcFileName + "," +
+                   std::to_string(width) + "x" + std::to_string(height) + "," +
+                   sourceMime + "," +
+                   std::to_string(trackDurationUs/1000) + "," +
+                   (includeAudio ? "Yes" : "No") + "," +
+                   (transcodeVideo ? "Yes" : "No") + "," +
+                   targetMime + "," +
+                   std::to_string(targetBitrate)
+                   );
 
 exit:
     if (srcFd > 0) close(srcFd);
@@ -543,7 +584,11 @@ private:
     void PrintRunData(const Run& report);
 
     bool mPrintedHeader;
-    std::vector<std::string> mHeaders = {"name", "real_time", "cpu_time", PARAM_VIDEO_FRAME_RATE};
+    std::vector<std::string> mHeaders = {
+        "File",          "Resolution",     "SourceMime", "VideoTrackDuration(ms)",
+        "IncludeAudio",  "TranscodeVideo", "TargetMime", "TargetBirate(bps)",
+        "real_time(ms)", "cpu_time(ms)",   PARAM_VIDEO_FRAME_RATE
+    };
 };
 
 bool CustomCsvReporter::ReportContext(const Context& context __unused) {
@@ -574,7 +619,8 @@ void CustomCsvReporter::PrintRunData(const Run& run) {
         return;
     }
     std::ostream& Out = GetOutputStream();
-    Out << run.benchmark_name() << ",";
+    // Log the transcoding params reported through label
+    Out << run.report_label << ",";
     Out << run.GetAdjustedRealTime() << ",";
     Out << run.GetAdjustedCPUTime() << ",";
     auto frameRate = run.counters.find(PARAM_VIDEO_FRAME_RATE);
