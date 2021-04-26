@@ -113,6 +113,10 @@ public:
         mutable Mutex mRemoteCallbackLock;
     } mSharedCameraCallbacks;
 
+    status_t      injectCamera(const String8& injectedCamId,
+                               sp<CameraProviderManager> manager) override;
+    status_t      stopInjection() override;
+
 protected:
 
     // The PID provided in the constructor call

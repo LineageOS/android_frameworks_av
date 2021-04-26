@@ -427,6 +427,18 @@ class CameraDeviceBase : public virtual FrameProducer {
      */
     void setImageDumpMask(int mask) { mImageDumpMask = mask; }
 
+    /**
+     * The injection camera session to replace the internal camera
+     * session.
+     */
+    virtual status_t injectCamera(const String8& injectedCamId,
+            sp<CameraProviderManager> manager) = 0;
+
+    /**
+     * Stop the injection camera and restore to internal camera session.
+     */
+    virtual status_t stopInjection() = 0;
+
 protected:
     bool mImageDumpMask = 0;
 };
