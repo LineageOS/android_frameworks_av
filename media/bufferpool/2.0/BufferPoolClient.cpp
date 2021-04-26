@@ -29,7 +29,7 @@ namespace bufferpool {
 namespace V2_0 {
 namespace implementation {
 
-static constexpr int64_t kReceiveTimeoutUs = 1000000; // 100ms
+static constexpr int64_t kReceiveTimeoutUs = 2000000; // 2s
 static constexpr int kPostMaxRetry = 3;
 static constexpr int kCacheTtlUs = 1000000; // TODO: tune
 static constexpr size_t kMaxCachedBufferCount = 64;
