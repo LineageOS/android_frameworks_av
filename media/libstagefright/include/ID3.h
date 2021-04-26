@@ -91,7 +91,7 @@ private:
     bool parseV1(DataSourceBase *source);
     bool parseV2(DataSourceBase *source, off64_t offset);
     void removeUnsynchronization();
-    bool removeUnsynchronizationV2_4(bool iTunesHack);
+    bool removeUnsynchronizationV2_4(bool iTunesHack, bool hasGlobalUnsync);
 
     static bool ParseSyncsafeInteger(const uint8_t encoded[4], size_t *x);
 
