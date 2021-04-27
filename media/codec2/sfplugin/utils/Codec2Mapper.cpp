@@ -311,6 +311,8 @@ ALookup<C2Config::pcm_encoding_t, int32_t> sPcmEncodings = {
     { C2Config::PCM_8, kAudioEncodingPcm8bit },
     { C2Config::PCM_16, kAudioEncodingPcm16bit },
     { C2Config::PCM_FLOAT, kAudioEncodingPcmFloat },
+    { C2Config::PCM_24, kAudioEncodingPcm24bitPacked },
+    { C2Config::PCM_32, kAudioEncodingPcm32bit },
 };
 
 ALookup<C2Config::level_t, int32_t> sVp9Levels = {
