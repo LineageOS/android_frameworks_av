@@ -42,10 +42,10 @@ bool FilterWrapper::isFilteringEnabled(const std::shared_ptr<C2ComponentInterfac
 }
 
 c2_status_t FilterWrapper::createBlockPool(
-        C2PlatformAllocatorStore::id_t,
-        std::shared_ptr<const C2Component>,
-        std::shared_ptr<C2BlockPool> *) {
-    return C2_OMITTED;
+        C2PlatformAllocatorStore::id_t allocatorId,
+        std::shared_ptr<const C2Component> component,
+        std::shared_ptr<C2BlockPool> *pool) {
+    return CreateCodec2BlockPool(allocatorId, component, pool);
 }
 
 }  // namespace android
