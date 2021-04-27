@@ -1019,6 +1019,9 @@ status_t AudioPolicyService::shellCommand(int in, int out, int err, Vector<Strin
         return handleResetUidState(args, err);
     } else if (args.size() >= 2 && args[0] == String16("get-uid-state")) {
         return handleGetUidState(args, out, err);
+    } else if (args.size() >= 1 && args[0] == String16("purge_permission-cache")) {
+        purgePermissionCache();
+        return NO_ERROR;
     } else if (args.size() == 1 && args[0] == String16("help")) {
         printHelp(out);
         return NO_ERROR;
