@@ -234,9 +234,11 @@ struct id3_header {
     }
 
     // first handle global unsynchronization
+    bool hasGlobalUnsync = false;
     if (header.flags & 0x80) {
         ALOGV("removing unsynchronization");
 
+        hasGlobalUnsync = true;
         removeUnsynchronization();
     }
 
@@ -341,12 +343,12 @@ struct id3_header {
 
         memcpy(copy, mData, size);
 
-        bool success = removeUnsynchronizationV2_4(false /* iTunesHack */);
+        bool success = removeUnsynchronizationV2_4(false /* iTunesHack */, hasGlobalUnsync);
         if (!success) {
             memcpy(mData, copy, size);
             mSize = size;
 
-            success = removeUnsynchronizationV2_4(true /* iTunesHack */);
+            success = removeUnsynchronizationV2_4(true /* iTunesHack */, hasGlobalUnsync);
 
             if (success) {
                 ALOGV("Had to apply the iTunes hack to parse this ID3 tag");
@@ -407,7 +409,7 @@ static void WriteSyncsafeInteger(uint8_t *dst, size_t x) {
     }
 }
 
-bool ID3::removeUnsynchronizationV2_4(bool iTunesHack) {
+bool ID3::removeUnsynchronizationV2_4(bool iTunesHack, bool hasGlobalUnsync) {
     size_t oldSize = mSize;
 
     size_t offset = mFirstFrameOffset;
@@ -443,7 +445,7 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack) {
             flags &= ~1;
         }
 
-        if ((flags & 2) && (dataSize >= 2)) {
+        if (!hasGlobalUnsync && (flags & 2) && (dataSize >= 2)) {
             // This frame has "unsynchronization", so we have to replace occurrences
             // of 0xff 0x00 with just 0xff in order to get the real data.
 
