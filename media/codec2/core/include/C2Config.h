@@ -394,6 +394,7 @@ enum : uint32_t {
     _C2_PL_VP9_BASE  = 0x7000,
     _C2_PL_DV_BASE   = 0x8000,
     _C2_PL_AV1_BASE  = 0x9000,
+    _C2_PL_VP8_BASE  = 0xA000,
 
     C2_PROFILE_LEVEL_VENDOR_START = 0x70000000,
 };
@@ -547,6 +548,12 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_AV1_0 = _C2_PL_AV1_BASE,            ///< AV1 Profile 0 (4:2:0, 8 to 10 bit)
     PROFILE_AV1_1,                              ///< AV1 Profile 1 (8 to 10 bit)
     PROFILE_AV1_2,                              ///< AV1 Profile 2 (8 to 12 bit)
+
+    // VP8 profiles
+    PROFILE_VP8_0 = _C2_PL_VP8_BASE,            ///< VP8 Profile 0
+    PROFILE_VP8_1,                              ///< VP8 Profile 1
+    PROFILE_VP8_2,                              ///< VP8 Profile 2
+    PROFILE_VP8_3,                              ///< VP8 Profile 3
 };
 
 enum C2Config::level_t : uint32_t {
