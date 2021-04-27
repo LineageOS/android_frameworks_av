@@ -18,6 +18,7 @@
 #define LOG_TAG "hidl_ClearKeyPlugin"
 #include <utils/Log.h>
 
+#include <chrono>
 #include <stdio.h>
 #include <inttypes.h>
 
@@ -58,7 +59,7 @@ std::vector<uint8_t> uint32ToVector(uint32_t value) {
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 KeyRequestType toKeyRequestType_V1_0(KeyRequestType_V1_1 keyRequestType) {
@@ -635,6 +636,68 @@ Return<void> DrmPlugin::getSecurityLevel(const hidl_vec<uint8_t>& sessionId,
     return Void();
 }
 
+Return<void> DrmPlugin::getLogMessages(
+        getLogMessages_cb _hidl_cb) {
+    using std::chrono::duration_cast;
+    using std::chrono::milliseconds;
+    using std::chrono::system_clock;
+
+    auto timeMillis = duration_cast<milliseconds>(
+            system_clock::now().time_since_epoch()).count();
+
+    //TODO(b/182525516) Stub out for now
+    std::vector<LogMessage> logs = {
+            { timeMillis, LogPriority::DEFAULT, std::string() }};
+    _hidl_cb(drm::V1_4::Status::OK, toHidlVec(logs));
+    return Void();
+}
+
+Return<bool> DrmPlugin::requiresSecureDecoder(
+        const hidl_string& mime, SecurityLevel level) {
+    if (!strncasecmp(mime.c_str(), "video/", 6)) {
+        // Type is video, so check level to see if we require a secure decoder.
+        return level == SecurityLevel::HW_SECURE_DECODE;
+    } else {
+        // Type is not video, so never require a secure decoder.
+        return false;
+    }
+}
+
+Return<bool> DrmPlugin::requiresSecureDecoderDefault(const hidl_string& mime) {
+    UNUSED(mime);
+    // Clearkey only supports SW_SECURE_CRYPTO, so we always returns false
+    // regardless of mime type.
+    return false;
+}
+
+Return<Status> DrmPlugin::setPlaybackId(
+    const hidl_vec<uint8_t>& sessionId,
+    const hidl_string& playbackId) {
+    if (sessionId.size() == 0) {
+        ALOGE("Invalid empty session id");
+        return Status::BAD_VALUE;
+    }
+
+    std::vector<uint8_t> sid = toVector(sessionId);
+    sp<Session> session = mSessionLibrary->findSession(sid);
+    if (!session.get()) {
+        return Status::ERROR_DRM_SESSION_NOT_OPENED;
+    }
+
+    std::map<std::vector<uint8_t>, std::string>::iterator itr =
+            mPlaybackId.find(sid);
+    if (itr != mPlaybackId.end()) {
+        mPlaybackId[sid] = playbackId;
+    } else {
+        if (!mPlaybackId.insert(
+                std::pair<std::vector<uint8_t>, std::string>(sid, playbackId)).second) {
+            ALOGE("Failed to set playback Id");
+            return Status::ERROR_DRM_UNKNOWN;
+        }
+    }
+    return Status::OK;
+}
+
 Return<Status> DrmPlugin::setSecurityLevel(const hidl_vec<uint8_t>& sessionId,
             SecurityLevel level) {
     if (sessionId.size() == 0) {
@@ -702,8 +765,21 @@ Return<void> DrmPlugin::getMetrics(getMetrics_cb _hidl_cb) {
       "close_session", { closeSessionNotOpenedAttribute }, { closeSessionNotOpenedMetricValue }
     };
 
-    DrmMetricGroup metrics = { { openSessionMetric, closeSessionMetric,
-                                closeSessionNotOpenedMetric } };
+    // Set the setPlaybackId metric.
+    DrmMetricGroup::Attribute setPlaybackIdOKAttribute = {
+      "status", DrmMetricGroup::ValueType::INT64_TYPE,
+      (int64_t) Status::OK, 0.0, ""
+    };
+    std::string playbackId = mPlaybackId.begin()->second;
+    DrmMetricGroup::Value setPlaybackIdMetricValue = {
+      "value", DrmMetricGroup::ValueType::STRING_TYPE, 0, 0,  playbackId.c_str()
+    };
+    DrmMetricGroup::Metric setPlaybackIdMetric = {
+      "set_playback_id", { setPlaybackIdOKAttribute }, { setPlaybackIdMetricValue }
+    };
+
+    DrmMetricGroup metrics = {{ openSessionMetric, closeSessionMetric,
+                                closeSessionNotOpenedMetric, setPlaybackIdMetric }};
 
     _hidl_cb(Status::OK, hidl_vec<DrmMetricGroup>({metrics}));
     return Void();
@@ -907,7 +983,7 @@ Return<Status> DrmPlugin::removeAllSecureStops() {
 }
 
 }  // namespace clearkey
-}  // namespace V1_2
+}  // namespace V1_4
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android

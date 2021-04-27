@@ -20,8 +20,10 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
+
+using ::android::hardware::drm::V1_2::clearkey::OfflineFile;
 
 class DeviceFiles {
  public:
@@ -63,7 +65,7 @@ class DeviceFiles {
 };
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android
