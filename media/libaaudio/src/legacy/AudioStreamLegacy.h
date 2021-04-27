@@ -60,7 +60,7 @@ class AudioStreamLegacy : public AudioStream, public FixedBlockProcessor {
 public:
     AudioStreamLegacy();
 
-    virtual ~AudioStreamLegacy();
+    virtual ~AudioStreamLegacy() = default;
 
     aaudio_legacy_callback_t getLegacyCallback();
 

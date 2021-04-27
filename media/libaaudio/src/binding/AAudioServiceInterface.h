@@ -37,7 +37,7 @@ namespace aaudio {
 class AAudioServiceInterface {
 public:
 
-    AAudioServiceInterface() {};
+    AAudioServiceInterface() = default;
     virtual ~AAudioServiceInterface() = default;
 
     virtual void registerClient(const android::sp<IAAudioClient>& client) = 0;

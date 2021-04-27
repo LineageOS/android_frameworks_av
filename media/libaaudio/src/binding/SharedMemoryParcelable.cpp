@@ -32,7 +32,6 @@
 #include "binding/SharedMemoryParcelable.h"
 
 using android::base::unique_fd;
-using android::NO_ERROR;
 using android::status_t;
 using android::media::SharedFileRegion;
 
@@ -77,7 +76,7 @@ aaudio_result_t SharedMemoryParcelable::close() {
 }
 
 aaudio_result_t SharedMemoryParcelable::resolveSharedMemory(const unique_fd& fd) {
-    mResolvedAddress = (uint8_t *) mmap(0, mSizeInBytes, PROT_READ | PROT_WRITE,
+    mResolvedAddress = (uint8_t *) mmap(nullptr, mSizeInBytes, PROT_READ | PROT_WRITE,
                                         MAP_SHARED, fd.get(), 0);
     if (mResolvedAddress == MMAP_UNRESOLVED_ADDRESS) {
         ALOGE("mmap() failed for fd = %d, nBytes = %" PRId64 ", errno = %s",

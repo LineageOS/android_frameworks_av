@@ -25,7 +25,7 @@ SourceFloat::SourceFloat(int32_t channelCount)
         : AudioSource(channelCount) {
 }
 
-int32_t SourceFloat::onProcess(int64_t framePosition, int32_t numFrames) {
+int32_t SourceFloat::onProcess(int64_t /*framePosition*/, int32_t numFrames) {
 
     float *outputBuffer = output.getBlock();
     int32_t channelCount = output.getSamplesPerFrame();

@@ -30,9 +30,9 @@
 using namespace aaudio;
 
 RingBufferParcelable::RingBufferParcelable(const RingBuffer& parcelable)
-        : mReadCounterParcelable(std::move(parcelable.readCounterParcelable)),
-          mWriteCounterParcelable(std::move(parcelable.writeCounterParcelable)),
-          mDataParcelable(std::move(parcelable.dataParcelable)),
+        : mReadCounterParcelable(parcelable.readCounterParcelable),
+          mWriteCounterParcelable(parcelable.writeCounterParcelable),
+          mDataParcelable(parcelable.dataParcelable),
           mBytesPerFrame(parcelable.bytesPerFrame),
           mFramesPerBurst(parcelable.framesPerBurst),
           mCapacityInFrames(parcelable.capacityInFrames),
@@ -42,9 +42,9 @@ RingBufferParcelable::RingBufferParcelable(const RingBuffer& parcelable)
 
 RingBuffer RingBufferParcelable::parcelable() const {
     RingBuffer result;
-    result.readCounterParcelable = std::move(mReadCounterParcelable).parcelable();
-    result.writeCounterParcelable = std::move(mWriteCounterParcelable).parcelable();
-    result.dataParcelable = std::move(mDataParcelable).parcelable();
+    result.readCounterParcelable = mReadCounterParcelable.parcelable();
+    result.writeCounterParcelable = mWriteCounterParcelable.parcelable();
+    result.dataParcelable = mDataParcelable.parcelable();
     result.bytesPerFrame = mBytesPerFrame;
     result.framesPerBurst = mFramesPerBurst;
     result.capacityInFrames = mCapacityInFrames;

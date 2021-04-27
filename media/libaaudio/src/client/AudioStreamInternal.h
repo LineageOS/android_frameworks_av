@@ -116,7 +116,7 @@ protected:
 
     virtual void prepareBuffersForStart() {}
 
-    virtual void advanceClientToMatchServerPosition(int32_t serverMargin = 0) = 0;
+    virtual void advanceClientToMatchServerPosition(int32_t serverMargin) = 0;
 
     virtual void onFlushFromServer() {}
 

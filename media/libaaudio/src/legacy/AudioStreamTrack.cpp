@@ -160,11 +160,11 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             callback,
             callbackData,
             notificationFrames,
-            0,       // DEFAULT sharedBuffer*/,
+            nullptr,       // DEFAULT sharedBuffer*/,
             false,   // DEFAULT threadCanCallJava
             sessionId,
             streamTransferType,
-            NULL,    // DEFAULT audio_offload_info_t
+            nullptr,    // DEFAULT audio_offload_info_t
             Identity(), // DEFAULT uid and pid
             &attributes,
             // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging

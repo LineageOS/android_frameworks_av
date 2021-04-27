@@ -34,7 +34,7 @@ namespace aaudio {
 class AudioEndpoint {
 
 public:
-    AudioEndpoint();
+    AudioEndpoint() = default;
 
     /**
      * Configure based on the EndPointDescriptor_t.
@@ -95,9 +95,9 @@ public:
 private:
     std::unique_ptr<android::FifoBufferIndirect> mUpCommandQueue;
     std::unique_ptr<android::FifoBufferIndirect> mDataQueue;
-    bool                    mFreeRunning;
-    android::fifo_counter_t mDataReadCounter; // only used if free-running
-    android::fifo_counter_t mDataWriteCounter; // only used if free-running
+    bool                    mFreeRunning{false};
+    android::fifo_counter_t mDataReadCounter{0}; // only used if free-running
+    android::fifo_counter_t mDataWriteCounter{0}; // only used if free-running
 };
 
 } // namespace aaudio

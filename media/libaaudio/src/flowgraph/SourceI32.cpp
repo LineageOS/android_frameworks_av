@@ -30,7 +30,7 @@ SourceI32::SourceI32(int32_t channelCount)
         : AudioSource(channelCount) {
 }
 
-int32_t SourceI32::onProcess(int64_t framePosition, int32_t numFrames) {
+int32_t SourceI32::onProcess(int64_t /*framePosition*/, int32_t numFrames) {
     float *floatData = output.getBlock();
     int32_t channelCount = output.getSamplesPerFrame();
 
