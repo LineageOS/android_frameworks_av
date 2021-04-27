@@ -155,6 +155,10 @@ enum {
     kKeyIsADTS            = 'adts',  // bool (int32_t)
     kKeyAACAOT            = 'aaot',  // int32_t
 
+    kKeyMpeghProfileLevelIndication = 'hpli', // int32_t
+    kKeyMpeghReferenceChannelLayout = 'hrcl', // int32_t
+    kKeyMpeghCompatibleSets         = 'hcos', // raw data
+
     // If a MediaBuffer's data represents (at least partially) encrypted
     // data, the following fields aid in decryption.
     // The data can be thought of as pairs of plain and encrypted data
@@ -280,6 +284,7 @@ enum {
     kTypeAV1C        = 'av1c',
     kTypeDVCC        = 'dvcc',
     kTypeD263        = 'd263',
+    kTypeHCOS        = 'hcos',
 };
 
 enum {
