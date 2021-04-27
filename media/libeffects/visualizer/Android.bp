@@ -1,0 +1,41 @@
+package {
+    default_applicable_licenses: ["frameworks_av_media_libeffects_visualizer_license"],
+}
+
+// See: http://go/android-license-faq
+license {
+    name: "frameworks_av_media_libeffects_visualizer_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-Apache-2.0",
+    ],
+    license_text: [
+        "NOTICE",
+    ],
+}
+
+// Visualizer library
+cc_library_shared {
+    name: "libvisualizer",
+    vendor: true,
+    srcs: ["EffectVisualizer.cpp"],
+    cflags: [
+        "-O2",
+        "-fvisibility=hidden",
+        "-Wall",
+        "-Werror",
+        "-DBUILD_FLOAT",
+        "-DSUPPORT_MC",
+    ],
+    shared_libs: [
+        "libcutils",
+        "liblog",
+        "libdl",
+    ],
+    relative_install_path: "soundfx",
+    header_libs: [
+        "libhardware_headers",
+        "libaudioeffects",
+        "libaudioutils_headers",
+    ],
+}
