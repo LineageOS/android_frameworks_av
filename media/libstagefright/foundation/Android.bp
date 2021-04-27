@@ -45,6 +45,9 @@ cc_defaults {
     ],
 
     header_libs: [
+        // this is only needed for the vendor variant that removes libbinder, but vendor
+        // target below does not allow adding header_libs.
+        "libbinder_headers",
         "libstagefright_foundation_headers",
         "media_ndk_headers",
         "media_plugin_headers",
@@ -98,6 +101,7 @@ cc_defaults {
 
     target: {
         vendor: {
+            // TODO: add libbinder_headers here instead of above when it becomes supported
             exclude_shared_libs: [
                 "libbinder",
             ],
