@@ -987,7 +987,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
 
     std::string formatAppStr;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
-            key, AMEDIAMETRICS_PROP_ENCODINGREQUESTED, &formatAppStr);
+            key, AMEDIAMETRICS_PROP_ENCODINGCLIENT, &formatAppStr);
     const auto formatApp = types::lookup<types::ENCODING, int32_t>(formatAppStr);
 
     std::string formatDeviceStr;

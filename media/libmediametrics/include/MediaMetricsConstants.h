@@ -160,9 +160,9 @@
 #define AMEDIAMETRICS_PROP_VOLUME_LEFT    "volume.left"    // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_VOLUME_RIGHT   "volume.right"   // double (AudioTrack)
 #define AMEDIAMETRICS_PROP_WHERE          "where"          // string value
-// EncodingRequested is the encoding format requested by the app
-#define AMEDIAMETRICS_PROP_ENCODINGREQUESTED "encodingRequested" // string
-// PerformanceModeActual is the actual selected performance mode, could be "none', "loeLatency" or
+// EncodingClient is the encoding format requested by the client
+#define AMEDIAMETRICS_PROP_ENCODINGCLIENT "encodingClient" // string
+// PerformanceModeActual is the actual selected performance mode, could be "none', "lowLatency" or
 // "powerSaving"
 #define AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL "performanceModeActual" // string
 #define AMEDIAMETRICS_PROP_FRAMESTRANSFERRED "framesTransferred" // int64_t, transferred frames

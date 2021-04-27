@@ -118,7 +118,7 @@ public:
     virtual aaudio_result_t open(const AudioStreamBuilder& builder);
 
     // log to MediaMetrics
-    virtual void logOpen();
+    virtual void logOpenActual();
     void logReleaseBufferState();
 
     /* Note about naming for "release"  and "close" related methods.
