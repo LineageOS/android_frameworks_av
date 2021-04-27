@@ -20,6 +20,8 @@ import android.hardware.ICamera;
 import android.hardware.ICameraClient;
 import android.hardware.camera2.ICameraDeviceUser;
 import android.hardware.camera2.ICameraDeviceCallbacks;
+import android.hardware.camera2.ICameraInjectionCallback;
+import android.hardware.camera2.ICameraInjectionSession;
 import android.hardware.camera2.params.VendorTagDescriptor;
 import android.hardware.camera2.params.VendorTagDescriptorCache;
 import android.hardware.camera2.utils.ConcurrentCameraIdCombination;
@@ -161,6 +163,9 @@ interface ICameraService
     boolean supportsCameraApi(String cameraId, int apiVersion);
     // Determines if a cameraId is a hidden physical camera of a logical multi-camera.
     boolean isHiddenPhysicalCamera(String cameraId);
+    // Inject the external camera to replace the internal camera session.
+    ICameraInjectionSession injectCamera(String packageName, String internalCamId,
+            String externalCamId, in ICameraInjectionCallback CameraInjectionCallback);
 
     void setTorchMode(String cameraId, boolean enabled, IBinder clientBinder);
 
