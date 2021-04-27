@@ -82,6 +82,14 @@ class CodecProperties {
     void setSupportsQp(bool supported) { mSupportsQp = supported;}
     bool supportsQp() { return mSupportsQp;}
 
+    // defines our range of operation -- multiplier on the floor bitrate
+    double getPhaseOut() { return mPhaseOut; }
+    void setPhaseOut(double overageMultiplier);
+
+    // how much (0.20 = +20%) do we add if Qp is requested but unsupported
+    double getMissingQpBoost() {return mMissingQpBoost; }
+    void setMissingQpBoost(double boost);
+
     int  supportedApi();
 
     // a codec is not usable until it has been registered with its
@@ -97,6 +105,11 @@ class CodecProperties {
     int mTargetQpMax = INT32_MAX;
     bool mSupportsQp = false;
     double mBpp = 0.0;
+
+    // target bitrates above floor * mPhaseOut are left untouched
+    double mPhaseOut = 1.75;
+    // 20% bump if QP is configured but it is unavailable
+    double mMissingQpBoost = 0.20;
 
     // allow different target bits-per-pixel based on resolution
     // similar to codec 'performance points'
