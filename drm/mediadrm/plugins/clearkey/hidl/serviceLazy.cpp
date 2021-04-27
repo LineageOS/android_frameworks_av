@@ -25,10 +25,10 @@ using ::android::hardware::configureRpcThreadpool;
 using ::android::hardware::joinRpcThreadpool;
 using ::android::sp;
 
-using android::hardware::drm::V1_3::ICryptoFactory;
-using android::hardware::drm::V1_3::IDrmFactory;
-using android::hardware::drm::V1_3::clearkey::CryptoFactory;
-using android::hardware::drm::V1_3::clearkey::DrmFactory;
+using android::hardware::drm::V1_4::ICryptoFactory;
+using android::hardware::drm::V1_4::IDrmFactory;
+using android::hardware::drm::V1_4::clearkey::CryptoFactory;
+using android::hardware::drm::V1_4::clearkey::DrmFactory;
 using android::hardware::LazyServiceRegistrar;
 
 int main(int /* argc */, char** /* argv */) {
