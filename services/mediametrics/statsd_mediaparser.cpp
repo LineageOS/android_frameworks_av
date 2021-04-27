@@ -79,8 +79,8 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
     int32_t videoHeight = -1;
     item->getInt32("android.media.mediaparser.videoHeight", &videoHeight);
 
-    std::string playbackSessionId;
-    item->getString("android.media.mediaparser.playbackId", &playbackSessionId);
+    std::string logSessionId;
+    item->getString("android.media.mediaparser.logSessionId", &logSessionId);
 
     if (enabled_statsd) {
         (void) android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
@@ -98,11 +98,10 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
                                    alteredParameters.c_str(),
                                    videoWidth,
                                    videoHeight,
-                                   playbackSessionId.c_str());
+                                   logSessionId.c_str());
     } else {
         ALOGV("NOT sending MediaParser media metrics.");
     }
-    // TODO: Cleanup after playback_id is merged.
     std::stringstream log;
     log << "result:" << "(result)" << " {"
             << " mediametrics_mediaparser_reported:"
@@ -121,8 +120,7 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
             << " altered_parameters:" << alteredParameters
             << " video_width:" << videoWidth
             << " video_height:" << videoHeight
-            // TODO: Add MediaParser playback_id
-            // << " playback_id:" << playbackId
+            << " log_session_id:" << logSessionId
             << " }";
     statsdLog->log(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED, log.str());
     return true;
