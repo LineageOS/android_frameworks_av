@@ -135,6 +135,7 @@ TEST_P(ID3albumArtTest, AlbumArtTest) {
     } else {
         ASSERT_EQ(data, nullptr) << "Found album art when expected none!";
     }
+
 #if (LOG_NDEBUG == 0)
     hexdump(data, dataSize > 128 ? 128 : dataSize);
 #endif
@@ -186,7 +187,8 @@ INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3tagTest,
                                            "bbb_1sec_v23_3tags.mp3",
                                            "bbb_1sec_v1_5tags.mp3",
                                            "bbb_2sec_v24_unsynchronizedOneFrame.mp3",
-                                           "bbb_2sec_v24_unsynchronizedAllFrames.mp3"));
+                                           "bbb_2sec_v24_unsynchronizedAllFrames.mp3",
+                                           "idv24_unsynchronized.mp3"));
 
 INSTANTIATE_TEST_SUITE_P(
         id3TestAll, ID3versionTest,
@@ -201,7 +203,8 @@ INSTANTIATE_TEST_SUITE_P(
                           make_pair("bbb_1sec_v1_5tags.mp3", ID3::ID3_V1_1),
                           make_pair("bbb_1sec_v1_3tags.mp3", ID3::ID3_V1_1),
                           make_pair("bbb_2sec_v24_unsynchronizedOneFrame.mp3", ID3::ID3_V2_4),
-                          make_pair("bbb_2sec_v24_unsynchronizedAllFrames.mp3", ID3::ID3_V2_4)));
+                          make_pair("bbb_2sec_v24_unsynchronizedAllFrames.mp3", ID3::ID3_V2_4),
+                          make_pair("idv24_unsynchronized.mp3", ID3::ID3_V2_4)));
 
 INSTANTIATE_TEST_SUITE_P(
         id3TestAll, ID3textTagTest,
@@ -227,7 +230,9 @@ INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3albumArtTest,
                                            make_pair("bbb_2sec_1_image.mp3", true),
                                            make_pair("bbb_2sec_2_image.mp3", true),
                                            make_pair("bbb_2sec_largeSize.mp3", true),
-                                           make_pair("bbb_1sec_v1_5tags.mp3", false)));
+                                           make_pair("bbb_1sec_v1_5tags.mp3", false),
+                                           make_pair("idv24_unsynchronized.mp3", true)
+                                           ));
 
 INSTANTIATE_TEST_SUITE_P(id3TestAll, ID3multiAlbumArtTest,
                          ::testing::Values(make_pair("bbb_1sec_v23.mp3", 0),
