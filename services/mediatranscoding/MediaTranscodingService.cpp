@@ -131,10 +131,10 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 void MediaTranscodingService::instantiate() {
     std::shared_ptr<MediaTranscodingService> service =
             ::ndk::SharedRefBase::make<MediaTranscodingService>();
-    binder_status_t status =
-            AServiceManager_addService(service->asBinder().get(), getServiceName());
-    if (status != STATUS_OK) {
-        return;
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+        // Once service is started, we want it to stay even is client side perished.
+        AServiceManager_forceLazyServicesPersist(true /*persist*/);
+        (void)AServiceManager_registerLazyService(service->asBinder().get(), getServiceName());
     }
 }
 
