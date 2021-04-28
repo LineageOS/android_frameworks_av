@@ -7934,18 +7934,18 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
 
     { // scope for mLock
         Mutex::Autolock _l(mLock);
-        long startTimeMs = -1;
+        int32_t startFrames = -1;
         if (!mSharedAudioPackageName.empty()
                 && mSharedAudioPackageName == checkedIdentity.packageName
                 && mSharedAudioSessionId == sessionId
                 && captureHotwordAllowed(checkedIdentity)) {
-            startTimeMs = mSharedAudioStartMs;
+            startFrames = mSharedAudioStartFrames;
         }
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid,
-                      checkedIdentity, *flags, TrackBase::TYPE_DEFAULT, portId, startTimeMs);
+                      checkedIdentity, *flags, TrackBase::TYPE_DEFAULT, portId, startFrames);
 
         lStatus = track->initCheck();
         if (lStatus != NO_ERROR) {
@@ -8202,17 +8202,32 @@ status_t AudioFlinger::RecordThread::shareAudioHistory_l(
     if ((hasAudioSession_l(sharedSessionId) & ThreadBase::TRACK_SESSION) == 0) {
         return BAD_VALUE;
     }
-    if (sharedAudioStartMs < 0 || sharedAudioStartMs * mSampleRate / 1000 > mRsmpInRear) {
+
+    if (sharedAudioStartMs < 0
+        || sharedAudioStartMs > INT64_MAX / mSampleRate) {
         return BAD_VALUE;
+    }
+
+    // Current implementation of the input resampling buffer wraps around indexes at 32 bit.
+    // As we cannot detect more than one wraparound, only accept values up current write position
+    // after one wraparound
+    // We assume recent wraparounds on mRsmpInRear only given it is unlikely that the requesting
+    // app waits several hours after the start time was computed.
+    const int64_t sharedAudioStartFrames = sharedAudioStartMs * mSampleRate / 1000;
+    const int32_t sharedOffset = audio_utils::safe_sub_overflow(mRsmpInRear,
+          (int32_t)sharedAudioStartFrames);
+    if (sharedOffset < 0
+          || sharedOffset > mRsmpInFrames) {
+      return BAD_VALUE;
     }
 
     mSharedAudioPackageName = sharedAudioPackageName;
     if (mSharedAudioPackageName.empty()) {
         mSharedAudioSessionId = AUDIO_SESSION_NONE;
-        mSharedAudioStartMs = -1;
+        mSharedAudioStartFrames = -1;
     } else {
         mSharedAudioSessionId = sharedSessionId;
-        mSharedAudioStartMs = sharedAudioStartMs;
+        mSharedAudioStartFrames = (int32_t)sharedAudioStartFrames;
     }
     return NO_ERROR;
 }
@@ -8359,14 +8374,14 @@ void AudioFlinger::RecordThread::ResamplerBufferProvider::reset()
     mRsmpInUnrel = 0;
     const int32_t rear = recordThread->mRsmpInRear;
     ssize_t deltaFrames = 0;
-    if (mRecordTrack->startTimeMs() >= 0) {
-        int32_t startFrames = mRecordTrack->startTimeMs() * recordThread->sampleRate()  / 1000;
-        // start frame has to be in the past
-        //TODO: b/185972521 fix in case rear or startFrames wrap around
-        if (startFrames > rear) {
-            startFrames = rear;
+    if (mRecordTrack->startFrames() >= 0) {
+        int32_t startFrames = mRecordTrack->startFrames();
+        // Accept a recent wraparound of mRsmpInRear
+        if (startFrames <= rear) {
+            deltaFrames = rear - startFrames;
+        } else {
+            deltaFrames = (int32_t)((int64_t)rear + UINT32_MAX + 1 - startFrames);
         }
-        deltaFrames = rear - startFrames;
         // start frame cannot be further in the past than start of resampling buffer
         if ((size_t) deltaFrames > recordThread->mRsmpInFrames) {
             deltaFrames = recordThread->mRsmpInFrames;
@@ -8828,17 +8843,22 @@ int32_t AudioFlinger::RecordThread::getOldestFront_l()
     if (mTracks.size() == 0) {
         return 0;
     }
-    //TODO: b/185972521 fix in case of wrap around on one track:
-    //  want the max(rear - front) for all tracks.
-    int32_t front = INT_MAX;
+    int32_t oldestFront = mRsmpInRear;
+    int32_t maxFilled = 0;
     for (size_t i = 0; i < mTracks.size(); i++) {
-        front = std::min(front, mTracks[i]->mResamplerBufferProvider->getFront());
+        int32_t front = mTracks[i]->mResamplerBufferProvider->getFront();
+        int32_t filled;
+        if (front <= mRsmpInRear) {
+            filled = mRsmpInRear - front;
+        } else {
+            filled = (int32_t)((int64_t)mRsmpInRear + UINT32_MAX + 1 - front);
+        }
+        if (filled > maxFilled) {
+            oldestFront = front;
+            maxFilled = filled;
+        }
     }
-    // discard any audio past the buffer size
-    if (audio_utils::safe_add_overflow(front, (int32_t)mRsmpInFrames) < mRsmpInRear) {
-        front = audio_utils::safe_sub_overflow(mRsmpInRear, (int32_t)mRsmpInFrames);
-    }
-    return front;
+    return oldestFront;
 }
 
 void AudioFlinger::RecordThread::updateFronts_l(int32_t offset)
