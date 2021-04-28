@@ -11,7 +11,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 std::string MemoryFileSystem::GetFileName(const std::string& path) {
@@ -93,7 +93,7 @@ bool MemoryFileSystem::RemoveAllFiles() {
 }
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

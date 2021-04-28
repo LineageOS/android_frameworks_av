@@ -60,6 +60,13 @@ void CodecProperties::setTargetQpMax(int qpMax) {
     mTargetQpMax = qpMax;
 }
 
+void CodecProperties::setMissingQpBoost(double boost) {
+    mMissingQpBoost = boost;
+}
+void CodecProperties::setPhaseOut(double phaseout) {
+    mPhaseOut = phaseout;
+}
+
 // what API is this codec set up for (e.g. API of the associated partition)
 // vendor-side (OEM) codecs may be older, due to 'vendor freeze' and treble
 int CodecProperties::supportedApi() {
@@ -132,6 +139,22 @@ void CodecProperties::setTuningValue(std::string key, std::string value) {
         if (q != p) {
             double bpp = iValue / 100.0;
             setBpp(bpp);
+            legal = true;
+        }
+    } else if (!strcmp(key.c_str(), "vq-bitrate-phaseout")) {
+        const char *p = value.c_str();
+        char *q;
+        double phaseout = strtod(p, &q);
+        if (q != p) {
+            setPhaseOut(phaseout);
+            legal = true;
+        }
+    } else if (!strcmp(key.c_str(), "vq-boost-missing-qp")) {
+        const char *p = value.c_str();
+        char *q;
+        double boost = strtod(p, &q);
+        if (q != p) {
+            setMissingQpBoost(boost);
             legal = true;
         }
     } else {

@@ -97,6 +97,7 @@ bool modifyDefaultAudioEffectsAllowed(const media::permission::Identity& identit
 bool dumpAllowed();
 bool modifyPhoneStateAllowed(const media::permission::Identity& identity);
 bool bypassInterruptionPolicyAllowed(const media::permission::Identity& identity);
+void purgePermissionCache();
 
 media::permission::Identity getCallingIdentity();
 

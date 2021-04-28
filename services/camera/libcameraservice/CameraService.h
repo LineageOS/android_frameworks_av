@@ -20,6 +20,8 @@
 #include <android/hardware/BnCameraService.h>
 #include <android/hardware/BnSensorPrivacyListener.h>
 #include <android/hardware/ICameraServiceListener.h>
+#include <android/hardware/camera2/BnCameraInjectionSession.h>
+#include <android/hardware/camera2/ICameraInjectionCallback.h>
 
 #include <cutils/multiuser.h>
 #include <utils/Vector.h>
@@ -179,6 +181,13 @@ public:
             const String16& cameraId,
             /*out*/
             bool *isSupported);
+
+    virtual binder::Status injectCamera(
+            const String16& packageName, const String16& internalCamId,
+            const String16& externalCamId,
+            const sp<hardware::camera2::ICameraInjectionCallback>& callback,
+            /*out*/
+            sp<hardware::camera2::ICameraInjectionSession>* cameraInjectionSession);
 
     // Extra permissions checks
     virtual status_t    onTransact(uint32_t code, const Parcel& data,
@@ -1147,6 +1156,46 @@ private:
 
     // Current camera mute mode
     bool mOverrideCameraMuteMode = false;
+
+    /**
+     * A listener class that implements the IBinder::DeathRecipient interface
+     * for use to call back the error state injected by the external camera, and
+     * camera service can kill the injection when binder signals process death.
+     */
+    class InjectionStatusListener : public virtual IBinder::DeathRecipient {
+        public:
+            InjectionStatusListener(sp<CameraService> parent) : mParent(parent) {}
+
+            void addListener(const sp<hardware::camera2::ICameraInjectionCallback>& callback);
+            void removeListener();
+            void notifyInjectionError(int errorCode);
+
+            // IBinder::DeathRecipient implementation
+            virtual void binderDied(const wp<IBinder>& who);
+
+        private:
+            Mutex mListenerLock;
+            wp<CameraService> mParent;
+            sp<hardware::camera2::ICameraInjectionCallback> mCameraInjectionCallback;
+    };
+
+    sp<InjectionStatusListener> mInjectionStatusListener;
+
+    /**
+     * A class that implements the hardware::camera2::BnCameraInjectionSession interface
+     */
+    class CameraInjectionSession : public hardware::camera2::BnCameraInjectionSession {
+        public:
+            CameraInjectionSession(sp<CameraService> parent) : mParent(parent) {}
+            virtual ~CameraInjectionSession() {}
+            binder::Status stopInjection() override;
+
+        private:
+            Mutex mInjectionSessionLock;
+            wp<CameraService> mParent;
+    };
+
+    void stopInjectionImpl();
 };
 
 } // namespace android
