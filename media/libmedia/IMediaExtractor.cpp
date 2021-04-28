@@ -40,7 +40,7 @@ enum {
     NAME,
     GETMETRICS,
     SETENTRYPOINT,
-    SETPLAYBACKID
+    SETLOGSESSIONID
 };
 
 class BpMediaExtractor : public BpInterface<IMediaExtractor> {
@@ -152,11 +152,11 @@ public:
         return remote()->transact(SETENTRYPOINT, data, &reply);
     }
 
-    virtual status_t setPlaybackId(const String8& playbackId) {
+    virtual status_t setLogSessionId(const String8& logSessionId) {
         Parcel data, reply;
         data.writeInterfaceToken(BpMediaExtractor::getInterfaceDescriptor());
-        data.writeString8(playbackId);
-        return remote()->transact(SETPLAYBACKID, data, &reply);
+        data.writeString8(logSessionId);
+        return remote()->transact(SETLOGSESSIONID, data, &reply);
     }
 };
 
@@ -258,13 +258,13 @@ status_t BnMediaExtractor::onTransact(
             }
             return err;
         }
-        case SETPLAYBACKID: {
-            ALOGV("setPlaybackId");
+        case SETLOGSESSIONID: {
+            ALOGV("setLogSessionId");
             CHECK_INTERFACE(IMediaExtractor, data, reply);
-            String8 playbackId;
-            status_t status = data.readString8(&playbackId);
+            String8 logSessionId;
+            status_t status = data.readString8(&logSessionId);
             if (status == OK) {
-              setPlaybackId(playbackId);
+              setLogSessionId(logSessionId);
             }
             return status;
         }
