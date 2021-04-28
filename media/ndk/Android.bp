@@ -85,7 +85,9 @@ cc_library_headers {
 
 cc_library_shared {
     name: "libmediandk",
-    llndk_stubs: "libmediandk.llndk",
+    llndk: {
+        symbol_file: "libmediandk.map.txt",
+    },
 
     srcs: [
         "NdkJavaVMHelper.cpp",
@@ -166,14 +168,6 @@ cc_library_shared {
         symbol_file: "libmediandk.map.txt",
         versions: ["29"],
     },
-}
-
-llndk_library {
-    name: "libmediandk.llndk",
-    symbol_file: "libmediandk.map.txt",
-    export_include_dirs: [
-        "include",
-    ],
 }
 
 cc_library {

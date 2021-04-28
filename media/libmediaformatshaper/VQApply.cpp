@@ -49,14 +49,6 @@ namespace mediaformatshaper {
 static const int BITRATE_MODE_VBR = 1;
 
 
-// constants we use within the calculations
-//
-constexpr double BITRATE_LEAVE_UNTOUCHED = 1.75;
-
-// 20% bump if QP is configured but it is unavailable
-constexpr double BITRATE_QP_UNAVAILABLE_BOOST = 0.20;
-
-
 //
 // Caller retains ownership of and responsibility for inFormat
 //
@@ -100,7 +92,7 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
     double minimumBpp = codec->getBpp(width, height);
 
     int64_t bitrateFloor = pixels * minimumBpp;
-    int64_t bitrateCeiling = bitrateFloor * BITRATE_LEAVE_UNTOUCHED;
+    int64_t bitrateCeiling = bitrateFloor * codec->getPhaseOut();
     if (bitrateFloor > INT32_MAX) bitrateFloor = INT32_MAX;
     if (bitrateCeiling > INT32_MAX) bitrateCeiling = INT32_MAX;
 
@@ -144,8 +136,7 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
     // if QP is desired but not supported, compensate with additional bits
     if (!codec->supportsQp()) {
         if (qpChosen != INT32_MAX) {
-            int64_t boost = 0;
-            boost = bitrateChosen * BITRATE_QP_UNAVAILABLE_BOOST;
+            int64_t boost = bitrateChosen * codec->getMissingQpBoost();
             ALOGD("minquality: requested QP unsupported, boost bitrate %" PRId64 " by %" PRId64,
                 bitrateChosen, boost);
             bitrateChosen =  bitrateChosen + boost;
@@ -165,7 +156,7 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
 
     if (bitrateChosen != bitrateConfigured) {
         if (bitrateChosen > bitrateCeiling) {
-            ALOGD("minquality: bitrate clamped at ceiling %" PRId64,  bitrateCeiling);
+            ALOGD("minquality: bitrate increase clamped at ceiling %" PRId64,  bitrateCeiling);
             bitrateChosen = bitrateCeiling;
         }
         ALOGD("minquality/target bitrate raised from %" PRId64 " to %" PRId64 " bps",

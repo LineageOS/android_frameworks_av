@@ -91,6 +91,8 @@ using hardware::ICameraClient;
 using hardware::ICameraServiceListener;
 using hardware::camera::common::V1_0::CameraDeviceStatus;
 using hardware::camera::common::V1_0::TorchModeStatus;
+using hardware::camera2::ICameraInjectionCallback;
+using hardware::camera2::ICameraInjectionSession;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 using hardware::camera2::utils::ConcurrentCameraIdCombination;
 
@@ -127,6 +129,8 @@ static const String16
         sCameraSendSystemEventsPermission("android.permission.CAMERA_SEND_SYSTEM_EVENTS");
 static const String16 sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
+static const String16
+        sCameraInjectExternalCameraPermission("android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
 
 static constexpr int32_t kVendorClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PERSISTENT_UI;
@@ -166,6 +170,7 @@ void CameraService::onFirstRef()
     mUidPolicy->registerSelf();
     mSensorPrivacyPolicy = new SensorPrivacyPolicy(this);
     mSensorPrivacyPolicy->registerSelf();
+    mInjectionStatusListener = new InjectionStatusListener(this);
     mAppOps.setCameraAudioRestriction(mAudioRestriction);
     sp<HidlCameraService> hcs = HidlCameraService::getInstance(this);
     if (hcs->registerAsService() != android::OK) {
@@ -243,6 +248,7 @@ CameraService::~CameraService() {
     VendorTagDescriptor::clearGlobalVendorTagDescriptor();
     mUidPolicy->unregisterSelf();
     mSensorPrivacyPolicy->unregisterSelf();
+    mInjectionStatusListener->removeListener();
 }
 
 void CameraService::onNewProviderRegistered() {
@@ -2386,6 +2392,42 @@ Status CameraService::isHiddenPhysicalCamera(const String16& cameraId,
     return Status::ok();
 }
 
+Status CameraService::injectCamera(
+        const String16& packageName, const String16& internalCamId,
+        const String16& externalCamId,
+        const sp<ICameraInjectionCallback>& callback,
+        /*out*/
+        sp<hardware::camera2::ICameraInjectionSession>* cameraInjectionSession) {
+    ATRACE_CALL();
+
+    if (!checkCallingPermission(sCameraInjectExternalCameraPermission)) {
+        const int pid = CameraThreadState::getCallingPid();
+        const int uid = CameraThreadState::getCallingUid();
+        ALOGE("Permission Denial: can't inject camera pid=%d, uid=%d", pid, uid);
+        return STATUS_ERROR(ERROR_PERMISSION_DENIED,
+                        "Permission Denial: no permission to inject camera");
+    }
+
+    ALOGV(
+        "%s: Package name = %s, Internal camera ID = %s, External camera ID = "
+        "%s",
+        __FUNCTION__, String8(packageName).string(),
+        String8(internalCamId).string(), String8(externalCamId).string());
+
+    binder::Status ret = binder::Status::ok();
+    // TODO: Implement the injection camera function.
+    // ret = internalInjectCamera(...);
+    // if(!ret.isOk()) {
+    //     mInjectionStatusListener->notifyInjectionError(...);
+    //     return ret;
+    // }
+
+    mInjectionStatusListener->addListener(callback);
+    *cameraInjectionSession = new CameraInjectionSession(this);
+
+    return ret;
+}
+
 void CameraService::removeByClient(const BasicClient* client) {
     Mutex::Autolock lock(mServiceLock);
     for (auto& i : mActiveClientManager.getAll()) {
@@ -3614,6 +3656,66 @@ CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescr
 }
 
 // ----------------------------------------------------------------------------
+//                  InjectionStatusListener
+// ----------------------------------------------------------------------------
+
+void CameraService::InjectionStatusListener::addListener(
+        const sp<ICameraInjectionCallback>& callback) {
+    Mutex::Autolock lock(mListenerLock);
+    if (mCameraInjectionCallback) return;
+    status_t res = IInterface::asBinder(callback)->linkToDeath(this);
+    if (res == OK) {
+        mCameraInjectionCallback = callback;
+    }
+}
+
+void CameraService::InjectionStatusListener::removeListener() {
+    Mutex::Autolock lock(mListenerLock);
+    if (mCameraInjectionCallback == nullptr) {
+        ALOGW("InjectionStatusListener: mCameraInjectionCallback == nullptr");
+        return;
+    }
+    IInterface::asBinder(mCameraInjectionCallback)->unlinkToDeath(this);
+    mCameraInjectionCallback = nullptr;
+}
+
+void CameraService::InjectionStatusListener::notifyInjectionError(
+        int errorCode) {
+    Mutex::Autolock lock(mListenerLock);
+    if (mCameraInjectionCallback == nullptr) {
+        ALOGW("InjectionStatusListener: mCameraInjectionCallback == nullptr");
+        return;
+    }
+    mCameraInjectionCallback->onInjectionError(errorCode);
+}
+
+void CameraService::InjectionStatusListener::binderDied(
+        const wp<IBinder>& /*who*/) {
+    Mutex::Autolock lock(mListenerLock);
+    ALOGV("InjectionStatusListener: ICameraInjectionCallback has died");
+    auto parent = mParent.promote();
+    if (parent != nullptr) {
+        parent->stopInjectionImpl();
+    }
+}
+
+// ----------------------------------------------------------------------------
+//                  CameraInjectionSession
+// ----------------------------------------------------------------------------
+
+binder::Status CameraService::CameraInjectionSession::stopInjection() {
+    Mutex::Autolock lock(mInjectionSessionLock);
+    auto parent = mParent.promote();
+    if (parent == nullptr) {
+        ALOGE("CameraInjectionSession: Parent is gone");
+        return STATUS_ERROR(ICameraInjectionCallback::ERROR_INJECTION_SERVICE,
+                "Camera service encountered error");
+    }
+    parent->stopInjectionImpl();
+    return binder::Status::ok();
+}
+
+// ----------------------------------------------------------------------------
 
 static const int kDumpLockRetries = 50;
 static const int kDumpLockSleep = 60000;
@@ -4271,6 +4373,12 @@ int32_t CameraService::updateAudioRestrictionLocked() {
         mAppOps.setCameraAudioRestriction(mode);
     }
     return mode;
+}
+
+void CameraService::stopInjectionImpl() {
+    mInjectionStatusListener->removeListener();
+
+    // TODO: Implement the stop injection function.
 }
 
 }; // namespace android
