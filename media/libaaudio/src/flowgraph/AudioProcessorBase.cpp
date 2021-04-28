@@ -34,8 +34,7 @@ AudioFloatBlockPort::AudioFloatBlockPort(AudioProcessorBase &parent,
                                int32_t samplesPerFrame,
                                int32_t framesPerBlock)
         : AudioPort(parent, samplesPerFrame)
-        , mFramesPerBlock(framesPerBlock)
-        , mSampleBlock(NULL) {
+        , mFramesPerBlock(framesPerBlock) {
     int32_t numFloats = framesPerBlock * getSamplesPerFrame();
     mSampleBlock = new float[numFloats]{0.0f};
 }
@@ -61,13 +60,13 @@ void AudioFloatOutputPort::disconnect(AudioFloatInputPort *port) {
 
 /***************************************************************************/
 int32_t AudioFloatInputPort::pullData(int64_t framePosition, int32_t numFrames) {
-    return (mConnected == NULL)
+    return (mConnected == nullptr)
             ? std::min(getFramesPerBlock(), numFrames)
             : mConnected->pullData(framePosition, numFrames);
 }
 
 float *AudioFloatInputPort::getBlock() {
-    if (mConnected == NULL) {
+    if (mConnected == nullptr) {
         return AudioFloatBlockPort::getBlock(); // loaded using setValue()
     } else {
         return mConnected->getBlock();

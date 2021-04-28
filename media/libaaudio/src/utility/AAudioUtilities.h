@@ -198,7 +198,7 @@ aaudio_result_t AAudio_isFlushAllowed(aaudio_stream_state_t state);
  * @return true if f() eventually returns true.
  */
 static inline bool AAudio_tryUntilTrue(
-        std::function<bool()> f, int times, int sleepMs) {
+        const std::function<bool()>& f, int times, int sleepMs) {
     static const useconds_t US_PER_MS = 1000;
 
     sleepMs = std::max(sleepMs, 0);
@@ -270,9 +270,7 @@ private:
 
 class Timestamp {
 public:
-    Timestamp()
-            : mPosition(0)
-            , mNanoseconds(0) {}
+    Timestamp() = default;
     Timestamp(int64_t position, int64_t nanoseconds)
             : mPosition(position)
             , mNanoseconds(nanoseconds) {}
@@ -283,8 +281,8 @@ public:
 
 private:
     // These cannot be const because we need to implement the copy assignment operator.
-    int64_t mPosition;
-    int64_t mNanoseconds;
+    int64_t mPosition{0};
+    int64_t mNanoseconds{0};
 };
 
 

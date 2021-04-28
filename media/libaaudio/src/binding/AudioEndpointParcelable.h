@@ -43,7 +43,7 @@ public:
     // Ctor/assignment from a parcelable representation.
     // Since the parcelable object owns unique FDs (for shared memory blocks), move semantics are
     // provided to avoid the need to dupe.
-    AudioEndpointParcelable(Endpoint&& parcelable);
+    explicit AudioEndpointParcelable(Endpoint&& parcelable);
     AudioEndpointParcelable& operator=(Endpoint&& parcelable);
 
     /**

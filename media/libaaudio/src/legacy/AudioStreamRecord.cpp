@@ -502,7 +502,7 @@ aaudio_result_t AudioStreamRecord::read(void *buffer,
     return (aaudio_result_t) framesRead;
 }
 
-aaudio_result_t AudioStreamRecord::setBufferSize(int32_t requestedFrames)
+aaudio_result_t AudioStreamRecord::setBufferSize(int32_t /*requestedFrames*/)
 {
     return getBufferSize();
 }

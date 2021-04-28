@@ -29,9 +29,6 @@ FifoControllerBase::FifoControllerBase(fifo_frames_t capacity, fifo_frames_t thr
 {
 }
 
-FifoControllerBase::~FifoControllerBase() {
-}
-
 fifo_frames_t FifoControllerBase::getFullFramesAvailable() {
     fifo_frames_t temp = 0;
     __builtin_sub_overflow(getWriteCounter(), getReadCounter(), &temp);

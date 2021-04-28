@@ -29,7 +29,7 @@ class MonoToMultiConverter : public AudioProcessorBase {
 public:
     explicit MonoToMultiConverter(int32_t channelCount);
 
-    virtual ~MonoToMultiConverter();
+    virtual ~MonoToMultiConverter() = default;
 
     int32_t onProcess(int64_t framePosition, int32_t numFrames) override;
 
