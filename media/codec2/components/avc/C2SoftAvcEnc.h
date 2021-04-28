@@ -102,8 +102,8 @@ namespace android {
 /** limits as specified by h264
  *  (QP_MIN==4 is actually a limitation of this SW codec, not the H.264 standard)
  **/
-#define CODEC_QP_MIN                4
-#define CODEC_QP_MAX                51
+#define AVC_QP_MIN                4
+#define AVC_QP_MAX                51
 
 
 #define MIN(a, b) ((a) < (b))? (a) : (b)
