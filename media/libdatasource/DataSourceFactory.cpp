@@ -65,6 +65,9 @@ sp<DataSource> DataSourceFactory::CreateFromURI(
         sp<HTTPBase> mediaHTTP = httpSource;
         if (mediaHTTP == NULL) {
             mediaHTTP = static_cast<HTTPBase *>(CreateMediaHTTP(httpService).get());
+            if (mediaHTTP == NULL) {
+                return NULL;
+            }
         }
 
         String8 cacheConfig;
