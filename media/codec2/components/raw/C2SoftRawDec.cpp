@@ -87,7 +87,9 @@ public:
                 .withFields({C2F(mPcmEncodingInfo, value).oneOf({
                      C2Config::PCM_16,
                      C2Config::PCM_8,
-                     C2Config::PCM_FLOAT})
+                     C2Config::PCM_FLOAT,
+                     C2Config::PCM_24,
+                     C2Config::PCM_32})
                 })
                 .withSetter((Setter<decltype(*mPcmEncodingInfo)>::StrictValueWithNoDeps))
                 .build());

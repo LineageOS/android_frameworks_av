@@ -47,6 +47,16 @@
 #include <media/AudioParameter.h>
 #include <system/audio.h>
 
+// TODO : Remove the defines once mainline media is built against NDK >= 31.
+// The mp4 extractor is part of mainline and builds against NDK 29 as of
+// writing. These keys are available only from NDK 31:
+#define AMEDIAFORMAT_KEY_MPEGH_PROFILE_LEVEL_INDICATION \
+  "mpegh-profile-level-indication"
+#define AMEDIAFORMAT_KEY_MPEGH_REFERENCE_CHANNEL_LAYOUT \
+  "mpegh-reference-channel-layout"
+#define AMEDIAFORMAT_KEY_MPEGH_COMPATIBLE_SETS \
+  "mpegh-compatible-sets"
+
 namespace android {
 
 static status_t copyNALUToABuffer(sp<ABuffer> *buffer, const uint8_t *ptr, size_t length) {
@@ -1085,6 +1095,25 @@ status_t convertMetaDataToMessage(
             msg->setInt32("is-adts", isADTS);
         }
 
+        int32_t mpeghProfileLevelIndication;
+        if (meta->findInt32(kKeyMpeghProfileLevelIndication, &mpeghProfileLevelIndication)) {
+            msg->setInt32(AMEDIAFORMAT_KEY_MPEGH_PROFILE_LEVEL_INDICATION,
+                    mpeghProfileLevelIndication);
+        }
+        int32_t mpeghReferenceChannelLayout;
+        if (meta->findInt32(kKeyMpeghReferenceChannelLayout, &mpeghReferenceChannelLayout)) {
+            msg->setInt32(AMEDIAFORMAT_KEY_MPEGH_REFERENCE_CHANNEL_LAYOUT,
+                    mpeghReferenceChannelLayout);
+        }
+        if (meta->findData(kKeyMpeghCompatibleSets, &type, &data, &size)) {
+            sp<ABuffer> buffer = new (std::nothrow) ABuffer(size);
+            if (buffer.get() == NULL || buffer->base() == NULL) {
+                return NO_MEMORY;
+            }
+            msg->setBuffer(AMEDIAFORMAT_KEY_MPEGH_COMPATIBLE_SETS, buffer);
+            memcpy(buffer->data(), data, size);
+        }
+
         int32_t aacProfile = -1;
         if (meta->findInt32(kKeyAACAOT, &aacProfile)) {
             msg->setInt32("aac-profile", aacProfile);
@@ -1848,6 +1877,23 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         int32_t isADTS;
         if (msg->findInt32("is-adts", &isADTS)) {
             meta->setInt32(kKeyIsADTS, isADTS);
+        }
+
+        int32_t mpeghProfileLevelIndication = -1;
+        if (msg->findInt32(AMEDIAFORMAT_KEY_MPEGH_PROFILE_LEVEL_INDICATION,
+                &mpeghProfileLevelIndication)) {
+            meta->setInt32(kKeyMpeghProfileLevelIndication, mpeghProfileLevelIndication);
+        }
+        int32_t mpeghReferenceChannelLayout = -1;
+        if (msg->findInt32(AMEDIAFORMAT_KEY_MPEGH_REFERENCE_CHANNEL_LAYOUT,
+                &mpeghReferenceChannelLayout)) {
+            meta->setInt32(kKeyMpeghReferenceChannelLayout, mpeghReferenceChannelLayout);
+        }
+        sp<ABuffer> mpeghCompatibleSets;
+        if (msg->findBuffer(AMEDIAFORMAT_KEY_MPEGH_COMPATIBLE_SETS,
+                &mpeghCompatibleSets)) {
+            meta->setData(kKeyMpeghCompatibleSets, kTypeHCOS,
+                    mpeghCompatibleSets->data(), mpeghCompatibleSets->size());
         }
 
         int32_t aacProfile = -1;
