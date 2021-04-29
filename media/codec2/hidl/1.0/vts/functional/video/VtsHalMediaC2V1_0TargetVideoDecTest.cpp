@@ -24,7 +24,6 @@
 
 #include <openssl/md5.h>
 
-#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Config.h>
@@ -34,8 +33,6 @@
 #include <gui/IConsumerListener.h>
 #include <gui/IProducerListener.h>
 #include <system/window.h>
-
-using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
 #include "media_c2_video_hidl_test_common.h"

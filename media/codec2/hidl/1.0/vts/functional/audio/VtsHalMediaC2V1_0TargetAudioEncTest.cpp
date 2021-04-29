@@ -24,14 +24,11 @@
 #include <algorithm>
 #include <fstream>
 
-#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Config.h>
 #include <C2Debug.h>
 #include <codec2/hidl/client.h>
-
-using android::C2AllocatorIon;
 
 #include "media_c2_hidl_test_common.h"
 
