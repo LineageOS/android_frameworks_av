@@ -41,7 +41,7 @@ using ::android::hardware::Void;
 using namespace ::std::chrono;
 
 using TestParameters = std::tuple<std::string, std::string>;
-static std::vector<TestParameters> kTestParameters;
+static std::vector<TestParameters> gTestParameters;
 
 // Resource directory
 extern std::string sResourceDir;

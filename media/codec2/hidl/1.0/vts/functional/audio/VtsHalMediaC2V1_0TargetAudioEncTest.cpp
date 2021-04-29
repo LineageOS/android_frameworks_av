@@ -37,7 +37,7 @@ using android::C2AllocatorIon;
 
 using EncodeTestParameters = std::tuple<std::string, std::string, bool, int32_t>;
 
-static std::vector<EncodeTestParameters> kEncodeTestParameters;
+static std::vector<EncodeTestParameters> gEncodeTestParameters;
 
 class LinearBuffer : public C2Buffer {
   public:
@@ -748,28 +748,28 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(kTestParameters),
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 // EncodeTest with EOS / No EOS and inputMaxBufRatio
 // inputMaxBufRatio is ratio w.r.t. to mInputMaxBufSize
 INSTANTIATE_TEST_SUITE_P(EncodeTest, Codec2AudioEncEncodeTest,
-                         testing::ValuesIn(kEncodeTestParameters),
+                         testing::ValuesIn(gEncodeTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    kTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_ENCODER);
-    for (auto params : kTestParameters) {
-        kEncodeTestParameters.push_back(
+    gTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_ENCODER);
+    for (auto params : gTestParameters) {
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), false, 1));
-        kEncodeTestParameters.push_back(
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), false, 2));
-        kEncodeTestParameters.push_back(
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), true, 1));
-        kEncodeTestParameters.push_back(
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), true, 2));
     }
 
