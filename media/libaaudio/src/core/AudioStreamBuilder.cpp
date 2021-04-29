@@ -189,7 +189,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         }
         if (result == AAUDIO_OK) {
             audioStream->registerPlayerBase();
-            audioStream->logOpen();
+            audioStream->logOpenActual();
             *streamPtr = startUsingStream(audioStream);
         } // else audioStream will go out of scope and be deleted
     }

@@ -100,8 +100,9 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     const int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
     int32_t burstMicros = 0;
 
+    const audio_format_t requestedFormat = getFormat();
     // We have to do volume scaling. So we prefer FLOAT format.
-    if (getFormat() == AUDIO_FORMAT_DEFAULT) {
+    if (requestedFormat == AUDIO_FORMAT_DEFAULT) {
         setFormat(AUDIO_FORMAT_PCM_FLOAT);
     }
     // Request FLOAT for the shared mixer or the device.
@@ -155,6 +156,12 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     // so the client can have permission to log.
     mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM)
             + std::to_string(mServiceStreamHandle);
+
+    android::mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+                 AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+            .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT,
+                 android::toString(requestedFormat).c_str()).record();
 
     result = configurationOutput.validate();
     if (result != AAUDIO_OK) {
