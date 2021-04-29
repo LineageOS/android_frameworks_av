@@ -42,10 +42,10 @@ class GraphicBuffer : public C2Buffer {
 };
 
 using EncodeTestParameters = std::tuple<std::string, std::string, bool, bool, bool>;
-static std::vector<EncodeTestParameters> kEncodeTestParameters;
+static std::vector<EncodeTestParameters> gEncodeTestParameters;
 
 using EncodeResolutionTestParameters = std::tuple<std::string, std::string, int32_t, int32_t>;
-static std::vector<EncodeResolutionTestParameters> kEncodeResolutionTestParameters;
+static std::vector<EncodeResolutionTestParameters> gEncodeResolutionTestParameters;
 
 namespace {
 
@@ -706,16 +706,16 @@ TEST_P(Codec2VideoEncResolutionTest, ResolutionTest) {
     ASSERT_EQ(mComponent->reset(), C2_OK);
 }
 
-INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoEncHidlTest, testing::ValuesIn(kTestParameters),
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoEncHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_SUITE_P(NonStdSizes, Codec2VideoEncResolutionTest,
-                         ::testing::ValuesIn(kEncodeResolutionTestParameters),
+                         ::testing::ValuesIn(gEncodeResolutionTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 // EncodeTest with EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(EncodeTestwithEOS, Codec2VideoEncEncodeTest,
-                         ::testing::ValuesIn(kEncodeTestParameters),
+                         ::testing::ValuesIn(gEncodeTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
@@ -808,24 +808,24 @@ TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
-    for (auto params : kTestParameters) {
+    gTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_ENCODER);
+    for (auto params : gTestParameters) {
         for (size_t i = 0; i < 1 << 3; ++i) {
-            kEncodeTestParameters.push_back(std::make_tuple(
+            gEncodeTestParameters.push_back(std::make_tuple(
                     std::get<0>(params), std::get<1>(params), i & 1, (i >> 1) & 1, (i >> 2) & 1));
         }
 
-        kEncodeResolutionTestParameters.push_back(
+        gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 52, 18));
-        kEncodeResolutionTestParameters.push_back(
+        gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 365, 365));
-        kEncodeResolutionTestParameters.push_back(
+        gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 484, 362));
-        kEncodeResolutionTestParameters.push_back(
+        gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 244, 488));
-        kEncodeResolutionTestParameters.push_back(
+        gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 852, 608));
-        kEncodeResolutionTestParameters.push_back(
+        gEncodeResolutionTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 1400, 442));
     }
 
