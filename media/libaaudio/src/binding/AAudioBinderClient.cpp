@@ -36,13 +36,10 @@ using android::String16;
 using android::IServiceManager;
 using android::defaultServiceManager;
 using android::interface_cast;
-using android::IInterface;
 using android::Mutex;
 using android::ProcessState;
 using android::sp;
 using android::status_t;
-using android::wp;
-using android::binder::Status;
 
 using namespace aaudio;
 
@@ -93,7 +90,7 @@ std::shared_ptr<AAudioServiceInterface> AAudioBinderClient::getAAudioService() {
                     ALOGE("%s() - linkToDeath() returned %d", __func__, status);
                 }
                 aaudioService = interface_cast<IAAudioService>(binder);
-                mAdapter.reset(new Adapter(aaudioService, mAAudioClient));
+                mAdapter = std::make_shared<Adapter>(aaudioService, mAAudioClient);
                 needToRegister = true;
                 // Make sure callbacks can be received by mAAudioClient
                 ProcessState::self()->startThreadPool();

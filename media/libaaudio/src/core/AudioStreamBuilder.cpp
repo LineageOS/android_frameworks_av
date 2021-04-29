@@ -54,16 +54,10 @@ using namespace aaudio;
 /*
  * AudioStreamBuilder
  */
-AudioStreamBuilder::AudioStreamBuilder() {
-}
-
-AudioStreamBuilder::~AudioStreamBuilder() {
-}
-
 static aaudio_result_t builder_createStream(aaudio_direction_t direction,
-                                         aaudio_sharing_mode_t sharingMode,
-                                         bool tryMMap,
-                                         android::sp<AudioStream> &stream) {
+                                            aaudio_sharing_mode_t /*sharingMode*/,
+                                            bool tryMMap,
+                                            android::sp<AudioStream> &stream) {
     aaudio_result_t result = AAUDIO_OK;
 
     switch (direction) {
@@ -189,7 +183,7 @@ aaudio_result_t AudioStreamBuilder::build(AudioStream** streamPtr) {
         }
         if (result == AAUDIO_OK) {
             audioStream->registerPlayerBase();
-            audioStream->logOpen();
+            audioStream->logOpenActual();
             *streamPtr = startUsingStream(audioStream);
         } // else audioStream will go out of scope and be deleted
     }

@@ -31,13 +31,6 @@ using namespace aaudio;
 #define RIDICULOUSLY_LARGE_BUFFER_CAPACITY   (256 * 1024)
 #define RIDICULOUSLY_LARGE_FRAME_SIZE        4096
 
-AudioEndpoint::AudioEndpoint()
-    : mFreeRunning(false)
-    , mDataReadCounter(0)
-    , mDataWriteCounter(0)
-{
-}
-
 // TODO Consider moving to a method in RingBufferDescriptor
 static aaudio_result_t AudioEndpoint_validateQueueDescriptor(const char *type,
                                                   const RingBufferDescriptor *descriptor) {

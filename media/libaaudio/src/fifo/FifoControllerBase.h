@@ -43,7 +43,7 @@ public:
      */
     FifoControllerBase(fifo_frames_t capacity, fifo_frames_t threshold);
 
-    virtual ~FifoControllerBase();
+    virtual ~FifoControllerBase() = default;
 
     // Abstract methods to be implemented in subclasses.
     /**
@@ -123,6 +123,6 @@ private:
     fifo_frames_t mThreshold;
 };
 
-}  // android
+}  // namespace android
 
 #endif // FIFO_FIFO_CONTROLLER_BASE_H

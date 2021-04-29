@@ -118,7 +118,7 @@ public:
     virtual aaudio_result_t open(const AudioStreamBuilder& builder);
 
     // log to MediaMetrics
-    virtual void logOpen();
+    virtual void logOpenActual();
     void logReleaseBufferState();
 
     /* Note about naming for "release"  and "close" related methods.
@@ -425,7 +425,7 @@ protected:
     // PlayerBase allows the system to control the stream volume.
     class MyPlayerBase : public android::PlayerBase {
     public:
-        MyPlayerBase() {};
+        MyPlayerBase() = default;
 
         virtual ~MyPlayerBase() = default;
 
@@ -554,7 +554,7 @@ protected:
      * @param numFrames
      * @return original pointer or the conversion buffer
      */
-    virtual const void * maybeConvertDeviceData(const void *audioData, int32_t numFrames) {
+    virtual const void * maybeConvertDeviceData(const void *audioData, int32_t /*numFrames*/) {
         return audioData;
     }
 

@@ -30,8 +30,8 @@
 class MonotonicCounter {
 
 public:
-    MonotonicCounter() {};
-    virtual ~MonotonicCounter() {};
+    MonotonicCounter() = default;
+    virtual ~MonotonicCounter() = default;
 
     /**
      * @return current value of the counter

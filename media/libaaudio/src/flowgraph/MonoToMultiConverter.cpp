@@ -26,8 +26,6 @@ MonoToMultiConverter::MonoToMultiConverter(int32_t channelCount)
         , output(*this, channelCount) {
 }
 
-MonoToMultiConverter::~MonoToMultiConverter() { }
-
 int32_t MonoToMultiConverter::onProcess(int64_t framePosition, int32_t numFrames) {
     int32_t framesToProcess = input.pullData(framePosition, numFrames);
 

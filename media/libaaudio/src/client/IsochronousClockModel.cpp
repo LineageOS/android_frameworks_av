@@ -43,14 +43,7 @@ using namespace android::audio_utils;
 // and dumped to the log when the stream is stopped.
 
 IsochronousClockModel::IsochronousClockModel()
-        : mMarkerFramePosition(0)
-        , mMarkerNanoTime(0)
-        , mSampleRate(48000)
-        , mFramesPerBurst(48)
-        , mBurstPeriodNanos(0) // this will be updated before use
-        , mMaxMeasuredLatenessNanos(0)
-        , mLatenessForDriftNanos(kInitialLatenessForDriftNanos)
-        , mState(STATE_STOPPED)
+        : mLatenessForDriftNanos(kInitialLatenessForDriftNanos)
 {
     if ((AAudioProperty_getLogMask() & AAUDIO_LOG_CLOCK_MODEL_HISTOGRAM) != 0) {
         mHistogramMicros = std::make_unique<Histogram>(kHistogramBinCount,

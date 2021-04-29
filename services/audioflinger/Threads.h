@@ -1863,7 +1863,7 @@ private:
             DeviceDescriptorBaseVector          mOutDevices;
 
             std::string                         mSharedAudioPackageName = {};
-            long                                mSharedAudioStartMs = 0;
+            int32_t                             mSharedAudioStartFrames = -1;
             audio_session_t                     mSharedAudioSessionId = AUDIO_SESSION_NONE;
 };
 

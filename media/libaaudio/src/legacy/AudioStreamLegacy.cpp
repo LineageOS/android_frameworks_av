@@ -37,9 +37,6 @@ AudioStreamLegacy::AudioStreamLegacy()
         : AudioStream() {
 }
 
-AudioStreamLegacy::~AudioStreamLegacy() {
-}
-
 // Called from AudioTrack.cpp or AudioRecord.cpp
 static void AudioStreamLegacy_callback(int event, void* userData, void *info) {
     AudioStreamLegacy *streamLegacy = (AudioStreamLegacy *) userData;

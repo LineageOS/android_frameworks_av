@@ -23,9 +23,11 @@
 
 #include <aaudio/AAudio.h>
 #include <system/audio.h>
-#include "utility/AudioClock.h"
+
+#include "core/AudioGlobal.h"
 #include "legacy/AudioStreamLegacy.h"
 #include "legacy/AudioStreamTrack.h"
+#include "utility/AudioClock.h"
 #include "utility/FixedBlockReader.h"
 
 using namespace android;
@@ -160,11 +162,11 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
             callback,
             callbackData,
             notificationFrames,
-            0,       // DEFAULT sharedBuffer*/,
+            nullptr,       // DEFAULT sharedBuffer*/,
             false,   // DEFAULT threadCanCallJava
             sessionId,
             streamTransferType,
-            NULL,    // DEFAULT audio_offload_info_t
+            nullptr,    // DEFAULT audio_offload_info_t
             Identity(), // DEFAULT uid and pid
             &attributes,
             // WARNING - If doNotReconnect set true then audio stops after plugging and unplugging
@@ -187,6 +189,10 @@ aaudio_result_t AudioStreamTrack::open(const AudioStreamBuilder& builder)
 
     mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_TRACK)
             + std::to_string(mAudioTrack->getPortId());
+    android::mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+                 AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+            .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT, toString(getFormat()).c_str()).record();
 
     doSetVolume();
 

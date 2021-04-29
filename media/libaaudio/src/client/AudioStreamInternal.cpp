@@ -49,8 +49,6 @@
 // This is needed to make sense of the logs more easily.
 #define LOG_TAG (mInService ? "AudioStreamInternal_Service" : "AudioStreamInternal_Client")
 
-using android::Mutex;
-using android::WrappingBuffer;
 using android::media::permission::Identity;
 
 using namespace aaudio;
@@ -100,8 +98,9 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     const int32_t burstMinMicros = AAudioProperty_getHardwareBurstMinMicros();
     int32_t burstMicros = 0;
 
+    const audio_format_t requestedFormat = getFormat();
     // We have to do volume scaling. So we prefer FLOAT format.
-    if (getFormat() == AUDIO_FORMAT_DEFAULT) {
+    if (requestedFormat == AUDIO_FORMAT_DEFAULT) {
         setFormat(AUDIO_FORMAT_PCM_FLOAT);
     }
     // Request FLOAT for the shared mixer or the device.
@@ -155,6 +154,12 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     // so the client can have permission to log.
     mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM)
             + std::to_string(mServiceStreamHandle);
+
+    android::mediametrics::LogItem(mMetricsId)
+            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+                 AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
+            .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT,
+                 android::toString(requestedFormat).c_str()).record();
 
     result = configurationOutput.validate();
     if (result != AAUDIO_OK) {
@@ -319,10 +324,10 @@ static void *aaudio_callback_thread_proc(void *context)
 {
     AudioStreamInternal *stream = (AudioStreamInternal *)context;
     //LOGD("oboe_callback_thread, stream = %p", stream);
-    if (stream != NULL) {
+    if (stream != nullptr) {
         return stream->callbackLoop();
     } else {
-        return NULL;
+        return nullptr;
     }
 }
 
@@ -411,7 +416,7 @@ aaudio_result_t AudioStreamInternal::stopCallback_l()
     if (isDataCallbackSet()
             && (isActive() || getState() == AAUDIO_STREAM_STATE_DISCONNECTED)) {
         mCallbackEnabled.store(false);
-        aaudio_result_t result = joinThread_l(NULL); // may temporarily unlock mStreamLock
+        aaudio_result_t result = joinThread_l(nullptr); // may temporarily unlock mStreamLock
         if (result == AAUDIO_ERROR_INVALID_HANDLE) {
             ALOGD("%s() INVALID_HANDLE, stream was probably stolen", __func__);
             result = AAUDIO_OK;
@@ -498,7 +503,7 @@ aaudio_result_t AudioStreamInternal::stopClient(audio_port_handle_t portHandle) 
     return result;
 }
 
-aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t clockId,
+aaudio_result_t AudioStreamInternal::getTimestamp(clockid_t /*clockId*/,
                            int64_t *framePosition,
                            int64_t *timeNanoseconds) {
     // Generated in server and passed to client. Return latest.
