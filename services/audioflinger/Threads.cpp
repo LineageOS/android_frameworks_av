@@ -6043,16 +6043,13 @@ void AudioFlinger::DirectOutputThread::threadLoop_sleepTime()
         mSleepTimeUs = mIdleSleepTimeUs;
         return;
     }
-    if (mSleepTimeUs == 0) {
-        if (mMixerStatus == MIXER_TRACKS_ENABLED) {
-            mSleepTimeUs = mActiveSleepTimeUs;
-        } else {
-            mSleepTimeUs = mIdleSleepTimeUs;
-        }
-    } else if (mBytesWritten != 0 && audio_has_proportional_frames(mFormat)) {
-        memset(mSinkBuffer, 0, mFrameCount * mFrameSize);
-        mSleepTimeUs = 0;
+    if (mMixerStatus == MIXER_TRACKS_ENABLED) {
+        mSleepTimeUs = mActiveSleepTimeUs;
+    } else {
+        mSleepTimeUs = mIdleSleepTimeUs;
     }
+    // Note: In S or later, we do not write zeroes for
+    // linear or proportional PCM direct tracks in underrun.
 }
 
 void AudioFlinger::DirectOutputThread::threadLoop_exit()
