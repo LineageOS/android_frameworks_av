@@ -2378,7 +2378,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
             audio_input_flags_t flags,
             track_type type,
             audio_port_handle_t portId,
-            int64_t startTimeMs)
+            int32_t startFrames)
     :   TrackBase(thread, client, attr, sampleRate, format,
                   channelMask, frameCount, buffer, bufferSize, sessionId,
                   creatorPid,
@@ -2396,7 +2396,7 @@ AudioFlinger::RecordThread::RecordTrack::RecordTrack(
         mFlags(flags),
         mSilenced(false),
         mOpRecordAudioMonitor(OpRecordAudioMonitor::createIfNeeded(identity, attr)),
-        mStartTimeMs(startTimeMs)
+        mStartFrames(startFrames)
 {
     if (mCblk == NULL) {
         return;

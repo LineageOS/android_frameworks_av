@@ -56,16 +56,6 @@ AudioStream::~AudioStream() {
 
     ALOGE_IF(mHasThread, "%s() callback thread never join()ed", __func__);
 
-    if (!mMetricsId.empty()) {
-        android::mediametrics::LogItem(mMetricsId)
-                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM)
-                .set(AMEDIAMETRICS_PROP_ENCODINGREQUESTED,
-                     android::toString(mDeviceFormat).c_str())
-                .set(AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL,
-                     AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
-                .record();
-    }
-
     // If the stream is deleted when OPEN or in use then audio resources will leak.
     // This would indicate an internal error. So we want to find this ASAP.
     LOG_ALWAYS_FATAL_IF(!(getState() == AAUDIO_STREAM_STATE_CLOSED
@@ -121,11 +111,11 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     return AAUDIO_OK;
 }
 
-void AudioStream::logOpen() {
+void AudioStream::logOpenActual() {
     if (mMetricsId.size() > 0) {
         android::mediametrics::LogItem item(mMetricsId);
         item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN)
-            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
+            .set(AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL,
                 AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
             .set(AMEDIAMETRICS_PROP_SHARINGMODE,
                 AudioGlobal_convertSharingModeToText(getSharingMode()))
@@ -359,6 +349,7 @@ void AudioStream::close_l() {
                 .set(AMEDIAMETRICS_PROP_FRAMESTRANSFERRED,
                         getDirection() == AAUDIO_DIRECTION_INPUT ? getFramesWritten()
                                                                  : getFramesRead())
+                .set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_ENDAAUDIOSTREAM)
                 .record();
     }
 }
