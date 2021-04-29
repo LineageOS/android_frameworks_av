@@ -478,7 +478,7 @@ media_status_t TranscoderWrapper::handleStart(
     media_status_t err =
             setupTranscoder(clientId, sessionId, request, callingUid, clientCb, &reason);
     if (err != AMEDIA_OK) {
-        ALOGI("%s: failed to setup transcoder", __FUNCTION__);
+        ALOGE("%s: failed to setup transcoder", __FUNCTION__);
         logSessionEnded(reason, err);
         return err;
     }
@@ -613,7 +613,7 @@ void TranscoderWrapper::threadLoop() {
         Event event = *mQueue.begin();
         mQueue.pop_front();
 
-        ALOGD("%s: %s", __FUNCTION__, toString(event).c_str());
+        ALOGV("%s: %s", __FUNCTION__, toString(event).c_str());
 
         if (event.type == Event::Abandon) {
             break;
