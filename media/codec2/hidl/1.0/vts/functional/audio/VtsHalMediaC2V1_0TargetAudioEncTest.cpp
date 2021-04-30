@@ -24,26 +24,25 @@
 #include <algorithm>
 #include <fstream>
 
-#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Config.h>
 #include <C2Debug.h>
 #include <codec2/hidl/client.h>
 
-using android::C2AllocatorIon;
-
 #include "media_c2_hidl_test_common.h"
 
 using EncodeTestParameters = std::tuple<std::string, std::string, bool, int32_t>;
 
-static std::vector<EncodeTestParameters> kEncodeTestParameters;
+static std::vector<EncodeTestParameters> gEncodeTestParameters;
 
 class LinearBuffer : public C2Buffer {
   public:
     explicit LinearBuffer(const std::shared_ptr<C2LinearBlock>& block)
         : C2Buffer({block->share(block->offset(), block->size(), ::C2Fence())}) {}
 };
+
+constexpr uint32_t kMaxSamplesPerFrame = 256;
 
 namespace {
 
@@ -98,7 +97,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
 
-    void GetURLForComponent(char* mURL);
+    void GetURLForComponent(char* mURL, int32_t channelCount, int32_t sampleRate);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -223,53 +222,105 @@ bool setupConfigParam(const std::shared_ptr<android::Codec2Client::Component>& c
     return false;
 }
 
+c2_status_t getChannelCount(const std::shared_ptr<android::Codec2Client::Component>& component,
+                            int32_t* nChannels) {
+    std::unique_ptr<C2StreamChannelCountInfo::input> channelCount =
+            std::make_unique<C2StreamChannelCountInfo::input>();
+    std::vector<C2FieldSupportedValuesQuery> validValueInfos = {
+            C2FieldSupportedValuesQuery::Current(
+                    C2ParamField(channelCount.get(), &C2StreamChannelCountInfo::value))};
+    c2_status_t c2err = component->querySupportedValues(validValueInfos, C2_DONT_BLOCK);
+    if (c2err != C2_OK || validValueInfos.size() != 1u) {
+        ALOGE("querySupportedValues_vb failed for channelCount");
+        return c2err;
+    }
+
+    // setting default value of channelCount
+    *nChannels = 1;
+    const auto& c2FSV = validValueInfos[0].values;
+    switch (c2FSV.type) {
+        case C2FieldSupportedValues::type_t::RANGE: {
+            const auto& range = c2FSV.range;
+            uint32_t rmax = (uint32_t)(range.max).ref<uint32_t>();
+            if (rmax >= 2) {
+                *nChannels = 2;
+            } else {
+                *nChannels = 1;
+            }
+            break;
+        }
+        case C2FieldSupportedValues::type_t::VALUES: {
+            for (const C2Value::Primitive& prim : c2FSV.values) {
+                if ((uint32_t)prim.ref<uint32_t>() == 2) {
+                    *nChannels = 2;
+                } else if ((uint32_t)prim.ref<uint32_t>() == 1) {
+                    *nChannels = 1;
+                }
+            }
+            break;
+        }
+        default:
+            break;
+    }
+    return C2_OK;
+}
+
+c2_status_t getSampleRate(const std::shared_ptr<android::Codec2Client::Component>& component,
+                          int32_t* nSampleRate) {
+    // Use the default sample rate for components
+    std::vector<std::unique_ptr<C2Param>> queried;
+    c2_status_t c2err = component->query({}, {C2StreamSampleRateInfo::input::PARAM_TYPE},
+                                         C2_DONT_BLOCK, &queried);
+    if (c2err != C2_OK || queried.size() == 0) return c2err;
+
+    size_t offset = sizeof(C2Param);
+    C2Param* param = queried[0].get();
+    *nSampleRate = *(int32_t*)((uint8_t*)param + offset);
+
+    return C2_OK;
+}
+
+c2_status_t getSamplesPerFrame(const std::shared_ptr<android::Codec2Client::Component>& component,
+                               int32_t nChannels, int32_t* samplesPerFrame) {
+    std::vector<std::unique_ptr<C2Param>> queried;
+    c2_status_t c2err = component->query({}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE},
+                                         C2_DONT_BLOCK, &queried);
+    if (c2err != C2_OK || queried.size() == 0) return c2err;
+
+    size_t offset = sizeof(C2Param);
+    C2Param* param = queried[0].get();
+    uint32_t maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
+    *samplesPerFrame = std::min((maxInputSize / (nChannels * 2)), kMaxSamplesPerFrame);
+
+    return C2_OK;
+}
+
 // Get config params for a component
-bool getConfigParams(std::string mime, int32_t* nChannels, int32_t* nSampleRate,
-                     int32_t* samplesPerFrame) {
-    if (mime.find("mp4a-latm") != std::string::npos) {
-        *nChannels = 2;
-        *nSampleRate = 48000;
-        *samplesPerFrame = 1024;
-    } else if (mime.find("flac") != std::string::npos) {
-        *nChannels = 2;
-        *nSampleRate = 48000;
-        *samplesPerFrame = 1152;
-    } else if (mime.find("opus") != std::string::npos) {
-        *nChannels = 2;
-        *nSampleRate = 48000;
-        *samplesPerFrame = 960;
-    } else if (mime.find("3gpp") != std::string::npos) {
-        *nChannels = 1;
-        *nSampleRate = 8000;
-        *samplesPerFrame = 160;
-    } else if (mime.find("amr-wb") != std::string::npos) {
-        *nChannels = 1;
-        *nSampleRate = 16000;
-        *samplesPerFrame = 160;
-    } else
-        return false;
+bool getConfigParams(const std::shared_ptr<android::Codec2Client::Component>& component,
+                     int32_t* nChannels, int32_t* nSampleRate, int32_t* samplesPerFrame) {
+    c2_status_t status = getChannelCount(component, nChannels);
+    if (status != C2_OK) return false;
+
+    status = getSampleRate(component, nSampleRate);
+    if (status != C2_OK) return false;
+
+    status = getSamplesPerFrame(component, *nChannels, samplesPerFrame);
+    if (status != C2_OK) return false;
 
     return true;
 }
 
 // LookUpTable of clips and metadata for component testing
-void Codec2AudioEncHidlTestBase::GetURLForComponent(char* mURL) {
-    struct CompToURL {
-        std::string mime;
-        const char* mURL;
-    };
-    static const CompToURL kCompToURL[] = {
-            {"mp4a-latm", "bbb_raw_2ch_48khz_s16le.raw"}, {"3gpp", "bbb_raw_1ch_8khz_s16le.raw"},
-            {"amr-wb", "bbb_raw_1ch_16khz_s16le.raw"},    {"flac", "bbb_raw_2ch_48khz_s16le.raw"},
-            {"opus", "bbb_raw_2ch_48khz_s16le.raw"},
-    };
-
-    for (size_t i = 0; i < sizeof(kCompToURL) / sizeof(kCompToURL[0]); ++i) {
-        if (mMime.find(kCompToURL[i].mime) != std::string::npos) {
-            strcat(mURL, kCompToURL[i].mURL);
-            return;
-        }
+void Codec2AudioEncHidlTestBase::GetURLForComponent(char* mURL, int32_t channelCount,
+                                                    int32_t sampleRate) {
+    std::string rawInput = "bbb_raw_1ch_8khz_s16le.raw";
+    if (channelCount == 1 && sampleRate == 16000) {
+        rawInput = "bbb_raw_1ch_16khz_s16le.raw";
+    } else if (channelCount == 2) {
+        rawInput = "bbb_raw_2ch_48khz_s16le.raw";
     }
+
+    strcat(mURL, rawInput.c_str());
 }
 
 void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
@@ -283,9 +334,17 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
 
     uint32_t frameID = 0;
     uint32_t maxRetry = 0;
-    int bytesCount = samplesPerFrame * nChannels * 2;
+    uint32_t bytesCount = samplesPerFrame * nChannels * 2;
     int32_t timestampIncr = (int)(((float)samplesPerFrame / nSampleRate) * 1000000);
     uint64_t timestamp = 0;
+
+    // get length of file:
+    int32_t currPos = eleStream.tellg();
+    eleStream.seekg(0, eleStream.end);
+    uint32_t remainingBytes = (uint32_t)eleStream.tellg() - currPos;
+    eleStream.seekg(currPos, eleStream.beg);
+
+    nFrames = std::min(nFrames, remainingBytes / bytesCount);
     while (1) {
         if (nFrames == 0) break;
         uint32_t flags = 0;
@@ -319,7 +378,12 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         char* data = (char*)malloc(bytesCount);
         ASSERT_NE(data, nullptr);
         eleStream.read(data, bytesCount);
-        ASSERT_EQ(eleStream.gcount(), bytesCount);
+        // if we have reached at the end of input stream, signal eos
+        if (eleStream.gcount() < bytesCount) {
+            bytesCount = eleStream.gcount();
+            if (signalEOS) flags |= C2FrameData::FLAG_END_OF_STREAM;
+        }
+
         std::shared_ptr<C2LinearBlock> block;
         ASSERT_EQ(C2_OK,
                   linearPool->fetchLinearBlock(
@@ -373,9 +437,6 @@ class Codec2AudioEncEncodeTest : public Codec2AudioEncHidlTestBase,
 TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     ALOGV("EncodeTest");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
-    char mURL[512];
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
     bool signalEOS = std::get<2>(GetParam());
     // Ratio w.r.t to mInputMaxBufSize
     int32_t inputMaxBufRatio = std::get<3>(GetParam());
@@ -384,7 +445,7 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     int32_t nSampleRate;
     int32_t samplesPerFrame;
 
-    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+    if (!getConfigParams(mComponent, &nChannels, &nSampleRate, &samplesPerFrame)) {
         std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
@@ -398,6 +459,10 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
+    char mURL[512];
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mURL, nChannels, nSampleRate);
+
     ASSERT_EQ(mComponent->start(), C2_OK);
     std::ifstream eleStream;
     uint32_t numFrames = 16;
@@ -479,16 +544,12 @@ TEST_P(Codec2AudioEncHidlTest, FlushTest) {
     description("Test Request for flush");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512];
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
-
     mFlushedIndices.clear();
     int32_t nChannels;
     int32_t nSampleRate;
     int32_t samplesPerFrame;
 
-    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+    if (!getConfigParams(mComponent, &nChannels, &nSampleRate, &samplesPerFrame)) {
         std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
@@ -498,6 +559,10 @@ TEST_P(Codec2AudioEncHidlTest, FlushTest) {
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
+    char mURL[512];
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mURL, nChannels, nSampleRate);
+
     ASSERT_EQ(mComponent->start(), C2_OK);
 
     std::ifstream eleStream;
@@ -544,26 +609,25 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
     description("Encodes input file for different channel count");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512];
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
-
-    std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
-    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
-    ALOGV("mURL : %s", mURL);
-
     int32_t nSampleRate;
     int32_t samplesPerFrame;
     int32_t nChannels;
     int32_t numFrames = 16;
     int32_t maxChannelCount = 8;
 
-    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+    if (!getConfigParams(mComponent, &nChannels, &nSampleRate, &samplesPerFrame)) {
         std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
+    char mURL[512];
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mURL, nChannels, nSampleRate);
+
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
+    ALOGV("mURL : %s", mURL);
 
     uint64_t prevOutputSize = 0u;
     uint32_t prevChannelCount = 0u;
@@ -591,8 +655,11 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
         }
 
         // To check if the input stream is sufficient to encode for the higher channel count
+        struct stat buf;
+        stat(mURL, &buf);
+        size_t fileSize = buf.st_size;
         int32_t bytesCount = (samplesPerFrame * nChannels * 2) * numFrames;
-        if (eleStream.gcount() < bytesCount) {
+        if (fileSize < bytesCount) {
             std::cout << "[   WARN   ] Test Skipped for ChannelCount " << nChannels
                       << " because of insufficient input data\n";
             continue;
@@ -616,9 +683,6 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
         // blocking call to ensures application to Wait till all the inputs are consumed
         waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
-        // Validate output size based on chosen ChannelCount
-        EXPECT_GE(mOutputSize, prevOutputSize);
-
         prevChannelCount = nChannels;
         prevOutputSize = mOutputSize;
 
@@ -633,7 +697,8 @@ TEST_P(Codec2AudioEncHidlTest, MultiChannelCountTest) {
             ASSERT_TRUE(mCsd) << "CSD buffer missing";
         }
         ASSERT_TRUE(mEos);
-        ASSERT_EQ(mComponent->stop(), C2_OK);
+        // TODO(b/147348711) Use reset instead of stop when using the same instance of codec.
+        ASSERT_EQ(mComponent->reset(), C2_OK);
         mFramesReceived = 0;
         mOutputSize = 0;
         mEos = false;
@@ -646,25 +711,24 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
     description("Encodes input file for different SampleRate");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512];
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
-
-    std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
-    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
-    ALOGV("mURL : %s", mURL);
-
     int32_t nSampleRate;
     int32_t samplesPerFrame;
     int32_t nChannels;
     int32_t numFrames = 16;
 
-    if (!getConfigParams(mMime, &nChannels, &nSampleRate, &samplesPerFrame)) {
+    if (!getConfigParams(mComponent, &nChannels, &nSampleRate, &samplesPerFrame)) {
         std::cout << "Failed to get the config params for " << mComponentName << "\n";
         std::cout << "[   WARN   ] Test Skipped \n";
         return;
     }
+    char mURL[512];
+    strcpy(mURL, sResourceDir.c_str());
+    GetURLForComponent(mURL, nChannels, nSampleRate);
+
+    std::ifstream eleStream;
+    eleStream.open(mURL, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
+    ALOGV("mURL : %s", mURL);
 
     int32_t sampleRateValues[] = {1000, 8000, 16000, 24000, 48000, 96000, 192000};
 
@@ -694,8 +758,11 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
         }
 
         // To check if the input stream is sufficient to encode for the higher SampleRate
+        struct stat buf;
+        stat(mURL, &buf);
+        size_t fileSize = buf.st_size;
         int32_t bytesCount = (samplesPerFrame * nChannels * 2) * numFrames;
-        if (eleStream.gcount() < bytesCount) {
+        if (fileSize < bytesCount) {
             std::cout << "[   WARN   ] Test Skipped for SampleRate " << nSampleRate
                       << " because of insufficient input data\n";
             continue;
@@ -719,12 +786,6 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
         // blocking call to ensures application to Wait till all the inputs are consumed
         waitOnInputConsumption(mQueueLock, mQueueCondition, mWorkQueue);
 
-        // Validate output size based on chosen samplerate
-        if (prevSampleRate >= nSampleRate) {
-            EXPECT_LE(mOutputSize, prevOutputSize);
-        } else {
-            EXPECT_GT(mOutputSize, prevOutputSize);
-        }
         prevSampleRate = nSampleRate;
         prevOutputSize = mOutputSize;
 
@@ -739,7 +800,8 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
             ASSERT_TRUE(mCsd) << "CSD buffer missing";
         }
         ASSERT_TRUE(mEos);
-        ASSERT_EQ(mComponent->stop(), C2_OK);
+        // TODO(b/147348711) Use reset instead of stop when using the same instance of codec.
+        ASSERT_EQ(mComponent->reset(), C2_OK);
         mFramesReceived = 0;
         mOutputSize = 0;
         mEos = false;
@@ -748,28 +810,28 @@ TEST_P(Codec2AudioEncHidlTest, MultiSampleRateTest) {
     }
 }
 
-INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(kTestParameters),
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioEncHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 // EncodeTest with EOS / No EOS and inputMaxBufRatio
 // inputMaxBufRatio is ratio w.r.t. to mInputMaxBufSize
 INSTANTIATE_TEST_SUITE_P(EncodeTest, Codec2AudioEncEncodeTest,
-                         testing::ValuesIn(kEncodeTestParameters),
+                         testing::ValuesIn(gEncodeTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    kTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_ENCODER);
-    for (auto params : kTestParameters) {
-        kEncodeTestParameters.push_back(
+    gTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_ENCODER);
+    for (auto params : gTestParameters) {
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), false, 1));
-        kEncodeTestParameters.push_back(
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), false, 2));
-        kEncodeTestParameters.push_back(
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), true, 1));
-        kEncodeTestParameters.push_back(
+        gEncodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), true, 2));
     }
 
