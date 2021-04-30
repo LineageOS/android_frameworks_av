@@ -117,7 +117,7 @@ void AudioStream::logOpenActual() {
         item.set(AMEDIAMETRICS_PROP_EVENT, AMEDIAMETRICS_PROP_EVENT_VALUE_OPEN)
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL,
                 AudioGlobal_convertPerformanceModeToText(getPerformanceMode()))
-            .set(AMEDIAMETRICS_PROP_SHARINGMODE,
+            .set(AMEDIAMETRICS_PROP_SHARINGMODEACTUAL,
                 AudioGlobal_convertSharingModeToText(getSharingMode()))
             .set(AMEDIAMETRICS_PROP_BUFFERCAPACITYFRAMES, getBufferCapacity())
             .set(AMEDIAMETRICS_PROP_BURSTFRAMES, getFramesPerBurst())
