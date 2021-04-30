@@ -142,6 +142,10 @@ DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(C2Config::profile_t, ({
         { "av1-0", C2Config::PROFILE_AV1_0 },
         { "av1-1", C2Config::PROFILE_AV1_1 },
         { "av1-2", C2Config::PROFILE_AV1_2 },
+        { "vp8-0", C2Config::PROFILE_VP8_0 },
+        { "vp8-1", C2Config::PROFILE_VP8_1 },
+        { "vp8-2", C2Config::PROFILE_VP8_2 },
+        { "vp8-3", C2Config::PROFILE_VP8_3 },
 }))
 
 DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(C2Config::level_t, ({
