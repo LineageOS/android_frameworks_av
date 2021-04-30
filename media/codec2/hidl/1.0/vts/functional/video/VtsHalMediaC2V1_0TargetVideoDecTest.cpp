@@ -24,7 +24,6 @@
 
 #include <openssl/md5.h>
 
-#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Config.h>
@@ -35,16 +34,14 @@
 #include <gui/IProducerListener.h>
 #include <system/window.h>
 
-using android::C2AllocatorIon;
-
 #include "media_c2_hidl_test_common.h"
 #include "media_c2_video_hidl_test_common.h"
 
 using DecodeTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
-static std::vector<DecodeTestParameters> kDecodeTestParameters;
+static std::vector<DecodeTestParameters> gDecodeTestParameters;
 
 using CsdFlushTestParameters = std::tuple<std::string, std::string, bool>;
-static std::vector<CsdFlushTestParameters> kCsdFlushTestParameters;
+static std::vector<CsdFlushTestParameters> gCsdFlushTestParameters;
 
 struct CompToURL {
     std::string mime;
@@ -52,7 +49,7 @@ struct CompToURL {
     std::string info;
     std::string chksum;
 };
-std::vector<CompToURL> kCompToURL = {
+std::vector<CompToURL> gCompToURL = {
         {"avc", "bbb_avc_176x144_300kbps_60fps.h264", "bbb_avc_176x144_300kbps_60fps.info",
          "bbb_avc_176x144_300kbps_60fps_chksum.md5"},
         {"avc", "bbb_avc_640x360_768kbps_30fps.h264", "bbb_avc_640x360_768kbps_30fps.info",
@@ -365,12 +362,12 @@ void validateComponent(const std::shared_ptr<android::Codec2Client::Component>& 
 void Codec2VideoDecHidlTestBase::GetURLChksmForComponent(char* mURL, char* info, char* chksum,
                                                          size_t streamIndex) {
     int streamCount = 0;
-    for (size_t i = 0; i < kCompToURL.size(); ++i) {
-        if (mMime.find(kCompToURL[i].mime) != std::string::npos) {
+    for (size_t i = 0; i < gCompToURL.size(); ++i) {
+        if (mMime.find(gCompToURL[i].mime) != std::string::npos) {
             if (streamCount == streamIndex) {
-                strcat(mURL, kCompToURL[i].mURL.c_str());
-                strcat(info, kCompToURL[i].info.c_str());
-                strcat(chksum, kCompToURL[i].chksum.c_str());
+                strcat(mURL, gCompToURL[i].mURL.c_str());
+                strcat(info, gCompToURL[i].info.c_str());
+                strcat(chksum, gCompToURL[i].chksum.c_str());
                 return;
             }
             streamCount++;
@@ -1074,16 +1071,16 @@ TEST_P(Codec2VideoDecCsdInputTests, CSDFlushTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoDecHidlTest, testing::ValuesIn(kTestParameters),
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2VideoDecHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 // DecodeTest with StreamIndex and EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(StreamIndexAndEOS, Codec2VideoDecDecodeTest,
-                         testing::ValuesIn(kDecodeTestParameters),
+                         testing::ValuesIn(gDecodeTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2VideoDecCsdInputTests,
-                         testing::ValuesIn(kCsdFlushTestParameters),
+                         testing::ValuesIn(gCsdFlushTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
@@ -1091,24 +1088,24 @@ INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2VideoDecCsdInputTests,
 // TODO : Video specific configuration Test
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    kTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER);
-    for (auto params : kTestParameters) {
-        kDecodeTestParameters.push_back(
+    gTestParameters = getTestParameters(C2Component::DOMAIN_VIDEO, C2Component::KIND_DECODER);
+    for (auto params : gTestParameters) {
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 1, false));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 1, true));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 2, false));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 2, true));
 
-        kCsdFlushTestParameters.push_back(
+        gCsdFlushTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), true));
-        kCsdFlushTestParameters.push_back(
+        gCsdFlushTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), false));
     }
 
