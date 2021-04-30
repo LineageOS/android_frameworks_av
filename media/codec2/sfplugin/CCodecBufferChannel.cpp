@@ -1780,7 +1780,7 @@ bool CCodecBufferChannel::handleWork(
         {
             Mutexed<Output>::Locked output(mOutput);
             numOutputSlots = output->numSlots;
-            reorderDepth = output->buffers->getReorderDepth();
+            reorderDepth = output->buffers ? output->buffers->getReorderDepth() : 0;
         }
         {
             Mutexed<OutputSurface>::Locked output(mOutputSurface);
