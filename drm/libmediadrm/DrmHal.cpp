@@ -888,7 +888,7 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
     Return<void> hResult;
 
     if (mPluginV1_2 != NULL) {
-        Return<void> hResult = mPluginV1_2->getProvisionRequest_1_2(
+        hResult = mPluginV1_2->getProvisionRequest_1_2(
                 toHidlString(certType), toHidlString(certAuthority),
                 [&](Status_V1_2 status, const hidl_vec<uint8_t>& hRequest,
                         const hidl_string& hDefaultUrl) {
@@ -900,7 +900,7 @@ status_t DrmHal::getProvisionRequest(String8 const &certType,
                 }
             );
     } else {
-        Return<void> hResult = mPlugin->getProvisionRequest(
+        hResult = mPlugin->getProvisionRequest(
                 toHidlString(certType), toHidlString(certAuthority),
                 [&](Status status, const hidl_vec<uint8_t>& hRequest,
                         const hidl_string& hDefaultUrl) {
@@ -1522,22 +1522,38 @@ std::string DrmHal::reportPluginMetrics() const
     return metricsString;
 }
 
-bool DrmHal::requiresSecureDecoder(const char *mime) const {
+status_t DrmHal::requiresSecureDecoder(const char *mime, bool *required) const {
     Mutex::Autolock autoLock(mLock);
     if (mPluginV1_4 == NULL) {
         return false;
     }
-    return mPluginV1_4->requiresSecureDecoderDefault(hidl_string(mime));
+    auto hResult = mPluginV1_4->requiresSecureDecoderDefault(hidl_string(mime));
+    if (!hResult.isOk()) {
+        DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %s", hResult.description().c_str());
+        return DEAD_OBJECT;
+    }
+    if (required) {
+        *required = hResult;
+    }
+    return OK;
 }
 
-bool DrmHal::requiresSecureDecoder(const char *mime,
-        DrmPlugin::SecurityLevel securityLevel) const {
+status_t DrmHal::requiresSecureDecoder(const char *mime, DrmPlugin::SecurityLevel securityLevel,
+                                       bool *required) const {
     Mutex::Autolock autoLock(mLock);
     if (mPluginV1_4 == NULL) {
         return false;
     }
     auto hLevel = toHidlSecurityLevel(securityLevel);
-    return mPluginV1_4->requiresSecureDecoder(hidl_string(mime), hLevel);
+    auto hResult = mPluginV1_4->requiresSecureDecoder(hidl_string(mime), hLevel);
+    if (!hResult.isOk()) {
+        DrmUtils::LOG2BE("requiresSecureDecoder txn failed: %s", hResult.description().c_str());
+        return DEAD_OBJECT;
+    }
+    if (required) {
+        *required = hResult;
+    }
+    return OK;
 }
 
 status_t DrmHal::setPlaybackId(Vector<uint8_t> const &sessionId, const char *playbackId) {
@@ -1545,10 +1561,8 @@ status_t DrmHal::setPlaybackId(Vector<uint8_t> const &sessionId, const char *pla
     if (mPluginV1_4 == NULL) {
         return ERROR_UNSUPPORTED;
     }
-    drm::V1_0::Status err = mPluginV1_4->setPlaybackId(
-            toHidlVec(sessionId),
-            hidl_string(playbackId));
-    return toStatusT(err);
+    auto err = mPluginV1_4->setPlaybackId(toHidlVec(sessionId), hidl_string(playbackId));
+    return err.isOk() ? toStatusT(err) : DEAD_OBJECT;
 }
 
 status_t DrmHal::getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const {

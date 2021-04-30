@@ -382,7 +382,8 @@ void CryptoHal::notifyResolution(uint32_t width, uint32_t height) {
         return;
     }
 
-    mPlugin->notifyResolution(width, height);
+    auto hResult = mPlugin->notifyResolution(width, height);
+    ALOGE_IF(!hResult.isOk(), "notifyResolution txn failed %s", hResult.description().c_str());
 }
 
 status_t CryptoHal::setMediaDrmSession(const Vector<uint8_t> &sessionId) {
@@ -392,7 +393,8 @@ status_t CryptoHal::setMediaDrmSession(const Vector<uint8_t> &sessionId) {
         return mInitCheck;
     }
 
-    return toStatusT(mPlugin->setMediaDrmSession(toHidlVec(sessionId)));
+    auto err = mPlugin->setMediaDrmSession(toHidlVec(sessionId));
+    return err.isOk() ? toStatusT(err) : DEAD_OBJECT;
 }
 
 status_t CryptoHal::getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const {
