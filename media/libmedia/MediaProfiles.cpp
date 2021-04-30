@@ -1121,6 +1121,36 @@ int MediaProfiles::getCamcorderProfileIndex(int cameraId, camcorder_quality qual
     return index;
 }
 
+const MediaProfiles::CamcorderProfile *MediaProfiles::getCamcorderProfile(
+            int cameraId, camcorder_quality quality) const {
+    int index = getCamcorderProfileIndex(cameraId, quality);
+    if (index == -1) {
+        ALOGE("The given camcorder profile camera %d quality %d is not found",
+            cameraId, quality);
+        return nullptr;
+    }
+
+    return mCamcorderProfiles[index];
+}
+
+std::vector<const MediaProfiles::AudioCodec *>
+MediaProfiles::CamcorderProfile::getAudioCodecs() const {
+    std::vector<const MediaProfiles::AudioCodec *> res;
+    for (const MediaProfiles::AudioCodec &ac : mAudioCodecs) {
+        res.push_back(&ac);
+    }
+    return res;
+}
+
+std::vector<const MediaProfiles::VideoCodec *>
+MediaProfiles::CamcorderProfile::getVideoCodecs() const {
+    std::vector<const MediaProfiles::VideoCodec *> res;
+    for (const MediaProfiles::VideoCodec &vc : mVideoCodecs) {
+        res.push_back(&vc);
+    }
+    return res;
+}
+
 int MediaProfiles::getCamcorderProfileParamByName(const char *name,
                                                   int cameraId,
                                                   camcorder_quality quality) const
