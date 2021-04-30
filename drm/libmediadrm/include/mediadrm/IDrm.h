@@ -154,12 +154,10 @@ struct IDrm : public virtual RefBase {
 
     virtual status_t setListener(const sp<IDrmClient>& listener) = 0;
 
-    virtual bool requiresSecureDecoder(
-            const char *mime) const = 0;
+    virtual status_t requiresSecureDecoder(const char *mime, bool *required) const = 0;
 
-    virtual bool requiresSecureDecoder(
-            const char *mime,
-            DrmPlugin::SecurityLevel securityLevel) const = 0;
+    virtual status_t requiresSecureDecoder(const char *mime, DrmPlugin::SecurityLevel securityLevel,
+                                           bool *required) const = 0;
 
     virtual status_t setPlaybackId(
             Vector<uint8_t> const &sessionId,
