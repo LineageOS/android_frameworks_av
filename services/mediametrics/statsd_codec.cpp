@@ -294,6 +294,12 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
         metrics_proto.set_video_input_frames(inputFrames);
     }
 
+    // android.media.mediacodec.original.bitrate
+    int32_t originalBitrate = -1;
+    if ( item->getInt32("android.media.mediacodec.original.bitrate", &originalBitrate)) {
+        metrics_proto.set_original_bitrate(originalBitrate);
+    }
+
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize codec metrics");
