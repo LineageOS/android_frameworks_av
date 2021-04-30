@@ -23,21 +23,18 @@
 #include <stdio.h>
 #include <algorithm>
 
-#include <C2AllocatorIon.h>
 #include <C2Buffer.h>
 #include <C2BufferPriv.h>
 #include <C2Config.h>
 #include <C2Debug.h>
 #include <codec2/hidl/client.h>
 
-using android::C2AllocatorIon;
-
 #include "media_c2_hidl_test_common.h"
 using DecodeTestParameters = std::tuple<std::string, std::string, uint32_t, bool>;
-static std::vector<DecodeTestParameters> kDecodeTestParameters;
+static std::vector<DecodeTestParameters> gDecodeTestParameters;
 
 using CsdFlushTestParameters = std::tuple<std::string, std::string, bool>;
-static std::vector<CsdFlushTestParameters> kCsdFlushTestParameters;
+static std::vector<CsdFlushTestParameters> gCsdFlushTestParameters;
 
 struct CompToURL {
     std::string mime;
@@ -45,7 +42,7 @@ struct CompToURL {
     std::string info;
 };
 
-std::vector<CompToURL> kCompToURL = {
+std::vector<CompToURL> gCompToURL = {
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz.info"},
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac",
          "bbb_aac_stereo_128kbps_48000hz_multi_frame.info"},
@@ -290,11 +287,11 @@ void getInputChannelInfo(const std::shared_ptr<android::Codec2Client::Component>
 // LookUpTable of clips and metadata for component testing
 void Codec2AudioDecHidlTestBase::GetURLForComponent(char* mURL, char* info, size_t streamIndex) {
     int streamCount = 0;
-    for (size_t i = 0; i < kCompToURL.size(); ++i) {
-        if (mMime.find(kCompToURL[i].mime) != std::string::npos) {
+    for (size_t i = 0; i < gCompToURL.size(); ++i) {
+        if (mMime.find(gCompToURL[i].mime) != std::string::npos) {
             if (streamCount == streamIndex) {
-                strcat(mURL, kCompToURL[i].mURL.c_str());
-                strcat(info, kCompToURL[i].info.c_str());
+                strcat(mURL, gCompToURL[i].mURL.c_str());
+                strcat(info, gCompToURL[i].info.c_str());
                 return;
             }
             streamCount++;
@@ -859,36 +856,36 @@ TEST_P(Codec2AudioDecCsdInputTests, CSDFlushTest) {
     ASSERT_EQ(mComponent->stop(), C2_OK);
 }
 
-INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioDecHidlTest, testing::ValuesIn(kTestParameters),
+INSTANTIATE_TEST_SUITE_P(PerInstance, Codec2AudioDecHidlTest, testing::ValuesIn(gTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 // DecodeTest with StreamIndex and EOS / No EOS
 INSTANTIATE_TEST_SUITE_P(StreamIndexAndEOS, Codec2AudioDecDecodeTest,
-                         testing::ValuesIn(kDecodeTestParameters),
+                         testing::ValuesIn(gDecodeTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 INSTANTIATE_TEST_SUITE_P(CsdInputs, Codec2AudioDecCsdInputTests,
-                         testing::ValuesIn(kCsdFlushTestParameters),
+                         testing::ValuesIn(gCsdFlushTestParameters),
                          PrintInstanceTupleNameToString<>);
 
 }  // anonymous namespace
 
 int main(int argc, char** argv) {
     parseArgs(argc, argv);
-    kTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER);
-    for (auto params : kTestParameters) {
-        kDecodeTestParameters.push_back(
+    gTestParameters = getTestParameters(C2Component::DOMAIN_AUDIO, C2Component::KIND_DECODER);
+    for (auto params : gTestParameters) {
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 0, false));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 0, true));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 1, false));
-        kDecodeTestParameters.push_back(
+        gDecodeTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), 1, true));
 
-        kCsdFlushTestParameters.push_back(
+        gCsdFlushTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), true));
-        kCsdFlushTestParameters.push_back(
+        gCsdFlushTestParameters.push_back(
                 std::make_tuple(std::get<0>(params), std::get<1>(params), false));
     }
 
