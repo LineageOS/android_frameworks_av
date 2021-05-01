@@ -100,7 +100,7 @@ struct NuMediaExtractor : public RefBase {
 
     status_t getAudioPresentations(size_t trackIdx, AudioPresentationCollection *presentations);
 
-    status_t setPlaybackId(const String8& playbackId);
+    status_t setLogSessionId(const String8& logSessionId);
 
     const char* getName() const;
 
