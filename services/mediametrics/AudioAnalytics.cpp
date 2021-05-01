@@ -157,6 +157,7 @@ static constexpr const char * const AAudioStreamFields[] {
     "log_session_id",
     "sample_rate",
     "content_type",
+    "sharing_requested",
 };
 
 /**
@@ -973,10 +974,11 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
     const auto perfModeActual =
             types::lookup<types::AAUDIO_PERFORMANCE_MODE, int32_t>(perfModeActualStr);
 
-    std::string sharingModeStr;
+    std::string sharingModeActualStr;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
-            key, AMEDIAMETRICS_PROP_SHARINGMODE, &sharingModeStr);
-    const auto sharingMode = types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeStr);
+            key, AMEDIAMETRICS_PROP_SHARINGMODEACTUAL, &sharingModeActualStr);
+    const auto sharingModeActual =
+            types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeActualStr);
 
     int32_t xrunCount = -1;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
@@ -1008,6 +1010,12 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
             key, AMEDIAMETRICS_PROP_CONTENTTYPE, &contentTypeStr);
     const auto contentType = types::lookup<types::CONTENT_TYPE, int32_t>(contentTypeStr);
 
+    std::string sharingModeRequestedStr;
+    mAudioAnalytics.mAnalyticsState->timeMachine().get(
+            key, AMEDIAMETRICS_PROP_SHARINGMODE, &sharingModeRequestedStr);
+    const auto sharingModeRequested =
+            types::lookup<types::AAUDIO_SHARING_MODE, int32_t>(sharingModeRequestedStr);
+
     LOG(LOG_LEVEL) << "key:" << key
             << " path:" << path
             << " direction:" << direction << "(" << directionStr << ")"
@@ -1018,14 +1026,16 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
             << " total_frames_transferred:" << totalFramesTransferred
             << " perf_mode_requested:" << perfModeRequested << "(" << perfModeRequestedStr << ")"
             << " perf_mode_actual:" << perfModeActual << "(" << perfModeActualStr << ")"
-            << " sharing:" << sharingMode << "(" << sharingModeStr << ")"
+            << " sharing:" << sharingModeActual << "(" << sharingModeActualStr << ")"
             << " xrun_count:" << xrunCount
             << " device_type:" << serializedDeviceTypes
             << " format_app:" << formatApp << "(" << formatAppStr << ")"
             << " format_device: " << formatDevice << "(" << formatDeviceStr << ")"
             << " log_session_id: " << logSessionId
             << " sample_rate: " << sampleRate
-            << " content_type: " << contentType << "(" << contentTypeStr << ")";
+            << " content_type: " << contentType << "(" << contentTypeStr << ")"
+            << " sharing_requested:" << sharingModeRequested
+                    << "(" << sharingModeRequestedStr << ")";
 
     if (mAudioAnalytics.mDeliverStatistics) {
         android::util::BytesField bf_serialized(
@@ -1041,7 +1051,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , totalFramesTransferred
                 , perfModeRequested
                 , perfModeActual
-                , sharingMode
+                , sharingModeActual
                 , xrunCount
                 , bf_serialized
                 , formatApp
@@ -1049,6 +1059,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , logSessionId.c_str()
                 , sampleRate
                 , contentType
+                , sharingModeRequested
                 );
         std::stringstream ss;
         ss << "result:" << result;
@@ -1063,7 +1074,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , totalFramesTransferred
                 , perfModeRequested
                 , perfModeActual
-                , sharingMode
+                , sharingModeActual
                 , xrunCount
                 , serializedDeviceTypes.c_str()
                 , formatApp
@@ -1071,6 +1082,7 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
                 , logSessionId.c_str()
                 , sampleRate
                 , contentType
+                , sharingModeRequested
                 );
         ss << " " << fieldsStr;
         std::string str = ss.str();
