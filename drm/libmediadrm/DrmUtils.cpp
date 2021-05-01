@@ -326,6 +326,9 @@ char logPriorityToChar(::V1_4::LogPriority priority) {
 
 std::string GetExceptionMessage(status_t err, const char *msg,
                                 const Vector<::V1_4::LogMessage> &logs) {
+    std::string ruler("==============================");
+    std::string header("Beginning of DRM Plugin Log");
+    std::string footer("End of DRM Plugin Log");
     String8 msg8;
     if (msg) {
         msg8 += msg;
@@ -333,6 +336,7 @@ std::string GetExceptionMessage(status_t err, const char *msg,
     }
     auto errStr = StrCryptoError(err);
     msg8 += errStr.c_str();
+    msg8 += String8::format("\n%s %s %s", ruler.c_str(), header.c_str(), ruler.c_str());
 
     for (auto log : logs) {
         time_t seconds = log.timeMs / 1000;
@@ -344,9 +348,10 @@ std::string GetExceptionMessage(status_t err, const char *msg,
         }
 
         char p = logPriorityToChar(log.priority);
-        msg8 += String8::format("\n%s.%03d %c %s", timeStr.c_str(), ms, p, log.message.c_str());
+        msg8 += String8::format("\n  %s.%03d %c %s", timeStr.c_str(), ms, p, log.message.c_str());
     }
 
+    msg8 += String8::format("\n%s %s %s", ruler.c_str(), footer.c_str(), ruler.c_str());
     return msg8.c_str();
 }
 
