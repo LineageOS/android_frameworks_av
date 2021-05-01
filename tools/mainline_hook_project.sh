@@ -17,7 +17,7 @@
 
 # tunables
 DEV_BRANCH=master
-MAINLINE_BRANCH=mainline-prod
+MAINLINE_BRANCH=sc-mainline-prod
 
 ###
 RED=$(tput setaf 1)

@@ -86,6 +86,12 @@ bool statsd_extractor(const std::shared_ptr<const mediametrics::Item>& item,
       metrics_proto.set_entry_point(entry_point);
     }
 
+    // android.media.mediaextractor.logSessionId        string
+    std::string log_session_id;
+    if (item->getString("android.media.mediaextractor.logSessionId", &log_session_id)) {
+        metrics_proto.set_log_session_id(log_session_id);
+    }
+
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize extractor metrics");
@@ -110,10 +116,7 @@ bool statsd_extractor(const std::shared_ptr<const mediametrics::Item>& item,
             << " mime:" << mime
             << " tracks:" << tracks
             << " entry_point:" << entry_point_string << "(" << entry_point << ")"
-
-            // TODO: Add MediaExtractor log_session_id
-            // << " log_session_id:" << log_session_id
-
+            << " log_session_id:" << log_session_id
             << " }";
     statsdLog->log(android::util::MEDIAMETRICS_EXTRACTOR_REPORTED, log.str());
     return true;
