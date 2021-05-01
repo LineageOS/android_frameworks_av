@@ -59,7 +59,8 @@ SharedMemoryParcelable SharedMemoryParcelable::dup() const {
 }
 
 void SharedMemoryParcelable::setup(const unique_fd& fd, int32_t sizeInBytes) {
-    mFd.reset(::dup(fd.get())); // store a duplicate fd
+    constexpr int minFd = 3; // skip over stdout, stdin and stderr
+    mFd.reset(fcntl(fd.get(), F_DUPFD_CLOEXEC, minFd)); // store a duplicate FD
     ALOGV("setup(fd = %d -> %d, size = %d) this = %p\n", fd.get(), mFd.get(), sizeInBytes, this);
     mSizeInBytes = sizeInBytes;
 }
