@@ -885,4 +885,15 @@ status_t NuMediaExtractor::getAudioPresentations(
     return ERROR_UNSUPPORTED;
 }
 
+status_t NuMediaExtractor::setLogSessionId(const String8& logSessionId) {
+    if (mImpl == nullptr) {
+        return ERROR_UNSUPPORTED;
+    }
+    status_t status = mImpl->setLogSessionId(logSessionId);
+    if (status != OK) {
+        ALOGW("Failed to set log session id: %d.", status);
+    }
+    return status;
+}
+
 }  // namespace android
