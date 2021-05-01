@@ -28,6 +28,7 @@
 #include <media/stagefright/foundation/AUtils.h>
 
 #include <C2Debug.h>
+#include <Codec2Mapper.h>
 #include <C2PlatformSupport.h>
 #include <Codec2BufferUtils.h>
 #include <SimpleC2Interface.h>
@@ -213,6 +214,42 @@ public:
                 .withFields({C2F(mSyncFramePeriod, value).any()})
                 .withSetter(Setter<decltype(*mSyncFramePeriod)>::StrictValueWithNoDeps)
                 .build());
+
+        addParameter(
+                DefineParam(mColorAspects, C2_PARAMKEY_COLOR_ASPECTS)
+                .withDefault(new C2StreamColorAspectsInfo::input(
+                        0u, C2Color::RANGE_UNSPECIFIED, C2Color::PRIMARIES_UNSPECIFIED,
+                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+                .withFields({
+                    C2F(mColorAspects, range).inRange(
+                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+                    C2F(mColorAspects, primaries).inRange(
+                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                    C2F(mColorAspects, transfer).inRange(
+                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+                    C2F(mColorAspects, matrix).inRange(
+                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+                })
+                .withSetter(ColorAspectsSetter)
+                .build());
+
+        addParameter(
+                DefineParam(mCodedColorAspects, C2_PARAMKEY_VUI_COLOR_ASPECTS)
+                .withDefault(new C2StreamColorAspectsInfo::output(
+                        0u, C2Color::RANGE_LIMITED, C2Color::PRIMARIES_UNSPECIFIED,
+                        C2Color::TRANSFER_UNSPECIFIED, C2Color::MATRIX_UNSPECIFIED))
+                .withFields({
+                    C2F(mCodedColorAspects, range).inRange(
+                                C2Color::RANGE_UNSPECIFIED,     C2Color::RANGE_OTHER),
+                    C2F(mCodedColorAspects, primaries).inRange(
+                                C2Color::PRIMARIES_UNSPECIFIED, C2Color::PRIMARIES_OTHER),
+                    C2F(mCodedColorAspects, transfer).inRange(
+                                C2Color::TRANSFER_UNSPECIFIED,  C2Color::TRANSFER_OTHER),
+                    C2F(mCodedColorAspects, matrix).inRange(
+                                C2Color::MATRIX_UNSPECIFIED,    C2Color::MATRIX_OTHER)
+                })
+                .withSetter(CodedColorAspectsSetter, mColorAspects)
+                .build());
     }
 
     static C2R InputDelaySetter(
@@ -359,6 +396,33 @@ public:
         return C2R::Ok();
     }
 
+    static C2R ColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::input> &me) {
+        (void)mayBlock;
+        if (me.v.range > C2Color::RANGE_OTHER) {
+                me.set().range = C2Color::RANGE_OTHER;
+        }
+        if (me.v.primaries > C2Color::PRIMARIES_OTHER) {
+                me.set().primaries = C2Color::PRIMARIES_OTHER;
+        }
+        if (me.v.transfer > C2Color::TRANSFER_OTHER) {
+                me.set().transfer = C2Color::TRANSFER_OTHER;
+        }
+        if (me.v.matrix > C2Color::MATRIX_OTHER) {
+                me.set().matrix = C2Color::MATRIX_OTHER;
+        }
+        return C2R::Ok();
+    }
+
+    static C2R CodedColorAspectsSetter(bool mayBlock, C2P<C2StreamColorAspectsInfo::output> &me,
+                                       const C2P<C2StreamColorAspectsInfo::input> &coded) {
+        (void)mayBlock;
+        me.set().range = coded.v.range;
+        me.set().primaries = coded.v.primaries;
+        me.set().transfer = coded.v.transfer;
+        me.set().matrix = coded.v.matrix;
+        return C2R::Ok();
+    }
+
     IV_PROFILE_T getProfile_l() const {
         switch (mProfileLevel->profile) {
         case PROFILE_AVC_CONSTRAINED_BASELINE:  [[fallthrough]];
@@ -418,6 +482,9 @@ public:
     std::shared_ptr<C2StreamGopTuning::output> getGop_l() const { return mGop; }
     std::shared_ptr<C2StreamPictureQuantizationTuning::output> getPictureQuantization_l() const
     { return mPictureQuantization; }
+    std::shared_ptr<C2StreamColorAspectsInfo::output> getCodedColorAspects_l() const {
+        return mCodedColorAspects;
+    }
 
 private:
     std::shared_ptr<C2StreamUsageTuning::input> mUsage;
@@ -430,6 +497,8 @@ private:
     std::shared_ptr<C2StreamSyncFrameIntervalTuning::output> mSyncFramePeriod;
     std::shared_ptr<C2StreamGopTuning::output> mGop;
     std::shared_ptr<C2StreamPictureQuantizationTuning::output> mPictureQuantization;
+    std::shared_ptr<C2StreamColorAspectsInfo::input> mColorAspects;
+    std::shared_ptr<C2StreamColorAspectsInfo::output> mCodedColorAspects;
 };
 
 #define ive_api_function  ih264e_api_function
@@ -980,6 +1049,55 @@ void C2SoftAvcEnc::logVersion() {
     return;
 }
 
+c2_status_t C2SoftAvcEnc::setVuiParams()
+{
+    ColorAspects sfAspects;
+    if (!C2Mapper::map(mColorAspects->primaries, &sfAspects.mPrimaries)) {
+        sfAspects.mPrimaries = android::ColorAspects::PrimariesUnspecified;
+    }
+    if (!C2Mapper::map(mColorAspects->range, &sfAspects.mRange)) {
+        sfAspects.mRange = android::ColorAspects::RangeUnspecified;
+    }
+    if (!C2Mapper::map(mColorAspects->matrix, &sfAspects.mMatrixCoeffs)) {
+        sfAspects.mMatrixCoeffs = android::ColorAspects::MatrixUnspecified;
+    }
+    if (!C2Mapper::map(mColorAspects->transfer, &sfAspects.mTransfer)) {
+        sfAspects.mTransfer = android::ColorAspects::TransferUnspecified;
+    }
+    int32_t primaries, transfer, matrixCoeffs;
+    bool range;
+    ColorUtils::convertCodecColorAspectsToIsoAspects(sfAspects,
+            &primaries,
+            &transfer,
+            &matrixCoeffs,
+            &range);
+    ih264e_vui_ip_t s_vui_params_ip {};
+    ih264e_vui_op_t s_vui_params_op {};
+
+    s_vui_params_ip.e_cmd = IVE_CMD_VIDEO_CTL;
+    s_vui_params_ip.e_sub_cmd = IVE_CMD_CTL_SET_VUI_PARAMS;
+
+    s_vui_params_ip.u1_video_signal_type_present_flag = 1;
+    s_vui_params_ip.u1_colour_description_present_flag = 1;
+    s_vui_params_ip.u1_colour_primaries = primaries;
+    s_vui_params_ip.u1_transfer_characteristics = transfer;
+    s_vui_params_ip.u1_matrix_coefficients = matrixCoeffs;
+    s_vui_params_ip.u1_video_full_range_flag = range;
+
+    s_vui_params_ip.u4_size = sizeof(ih264e_vui_ip_t);
+    s_vui_params_op.u4_size = sizeof(ih264e_vui_op_t);
+
+    IV_STATUS_T status = ih264e_api_function(mCodecCtx, &s_vui_params_ip,
+                                             &s_vui_params_op);
+    if(status != IV_SUCCESS)
+    {
+        ALOGE("Unable to set vui params = 0x%x\n",
+                s_vui_params_op.u4_error_code);
+        return C2_CORRUPTED;
+    }
+    return C2_OK;
+}
+
 c2_status_t C2SoftAvcEnc::initEncoder() {
     IV_STATUS_T status;
     WORD32 level;
@@ -999,6 +1117,7 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
         mIInterval = mIntf->getSyncFramePeriod_l();
         mIDRInterval = mIntf->getSyncFramePeriod_l();
         gop = mIntf->getGop_l();
+        mColorAspects = mIntf->getCodedColorAspects_l();
     }
     if (gop && gop->flexCount() > 0) {
         uint32_t syncInterval = 1;
@@ -1222,6 +1341,9 @@ c2_status_t C2SoftAvcEnc::initEncoder() {
 
     /* Video control Set Profile params */
     setProfileParams();
+
+    /* Video control Set VUI params */
+    setVuiParams();
 
     /* Video control Set in Encode header mode */
     setEncMode(IVE_ENC_MODE_HEADER);
