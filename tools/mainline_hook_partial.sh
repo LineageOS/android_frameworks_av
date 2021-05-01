@@ -36,7 +36,7 @@
 ## tunables:
 ##
 DEV_BRANCH=master
-MAINLINE_BRANCH=mainline-prod
+MAINLINE_BRANCH=sc-mainline-prod
 filelist_file=MainlineFiles.cfg
 
 ###
