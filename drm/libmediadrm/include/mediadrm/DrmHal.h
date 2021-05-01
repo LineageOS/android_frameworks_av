@@ -179,11 +179,10 @@ struct DrmHal : public IDrm,
 
     virtual status_t setListener(const sp<IDrmClient>& listener);
 
-    virtual bool requiresSecureDecoder(const char *mime) const;
+    virtual status_t requiresSecureDecoder(const char *mime, bool *required) const;
 
-    virtual bool requiresSecureDecoder(
-            const char *mime,
-            DrmPlugin::SecurityLevel securityLevel) const;
+    virtual status_t requiresSecureDecoder(const char *mime, DrmPlugin::SecurityLevel securityLevel,
+                                           bool *required) const;
 
     virtual status_t setPlaybackId(
             Vector<uint8_t> const &sessionId,

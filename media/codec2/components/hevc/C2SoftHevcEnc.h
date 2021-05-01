@@ -89,6 +89,7 @@ struct C2SoftHevcEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamQualityTuning::output> mQuality;
     std::shared_ptr<C2StreamGopTuning::output> mGop;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
+    std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
 #ifdef FILE_DUMP_ENABLE
     char mInFile[200];
     char mOutFile[200];

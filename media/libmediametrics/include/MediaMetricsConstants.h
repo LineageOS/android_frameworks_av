@@ -166,6 +166,8 @@
 // "powerSaving"
 #define AMEDIAMETRICS_PROP_PERFORMANCEMODEACTUAL "performanceModeActual" // string
 #define AMEDIAMETRICS_PROP_FRAMESTRANSFERRED "framesTransferred" // int64_t, transferred frames
+// string value, "exclusive", "shared". the actual selected sharing mode by the server
+#define AMEDIAMETRICS_PROP_SHARINGMODEACTUAL "sharingModeActual"
 
 // Timing values: millisecond values are suffixed with MS and the type is double
 // nanosecond values are suffixed with NS and the type is int64.
