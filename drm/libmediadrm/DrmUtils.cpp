@@ -82,7 +82,17 @@ void MakeHidlFactories(const uint8_t uuid[16], V &factories, M& instances) {
             auto factory = Hal::getService(instance);
             if (factory != nullptr) {
                 instances[instance.c_str()] = Hal::descriptor;
-                if (!uuid || factory->isCryptoSchemeSupported(uuid)) {
+                if (!uuid) {
+                    factories.push_back(factory);
+                    continue;
+                }
+                auto supported = factory->isCryptoSchemeSupported(uuid);
+                if (!supported.isOk()) {
+                    LOG2BE(uuid, "isCryptoSchemeSupported txn failed: %s",
+                           supported.description().c_str());
+                    continue;
+                }
+                if (supported) {
                     factories.push_back(factory);
                 }
             }
@@ -114,30 +124,42 @@ hidl_array<uint8_t, 16> toHidlArray16(const uint8_t *ptr) {
 sp<::V1_0::IDrmPlugin> MakeDrmPlugin(const sp<::V1_0::IDrmFactory> &factory,
                                      const uint8_t uuid[16], const char *appPackageName) {
     sp<::V1_0::IDrmPlugin> plugin;
-    factory->createPlugin(toHidlArray16(uuid), hidl_string(appPackageName),
-                          [&](::V1_0::Status status, const sp<::V1_0::IDrmPlugin> &hPlugin) {
-                              if (status != ::V1_0::Status::OK) {
-                                  LOG2BE(uuid, "MakeDrmPlugin failed: %d", status);
-                                  return;
-                              }
-                              plugin = hPlugin;
-                          });
-    return plugin;
+    auto err = factory->createPlugin(
+            toHidlArray16(uuid), hidl_string(appPackageName),
+            [&](::V1_0::Status status, const sp<::V1_0::IDrmPlugin> &hPlugin) {
+                if (status != ::V1_0::Status::OK) {
+                    LOG2BE(uuid, "MakeDrmPlugin failed: %d", status);
+                    return;
+                }
+                plugin = hPlugin;
+            });
+    if (err.isOk()) {
+        return plugin;
+    } else {
+        LOG2BE(uuid, "MakeDrmPlugin txn failed: %s", err.description().c_str());
+        return nullptr;
+    }
 }
 
 sp<::V1_0::ICryptoPlugin> MakeCryptoPlugin(const sp<::V1_0::ICryptoFactory> &factory,
                                            const uint8_t uuid[16], const void *initData,
                                            size_t initDataSize) {
     sp<::V1_0::ICryptoPlugin> plugin;
-    factory->createPlugin(toHidlArray16(uuid), toHidlVec(initData, initDataSize),
-                          [&](::V1_0::Status status, const sp<::V1_0::ICryptoPlugin> &hPlugin) {
-                              if (status != ::V1_0::Status::OK) {
-                                  LOG2BE(uuid, "MakeCryptoPlugin failed: %d", status);
-                                  return;
-                              }
-                              plugin = hPlugin;
-                          });
-    return plugin;
+    auto err = factory->createPlugin(
+            toHidlArray16(uuid), toHidlVec(initData, initDataSize),
+            [&](::V1_0::Status status, const sp<::V1_0::ICryptoPlugin> &hPlugin) {
+                if (status != ::V1_0::Status::OK) {
+                    LOG2BE(uuid, "MakeCryptoPlugin failed: %d", status);
+                    return;
+                }
+                plugin = hPlugin;
+            });
+    if (err.isOk()) {
+        return plugin;
+    } else {
+        LOG2BE(uuid, "MakeCryptoPlugin txn failed: %s", err.description().c_str());
+        return nullptr;
+    }
 }
 
 } // namespace
