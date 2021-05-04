@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
@@ -50,11 +50,16 @@ bool statsd_recorder(const std::shared_ptr<const mediametrics::Item>& item,
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::RecorderData metrics_proto;
+    ::android::stats::mediametrics_message::RecorderData metrics_proto;
 
     // flesh out the protobuf we'll hand off with our data
     //
 
+    // string kRecorderLogSessionId = "android.media.mediarecorder.log-session-id";
+    std::string log_session_id;
+    if (item->getString("android.media.mediarecorder.log_session_id", &log_session_id)) {
+        metrics_proto.set_log_session_id(std::move(log_session_id));
+    }
     // string kRecorderAudioMime = "android.media.mediarecorder.audio.mime";
     std::string audio_mime;
     if (item->getString("android.media.mediarecorder.audio.mime", &audio_mime)) {
