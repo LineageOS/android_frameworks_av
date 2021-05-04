@@ -48,6 +48,7 @@ struct StagefrightRecorder : public MediaRecorderBase {
     explicit StagefrightRecorder(const Identity& clientIdentity);
     virtual ~StagefrightRecorder();
     virtual status_t init();
+    virtual status_t setLogSessionId(const String8 &id);
     virtual status_t setAudioSource(audio_source_t as);
             status_t setPrivacySensitive(bool privacySensitive) override;
             status_t isPrivacySensitive(bool *privacySensitive) const override;
@@ -110,6 +111,7 @@ private:
     void flushAndResetMetrics(bool reinitialize);
     void updateMetrics();
 
+    AString mLogSessionId;
     audio_source_t mAudioSource;
     privacy_sensitive_t mPrivacySensitive;
     video_source mVideoSource;
