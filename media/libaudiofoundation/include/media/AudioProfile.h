@@ -98,7 +98,7 @@ private:
     bool mIsDynamicChannels = false;
     bool mIsDynamicRate = false;
 
-    audio_encapsulation_type_t mEncapsulationType;
+    audio_encapsulation_type_t mEncapsulationType = AUDIO_ENCAPSULATION_TYPE_NONE;
 
     AudioProfile() = default;
     AudioProfile& operator=(const AudioProfile& other);
