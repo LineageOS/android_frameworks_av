@@ -7,7 +7,6 @@ service media.transcoding /apex/com.android.media/bin/mediatranscoding
     group media
     ioprio rt 4
     # Restrict to little cores only with system-background cpuset.
-    # Lower IO priority to background.
-    writepid /dev/cpuset/system-background/tasks /dev/blkio/background/tasks
+    writepid /dev/cpuset/system-background/tasks
     interface aidl media.transcoding
     disabled
