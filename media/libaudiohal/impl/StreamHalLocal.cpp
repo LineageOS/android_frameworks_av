@@ -17,6 +17,7 @@
 #define LOG_TAG "StreamHalLocal"
 //#define LOG_NDEBUG 0
 
+#include <audio_utils/Metadata.h>
 #include <hardware/audio.h>
 #include <media/AudioParameter.h>
 #include <utils/Log.h>
@@ -353,7 +354,11 @@ int StreamOutHalLocal::asyncEventCallback(
     if (callback.get() == nullptr) return 0;
     switch (event) {
         case STREAM_EVENT_CBK_TYPE_CODEC_FORMAT_CHANGED:
-            callback->onCodecFormatChanged(std::basic_string<uint8_t>((uint8_t*)param));
+            // void* param is the byte string buffer from byte_string_from_audio_metadata().
+            // As the byte string buffer may have embedded zeroes, we cannot use strlen()
+            callback->onCodecFormatChanged(std::basic_string<uint8_t>(
+                    (const uint8_t*)param,
+                    audio_utils::metadata::dataByteStringLen((const uint8_t*)param)));
             break;
         default:
             ALOGW("%s unknown event %d", __func__, event);
