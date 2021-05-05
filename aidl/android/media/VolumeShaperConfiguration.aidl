@@ -29,5 +29,5 @@ parcelable VolumeShaperConfiguration {
     /** Bitmask, indexed by VolumeShaperConfigurationOptionFlag. */
     int optionFlags;
     double durationMs;
-    InterpolatorConfig interpolatorConfig;
+    @nullable InterpolatorConfig interpolatorConfig; // null if type == ID
 }
