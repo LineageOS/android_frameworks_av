@@ -18,7 +18,7 @@
 #include <utils/Log.h>
 
 #include <algorithm>
-#include <audio_utils/primitives.h>
+#include <audio_utils/format.h>
 #include <aaudio/AAudio.h>
 #include <media/MediaMetricsItem.h>
 
@@ -190,26 +190,10 @@ aaudio_result_t AudioStreamInternalCapture::readNowWithConversion(void *buffer,
 
         const audio_format_t sourceFormat = getDeviceFormat();
         const audio_format_t destinationFormat = getFormat();
-        // TODO factor this out into a utility function
-        if (sourceFormat == destinationFormat) {
-            memcpy(destination, wrappingBuffer.data[partIndex], numBytes);
-        } else if (sourceFormat == AUDIO_FORMAT_PCM_16_BIT
-                   && destinationFormat == AUDIO_FORMAT_PCM_FLOAT) {
-            memcpy_to_float_from_i16(
-                    (float *) destination,
-                    (const int16_t *) wrappingBuffer.data[partIndex],
-                    numSamples);
-        } else if (sourceFormat == AUDIO_FORMAT_PCM_FLOAT
-                   && destinationFormat == AUDIO_FORMAT_PCM_16_BIT) {
-            memcpy_to_i16_from_float(
-                    (int16_t *) destination,
-                    (const float *) wrappingBuffer.data[partIndex],
-                    numSamples);
-        } else {
-            ALOGE("%s() - Format conversion not supported! audio_format_t source = %u, dest = %u",
-                __func__, sourceFormat, destinationFormat);
-            return AAUDIO_ERROR_INVALID_FORMAT;
-        }
+
+        memcpy_by_audio_format(destination, destinationFormat,
+                wrappingBuffer.data[partIndex], sourceFormat, numSamples);
+
         destination += numBytes;
         framesLeft -= framesToProcess;
     }
