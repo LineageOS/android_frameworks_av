@@ -115,7 +115,7 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
     bool qpPresent = hasQpMax(inFormat);
 
     // calculate a target QP value
-    int32_t qpmax = codec->targetQpMax();
+    int32_t qpmax = codec->targetQpMax(width, height);
     if (!qpPresent) {
         // user didn't, so shaper wins
         if (qpmax != INT32_MAX) {

@@ -528,6 +528,8 @@ status_t CameraMetadata::resizeIfNeeded(size_t extraEntries, size_t extraData) {
             mBuffer = allocate_camera_metadata(newEntryCount,
                     newDataCount);
             if (mBuffer == NULL) {
+                // Maintain old buffer to avoid potential memory leak.
+                mBuffer = oldBuffer;
                 ALOGE("%s: Can't allocate larger metadata buffer", __FUNCTION__);
                 return NO_MEMORY;
             }
