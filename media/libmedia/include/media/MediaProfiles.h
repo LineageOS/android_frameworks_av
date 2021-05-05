@@ -114,13 +114,16 @@ public:
          * @param frameWidth frame width in pixels
          * @param frameHeight frame height in pixels
          * @param frameRate frame rate in fps
+         * @param profile codec profile (for MediaCodec) or -1 for none
          */
-        VideoCodec(video_encoder codec, int bitrate, int frameWidth, int frameHeight, int frameRate)
+        VideoCodec(video_encoder codec, int bitrate, int frameWidth, int frameHeight, int frameRate,
+                   int profile = -1)
             : mCodec(codec),
               mBitRate(bitrate),
               mFrameWidth(frameWidth),
               mFrameHeight(frameHeight),
-              mFrameRate(frameRate) {
+              mFrameRate(frameRate),
+              mProfile(profile) {
         }
 
         VideoCodec(const VideoCodec&) = default;
@@ -152,12 +155,18 @@ public:
             return mFrameRate;
         }
 
+        /** Returns the codec profile (or -1 for no profile). */
+        int getProfile() const {
+            return mProfile;
+        }
+
     private:
         video_encoder mCodec;
         int mBitRate;
         int mFrameWidth;
         int mFrameHeight;
         int mFrameRate;
+        int mProfile;
         friend class MediaProfiles;
     };
 
@@ -173,12 +182,14 @@ public:
          * @param bitrate bitrate in bps
          * @param sampleRate sample rate in Hz
          * @param channels number of channels
+         * @param profile codec profile (for MediaCodec) or -1 for none
          */
-        AudioCodec(audio_encoder codec, int bitrate, int sampleRate, int channels)
+        AudioCodec(audio_encoder codec, int bitrate, int sampleRate, int channels, int profile = -1)
             : mCodec(codec),
               mBitRate(bitrate),
               mSampleRate(sampleRate),
-              mChannels(channels) {
+              mChannels(channels),
+              mProfile(profile) {
         }
 
         AudioCodec(const AudioCodec&) = default;
@@ -205,11 +216,17 @@ public:
             return mChannels;
         }
 
+        /** Returns the codec profile (or -1 for no profile). */
+        int getProfile() const {
+            return mProfile;
+        }
+
     private:
         audio_encoder mCodec;
         int mBitRate;
         int mSampleRate;
         int mChannels;
+        int mProfile;
         friend class MediaProfiles;
     };
 
@@ -458,23 +475,23 @@ private:
     // If the xml configuration file does exist, use the settings
     // from the xml
     static MediaProfiles* createInstanceFromXmlFile(const char *xml);
-    static output_format createEncoderOutputFileFormat(const char **atts);
-    static void createVideoCodec(const char **atts, MediaProfiles *profiles);
-    static void createAudioCodec(const char **atts, MediaProfiles *profiles);
-    static AudioDecoderCap* createAudioDecoderCap(const char **atts);
-    static VideoDecoderCap* createVideoDecoderCap(const char **atts);
-    static VideoEncoderCap* createVideoEncoderCap(const char **atts);
-    static AudioEncoderCap* createAudioEncoderCap(const char **atts);
+    static output_format createEncoderOutputFileFormat(const char **atts, size_t natts);
+    static void createVideoCodec(const char **atts, size_t natts, MediaProfiles *profiles);
+    static void createAudioCodec(const char **atts, size_t natts, MediaProfiles *profiles);
+    static AudioDecoderCap* createAudioDecoderCap(const char **atts, size_t natts);
+    static VideoDecoderCap* createVideoDecoderCap(const char **atts, size_t natts);
+    static VideoEncoderCap* createVideoEncoderCap(const char **atts, size_t natts);
+    static AudioEncoderCap* createAudioEncoderCap(const char **atts, size_t natts);
 
     static CamcorderProfile* createCamcorderProfile(
-                int cameraId, const char **atts, Vector<int>& cameraIds);
+                int cameraId, const char **atts, size_t natts, Vector<int>& cameraIds);
 
-    static int getCameraId(const char **atts);
+    static int getCameraId(const char **atts, size_t natts);
 
-    void addStartTimeOffset(int cameraId, const char **atts);
+    void addStartTimeOffset(int cameraId, const char **atts, size_t natts);
 
     ImageEncodingQualityLevels* findImageEncodingQualityLevels(int cameraId) const;
-    void addImageEncodingQualityLevel(int cameraId, const char** atts);
+    void addImageEncodingQualityLevel(int cameraId, const char** atts, size_t natts);
 
     // Customized element tag handler for parsing the xml configuration file.
     static void startElementHandler(void *userData, const char *name, const char **atts);
