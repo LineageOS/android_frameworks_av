@@ -53,13 +53,6 @@ void CodecProperties::setSupportedMinimumQuality(int vmaf) {
     mMinimumQuality = vmaf;
 }
 
-int CodecProperties::targetQpMax() {
-    return mTargetQpMax;
-}
-void CodecProperties::setTargetQpMax(int qpMax) {
-    mTargetQpMax = qpMax;
-}
-
 void CodecProperties::setMissingQpBoost(double boost) {
     mMissingQpBoost = boost;
 }
@@ -118,6 +111,11 @@ void CodecProperties::setTuningValue(std::string key, std::string value) {
             setTargetQpMax(iValue);
             legal = true;
         }
+    } else if (!strncmp(key.c_str(), "vq-target-qpmax-", strlen("vq-target-qpmax-"))) {
+            std::string resolution = key.substr(strlen("vq-target-qpmax-"));
+            if (qpMaxPoint(resolution, value)) {
+                legal = true;
+            }
     } else if (!strcmp(key.c_str(), "vq-target-bpp")) {
         const char *p = value.c_str();
         char *q;
@@ -290,6 +288,131 @@ double CodecProperties::getBpp(int32_t width, int32_t height) {
 
     ALOGV("defaulting to %f bpp", mBpp);
     return mBpp;
+}
+
+bool CodecProperties::qpMaxPoint(std::string resolution, std::string value) {
+
+    int32_t width = 0;
+    int32_t height = 0;
+    int qpMax = INT32_MAX;
+
+    // resolution is "WxH", "W*H" or a standard name like "720p"
+    if (resolution == "1080p") {
+        width = 1080; height = 1920;
+    } else if (resolution == "720p") {
+        width = 720; height = 1280;
+    } else if (resolution == "540p") {
+        width = 540; height = 960;
+    } else if (resolution == "480p") {
+        width = 480; height = 854;
+    } else {
+        size_t sep = resolution.find('x');
+        if (sep == std::string::npos) {
+            sep = resolution.find('*');
+        }
+        if (sep == std::string::npos) {
+            ALOGW("unable to parse resolution: '%s'", resolution.c_str());
+            return false;
+        }
+        std::string w = resolution.substr(0, sep);
+        std::string h = resolution.substr(sep+1);
+
+        char *q;
+        const char *p = w.c_str();
+        width = strtol(p, &q, 0);
+        if (q == p) {
+                width = -1;
+        }
+        p = h.c_str();
+        height = strtol(p, &q, 0);
+        if (q == p) {
+                height = -1;
+        }
+        if (width <= 0 || height <= 0 || width > DIMENSION_LIMIT || height > DIMENSION_LIMIT) {
+            ALOGW("unparseable: width, height '%s'", resolution.c_str());
+            return false;
+        }
+    }
+
+    const char *p = value.c_str();
+    char *q;
+    qpMax = strtol(p, &q, 0);
+    if (q == p) {
+        ALOGW("unparseable qpmax '%s'", value.c_str());
+        return false;
+    }
+
+    // convert to our internal 'unspecified' notation
+    if (qpMax == -1)
+        qpMax = INT32_MAX;
+
+    struct qpmax_point *point = (struct qpmax_point*) malloc(sizeof(*point));
+    if (point == nullptr) {
+        ALOGW("unable to allocate memory for qpmax point");
+        return false;
+    }
+
+    point->pixels = width * height;
+    point->width = width;
+    point->height = height;
+    point->qpMax = qpMax;
+
+    if (mQpMaxPoints == nullptr) {
+        point->next = nullptr;
+        mQpMaxPoints = point;
+    } else if (point->pixels < mQpMaxPoints->pixels) {
+        // at the front
+        point->next = mQpMaxPoints;
+        mQpMaxPoints = point;
+    } else {
+        struct qpmax_point *after = mQpMaxPoints;
+        while (after->next) {
+            if (point->pixels > after->next->pixels) {
+                after = after->next;
+                continue;
+            }
+
+            // insert before after->next
+            point->next = after->next;
+            after->next = point;
+            break;
+        }
+        if (after->next == nullptr) {
+            // hasn't gone in yet
+            point->next = nullptr;
+            after->next = point;
+        }
+    }
+
+    return true;
+}
+
+int CodecProperties::targetQpMax(int32_t width, int32_t height) {
+    // look in the per-resolution list
+
+    int32_t pixels = width * height;
+
+    if (mQpMaxPoints) {
+        struct qpmax_point *point = mQpMaxPoints;
+        while (point && point->pixels < pixels) {
+            point = point->next;
+        }
+        if (point) {
+            ALOGV("targetQpMax(w=%d,h=%d) returns %d from qpmax_point w=%d h=%d",
+                width, height, point->qpMax, point->width, point->height);
+            return point->qpMax;
+        }
+    }
+
+    ALOGV("defaulting to %d qpmax", mTargetQpMax);
+    return mTargetQpMax;
+}
+
+void CodecProperties::setTargetQpMax(int qpMax) {
+    // convert to our internal 'unspecified' notation
+    if (qpMax == -1)
+        qpMax = INT32_MAX;
+    mTargetQpMax = qpMax;
 }
 
 std::string CodecProperties::getMapping(std::string key, std::string kind) {
