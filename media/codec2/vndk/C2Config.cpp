@@ -142,6 +142,14 @@ DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(C2Config::profile_t, ({
         { "av1-0", C2Config::PROFILE_AV1_0 },
         { "av1-1", C2Config::PROFILE_AV1_1 },
         { "av1-2", C2Config::PROFILE_AV1_2 },
+        { "vp8-0", C2Config::PROFILE_VP8_0 },
+        { "vp8-1", C2Config::PROFILE_VP8_1 },
+        { "vp8-2", C2Config::PROFILE_VP8_2 },
+        { "vp8-3", C2Config::PROFILE_VP8_3 },
+        { "mpegh-main", C2Config::PROFILE_MPEGH_MAIN },
+        { "mpegh-high", C2Config::PROFILE_MPEGH_HIGH },
+        { "mpegh-lc", C2Config::PROFILE_MPEGH_LC },
+        { "mpegh-baseline", C2Config::PROFILE_MPEGH_BASELINE },
 }))
 
 DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(C2Config::level_t, ({
@@ -248,6 +256,11 @@ DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(C2Config::level_t, ({
         { "av1-7.1", C2Config::LEVEL_AV1_7_1 },
         { "av1-7.2", C2Config::LEVEL_AV1_7_2 },
         { "av1-7.3", C2Config::LEVEL_AV1_7_3 },
+        { "mpegh-1", C2Config::LEVEL_MPEGH_1 },
+        { "mpegh-2", C2Config::LEVEL_MPEGH_2 },
+        { "mpegh-3", C2Config::LEVEL_MPEGH_3 },
+        { "mpegh-4", C2Config::LEVEL_MPEGH_4 },
+        { "mpegh-5", C2Config::LEVEL_MPEGH_5 },
 }))
 
 DEFINE_C2_ENUM_VALUE_CUSTOM_HELPER(C2BufferData::type_t, ({

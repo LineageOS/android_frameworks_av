@@ -79,6 +79,7 @@ static const char *kKeyRecorder = "recorder";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaRecorder.java
 // These must be kept synchronized with the constants there.
+static const char *kRecorderLogSessionId = "android.media.mediarecorder.log-session-id";
 static const char *kRecorderAudioBitrate = "android.media.mediarecorder.audio-bitrate";
 static const char *kRecorderAudioChannels = "android.media.mediarecorder.audio-channels";
 static const char *kRecorderAudioSampleRate = "android.media.mediarecorder.audio-samplerate";
@@ -159,6 +160,8 @@ void StagefrightRecorder::updateMetrics() {
     // we run as part of the media player service; what we really want to
     // know is the app which requested the recording.
     mMetricsItem->setUid(VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mClient.uid)));
+
+    mMetricsItem->setCString(kRecorderLogSessionId, mLogSessionId.c_str());
 
     // populate the values from the raw fields.
 
@@ -914,6 +917,14 @@ status_t StagefrightRecorder::requestIDRFrame() {
     return ret;
 }
 
+status_t StagefrightRecorder::setLogSessionId(const String8 &log_session_id) {
+    ALOGV("setLogSessionId: %s", log_session_id.string());
+
+    // TODO: validity check that log_session_id is a 32-byte hex digit.
+    mLogSessionId.setTo(log_session_id.string());
+    return OK;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -1082,6 +1093,8 @@ status_t StagefrightRecorder::setParameter(
         if (safe_strtoi64(value.string(), &networkHandle)) {
             return setSocketNetwork(networkHandle);
         }
+    } else if (key == "log-session-id") {
+        return setLogSessionId(value);
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
     }
