@@ -203,9 +203,8 @@ error:
     return result;
 }
 
-
-aaudio_result_t AAudioServiceStreamShared::close()  {
-    aaudio_result_t result = AAudioServiceStreamBase::close();
+aaudio_result_t AAudioServiceStreamShared::close_l()  {
+    aaudio_result_t result = AAudioServiceStreamBase::close_l();
 
     {
         std::lock_guard<std::mutex> lock(mAudioDataQueueLock);

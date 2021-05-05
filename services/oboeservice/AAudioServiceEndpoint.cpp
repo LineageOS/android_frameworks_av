@@ -87,15 +87,26 @@ bool AAudioServiceEndpoint::isStreamRegistered(audio_port_handle_t portHandle) {
 }
 
 void AAudioServiceEndpoint::disconnectRegisteredStreams() {
-    std::lock_guard<std::mutex> lock(mLockStreams);
+    std::vector<android::sp<AAudioServiceStreamBase>> streamsToDisconnect;
+    {
+        std::lock_guard<std::mutex> lock(mLockStreams);
+        mRegisteredStreams.swap(streamsToDisconnect);
+    }
+    // Stop and disconnect outside mLockStreams to avoid reverse
+    // ordering of AAudioServiceStreamBase::mLock and mLockStreams
     mConnected.store(false);
-    for (const auto& stream : mRegisteredStreams) {
-        ALOGD("disconnectRegisteredStreams() stop and disconnect port %d",
-              stream->getPortHandle());
+    // We need to stop all the streams before we disconnect them.
+    // Otherwise there is a race condition where the first disconnected app
+    // tries to reopen a stream as MMAP but is blocked by the second stream,
+    // which hasn't stopped yet. Then the first app ends up with a Legacy stream.
+    for (const auto &stream : streamsToDisconnect) {
+        ALOGD("%s() - stop(), port = %d", __func__, stream->getPortHandle());
         stream->stop();
+    }
+    for (const auto &stream : streamsToDisconnect) {
+        ALOGD("%s() - disconnect(), port = %d", __func__, stream->getPortHandle());
         stream->disconnect();
     }
-    mRegisteredStreams.clear();
 }
 
 aaudio_result_t AAudioServiceEndpoint::registerStream(sp<AAudioServiceStreamBase>stream) {
