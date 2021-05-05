@@ -2846,6 +2846,11 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                         case STOPPING:
                         {
                             if (mFlags & kFlagSawMediaServerDie) {
+                                bool postPendingReplies = true;
+                                if (mState == RELEASING && !mReplyID) {
+                                    ALOGD("Releasing asynchronously, so nothing to reply here.");
+                                    postPendingReplies = false;
+                                }
                                 // MediaServer died, there definitely won't
                                 // be a shutdown complete notification after
                                 // all.
@@ -2857,7 +2862,9 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                                 if (mState == RELEASING) {
                                     mComponentName.clear();
                                 }
-                                postPendingRepliesAndDeferredMessages(origin + ":dead");
+                                if (postPendingReplies) {
+                                    postPendingRepliesAndDeferredMessages(origin + ":dead");
+                                }
                                 sendErrorResponse = false;
                             } else if (!mReplyID) {
                                 sendErrorResponse = false;
