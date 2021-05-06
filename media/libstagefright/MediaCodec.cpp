@@ -1333,16 +1333,12 @@ status_t MediaCodec::configure(
     // the reclaimResource call doesn't consider the requester's buffer size for now.
     resources.push_back(MediaResource::GraphicMemoryResource(1));
     for (int i = 0; i <= kMaxRetry; ++i) {
-        if (i > 0) {
-            // Don't try to reclaim resource for the first time.
-            if (!mResourceManagerProxy->reclaimResource(resources)) {
-                break;
-            }
-        }
-
         sp<AMessage> response;
         err = PostAndAwaitResponse(msg, &response);
         if (err != OK && err != INVALID_OPERATION) {
+            if (isResourceError(err) && !mResourceManagerProxy->reclaimResource(resources)) {
+                break;
+            }
             // MediaCodec now set state to UNINITIALIZED upon any fatal error.
             // To maintain backward-compatibility, do a reset() to put codec
             // back into INITIALIZED state.
