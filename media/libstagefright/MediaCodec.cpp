@@ -3695,7 +3695,8 @@ void MediaCodec::handleOutputFormatChangeIfNeeded(const sp<MediaCodecBuffer> &bu
         // format as necessary.
         int32_t flags = 0;
         (void) buffer->meta()->findInt32("flags", &flags);
-        if ((flags & BUFFER_FLAG_CODECCONFIG) && !(mFlags & kFlagIsSecure)) {
+        if ((flags & BUFFER_FLAG_CODECCONFIG) && !(mFlags & kFlagIsSecure)
+                && !mOwnerName.startsWith("codec2::")) {
             status_t err =
                 amendOutputFormatWithCodecSpecificData(buffer);
 
