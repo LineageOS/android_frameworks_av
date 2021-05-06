@@ -143,7 +143,7 @@ c2_status_t C2SoftAmrDec::onStop() {
     if (!mIsWide) {
         Speech_Decode_Frame_reset(mAmrHandle);
     } else {
-        pvDecoder_AmrWb_Reset(mAmrHandle, 0 /* reset_all */);
+        pvDecoder_AmrWb_Reset(mAmrHandle, 1 /* reset_all */);
     }
     mSignalledError = false;
     mSignalledOutputEos = false;
