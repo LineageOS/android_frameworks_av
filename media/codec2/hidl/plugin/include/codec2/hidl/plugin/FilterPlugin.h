@@ -57,6 +57,15 @@ public:
      * current configuration; false if it will be no-op.
      */
     virtual bool isFilteringEnabled(const std::shared_ptr<C2ComponentInterface> &intf) = 0;
+
+    /**
+     * Query parameters to |intf|, which the component wants applied to
+     * the previous component in the chain. For example, an image/video filter
+     * may require specific usage or pixel format from the previous component.
+     */
+    virtual c2_status_t queryParamsForPreviousComponent(
+            const std::shared_ptr<C2ComponentInterface> &intf,
+            std::vector<std::unique_ptr<C2Param>> *params) = 0;
 };
 
 }  // namespace android
