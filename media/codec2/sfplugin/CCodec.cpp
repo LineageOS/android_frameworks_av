@@ -2341,12 +2341,43 @@ void CCodec::initiateReleaseIfStuck() {
         }
     }
     bool tunneled = false;
+    bool isMediaTypeKnown = false;
     {
+        static const std::set<std::string> kKnownMediaTypes{
+            MIMETYPE_VIDEO_VP8,
+            MIMETYPE_VIDEO_VP9,
+            MIMETYPE_VIDEO_AV1,
+            MIMETYPE_VIDEO_AVC,
+            MIMETYPE_VIDEO_HEVC,
+            MIMETYPE_VIDEO_MPEG4,
+            MIMETYPE_VIDEO_H263,
+            MIMETYPE_VIDEO_MPEG2,
+            MIMETYPE_VIDEO_RAW,
+            MIMETYPE_VIDEO_DOLBY_VISION,
+
+            MIMETYPE_AUDIO_AMR_NB,
+            MIMETYPE_AUDIO_AMR_WB,
+            MIMETYPE_AUDIO_MPEG,
+            MIMETYPE_AUDIO_AAC,
+            MIMETYPE_AUDIO_QCELP,
+            MIMETYPE_AUDIO_VORBIS,
+            MIMETYPE_AUDIO_OPUS,
+            MIMETYPE_AUDIO_G711_ALAW,
+            MIMETYPE_AUDIO_G711_MLAW,
+            MIMETYPE_AUDIO_RAW,
+            MIMETYPE_AUDIO_FLAC,
+            MIMETYPE_AUDIO_MSGSM,
+            MIMETYPE_AUDIO_AC3,
+            MIMETYPE_AUDIO_EAC3,
+
+            MIMETYPE_IMAGE_ANDROID_HEIC,
+        };
         Mutexed<std::unique_ptr<Config>>::Locked configLocked(mConfig);
         const std::unique_ptr<Config> &config = *configLocked;
         tunneled = config->mTunneled;
+        isMediaTypeKnown = (kKnownMediaTypes.count(config->mCodingMediaType) != 0);
     }
-    if (!tunneled && name.empty()) {
+    if (!tunneled && isMediaTypeKnown && name.empty()) {
         constexpr std::chrono::steady_clock::duration kWorkDurationThreshold = 3s;
         std::chrono::steady_clock::duration elapsed = mChannel->elapsed();
         if (elapsed >= kWorkDurationThreshold) {
