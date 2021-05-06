@@ -349,3 +349,47 @@ TEST(MediaCodecTest, ErrorWhileStopping) {
     codec->release();
     looper->stop();
 }
+
+TEST(MediaCodecTest, DeadWhileAsyncReleasing) {
+    // Test scenario:
+    //
+    // 1) Client thread calls release(); MediaCodec looper thread calls
+    //    initiateShutdown(); shutdown is being handled at the component thread.
+    // 2) Codec service died during the shutdown operation.
+    // 3) MediaCodec looper thread handles the death.
+
+    static const AString kCodecName{"test.codec"};
+    static const AString kCodecOwner{"nobody"};
+    static const AString kMediaType{"video/x-test"};
+
+    sp<MockCodec> mockCodec;
+    std::function<sp<CodecBase>(const AString &name, const char *owner)> getCodecBase =
+        [&mockCodec](const AString &, const char *) {
+            mockCodec = new MockCodec([](const std::shared_ptr<MockBufferChannel> &) {
+                // No mock setup, as we don't expect any buffer operations
+                // in this scenario.
+            });
+            ON_CALL(*mockCodec, initiateAllocateComponent(_))
+                .WillByDefault([mockCodec](const sp<AMessage> &) {
+                    mockCodec->callback()->onComponentAllocated(kCodecName.c_str());
+                });
+            ON_CALL(*mockCodec, initiateShutdown(_))
+                .WillByDefault([mockCodec](bool) {
+                    // 2)
+                    mockCodec->callback()->onError(DEAD_OBJECT, ACTION_CODE_FATAL);
+                    // Codec service has died, no callback.
+                });
+            return mockCodec;
+        };
+
+    sp<ALooper> looper{new ALooper};
+    sp<MediaCodec> codec = SetupMediaCodec(
+            kCodecOwner, kCodecName, kMediaType, looper, getCodecBase);
+    ASSERT_NE(nullptr, codec) << "Codec must not be null";
+    ASSERT_NE(nullptr, mockCodec) << "MockCodec must not be null";
+
+    codec->releaseAsync(new AMessage);
+    // sleep here so that the looper thread can handle the error
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    looper->stop();
+}
