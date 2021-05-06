@@ -56,7 +56,8 @@ public:
 
     /* Create a patch between several source and sink ports */
     status_t createAudioPatch(const struct audio_patch *patch,
-                                       audio_patch_handle_t *handle);
+                              audio_patch_handle_t *handle,
+                              bool endpointPatch = false);
 
     /* Release a patch */
     status_t releaseAudioPatch(audio_patch_handle_t handle);
@@ -161,7 +162,8 @@ public:
 
     class Patch final {
     public:
-        explicit Patch(const struct audio_patch &patch) : mAudioPatch(patch) {}
+        Patch(const struct audio_patch &patch, bool endpointPatch) :
+            mAudioPatch(patch), mIsEndpointPatch(endpointPatch) {}
         Patch() = default;
         ~Patch();
         Patch(const Patch& other) noexcept {
@@ -170,6 +172,7 @@ public:
             mPlayback = other.mPlayback;
             mRecord = other.mRecord;
             mThread = other.mThread;
+            mIsEndpointPatch = other.mIsEndpointPatch;
         }
         Patch(Patch&& other) noexcept { swap(other); }
         Patch& operator=(Patch&& other) noexcept {
@@ -184,6 +187,7 @@ public:
             swap(mPlayback, other.mPlayback);
             swap(mRecord, other.mRecord);
             swap(mThread, other.mThread);
+            swap(mIsEndpointPatch, other.mIsEndpointPatch);
         }
 
         friend void swap(Patch &a, Patch &b) noexcept {
@@ -218,6 +222,7 @@ public:
         Endpoint<RecordThread, RecordThread::PatchRecord> mRecord;
 
         wp<ThreadBase> mThread;
+        bool mIsEndpointPatch;
     };
 
     // Call with AudioFlinger mLock held
