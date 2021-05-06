@@ -236,10 +236,18 @@ struct id3_header {
     // first handle global unsynchronization
     bool hasGlobalUnsync = false;
     if (header.flags & 0x80) {
-        ALOGV("removing unsynchronization");
-
+        ALOGV("has Global unsynchronization");
         hasGlobalUnsync = true;
-        removeUnsynchronization();
+        // we have to wait on applying global unsynchronization to V2.4 frames
+        // if we apply it now, the length information within any V2.4 frames goes bad
+        // Removing unsynchronization shrinks the buffer, but lengths (stored in safesync
+        // format) stored within the frame reflect "pre-shrinking" totals.
+
+        // we can (and should) apply the non-2.4 synch now.
+        if ( header.version_major != 4) {
+            ALOGV("Apply global unsync for non V2.4 frames");
+            removeUnsynchronization();
+        }
     }
 
     // handle extended header, if present
@@ -329,9 +337,10 @@ struct id3_header {
     // Handle any v2.4 per-frame unsynchronization
     // The id3 spec isn't clear about what should happen if the global
     // unsynchronization flag is combined with per-frame unsynchronization,
-    // or whether that's even allowed, so this code assumes id3 writing
-    // tools do the right thing and not apply double-unsynchronization,
-    // but will honor the flags if they are set.
+    // or whether that's even allowed. We choose a "no more than 1 unsynchronization"
+    // semantic; the V2_4 unsynchronizer gets a copy of the global flag so it can handle
+    // this possible ambiquity.
+    //
     if (header.version_major == 4) {
         void *copy = malloc(size);
         if (copy == NULL) {
@@ -365,7 +374,6 @@ struct id3_header {
             return false;
         }
     }
-
 
 
     if (header.version_major == 2) {
@@ -445,7 +453,11 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack, bool hasGlobalUnsync) {
             flags &= ~1;
         }
 
-        if (!hasGlobalUnsync && (flags & 2) && (dataSize >= 2)) {
+        ALOGV("hasglobal %d  flags&2 %d", hasGlobalUnsync, flags&2);
+        if (hasGlobalUnsync && !(flags & 2)) {
+            ALOGV("OOPS: global unsync set, but per-frame NOT set; removing unsync anyway");
+        }
+        if ((hasGlobalUnsync || (flags & 2)) && (dataSize >= 2)) {
             // This frame has "unsynchronization", so we have to replace occurrences
             // of 0xff 0x00 with just 0xff in order to get the real data.
 
@@ -472,7 +484,6 @@ bool ID3::removeUnsynchronizationV2_4(bool iTunesHack, bool hasGlobalUnsync) {
                 ALOGE("b/34618607 (%zu %zu %zu %zu)", readOffset, writeOffset, oldSize, mSize);
                 android_errorWriteLog(0x534e4554, "34618607");
             }
-
         }
         flags &= ~2;
         if (flags != prevFlags || iTunesHack) {
