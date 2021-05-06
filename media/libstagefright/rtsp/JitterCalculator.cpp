@@ -25,45 +25,63 @@ namespace android {
 
 JitterCalc::JitterCalc(int32_t clockRate)
     : mClockRate(clockRate) {
-    init();
+    init(0, 0, 0, 0);
 }
 
-void JitterCalc::init() {
-    mJitterValueUs = 0;
-    mLastTimeStamp = 0;
-    mLastArrivalTimeUs = 0;
+void JitterCalc::init(uint32_t rtpTime, int64_t arrivalTimeUs, int32_t base, int32_t inter) {
+    mFirstTimeStamp = rtpTime;
+    mLastTimeStamp = rtpTime;
+    mFirstArrivalTimeUs = arrivalTimeUs;
+    mLastArrivalTimeUs = arrivalTimeUs;
+
+    mBaseJitterUs = base;
+    mInterArrivalJitterUs = inter;
 }
 
-void JitterCalc::putData(int64_t rtpTime, int64_t arrivalTimeUs) {
-    if (mLastTimeStamp == 0) {
-        mLastTimeStamp = rtpTime;
-        mLastArrivalTimeUs = arrivalTimeUs;
-    }
-
+void JitterCalc::putBaseData(int64_t rtpTime, int64_t arrivalTimeUs) {
+    // A RTP time wraps around after UINT32_MAX. We must consider this case.
     const int64_t UINT32_MSB = 0x80000000;
+    int64_t overflowMask = (mFirstTimeStamp & UINT32_MSB & ~rtpTime) << 1;
+    int64_t tempRtpTime = overflowMask | rtpTime;
+
+    // Base jitter implementation can be various
+    int64_t scheduledTimeUs = (tempRtpTime - (int64_t)mFirstTimeStamp) * 1000000ll / mClockRate;
+    int64_t elapsedTimeUs = arrivalTimeUs - mFirstArrivalTimeUs;
+    int64_t correctionTimeUs = elapsedTimeUs - scheduledTimeUs; // additional propagation delay;
+    mBaseJitterUs = (mBaseJitterUs * 15 + correctionTimeUs) / 16;
+    ALOGV("BaseJitterUs : %lld \t\t correctionTimeUs : %lld",
+            (long long)mBaseJitterUs, (long long)correctionTimeUs);
+}
+
+void JitterCalc::putInterArrivalData(int64_t rtpTime, int64_t arrivalTimeUs) {
+    const int64_t UINT32_MSB = 0x80000000;
+    int64_t tempRtpTime = rtpTime;
     int64_t tempLastTimeStamp = mLastTimeStamp;
+
     // A RTP time wraps around after UINT32_MAX. We must consider this case.
     int64_t overflowMask = (mLastTimeStamp ^ rtpTime) & UINT32_MSB;
-    rtpTime |= ((overflowMask & ~rtpTime) << 1);
+    tempRtpTime |= ((overflowMask & ~rtpTime) << 1);
     tempLastTimeStamp |= ((overflowMask & ~mLastTimeStamp) << 1);
-    ALOGV("Raw stamp \t\t now %llx \t\t last %llx",
-            (long long)rtpTime, (long long)tempLastTimeStamp);
-
-    int64_t diffTimeStampUs = abs(rtpTime - tempLastTimeStamp) * 1000000ll / mClockRate;
-    int64_t diffArrivalUs = abs(arrivalTimeUs - mLastArrivalTimeUs);
-    ALOGV("diffTimeStampus %lld \t\t diffArrivalUs %lld",
-            (long long)diffTimeStampUs, (long long)diffArrivalUs);
 
     // 6.4.1 of RFC3550 defines this interarrival jitter value.
-    mJitterValueUs = (mJitterValueUs * 15 + abs(diffTimeStampUs - diffArrivalUs)) / 16;
-    ALOGV("JitterUs %lld", (long long)mJitterValueUs);
+    int64_t diffTimeStampUs = abs(tempRtpTime - tempLastTimeStamp) * 1000000ll / mClockRate;
+    int64_t diffArrivalUs = arrivalTimeUs - mLastArrivalTimeUs; // Can't be minus
+    ALOGV("diffTimeStampUs %lld \t\t diffArrivalUs %lld",
+            (long long)diffTimeStampUs, (long long)diffArrivalUs);
+
+    int64_t varianceUs = diffArrivalUs - diffTimeStampUs;
+    mInterArrivalJitterUs = (mInterArrivalJitterUs * 15 + abs(varianceUs)) / 16;
 
     mLastTimeStamp = (uint32_t)rtpTime;
     mLastArrivalTimeUs = arrivalTimeUs;
 }
 
-uint32_t JitterCalc::getJitterMs() {
-    return mJitterValueUs / 1000;
+int32_t JitterCalc::getBaseJitterMs() {
+    return mBaseJitterUs / 1000;
+}
+
+int32_t JitterCalc::getInterArrivalJitterMs() {
+    return mInterArrivalJitterUs / 1000;
 }
 
 }   // namespace android
