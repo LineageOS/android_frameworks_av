@@ -289,13 +289,14 @@ c2_status_t C2SoftAacDec::onStop() {
     mOutputDelayRingBufferFilled = 0;
     mBuffersInfo.clear();
 
-    // To make the codec behave the same before and after a reset, we need to invalidate the
-    // streaminfo struct. This does that:
-    mStreamInfo->sampleRate = 0; // TODO: mStreamInfo is read only
-
+    status_t status = UNKNOWN_ERROR;
+    if (mAACDecoder) {
+        aacDecoder_Close(mAACDecoder);
+        status = initDecoder();
+    }
     mSignalledError = false;
 
-    return C2_OK;
+    return status == OK ? C2_OK : C2_CORRUPTED;
 }
 
 void C2SoftAacDec::onReset() {
