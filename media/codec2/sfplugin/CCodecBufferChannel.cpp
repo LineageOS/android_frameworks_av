@@ -1993,6 +1993,12 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
+    if (worklet->output.flags & C2FrameData::FLAG_DROP_FRAME) {
+        ALOGV("[%s] onWorkDone: drop output buffer (%lld)",
+              mName, work->input.ordinal.frameIndex.peekull());
+        notifyClient = false;
+    }
+
     if (notifyClient && !buffer && !flags) {
         ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
