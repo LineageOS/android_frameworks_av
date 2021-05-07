@@ -52,9 +52,6 @@ bool statsd_extractor(const std::shared_ptr<const mediametrics::Item>& item,
     //
     ::android::stats::mediametrics::ExtractorData metrics_proto;
 
-    // flesh out the protobuf we'll hand off with our data
-    //
-
     std::string format;
     if (item->getString("android.media.mediaextractor.fmt", &format)) {
         metrics_proto.set_format(format);
@@ -86,7 +83,6 @@ bool statsd_extractor(const std::shared_ptr<const mediametrics::Item>& item,
       metrics_proto.set_entry_point(entry_point);
     }
 
-    // android.media.mediaextractor.logSessionId        string
     std::string log_session_id;
     if (item->getString("android.media.mediaextractor.logSessionId", &log_session_id)) {
         metrics_proto.set_log_session_id(log_session_id);
