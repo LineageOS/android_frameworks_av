@@ -221,6 +221,11 @@ void C2SoftFlacDec::process(
 
     uint8_t *input = const_cast<uint8_t *>(rView.data() + inOffset);
     if (codecConfig) {
+        if (mHasStreamInfo) {
+            ALOGV("Ignore Codec Config");
+            fillEmptyWork(work);
+            return;
+        }
         status_t decoderErr = mFLACDecoder->parseMetadata(input, inSize);
         if (decoderErr != OK && decoderErr != WOULD_BLOCK) {
             ALOGE("process: FLACDecoder parseMetaData returns error %d", decoderErr);
