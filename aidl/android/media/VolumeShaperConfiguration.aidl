@@ -24,10 +24,10 @@ import android.media.VolumeShaperConfigurationType;
  * {@hide}
  */
 parcelable VolumeShaperConfiguration {
-    VolumeShaperConfigurationType type;
+    VolumeShaperConfigurationType type = VolumeShaperConfigurationType.ID;
     int id;
     /** Bitmask, indexed by VolumeShaperConfigurationOptionFlag. */
     int optionFlags;
     double durationMs;
-    InterpolatorConfig interpolatorConfig;
+    @nullable InterpolatorConfig interpolatorConfig; // null if type == ID
 }
