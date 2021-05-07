@@ -302,7 +302,8 @@ public:
             if (mType != TYPE_ID) {
                 parcelable->optionFlags = getOptionFlagsAsAidl();
                 parcelable->durationMs = getDurationMs();
-                Interpolator<S, T>::writeToConfig(&parcelable->interpolatorConfig);
+                parcelable->interpolatorConfig.emplace(); // create value in std::optional
+                Interpolator<S, T>::writeToConfig(&*parcelable->interpolatorConfig);
             }
         }
 
@@ -319,8 +320,10 @@ public:
                       ? NO_ERROR
                       : setOptionFlagsFromAidl(parcelable.optionFlags)
                         ?: setDurationMs(parcelable.durationMs)
-                           ?: Interpolator<S, T>::readFromConfig(parcelable.interpolatorConfig)
-                              ?: checkCurve();
+                           ?: !parcelable.interpolatorConfig  // check std::optional for value
+                               ? BAD_VALUE // must be nonnull.
+                               : Interpolator<S, T>::readFromConfig(*parcelable.interpolatorConfig)
+                                   ?: checkCurve();
         }
 
         // Returns a string for debug printing.

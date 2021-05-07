@@ -22,7 +22,7 @@ import android.media.InterpolatorType;
  * {@hide}
  */
 parcelable InterpolatorConfig {
-    InterpolatorType type;
+    InterpolatorType type = InterpolatorType.CUBIC;
     /** For cubic interpolation, the boundary conditions in slope. */
     float firstSlope;
     float lastSlope;
