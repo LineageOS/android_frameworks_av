@@ -114,6 +114,16 @@ public:
             }
             return info && info.transfer == C2Color::TRANSFER_170M;
         }
+
+        static c2_status_t QueryParamsForPreviousComponent(
+                [[maybe_unused]] const std::shared_ptr<C2ComponentInterface> &intf,
+                std::vector<std::unique_ptr<C2Param>> *params) {
+            params->emplace_back(new C2StreamUsageTuning::output(
+                    0u, C2AndroidMemoryUsage::HW_TEXTURE_READ));
+            params->emplace_back(new C2StreamPixelFormatInfo::output(
+                    0u, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED));
+            return C2_OK;
+        }
     private:
         const c2_node_id_t mId;
         std::shared_ptr<C2ReflectorHelper> mReflector;
@@ -944,6 +954,16 @@ public:
             return SampleToneMappingFilter::Interface::IsFilteringEnabled(intf);
         }
         return false;
+    }
+
+    c2_status_t queryParamsForPreviousComponent(
+            const std::shared_ptr<C2ComponentInterface> &intf,
+            std::vector<std::unique_ptr<C2Param>> *params) override {
+        if (intf->getName() == SampleToneMappingFilter::Interface::NAME) {
+            return SampleToneMappingFilter::Interface::QueryParamsForPreviousComponent(
+                    intf, params);
+        }
+        return C2_BAD_VALUE;
     }
 
 private:

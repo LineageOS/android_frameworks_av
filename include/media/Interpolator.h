@@ -43,7 +43,7 @@ public:
     using InterpolatorType  = media::InterpolatorType;
 
     explicit Interpolator(
-            InterpolatorType interpolatorType = InterpolatorType::LINEAR,
+            InterpolatorType interpolatorType = InterpolatorType::CUBIC,
             bool cache = true)
         : mCache(cache)
         , mFirstSlope(0)
