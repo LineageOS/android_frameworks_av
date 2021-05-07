@@ -735,6 +735,9 @@ private:
 
         status_t getAudioPort(struct audio_port_v7 *port) override;
 
+        status_t updateSecondaryOutputs(
+                const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
+
      private:
         AudioPolicyService *mAudioPolicyService;
     };
