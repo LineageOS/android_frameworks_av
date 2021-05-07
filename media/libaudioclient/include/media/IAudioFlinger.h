@@ -26,12 +26,14 @@
 #include <binder/IInterface.h>
 #include <media/AidlConversion.h>
 #include <media/AudioClient.h>
+#include <media/AudioCommonTypes.h>
 #include <media/DeviceDescriptorBase.h>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/String8.h>
 #include <media/MicrophoneInfo.h>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -55,6 +57,7 @@
 #include "android/media/OpenInputResponse.h"
 #include "android/media/OpenOutputRequest.h"
 #include "android/media/OpenOutputResponse.h"
+#include "android/media/TrackSecondaryOutputInfo.h"
 
 namespace android {
 
@@ -338,6 +341,9 @@ public:
     // The values will be used to initialize HapticGenerator.
     virtual status_t setVibratorInfos(
             const std::vector<media::AudioVibratorInfo>& vibratorInfos) = 0;
+
+    virtual status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
 };
 
 /**
@@ -430,6 +436,8 @@ public:
     status_t getMicrophones(std::vector<media::MicrophoneInfo>* microphones) override;
     status_t setAudioHalPids(const std::vector<pid_t>& pids) override;
     status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
 
 private:
     const sp<media::IAudioFlingerService> mDelegate;
@@ -513,6 +521,7 @@ public:
             SET_EFFECT_SUSPENDED = media::BnAudioFlingerService::TRANSACTION_setEffectSuspended,
             SET_AUDIO_HAL_PIDS = media::BnAudioFlingerService::TRANSACTION_setAudioHalPids,
             SET_VIBRATOR_INFOS = media::BnAudioFlingerService::TRANSACTION_setVibratorInfos,
+            UPDATE_SECONDARY_OUTPUTS = media::BnAudioFlingerService::TRANSACTION_updateSecondaryOutputs,
         };
 
         /**
@@ -619,6 +628,8 @@ public:
     Status getMicrophones(std::vector<media::MicrophoneInfoData>* _aidl_return) override;
     Status setAudioHalPids(const std::vector<int32_t>& pids) override;
     Status setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
+    Status updateSecondaryOutputs(
+            const std::vector<media::TrackSecondaryOutputInfo>& trackSecondaryOutputInfos) override;
 
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;

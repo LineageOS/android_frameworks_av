@@ -81,7 +81,8 @@ public:
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 /** default behaviour is to start when there are as many frames
                                   * ready as possible (aka. Buffer is full). */
-                                size_t frameCountToBeReady = SIZE_MAX);
+                                size_t frameCountToBeReady = SIZE_MAX,
+                                float speed = 1.0f);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
@@ -183,6 +184,9 @@ public:
                    mAudioTrackServerProxy->getUnderrunFrames());
        }
     }
+
+    audio_output_flags_t getOutputFlags() const { return mFlags; }
+    float getSpeed() const { return mSpeed; }
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -311,6 +315,7 @@ private:
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
     TeePatches  mTeePatches;
+    const float         mSpeed;
 };  // end of Track
 
 

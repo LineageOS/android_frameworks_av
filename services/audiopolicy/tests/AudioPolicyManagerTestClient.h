@@ -134,6 +134,11 @@ public:
     size_t getRoutingUpdatedCounter() const {
         return mRoutingUpdatedUpdateCount; }
 
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
+        return NO_ERROR;
+    }
+
 private:
     audio_module_handle_t mNextModuleHandle = AUDIO_MODULE_HANDLE_NONE + 1;
     audio_io_handle_t mNextIoHandle = AUDIO_IO_HANDLE_NONE + 1;

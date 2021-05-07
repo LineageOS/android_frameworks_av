@@ -272,6 +272,9 @@ public:
 
     virtual status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
 
+    virtual status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs);
+
     status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
         const std::function<status_t()>& delegate) override;
 
@@ -774,6 +777,11 @@ using effect_buffer_t = int16_t;
               sp<ThreadBase> getEffectThread_l(audio_session_t sessionId, int effectId);
 
               ThreadBase *hapticPlaybackThread_l() const;
+
+              void updateSecondaryOutputsForTrack_l(
+                      PlaybackThread::Track* track,
+                      PlaybackThread* thread,
+                      const std::vector<audio_io_handle_t>& secondaryOutputs) const;
 
 
                 void        removeClient_l(pid_t pid);
