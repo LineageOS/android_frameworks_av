@@ -2587,7 +2587,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
         case FOURCC("dvcC"):
         case FOURCC("dvvC"): {
 
-            CHECK_EQ(chunk_data_size, 24);
+            if (chunk_data_size != 24) {
+                return ERROR_MALFORMED;
+            }
 
             auto buffer = heapbuffer<uint8_t>(chunk_data_size);
 
