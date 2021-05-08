@@ -39,7 +39,6 @@ namespace android {
 bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
         const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
-    static constexpr bool enabled_statsd = true; // TODO: Remove, dup with dump2StatsdInternal().
     if (item == nullptr) return false;
 
     const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
@@ -82,28 +81,25 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
     std::string logSessionId;
     item->getString("android.media.mediaparser.logSessionId", &logSessionId);
 
-    if (enabled_statsd) {
-        (void) android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
-                                   timestamp_nanos,
-                                   package_name.c_str(),
-                                   package_version_code,
-                                   parserName.c_str(),
-                                   createdByName,
-                                   parserPool.c_str(),
-                                   lastException.c_str(),
-                                   resourceByteCount,
-                                   durationMillis,
-                                   trackMimeTypes.c_str(),
-                                   trackCodecs.c_str(),
-                                   alteredParameters.c_str(),
-                                   videoWidth,
-                                   videoHeight,
-                                   logSessionId.c_str());
-    } else {
-        ALOGV("NOT sending MediaParser media metrics.");
-    }
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
+                               timestamp_nanos,
+                               package_name.c_str(),
+                               package_version_code,
+                               parserName.c_str(),
+                               createdByName,
+                               parserPool.c_str(),
+                               lastException.c_str(),
+                               resourceByteCount,
+                               durationMillis,
+                               trackMimeTypes.c_str(),
+                               trackCodecs.c_str(),
+                               alteredParameters.c_str(),
+                               videoWidth,
+                               videoHeight,
+                               logSessionId.c_str());
+
     std::stringstream log;
-    log << "result:" << "(result)" << " {"
+    log << "result:" << result << " {"
             << " mediametrics_mediaparser_reported:"
             << android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED
             << " timestamp_nanos:" << timestamp_nanos
