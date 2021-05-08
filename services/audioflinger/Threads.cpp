@@ -828,12 +828,16 @@ String8 channelMaskToString(audio_channel_mask_t mask, bool output) {
             if (mask & AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER) s.append("top-front-center, ");
             if (mask & AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT) s.append("top-front-right, ");
             if (mask & AUDIO_CHANNEL_OUT_TOP_BACK_LEFT) s.append("top-back-left, ");
-            if (mask & AUDIO_CHANNEL_OUT_TOP_BACK_CENTER) s.append("top-back-center, " );
-            if (mask & AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT) s.append("top-back-right, " );
-            if (mask & AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT) s.append("top-side-left, " );
-            if (mask & AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT) s.append("top-side-right, " );
-            if (mask & AUDIO_CHANNEL_OUT_HAPTIC_B) s.append("haptic-B, " );
-            if (mask & AUDIO_CHANNEL_OUT_HAPTIC_A) s.append("haptic-A, " );
+            if (mask & AUDIO_CHANNEL_OUT_TOP_BACK_CENTER) s.append("top-back-center, ");
+            if (mask & AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT) s.append("top-back-right, ");
+            if (mask & AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT) s.append("top-side-left, ");
+            if (mask & AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT) s.append("top-side-right, ");
+            if (mask & AUDIO_CHANNEL_OUT_BOTTOM_FRONT_LEFT) s.append("bottom-front-left, ");
+            if (mask & AUDIO_CHANNEL_OUT_BOTTOM_FRONT_CENTER) s.append("bottom-front-center, ");
+            if (mask & AUDIO_CHANNEL_OUT_BOTTOM_FRONT_RIGHT) s.append("bottom-front-right, ");
+            if (mask & AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2) s.append("low_frequency_2, ");
+            if (mask & AUDIO_CHANNEL_OUT_HAPTIC_B) s.append("haptic-B, ");
+            if (mask & AUDIO_CHANNEL_OUT_HAPTIC_A) s.append("haptic-A, ");
             if (mask & ~AUDIO_CHANNEL_OUT_ALL) s.append("unknown,  ");
         } else {
             if (mask & AUDIO_CHANNEL_IN_LEFT) s.append("left, ");
@@ -852,8 +856,8 @@ String8 channelMaskToString(audio_channel_mask_t mask, bool output) {
             if (mask & AUDIO_CHANNEL_IN_BACK_RIGHT) s.append("back-right, ");
             if (mask & AUDIO_CHANNEL_IN_CENTER) s.append("center, ");
             if (mask & AUDIO_CHANNEL_IN_LOW_FREQUENCY) s.append("low freq, ");
-            if (mask & AUDIO_CHANNEL_IN_TOP_LEFT) s.append("top-left, " );
-            if (mask & AUDIO_CHANNEL_IN_TOP_RIGHT) s.append("top-right, " );
+            if (mask & AUDIO_CHANNEL_IN_TOP_LEFT) s.append("top-left, ");
+            if (mask & AUDIO_CHANNEL_IN_TOP_RIGHT) s.append("top-right, ");
             if (mask & AUDIO_CHANNEL_IN_VOICE_UPLINK) s.append("voice-uplink, ");
             if (mask & AUDIO_CHANNEL_IN_VOICE_DNLINK) s.append("voice-dnlink, ");
             if (mask & ~AUDIO_CHANNEL_IN_ALL) s.append("unknown,  ");
