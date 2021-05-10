@@ -338,7 +338,7 @@ public:
     virtual     void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices);
     virtual     void        toAudioPortConfig(struct audio_port_config *config) = 0;
 
-    virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs = 0);
+    virtual     void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs);
 
 
 
@@ -1717,7 +1717,7 @@ public:
                                            audio_patch_handle_t *handle);
     virtual status_t    releaseAudioPatch_l(const audio_patch_handle_t handle);
             void        updateOutDevices(const DeviceDescriptorBaseVector& outDevices) override;
-            void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs = 0) override;
+            void        resizeInputBuffer_l(int32_t maxSharedAudioHistoryMs) override;
 
             void        addPatchTrack(const sp<PatchRecord>& record);
             void        deletePatchTrack(const sp<PatchRecord>& record);
@@ -1862,6 +1862,7 @@ private:
 
             DeviceDescriptorBaseVector          mOutDevices;
 
+            int32_t                             mMaxSharedAudioHistoryMs = 0;
             std::string                         mSharedAudioPackageName = {};
             int32_t                             mSharedAudioStartFrames = -1;
             audio_session_t                     mSharedAudioSessionId = AUDIO_SESSION_NONE;
