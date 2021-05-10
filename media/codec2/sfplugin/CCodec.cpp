@@ -515,7 +515,7 @@ void RevertOutputFormatIfNeeded(
 }
 
 void AmendOutputFormatWithCodecSpecificData(
-        const uint8_t *data, size_t size, const std::string mediaType,
+        const uint8_t *data, size_t size, const std::string &mediaType,
         const sp<AMessage> &outputFormat) {
     if (mediaType == MIMETYPE_VIDEO_AVC) {
         // Codec specific data should be SPS and PPS in a single buffer,
