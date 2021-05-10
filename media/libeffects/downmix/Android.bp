@@ -33,7 +33,6 @@ cc_library_shared {
     relative_install_path: "soundfx",
 
     cflags: [
-        "-DBUILD_FLOAT",
         "-fvisibility=hidden",
         "-Wall",
         "-Werror",
