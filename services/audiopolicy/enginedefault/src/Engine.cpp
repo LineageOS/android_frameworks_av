@@ -261,12 +261,8 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
     case STRATEGY_PHONE: {
         devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_HEARING_AID);
         if (!devices.isEmpty()) break;
-        devices = availableOutputDevices.getFirstDevicesFromTypes({
-                                                                  AUDIO_DEVICE_OUT_WIRED_HEADPHONE,
-                                                                  AUDIO_DEVICE_OUT_WIRED_HEADSET,
-                                                                  AUDIO_DEVICE_OUT_LINE,
-                                                                  AUDIO_DEVICE_OUT_USB_HEADSET,
-                                                                  AUDIO_DEVICE_OUT_USB_DEVICE});
+        devices = availableOutputDevices.getFirstDevicesFromTypes(
+                                          getLastRemovableMediaDevices());
         if (!devices.isEmpty()) break;
         devices = availableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_EARPIECE);
     } break;
