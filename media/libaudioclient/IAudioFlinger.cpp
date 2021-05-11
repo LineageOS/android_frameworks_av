@@ -749,10 +749,20 @@ status_t AudioFlingerClientAdapter::setVibratorInfos(
 AudioFlingerServerAdapter::AudioFlingerServerAdapter(
         const sp<AudioFlingerServerAdapter::Delegate>& delegate) : mDelegate(delegate) {}
 
-status_t AudioFlingerServerAdapter::onTransact(uint32_t code, const Parcel& data, Parcel* reply,
+status_t AudioFlingerServerAdapter::onTransact(uint32_t code,
+                                               const Parcel& data,
+                                               Parcel* reply,
                                                uint32_t flags) {
-    return mDelegate->onPreTransact(static_cast<Delegate::TransactionCode>(code), data, flags)
-           ?: BnAudioFlingerService::onTransact(code, data, reply, flags);
+    return mDelegate->onTransactWrapper(static_cast<Delegate::TransactionCode>(code),
+                                        data,
+                                        flags,
+                                        [&] {
+                                            return BnAudioFlingerService::onTransact(
+                                                    code,
+                                                    data,
+                                                    reply,
+                                                    flags);
+                                        });
 }
 
 status_t AudioFlingerServerAdapter::dump(int fd, const Vector<String16>& args) {
