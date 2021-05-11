@@ -44,6 +44,7 @@
 #include <cutils/properties.h>
 
 #include <algorithm>
+#include <regex>
 
 namespace android {
 
@@ -348,6 +349,14 @@ static int compareSoftwareCodecsFirst(const AString *name1, const AString *name2
 void MediaCodecList::findMatchingCodecs(
         const char *mime, bool encoder, uint32_t flags,
         Vector<AString> *matches) {
+    sp<AMessage> format;        // initializes as clear/null
+    findMatchingCodecs(mime, encoder, flags, format, matches);
+}
+
+//static
+void MediaCodecList::findMatchingCodecs(
+        const char *mime, bool encoder, uint32_t flags, sp<AMessage> format,
+        Vector<AString> *matches) {
     matches->clear();
 
     const sp<IMediaCodecList> list = getInstance();
@@ -368,20 +377,142 @@ void MediaCodecList::findMatchingCodecs(
 
         const sp<MediaCodecInfo> info = list->getCodecInfo(matchIndex);
         CHECK(info != nullptr);
+
         AString componentName = info->getCodecName();
+
+        if (!codecHandlesFormat(mime, info, format)) {
+            ALOGV("skipping codec '%s' which doesn't satisfy format %s",
+                  componentName.c_str(), format->debugString(2).c_str());
+            continue;
+        }
 
         if ((flags & kHardwareCodecsOnly) && isSoftwareCodec(componentName)) {
             ALOGV("skipping SW codec '%s'", componentName.c_str());
-        } else {
-            matches->push(componentName);
-            ALOGV("matching '%s'", componentName.c_str());
+            continue;
         }
+
+        matches->push(componentName);
+        ALOGV("matching '%s'", componentName.c_str());
     }
 
     if (flags & kPreferSoftwareCodecs ||
             property_get_bool("debug.stagefright.swcodec", false)) {
         matches->sort(compareSoftwareCodecsFirst);
     }
+}
+
+/*static*/
+bool MediaCodecList::codecHandlesFormat(const char *mime, sp<MediaCodecInfo> info,
+                                        sp<AMessage> format) {
+
+    if (format == nullptr) {
+        ALOGD("codecHandlesFormat: no format, so no extra checks");
+        return true;
+    }
+
+    sp<MediaCodecInfo::Capabilities> capabilities = info->getCapabilitiesFor(mime);
+
+    // ... no capabilities listed means 'handle it all'
+    if (capabilities == nullptr) {
+        ALOGD("codecHandlesFormat: no capabilities for refinement");
+        return true;
+    }
+
+    const sp<AMessage> &details = capabilities->getDetails();
+
+    // if parsing the capabilities fails, ignore this particular codec
+    // currently video-centric evaluation
+    //
+    // TODO: like to make it handle the same set of properties from
+    // MediaCodecInfo::isFormatSupported()
+    // not yet done here are:
+    //  profile, level, bitrate, features,
+
+    bool isVideo = false;
+    if (strncmp(mime, "video/", 6) == 0) {
+        isVideo = true;
+    }
+
+    if (isVideo) {
+        int width = -1;
+        int height = -1;
+
+        if (format->findInt32("height", &height) && format->findInt32("width", &width)) {
+
+            // is it within the supported size range of the codec?
+            AString sizeRange;
+            AString minSize,maxSize;
+            AString minWidth, minHeight;
+            AString maxWidth, maxHeight;
+            if (!details->findString("size-range", &sizeRange)
+                || !splitString(sizeRange, "-", &minSize, &maxSize)) {
+                ALOGW("Unable to parse size-range from codec info");
+                return false;
+            }
+            if (!splitString(minSize, "x", &minWidth, &minHeight)) {
+                if (!splitString(minSize, "*", &minWidth, &minHeight)) {
+                    ALOGW("Unable to parse size-range/min-size from codec info");
+                    return false;
+                }
+            }
+            if (!splitString(maxSize, "x", &maxWidth, &maxHeight)) {
+                if (!splitString(maxSize, "*", &maxWidth, &maxHeight)) {
+                    ALOGW("Unable to fully parse size-range/max-size from codec info");
+                    return false;
+                }
+            }
+
+            // strtol() returns 0 if unable to parse a number, which works for our later tests
+            int minW = strtol(minWidth.c_str(), NULL, 10);
+            int minH = strtol(minHeight.c_str(), NULL, 10);
+            int maxW = strtol(maxWidth.c_str(), NULL, 10);
+            int maxH = strtol(maxHeight.c_str(), NULL, 10);
+
+            if (minW == 0 || minH == 0 || maxW == 0 || maxH == 0) {
+                ALOGW("Unable to parse values from size-range from codec info");
+                return false;
+            }
+
+            // finally, comparison time
+            if (width < minW || width > maxW || height < minH || height > maxH) {
+                ALOGV("format %dx%d outside of allowed %dx%d-%dx%d",
+                      width, height, minW, minH, maxW, maxH);
+                // at this point, it's a rejection, UNLESS
+                // the codec allows swapping width and height
+                int32_t swappable;
+                if (!details->findInt32("feature-can-swap-width-height", &swappable)
+                    || swappable == 0) {
+                    return false;
+                }
+                // NB: deliberate comparison of height vs width limits (and width vs height)
+                if (height < minW || height > maxW || width < minH || width > maxH) {
+                    return false;
+                }
+            }
+
+            // @ 'alignment' [e.g. "2x2" which tells us that both dimensions must be even]
+            // no alignment == we're ok with anything
+            AString alignment, alignWidth, alignHeight;
+            if (details->findString("alignment", &alignment)) {
+                if (splitString(alignment, "x", &alignWidth, &alignHeight) ||
+                    splitString(alignment, "*", &alignWidth, &alignHeight)) {
+                    int wAlign = strtol(alignWidth.c_str(), NULL, 10);
+                    int hAlign = strtol(alignHeight.c_str(), NULL, 10);
+                    // strtol() returns 0 if failing to parse, treat as "no restriction"
+                    if (wAlign > 0 && hAlign > 0) {
+                         if ((width % wAlign) != 0 || (height % hAlign) != 0) {
+                            ALOGV("format dimensions %dx%d not aligned to %dx%d",
+                                 width, height, wAlign, hAlign);
+                            return false;
+                         }
+                    }
+                }
+            }
+        }
+    }
+
+    // haven't found a reason to discard this one
+    return true;
 }
 
 }  // namespace android
