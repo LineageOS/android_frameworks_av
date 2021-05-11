@@ -263,6 +263,18 @@ class Camera3Device :
     wp<camera3::StatusTracker> getStatusTracker() { return mStatusTracker; }
 
     /**
+     * The injection camera session to replace the internal camera
+     * session.
+     */
+    status_t injectCamera(const String8& injectedCamId,
+                          sp<CameraProviderManager> manager);
+
+    /**
+     * Stop the injection camera and restore to internal camera session.
+     */
+    status_t stopInjection();
+
+    /**
      * Helper functions to map between framework and HIDL values
      */
     static hardware::graphics::common::V1_0::PixelFormat mapToPixelFormat(int frameworkFormat);
@@ -362,6 +374,13 @@ class Camera3Device :
         status_t configureStreams(const camera_metadata_t *sessionParams,
                 /*inout*/ camera_stream_configuration_t *config,
                 const std::vector<uint32_t>& bufferSizes);
+
+        // The injection camera configures the streams to hal.
+        status_t configureInjectedStreams(
+                const camera_metadata_t* sessionParams,
+                /*inout*/ camera_stream_configuration_t* config,
+                const std::vector<uint32_t>& bufferSizes,
+                const CameraMetadata& cameraCharacteristics);
 
         // When the call succeeds, the ownership of acquire fences in requests is transferred to
         // HalInterface. More specifically, the current implementation will send the fence to
@@ -900,6 +919,9 @@ class Camera3Device :
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
         status_t setCameraMute(bool enabled);
+
+        status_t setHalInterface(sp<HalInterface> newHalInterface);
+
       protected:
 
         virtual bool threadLoop();
@@ -1320,6 +1342,75 @@ class Camera3Device :
 
     // Whether the HAL supports camera muting via test pattern
     bool mSupportCameraMute = false;
+
+    // Injection camera related methods.
+    class Camera3DeviceInjectionMethods : public virtual RefBase {
+      public:
+        Camera3DeviceInjectionMethods(wp<Camera3Device> parent);
+
+        ~Camera3DeviceInjectionMethods();
+
+        // Initialize the injection camera and generate an hal interface.
+        status_t injectionInitialize(
+                const String8& injectedCamId, sp<CameraProviderManager> manager,
+                const sp<
+                    android::hardware::camera::device::V3_2 ::ICameraDeviceCallback>&
+                    callback);
+
+        // Injection camera will replace the internal camera and configure streams
+        // when device is IDLE and request thread is paused.
+        status_t injectCamera(
+                camera3::camera_stream_configuration& injectionConfig,
+                std::vector<uint32_t>& injectionBufferSizes);
+
+        // Stop the injection camera and switch back to backup hal interface.
+        status_t stopInjection();
+
+        bool isInjecting();
+
+        const String8& getInjectedCamId() const;
+
+        void getInjectionConfig(/*out*/ camera3::camera_stream_configuration* injectionConfig,
+                /*out*/ std::vector<uint32_t>* injectionBufferSizes);
+
+      private:
+        // Configure the streams of injection camera, it need wait until the
+        // output streams are created and configured to the original camera before
+        // proceeding.
+        status_t injectionConfigureStreams(
+                camera3::camera_stream_configuration& injectionConfig,
+                std::vector<uint32_t>& injectionBufferSizes);
+
+        // Disconnect the injection camera and delete the hal interface.
+        void injectionDisconnectImpl();
+
+        // Use injection camera hal interface to replace and backup original
+        // camera hal interface.
+        status_t replaceHalInterface(sp<HalInterface> newHalInterface,
+                bool keepBackup);
+
+        wp<Camera3Device> mParent;
+
+        // Backup of the original camera hal interface.
+        sp<HalInterface> mBackupHalInterface;
+
+        // Generated injection camera hal interface.
+        sp<HalInterface> mInjectedCamHalInterface;
+
+        // Copy the configuration of the internal camera.
+        camera3::camera_stream_configuration mInjectionConfig;
+
+        // Copy the bufferSizes of the output streams of the internal camera.
+        std::vector<uint32_t> mInjectionBufferSizes;
+
+        // Synchronizes access to injection camera between initialize and
+        // disconnect.
+        Mutex mInjectionLock;
+
+        // The injection camera ID.
+        String8 mInjectedCamId;
+    };
+    sp<Camera3DeviceInjectionMethods> mInjectionMethods;
 
 }; // class Camera3Device
 
