@@ -2400,6 +2400,11 @@ void CCodec::initiateReleaseIfStuck() {
     C2String compName;
     {
         Mutexed<State>::Locked state(mState);
+        if (!state->comp) {
+            ALOGD("previous call to %s exceeded timeout "
+                  "and the component is already released", name.c_str());
+            return;
+        }
         compName = state->comp->getName();
     }
     ALOGW("[%s] previous call to %s exceeded timeout", compName.c_str(), name.c_str());
