@@ -82,6 +82,7 @@ cc_library_shared {
         "device3/RotateAndCropMapper.cpp",
         "device3/Camera3OutputStreamInterface.cpp",
         "device3/Camera3OutputUtils.cpp",
+        "device3/Camera3DeviceInjectionMethods.cpp",
         "gui/RingBufferConsumer.cpp",
         "hidl/AidlCameraDeviceCallbacks.cpp",
         "hidl/AidlCameraServiceListener.cpp",
