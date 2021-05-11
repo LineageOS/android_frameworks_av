@@ -104,6 +104,10 @@ struct MediaCodec : public AHandler {
             const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err = NULL,
             pid_t pid = kNoPid, uid_t uid = kNoUid);
 
+    static sp<MediaCodec> CreateByType(
+            const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err,
+            pid_t pid, uid_t uid, sp<AMessage> format);
+
     static sp<MediaCodec> CreateByComponentName(
             const sp<ALooper> &looper, const AString &name, status_t *err = NULL,
             pid_t pid = kNoPid, uid_t uid = kNoUid);
@@ -400,6 +404,7 @@ private:
     std::string mLastReplyOrigin;
     std::vector<sp<AMessage>> mDeferredMessages;
     uint32_t mFlags;
+    int64_t mPresentationTimeUs = 0;
     status_t mStickyError;
     sp<Surface> mSurface;
     SoftwareRenderer *mSoftRenderer;

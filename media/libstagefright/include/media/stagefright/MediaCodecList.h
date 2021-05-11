@@ -75,6 +75,16 @@ struct MediaCodecList : public BnMediaCodecList {
             uint32_t flags,
             Vector<AString> *matchingCodecs);
 
+    // add optional format, to further refine matching codecs
+    static void findMatchingCodecs(
+            const char *mime,
+            bool createEncoder,
+            uint32_t flags,
+            sp<AMessage> format,
+            Vector<AString> *matchingCodecs);
+
+    static bool codecHandlesFormat(const char *mime, sp<MediaCodecInfo> info, sp<AMessage> format);
+
     static bool isSoftwareCodec(const AString &componentName);
 
 private:
