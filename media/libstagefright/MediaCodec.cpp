@@ -638,12 +638,20 @@ void CodecCallback::onFirstTunnelFrameReady() {
 sp<MediaCodec> MediaCodec::CreateByType(
         const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid,
         uid_t uid) {
+    sp<AMessage> format;
+    return CreateByType(looper, mime, encoder, err, pid, uid, format);
+}
+
+sp<MediaCodec> MediaCodec::CreateByType(
+        const sp<ALooper> &looper, const AString &mime, bool encoder, status_t *err, pid_t pid,
+        uid_t uid, sp<AMessage> format) {
     Vector<AString> matchingCodecs;
 
     MediaCodecList::findMatchingCodecs(
             mime.c_str(),
             encoder,
             0,
+            format,
             &matchingCodecs);
 
     if (err != NULL) {
