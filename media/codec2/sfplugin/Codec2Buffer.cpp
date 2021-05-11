@@ -358,21 +358,22 @@ public:
                         break;
 
                     case COLOR_FormatYUVP010:
+                        // stride is in bytes
                         mediaImage->mPlane[mediaImage->Y].mOffset = 0;
                         mediaImage->mPlane[mediaImage->Y].mColInc = 2;
-                        mediaImage->mPlane[mediaImage->Y].mRowInc = stride * 2;
+                        mediaImage->mPlane[mediaImage->Y].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->Y].mHorizSubsampling = 1;
                         mediaImage->mPlane[mediaImage->Y].mVertSubsampling = 1;
 
-                        mediaImage->mPlane[mediaImage->U].mOffset = stride * vStride * 2;
+                        mediaImage->mPlane[mediaImage->U].mOffset = stride * vStride;
                         mediaImage->mPlane[mediaImage->U].mColInc = 4;
-                        mediaImage->mPlane[mediaImage->U].mRowInc = stride * 2;
+                        mediaImage->mPlane[mediaImage->U].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->U].mHorizSubsampling = 2;
                         mediaImage->mPlane[mediaImage->U].mVertSubsampling = 2;
 
-                        mediaImage->mPlane[mediaImage->V].mOffset = stride * vStride * 2 + 2;
+                        mediaImage->mPlane[mediaImage->V].mOffset = stride * vStride + 2;
                         mediaImage->mPlane[mediaImage->V].mColInc = 4;
-                        mediaImage->mPlane[mediaImage->V].mRowInc = stride * 2;
+                        mediaImage->mPlane[mediaImage->V].mRowInc = stride;
                         mediaImage->mPlane[mediaImage->V].mHorizSubsampling = 2;
                         mediaImage->mPlane[mediaImage->V].mVertSubsampling = 2;
                         if (tryWrapping) {
@@ -533,8 +534,8 @@ public:
                 mInitCheck = BAD_VALUE;
                 return;
             }
-            bufferSize += stride * vStride
-                    / plane.rowSampling / plane.colSampling * divUp(mAllocatedDepth, 8u);
+            // stride is in bytes
+            bufferSize += stride * vStride / plane.rowSampling / plane.colSampling;
         }
 
         mBackBufferSize = bufferSize;
@@ -787,8 +788,14 @@ sp<ConstGraphicBlockBuffer> ConstGraphicBlockBuffer::AllocateEmpty(
         ALOGD("format had no width / height");
         return nullptr;
     }
-    // NOTE: we currently only support YUV420 formats for byte-buffer mode.
-    sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * 3 / 2));
+    int32_t colorFormat = COLOR_FormatYUV420Flexible;
+    int32_t bpp = 12;  // 8(Y) + 2(U) + 2(V)
+    if (format->findInt32(KEY_COLOR_FORMAT, &colorFormat)) {
+        if (colorFormat == COLOR_FormatYUVP010) {
+            bpp = 24;  // 16(Y) + 4(U) + 4(V)
+        }
+    }
+    sp<ABuffer> aBuffer(alloc(align(width, 16) * align(height, 16) * bpp / 8));
     return new ConstGraphicBlockBuffer(
             format,
             aBuffer,
