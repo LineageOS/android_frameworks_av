@@ -516,18 +516,22 @@ public:
         };
 
         /**
-         * And optional hook, called on every transaction, before unparceling the data and
-         * dispatching to the respective method. Useful for bulk operations, such as logging or
-         * permission checks.
-         * If an error status is returned, the transaction will return immediately and will not be
-         * processed.
+         * And optional hook, called on every transaction, allowing additional operations to be
+         * performed before/after the unparceling  ofthe data and dispatching to the respective
+         * method. Useful for bulk operations, such as logging or permission checks.
+         * The implementer is responsible to invoke the provided delegate function, which is the
+         * actual onTransact(), unless an error occurs.
+         * By default, this is just a pass-through to the delegate.
          */
-        virtual status_t onPreTransact(TransactionCode code, const Parcel& data, uint32_t flags) {
+        virtual status_t onTransactWrapper(TransactionCode code,
+                                           const Parcel& data,
+                                           uint32_t flags,
+                                           const std::function<status_t()>& delegate) {
             (void) code;
             (void) data;
             (void) flags;
-            return OK;
-        };
+            return delegate();
+        }
 
         /**
          * An optional hook for implementing diagnostics dumping.
