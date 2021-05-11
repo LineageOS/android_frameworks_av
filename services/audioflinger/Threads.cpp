@@ -1798,8 +1798,14 @@ void AudioFlinger::ThreadBase::ActiveTracks<T>::updatePowerState(
 
 template <typename T>
 bool AudioFlinger::ThreadBase::ActiveTracks<T>::readAndClearHasChanged() {
-    const bool hasChanged = mHasChanged;
+    bool hasChanged = mHasChanged;
     mHasChanged = false;
+
+    for (const sp<T> &track : mActiveTracks) {
+        // Do not short-circuit as all hasChanged states must be reset
+        // as all the metadata are going to be sent
+        hasChanged |= track->readAndClearHasChanged();
+    }
     return hasChanged;
 }
 
@@ -1986,7 +1992,7 @@ AudioFlinger::PlaybackThread::~PlaybackThread()
 
 void AudioFlinger::PlaybackThread::onFirstRef()
 {
-    if (mOutput == nullptr || mOutput->stream == nullptr) {
+    if (!isStreamInitialized()) {
         ALOGE("The stream is not open yet"); // This should not happen.
     } else {
         // setEventCallback will need a strong pointer as a parameter. Calling it
@@ -2695,7 +2701,7 @@ String8 AudioFlinger::PlaybackThread::getParameters(const String8& keys)
 
 status_t AudioFlinger::DirectOutputThread::selectPresentation(int presentationId, int programId) {
     Mutex::Autolock _l(mLock);
-    if (mOutput == nullptr || mOutput->stream == nullptr) {
+    if (!isStreamInitialized()) {
         return NO_INIT;
     }
     return mOutput->stream->selectPresentation(presentationId, programId);
@@ -2992,16 +2998,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
 
 void AudioFlinger::PlaybackThread::updateMetadata_l()
 {
-    if (mOutput == nullptr || mOutput->stream == nullptr ) {
-        return; // That should not happen
-    }
-    bool hasChanged = mActiveTracks.readAndClearHasChanged();
-    for (const sp<Track> &track : mActiveTracks) {
-        // Do not short-circuit as all hasChanged states must be reset
-        // as all the metadata are going to be sent
-        hasChanged |= track->readAndClearHasChanged();
-    }
-    if (!hasChanged) {
+    if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
         return; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
@@ -8186,7 +8183,7 @@ status_t AudioFlinger::RecordThread::getActiveMicrophones(
 {
     ALOGV("RecordThread::getActiveMicrophones");
     AutoMutex _l(mLock);
-    if (mInput == nullptr || mInput->stream == nullptr) {
+    if (!isStreamInitialized()) {
         return NO_INIT;
     }
     status_t status = mInput->stream->getActiveMicrophones(activeMicrophones);
@@ -8198,7 +8195,7 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneDirection(
 {
     ALOGV("setPreferredMicrophoneDirection(%d)", direction);
     AutoMutex _l(mLock);
-    if (mInput == nullptr || mInput->stream == nullptr) {
+    if (!isStreamInitialized()) {
         return NO_INIT;
     }
     return mInput->stream->setPreferredMicrophoneDirection(direction);
@@ -8208,7 +8205,7 @@ status_t AudioFlinger::RecordThread::setPreferredMicrophoneFieldDimension(float 
 {
     ALOGV("setPreferredMicrophoneFieldDimension(%f)", zoom);
     AutoMutex _l(mLock);
-    if (mInput == nullptr || mInput->stream == nullptr) {
+    if (!isStreamInitialized()) {
         return NO_INIT;
     }
     return mInput->stream->setPreferredMicrophoneFieldDimension(zoom);
@@ -8259,9 +8256,8 @@ status_t AudioFlinger::RecordThread::shareAudioHistory_l(
 
 void AudioFlinger::RecordThread::updateMetadata_l()
 {
-    if (mInput == nullptr || mInput->stream == nullptr ||
-            !mActiveTracks.readAndClearHasChanged()) {
-        return;
+    if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
+        return; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<RecordTrack> &track : mActiveTracks) {
@@ -9959,14 +9955,16 @@ void AudioFlinger::MmapPlaybackThread::processVolume_l()
                 }
             }
         }
+        for (const sp<MmapTrack> &track : mActiveTracks) {
+            track->setMetadataHasChanged();
+        }
     }
 }
 
 void AudioFlinger::MmapPlaybackThread::updateMetadata_l()
 {
-    if (mOutput == nullptr || mOutput->stream == nullptr ||
-            !mActiveTracks.readAndClearHasChanged()) {
-        return;
+    if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
+        return; // nothing to do
     }
     StreamOutHalInterface::SourceMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
@@ -10093,9 +10091,8 @@ void AudioFlinger::MmapCaptureThread::processVolume_l()
 
 void AudioFlinger::MmapCaptureThread::updateMetadata_l()
 {
-    if (mInput == nullptr || mInput->stream == nullptr ||
-            !mActiveTracks.readAndClearHasChanged()) {
-        return;
+    if (!isStreamInitialized() || !mActiveTracks.readAndClearHasChanged()) {
+        return; // nothing to do
     }
     StreamInHalInterface::SinkMetadata metadata;
     for (const sp<MmapTrack> &track : mActiveTracks) {
