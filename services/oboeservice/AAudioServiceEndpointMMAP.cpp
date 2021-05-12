@@ -80,16 +80,21 @@ aaudio_result_t AAudioServiceEndpointMMAP::open(const aaudio::AAudioStreamReques
 
     audio_format_t audioFormat = getFormat();
 
-    // FLOAT is not directly supported by the HAL so ask for a 24-bit.
-    bool isHighResRequested = audioFormat == AUDIO_FORMAT_PCM_FLOAT
-            || audioFormat == AUDIO_FORMAT_PCM_32_BIT;
-    if (isHighResRequested) {
+    // FLOAT is not directly supported by the HAL so ask for a 32-bit.
+    if (audioFormat == AUDIO_FORMAT_PCM_FLOAT) {
         // TODO remove these logs when finished debugging.
-        ALOGD("%s() change format from %d to 24_BIT_PACKED", __func__, audioFormat);
-        audioFormat = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+        ALOGD("%s() change format from %d to 32_BIT", __func__, audioFormat);
+        audioFormat = AUDIO_FORMAT_PCM_32_BIT;
     }
 
     result = openWithFormat(audioFormat);
+    if (result == AAUDIO_OK) return result;
+
+    if (result == AAUDIO_ERROR_UNAVAILABLE && audioFormat == AUDIO_FORMAT_PCM_32_BIT) {
+        ALOGD("%s() 32_BIT failed, perhaps due to format. Try again with 24_BIT_PACKED", __func__);
+        audioFormat = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+        result = openWithFormat(audioFormat);
+    }
     if (result == AAUDIO_OK) return result;
 
     // TODO The HAL and AudioFlinger should be recommending a format if the open fails.
