@@ -46,7 +46,7 @@ struct ARTPConnection : public AHandler {
     void injectPacket(int index, const sp<ABuffer> &buffer);
 
     void setSelfID(const uint32_t selfID);
-    void setJbTime(const uint32_t jbTimeMs);
+    void setStaticJitterTimeMs(const uint32_t jbTimeMs);
     void setTargetBitrate(int32_t targetBitrate);
 
     // Creates a pair of UDP datagram sockets bound to adjacent ports
@@ -89,7 +89,7 @@ private:
     int32_t mSelfID;
     int32_t mTargetBitrate;
 
-    uint32_t mJbTimeMs;
+    uint32_t mStaticJitterTimeMs;
 
     int32_t mCumulativeBytes;
 
