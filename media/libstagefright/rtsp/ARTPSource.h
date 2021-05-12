@@ -27,7 +27,11 @@
 
 #include <map>
 
+#include "JitterCalculator.h"
+
 namespace android {
+
+const uint32_t kStaticJitterTimeMs = 50;   // 50ms
 
 struct ABuffer;
 struct AMessage;
@@ -64,8 +68,13 @@ struct ARTPSource : public RefBase {
     void setSeqNumToNACK(uint16_t seqNum, uint16_t mask, uint16_t nowJitterHeadSeqNum);
     uint32_t getSelfID();
     void setSelfID(const uint32_t selfID);
-    void setJbTime(const uint32_t jbTimeMs);
     void setPeriodicFIR(bool enable);
+
+    uint32_t getStaticJitterTimeMs();
+    uint32_t getDynamicJitterTimeMs();
+    void setStaticJitterTimeMs(const uint32_t jbTimeMs);
+    void putDynamicJitterData(uint32_t timeStamp, int64_t arrivalTime);
+
     bool isNeedToEarlyNotify();
     void notifyPktInfo(int32_t bitrate, bool isRegular);
     // FIR needs to be sent by missing packet or broken video image.
@@ -78,7 +87,6 @@ struct ARTPSource : public RefBase {
     int64_t mFirstSysTime;
     int32_t mClockRate;
 
-    uint32_t mJbTimeMs;
     int32_t mFirstSsrc;
     int32_t mHighestNackNumber;
 
@@ -95,6 +103,9 @@ private:
 
     List<sp<ABuffer> > mQueue;
     sp<ARTPAssembler> mAssembler;
+
+    uint32_t mStaticJbTimeMs;
+    sp<JitterCalc> mJitterCalc;
 
     typedef struct infoNACK {
         uint16_t seqNum;

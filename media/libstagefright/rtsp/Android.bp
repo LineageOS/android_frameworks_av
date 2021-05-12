@@ -36,6 +36,7 @@ cc_defaults {
         "ARTPWriter.cpp",
         "ARTSPConnection.cpp",
         "ASessionDescription.cpp",
+        "JitterCalculator.cpp",
         "SDPLoader.cpp",
     ],
 
