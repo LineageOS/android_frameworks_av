@@ -41,6 +41,8 @@
 
 namespace android {
 
+const double JITTER_MULTIPLE = 1.5f;
+
 // static
 AHEVCAssembler::AHEVCAssembler(const sp<AMessage> &notify)
     : mNotifyMsg(notify),
@@ -130,23 +132,51 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
 
     sp<ABuffer> buffer = *queue->begin();
     buffer->meta()->setObject("source", source);
+
     int64_t rtpTime = findRTPTime(firstRTPTime, buffer);
 
-    int64_t startTime = source->mFirstSysTime / 1000;
-    int64_t nowTime = ALooper::GetNowUs() / 1000;
-    int64_t playedTime = nowTime - startTime;
-    int64_t playedTimeRtp = source->mFirstRtpTime + playedTime * (int64_t)source->mClockRate / 1000;
-    const int64_t jitterTime = source->mJbTimeMs * (int64_t)source->mClockRate / 1000;
+    const int64_t startTimeMs = source->mFirstSysTime / 1000;
+    const int64_t nowTimeMs = ALooper::GetNowUs() / 1000;
+    const int64_t staticJbTimeMs = source->getStaticJitterTimeMs();
+    const int64_t dynamicJbTimeMs = source->getDynamicJitterTimeMs();
+    const int64_t clockRate = source->mClockRate;
 
-    int64_t expiredTimeInJb = rtpTime + jitterTime;
-    bool isExpired = expiredTimeInJb <= (playedTimeRtp);
-    bool isTooLate200 = expiredTimeInJb < (playedTimeRtp - jitterTime);
-    bool isTooLate300 = expiredTimeInJb < (playedTimeRtp - (jitterTime * 3 / 2));
+    int64_t playedTimeMs = nowTimeMs - startTimeMs;
+    int64_t playedTimeRtp = source->mFirstRtpTime + MsToRtp(playedTimeMs, clockRate);
+
+    /**
+     * Based on experience in real commercial network services,
+     * 300 ms is a maximum heuristic jitter buffer time for video RTP service.
+     */
+
+    /**
+     * The static(base) jitter is a kind of expected propagation time that we desire.
+     * We can drop packets if it doesn't meet our standards.
+     * If it gets shorter we can get faster response but can lose packets.
+     * Expecting range : 50ms ~ 1000ms (But 300 ms would be practical upper bound)
+     */
+    const int64_t baseJbTimeRtp = MsToRtp(staticJbTimeMs, clockRate);
+    /**
+     * Dynamic jitter is a variance of interarrival time as defined in the 6.4.1 of RFC 3550.
+     * We can regard this as a tolerance of every moments.
+     * Expecting range : 0ms ~ 150ms (Not to over 300 ms practically)
+     */
+    const int64_t dynamicJbTimeRtp =                        // Max 150
+            std::min(MsToRtp(dynamicJbTimeMs, clockRate), MsToRtp(150, clockRate));
+    const int64_t jitterTimeRtp = baseJbTimeRtp + dynamicJbTimeRtp; // Total jitter time
+
+    int64_t expiredTimeRtp = rtpTime + jitterTimeRtp;       // When does this buffer expire ? (T)
+    int64_t diffTimeRtp = playedTimeRtp - expiredTimeRtp;
+    bool isExpired = (diffTimeRtp >= 0);                    // It's expired if T is passed away
+    bool isFirstLineBroken = (diffTimeRtp > jitterTimeRtp); // (T + jitter) is a standard tolerance
+
+    int64_t finalMargin = dynamicJbTimeRtp * JITTER_MULTIPLE;
+    bool isSecondLineBroken = (diffTimeRtp > jitterTimeRtp + finalMargin); // The Maginot line
 
     if (mShowQueueCnt < 20) {
         showCurrentQueue(queue);
-        printNowTimeUs(startTime, nowTime, playedTime);
-        printRTPTime(rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
+        printNowTimeMs(startTimeMs, nowTimeMs, playedTimeMs);
+        printRTPTime(rtpTime, playedTimeRtp, expiredTimeRtp, isExpired);
         mShowQueueCnt++;
     }
 
@@ -157,17 +187,23 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
         return NOT_ENOUGH_DATA;
     }
 
-    if (isTooLate200) {
-        ALOGW("=== WARNING === buffer arrived 200ms late. === WARNING === ");
-    }
+    if (isFirstLineBroken) {
+        if (isSecondLineBroken) {
+            ALOGW("buffer too late ... \t Diff in Jb=%lld \t "
+                    "Seq# %d \t ExpSeq# %d \t"
+                    "JitterMs %lld + (%lld * %.3f)",
+                    (long long)(diffTimeRtp),
+                    buffer->int32Data(), mNextExpectedSeqNo,
+                    (long long)staticJbTimeMs, (long long)dynamicJbTimeMs, JITTER_MULTIPLE + 1);
+            printNowTimeMs(startTimeMs, nowTimeMs, playedTimeMs);
+            printRTPTime(rtpTime, playedTimeRtp, expiredTimeRtp, isExpired);
 
-    if (isTooLate300) {
-        ALOGW("buffer arrived after 300ms ... \t Diff in Jb=%lld \t Seq# %d",
-                (long long)(playedTimeRtp - expiredTimeInJb), buffer->int32Data());
-        printNowTimeUs(startTime, nowTime, playedTime);
-        printRTPTime(rtpTime, playedTimeRtp, expiredTimeInJb, isExpired);
-
-        mNextExpectedSeqNo = pickProperSeq(queue, firstRTPTime, playedTimeRtp, jitterTime);
+            mNextExpectedSeqNo = pickProperSeq(queue, firstRTPTime, playedTimeRtp, jitterTimeRtp);
+        }  else {
+            ALOGW("=== WARNING === buffer arrived after %lld + %lld = %lld ms === WARNING === ",
+                    (long long)staticJbTimeMs, (long long)dynamicJbTimeMs,
+                    (long long)RtpToMs(jitterTimeRtp, clockRate));
+        }
     }
 
     if (mNextExpectedSeqNoValid) {
@@ -578,17 +614,6 @@ void AHEVCAssembler::submitAccessUnit() {
     msg->post();
 }
 
-inline int64_t AHEVCAssembler::findRTPTime(
-        const uint32_t& firstRTPTime, const sp<ABuffer>& buffer) {
-    /* If you want to +, -, * rtpTime, recommend to declare rtpTime as int64_t.
-       Because rtpTime can be near UINT32_MAX. Beware the overflow. */
-    int64_t rtpTime = 0;
-    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
-    // If the first overs 2^31 and rtp unders 2^31, the rtp value is overflowed one.
-    int64_t overflowMask = (firstRTPTime & 0x80000000 & ~rtpTime) << 1;
-    return rtpTime | overflowMask;
-}
-
 int32_t AHEVCAssembler::pickProperSeq(const Queue *queue,
         uint32_t first, int64_t play, int64_t jit) {
     sp<ABuffer> buffer = *(queue->begin());
@@ -631,16 +656,6 @@ int32_t AHEVCAssembler::deleteUnitUnderSeq(Queue *queue, uint32_t seq) {
     }
     queue->erase(queue->begin(), it);
     return initSize - queue->size();
-}
-
-inline void AHEVCAssembler::printNowTimeUs(int64_t start, int64_t now, int64_t play) {
-    ALOGD("start=%lld, now=%lld, played=%lld",
-            (long long)start, (long long)now, (long long)play);
-}
-
-inline void AHEVCAssembler::printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp) {
-    ALOGD("rtp-time(JB)=%lld, played-rtp-time(JB)=%lld, expired-rtp-time(JB)=%lld expired=%d",
-            (long long)rtp, (long long)play, (long long)exp, isExp);
 }
 
 ARTPAssembler::AssemblyStatus AHEVCAssembler::assembleMore(
