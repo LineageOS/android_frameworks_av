@@ -272,7 +272,8 @@ public:
 
     virtual status_t setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos);
 
-    status_t onPreTransact(TransactionCode code, const Parcel& data, uint32_t flags) override;
+    status_t onTransactWrapper(TransactionCode code, const Parcel& data, uint32_t flags,
+        const std::function<status_t()>& delegate) override;
 
     // end of IAudioFlinger interface
 
