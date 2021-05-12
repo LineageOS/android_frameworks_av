@@ -523,7 +523,7 @@ void RevertOutputFormatIfNeeded(
 }
 
 void AmendOutputFormatWithCodecSpecificData(
-        const uint8_t *data, size_t size, const std::string mediaType,
+        const uint8_t *data, size_t size, const std::string &mediaType,
         const sp<AMessage> &outputFormat) {
     if (mediaType == MIMETYPE_VIDEO_AVC) {
         // Codec specific data should be SPS and PPS in a single buffer,
@@ -2441,6 +2441,11 @@ void CCodec::initiateReleaseIfStuck() {
     C2String compName;
     {
         Mutexed<State>::Locked state(mState);
+        if (!state->comp) {
+            ALOGD("previous call to %s exceeded timeout "
+                  "and the component is already released", name.c_str());
+            return;
+        }
         compName = state->comp->getName();
     }
     ALOGW("[%s] previous call to %s exceeded timeout", compName.c_str(), name.c_str());
