@@ -107,7 +107,7 @@ private:
         // Maximum allowed back-to-back start count.
         int32_t pacerBurstCountQuota = 10;
         // Maximum allowed back-to-back running time.
-        int32_t pacerBurstTimeQuotaSeconds = 180;  // 3-min
+        int32_t pacerBurstTimeQuotaSeconds = 120;  // 2-min
     };
 
     struct Session {

@@ -88,6 +88,16 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         mTimestampUs = 0u;
         mOutputSize = 0u;
         mTimestampDevTest = false;
+        mWidth = ENC_DEFAULT_FRAME_WIDTH;
+        mHeight = ENC_DEFAULT_FRAME_HEIGHT;
+        mMaxWidth = 0;
+        mMaxHeight = 0;
+        mMinWidth = INT32_MAX;
+        mMinHeight = INT32_MAX;
+
+        ASSERT_EQ(getMaxMinResolutionSupported(mComponent), C2_OK);
+        mWidth = std::max(std::min(mWidth, mMaxWidth), mMinWidth);
+        mHeight = std::max(std::min(mHeight, mMaxHeight), mMinHeight);
 
         C2SecureModeTuning secureModeTuning{};
         mComponent->query({&secureModeTuning}, {}, C2_MAY_BLOCK, nullptr);
@@ -111,6 +121,8 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     virtual void getParams() {}
 
     bool setupConfigParam(int32_t nWidth, int32_t nHeight, int32_t nBFrame = 0);
+    c2_status_t getMaxMinResolutionSupported(
+            const std::shared_ptr<android::Codec2Client::Component>& component);
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -181,6 +193,12 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     uint32_t mFailedWorkReceived;
     uint64_t mTimestampUs;
     uint64_t mOutputSize;
+    int32_t mWidth;
+    int32_t mHeight;
+    int32_t mMaxWidth;
+    int32_t mMaxHeight;
+    int32_t mMinWidth;
+    int32_t mMinHeight;
 
     std::list<uint64_t> mTimestampUslist;
     std::list<uint64_t> mFlushedIndices;
@@ -271,6 +289,37 @@ void GetURLForComponent(char* URL) {
     strcat(URL, "bbb_352x288_420p_30fps_32frames.yuv");
 }
 
+void fillByteBuffer(char* inputBuffer, char* mInputData, uint32_t nWidth, int32_t nHeight) {
+    int width, height, tileWidth, tileHeight;
+    int offset = 0, frmOffset = 0;
+    int numOfPlanes = 3;
+    for (int plane = 0; plane < numOfPlanes; plane++) {
+        if (plane == 0) {
+            width = nWidth;
+            height = nHeight;
+            tileWidth = ENC_DEFAULT_FRAME_WIDTH;
+            tileHeight = ENC_DEFAULT_FRAME_HEIGHT;
+        } else {
+            width = nWidth / 2;
+            tileWidth = ENC_DEFAULT_FRAME_WIDTH / 2;
+            height = nHeight / 2;
+            tileHeight = ENC_DEFAULT_FRAME_HEIGHT / 2;
+        }
+        for (int k = 0; k < height; k += tileHeight) {
+            int rowsToCopy = std::min(height - k, tileHeight);
+            for (int j = 0; j < rowsToCopy; j++) {
+                for (int i = 0; i < width; i += tileWidth) {
+                    int colsToCopy = std::min(width - i, tileWidth);
+                    memcpy(inputBuffer + (offset + (k + j) * width + i),
+                           mInputData + (frmOffset + j * tileWidth), colsToCopy);
+                }
+            }
+        }
+        offset += width * height;
+        frmOffset += tileWidth * tileHeight;
+    }
+}
+
 void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
                    std::mutex& queueLock, std::condition_variable& queueCondition,
                    std::list<std::unique_ptr<C2Work>>& workQueue,
@@ -314,12 +363,22 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
             ULock l(queueLock);
             flushedIndices.emplace_back(frameID);
         }
-        char* data = (char*)malloc(bytesCount);
-        ASSERT_NE(data, nullptr);
-        memset(data, 0, bytesCount);
-        if (eleStream.is_open()) {
-            eleStream.read(data, bytesCount);
-            ASSERT_EQ(eleStream.gcount(), bytesCount);
+        std::vector<uint8_t> buffer(bytesCount);
+        char* data = (char*)buffer.data();
+        if (nWidth != ENC_DEFAULT_FRAME_WIDTH || nHeight != ENC_DEFAULT_FRAME_HEIGHT) {
+            int defaultBytesCount = ENC_DEFAULT_FRAME_HEIGHT * ENC_DEFAULT_FRAME_WIDTH * 3 >> 1;
+            std::vector<uint8_t> srcBuffer(defaultBytesCount);
+            char* srcData = (char*)srcBuffer.data();
+            if (eleStream.is_open()) {
+                eleStream.read(srcData, defaultBytesCount);
+                ASSERT_EQ(eleStream.gcount(), defaultBytesCount);
+            }
+            fillByteBuffer(data, srcData, nWidth, nHeight);
+        } else {
+            if (eleStream.is_open()) {
+                eleStream.read(data, bytesCount);
+                ASSERT_EQ(eleStream.gcount(), bytesCount);
+            }
         }
         std::shared_ptr<C2GraphicBlock> block;
         err = graphicPool->fetchGraphicBlock(nWidth, nHeight, HAL_PIXEL_FORMAT_YV12,
@@ -352,7 +411,6 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         work->input.buffers.emplace_back(new GraphicBuffer(block));
         work->worklets.clear();
         work->worklets.emplace_back(new C2Worklet);
-        free(data);
 
         std::list<std::unique_ptr<C2Work>> items;
         items.push_back(std::move(work));
@@ -381,13 +439,59 @@ class Codec2VideoEncEncodeTest : public Codec2VideoEncHidlTestBase,
     }
 };
 
+c2_status_t Codec2VideoEncHidlTestBase::getMaxMinResolutionSupported(
+        const std::shared_ptr<android::Codec2Client::Component>& component) {
+    std::unique_ptr<C2StreamPictureSizeInfo::input> param =
+            std::make_unique<C2StreamPictureSizeInfo::input>();
+    std::vector<C2FieldSupportedValuesQuery> validValueInfos = {
+            C2FieldSupportedValuesQuery::Current(
+                    C2ParamField(param.get(), &C2StreamPictureSizeInfo::width)),
+            C2FieldSupportedValuesQuery::Current(
+                    C2ParamField(param.get(), &C2StreamPictureSizeInfo::height))};
+    c2_status_t c2err = component->querySupportedValues(validValueInfos, C2_MAY_BLOCK);
+    if (c2err != C2_OK || validValueInfos.size() != 2u) {
+        ALOGE("querySupportedValues_vb failed for pictureSize");
+        return c2err;
+    }
+
+    const auto& c2FSVWidth = validValueInfos[0].values;
+    const auto& c2FSVHeight = validValueInfos[1].values;
+    switch (c2FSVWidth.type) {
+        case C2FieldSupportedValues::type_t::RANGE: {
+            const auto& widthRange = c2FSVWidth.range;
+            const auto& heightRange = c2FSVHeight.range;
+            mMaxWidth = (uint32_t)(widthRange.max).ref<uint32_t>();
+            mMaxHeight = (uint32_t)(heightRange.max).ref<uint32_t>();
+            mMinWidth = (uint32_t)(widthRange.min).ref<uint32_t>();
+            mMinHeight = (uint32_t)(heightRange.min).ref<uint32_t>();
+            break;
+        }
+        case C2FieldSupportedValues::type_t::VALUES: {
+            int32_t curr = 0;
+            for (const C2Value::Primitive& prim : c2FSVWidth.values) {
+                curr = (uint32_t)prim.ref<uint32_t>();
+                mMaxWidth = std::max(curr, mMaxWidth);
+                mMinWidth = std::min(curr, mMinWidth);
+            }
+            for (const C2Value::Primitive& prim : c2FSVHeight.values) {
+                curr = (uint32_t)prim.ref<uint32_t>();
+                mMaxHeight = std::max(curr, mMaxHeight);
+                mMinHeight = std::min(curr, mMinHeight);
+            }
+            break;
+        }
+        default:
+            ALOGE("Non supported data");
+            return C2_BAD_VALUE;
+    }
+    return C2_OK;
+}
+
 TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     description("Encodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     char mURL[512];
-    int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
-    int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
     bool signalEOS = std::get<3>(GetParam());
     // Send an empty frame to receive CSD data from encoder.
     bool sendEmptyFirstFrame = std::get<3>(GetParam());
@@ -415,10 +519,6 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
         inputFrames--;
     }
 
-    if (!setupConfigParam(nWidth, nHeight, mConfigBPictures ? 1 : 0)) {
-        std::cout << "[   WARN   ] Test Skipped \n";
-        return;
-    }
     std::vector<std::unique_ptr<C2Param>> inParams;
     c2_status_t c2_status = mComponent->query({}, {C2StreamGopTuning::output::PARAM_TYPE},
                                               C2_DONT_BLOCK, &inParams);
@@ -438,6 +538,9 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
             mConfigBPictures = false;
         }
     }
+    if (!setupConfigParam(mWidth, mHeight, mConfigBPictures ? 1 : 0)) {
+        ASSERT_TRUE(false) << "Failed while configuring height and width for " << mComponentName;
+    }
 
     ASSERT_EQ(mComponent->start(), C2_OK);
 
@@ -447,7 +550,7 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     }
     ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                                          inputFrames, ENC_NUM_FRAMES, nWidth, nHeight, false,
+                                          inputFrames, ENC_NUM_FRAMES, mWidth, mHeight, false,
                                           signalEOS));
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config succeeded
@@ -538,14 +641,12 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
     char mURL[512];
-    int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
-    int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
+
     strcpy(mURL, sResourceDir.c_str());
     GetURLForComponent(mURL);
 
-    if (!setupConfigParam(nWidth, nHeight)) {
-        std::cout << "[   WARN   ] Test Skipped \n";
-        return;
+    if (!setupConfigParam(mWidth, mHeight)) {
+        ASSERT_TRUE(false) << "Failed while configuring height and width for " << mComponentName;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
 
@@ -567,7 +668,7 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
 
     ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mGraphicPool, eleStream, mDisableTest, 0,
-                                          numFramesFlushed, nWidth, nHeight, false, false));
+                                          numFramesFlushed, mWidth, mHeight, false, false));
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config succeeded
     // In this cases, we skip encoding the input stream
@@ -587,8 +688,8 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
     ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mGraphicPool, eleStream, mDisableTest,
-                                          numFramesFlushed, numFrames - numFramesFlushed, nWidth,
-                                          nHeight, true));
+                                          numFramesFlushed, numFrames - numFramesFlushed, mWidth,
+                                          mHeight, true));
     eleStream.close();
     // mDisableTest will be set if buffer was not fetched properly.
     // This may happen when resolution is not proper but config succeeded
@@ -731,11 +832,8 @@ TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
 
     mFlushedIndices.clear();
 
-    int32_t nWidth = ENC_DEFAULT_FRAME_WIDTH;
-    int32_t nHeight = ENC_DEFAULT_FRAME_HEIGHT;
-    if (!setupConfigParam(nWidth, nHeight)) {
-        std::cout << "[   WARN   ] Test Skipped \n";
-        return;
+    if (!setupConfigParam(mWidth, mHeight)) {
+        ASSERT_TRUE(false) << "Failed while configuring height and width for " << mComponentName;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
 
@@ -756,8 +854,8 @@ TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
 
         ASSERT_NO_FATAL_FAILURE(encodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                               mFlushedIndices, mGraphicPool, eleStream,
-                                              mDisableTest, inputFrameId, ENC_NUM_FRAMES, nWidth,
-                                              nHeight, false, false));
+                                              mDisableTest, inputFrameId, ENC_NUM_FRAMES, mWidth,
+                                              mHeight, false, false));
         // mDisableTest will be set if buffer was not fetched properly.
         // This may happen when resolution is not proper but config succeeded
         // In this cases, we skip encoding the input stream
