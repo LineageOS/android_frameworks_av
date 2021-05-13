@@ -19,6 +19,9 @@
 #define A_RTP_ASSEMBLER_H_
 
 #include <media/stagefright/foundation/ABase.h>
+#include <media/stagefright/foundation/ABuffer.h>
+#include <media/stagefright/foundation/ADebug.h>
+#include <media/stagefright/foundation/AMessage.h>
 #include <utils/List.h>
 #include <utils/RefBase.h>
 
@@ -61,11 +64,46 @@ protected:
     bool mShowQueue;
     int32_t mShowQueueCnt;
 
+    // Utility functions
+    inline int64_t findRTPTime(const uint32_t& firstRTPTime, const sp<ABuffer>& buffer);
+    inline int64_t MsToRtp(int64_t ms, int64_t clockRate);
+    inline int64_t RtpToMs(int64_t rtp, int64_t clockRate);
+    inline void printNowTimeMs(int64_t start, int64_t now, int64_t play);
+    inline void printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp);
+
 private:
     int64_t mFirstFailureTimeUs;
 
     DISALLOW_EVIL_CONSTRUCTORS(ARTPAssembler);
 };
+
+inline int64_t ARTPAssembler::findRTPTime(const uint32_t& firstRTPTime, const sp<ABuffer>& buffer) {
+    /* If you want to +,-,* rtpTime, recommend to declare rtpTime as int64_t.
+       Because rtpTime can be near UINT32_MAX. Beware the overflow. */
+    int64_t rtpTime = 0;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+    // If the first overs 2^31 and rtp unders 2^31, the rtp value is overflowed one.
+    int64_t overflowMask = (firstRTPTime & 0x80000000 & ~rtpTime) << 1;
+    return rtpTime | overflowMask;
+}
+
+inline int64_t ARTPAssembler::MsToRtp(int64_t ms, int64_t clockRate) {
+    return ms * clockRate / 1000;
+}
+
+inline int64_t ARTPAssembler::RtpToMs(int64_t rtp, int64_t clockRate) {
+    return rtp * 1000 / clockRate;
+}
+
+inline void ARTPAssembler::printNowTimeMs(int64_t start, int64_t now, int64_t play) {
+    ALOGD("start=%lld, now=%lld, played=%lld",
+            (long long)start, (long long)now, (long long)play);
+}
+
+inline void ARTPAssembler::printRTPTime(int64_t rtp, int64_t play, int64_t exp, bool isExp) {
+    ALOGD("rtp-time(JB)=%lld, played-rtp-time(JB)=%lld, expired-rtp-time(JB)=%lld expired=%d",
+            (long long)rtp, (long long)play, (long long)exp, isExp);
+}
 
 }  // namespace android
 
