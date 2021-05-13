@@ -17,16 +17,16 @@
 #include <fcntl.h>
 
 #include <functional>
-#include  <type_traits>
+#include <type_traits>
 
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include "fuzzer/FuzzedDataProvider.h"
 #include "mediautils/ServiceUtilities.h"
 
 static constexpr int kMaxOperations = 50;
 static constexpr int kMaxStringLen = 256;
 
-using android::media::permission::Identity;
+using android::content::AttributionSourceState;
 
 const std::vector<std::function<void(FuzzedDataProvider*, android::MediaPackageManager)>>
     operations = {
@@ -54,10 +54,11 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     std::string packageNameStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
     std::string msgStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
     android::String16 msgStr16(packageNameStr.c_str());
-    Identity identity;
-    identity.packageName = packageNameStr;
-    identity.uid = uid;
-    identity.pid = pid;
+    AttributionSourceState attributionSource;
+    attributionSource.packageName = packageNameStr;
+    attributionSource.uid = uid;
+    attributionSource.pid = pid;
+    attributionSource.token = android::sp<android::BBinder>::make();
 
     // There is not state here, and order is not significant,
     // so we can simply call all of the target functions
@@ -65,14 +66,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     android::isAudioServerUid(uid);
     android::isAudioServerOrSystemServerUid(uid);
     android::isAudioServerOrMediaServerUid(uid);
-    android::recordingAllowed(identity);
-    android::startRecording(identity, msgStr16, source);
-    android::finishRecording(identity, source);
-    android::captureAudioOutputAllowed(identity);
-    android::captureMediaOutputAllowed(identity);
-    android::captureHotwordAllowed(identity);
-    android::modifyPhoneStateAllowed(identity);
-    android::bypassInterruptionPolicyAllowed(identity);
+    android::recordingAllowed(attributionSource);
+    android::startRecording(attributionSource, msgStr16, source);
+    android::finishRecording(attributionSource, source);
+    android::captureAudioOutputAllowed(attributionSource);
+    android::captureMediaOutputAllowed(attributionSource);
+    android::captureHotwordAllowed(attributionSource);
+    android::modifyPhoneStateAllowed(attributionSource);
+    android::bypassInterruptionPolicyAllowed(attributionSource);
     android::settingsAllowed();
     android::modifyAudioRoutingAllowed();
     android::modifyDefaultAudioEffectsAllowed();

@@ -32,7 +32,7 @@
 #include <utils/threads.h>
 
 #include "android/media/IAudioRecord.h"
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 
 namespace android {
 
@@ -149,9 +149,9 @@ public:
      *
      * Parameters:
      *
-     * clientIdentity:          The identity of the owner of the record
+     * client:          The attribution source of the owner of the record
      */
-                        AudioRecord(const media::permission::Identity& clientIdentity);
+                        AudioRecord(const android::content::AttributionSourceState& client);
 
     /* Creates an AudioRecord object and registers it with AudioFlinger.
      * Once created, the track needs to be started before it can be used.
@@ -164,7 +164,7 @@ public:
      * format:             Audio format (e.g AUDIO_FORMAT_PCM_16_BIT for signed
      *                     16 bits per sample).
      * channelMask:        Channel mask, such that audio_is_input_channel(channelMask) is true.
-     * client:             The identity of the owner of the record
+     * client:             The attribution source of the owner of the record
      * frameCount:         Minimum size of track PCM buffer in frames. This defines the
      *                     application's contribution to the
      *                     latency of the track.  The actual size selected by the AudioRecord could
@@ -187,7 +187,7 @@ public:
                                     uint32_t sampleRate,
                                     audio_format_t format,
                                     audio_channel_mask_t channelMask,
-                                    const media::permission::Identity& clientIdentity,
+                                    const android::content::AttributionSourceState& client,
                                     size_t frameCount = 0,
                                     callback_t cbf = NULL,
                                     void* user = NULL,
@@ -696,7 +696,7 @@ private:
 
     status_t                mStatus;
 
-    media::permission::Identity mClientIdentity;    // The identity of the owner of this record
+    android::content::AttributionSourceState mClientAttributionSource; // Owner's attribution source
 
     size_t                  mFrameCount;            // corresponds to current IAudioRecord, value is
                                                     // reported back by AudioFlinger to the client

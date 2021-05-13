@@ -45,12 +45,12 @@ cc_library_shared {
         "audiopolicy-aidl-cpp",
         "audiopolicy-types-aidl-cpp",
         "capture_state_listener-aidl-cpp",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     static_libs: [
         "libaudiopolicycomponents",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     header_libs: [
@@ -70,6 +70,6 @@ cc_library_shared {
     export_shared_lib_headers: [
         "libactivitymanager_aidl",
         "libsensorprivacy",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 }

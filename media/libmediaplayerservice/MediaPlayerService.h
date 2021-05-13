@@ -33,11 +33,13 @@
 #include <media/MediaPlayerInterface.h>
 #include <media/Metadata.h>
 #include <media/stagefright/foundation/ABase.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 
 #include <system/audio.h>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 class AudioTrack;
 struct AVSyncSettings;
@@ -80,7 +82,7 @@ class MediaPlayerService : public BnMediaPlayerService
      public:
                                 AudioOutput(
                                         audio_session_t sessionId,
-                                        const media::permission::Identity& identity,
+                                        const AttributionSourceState& attributionSource,
                                         const audio_attributes_t * attr,
                                         const sp<AudioSystem::AudioDeviceCallback>& deviceCallback);
         virtual                 ~AudioOutput();
@@ -169,7 +171,7 @@ class MediaPlayerService : public BnMediaPlayerService
         float                   mMsecsPerFrame;
         size_t                  mFrameSize;
         audio_session_t         mSessionId;
-        media::permission::Identity mIdentity;
+        AttributionSourceState  mAttributionSource;
         float                   mSendLevel;
         int                     mAuxEffectId;
         audio_output_flags_t    mFlags;
@@ -231,13 +233,13 @@ public:
     static  void                instantiate();
 
     // IMediaPlayerService interface
-    virtual sp<IMediaRecorder>  createMediaRecorder(const media::permission::Identity &identity);
+    virtual sp<IMediaRecorder> createMediaRecorder(const AttributionSourceState &attributionSource);
     void    removeMediaRecorderClient(const wp<MediaRecorderClient>& client);
     virtual sp<IMediaMetadataRetriever> createMetadataRetriever();
 
     virtual sp<IMediaPlayer>    create(const sp<IMediaPlayerClient>& client,
                                        audio_session_t audioSessionId,
-                                       const media::permission::Identity& identity);
+                                       const AttributionSourceState& attributionSource);
 
     virtual sp<IMediaCodecList> getCodecList() const;
 
@@ -380,7 +382,7 @@ private:
                 void            notify(int msg, int ext1, int ext2, const Parcel *obj);
 
                 pid_t           pid() const {
-                    return VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mIdentity.pid));
+                    return VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mAttributionSource.pid));
                 }
         virtual status_t        dump(int fd, const Vector<String16>& args);
 
@@ -411,7 +413,7 @@ private:
 
         friend class MediaPlayerService;
                                 Client( const sp<MediaPlayerService>& service,
-                                        const media::permission::Identity& identity,
+                                        const AttributionSourceState& attributionSource,
                                         int32_t connId,
                                         const sp<IMediaPlayerClient>& client,
                                         audio_session_t audioSessionId);
@@ -458,7 +460,7 @@ private:
                     sp<MediaPlayerService>        mService;
                     sp<IMediaPlayerClient>        mClient;
                     sp<AudioOutput>               mAudioOutput;
-                    const media::permission::Identity mIdentity;
+                    const AttributionSourceState  mAttributionSource;
                     status_t                      mStatus;
                     bool                          mLoop;
                     int32_t                       mConnId;

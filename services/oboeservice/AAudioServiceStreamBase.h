@@ -160,11 +160,13 @@ public:
     }
 
     uid_t getOwnerUserId() const {
-        return VALUE_OR_FATAL(android::aidl2legacy_int32_t_uid_t(mMmapClient.identity.uid));
+        return VALUE_OR_FATAL(android::aidl2legacy_int32_t_uid_t(
+                mMmapClient.attributionSource.uid));
     }
 
     pid_t getOwnerProcessId() const {
-        return VALUE_OR_FATAL(android::aidl2legacy_int32_t_pid_t(mMmapClient.identity.pid));
+        return VALUE_OR_FATAL(android::aidl2legacy_int32_t_pid_t(
+                mMmapClient.attributionSource.pid));
     }
 
     aaudio_handle_t getHandle() const {

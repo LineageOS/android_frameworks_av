@@ -52,6 +52,8 @@
 
 namespace android {
 
+using content::AttributionSourceState;
+
 // ----------------------------------------------------------------------------
 
 // Attenuation applied to STRATEGY_SONIFICATION streams when a headset is connected: 6dB
@@ -116,7 +118,7 @@ public:
                                   audio_io_handle_t *output,
                                   audio_session_t session,
                                   audio_stream_type_t *stream,
-                                  const media::permission::Identity& identity,
+                                  const AttributionSourceState& attributionSource,
                                   const audio_config_t *config,
                                   audio_output_flags_t *flags,
                                   audio_port_handle_t *selectedDeviceId,
@@ -130,7 +132,7 @@ public:
                                          audio_io_handle_t *input,
                                          audio_unique_id_t riid,
                                          audio_session_t session,
-                                         const media::permission::Identity& identity,
+                                         const AttributionSourceState& attributionSource,
                                          const audio_config_base_t *config,
                                          audio_input_flags_t flags,
                                          audio_port_handle_t *selectedDeviceId,
