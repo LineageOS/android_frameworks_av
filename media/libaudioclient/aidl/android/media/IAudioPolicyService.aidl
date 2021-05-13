@@ -17,6 +17,7 @@
 package android.media;
 
 import android.media.AudioFormatSys;
+import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
 import android.media.AudioAttributesInternal;
@@ -48,7 +49,6 @@ import android.media.GetOutputForAttrResponse;
 import android.media.IAudioPolicyServiceClient;
 import android.media.ICaptureStateListener;
 import android.media.Int;
-import android.media.permission.Identity;
 import android.media.SoundTriggerSession;
 
 /**
@@ -81,7 +81,7 @@ interface IAudioPolicyService {
 
     GetOutputForAttrResponse getOutputForAttr(in AudioAttributesInternal attr,
                                               int /* audio_session_t */ session,
-                                              in Identity identity,
+                                              in AttributionSourceState attributionSource,
                                               in AudioConfig config,
                                               int /* Bitmask, indexed by AudioOutputFlags */ flags,
                                               int /* audio_port_handle_t */ selectedDeviceId);
@@ -96,7 +96,7 @@ interface IAudioPolicyService {
                                             int /* audio_io_handle_t */ input,
                                             int /* audio_unique_id_t */ riid,
                                             int /* audio_session_t */ session,
-                                            in Identity identity,
+                                            in AttributionSourceState attributionSource,
                                             in AudioConfigBase config,
                                             int /* Bitmask, indexed by AudioInputFlags */ flags,
                                             int /* audio_port_handle_t */ selectedDeviceId);

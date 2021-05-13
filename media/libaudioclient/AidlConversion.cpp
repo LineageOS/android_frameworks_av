@@ -1182,7 +1182,7 @@ ConversionResult<AudioClient> aidl2legacy_AudioClient_AudioClient(
         const media::AudioClient& aidl) {
     AudioClient legacy;
     legacy.clientTid = VALUE_OR_RETURN(aidl2legacy_int32_t_pid_t(aidl.clientTid));
-    legacy.identity = aidl.identity;
+    legacy.attributionSource = aidl.attributionSource;
     return legacy;
 }
 
@@ -1190,7 +1190,7 @@ ConversionResult<media::AudioClient> legacy2aidl_AudioClient_AudioClient(
         const AudioClient& legacy) {
     media::AudioClient aidl;
     aidl.clientTid = VALUE_OR_RETURN(legacy2aidl_pid_t_int32_t(legacy.clientTid));
-    aidl.identity = legacy.identity;
+    aidl.attributionSource = legacy.attributionSource;
     return aidl;
 }
 
