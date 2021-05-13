@@ -29,6 +29,7 @@
 
 #include "Parameters.h"
 #include "system/camera.h"
+#include <android-base/properties.h>
 #include <android/hardware/ICamera.h>
 #include <media/MediaProfiles.h>
 #include <media/mediarecorder.h>
@@ -1247,6 +1248,7 @@ status_t Parameters::buildFastInfo(CameraDeviceBase *device) {
             }
         }
         fastInfo.maxZslSize = maxPrivInputSize;
+        fastInfo.usedZslSize = maxPrivInputSize;
     } else {
         fastInfo.maxZslSize = {0, 0};
     }
@@ -2047,12 +2049,33 @@ status_t Parameters::set(const String8& paramString) {
 
     slowJpegMode = false;
     Size pictureSize = { pictureWidth, pictureHeight };
-    int64_t minFrameDurationNs = getJpegStreamMinFrameDurationNs(pictureSize);
-    if (previewFpsRange[1] > 1e9/minFrameDurationNs + FPS_MARGIN) {
+    bool zslFrameRateSupported = false;
+    int64_t jpegMinFrameDurationNs = getJpegStreamMinFrameDurationNs(pictureSize);
+    if (previewFpsRange[1] > 1e9/jpegMinFrameDurationNs + FPS_MARGIN) {
         slowJpegMode = true;
     }
-    if (isDeviceZslSupported || slowJpegMode ||
-            property_get_bool("camera.disable_zsl_mode", false)) {
+    if (isZslReprocessPresent) {
+        unsigned int firstApiLevel =
+            android::base::GetUintProperty<unsigned int>("ro.product.first_api_level", 0);
+        Size chosenSize;
+        if ((firstApiLevel >= __ANDROID_API_S__) &&
+            !android::base::GetBoolProperty("ro.camera.enableCamera1MaxZsl", false)) {
+            chosenSize = pictureSize;
+        } else {
+          // follow old behavior of keeping max zsl size as the input / output
+          // zsl stream size
+          chosenSize = fastInfo.maxZslSize;
+        }
+        int64_t zslMinFrameDurationNs = getZslStreamMinFrameDurationNs(chosenSize);
+        if (zslMinFrameDurationNs > 0 &&
+                previewFpsRange[1] <= (1e9/zslMinFrameDurationNs + FPS_MARGIN)) {
+            zslFrameRateSupported = true;
+            fastInfo.usedZslSize = chosenSize;
+        }
+    }
+
+    if (isDeviceZslSupported || slowJpegMode || !zslFrameRateSupported ||
+            android::base::GetBoolProperty("camera.disable_zsl_mode", false)) {
         allowZslMode = false;
     } else {
         allowZslMode = isZslReprocessPresent;
@@ -3054,6 +3077,10 @@ Vector<Parameters::StreamConfiguration> Parameters::getStreamConfigurations() {
 
 int64_t Parameters::getJpegStreamMinFrameDurationNs(Parameters::Size size) {
     return getMinFrameDurationNs(size, HAL_PIXEL_FORMAT_BLOB);
+}
+
+int64_t Parameters::getZslStreamMinFrameDurationNs(Parameters::Size size) {
+    return getMinFrameDurationNs(size, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
 }
 
 int64_t Parameters::getMinFrameDurationNs(Parameters::Size size, int fmt) {
