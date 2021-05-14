@@ -645,22 +645,17 @@ Return<void> DrmPlugin::getLogMessages(
     auto timeMillis = duration_cast<milliseconds>(
             system_clock::now().time_since_epoch()).count();
 
-    //TODO(b/182525516) Stub out for now
     std::vector<LogMessage> logs = {
-            { timeMillis, LogPriority::DEFAULT, std::string() }};
+            { timeMillis, LogPriority::ERROR, std::string("Not implemented") }};
     _hidl_cb(drm::V1_4::Status::OK, toHidlVec(logs));
     return Void();
 }
 
 Return<bool> DrmPlugin::requiresSecureDecoder(
         const hidl_string& mime, SecurityLevel level) {
-    if (!strncasecmp(mime.c_str(), "video/", 6)) {
-        // Type is video, so check level to see if we require a secure decoder.
-        return level == SecurityLevel::HW_SECURE_DECODE;
-    } else {
-        // Type is not video, so never require a secure decoder.
-        return false;
-    }
+    UNUSED(mime);
+    UNUSED(level);
+    return false;
 }
 
 Return<bool> DrmPlugin::requiresSecureDecoderDefault(const hidl_string& mime) {
@@ -679,22 +674,7 @@ Return<Status> DrmPlugin::setPlaybackId(
     }
 
     std::vector<uint8_t> sid = toVector(sessionId);
-    sp<Session> session = mSessionLibrary->findSession(sid);
-    if (!session.get()) {
-        return Status::ERROR_DRM_SESSION_NOT_OPENED;
-    }
-
-    std::map<std::vector<uint8_t>, std::string>::iterator itr =
-            mPlaybackId.find(sid);
-    if (itr != mPlaybackId.end()) {
-        mPlaybackId[sid] = playbackId;
-    } else {
-        if (!mPlaybackId.insert(
-                std::pair<std::vector<uint8_t>, std::string>(sid, playbackId)).second) {
-            ALOGE("Failed to set playback Id");
-            return Status::ERROR_DRM_UNKNOWN;
-        }
-    }
+    mPlaybackId[sid] = playbackId;
     return Status::OK;
 }
 
@@ -766,21 +746,24 @@ Return<void> DrmPlugin::getMetrics(getMetrics_cb _hidl_cb) {
     };
 
     // Set the setPlaybackId metric.
-    DrmMetricGroup::Attribute setPlaybackIdOKAttribute = {
-      "status", DrmMetricGroup::ValueType::INT64_TYPE,
-      (int64_t) Status::OK, 0.0, ""
-    };
-    std::string playbackId = mPlaybackId.begin()->second;
-    DrmMetricGroup::Value setPlaybackIdMetricValue = {
-      "value", DrmMetricGroup::ValueType::STRING_TYPE, 0, 0,  playbackId.c_str()
-    };
+    std::vector<DrmMetricGroup::Attribute> sids;
+    std::vector<DrmMetricGroup::Value> playbackIds;
+    for (const auto&[key, value] : mPlaybackId) {
+        std::string sid(key.begin(), key.end());
+        DrmMetricGroup::Attribute sessionIdAttribute = {
+            "sid", DrmMetricGroup::ValueType::STRING_TYPE, 0, 0, sid };
+        sids.push_back(sessionIdAttribute);
+
+        DrmMetricGroup::Value playbackIdMetricValue = {
+            "playbackId", DrmMetricGroup::ValueType::STRING_TYPE, 0, 0, value };
+        playbackIds.push_back(playbackIdMetricValue);
+    }
     DrmMetricGroup::Metric setPlaybackIdMetric = {
-      "set_playback_id", { setPlaybackIdOKAttribute }, { setPlaybackIdMetricValue }
-    };
+            "set_playback_id", { sids }, { playbackIds }};
 
-    DrmMetricGroup metrics = {{ openSessionMetric, closeSessionMetric,
-                                closeSessionNotOpenedMetric, setPlaybackIdMetric }};
-
+    DrmMetricGroup metrics = {
+            { openSessionMetric, closeSessionMetric,
+              closeSessionNotOpenedMetric, setPlaybackIdMetric }};
     _hidl_cb(Status::OK, hidl_vec<DrmMetricGroup>({metrics}));
     return Void();
 }
