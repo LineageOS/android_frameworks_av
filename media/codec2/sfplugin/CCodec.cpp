@@ -2688,7 +2688,11 @@ static status_t CalculateMinMaxUsage(
             *maxUsage = 0;
             continue;
         }
-        *minUsage |= supported.values[0].u64;
+        if (supported.values.size() > 1) {
+            *minUsage |= supported.values[1].u64;
+        } else {
+            *minUsage |= supported.values[0].u64;
+        }
         int64_t currentMaxUsage = 0;
         for (const C2Value::Primitive &flags : supported.values) {
             currentMaxUsage |= flags.u64;
