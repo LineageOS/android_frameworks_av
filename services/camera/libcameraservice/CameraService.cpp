@@ -137,6 +137,9 @@ static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PER
 
 const String8 CameraService::kOfflineDevice("offline-");
 
+// Set to keep track of logged service error events.
+static std::set<String8> sServiceErrorEventSet;
+
 CameraService::CameraService() :
         mEventLog(DEFAULT_EVENT_LOG_LENGTH),
         mNumberOfCameras(0),
@@ -197,6 +200,8 @@ status_t CameraService::enumerateProviders() {
             if (res != OK) {
                 ALOGE("%s: Unable to initialize camera provider manager: %s (%d)",
                         __FUNCTION__, strerror(-res), res);
+                logServiceError(String8::format("Unable to initialize camera provider manager"),
+                ERROR_DISCONNECTED);
                 return res;
             }
         }
@@ -597,6 +602,7 @@ Status CameraService::getCameraInfo(int cameraId,
     }
 
     if (!mInitialized) {
+        logServiceError(String8::format("Camera subsystem is not available"),ERROR_DISCONNECTED);
         return STATUS_ERROR(ERROR_DISCONNECTED,
                 "Camera subsystem is not available");
     }
@@ -619,6 +625,8 @@ Status CameraService::getCameraInfo(int cameraId,
         ret = STATUS_ERROR_FMT(ERROR_INVALID_OPERATION,
                 "Error retrieving camera info from device %d: %s (%d)", cameraId,
                 strerror(-err), err);
+        logServiceError(String8::format("Error retrieving camera info from device %d",cameraId),
+            ERROR_INVALID_OPERATION);
     }
 
     return ret;
@@ -656,6 +664,7 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
 
     if (!mInitialized) {
         ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        logServiceError(String8::format("Camera subsystem is not available"),ERROR_DISCONNECTED);
         return STATUS_ERROR(ERROR_DISCONNECTED,
                 "Camera subsystem is not available");;
     }
@@ -675,6 +684,8 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
                     "characteristics for unknown device %s: %s (%d)", String8(cameraId).string(),
                     strerror(-res), res);
         } else {
+            logServiceError(String8::format("Unable to retrieve camera characteristics for "
+            "device %s.", String8(cameraId).string()),ERROR_INVALID_OPERATION);
             return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to retrieve camera "
                     "characteristics for device %s: %s (%d)", String8(cameraId).string(),
                     strerror(-res), res);
@@ -1916,6 +1927,7 @@ Status CameraService::setTorchMode(const String16& cameraId, bool enabled,
                 errorCode = ERROR_INVALID_OPERATION;
         }
         ALOGE("%s: %s", __FUNCTION__, msg.string());
+        logServiceError(msg,errorCode);
         return STATUS_ERROR(errorCode, msg.string());
     }
 
@@ -2091,6 +2103,7 @@ Status CameraService::getConcurrentCameraIds(
 
     if (!mInitialized) {
         ALOGE("%s: Camera HAL couldn't be initialized", __FUNCTION__);
+        logServiceError(String8::format("Camera subsystem is not available"),ERROR_DISCONNECTED);
         return STATUS_ERROR(ERROR_DISCONNECTED,
                 "Camera subsystem is not available");
     }
@@ -2152,6 +2165,8 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
             mCameraProviderManager->isConcurrentSessionConfigurationSupported(
                     cameraIdsAndSessionConfigurations, isSupported);
     if (res != OK) {
+        logServiceError(String8::format("Unable to query session configuration support"),
+            ERROR_INVALID_OPERATION);
         return STATUS_ERROR_FMT(ERROR_INVALID_OPERATION, "Unable to query session configuration "
                 "support %s (%d)", strerror(-res), res);
     }
@@ -2207,6 +2222,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         if (ret != NO_ERROR) {
             String8 msg = String8::format("Failed to initialize service listener: %s (%d)",
                     strerror(-ret), ret);
+            logServiceError(msg,ERROR_ILLEGAL_ARGUMENT);
             ALOGE("%s: %s", __FUNCTION__, msg.string());
             return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
         }
@@ -2591,7 +2607,15 @@ void CameraService::doUserSwitch(const std::vector<int32_t>& newUserIds) {
 void CameraService::logEvent(const char* event) {
     String8 curTime = getFormattedCurrentTime();
     Mutex::Autolock l(mLogLock);
-    mEventLog.add(String8::format("%s : %s", curTime.string(), event));
+    String8 msg = String8::format("%s : %s", curTime.string(), event);
+    // For service error events, print the msg only once.
+    if(!msg.contains("SERVICE ERROR")) {
+        mEventLog.add(msg);
+    } else if(sServiceErrorEventSet.find(msg) == sServiceErrorEventSet.end()) {
+        // Error event not added to the dumpsys log before
+        mEventLog.add(msg);
+        sServiceErrorEventSet.insert(msg);
+    }
 }
 
 void CameraService::logDisconnected(const char* cameraId, int clientPid,
