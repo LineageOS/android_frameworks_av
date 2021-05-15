@@ -2323,4 +2323,28 @@ legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
     return unexpected(BAD_VALUE);
 }
 
+ConversionResult<TrackSecondaryOutputInfoPair>
+aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair(
+        const media::TrackSecondaryOutputInfo& aidl) {
+    TrackSecondaryOutputInfoPair trackSecondaryOutputInfoPair;
+    trackSecondaryOutputInfoPair.first =
+            VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
+    trackSecondaryOutputInfoPair.second =
+            VALUE_OR_RETURN(convertContainer<std::vector<audio_port_handle_t>>(
+                    aidl.secondaryOutputIds, aidl2legacy_int32_t_audio_io_handle_t));
+    return trackSecondaryOutputInfoPair;
+}
+
+ConversionResult<media::TrackSecondaryOutputInfo>
+legacy2aidl_TrackSecondaryOutputInfoPair_TrackSecondaryOutputInfo(
+        const TrackSecondaryOutputInfoPair& legacy) {
+    media::TrackSecondaryOutputInfo trackSecondaryOutputInfo;
+    trackSecondaryOutputInfo.portId =
+            VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.first));
+    trackSecondaryOutputInfo.secondaryOutputIds =
+            VALUE_OR_RETURN(convertContainer<std::vector<int32_t>>(
+                    legacy.second, legacy2aidl_audio_io_handle_t_int32_t));
+    return trackSecondaryOutputInfo;
+}
+
 }  // namespace android
