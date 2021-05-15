@@ -81,7 +81,8 @@ public:
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
                                 /** default behaviour is to start when there are as many frames
                                   * ready as possible (aka. Buffer is full). */
-                                size_t frameCountToBeReady = SIZE_MAX);
+                                size_t frameCountToBeReady = SIZE_MAX,
+                                float speed = 1.0f);
     virtual             ~Track();
     virtual status_t    initCheck() const;
 
@@ -148,14 +149,6 @@ public:
     void                setFinalVolume(float volume);
     float               getFinalVolume() const { return mFinalVolume; }
 
-    /** @return true if the track has changed (metadata or volume) since
-     *          the last time this function was called,
-     *          true if this function was never called since the track creation,
-     *          false otherwise.
-     *  Thread safe.
-     */
-    bool            readAndClearHasChanged() { return !mChangeNotified.test_and_set(); }
-
     using SourceMetadatas = std::vector<playback_track_metadata_v7_t>;
     using MetadataInserter = std::back_insert_iterator<SourceMetadatas>;
     /** Copy the track metadata in the provided iterator. Thread safe. */
@@ -191,6 +184,9 @@ public:
                    mAudioTrackServerProxy->getUnderrunFrames());
        }
     }
+
+    audio_output_flags_t getOutputFlags() const { return mFlags; }
+    float getSpeed() const { return mSpeed; }
 protected:
     // for numerous
     friend class PlaybackThread;
@@ -234,8 +230,6 @@ protected:
     bool presentationComplete(int64_t framesWritten, size_t audioHalFrames);
     void signalClientFlag(int32_t flag);
 
-    /** Set that a metadata has changed and needs to be notified to backend. Thread safe. */
-    void setMetadataHasChanged() { mChangeNotified.clear(); }
 public:
     void triggerEvents(AudioSystem::sync_event_t type);
     virtual void invalidate();
@@ -320,9 +314,8 @@ private:
     bool                mFlushHwPending; // track requests for thread flush
     bool                mPauseHwPending = false; // direct/offload track request for thread pause
     audio_output_flags_t mFlags;
-    // If the last track change was notified to the client with readAndClearHasChanged
-    std::atomic_flag     mChangeNotified = ATOMIC_FLAG_INIT;
     TeePatches  mTeePatches;
+    const float         mSpeed;
 };  // end of Track
 
 
