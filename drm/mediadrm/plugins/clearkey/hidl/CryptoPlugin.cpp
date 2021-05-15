@@ -235,6 +235,21 @@ Return<Status> CryptoPlugin::setMediaDrmSession(
     return Status::OK;
 }
 
+Return<void> CryptoPlugin::getLogMessages(
+        getLogMessages_cb _hidl_cb) {
+    using std::chrono::duration_cast;
+    using std::chrono::milliseconds;
+    using std::chrono::system_clock;
+
+    auto timeMillis = duration_cast<milliseconds>(
+            system_clock::now().time_since_epoch()).count();
+
+    std::vector<LogMessage> logs = {
+            { timeMillis, LogPriority::ERROR, std::string("Not implemented") }};
+    _hidl_cb(drm::V1_4::Status::OK, toHidlVec(logs));
+    return Void();
+}
+
 } // namespace clearkey
 } // namespace V1_4.
 } // namespace drm
