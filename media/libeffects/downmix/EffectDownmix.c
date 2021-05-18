@@ -16,23 +16,52 @@
 
 #define LOG_TAG "EffectDownmix"
 //#define LOG_NDEBUG 0
-
-#include <inttypes.h>
-#include <stdbool.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include <log/log.h>
 
 #include "EffectDownmix.h"
+#include <math.h>
+#include <stdlib.h>
 
 // Do not submit with DOWNMIX_TEST_CHANNEL_INDEX defined, strictly for testing
 //#define DOWNMIX_TEST_CHANNEL_INDEX 0
 // Do not submit with DOWNMIX_ALWAYS_USE_GENERIC_DOWNMIXER defined, strictly for testing
 //#define DOWNMIX_ALWAYS_USE_GENERIC_DOWNMIXER 0
 
-#define MINUS_3_DB_IN_FLOAT 0.70710678f // -3dB = 0.70710678f
-const audio_format_t gTargetFormat = AUDIO_FORMAT_PCM_FLOAT;
+#define MINUS_3_DB_IN_FLOAT M_SQRT1_2 // -3dB = 0.70710678
+
+#define LVM_FLOAT float
+
+const uint32_t kSides = AUDIO_CHANNEL_OUT_SIDE_LEFT | AUDIO_CHANNEL_OUT_SIDE_RIGHT;
+const uint32_t kBacks = AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT;
+const uint32_t kUnsupported =
+        AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER | AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER |
+        AUDIO_CHANNEL_OUT_TOP_CENTER |
+        AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
+        AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER |
+        AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
+        AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
+        AUDIO_CHANNEL_OUT_TOP_BACK_CENTER |
+        AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT;
+
+typedef enum {
+    DOWNMIX_STATE_UNINITIALIZED,
+    DOWNMIX_STATE_INITIALIZED,
+    DOWNMIX_STATE_ACTIVE,
+} downmix_state_t;
+
+/* parameters for each downmixer */
+typedef struct {
+    downmix_state_t state;
+    downmix_type_t type;
+    bool apply_volume_correction;
+    uint8_t input_channel_count;
+} downmix_object_t;
+
+typedef struct downmix_module_s {
+    const struct effect_interface_s *itfe;
+    effect_config_t config;
+    downmix_object_t context;
+} downmix_module_t;
 
 // subset of possible audio_channel_mask_t values, and AUDIO_CHANNEL_OUT_* renamed to CHANNEL_MASK_*
 typedef enum {
@@ -42,6 +71,40 @@ typedef enum {
     CHANNEL_MASK_5POINT1_SIDE = AUDIO_CHANNEL_OUT_5POINT1_SIDE,
     CHANNEL_MASK_7POINT1 = AUDIO_CHANNEL_OUT_7POINT1,
 } downmix_input_channel_mask_t;
+
+// Audio Effect API
+static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
+        int32_t sessionId,
+        int32_t ioId,
+        effect_handle_t *pHandle);
+static int32_t DownmixLib_Release(effect_handle_t handle);
+static int32_t DownmixLib_GetDescriptor(const effect_uuid_t *uuid,
+        effect_descriptor_t *pDescriptor);
+static int32_t Downmix_Process(effect_handle_t self,
+        audio_buffer_t *inBuffer,
+        audio_buffer_t *outBuffer);
+static int32_t Downmix_Command(effect_handle_t self,
+        uint32_t cmdCode,
+        uint32_t cmdSize,
+        void *pCmdData,
+        uint32_t *replySize,
+        void *pReplyData);
+static int32_t Downmix_GetDescriptor(effect_handle_t self,
+        effect_descriptor_t *pDescriptor);
+
+// Internal methods
+static int Downmix_Init(downmix_module_t *pDwmModule);
+static int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pConfig, bool init);
+static int Downmix_Reset(downmix_object_t *pDownmixer, bool init);
+static int Downmix_setParameter(
+        downmix_object_t *pDownmixer, int32_t param, uint32_t size, void *pValue);
+static int Downmix_getParameter(
+        downmix_object_t *pDownmixer, int32_t param, uint32_t *pSize, void *pValue);
+static void Downmix_foldFromQuad(float *pSrc, float *pDst, size_t numFrames, bool accumulate);
+static void Downmix_foldFrom5Point1(float *pSrc, float *pDst, size_t numFrames, bool accumulate);
+static void Downmix_foldFrom7Point1(float *pSrc, float *pDst, size_t numFrames, bool accumulate);
+static bool Downmix_foldGeneric(
+        uint32_t mask, float *pSrc, float *pDst, size_t numFrames, bool accumulate);
 
 // effect_handle_t interface implementation for downmix effect
 const struct effect_interface_s gDownmixInterface = {
@@ -62,7 +125,6 @@ audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM = {
     .release_effect = DownmixLib_Release,
     .get_descriptor = DownmixLib_GetDescriptor,
 };
-
 
 // AOSP insert downmix UUID: 93f04452-e4fe-41cc-91f9-e475b6d1d69f
 static const effect_descriptor_t gDownmixDescriptor = {
@@ -103,7 +165,7 @@ static LVM_FLOAT clamp_float(LVM_FLOAT a) {
 // strictly for testing, logs the indices of the channels for a given mask,
 // uses the same code as Downmix_foldGeneric()
 void Downmix_testIndexComputation(uint32_t mask) {
-    ALOGI("Testing index computation for 0x%" PRIx32 ":", mask);
+    ALOGI("Testing index computation for %#x:", mask);
     // check against unsupported channels
     if (mask & kUnsupported) {
         ALOGE("Unsupported channels (top or front left/right of center)");
@@ -194,7 +256,7 @@ static bool Downmix_validChannelMask(uint32_t mask)
 
 /*--- Effect Library Interface Implementation ---*/
 
-int32_t DownmixLib_Create(const effect_uuid_t *uuid,
+static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
         int32_t sessionId __unused,
         int32_t ioId __unused,
         effect_handle_t *pHandle) {
@@ -260,8 +322,7 @@ int32_t DownmixLib_Create(const effect_uuid_t *uuid,
     return 0;
 }
 
-
-int32_t DownmixLib_Release(effect_handle_t handle) {
+static int32_t DownmixLib_Release(effect_handle_t handle) {
     downmix_module_t *pDwmModule = (downmix_module_t *)handle;
 
     ALOGV("DownmixLib_Release() %p", handle);
@@ -275,8 +336,8 @@ int32_t DownmixLib_Release(effect_handle_t handle) {
     return 0;
 }
 
-
-int32_t DownmixLib_GetDescriptor(const effect_uuid_t *uuid, effect_descriptor_t *pDescriptor) {
+static int32_t DownmixLib_GetDescriptor(
+        const effect_uuid_t *uuid, effect_descriptor_t *pDescriptor) {
     ALOGV("DownmixLib_GetDescriptor()");
     int i;
 
@@ -289,7 +350,7 @@ int32_t DownmixLib_GetDescriptor(const effect_uuid_t *uuid, effect_descriptor_t 
         ALOGV("DownmixLib_GetDescriptor() i=%d", i);
         if (memcmp(uuid, &gDescriptors[i]->uuid, sizeof(effect_uuid_t)) == 0) {
             memcpy(pDescriptor, gDescriptors[i], sizeof(effect_descriptor_t));
-            ALOGV("EffectGetDescriptor - UUID matched downmix type %d, UUID = %" PRIx32,
+            ALOGV("EffectGetDescriptor - UUID matched downmix type %d, UUID = %#x",
                  i, gDescriptors[i]->uuid.timeLow);
             return 0;
         }
@@ -300,7 +361,7 @@ int32_t DownmixLib_GetDescriptor(const effect_uuid_t *uuid, effect_descriptor_t 
 
 /*--- Effect Control Interface Implementation ---*/
 
-static int Downmix_Process(effect_handle_t self,
+static int32_t Downmix_Process(effect_handle_t self,
         audio_buffer_t *inBuffer, audio_buffer_t *outBuffer) {
 
     downmix_object_t *pDownmixer;
@@ -362,7 +423,7 @@ static int Downmix_Process(effect_handle_t self,
           // bypass the optimized downmix routines for the common formats
           if (!Downmix_foldGeneric(
                   downmixInputChannelMask, pSrc, pDst, numFrames, accumulate)) {
-              ALOGE("Multichannel configuration 0x%" PRIx32 " is not supported",
+              ALOGE("Multichannel configuration %#x is not supported",
                     downmixInputChannelMask);
               return -EINVAL;
           }
@@ -384,7 +445,7 @@ static int Downmix_Process(effect_handle_t self,
         default:
             if (!Downmix_foldGeneric(
                     downmixInputChannelMask, pSrc, pDst, numFrames, accumulate)) {
-                ALOGE("Multichannel configuration 0x%" PRIx32 " is not supported",
+                ALOGE("Multichannel configuration %#x is not supported",
                       downmixInputChannelMask);
                 return -EINVAL;
             }
@@ -399,7 +460,7 @@ static int Downmix_Process(effect_handle_t self,
     return 0;
 }
 
-static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
+static int32_t Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdSize,
         void *pCmdData, uint32_t *replySize, void *pReplyData) {
 
     downmix_module_t *pDwmModule = (downmix_module_t *) self;
@@ -411,7 +472,7 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
 
     pDownmixer = (downmix_object_t*) &pDwmModule->context;
 
-    ALOGV("Downmix_Command command %" PRIu32 " cmdSize %" PRIu32, cmdCode, cmdSize);
+    ALOGV("Downmix_Command command %u cmdSize %u", cmdCode, cmdSize);
 
     switch (cmdCode) {
     case EFFECT_CMD_INIT:
@@ -435,7 +496,7 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
         break;
 
     case EFFECT_CMD_GET_PARAM:
-        ALOGV("Downmix_Command EFFECT_CMD_GET_PARAM pCmdData %p, *replySize %" PRIu32 ", pReplyData: %p",
+        ALOGV("Downmix_Command EFFECT_CMD_GET_PARAM pCmdData %p, *replySize %u, pReplyData: %p",
                 pCmdData, *replySize, pReplyData);
         if (pCmdData == NULL || cmdSize < (int)(sizeof(effect_param_t) + sizeof(int32_t)) ||
                 pReplyData == NULL || replySize == NULL ||
@@ -444,7 +505,7 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
         }
         effect_param_t *rep = (effect_param_t *) pReplyData;
         memcpy(pReplyData, pCmdData, sizeof(effect_param_t) + sizeof(int32_t));
-        ALOGV("Downmix_Command EFFECT_CMD_GET_PARAM param %" PRId32 ", replySize %" PRIu32,
+        ALOGV("Downmix_Command EFFECT_CMD_GET_PARAM param %d, replySize %u",
                 *(int32_t *)rep->data, rep->vsize);
         rep->status = Downmix_getParameter(pDownmixer, *(int32_t *)rep->data, &rep->vsize,
                 rep->data + sizeof(int32_t));
@@ -452,7 +513,7 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
         break;
 
     case EFFECT_CMD_SET_PARAM:
-        ALOGV("Downmix_Command EFFECT_CMD_SET_PARAM cmdSize %d pCmdData %p, *replySize %" PRIu32
+        ALOGV("Downmix_Command EFFECT_CMD_SET_PARAM cmdSize %d pCmdData %p, *replySize %u"
                 ", pReplyData %p", cmdSize, pCmdData, *replySize, pReplyData);
         if (pCmdData == NULL || (cmdSize < (int)(sizeof(effect_param_t) + sizeof(int32_t)))
                 || pReplyData == NULL || replySize == NULL || *replySize != (int)sizeof(int32_t)) {
@@ -506,7 +567,7 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
             return -EINVAL;
         }
         // FIXME change type if playing on headset vs speaker
-        ALOGV("Downmix_Command EFFECT_CMD_SET_DEVICE: 0x%08" PRIx32, *(uint32_t *)pCmdData);
+        ALOGV("Downmix_Command EFFECT_CMD_SET_DEVICE: %#x", *(uint32_t *)pCmdData);
         break;
 
     case EFFECT_CMD_SET_VOLUME: {
@@ -526,7 +587,7 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
         if (pCmdData == NULL || cmdSize != (int)sizeof(uint32_t)) {
             return -EINVAL;
         }
-        ALOGV("Downmix_Command EFFECT_CMD_SET_AUDIO_MODE: %" PRIu32, *(uint32_t *)pCmdData);
+        ALOGV("Downmix_Command EFFECT_CMD_SET_AUDIO_MODE: %u", *(uint32_t *)pCmdData);
         break;
 
     case EFFECT_CMD_SET_CONFIG_REVERSE:
@@ -535,15 +596,14 @@ static int Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t cmdS
         break;
 
     default:
-        ALOGW("Downmix_Command invalid command %" PRIu32, cmdCode);
+        ALOGW("Downmix_Command invalid command %u", cmdCode);
         return -EINVAL;
     }
 
     return 0;
 }
 
-
-int Downmix_GetDescriptor(effect_handle_t self, effect_descriptor_t *pDescriptor)
+static int32_t Downmix_GetDescriptor(effect_handle_t self, effect_descriptor_t *pDescriptor)
 {
     downmix_module_t *pDwnmxModule = (downmix_module_t *) self;
 
@@ -591,7 +651,7 @@ int Downmix_GetDescriptor(effect_handle_t self, effect_descriptor_t *pDescriptor
  *----------------------------------------------------------------------------
  */
 
-int Downmix_Init(downmix_module_t *pDwmModule) {
+static int Downmix_Init(downmix_module_t *pDwmModule) {
 
     ALOGV("Downmix_Init module %p", pDwmModule);
     int ret = 0;
@@ -599,7 +659,7 @@ int Downmix_Init(downmix_module_t *pDwmModule) {
     memset(&pDwmModule->context, 0, sizeof(downmix_object_t));
 
     pDwmModule->config.inputCfg.accessMode = EFFECT_BUFFER_ACCESS_READ;
-    pDwmModule->config.inputCfg.format = gTargetFormat;
+    pDwmModule->config.inputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
     pDwmModule->config.inputCfg.channels = AUDIO_CHANNEL_OUT_7POINT1;
     pDwmModule->config.inputCfg.bufferProvider.getBuffer = NULL;
     pDwmModule->config.inputCfg.bufferProvider.releaseBuffer = NULL;
@@ -611,7 +671,7 @@ int Downmix_Init(downmix_module_t *pDwmModule) {
 
     // set a default value for the access mode, but should be overwritten by caller
     pDwmModule->config.outputCfg.accessMode = EFFECT_BUFFER_ACCESS_ACCUMULATE;
-    pDwmModule->config.outputCfg.format = gTargetFormat;
+    pDwmModule->config.outputCfg.format = AUDIO_FORMAT_PCM_FLOAT;
     pDwmModule->config.outputCfg.channels = AUDIO_CHANNEL_OUT_STEREO;
     pDwmModule->config.outputCfg.bufferProvider.getBuffer = NULL;
     pDwmModule->config.outputCfg.bufferProvider.releaseBuffer = NULL;
@@ -651,15 +711,15 @@ int Downmix_Init(downmix_module_t *pDwmModule) {
  *----------------------------------------------------------------------------
  */
 
-int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pConfig, bool init) {
+static int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pConfig, bool init) {
 
     downmix_object_t *pDownmixer = &pDwmModule->context;
 
     // Check configuration compatibility with build options, and effect capabilities
     if (pConfig->inputCfg.samplingRate != pConfig->outputCfg.samplingRate
-        || pConfig->outputCfg.channels != DOWNMIX_OUTPUT_CHANNELS
-        || pConfig->inputCfg.format != gTargetFormat
-        || pConfig->outputCfg.format != gTargetFormat) {
+        || pConfig->outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
+        || pConfig->inputCfg.format != AUDIO_FORMAT_PCM_FLOAT
+        || pConfig->outputCfg.format != AUDIO_FORMAT_PCM_FLOAT) {
         ALOGE("Downmix_Configure error: invalid config");
         return -EINVAL;
     }
@@ -709,7 +769,7 @@ int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pConfig, bo
  *----------------------------------------------------------------------------
  */
 
-int Downmix_Reset(downmix_object_t *pDownmixer __unused, bool init __unused) {
+static int Downmix_Reset(downmix_object_t *pDownmixer __unused, bool init __unused) {
     // nothing to do here
     return 0;
 }
@@ -736,31 +796,32 @@ int Downmix_Reset(downmix_object_t *pDownmixer __unused, bool init __unused) {
  *
  *----------------------------------------------------------------------------
  */
-int Downmix_setParameter(downmix_object_t *pDownmixer, int32_t param, uint32_t size, void *pValue) {
+static int Downmix_setParameter(
+        downmix_object_t *pDownmixer, int32_t param, uint32_t size, void *pValue) {
 
     int16_t value16;
-    ALOGV("Downmix_setParameter, context %p, param %" PRId32 ", value16 %" PRId16 ", value32 %" PRId32,
+    ALOGV("Downmix_setParameter, context %p, param %d, value16 %d, value32 %d",
             pDownmixer, param, *(int16_t *)pValue, *(int32_t *)pValue);
 
     switch (param) {
 
       case DOWNMIX_PARAM_TYPE:
         if (size != sizeof(downmix_type_t)) {
-            ALOGE("Downmix_setParameter(DOWNMIX_PARAM_TYPE) invalid size %" PRIu32 ", should be %zu",
+            ALOGE("Downmix_setParameter(DOWNMIX_PARAM_TYPE) invalid size %u, should be %zu",
                     size, sizeof(downmix_type_t));
             return -EINVAL;
         }
         value16 = *(int16_t *)pValue;
-        ALOGV("set DOWNMIX_PARAM_TYPE, type %" PRId16, value16);
+        ALOGV("set DOWNMIX_PARAM_TYPE, type %d", value16);
         if (!((value16 > DOWNMIX_TYPE_INVALID) && (value16 <= DOWNMIX_TYPE_LAST))) {
-            ALOGE("Downmix_setParameter invalid DOWNMIX_PARAM_TYPE value %" PRId16, value16);
+            ALOGE("Downmix_setParameter invalid DOWNMIX_PARAM_TYPE value %d", value16);
             return -EINVAL;
         } else {
             pDownmixer->type = (downmix_type_t) value16;
         break;
 
       default:
-        ALOGE("Downmix_setParameter unknown parameter %" PRId32, param);
+        ALOGE("Downmix_setParameter unknown parameter %d", param);
         return -EINVAL;
     }
 }
@@ -792,24 +853,25 @@ int Downmix_setParameter(downmix_object_t *pDownmixer, int32_t param, uint32_t s
  *
  *----------------------------------------------------------------------------
  */
-int Downmix_getParameter(downmix_object_t *pDownmixer, int32_t param, uint32_t *pSize, void *pValue) {
+static int Downmix_getParameter(
+        downmix_object_t *pDownmixer, int32_t param, uint32_t *pSize, void *pValue) {
     int16_t *pValue16;
 
     switch (param) {
 
     case DOWNMIX_PARAM_TYPE:
       if (*pSize < sizeof(int16_t)) {
-          ALOGE("Downmix_getParameter invalid parameter size %" PRIu32 " for DOWNMIX_PARAM_TYPE", *pSize);
+          ALOGE("Downmix_getParameter invalid parameter size %u for DOWNMIX_PARAM_TYPE", *pSize);
           return -EINVAL;
       }
       pValue16 = (int16_t *)pValue;
       *pValue16 = (int16_t) pDownmixer->type;
       *pSize = sizeof(int16_t);
-      ALOGV("Downmix_getParameter DOWNMIX_PARAM_TYPE is %" PRId16, *pValue16);
+      ALOGV("Downmix_getParameter DOWNMIX_PARAM_TYPE is %d", *pValue16);
       break;
 
     default:
-      ALOGE("Downmix_getParameter unknown parameter %" PRId16, param);
+      ALOGE("Downmix_getParameter unknown parameter %d", param);
       return -EINVAL;
     }
 

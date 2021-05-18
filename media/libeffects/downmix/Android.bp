@@ -18,9 +18,8 @@ license {
     ],
 }
 
-cc_library_shared {
+cc_library {
     name: "libdownmix",
-
     vendor: true,
     srcs: ["EffectDownmix.c"],
 
