@@ -62,14 +62,6 @@ typedef struct downmix_module_s {
     downmix_object_t context;
 } downmix_module_t;
 
-// subset of possible audio_channel_mask_t values, and AUDIO_CHANNEL_OUT_* renamed to CHANNEL_MASK_*
-typedef enum {
-    CHANNEL_MASK_QUAD_BACK = AUDIO_CHANNEL_OUT_QUAD_BACK,
-    CHANNEL_MASK_QUAD_SIDE = AUDIO_CHANNEL_OUT_QUAD_SIDE,
-    CHANNEL_MASK_5POINT1_BACK = AUDIO_CHANNEL_OUT_5POINT1_BACK,
-    CHANNEL_MASK_5POINT1_SIDE = AUDIO_CHANNEL_OUT_5POINT1_SIDE,
-    CHANNEL_MASK_7POINT1 = AUDIO_CHANNEL_OUT_7POINT1,
-} downmix_input_channel_mask_t;
 
 // Audio Effect API
 static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
@@ -271,9 +263,9 @@ static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
     ALOGI("DOWNMIX_TEST_CHANNEL_INDEX: should work:");
     Downmix_testIndexComputation(AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT |
                     AUDIO_CHANNEL_OUT_LOW_FREQUENCY | AUDIO_CHANNEL_OUT_BACK_CENTER);
-    Downmix_testIndexComputation(CHANNEL_MASK_QUAD_SIDE | CHANNEL_MASK_QUAD_BACK);
-    Downmix_testIndexComputation(CHANNEL_MASK_5POINT1_SIDE | AUDIO_CHANNEL_OUT_BACK_CENTER);
-    Downmix_testIndexComputation(CHANNEL_MASK_5POINT1_BACK | AUDIO_CHANNEL_OUT_BACK_CENTER);
+    Downmix_testIndexComputation(AUDIO_CHANNEL_OUT_QUAD_SIDE | AUDIO_CHANNEL_OUT_QUAD_BACK);
+    Downmix_testIndexComputation(AUDIO_CHANNEL_OUT_5POINT1_SIDE | AUDIO_CHANNEL_OUT_BACK_CENTER);
+    Downmix_testIndexComputation(AUDIO_CHANNEL_OUT_5POINT1_BACK | AUDIO_CHANNEL_OUT_BACK_CENTER);
     // shouldn't work (will log an error, won't display channel indices)
     ALOGI("DOWNMIX_TEST_CHANNEL_INDEX: should NOT work:");
     Downmix_testIndexComputation(AUDIO_CHANNEL_OUT_FRONT_LEFT | AUDIO_CHANNEL_OUT_FRONT_RIGHT |
@@ -429,16 +421,16 @@ static int32_t Downmix_Process(effect_handle_t self,
           break;
 #endif
         // optimize for the common formats
-        switch((downmix_input_channel_mask_t)downmixInputChannelMask) {
-        case CHANNEL_MASK_QUAD_BACK:
-        case CHANNEL_MASK_QUAD_SIDE:
+        switch (downmixInputChannelMask) {
+        case AUDIO_CHANNEL_OUT_QUAD_BACK:
+        case AUDIO_CHANNEL_OUT_QUAD_SIDE:
             Downmix_foldFromQuad(pSrc, pDst, numFrames, accumulate);
             break;
-        case CHANNEL_MASK_5POINT1_BACK:
-        case CHANNEL_MASK_5POINT1_SIDE:
+        case AUDIO_CHANNEL_OUT_5POINT1_BACK:
+        case AUDIO_CHANNEL_OUT_5POINT1_SIDE:
             Downmix_foldFrom5Point1(pSrc, pDst, numFrames, accumulate);
             break;
-        case CHANNEL_MASK_7POINT1:
+        case AUDIO_CHANNEL_OUT_7POINT1:
             Downmix_foldFrom7Point1(pSrc, pDst, numFrames, accumulate);
             break;
         default:
