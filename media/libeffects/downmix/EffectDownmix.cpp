@@ -256,8 +256,8 @@ static bool Downmix_validChannelMask(uint32_t mask)
 /*--- Effect Library Interface Implementation ---*/
 
 static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
-        int32_t sessionId __unused,
-        int32_t ioId __unused,
+        int32_t /* sessionId */,
+        int32_t /* ioId */,
         effect_handle_t *pHandle) {
     int ret;
     int i;
@@ -769,7 +769,7 @@ static int Downmix_Configure(downmix_module_t *pDwmModule, effect_config_t *pCon
  *----------------------------------------------------------------------------
  */
 
-static int Downmix_Reset(downmix_object_t *pDownmixer __unused, bool init __unused) {
+static int Downmix_Reset(downmix_object_t* /* pDownmixer */, bool /* init */) {
     // nothing to do here
     return 0;
 }

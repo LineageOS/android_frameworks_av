@@ -15,8 +15,9 @@ package {
 // Use "atest downmix_tests" to run.
 cc_test {
     name:"downmix_tests",
-    host_supported: false,
-    proprietary: true,
+    gtest: true,
+    host_supported: true,
+    vendor: true,
     include_dirs: [
         "frameworks/av/media/libeffects/downmix",
     ],
