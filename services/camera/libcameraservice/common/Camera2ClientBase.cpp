@@ -405,6 +405,17 @@ void Camera2ClientBase<TClientBase>::SharedCameraCallbacks::clear() {
     mRemoteCallback.clear();
 }
 
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::injectCamera(const String8& injectedCamId,
+        sp<CameraProviderManager> manager) {
+    return mDevice->injectCamera(injectedCamId, manager);
+}
+
+template <typename TClientBase>
+status_t Camera2ClientBase<TClientBase>::stopInjection() {
+    return mDevice->stopInjection();
+}
+
 template class Camera2ClientBase<CameraService::Client>;
 template class Camera2ClientBase<CameraDeviceClientBase>;
 
