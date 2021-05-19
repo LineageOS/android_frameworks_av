@@ -28,8 +28,6 @@
 
 #define MINUS_3_DB_IN_FLOAT M_SQRT1_2 // -3dB = 0.70710678
 
-#define LVM_FLOAT float
-
 const uint32_t kSides = AUDIO_CHANNEL_OUT_SIDE_LEFT | AUDIO_CHANNEL_OUT_SIDE_RIGHT;
 const uint32_t kBacks = AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT;
 const uint32_t kUnsupported =
@@ -137,7 +135,7 @@ static const effect_descriptor_t * const gDescriptors[] = {
 // number of effects in this library
 const int kNbEffects = sizeof(gDescriptors) / sizeof(const effect_descriptor_t *);
 
-static LVM_FLOAT clamp_float(LVM_FLOAT a) {
+static float clamp_float(float a) {
     if (a > 1.0f) {
         return 1.0f;
     }
@@ -356,7 +354,7 @@ static int32_t Downmix_Process(effect_handle_t self,
         audio_buffer_t *inBuffer, audio_buffer_t *outBuffer) {
 
     downmix_object_t *pDownmixer;
-    LVM_FLOAT *pSrc, *pDst;
+    float *pSrc, *pDst;
     downmix_module_t *pDwmModule = (downmix_module_t *)self;
 
     if (pDwmModule == NULL) {
@@ -379,8 +377,8 @@ static int32_t Downmix_Process(effect_handle_t self,
         return -ENODATA;
     }
 
-    pSrc = (LVM_FLOAT *) inBuffer->s16;
-    pDst = (LVM_FLOAT *) outBuffer->s16;
+    pSrc = inBuffer->f32;
+    pDst = outBuffer->f32;
     size_t numFrames = outBuffer->frameCount;
 
     const bool accumulate =
@@ -888,7 +886,7 @@ static int Downmix_getParameter(
  *
  *----------------------------------------------------------------------------
  */
-void Downmix_foldFromQuad(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
+void Downmix_foldFromQuad(float *pSrc, float *pDst, size_t numFrames, bool accumulate) {
     // sample at index 0 is FL
     // sample at index 1 is FR
     // sample at index 2 is RL
@@ -933,8 +931,8 @@ void Downmix_foldFromQuad(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bo
  *
  *----------------------------------------------------------------------------
  */
-void Downmix_foldFrom5Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
-    LVM_FLOAT lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
+void Downmix_foldFrom5Point1(float *pSrc, float *pDst, size_t numFrames, bool accumulate) {
+    float lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
     // sample at index 0 is FL
     // sample at index 1 is FR
     // sample at index 2 is FC
@@ -995,8 +993,8 @@ void Downmix_foldFrom5Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames,
  *
  *----------------------------------------------------------------------------
  */
-void Downmix_foldFrom7Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
-    LVM_FLOAT lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
+void Downmix_foldFrom7Point1(float *pSrc, float *pDst, size_t numFrames, bool accumulate) {
+    float lt, rt, centerPlusLfeContrib; // samples in Q19.12 format
     // sample at index 0 is FL
     // sample at index 1 is FR
     // sample at index 2 is FC
@@ -1069,7 +1067,7 @@ void Downmix_foldFrom7Point1(LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames,
  *----------------------------------------------------------------------------
  */
 bool Downmix_foldGeneric(
-        uint32_t mask, LVM_FLOAT *pSrc, LVM_FLOAT *pDst, size_t numFrames, bool accumulate) {
+        uint32_t mask, float *pSrc, float *pDst, size_t numFrames, bool accumulate) {
 
     if (!Downmix_validChannelMask(mask)) {
         return false;
@@ -1095,7 +1093,7 @@ bool Downmix_foldGeneric(
     const int indexSL  = hasSides ? indexBC + 1  : indexBC;  // side left
     const int indexSR  = hasSides ? indexSL + 1  : indexSL;  // side right
 
-    LVM_FLOAT lt, rt, centersLfeContrib;
+    float lt, rt, centersLfeContrib;
     // code is mostly duplicated between the two values of accumulate to avoid repeating the test
     // for every sample
     if (accumulate) {
