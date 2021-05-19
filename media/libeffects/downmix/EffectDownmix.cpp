@@ -28,18 +28,6 @@
 
 #define MINUS_3_DB_IN_FLOAT M_SQRT1_2 // -3dB = 0.70710678
 
-const uint32_t kSides = AUDIO_CHANNEL_OUT_SIDE_LEFT | AUDIO_CHANNEL_OUT_SIDE_RIGHT;
-const uint32_t kBacks = AUDIO_CHANNEL_OUT_BACK_LEFT | AUDIO_CHANNEL_OUT_BACK_RIGHT;
-const uint32_t kUnsupported =
-        AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER | AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER |
-        AUDIO_CHANNEL_OUT_TOP_CENTER |
-        AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT |
-        AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER |
-        AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT |
-        AUDIO_CHANNEL_OUT_TOP_BACK_LEFT |
-        AUDIO_CHANNEL_OUT_TOP_BACK_CENTER |
-        AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT;
-
 typedef enum {
     DOWNMIX_STATE_UNINITIALIZED,
     DOWNMIX_STATE_INITIALIZED,
@@ -135,16 +123,8 @@ static const effect_descriptor_t * const gDescriptors[] = {
 // number of effects in this library
 const int kNbEffects = sizeof(gDescriptors) / sizeof(const effect_descriptor_t *);
 
-static float clamp_float(float a) {
-    if (a > 1.0f) {
-        return 1.0f;
-    }
-    else if (a < -1.0f) {
-        return -1.0f;
-    }
-    else {
-        return a;
-    }
+static inline float clamp_float(float value) {
+    return fmin(fmax(value, -1.f), 1.f);
 }
 
 /*----------------------------------------------------------------------------
@@ -213,28 +193,9 @@ static bool Downmix_validChannelMask(uint32_t mask)
         return false;
     }
     // check against unsupported channels
-    if (mask & kUnsupported) {
-        ALOGE("Unsupported channels (top or front left/right of center)");
+    if (mask & ~AUDIO_CHANNEL_OUT_22POINT2) {
+        ALOGE("Unsupported channels in %u", mask & ~AUDIO_CHANNEL_OUT_22POINT2);
         return false;
-    }
-    // verify has FL/FR
-    if ((mask & AUDIO_CHANNEL_OUT_STEREO) != AUDIO_CHANNEL_OUT_STEREO) {
-        ALOGE("Front channels must be present");
-        return false;
-    }
-    // verify uses SIDE as a pair (ok if not using SIDE at all)
-    if ((mask & kSides) != 0) {
-        if ((mask & kSides) != kSides) {
-            ALOGE("Side channels must be used as a pair");
-            return false;
-        }
-    }
-    // verify uses BACK as a pair (ok if not using BACK at all)
-    if ((mask & kBacks) != 0) {
-        if ((mask & kBacks) != kBacks) {
-            ALOGE("Back channels must be used as a pair");
-            return false;
-        }
     }
     return true;
 }
@@ -1044,13 +1005,7 @@ void Downmix_foldFrom7Point1(float *pSrc, float *pDst, size_t numFrames, bool ac
  * Downmix_foldGeneric()
  *----------------------------------------------------------------------------
  * Purpose:
- * downmix to stereo a multichannel signal whose format is:
- *  - has FL/FR
- *  - if using AUDIO_CHANNEL_OUT_SIDE*, it contains both left and right
- *  - if using AUDIO_CHANNEL_OUT_BACK*, it contains both left and right
- *  - doesn't use any of the AUDIO_CHANNEL_OUT_TOP* channels
- *  - doesn't use any of the AUDIO_CHANNEL_OUT_FRONT_*_OF_CENTER channels
- * Only handles channel masks not enumerated in downmix_input_channel_mask_t
+ * downmix to stereo a multichannel signal of arbitrary channel position mask.
  *
  * Inputs:
  *  mask       the channel mask of pSrc
@@ -1072,88 +1027,101 @@ bool Downmix_foldGeneric(
     if (!Downmix_validChannelMask(mask)) {
         return false;
     }
-
-    const bool hasSides = (mask & kSides) != 0;
-    const bool hasBacks = (mask & kBacks) != 0;
-
     const int numChan = audio_channel_count_from_out_mask(mask);
-    const bool hasFC = ((mask & AUDIO_CHANNEL_OUT_FRONT_CENTER) == AUDIO_CHANNEL_OUT_FRONT_CENTER);
-    const bool hasLFE =
-            ((mask & AUDIO_CHANNEL_OUT_LOW_FREQUENCY) == AUDIO_CHANNEL_OUT_LOW_FREQUENCY);
-    const bool hasBC = ((mask & AUDIO_CHANNEL_OUT_BACK_CENTER) == AUDIO_CHANNEL_OUT_BACK_CENTER);
-    // compute at what index each channel is: samples will be in the following order:
-    //   FL FR FC LFE BL BR BC SL SR
-    // when a channel is not present, its index is set to the same as the index of the preceding
-    // channel
-    const int indexFC  = hasFC    ? 2            : 1;        // front center
-    const int indexLFE = hasLFE   ? indexFC + 1  : indexFC;  // low frequency
-    const int indexBL  = hasBacks ? indexLFE + 1 : indexLFE; // back left
-    const int indexBR  = hasBacks ? indexBL + 1  : indexBL;  // back right
-    const int indexBC  = hasBC    ? indexBR + 1  : indexBR;  // back center
-    const int indexSL  = hasSides ? indexBC + 1  : indexBC;  // side left
-    const int indexSR  = hasSides ? indexSL + 1  : indexSL;  // side right
 
-    float lt, rt, centersLfeContrib;
-    // code is mostly duplicated between the two values of accumulate to avoid repeating the test
-    // for every sample
-    if (accumulate) {
-        while (numFrames) {
-            // compute contribution of FC, BC and LFE
-            centersLfeContrib = 0;
-            if (hasFC)  { centersLfeContrib += pSrc[indexFC]; }
-            if (hasLFE) { centersLfeContrib += pSrc[indexLFE]; }
-            if (hasBC)  { centersLfeContrib += pSrc[indexBC]; }
-            centersLfeContrib *= MINUS_3_DB_IN_FLOAT;
-            // always has FL/FR
-            lt = pSrc[0];
-            rt = pSrc[1];
-            // mix in sides and backs
-            if (hasSides) {
-                lt += pSrc[indexSL];
-                rt += pSrc[indexSR];
-            }
-            if (hasBacks) {
-                lt += pSrc[indexBL];
-                rt += pSrc[indexBR];
-            }
-            lt += centersLfeContrib;
-            rt += centersLfeContrib;
-            // accumulate in destination
-            pDst[0] = clamp_float(pDst[0] + (lt / 2.0f));
-            pDst[1] = clamp_float(pDst[1] + (rt / 2.0f));
-            pSrc += numChan;
-            pDst += 2;
-            numFrames--;
+    // compute at what index each channel is: samples will be in the following order:
+    //   FL  FR  FC    LFE   BL  BR  BC    SL  SR
+    //
+    //  (transfer matrix)
+    //   FL  FR  FC    LFE   BL  BR  BC    SL  SR
+    //   0.5     0.353 0.353 0.5     0.353 0.5
+    //       0.5 0.353 0.353     0.5 0.353     0.5
+
+    // derive the indices for the transfer matrix columns that have non-zero values.
+    int indexFL = -1;
+    int indexFR = -1;
+    int indexFC = -1;
+    int indexLFE = -1;
+    int indexBL = -1;
+    int indexBR = -1;
+    int indexBC = -1;
+    int indexSL = -1;
+    int indexSR = -1;
+    int index = 0;
+    for (unsigned tmp = mask;
+         (tmp & (AUDIO_CHANNEL_OUT_7POINT1 | AUDIO_CHANNEL_OUT_BACK_CENTER)) != 0;
+         ++index) {
+        const unsigned lowestBit = tmp & -(signed)tmp;
+        switch (lowestBit) {
+        case AUDIO_CHANNEL_OUT_FRONT_LEFT:
+            indexFL = index;
+            break;
+        case AUDIO_CHANNEL_OUT_FRONT_RIGHT:
+            indexFR = index;
+            break;
+        case AUDIO_CHANNEL_OUT_FRONT_CENTER:
+            indexFC = index;
+            break;
+        case AUDIO_CHANNEL_OUT_LOW_FREQUENCY:
+            indexLFE = index;
+            break;
+        case AUDIO_CHANNEL_OUT_BACK_LEFT:
+            indexBL = index;
+            break;
+        case AUDIO_CHANNEL_OUT_BACK_RIGHT:
+            indexBR = index;
+            break;
+        case AUDIO_CHANNEL_OUT_BACK_CENTER:
+            indexBC = index;
+            break;
+        case AUDIO_CHANNEL_OUT_SIDE_LEFT:
+            indexSL = index;
+            break;
+        case AUDIO_CHANNEL_OUT_SIDE_RIGHT:
+            indexSR = index;
+            break;
         }
-    } else {
-        while (numFrames) {
-            // compute contribution of FC, BC and LFE
-            centersLfeContrib = 0;
-            if (hasFC)  { centersLfeContrib += pSrc[indexFC]; }
-            if (hasLFE) { centersLfeContrib += pSrc[indexLFE]; }
-            if (hasBC)  { centersLfeContrib += pSrc[indexBC]; }
-            centersLfeContrib *= MINUS_3_DB_IN_FLOAT;
-            // always has FL/FR
-            lt = pSrc[0];
-            rt = pSrc[1];
-            // mix in sides and backs
-            if (hasSides) {
-                lt += pSrc[indexSL];
-                rt += pSrc[indexSR];
-            }
-            if (hasBacks) {
-                lt += pSrc[indexBL];
-                rt += pSrc[indexBR];
-            }
-            lt += centersLfeContrib;
-            rt += centersLfeContrib;
-            // store in destination
-            pDst[0] = clamp_float(lt / 2.0f); // differs from when accumulate is true above
-            pDst[1] = clamp_float(rt / 2.0f); // differs from when accumulate is true above
-            pSrc += numChan;
-            pDst += 2;
-            numFrames--;
+        tmp ^= lowestBit;
+    }
+
+    // With good branch prediction, this should run reasonably fast.
+    // Also consider using a transfer matrix form.
+    while (numFrames) {
+        // compute contribution of FC, BC and LFE
+        float centersLfeContrib = 0;
+        if (indexFC >= 0) centersLfeContrib = pSrc[indexFC];
+        if (indexLFE >= 0) centersLfeContrib += pSrc[indexLFE];
+        if (indexBC >= 0) centersLfeContrib += pSrc[indexBC];
+        centersLfeContrib *= MINUS_3_DB_IN_FLOAT;
+
+        float ch[2];
+        ch[0] = centersLfeContrib;
+        ch[1] = centersLfeContrib;
+
+        // mix in left / right channels
+        if (indexFL >= 0) ch[0] += pSrc[indexFL];
+        if (indexFR >= 0) ch[1] += pSrc[indexFR];
+
+        if (indexSL >= 0) ch[0] += pSrc[indexSL];
+        if (indexSR >= 0) ch[1] += pSrc[indexSR]; // note pair checks enforce this if indexSL != 0
+
+        if (indexBL >= 0) ch[0] += pSrc[indexBL];
+        if (indexBR >= 0) ch[1] += pSrc[indexBR]; // note pair checks enforce this if indexBL != 0
+
+        // scale to prevent overflow.
+        ch[0] *= 0.5f;
+        ch[1] *= 0.5f;
+
+        if (accumulate) {
+            ch[0] += pDst[0];
+            ch[1] += pDst[1];
         }
+
+        pDst[0] = clamp_float(ch[0]);
+        pDst[1] = clamp_float(ch[1]);
+        pSrc += numChan;
+        pDst += 2;
+        numFrames--;
     }
     return true;
 }

@@ -64,32 +64,32 @@ static constexpr size_t kFrameCount = 1000;
 /*
 Pixel 3XL
 downmix_benchmark:
-  #BM_Downmix/0     5211 ns    5194 ns       135028
-  #BM_Downmix/1     5611 ns    5593 ns       126034
-  #BM_Downmix/2     2151 ns    2145 ns       325651
-  #BM_Downmix/3     2263 ns    2256 ns       325645
-  #BM_Downmix/4     2146 ns    2139 ns       310723
-  #BM_Downmix/5     6236 ns    6215 ns       112742
-  #BM_Downmix/6     6415 ns    6394 ns       109240
-  #BM_Downmix/7     6806 ns    6783 ns       102283
-  #BM_Downmix/8     6802 ns    6780 ns       103021
-  #BM_Downmix/9     6841 ns    6818 ns       102421
-  #BM_Downmix/10    7798 ns    7772 ns        90136
-  #BM_Downmix/11    8591 ns    8562 ns        81242
+  #BM_Downmix/0     4719 ns    4704 ns       148890
+  #BM_Downmix/1     5050 ns    5034 ns       139104
+  #BM_Downmix/2     1506 ns    1501 ns       466795
+  #BM_Downmix/3     1554 ns    1549 ns       444498
+  #BM_Downmix/4     1514 ns    1510 ns       463697
+  #BM_Downmix/5     4442 ns    4428 ns       158016
+  #BM_Downmix/6     4404 ns    4378 ns       159858
+  #BM_Downmix/7     4851 ns    4835 ns       144681
+  #BM_Downmix/8     4848 ns    4832 ns       144560
+  #BM_Downmix/9     4859 ns    4844 ns       144496
+  #BM_Downmix/10    5806 ns    5788 ns       120751
+  #BM_Downmix/11    5051 ns    5036 ns       138920
 --
-downmix_benchmark: (generic fold for all channel masks)
-  #BM_Downmix/0     5205 ns    5188 ns       134594
-  #BM_Downmix/1     5604 ns    5586 ns       124443
-  #BM_Downmix/2     5564 ns    5546 ns       126144
-  #BM_Downmix/3     5736 ns    5718 ns       126185
-  #BM_Downmix/4     5721 ns    5705 ns       121404
-  #BM_Downmix/5     6264 ns    6243 ns       112684
-  #BM_Downmix/6     6417 ns    6395 ns       109391
-  #BM_Downmix/7     6739 ns    6718 ns       103811
-  #BM_Downmix/8     6762 ns    6740 ns       103860
-  #BM_Downmix/9     6769 ns    6747 ns       103680
-  #BM_Downmix/10    7806 ns    7779 ns        90045
-  #BM_Downmix/11    7939 ns    7911 ns        88370
+downmix_benchmark: (generic fold)
+  #BM_Downmix/0     4723 ns    4708 ns       148605
+  #BM_Downmix/1     5081 ns    5065 ns       137920
+  #BM_Downmix/2     4472 ns    4458 ns       160047
+  #BM_Downmix/3     4359 ns    4345 ns       158744
+  #BM_Downmix/4     4722 ns    4706 ns       149648
+  #BM_Downmix/5     4426 ns    4412 ns       158618
+  #BM_Downmix/6     4377 ns    4363 ns       160217
+  #BM_Downmix/7     5262 ns    5245 ns       133155
+  #BM_Downmix/8     5265 ns    5248 ns       132817
+  #BM_Downmix/9     5246 ns    5229 ns       133932
+  #BM_Downmix/10    5819 ns    5801 ns       120295
+  #BM_Downmix/11    6030 ns    6011 ns       116619
 */
 
 static void BM_Downmix(benchmark::State& state) {
