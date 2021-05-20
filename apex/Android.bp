@@ -24,7 +24,7 @@ package {
 apex_defaults {
     name: "com.android.media-defaults",
     updatable: true,
-    java_libs: ["updatable-media"],
+    bootclasspath_fragments: ["com.android.media-bootclasspath-fragment"],
     multilib: {
         first: {
             // Extractor process runs only with the primary ABI.
@@ -82,6 +82,13 @@ linker_config {
     name: "media-linker-config",
     src: "linker.config.json",
     installable: false,
+}
+
+// Encapsulate the contributions made by the com.android.media to the bootclasspath.
+bootclasspath_fragment {
+    name: "com.android.media-bootclasspath-fragment",
+    contents: ["updatable-media"],
+    apex_available: ["com.android.media"],
 }
 
 filegroup {
