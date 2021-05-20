@@ -64,20 +64,26 @@ public:
      * case where the construction is offloaded to another thread which isn't a
      * hwbinder thread.
      */
-    ClientPriority(int32_t score, int32_t state, bool isVendorClient) :
-            mScore((score == INVALID_ADJ) ? UNKNOWN_ADJ : score),
-            mState(state),
-            mIsVendorClient(isVendorClient) { }
+    ClientPriority(int32_t score, int32_t state, bool isVendorClient, int32_t scoreOffset = 0) :
+            mIsVendorClient(isVendorClient), mScoreOffset(scoreOffset) {
+        setScore(score);
+        setState(state);
+    }
 
     int32_t getScore() const { return mScore; }
     int32_t getState() const { return mState; }
+    int32_t isVendorClient() const { return mIsVendorClient; }
 
     void setScore(int32_t score) {
         // For vendor clients, the score is set once and for all during
         // construction. Otherwise, it can get reset each time cameraserver
         // queries ActivityManagerService for oom_adj scores / states .
-        if (!mIsVendorClient) {
-            mScore = (score == INVALID_ADJ) ? UNKNOWN_ADJ : score;
+        // For clients where the score offset is set by the app, add it to the
+        // score provided by ActivityManagerService.
+        if (score == INVALID_ADJ) {
+            mScore = UNKNOWN_ADJ;
+        } else {
+            mScore = mScoreOffset + score;
         }
     }
 
@@ -87,9 +93,7 @@ public:
       // queries ActivityManagerService for oom_adj scores / states
       // (ActivityManagerService returns a vendor process' state as
       // PROCESS_STATE_NONEXISTENT.
-      if (!mIsVendorClient) {
-          mState = state;
-      }
+      mState = state;
     }
 
     bool operator==(const ClientPriority& rhs) const {
@@ -120,6 +124,7 @@ private:
         int32_t mScore;
         int32_t mState;
         bool mIsVendorClient = false;
+        int32_t mScoreOffset = 0;
 };
 
 // --------------------------------------------------------------------------------
@@ -137,9 +142,10 @@ class ClientDescriptor final {
 public:
     ClientDescriptor(const KEY& key, const VALUE& value, int32_t cost,
             const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
-            bool isVendorClient);
+            bool isVendorClient, int32_t oomScoreOffset);
     ClientDescriptor(KEY&& key, VALUE&& value, int32_t cost, std::set<KEY>&& conflictingKeys,
-            int32_t score, int32_t ownerId, int32_t state, bool isVendorClient);
+            int32_t score, int32_t ownerId, int32_t state, bool isVendorClient,
+            int32_t oomScoreOffset);
 
     ~ClientDescriptor();
 
@@ -204,18 +210,18 @@ bool operator < (const ClientDescriptor<K, V>& a, const ClientDescriptor<K, V>& 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::ClientDescriptor(const KEY& key, const VALUE& value, int32_t cost,
         const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
-        bool isVendorClient) :
+        bool isVendorClient, int32_t scoreOffset) :
         mKey{key}, mValue{value}, mCost{cost}, mConflicting{conflictingKeys},
-        mPriority(score, state, isVendorClient),
+        mPriority(score, state, isVendorClient, scoreOffset),
         mOwnerId{ownerId} {}
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::ClientDescriptor(KEY&& key, VALUE&& value, int32_t cost,
         std::set<KEY>&& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
-        bool isVendorClient) :
+        bool isVendorClient, int32_t scoreOffset) :
         mKey{std::forward<KEY>(key)}, mValue{std::forward<VALUE>(value)}, mCost{cost},
         mConflicting{std::forward<std::set<KEY>>(conflictingKeys)},
-        mPriority(score, state, isVendorClient), mOwnerId{ownerId} {}
+        mPriority(score, state, isVendorClient, scoreOffset), mOwnerId{ownerId} {}
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::~ClientDescriptor() {}
@@ -266,6 +272,9 @@ void ClientDescriptor<KEY, VALUE>::setPriority(const ClientPriority& priority) {
     // off in the incoming priority argument since an AIDL thread might have
     // called getCurrentServingCall() == BinderCallType::HWBINDER after refreshing
     // priorities for old clients through ProcessInfoService::getProcessStatesScoresFromPids().
+    if (mPriority.isVendorClient()) {
+        return;
+    }
     mPriority.setScore(priority.getScore());
     mPriority.setState(priority.getState());
 }
