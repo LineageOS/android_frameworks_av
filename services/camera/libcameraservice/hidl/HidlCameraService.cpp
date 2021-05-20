@@ -104,7 +104,7 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
     binder::Status serviceRet = mAidlICameraService->connectDevice(
             callbacks, String16(cameraId.c_str()), String16(""), {},
-            hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
+            hardware::ICameraService::USE_CALLING_UID, 0/*oomScoreOffset*/, /*out*/&deviceRemote);
     HStatus status = HStatus::NO_ERROR;
     if (!serviceRet.isOk()) {
         ALOGE("%s: Unable to connect to camera device", __FUNCTION__);
