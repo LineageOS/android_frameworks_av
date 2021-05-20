@@ -317,6 +317,14 @@ public:
         // Set/reset camera mute
         virtual status_t setCameraMute(bool enabled) = 0;
 
+        // The injection camera session to replace the internal camera
+        // session.
+        virtual status_t injectCamera(const String8& injectedCamId,
+                sp<CameraProviderManager> manager) = 0;
+
+        // Stop the injection camera and restore to internal camera session.
+        virtual status_t stopInjection() = 0;
+
     protected:
         BasicClient(const sp<CameraService>& cameraService,
                 const sp<IBinder>& remoteCallback,
@@ -1168,7 +1176,7 @@ private:
 
             void addListener(const sp<hardware::camera2::ICameraInjectionCallback>& callback);
             void removeListener();
-            void notifyInjectionError(int errorCode);
+            void notifyInjectionError(String8 injectedCamId, status_t err);
 
             // IBinder::DeathRecipient implementation
             virtual void binderDied(const wp<IBinder>& who);
@@ -1195,7 +1203,15 @@ private:
             wp<CameraService> mParent;
     };
 
-    void stopInjectionImpl();
+    void clearInjectionParameters();
+
+    // This is the existing camera id being replaced.
+    String8 mInjectionInternalCamId;
+    // This is the external camera Id replacing the internalId.
+    String8 mInjectionExternalCamId;
+    bool mInjectionInitPending = true;
+    // Guard mInjectionInternalCamId and mInjectionInitPending.
+    Mutex mInjectionParametersLock;
 };
 
 } // namespace android
