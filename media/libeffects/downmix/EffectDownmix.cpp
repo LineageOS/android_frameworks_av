@@ -20,7 +20,6 @@
 
 #include "EffectDownmix.h"
 #include <math.h>
-#include <stdlib.h>
 
 // Do not submit with DOWNMIX_TEST_CHANNEL_INDEX defined, strictly for testing
 //#define DOWNMIX_TEST_CHANNEL_INDEX 0
@@ -302,7 +301,7 @@ static int32_t DownmixLib_Create(const effect_uuid_t *uuid,
         return -ENOENT;
     }
 
-    module = malloc(sizeof(downmix_module_t));
+    module = new downmix_module_t{};
 
     module->itfe = &gDownmixInterface;
 
@@ -332,7 +331,7 @@ static int32_t DownmixLib_Release(effect_handle_t handle) {
 
     pDwmModule->context.state = DOWNMIX_STATE_UNINITIALIZED;
 
-    free(pDwmModule);
+    delete pDwmModule;
     return 0;
 }
 
@@ -495,7 +494,7 @@ static int32_t Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t 
         Downmix_Reset(pDownmixer, false);
         break;
 
-    case EFFECT_CMD_GET_PARAM:
+    case EFFECT_CMD_GET_PARAM: {
         ALOGV("Downmix_Command EFFECT_CMD_GET_PARAM pCmdData %p, *replySize %u, pReplyData: %p",
                 pCmdData, *replySize, pReplyData);
         if (pCmdData == NULL || cmdSize < (int)(sizeof(effect_param_t) + sizeof(int32_t)) ||
@@ -511,8 +510,8 @@ static int32_t Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t 
                 rep->data + sizeof(int32_t));
         *replySize = sizeof(effect_param_t) + sizeof(int32_t) + rep->vsize;
         break;
-
-    case EFFECT_CMD_SET_PARAM:
+    }
+    case EFFECT_CMD_SET_PARAM: {
         ALOGV("Downmix_Command EFFECT_CMD_SET_PARAM cmdSize %d pCmdData %p, *replySize %u"
                 ", pReplyData %p", cmdSize, pCmdData, *replySize, pReplyData);
         if (pCmdData == NULL || (cmdSize < (int)(sizeof(effect_param_t) + sizeof(int32_t)))
@@ -527,6 +526,7 @@ static int32_t Downmix_Command(effect_handle_t self, uint32_t cmdCode, uint32_t 
         *(int *)pReplyData = Downmix_setParameter(pDownmixer, *(int32_t *)cmd->data,
                 cmd->vsize, cmd->data + sizeof(int32_t));
         break;
+    }
 
     case EFFECT_CMD_SET_PARAM_DEFERRED:
         //FIXME implement

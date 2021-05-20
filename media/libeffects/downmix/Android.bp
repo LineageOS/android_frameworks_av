@@ -21,7 +21,7 @@ license {
 cc_library {
     name: "libdownmix",
     vendor: true,
-    srcs: ["EffectDownmix.c"],
+    srcs: ["EffectDownmix.cpp"],
 
     shared_libs: [
         "libaudioutils",
