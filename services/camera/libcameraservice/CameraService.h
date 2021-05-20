@@ -138,7 +138,7 @@ public:
     virtual binder::Status     connectDevice(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb, const String16& cameraId,
             const String16& clientPackageName, const std::optional<String16>& clientFeatureId,
-            int32_t clientUid,
+            int32_t clientUid, int scoreOffset,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
 
@@ -510,14 +510,14 @@ public:
          */
         static DescriptorPtr makeClientDescriptor(const String8& key, const sp<BasicClient>& value,
                 int32_t cost, const std::set<String8>& conflictingKeys, int32_t score,
-                int32_t ownerId, int32_t state);
+                int32_t ownerId, int32_t state, int oomScoreOffset);
 
         /**
          * Make a ClientDescriptor object wrapping the given BasicClient strong pointer with
          * values intialized from a prior ClientDescriptor.
          */
         static DescriptorPtr makeClientDescriptor(const sp<BasicClient>& value,
-                const CameraService::DescriptorPtr& partial);
+                const CameraService::DescriptorPtr& partial, int oomScoreOffset);
 
     }; // class CameraClientManager
 
@@ -739,6 +739,7 @@ private:
     // Only call with with mServiceLock held.
     status_t handleEvictionsLocked(const String8& cameraId, int clientPid,
         apiLevel effectiveApiLevel, const sp<IBinder>& remoteCallback, const String8& packageName,
+        int scoreOffset,
         /*out*/
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial);
@@ -772,7 +773,8 @@ private:
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
             int api1CameraId, const String16& clientPackageName,
             const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
-            apiLevel effectiveApiLevel, bool shimUpdateOnly, /*out*/sp<CLIENT>& device);
+            apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset,
+            /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
     Mutex               mServiceLock;
@@ -831,7 +833,8 @@ private:
      *
      * This method must be called with mServiceLock held.
      */
-    void finishConnectLocked(const sp<BasicClient>& client, const DescriptorPtr& desc);
+    void finishConnectLocked(const sp<BasicClient>& client, const DescriptorPtr& desc,
+            int oomScoreOffset);
 
     /**
      * Returns the underlying camera Id string mapped to a camera id int

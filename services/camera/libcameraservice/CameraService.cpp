@@ -945,7 +945,7 @@ Status CameraService::initializeShimMetadata(int cameraId) {
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
             internalPackageName, {}, uid, USE_CALLING_PID,
-            API_1, /*shimUpdateOnly*/ true, /*out*/ tmp)
+            API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
     }
@@ -1217,10 +1217,12 @@ status_t CameraService::checkIfDeviceIsUsable(const String8& cameraId) const {
 }
 
 void CameraService::finishConnectLocked(const sp<BasicClient>& client,
-        const CameraService::DescriptorPtr& desc) {
+        const CameraService::DescriptorPtr& desc, int oomScoreOffset) {
 
     // Make a descriptor for the incoming client
-    auto clientDescriptor = CameraService::CameraClientManager::makeClientDescriptor(client, desc);
+    auto clientDescriptor =
+            CameraService::CameraClientManager::makeClientDescriptor(client, desc,
+                    oomScoreOffset);
     auto evicted = mActiveClientManager.addAndEvict(clientDescriptor);
 
     logConnected(desc->getKey(), static_cast<int>(desc->getOwnerId()),
@@ -1250,6 +1252,7 @@ void CameraService::finishConnectLocked(const sp<BasicClient>& client,
 
 status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clientPid,
         apiLevel effectiveApiLevel, const sp<IBinder>& remoteCallback, const String8& packageName,
+        int oomScoreOffset,
         /*out*/
         sp<BasicClient>* client,
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>* partial) {
@@ -1301,7 +1304,8 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
         for (size_t i = 0; i < ownerPids.size() - 1; i++) {
             pidToPriorityMap.emplace(ownerPids[i],
                     resource_policy::ClientPriority(priorityScores[i], states[i],
-                            /* isVendorClient won't get copied over*/ false));
+                            /* isVendorClient won't get copied over*/ false,
+                            /* oomScoreOffset won't get copied over*/ 0));
         }
         mActiveClientManager.updatePriorities(pidToPriorityMap);
 
@@ -1314,13 +1318,16 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
             return BAD_VALUE;
         }
 
-        // Make descriptor for incoming client
+        int32_t actualScore = priorityScores[priorityScores.size() - 1];
+        int32_t actualState = states[states.size() - 1];
+
+        // Make descriptor for incoming client. We store the oomScoreOffset
+        // since we might need it later on new handleEvictionsLocked and
+        // ProcessInfoService would not take that into account.
         clientDescriptor = CameraClientManager::makeClientDescriptor(cameraId,
                 sp<BasicClient>{nullptr}, static_cast<int32_t>(state->getCost()),
-                state->getConflicting(),
-                priorityScores[priorityScores.size() - 1],
-                clientPid,
-                states[states.size() - 1]);
+                state->getConflicting(), actualScore, clientPid, actualState,
+                oomScoreOffset);
 
         resource_policy::ClientPriority clientPriority = clientDescriptor->getPriority();
 
@@ -1463,7 +1470,7 @@ Status CameraService::connect(
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
             clientPackageName, {}, clientUid, clientPid, API_1,
-            /*shimUpdateOnly*/ false, /*out*/client);
+            /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
@@ -1539,7 +1546,7 @@ Status CameraService::connectDevice(
         const String16& cameraId,
         const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId,
-        int clientUid,
+        int clientUid, int oomScoreOffset,
         /*out*/
         sp<hardware::camera2::ICameraDeviceUser>* device) {
 
@@ -1548,19 +1555,41 @@ Status CameraService::connectDevice(
     String8 id = String8(cameraId);
     sp<CameraDeviceClient> client = nullptr;
     String16 clientPackageNameAdj = clientPackageName;
+    int callingPid = CameraThreadState::getCallingPid();
 
     if (getCurrentServingCall() == BinderCallType::HWBINDER) {
         std::string vendorClient =
                 StringPrintf("vendor.client.pid<%d>", CameraThreadState::getCallingPid());
         clientPackageNameAdj = String16(vendorClient.c_str());
     }
+
+    if (oomScoreOffset < 0) {
+        String8 msg =
+                String8::format("Cannot increase the priority of a client %s pid %d for "
+                        "camera id %s", String8(clientPackageNameAdj).string(), callingPid,
+                        id.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, msg.string());
+    }
+
+    // enforce system camera permissions
+    if (oomScoreOffset > 0 &&
+            !hasPermissionsForSystemCamera(callingPid, CameraThreadState::getCallingUid())) {
+        String8 msg =
+                String8::format("Cannot change the priority of a client %s pid %d for "
+                        "camera id %s without SYSTEM_CAMERA permissions",
+                        String8(clientPackageNameAdj).string(), callingPid, id.string());
+        ALOGE("%s: %s", __FUNCTION__, msg.string());
+        return STATUS_ERROR(ERROR_PERMISSION_DENIED, msg.string());
+    }
+
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1, clientPackageNameAdj, clientFeatureId,
-            clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, /*out*/client);
+            clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, oomScoreOffset,
+            /*out*/client);
 
     if(!ret.isOk()) {
-        logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageNameAdj),
-                ret.toString8());
+        logRejected(id, callingPid, String8(clientPackageNameAdj), ret.toString8());
         return ret;
     }
 
@@ -1572,7 +1601,7 @@ template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
         int api1CameraId, const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
-        apiLevel effectiveApiLevel, bool shimUpdateOnly,
+        apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset,
         /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
 
@@ -1623,7 +1652,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         sp<BasicClient> clientTmp = nullptr;
         std::shared_ptr<resource_policy::ClientDescriptor<String8, sp<BasicClient>>> partial;
         if ((err = handleEvictionsLocked(cameraId, originalClientPid, effectiveApiLevel,
-                IInterface::asBinder(cameraCb), clientName8, /*out*/&clientTmp,
+                IInterface::asBinder(cameraCb), clientName8, oomScoreOffset, /*out*/&clientTmp,
                 /*out*/&partial)) != NO_ERROR) {
             switch (err) {
                 case -ENODEV:
@@ -1741,7 +1770,7 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
             mServiceLock.lock();
         } else {
             // Otherwise, add client to active clients list
-            finishConnectLocked(client, partial);
+            finishConnectLocked(client, partial, oomScoreOffset);
         }
 
         client->setImageDumpMask(mImageDumpMask);
@@ -1788,7 +1817,8 @@ status_t CameraService::addOfflineClient(String8 cameraId, sp<BasicClient> offli
         auto offlineClientDesc = CameraClientManager::makeClientDescriptor(
                 kOfflineDevice + onlineClientDesc->getKey(), offlineClient, /*cost*/ 0,
                 /*conflictingKeys*/ std::set<String8>(), onlinePriority.getScore(),
-                onlineClientDesc->getOwnerId(), onlinePriority.getState());
+                onlineClientDesc->getOwnerId(), onlinePriority.getState(),
+                /*ommScoreOffset*/ 0);
 
         // Allow only one offline device per camera
         auto incompatibleClients = mActiveClientManager.getIncompatibleClients(offlineClientDesc);
@@ -3662,21 +3692,23 @@ String8 CameraService::CameraClientManager::toString() const {
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(
         const String8& key, const sp<BasicClient>& value, int32_t cost,
         const std::set<String8>& conflictingKeys, int32_t score, int32_t ownerId,
-        int32_t state) {
+        int32_t state, int32_t oomScoreOffset) {
 
     bool isVendorClient = getCurrentServingCall() == BinderCallType::HWBINDER;
     int32_t score_adj = isVendorClient ? kVendorClientScore : score;
     int32_t state_adj = isVendorClient ? kVendorClientState: state;
 
     return std::make_shared<resource_policy::ClientDescriptor<String8, sp<BasicClient>>>(
-            key, value, cost, conflictingKeys, score_adj, ownerId, state_adj, isVendorClient);
+            key, value, cost, conflictingKeys, score_adj, ownerId, state_adj, isVendorClient,
+            oomScoreOffset);
 }
 
 CameraService::DescriptorPtr CameraService::CameraClientManager::makeClientDescriptor(
-        const sp<BasicClient>& value, const CameraService::DescriptorPtr& partial) {
+        const sp<BasicClient>& value, const CameraService::DescriptorPtr& partial,
+        int32_t oomScoreOffset) {
     return makeClientDescriptor(partial->getKey(), value, partial->getCost(),
             partial->getConflicting(), partial->getPriority().getScore(),
-            partial->getOwnerId(), partial->getPriority().getState());
+            partial->getOwnerId(), partial->getPriority().getState(), oomScoreOffset);
 }
 
 // ----------------------------------------------------------------------------
