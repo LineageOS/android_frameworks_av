@@ -1065,6 +1065,8 @@ status_t AudioFlinger::PlaybackThread::Track::start(AudioSystem::sync_event_t ev
             reset();
         }
 
+        // clear mPauseHwPending because of pause (and possibly flush) during underrun.
+        mPauseHwPending = false;
         if (state == PAUSED || state == PAUSING) {
             if (mResumeToStopping) {
                 // happened we need to resume to STOPPING_1
