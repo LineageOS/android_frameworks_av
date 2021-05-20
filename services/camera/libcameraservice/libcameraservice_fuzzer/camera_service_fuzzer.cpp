@@ -526,7 +526,7 @@ void Camera2Fuzzer::process() {
         sp<TestCameraDeviceCallbacks> callbacks(new TestCameraDeviceCallbacks());
         sp<hardware::camera2::ICameraDeviceUser> device;
         mCameraService->connectDevice(callbacks, String16(s.cameraId), String16(), {},
-                android::CameraService::USE_CALLING_UID, &device);
+                android::CameraService::USE_CALLING_UID, 0/*oomScoreDiff*/, &device);
         if (device == nullptr) {
             continue;
         }
