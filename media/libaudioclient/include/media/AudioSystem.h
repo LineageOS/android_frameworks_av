@@ -148,6 +148,11 @@ public:
     static void setRecordConfigCallback(record_config_callback);
     static void setRoutingCallback(routing_callback cb);
 
+    // Sets the binder to use for accessing the AudioFlinger service. This enables the system server
+    // to grant specific isolated processes access to the audio system. Currently used only for the
+    // HotwordDetectionService.
+    static void setAudioFlingerBinder(const sp<IBinder>& audioFlinger);
+
     // helper function to obtain AudioFlinger service handle
     static const sp<IAudioFlinger> get_audio_flinger();
 
