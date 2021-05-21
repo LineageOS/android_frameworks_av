@@ -67,7 +67,7 @@ static String16 resolveCallingPackage(PermissionController& permissionController
     return packages[0];
 }
 
-static int32_t getOpForSource(audio_source_t source) {
+int32_t getOpForSource(audio_source_t source) {
   switch (source) {
     case AUDIO_SOURCE_HOTWORD:
       return AppOpsManager::OP_RECORD_AUDIO_HOTWORD;
@@ -133,8 +133,8 @@ static bool checkRecordingInternal(const Identity& identity, const String16& msg
     return true;
 }
 
-bool recordingAllowed(const Identity& identity) {
-    return checkRecordingInternal(identity, String16(), /*start*/ false, AUDIO_SOURCE_DEFAULT);
+bool recordingAllowed(const Identity& identity, audio_source_t source) {
+    return checkRecordingInternal(identity, String16(), /*start*/ false, source);
 }
 
 bool startRecording(const Identity& identity, const String16& msg, audio_source_t source) {

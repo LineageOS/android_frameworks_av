@@ -580,7 +580,7 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
     // Capturing from FM_TUNER source is controlled by captureTunerAudioInputAllowed() and
     // captureAudioOutputAllowed() (deprecated) as this does not affect users privacy
     // as does capturing from an actual microphone.
-    if (!(recordingAllowed(adjIdentity) || attr.source == AUDIO_SOURCE_FM_TUNER)) {
+    if (!(recordingAllowed(adjIdentity, attr.source) || attr.source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for %s",
                 __func__, adjIdentity.toString().c_str());
         return binderStatusFromStatusT(PERMISSION_DENIED);
