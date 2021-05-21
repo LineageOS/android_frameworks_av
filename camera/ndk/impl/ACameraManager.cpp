@@ -739,7 +739,7 @@ ACameraManager::openCamera(
     // Send a zero length package name and let camera service figure it out from UID
     binder::Status serviceRet = cs->connectDevice(
             callbacks, String16(cameraId), String16(""), {},
-            hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
+            hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/0, /*out*/&deviceRemote);
 
     if (!serviceRet.isOk()) {
         ALOGE("%s: connect camera device failed: %s", __FUNCTION__, serviceRet.toString8().string());

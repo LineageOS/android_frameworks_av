@@ -378,7 +378,7 @@ TEST(CameraServiceBinderTest, CheckBinderCameraService) {
         sp<TestCameraDeviceCallbacks> callbacks(new TestCameraDeviceCallbacks());
         sp<hardware::camera2::ICameraDeviceUser> device;
         res = service->connectDevice(callbacks, cameraId, String16("meeeeeeeee!"),
-                {}, hardware::ICameraService::USE_CALLING_UID,
+                {}, hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/ 0,
                 /*out*/&device);
         EXPECT_TRUE(res.isOk()) << res;
         ASSERT_NE(nullptr, device.get());
@@ -421,7 +421,7 @@ protected:
         {
             SCOPED_TRACE("openNewDevice");
             binder::Status res = service->connectDevice(callbacks, deviceId, String16("meeeeeeeee!"),
-                    {}, hardware::ICameraService::USE_CALLING_UID,
+                    {}, hardware::ICameraService::USE_CALLING_UID, /*oomScoreOffset*/ 0,
                     /*out*/&device);
             EXPECT_TRUE(res.isOk()) << res;
         }
