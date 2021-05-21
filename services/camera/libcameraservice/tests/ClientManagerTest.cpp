@@ -44,7 +44,7 @@ using TestDescriptorPtr = std::shared_ptr<TestClientDescriptor>;
 
 TestDescriptorPtr makeDescFromTestClient(const TestClient& tc) {
     return std::make_shared<TestClientDescriptor>(/*ID*/tc.mId, tc, tc.mCost, tc.mConflictingKeys,
-            tc.mScore, tc.mOwnerId, tc.mState, tc.mIsVendorClient);
+            tc.mScore, tc.mOwnerId, tc.mState, tc.mIsVendorClient, /*oomScoreOffset*/0);
 }
 
 class TestClientManager : public ClientManager<int, TestClient> {
