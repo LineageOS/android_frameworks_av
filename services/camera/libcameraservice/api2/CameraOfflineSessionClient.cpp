@@ -330,5 +330,19 @@ void CameraOfflineSessionClient::notifyRepeatingRequestError(long /*lastFrameNum
                 CaptureResultExtras());
 }
 
+status_t CameraOfflineSessionClient::injectCamera(const String8& injectedCamId,
+            sp<CameraProviderManager> manager) {
+    ALOGV("%s: This client doesn't support the injection camera. injectedCamId: %s providerPtr: %p",
+            __FUNCTION__, injectedCamId.string(), manager.get());
+
+    return OK;
+}
+
+status_t CameraOfflineSessionClient::stopInjection() {
+    ALOGV("%s: This client doesn't support the injection camera.", __FUNCTION__);
+
+    return OK;
+}
+
 // ----------------------------------------------------------------------------
 }; // namespace android

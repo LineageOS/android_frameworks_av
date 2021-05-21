@@ -98,6 +98,9 @@ public:
     void notifyPrepared(int streamId) override;
     void notifyRequestQueueEmpty() override;
     void notifyRepeatingRequestError(long lastFrameNumber) override;
+    status_t injectCamera(const String8& injectedCamId,
+            sp<CameraProviderManager> manager) override;
+    status_t stopInjection() override;
 
 private:
     mutable Mutex mBinderSerializationLock;
