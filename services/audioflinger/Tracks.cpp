@@ -2215,7 +2215,7 @@ AudioFlinger::RecordThread::OpRecordAudioMonitor::createIfNeeded(
         return nullptr;
     }
 
-    // Capturing from FM TUNER output is not controlled by OP_RECORD_AUDIO
+    // Capturing from FM TUNER output is not controlled by an app op
     // because it does not affect users privacy as does capturing from an actual microphone.
     if (attr.source == AUDIO_SOURCE_FM_TUNER) {
         ALOGV("not muting FM TUNER capture for uid %d", identity.uid);
@@ -2227,12 +2227,12 @@ AudioFlinger::RecordThread::OpRecordAudioMonitor::createIfNeeded(
             || checkedIdentity.packageName.value().size() == 0) {
         return nullptr;
     }
-    return new OpRecordAudioMonitor(checkedIdentity);
+    return new OpRecordAudioMonitor(checkedIdentity, getOpForSource(attr.source));
 }
 
 AudioFlinger::RecordThread::OpRecordAudioMonitor::OpRecordAudioMonitor(
-        const Identity& identity)
-        : mHasOpRecordAudio(true), mIdentity(identity)
+        const Identity& identity, int32_t appOp)
+        : mHasOp(true), mIdentity(identity), mAppOp(appOp)
 {
 }
 
@@ -2246,36 +2246,36 @@ AudioFlinger::RecordThread::OpRecordAudioMonitor::~OpRecordAudioMonitor()
 
 void AudioFlinger::RecordThread::OpRecordAudioMonitor::onFirstRef()
 {
-    checkRecordAudio();
+    checkOp();
     mOpCallback = new RecordAudioOpCallback(this);
-    ALOGV("start watching OP_RECORD_AUDIO for %s", mIdentity.toString().c_str());
-    mAppOpsManager.startWatchingMode(AppOpsManager::OP_RECORD_AUDIO,
+    ALOGV("start watching op %d for %s", mAppOp, mIdentity.toString().c_str());
+    mAppOpsManager.startWatchingMode(mAppOp,
         VALUE_OR_FATAL(aidl2legacy_string_view_String16(mIdentity.packageName.value_or(""))),
         mOpCallback);
 }
 
-bool AudioFlinger::RecordThread::OpRecordAudioMonitor::hasOpRecordAudio() const {
-    return mHasOpRecordAudio.load();
+bool AudioFlinger::RecordThread::OpRecordAudioMonitor::hasOp() const {
+    return mHasOp.load();
 }
 
-// Called by RecordAudioOpCallback when OP_RECORD_AUDIO is updated in AppOp callback
-// and in onFirstRef()
+// Called by RecordAudioOpCallback when the app op corresponding to this OpRecordAudioMonitor
+// is updated in AppOp callback and in onFirstRef()
 // Note this method is never called (and never to be) for audio server / root track
 // due to the UID in createIfNeeded(). As a result for those record track, it's:
 // - not called from constructor,
 // - not called from RecordAudioOpCallback because the callback is not installed in this case
-void AudioFlinger::RecordThread::OpRecordAudioMonitor::checkRecordAudio()
+void AudioFlinger::RecordThread::OpRecordAudioMonitor::checkOp()
 {
 
-    const int32_t mode = mAppOpsManager.checkOp(AppOpsManager::OP_RECORD_AUDIO,
+    const int32_t mode = mAppOpsManager.checkOp(mAppOp,
             mIdentity.uid, VALUE_OR_FATAL(aidl2legacy_string_view_String16(
                 mIdentity.packageName.value_or(""))));
     const bool hasIt =  (mode == AppOpsManager::MODE_ALLOWED);
     // verbose logging only log when appOp changed
-    ALOGI_IF(hasIt != mHasOpRecordAudio.load(),
-            "OP_RECORD_AUDIO missing, %ssilencing record %s",
-            hasIt ? "un" : "", mIdentity.toString().c_str());
-    mHasOpRecordAudio.store(hasIt);
+    ALOGI_IF(hasIt != mHasOp.load(),
+            "App op %d missing, %ssilencing record %s",
+            mAppOp, hasIt ? "un" : "", mIdentity.toString().c_str());
+    mHasOp.store(hasIt);
 
 }
 
@@ -2286,12 +2286,12 @@ AudioFlinger::RecordThread::OpRecordAudioMonitor::RecordAudioOpCallback::RecordA
 void AudioFlinger::RecordThread::OpRecordAudioMonitor::RecordAudioOpCallback::opChanged(int32_t op,
             const String16& packageName) {
     UNUSED(packageName);
-    if (op != AppOpsManager::OP_RECORD_AUDIO) {
-        return;
-    }
     sp<OpRecordAudioMonitor> monitor = mMonitor.promote();
     if (monitor != NULL) {
-        monitor->checkRecordAudio();
+        if (op != monitor->getOp()) {
+            return;
+        }
+        monitor->checkOp();
     }
 }
 
@@ -2661,7 +2661,7 @@ bool AudioFlinger::RecordThread::RecordTrack::isSilenced() const {
         return true;
     }
     // The monitor is only created for record tracks that can be silenced.
-    return mOpRecordAudioMonitor ? !mOpRecordAudioMonitor->hasOpRecordAudio() : false;
+    return mOpRecordAudioMonitor ? !mOpRecordAudioMonitor->hasOp() : false;
 }
 
 status_t AudioFlinger::RecordThread::RecordTrack::getActiveMicrophones(
