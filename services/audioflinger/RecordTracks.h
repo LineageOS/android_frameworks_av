@@ -19,17 +19,18 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
-// Checks and monitors OP_RECORD_AUDIO
+// Checks and monitors app ops for audio record
 class OpRecordAudioMonitor : public RefBase {
 public:
     ~OpRecordAudioMonitor() override;
-    bool hasOpRecordAudio() const;
+    bool hasOp() const;
+    int32_t getOp() const { return mAppOp; }
 
     static sp<OpRecordAudioMonitor> createIfNeeded
         (const media::permission::Identity& identity, const audio_attributes_t& attr);
 
 private:
-    explicit OpRecordAudioMonitor(const media::permission::Identity& identity);
+    OpRecordAudioMonitor(const media::permission::Identity& identity, int32_t appOp);
     void onFirstRef() override;
 
     AppOpsManager mAppOpsManager;
@@ -44,12 +45,13 @@ private:
     };
 
     sp<RecordAudioOpCallback> mOpCallback;
-    // called by RecordAudioOpCallback when OP_RECORD_AUDIO is updated in AppOp callback
-    // and in onFirstRef()
-    void checkRecordAudio();
+    // called by RecordAudioOpCallback when the app op for this OpRecordAudioMonitor is updated
+    // in AppOp callback and in onFirstRef()
+    void checkOp();
 
-    std::atomic_bool mHasOpRecordAudio;
+    std::atomic_bool mHasOp;
     const media::permission::Identity mIdentity;
+    const int32_t mAppOp;
 };
 
 // record track
@@ -149,7 +151,7 @@ private:
 
             bool                               mSilenced;
 
-            // used to enforce OP_RECORD_AUDIO
+            // used to enforce the audio record app op corresponding to this track's audio source
             sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
             std::string                        mSharedAudioPackageName = {};
             int32_t                            mStartFrames = -1;
