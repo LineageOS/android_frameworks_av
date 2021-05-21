@@ -92,7 +92,7 @@ interface ICameraService
             String cameraId,
             String opPackageName,
             @nullable String featureId,
-            int clientUid);
+            int clientUid, int oomScoreOffset);
 
     /**
      * Add listener for changes to camera device and flashlight state.
