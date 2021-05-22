@@ -67,13 +67,13 @@ public:
             const media::AudioDevice& device,
             media::AudioPolicyDeviceState state,
             const std::string& deviceName,
-            media::audio::common::AudioFormat encodedFormat) override;
+            media::AudioFormatSys encodedFormat) override;
     binder::Status getDeviceConnectionState(const media::AudioDevice& device,
                                             media::AudioPolicyDeviceState* _aidl_return) override;
     binder::Status handleDeviceConfigChange(
             const media::AudioDevice& device,
             const std::string& deviceName,
-            media::audio::common::AudioFormat encodedFormat) override;
+            media::AudioFormatSys encodedFormat) override;
     binder::Status setPhoneState(media::AudioMode state, int32_t uid) override;
     binder::Status setForceUse(media::AudioPolicyForceUse usage,
                                media::AudioPolicyForcedConfig config) override;
@@ -186,13 +186,13 @@ public:
     binder::Status getStreamVolumeDB(media::AudioStreamType stream, int32_t index, int32_t device,
                                      float* _aidl_return) override;
     binder::Status getSurroundFormats(media::Int* count,
-                                      std::vector<media::audio::common::AudioFormat>* formats,
+                                      std::vector<media::AudioFormatSys>* formats,
                                       std::vector<bool>* formatsEnabled) override;
     binder::Status getReportedSurroundFormats(
-            media::Int* count, std::vector<media::audio::common::AudioFormat>* formats) override;
+            media::Int* count, std::vector<media::AudioFormatSys>* formats) override;
     binder::Status getHwOffloadEncodingFormatsSupportedForA2DP(
-            std::vector<media::audio::common::AudioFormat>* _aidl_return) override;
-    binder::Status setSurroundFormatEnabled(media::audio::common::AudioFormat audioFormat,
+            std::vector<media::AudioFormatSys>* _aidl_return) override;
+    binder::Status setSurroundFormatEnabled(media::AudioFormatSys audioFormat,
                                             bool enabled) override;
     binder::Status setAssistantUid(int32_t uid) override;
     binder::Status setA11yServicesUids(const std::vector<int32_t>& uids) override;
