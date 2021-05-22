@@ -80,7 +80,8 @@ static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
     }
 }
 
-bool recordingAllowed(const media::permission::Identity& identity);
+bool recordingAllowed(const media::permission::Identity& identity,
+        audio_source_t source = AUDIO_SOURCE_DEFAULT);
 bool startRecording(const media::permission::Identity& identity,
     const String16& msg, audio_source_t source);
 void finishRecording(const media::permission::Identity& identity, audio_source_t source);
@@ -98,6 +99,7 @@ bool dumpAllowed();
 bool modifyPhoneStateAllowed(const media::permission::Identity& identity);
 bool bypassInterruptionPolicyAllowed(const media::permission::Identity& identity);
 void purgePermissionCache();
+int32_t getOpForSource(audio_source_t source);
 
 media::permission::Identity getCallingIdentity();
 
