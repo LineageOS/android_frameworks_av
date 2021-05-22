@@ -127,7 +127,7 @@ status_t MediaRecorderClient::setAudioSource(int as)
 
     if ((as == AUDIO_SOURCE_FM_TUNER
             && !(captureAudioOutputAllowed(mIdentity) || captureTunerAudioInputAllowed(mIdentity)))
-            || !recordingAllowed(mIdentity)) {
+            || !recordingAllowed(mIdentity, (audio_source_t)as)) {
         return PERMISSION_DENIED;
     }
     Mutex::Autolock lock(mLock);

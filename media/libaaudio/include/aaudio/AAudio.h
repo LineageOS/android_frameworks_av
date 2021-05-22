@@ -635,13 +635,14 @@ AAUDIO_API aaudio_result_t AAudio_createStreamBuilder(AAudioStreamBuilder** buil
 AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
                                                 int32_t deviceId) __INTRODUCED_IN(26);
 
-// TODO b/182392769: reexamine if Identity can be used
 /**
  * Declare the name of the package creating the stream.
  *
  * This is usually {@code Context#getPackageName()}.
  *
  * The default, if you do not call this function, is a random package in the calling uid.
+ * The vast majority of apps have only one package per calling UID. If the package
+ * name does not match the calling UID, then requests will be rejected.
  *
  * Available since API level 31.
  *
@@ -656,7 +657,7 @@ AAUDIO_API void AAudioStreamBuilder_setPackageName(AAudioStreamBuilder* builder,
  *
  * This is usually {@code Context#getAttributionTag()}.
  *
- * The default, if you do not call this function, is the default attribution tag.
+ * The default, if you do not call this function, is null.
  *
  * Available since API level 31.
  *
