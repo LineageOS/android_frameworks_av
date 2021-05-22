@@ -527,6 +527,8 @@ public:
                     }
                 }
 
+    virtual     bool isStreamInitialized() = 0;
+
 protected:
 
                 // entry describing an effect being suspended in mSuspendedSessions keyed vector
@@ -741,7 +743,9 @@ protected:
                     void            updatePowerState(sp<ThreadBase> thread, bool force = false);
 
                     /** @return true if one or move active tracks was added or removed since the
-                     *          last time this function was called or the vector was created. */
+                     *          last time this function was called or the vector was created.
+                     *          true if volume of one of active tracks was changed.
+                     */
                     bool            readAndClearHasChanged();
 
                 private:
@@ -991,6 +995,10 @@ public:
                 bool        isTimestampCorrectionEnabled() const override {
                                 return audio_is_output_devices(mTimestampCorrectedDevice)
                                         && outDeviceTypes().count(mTimestampCorrectedDevice) != 0;
+                            }
+
+    virtual     bool        isStreamInitialized() {
+                                return !(mOutput == nullptr || mOutput->stream == nullptr);
                             }
 
                 audio_channel_mask_t hapticChannelMask() const override {
@@ -1780,6 +1788,10 @@ public:
                                           audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
                                           int64_t sharedAudioStartMs = -1);
 
+    virtual bool        isStreamInitialized() {
+                            return !(mInput == nullptr || mInput->stream == nullptr);
+                        }
+
 protected:
             void        dumpInternals_l(int fd, const Vector<String16>& args) override;
             void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -1949,6 +1961,8 @@ class MmapThread : public ThreadBase
     virtual     void        setRecordSilenced(audio_port_handle_t portId __unused,
                                               bool silenced __unused) {}
 
+    virtual     bool        isStreamInitialized() { return false; }
+
  protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
                 void        dumpTracks_l(int fd, const Vector<String16>& args) override;
@@ -2011,6 +2025,10 @@ public:
 
                 status_t    getExternalPosition(uint64_t *position, int64_t *timeNanos) override;
 
+    virtual     bool        isStreamInitialized() {
+                                return !(mOutput == nullptr || mOutput->stream == nullptr);
+                            }
+
 protected:
                 void        dumpInternals_l(int fd, const Vector<String16>& args) override;
 
@@ -2042,6 +2060,10 @@ public:
     virtual     void           toAudioPortConfig(struct audio_port_config *config);
 
                 status_t       getExternalPosition(uint64_t *position, int64_t *timeNanos) override;
+
+    virtual     bool           isStreamInitialized() {
+                                   return !(mInput == nullptr || mInput->stream == nullptr);
+                               }
 
 protected:
 
