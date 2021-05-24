@@ -25,9 +25,7 @@ apex_defaults {
     name: "com.android.media-defaults",
     updatable: true,
     bootclasspath_fragments: ["com.android.media-bootclasspath-fragment"],
-    java_libs: [
-      "service-media-s",
-    ],
+    systemserverclasspath_fragments: ["com.android.media-systemserverclasspath-fragment"],
     multilib: {
         first: {
             // Extractor process runs only with the primary ABI.
@@ -98,6 +96,13 @@ linker_config {
 bootclasspath_fragment {
     name: "com.android.media-bootclasspath-fragment",
     contents: ["updatable-media"],
+    apex_available: ["com.android.media"],
+}
+
+// Encapsulate the contributions made by the com.android.media to the systemserverclasspath.
+systemserverclasspath_fragment {
+    name: "com.android.media-systemserverclasspath-fragment",
+    contents: ["service-media-s"],
     apex_available: ["com.android.media"],
 }
 
