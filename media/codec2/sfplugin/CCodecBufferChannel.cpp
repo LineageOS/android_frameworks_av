@@ -2305,6 +2305,12 @@ bool CCodecBufferChannel::handleWork(
         ALOGV("[%s] empty work returned; omitted.", mName);
         return false; // omitted
     } else if (work->result == C2_NOT_FOUND) {
+        if (work->input.flags & C2FrameData::FLAG_DROP_FRAME) {
+            // NOTE: This is to solve backward compatibility issue of queueDummyWork. If no HAL fix,
+            //       we will receive C2_NOT_FOUND here and then issue fatal error to MediaCodec
+            ALOGV("[%s] empty work returned; omitted.", mName);
+            return false; // omitted
+        }
         ALOGD("[%s] flushed work; ignored.", mName);
     } else {
         // C2_OK and C2_NOT_FOUND are the only results that we accept for processing
