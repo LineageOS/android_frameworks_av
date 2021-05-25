@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
@@ -54,7 +54,7 @@ bool statsd_nuplayer(const std::shared_ptr<const mediametrics::Item>& item,
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::NuPlayerData metrics_proto;
+    ::android::stats::mediametrics_message::NuPlayerData metrics_proto;
 
     // flesh out the protobuf we'll hand off with our data
     //
