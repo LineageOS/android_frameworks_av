@@ -65,6 +65,7 @@ aidl_interface {
             enabled: true,
         },
     },
+    versions: ["1"],
 }
 
 cc_library {
