@@ -93,6 +93,7 @@ static const char *kCodecKeyName = "codec";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaCodec.java
 // These must be kept synchronized with the constants there.
+static const char *kCodecLogSessionId = "android.media.mediacodec.log-session-id";
 static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
 static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
 static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
@@ -108,6 +109,16 @@ static const char *kCodecFrameRate = "android.media.mediacodec.frame-rate";
 static const char *kCodecCaptureRate = "android.media.mediacodec.capture-rate";
 static const char *kCodecOperatingRate = "android.media.mediacodec.operating-rate";
 static const char *kCodecPriority = "android.media.mediacodec.priority";
+
+// Min/Max QP before shaping
+static const char *kCodecOriginalVideoQPIMin = "android.media.mediacodec.original-video-qp-i-min";
+static const char *kCodecOriginalVideoQPIMax = "android.media.mediacodec.original-video-qp-i-max";
+static const char *kCodecOriginalVideoQPPMin = "android.media.mediacodec.original-video-qp-p-min";
+static const char *kCodecOriginalVideoQPPMax = "android.media.mediacodec.original-video-qp-p-max";
+static const char *kCodecOriginalVideoQPBMin = "android.media.mediacodec.original-video-qp-b-min";
+static const char *kCodecOriginalVideoQPBMax = "android.media.mediacodec.original-video-qp-b-max";
+
+// Min/Max QP after shaping
 static const char *kCodecRequestedVideoQPIMin = "android.media.mediacodec.video-qp-i-min";
 static const char *kCodecRequestedVideoQPIMax = "android.media.mediacodec.video-qp-i-max";
 static const char *kCodecRequestedVideoQPPMin = "android.media.mediacodec.video-qp-p-min";
@@ -156,7 +167,9 @@ static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hi
 static const char *kCodecPlaybackDuration =
         "android.media.mediacodec.playback-duration"; /* in sec */
 
-static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";    /* 0/1 */
+/* -1: shaper disabled
+   >=0: number of fields changed */
+static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
 
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
@@ -1491,6 +1504,8 @@ status_t MediaCodec::configure(
     }
 
     if (mIsVideo) {
+        // TODO: validity check log-session-id: it should be a 32-hex-digit.
+        format->findString("log-session-id", &mLogSessionId);
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
         if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
@@ -1498,6 +1513,7 @@ status_t MediaCodec::configure(
         }
 
         if (mMetricsHandle != 0) {
+            mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
             mediametrics_setInt32(mMetricsHandle, kCodecWidth, mVideoWidth);
             mediametrics_setInt32(mMetricsHandle, kCodecHeight, mVideoHeight);
             mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);
@@ -1529,30 +1545,6 @@ status_t MediaCodec::configure(
             if (format->findInt32("priority", &priority)) {
                 mediametrics_setInt32(mMetricsHandle, kCodecPriority, priority);
             }
-            int32_t qpIMin = -1;
-            if (format->findInt32("video-qp-i-min", &qpIMin)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
-            }
-            int32_t qpIMax = -1;
-            if (format->findInt32("video-qp-i-max", &qpIMax)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
-            }
-            int32_t qpPMin = -1;
-            if (format->findInt32("video-qp-p-min", &qpPMin)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
-            }
-            int32_t qpPMax = -1;
-            if (format->findInt32("video-qp-p-max", &qpPMax)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
-            }
-             int32_t qpBMin = -1;
-            if (format->findInt32("video-qp-b-min", &qpBMin)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
-            }
-            int32_t qpBMax = -1;
-            if (format->findInt32("video-qp-b-max", &qpBMax)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
-            }
         }
 
         // Prevent possible integer overflow in downstream code.
@@ -1580,10 +1572,41 @@ status_t MediaCodec::configure(
                                                  enableMediaFormatShapingDefault);
         if (!enableShaping) {
             ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
+            if (mMetricsHandle != 0) {
+                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, -1);
+            }
         } else {
             (void) shapeMediaFormat(format, flags);
             // XXX: do we want to do this regardless of shaping enablement?
             mapFormat(mComponentName, format, nullptr, false);
+        }
+    }
+
+    // push min/max QP to MediaMetrics after shaping
+    if (mIsVideo && mMetricsHandle != 0) {
+        int32_t qpIMin = -1;
+        if (format->findInt32("video-qp-i-min", &qpIMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
+        }
+        int32_t qpIMax = -1;
+        if (format->findInt32("video-qp-i-max", &qpIMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
+        }
+        int32_t qpPMin = -1;
+        if (format->findInt32("video-qp-p-min", &qpPMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
+        }
+        int32_t qpPMax = -1;
+        if (format->findInt32("video-qp-p-max", &qpPMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
+        }
+        int32_t qpBMin = -1;
+        if (format->findInt32("video-qp-b-min", &qpBMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
+        }
+        int32_t qpBMax = -1;
+        if (format->findInt32("video-qp-b-max", &qpBMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
         }
     }
 
@@ -1906,13 +1929,39 @@ status_t MediaCodec::shapeMediaFormat(
         sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
         size_t changeCount = deltas->countEntries();
         ALOGD("shapeMediaFormat: deltas(%zu): %s", changeCount, deltas->debugString(2).c_str());
+        if (mMetricsHandle != 0) {
+            mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
+        }
         if (changeCount > 0) {
             if (mMetricsHandle != 0) {
-                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
                 // save some old properties before we fold in the new ones
                 int32_t bitrate;
                 if (format->findInt32(KEY_BIT_RATE, &bitrate)) {
                     mediametrics_setInt32(mMetricsHandle, kCodecOriginalBitrate, bitrate);
+                }
+                int32_t qpIMin = -1;
+                if (format->findInt32("original-video-qp-i-min", &qpIMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
+                }
+                int32_t qpIMax = -1;
+                if (format->findInt32("original-video-qp-i-max", &qpIMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
+                }
+                int32_t qpPMin = -1;
+                if (format->findInt32("original-video-qp-p-min", &qpPMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
+                }
+                int32_t qpPMax = -1;
+                if (format->findInt32("original-video-qp-p-max", &qpPMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
+                }
+                 int32_t qpBMin = -1;
+                if (format->findInt32("original-video-qp-b-min", &qpBMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
+                }
+                int32_t qpBMax = -1;
+                if (format->findInt32("original-video-qp-b-max", &qpBMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
                 }
             }
             // NB: for any field in both format and deltas, the deltas copy wins
