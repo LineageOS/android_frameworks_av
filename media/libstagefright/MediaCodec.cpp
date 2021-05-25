@@ -29,6 +29,7 @@
 #include <C2Buffer.h>
 
 #include "include/SoftwareRenderer.h"
+#include "PlaybackDurationAccumulator.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
@@ -152,6 +153,8 @@ static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min
 static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
 static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
+static const char *kCodecPlaybackDuration =
+        "android.media.mediacodec.playback-duration"; /* in sec */
 
 static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";    /* 0/1 */
 
@@ -740,6 +743,8 @@ MediaCodec::MediaCodec(
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
+      mPlaybackDurationAccumulator(new PlaybackDurationAccumulator()),
+      mIsSurfaceToScreen(false),
       mLatencyUnknown(0),
       mBytesEncoded(0),
       mEarliestEncodedPtsUs(INT64_MAX),
@@ -845,6 +850,10 @@ void MediaCodec::updateMediametrics() {
     }
     if (mLatencyUnknown > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
+    }
+    int64_t playbackDuration = mPlaybackDurationAccumulator->getDurationInSeconds();
+    if (playbackDuration > 0) {
+        mediametrics_setInt64(mMetricsHandle, kCodecPlaybackDuration, playbackDuration);
     }
     if (mLifetimeStartNs > 0) {
         nsecs_t lifetime = systemTime(SYSTEM_TIME_MONOTONIC) - mLifetimeStartNs;
@@ -983,6 +992,28 @@ void MediaCodec::updateTunnelPeek(const sp<AMessage> &msg) {
     }
 
     ALOGV("Ignoring tunnel-peek=%d for %s", tunnelPeek, asString(mTunnelPeekState));
+}
+
+void MediaCodec::updatePlaybackDuration(const sp<AMessage> &msg) {
+    int what = 0;
+    msg->findInt32("what", &what);
+    if (msg->what() != kWhatCodecNotify && what != kWhatOutputFramesRendered) {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            ALOGE("updatePlaybackDuration: expected kWhatOuputFramesRendered (%d)", msg->what());
+        }
+        return;
+    }
+    // Playback duration only counts if the buffers are going to the screen.
+    if (!mIsSurfaceToScreen) {
+        return;
+    }
+    int64_t renderTimeNs;
+    size_t index = 0;
+    while (msg->findInt64(AStringPrintf("%zu-system-nano", index++).c_str(), &renderTimeNs)) {
+        mPlaybackDurationAccumulator->processRenderTime(renderTimeNs);
+    }
 }
 
 bool MediaCodec::Histogram::setup(int nbuckets, int64_t width, int64_t floor)
@@ -3199,6 +3230,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ALOGV("TunnelPeekState: %s -> %s",
                           asString(previousState),
                           asString(TunnelPeekState::kBufferRendered));
+                    updatePlaybackDuration(msg);
                     // check that we have a notification set
                     if (mOnFrameRenderedNotification != NULL) {
                         sp<AMessage> notify = mOnFrameRenderedNotification->dup();
@@ -4905,6 +4937,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             return ALREADY_EXISTS;
         }
 
+        // in case we don't connect, ensure that we don't signal the surface is
+        // connected to the screen
+        mIsSurfaceToScreen = false;
+
         err = nativeWindowConnect(surface.get(), "connectToSurface");
         if (err == OK) {
             // Require a fresh set of buffers after each connect by using a unique generation
@@ -4930,6 +4966,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             if (!mAllowFrameDroppingBySurface) {
                 disableLegacyBufferDropPostQ(surface);
             }
+            // keep track whether or not the buffers of the connected surface go to the screen
+            int result = 0;
+            surface->query(NATIVE_WINDOW_QUEUES_TO_WINDOW_COMPOSER, &result);
+            mIsSurfaceToScreen = result != 0;
         }
     }
     // do not return ALREADY_EXISTS unless surfaces are the same
@@ -4947,6 +4987,7 @@ status_t MediaCodec::disconnectFromSurface() {
         }
         // assume disconnected even on error
         mSurface.clear();
+        mIsSurfaceToScreen = false;
     }
     return err;
 }
