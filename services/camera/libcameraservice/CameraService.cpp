@@ -232,6 +232,10 @@ status_t CameraService::enumerateProviders() {
         }
     }
 
+    //Derive primary rear/front cameras, and filter their charactierstics.
+    //This needs to be done after all cameras are enumerated and camera ids are sorted.
+    filterSPerfClassCharacteristics();
+
     return OK;
 }
 
@@ -300,6 +304,45 @@ void CameraService::updateCameraNumAndIds() {
     mNormalDeviceIds =
             mCameraProviderManager->getAPI1CompatibleCameraDeviceIds();
     filterAPI1SystemCameraLocked(mNormalDeviceIds);
+}
+
+void CameraService::filterSPerfClassCharacteristics() {
+    static int32_t kPerformanceClassLevel =
+            property_get_int32("ro.odm.build.media_performance_class", 0);
+    static bool kIsSPerformanceClass = (kPerformanceClassLevel == 31);
+
+    if (!kIsSPerformanceClass) return;
+
+    // To claim to be S Performance primary cameras, the cameras must be
+    // backward compatible. So performance class primary camera Ids must be API1
+    // compatible.
+    bool firstRearCameraSeen = false, firstFrontCameraSeen = false;
+    for (const auto& cameraId : mNormalDeviceIdsWithoutSystemCamera) {
+        int facing = -1;
+        int orientation = 0;
+        String8 cameraId8(cameraId.c_str());
+        getDeviceVersion(cameraId8, /*out*/&facing, /*out*/&orientation);
+        if (facing == -1) {
+            ALOGE("%s: Unable to get camera device \"%s\" facing", __FUNCTION__, cameraId.c_str());
+            return;
+        }
+
+        if ((facing == hardware::CAMERA_FACING_BACK && !firstRearCameraSeen) ||
+                (facing == hardware::CAMERA_FACING_FRONT && !firstFrontCameraSeen)) {
+            mCameraProviderManager->filterSmallJpegSizes(cameraId);
+
+            if (facing == hardware::CAMERA_FACING_BACK) {
+                firstRearCameraSeen = true;
+            }
+            if (facing == hardware::CAMERA_FACING_FRONT) {
+                firstFrontCameraSeen = true;
+            }
+        }
+
+        if (firstRearCameraSeen && firstFrontCameraSeen) {
+            break;
+        }
+    }
 }
 
 void CameraService::addStates(const String8 id) {
