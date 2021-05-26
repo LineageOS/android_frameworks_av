@@ -10,6 +10,43 @@ package {
     ],
 }
 
+// This is a gtest unit test.
+//
+// Use "atest downmix_tests" to run.
+cc_test {
+    name:"downmix_tests",
+    gtest: true,
+    host_supported: true,
+    vendor: true,
+    include_dirs: [
+        "frameworks/av/media/libeffects/downmix",
+    ],
+    header_libs: [
+        "libaudioeffects",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    static_libs: [
+        "libaudioutils",
+        "libdownmix",
+    ],
+    srcs: [
+        "downmix_tests.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+}
+
+// This is a test application which generates downmixed files for regression
+// analysis.
+//
+// See build_and_run_all_unit_tests.sh for a test script that uses this
+// test application and outputs then compares files in a local directory
+// on device (/data/local/tmp/downmixtest/).
 cc_test {
     name:"downmixtest",
     host_supported: false,
