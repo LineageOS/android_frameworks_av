@@ -29,6 +29,7 @@
 #include <C2Buffer.h>
 
 #include "include/SoftwareRenderer.h"
+#include "PlaybackDurationAccumulator.h"
 
 #include <android/hardware/cas/native/1.0/IDescrambler.h>
 #include <android/hardware/media/omx/1.0/IGraphicBufferSource.h>
@@ -92,6 +93,7 @@ static const char *kCodecKeyName = "codec";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaCodec.java
 // These must be kept synchronized with the constants there.
+static const char *kCodecLogSessionId = "android.media.mediacodec.log-session-id";
 static const char *kCodecCodec = "android.media.mediacodec.codec";  /* e.g. OMX.google.aac.decoder */
 static const char *kCodecMime = "android.media.mediacodec.mime";    /* e.g. audio/mime */
 static const char *kCodecMode = "android.media.mediacodec.mode";    /* audio, video */
@@ -107,6 +109,16 @@ static const char *kCodecFrameRate = "android.media.mediacodec.frame-rate";
 static const char *kCodecCaptureRate = "android.media.mediacodec.capture-rate";
 static const char *kCodecOperatingRate = "android.media.mediacodec.operating-rate";
 static const char *kCodecPriority = "android.media.mediacodec.priority";
+
+// Min/Max QP before shaping
+static const char *kCodecOriginalVideoQPIMin = "android.media.mediacodec.original-video-qp-i-min";
+static const char *kCodecOriginalVideoQPIMax = "android.media.mediacodec.original-video-qp-i-max";
+static const char *kCodecOriginalVideoQPPMin = "android.media.mediacodec.original-video-qp-p-min";
+static const char *kCodecOriginalVideoQPPMax = "android.media.mediacodec.original-video-qp-p-max";
+static const char *kCodecOriginalVideoQPBMin = "android.media.mediacodec.original-video-qp-b-min";
+static const char *kCodecOriginalVideoQPBMax = "android.media.mediacodec.original-video-qp-b-max";
+
+// Min/Max QP after shaping
 static const char *kCodecRequestedVideoQPIMin = "android.media.mediacodec.video-qp-i-min";
 static const char *kCodecRequestedVideoQPIMax = "android.media.mediacodec.video-qp-i-max";
 static const char *kCodecRequestedVideoQPPMin = "android.media.mediacodec.video-qp-p-min";
@@ -152,8 +164,12 @@ static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min
 static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
 static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
+static const char *kCodecPlaybackDuration =
+        "android.media.mediacodec.playback-duration"; /* in sec */
 
-static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";    /* 0/1 */
+/* -1: shaper disabled
+   >=0: number of fields changed */
+static const char *kCodecShapingEnhanced = "android.media.mediacodec.shaped";
 
 // XXX suppress until we get our representation right
 static bool kEmitHistogram = false;
@@ -740,6 +756,8 @@ MediaCodec::MediaCodec(
       mHaveInputSurface(false),
       mHavePendingInputBuffers(false),
       mCpuBoostRequested(false),
+      mPlaybackDurationAccumulator(new PlaybackDurationAccumulator()),
+      mIsSurfaceToScreen(false),
       mLatencyUnknown(0),
       mBytesEncoded(0),
       mEarliestEncodedPtsUs(INT64_MAX),
@@ -845,6 +863,10 @@ void MediaCodec::updateMediametrics() {
     }
     if (mLatencyUnknown > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
+    }
+    int64_t playbackDuration = mPlaybackDurationAccumulator->getDurationInSeconds();
+    if (playbackDuration > 0) {
+        mediametrics_setInt64(mMetricsHandle, kCodecPlaybackDuration, playbackDuration);
     }
     if (mLifetimeStartNs > 0) {
         nsecs_t lifetime = systemTime(SYSTEM_TIME_MONOTONIC) - mLifetimeStartNs;
@@ -983,6 +1005,28 @@ void MediaCodec::updateTunnelPeek(const sp<AMessage> &msg) {
     }
 
     ALOGV("Ignoring tunnel-peek=%d for %s", tunnelPeek, asString(mTunnelPeekState));
+}
+
+void MediaCodec::updatePlaybackDuration(const sp<AMessage> &msg) {
+    int what = 0;
+    msg->findInt32("what", &what);
+    if (msg->what() != kWhatCodecNotify && what != kWhatOutputFramesRendered) {
+        static bool logged = false;
+        if (!logged) {
+            logged = true;
+            ALOGE("updatePlaybackDuration: expected kWhatOuputFramesRendered (%d)", msg->what());
+        }
+        return;
+    }
+    // Playback duration only counts if the buffers are going to the screen.
+    if (!mIsSurfaceToScreen) {
+        return;
+    }
+    int64_t renderTimeNs;
+    size_t index = 0;
+    while (msg->findInt64(AStringPrintf("%zu-system-nano", index++).c_str(), &renderTimeNs)) {
+        mPlaybackDurationAccumulator->processRenderTime(renderTimeNs);
+    }
 }
 
 bool MediaCodec::Histogram::setup(int nbuckets, int64_t width, int64_t floor)
@@ -1460,6 +1504,8 @@ status_t MediaCodec::configure(
     }
 
     if (mIsVideo) {
+        // TODO: validity check log-session-id: it should be a 32-hex-digit.
+        format->findString("log-session-id", &mLogSessionId);
         format->findInt32("width", &mVideoWidth);
         format->findInt32("height", &mVideoHeight);
         if (!format->findInt32("rotation-degrees", &mRotationDegrees)) {
@@ -1467,6 +1513,7 @@ status_t MediaCodec::configure(
         }
 
         if (mMetricsHandle != 0) {
+            mediametrics_setCString(mMetricsHandle, kCodecLogSessionId, mLogSessionId.c_str());
             mediametrics_setInt32(mMetricsHandle, kCodecWidth, mVideoWidth);
             mediametrics_setInt32(mMetricsHandle, kCodecHeight, mVideoHeight);
             mediametrics_setInt32(mMetricsHandle, kCodecRotation, mRotationDegrees);
@@ -1498,30 +1545,6 @@ status_t MediaCodec::configure(
             if (format->findInt32("priority", &priority)) {
                 mediametrics_setInt32(mMetricsHandle, kCodecPriority, priority);
             }
-            int32_t qpIMin = -1;
-            if (format->findInt32("video-qp-i-min", &qpIMin)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
-            }
-            int32_t qpIMax = -1;
-            if (format->findInt32("video-qp-i-max", &qpIMax)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
-            }
-            int32_t qpPMin = -1;
-            if (format->findInt32("video-qp-p-min", &qpPMin)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
-            }
-            int32_t qpPMax = -1;
-            if (format->findInt32("video-qp-p-max", &qpPMax)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
-            }
-             int32_t qpBMin = -1;
-            if (format->findInt32("video-qp-b-min", &qpBMin)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
-            }
-            int32_t qpBMax = -1;
-            if (format->findInt32("video-qp-b-max", &qpBMax)) {
-                mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
-            }
         }
 
         // Prevent possible integer overflow in downstream code.
@@ -1549,10 +1572,41 @@ status_t MediaCodec::configure(
                                                  enableMediaFormatShapingDefault);
         if (!enableShaping) {
             ALOGI("format shaping disabled, property '%s'", enableMediaFormatShapingProperty);
+            if (mMetricsHandle != 0) {
+                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, -1);
+            }
         } else {
             (void) shapeMediaFormat(format, flags);
             // XXX: do we want to do this regardless of shaping enablement?
             mapFormat(mComponentName, format, nullptr, false);
+        }
+    }
+
+    // push min/max QP to MediaMetrics after shaping
+    if (mIsVideo && mMetricsHandle != 0) {
+        int32_t qpIMin = -1;
+        if (format->findInt32("video-qp-i-min", &qpIMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMin, qpIMin);
+        }
+        int32_t qpIMax = -1;
+        if (format->findInt32("video-qp-i-max", &qpIMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPIMax, qpIMax);
+        }
+        int32_t qpPMin = -1;
+        if (format->findInt32("video-qp-p-min", &qpPMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMin, qpPMin);
+        }
+        int32_t qpPMax = -1;
+        if (format->findInt32("video-qp-p-max", &qpPMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPPMax, qpPMax);
+        }
+        int32_t qpBMin = -1;
+        if (format->findInt32("video-qp-b-min", &qpBMin)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMin, qpBMin);
+        }
+        int32_t qpBMax = -1;
+        if (format->findInt32("video-qp-b-max", &qpBMax)) {
+            mediametrics_setInt32(mMetricsHandle, kCodecRequestedVideoQPBMax, qpBMax);
         }
     }
 
@@ -1875,13 +1929,39 @@ status_t MediaCodec::shapeMediaFormat(
         sp<AMessage> deltas = updatedFormat->changesFrom(format, false /* deep */);
         size_t changeCount = deltas->countEntries();
         ALOGD("shapeMediaFormat: deltas(%zu): %s", changeCount, deltas->debugString(2).c_str());
+        if (mMetricsHandle != 0) {
+            mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
+        }
         if (changeCount > 0) {
             if (mMetricsHandle != 0) {
-                mediametrics_setInt32(mMetricsHandle, kCodecShapingEnhanced, changeCount);
                 // save some old properties before we fold in the new ones
                 int32_t bitrate;
                 if (format->findInt32(KEY_BIT_RATE, &bitrate)) {
                     mediametrics_setInt32(mMetricsHandle, kCodecOriginalBitrate, bitrate);
+                }
+                int32_t qpIMin = -1;
+                if (format->findInt32("original-video-qp-i-min", &qpIMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMin, qpIMin);
+                }
+                int32_t qpIMax = -1;
+                if (format->findInt32("original-video-qp-i-max", &qpIMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPIMax, qpIMax);
+                }
+                int32_t qpPMin = -1;
+                if (format->findInt32("original-video-qp-p-min", &qpPMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMin, qpPMin);
+                }
+                int32_t qpPMax = -1;
+                if (format->findInt32("original-video-qp-p-max", &qpPMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPPMax, qpPMax);
+                }
+                 int32_t qpBMin = -1;
+                if (format->findInt32("original-video-qp-b-min", &qpBMin)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMin, qpBMin);
+                }
+                int32_t qpBMax = -1;
+                if (format->findInt32("original-video-qp-b-max", &qpBMax)) {
+                    mediametrics_setInt32(mMetricsHandle, kCodecOriginalVideoQPBMax, qpBMax);
                 }
             }
             // NB: for any field in both format and deltas, the deltas copy wins
@@ -3199,6 +3279,7 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     ALOGV("TunnelPeekState: %s -> %s",
                           asString(previousState),
                           asString(TunnelPeekState::kBufferRendered));
+                    updatePlaybackDuration(msg);
                     // check that we have a notification set
                     if (mOnFrameRenderedNotification != NULL) {
                         sp<AMessage> notify = mOnFrameRenderedNotification->dup();
@@ -4905,6 +4986,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             return ALREADY_EXISTS;
         }
 
+        // in case we don't connect, ensure that we don't signal the surface is
+        // connected to the screen
+        mIsSurfaceToScreen = false;
+
         err = nativeWindowConnect(surface.get(), "connectToSurface");
         if (err == OK) {
             // Require a fresh set of buffers after each connect by using a unique generation
@@ -4930,6 +5015,10 @@ status_t MediaCodec::connectToSurface(const sp<Surface> &surface) {
             if (!mAllowFrameDroppingBySurface) {
                 disableLegacyBufferDropPostQ(surface);
             }
+            // keep track whether or not the buffers of the connected surface go to the screen
+            int result = 0;
+            surface->query(NATIVE_WINDOW_QUEUES_TO_WINDOW_COMPOSER, &result);
+            mIsSurfaceToScreen = result != 0;
         }
     }
     // do not return ALREADY_EXISTS unless surfaces are the same
@@ -4947,6 +5036,7 @@ status_t MediaCodec::disconnectFromSurface() {
         }
         // assume disconnected even on error
         mSurface.clear();
+        mIsSurfaceToScreen = false;
     }
     return err;
 }

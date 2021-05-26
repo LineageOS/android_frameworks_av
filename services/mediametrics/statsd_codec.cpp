@@ -55,6 +55,11 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
 
     // flesh out the protobuf we'll hand off with our data
     //
+    //android.media.mediacodec.log-session-id   string
+    std::string sessionId;
+    if (item->getString("android.media.mediacodec.log-session-id", &sessionId)) {
+        metrics_proto.set_log_session_id(sessionId);
+    }
     // android.media.mediacodec.codec   string
     std::string codec;
     if (item->getString("android.media.mediacodec.codec", &codec)) {
@@ -300,6 +305,48 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
         metrics_proto.set_original_bitrate(originalBitrate);
     }
 
+    // android.media.mediacodec.shaped
+    int32_t shapingEnhanced = -1;
+    if ( item->getInt32("android.media.mediacodec.shaped", &shapingEnhanced)) {
+        metrics_proto.set_shaping_enhanced(shapingEnhanced);
+    }
+
+    // android.media.mediacodec.original-video-qp-i-min
+    int32_t qpIMinOri = -1;
+    if ( item->getInt32("android.media.mediacodec.original-video-qp-i-min", &qpIMinOri)) {
+        metrics_proto.set_original_video_qp_i_min(qpIMinOri);
+    }
+
+    // android.media.mediacodec.original-video-qp-i-max
+    int32_t qpIMaxOri = -1;
+    if ( item->getInt32("android.media.mediacodec.original-video-qp-i-max", &qpIMaxOri)) {
+        metrics_proto.set_original_video_qp_i_max(qpIMaxOri);
+    }
+
+    // android.media.mediacodec.original-video-qp-p-min
+    int32_t qpPMinOri = -1;
+    if ( item->getInt32("android.media.mediacodec.original-video-qp-p-min", &qpPMinOri)) {
+        metrics_proto.set_original_video_qp_p_min(qpPMinOri);
+    }
+
+    // android.media.mediacodec.original-video-qp-p-max
+    int32_t qpPMaxOri = -1;
+    if ( item->getInt32("android.media.mediacodec.original-video-qp-p-max", &qpPMaxOri)) {
+        metrics_proto.set_original_video_qp_p_max(qpPMaxOri);
+    }
+
+    // android.media.mediacodec.original-video-qp-b-min
+    int32_t qpBMinOri = -1;
+    if ( item->getInt32("android.media.mediacodec.original-video-qp-b-min", &qpBMinOri)) {
+        metrics_proto.set_original_video_qp_b_min(qpIMinOri);
+    }
+
+    // android.media.mediacodec.original-video-qp-b-max
+    int32_t qpBMaxOri = -1;
+    if ( item->getInt32("android.media.mediacodec.original-video-qp-b-max", &qpBMaxOri)) {
+        metrics_proto.set_original_video_qp_b_max(qpBMaxOri);
+    }
+
     std::string serialized;
     if (!metrics_proto.SerializeToString(&serialized)) {
         ALOGE("Failed to serialize codec metrics");
@@ -345,9 +392,33 @@ bool statsd_codec(const std::shared_ptr<const mediametrics::Item>& item,
             << " queue_secure_input_buffer_error:" << queue_secure_input_buffer_error
             << " bitrate_mode:" << bitrate_mode
             << " bitrate:" << bitrate
+            << " original_bitrate:" << originalBitrate
             << " lifetime_millis:" << lifetime_millis
-            // TODO: add when log_session_id is merged.
-            // << " log_session_id:" << log_session_id
+            << " log_session_id:" << sessionId
+            << " channel_count:" << channelCount
+            << " sample_rate:" << sampleRate
+            << " encode_bytes:" << bytes
+            << " encode_frames:" << frames
+            << " encode_duration_us:" << durationUs
+            << " color_format:" << colorFormat
+            << " frame_rate:" << frameRate
+            << " capture_rate:" << captureRate
+            << " operating_rate:" << operatingRate
+            << " priority:" << priority
+            << " shaping_enhanced:" << shapingEnhanced
+
+            << " qp_i_min:" << qpIMin
+            << " qp_i_max:" << qpIMax
+            << " qp_p_min:" << qpPMin
+            << " qp_p_max:" << qpPMax
+            << " qp_b_min:" << qpBMin
+            << " qp_b_max:" << qpBMax
+            << " original_qp_i_min:" << qpIMinOri
+            << " original_qp_i_max:" << qpIMaxOri
+            << " original_qp_p_min:" << qpPMinOri
+            << " original_qp_p_max:" << qpPMaxOri
+            << " original_qp_b_min:" << qpBMinOri
+            << " original_qp_b_max:" << qpBMaxOri
             << " }";
     statsdLog->log(android::util::MEDIAMETRICS_CODEC_REPORTED, log.str());
     return true;
