@@ -58,6 +58,7 @@ class IMemory;
 struct PersistentSurface;
 class SoftwareRenderer;
 class Surface;
+class PlaybackDurationAccumulator;
 namespace hardware {
 namespace cas {
 namespace native {
@@ -418,6 +419,7 @@ private:
     void updateLowLatency(const sp<AMessage> &msg);
     constexpr const char *asString(TunnelPeekState state, const char *default_string="?");
     void updateTunnelPeek(const sp<AMessage> &msg);
+    void updatePlaybackDuration(const sp<AMessage> &msg);
 
     sp<AMessage> mOutputFormat;
     sp<AMessage> mInputFormat;
@@ -484,6 +486,9 @@ private:
     bool mCpuBoostRequested;
 
     std::shared_ptr<BufferChannelBase> mBufferChannel;
+
+    PlaybackDurationAccumulator * mPlaybackDurationAccumulator;
+    bool mIsSurfaceToScreen;
 
     MediaCodec(
             const sp<ALooper> &looper, pid_t pid, uid_t uid,
