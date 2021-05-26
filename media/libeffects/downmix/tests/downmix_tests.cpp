@@ -26,31 +26,36 @@
 
 extern audio_effect_library_t AUDIO_EFFECT_LIBRARY_INFO_SYM;
 static constexpr audio_channel_mask_t kChannelPositionMasks[] = {
-//    AUDIO_CHANNEL_OUT_MONO,
-//    AUDIO_CHANNEL_OUT_FRONT_CENTER,
+    AUDIO_CHANNEL_OUT_FRONT_LEFT, // Legacy: the downmix effect treats MONO as FRONT_LEFT only.
+                                  // The AudioMixer interprets MONO as a special case requiring
+                                  // channel replication, bypassing the downmix effect.
+    AUDIO_CHANNEL_OUT_FRONT_CENTER,
     AUDIO_CHANNEL_OUT_STEREO,
     AUDIO_CHANNEL_OUT_2POINT1,
-//    AUDIO_CHANNEL_OUT_2POINT0POINT2,
+    AUDIO_CHANNEL_OUT_2POINT0POINT2,
     AUDIO_CHANNEL_OUT_QUAD,
     AUDIO_CHANNEL_OUT_QUAD_BACK,
     AUDIO_CHANNEL_OUT_QUAD_SIDE,
     AUDIO_CHANNEL_OUT_SURROUND,
-//    AUDIO_CHANNEL_OUT_2POINT1POINT2,
-//    AUDIO_CHANNEL_OUT_3POINT0POINT2,
+    AUDIO_CHANNEL_OUT_2POINT1POINT2,
+    AUDIO_CHANNEL_OUT_3POINT0POINT2,
     AUDIO_CHANNEL_OUT_PENTA,
-//    AUDIO_CHANNEL_OUT_3POINT1POINT2,
+    AUDIO_CHANNEL_OUT_3POINT1POINT2,
     AUDIO_CHANNEL_OUT_5POINT1,
     AUDIO_CHANNEL_OUT_5POINT1_BACK,
     AUDIO_CHANNEL_OUT_5POINT1_SIDE,
     AUDIO_CHANNEL_OUT_6POINT1,
-//    AUDIO_CHANNEL_OUT_5POINT1POINT2,
+    AUDIO_CHANNEL_OUT_5POINT1POINT2,
     AUDIO_CHANNEL_OUT_7POINT1,
-//    AUDIO_CHANNEL_OUT_5POINT1POINT4,
-//    AUDIO_CHANNEL_OUT_7POINT1POINT2,
-//    AUDIO_CHANNEL_OUT_7POINT1POINT4,
-//    AUDIO_CHANNEL_OUT_13POINT_360RA,
-//    AUDIO_CHANNEL_OUT_22POINT2,
+    AUDIO_CHANNEL_OUT_5POINT1POINT4,
+    AUDIO_CHANNEL_OUT_7POINT1POINT2,
+    AUDIO_CHANNEL_OUT_7POINT1POINT4,
+    AUDIO_CHANNEL_OUT_13POINT_360RA,
+    AUDIO_CHANNEL_OUT_22POINT2,
 };
+
+static constexpr audio_channel_mask_t kConsideredChannels =
+    (audio_channel_mask_t)(AUDIO_CHANNEL_OUT_7POINT1 | AUDIO_CHANNEL_OUT_BACK_CENTER);
 
 // Downmix doesn't change with sample rate
 static constexpr size_t kSampleRates[] = {
@@ -100,7 +105,8 @@ public:
             ASSERT_LT(index, FCC_24);
             const int pairIndex = pairIdxFromChannelIdx(index);
             const AUDIO_GEOMETRY_SIDE side = sideFromChannelIdx(index);
-            channel &= ~(1 << index);
+            const int channelBit = 1 << index;
+            channel &= ~channelBit;
 
             // Generate a +1, -1 alternating stream in one channel, which has variance 1.
             auto indata = input.data();
@@ -127,6 +133,12 @@ public:
             // Confirm exactly the mix amount prescribed by the existing downmix effect.
             // For future changes to the downmix effect, the nearness needs to be relaxed
             // to compare behavior S or earlier.
+            if ((channelBit & kConsideredChannels) == 0) {
+                // for channels not considered, expect 0 power for legacy downmix
+                EXPECT_EQ(0.f, power[0]);
+                EXPECT_EQ(0.f, power[1]);
+                continue;
+            }
             constexpr float POWER_TOLERANCE = 0.01;  // for variance sum error.
             switch (side) {
             case AUDIO_GEOMETRY_SIDE_LEFT:
