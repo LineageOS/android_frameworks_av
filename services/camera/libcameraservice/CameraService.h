@@ -935,6 +935,11 @@ private:
      */
     void updateCameraNumAndIds();
 
+    /**
+     * Filter camera characteristics for S Performance class primary cameras
+     */
+    void filterSPerfClassCharacteristics();
+
     // Number of camera devices (excluding hidden secure cameras)
     int                 mNumberOfCameras;
     // Number of camera devices (excluding hidden secure cameras and
