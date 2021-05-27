@@ -918,7 +918,7 @@ class Camera3Device :
         status_t setRotateAndCropAutoBehavior(
                 camera_metadata_enum_android_scaler_rotate_and_crop_t rotateAndCropValue);
 
-        status_t setCameraMute(bool enabled);
+        status_t setCameraMute(int32_t muteMode);
 
         status_t setHalInterface(sp<HalInterface> newHalInterface);
 
@@ -1069,7 +1069,7 @@ class Camera3Device :
         uint32_t           mCurrentAfTriggerId;
         uint32_t           mCurrentPreCaptureTriggerId;
         camera_metadata_enum_android_scaler_rotate_and_crop_t mRotateAndCropOverride;
-        bool               mCameraMute;
+        int32_t            mCameraMute; // 0 = no mute, otherwise the TEST_PATTERN_MODE to use
         bool               mCameraMuteChanged;
 
         int64_t            mRepeatingLastFrameNumber;
@@ -1342,6 +1342,8 @@ class Camera3Device :
 
     // Whether the HAL supports camera muting via test pattern
     bool mSupportCameraMute = false;
+    // Whether the HAL supports SOLID_COLOR or BLACK if mSupportCameraMute is true
+    bool mSupportTestPatternSolidColor = false;
 
     // Injection camera related methods.
     class Camera3DeviceInjectionMethods : public virtual RefBase {
