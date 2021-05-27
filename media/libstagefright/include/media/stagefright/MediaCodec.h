@@ -431,6 +431,7 @@ private:
     sp<ResourceManagerServiceProxy> mResourceManagerProxy;
 
     bool mIsVideo;
+    AString mLogSessionId;
     int32_t mVideoWidth;
     int32_t mVideoHeight;
     int32_t mRotationDegrees;

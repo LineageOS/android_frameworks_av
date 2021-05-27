@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
@@ -50,7 +50,7 @@ bool statsd_audiothread(const std::shared_ptr<const mediametrics::Item>& item,
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::AudioThreadData metrics_proto;
+    ::android::stats::mediametrics_message::AudioThreadData metrics_proto;
 
 #define	MM_PREFIX "android.media.audiothread."
 
