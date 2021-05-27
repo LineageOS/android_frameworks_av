@@ -743,6 +743,16 @@ status_t AudioFlingerClientAdapter::setVibratorInfos(
     return statusTFromBinderStatus(mDelegate->setVibratorInfos(vibratorInfos));
 }
 
+status_t AudioFlingerClientAdapter::updateSecondaryOutputs(
+        const TrackSecondaryOutputsMap& trackSecondaryOutputs) {
+    std::vector<media::TrackSecondaryOutputInfo> trackSecondaryOutputInfos =
+            VALUE_OR_RETURN_STATUS(
+                    convertContainer<std::vector<media::TrackSecondaryOutputInfo>>(
+                            trackSecondaryOutputs,
+                            legacy2aidl_TrackSecondaryOutputInfoPair_TrackSecondaryOutputInfo));
+    return statusTFromBinderStatus(mDelegate->updateSecondaryOutputs(trackSecondaryOutputInfos));
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
@@ -1197,6 +1207,15 @@ Status AudioFlingerServerAdapter::setAudioHalPids(const std::vector<int32_t>& pi
 Status AudioFlingerServerAdapter::setVibratorInfos(
         const std::vector<media::AudioVibratorInfo>& vibratorInfos) {
     return Status::fromStatusT(mDelegate->setVibratorInfos(vibratorInfos));
+}
+
+Status AudioFlingerServerAdapter::updateSecondaryOutputs(
+        const std::vector<media::TrackSecondaryOutputInfo>& trackSecondaryOutputInfos) {
+    TrackSecondaryOutputsMap trackSecondaryOutputs =
+            VALUE_OR_RETURN_BINDER(convertContainer<TrackSecondaryOutputsMap>(
+                    trackSecondaryOutputInfos,
+                    aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair));
+    return Status::fromStatusT(mDelegate->updateSecondaryOutputs(trackSecondaryOutputs));
 }
 
 } // namespace android
