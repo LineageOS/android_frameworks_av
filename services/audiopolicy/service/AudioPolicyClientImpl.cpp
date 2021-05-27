@@ -291,4 +291,14 @@ status_t AudioPolicyService::AudioPolicyClient::getAudioPort(struct audio_port_v
     return af->getAudioPort(port);
 }
 
+status_t AudioPolicyService::AudioPolicyClient::updateSecondaryOutputs(
+        const TrackSecondaryOutputsMap& trackSecondaryOutputs) {
+    sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        ALOGW("%s: could not get AudioFlinger", __func__);
+        return PERMISSION_DENIED;
+    }
+    return af->updateSecondaryOutputs(trackSecondaryOutputs);
+}
+
 } // namespace android

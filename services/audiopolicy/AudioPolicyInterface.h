@@ -17,6 +17,7 @@
 #ifndef ANDROID_AUDIOPOLICY_INTERFACE_H
 #define ANDROID_AUDIOPOLICY_INTERFACE_H
 
+#include <media/AudioCommonTypes.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
@@ -453,6 +454,9 @@ public:
     virtual void setSoundTriggerCaptureState(bool active) = 0;
 
     virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
+
+    virtual status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
 };
 
     // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager

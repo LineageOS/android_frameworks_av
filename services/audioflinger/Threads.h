@@ -1013,6 +1013,8 @@ public:
                     mDownStreamPatch = *patch;
                 }
 
+                PlaybackThread::Track* getTrackById_l(audio_port_handle_t trackId);
+
 protected:
     // updated by readOutputParameters_l()
     size_t                          mNormalFrameCount;  // normal mixer and effects
