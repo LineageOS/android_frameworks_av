@@ -74,6 +74,7 @@ apex {
     manifest: "manifest.json",
     defaults: ["com.android.media-defaults"],
     prebuilts: [
+        "current_sdkinfo",
         "media-linker-config",
     ],
 }
