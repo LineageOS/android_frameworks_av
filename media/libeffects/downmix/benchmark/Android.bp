@@ -1,0 +1,38 @@
+// Build testbench for downmix module.
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_media_libeffects_downmix_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: [
+        "frameworks_av_media_libeffects_downmix_license",
+    ],
+}
+
+cc_benchmark {
+    name: "downmix_benchmark",
+    host_supported: false,
+    vendor: true,
+    include_dirs: [
+        "frameworks/av/media/libeffects/downmix",
+    ],
+    header_libs: [
+        "libaudioeffects",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    static_libs: [
+        "libaudioutils",
+        "libdownmix",
+    ],
+    srcs: [
+        "downmix_benchmark.cpp",
+    ],
+    cflags: [
+        "-Wall",
+        "-Werror",
+        "-Wextra",
+    ],
+}

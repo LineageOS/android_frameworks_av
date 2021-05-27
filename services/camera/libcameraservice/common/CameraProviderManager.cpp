@@ -1186,6 +1186,17 @@ bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) 
     return isHiddenPhysicalCameraInternal(cameraId).first;
 }
 
+void CameraProviderManager::filterSmallJpegSizes(const std::string& cameraId) {
+    for (auto& provider : mProviders) {
+        for (auto& deviceInfo : provider->mDevices) {
+            if (deviceInfo->mId == cameraId) {
+                deviceInfo->filterSmallJpegSizes();
+                return;
+            }
+        }
+    }
+}
+
 std::pair<bool, CameraProviderManager::ProviderInfo::DeviceInfo *>
 CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraId) const {
     auto falseRet = std::make_pair(false, nullptr);
@@ -2560,6 +2571,70 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
     }
 
     return res;
+}
+
+void CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes() {
+    static constexpr int FHD_W = 1920;
+    static constexpr int FHD_H = 1080;
+
+    // Remove small JPEG sizes from available stream configurations
+    std::vector<int32_t> newStreamConfigs;
+    camera_metadata_entry streamConfigs =
+            mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
+    for (size_t i = 0; i < streamConfigs.count; i += 4) {
+        if ((streamConfigs.data.i32[i] == HAL_PIXEL_FORMAT_BLOB) && (streamConfigs.data.i32[i+3] ==
+                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT) &&
+                (streamConfigs.data.i32[i+1] < FHD_W || streamConfigs.data.i32[i+2] < FHD_H)) {
+            continue;
+        }
+        newStreamConfigs.insert(newStreamConfigs.end(), streamConfigs.data.i32 + i,
+                streamConfigs.data.i32 + i + 4);
+    }
+    if (newStreamConfigs.size() > 0) {
+        mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
+                newStreamConfigs.data(), newStreamConfigs.size());
+    }
+
+    // Remove small JPEG sizes from available min frame durations
+    std::vector<int64_t> newMinDurations;
+    camera_metadata_entry minDurations =
+            mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
+    for (size_t i = 0; i < minDurations.count; i += 4) {
+        if ((minDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) &&
+                (minDurations.data.i64[i+1] < FHD_W || minDurations.data.i64[i+2] < FHD_H)) {
+            continue;
+        }
+        newMinDurations.insert(newMinDurations.end(), minDurations.data.i64 + i,
+                minDurations.data.i64 + i + 4);
+    }
+    if (newMinDurations.size() > 0) {
+        mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
+                newMinDurations.data(), newMinDurations.size());
+    }
+
+    // Remove small JPEG sizes from available stall durations
+    std::vector<int64_t> newStallDurations;
+    camera_metadata_entry stallDurations =
+            mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS);
+    for (size_t i = 0; i < stallDurations.count; i += 4) {
+        if ((stallDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) &&
+                (stallDurations.data.i64[i+1] < FHD_W || stallDurations.data.i64[i+2] < FHD_H)) {
+            continue;
+        }
+        newStallDurations.insert(newStallDurations.end(), stallDurations.data.i64 + i,
+                stallDurations.data.i64 + i + 4);
+    }
+    if (newStallDurations.size() > 0) {
+        mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
+                newStallDurations.data(), newStallDurations.size());
+    }
+
+    // Re-generate metadata tags that have dependencies on BLOB sizes
+    auto res = addDynamicDepthTags();
+    if (OK != res) {
+        ALOGE("%s: Failed to append dynamic depth tags: %s (%d)", __FUNCTION__,
+                strerror(-res), res);
+    }
 }
 
 status_t CameraProviderManager::ProviderInfo::parseProviderName(const std::string& name,
