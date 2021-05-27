@@ -2976,7 +2976,7 @@ status_t Parameters::getFilteredSizes(Size limit, Vector<Size> *sizes) {
         const StreamConfiguration &sc = scs[i];
         if (sc.isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT &&
                 sc.format == HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED &&
-                sc.width <= limit.width && sc.height <= limit.height) {
+                ((sc.width * sc.height) <= (limit.width * limit.height))) {
             int64_t minFrameDuration = getMinFrameDurationNs(
                     {sc.width, sc.height}, HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
             if (minFrameDuration > MAX_PREVIEW_RECORD_DURATION_NS) {
