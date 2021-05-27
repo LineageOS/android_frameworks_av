@@ -31,6 +31,7 @@
 
 #include <algorithm>
 #include <inttypes.h>
+#include <map>
 #include <math.h>
 #include <set>
 #include <unordered_set>
@@ -5694,6 +5695,7 @@ void AudioPolicyManager::checkOutputForAllStrategies()
 
 void AudioPolicyManager::checkSecondaryOutputs() {
     std::set<audio_stream_type_t> streamsToInvalidate;
+    TrackSecondaryOutputsMap trackSecondaryOutputs;
     for (size_t i = 0; i < mOutputs.size(); i++) {
         const sp<SwAudioOutputDescriptor>& outputDescriptor = mOutputs[i];
         for (const sp<TrackClientDescriptor>& client : outputDescriptor->getClientIterable()) {
@@ -5710,16 +5712,28 @@ void AudioPolicyManager::checkSecondaryOutputs() {
                 }
             }
 
-            if (status != OK ||
-                !std::equal(client->getSecondaryOutputs().begin(),
-                            client->getSecondaryOutputs().end(),
-                            secondaryDescs.begin(), secondaryDescs.end())) {
+            if (status != OK) {
                 streamsToInvalidate.insert(client->stream());
+            } else if (!std::equal(
+                    client->getSecondaryOutputs().begin(),
+                    client->getSecondaryOutputs().end(),
+                    secondaryDescs.begin(), secondaryDescs.end())) {
+                std::vector<wp<SwAudioOutputDescriptor>> weakSecondaryDescs;
+                std::vector<audio_io_handle_t> secondaryOutputIds;
+                for (const auto& secondaryDesc : secondaryDescs) {
+                    secondaryOutputIds.push_back(secondaryDesc->mIoHandle);
+                    weakSecondaryDescs.push_back(secondaryDesc);
+                }
+                trackSecondaryOutputs.emplace(client->portId(), secondaryOutputIds);
+                client->setSecondaryOutputs(std::move(weakSecondaryDescs));
             }
         }
     }
+    if (!trackSecondaryOutputs.empty()) {
+        mpClientInterface->updateSecondaryOutputs(trackSecondaryOutputs);
+    }
     for (audio_stream_type_t stream : streamsToInvalidate) {
-        ALOGD("%s Invalidate stream %d due to secondary output change", __func__, stream);
+        ALOGD("%s Invalidate stream %d due to fail getting output for attr", __func__, stream);
         mpClientInterface->invalidateStream(stream);
     }
 }

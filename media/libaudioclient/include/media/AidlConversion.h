@@ -50,6 +50,7 @@
 #include <android/media/AudioUniqueIdUse.h>
 #include <android/media/EffectDescriptor.h>
 #include <android/media/ExtraAudioDescriptor.h>
+#include <android/media/TrackSecondaryOutputInfo.h>
 
 #include <android/media/SharedFileRegion.h>
 #include <binder/IMemory.h>
@@ -407,6 +408,13 @@ ConversionResult<media::AudioEncapsulationType>
 legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
         const audio_encapsulation_type_t & legacy);
 
+using TrackSecondaryOutputInfoPair = std::pair<audio_port_handle_t, std::vector<audio_io_handle_t>>;
+ConversionResult<TrackSecondaryOutputInfoPair>
+aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair(
+        const media::TrackSecondaryOutputInfo& aidl);
+ConversionResult<media::TrackSecondaryOutputInfo>
+legacy2aidl_TrackSecondaryOutputInfoPair_TrackSecondaryOutputInfo(
+        const TrackSecondaryOutputInfoPair& legacy);
 
 
 }  // namespace android
