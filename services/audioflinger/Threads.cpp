@@ -2425,7 +2425,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
                           channelMask, frameCount,
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
                           sessionId, creatorPid, identity, trackFlags, TrackBase::TYPE_DEFAULT,
-                          portId, SIZE_MAX /*frameCountToBeReady*/);
+                          portId, SIZE_MAX /*frameCountToBeReady*/, speed);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
@@ -3319,6 +3319,17 @@ void AudioFlinger::PlaybackThread::invalidateTracks(audio_stream_type_t streamTy
 {
     Mutex::Autolock _l(mLock);
     invalidateTracks_l(streamType);
+}
+
+// getTrackById_l must be called with holding thread lock
+AudioFlinger::PlaybackThread::Track* AudioFlinger::PlaybackThread::getTrackById_l(
+        audio_port_handle_t trackPortId) {
+    for (size_t i = 0; i < mTracks.size(); i++) {
+        if (mTracks[i]->portId() == trackPortId) {
+            return mTracks[i].get();
+        }
+    }
+    return nullptr;
 }
 
 status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& chain)
