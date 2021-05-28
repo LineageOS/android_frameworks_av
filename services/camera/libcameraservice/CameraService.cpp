@@ -85,6 +85,7 @@ namespace android {
 
 using base::StringPrintf;
 using binder::Status;
+using camera3::SessionConfigurationUtils;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
@@ -241,7 +242,9 @@ status_t CameraService::enumerateProviders() {
 
     //Derive primary rear/front cameras, and filter their charactierstics.
     //This needs to be done after all cameras are enumerated and camera ids are sorted.
-    filterSPerfClassCharacteristics();
+    if (SessionConfigurationUtils::IS_PERF_CLASS) {
+        filterSPerfClassCharacteristics();
+    }
 
     return OK;
 }
@@ -314,12 +317,6 @@ void CameraService::updateCameraNumAndIds() {
 }
 
 void CameraService::filterSPerfClassCharacteristics() {
-    static int32_t kPerformanceClassLevel =
-            property_get_int32("ro.odm.build.media_performance_class", 0);
-    static bool kIsSPerformanceClass = (kPerformanceClassLevel == 31);
-
-    if (!kIsSPerformanceClass) return;
-
     // To claim to be S Performance primary cameras, the cameras must be
     // backward compatible. So performance class primary camera Ids must be API1
     // compatible.
@@ -336,7 +333,14 @@ void CameraService::filterSPerfClassCharacteristics() {
 
         if ((facing == hardware::CAMERA_FACING_BACK && !firstRearCameraSeen) ||
                 (facing == hardware::CAMERA_FACING_FRONT && !firstFrontCameraSeen)) {
-            mCameraProviderManager->filterSmallJpegSizes(cameraId);
+            status_t res = mCameraProviderManager->filterSmallJpegSizes(cameraId);
+            if (res == OK) {
+                mPerfClassPrimaryCameraIds.insert(cameraId);
+            } else {
+                ALOGE("%s: Failed to filter small JPEG sizes for performance class primary "
+                        "camera %s: %s(%d)", __FUNCTION__, cameraId.c_str(), strerror(-res), res);
+                break;
+            }
 
             if (facing == hardware::CAMERA_FACING_BACK) {
                 firstRearCameraSeen = true;
@@ -705,7 +709,7 @@ String8 CameraService::cameraIdIntToStr(int cameraIdInt) {
 }
 
 Status CameraService::getCameraCharacteristics(const String16& cameraId,
-        CameraMetadata* cameraInfo) {
+        int targetSdkVersion, CameraMetadata* cameraInfo) {
     ATRACE_CALL();
     if (!cameraInfo) {
         ALOGE("%s: cameraInfo is NULL", __FUNCTION__);
@@ -726,8 +730,13 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
 
     Status ret{};
 
+
+    std::string cameraIdStr = String8(cameraId).string();
+    bool overrideForPerfClass =
+            SessionConfigurationUtils::targetPerfClassPrimaryCamera(mPerfClassPrimaryCameraIds,
+                    cameraIdStr, targetSdkVersion);
     status_t res = mCameraProviderManager->getCameraCharacteristics(
-            String8(cameraId).string(), cameraInfo);
+            cameraIdStr, overrideForPerfClass, cameraInfo);
     if (res != OK) {
         if (res == NAME_NOT_FOUND) {
             return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT, "Unable to retrieve camera "
@@ -869,7 +878,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
         const sp<IInterface>& cameraCb, const String16& packageName,
         const std::optional<String16>& featureId,  const String8& cameraId,
         int api1CameraId, int facing, int sensorOrientation, int clientPid, uid_t clientUid,
-        int servicePid, int deviceVersion, apiLevel effectiveApiLevel,
+        int servicePid, int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
         /*out*/sp<BasicClient>* client) {
 
     // Create CameraClient based on device version reported by the HAL.
@@ -893,12 +902,13 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
                 *client = new Camera2Client(cameraService, tmp, packageName, featureId,
                         cameraId, api1CameraId,
                         facing, sensorOrientation, clientPid, clientUid,
-                        servicePid);
+                        servicePid, overrideForPerfClass);
             } else { // Camera2 API route
                 sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                         static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
                 *client = new CameraDeviceClient(cameraService, tmp, packageName, featureId,
-                        cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid);
+                        cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid,
+                        overrideForPerfClass);
             }
             break;
         default:
@@ -995,7 +1005,8 @@ Status CameraService::initializeShimMetadata(int cameraId) {
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
             internalPackageName, {}, uid, USE_CALLING_PID,
-            API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0, /*out*/ tmp)
+            API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0,
+            /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
     }
@@ -1510,6 +1521,7 @@ Status CameraService::connect(
         const String16& clientPackageName,
         int clientUid,
         int clientPid,
+        int targetSdkVersion,
         /*out*/
         sp<ICamera>* device) {
 
@@ -1520,7 +1532,7 @@ Status CameraService::connect(
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
             clientPackageName, {}, clientUid, clientPid, API_1,
-            /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, /*out*/client);
+            /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, targetSdkVersion, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
@@ -1596,7 +1608,7 @@ Status CameraService::connectDevice(
         const String16& cameraId,
         const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId,
-        int clientUid, int oomScoreOffset,
+        int clientUid, int oomScoreOffset, int targetSdkVersion,
         /*out*/
         sp<hardware::camera2::ICameraDeviceUser>* device) {
 
@@ -1636,7 +1648,7 @@ Status CameraService::connectDevice(
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1, clientPackageNameAdj, clientFeatureId,
             clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, oomScoreOffset,
-            /*out*/client);
+            targetSdkVersion, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, callingPid, String8(clientPackageNameAdj), ret.toString8());
@@ -1666,7 +1678,7 @@ template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
         int api1CameraId, const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
-        apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset,
+        apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset, int targetSdkVersion,
         /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
 
@@ -1756,10 +1768,12 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         }
 
         sp<BasicClient> tmp = nullptr;
+        bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+                mPerfClassPrimaryCameraIds, cameraId.string(), targetSdkVersion);
         if(!(ret = makeClient(this, cameraCb, clientPackageName, clientFeatureId,
                 cameraId, api1CameraId, facing, orientation,
                 clientPid, clientUid, getpid(),
-                deviceVersion, effectiveApiLevel,
+                deviceVersion, effectiveApiLevel, overrideForPerfClass,
                 /*out*/&tmp)).isOk()) {
             return ret;
         }
@@ -2234,7 +2248,7 @@ Status CameraService::getConcurrentCameraIds(
 
 Status CameraService::isConcurrentSessionConfigurationSupported(
         const std::vector<CameraIdAndSessionConfiguration>& cameraIdsAndSessionConfigurations,
-        /*out*/bool* isSupported) {
+        int targetSdkVersion, /*out*/bool* isSupported) {
     if (!isSupported) {
         ALOGE("%s: isSupported is NULL", __FUNCTION__);
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, "isSupported is NULL");
@@ -2258,7 +2272,8 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
 
     status_t res =
             mCameraProviderManager->isConcurrentSessionConfigurationSupported(
-                    cameraIdsAndSessionConfigurations, isSupported);
+                    cameraIdsAndSessionConfigurations, mPerfClassPrimaryCameraIds,
+                    targetSdkVersion, isSupported);
     if (res != OK) {
         logServiceError(String8::format("Unable to query session configuration support"),
             ERROR_INVALID_OPERATION);

@@ -149,7 +149,8 @@ status_t CameraSource::isCameraAvailable(
     int32_t cameraId, const String16& clientName, uid_t clientUid, pid_t clientPid) {
 
     if (camera == 0) {
-        mCamera = Camera::connect(cameraId, clientName, clientUid, clientPid);
+        mCamera = Camera::connect(cameraId, clientName, clientUid, clientPid,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__);
         if (mCamera == 0) return -EBUSY;
         mCameraFlags &= ~FLAGS_HOT_CAMERA;
     } else {

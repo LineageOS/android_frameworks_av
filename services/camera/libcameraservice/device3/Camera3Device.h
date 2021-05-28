@@ -89,7 +89,7 @@ class Camera3Device :
             public camera3::FlushBufferInterface {
   public:
 
-    explicit Camera3Device(const String8& id);
+    explicit Camera3Device(const String8& id, bool overrideForPerfClass);
 
     virtual ~Camera3Device();
 
@@ -1342,6 +1342,10 @@ class Camera3Device :
 
     // Whether the HAL supports camera muting via test pattern
     bool mSupportCameraMute = false;
+
+    // Whether the camera framework overrides the device characteristics for
+    // performance class.
+    bool mOverrideForPerfClass;
 
     // Injection camera related methods.
     class Camera3DeviceInjectionMethods : public virtual RefBase {

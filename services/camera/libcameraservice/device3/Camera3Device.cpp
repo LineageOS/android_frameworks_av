@@ -75,7 +75,7 @@ using android::hardware::camera::metadata::V3_6::CameraMetadataEnumAndroidSensor
 
 namespace android {
 
-Camera3Device::Camera3Device(const String8 &id):
+Camera3Device::Camera3Device(const String8 &id, bool overrideForPerfClass):
         mId(id),
         mOperatingMode(NO_MODE),
         mIsConstrainedHighSpeedConfiguration(false),
@@ -93,7 +93,8 @@ Camera3Device::Camera3Device(const String8 &id):
         mListener(NULL),
         mVendorTagId(CAMERA_METADATA_INVALID_VENDOR_ID),
         mLastTemplateId(-1),
-        mNeedFixupMonochromeTags(false)
+        mNeedFixupMonochromeTags(false),
+        mOverrideForPerfClass(overrideForPerfClass)
 {
     ATRACE_CALL();
     ALOGV("%s: Created device for camera %s", __FUNCTION__, mId.string());
@@ -132,7 +133,7 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
         return res;
     }
 
-    res = manager->getCameraCharacteristics(mId.string(), &mDeviceInfo);
+    res = manager->getCameraCharacteristics(mId.string(), mOverrideForPerfClass, &mDeviceInfo);
     if (res != OK) {
         SET_ERR_L("Could not retrieve camera characteristics: %s (%d)", strerror(-res), res);
         session->close();
@@ -144,8 +145,9 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
     bool isLogical = manager->isLogicalCamera(mId.string(), &physicalCameraIds);
     if (isLogical) {
         for (auto& physicalId : physicalCameraIds) {
+            // Do not override characteristics for physical cameras
             res = manager->getCameraCharacteristics(
-                    physicalId, &mPhysicalDeviceInfoMap[physicalId]);
+                    physicalId, /*overrideForPerfClass*/false, &mPhysicalDeviceInfoMap[physicalId]);
             if (res != OK) {
                 SET_ERR_L("Could not retrieve camera %s characteristics: %s (%d)",
                         physicalId.c_str(), strerror(-res), res);
