@@ -351,6 +351,7 @@ aidl_interface {
         "aidl/android/media/AudioVibratorInfo.aidl",
         "aidl/android/media/EffectDescriptor.aidl",
         "aidl/android/media/ExtraAudioDescriptor.aidl",
+        "aidl/android/media/TrackSecondaryOutputInfo.aidl",
     ],
     imports: [
         "audio_common-aidl",
