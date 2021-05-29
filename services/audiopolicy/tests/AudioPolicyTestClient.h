@@ -91,6 +91,10 @@ public:
     status_t getAudioPort(struct audio_port_v7 *port __unused) override {
         return INVALID_OPERATION;
     };
+    status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs __unused) override {
+        return NO_INIT;
+    }
 };
 
 } // namespace android
