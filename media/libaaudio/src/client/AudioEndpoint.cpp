@@ -166,6 +166,10 @@ aaudio_result_t AudioEndpoint::configure(const EndpointDescriptor *pEndpointDesc
                                   ? &mDataWriteCounter
                                   : descriptor->writeCounterAddress;
 
+    // Clear buffer to avoid an initial glitch on some devices.
+    size_t bufferSizeBytes = descriptor->capacityInFrames * descriptor->bytesPerFrame;
+    memset(descriptor->dataAddress, 0, bufferSizeBytes);
+
     mDataQueue = std::make_unique<FifoBufferIndirect>(
             descriptor->bytesPerFrame,
             descriptor->capacityInFrames,
