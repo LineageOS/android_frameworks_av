@@ -21,6 +21,8 @@
 #include <iostream>
 #include <limits>
 
+#include <android/binder_process.h>
+
 #include "BenchmarkTestEnvironment.h"
 #include "Decoder.h"
 
@@ -175,6 +177,7 @@ INSTANTIATE_TEST_SUITE_P(VideoDecoderAsyncTest, DecoderTest,
                                             "c2.android.hevc.decoder", true)));
 
 int main(int argc, char **argv) {
+    ABinderProcess_startThreadPool();
     gEnv = new BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);
