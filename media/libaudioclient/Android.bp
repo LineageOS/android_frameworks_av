@@ -312,6 +312,7 @@ aidl_interface {
         "aidl/android/media/AudioEncapsulationMode.aidl",
         "aidl/android/media/AudioEncapsulationMetadataType.aidl",
         "aidl/android/media/AudioEncapsulationType.aidl",
+        "aidl/android/media/AudioFormatSys.aidl",
         "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGain.aidl",
         "aidl/android/media/AudioGainConfig.aidl",
@@ -354,7 +355,6 @@ aidl_interface {
         "aidl/android/media/TrackSecondaryOutputInfo.aidl",
     ],
     imports: [
-        "android.media.audio.common.types",
         "media_permission-aidl",
     ],
     backend: {
@@ -395,7 +395,6 @@ aidl_interface {
         "aidl/android/media/SoundTriggerSession.aidl",
     ],
     imports: [
-        "android.media.audio.common.types",
         "audioclient-types-aidl",
     ],
     backend: {
@@ -438,7 +437,6 @@ aidl_interface {
         "aidl/android/media/IAudioTrackCallback.aidl",
     ],
     imports: [
-        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "av-types-aidl",
         "effect-aidl",
@@ -476,7 +474,6 @@ aidl_interface {
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
     ],
     imports: [
-        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",

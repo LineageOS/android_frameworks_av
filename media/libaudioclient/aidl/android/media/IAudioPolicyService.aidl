@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.audio.common.AudioFormat;
+import android.media.AudioFormatSys;
 
 import android.media.AudioAttributesEx;
 import android.media.AudioAttributesInternal;
@@ -62,13 +62,13 @@ interface IAudioPolicyService {
     void setDeviceConnectionState(in AudioDevice device,
                                   in AudioPolicyDeviceState state,
                                   @utf8InCpp String deviceName,
-                                  in AudioFormat encodedFormat);
+                                  in AudioFormatSys encodedFormat);
 
     AudioPolicyDeviceState getDeviceConnectionState(in AudioDevice device);
 
     void handleDeviceConfigChange(in AudioDevice device,
                                   @utf8InCpp String deviceName,
-                                  in AudioFormat encodedFormat);
+                                  in AudioFormatSys encodedFormat);
 
     void setPhoneState(AudioMode state, int /* uid_t */ uid);
 
@@ -278,7 +278,7 @@ interface IAudioPolicyService {
      * number of elements without actually retrieving them.
      */
     void getSurroundFormats(inout Int count,
-                            out AudioFormat[] formats,
+                            out AudioFormatSys[] formats,
                             out boolean[] formatsEnabled);
 
     /**
@@ -290,11 +290,11 @@ interface IAudioPolicyService {
      * number of elements without actually retrieving them.
      */
     void getReportedSurroundFormats(inout Int count,
-                                    out AudioFormat[] formats);
+                                    out AudioFormatSys[] formats);
 
-    AudioFormat[] getHwOffloadEncodingFormatsSupportedForA2DP();
+    AudioFormatSys[] getHwOffloadEncodingFormatsSupportedForA2DP();
 
-    void setSurroundFormatEnabled(AudioFormat audioFormat, boolean enabled);
+    void setSurroundFormatEnabled(AudioFormatSys audioFormat, boolean enabled);
 
     void setAssistantUid(int /* uid_t */ uid);
 

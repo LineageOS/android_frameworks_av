@@ -20,7 +20,7 @@ import android.media.AudioConfigBase;
 import android.media.AudioEncapsulationMode;
 import android.media.AudioStreamType;
 import android.media.AudioUsage;
-import android.media.audio.common.AudioFormat;
+import android.media.AudioFormatSys;
 
 /**
  * {@hide}

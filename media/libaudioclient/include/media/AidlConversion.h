@@ -132,8 +132,8 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
         audio_port_type_t legacy);
 
 ConversionResult<audio_format_t> aidl2legacy_AudioFormat_audio_format_t(
-        media::audio::common::AudioFormat aidl);
-ConversionResult<media::audio::common::AudioFormat> legacy2aidl_audio_format_t_AudioFormat(
+        media::AudioFormatSys aidl);
+ConversionResult<media::AudioFormatSys> legacy2aidl_audio_format_t_AudioFormat(
         audio_format_t legacy);
 
 ConversionResult<audio_gain_mode_t>
