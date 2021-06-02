@@ -40,7 +40,7 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerService.h>
 #include <android/media/BpAudioFlingerService.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include "android/media/CreateEffectRequest.h"
 #include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
@@ -131,7 +131,6 @@ public:
         audio_attributes_t attr;
         audio_config_base_t config;
         AudioClient clientInfo;
-        media::permission::Identity identity;
         audio_unique_id_t riid;
         int32_t maxSharedAudioHistoryMs;
 
@@ -563,7 +562,7 @@ public:
     Status createRecord(const media::CreateRecordRequest& request,
                         media::CreateRecordResponse* _aidl_return) override;
     Status sampleRate(int32_t ioHandle, int32_t* _aidl_return) override;
-    Status format(int32_t output, media::audio::common::AudioFormat* _aidl_return) override;
+    Status format(int32_t output, media::AudioFormatSys* _aidl_return) override;
     Status frameCount(int32_t ioHandle, int64_t* _aidl_return) override;
     Status latency(int32_t output, int32_t* _aidl_return) override;
     Status setMasterVolume(float value) override;
@@ -585,7 +584,7 @@ public:
     Status
     getParameters(int32_t ioHandle, const std::string& keys, std::string* _aidl_return) override;
     Status registerClient(const sp<media::IAudioFlingerClient>& client) override;
-    Status getInputBufferSize(int32_t sampleRate, media::audio::common::AudioFormat format,
+    Status getInputBufferSize(int32_t sampleRate, media::AudioFormatSys format,
                               int32_t channelMask, int64_t* _aidl_return) override;
     Status openOutput(const media::OpenOutputRequest& request,
                       media::OpenOutputResponse* _aidl_return) override;

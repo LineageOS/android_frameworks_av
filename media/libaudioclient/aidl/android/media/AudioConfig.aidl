@@ -17,7 +17,7 @@
 package android.media;
 
 import android.media.AudioOffloadInfo;
-import android.media.audio.common.AudioFormat;
+import android.media.AudioFormatSys;
 
 /**
  * {@hide}
@@ -29,7 +29,7 @@ parcelable AudioConfig {
      * TODO(ytai): Create a designated type.
      */
     int channelMask;
-    AudioFormat format;
+    AudioFormatSys format;
     AudioOffloadInfo offloadInfo;
     long frameCount;
 }

@@ -52,7 +52,7 @@ namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::IAudioPolicyService;
-using media::permission::Identity;
+using android::content::AttributionSourceState;
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
@@ -941,7 +941,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
                                        audio_io_handle_t* output,
                                        audio_session_t session,
                                        audio_stream_type_t* stream,
-                                       const Identity& identity,
+                                       const AttributionSourceState& attributionSource,
                                        const audio_config_t* config,
                                        audio_output_flags_t flags,
                                        audio_port_handle_t* selectedDeviceId,
@@ -984,7 +984,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     media::GetOutputForAttrResponse responseAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getOutputForAttr(attrAidl, sessionAidl, identity, configAidl, flagsAidl,
+            aps->getOutputForAttr(attrAidl, sessionAidl, attributionSource, configAidl, flagsAidl,
                                   selectedDeviceIdAidl, &responseAidl)));
 
     *output = VALUE_OR_RETURN_STATUS(
@@ -1038,7 +1038,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
                                       audio_io_handle_t* input,
                                       audio_unique_id_t riid,
                                       audio_session_t session,
-                                      const Identity &identity,
+                                      const AttributionSourceState &attributionSource,
                                       const audio_config_base_t* config,
                                       audio_input_flags_t flags,
                                       audio_port_handle_t* selectedDeviceId,
@@ -1077,7 +1077,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     media::GetInputForAttrResponse response;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, identity,
+            aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, attributionSource,
                 configAidl, flagsAidl, selectedDeviceIdAidl, &response)));
 
     *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.input));
@@ -1842,7 +1842,7 @@ status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
     media::Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
-    std::vector<media::audio::common::AudioFormat> surroundFormatsAidl;
+    std::vector<media::AudioFormatSys> surroundFormatsAidl;
     std::vector<bool> surroundFormatsEnabledAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl,
@@ -1869,7 +1869,7 @@ status_t AudioSystem::getReportedSurroundFormats(unsigned int* numSurroundFormat
     media::Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
-    std::vector<media::audio::common::AudioFormat> surroundFormatsAidl;
+    std::vector<media::AudioFormatSys> surroundFormatsAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getReportedSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl)));
 
@@ -1885,7 +1885,7 @@ status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool 
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::audio::common::AudioFormat audioFormatAidl = VALUE_OR_RETURN_STATUS(
+    media::AudioFormatSys audioFormatAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_format_t_AudioFormat(audioFormat));
     return statusTFromBinderStatus(
             aps->setSurroundFormatEnabled(audioFormatAidl, enabled));
@@ -1939,7 +1939,7 @@ status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
             & aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    std::vector<media::audio::common::AudioFormat> formatsAidl;
+    std::vector<media::AudioFormatSys> formatsAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getHwOffloadEncodingFormatsSupportedForA2DP(&formatsAidl)));
     *formats = VALUE_OR_RETURN_STATUS(

@@ -16,7 +16,8 @@
 
 package android.media;
 
-import android.media.audio.common.AudioFormat;
+import android.media.AudioFormatSys;
+import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
 import android.media.AudioAttributesInternal;
@@ -48,7 +49,6 @@ import android.media.GetOutputForAttrResponse;
 import android.media.IAudioPolicyServiceClient;
 import android.media.ICaptureStateListener;
 import android.media.Int;
-import android.media.permission.Identity;
 import android.media.SoundTriggerSession;
 
 /**
@@ -62,13 +62,13 @@ interface IAudioPolicyService {
     void setDeviceConnectionState(in AudioDevice device,
                                   in AudioPolicyDeviceState state,
                                   @utf8InCpp String deviceName,
-                                  in AudioFormat encodedFormat);
+                                  in AudioFormatSys encodedFormat);
 
     AudioPolicyDeviceState getDeviceConnectionState(in AudioDevice device);
 
     void handleDeviceConfigChange(in AudioDevice device,
                                   @utf8InCpp String deviceName,
-                                  in AudioFormat encodedFormat);
+                                  in AudioFormatSys encodedFormat);
 
     void setPhoneState(AudioMode state, int /* uid_t */ uid);
 
@@ -81,7 +81,7 @@ interface IAudioPolicyService {
 
     GetOutputForAttrResponse getOutputForAttr(in AudioAttributesInternal attr,
                                               int /* audio_session_t */ session,
-                                              in Identity identity,
+                                              in AttributionSourceState attributionSource,
                                               in AudioConfig config,
                                               int /* Bitmask, indexed by AudioOutputFlags */ flags,
                                               int /* audio_port_handle_t */ selectedDeviceId);
@@ -96,7 +96,7 @@ interface IAudioPolicyService {
                                             int /* audio_io_handle_t */ input,
                                             int /* audio_unique_id_t */ riid,
                                             int /* audio_session_t */ session,
-                                            in Identity identity,
+                                            in AttributionSourceState attributionSource,
                                             in AudioConfigBase config,
                                             int /* Bitmask, indexed by AudioInputFlags */ flags,
                                             int /* audio_port_handle_t */ selectedDeviceId);
@@ -278,7 +278,7 @@ interface IAudioPolicyService {
      * number of elements without actually retrieving them.
      */
     void getSurroundFormats(inout Int count,
-                            out AudioFormat[] formats,
+                            out AudioFormatSys[] formats,
                             out boolean[] formatsEnabled);
 
     /**
@@ -290,11 +290,11 @@ interface IAudioPolicyService {
      * number of elements without actually retrieving them.
      */
     void getReportedSurroundFormats(inout Int count,
-                                    out AudioFormat[] formats);
+                                    out AudioFormatSys[] formats);
 
-    AudioFormat[] getHwOffloadEncodingFormatsSupportedForA2DP();
+    AudioFormatSys[] getHwOffloadEncodingFormatsSupportedForA2DP();
 
-    void setSurroundFormatEnabled(AudioFormat audioFormat, boolean enabled);
+    void setSurroundFormatEnabled(AudioFormatSys audioFormat, boolean enabled);
 
     void setAssistantUid(int /* uid_t */ uid);
 

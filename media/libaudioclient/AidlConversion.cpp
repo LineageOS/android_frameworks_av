@@ -394,17 +394,17 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
 }
 
 ConversionResult<audio_format_t> aidl2legacy_AudioFormat_audio_format_t(
-        media::audio::common::AudioFormat aidl) {
-    // This relies on AudioFormat being kept in sync with audio_format_t.
-    static_assert(sizeof(media::audio::common::AudioFormat) == sizeof(audio_format_t));
+        media::AudioFormatSys aidl) {
+    // This relies on AudioFormatSys being kept in sync with audio_format_t.
+    static_assert(sizeof(media::AudioFormatSys) == sizeof(audio_format_t));
     return static_cast<audio_format_t>(aidl);
 }
 
-ConversionResult<media::audio::common::AudioFormat> legacy2aidl_audio_format_t_AudioFormat(
+ConversionResult<media::AudioFormatSys> legacy2aidl_audio_format_t_AudioFormat(
         audio_format_t legacy) {
-    // This relies on AudioFormat being kept in sync with audio_format_t.
-    static_assert(sizeof(media::audio::common::AudioFormat) == sizeof(audio_format_t));
-    return static_cast<media::audio::common::AudioFormat>(legacy);
+    // This relies on AudioFormatSys being kept in sync with audio_format_t.
+    static_assert(sizeof(media::AudioFormatSys) == sizeof(audio_format_t));
+    return static_cast<media::AudioFormatSys>(legacy);
 }
 
 ConversionResult<audio_gain_mode_t> aidl2legacy_AudioGainMode_audio_gain_mode_t(media::AudioGainMode aidl) {
@@ -1182,7 +1182,7 @@ ConversionResult<AudioClient> aidl2legacy_AudioClient_AudioClient(
         const media::AudioClient& aidl) {
     AudioClient legacy;
     legacy.clientTid = VALUE_OR_RETURN(aidl2legacy_int32_t_pid_t(aidl.clientTid));
-    legacy.identity = aidl.identity;
+    legacy.attributionSource = aidl.attributionSource;
     return legacy;
 }
 
@@ -1190,7 +1190,7 @@ ConversionResult<media::AudioClient> legacy2aidl_AudioClient_AudioClient(
         const AudioClient& legacy) {
     media::AudioClient aidl;
     aidl.clientTid = VALUE_OR_RETURN(legacy2aidl_pid_t_int32_t(legacy.clientTid));
-    aidl.identity = legacy.identity;
+    aidl.attributionSource = legacy.attributionSource;
     return aidl;
 }
 
