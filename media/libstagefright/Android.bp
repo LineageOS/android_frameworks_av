@@ -338,7 +338,7 @@ cc_library {
         "android.hardware.cas.native@1.0",
         "android.hardware.drm@1.0",
         "android.hardware.media.omx@1.0",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
 
@@ -352,7 +352,7 @@ cc_library {
         "libogg",
         "libwebm",
         "libstagefright_id3",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libmediandk_format",
         "libmedia_ndkformatpriv",
     ],
@@ -370,7 +370,7 @@ cc_library {
         "libhidlmemory",
         "libmedia",
         "android.hidl.allocator@1.0",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     export_include_dirs: [
