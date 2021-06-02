@@ -34,7 +34,7 @@ cc_library_shared {
         // a dependency on it in the device makefile. There will be no build time
         // conflict with libaudiopolicyenginedefault.
         "libaudiopolicyenginedefault",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
 

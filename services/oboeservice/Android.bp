@@ -66,13 +66,13 @@ cc_library {
         "liblog",
         "libutils",
         "aaudio-aidl-cpp",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
 
     export_shared_lib_headers: [
         "libaaudio_internal",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     header_libs: [

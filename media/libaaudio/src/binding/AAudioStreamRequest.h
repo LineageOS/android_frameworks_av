@@ -23,9 +23,11 @@
 #include <aaudio/StreamRequest.h>
 
 #include "binding/AAudioStreamConfiguration.h"
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 
 namespace aaudio {
+
+using android::content::AttributionSourceState;
 
 class AAudioStreamRequest {
 public:
@@ -34,12 +36,12 @@ public:
     // Construct based on a parcelable representation.
     explicit AAudioStreamRequest(const StreamRequest& parcelable);
 
-    const android::media::permission::Identity &getIdentity() const {
-        return mIdentity;
+    const AttributionSourceState &getAttributionSource() const {
+        return mAttributionSource;
     }
 
-    void setIdentity(const android::media::permission::Identity &identity) {
-        mIdentity = identity;
+    void setAttributionSource(const AttributionSourceState &attributionSource) {
+        mAttributionSource = attributionSource;
     }
 
     bool isSharingModeMatchRequired() const {
@@ -75,7 +77,7 @@ public:
 
 private:
     AAudioStreamConfiguration  mConfiguration;
-    android::media::permission::Identity mIdentity;
+    AttributionSourceState mAttributionSource;
     bool                       mSharingModeMatchRequired = false;
     bool                       mInService = false; // Stream opened by AAudioservice
 };

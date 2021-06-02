@@ -52,7 +52,7 @@ namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::IAudioPolicyService;
-using media::permission::Identity;
+using android::content::AttributionSourceState;
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
@@ -941,7 +941,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
                                        audio_io_handle_t* output,
                                        audio_session_t session,
                                        audio_stream_type_t* stream,
-                                       const Identity& identity,
+                                       const AttributionSourceState& attributionSource,
                                        const audio_config_t* config,
                                        audio_output_flags_t flags,
                                        audio_port_handle_t* selectedDeviceId,
@@ -984,7 +984,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
     media::GetOutputForAttrResponse responseAidl;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getOutputForAttr(attrAidl, sessionAidl, identity, configAidl, flagsAidl,
+            aps->getOutputForAttr(attrAidl, sessionAidl, attributionSource, configAidl, flagsAidl,
                                   selectedDeviceIdAidl, &responseAidl)));
 
     *output = VALUE_OR_RETURN_STATUS(
@@ -1038,7 +1038,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
                                       audio_io_handle_t* input,
                                       audio_unique_id_t riid,
                                       audio_session_t session,
-                                      const Identity &identity,
+                                      const AttributionSourceState &attributionSource,
                                       const audio_config_base_t* config,
                                       audio_input_flags_t flags,
                                       audio_port_handle_t* selectedDeviceId,
@@ -1077,7 +1077,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     media::GetInputForAttrResponse response;
 
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
-            aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, identity,
+            aps->getInputForAttr(attrAidl, inputAidl, riidAidl, sessionAidl, attributionSource,
                 configAidl, flagsAidl, selectedDeviceIdAidl, &response)));
 
     *input = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(response.input));

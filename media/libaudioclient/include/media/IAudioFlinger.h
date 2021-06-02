@@ -40,7 +40,7 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerService.h>
 #include <android/media/BpAudioFlingerService.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include "android/media/CreateEffectRequest.h"
 #include "android/media/CreateEffectResponse.h"
 #include "android/media/CreateRecordRequest.h"
@@ -131,7 +131,6 @@ public:
         audio_attributes_t attr;
         audio_config_base_t config;
         AudioClient clientInfo;
-        media::permission::Identity identity;
         audio_unique_id_t riid;
         int32_t maxSharedAudioHistoryMs;
 

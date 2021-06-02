@@ -118,7 +118,7 @@ static inline T min(const T& a, const T& b)
 namespace android {
 
 using media::IEffectClient;
-using media::permission::Identity;
+using content::AttributionSourceState;
 
 // retry counts for buffer fill timeout
 // 50 * ~20msecs = 1 second
@@ -2129,7 +2129,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         audio_session_t sessionId,
         audio_output_flags_t *flags,
         pid_t creatorPid,
-        const Identity& identity,
+        const AttributionSourceState& attributionSource,
         pid_t tid,
         status_t *status,
         audio_port_handle_t portId,
@@ -2424,8 +2424,8 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         track = new Track(this, client, streamType, attr, sampleRate, format,
                           channelMask, frameCount,
                           nullptr /* buffer */, (size_t)0 /* bufferSize */, sharedBuffer,
-                          sessionId, creatorPid, identity, trackFlags, TrackBase::TYPE_DEFAULT,
-                          portId, SIZE_MAX /*frameCountToBeReady*/, speed);
+                          sessionId, creatorPid, attributionSource, trackFlags,
+                          TrackBase::TYPE_DEFAULT, portId, SIZE_MAX /*frameCountToBeReady*/, speed);
 
         lStatus = track != 0 ? track->initCheck() : (status_t) NO_MEMORY;
         if (lStatus != NO_ERROR) {
@@ -6886,19 +6886,20 @@ void AudioFlinger::DuplicatingThread::addOutputTrack(MixerThread *thread)
     // from different OutputTracks and their associated MixerThreads (e.g. one may
     // nearly empty and the other may be dropping data).
 
-    // TODO b/182392769: use identity util, move to server edge
-    Identity identity = Identity();
-    identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(
+    // TODO b/182392769: use attribution source util, move to server edge
+    AttributionSourceState attributionSource = AttributionSourceState();
+    attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(
         IPCThreadState::self()->getCallingUid()));
-    identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(
+    attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(
       IPCThreadState::self()->getCallingPid()));
+    attributionSource.token = sp<BBinder>::make();
     sp<OutputTrack> outputTrack = new OutputTrack(thread,
                                             this,
                                             mSampleRate,
                                             mFormat,
                                             mChannelMask,
                                             frameCount,
-                                            identity);
+                                            attributionSource);
     status_t status = outputTrack != 0 ? outputTrack->initCheck() : (status_t) NO_MEMORY;
     if (status != NO_ERROR) {
         ALOGE("addOutputTrack() initCheck failed %d", status);
@@ -7822,7 +7823,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         audio_session_t sessionId,
         size_t *pNotificationFrameCount,
         pid_t creatorPid,
-        const Identity& identity,
+        const AttributionSourceState& attributionSource,
         audio_input_flags_t *flags,
         pid_t tid,
         status_t *status,
@@ -7836,7 +7837,8 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     audio_input_flags_t inputFlags = mInput->flags;
     audio_input_flags_t requestedFlags = *flags;
     uint32_t sampleRate;
-    Identity checkedIdentity = AudioFlinger::checkIdentityPackage(identity);
+    AttributionSourceState checkedAttributionSource = AudioFlinger::checkAttributionSourcePackage(
+            attributionSource);
 
     lStatus = initCheck();
     if (lStatus != NO_ERROR) {
@@ -7851,7 +7853,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
     }
 
     if (maxSharedAudioHistoryMs != 0) {
-        if (!captureHotwordAllowed(checkedIdentity)) {
+        if (!captureHotwordAllowed(checkedAttributionSource)) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
         }
@@ -7973,16 +7975,17 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
         Mutex::Autolock _l(mLock);
         int32_t startFrames = -1;
         if (!mSharedAudioPackageName.empty()
-                && mSharedAudioPackageName == checkedIdentity.packageName
+                && mSharedAudioPackageName == checkedAttributionSource.packageName
                 && mSharedAudioSessionId == sessionId
-                && captureHotwordAllowed(checkedIdentity)) {
+                && captureHotwordAllowed(checkedAttributionSource)) {
             startFrames = mSharedAudioStartFrames;
         }
 
         track = new RecordTrack(this, client, attr, sampleRate,
                       format, channelMask, frameCount,
                       nullptr /* buffer */, (size_t)0 /* bufferSize */, sessionId, creatorPid,
-                      checkedIdentity, *flags, TrackBase::TYPE_DEFAULT, portId, startFrames);
+                      checkedAttributionSource, *flags, TrackBase::TYPE_DEFAULT, portId,
+                      startFrames);
 
         lStatus = track->initCheck();
         if (lStatus != NO_ERROR) {
@@ -9174,7 +9177,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
                                          audio_port_handle_t *handle)
 {
     ALOGV("%s clientUid %d mStandby %d mPortId %d *handle %d", __FUNCTION__,
-          client.identity.uid, mStandby, mPortId, *handle);
+          client.attributionSource.uid, mStandby, mPortId, *handle);
     if (mHalStream == 0) {
         return NO_INIT;
     }
@@ -9206,7 +9209,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         ret = AudioSystem::getOutputForAttr(&mAttr, &io,
                                             mSessionId,
                                             &stream,
-                                            client.identity,
+                                            client.attributionSource,
                                             &config,
                                             flags,
                                             &deviceId,
@@ -9223,7 +9226,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         ret = AudioSystem::getInputForAttr(&mAttr, &io,
                                               RECORD_RIID_INVALID,
                                               mSessionId,
-                                              client.identity,
+                                              client.attributionSource,
                                               &config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ,
                                               &deviceId,
@@ -9263,7 +9266,8 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
 
     // Given that MmapThread::mAttr is mutable, should a MmapTrack have attributes ?
     sp<MmapTrack> track = new MmapTrack(this, attr == nullptr ? mAttr : *attr, mSampleRate, mFormat,
-                                        mChannelMask, mSessionId, isOutput(), client.identity,
+                                        mChannelMask, mSessionId, isOutput(),
+                                        client.attributionSource,
                                         IPCThreadState::self()->getCallingPid(), portId);
 
     if (isOutput()) {
@@ -9271,7 +9275,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
         mHalVolFloat = -1.0f;
     } else if (!track->isSilenced_l()) {
         for (const sp<MmapTrack> &t : mActiveTracks) {
-            if (t->isSilenced_l() && t->uid() != client.identity.uid)
+            if (t->isSilenced_l() && t->uid() != client.attributionSource.uid)
                 t->invalidate();
         }
     }
