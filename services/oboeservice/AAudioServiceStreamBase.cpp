@@ -39,7 +39,7 @@
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
-using media::permission::Identity;
+using content::AttributionSourceState;
 
 /**
  * Base class for streams in the service.
@@ -50,7 +50,7 @@ AAudioServiceStreamBase::AAudioServiceStreamBase(AAudioService &audioService)
         : mTimestampThread("AATime")
         , mAtomicStreamTimestamp()
         , mAudioService(audioService) {
-    mMmapClient.identity = Identity();
+    mMmapClient.attributionSource = AttributionSourceState();
 }
 
 AAudioServiceStreamBase::~AAudioServiceStreamBase() {
@@ -81,7 +81,7 @@ std::string AAudioServiceStreamBase::dump() const {
 
     result << "    0x" << std::setfill('0') << std::setw(8) << std::hex << mHandle
            << std::dec << std::setfill(' ') ;
-    result << std::setw(6) << mMmapClient.identity.uid;
+    result << std::setw(6) << mMmapClient.attributionSource.uid;
     result << std::setw(7) << mClientHandle;
     result << std::setw(4) << (isRunning() ? "yes" : " no");
     result << std::setw(6) << getState();
@@ -127,11 +127,11 @@ aaudio_result_t AAudioServiceStreamBase::open(const aaudio::AAudioStreamRequest 
     AAudioEndpointManager &mEndpointManager = AAudioEndpointManager::getInstance();
     aaudio_result_t result = AAUDIO_OK;
 
-    mMmapClient.identity = request.getIdentity();
-    // TODO b/182392769: use identity util
-    mMmapClient.identity.uid = VALUE_OR_FATAL(
+    mMmapClient.attributionSource = request.getAttributionSource();
+    // TODO b/182392769: use attribution source util
+    mMmapClient.attributionSource.uid = VALUE_OR_FATAL(
         legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
-    mMmapClient.identity.pid = VALUE_OR_FATAL(
+    mMmapClient.attributionSource.pid = VALUE_OR_FATAL(
         legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
 
     // Limit scope of lock to avoid recursive lock in close().

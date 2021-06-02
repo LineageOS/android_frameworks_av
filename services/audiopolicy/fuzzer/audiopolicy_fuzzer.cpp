@@ -26,7 +26,7 @@
 
 #include <Serializer.h>
 #include <android-base/file.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include <libxml/parser.h>
 #include <libxml/xinclude.h>
 #include <media/AudioPolicy.h>
@@ -47,7 +47,7 @@ namespace xsd {
 using namespace ::android::audio::policy::configuration::V7_0;
 }
 
-using media::permission::Identity;
+using content::AttributionSourceState;
 
 static const std::vector<audio_format_t> kAudioFormats = [] {
     std::vector<audio_format_t> result;
@@ -249,11 +249,12 @@ bool AudioPolicyManagerFuzzer::getOutputForAttr(
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
 
-    // TODO b/182392769: use identity util
-    Identity i;
-    i.uid = 0;
-    if (mManager->getOutputForAttr(&attr, output, AUDIO_SESSION_NONE, &stream, i, &config,
-                                   &flags, selectedDeviceId, portId, {}, &outputType) != OK) {
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource;
+    attributionSource.uid = 0;
+    attributionSource.token = sp<BBinder>::make();
+    if (mManager->getOutputForAttr(&attr, output, AUDIO_SESSION_NONE, &stream, attributionSource,
+            &config, &flags, selectedDeviceId, portId, {}, &outputType) != OK) {
         return false;
     }
     if (*output == AUDIO_IO_HANDLE_NONE || *portId == AUDIO_PORT_HANDLE_NONE) {
@@ -276,10 +277,11 @@ bool AudioPolicyManagerFuzzer::getInputForAttr(
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::input_type_t inputType;
 
-    Identity i;
-    i.uid = 0;
-    if (mManager->getInputForAttr(&attr, &input, riid, AUDIO_SESSION_NONE, i, &config,
-                                  flags, selectedDeviceId, &inputType, portId) != OK) {
+    AttributionSourceState attributionSource;
+    attributionSource.uid = 0;
+    attributionSource.token = sp<BBinder>::make();
+    if (mManager->getInputForAttr(&attr, &input, riid, AUDIO_SESSION_NONE, attributionSource,
+            &config, flags, selectedDeviceId, &inputType, portId) != OK) {
         return false;
     }
     if (*portId == AUDIO_PORT_HANDLE_NONE || input == AUDIO_IO_HANDLE_NONE) {

@@ -21,7 +21,7 @@
 #include <media/AudioSystem.h>
 #include <media/MicrophoneInfo.h>
 #include <media/mediarecorder.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 
 #include <system/audio.h>
 
@@ -34,8 +34,8 @@ class IGraphicBufferProducer;
 struct PersistentSurface;
 
 struct MediaRecorderBase {
-    explicit MediaRecorderBase(const media::permission::Identity &client)
-        : mClient(client) {}
+    explicit MediaRecorderBase(const android::content::AttributionSourceState &attributionSource)
+        : mAttributionSource(attributionSource) {}
     virtual ~MediaRecorderBase() {}
 
     virtual status_t init() = 0;
@@ -84,7 +84,7 @@ struct MediaRecorderBase {
 
 protected:
 
-    media::permission::Identity mClient;
+    android::content::AttributionSourceState mAttributionSource;
 
 private:
     MediaRecorderBase(const MediaRecorderBase &);

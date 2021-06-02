@@ -15,6 +15,8 @@
 ** limitations under the License.
 */
 
+#include <android/content/AttributionSourceState.h>
+
 #ifndef INCLUDING_FROM_AUDIOFLINGER_H
     #error This header file should only be included from AudioFlinger.h
 #endif
@@ -26,11 +28,12 @@ public:
     bool hasOp() const;
     int32_t getOp() const { return mAppOp; }
 
-    static sp<OpRecordAudioMonitor> createIfNeeded
-        (const media::permission::Identity& identity, const audio_attributes_t& attr);
+    static sp<OpRecordAudioMonitor> createIfNeeded(const AttributionSourceState& attributionSource,
+            const audio_attributes_t& attr);
 
 private:
-    OpRecordAudioMonitor(const media::permission::Identity& identity, int32_t appOp);
+    OpRecordAudioMonitor(const AttributionSourceState& attributionSource, int32_t appOp);
+
     void onFirstRef() override;
 
     AppOpsManager mAppOpsManager;
@@ -50,7 +53,7 @@ private:
     void checkOp();
 
     std::atomic_bool mHasOp;
-    const media::permission::Identity mIdentity;
+    const AttributionSourceState mAttributionSource;
     const int32_t mAppOp;
 };
 
@@ -68,7 +71,7 @@ public:
                                 size_t bufferSize,
                                 audio_session_t sessionId,
                                 pid_t creatorPid,
-                                const media::permission::Identity& identity,
+                                const AttributionSourceState& attributionSource,
                                 audio_input_flags_t flags,
                                 track_type type,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,

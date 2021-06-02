@@ -81,12 +81,12 @@ cc_library_shared {
         "libmedia_helper",
         "libshmemcompat",
         "libvibrator",
-        "media_permission-aidl-cpp",
     ],
 
     static_libs: [
         "libcpustats",
         "libsndfile",
+        "libpermission",
     ],
 
     header_libs: [
@@ -97,7 +97,6 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libpermission",
-        "media_permission-aidl-cpp",
     ],
 
     cflags: [
