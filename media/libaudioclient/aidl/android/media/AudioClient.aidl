@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.permission.Identity;
+import android.content.AttributionSourceState;
 
 /**
  * {@hide}
@@ -24,5 +24,5 @@ import android.media.permission.Identity;
 parcelable AudioClient {
     /** Interpreted as pid_t. */
     int clientTid;
-    Identity identity;
+    AttributionSourceState attributionSource;
 }
