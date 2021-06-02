@@ -1842,7 +1842,7 @@ status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
     media::Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
-    std::vector<media::audio::common::AudioFormat> surroundFormatsAidl;
+    std::vector<media::AudioFormatSys> surroundFormatsAidl;
     std::vector<bool> surroundFormatsEnabledAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl,
@@ -1869,7 +1869,7 @@ status_t AudioSystem::getReportedSurroundFormats(unsigned int* numSurroundFormat
     media::Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
-    std::vector<media::audio::common::AudioFormat> surroundFormatsAidl;
+    std::vector<media::AudioFormatSys> surroundFormatsAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getReportedSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl)));
 
@@ -1885,7 +1885,7 @@ status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool 
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::audio::common::AudioFormat audioFormatAidl = VALUE_OR_RETURN_STATUS(
+    media::AudioFormatSys audioFormatAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_format_t_AudioFormat(audioFormat));
     return statusTFromBinderStatus(
             aps->setSurroundFormatEnabled(audioFormatAidl, enabled));
@@ -1939,7 +1939,7 @@ status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
             & aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    std::vector<media::audio::common::AudioFormat> formatsAidl;
+    std::vector<media::AudioFormatSys> formatsAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getHwOffloadEncodingFormatsSupportedForA2DP(&formatsAidl)));
     *formats = VALUE_OR_RETURN_STATUS(
