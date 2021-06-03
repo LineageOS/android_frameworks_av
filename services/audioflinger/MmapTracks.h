@@ -29,7 +29,7 @@ public:
                             audio_channel_mask_t channelMask,
                             audio_session_t sessionId,
                             bool isOut,
-                            const media::permission::Identity& identity,
+                            const android::content::AttributionSourceState& attributionSource,
                             pid_t creatorPid,
                             audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE);
     virtual             ~MmapTrack();

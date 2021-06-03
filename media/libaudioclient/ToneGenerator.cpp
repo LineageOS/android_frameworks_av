@@ -27,7 +27,7 @@
 
 namespace android {
 
-using media::permission::Identity;
+using android::content::AttributionSourceState;
 
 // Descriptors for all available tones (See ToneGenerator::ToneDescriptor class declaration for details)
 const ToneGenerator::ToneDescriptor ToneGenerator::sToneDescriptors[] = {
@@ -1260,10 +1260,11 @@ void ToneGenerator::stopTone() {
 ////////////////////////////////////////////////////////////////////////////////
 bool ToneGenerator::initAudioTrack() {
     // Open audio track in mono, PCM 16bit, default sampling rate.
-    // TODO b/182392769: use identity util
-    Identity identity = Identity();
-    identity.packageName = mOpPackageName;
-    mpAudioTrack = new AudioTrack(identity);
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource = AttributionSourceState();
+    attributionSource.packageName = mOpPackageName;
+    attributionSource.token = sp<BBinder>::make();
+    mpAudioTrack = new AudioTrack(attributionSource);
     ALOGV("AudioTrack(%p) created", mpAudioTrack.get());
 
     audio_attributes_t attr;
@@ -1289,7 +1290,7 @@ bool ToneGenerator::initAudioTrack() {
             AUDIO_SESSION_ALLOCATE,
             AudioTrack::TRANSFER_CALLBACK,
             nullptr,
-            identity,
+            attributionSource,
             &attr);
     // Set caller name so it can be logged in destructor.
     // MediaMetricsConstants.h: AMEDIAMETRICS_PROP_CALLERNAME_VALUE_TONEGENERATOR

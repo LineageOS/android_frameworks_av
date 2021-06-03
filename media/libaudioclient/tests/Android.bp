@@ -37,6 +37,7 @@ cc_test {
         "libmediametrics_headers",
     ],
     shared_libs: [
+        "framework-permission-aidl-cpp",
         "libaudioclient",
         "libbinder",
         "libcutils",
@@ -59,6 +60,7 @@ cc_test {
         "libbinder",
         "libcutils",
         "libutils",
+        "framework-permission-aidl-cpp",
     ],
     data: ["record_test_input_*.txt"],
 }

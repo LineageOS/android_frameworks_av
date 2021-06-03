@@ -31,6 +31,8 @@
 
 namespace android {
 
+using content::AttributionSourceState;
+
 class AudioRecord;
 
 struct AudioSource : public MediaSource, public MediaBufferObserver {
@@ -38,7 +40,7 @@ struct AudioSource : public MediaSource, public MediaBufferObserver {
     // _not_ a bitmask of audio_channels_t constants.
     AudioSource(
         const audio_attributes_t *attr,
-        const media::permission::Identity& identity,
+        const AttributionSourceState& attributionSource,
         uint32_t sampleRate,
         uint32_t channels,
         uint32_t outSampleRate = 0,
@@ -145,7 +147,7 @@ private:
 
     void set(
         const audio_attributes_t *attr,
-        const media::permission::Identity& identity,
+        const AttributionSourceState& attributionSource,
         uint32_t sampleRate,
         uint32_t channels,
         uint32_t outSampleRate = 0,

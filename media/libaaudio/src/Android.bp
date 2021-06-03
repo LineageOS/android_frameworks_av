@@ -52,6 +52,7 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "libpermission",
     ],
 
     sanitize: {
@@ -86,7 +87,7 @@ cc_library {
     export_header_lib_headers: ["libaaudio_headers"],
 
     export_shared_lib_headers: [
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     shared_libs: [
@@ -99,13 +100,9 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "framework-permission-aidl-cpp",
         "aaudio-aidl-cpp",
-        "media_permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
-    ],
-
-    static_libs: [
-        "media_permission-aidl-cpp",
     ],
 
     cflags: [
@@ -177,7 +174,7 @@ aidl_interface {
     imports: [
         "audio_common-aidl",
         "shared-file-region-aidl",
-        "media_permission-aidl",
+        "framework-permission-aidl"
     ],
     backend:
     {
