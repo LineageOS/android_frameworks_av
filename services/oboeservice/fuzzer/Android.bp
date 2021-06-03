@@ -46,7 +46,7 @@ cc_fuzz {
         "liblog",
         "libutils",
         "aaudio-aidl-cpp",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
     static_libs: [

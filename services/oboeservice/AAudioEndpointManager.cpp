@@ -184,7 +184,7 @@ sp<AAudioServiceEndpoint> AAudioEndpointManager::openExclusiveEndpoint(
             // An app can avoid having this happen by closing their streams when
             // the app is paused.
             pid_t pid = VALUE_OR_FATAL(
-                aidl2legacy_int32_t_pid_t(request.getIdentity().pid));
+                aidl2legacy_int32_t_pid_t(request.getAttributionSource().pid));
             AAudioClientTracker::getInstance().setExclusiveEnabled(pid, false);
             endpointToSteal = endpoint; // return it to caller
         }

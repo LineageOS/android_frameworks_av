@@ -25,7 +25,9 @@
 #include <cutils/multiuser.h>
 #include <private/android_filesystem_config.h>
 #include <system/audio-hal-enums.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
+#include <binder/PermissionController.h>
+#include <android/permission/PermissionChecker.h>
 
 #include <map>
 #include <optional>
@@ -34,6 +36,8 @@
 #include <vector>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 // Audio permission utilities
 
@@ -80,28 +84,30 @@ static inline bool isAudioServerOrMediaServerUid(uid_t uid) {
     }
 }
 
-bool recordingAllowed(const media::permission::Identity& identity,
+bool recordingAllowed(const AttributionSourceState& attributionSource,
         audio_source_t source = AUDIO_SOURCE_DEFAULT);
-bool startRecording(const media::permission::Identity& identity,
+bool startRecording(const AttributionSourceState& attributionSource,
     const String16& msg, audio_source_t source);
-void finishRecording(const media::permission::Identity& identity, audio_source_t source);
-bool captureAudioOutputAllowed(const media::permission::Identity& identity);
-bool captureMediaOutputAllowed(const media::permission::Identity& identity);
-bool captureTunerAudioInputAllowed(const media::permission::Identity& identity);
-bool captureVoiceCommunicationOutputAllowed(const media::permission::Identity& identity);
-bool captureHotwordAllowed(const media::permission::Identity& identity);
+void finishRecording(const AttributionSourceState& attributionSource, audio_source_t source);
+std::optional<AttributionSourceState> resolveAttributionSource(
+    const AttributionSourceState& callerAttributionSource);
+bool captureAudioOutputAllowed(const AttributionSourceState& attributionSource);
+bool captureMediaOutputAllowed(const AttributionSourceState& attributionSource);
+bool captureTunerAudioInputAllowed(const AttributionSourceState& attributionSource);
+bool captureVoiceCommunicationOutputAllowed(const AttributionSourceState& attributionSource);
+bool captureHotwordAllowed(const AttributionSourceState& attributionSource);
 bool settingsAllowed();
 bool modifyAudioRoutingAllowed();
-bool modifyAudioRoutingAllowed(const media::permission::Identity& identity);
+bool modifyAudioRoutingAllowed(const AttributionSourceState& attributionSource);
 bool modifyDefaultAudioEffectsAllowed();
-bool modifyDefaultAudioEffectsAllowed(const media::permission::Identity& identity);
+bool modifyDefaultAudioEffectsAllowed(const AttributionSourceState& attributionSource);
 bool dumpAllowed();
-bool modifyPhoneStateAllowed(const media::permission::Identity& identity);
-bool bypassInterruptionPolicyAllowed(const media::permission::Identity& identity);
+bool modifyPhoneStateAllowed(const AttributionSourceState& attributionSource);
+bool bypassInterruptionPolicyAllowed(const AttributionSourceState& attributionSource);
 void purgePermissionCache();
 int32_t getOpForSource(audio_source_t source);
 
-media::permission::Identity getCallingIdentity();
+AttributionSourceState getCallingAttributionSource();
 
 status_t checkIMemory(const sp<IMemory>& iMemory);
 

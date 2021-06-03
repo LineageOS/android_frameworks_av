@@ -161,7 +161,7 @@ status_t OutputConfiguration::readFromParcel(const android::Parcel* parcel) {
     }
 
     std::vector<int32_t> sensorPixelModesUsed;
-    if ((err = parcel->readParcelableVector(&sensorPixelModesUsed)) != OK) {
+    if ((err = parcel->readInt32Vector(&sensorPixelModesUsed)) != OK) {
         ALOGE("%s: Failed to read sensor pixel mode(s) from parcel", __FUNCTION__);
         return err;
     }
