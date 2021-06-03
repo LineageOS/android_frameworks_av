@@ -236,11 +236,12 @@ AudioFlinger::AudioFlinger()
     timespec ts{};
     clock_gettime(CLOCK_MONOTONIC, &ts);
     // zero ID has a special meaning, so start allocation at least at AUDIO_UNIQUE_ID_USE_MAX
-    uint32_t sessionBase = (uint32_t)std::max((long)1, ts.tv_sec);
+    uint32_t movingBase = (uint32_t)std::max((long)1, ts.tv_sec);
     // unsigned instead of audio_unique_id_use_t, because ++ operator is unavailable for enum
     for (unsigned use = AUDIO_UNIQUE_ID_USE_UNSPECIFIED; use < AUDIO_UNIQUE_ID_USE_MAX; use++) {
         mNextUniqueIds[use] =
-                ((use == AUDIO_UNIQUE_ID_USE_SESSION) ? sessionBase : 1) * AUDIO_UNIQUE_ID_USE_MAX;
+                ((use == AUDIO_UNIQUE_ID_USE_SESSION || use == AUDIO_UNIQUE_ID_USE_CLIENT) ?
+                        movingBase : 1) * AUDIO_UNIQUE_ID_USE_MAX;
     }
 
 #if 1
