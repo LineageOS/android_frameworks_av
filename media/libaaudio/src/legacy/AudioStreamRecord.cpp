@@ -32,7 +32,7 @@
 #include "utility/AudioClock.h"
 #include "utility/FixedBlockWriter.h"
 
-using android::media::permission::Identity;
+using android::content::AttributionSourceState;
 
 using namespace android;
 using namespace aaudio;
@@ -157,12 +157,13 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .tags = ""
     };
 
-    // TODO b/182392769: use identity util
-    Identity identity;
-    identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
-    identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
-    identity.packageName = builder.getOpPackageName();
-    identity.attributionTag = builder.getAttributionTag();
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource;
+    attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(getuid()));
+    attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(getpid()));
+    attributionSource.packageName = builder.getOpPackageName();
+    attributionSource.attributionTag = builder.getAttributionTag();
+    attributionSource.token = sp<BBinder>::make();
 
     // ----------- open the AudioRecord ---------------------
     // Might retry, but never more than once.
@@ -170,7 +171,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
         const audio_format_t requestedInternalFormat = getDeviceFormat();
 
         mAudioRecord = new AudioRecord(
-                identity
+                attributionSource
         );
         mAudioRecord->set(
                 AUDIO_SOURCE_DEFAULT, // ignored because we pass attributes below

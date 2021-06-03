@@ -24,7 +24,7 @@
 
 #include <utils/String16.h>
 
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include <binder/ProcessState.h>
 #include <media/mediarecorder.h>
 #include <media/stagefright/foundation/ADebug.h>
@@ -39,7 +39,7 @@
 
 using namespace android;
 
-using media::permission::Identity;
+using content::AttributionSourceState;
 
 static void usage(const char* name)
 {
@@ -113,10 +113,10 @@ int main(int argc, char* argv[])
         audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
         attr.source = AUDIO_SOURCE_MIC;
 
-        // TODO b/182392769: use identity util
+        // TODO b/182392769: use attribution source util
         source = new AudioSource(
                 &attr,
-                Identity(),
+                AttributionSourceState(),
                 sampleRate,
                 channels);
     } else {

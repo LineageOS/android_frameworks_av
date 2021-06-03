@@ -16,7 +16,8 @@ cc_defaults {
         "liblog",
         "libmediautils",
         "libutils",
-        "media_permission-aidl-cpp",
+        "libbinder",
+        "framework-permission-aidl-cpp",
     ],
 
     cflags: [

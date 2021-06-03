@@ -22,7 +22,7 @@
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include <media/AidlConversionUtil.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
@@ -37,6 +37,8 @@
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
 #include <vector>
+
+using android::content::AttributionSourceState;
 
 namespace android {
 
@@ -264,7 +266,7 @@ public:
                                      audio_io_handle_t *output,
                                      audio_session_t session,
                                      audio_stream_type_t *stream,
-                                     const media::permission::Identity& identity,
+                                     const AttributionSourceState& attributionSource,
                                      const audio_config_t *config,
                                      audio_output_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
@@ -280,7 +282,7 @@ public:
                                     audio_io_handle_t *input,
                                     audio_unique_id_t riid,
                                     audio_session_t session,
-                                    const media::permission::Identity& identity,
+                                     const AttributionSourceState& attributionSource,
                                     const audio_config_base_t *config,
                                     audio_input_flags_t flags,
                                     audio_port_handle_t *selectedDeviceId,

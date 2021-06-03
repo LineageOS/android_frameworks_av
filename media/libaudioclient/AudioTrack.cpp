@@ -48,7 +48,7 @@ namespace android {
 // ---------------------------------------------------------------------------
 
 using media::VolumeShaper;
-using media::permission::Identity;
+using android::content::AttributionSourceState;
 
 // TODO: Move to a separate .h
 
@@ -225,11 +225,11 @@ status_t AudioTrack::getMetrics(mediametrics::Item * &item)
     return NO_ERROR;
 }
 
-AudioTrack::AudioTrack() : AudioTrack(Identity())
+AudioTrack::AudioTrack() : AudioTrack(AttributionSourceState())
 {
 }
 
-AudioTrack::AudioTrack(const Identity& identity)
+AudioTrack::AudioTrack(const AttributionSourceState& attributionSource)
     : mStatus(NO_INIT),
       mState(STATE_STOPPED),
       mPreviousPriority(ANDROID_PRIORITY_NORMAL),
@@ -237,7 +237,7 @@ AudioTrack::AudioTrack(const Identity& identity)
       mPausedPosition(0),
       mSelectedDeviceId(AUDIO_PORT_HANDLE_NONE),
       mRoutedDeviceId(AUDIO_PORT_HANDLE_NONE),
-      mClientIdentity(identity),
+      mClientAttributionSource(attributionSource),
       mAudioTrackCallback(new AudioTrackCallback())
 {
     mAttributes.content_type = AUDIO_CONTENT_TYPE_UNKNOWN;
@@ -259,7 +259,7 @@ AudioTrack::AudioTrack(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        const Identity& identity,
+        const AttributionSourceState& attributionSource,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
@@ -275,8 +275,8 @@ AudioTrack::AudioTrack(
 
     (void)set(streamType, sampleRate, format, channelMask,
             frameCount, flags, cbf, user, notificationFrames,
-            0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType,
-            offloadInfo, identity, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
+            0 /*sharedBuffer*/, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
+            attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
 AudioTrack::AudioTrack(
@@ -292,7 +292,7 @@ AudioTrack::AudioTrack(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        const Identity& identity,
+        const AttributionSourceState& attributionSource,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed)
@@ -309,7 +309,7 @@ AudioTrack::AudioTrack(
     (void)set(streamType, sampleRate, format, channelMask,
             0 /*frameCount*/, flags, cbf, user, notificationFrames,
             sharedBuffer, false /*threadCanCallJava*/, sessionId, transferType, offloadInfo,
-            identity, pAttributes, doNotReconnect, maxRequiredSpeed);
+            attributionSource, pAttributes, doNotReconnect, maxRequiredSpeed);
 }
 
 AudioTrack::~AudioTrack()
@@ -335,7 +335,7 @@ AudioTrack::~AudioTrack()
         mCblkMemory.clear();
         mSharedBuffer.clear();
         IPCThreadState::self()->flushCommands();
-        pid_t clientPid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientIdentity.pid));
+        pid_t clientPid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientAttributionSource.pid));
         ALOGV("%s(%d), releasing session id %d from %d on behalf of %d",
                 __func__, mPortId,
                 mSessionId, IPCThreadState::self()->getCallingPid(), clientPid);
@@ -381,7 +381,7 @@ status_t AudioTrack::set(
         audio_session_t sessionId,
         transfer_type transferType,
         const audio_offload_info_t *offloadInfo,
-        const Identity& identity,
+        const AttributionSourceState& attributionSource,
         const audio_attributes_t* pAttributes,
         bool doNotReconnect,
         float maxRequiredSpeed,
@@ -391,15 +391,15 @@ status_t AudioTrack::set(
     uint32_t channelCount;
     pid_t callingPid;
     pid_t myPid;
-    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(identity.uid));
-    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(identity.pid));
+    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
+    pid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
 
     // Note mPortId is not valid until the track is created, so omit mPortId in ALOG for set.
     ALOGV("%s(): streamType %d, sampleRate %u, format %#x, channelMask %#x, frameCount %zu, "
           "flags #%x, notificationFrames %d, sessionId %d, transferType %d, uid %d, pid %d",
           __func__,
           streamType, sampleRate, format, channelMask, frameCount, flags, notificationFrames,
-          sessionId, transferType, identity.uid, identity.pid);
+          sessionId, transferType, attributionSource.uid, attributionSource.pid);
 
     mThreadCanCallJava = threadCanCallJava;
     mSelectedDeviceId = selectedDeviceId;
@@ -596,18 +596,15 @@ status_t AudioTrack::set(
     }
     mNotificationFramesAct = 0;
     // TODO b/182392553: refactor or remove
+    mClientAttributionSource = AttributionSourceState(attributionSource);
     callingPid = IPCThreadState::self()->getCallingPid();
     myPid = getpid();
     if (uid == -1 || (callingPid != myPid)) {
-        mClientIdentity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(
+        mClientAttributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(
             IPCThreadState::self()->getCallingUid()));
-    } else {
-        mClientIdentity.uid = identity.uid;
     }
     if (pid == (pid_t)-1 || (callingPid != myPid)) {
-        mClientIdentity.pid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(callingPid));
-    } else {
-        mClientIdentity.pid = identity.pid;
+        mClientAttributionSource.pid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(callingPid));
     }
     mAuxEffectId = 0;
     mOrigFlags = mFlags = flags;
@@ -692,13 +689,14 @@ status_t AudioTrack::set(
         float maxRequiredSpeed,
         audio_port_handle_t selectedDeviceId)
 {
-    Identity identity;
-    identity.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(uid));
-    identity.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(pid));
+    AttributionSourceState attributionSource;
+    attributionSource.uid = VALUE_OR_FATAL(legacy2aidl_uid_t_int32_t(uid));
+    attributionSource.pid = VALUE_OR_FATAL(legacy2aidl_pid_t_int32_t(pid));
+    attributionSource.token = sp<BBinder>::make();
     return set(streamType, sampleRate, format,
             static_cast<audio_channel_mask_t>(channelMask),
             frameCount, flags, cbf, user, notificationFrames, sharedBuffer,
-            threadCanCallJava, sessionId, transferType, offloadInfo, identity,
+            threadCanCallJava, sessionId, transferType, offloadInfo, attributionSource,
             pAttributes, doNotReconnect, maxRequiredSpeed, selectedDeviceId);
 }
 
@@ -1700,7 +1698,7 @@ status_t AudioTrack::createTrack_l()
     input.config.channel_mask = mChannelMask;
     input.config.format = mFormat;
     input.config.offload_info = mOffloadInfoCopy;
-    input.clientInfo.identity = mClientIdentity;
+    input.clientInfo.attributionSource = mClientAttributionSource;
     input.clientInfo.clientTid = -1;
     if (mFlags & AUDIO_OUTPUT_FLAG_FAST) {
         // It is currently meaningless to request SCHED_FIFO for a Java thread.  Even if the
