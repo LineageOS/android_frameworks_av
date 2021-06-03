@@ -165,8 +165,9 @@ AudioProfile::toParcelable() const {
     parcelable.name = mName;
     parcelable.format = VALUE_OR_RETURN(legacy2aidl_audio_format_t_AudioFormat(mFormat));
     parcelable.channelMasks = VALUE_OR_RETURN(
-            convertContainer<std::vector<int32_t>>(mChannelMasks,
-                                                   legacy2aidl_audio_channel_mask_t_int32_t));
+            convertContainer<std::vector<media::AudioChannelMask>>(
+                    mChannelMasks,
+                    legacy2aidl_audio_channel_mask_t_AudioChannelMask));
     parcelable.samplingRates = VALUE_OR_RETURN(
             convertContainer<std::vector<int32_t>>(mSamplingRates,
                                                    convertIntegral<int32_t, uint32_t>));
@@ -194,7 +195,7 @@ AudioProfile::fromParcelable(const media::AudioProfile& parcelable) {
     legacy->mFormat = VALUE_OR_RETURN(aidl2legacy_AudioFormat_audio_format_t(parcelable.format));
     legacy->mChannelMasks = VALUE_OR_RETURN(
             convertContainer<ChannelMaskSet>(parcelable.channelMasks,
-                                             aidl2legacy_int32_t_audio_channel_mask_t));
+                                             aidl2legacy_AudioChannelMask_audio_channel_mask_t));
     legacy->mSamplingRates = VALUE_OR_RETURN(
             convertContainer<SampleRateSet>(parcelable.samplingRates,
                                             convertIntegral<uint32_t, int32_t>));
