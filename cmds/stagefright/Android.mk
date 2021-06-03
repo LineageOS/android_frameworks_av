@@ -16,9 +16,9 @@ LOCAL_SHARED_LIBRARIES := \
         libstagefright_foundation libjpeg libui libgui libcutils liblog \
         libhidlbase libdatasource libaudioclient \
         android.hardware.media.omx@1.0 \
-        media_permission-aidl-cpp
+        framework-permission-aidl-cpp
 
-LOCAL_STATIC_LIBRARIES := media_permission-aidl-cpp
+LOCAL_STATIC_LIBRARIES := framework-permission-aidl-cpp
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
@@ -52,7 +52,7 @@ LOCAL_HEADER_LIBRARIES := \
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
         libstagefright_foundation libdatasource libaudioclient \
-        media_permission-aidl-cpp
+        framework-permission-aidl-cpp
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/camera/include \
@@ -90,7 +90,7 @@ LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \
         frameworks/native/include/media/openmax \
         frameworks/native/include/media/hardware \
-        media_permission-aidl-cpp
+        framework-permission-aidl-cpp
 
 LOCAL_CFLAGS += -Wno-multichar -Werror -Wall
 
@@ -119,7 +119,7 @@ LOCAL_HEADER_LIBRARIES := \
 LOCAL_SHARED_LIBRARIES := \
         libstagefright libmedia liblog libutils libbinder \
         libstagefright_foundation libaudioclient \
-        media_permission-aidl-cpp
+        framework-permission-aidl-cpp
 
 LOCAL_C_INCLUDES:= \
         frameworks/av/media/libstagefright \

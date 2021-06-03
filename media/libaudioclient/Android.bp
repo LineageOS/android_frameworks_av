@@ -132,12 +132,12 @@ cc_library {
         "libshmemcompat",
         "libutils",
         "libvibrator",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
         "libbinder",
     ],
 
@@ -164,7 +164,6 @@ cc_library {
         // for memory heap analysis
         "libc_malloc_debug_backtrace",
         "shared-file-region-aidl-cpp",
-        "media_permission-aidl-cpp",
     ],
     cflags: [
         "-Wall",
@@ -232,7 +231,7 @@ cc_library {
         "libshmemcompat",
         "libutils",
         "shared-file-region-aidl-cpp",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
         "audioclient-types-aidl-cpp",
@@ -355,7 +354,7 @@ aidl_interface {
     ],
     imports: [
         "audio_common-aidl",
-        "media_permission-aidl",
+        "framework-permission-aidl",
     ],
     backend: {
         cpp: {
@@ -437,7 +436,7 @@ aidl_interface {
         "av-types-aidl",
         "effect-aidl",
         "shared-file-region-aidl",
-        "media_permission-aidl",
+        "framework-permission-aidl",
     ],
     double_loadable: true,
     backend: {
@@ -462,7 +461,6 @@ aidl_interface {
         "aidl/android/media/GetOutputForAttrResponse.aidl",
         "aidl/android/media/Int.aidl",
         "aidl/android/media/RecordClientInfo.aidl",
-
         "aidl/android/media/IAudioPolicyService.aidl",
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
     ],
@@ -471,8 +469,9 @@ aidl_interface {
         "audioclient-types-aidl",
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",
-        "media_permission-aidl",
+        "framework-permission-aidl",
     ],
+
     double_loadable: true,
     backend: {
         cpp: {

@@ -26,11 +26,11 @@
 #include <system/audio.h>
 
 #include <media/hardware/MetadataBufferType.h>
-#include <android/media/permission/Identity.h>
-
-using namespace android::media::permission;
+#include <android/content/AttributionSourceState.h>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 class Camera;
 class ICameraRecordingProxy;
@@ -45,7 +45,7 @@ class MediaProfiles;
 struct ALooper;
 
 struct StagefrightRecorder : public MediaRecorderBase {
-    explicit StagefrightRecorder(const Identity& clientIdentity);
+    explicit StagefrightRecorder(const AttributionSourceState& attributionSource);
     virtual ~StagefrightRecorder();
     virtual status_t init();
     virtual status_t setLogSessionId(const String8 &id);

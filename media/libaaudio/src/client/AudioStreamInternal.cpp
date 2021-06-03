@@ -51,7 +51,7 @@
 
 using android::Mutex;
 using android::WrappingBuffer;
-using android::media::permission::Identity;
+using android::content::AttributionSourceState;
 
 using namespace aaudio;
 
@@ -108,15 +108,16 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
     // Request FLOAT for the shared mixer or the device.
     request.getConfiguration().setFormat(AUDIO_FORMAT_PCM_FLOAT);
 
-    // TODO b/182392769: use identity util
-    Identity identity;
-    identity.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
-    identity.pid = VALUE_OR_FATAL(android::legacy2aidl_pid_t_int32_t(getpid()));
-    identity.packageName = builder.getOpPackageName();
-    identity.attributionTag = builder.getAttributionTag();
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource;
+    attributionSource.uid = VALUE_OR_FATAL(android::legacy2aidl_uid_t_int32_t(getuid()));
+    attributionSource.pid = VALUE_OR_FATAL(android::legacy2aidl_pid_t_int32_t(getpid()));
+    attributionSource.packageName = builder.getOpPackageName();
+    attributionSource.attributionTag = builder.getAttributionTag();
+    attributionSource.token = sp<android::BBinder>::make();
 
     // Build the request to send to the server.
-    request.setIdentity(identity);
+    request.setAttributionSource(attributionSource);
     request.setSharingModeMatchRequired(isSharingModeMatchRequired());
     request.setInService(isInService());
 

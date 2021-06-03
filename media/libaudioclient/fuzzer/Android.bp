@@ -65,7 +65,7 @@ cc_fuzz {
         "libutils",
         "libxml2",
         "mediametricsservice-aidl-cpp",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
     header_libs: [
         "libaudiofoundation_headers",

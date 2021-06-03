@@ -365,7 +365,7 @@ cc_library {
         "libaudioclient",
         "libmedia_codeclist",
         "libmedia_omx",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     export_shared_lib_headers: [
@@ -374,17 +374,17 @@ cc_library {
         "libandroidicu",
         //"libsonivox",
         "libmedia_omx",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     static_libs: [
         "resourcemanager_aidl_interface-ndk_platform",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     export_static_lib_headers: [
         "resourcemanager_aidl_interface-ndk_platform",
-        "media_permission-aidl-cpp",
+        "framework-permission-aidl-cpp",
     ],
 
     export_include_dirs: [

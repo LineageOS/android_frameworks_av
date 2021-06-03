@@ -19,7 +19,7 @@
 #define ANDROID_AUDIO_CLIENT_H
 
 #include <sys/types.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 
 namespace android {
 
@@ -29,7 +29,7 @@ class AudioClient {
         clientTid(-1) {}
 
     pid_t clientTid;
-    android::media::permission::Identity identity;
+    android::content::AttributionSourceState attributionSource;
 };
 
 }; // namespace android

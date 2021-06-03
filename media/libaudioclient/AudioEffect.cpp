@@ -42,7 +42,6 @@ namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::IAudioPolicyService;
-using media::permission::Identity;
 
 namespace {
 
@@ -58,8 +57,8 @@ void appendToBuffer(const void* data,
 
 // ---------------------------------------------------------------------------
 
-AudioEffect::AudioEffect(const Identity& identity)
-    : mClientIdentity(identity)
+AudioEffect::AudioEffect(const android::content::AttributionSourceState& attributionSource)
+    : mClientAttributionSource(attributionSource)
 {
 }
 
@@ -108,12 +107,12 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     mDescriptor.type = *(type != NULL ? type : EFFECT_UUID_NULL);
     mDescriptor.uuid = *(uuid != NULL ? uuid : EFFECT_UUID_NULL);
 
-    // TODO b/182392769: use identity util
+    // TODO b/182392769: use attribution source util
     mIEffectClient = new EffectClient(this);
     pid_t pid = IPCThreadState::self()->getCallingPid();
-    mClientIdentity.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(pid));
+    mClientAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(pid));
     pid_t uid = IPCThreadState::self()->getCallingUid();
-    mClientIdentity.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
+    mClientAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
 
     media::CreateEffectRequest request;
     request.desc = VALUE_OR_RETURN_STATUS(
@@ -123,7 +122,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
     request.output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(io));
     request.sessionId = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(mSessionId));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(device));
-    request.identity = mClientIdentity;
+    request.attributionSource = mClientAttributionSource;
     request.probe = probe;
 
     media::CreateEffectResponse response;
@@ -178,7 +177,7 @@ status_t AudioEffect::set(const effect_uuid_t *type,
 
     IInterface::asBinder(iEffect)->linkToDeath(mIEffectClient);
     ALOGV("set() %p OK effect: %s id: %d status %d enabled %d pid %d", this, mDescriptor.name, mId,
-            mStatus, mEnabled, mClientIdentity.pid);
+            mStatus, mEnabled, mClientAttributionSource.pid);
 
     if (!audio_is_global_session(mSessionId)) {
         AudioSystem::acquireAudioSessionId(mSessionId, pid, uid);
@@ -223,7 +222,7 @@ AudioEffect::~AudioEffect()
     if (!mProbe && (mStatus == NO_ERROR || mStatus == ALREADY_EXISTS)) {
         if (!audio_is_global_session(mSessionId)) {
             AudioSystem::releaseAudioSessionId(mSessionId,
-                VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientIdentity.pid)));
+                VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mClientAttributionSource.pid)));
         }
         if (mIEffect != NULL) {
             mIEffect->disconnect();

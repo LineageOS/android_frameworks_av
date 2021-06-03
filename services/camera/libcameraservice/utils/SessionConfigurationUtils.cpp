@@ -669,15 +669,22 @@ status_t SessionConfigurationUtils::checkAndOverrideSensorPixelModesUsed(
         const std::vector<int32_t> &sensorPixelModesUsed, int format, int width, int height,
         const CameraMetadata &staticInfo, bool flexibleConsumer,
         std::unordered_set<int32_t> *overriddenSensorPixelModesUsed) {
+
+    const std::unordered_set<int32_t> &sensorPixelModesUsedSet =
+            convertToSet(sensorPixelModesUsed);
     if (!isUltraHighResolutionSensor(staticInfo)) {
+        if (sensorPixelModesUsedSet.find(ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION) !=
+                sensorPixelModesUsedSet.end()) {
+            // invalid value for non ultra high res sensors
+            return BAD_VALUE;
+        }
         overriddenSensorPixelModesUsed->clear();
         overriddenSensorPixelModesUsed->insert(ANDROID_SENSOR_PIXEL_MODE_DEFAULT);
         return OK;
     }
 
     StreamConfigurationPair streamConfigurationPair = getStreamConfigurationPair(staticInfo);
-    const std::unordered_set<int32_t> &sensorPixelModesUsedSet =
-            convertToSet(sensorPixelModesUsed);
+
     bool isInDefaultStreamConfigurationMap =
             inStreamConfigurationMap(format, width, height,
                     streamConfigurationPair.mDefaultStreamConfigurationMap);

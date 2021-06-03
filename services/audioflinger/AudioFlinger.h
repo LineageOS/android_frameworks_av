@@ -37,6 +37,8 @@
 #include <android/media/IAudioFlingerClient.h>
 #include <android/media/IAudioTrackCallback.h>
 #include <android/os/BnExternalVibrationController.h>
+#include <android/content/AttributionSourceState.h>
+
 
 #include <android-base/macros.h>
 #include <cutils/atomic.h>
@@ -124,13 +126,15 @@ static const nsecs_t kDefaultStandbyTimeInNsecs = seconds(3);
 
 #define INCLUDING_FROM_AUDIOFLINGER_H
 
+using android::content::AttributionSourceState;
+
 class AudioFlinger : public AudioFlingerServerAdapter::Delegate
 {
 public:
     static void instantiate() ANDROID_API;
 
-    static media::permission::Identity checkIdentityPackage(
-                                            const media::permission::Identity& identity);
+    static AttributionSourceState checkAttributionSourcePackage(
+        const AttributionSourceState& attributionSource);
 
     status_t dump(int fd, const Vector<String16>& args) override;
 
