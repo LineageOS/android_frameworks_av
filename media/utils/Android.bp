@@ -46,12 +46,11 @@ cc_library {
         "libbinder",
         "libcutils",
         "liblog",
-        "libpermission",
         "libutils",
         "libhidlbase",
+        "libpermission",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
-        "media_permission-aidl-cpp",
     ],
     export_static_lib_headers: [
         "libbatterystats_aidl",
@@ -71,7 +70,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
-        "media_permission-aidl-cpp"
+        "libpermission",
     ],
 
     include_dirs: [

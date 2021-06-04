@@ -103,7 +103,7 @@
 namespace android {
 
 using media::IEffectClient;
-using media::permission::Identity;
+using android::content::AttributionSourceState;
 
 static const char kDeadlockedString[] = "AudioFlinger may be deadlocked\n";
 static const char kHardwareLockedString[] = "Hardware lock is taken\n";
@@ -163,31 +163,32 @@ class DevicesFactoryHalCallbackImpl : public DevicesFactoryHalCallback {
     }
 };
 
-// TODO b/182392769: use identity util
+// TODO b/182392769: use attribution source util
 /* static */
-media::permission::Identity AudioFlinger::checkIdentityPackage(
-        const media::permission::Identity& identity) {
+AttributionSourceState AudioFlinger::checkAttributionSourcePackage(
+        const AttributionSourceState& attributionSource) {
     Vector<String16> packages;
-    PermissionController{}.getPackagesForUid(identity.uid, packages);
+    PermissionController{}.getPackagesForUid(attributionSource.uid, packages);
 
-    Identity checkedIdentity = identity;
-    if (!identity.packageName.has_value() || identity.packageName.value().size() == 0) {
+    AttributionSourceState checkedAttributionSource = attributionSource;
+    if (!attributionSource.packageName.has_value()
+            || attributionSource.packageName.value().size() == 0) {
         if (!packages.isEmpty()) {
-            checkedIdentity.packageName =
+            checkedAttributionSource.packageName =
                 std::move(legacy2aidl_String16_string(packages[0]).value());
         }
     } else {
         String16 opPackageLegacy = VALUE_OR_FATAL(
-            aidl2legacy_string_view_String16(identity.packageName.value_or("")));
+            aidl2legacy_string_view_String16(attributionSource.packageName.value_or("")));
         if (std::find_if(packages.begin(), packages.end(),
                 [&opPackageLegacy](const auto& package) {
                 return opPackageLegacy == package; }) == packages.end()) {
             ALOGW("The package name(%s) provided does not correspond to the uid %d",
-                    identity.packageName.value_or("").c_str(), identity.uid);
-            checkedIdentity.packageName = std::optional<std::string>();
+                    attributionSource.packageName.value_or("").c_str(), attributionSource.uid);
+            checkedAttributionSource.packageName = std::optional<std::string>();
         }
     }
-    return checkedIdentity;
+    return checkedAttributionSource;
 }
 
 // ----------------------------------------------------------------------------
@@ -431,7 +432,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
 
         ret = AudioSystem::getOutputForAttr(&localAttr, &io,
                                             actualSessionId,
-                                            &streamType, client.identity,
+                                            &streamType, client.attributionSource,
                                             &fullConfig,
                                             (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_MMAP_NOIRQ |
                                                     AUDIO_OUTPUT_FLAG_DIRECT),
@@ -442,7 +443,7 @@ status_t AudioFlinger::openMmapStream(MmapStreamInterface::stream_direction_t di
         ret = AudioSystem::getInputForAttr(&localAttr, &io,
                                               RECORD_RIID_INVALID,
                                               actualSessionId,
-                                              client.identity,
+                                              client.attributionSource,
                                               config,
                                               AUDIO_INPUT_FLAG_MMAP_NOIRQ, deviceId, &portId);
     }
@@ -848,21 +849,21 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
 
     // TODO b/182392553: refactor or make clearer
     pid_t clientPid =
-        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(input.clientInfo.identity.pid));
+        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(input.clientInfo.attributionSource.pid));
     bool updatePid = (clientPid == (pid_t)-1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
     uid_t clientUid =
-        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(input.clientInfo.identity.uid));
+        VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(input.clientInfo.attributionSource.uid));
     audio_io_handle_t effectThreadId = AUDIO_IO_HANDLE_NONE;
     std::vector<int> effectIds;
     audio_attributes_t localAttr = input.attr;
 
-    Identity adjIdentity = input.clientInfo.identity;
+    AttributionSourceState adjAttributionSource = input.clientInfo.attributionSource;
     if (!isAudioServerOrMediaServerUid(callingUid)) {
         ALOGW_IF(clientUid != callingUid,
                 "%s uid %d tried to pass itself off as %d",
                 __FUNCTION__, callingUid, clientUid);
-        adjIdentity.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+        adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
         clientUid = callingUid;
         updatePid = true;
     }
@@ -872,7 +873,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, clientPid);
         clientPid = callingPid;
-        adjIdentity.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
 
     audio_session_t sessionId = input.sessionId;
@@ -887,7 +888,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
     output.outputId = AUDIO_IO_HANDLE_NONE;
     output.selectedDeviceId = input.selectedDeviceId;
     lStatus = AudioSystem::getOutputForAttr(&localAttr, &output.outputId, sessionId, &streamType,
-                                            adjIdentity, &input.config, input.flags,
+                                            adjAttributionSource, &input.config, input.flags,
                                             &output.selectedDeviceId, &portId, &secondaryOutputs);
 
     if (lStatus != NO_ERROR || output.outputId == AUDIO_IO_HANDLE_NONE) {
@@ -952,7 +953,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
                                       &output.frameCount, &output.notificationFrameCount,
                                       input.notificationsPerBuffer, input.speed,
                                       input.sharedBuffer, sessionId, &output.flags,
-                                      callingPid, adjIdentity, input.clientInfo.clientTid,
+                                      callingPid, adjAttributionSource, input.clientInfo.clientTid,
                                       &lStatus, portId, input.audioTrackCallback);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (track == 0));
         // we don't abort yet if lStatus != NO_ERROR; there is still work to be done regardless
@@ -2031,24 +2032,26 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     output.inputId = AUDIO_IO_HANDLE_NONE;
 
     // TODO b/182392553: refactor or clean up
-    Identity adjIdentity = input.clientInfo.identity;
-    bool updatePid = (adjIdentity.pid == -1);
+    AttributionSourceState adjAttributionSource = input.clientInfo.attributionSource;
+    bool updatePid = (adjAttributionSource.pid == -1);
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    const uid_t currentUid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(adjIdentity.uid));
+    const uid_t currentUid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(
+           adjAttributionSource.uid));
     if (!isAudioServerOrMediaServerUid(callingUid)) {
         ALOGW_IF(currentUid != callingUid,
                 "%s uid %d tried to pass itself off as %d",
                 __FUNCTION__, callingUid, currentUid);
-        adjIdentity.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+        adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
         updatePid = true;
     }
     const pid_t callingPid = IPCThreadState::self()->getCallingPid();
-    const pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(adjIdentity.pid));
+    const pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(
+            adjAttributionSource.pid));
     if (updatePid) {
         ALOGW_IF(currentPid != (pid_t)-1 && currentPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, currentPid);
-        adjIdentity.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
     }
 
     // we don't yet support anything other than linear PCM
@@ -2076,7 +2079,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
     output.selectedDeviceId = input.selectedDeviceId;
     output.flags = input.flags;
 
-    client = registerPid(VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(adjIdentity.pid)));
+    client = registerPid(VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(adjAttributionSource.pid)));
 
     // Not a conventional loop, but a retry loop for at most two iterations total.
     // Try first maybe with FAST flag then try again without FAST flag if that fails.
@@ -2096,7 +2099,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                                       input.riid,
                                       sessionId,
                                     // FIXME compare to AudioTrack
-                                      adjIdentity,
+                                      adjAttributionSource,
                                       &input.config,
                                       output.flags, &output.selectedDeviceId, &portId);
     if (lStatus != NO_ERROR) {
@@ -2123,7 +2126,7 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
                                                   input.config.format, input.config.channel_mask,
                                                   &output.frameCount, sessionId,
                                                   &output.notificationFrameCount,
-                                                  callingPid, adjIdentity, &output.flags,
+                                                  callingPid, adjAttributionSource, &output.flags,
                                                   input.clientInfo.clientTid,
                                                   &lStatus, portId, input.maxSharedAudioHistoryMs);
         LOG_ALWAYS_FATAL_IF((lStatus == NO_ERROR) && (recordTrack == 0));
@@ -3606,7 +3609,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
     const int32_t priority = request.priority;
     const AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioDeviceTypeAddress(request.device));
-    Identity adjIdentity = request.identity;
+    AttributionSourceState adjAttributionSource = request.attributionSource;
     const audio_session_t sessionId = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_session_t(request.sessionId));
     audio_io_handle_t io = VALUE_OR_RETURN_STATUS(
@@ -3624,19 +3627,20 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
 
     // TODO b/182392553: refactor or make clearer
     const uid_t callingUid = IPCThreadState::self()->getCallingUid();
-    adjIdentity.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
-    pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(adjIdentity.pid));
+    adjAttributionSource.uid = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(callingUid));
+    pid_t currentPid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(adjAttributionSource.pid));
     if (currentPid == -1 || !isAudioServerOrMediaServerUid(callingUid)) {
         const pid_t callingPid = IPCThreadState::self()->getCallingPid();
         ALOGW_IF(currentPid != -1 && currentPid != callingPid,
                  "%s uid %d pid %d tried to pass itself off as pid %d",
                  __func__, callingUid, callingPid, currentPid);
-        adjIdentity.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
+        adjAttributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(callingPid));
         currentPid = callingPid;
     }
 
     ALOGV("createEffect pid %d, effectClient %p, priority %d, sessionId %d, io %d, factory %p",
-          adjIdentity.pid, effectClient.get(), priority, sessionId, io, mEffectsFactoryHal.get());
+          adjAttributionSource.pid, effectClient.get(), priority, sessionId, io,
+          mEffectsFactoryHal.get());
 
     if (mEffectsFactoryHal == 0) {
         ALOGE("%s: no effects factory hal", __func__);
@@ -3664,7 +3668,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             goto Exit;
         }
     } else if (sessionId == AUDIO_SESSION_DEVICE) {
-        if (!modifyDefaultAudioEffectsAllowed(adjIdentity)) {
+        if (!modifyDefaultAudioEffectsAllowed(adjAttributionSource)) {
             ALOGE("%s: device effect permission denied for uid %d", __func__, callingUid);
             lStatus = PERMISSION_DENIED;
             goto Exit;
@@ -3709,7 +3713,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
         // check recording permission for visualizer
         if ((memcmp(&descOut.type, SL_IID_VISUALIZATION, sizeof(effect_uuid_t)) == 0) &&
             // TODO: Do we need to start/stop op - i.e. is there recording being performed?
-            !recordingAllowed(adjIdentity)) {
+            !recordingAllowed(adjAttributionSource)) {
             lStatus = PERMISSION_DENIED;
             goto Exit;
         }

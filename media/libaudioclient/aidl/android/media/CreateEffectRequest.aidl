@@ -19,7 +19,7 @@ package android.media;
 import android.media.AudioDevice;
 import android.media.EffectDescriptor;
 import android.media.IEffectClient;
-import android.media.permission.Identity;
+import android.content.AttributionSourceState;
 
 /**
  * Input arguments of the createEffect() method.
@@ -35,6 +35,6 @@ parcelable CreateEffectRequest {
     /** Interpreted as audio_session_t. */
     int sessionId;
     AudioDevice device;
-    Identity identity;
+    AttributionSourceState attributionSource;
     boolean probe;
 }

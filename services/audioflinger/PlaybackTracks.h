@@ -15,8 +15,6 @@
 ** limitations under the License.
 */
 
-#include <android/media/permission/Identity.h>
-
 #ifndef INCLUDING_FROM_AUDIOFLINGER_H
     #error This header file should only be included from AudioFlinger.h
 #endif
@@ -28,12 +26,12 @@ public:
     bool hasOpPlayAudio() const;
 
     static sp<OpPlayAudioMonitor> createIfNeeded(
-            const android::media::permission::Identity& identity,
+            const AttributionSourceState& attributionSource,
             const audio_attributes_t& attr, int id,
             audio_stream_type_t streamType);
 
 private:
-    OpPlayAudioMonitor(const android::media::permission::Identity& identity,
+    OpPlayAudioMonitor(const AttributionSourceState& attributionSource,
         audio_usage_t usage, int id);
     void onFirstRef() override;
     static void getPackagesForUid(uid_t uid, Vector<String16>& packages);
@@ -54,7 +52,7 @@ private:
     void checkPlayAudioForUsage();
 
     std::atomic_bool mHasOpPlayAudio;
-    const android::media::permission::Identity mIdentity;
+    const AttributionSourceState mAttributionSource;
     const int32_t mUsage; // on purpose not audio_usage_t because always checked in appOps as int32_t
     const int mId; // for logging purposes only
 };
@@ -75,7 +73,7 @@ public:
                                 const sp<IMemory>& sharedBuffer,
                                 audio_session_t sessionId,
                                 pid_t creatorPid,
-                                const media::permission::Identity& identity,
+                                const AttributionSourceState& attributionSource,
                                 audio_output_flags_t flags,
                                 track_type type,
                                 audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE,
@@ -334,7 +332,7 @@ public:
                                 audio_format_t format,
                                 audio_channel_mask_t channelMask,
                                 size_t frameCount,
-                                const android::media::permission::Identity& identity);
+                                const AttributionSourceState& attributionSource);
     virtual             ~OutputTrack();
 
     virtual status_t    start(AudioSystem::sync_event_t event =

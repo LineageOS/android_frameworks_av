@@ -22,10 +22,12 @@
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
 #include <media/DeviceDescriptorBase.h>
-#include <android/media/permission/Identity.h>
+#include <android/content/AttributionSourceState.h>
 #include <utils/String8.h>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 // ----------------------------------------------------------------------------
 
@@ -124,7 +126,7 @@ public:
                                         audio_io_handle_t *output,
                                         audio_session_t session,
                                         audio_stream_type_t *stream,
-                                        const media::permission::Identity& identity,
+                                        const AttributionSourceState& attributionSouce,
                                         const audio_config_t *config,
                                         audio_output_flags_t *flags,
                                         audio_port_handle_t *selectedDeviceId,
@@ -143,7 +145,7 @@ public:
                                      audio_io_handle_t *input,
                                      audio_unique_id_t riid,
                                      audio_session_t session,
-                                     const media::permission::Identity& identity,
+                                     const AttributionSourceState& attributionSouce,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,

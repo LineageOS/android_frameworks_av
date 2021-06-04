@@ -95,7 +95,7 @@ using android::BAD_VALUE;
 using android::NOT_ENOUGH_DATA;
 using android::Parcel;
 using android::media::VolumeShaper;
-using android::media::permission::Identity;
+using android::content::AttributionSourceState;
 
 // Max number of entries in the filter.
 const int kMaxFilterSize = 64;  // I pulled that out of thin air.
@@ -455,21 +455,22 @@ MediaPlayerService::~MediaPlayerService()
     ALOGV("MediaPlayerService destroyed");
 }
 
-sp<IMediaRecorder> MediaPlayerService::createMediaRecorder(const Identity& identity)
+sp<IMediaRecorder> MediaPlayerService::createMediaRecorder(
+        const AttributionSourceState& attributionSource)
 {
-    // TODO b/182392769: use identity util
-    Identity verifiedIdentity = identity;
-    verifiedIdentity.uid = VALUE_OR_FATAL(
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState verifiedAttributionSource = attributionSource;
+    verifiedAttributionSource.uid = VALUE_OR_FATAL(
       legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
-    verifiedIdentity.pid = VALUE_OR_FATAL(
+    verifiedAttributionSource.pid = VALUE_OR_FATAL(
         legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
     sp<MediaRecorderClient> recorder =
-        new MediaRecorderClient(this, verifiedIdentity);
+        new MediaRecorderClient(this, verifiedAttributionSource);
     wp<MediaRecorderClient> w = recorder;
     Mutex::Autolock lock(mLock);
     mMediaRecorderClients.add(w);
     ALOGV("Create new media recorder client from pid %s",
-        verifiedIdentity.toString().c_str());
+        verifiedAttributionSource.toString().c_str());
     return recorder;
 }
 
@@ -489,21 +490,21 @@ sp<IMediaMetadataRetriever> MediaPlayerService::createMetadataRetriever()
 }
 
 sp<IMediaPlayer> MediaPlayerService::create(const sp<IMediaPlayerClient>& client,
-        audio_session_t audioSessionId, const Identity& identity)
+        audio_session_t audioSessionId, const AttributionSourceState& attributionSource)
 {
     int32_t connId = android_atomic_inc(&mNextConnId);
-    // TODO b/182392769: use identity util
-    Identity verifiedIdentity = identity;
-    verifiedIdentity.pid = VALUE_OR_FATAL(
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState verifiedAttributionSource = attributionSource;
+    verifiedAttributionSource.pid = VALUE_OR_FATAL(
         legacy2aidl_pid_t_int32_t(IPCThreadState::self()->getCallingPid()));
-    verifiedIdentity.uid = VALUE_OR_FATAL(
+    verifiedAttributionSource.uid = VALUE_OR_FATAL(
         legacy2aidl_uid_t_int32_t(IPCThreadState::self()->getCallingUid()));
 
     sp<Client> c = new Client(
-            this, verifiedIdentity, connId, client, audioSessionId);
+            this, verifiedAttributionSource, connId, client, audioSessionId);
 
     ALOGV("Create new client(%d) from %s, ", connId,
-        verifiedIdentity.toString().c_str());
+        verifiedAttributionSource.toString().c_str());
 
     wp<Client> w = c;
     {
@@ -556,8 +557,8 @@ status_t MediaPlayerService::Client::dump(int fd, const Vector<String16>& args)
     char buffer[SIZE];
     String8 result;
     result.append(" Client\n");
-    snprintf(buffer, 255, "  Identity(%s), connId(%d), status(%d), looping(%s)\n",
-        mIdentity.toString().c_str(), mConnId, mStatus, mLoop?"true": "false");
+    snprintf(buffer, 255, "  AttributionSource(%s), connId(%d), status(%d), looping(%s)\n",
+        mAttributionSource.toString().c_str(), mConnId, mStatus, mLoop?"true": "false");
     result.append(buffer);
 
     sp<MediaPlayerBase> p;
@@ -621,7 +622,8 @@ status_t MediaPlayerService::dump(int fd, const Vector<String16>& args)
             for (int i = 0, n = mMediaRecorderClients.size(); i < n; ++i) {
                 sp<MediaRecorderClient> c = mMediaRecorderClients[i].promote();
                 if (c != 0) {
-                    snprintf(buffer, 255, " MediaRecorderClient pid(%d)\n", c->mIdentity.pid);
+                    snprintf(buffer, 255, " MediaRecorderClient pid(%d)\n",
+                            c->mAttributionSource.pid);
                     result.append(buffer);
                     write(fd, result.string(), result.size());
                     result = "\n";
@@ -744,10 +746,10 @@ bool MediaPlayerService::hasClient(wp<Client> client)
 }
 
 MediaPlayerService::Client::Client(
-        const sp<MediaPlayerService>& service, const Identity& identity,
+        const sp<MediaPlayerService>& service, const AttributionSourceState& attributionSource,
         int32_t connId, const sp<IMediaPlayerClient>& client,
         audio_session_t audioSessionId)
-        : mIdentity(identity)
+        : mAttributionSource(attributionSource)
 {
     ALOGV("Client(%d) constructor", connId);
     mConnId = connId;
@@ -768,7 +770,8 @@ MediaPlayerService::Client::Client(
 
 MediaPlayerService::Client::~Client()
 {
-    ALOGV("Client(%d) destructor identity = %s", mConnId, mIdentity.toString().c_str());
+    ALOGV("Client(%d) destructor AttributionSource = %s", mConnId,
+            mAttributionSource.toString().c_str());
     mAudioOutput.clear();
     wp<Client> client(this);
     disconnect();
@@ -781,7 +784,8 @@ MediaPlayerService::Client::~Client()
 
 void MediaPlayerService::Client::disconnect()
 {
-    ALOGV("disconnect(%d) from identity %s", mConnId, mIdentity.toString().c_str());
+    ALOGV("disconnect(%d) from AttributionSource %s", mConnId,
+            mAttributionSource.toString().c_str());
     // grab local reference and clear main reference to prevent future
     // access to object
     sp<MediaPlayerBase> p;
@@ -822,11 +826,11 @@ sp<MediaPlayerBase> MediaPlayerService::Client::createPlayer(player_type playerT
     }
     if (p == NULL) {
         p = MediaPlayerFactory::createPlayer(playerType, mListener,
-            VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mIdentity.pid)));
+            VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(mAttributionSource.pid)));
     }
 
     if (p != NULL) {
-        p->setUID(VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mIdentity.uid)));
+        p->setUID(VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mAttributionSource.uid)));
     }
 
     return p;
@@ -934,7 +938,7 @@ sp<MediaPlayerBase> MediaPlayerService::Client::setDataSource_pre(
     mAudioDeviceUpdatedListener = new AudioDeviceUpdatedNotifier(p);
 
     if (!p->hardwareOutput()) {
-        mAudioOutput = new AudioOutput(mAudioSessionId, mIdentity,
+        mAudioOutput = new AudioOutput(mAudioSessionId, mAttributionSource,
                 mAudioAttributes, mAudioDeviceUpdatedListener);
         static_cast<MediaPlayerInterface*>(p.get())->setAudioSink(mAudioOutput);
     }
@@ -1784,8 +1788,9 @@ int Antagonizer::callbackThread(void* user)
 
 #undef LOG_TAG
 #define LOG_TAG "AudioSink"
-MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, const Identity& identity,
-        const audio_attributes_t* attr, const sp<AudioSystem::AudioDeviceCallback>& deviceCallback)
+MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId,
+        const AttributionSourceState& attributionSource, const audio_attributes_t* attr,
+        const sp<AudioSystem::AudioDeviceCallback>& deviceCallback)
     : mCallback(NULL),
       mCallbackCookie(NULL),
       mCallbackData(NULL),
@@ -1797,7 +1802,7 @@ MediaPlayerService::AudioOutput::AudioOutput(audio_session_t sessionId, const Id
       mMsecsPerFrame(0),
       mFrameSize(0),
       mSessionId(sessionId),
-      mIdentity(identity),
+      mAttributionSource(attributionSource),
       mSendLevel(0.0),
       mAuxEffectId(0),
       mFlags(AUDIO_OUTPUT_FLAG_NONE),
@@ -2193,7 +2198,7 @@ status_t MediaPlayerService::AudioOutput::open(
                     mSessionId,
                     AudioTrack::TRANSFER_CALLBACK,
                     offloadInfo,
-                    mIdentity,
+                    mAttributionSource,
                     mAttributes,
                     doNotReconnect,
                     1.0f,  // default value for maxRequiredSpeed
@@ -2220,7 +2225,7 @@ status_t MediaPlayerService::AudioOutput::open(
                     mSessionId,
                     AudioTrack::TRANSFER_DEFAULT,
                     NULL, // offload info
-                    mIdentity,
+                    mAttributionSource,
                     mAttributes,
                     doNotReconnect,
                     targetSpeed,
