@@ -47,6 +47,10 @@ cc_test {
         },
     },
 
+    // this unit test also runs within the mainline tests (MTS),
+    // so it must be compatible back to Android Q/10 (sdk 29)
+    min_sdk_version: "29",
+
     srcs: [
         "Mpeg4H263DecoderTest.cpp",
     ],
