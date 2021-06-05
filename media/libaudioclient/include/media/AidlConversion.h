@@ -30,6 +30,7 @@
 #include <android/media/AudioEncapsulationMetadataType.h>
 #include <android/media/AudioEncapsulationType.h>
 #include <android/media/AudioFlag.h>
+#include <android/media/AudioFormatDescription.h>
 #include <android/media/AudioGain.h>
 #include <android/media/AudioGainMode.h>
 #include <android/media/AudioInputFlags.h>
@@ -136,6 +137,11 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
 ConversionResult<audio_format_t> aidl2legacy_AudioFormat_audio_format_t(
         media::AudioFormatSys aidl);
 ConversionResult<media::AudioFormatSys> legacy2aidl_audio_format_t_AudioFormat(
+        audio_format_t legacy);
+
+ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format_t(
+        const media::AudioFormatDescription& aidl);
+ConversionResult<media::AudioFormatDescription> legacy2aidl_audio_format_t_AudioFormatDescription(
         audio_format_t legacy);
 
 ConversionResult<audio_gain_mode_t>
