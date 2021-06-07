@@ -302,6 +302,7 @@ aidl_interface {
     local_include_dir: "aidl",
     srcs: [
         "aidl/android/media/AudioAttributesInternal.aidl",
+        "aidl/android/media/AudioChannelMask.aidl",
         "aidl/android/media/AudioClient.aidl",
         "aidl/android/media/AudioConfig.aidl",
         "aidl/android/media/AudioConfigBase.aidl",
