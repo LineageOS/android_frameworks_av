@@ -152,12 +152,12 @@ status_t AudioFlinger::EffectBase::setEnabled(bool enabled, bool fromHandle)
     if (fromHandle) {
         if (enabled) {
             if (status != NO_ERROR) {
-                mCallback->checkSuspendOnEffectEnabled(this, false, false /*threadLocked*/);
+                getCallback()->checkSuspendOnEffectEnabled(this, false, false /*threadLocked*/);
             } else {
-                mCallback->onEffectEnable(this);
+                getCallback()->onEffectEnable(this);
             }
         } else {
-            mCallback->onEffectDisable(this);
+            getCallback()->onEffectDisable(this);
         }
     }
     return status;
@@ -247,8 +247,9 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
             doRegister = true;
             mPolicyRegistered = mHandles.size() > 0;
             if (mPolicyRegistered) {
-                io = mCallback->io();
-                strategy = mCallback->strategy();
+                const auto callback = getCallback();
+                io = callback->io();
+                strategy = callback->strategy();
             }
         }
         // enable effect when registered according to enable state requested by controlling handle
@@ -349,8 +350,9 @@ AudioFlinger::EffectHandle *AudioFlinger::EffectBase::controlHandle_l()
 // unsafe method called when the effect parent thread has been destroyed
 ssize_t AudioFlinger::EffectBase::disconnectHandle(EffectHandle *handle, bool unpinIfLast)
 {
+    const auto callback = getCallback();
     ALOGV("disconnect() %p handle %p", this, handle);
-    if (mCallback->disconnectEffectHandle(handle, unpinIfLast)) {
+    if (callback->disconnectEffectHandle(handle, unpinIfLast)) {
         return mHandles.size();
     }
 
@@ -358,7 +360,7 @@ ssize_t AudioFlinger::EffectBase::disconnectHandle(EffectHandle *handle, bool un
     ssize_t numHandles = removeHandle_l(handle);
     if ((numHandles == 0) && (!mPinned || unpinIfLast)) {
         mLock.unlock();
-        mCallback->updateOrphanEffectChains(this);
+        callback->updateOrphanEffectChains(this);
         mLock.lock();
     }
     return numHandles;
@@ -377,7 +379,7 @@ bool AudioFlinger::EffectBase::purgeHandles()
 }
 
 void AudioFlinger::EffectBase::checkSuspendOnEffectEnabled(bool enabled, bool threadLocked) {
-    mCallback->checkSuspendOnEffectEnabled(this, enabled, threadLocked);
+    getCallback()->checkSuspendOnEffectEnabled(this, enabled, threadLocked);
 }
 
 static String8 effectFlagsToString(uint32_t flags) {
@@ -835,7 +837,7 @@ void AudioFlinger::EffectModule::process()
                 mConfig.inputCfg.buffer.raw != mConfig.outputCfg.buffer.raw) {
         // If an insert effect is idle and input buffer is different from output buffer,
         // accumulate input onto output
-        if (mCallback->activeTrackCnt() != 0) {
+        if (getCallback()->activeTrackCnt() != 0) {
             // similar handling with data_bypass above.
             if (mConfig.outputCfg.accessMode == EFFECT_BUFFER_ACCESS_ACCUMULATE) {
                 accumulateInputToOutput();
@@ -860,6 +862,7 @@ status_t AudioFlinger::EffectModule::configure()
     status_t status;
     uint32_t size;
     audio_channel_mask_t channelMask;
+    sp<EffectCallbackInterface> callback;
 
     if (mEffectInterface == 0) {
         status = NO_INIT;
@@ -870,7 +873,8 @@ status_t AudioFlinger::EffectModule::configure()
     // TODO: handle configuration of input (record) SW effects above the HAL,
     // similar to output EFFECT_FLAG_TYPE_INSERT/REPLACE,
     // in which case input channel masks should be used here.
-    channelMask = mCallback->channelMask();
+    callback = getCallback();
+    channelMask = callback->channelMask();
     mConfig.inputCfg.channels = channelMask;
     mConfig.outputCfg.channels = channelMask;
 
@@ -899,7 +903,7 @@ status_t AudioFlinger::EffectModule::configure()
 #endif
     }
     if (isHapticGenerator()) {
-        audio_channel_mask_t hapticChannelMask = mCallback->hapticChannelMask();
+        audio_channel_mask_t hapticChannelMask = callback->hapticChannelMask();
         mConfig.inputCfg.channels |= hapticChannelMask;
         mConfig.outputCfg.channels |= hapticChannelMask;
     }
@@ -912,11 +916,11 @@ status_t AudioFlinger::EffectModule::configure()
     mConfig.outputCfg.format = EFFECT_BUFFER_FORMAT;
 
     // Don't use sample rate for thread if effect isn't offloadable.
-    if (mCallback->isOffloadOrDirect() && !isOffloaded()) {
+    if (callback->isOffloadOrDirect() && !isOffloaded()) {
         mConfig.inputCfg.samplingRate = DEFAULT_OUTPUT_SAMPLE_RATE;
         ALOGV("Overriding effect input as 48kHz");
     } else {
-        mConfig.inputCfg.samplingRate = mCallback->sampleRate();
+        mConfig.inputCfg.samplingRate = callback->sampleRate();
     }
     mConfig.outputCfg.samplingRate = mConfig.inputCfg.samplingRate;
     mConfig.inputCfg.bufferProvider.cookie = NULL;
@@ -942,11 +946,11 @@ status_t AudioFlinger::EffectModule::configure()
     }
     mConfig.inputCfg.mask = EFFECT_CONFIG_ALL;
     mConfig.outputCfg.mask = EFFECT_CONFIG_ALL;
-    mConfig.inputCfg.buffer.frameCount = mCallback->frameCount();
+    mConfig.inputCfg.buffer.frameCount = callback->frameCount();
     mConfig.outputCfg.buffer.frameCount = mConfig.inputCfg.buffer.frameCount;
 
     ALOGV("configure() %p chain %p buffer %p framecount %zu",
-          this, mCallback->chain().promote().get(),
+          this, callback->chain().promote().get(),
           mConfig.inputCfg.buffer.raw, mConfig.inputCfg.buffer.frameCount);
 
     status_t cmdStatus;
@@ -962,7 +966,7 @@ status_t AudioFlinger::EffectModule::configure()
 
 #ifdef MULTICHANNEL_EFFECT_CHAIN
     if (status != NO_ERROR &&
-            mCallback->isOutput() &&
+            callback->isOutput() &&
             (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_STEREO
                     || mConfig.outputCfg.channels != AUDIO_CHANNEL_OUT_STEREO)) {
         // Older effects may require exact STEREO position mask.
@@ -1029,7 +1033,7 @@ status_t AudioFlinger::EffectModule::configure()
             size = sizeof(int);
             *(int32_t *)p->data = VISUALIZER_PARAM_LATENCY;
 
-            uint32_t latency = mCallback->latency();
+            uint32_t latency = callback->latency();
 
             *((int32_t *)p->data + 1)= latency;
             mEffectInterface->command(EFFECT_CMD_SET_PARAM,
@@ -1076,7 +1080,7 @@ void AudioFlinger::EffectModule::addEffectToHal_l()
 {
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC ||
          (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
-        (void)mCallback->addEffectToHal(mEffectInterface);
+        (void)getCallback()->addEffectToHal(mEffectInterface);
     }
 }
 
@@ -1089,7 +1093,7 @@ status_t AudioFlinger::EffectModule::start()
         status = start_l();
     }
     if (status == NO_ERROR) {
-        mCallback->resetVolume();
+        getCallback()->resetVolume();
     }
     return status;
 }
@@ -1139,7 +1143,7 @@ status_t AudioFlinger::EffectModule::stop_l()
         // We have the EffectChain and EffectModule lock, permit a reentrant call to setVolume:
         // resetVolume_l --> setVolume_l --> EffectModule::setVolume
         mSetVolumeReentrantTid = gettid();
-        mCallback->resetVolume();
+        getCallback()->resetVolume();
         mSetVolumeReentrantTid = INVALID_PID;
     }
 
@@ -1172,7 +1176,7 @@ status_t AudioFlinger::EffectModule::removeEffectFromHal_l()
 {
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_PRE_PROC ||
              (mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_POST_PROC) {
-        mCallback->removeEffectFromHal(mEffectInterface);
+        getCallback()->removeEffectFromHal(mEffectInterface);
     }
     return NO_ERROR;
 }
@@ -1288,7 +1292,7 @@ bool AudioFlinger::EffectModule::isProcessEnabled() const
 
 bool AudioFlinger::EffectModule::isOffloadedOrDirect() const
 {
-    return mCallback->isOffloadOrDirect();
+    return getCallback()->isOffloadOrDirect();
 }
 
 bool AudioFlinger::EffectModule::isVolumeControlEnabled() const
@@ -1332,7 +1336,7 @@ void AudioFlinger::EffectModule::setInBuffer(const sp<EffectBufferHalInterface>&
                 || size > mInConversionBuffer->getSize())) {
             mInConversionBuffer.clear();
             ALOGV("%s: allocating mInConversionBuffer %zu", __func__, size);
-            (void)mCallback->allocateHalBuffer(size, &mInConversionBuffer);
+            (void)getCallback()->allocateHalBuffer(size, &mInConversionBuffer);
         }
         if (mInConversionBuffer != nullptr) {
             mInConversionBuffer->setFrameCount(inFrameCount);
@@ -1376,7 +1380,7 @@ void AudioFlinger::EffectModule::setOutBuffer(const sp<EffectBufferHalInterface>
                 || size > mOutConversionBuffer->getSize())) {
             mOutConversionBuffer.clear();
             ALOGV("%s: allocating mOutConversionBuffer %zu", __func__, size);
-            (void)mCallback->allocateHalBuffer(size, &mOutConversionBuffer);
+            (void)getCallback()->allocateHalBuffer(size, &mOutConversionBuffer);
         }
         if (mOutConversionBuffer != nullptr) {
             mOutConversionBuffer->setFrameCount(outFrameCount);
