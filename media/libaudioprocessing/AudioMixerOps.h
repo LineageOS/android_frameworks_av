@@ -293,6 +293,16 @@ void stereoVolumeHelper(TO*& out, const TI*& in, const TV *vol, F f) {
     // NCHAN == 8
     proc(*out++, f(inp(), vol[0])); // side left
     proc(*out++, f(inp(), vol[1])); // side right
+    if constexpr (NCHAN > FCC_8) {
+        // Mutes to zero extended surround channels.
+        // 7.1.4 has the correct behavior.
+        // 22.2 has the behavior that FLC and FRC will be mixed instead
+        // of SL and SR and LFE will be center, not left.
+        for (int i = 8; i < NCHAN; ++i) {
+            // TODO: Consider using android::audio_utils::channels::kSideFromChannelIdx
+            proc(*out++, f(inp(), 0.f));
+        }
+    }
 }
 
 /*
