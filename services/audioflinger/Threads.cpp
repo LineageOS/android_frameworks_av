@@ -1638,7 +1638,7 @@ void AudioFlinger::ThreadBase::removeEffect_l(const sp<EffectModule>& effect, bo
         detachAuxEffect_l(effect->id());
     }
 
-    sp<EffectChain> chain = effect->callback()->chain().promote();
+    sp<EffectChain> chain = effect->getCallback()->chain().promote();
     if (chain != 0) {
         // remove effect chain if removing last effect
         if (chain->removeEffect_l(effect, release) == 0) {
