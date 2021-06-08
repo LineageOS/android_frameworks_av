@@ -598,18 +598,10 @@ void fillMainDataBuf(void  *pMem, int32 temp)
         }
         else
         {
-            int32 tmp1 = *(ptr++);
-            for (int32 nBytes = temp >> 1; nBytes != 0; nBytes--)  /* read main data. */
+            for (int32 nBytes = temp; nBytes != 0; nBytes--)  /* read main data. */
             {
-                int32 tmp2 = *(ptr++);
-                fillDataBuf(&pVars->mainDataStream, tmp1);
-                fillDataBuf(&pVars->mainDataStream, tmp2);
-                tmp1 = *(ptr++);
-            }
-
-            if (temp&1)
-            {
-                fillDataBuf(&pVars->mainDataStream, tmp1);
+                int32 tmp = *(ptr++);
+                fillDataBuf(&pVars->mainDataStream, tmp);
             }
 
             /* adjust circular buffer counter */
@@ -618,14 +610,9 @@ void fillMainDataBuf(void  *pMem, int32 temp)
     }
     else
     {
-        for (int32 nBytes = temp >> 1; nBytes != 0; nBytes--)  /* read main data. */
+        for (int32 nBytes = temp; nBytes != 0; nBytes--)  /* read main data. */
         {
             fillDataBuf(&pVars->mainDataStream, *(pVars->inputStream.pBuffer + module(offset++  , BUFSIZE)));
-            fillDataBuf(&pVars->mainDataStream, *(pVars->inputStream.pBuffer + module(offset++  , BUFSIZE)));
-        }
-        if (temp&1)
-        {
-            fillDataBuf(&pVars->mainDataStream, *(pVars->inputStream.pBuffer + module(offset  , BUFSIZE)));
         }
     }
 
