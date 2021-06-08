@@ -202,6 +202,8 @@ public:
             std::vector<hardware::CameraStatus>* cameraStatuses, bool isVendor = false,
             bool isProcessLocalTest = false);
 
+    void cacheDump();
+
     // Monitored UIDs availability notification
     void                notifyMonitoredUids();
 
@@ -784,6 +786,12 @@ private:
 
     // Return NO_ERROR if the device with a give ID can be connected to
     status_t checkIfDeviceIsUsable(const String8& cameraId) const;
+
+    // Adds client logs during open session to the file pointed by fd.
+    void dumpOpenSessionClientLogs(int fd, const Vector<String16>& args, const String8& cameraId);
+
+    // Adds client logs during closed session to the file pointed by fd.
+    void dumpClosedSessionClientLogs(int fd, const String8& cameraId);
 
     // Container for managing currently active application-layer clients
     CameraClientManager mActiveClientManager;
