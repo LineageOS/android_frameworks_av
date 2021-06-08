@@ -8573,7 +8573,7 @@ bool AudioFlinger::RecordThread::checkForNewParameter_l(const String8& keyValueP
     if (param.getInt(String8(AudioParameter::keyChannels), value) == NO_ERROR) {
         audio_channel_mask_t mask = (audio_channel_mask_t) value;
         if (!audio_is_input_channel(mask) ||
-                audio_channel_count_from_in_mask(mask) > FCC_8) {
+                audio_channel_count_from_in_mask(mask) > FCC_LIMIT) {
             status = BAD_VALUE;
         } else {
             channelMask = mask;
@@ -8610,7 +8610,7 @@ bool AudioFlinger::RecordThread::checkForNewParameter_l(const String8& keyValueP
                 if (mInput->stream->getAudioProperties(&config) == OK &&
                         audio_is_linear_pcm(config.format) && audio_is_linear_pcm(reqFormat) &&
                         config.sample_rate <= (AUDIO_RESAMPLER_DOWN_RATIO_MAX * samplingRate) &&
-                        audio_channel_count_from_in_mask(config.channel_mask) <= FCC_8) {
+                        audio_channel_count_from_in_mask(config.channel_mask) <= FCC_LIMIT) {
                     status = NO_ERROR;
                 }
             }
@@ -8672,10 +8672,10 @@ void AudioFlinger::RecordThread::readInputParameters_l()
     mFormat = mHALFormat;
     mChannelCount = audio_channel_count_from_in_mask(mChannelMask);
     if (audio_is_linear_pcm(mFormat)) {
-        LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_8, "HAL channel count %d > %d",
-                mChannelCount, FCC_8);
+        LOG_ALWAYS_FATAL_IF(mChannelCount > FCC_LIMIT, "HAL channel count %d > %d",
+                mChannelCount, FCC_LIMIT);
     } else {
-        // Can have more that FCC_8 channels in encoded streams.
+        // Can have more that FCC_LIMIT channels in encoded streams.
         ALOGI("HAL format %#x is not linear pcm", mFormat);
     }
     result = mInput->stream->getFrameSize(&mFrameSize);

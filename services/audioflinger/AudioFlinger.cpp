@@ -2896,8 +2896,8 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openInput_l(audio_module_handle_t mod
         audio_is_linear_pcm(config->format) &&
         audio_is_linear_pcm(halconfig.format) &&
         (halconfig.sample_rate <= AUDIO_RESAMPLER_DOWN_RATIO_MAX * config->sample_rate) &&
-        (audio_channel_count_from_in_mask(halconfig.channel_mask) <= FCC_8) &&
-        (audio_channel_count_from_in_mask(config->channel_mask) <= FCC_8)) {
+        (audio_channel_count_from_in_mask(halconfig.channel_mask) <= FCC_LIMIT) &&
+        (audio_channel_count_from_in_mask(config->channel_mask) <= FCC_LIMIT)) {
         // FIXME describe the change proposed by HAL (save old values so we can log them here)
         ALOGV("openInput_l() reopening with proposed sampling rate and channel mask");
         inStream.clear();
