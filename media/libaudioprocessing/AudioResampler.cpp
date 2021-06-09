@@ -268,7 +268,7 @@ AudioResampler::AudioResampler(int inChannelCount,
         mPhaseFraction(0),
         mQuality(quality) {
 
-    const int maxChannels = quality < DYN_LOW_QUALITY ? 2 : 8;
+    const int maxChannels = quality < DYN_LOW_QUALITY ? FCC_2 : FCC_LIMIT;
     if (inChannelCount < 1
             || inChannelCount > maxChannels) {
         LOG_ALWAYS_FATAL("Unsupported sample format %d quality %d channels",
