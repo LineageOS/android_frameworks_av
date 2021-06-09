@@ -3996,7 +3996,7 @@ status_t AudioFlinger::moveEffectChain_l(audio_session_t sessionId,
         // if the move request is not received from audio policy manager, the effect must be
         // re-registered with the new strategy and output
         if (dstChain == 0) {
-            dstChain = effect->callback()->chain().promote();
+            dstChain = effect->getCallback()->chain().promote();
             if (dstChain == 0) {
                 ALOGW("moveEffectChain_l() cannot get chain from effect %p", effect.get());
                 status = NO_INIT;
@@ -4046,7 +4046,7 @@ status_t AudioFlinger::moveAuxEffectToIo(int EffectId,
             goto Exit;
         }
 
-        dstChain = effect->callback()->chain().promote();
+        dstChain = effect->getCallback()->chain().promote();
         if (dstChain == 0) {
             thread->addEffect_l(effect);
             status = INVALID_OPERATION;

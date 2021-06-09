@@ -408,8 +408,8 @@ size_t AudioFlingerClientAdapter::getInputBufferSize(uint32_t sampleRate, audio_
         int32_t sampleRateAidl = VALUE_OR_RETURN(convertIntegral<int32_t>(sampleRate));
         media::AudioFormatSys formatAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_format_t_AudioFormat(format));
-        int32_t channelMaskAidl = VALUE_OR_RETURN(
-                legacy2aidl_audio_channel_mask_t_int32_t(channelMask));
+        media::AudioChannelMask channelMaskAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_channel_mask_t_AudioChannelMask(channelMask));
         int64_t aidlRet;
         RETURN_IF_ERROR(statusTFromBinderStatus(
                 mDelegate->getInputBufferSize(sampleRateAidl, formatAidl, channelMaskAidl,
@@ -927,12 +927,13 @@ Status AudioFlingerServerAdapter::registerClient(const sp<media::IAudioFlingerCl
 
 Status AudioFlingerServerAdapter::getInputBufferSize(int32_t sampleRate,
                                                      media::AudioFormatSys format,
-                                                     int32_t channelMask, int64_t* _aidl_return) {
+                                                     media::AudioChannelMask channelMask,
+                                                     int64_t* _aidl_return) {
     uint32_t sampleRateLegacy = VALUE_OR_RETURN_BINDER(convertIntegral<uint32_t>(sampleRate));
     audio_format_t formatLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_AudioFormat_audio_format_t(format));
     audio_channel_mask_t channelMaskLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_int32_t_audio_channel_mask_t(channelMask));
+            aidl2legacy_AudioChannelMask_audio_channel_mask_t(channelMask));
     size_t size = mDelegate->getInputBufferSize(sampleRateLegacy, formatLegacy, channelMaskLegacy);
     *_aidl_return = VALUE_OR_RETURN_BINDER(convertIntegral<int64_t>(size));
     return Status::ok();
