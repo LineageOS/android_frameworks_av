@@ -157,7 +157,7 @@ int Visualizer_setConfig(VisualizerContext *pContext, effect_config_t *pConfig)
     if (pConfig->inputCfg.format != pConfig->outputCfg.format) return -EINVAL;
     const uint32_t channelCount = audio_channel_count_from_out_mask(pConfig->inputCfg.channels);
 #ifdef SUPPORT_MC
-    if (channelCount < 1 || channelCount > FCC_8) return -EINVAL;
+    if (channelCount < 1 || channelCount > FCC_LIMIT) return -EINVAL;
 #else
     if (channelCount != FCC_2) return -EINVAL;
 #endif
