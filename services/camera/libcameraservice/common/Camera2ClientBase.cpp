@@ -195,6 +195,8 @@ binder::Status Camera2ClientBase<TClientBase>::disconnect() {
 
     ALOGV("Camera %s: Shutting down", TClientBase::mCameraIdStr.string());
 
+    // Before detaching the device, cache the info from current open session
+    Camera2ClientBase::getCameraService()->cacheDump();
     detachDevice();
 
     CameraService::BasicClient::disconnect();
