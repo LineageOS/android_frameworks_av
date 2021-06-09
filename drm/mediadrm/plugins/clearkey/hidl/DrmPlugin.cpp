@@ -215,6 +215,7 @@ Status_V1_2 DrmPlugin::getKeyRequestCommon(const hidl_vec<uint8_t>& scope,
         if (requestString.find(kOfflineLicense) != std::string::npos) {
             std::string emptyResponse;
             std::string keySetIdString(keySetId.begin(), keySetId.end());
+            Mutex::Autolock lock(mFileHandleLock);
             if (!mFileHandle.StoreLicense(keySetIdString,
                     DeviceFiles::kLicenseStateReleasing,
                     emptyResponse)) {
@@ -330,6 +331,7 @@ bool DrmPlugin::makeKeySetId(std::string* keySetId) {
         }
         *keySetId = kKeySetIdPrefix + ByteArrayToHexString(
                 reinterpret_cast<const uint8_t*>(randomData.data()), randomData.size());
+        Mutex::Autolock lock(mFileHandleLock);
         if (mFileHandle.LicenseExists(*keySetId)) {
             // collision, regenerate
             ALOGV("Retry generating KeySetId");
@@ -382,6 +384,7 @@ Return<void> DrmPlugin::provideKeyResponse(
     if (status == Status::OK) {
         if (isOfflineLicense) {
             if (isRelease) {
+                Mutex::Autolock lock(mFileHandleLock);
                 mFileHandle.DeleteLicense(keySetId);
             } else {
                 if (!makeKeySetId(&keySetId)) {
@@ -389,6 +392,7 @@ Return<void> DrmPlugin::provideKeyResponse(
                     return Void();
                 }
 
+                Mutex::Autolock lock(mFileHandleLock);
                 bool ok = mFileHandle.StoreLicense(
                         keySetId,
                         DeviceFiles::kLicenseStateActive,
@@ -443,6 +447,7 @@ Return<Status> DrmPlugin::restoreKeys(
         DeviceFiles::LicenseState licenseState;
         std::string offlineLicense;
         Status status = Status::OK;
+        Mutex::Autolock lock(mFileHandleLock);
         if (!mFileHandle.RetrieveLicense(std::string(keySetId.begin(), keySetId.end()),
                 &licenseState, &offlineLicense)) {
             ALOGE("Failed to restore offline license");
@@ -565,7 +570,6 @@ Return<Status> DrmPlugin::setPropertyByteArray(
 Return<void> DrmPlugin::queryKeyStatus(
         const hidl_vec<uint8_t>& sessionId,
         queryKeyStatus_cb _hidl_cb) {
-
     if (sessionId.size() == 0) {
         // Returns empty key status KeyValue pair
         _hidl_cb(Status::BAD_VALUE, hidl_vec<KeyValue>());
@@ -575,12 +579,14 @@ Return<void> DrmPlugin::queryKeyStatus(
     std::vector<KeyValue> infoMapVec;
     infoMapVec.clear();
 
+    mPlayPolicyLock.lock();
     KeyValue keyValuePair;
     for (size_t i = 0; i < mPlayPolicy.size(); ++i) {
         keyValuePair.key = mPlayPolicy[i].key;
         keyValuePair.value = mPlayPolicy[i].value;
         infoMapVec.push_back(keyValuePair);
     }
+    mPlayPolicyLock.unlock();
     _hidl_cb(Status::OK, toHidlVec(infoMapVec));
     return Void();
 }
@@ -693,6 +699,7 @@ Return<void> DrmPlugin::getMetrics(getMetrics_cb _hidl_cb) {
 }
 
 Return<void> DrmPlugin::getOfflineLicenseKeySetIds(getOfflineLicenseKeySetIds_cb _hidl_cb) {
+    Mutex::Autolock lock(mFileHandleLock);
     std::vector<std::string> licenseNames = mFileHandle.ListLicenses();
     std::vector<KeySetId> keySetIds;
     if (mMockError != Status_V1_2::OK) {
@@ -713,6 +720,7 @@ Return<Status> DrmPlugin::removeOfflineLicense(const KeySetId& keySetId) {
         return toStatus_1_0(mMockError);
     }
     std::string licenseName(keySetId.begin(), keySetId.end());
+    Mutex::Autolock lock(mFileHandleLock);
     if (mFileHandle.DeleteLicense(licenseName)) {
         return Status::OK;
     }
@@ -721,6 +729,8 @@ Return<Status> DrmPlugin::removeOfflineLicense(const KeySetId& keySetId) {
 
 Return<void> DrmPlugin::getOfflineLicenseState(const KeySetId& keySetId,
         getOfflineLicenseState_cb _hidl_cb) {
+    Mutex::Autolock lock(mFileHandleLock);
+
     std::string licenseName(keySetId.begin(), keySetId.end());
     DeviceFiles::LicenseState state;
     std::string license;
