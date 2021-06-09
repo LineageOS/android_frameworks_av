@@ -308,6 +308,17 @@ bool BaseItem::isEnabled() {
     switch (uid) {
     case AID_RADIO:     // telephony subsystem, RIL
         return false;
+    default:
+        // Some isolated processes can access the audio system; see
+        // AudioSystem::setAudioFlingerBinder (currently only the HotwordDetectionService). Instead
+        // of also allowing access to the MediaMetrics service, it's simpler to just disable it for
+        // now.
+        // TODO(b/190151205): Either allow the HotwordDetectionService to access MediaMetrics or
+        // make this disabling specific to that process.
+        if (uid >= AID_ISOLATED_START && uid <= AID_ISOLATED_END) {
+            return false;
+        }
+        break;
     }
 
     int enabled = property_get_int32(Item::EnabledProperty, -1);
