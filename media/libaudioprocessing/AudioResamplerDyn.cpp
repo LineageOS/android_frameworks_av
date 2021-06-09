@@ -545,8 +545,8 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
     // Note: A stride of 2 is achieved with non-SIMD processing.
     int stride = ((c.mHalfNumCoefs & 7) == 0) ? 16 : 2;
     LOG_ALWAYS_FATAL_IF(stride < 16, "Resampler stride must be 16 or more");
-    LOG_ALWAYS_FATAL_IF(mChannelCount < 1 || mChannelCount > 8,
-            "Resampler channels(%d) must be between 1 to 8", mChannelCount);
+    LOG_ALWAYS_FATAL_IF(mChannelCount < 1 || mChannelCount > FCC_LIMIT,
+            "Resampler channels(%d) must be between 1 to %d", mChannelCount, FCC_LIMIT);
     // stride 16 (falls back to stride 2 for machines that do not support NEON)
     if (locked) {
         switch (mChannelCount) {
