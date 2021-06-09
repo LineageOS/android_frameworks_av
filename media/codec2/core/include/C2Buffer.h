@@ -898,6 +898,12 @@ public:
      * Obtains a linear writeable block of given |capacity| and |usage|. If successful, the
      * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
      *
+     * \note The returned buffer may have a larger capacity than requested. In this case the
+     * larger (returned) capacity may be fully used.
+     *
+     * \note There is no guarantee on the alignedness of the returned block. The only guarantee is
+     * that its capacity is equal to or larger than the requested capacity.
+     *
      * \param capacity the size of requested block.
      * \param usage    the memory usage info for the requested block. Returned blocks will be
      *                 optimized for this usage, but may be used with any usage. One exception:
@@ -925,6 +931,12 @@ public:
     /**
      * Obtains a circular writeable block of given |capacity| and |usage|. If successful, the
      * block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
+     *
+     * \note The returned buffer may have a larger capacity than requested. In this case the
+     * larger (returned) capacity may be fully used.
+     *
+     * \note There is no guarantee on the alignedness of the returned block. The only guarantee is
+     * that its capacity is equal to or larger than the requested capacity.
      *
      * \param capacity the size of requested circular block. (note: the size of the obtained
      *                 block could be slightly larger, e.g. to accommodate any system-required
@@ -955,6 +967,12 @@ public:
     /**
      * Obtains a 2D graphic block of given |width|, |height|, |format| and |usage|. If successful,
      * the block is stored in |block|. Otherwise, |block| is set to 'nullptr'.
+     *
+     * \note The returned buffer may have a larger capacity (width and height) than requested. In
+     * this case the larger (returned) capacity may be fully used.
+     *
+     * \note There is no guarantee on the alignedness of the returned block. The only guarantee is
+     * that its capacity is equal to or larger than the requested capacity (width and height).
      *
      * \param width  the width of requested block (the obtained block could be slightly larger, e.g.
      *               to accommodate any system-required alignment)
@@ -1000,6 +1018,12 @@ public:
      * fence is signalled when the temporary restriction on fetch is lifted.
      * e.g. more memory is available to fetch because some meomory or prior blocks were released.
      *
+     * \note The returned buffer may have a larger capacity than requested. In this case the
+     * larger (returned) capacity may be fully used.
+     *
+     * \note There is no guarantee on the alignedness of the returned block. The only guarantee is
+     * that its capacity is equal to or larger than the requested capacity.
+     *
      * \param capacity the size of requested block.
      * \param usage    the memory usage info for the requested block. Returned blocks will be
      *                 optimized for this usage, but may be used with any usage. One exception:
@@ -1038,6 +1062,12 @@ public:
      * Otherwise, |block| is set to nullptr and |fence| is set to a null-fence. The waitable
      * fence is signalled when the temporary restriction on fetch is lifted.
      * e.g. more memory is available to fetch because some meomory or prior blocks were released.
+     *
+     * \note The returned buffer may have a larger capacity (width and height) than requested. In
+     * this case the larger (returned) capacity may be fully used.
+     *
+     * \note There is no guarantee on the alignedness of the returned block. The only guarantee is
+     * that its capacity is equal to or larger than the requested capacity (width and height).
      *
      * \param width  the width of requested block (the obtained block could be slightly larger, e.g.
      *               to accommodate any system-required alignment)
