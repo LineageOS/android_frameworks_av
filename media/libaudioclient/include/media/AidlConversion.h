@@ -96,8 +96,10 @@ ConversionResult<media::AudioPortConfigType> legacy2aidl_int32_t_AudioPortConfig
 ConversionResult<unsigned int> aidl2legacy_int32_t_config_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_config_mask_int32_t(unsigned int legacy);
 
-ConversionResult<audio_channel_mask_t> aidl2legacy_int32_t_audio_channel_mask_t(int32_t aidl);
-ConversionResult<int32_t> legacy2aidl_audio_channel_mask_t_int32_t(audio_channel_mask_t legacy);
+ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelMask_audio_channel_mask_t(
+        media::AudioChannelMask aidl);
+ConversionResult<media::AudioChannelMask> legacy2aidl_audio_channel_mask_t_AudioChannelMask(
+        audio_channel_mask_t legacy);
 
 ConversionResult<pid_t> aidl2legacy_int32_t_pid_t(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_pid_t_int32_t(pid_t legacy);
