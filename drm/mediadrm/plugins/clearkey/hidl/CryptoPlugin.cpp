@@ -37,6 +37,8 @@ Return<void> CryptoPlugin::setSharedBufferBase(
     sp<IMemory> hidlMemory = mapMemory(base);
     ALOGE_IF(hidlMemory == nullptr, "mapMemory returns nullptr");
 
+    std::lock_guard<std::mutex> shared_buffer_lock(mSharedBufferLock);
+
     // allow mapMemory to return nullptr
     mSharedBufferMap[bufferId] = hidlMemory;
     return Void();
@@ -64,6 +66,7 @@ Return<void> CryptoPlugin::decrypt(
         return Void();
     }
 
+    std::unique_lock<std::mutex> shared_buffer_lock(mSharedBufferLock);
     if (mSharedBufferMap.find(source.bufferId) == mSharedBufferMap.end()) {
       _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0,
                "source decrypt buffer base not set");
@@ -111,12 +114,17 @@ Return<void> CryptoPlugin::decrypt(
     }
 
     base = static_cast<uint8_t *>(static_cast<void *>(destBase->getPointer()));
-
-    if (destBuffer.offset + destBuffer.size > destBase->getSize()) {
+    totalSize = 0;
+    if (__builtin_add_overflow(destBuffer.offset, destBuffer.size, &totalSize) ||
+        totalSize > destBase->getSize()) {
+        android_errorWriteLog(0x534e4554, "176444622");
         _hidl_cb(Status::ERROR_DRM_CANNOT_HANDLE, 0, "invalid buffer size");
         return Void();
     }
-    destPtr = static_cast<void *>(base + destination.nonsecureMemory.offset);
+    destPtr = static_cast<void*>(base + destination.nonsecureMemory.offset);
+
+    // release mSharedBufferLock
+    shared_buffer_lock.unlock();
 
     // Calculate the output buffer size and determine if any subsamples are
     // encrypted.
