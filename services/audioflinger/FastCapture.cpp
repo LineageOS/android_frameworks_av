@@ -107,7 +107,7 @@ void FastCapture::onStateChange()
             mSampleRate = Format_sampleRate(mFormat);
 #if !LOG_NDEBUG
             unsigned channelCount = Format_channelCount(mFormat);
-            ALOG_ASSERT(channelCount >= 1 && channelCount <= FCC_8);
+            ALOG_ASSERT(channelCount >= 1 && channelCount <= FCC_LIMIT);
 #endif
         }
         dumpState->mSampleRate = mSampleRate;
