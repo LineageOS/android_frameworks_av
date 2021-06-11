@@ -786,7 +786,7 @@ void AudioPolicyService::updateUidStates_l()
                 allowCapture = true;
             }
         }
-        setAppState_l(current->portId,
+        setAppState_l(current,
                       allowCapture ? apmStatFromAmState(mUidPolicy->getUidState(currentUid)) :
                                 APP_STATE_IDLE);
     }
@@ -796,7 +796,7 @@ void AudioPolicyService::silenceAllRecordings_l() {
     for (size_t i = 0; i < mAudioRecordClients.size(); i++) {
         sp<AudioRecordClient> current = mAudioRecordClients[i];
         if (!isVirtualSource(current->attributes.source)) {
-            setAppState_l(current->portId, APP_STATE_IDLE);
+            setAppState_l(current, APP_STATE_IDLE);
         }
     }
 }
@@ -830,17 +830,32 @@ bool AudioPolicyService::isVirtualSource(audio_source_t source)
     return false;
 }
 
-void AudioPolicyService::setAppState_l(audio_port_handle_t portId, app_state_t state)
+void AudioPolicyService::setAppState_l(sp<AudioRecordClient> client, app_state_t state)
 {
     AutoCallerClear acc;
 
     if (mAudioPolicyManager) {
-        mAudioPolicyManager->setAppState(portId, state);
+        mAudioPolicyManager->setAppState(client->portId, state);
     }
     sp<IAudioFlinger> af = AudioSystem::get_audio_flinger();
     if (af) {
         bool silenced = state == APP_STATE_IDLE;
-        af->setRecordSilenced(portId, silenced);
+        if (client->silenced != silenced) {
+            if (client->active) {
+                if (silenced) {
+                    finishRecording(client->attributionSource, client->attributes.source);
+                } else {
+                    std::stringstream msg;
+                    msg << "Audio recording un-silenced on session " << client->session;
+                    if (!startRecording(client->attributionSource, String16(msg.str().c_str()),
+                            client->attributes.source)) {
+                        silenced = true;
+                    }
+                }
+            }
+            af->setRecordSilenced(client->portId, silenced);
+            client->silenced = silenced;
+        }
     }
 }
 

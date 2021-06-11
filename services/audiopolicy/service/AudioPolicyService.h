@@ -324,8 +324,10 @@ private:
     // Handles binder shell commands
     virtual status_t shellCommand(int in, int out, int err, Vector<String16>& args);
 
+    class AudioRecordClient;
+
     // Sets whether the given UID records only silence
-    virtual void setAppState_l(audio_port_handle_t portId, app_state_t state) REQUIRES(mLock);
+    virtual void setAppState_l(sp<AudioRecordClient> client, app_state_t state) REQUIRES(mLock);
 
     // Overrides the UID state as if it is idle
     status_t handleSetUidState(Vector<String16>& args, int err);
@@ -826,13 +828,14 @@ private:
                     AudioClient(attributes, io, attributionSource,
                         session, portId, deviceId), attributionSource(attributionSource),
                         startTimeNs(0), canCaptureOutput(canCaptureOutput),
-                        canCaptureHotword(canCaptureHotword) {}
+                        canCaptureHotword(canCaptureHotword), silenced(false) {}
                 ~AudioRecordClient() override = default;
 
         const AttributionSourceState attributionSource; // attribution source of client
         nsecs_t startTimeNs;
         const bool canCaptureOutput;
         const bool canCaptureHotword;
+        bool silenced;
     };
 
     // --- AudioPlaybackClient ---
