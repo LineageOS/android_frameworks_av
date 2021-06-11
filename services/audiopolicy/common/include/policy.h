@@ -42,7 +42,7 @@ static const uint32_t SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY = 5000;
 
 // For mixed output and inputs, the policy will use max mixer channel count.
 // Do not limit channel count otherwise
-#define MAX_MIXER_CHANNEL_COUNT FCC_8
+#define MAX_MIXER_CHANNEL_COUNT FCC_LIMIT
 
 /**
  * Alias to AUDIO_DEVICE_OUT_DEFAULT defined for clarification when this value is used by volume
