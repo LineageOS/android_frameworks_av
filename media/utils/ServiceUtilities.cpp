@@ -215,14 +215,17 @@ bool captureVoiceCommunicationOutputAllowed(const AttributionSourceState& attrib
 }
 
 bool captureHotwordAllowed(const AttributionSourceState& attributionSource) {
-    uid_t uid = VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(attributionSource.uid));
-    uid_t pid = VALUE_OR_FATAL(aidl2legacy_int32_t_pid_t(attributionSource.pid));
     // CAPTURE_AUDIO_HOTWORD permission implies RECORD_AUDIO permission
     bool ok = recordingAllowed(attributionSource);
 
     if (ok) {
         static const String16 sCaptureHotwordAllowed("android.permission.CAPTURE_AUDIO_HOTWORD");
-        ok = PermissionCache::checkPermission(sCaptureHotwordAllowed, pid, uid);
+        // Use PermissionChecker, which includes some logic for allowing the isolated
+        // HotwordDetectionService to hold certain permissions.
+        permission::PermissionChecker permissionChecker;
+        ok = (permissionChecker.checkPermissionForPreflight(
+                sCaptureHotwordAllowed, attributionSource, String16(),
+                AppOpsManager::OP_NONE) != permission::PermissionChecker::PERMISSION_HARD_DENIED);
     }
     if (!ok) ALOGV("android.permission.CAPTURE_AUDIO_HOTWORD");
     return ok;
