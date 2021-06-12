@@ -86,9 +86,6 @@ cc_fuzz {
     dictionary: "dictionaries/formats.dict",
     defaults: ["libstagefright_fuzzer_defaults"],
     static_libs: [
-        "libstagefright_webm",
         "libdatasource",
-        "libstagefright_esds",
-        "libogg",
     ],
 }
