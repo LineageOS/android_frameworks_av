@@ -252,8 +252,15 @@ void CameraService::pingCameraServiceProxy() {
     proxyBinder->pingForUserUpdate();
 }
 
-void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeStatus status,
-        SystemCameraKind systemCameraKind) {
+void CameraService::broadcastTorchModeStatus(const String8& cameraId, TorchModeStatus status) {
+    // Avoid calling getSystemCameraKind() with mStatusListenerLock held (b/141756275)
+    SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
+    status_t res = getSystemCameraKind(cameraId, &systemCameraKind);
+    if (res != OK) {
+        ALOGE("%s: Could not get system camera kind for camera id %s", __FUNCTION__,
+                cameraId.string());
+        return;
+    }
     Mutex::Autolock lock(mStatusListenerLock);
     for (auto& i : mListenerList) {
         if (shouldSkipStatusUpdates(systemCameraKind, i->isVendorListener(), i->getListenerPid(),
@@ -347,7 +354,7 @@ void CameraService::addStates(const String8 id) {
         Mutex::Autolock al(mTorchStatusMutex);
         mTorchStatusMap.add(id, TorchModeStatus::AVAILABLE_OFF);
 
-        broadcastTorchModeStatus(id, TorchModeStatus::AVAILABLE_OFF, deviceKind);
+        broadcastTorchModeStatus(id, TorchModeStatus::AVAILABLE_OFF);
     }
 
     updateCameraNumAndIds();
@@ -508,19 +515,12 @@ void CameraService::disconnectClient(const String8& id, sp<BasicClient> clientTo
 
 void CameraService::onTorchStatusChanged(const String8& cameraId,
         TorchModeStatus newStatus) {
-    SystemCameraKind systemCameraKind = SystemCameraKind::PUBLIC;
-    status_t res = getSystemCameraKind(cameraId, &systemCameraKind);
-    if (res != OK) {
-        ALOGE("%s: Could not get system camera kind for camera id %s", __FUNCTION__,
-                cameraId.string());
-        return;
-    }
     Mutex::Autolock al(mTorchStatusMutex);
-    onTorchStatusChangedLocked(cameraId, newStatus, systemCameraKind);
+    onTorchStatusChangedLocked(cameraId, newStatus);
 }
 
 void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
-        TorchModeStatus newStatus, SystemCameraKind systemCameraKind) {
+        TorchModeStatus newStatus) {
     ALOGI("%s: Torch status changed for cameraId=%s, newStatus=%d",
             __FUNCTION__, cameraId.string(), newStatus);
 
@@ -569,7 +569,7 @@ void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
             }
         }
     }
-    broadcastTorchModeStatus(cameraId, newStatus, systemCameraKind);
+    broadcastTorchModeStatus(cameraId, newStatus);
 }
 
 static bool hasPermissionsForSystemCamera(int callingPid, int callingUid) {
@@ -3806,7 +3806,7 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
                             TorchModeStatus::AVAILABLE_OFF :
                             TorchModeStatus::NOT_AVAILABLE;
                     if (torchStatus != newTorchStatus) {
-                        onTorchStatusChangedLocked(cameraId, newTorchStatus, deviceKind);
+                        onTorchStatusChangedLocked(cameraId, newTorchStatus);
                     }
                 }
             }
