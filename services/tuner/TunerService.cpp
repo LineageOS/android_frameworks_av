@@ -445,90 +445,118 @@ TunerFrontendInfo TunerService::convertToAidlFrontendInfo(FrontendInfo halInfo) 
     TunerFrontendCapabilities caps;
     switch (halInfo.type) {
         case FrontendType::ANALOG: {
-            TunerFrontendAnalogCapabilities analogCaps{
-                .typeCap = (int)halInfo.frontendCaps.analogCaps().typeCap,
-                .sifStandardCap = (int)halInfo.frontendCaps.analogCaps().sifStandardCap,
-            };
-            caps.set<TunerFrontendCapabilities::analogCaps>(analogCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::analogCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendAnalogCapabilities analogCaps{
+                    .typeCap = (int)halInfo.frontendCaps.analogCaps().typeCap,
+                    .sifStandardCap = (int)halInfo.frontendCaps.analogCaps().sifStandardCap,
+                };
+                caps.set<TunerFrontendCapabilities::analogCaps>(analogCaps);
+            }
             break;
         }
         case FrontendType::ATSC: {
-            TunerFrontendAtscCapabilities atscCaps{
-                .modulationCap = (int)halInfo.frontendCaps.atscCaps().modulationCap,
-            };
-            caps.set<TunerFrontendCapabilities::atscCaps>(atscCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::atscCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendAtscCapabilities atscCaps{
+                    .modulationCap = (int)halInfo.frontendCaps.atscCaps().modulationCap,
+                };
+                caps.set<TunerFrontendCapabilities::atscCaps>(atscCaps);
+            }
             break;
         }
         case FrontendType::ATSC3: {
-            TunerFrontendAtsc3Capabilities atsc3Caps{
-                .bandwidthCap = (int)halInfo.frontendCaps.atsc3Caps().bandwidthCap,
-                .modulationCap = (int)halInfo.frontendCaps.atsc3Caps().modulationCap,
-                .timeInterleaveModeCap =
-                        (int)halInfo.frontendCaps.atsc3Caps().timeInterleaveModeCap,
-                .codeRateCap = (int)halInfo.frontendCaps.atsc3Caps().codeRateCap,
-                .demodOutputFormatCap = (int)halInfo.frontendCaps.atsc3Caps().demodOutputFormatCap,
-                .fecCap = (int)halInfo.frontendCaps.atsc3Caps().fecCap,
-            };
-            caps.set<TunerFrontendCapabilities::atsc3Caps>(atsc3Caps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::atsc3Caps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendAtsc3Capabilities atsc3Caps{
+                    .bandwidthCap = (int)halInfo.frontendCaps.atsc3Caps().bandwidthCap,
+                    .modulationCap = (int)halInfo.frontendCaps.atsc3Caps().modulationCap,
+                    .timeInterleaveModeCap =
+                            (int)halInfo.frontendCaps.atsc3Caps().timeInterleaveModeCap,
+                    .codeRateCap = (int)halInfo.frontendCaps.atsc3Caps().codeRateCap,
+                    .demodOutputFormatCap
+                        = (int)halInfo.frontendCaps.atsc3Caps().demodOutputFormatCap,
+                    .fecCap = (int)halInfo.frontendCaps.atsc3Caps().fecCap,
+                };
+                caps.set<TunerFrontendCapabilities::atsc3Caps>(atsc3Caps);
+            }
             break;
         }
         case FrontendType::DVBC: {
-            TunerFrontendCableCapabilities cableCaps{
-                .modulationCap = (int)halInfo.frontendCaps.dvbcCaps().modulationCap,
-                .codeRateCap = (int64_t)halInfo.frontendCaps.dvbcCaps().fecCap,
-                .annexCap = (int)halInfo.frontendCaps.dvbcCaps().annexCap,
-            };
-            caps.set<TunerFrontendCapabilities::cableCaps>(cableCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::dvbcCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendCableCapabilities cableCaps{
+                    .modulationCap = (int)halInfo.frontendCaps.dvbcCaps().modulationCap,
+                    .codeRateCap = (int64_t)halInfo.frontendCaps.dvbcCaps().fecCap,
+                    .annexCap = (int)halInfo.frontendCaps.dvbcCaps().annexCap,
+                };
+                caps.set<TunerFrontendCapabilities::cableCaps>(cableCaps);
+            }
             break;
         }
         case FrontendType::DVBS: {
-            TunerFrontendDvbsCapabilities dvbsCaps{
-                .modulationCap = (int)halInfo.frontendCaps.dvbsCaps().modulationCap,
-                .codeRateCap = (long)halInfo.frontendCaps.dvbsCaps().innerfecCap,
-                .standard = (int)halInfo.frontendCaps.dvbsCaps().standard,
-            };
-            caps.set<TunerFrontendCapabilities::dvbsCaps>(dvbsCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::dvbsCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendDvbsCapabilities dvbsCaps{
+                    .modulationCap = (int)halInfo.frontendCaps.dvbsCaps().modulationCap,
+                    .codeRateCap = (long)halInfo.frontendCaps.dvbsCaps().innerfecCap,
+                    .standard = (int)halInfo.frontendCaps.dvbsCaps().standard,
+                };
+                caps.set<TunerFrontendCapabilities::dvbsCaps>(dvbsCaps);
+            }
             break;
         }
         case FrontendType::DVBT: {
-            TunerFrontendDvbtCapabilities dvbtCaps{
-                .transmissionModeCap = (int)halInfo.frontendCaps.dvbtCaps().transmissionModeCap,
-                .bandwidthCap = (int)halInfo.frontendCaps.dvbtCaps().bandwidthCap,
-                .constellationCap = (int)halInfo.frontendCaps.dvbtCaps().constellationCap,
-                .codeRateCap = (int)halInfo.frontendCaps.dvbtCaps().coderateCap,
-                .hierarchyCap = (int)halInfo.frontendCaps.dvbtCaps().hierarchyCap,
-                .guardIntervalCap = (int)halInfo.frontendCaps.dvbtCaps().guardIntervalCap,
-                .isT2Supported = (bool)halInfo.frontendCaps.dvbtCaps().isT2Supported,
-                .isMisoSupported = (bool)halInfo.frontendCaps.dvbtCaps().isMisoSupported,
-            };
-            caps.set<TunerFrontendCapabilities::dvbtCaps>(dvbtCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::dvbtCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendDvbtCapabilities dvbtCaps{
+                    .transmissionModeCap = (int)halInfo.frontendCaps.dvbtCaps().transmissionModeCap,
+                    .bandwidthCap = (int)halInfo.frontendCaps.dvbtCaps().bandwidthCap,
+                    .constellationCap = (int)halInfo.frontendCaps.dvbtCaps().constellationCap,
+                    .codeRateCap = (int)halInfo.frontendCaps.dvbtCaps().coderateCap,
+                    .hierarchyCap = (int)halInfo.frontendCaps.dvbtCaps().hierarchyCap,
+                    .guardIntervalCap = (int)halInfo.frontendCaps.dvbtCaps().guardIntervalCap,
+                    .isT2Supported = (bool)halInfo.frontendCaps.dvbtCaps().isT2Supported,
+                    .isMisoSupported = (bool)halInfo.frontendCaps.dvbtCaps().isMisoSupported,
+                };
+                caps.set<TunerFrontendCapabilities::dvbtCaps>(dvbtCaps);
+            }
             break;
         }
         case FrontendType::ISDBS: {
-            TunerFrontendIsdbsCapabilities isdbsCaps{
-                .modulationCap = (int)halInfo.frontendCaps.isdbsCaps().modulationCap,
-                .codeRateCap = (int)halInfo.frontendCaps.isdbsCaps().coderateCap,
-            };
-            caps.set<TunerFrontendCapabilities::isdbsCaps>(isdbsCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::isdbsCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendIsdbsCapabilities isdbsCaps{
+                    .modulationCap = (int)halInfo.frontendCaps.isdbsCaps().modulationCap,
+                    .codeRateCap = (int)halInfo.frontendCaps.isdbsCaps().coderateCap,
+                };
+                caps.set<TunerFrontendCapabilities::isdbsCaps>(isdbsCaps);
+            }
             break;
         }
         case FrontendType::ISDBS3: {
-            TunerFrontendIsdbs3Capabilities isdbs3Caps{
-                .modulationCap = (int)halInfo.frontendCaps.isdbs3Caps().modulationCap,
-                .codeRateCap = (int)halInfo.frontendCaps.isdbs3Caps().coderateCap,
-            };
-            caps.set<TunerFrontendCapabilities::isdbs3Caps>(isdbs3Caps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::isdbs3Caps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendIsdbs3Capabilities isdbs3Caps{
+                    .modulationCap = (int)halInfo.frontendCaps.isdbs3Caps().modulationCap,
+                    .codeRateCap = (int)halInfo.frontendCaps.isdbs3Caps().coderateCap,
+                };
+                caps.set<TunerFrontendCapabilities::isdbs3Caps>(isdbs3Caps);
+            }
             break;
         }
         case FrontendType::ISDBT: {
-            TunerFrontendIsdbtCapabilities isdbtCaps{
-                .modeCap = (int)halInfo.frontendCaps.isdbtCaps().modeCap,
-                .bandwidthCap = (int)halInfo.frontendCaps.isdbtCaps().bandwidthCap,
-                .modulationCap = (int)halInfo.frontendCaps.isdbtCaps().modulationCap,
-                .codeRateCap = (int)halInfo.frontendCaps.isdbtCaps().coderateCap,
-                .guardIntervalCap = (int)halInfo.frontendCaps.isdbtCaps().guardIntervalCap,
-            };
-            caps.set<TunerFrontendCapabilities::isdbtCaps>(isdbtCaps);
+            if (FrontendInfo::FrontendCapabilities::hidl_discriminator::isdbtCaps
+                    == halInfo.frontendCaps.getDiscriminator()) {
+                TunerFrontendIsdbtCapabilities isdbtCaps{
+                    .modeCap = (int)halInfo.frontendCaps.isdbtCaps().modeCap,
+                    .bandwidthCap = (int)halInfo.frontendCaps.isdbtCaps().bandwidthCap,
+                    .modulationCap = (int)halInfo.frontendCaps.isdbtCaps().modulationCap,
+                    .codeRateCap = (int)halInfo.frontendCaps.isdbtCaps().coderateCap,
+                    .guardIntervalCap = (int)halInfo.frontendCaps.isdbtCaps().guardIntervalCap,
+                };
+                caps.set<TunerFrontendCapabilities::isdbtCaps>(isdbtCaps);
+            }
             break;
         }
         default:
