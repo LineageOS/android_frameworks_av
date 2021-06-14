@@ -377,15 +377,23 @@ private:
     // This type is used to track the tunnel mode video peek state machine:
     //
     // DisabledNoBuffer -> EnabledNoBuffer  when tunnel-peek = true
+    // DisabledQueued   -> EnabledQueued    when tunnel-peek = true
+    // DisabledNoBuffer -> DisabledQueued   when first frame queued
     // EnabledNoBuffer  -> DisabledNoBuffer when tunnel-peek = false
+    // EnabledQueued    -> DisabledQueued   when tunnel-peek = false
+    // EnabledNoBuffer  -> EnabledQueued    when first frame queued
     // DisabledNoBuffer -> BufferDecoded    when kWhatFirstTunnelFrameReady
+    // DisabledQueued   -> BufferDecoded    when kWhatFirstTunnelFrameReady
     // EnabledNoBuffer  -> BufferDecoded    when kWhatFirstTunnelFrameReady
+    // EnabledQueued    -> BufferDecoded    when kWhatFirstTunnelFrameReady
     // BufferDecoded    -> BufferRendered   when kWhatFrameRendered
     // <all states>     -> EnabledNoBuffer  when flush
     // <all states>     -> EnabledNoBuffer  when stop then configure then start
     enum struct TunnelPeekState {
         kDisabledNoBuffer,
         kEnabledNoBuffer,
+        kDisabledQueued,
+        kEnabledQueued,
         kBufferDecoded,
         kBufferRendered,
     };
