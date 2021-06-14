@@ -938,6 +938,14 @@ void CCodecConfig::initializeStandardParams() {
             return value == 0 ? C2_FALSE : C2_TRUE;
         }));
 
+    add(ConfigMapper("android._trigger-tunnel-peek", C2_PARAMKEY_TUNNEL_START_RENDER, "value")
+        .limitTo(D::PARAM & D::VIDEO & D::DECODER)
+        .withMapper([](C2Value v) -> C2Value {
+            int32_t value = 0;
+            (void)v.get(&value);
+            return value == 0 ? C2_FALSE : C2_TRUE;
+        }));
+
     /* still to do
     constexpr char KEY_PUSH_BLANK_BUFFERS_ON_STOP[] = "push-blank-buffers-on-shutdown";
 
