@@ -139,11 +139,24 @@ struct VolumeGroupTraits : public BaseSerializerTraits<VolumeGroup, VolumeGroups
                                          Collection &collection);
 };
 
-using xmlCharUnique = std::unique_ptr<xmlChar, decltype(xmlFree)>;
+template <class T>
+constexpr void (*xmlDeleter)(T* t);
+template <>
+constexpr auto xmlDeleter<xmlDoc> = xmlFreeDoc;
+template <>
+constexpr auto xmlDeleter<xmlChar> = [](xmlChar *s) { xmlFree(s); };
+
+/** @return a unique_ptr with the correct deleter for the libxml2 object. */
+template <class T>
+constexpr auto make_xmlUnique(T *t) {
+    // Wrap deleter in lambda to enable empty base optimization
+    auto deleter = [](T *t) { xmlDeleter<T>(t); };
+    return std::unique_ptr<T, decltype(deleter)>{t, deleter};
+}
 
 std::string getXmlAttribute(const xmlNode *cur, const char *attribute)
 {
-    xmlCharUnique charPtr(xmlGetProp(cur, reinterpret_cast<const xmlChar *>(attribute)), xmlFree);
+    auto charPtr = make_xmlUnique(xmlGetProp(cur, reinterpret_cast<const xmlChar *>(attribute)));
     if (charPtr == NULL) {
         return "";
     }
@@ -441,7 +454,7 @@ status_t VolumeTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Collectio
     for (const xmlNode *child = referenceName.empty() ?
          root->xmlChildrenNode : ref->xmlChildrenNode; child != NULL; child = child->next) {
         if (!xmlStrcmp(child->name, (const xmlChar *)volumePointTag)) {
-            xmlCharUnique pointXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            auto pointXml = make_xmlUnique(xmlNodeListGetString(doc, child->xmlChildrenNode, 1));
             if (pointXml == NULL) {
                 return BAD_VALUE;
             }
@@ -471,14 +484,14 @@ status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Coll
 
     for (const xmlNode *child = root->xmlChildrenNode; child != NULL; child = child->next) {
         if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::name)) {
-            xmlCharUnique nameXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            auto nameXml = make_xmlUnique(xmlNodeListGetString(doc, child->xmlChildrenNode, 1));
             if (nameXml == nullptr) {
                 return BAD_VALUE;
             }
             name = reinterpret_cast<const char*>(nameXml.get());
         }
         if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMin)) {
-            xmlCharUnique indexMinXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            auto indexMinXml = make_xmlUnique(xmlNodeListGetString(doc, child->xmlChildrenNode, 1));
             if (indexMinXml == nullptr) {
                 return BAD_VALUE;
             }
@@ -488,7 +501,7 @@ status_t VolumeGroupTraits::deserialize(_xmlDoc *doc, const _xmlNode *root, Coll
             }
         }
         if (not xmlStrcmp(child->name, (const xmlChar *)Attributes::indexMax)) {
-            xmlCharUnique indexMaxXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            auto indexMaxXml = make_xmlUnique(xmlNodeListGetString(doc, child->xmlChildrenNode, 1));
             if (indexMaxXml == nullptr) {
                 return BAD_VALUE;
             }
@@ -548,7 +561,7 @@ status_t deserializeLegacyVolume(_xmlDoc *doc, const _xmlNode *cur,
     for (const xmlNode *child = referenceName.empty() ?
          cur->xmlChildrenNode : ref->xmlChildrenNode; child != NULL; child = child->next) {
         if (!xmlStrcmp(child->name, (const xmlChar *)VolumeTraits::volumePointTag)) {
-            xmlCharUnique pointXml(xmlNodeListGetString(doc, child->xmlChildrenNode, 1), xmlFree);
+            auto pointXml = make_xmlUnique(xmlNodeListGetString(doc, child->xmlChildrenNode, 1));
             if (pointXml == NULL) {
                 return BAD_VALUE;
             }
@@ -640,8 +653,7 @@ private:
 
 ParsingResult parse(const char* path) {
     XmlErrorHandler errorHandler;
-    xmlDocPtr doc;
-    doc = xmlParseFile(path);
+    auto doc = make_xmlUnique(xmlParseFile(path));
     if (doc == NULL) {
         // It is OK not to find an engine config file at the default location
         // as the caller will default to hardcoded default config
@@ -650,13 +662,12 @@ ParsingResult parse(const char* path) {
         }
         return {nullptr, 0};
     }
-    xmlNodePtr cur = xmlDocGetRootElement(doc);
+    xmlNodePtr cur = xmlDocGetRootElement(doc.get());
     if (cur == NULL) {
         ALOGE("%s: Could not parse: empty document %s", __FUNCTION__, path);
-        xmlFreeDoc(doc);
         return {nullptr, 0};
     }
-    if (xmlXIncludeProcess(doc) < 0) {
+    if (xmlXIncludeProcess(doc.get()) < 0) {
         ALOGE("%s: libxml failed to resolve XIncludes on document %s", __FUNCTION__, path);
         return {nullptr, 0};
     }
@@ -669,37 +680,35 @@ ParsingResult parse(const char* path) {
     auto config = std::make_unique<Config>();
     config->version = std::stof(version);
     deserializeCollection<ProductStrategyTraits>(
-                doc, cur, config->productStrategies, nbSkippedElements);
+                doc.get(), cur, config->productStrategies, nbSkippedElements);
     deserializeCollection<CriterionTraits>(
-                doc, cur, config->criteria, nbSkippedElements);
+                doc.get(), cur, config->criteria, nbSkippedElements);
     deserializeCollection<CriterionTypeTraits>(
-                doc, cur, config->criterionTypes, nbSkippedElements);
+                doc.get(), cur, config->criterionTypes, nbSkippedElements);
     deserializeCollection<VolumeGroupTraits>(
-                doc, cur, config->volumeGroups, nbSkippedElements);
+                doc.get(), cur, config->volumeGroups, nbSkippedElements);
 
     return {std::move(config), nbSkippedElements};
 }
 
 android::status_t parseLegacyVolumeFile(const char* path, VolumeGroups &volumeGroups) {
     XmlErrorHandler errorHandler;
-    xmlDocPtr doc;
-    doc = xmlParseFile(path);
+    auto doc = make_xmlUnique(xmlParseFile(path));
     if (doc == NULL) {
         ALOGE("%s: Could not parse document %s", __FUNCTION__, path);
         return BAD_VALUE;
     }
-    xmlNodePtr cur = xmlDocGetRootElement(doc);
+    xmlNodePtr cur = xmlDocGetRootElement(doc.get());
     if (cur == NULL) {
         ALOGE("%s: Could not parse: empty document %s", __FUNCTION__, path);
-        xmlFreeDoc(doc);
         return BAD_VALUE;
     }
-    if (xmlXIncludeProcess(doc) < 0) {
+    if (xmlXIncludeProcess(doc.get()) < 0) {
         ALOGE("%s: libxml failed to resolve XIncludes on document %s", __FUNCTION__, path);
         return BAD_VALUE;
     }
     size_t nbSkippedElements = 0;
-    return deserializeLegacyVolumeCollection(doc, cur, volumeGroups, nbSkippedElements);
+    return deserializeLegacyVolumeCollection(doc.get(), cur, volumeGroups, nbSkippedElements);
 }
 
 android::status_t parseLegacyVolumes(VolumeGroups &volumeGroups) {
