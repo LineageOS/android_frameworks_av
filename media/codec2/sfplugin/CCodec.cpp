@@ -673,6 +673,10 @@ public:
         mCodec->mCallback->onOutputBuffersChanged();
     }
 
+    void onFirstTunnelFrameReady() override {
+        mCodec->mCallback->onFirstTunnelFrameReady();
+    }
+
 private:
     CCodec *mCodec;
 };
