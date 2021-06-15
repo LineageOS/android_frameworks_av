@@ -65,12 +65,14 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
                                               C2Config::PROFILE_AV1_1}),
                                   C2F(mProfileLevel, level)
                                       .oneOf({
-                                          C2Config::LEVEL_AV1_2,
-                                          C2Config::LEVEL_AV1_2_1,
-                                          C2Config::LEVEL_AV1_2_2,
-                                          C2Config::LEVEL_AV1_3,
-                                          C2Config::LEVEL_AV1_3_1,
-                                          C2Config::LEVEL_AV1_3_2,
+                                          C2Config::LEVEL_AV1_2, C2Config::LEVEL_AV1_2_1,
+                                          C2Config::LEVEL_AV1_2_2, C2Config::LEVEL_AV1_2_3,
+                                          C2Config::LEVEL_AV1_3, C2Config::LEVEL_AV1_3_1,
+                                          C2Config::LEVEL_AV1_3_2, C2Config::LEVEL_AV1_3_3,
+                                          C2Config::LEVEL_AV1_4, C2Config::LEVEL_AV1_4_1,
+                                          C2Config::LEVEL_AV1_4_2, C2Config::LEVEL_AV1_4_3,
+                                          C2Config::LEVEL_AV1_5, C2Config::LEVEL_AV1_5_1,
+                                          C2Config::LEVEL_AV1_5_2, C2Config::LEVEL_AV1_5_3,
                                       })})
                      .withSetter(ProfileLevelSetter, mSize)
                      .build());
