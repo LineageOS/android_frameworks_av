@@ -976,6 +976,10 @@ constexpr const char *MediaCodec::asString(TunnelPeekState state, const char *de
             return "BufferDecoded";
         case TunnelPeekState::kBufferRendered:
             return "BufferRendered";
+        case TunnelPeekState::kDisabledQueued:
+            return "DisabledQueued";
+        case TunnelPeekState::kEnabledQueued:
+            return "EnabledQueued";
         default:
             return default_string;
     }
@@ -986,25 +990,39 @@ void MediaCodec::updateTunnelPeek(const sp<AMessage> &msg) {
     if (!msg->findInt32("tunnel-peek", &tunnelPeek)){
         return;
     }
+
+    TunnelPeekState previousState = mTunnelPeekState;
     if(tunnelPeek == 0){
-        if (mTunnelPeekState == TunnelPeekState::kEnabledNoBuffer) {
-            mTunnelPeekState = TunnelPeekState::kDisabledNoBuffer;
-            ALOGV("TunnelPeekState: %s -> %s",
-                  asString(TunnelPeekState::kEnabledNoBuffer),
-                  asString(TunnelPeekState::kDisabledNoBuffer));
-            return;
+        switch (mTunnelPeekState) {
+            case TunnelPeekState::kEnabledNoBuffer:
+                mTunnelPeekState = TunnelPeekState::kDisabledNoBuffer;
+                break;
+            case TunnelPeekState::kEnabledQueued:
+                mTunnelPeekState = TunnelPeekState::kDisabledQueued;
+                break;
+            default:
+                ALOGV("Ignoring tunnel-peek=%d for %s", tunnelPeek, asString(mTunnelPeekState));
+                return;
         }
     } else {
-        if (mTunnelPeekState == TunnelPeekState::kDisabledNoBuffer) {
-            mTunnelPeekState = TunnelPeekState::kEnabledNoBuffer;
-            ALOGV("TunnelPeekState: %s -> %s",
-                  asString(TunnelPeekState::kDisabledNoBuffer),
-                  asString(TunnelPeekState::kEnabledNoBuffer));
-            return;
+        switch (mTunnelPeekState) {
+            case TunnelPeekState::kDisabledNoBuffer:
+                mTunnelPeekState = TunnelPeekState::kEnabledNoBuffer;
+                break;
+            case TunnelPeekState::kDisabledQueued:
+                mTunnelPeekState = TunnelPeekState::kEnabledQueued;
+                break;
+            case TunnelPeekState::kBufferDecoded:
+                msg->setInt32("android._trigger-tunnel-peek", 1);
+                mTunnelPeekState = TunnelPeekState::kBufferRendered;
+                break;
+            default:
+                ALOGV("Ignoring tunnel-peek=%d for %s", tunnelPeek, asString(mTunnelPeekState));
+                return;
         }
     }
 
-    ALOGV("Ignoring tunnel-peek=%d for %s", tunnelPeek, asString(mTunnelPeekState));
+    ALOGV("TunnelPeekState: %s -> %s", asString(previousState), asString(mTunnelPeekState));
 }
 
 void MediaCodec::updatePlaybackDuration(const sp<AMessage> &msg) {
@@ -3294,25 +3312,32 @@ void MediaCodec::onMessageReceived(const sp<AMessage> &msg) {
                     if (mState != STARTED) {
                         break;
                     }
+                    TunnelPeekState previousState = mTunnelPeekState;
                     switch(mTunnelPeekState) {
                         case TunnelPeekState::kDisabledNoBuffer:
+                        case TunnelPeekState::kDisabledQueued:
                             mTunnelPeekState = TunnelPeekState::kBufferDecoded;
+                            ALOGV("First tunnel frame ready");
                             ALOGV("TunnelPeekState: %s -> %s",
-                                  asString(TunnelPeekState::kDisabledNoBuffer),
-                                  asString(TunnelPeekState::kBufferDecoded));
+                                  asString(previousState),
+                                  asString(mTunnelPeekState));
                             break;
                         case TunnelPeekState::kEnabledNoBuffer:
-                            mTunnelPeekState = TunnelPeekState::kBufferDecoded;
-                            ALOGV("TunnelPeekState: %s -> %s",
-                                  asString(TunnelPeekState::kEnabledNoBuffer),
-                                  asString(TunnelPeekState::kBufferDecoded));
+                        case TunnelPeekState::kEnabledQueued:
                             {
                                 sp<AMessage> parameters = new AMessage();
                                 parameters->setInt32("android._trigger-tunnel-peek", 1);
                                 mCodec->signalSetParameters(parameters);
                             }
+                            mTunnelPeekState = TunnelPeekState::kBufferRendered;
+                            ALOGV("First tunnel frame ready");
+                            ALOGV("TunnelPeekState: %s -> %s",
+                                  asString(previousState),
+                                  asString(mTunnelPeekState));
                             break;
                         default:
+                            ALOGV("Ignoring first tunnel frame ready, TunnelPeekState: %s",
+                                  asString(mTunnelPeekState));
                             break;
                     }
 
@@ -4775,6 +4800,28 @@ status_t MediaCodec::onQueueInputBuffer(const sp<AMessage> &msg) {
 
     if (flags & BUFFER_FLAG_CODECCONFIG) {
         buffer->meta()->setInt32("csd", true);
+    }
+
+    if (mTunneled) {
+        TunnelPeekState previousState = mTunnelPeekState;
+        switch(mTunnelPeekState){
+            case TunnelPeekState::kEnabledNoBuffer:
+                buffer->meta()->setInt32("tunnel-first-frame", 1);
+                mTunnelPeekState = TunnelPeekState::kEnabledQueued;
+                ALOGV("TunnelPeekState: %s -> %s",
+                        asString(previousState),
+                        asString(mTunnelPeekState));
+                break;
+            case TunnelPeekState::kDisabledNoBuffer:
+                buffer->meta()->setInt32("tunnel-first-frame", 1);
+                mTunnelPeekState = TunnelPeekState::kDisabledQueued;
+                ALOGV("TunnelPeekState: %s -> %s",
+                        asString(previousState),
+                        asString(mTunnelPeekState));
+                break;
+            default:
+                break;
+        }
     }
 
     status_t err = OK;
