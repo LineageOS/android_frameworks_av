@@ -262,6 +262,8 @@ enum C2ParamIndexKind : C2Param::type_index_t {
     kParamIndexTunneledMode, // struct
     kParamIndexTunnelHandle, // int32[]
     kParamIndexTunnelSystemTime, // int64
+    kParamIndexTunnelHoldRender, // bool
+    kParamIndexTunnelStartRender, // bool
 
     // dmabuf allocator
     kParamIndexStoreDmaBufUsage,  // store, struct
@@ -2365,6 +2367,31 @@ constexpr char C2_PARAMKEY_OUTPUT_TUNNEL_HANDLE[] = "output.tunnel-handle";
 typedef C2PortParam<C2Info, C2SimpleValueStruct<int64_t>, kParamIndexTunnelSystemTime>
         C2PortTunnelSystemTime;
 constexpr char C2_PARAMKEY_OUTPUT_RENDER_TIME[] = "output.render-time";
+
+
+/**
+ * Tunneled mode video peek signaling flag.
+ *
+ * When a video frame is pushed to the decoder with this parameter set to true,
+ * the decoder must decode the frame, signal partial completion, and hold on the
+ * frame until C2StreamTunnelStartRender is set to true (which resets this
+ * flag). Flush will also result in the frames being returned back to the
+ * client (but not rendered).
+ */
+typedef C2StreamParam<C2Info, C2EasyBoolValue, kParamIndexTunnelHoldRender>
+        C2StreamTunnelHoldRender;
+constexpr char C2_PARAMKEY_TUNNEL_HOLD_RENDER[] = "output.tunnel-hold-render";
+
+/**
+ * Tunneled mode video peek signaling flag.
+ *
+ * Upon receiving this flag, the decoder shall set C2StreamTunnelHoldRender to
+ * false, which shall cause any frames held for rendering to be immediately
+ * displayed, regardless of their timestamps.
+*/
+typedef C2StreamParam<C2Info, C2EasyBoolValue, kParamIndexTunnelStartRender>
+        C2StreamTunnelStartRender;
+constexpr char C2_PARAMKEY_TUNNEL_START_RENDER[] = "output.tunnel-start-render";
 
 C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
     NONE,

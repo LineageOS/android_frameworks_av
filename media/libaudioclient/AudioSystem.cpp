@@ -71,6 +71,25 @@ class CaptureStateListenerImpl;
 Mutex gSoundTriggerCaptureStateListenerLock;
 sp<CaptureStateListenerImpl> gSoundTriggerCaptureStateListener = nullptr;
 
+// Binder for the AudioFlinger service that's passed to this client process from the system server.
+// This allows specific isolated processes to access the audio system. Currently used only for the
+// HotwordDetectionService.
+sp<IBinder> gAudioFlingerBinder = nullptr;
+
+void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
+    if (audioFlinger->getInterfaceDescriptor() != media::IAudioFlingerService::descriptor) {
+        ALOGE("setAudioFlingerBinder: received a binder of type %s",
+              String8(audioFlinger->getInterfaceDescriptor()).string());
+        return;
+    }
+    Mutex::Autolock _l(gLock);
+    if (gAudioFlinger != nullptr) {
+        ALOGW("setAudioFlingerBinder: ignoring; AudioFlinger connection already established.");
+        return;
+    }
+    gAudioFlingerBinder = audioFlinger;
+}
+
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
     sp<IAudioFlinger> af;
@@ -79,15 +98,19 @@ const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
     {
         Mutex::Autolock _l(gLock);
         if (gAudioFlinger == 0) {
-            sp<IServiceManager> sm = defaultServiceManager();
             sp<IBinder> binder;
-            do {
-                binder = sm->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
-                if (binder != 0)
-                    break;
-                ALOGW("AudioFlinger not published, waiting...");
-                usleep(500000); // 0.5 s
-            } while (true);
+            if (gAudioFlingerBinder != nullptr) {
+                binder = gAudioFlingerBinder;
+            } else {
+                sp<IServiceManager> sm = defaultServiceManager();
+                do {
+                    binder = sm->getService(String16(IAudioFlinger::DEFAULT_SERVICE_NAME));
+                    if (binder != 0)
+                        break;
+                    ALOGW("AudioFlinger not published, waiting...");
+                    usleep(500000); // 0.5 s
+                } while (true);
+            }
             if (gAudioFlingerClient == NULL) {
                 gAudioFlingerClient = new AudioFlingerClient();
             } else {
