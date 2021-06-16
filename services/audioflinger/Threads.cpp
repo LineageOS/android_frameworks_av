@@ -2568,7 +2568,7 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
         }
 
         track->mResetDone = false;
-        track->mPresentationCompleteFrames = 0;
+        track->resetPresentationComplete();
         mActiveTracks.add(track);
         sp<EffectChain> chain = getEffectChain_l(track->sessionId());
         if (chain != 0) {
@@ -5958,16 +5958,8 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::DirectOutputThread::prep
                     track->isStopping_2() || track->isPaused()) {
                 // We have consumed all the buffers of this track.
                 // Remove it from the list of active tracks.
-                size_t audioHALFrames;
-                if (audio_has_proportional_frames(mFormat)) {
-                    audioHALFrames = (latency_l() * mSampleRate) / 1000;
-                } else {
-                    audioHALFrames = 0;
-                }
-
-                int64_t framesWritten = mBytesWritten / mFrameSize;
                 if (mStandby || !last ||
-                        track->presentationComplete(framesWritten, audioHALFrames) ||
+                        track->presentationComplete(latency_l()) ||
                         track->isPaused() || mHwPaused) {
                     if (track->isStopping_2()) {
                         track->mState = TrackBase::STOPPED;
@@ -6541,14 +6533,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::OffloadThread::prepareTr
                 // Drain has completed or we are in standby, signal presentation complete
                 if (!(mDrainSequence & 1) || !last || mStandby) {
                     track->mState = TrackBase::STOPPED;
-                    uint32_t latency = 0;
-                    status_t result = mOutput->stream->getLatency(&latency);
-                    ALOGE_IF(result != OK,
-                            "Error when retrieving output stream latency: %d", result);
-                    size_t audioHALFrames = (latency * mSampleRate) / 1000;
-                    int64_t framesWritten =
-                            mBytesWritten / mOutput->getFrameSize();
-                    track->presentationComplete(framesWritten, audioHALFrames);
+                    track->presentationComplete(latency_l());
                     track->reset();
                     tracksToRemove->add(track);
                     // OFFLOADED stop resets frame counts.
