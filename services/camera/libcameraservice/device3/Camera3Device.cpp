@@ -353,9 +353,15 @@ status_t Camera3Device::initializeCommonLocked() {
     camera_metadata_entry_t availableTestPatternModes = mDeviceInfo.find(
             ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES);
     for (size_t i = 0; i < availableTestPatternModes.count; i++) {
-        if (availableTestPatternModes.data.i32[i] == ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
+        if (availableTestPatternModes.data.i32[i] ==
+                ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
             mSupportCameraMute = true;
+            mSupportTestPatternSolidColor = true;
             break;
+        } else if (availableTestPatternModes.data.i32[i] ==
+                ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK) {
+            mSupportCameraMute = true;
+            mSupportTestPatternSolidColor = false;
         }
     }
 
@@ -4163,7 +4169,7 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mCurrentAfTriggerId(0),
         mCurrentPreCaptureTriggerId(0),
         mRotateAndCropOverride(ANDROID_SCALER_ROTATE_AND_CROP_NONE),
-        mCameraMute(false),
+        mCameraMute(ANDROID_SENSOR_TEST_PATTERN_MODE_OFF),
         mCameraMuteChanged(false),
         mRepeatingLastFrameNumber(
             hardware::camera2::ICameraDeviceUser::NO_IN_FLIGHT_REPEATING_FRAMES),
@@ -5265,11 +5271,11 @@ status_t Camera3Device::RequestThread::setRotateAndCropAutoBehavior(
     return OK;
 }
 
-status_t Camera3Device::RequestThread::setCameraMute(bool enabled) {
+status_t Camera3Device::RequestThread::setCameraMute(int32_t muteMode) {
     ATRACE_CALL();
     Mutex::Autolock l(mTriggerMutex);
-    if (enabled != mCameraMute) {
-        mCameraMute = enabled;
+    if (muteMode != mCameraMute) {
+        mCameraMute = muteMode;
         mCameraMuteChanged = true;
     }
     return OK;
@@ -5844,8 +5850,8 @@ bool Camera3Device::RequestThread::overrideTestPattern(
         request->mOriginalTestPatternData[3]
     };
 
-    if (mCameraMute) {
-        testPatternMode = ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR;
+    if (mCameraMute != ANDROID_SENSOR_TEST_PATTERN_MODE_OFF) {
+        testPatternMode = mCameraMute;
         testPatternData[0] = 0;
         testPatternData[1] = 0;
         testPatternData[2] = 0;
@@ -6535,7 +6541,11 @@ status_t Camera3Device::setCameraMute(bool enabled) {
     if (mRequestThread == nullptr || !mSupportCameraMute) {
         return INVALID_OPERATION;
     }
-    return mRequestThread->setCameraMute(enabled);
+    int32_t muteMode =
+            !enabled                      ? ANDROID_SENSOR_TEST_PATTERN_MODE_OFF :
+            mSupportTestPatternSolidColor ? ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR :
+                                            ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK;
+    return mRequestThread->setCameraMute(muteMode);
 }
 
 status_t Camera3Device::injectCamera(const String8& injectedCamId,
