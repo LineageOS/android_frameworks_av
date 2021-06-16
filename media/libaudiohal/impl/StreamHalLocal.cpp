@@ -86,7 +86,8 @@ status_t StreamHalLocal::standby() {
     return mStream->standby(mStream);
 }
 
-status_t StreamHalLocal::dump(int fd) {
+status_t StreamHalLocal::dump(int fd, const Vector<String16>& args) {
+    (void) args;
     status_t status = mStream->dump(mStream, fd);
     mStreamPowerLog.dump(fd);
     return status;

@@ -104,6 +104,15 @@ ConversionHelperHidl::ConversionHelperHidl(const char* className)
 }
 
 // static
+void ConversionHelperHidl::argsFromHal(
+        const Vector<String16>& args, hidl_vec<hidl_string> *hidlArgs) {
+    hidlArgs->resize(args.size());
+    for (size_t i = 0; i < args.size(); ++i) {
+        (*hidlArgs)[i] = String8(args[i]).c_str();
+    }
+}
+
+// static
 status_t ConversionHelperHidl::analyzeResult(const Result& result) {
     switch (result) {
         case Result::OK: return OK;

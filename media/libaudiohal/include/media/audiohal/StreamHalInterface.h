@@ -25,6 +25,7 @@
 #include <utils/Errors.h>
 #include <utils/RefBase.h>
 #include <utils/String8.h>
+#include <utils/Vector.h>
 
 namespace android {
 
@@ -69,7 +70,7 @@ class StreamHalInterface : public virtual RefBase
     // Put the audio hardware input/output into standby mode.
     virtual status_t standby() = 0;
 
-    virtual status_t dump(int fd) = 0;
+    virtual status_t dump(int fd, const Vector<String16>& args = {}) = 0;
 
     // Start a stream operating in mmap mode.
     virtual status_t start() = 0;

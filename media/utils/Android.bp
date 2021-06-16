@@ -82,6 +82,36 @@ cc_library {
     export_include_dirs: ["include"],
 }
 
+cc_library {
+    name: "libmediautils_vendor",
+    vendor_available: true,  // required for platform/hardware/interfaces
+    srcs: [
+        "MemoryLeakTrackUtil.cpp",
+    ],
+
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+    ],
+    shared_libs: [
+        "liblog",
+        "libutils",
+    ],
+
+    static_libs: [
+        "libc_malloc_debug_backtrace",
+    ],
+
+    header_libs: [
+        "bionic_libc_platform_headers",
+    ],
+
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+}
+
+
 cc_library_headers {
     name: "libmediautils_headers",
     vendor_available: true,  // required for platform/hardware/interfaces
