@@ -82,7 +82,8 @@ interface ICameraService
     ICamera connect(ICameraClient client,
             int cameraId,
             String opPackageName,
-            int clientUid, int clientPid);
+            int clientUid, int clientPid,
+            int targetSdkVersion);
 
     /**
      * Open a camera device through the new camera API
@@ -92,7 +93,8 @@ interface ICameraService
             String cameraId,
             String opPackageName,
             @nullable String featureId,
-            int clientUid, int oomScoreOffset);
+            int clientUid, int oomScoreOffset,
+            int targetSdkVersion);
 
     /**
      * Add listener for changes to camera device and flashlight state.
@@ -114,13 +116,15 @@ interface ICameraService
       * corresponding camera ids.
       *
       * @param sessions the set of camera id and session configuration pairs to be queried.
+      * @param targetSdkVersion the target sdk level of the application calling this function.
       * @return true  - the set of concurrent camera id and stream combinations is supported.
       *         false - the set of concurrent camera id and stream combinations is not supported
       *                 OR the method was called with a set of camera ids not returned by
       *                 getConcurrentCameraIds().
       */
     boolean isConcurrentSessionConfigurationSupported(
-            in CameraIdAndSessionConfiguration[] sessions);
+            in CameraIdAndSessionConfiguration[] sessions,
+            int targetSdkVersion);
 
     /**
      * Remove listener for changes to camera device and flashlight state.
@@ -131,7 +135,7 @@ interface ICameraService
      * Read the static camera metadata for a camera device.
      * Only supported for device HAL versions >= 3.2
      */
-    CameraMetadataNative getCameraCharacteristics(String cameraId);
+    CameraMetadataNative getCameraCharacteristics(String cameraId, int targetSdkVersion);
 
     /**
      * Read in the vendor tag descriptors from the camera module HAL.
