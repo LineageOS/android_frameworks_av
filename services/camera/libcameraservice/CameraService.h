@@ -205,6 +205,9 @@ public:
     // Monitored UIDs availability notification
     void                notifyMonitoredUids();
 
+    // Stores current open session device info in temp file.
+    void cacheDump();
+
     // Register an offline client for a given active camera id
     status_t addOfflineClient(String8 cameraId, sp<BasicClient> offlineClient);
 
@@ -796,6 +799,12 @@ private:
     // Container for managing currently active application-layer clients
     CameraClientManager mActiveClientManager;
 
+    // Adds client logs during open session to the file pointed by fd.
+    void dumpOpenSessionClientLogs(int fd, const Vector<String16>& args, const String8& cameraId);
+
+    // Adds client logs during closed session to the file pointed by fd.
+    void dumpClosedSessionClientLogs(int fd, const String8& cameraId);
+
     // Mapping from camera ID -> state for each device, map is protected by mCameraStatesLock
     std::map<String8, std::shared_ptr<CameraState>> mCameraStates;
 
@@ -947,6 +956,10 @@ private:
      * Filter camera characteristics for S Performance class primary cameras
      */
     void filterSPerfClassCharacteristics();
+
+    // File descriptor to temp file used for caching previous open
+    // session dumpsys info.
+    int mMemFd;
 
     // Number of camera devices (excluding hidden secure cameras)
     int                 mNumberOfCameras;
