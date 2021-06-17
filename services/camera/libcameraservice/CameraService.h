@@ -121,7 +121,7 @@ public:
     virtual binder::Status     getCameraInfo(int cameraId,
             hardware::CameraInfo* cameraInfo);
     virtual binder::Status     getCameraCharacteristics(const String16& cameraId,
-            CameraMetadata* cameraInfo);
+            int targetSdkVersion, CameraMetadata* cameraInfo);
     virtual binder::Status     getCameraVendorTagDescriptor(
             /*out*/
             hardware::camera2::params::VendorTagDescriptor* desc);
@@ -131,14 +131,14 @@ public:
 
     virtual binder::Status     connect(const sp<hardware::ICameraClient>& cameraClient,
             int32_t cameraId, const String16& clientPackageName,
-            int32_t clientUid, int clientPid,
+            int32_t clientUid, int clientPid, int targetSdkVersion,
             /*out*/
             sp<hardware::ICamera>* device);
 
     virtual binder::Status     connectDevice(
             const sp<hardware::camera2::ICameraDeviceCallbacks>& cameraCb, const String16& cameraId,
             const String16& clientPackageName, const std::optional<String16>& clientFeatureId,
-            int32_t clientUid, int scoreOffset,
+            int32_t clientUid, int scoreOffset, int targetSdkVersion,
             /*out*/
             sp<hardware::camera2::ICameraDeviceUser>* device);
 
@@ -154,7 +154,7 @@ public:
 
     virtual binder::Status isConcurrentSessionConfigurationSupported(
         const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>& sessions,
-        /*out*/bool* supported);
+        int targetSdkVersion, /*out*/bool* supported);
 
     virtual binder::Status    getLegacyParameters(
             int32_t cameraId,
@@ -776,7 +776,7 @@ private:
     binder::Status connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
             int api1CameraId, const String16& clientPackageName,
             const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
-            apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset,
+            apiLevel effectiveApiLevel, bool shimUpdateOnly, int scoreOffset, int targetSdkVersion,
             /*out*/sp<CLIENT>& device);
 
     // Lock guarding camera service state
@@ -961,6 +961,7 @@ private:
 
     std::vector<std::string> mNormalDeviceIds;
     std::vector<std::string> mNormalDeviceIdsWithoutSystemCamera;
+    std::set<std::string> mPerfClassPrimaryCameraIds;
 
     // sounds
     sp<MediaPlayer>     newMediaPlayer(const char *file);
@@ -1141,7 +1142,7 @@ private:
             const sp<IInterface>& cameraCb, const String16& packageName,
             const std::optional<String16>& featureId, const String8& cameraId, int api1CameraId,
             int facing, int sensorOrientation, int clientPid, uid_t clientUid, int servicePid,
-            int deviceVersion, apiLevel effectiveApiLevel,
+            int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
             /*out*/sp<BasicClient>* client);
 
     status_t checkCameraAccess(const String16& opPackageName);
