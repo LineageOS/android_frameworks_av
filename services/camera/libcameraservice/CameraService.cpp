@@ -131,7 +131,7 @@ static const String16 sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 static const String16
         sCameraInjectExternalCameraPermission("android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
-
+const char *sFileName = "lastOpenSessionDumpFile";
 static constexpr int32_t kVendorClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PERSISTENT_UI;
 
@@ -148,6 +148,10 @@ CameraService::CameraService() :
         mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE) {
     ALOGI("CameraService started (pid=%d)", getpid());
     mServiceLockWrapper = std::make_shared<WaitableMutexWrapper>(&mServiceLock);
+    mMemFd = memfd_create(sFileName, MFD_ALLOW_SEALING);
+    if (mMemFd == -1) {
+        ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
+    }
 }
 
 void CameraService::onFirstRef()
@@ -1637,6 +1641,22 @@ Status CameraService::connectDevice(
     }
 
     *device = client;
+    Mutex::Autolock lock(mServiceLock);
+
+    // Clear the previous cached logs and reposition the
+    // file offset to beginning of the file to log new data.
+    // If either truncate or lseek fails, close the previous file and create a new one.
+    if ((ftruncate(mMemFd, 0) == -1) || (lseek(mMemFd, 0, SEEK_SET) == -1)) {
+        ALOGE("%s: Error while truncating the file: %s", __FUNCTION__, sFileName);
+        // Close the previous memfd.
+        close(mMemFd);
+        // If failure to wipe the data, then create a new file and
+        // assign the new value to mMemFd.
+        mMemFd = memfd_create(sFileName, MFD_ALLOW_SEALING);
+        if (mMemFd == -1) {
+            ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
+        }
+    }
     return ret;
 }
 
@@ -3832,6 +3852,28 @@ static bool tryLock(Mutex& mutex)
     return locked;
 }
 
+void CameraService::cacheDump() {
+    if (mMemFd != -1) {
+        const Vector<String16> args;
+        ATRACE_CALL();
+        // Acquiring service lock here will avoid the deadlock since
+        // cacheDump will not be called during the second disconnect.
+        Mutex::Autolock lock(mServiceLock);
+
+        Mutex::Autolock l(mCameraStatesLock);
+        // Start collecting the info for open sessions and store it in temp file.
+        for (const auto& state : mCameraStates) {
+            String8 cameraId = state.first;
+            auto clientDescriptor = mActiveClientManager.get(cameraId);
+            if (clientDescriptor != nullptr) {
+                dprintf(mMemFd, "== Camera device %s dynamic info: ==\n", cameraId.string());
+                // Log the current open session info before device is disconnected.
+                dumpOpenSessionClientLogs(mMemFd, args, cameraId);
+            }
+        }
+    }
+}
+
 status_t CameraService::dump(int fd, const Vector<String16>& args) {
     ATRACE_CALL();
 
@@ -3898,21 +3940,10 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
 
         auto clientDescriptor = mActiveClientManager.get(cameraId);
         if (clientDescriptor != nullptr) {
-            dprintf(fd, "  Device %s is open. Client instance dump:\n",
-                    cameraId.string());
-            dprintf(fd, "    Client priority score: %d state: %d\n",
-                    clientDescriptor->getPriority().getScore(),
-                    clientDescriptor->getPriority().getState());
-            dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
-
-            auto client = clientDescriptor->getValue();
-            dprintf(fd, "    Client package: %s\n",
-                    String8(client->getPackageName()).string());
-
-            client->dumpClient(fd, args);
+            // log the current open session info
+            dumpOpenSessionClientLogs(fd, args, cameraId);
         } else {
-            dprintf(fd, "  Device %s is closed, no client instance\n",
-                    cameraId.string());
+            dumpClosedSessionClientLogs(fd, cameraId);
         }
 
     }
@@ -3969,7 +4000,53 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
             }
         }
     }
+
+    bool serviceLocked = tryLock(mServiceLock);
+
+    // Dump info from previous open sessions.
+    // Reposition the offset to beginning of the file before reading
+
+    if ((mMemFd >= 0) && (lseek(mMemFd, 0, SEEK_SET) != -1)) {
+        dprintf(fd, "\n**********Dumpsys from previous open session**********\n");
+        ssize_t size_read;
+        char buf[4096];
+        while ((size_read = read(mMemFd, buf, (sizeof(buf) - 1))) > 0) {
+            // Read data from file to a small buffer and write it to fd.
+            write(fd, buf, size_read);
+            if (size_read == -1) {
+                ALOGE("%s: Error during reading the file: %s", __FUNCTION__, sFileName);
+                break;
+            }
+        }
+        dprintf(fd, "\n**********End of Dumpsys from previous open session**********\n");
+    } else {
+        ALOGE("%s: Error during reading the file: %s", __FUNCTION__, sFileName);
+    }
+
+    if (serviceLocked) mServiceLock.unlock();
     return NO_ERROR;
+}
+
+void CameraService::dumpOpenSessionClientLogs(int fd,
+        const Vector<String16>& args, const String8& cameraId) {
+    auto clientDescriptor = mActiveClientManager.get(cameraId);
+    dprintf(fd, "  Device %s is open. Client instance dump:\n",
+        cameraId.string());
+    dprintf(fd, "    Client priority score: %d state: %d\n",
+        clientDescriptor->getPriority().getScore(),
+        clientDescriptor->getPriority().getState());
+    dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
+
+    auto client = clientDescriptor->getValue();
+    dprintf(fd, "    Client package: %s\n",
+        String8(client->getPackageName()).string());
+
+    client->dumpClient(fd, args);
+}
+
+void CameraService::dumpClosedSessionClientLogs(int fd, const String8& cameraId) {
+    dprintf(fd, "  Device %s is closed, no client instance\n",
+                    cameraId.string());
 }
 
 void CameraService::dumpEventLog(int fd) {
