@@ -104,7 +104,8 @@ public:
             int sensorOrientation,
             int clientPid,
             uid_t clientUid,
-            int servicePid);
+            int servicePid,
+            bool overrideForPerfClass);
 
     virtual ~Camera2Client();
 
