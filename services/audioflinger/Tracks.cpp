@@ -650,7 +650,6 @@ AudioFlinger::PlaybackThread::Track::Track(
     mMainBuffer(thread->sinkBuffer()),
     mAuxBuffer(NULL),
     mAuxEffectId(0), mHasVolumeController(false),
-    mPresentationCompleteFrames(0),
     mFrameMap(16 /* sink-frame-to-track-frame map memory */),
     mVolumeHandler(new media::VolumeHandler(sampleRate)),
     mOpPlayAudioMonitor(OpPlayAudioMonitor::createIfNeeded(attributionSource, attr, id(),
@@ -1462,6 +1461,7 @@ void AudioFlinger::PlaybackThread::Track::setAuxBuffer(int EffectId, int32_t *bu
     mAuxBuffer = buffer;
 }
 
+// presentationComplete verified by frames, used by Mixed tracks.
 bool AudioFlinger::PlaybackThread::Track::presentationComplete(
         int64_t framesWritten, size_t audioHalFrames)
 {
@@ -1480,28 +1480,68 @@ bool AudioFlinger::PlaybackThread::Track::presentationComplete(
             (long long)mPresentationCompleteFrames, (long long)framesWritten);
     if (mPresentationCompleteFrames == 0) {
         mPresentationCompleteFrames = framesWritten + audioHalFrames;
-        ALOGV("%s(%d): presentationComplete() reset:"
+        ALOGV("%s(%d): set:"
                 " mPresentationCompleteFrames %lld audioHalFrames %zu",
                 __func__, mId,
                 (long long)mPresentationCompleteFrames, audioHalFrames);
     }
 
     bool complete;
-    if (isOffloaded()) {
-        complete = true;
-    } else if (isDirect() || isFastTrack()) { // these do not go through linear map
+    if (isFastTrack()) { // does not go through linear map
         complete = framesWritten >= (int64_t) mPresentationCompleteFrames;
+        ALOGV("%s(%d): %s framesWritten:%lld  mPresentationCompleteFrames:%lld",
+                __func__, mId, (complete ? "complete" : "waiting"),
+                (long long) framesWritten, (long long) mPresentationCompleteFrames);
     } else {  // Normal tracks, OutputTracks, and PatchTracks
         complete = framesWritten >= (int64_t) mPresentationCompleteFrames
                 && mAudioTrackServerProxy->isDrained();
     }
 
     if (complete) {
-        triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
-        mAudioTrackServerProxy->setStreamEndDone();
+        notifyPresentationComplete();
         return true;
     }
     return false;
+}
+
+// presentationComplete checked by time, used by DirectTracks.
+bool AudioFlinger::PlaybackThread::Track::presentationComplete(uint32_t latencyMs)
+{
+    // For Offloaded or Direct tracks.
+
+    // For a direct track, we incorporated time based testing for presentationComplete.
+
+    // For an offloaded track the HAL+h/w delay is variable so a HAL drain() is used
+    // to detect when all frames have been played. In this case latencyMs isn't
+    // useful because it doesn't always reflect whether there is data in the h/w
+    // buffers, particularly if a track has been paused and resumed during draining
+
+    constexpr float MIN_SPEED = 0.125f; // min speed scaling allowed for timely response.
+    if (mPresentationCompleteTimeNs == 0) {
+        mPresentationCompleteTimeNs = systemTime() + latencyMs * 1e6 / fmax(mSpeed, MIN_SPEED);
+        ALOGV("%s(%d): set: latencyMs %u  mPresentationCompleteTimeNs:%lld",
+                __func__, mId, latencyMs, (long long) mPresentationCompleteTimeNs);
+    }
+
+    bool complete;
+    if (isOffloaded()) {
+        complete = true;
+    } else { // Direct
+        complete = systemTime() >= mPresentationCompleteTimeNs;
+        ALOGV("%s(%d): %s", __func__, mId, (complete ? "complete" : "waiting"));
+    }
+    if (complete) {
+        notifyPresentationComplete();
+        return true;
+    }
+    return false;
+}
+
+void AudioFlinger::PlaybackThread::Track::notifyPresentationComplete()
+{
+    // This only triggers once. TODO: should we enforce this?
+    triggerEvents(AudioSystem::SYNC_EVENT_PRESENTATION_COMPLETE);
+    mAudioTrackServerProxy->setStreamEndDone();
 }
 
 void AudioFlinger::PlaybackThread::Track::triggerEvents(AudioSystem::sync_event_t type)
