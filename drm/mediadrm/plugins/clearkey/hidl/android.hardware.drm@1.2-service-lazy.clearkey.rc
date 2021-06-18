@@ -11,4 +11,4 @@ service vendor.drm-clearkey-hal-1-2 /vendor/bin/hw/android.hardware.drm@1.2-serv
     user media
     group media mediadrm
     ioprio rt 4
-    writepid /dev/cpuset/foreground/tasks
+    task_profiles ProcessCapacityHigh
