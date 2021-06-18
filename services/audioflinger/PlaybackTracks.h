@@ -222,10 +222,23 @@ protected:
 
     sp<IMemory> sharedBuffer() const { return mSharedBuffer; }
 
+    // presentationComplete checked by frames. (Mixed Tracks).
     // framesWritten is cumulative, never reset, and is shared all tracks
     // audioHalFrames is derived from output latency
-    // FIXME parameters not needed, could get them from the thread
     bool presentationComplete(int64_t framesWritten, size_t audioHalFrames);
+
+    // presentationComplete checked by time. (Direct Tracks).
+    bool presentationComplete(uint32_t latencyMs);
+
+    void resetPresentationComplete() {
+        mPresentationCompleteFrames = 0;
+        mPresentationCompleteTimeNs = 0;
+    }
+
+    // notifyPresentationComplete is called when presentationComplete() detects
+    // that the track is finished stopping.
+    void notifyPresentationComplete();
+
     void signalClientFlag(int32_t flag);
 
 public:
@@ -256,9 +269,6 @@ protected:
     int32_t             *mAuxBuffer;
     int                 mAuxEffectId;
     bool                mHasVolumeController;
-    size_t              mPresentationCompleteFrames; // number of frames written to the
-                                    // audio HAL when this track will be fully rendered
-                                    // zero means not monitoring
 
     // access these three variables only when holding thread lock.
     LinearMap<int64_t> mFrameMap;           // track frame to server frame mapping
@@ -293,6 +303,14 @@ private:
     void                forEachTeePatchTrack(F f) {
         for (auto& tp : mTeePatches) { f(tp.patchTrack); }
     };
+
+    size_t              mPresentationCompleteFrames = 0; // (Used for Mixed tracks)
+                                    // The number of frames written to the
+                                    // audio HAL when this track is considered fully rendered.
+                                    // Zero means not monitoring.
+    int64_t             mPresentationCompleteTimeNs = 0; // (Used for Direct tracks)
+                                    // The time when this track is considered fully rendered.
+                                    // Zero means not monitoring.
 
     // The following fields are only for fast tracks, and should be in a subclass
     int                 mFastIndex; // index within FastMixerState::mFastTracks[];
