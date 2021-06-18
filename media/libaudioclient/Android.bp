@@ -309,6 +309,8 @@ aidl_interface {
         "aidl/android/media/AudioConfigBase.aidl",
         "aidl/android/media/AudioContentType.aidl",
         "aidl/android/media/AudioDevice.aidl",
+        "aidl/android/media/AudioDeviceDescription.aidl",
+        "aidl/android/media/AudioDeviceType.aidl",
         "aidl/android/media/AudioDualMonoMode.aidl",
         "aidl/android/media/AudioEncapsulationMode.aidl",
         "aidl/android/media/AudioEncapsulationMetadataType.aidl",
