@@ -27,6 +27,7 @@
 
 #include <device3/Camera3StreamInterface.h>
 
+#include <set>
 #include <stdint.h>
 
 // Convenience methods for constructing binder::Status objects for error returns
@@ -43,7 +44,7 @@
 namespace android {
 namespace camera3 {
 
-typedef std::function<CameraMetadata (const String8 &)> metadataGetter;
+typedef std::function<CameraMetadata (const String8 &, int targetSdkVersion)> metadataGetter;
 
 class StreamConfiguration {
 public:
@@ -114,7 +115,7 @@ public:
             const String8 &cameraId, const CameraMetadata &deviceInfo,
             metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
             hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
-            bool *earlyExit);
+            bool overrideForPerfClass, bool *earlyExit);
 
     // Utility function to convert a V3_7::StreamConfiguration to
     // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
@@ -134,10 +135,19 @@ public:
 
     static int32_t getAppropriateModeTag(int32_t defaultTag, bool maxResolution = false);
 
+    static bool targetPerfClassPrimaryCamera(
+            const std::set<std::string>& perfClassPrimaryCameraIds, const std::string& cameraId,
+            int32_t targetSdkVersion);
+
     static const int32_t MAX_SURFACES_PER_STREAM = 4;
 
     static const int32_t ROUNDING_WIDTH_CAP = 1920;
 
+    static const int32_t SDK_VERSION_S = 31;
+    static int32_t PERF_CLASS_LEVEL;
+    static bool IS_PERF_CLASS;
+    static const int32_t PERF_CLASS_JPEG_THRESH_W = 1920;
+    static const int32_t PERF_CLASS_JPEG_THRESH_H = 1080;
 };
 
 } // camera3
