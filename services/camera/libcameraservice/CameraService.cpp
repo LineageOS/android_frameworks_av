@@ -85,6 +85,7 @@ namespace android {
 
 using base::StringPrintf;
 using binder::Status;
+using camera3::SessionConfigurationUtils;
 using frameworks::cameraservice::service::V2_0::implementation::HidlCameraService;
 using hardware::ICamera;
 using hardware::ICameraClient;
@@ -131,7 +132,7 @@ static const String16 sCameraOpenCloseListenerPermission(
         "android.permission.CAMERA_OPEN_CLOSE_LISTENER");
 static const String16
         sCameraInjectExternalCameraPermission("android.permission.CAMERA_INJECT_EXTERNAL_CAMERA");
-
+const char *sFileName = "lastOpenSessionDumpFile";
 static constexpr int32_t kVendorClientScore = resource_policy::PERCEPTIBLE_APP_ADJ;
 static constexpr int32_t kVendorClientState = ActivityManager::PROCESS_STATE_PERSISTENT_UI;
 
@@ -148,6 +149,10 @@ CameraService::CameraService() :
         mAudioRestriction(hardware::camera2::ICameraDeviceUser::AUDIO_RESTRICTION_NONE) {
     ALOGI("CameraService started (pid=%d)", getpid());
     mServiceLockWrapper = std::make_shared<WaitableMutexWrapper>(&mServiceLock);
+    mMemFd = memfd_create(sFileName, MFD_ALLOW_SEALING);
+    if (mMemFd == -1) {
+        ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
+    }
 }
 
 void CameraService::onFirstRef()
@@ -234,7 +239,9 @@ status_t CameraService::enumerateProviders() {
 
     //Derive primary rear/front cameras, and filter their charactierstics.
     //This needs to be done after all cameras are enumerated and camera ids are sorted.
-    filterSPerfClassCharacteristics();
+    if (SessionConfigurationUtils::IS_PERF_CLASS) {
+        filterSPerfClassCharacteristics();
+    }
 
     return OK;
 }
@@ -307,12 +314,6 @@ void CameraService::updateCameraNumAndIds() {
 }
 
 void CameraService::filterSPerfClassCharacteristics() {
-    static int32_t kPerformanceClassLevel =
-            property_get_int32("ro.odm.build.media_performance_class", 0);
-    static bool kIsSPerformanceClass = (kPerformanceClassLevel == 31);
-
-    if (!kIsSPerformanceClass) return;
-
     // To claim to be S Performance primary cameras, the cameras must be
     // backward compatible. So performance class primary camera Ids must be API1
     // compatible.
@@ -329,7 +330,14 @@ void CameraService::filterSPerfClassCharacteristics() {
 
         if ((facing == hardware::CAMERA_FACING_BACK && !firstRearCameraSeen) ||
                 (facing == hardware::CAMERA_FACING_FRONT && !firstFrontCameraSeen)) {
-            mCameraProviderManager->filterSmallJpegSizes(cameraId);
+            status_t res = mCameraProviderManager->filterSmallJpegSizes(cameraId);
+            if (res == OK) {
+                mPerfClassPrimaryCameraIds.insert(cameraId);
+            } else {
+                ALOGE("%s: Failed to filter small JPEG sizes for performance class primary "
+                        "camera %s: %s(%d)", __FUNCTION__, cameraId.c_str(), strerror(-res), res);
+                break;
+            }
 
             if (facing == hardware::CAMERA_FACING_BACK) {
                 firstRearCameraSeen = true;
@@ -698,7 +706,7 @@ String8 CameraService::cameraIdIntToStr(int cameraIdInt) {
 }
 
 Status CameraService::getCameraCharacteristics(const String16& cameraId,
-        CameraMetadata* cameraInfo) {
+        int targetSdkVersion, CameraMetadata* cameraInfo) {
     ATRACE_CALL();
     if (!cameraInfo) {
         ALOGE("%s: cameraInfo is NULL", __FUNCTION__);
@@ -719,8 +727,13 @@ Status CameraService::getCameraCharacteristics(const String16& cameraId,
 
     Status ret{};
 
+
+    std::string cameraIdStr = String8(cameraId).string();
+    bool overrideForPerfClass =
+            SessionConfigurationUtils::targetPerfClassPrimaryCamera(mPerfClassPrimaryCameraIds,
+                    cameraIdStr, targetSdkVersion);
     status_t res = mCameraProviderManager->getCameraCharacteristics(
-            String8(cameraId).string(), cameraInfo);
+            cameraIdStr, overrideForPerfClass, cameraInfo);
     if (res != OK) {
         if (res == NAME_NOT_FOUND) {
             return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT, "Unable to retrieve camera "
@@ -862,7 +875,7 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
         const sp<IInterface>& cameraCb, const String16& packageName,
         const std::optional<String16>& featureId,  const String8& cameraId,
         int api1CameraId, int facing, int sensorOrientation, int clientPid, uid_t clientUid,
-        int servicePid, int deviceVersion, apiLevel effectiveApiLevel,
+        int servicePid, int deviceVersion, apiLevel effectiveApiLevel, bool overrideForPerfClass,
         /*out*/sp<BasicClient>* client) {
 
     // Create CameraClient based on device version reported by the HAL.
@@ -886,12 +899,13 @@ Status CameraService::makeClient(const sp<CameraService>& cameraService,
                 *client = new Camera2Client(cameraService, tmp, packageName, featureId,
                         cameraId, api1CameraId,
                         facing, sensorOrientation, clientPid, clientUid,
-                        servicePid);
+                        servicePid, overrideForPerfClass);
             } else { // Camera2 API route
                 sp<hardware::camera2::ICameraDeviceCallbacks> tmp =
                         static_cast<hardware::camera2::ICameraDeviceCallbacks*>(cameraCb.get());
                 *client = new CameraDeviceClient(cameraService, tmp, packageName, featureId,
-                        cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid);
+                        cameraId, facing, sensorOrientation, clientPid, clientUid, servicePid,
+                        overrideForPerfClass);
             }
             break;
         default:
@@ -988,7 +1002,8 @@ Status CameraService::initializeShimMetadata(int cameraId) {
     if (!(ret = connectHelper<ICameraClient,Client>(
             sp<ICameraClient>{nullptr}, id, cameraId,
             internalPackageName, {}, uid, USE_CALLING_PID,
-            API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0, /*out*/ tmp)
+            API_1, /*shimUpdateOnly*/ true, /*oomScoreOffset*/ 0,
+            /*targetSdkVersion*/ __ANDROID_API_FUTURE__, /*out*/ tmp)
             ).isOk()) {
         ALOGE("%s: Error initializing shim metadata: %s", __FUNCTION__, ret.toString8().string());
     }
@@ -1503,6 +1518,7 @@ Status CameraService::connect(
         const String16& clientPackageName,
         int clientUid,
         int clientPid,
+        int targetSdkVersion,
         /*out*/
         sp<ICamera>* device) {
 
@@ -1513,7 +1529,7 @@ Status CameraService::connect(
     sp<Client> client = nullptr;
     ret = connectHelper<ICameraClient,Client>(cameraClient, id, api1CameraId,
             clientPackageName, {}, clientUid, clientPid, API_1,
-            /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, /*out*/client);
+            /*shimUpdateOnly*/ false, /*oomScoreOffset*/ 0, targetSdkVersion, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, CameraThreadState::getCallingPid(), String8(clientPackageName),
@@ -1589,7 +1605,7 @@ Status CameraService::connectDevice(
         const String16& cameraId,
         const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId,
-        int clientUid, int oomScoreOffset,
+        int clientUid, int oomScoreOffset, int targetSdkVersion,
         /*out*/
         sp<hardware::camera2::ICameraDeviceUser>* device) {
 
@@ -1629,7 +1645,7 @@ Status CameraService::connectDevice(
     ret = connectHelper<hardware::camera2::ICameraDeviceCallbacks,CameraDeviceClient>(cameraCb, id,
             /*api1CameraId*/-1, clientPackageNameAdj, clientFeatureId,
             clientUid, USE_CALLING_PID, API_2, /*shimUpdateOnly*/ false, oomScoreOffset,
-            /*out*/client);
+            targetSdkVersion, /*out*/client);
 
     if(!ret.isOk()) {
         logRejected(id, callingPid, String8(clientPackageNameAdj), ret.toString8());
@@ -1637,6 +1653,22 @@ Status CameraService::connectDevice(
     }
 
     *device = client;
+    Mutex::Autolock lock(mServiceLock);
+
+    // Clear the previous cached logs and reposition the
+    // file offset to beginning of the file to log new data.
+    // If either truncate or lseek fails, close the previous file and create a new one.
+    if ((ftruncate(mMemFd, 0) == -1) || (lseek(mMemFd, 0, SEEK_SET) == -1)) {
+        ALOGE("%s: Error while truncating the file: %s", __FUNCTION__, sFileName);
+        // Close the previous memfd.
+        close(mMemFd);
+        // If failure to wipe the data, then create a new file and
+        // assign the new value to mMemFd.
+        mMemFd = memfd_create(sFileName, MFD_ALLOW_SEALING);
+        if (mMemFd == -1) {
+            ALOGE("%s: Error while creating the file: %s", __FUNCTION__, sFileName);
+        }
+    }
     return ret;
 }
 
@@ -1644,7 +1676,7 @@ template<class CALLBACK, class CLIENT>
 Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8& cameraId,
         int api1CameraId, const String16& clientPackageName,
         const std::optional<String16>& clientFeatureId, int clientUid, int clientPid,
-        apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset,
+        apiLevel effectiveApiLevel, bool shimUpdateOnly, int oomScoreOffset, int targetSdkVersion,
         /*out*/sp<CLIENT>& device) {
     binder::Status ret = binder::Status::ok();
 
@@ -1734,10 +1766,12 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         }
 
         sp<BasicClient> tmp = nullptr;
+        bool overrideForPerfClass = SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+                mPerfClassPrimaryCameraIds, cameraId.string(), targetSdkVersion);
         if(!(ret = makeClient(this, cameraCb, clientPackageName, clientFeatureId,
                 cameraId, api1CameraId, facing, orientation,
                 clientPid, clientUid, getpid(),
-                deviceVersion, effectiveApiLevel,
+                deviceVersion, effectiveApiLevel, overrideForPerfClass,
                 /*out*/&tmp)).isOk()) {
             return ret;
         }
@@ -2212,7 +2246,7 @@ Status CameraService::getConcurrentCameraIds(
 
 Status CameraService::isConcurrentSessionConfigurationSupported(
         const std::vector<CameraIdAndSessionConfiguration>& cameraIdsAndSessionConfigurations,
-        /*out*/bool* isSupported) {
+        int targetSdkVersion, /*out*/bool* isSupported) {
     if (!isSupported) {
         ALOGE("%s: isSupported is NULL", __FUNCTION__);
         return STATUS_ERROR(ERROR_ILLEGAL_ARGUMENT, "isSupported is NULL");
@@ -2236,7 +2270,8 @@ Status CameraService::isConcurrentSessionConfigurationSupported(
 
     status_t res =
             mCameraProviderManager->isConcurrentSessionConfigurationSupported(
-                    cameraIdsAndSessionConfigurations, isSupported);
+                    cameraIdsAndSessionConfigurations, mPerfClassPrimaryCameraIds,
+                    targetSdkVersion, isSupported);
     if (res != OK) {
         logServiceError(String8::format("Unable to query session configuration support"),
             ERROR_INVALID_OPERATION);
@@ -3832,6 +3867,28 @@ static bool tryLock(Mutex& mutex)
     return locked;
 }
 
+void CameraService::cacheDump() {
+    if (mMemFd != -1) {
+        const Vector<String16> args;
+        ATRACE_CALL();
+        // Acquiring service lock here will avoid the deadlock since
+        // cacheDump will not be called during the second disconnect.
+        Mutex::Autolock lock(mServiceLock);
+
+        Mutex::Autolock l(mCameraStatesLock);
+        // Start collecting the info for open sessions and store it in temp file.
+        for (const auto& state : mCameraStates) {
+            String8 cameraId = state.first;
+            auto clientDescriptor = mActiveClientManager.get(cameraId);
+            if (clientDescriptor != nullptr) {
+                dprintf(mMemFd, "== Camera device %s dynamic info: ==\n", cameraId.string());
+                // Log the current open session info before device is disconnected.
+                dumpOpenSessionClientLogs(mMemFd, args, cameraId);
+            }
+        }
+    }
+}
+
 status_t CameraService::dump(int fd, const Vector<String16>& args) {
     ATRACE_CALL();
 
@@ -3898,21 +3955,10 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
 
         auto clientDescriptor = mActiveClientManager.get(cameraId);
         if (clientDescriptor != nullptr) {
-            dprintf(fd, "  Device %s is open. Client instance dump:\n",
-                    cameraId.string());
-            dprintf(fd, "    Client priority score: %d state: %d\n",
-                    clientDescriptor->getPriority().getScore(),
-                    clientDescriptor->getPriority().getState());
-            dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
-
-            auto client = clientDescriptor->getValue();
-            dprintf(fd, "    Client package: %s\n",
-                    String8(client->getPackageName()).string());
-
-            client->dumpClient(fd, args);
+            // log the current open session info
+            dumpOpenSessionClientLogs(fd, args, cameraId);
         } else {
-            dprintf(fd, "  Device %s is closed, no client instance\n",
-                    cameraId.string());
+            dumpClosedSessionClientLogs(fd, cameraId);
         }
 
     }
@@ -3969,7 +4015,53 @@ status_t CameraService::dump(int fd, const Vector<String16>& args) {
             }
         }
     }
+
+    bool serviceLocked = tryLock(mServiceLock);
+
+    // Dump info from previous open sessions.
+    // Reposition the offset to beginning of the file before reading
+
+    if ((mMemFd >= 0) && (lseek(mMemFd, 0, SEEK_SET) != -1)) {
+        dprintf(fd, "\n**********Dumpsys from previous open session**********\n");
+        ssize_t size_read;
+        char buf[4096];
+        while ((size_read = read(mMemFd, buf, (sizeof(buf) - 1))) > 0) {
+            // Read data from file to a small buffer and write it to fd.
+            write(fd, buf, size_read);
+            if (size_read == -1) {
+                ALOGE("%s: Error during reading the file: %s", __FUNCTION__, sFileName);
+                break;
+            }
+        }
+        dprintf(fd, "\n**********End of Dumpsys from previous open session**********\n");
+    } else {
+        ALOGE("%s: Error during reading the file: %s", __FUNCTION__, sFileName);
+    }
+
+    if (serviceLocked) mServiceLock.unlock();
     return NO_ERROR;
+}
+
+void CameraService::dumpOpenSessionClientLogs(int fd,
+        const Vector<String16>& args, const String8& cameraId) {
+    auto clientDescriptor = mActiveClientManager.get(cameraId);
+    dprintf(fd, "  Device %s is open. Client instance dump:\n",
+        cameraId.string());
+    dprintf(fd, "    Client priority score: %d state: %d\n",
+        clientDescriptor->getPriority().getScore(),
+        clientDescriptor->getPriority().getState());
+    dprintf(fd, "    Client PID: %d\n", clientDescriptor->getOwnerId());
+
+    auto client = clientDescriptor->getValue();
+    dprintf(fd, "    Client package: %s\n",
+        String8(client->getPackageName()).string());
+
+    client->dumpClient(fd, args);
+}
+
+void CameraService::dumpClosedSessionClientLogs(int fd, const String8& cameraId) {
+    dprintf(fd, "  Device %s is closed, no client instance\n",
+                    cameraId.string());
 }
 
 void CameraService::dumpEventLog(int fd) {
