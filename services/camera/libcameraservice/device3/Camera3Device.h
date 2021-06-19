@@ -89,7 +89,7 @@ class Camera3Device :
             public camera3::FlushBufferInterface {
   public:
 
-    explicit Camera3Device(const String8& id);
+    explicit Camera3Device(const String8& id, bool overrideForPerfClass);
 
     virtual ~Camera3Device();
 
@@ -1344,6 +1344,10 @@ class Camera3Device :
     bool mSupportCameraMute = false;
     // Whether the HAL supports SOLID_COLOR or BLACK if mSupportCameraMute is true
     bool mSupportTestPatternSolidColor = false;
+
+    // Whether the camera framework overrides the device characteristics for
+    // performance class.
+    bool mOverrideForPerfClass;
 
     // Injection camera related methods.
     class Camera3DeviceInjectionMethods : public virtual RefBase {

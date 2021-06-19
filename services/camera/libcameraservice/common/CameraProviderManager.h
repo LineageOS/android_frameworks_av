@@ -20,6 +20,7 @@
 #include <vector>
 #include <unordered_map>
 #include <unordered_set>
+#include <set>
 #include <string>
 #include <mutex>
 #include <future>
@@ -226,12 +227,13 @@ public:
      * not have a v3 or newer HAL version.
      */
     status_t getCameraCharacteristics(const std::string &id,
-            CameraMetadata* characteristics) const;
+            bool overrideForPerfClass, CameraMetadata* characteristics) const;
 
     status_t isConcurrentSessionConfigurationSupported(
             const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>
                     &cameraIdsAndSessionConfigs,
-            bool *isSupported);
+            const std::set<std::string>& perfClassPrimaryCameraIds,
+            int targetSdkVersion, bool *isSupported);
 
     std::vector<std::unordered_set<std::string>> getConcurrentCameraIds() const;
     /**
@@ -327,7 +329,7 @@ public:
     status_t getSystemCameraKind(const std::string& id, SystemCameraKind *kind) const;
     bool isHiddenPhysicalCamera(const std::string& cameraId) const;
 
-    void filterSmallJpegSizes(const std::string& cameraId);
+    status_t filterSmallJpegSizes(const std::string& cameraId);
 
     static const float kDepthARTolerance;
 private:
@@ -472,7 +474,9 @@ private:
             virtual status_t getCameraInfo(hardware::CameraInfo *info) const = 0;
             virtual bool isAPI1Compatible() const = 0;
             virtual status_t dumpState(int fd) = 0;
-            virtual status_t getCameraCharacteristics(CameraMetadata *characteristics) const {
+            virtual status_t getCameraCharacteristics(bool overrideForPerfClass,
+                    CameraMetadata *characteristics) const {
+                (void) overrideForPerfClass;
                 (void) characteristics;
                 return INVALID_OPERATION;
             }
@@ -488,7 +492,7 @@ private:
                     bool * /*status*/) {
                 return INVALID_OPERATION;
             }
-            virtual void filterSmallJpegSizes() = 0;
+            virtual status_t filterSmallJpegSizes() = 0;
 
             template<class InterfaceT>
             sp<InterfaceT> startDeviceInterface();
@@ -540,6 +544,7 @@ private:
             virtual bool isAPI1Compatible() const override;
             virtual status_t dumpState(int fd) override;
             virtual status_t getCameraCharacteristics(
+                    bool overrideForPerfClass,
                     CameraMetadata *characteristics) const override;
             virtual status_t getPhysicalCameraCharacteristics(const std::string& physicalCameraId,
                     CameraMetadata *characteristics) const override;
@@ -547,7 +552,7 @@ private:
                     const hardware::camera::device::V3_7::StreamConfiguration &configuration,
                     bool *status /*out*/)
                     override;
-            virtual void filterSmallJpegSizes() override;
+            virtual status_t filterSmallJpegSizes() override;
 
             DeviceInfo3(const std::string& name, const metadata_vendor_id_t tagId,
                     const std::string &id, uint16_t minorVersion,
@@ -557,6 +562,9 @@ private:
             virtual ~DeviceInfo3();
         private:
             CameraMetadata mCameraCharacteristics;
+            // A copy of mCameraCharacteristics without performance class
+            // override
+            std::unique_ptr<CameraMetadata> mCameraCharNoPCOverride;
             std::unordered_map<std::string, CameraMetadata> mPhysicalCameraCharacteristics;
             void queryPhysicalCameraIds();
             SystemCameraKind getSystemCameraKind();
@@ -569,11 +577,12 @@ private:
             static void getSupportedSizes(const CameraMetadata& ch, uint32_t tag,
                     android_pixel_format_t format,
                     std::vector<std::tuple<size_t, size_t>> *sizes /*out*/);
-            void getSupportedDurations( const CameraMetadata& ch, uint32_t tag,
+            static void getSupportedDurations( const CameraMetadata& ch, uint32_t tag,
                     android_pixel_format_t format,
                     const std::vector<std::tuple<size_t, size_t>>& sizes,
                     std::vector<int64_t> *durations/*out*/);
-            void getSupportedDynamicDepthDurations(const std::vector<int64_t>& depthDurations,
+            static void getSupportedDynamicDepthDurations(
+                    const std::vector<int64_t>& depthDurations,
                     const std::vector<int64_t>& blobDurations,
                     std::vector<int64_t> *dynamicDepthDurations /*out*/);
             static void getSupportedDynamicDepthSizes(
@@ -690,7 +699,7 @@ private:
     static const char* torchStatusToString(
         const hardware::camera::common::V1_0::TorchModeStatus&);
 
-    status_t getCameraCharacteristicsLocked(const std::string &id,
+    status_t getCameraCharacteristicsLocked(const std::string &id, bool overrideForPerfClass,
             CameraMetadata* characteristics) const;
     void filterLogicalCameraIdsLocked(std::vector<std::string>& deviceIds) const;
 
@@ -704,6 +713,8 @@ private:
     status_t convertToHALStreamCombinationAndCameraIdsLocked(
               const std::vector<hardware::camera2::utils::CameraIdAndSessionConfiguration>
                       &cameraIdsAndSessionConfigs,
+              const std::set<std::string>& perfClassPrimaryCameraIds,
+              int targetSdkVersion,
               hardware::hidl_vec<hardware::camera::provider::V2_7::CameraIdAndStreamCombination>
                       *halCameraIdsAndStreamCombinations,
               bool *earlyExit);

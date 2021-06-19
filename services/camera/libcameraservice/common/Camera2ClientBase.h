@@ -55,7 +55,8 @@ public:
                       int sensorOrientation,
                       int clientPid,
                       uid_t clientUid,
-                      int servicePid);
+                      int servicePid,
+                      bool overrideForPerfClass);
     virtual ~Camera2ClientBase();
 
     virtual status_t      initialize(sp<CameraProviderManager> manager, const String8& monitorTags);

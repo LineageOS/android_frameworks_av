@@ -46,6 +46,7 @@ namespace android {
 
 using namespace ::android::hardware::camera;
 using namespace ::android::hardware::camera::common::V1_0;
+using camera3::SessionConfigurationUtils;
 using std::literals::chrono_literals::operator""s;
 using hardware::camera2::utils::CameraIdAndSessionConfiguration;
 using hardware::camera::provider::V2_7::CameraIdAndStreamCombination;
@@ -278,9 +279,9 @@ status_t CameraProviderManager::isSessionConfigurationSupported(const std::strin
 }
 
 status_t CameraProviderManager::getCameraCharacteristics(const std::string &id,
-        CameraMetadata* characteristics) const {
+        bool overrideForPerfClass, CameraMetadata* characteristics) const {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
-    return getCameraCharacteristicsLocked(id, characteristics);
+    return getCameraCharacteristicsLocked(id, overrideForPerfClass, characteristics);
 }
 
 status_t CameraProviderManager::getHighestSupportedVersion(const std::string &id,
@@ -691,32 +692,32 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::addDynamicDepthTags(
     const int32_t depthExclTag = ANDROID_DEPTH_DEPTH_IS_EXCLUSIVE;
 
     const int32_t scalerSizesTag =
-              camera3::SessionConfigurationUtils::getAppropriateModeTag(
+              SessionConfigurationUtils::getAppropriateModeTag(
                       ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
     const int32_t scalerMinFrameDurationsTag =
             ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS;
     const int32_t scalerStallDurationsTag =
-                 camera3::SessionConfigurationUtils::getAppropriateModeTag(
+                 SessionConfigurationUtils::getAppropriateModeTag(
                         ANDROID_SCALER_AVAILABLE_STALL_DURATIONS, maxResolution);
 
     const int32_t depthSizesTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS, maxResolution);
     const int32_t depthStallDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_DEPTH_AVAILABLE_DEPTH_STALL_DURATIONS, maxResolution);
     const int32_t depthMinFrameDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_DEPTH_AVAILABLE_DEPTH_MIN_FRAME_DURATIONS, maxResolution);
 
     const int32_t dynamicDepthSizesTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STREAM_CONFIGURATIONS, maxResolution);
     const int32_t dynamicDepthStallDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_STALL_DURATIONS, maxResolution);
     const int32_t dynamicDepthMinFrameDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                  ANDROID_DEPTH_AVAILABLE_DYNAMIC_DEPTH_MIN_FRAME_DURATIONS, maxResolution);
 
     auto& c = mCameraCharacteristics;
@@ -1077,20 +1078,20 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::fillHeicStreamCombina
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::deriveHeicTags(bool maxResolution) {
     int32_t scalerStreamSizesTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS, maxResolution);
     int32_t scalerMinFrameDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS, maxResolution);
 
     int32_t heicStreamSizesTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_HEIC_AVAILABLE_HEIC_STREAM_CONFIGURATIONS, maxResolution);
     int32_t heicMinFrameDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_HEIC_AVAILABLE_HEIC_MIN_FRAME_DURATIONS, maxResolution);
     int32_t heicStallDurationsTag =
-            camera3::SessionConfigurationUtils::getAppropriateModeTag(
+            SessionConfigurationUtils::getAppropriateModeTag(
                     ANDROID_HEIC_AVAILABLE_HEIC_STALL_DURATIONS, maxResolution);
 
     auto& c = mCameraCharacteristics;
@@ -1186,15 +1187,15 @@ bool CameraProviderManager::isHiddenPhysicalCamera(const std::string& cameraId) 
     return isHiddenPhysicalCameraInternal(cameraId).first;
 }
 
-void CameraProviderManager::filterSmallJpegSizes(const std::string& cameraId) {
+status_t CameraProviderManager::filterSmallJpegSizes(const std::string& cameraId) {
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
             if (deviceInfo->mId == cameraId) {
-                deviceInfo->filterSmallJpegSizes();
-                return;
+                return deviceInfo->filterSmallJpegSizes();
             }
         }
     }
+    return NAME_NOT_FOUND;
 }
 
 std::pair<bool, CameraProviderManager::ProviderInfo::DeviceInfo *>
@@ -1212,14 +1213,6 @@ CameraProviderManager::isHiddenPhysicalCameraInternal(const std::string& cameraI
 
     for (auto& provider : mProviders) {
         for (auto& deviceInfo : provider->mDevices) {
-            CameraMetadata info;
-            status_t res = deviceInfo->getCameraCharacteristics(&info);
-            if (res != OK) {
-                ALOGE("%s: Failed to getCameraCharacteristics for id %s", __FUNCTION__,
-                        deviceInfo->mId.c_str());
-                return falseRet;
-            }
-
             std::vector<std::string> physicalIds;
             if (deviceInfo->mIsLogicalCamera) {
                 if (std::find(deviceInfo->mPhysicalIds.begin(), deviceInfo->mPhysicalIds.end(),
@@ -1705,7 +1698,7 @@ status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16
             dprintf(fd, "    Orientation: %d\n", info.orientation);
         }
         CameraMetadata info2;
-        res = device->getCameraCharacteristics(&info2);
+        res = device->getCameraCharacteristics(true /*overrideForPerfClass*/, &info2);
         if (res == INVALID_OPERATION) {
             dprintf(fd, "  API2 not directly supported\n");
         } else if (res != OK) {
@@ -2104,9 +2097,6 @@ status_t CameraProviderManager::ProviderInfo::isConcurrentSessionConfigurationSu
                         *isSupported = false;
                         return OK;
                     }
-                    camera3::SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
-                            halCameraIdsAndStreamCombinations_2_6[i].streamConfiguration,
-                            combination.streamConfiguration);
                 }
                 ret = interface_2_6->isConcurrentStreamCombinationSupported(
                         halCameraIdsAndStreamCombinations_2_6, cb);
@@ -2313,7 +2303,7 @@ CameraProviderManager::ProviderInfo::DeviceInfo3::DeviceInfo3(const std::string&
                 __FUNCTION__, strerror(-res), res);
     }
 
-    if (camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mCameraCharacteristics)) {
+    if (SessionConfigurationUtils::isUltraHighResolutionSensor(mCameraCharacteristics)) {
         status_t status = addDynamicDepthTags(/*maxResolution*/true);
         if (OK != status) {
             ALOGE("%s: Failed appending dynamic depth tags for maximum resolution mode: %s (%d)",
@@ -2497,10 +2487,15 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::dumpState(int fd) {
 }
 
 status_t CameraProviderManager::ProviderInfo::DeviceInfo3::getCameraCharacteristics(
-        CameraMetadata *characteristics) const {
+        bool overrideForPerfClass, CameraMetadata *characteristics) const {
     if (characteristics == nullptr) return BAD_VALUE;
 
-    *characteristics = mCameraCharacteristics;
+    if (!overrideForPerfClass && mCameraCharNoPCOverride != nullptr) {
+        *characteristics = *mCameraCharNoPCOverride;
+    } else {
+        *characteristics = mCameraCharacteristics;
+    }
+
     return OK;
 }
 
@@ -2542,7 +2537,7 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
         ret = interface_3_7->isStreamCombinationSupported_3_7(configuration, halCb);
     } else if (interface_3_5 != nullptr) {
         hardware::camera::device::V3_4::StreamConfiguration configuration_3_4;
-        bool success = camera3::SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
+        bool success = SessionConfigurationUtils::convertHALStreamCombinationFromV37ToV34(
                 configuration_3_4, configuration);
         if (!success) {
             *status = false;
@@ -2573,68 +2568,94 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::isSessionConfiguratio
     return res;
 }
 
-void CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes() {
-    static constexpr int FHD_W = 1920;
-    static constexpr int FHD_H = 1080;
+status_t CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes() {
+    int32_t thresholdW = SessionConfigurationUtils::PERF_CLASS_JPEG_THRESH_W;
+    int32_t thresholdH = SessionConfigurationUtils::PERF_CLASS_JPEG_THRESH_H;
+
+    if (mCameraCharNoPCOverride != nullptr) return OK;
+
+    mCameraCharNoPCOverride = std::make_unique<CameraMetadata>(mCameraCharacteristics);
 
     // Remove small JPEG sizes from available stream configurations
+    size_t largeJpegCount = 0;
     std::vector<int32_t> newStreamConfigs;
     camera_metadata_entry streamConfigs =
             mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS);
     for (size_t i = 0; i < streamConfigs.count; i += 4) {
         if ((streamConfigs.data.i32[i] == HAL_PIXEL_FORMAT_BLOB) && (streamConfigs.data.i32[i+3] ==
-                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT) &&
-                (streamConfigs.data.i32[i+1] < FHD_W || streamConfigs.data.i32[i+2] < FHD_H)) {
-            continue;
+                ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT)) {
+            if (streamConfigs.data.i32[i+1] < thresholdW  ||
+                    streamConfigs.data.i32[i+2] < thresholdH) {
+                continue;
+            } else {
+                largeJpegCount ++;
+            }
         }
         newStreamConfigs.insert(newStreamConfigs.end(), streamConfigs.data.i32 + i,
                 streamConfigs.data.i32 + i + 4);
     }
-    if (newStreamConfigs.size() > 0) {
-        mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
-                newStreamConfigs.data(), newStreamConfigs.size());
+    if (newStreamConfigs.size() == 0 || largeJpegCount == 0) {
+        return BAD_VALUE;
     }
 
     // Remove small JPEG sizes from available min frame durations
+    largeJpegCount = 0;
     std::vector<int64_t> newMinDurations;
     camera_metadata_entry minDurations =
             mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS);
     for (size_t i = 0; i < minDurations.count; i += 4) {
-        if ((minDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) &&
-                (minDurations.data.i64[i+1] < FHD_W || minDurations.data.i64[i+2] < FHD_H)) {
-            continue;
+        if (minDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) {
+            if (minDurations.data.i64[i+1] < thresholdW ||
+                    minDurations.data.i64[i+2] < thresholdH) {
+                continue;
+            } else {
+                largeJpegCount++;
+            }
         }
         newMinDurations.insert(newMinDurations.end(), minDurations.data.i64 + i,
                 minDurations.data.i64 + i + 4);
     }
-    if (newMinDurations.size() > 0) {
-        mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
-                newMinDurations.data(), newMinDurations.size());
+    if (newMinDurations.size() == 0 || largeJpegCount == 0) {
+        return BAD_VALUE;
     }
 
     // Remove small JPEG sizes from available stall durations
+    largeJpegCount = 0;
     std::vector<int64_t> newStallDurations;
     camera_metadata_entry stallDurations =
             mCameraCharacteristics.find(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS);
     for (size_t i = 0; i < stallDurations.count; i += 4) {
-        if ((stallDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) &&
-                (stallDurations.data.i64[i+1] < FHD_W || stallDurations.data.i64[i+2] < FHD_H)) {
-            continue;
+        if (stallDurations.data.i64[i] == HAL_PIXEL_FORMAT_BLOB) {
+            if (stallDurations.data.i64[i+1] < thresholdW ||
+                    stallDurations.data.i64[i+2] < thresholdH) {
+                continue;
+            } else {
+                largeJpegCount++;
+            }
         }
         newStallDurations.insert(newStallDurations.end(), stallDurations.data.i64 + i,
                 stallDurations.data.i64 + i + 4);
     }
-    if (newStallDurations.size() > 0) {
-        mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
-                newStallDurations.data(), newStallDurations.size());
+    if (newStallDurations.size() == 0 || largeJpegCount == 0) {
+        return BAD_VALUE;
     }
+
+    mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS,
+            newStreamConfigs.data(), newStreamConfigs.size());
+    mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_MIN_FRAME_DURATIONS,
+            newMinDurations.data(), newMinDurations.size());
+    mCameraCharacteristics.update(ANDROID_SCALER_AVAILABLE_STALL_DURATIONS,
+            newStallDurations.data(), newStallDurations.size());
 
     // Re-generate metadata tags that have dependencies on BLOB sizes
     auto res = addDynamicDepthTags();
     if (OK != res) {
         ALOGE("%s: Failed to append dynamic depth tags: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
+        return res;
     }
+
+    return OK;
 }
 
 status_t CameraProviderManager::ProviderInfo::parseProviderName(const std::string& name,
@@ -2983,6 +3004,8 @@ CameraProviderManager::getConcurrentCameraIds() const {
 
 status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
         const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
+        const std::set<std::string>& perfClassPrimaryCameraIds,
+        int targetSdkVersion,
         hardware::hidl_vec<CameraIdAndStreamCombination> *halCameraIdsAndStreamCombinations,
         bool *earlyExit) {
     binder::Status bStatus = binder::Status::ok();
@@ -2990,25 +3013,31 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
     bool shouldExit = false;
     status_t res = OK;
     for (auto &cameraIdAndSessionConfig : cameraIdsAndSessionConfigs) {
+        const std::string& cameraId = cameraIdAndSessionConfig.mCameraId;
         hardware::camera::device::V3_7::StreamConfiguration streamConfiguration;
         CameraMetadata deviceInfo;
-        res = getCameraCharacteristicsLocked(cameraIdAndSessionConfig.mCameraId, &deviceInfo);
+        bool overrideForPerfClass =
+                SessionConfigurationUtils::targetPerfClassPrimaryCamera(
+                        perfClassPrimaryCameraIds, cameraId, targetSdkVersion);
+        res = getCameraCharacteristicsLocked(cameraId, overrideForPerfClass, &deviceInfo);
         if (res != OK) {
             return res;
         }
         camera3::metadataGetter getMetadata =
-                [this](const String8 &id) {
+                [this](const String8 &id, bool overrideForPerfClass) {
                     CameraMetadata physicalDeviceInfo;
-                    getCameraCharacteristicsLocked(id.string(), &physicalDeviceInfo);
+                    getCameraCharacteristicsLocked(id.string(), overrideForPerfClass,
+                                                   &physicalDeviceInfo);
                     return physicalDeviceInfo;
                 };
         std::vector<std::string> physicalCameraIds;
-        isLogicalCameraLocked(cameraIdAndSessionConfig.mCameraId, &physicalCameraIds);
+        isLogicalCameraLocked(cameraId, &physicalCameraIds);
         bStatus =
-            camera3::SessionConfigurationUtils::convertToHALStreamCombination(
+            SessionConfigurationUtils::convertToHALStreamCombination(
                     cameraIdAndSessionConfig.mSessionConfiguration,
-                    String8(cameraIdAndSessionConfig.mCameraId.c_str()), deviceInfo, getMetadata,
-                    physicalCameraIds, streamConfiguration, &shouldExit);
+                    String8(cameraId.c_str()), deviceInfo, getMetadata,
+                    physicalCameraIds, streamConfiguration,
+                    overrideForPerfClass, &shouldExit);
         if (!bStatus.isOk()) {
             ALOGE("%s: convertToHALStreamCombination failed", __FUNCTION__);
             return INVALID_OPERATION;
@@ -3018,7 +3047,7 @@ status_t CameraProviderManager::convertToHALStreamCombinationAndCameraIdsLocked(
             return OK;
         }
         CameraIdAndStreamCombination halCameraIdAndStream;
-        halCameraIdAndStream.cameraId = cameraIdAndSessionConfig.mCameraId;
+        halCameraIdAndStream.cameraId = cameraId;
         halCameraIdAndStream.streamConfiguration = streamConfiguration;
         halCameraIdsAndStreamsV.push_back(halCameraIdAndStream);
     }
@@ -3051,7 +3080,8 @@ static bool checkIfSetContainsAll(
 
 status_t CameraProviderManager::isConcurrentSessionConfigurationSupported(
         const std::vector<CameraIdAndSessionConfiguration> &cameraIdsAndSessionConfigs,
-        bool *isSupported) {
+        const std::set<std::string>& perfClassPrimaryCameraIds,
+        int targetSdkVersion, bool *isSupported) {
     std::lock_guard<std::mutex> lock(mInterfaceMutex);
     // Check if all the devices are a subset of devices advertised by the
     // same provider through getConcurrentStreamingCameraIds()
@@ -3065,8 +3095,8 @@ status_t CameraProviderManager::isConcurrentSessionConfigurationSupported(
             hardware::hidl_vec<CameraIdAndStreamCombination> halCameraIdsAndStreamCombinations;
             bool knowUnsupported = false;
             status_t res = convertToHALStreamCombinationAndCameraIdsLocked(
-                    cameraIdsAndSessionConfigs, &halCameraIdsAndStreamCombinations,
-                    &knowUnsupported);
+                    cameraIdsAndSessionConfigs, perfClassPrimaryCameraIds,
+                    targetSdkVersion, &halCameraIdsAndStreamCombinations, &knowUnsupported);
             if (res != OK) {
                 ALOGE("%s unable to convert session configurations provided to HAL stream"
                       "combinations", __FUNCTION__);
@@ -3088,10 +3118,10 @@ status_t CameraProviderManager::isConcurrentSessionConfigurationSupported(
 }
 
 status_t CameraProviderManager::getCameraCharacteristicsLocked(const std::string &id,
-        CameraMetadata* characteristics) const {
+        bool overrideForPerfClass, CameraMetadata* characteristics) const {
     auto deviceInfo = findDeviceInfoLocked(id, /*minVersion*/ {3,0}, /*maxVersion*/ {5,0});
     if (deviceInfo != nullptr) {
-        return deviceInfo->getCameraCharacteristics(characteristics);
+        return deviceInfo->getCameraCharacteristics(overrideForPerfClass, characteristics);
     }
 
     // Find hidden physical camera characteristics

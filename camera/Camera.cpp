@@ -71,9 +71,10 @@ Camera::~Camera()
 }
 
 sp<Camera> Camera::connect(int cameraId, const String16& clientPackageName,
-        int clientUid, int clientPid)
+        int clientUid, int clientPid, int targetSdkVersion)
 {
-    return CameraBaseT::connect(cameraId, clientPackageName, clientUid, clientPid);
+    return CameraBaseT::connect(cameraId, clientPackageName, clientUid,
+            clientPid, targetSdkVersion);
 }
 
 status_t Camera::reconnect()

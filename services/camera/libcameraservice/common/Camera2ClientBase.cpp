@@ -54,13 +54,14 @@ Camera2ClientBase<TClientBase>::Camera2ClientBase(
         int sensorOrientation,
         int clientPid,
         uid_t clientUid,
-        int servicePid):
+        int servicePid,
+        bool overrideForPerfClass):
         TClientBase(cameraService, remoteCallback, clientPackageName, clientFeatureId,
                 cameraId, api1CameraId, cameraFacing, sensorOrientation, clientPid, clientUid,
                 servicePid),
         mSharedCameraCallbacks(remoteCallback),
         mDeviceVersion(cameraService->getDeviceVersion(TClientBase::mCameraIdStr)),
-        mDevice(new Camera3Device(cameraId)),
+        mDevice(new Camera3Device(cameraId, overrideForPerfClass)),
         mDeviceActive(false), mApi1CameraId(api1CameraId)
 {
     ALOGI("Camera %s: Opened. Client: %s (PID %d, UID %d)", cameraId.string(),
@@ -194,6 +195,13 @@ binder::Status Camera2ClientBase<TClientBase>::disconnect() {
         callingPid != TClientBase::mServicePid) return res;
 
     ALOGV("Camera %s: Shutting down", TClientBase::mCameraIdStr.string());
+
+    // Before detaching the device, cache the info from current open session.
+    // The disconnected check avoids duplication of info and also prevents
+    // deadlock while acquiring service lock in cacheDump.
+    if (!TClientBase::mDisconnected) {
+        Camera2ClientBase::getCameraService()->cacheDump();
+    }
 
     detachDevice();
 
