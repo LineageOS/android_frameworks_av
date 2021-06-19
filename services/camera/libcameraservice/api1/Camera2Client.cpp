@@ -58,10 +58,11 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         int sensorOrientation,
         int clientPid,
         uid_t clientUid,
-        int servicePid):
+        int servicePid,
+        bool overrideForPerfClass):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName, clientFeatureId,
                 cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation,
-                clientPid, clientUid, servicePid),
+                clientPid, clientUid, servicePid, overrideForPerfClass),
         mParameters(api1CameraId, cameraFacing)
 {
     ATRACE_CALL();
