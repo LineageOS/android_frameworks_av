@@ -22,12 +22,15 @@
 
 #include <algorithm>
 #include <memory>
+#include <string>
 #include <utility>
 
 #include <errno.h>
 #include <inttypes.h>
 #include <math.h>
 
+#include <android-base/parsedouble.h>
+#include <android-base/properties.h>
 #include <audio_effects/effect_hapticgenerator.h>
 #include <audio_utils/format.h>
 #include <system/audio.h>
@@ -35,6 +38,7 @@
 static constexpr float DEFAULT_RESONANT_FREQUENCY = 150.0f;
 static constexpr float DEFAULT_BSF_ZERO_Q = 8.0f;
 static constexpr float DEFAULT_BSF_POLE_Q = 4.0f;
+static constexpr float DEFAULT_DISTORTION_OUTPUT_GAIN = 1.5f;
 
 // This is the only symbol that needs to be exported
 __attribute__ ((visibility ("default")))
@@ -81,6 +85,15 @@ static const effect_descriptor_t gHgDescriptor = {
 
 namespace {
 
+float getFloatProperty(const std::string& key, float defaultValue) {
+    float result;
+    std::string value = android::base::GetProperty(key, "");
+    if (!value.empty() && android::base::ParseFloat(value, &result)) {
+        return result;
+    }
+    return defaultValue;
+}
+
 int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->itfe = &gHapticGeneratorInterface;
 
@@ -114,7 +127,9 @@ int HapticGenerator_Init(struct HapticGeneratorContext *context) {
     context->param.distortionCornerFrequency = 300.0f;
     context->param.distortionInputGain = 0.3f;
     context->param.distortionCubeThreshold = 0.1f;
-    context->param.distortionOutputGain = 1.5f;
+    context->param.distortionOutputGain = getFloatProperty(
+            "vendor.audio.hapticgenerator.distortion.output.gain", DEFAULT_DISTORTION_OUTPUT_GAIN);
+    ALOGD("Using distortion output gain as %f", context->param.distortionOutputGain);
 
     context->state = HAPTICGENERATOR_STATE_INITIALIZED;
     return 0;
