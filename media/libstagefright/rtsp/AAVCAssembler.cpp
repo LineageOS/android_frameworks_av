@@ -45,6 +45,7 @@ AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
       mAccessUnitDamaged(false),
       mFirstIFrameProvided(false),
       mLastIFrameProvidedAtMs(0),
+      mLastRtpTimeJitterDataUs(0),
       mWidth(0),
       mHeight(0) {
 }
@@ -123,45 +124,65 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
     sp<ABuffer> buffer = *queue->begin();
     buffer->meta()->setObject("source", source);
 
+    /**
+     * RFC3550 calculates the interarrival jitter time for 'ALL packets'.
+     * But that is not useful as an ingredient of buffering time.
+     * Instead, we calculates the time only for all 'NAL units'.
+     */
     int64_t rtpTime = findRTPTime(firstRTPTime, buffer);
+    int64_t nowTimeUs = ALooper::GetNowUs();
+    if (rtpTime != mLastRtpTimeJitterDataUs) {
+        source->putBaseJitterData(rtpTime, nowTimeUs);
+        mLastRtpTimeJitterDataUs = rtpTime;
+    }
+    source->putInterArrivalJitterData(rtpTime, nowTimeUs);
 
     const int64_t startTimeMs = source->mFirstSysTime / 1000;
-    const int64_t nowTimeMs = ALooper::GetNowUs() / 1000;
-    const int64_t staticJbTimeMs = source->getStaticJitterTimeMs();
-    const int64_t dynamicJbTimeMs = source->getDynamicJitterTimeMs();
+    const int64_t nowTimeMs = nowTimeUs / 1000;
+    const int32_t staticJitterTimeMs = source->getStaticJitterTimeMs();
+    const int32_t baseJitterTimeMs = source->getBaseJitterTimeMs();
+    const int32_t dynamicJitterTimeMs = source->getInterArrivalJitterTimeMs();
     const int64_t clockRate = source->mClockRate;
 
     int64_t playedTimeMs = nowTimeMs - startTimeMs;
     int64_t playedTimeRtp = source->mFirstRtpTime + MsToRtp(playedTimeMs, clockRate);
 
     /**
-     * Based on experience in real commercial network services,
+     * Based on experiences in real commercial network services,
      * 300 ms is a maximum heuristic jitter buffer time for video RTP service.
      */
 
     /**
-     * The static(base) jitter is a kind of expected propagation time that we desire.
-     * We can drop packets if it doesn't meet our standards.
-     * If it gets shorter we can get faster response but can lose packets.
+     * The base jitter is an expected additional propagation time.
+     * We can drop packets if the time doesn't meet our standards.
+     * If it gets shorter, we can get faster response but should drop delayed packets.
      * Expecting range : 50ms ~ 1000ms (But 300 ms would be practical upper bound)
      */
-    const int64_t baseJbTimeRtp = MsToRtp(staticJbTimeMs, clockRate);
+    const int32_t baseJbTimeMs = std::min(std::max(staticJitterTimeMs, baseJitterTimeMs), 300);
     /**
      * Dynamic jitter is a variance of interarrival time as defined in the 6.4.1 of RFC 3550.
-     * We can regard this as a tolerance of every moments.
+     * We can regard this as a tolerance of every data putting moments.
      * Expecting range : 0ms ~ 150ms (Not to over 300 ms practically)
      */
-    const int64_t dynamicJbTimeRtp =                        // Max 150
-            std::min(MsToRtp(dynamicJbTimeMs, clockRate), MsToRtp(150, clockRate));
-    const int64_t jitterTimeRtp = baseJbTimeRtp + dynamicJbTimeRtp; // Total jitter time
+    const int32_t dynamicJbTimeMs = std::min(dynamicJitterTimeMs, 150);
+    const int64_t dynamicJbTimeRtp = MsToRtp(dynamicJbTimeMs, clockRate);
+    /* Fundamental jitter time */
+    const int32_t jitterTimeMs = baseJbTimeMs;
+    const int64_t jitterTimeRtp = MsToRtp(jitterTimeMs, clockRate);
 
+    // Till (T), this assembler waits unconditionally to collect current NAL unit
     int64_t expiredTimeRtp = rtpTime + jitterTimeRtp;       // When does this buffer expire ? (T)
     int64_t diffTimeRtp = playedTimeRtp - expiredTimeRtp;
     bool isExpired = (diffTimeRtp >= 0);                    // It's expired if T is passed away
-    bool isFirstLineBroken = (diffTimeRtp > jitterTimeRtp); // (T + jitter) is a standard tolerance
 
-    int64_t finalMargin = dynamicJbTimeRtp * JITTER_MULTIPLE;
-    bool isSecondLineBroken = (diffTimeRtp > jitterTimeRtp + finalMargin); // The Maginot line
+    // From (T), this assembler tries to complete the NAL till (T + try)
+    int32_t tryJbTimeMs = baseJitterTimeMs / 2 + dynamicJbTimeMs;
+    int64_t tryJbTimeRtp = MsToRtp(tryJbTimeMs, clockRate);
+    bool isFirstLineBroken = (diffTimeRtp > tryJbTimeRtp);
+
+    // After (T + try), it gives last chance till (T + try + a) with warning messages.
+    int64_t alpha = dynamicJbTimeRtp * JITTER_MULTIPLE;     // Use Dyn as 'a'
+    bool isSecondLineBroken = (diffTimeRtp > (tryJbTimeRtp + alpha));   // The Maginot line
 
     if (mShowQueue && mShowQueueCnt < 20) {
         showCurrentQueue(queue);
@@ -179,20 +200,20 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
 
     if (isFirstLineBroken) {
         if (isSecondLineBroken) {
-            ALOGW("buffer too late ... \t Diff in Jb=%lld \t "
+            int64_t totalDiffTimeMs = RtpToMs(diffTimeRtp + jitterTimeRtp, clockRate);
+            ALOGE("buffer too late... \t RTP diff from exp =%lld \t MS diff from stamp = %lld\t\t"
                     "Seq# %d \t ExpSeq# %d \t"
-                    "JitterMs %lld + (%lld * %.3f)",
-                    (long long)(diffTimeRtp),
+                    "JitterMs %d + (%d + %d * %.3f)",
+                    (long long)diffTimeRtp, (long long)totalDiffTimeMs,
                     buffer->int32Data(), mNextExpectedSeqNo,
-                    (long long)staticJbTimeMs, (long long)dynamicJbTimeMs, JITTER_MULTIPLE + 1);
+                    jitterTimeMs, tryJbTimeMs, dynamicJbTimeMs, JITTER_MULTIPLE);
             printNowTimeMs(startTimeMs, nowTimeMs, playedTimeMs);
             printRTPTime(rtpTime, playedTimeRtp, expiredTimeRtp, isExpired);
 
             mNextExpectedSeqNo = pickProperSeq(queue, firstRTPTime, playedTimeRtp, jitterTimeRtp);
         }  else {
-            ALOGW("=== WARNING === buffer arrived after %lld + %lld = %lld ms === WARNING === ",
-                    (long long)staticJbTimeMs, (long long)dynamicJbTimeMs,
-                    (long long)RtpToMs(jitterTimeRtp, clockRate));
+            ALOGW("=== WARNING === buffer arrived after %d + %d = %d ms === WARNING === ",
+                    jitterTimeMs, tryJbTimeMs, jitterTimeMs + tryJbTimeMs);
         }
     }
 
