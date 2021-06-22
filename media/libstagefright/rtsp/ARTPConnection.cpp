@@ -723,7 +723,6 @@ status_t ARTPConnection::parseRTP(StreamInfo *s, const sp<ABuffer> &buffer) {
     buffer->setInt32Data(u16at(&data[2]));
     buffer->setRange(payloadOffset, size - payloadOffset);
 
-    source->putDynamicJitterData(rtpTime, s->mLastPollTimeUs);
     source->processRTPPacket(buffer);
 
     return OK;
