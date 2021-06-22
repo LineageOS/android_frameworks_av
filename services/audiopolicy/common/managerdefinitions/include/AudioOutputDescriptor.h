@@ -305,6 +305,7 @@ public:
     {
         return !devices().isEmpty() ? devices().itemAt(0)->hasGainController() : false;
     }
+    bool isRouted() const { return mPatchHandle != AUDIO_PATCH_HANDLE_NONE; }
 
     DeviceVector mDevices; /**< current devices this output is routed to */
     wp<AudioPolicyMix> mPolicyMix;  // non NULL when used by a dynamic policy
