@@ -70,10 +70,12 @@ struct ARTPSource : public RefBase {
     void setSelfID(const uint32_t selfID);
     void setPeriodicFIR(bool enable);
 
-    uint32_t getStaticJitterTimeMs();
-    uint32_t getDynamicJitterTimeMs();
+    int32_t getStaticJitterTimeMs();
+    int32_t getBaseJitterTimeMs();
+    int32_t getInterArrivalJitterTimeMs();
     void setStaticJitterTimeMs(const uint32_t jbTimeMs);
-    void putDynamicJitterData(uint32_t timeStamp, int64_t arrivalTime);
+    void putBaseJitterData(uint32_t timeStamp, int64_t arrivalTime);
+    void putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime);
 
     bool isNeedToEarlyNotify();
     void notifyPktInfo(int32_t bitrate, bool isRegular);
@@ -104,7 +106,7 @@ private:
     List<sp<ABuffer> > mQueue;
     sp<ARTPAssembler> mAssembler;
 
-    uint32_t mStaticJbTimeMs;
+    int32_t mStaticJbTimeMs;
     sp<JitterCalc> mJitterCalc;
 
     typedef struct infoNACK {
