@@ -638,18 +638,22 @@ protected:
         void updateCallAndOutputRouting(bool forceVolumeReeval = true, uint32_t delayMs = 0);
 
         bool isCallRxAudioSource(const sp<SourceClientDescriptor> &source) {
-            return mCallRxSourceClientPort != AUDIO_PORT_HANDLE_NONE
-                && source == mAudioSources.valueFor(mCallRxSourceClientPort);
+            return mCallRxSourceClient != nullptr && source == mCallRxSourceClient;
         }
 
         void connectTelephonyRxAudioSource();
 
-        void disconnectTelephonyAudioSource(audio_port_handle_t &portHandle);
+        void disconnectTelephonyAudioSource(sp<SourceClientDescriptor> &clientDesc);
 
         void connectTelephonyTxAudioSource(const sp<DeviceDescriptor> &srcdevice,
                                            const sp<DeviceDescriptor> &sinkDevice,
                                            uint32_t delayMs);
 
+        bool isTelephonyRxOrTx(const sp<SwAudioOutputDescriptor>& desc) const {
+            return (mCallRxSourceClient != nullptr && mCallRxSourceClient->belongsToOutput(desc))
+                    || (mCallTxSourceClient != nullptr
+                    &&  mCallTxSourceClient->belongsToOutput(desc));
+        }
 
         /**
          * @brief updates routing for all inputs.
@@ -952,8 +956,8 @@ protected:
 
         // The port handle of the hardware audio source created internally for the Call RX audio
         // end point.
-        audio_port_handle_t mCallRxSourceClientPort = AUDIO_PORT_HANDLE_NONE;
-        audio_port_handle_t mCallTxSourceClientPort = AUDIO_PORT_HANDLE_NONE;
+        sp<SourceClientDescriptor> mCallRxSourceClient;
+        sp<SourceClientDescriptor> mCallTxSourceClient;
 
         // Support for Multi-Stream Decoder (MSD) module
         sp<DeviceDescriptor> getMsdAudioInDevice() const;
@@ -988,6 +992,10 @@ protected:
         bool isMsdPatch(const audio_patch_handle_t &handle) const;
 
 private:
+        sp<SourceClientDescriptor> startAudioSourceInternal(
+                const struct audio_port_config *source, const audio_attributes_t *attributes,
+                uid_t uid);
+
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
         // Add or remove AC3 DTS encodings based on user preferences.

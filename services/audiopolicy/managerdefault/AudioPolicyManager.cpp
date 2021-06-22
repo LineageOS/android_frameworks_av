@@ -664,8 +664,8 @@ status_t AudioPolicyManager::updateCallRoutingInternal(
     ALOGV("%s device rxDevice %s txDevice %s", __func__,
           rxDevices.itemAt(0)->toString().c_str(), txSourceDevice->toString().c_str());
 
-    disconnectTelephonyAudioSource(mCallRxSourceClientPort);
-    disconnectTelephonyAudioSource(mCallTxSourceClientPort);
+    disconnectTelephonyAudioSource(mCallRxSourceClient);
+    disconnectTelephonyAudioSource(mCallTxSourceClient);
 
     auto telephonyRxModule =
         mHwModules.getModuleForDeviceType(AUDIO_DEVICE_IN_TELEPHONY_RX, AUDIO_FORMAT_DEFAULT);
@@ -745,27 +745,32 @@ bool AudioPolicyManager::isDeviceOfModule(
 
 void AudioPolicyManager::connectTelephonyRxAudioSource()
 {
-    disconnectTelephonyAudioSource(mCallRxSourceClientPort);
+    disconnectTelephonyAudioSource(mCallRxSourceClient);
     const struct audio_port_config source = {
         .role = AUDIO_PORT_ROLE_SOURCE, .type = AUDIO_PORT_TYPE_DEVICE,
         .ext.device.type = AUDIO_DEVICE_IN_TELEPHONY_RX, .ext.device.address = ""
     };
     const auto aa = mEngine->getAttributesForStreamType(AUDIO_STREAM_VOICE_CALL);
-    status_t status = startAudioSource(&source, &aa, &mCallRxSourceClientPort, 0/*uid*/);
-    ALOGE_IF(status != NO_ERROR, "%s failed to start Telephony Rx AudioSource", __func__);
+    mCallRxSourceClient = startAudioSourceInternal(&source, &aa, 0/*uid*/);
+    ALOGE_IF(mCallRxSourceClient == nullptr,
+             "%s failed to start Telephony Rx AudioSource", __func__);
 }
 
-void AudioPolicyManager::disconnectTelephonyAudioSource(audio_port_handle_t &portHandle)
+void AudioPolicyManager::disconnectTelephonyAudioSource(sp<SourceClientDescriptor> &clientDesc)
 {
-    stopAudioSource(portHandle);
-    portHandle = AUDIO_PORT_HANDLE_NONE;
+    if (clientDesc == nullptr) {
+        return;
+    }
+    ALOGW_IF(stopAudioSource(clientDesc->portId()) != NO_ERROR,
+            "%s error stopping audio source", __func__);
+    clientDesc.clear();
 }
 
 void AudioPolicyManager::connectTelephonyTxAudioSource(
         const sp<DeviceDescriptor> &srcDevice, const sp<DeviceDescriptor> &sinkDevice,
         uint32_t delayMs)
 {
-    disconnectTelephonyAudioSource(mCallTxSourceClientPort);
+    disconnectTelephonyAudioSource(mCallTxSourceClient);
     if (srcDevice == nullptr || sinkDevice == nullptr) {
         ALOGW("%s could not create patch, invalid sink and/or source device(s)", __func__);
         return;
@@ -774,19 +779,20 @@ void AudioPolicyManager::connectTelephonyTxAudioSource(
     patchBuilder.addSource(srcDevice).addSink(sinkDevice);
     ALOGV("%s between source %s and sink %s", __func__,
             srcDevice->toString().c_str(), sinkDevice->toString().c_str());
-    mCallTxSourceClientPort = PolicyAudioPort::getNextUniqueId();
+    auto callTxSourceClientPortId = PolicyAudioPort::getNextUniqueId();
     const audio_attributes_t aa = { .source = AUDIO_SOURCE_VOICE_COMMUNICATION };
     struct audio_port_config source = {};
     srcDevice->toAudioPortConfig(&source);
-    sp<SourceClientDescriptor> sourceDesc = new InternalSourceClientDescriptor(
-                mCallTxSourceClientPort, mUidCached, aa, source, srcDevice, sinkDevice,
+    mCallTxSourceClient = new InternalSourceClientDescriptor(
+                callTxSourceClientPortId, mUidCached, aa, source, srcDevice, sinkDevice,
                 mCommunnicationStrategy, toVolumeSource(aa));
     audio_patch_handle_t patchHandle = AUDIO_PATCH_HANDLE_NONE;
     status_t status = connectAudioSourceToSink(
-                sourceDesc, sinkDevice, patchBuilder.patch(), patchHandle, mUidCached, delayMs);
+                mCallTxSourceClient, sinkDevice, patchBuilder.patch(), patchHandle, mUidCached,
+                delayMs);
     ALOGE_IF(status != NO_ERROR, "%s() error %d creating TX audio patch", __func__, status);
     if (status == NO_ERROR) {
-        mAudioSources.add(mCallTxSourceClientPort, sourceDesc);
+        mAudioSources.add(callTxSourceClientPortId, mCallTxSourceClient);
     }
 }
 
@@ -855,8 +861,8 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
                 rxDevices = mPrimaryOutput->devices();
             }
             if (oldState == AUDIO_MODE_IN_CALL) {
-                disconnectTelephonyAudioSource(mCallRxSourceClientPort);
-                disconnectTelephonyAudioSource(mCallTxSourceClientPort);
+                disconnectTelephonyAudioSource(mCallRxSourceClient);
+                disconnectTelephonyAudioSource(mCallTxSourceClient);
             }
             setOutputDevices(mPrimaryOutput, rxDevices, force, 0);
         }
@@ -866,8 +872,10 @@ void AudioPolicyManager::setPhoneState(audio_mode_t state)
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> desc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(desc, true /*fromCache*/);
-        if (state != AUDIO_MODE_IN_CALL || desc != mPrimaryOutput) {
-            setOutputDevices(desc, newDevices, !newDevices.isEmpty(), 0 /*delayMs*/);
+        if (state != AUDIO_MODE_IN_CALL || (desc != mPrimaryOutput && !isTelephonyRxOrTx(desc))) {
+            bool forceRouting = !newDevices.isEmpty();
+            setOutputDevices(desc, newDevices, forceRouting, 0 /*delayMs*/, nullptr,
+                             true /*requiresMuteCheck*/, !forceRouting /*requiresVolumeCheck*/);
         }
     }
 
@@ -3523,11 +3531,15 @@ void AudioPolicyManager::updateCallAndOutputRouting(bool forceVolumeReeval, uint
     for (size_t i = 0; i < mOutputs.size(); i++) {
         sp<SwAudioOutputDescriptor> outputDesc = mOutputs.valueAt(i);
         DeviceVector newDevices = getNewOutputDevices(outputDesc, true /*fromCache*/);
-        if ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) || (outputDesc != mPrimaryOutput)) {
+        if ((mEngine->getPhoneState() != AUDIO_MODE_IN_CALL) ||
+                (outputDesc != mPrimaryOutput && !isTelephonyRxOrTx(outputDesc))) {
             // As done in setDeviceConnectionState, we could also fix default device issue by
             // preventing the force re-routing in case of default dev that distinguishes on address.
             // Let's give back to engine full device choice decision however.
-            waitMs = setOutputDevices(outputDesc, newDevices, !newDevices.isEmpty(), delayMs);
+            bool forceRouting = !newDevices.isEmpty();
+            waitMs = setOutputDevices(outputDesc, newDevices, forceRouting, delayMs, nullptr,
+                                      true /*requiresMuteCheck*/,
+                                      !forceRouting /*requiresVolumeCheck*/);
             // Only apply special touch sound delay once
             delayMs = 0;
         }
@@ -4798,6 +4810,18 @@ status_t AudioPolicyManager::startAudioSource(const struct audio_port_config *so
     }
     return status;
 }
+
+sp<SourceClientDescriptor> AudioPolicyManager::startAudioSourceInternal(
+        const struct audio_port_config *source, const audio_attributes_t *attributes, uid_t uid)
+{
+    ALOGV("%s", __FUNCTION__);
+    audio_port_handle_t portId = AUDIO_PORT_HANDLE_NONE;
+
+    status_t status = startAudioSource(source, attributes, &portId, uid);
+    ALOGE_IF(status != OK, "%s: failed to start audio source (%d)", __func__, status);
+    return mAudioSources.valueFor(portId);
+}
+
 
 status_t AudioPolicyManager::connectAudioSource(const sp<SourceClientDescriptor>& sourceDesc)
 {

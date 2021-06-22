@@ -225,6 +225,9 @@ public:
         mPatchHandle = AUDIO_PATCH_HANDLE_NONE;
         mSinkDevice = nullptr;
     }
+    bool belongsToOutput(const sp<SwAudioOutputDescriptor> &swOutput) const {
+        return swOutput != nullptr && mSwOutput.promote() == swOutput;
+    }
     void setUseSwBridge() { mUseSwBridge = true; }
     bool useSwBridge() const { return mUseSwBridge; }
     bool isConnected() const { return mPatchHandle != AUDIO_PATCH_HANDLE_NONE; }
