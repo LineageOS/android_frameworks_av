@@ -158,7 +158,7 @@ public:
     virtual bool isDuplicated() const { return false; }
     virtual uint32_t latency() { return 0; }
     virtual bool isFixedVolume(const DeviceTypeSet& deviceTypes);
-    virtual bool setVolume(float volumeDb,
+    virtual bool setVolume(float volumeDb, bool muted,
                            VolumeSource volumeSource, const StreamTypeVector &streams,
                            const DeviceTypeSet& deviceTypes,
                            uint32_t delayMs,
@@ -352,7 +352,22 @@ public:
             setClientActive(client, false);
         }
     }
-    virtual bool setVolume(float volumeDb,
+
+    /**
+     * @brief setSwMute for SwOutput routed on a device that supports Hw Gain, this function allows
+     * to mute the tracks associated to a given volume source only.
+     * As an output may host one or more source(s), and as AudioPolicyManager may dispatch or not
+     * the volume change request according to the priority of the volume source to control the
+     * unique hw gain controller, a separated API allows to force a mute/unmute of a volume source.
+     * @param muted true to mute, false otherwise
+     * @param vs volume source to be considered
+     * @param device scoped for the change
+     * @param delayMs potentially applyed to prevent cut sounds.
+     */
+    void setSwMute(bool muted, VolumeSource vs, const StreamTypeVector &streams,
+                   const DeviceTypeSet& device, uint32_t delayMs);
+
+    virtual bool setVolume(float volumeDb, bool muted,
                            VolumeSource volumeSource, const StreamTypeVector &streams,
                            const DeviceTypeSet& device,
                            uint32_t delayMs,
@@ -435,7 +450,7 @@ public:
 
             void dump(String8 *dst) const override;
 
-    virtual bool setVolume(float volumeDb,
+    virtual bool setVolume(float volumeDb, bool muted,
                            VolumeSource volumeSource, const StreamTypeVector &streams,
                            const DeviceTypeSet& deviceTypes,
                            uint32_t delayMs,

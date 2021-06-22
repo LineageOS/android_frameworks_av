@@ -2801,6 +2801,8 @@ status_t AudioPolicyManager::setVolumeIndexForAttributes(const audio_attributes_
         // HW Gain management, do not change the volume
         if (desc->useHwGain()) {
             applyVolume = false;
+            // If the volume source is active with higher priority source, ensure at least Sw Muted
+            desc->setSwMute((index == 0), vs, curves.getStreamTypes(), curDevices, 0 /*delayMs*/);
             for (const auto &productStrategy : mEngine->getOrderedProductStrategies()) {
                 auto activeClients = desc->clientsList(true /*activeOnly*/, productStrategy,
                                                        false /*preferredDevice*/);
@@ -6575,8 +6577,9 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
                     isSingleDeviceType(deviceTypes, audio_is_bluetooth_out_sco_device))) {
         volumeDb = 0.0f;
     }
+    const bool muted = (index == 0) && (volumeDb != 0.0f);
     outputDesc->setVolume(
-            volumeDb, volumeSource, curves.getStreamTypes(), deviceTypes, delayMs, force);
+            volumeDb, muted, volumeSource, curves.getStreamTypes(), deviceTypes, delayMs, force);
 
     if (outputDesc == mPrimaryOutput && (isVoiceVolSrc || isBtScoVolSrc)) {
         float voiceVolume;
