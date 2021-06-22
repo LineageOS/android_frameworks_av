@@ -453,14 +453,27 @@ protected:
         void removeOutput(audio_io_handle_t output);
         void addInput(audio_io_handle_t input, const sp<AudioInputDescriptor>& inputDesc);
 
-        // change the route of the specified output. Returns the number of ms we have slept to
-        // allow new routing to take effect in certain cases.
+        /**
+         * @brief setOutputDevices change the route of the specified output.
+         * @param outputDesc to be considered
+         * @param device to be considered to route the output
+         * @param force if true, force the routing even if no change.
+         * @param delayMs if specified, delay to apply for mute/volume op when changing device
+         * @param patchHandle if specified, the patch handle this output is connected through.
+         * @param requiresMuteCheck if specified, for e.g. when another output is on a shared device
+         *        and currently active, allow to have proper drain and avoid pops
+         * @param requiresVolumeCheck true if called requires to reapply volume if the routing did
+         * not change (but the output is still routed).
+         * @return the number of ms we have slept to allow new routing to take effect in certain
+         * cases.
+         */
         uint32_t setOutputDevices(const sp<SwAudioOutputDescriptor>& outputDesc,
                                   const DeviceVector &device,
                                   bool force = false,
                                   int delayMs = 0,
                                   audio_patch_handle_t *patchHandle = NULL,
-                                  bool requiresMuteCheck = true);
+                                  bool requiresMuteCheck = true,
+                                  bool requiresVolumeCheck = false);
         status_t resetOutputDevice(const sp<AudioOutputDescriptor>& outputDesc,
                                    int delayMs = 0,
                                    audio_patch_handle_t *patchHandle = NULL);
