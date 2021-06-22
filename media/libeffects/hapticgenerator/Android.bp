@@ -45,6 +45,7 @@ cc_library_shared {
 
     shared_libs: [
         "libaudioutils",
+        "libbase",
         "libbinder",
         "liblog",
         "libutils",
