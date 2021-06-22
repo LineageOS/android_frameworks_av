@@ -28,15 +28,22 @@ private:
     // Time Stamp per Second
     const int32_t mClockRate;
 
-    uint32_t mJitterValueUs;
+    uint32_t mFirstTimeStamp;
     uint32_t mLastTimeStamp;
+    int64_t mFirstArrivalTimeUs;
     int64_t mLastArrivalTimeUs;
 
-    void init();
+    int32_t mBaseJitterUs;
+    int32_t mInterArrivalJitterUs;
+
 public:
     JitterCalc(int32_t clockRate);
-    void putData(int64_t rtpTime, int64_t arrivalTime);
-    uint32_t getJitterMs();
+
+    void init(uint32_t rtpTime, int64_t arrivalTimeUs, int32_t base, int32_t inter);
+    void putInterArrivalData(int64_t rtpTime, int64_t arrivalTime);
+    void putBaseData(int64_t rtpTime, int64_t arrivalTimeUs);
+    int32_t getBaseJitterMs();
+    int32_t getInterArrivalJitterMs();
 };
 
 }   // namespace android
