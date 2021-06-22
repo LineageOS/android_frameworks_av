@@ -2652,7 +2652,8 @@ status_t CameraProviderManager::ProviderInfo::DeviceInfo3::filterSmallJpegSizes(
     if (OK != res) {
         ALOGE("%s: Failed to append dynamic depth tags: %s (%d)", __FUNCTION__,
                 strerror(-res), res);
-        return res;
+        // Allow filtering of small JPEG sizes to succeed even if dynamic depth
+        // tags fail to generate.
     }
 
     return OK;
