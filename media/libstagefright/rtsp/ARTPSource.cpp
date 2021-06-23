@@ -146,6 +146,7 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
         mFirstSsrc = ssrc;
         ALOGD("first-rtp arrived: first-rtp-time=%u, sys-time=%lld, seq-num=%u, ssrc=%d",
                 mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber, mFirstSsrc);
+        mJitterCalc->init(mFirstRtpTime, mFirstSysTime, 0, mStaticJbTimeMs * 1000);
         mQueue.push_back(buffer);
         return true;
     }
@@ -331,7 +332,7 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
     data[18] = (mHighestSeqNumber >> 8) & 0xff;
     data[19] = mHighestSeqNumber & 0xff;
 
-    uint32_t jitterTime = getDynamicJitterTimeMs() * mClockRate / 1000;
+    uint32_t jitterTime = 0;
     data[20] = jitterTime >> 24;    // Interarrival jitter
     data[21] = (jitterTime >> 16) & 0xff;
     data[22] = (jitterTime >> 8) & 0xff;
@@ -518,20 +519,28 @@ void ARTPSource::setPeriodicFIR(bool enable) {
     mIssueFIRRequests = enable;
 }
 
-uint32_t ARTPSource::getStaticJitterTimeMs() {
+int32_t ARTPSource::getStaticJitterTimeMs() {
     return mStaticJbTimeMs;
 }
 
-uint32_t ARTPSource::getDynamicJitterTimeMs() {
-    return mJitterCalc->getJitterMs();
+int32_t ARTPSource::getBaseJitterTimeMs() {
+    return mJitterCalc->getBaseJitterMs();
+}
+
+int32_t ARTPSource::getInterArrivalJitterTimeMs() {
+    return mJitterCalc->getInterArrivalJitterMs();
 }
 
 void ARTPSource::setStaticJitterTimeMs(const uint32_t jbTimeMs) {
     mStaticJbTimeMs = jbTimeMs;
 }
 
-void ARTPSource::putDynamicJitterData(uint32_t timeStamp, int64_t arrivalTime) {
-    mJitterCalc->putData(timeStamp, arrivalTime);
+void ARTPSource::putBaseJitterData(uint32_t timeStamp, int64_t arrivalTime) {
+    mJitterCalc->putBaseData(timeStamp, arrivalTime);
+}
+
+void ARTPSource::putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime) {
+    mJitterCalc->putInterArrivalData(timeStamp, arrivalTime);
 }
 
 bool ARTPSource::isNeedToEarlyNotify() {
