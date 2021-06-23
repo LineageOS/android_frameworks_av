@@ -17,6 +17,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "TranscodingThermalPolicy"
 
+#include <media/TranscodingDefs.h>
 #include <media/TranscodingThermalPolicy.h>
 #include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>

@@ -28,9 +28,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
-#define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
-
 struct AActivityManager_UidImportanceListener;
 
 namespace android {

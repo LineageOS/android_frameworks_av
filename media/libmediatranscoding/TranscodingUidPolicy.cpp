@@ -21,6 +21,7 @@
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
 #include <inttypes.h>
+#include <media/TranscodingDefs.h>
 #include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
 
