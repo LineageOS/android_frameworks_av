@@ -24,9 +24,6 @@ namespace android {
 
 using ::aidl::android::media::TranscodingRequestParcel;
 
-// TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
-#define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
-
 // Helper class for duplicating a TranscodingRequestParcel
 class TranscodingRequest : public TranscodingRequestParcel {
 public:
