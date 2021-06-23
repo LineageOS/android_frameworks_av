@@ -608,6 +608,32 @@ MtpProperty* MtpDevice::getDevicePropDesc(MtpDeviceProperty code) {
     return NULL;
 }
 
+bool MtpDevice::setDevicePropValueStr(MtpProperty* property) {
+    if (property == nullptr)
+        return false;
+
+    std::lock_guard<std::mutex> lg(mMutex);
+
+    if (property->getDataType() != MTP_TYPE_STR) {
+        return false;
+    }
+
+    mRequest.reset();
+    mRequest.setParameter(1, property->getPropertyCode());
+
+    mData.reset();
+    mData.putString(property->getCurrentValue().str);
+
+   if (sendRequest(MTP_OPERATION_SET_DEVICE_PROP_VALUE) && sendData()) {
+        MtpResponseCode ret = readResponse();
+        if (ret != MTP_RESPONSE_OK) {
+            ALOGW("%s: Response=0x%04X\n", __func__, ret);
+            return false;
+        }
+    }
+    return true;
+}
+
 MtpProperty* MtpDevice::getObjectPropDesc(MtpObjectProperty code, MtpObjectFormat format) {
     std::lock_guard<std::mutex> lg(mMutex);
 
