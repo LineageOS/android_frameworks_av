@@ -164,8 +164,8 @@ static const char *kCodecRecentLatencyMin = "android.media.mediacodec.recent.min
 static const char *kCodecRecentLatencyAvg = "android.media.mediacodec.recent.avg";      /* in us */
 static const char *kCodecRecentLatencyCount = "android.media.mediacodec.recent.n";
 static const char *kCodecRecentLatencyHist = "android.media.mediacodec.recent.hist";    /* in us */
-static const char *kCodecPlaybackDuration =
-        "android.media.mediacodec.playback-duration"; /* in sec */
+static const char *kCodecPlaybackDurationSec =
+        "android.media.mediacodec.playback-duration-sec"; /* in sec */
 
 /* -1: shaper disabled
    >=0: number of fields changed */
@@ -864,9 +864,9 @@ void MediaCodec::updateMediametrics() {
     if (mLatencyUnknown > 0) {
         mediametrics_setInt64(mMetricsHandle, kCodecLatencyUnknown, mLatencyUnknown);
     }
-    int64_t playbackDuration = mPlaybackDurationAccumulator->getDurationInSeconds();
-    if (playbackDuration > 0) {
-        mediametrics_setInt64(mMetricsHandle, kCodecPlaybackDuration, playbackDuration);
+    int64_t playbackDurationSec = mPlaybackDurationAccumulator->getDurationInSeconds();
+    if (playbackDurationSec > 0) {
+        mediametrics_setInt64(mMetricsHandle, kCodecPlaybackDurationSec, playbackDurationSec);
     }
     if (mLifetimeStartNs > 0) {
         nsecs_t lifetime = systemTime(SYSTEM_TIME_MONOTONIC) - mLifetimeStartNs;

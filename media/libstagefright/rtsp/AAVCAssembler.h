@@ -48,6 +48,7 @@ private:
     bool mAccessUnitDamaged;
     bool mFirstIFrameProvided;
     uint64_t mLastIFrameProvidedAtMs;
+    int64_t mLastRtpTimeJitterDataUs;
     int32_t mWidth;
     int32_t mHeight;
     List<sp<ABuffer> > mNALUnits;
