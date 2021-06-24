@@ -268,8 +268,7 @@ media_status_t VideoTrackTranscoder::configureDestinationFormat(
         return AMEDIA_ERROR_INVALID_PARAMETER;
     }
 
-// TODO: replace __ANDROID_API_FUTURE__with 31 when it's official (b/178144708)
-#define __TRANSCODING_MIN_API__ __ANDROID_API_FUTURE__
+#define __TRANSCODING_MIN_API__ 31
 
     AMediaCodec* encoder;
     if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
