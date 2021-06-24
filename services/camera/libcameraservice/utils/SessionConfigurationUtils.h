@@ -83,7 +83,7 @@ public:
     // a width <= ROUNDING_WIDTH_CAP
     static bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
             android_dataspace dataSpace, const CameraMetadata& info, bool maxResolution,
-            /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
+            /*out*/int32_t* outWidth, /*out*/int32_t* outHeight, bool isPriviledgedClient);
 
     static bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo, int32_t arrayTag,
             int32_t *width, int32_t *height);
