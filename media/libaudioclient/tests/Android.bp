@@ -9,9 +9,33 @@ package {
 
 cc_defaults {
     name: "libaudioclient_tests_defaults",
+    test_suites: ["device-tests"],
     cflags: [
         "-Wall",
         "-Werror",
+    ],
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+    },
+}
+
+cc_test {
+    name: "audio_aidl_conversion_tests",
+    defaults: ["libaudioclient_tests_defaults"],
+    srcs: ["audio_aidl_legacy_conversion_tests.cpp"],
+    shared_libs: [
+        "libbinder",
+        "libcutils",
+        "liblog",
+        "libutils",
+    ],
+    static_libs: [
+        "audioclient-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+        "libstagefright_foundation",
     ],
 }
 
@@ -30,8 +54,10 @@ cc_test {
 cc_test {
     name: "test_create_audiotrack",
     defaults: ["libaudioclient_tests_defaults"],
-    srcs: ["test_create_audiotrack.cpp",
-           "test_create_utils.cpp"],
+    srcs: [
+        "test_create_audiotrack.cpp",
+        "test_create_utils.cpp",
+    ],
     header_libs: [
         "libmedia_headers",
         "libmediametrics_headers",
@@ -49,8 +75,10 @@ cc_test {
 cc_test {
     name: "test_create_audiorecord",
     defaults: ["libaudioclient_tests_defaults"],
-    srcs: ["test_create_audiorecord.cpp",
-           "test_create_utils.cpp"],
+    srcs: [
+        "test_create_audiorecord.cpp",
+        "test_create_utils.cpp",
+    ],
     header_libs: [
         "libmedia_headers",
         "libmediametrics_headers",

@@ -17,9 +17,39 @@
 
 #pragma once
 
+#include <functional>
+
+#include <android/media/AudioFormatDescription.h>
+#include <binder/Parcelable.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
-#include <binder/Parcelable.h>
+
+namespace {
+// see boost::hash_combine
+#if defined(__clang__)
+__attribute__((no_sanitize("unsigned-integer-overflow")))
+#endif
+static size_t hash_combine(size_t seed, size_t v) {
+    return std::hash<size_t>{}(v) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+}
+
+namespace std {
+
+// Note: when extending AudioFormatDescription we need to account for the
+// possibility of comparison between different versions of it, e.g. a HAL
+// may be using a previous version of the AIDL interface.
+template<> struct hash<android::media::AudioFormatDescription>
+{
+    std::size_t operator()(const android::media::AudioFormatDescription& afd) const noexcept {
+        return hash_combine(
+                std::hash<android::media::AudioFormatType>{}(afd.type),
+                hash_combine(
+                        std::hash<android::media::PcmType>{}(afd.pcm),
+                        std::hash<std::string>{}(afd.encoding)));
+    }
+};
+}  // namespace std
 
 namespace android {
 
@@ -45,4 +75,3 @@ enum volume_group_t : uint32_t;
 static const volume_group_t VOLUME_GROUP_NONE = static_cast<volume_group_t>(-1);
 
 } // namespace android
-
