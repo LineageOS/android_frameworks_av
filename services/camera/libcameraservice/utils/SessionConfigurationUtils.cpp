@@ -202,7 +202,7 @@ int64_t SessionConfigurationUtils::euclidDistSquare(int32_t x0, int32_t y0, int3
 bool SessionConfigurationUtils::roundBufferDimensionNearest(int32_t width, int32_t height,
         int32_t format, android_dataspace dataSpace,
         const CameraMetadata& info, bool maxResolution, /*out*/int32_t* outWidth,
-        /*out*/int32_t* outHeight) {
+        /*out*/int32_t* outHeight, bool isPriviledgedClient) {
     const int32_t depthSizesTag =
             getAppropriateModeTag(ANDROID_DEPTH_AVAILABLE_DEPTH_STREAM_CONFIGURATIONS,
                     maxResolution);
@@ -240,6 +240,25 @@ bool SessionConfigurationUtils::roundBufferDimensionNearest(int32_t width, int32
                 bestWidth = w;
                 bestHeight = h;
             }
+        }
+    }
+
+    if (isPriviledgedClient == true && bestWidth == -1 &&
+        (format == HAL_PIXEL_FORMAT_RAW10 || format == HAL_PIXEL_FORMAT_RAW12 ||
+         format == HAL_PIXEL_FORMAT_RAW16 || format == HAL_PIXEL_FORMAT_RAW_OPAQUE)) {
+        bool isLogicalCamera = false;
+        auto entry = info.find(ANDROID_REQUEST_AVAILABLE_CAPABILITIES);
+        for (size_t i = 0; i < entry.count; ++i) {
+            uint8_t capability = entry.data.u8[i];
+            if (capability == ANDROID_REQUEST_AVAILABLE_CAPABILITIES_LOGICAL_MULTI_CAMERA) {
+                isLogicalCamera = true;
+                break;
+            }
+        }
+
+        if (isLogicalCamera == true) {
+            bestWidth = width;
+            bestHeight = height;
         }
     }
 
@@ -322,7 +341,7 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
     uint64_t allowedFlags = GraphicBuffer::USAGE_SW_READ_MASK |
                            GraphicBuffer::USAGE_HW_TEXTURE |
                            GraphicBuffer::USAGE_HW_COMPOSER;
-    bool flexibleConsumer = !isPriviledgedClient && (consumerUsage & disallowedFlags) == 0 &&
+    bool flexibleConsumer = (consumerUsage & disallowedFlags) == 0 &&
             (consumerUsage & allowedFlags) != 0;
 
     surface = new Surface(gbp, useAsync);
@@ -384,7 +403,7 @@ binder::Status SessionConfigurationUtils::createSurfaceFromGbp(
     if (flexibleConsumer && isPublicFormat(format) &&
             !SessionConfigurationUtils::roundBufferDimensionNearest(width, height,
             format, dataSpace, physicalCameraMetadata, foundInMaxRes, /*out*/&width,
-            /*out*/&height)) {
+            /*out*/&height, isPriviledgedClient)) {
         String8 msg = String8::format("Camera %s: No supported stream configurations with "
                 "format %#x defined, failed to create output stream",
                 logicalCameraId.string(), format);
