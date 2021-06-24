@@ -24,6 +24,7 @@
 #include <cutils/properties.h>
 #include <media/TranscoderWrapper.h>
 #include <media/TranscodingClientManager.h>
+#include <media/TranscodingDefs.h>
 #include <media/TranscodingLogger.h>
 #include <media/TranscodingResourcePolicy.h>
 #include <media/TranscodingSessionController.h>

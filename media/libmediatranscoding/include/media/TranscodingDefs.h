@@ -20,6 +20,9 @@
 #include <aidl/android/media/ITranscodingClientCallback.h>
 #include <aidl/android/media/TranscodingRequestParcel.h>
 
+// Transcoding uses some APIs available on API31+.
+#define __TRANSCODING_MIN_API__ 31
+
 namespace android {
 
 using ClientIdType = uintptr_t;
