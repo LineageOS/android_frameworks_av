@@ -19,6 +19,7 @@
 
 #include <functional>
 
+#include <android/media/AudioChannelLayout.h>
 #include <android/media/AudioDeviceDescription.h>
 #include <android/media/AudioFormatDescription.h>
 #include <binder/Parcelable.h>
@@ -37,9 +38,29 @@ static size_t hash_combine(size_t seed, size_t v) {
 
 namespace std {
 
-// Note: when extending Audio{Device|Format}Description we need to account for the
-// possibility of comparison between different versions of it, e.g. a HAL
-// may be using a previous version of the AIDL interface.
+// Note: when extending the types hashed below we need to account for the
+// possibility of processing types belonging to different versions of the type,
+// e.g. a HAL may be using a previous version of the AIDL interface.
+
+template<> struct hash<android::media::AudioChannelLayout>
+{
+    std::size_t operator()(const android::media::AudioChannelLayout& acl) const noexcept {
+        using Tag = android::media::AudioChannelLayout::Tag;
+        const size_t seed = std::hash<Tag>{}(acl.getTag());
+        switch (acl.getTag()) {
+            case Tag::none:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::none>()));
+            case Tag::invalid:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::invalid>()));
+            case Tag::indexMask:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::indexMask>()));
+            case Tag::layoutMask:
+                return hash_combine(seed, std::hash<int32_t>{}(acl.get<Tag::layoutMask>()));
+        }
+        return seed;
+    }
+};
+
 template<> struct hash<android::media::AudioDeviceDescription>
 {
     std::size_t operator()(const android::media::AudioDeviceDescription& add) const noexcept {
