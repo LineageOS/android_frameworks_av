@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, The Android Open Source Project
+ * Copyright 2012-2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,8 @@
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
+#include <media/MediaBufferHolder.h>
 #include <media/stagefright/MediaSource.h>
 #include <media/stagefright/MetaData.h>
 
@@ -138,7 +139,7 @@ void MediaPuller::onMessageReceived(const sp<AMessage> &msg) {
                 break;
             }
 
-            MediaBuffer *mbuf;
+            MediaBufferBase *mbuf;
             status_t err = mSource->read(&mbuf);
 
             if (mPaused) {
@@ -163,7 +164,7 @@ void MediaPuller::onMessageReceived(const sp<AMessage> &msg) {
                 notify->post();
             } else {
                 int64_t timeUs;
-                CHECK(mbuf->meta_data()->findInt64(kKeyTime, &timeUs));
+                CHECK(mbuf->meta_data().findInt64(kKeyTime, &timeUs));
 
                 sp<ABuffer> accessUnit = new ABuffer(mbuf->range_length());
 
@@ -177,9 +178,11 @@ void MediaPuller::onMessageReceived(const sp<AMessage> &msg) {
                     mbuf->release();
                     mbuf = NULL;
                 } else {
-                    // video encoder will release MediaBuffer when done
+                    // video encoder will release MediaBufferBase when done
                     // with underlying data.
-                    accessUnit->setMediaBufferBase(mbuf);
+                    accessUnit->meta()->setObject("mediaBufferHolder", new MediaBufferHolder(mbuf));
+                    mbuf->release();
+                    mbuf = NULL;
                 }
 
                 sp<AMessage> notify = mNotify->dup();

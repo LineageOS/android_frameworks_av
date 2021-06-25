@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009 The Android Open Source Project
+ * Copyright (C) 2009-2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -475,7 +475,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
     // check calling permissions.
     // Capturing from FM_TUNER source is controlled by captureAudioOutputAllowed() only as this
     // does not affect users privacy as does capturing from an actual microphone.
-    if (!(recordingAllowed(opPackageName, pid, uid) || attr->source == AUDIO_SOURCE_FM_TUNER)) {
+    if (!isAudioServerOrMediaServerUid(callingUid) && !(recordingAllowed(opPackageName, pid, uid) || attr->source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
                 __func__, uid, pid);
         return PERMISSION_DENIED;
@@ -523,7 +523,7 @@ status_t AudioPolicyService::getInputForAttr(const audio_attributes_t *attr,
             case AudioPolicyInterface::API_INPUT_TELEPHONY_RX:
                 // FIXME: use the same permission as for remote submix for now.
             case AudioPolicyInterface::API_INPUT_MIX_CAPTURE:
-                if (!canCaptureOutput) {
+                if (!isAudioServerOrMediaServerUid(callingUid) && !canCaptureOutput) {
                     ALOGE("getInputForAttr() permission denied: capture not allowed");
                     status = PERMISSION_DENIED;
                 }
@@ -592,7 +592,7 @@ status_t AudioPolicyService::startInput(audio_port_handle_t portId)
     }
 
     // check calling permissions
-    if (!(startRecording(client->opPackageName, client->pid, client->uid,
+    if (!isAudioServerOrMediaServerUid(IPCThreadState::self()->getCallingUid()) && !(startRecording(client->opPackageName, client->pid, client->uid,
             client->attributes.source == AUDIO_SOURCE_HOTWORD)
             || client->attributes.source == AUDIO_SOURCE_FM_TUNER)) {
         ALOGE("%s permission denied: recording not allowed for uid %d pid %d",
