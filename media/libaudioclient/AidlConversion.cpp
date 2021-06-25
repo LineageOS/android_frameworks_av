@@ -14,6 +14,11 @@
  * limitations under the License.
  */
 
+#include <algorithm>
+#include <unordered_map>
+#include <utility>
+#include <vector>
+
 #define LOG_TAG "AidlConversion"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
@@ -21,6 +26,7 @@
 #include "media/AidlConversion.h"
 
 #include <media/ShmemCompat.h>
+#include <media/stagefright/foundation/MediaDefs.h>
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // Utilities
@@ -401,6 +407,630 @@ ConversionResult<media::AudioFormatSys> legacy2aidl_audio_format_t_AudioFormat(
     // This relies on AudioFormatSys being kept in sync with audio_format_t.
     static_assert(sizeof(media::AudioFormatSys) == sizeof(audio_format_t));
     return static_cast<media::AudioFormatSys>(legacy);
+}
+
+namespace {
+
+namespace detail {
+using AudioDevicePair = std::pair<audio_devices_t, media::AudioDeviceDescription>;
+using AudioDevicePairs = std::vector<AudioDevicePair>;
+using AudioFormatPair = std::pair<audio_format_t, media::AudioFormatDescription>;
+using AudioFormatPairs = std::vector<AudioFormatPair>;
+}
+
+media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType type,
+        const std::string& connection = "") {
+    media::AudioDeviceDescription result;
+    result.type = type;
+    result.connection = connection;
+    return result;
+}
+
+void append_AudioDeviceDescription(detail::AudioDevicePairs& pairs,
+        audio_devices_t inputType, audio_devices_t outputType,
+        media::AudioDeviceType inType, media::AudioDeviceType outType,
+        const std::string& connection = "") {
+    pairs.push_back(std::make_pair(inputType, make_AudioDeviceDescription(inType, connection)));
+    pairs.push_back(std::make_pair(outputType, make_AudioDeviceDescription(outType, connection)));
+}
+
+const detail::AudioDevicePairs& getAudioDevicePairs() {
+    static const detail::AudioDevicePairs pairs = []() {
+        detail::AudioDevicePairs pairs = {{
+            {
+                AUDIO_DEVICE_NONE, media::AudioDeviceDescription{}
+            },
+            {
+                AUDIO_DEVICE_OUT_EARPIECE, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_SPEAKER_EARPIECE)
+            },
+            {
+                AUDIO_DEVICE_OUT_SPEAKER, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_SPEAKER)
+            },
+            {
+                AUDIO_DEVICE_OUT_WIRED_HEADPHONE, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_HEADPHONE,
+                        media::AudioDeviceDescription::CONNECTION_ANALOG())
+            },
+            {
+                AUDIO_DEVICE_OUT_BLUETOOTH_SCO, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_DEVICE,
+                        media::AudioDeviceDescription::CONNECTION_BT_SCO())
+            },
+            {
+                AUDIO_DEVICE_OUT_BLUETOOTH_SCO_CARKIT, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_CARKIT,
+                        media::AudioDeviceDescription::CONNECTION_BT_SCO())
+            },
+            {
+                AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_HEADPHONE,
+                        media::AudioDeviceDescription::CONNECTION_BT_A2DP())
+            },
+            {
+                AUDIO_DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_SPEAKER,
+                        media::AudioDeviceDescription::CONNECTION_BT_A2DP())
+            },
+            {
+                AUDIO_DEVICE_OUT_TELEPHONY_TX, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_TELEPHONY_TX)
+            },
+            {
+                AUDIO_DEVICE_OUT_AUX_LINE, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_LINE_AUX)
+            },
+            {
+                AUDIO_DEVICE_OUT_SPEAKER_SAFE, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_SPEAKER_SAFE)
+            },
+            {
+                AUDIO_DEVICE_OUT_HEARING_AID, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_HEARING_AID,
+                        media::AudioDeviceDescription::CONNECTION_WIRELESS())
+            },
+            {
+                AUDIO_DEVICE_OUT_ECHO_CANCELLER, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_ECHO_CANCELLER)
+            },
+            {
+                AUDIO_DEVICE_OUT_BLE_SPEAKER, make_AudioDeviceDescription(
+                        media::AudioDeviceType::OUT_SPEAKER,
+                        media::AudioDeviceDescription::CONNECTION_BT_LE())
+            },
+            // AUDIO_DEVICE_IN_AMBIENT and IN_COMMUNICATION are removed since they were deprecated.
+            {
+                AUDIO_DEVICE_IN_BUILTIN_MIC, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_MICROPHONE)
+            },
+            {
+                AUDIO_DEVICE_IN_BACK_MIC, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_MICROPHONE_BACK)
+            },
+            {
+                AUDIO_DEVICE_IN_TELEPHONY_RX, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_TELEPHONY_RX)
+            },
+            {
+                AUDIO_DEVICE_IN_TV_TUNER, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_TV_TUNER)
+            },
+            {
+                AUDIO_DEVICE_IN_LOOPBACK, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_LOOPBACK)
+            },
+            {
+                AUDIO_DEVICE_IN_BLUETOOTH_BLE, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_DEVICE,
+                        media::AudioDeviceDescription::CONNECTION_BT_LE())
+            },
+            {
+                AUDIO_DEVICE_IN_ECHO_REFERENCE, make_AudioDeviceDescription(
+                        media::AudioDeviceType::IN_ECHO_REFERENCE)
+            }
+        }};
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_DEFAULT, AUDIO_DEVICE_OUT_DEFAULT,
+                media::AudioDeviceType::IN_DEFAULT, media::AudioDeviceType::OUT_DEFAULT);
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADSET,
+                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
+                media::AudioDeviceDescription::CONNECTION_ANALOG());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, AUDIO_DEVICE_OUT_BLUETOOTH_SCO_HEADSET,
+                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
+                media::AudioDeviceDescription::CONNECTION_BT_SCO());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_HDMI, AUDIO_DEVICE_OUT_HDMI,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_HDMI());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_REMOTE_SUBMIX, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
+                media::AudioDeviceType::IN_SUBMIX, media::AudioDeviceType::OUT_SUBMIX);
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_ANLG_DOCK_HEADSET, AUDIO_DEVICE_OUT_ANLG_DOCK_HEADSET,
+                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
+                media::AudioDeviceDescription::CONNECTION_ANALOG_DOCK());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_DGTL_DOCK_HEADSET, AUDIO_DEVICE_OUT_DGTL_DOCK_HEADSET,
+                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
+                media::AudioDeviceDescription::CONNECTION_DIGITAL_DOCK());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_USB_ACCESSORY, AUDIO_DEVICE_OUT_USB_ACCESSORY,
+                media::AudioDeviceType::IN_ACCESSORY, media::AudioDeviceType::OUT_ACCESSORY,
+                media::AudioDeviceDescription::CONNECTION_USB());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_USB_DEVICE, AUDIO_DEVICE_OUT_USB_DEVICE,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_USB());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_FM_TUNER, AUDIO_DEVICE_OUT_FM,
+                media::AudioDeviceType::IN_FM_TUNER, media::AudioDeviceType::OUT_FM);
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_LINE, AUDIO_DEVICE_OUT_LINE,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_ANALOG());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_SPDIF, AUDIO_DEVICE_OUT_SPDIF,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_SPDIF());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_BLUETOOTH_A2DP, AUDIO_DEVICE_OUT_BLUETOOTH_A2DP,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_BT_A2DP());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_IP, AUDIO_DEVICE_OUT_IP,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_IP_V4());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_BUS, AUDIO_DEVICE_OUT_BUS,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_BUS());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_PROXY, AUDIO_DEVICE_OUT_PROXY,
+                media::AudioDeviceType::IN_AFE_PROXY, media::AudioDeviceType::OUT_AFE_PROXY);
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_USB_HEADSET, AUDIO_DEVICE_OUT_USB_HEADSET,
+                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
+                media::AudioDeviceDescription::CONNECTION_USB());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_HDMI_ARC, AUDIO_DEVICE_OUT_HDMI_ARC,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_HDMI_ARC());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_HDMI_EARC, AUDIO_DEVICE_OUT_HDMI_EARC,
+                media::AudioDeviceType::IN_DEVICE, media::AudioDeviceType::OUT_DEVICE,
+                media::AudioDeviceDescription::CONNECTION_HDMI_EARC());
+        append_AudioDeviceDescription(pairs,
+                AUDIO_DEVICE_IN_BLE_HEADSET, AUDIO_DEVICE_OUT_BLE_HEADSET,
+                media::AudioDeviceType::IN_HEADSET, media::AudioDeviceType::OUT_HEADSET,
+                media::AudioDeviceDescription::CONNECTION_BT_LE());
+        return pairs;
+    }();
+    return pairs;
+}
+
+media::AudioFormatDescription make_AudioFormatDescription(media::AudioFormatType type) {
+    media::AudioFormatDescription result;
+    result.type = type;
+    return result;
+}
+
+media::AudioFormatDescription make_AudioFormatDescription(media::PcmType pcm) {
+    auto result = make_AudioFormatDescription(media::AudioFormatType::PCM);
+    result.pcm = pcm;
+    return result;
+}
+
+media::AudioFormatDescription make_AudioFormatDescription(const std::string& encoding) {
+    media::AudioFormatDescription result;
+    result.encoding = encoding;
+    return result;
+}
+
+media::AudioFormatDescription make_AudioFormatDescription(media::PcmType transport,
+        const std::string& encoding) {
+    auto result = make_AudioFormatDescription(encoding);
+    result.pcm = transport;
+    return result;
+}
+
+const detail::AudioFormatPairs& getAudioFormatPairs() {
+    static const detail::AudioFormatPairs pairs = {{
+        {
+            AUDIO_FORMAT_INVALID,
+            make_AudioFormatDescription(media::AudioFormatType::SYS_RESERVED_INVALID)
+        },
+        {
+            AUDIO_FORMAT_DEFAULT, media::AudioFormatDescription{}
+        },
+        {
+            AUDIO_FORMAT_PCM_16_BIT, make_AudioFormatDescription(media::PcmType::INT_16_BIT)
+        },
+        {
+            AUDIO_FORMAT_PCM_8_BIT, make_AudioFormatDescription(media::PcmType::UINT_8_BIT)
+        },
+        {
+            AUDIO_FORMAT_PCM_32_BIT, make_AudioFormatDescription(media::PcmType::INT_32_BIT)
+        },
+        {
+            AUDIO_FORMAT_PCM_8_24_BIT, make_AudioFormatDescription(media::PcmType::FIXED_Q_8_24)
+        },
+        {
+            AUDIO_FORMAT_PCM_FLOAT, make_AudioFormatDescription(media::PcmType::FLOAT_32_BIT)
+        },
+        {
+            AUDIO_FORMAT_PCM_24_BIT_PACKED, make_AudioFormatDescription(media::PcmType::INT_24_BIT)
+        },
+        {
+            // See the comment in MediaDefs.h.
+            AUDIO_FORMAT_MP3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEG)
+        },
+        {
+            AUDIO_FORMAT_AMR_NB, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AMR_NB)
+        },
+        {
+            AUDIO_FORMAT_AMR_WB, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AMR_WB)
+        },
+        {
+            // Note: in MediaDefs.cpp MEDIA_MIMETYPE_AUDIO_AAC = "audio/mp4a-latm".
+            AUDIO_FORMAT_AAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_FORMAT)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_MAIN, make_AudioFormatDescription("audio/aac.main")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_LC, make_AudioFormatDescription("audio/aac.lc")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_SSR, make_AudioFormatDescription("audio/aac.ssr")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_LTP, make_AudioFormatDescription("audio/aac.ltp")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_HE_V1, make_AudioFormatDescription("audio/aac.he.v1")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_SCALABLE, make_AudioFormatDescription("audio/aac.scalable")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ERLC, make_AudioFormatDescription("audio/aac.erlc")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_LD, make_AudioFormatDescription("audio/aac.ld")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_HE_V2, make_AudioFormatDescription("audio/aac.he.v2")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ELD, make_AudioFormatDescription("audio/aac.eld")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_XHE, make_AudioFormatDescription("audio/aac.xhe")
+        },
+        // AUDIO_FORMAT_HE_AAC_V1 and HE_AAC_V2 are removed since they were deprecated long time
+        // ago.
+        {
+            AUDIO_FORMAT_VORBIS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_VORBIS)
+        },
+        {
+            AUDIO_FORMAT_OPUS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_OPUS)
+        },
+        {
+            AUDIO_FORMAT_AC3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AC3)
+        },
+        {
+            AUDIO_FORMAT_E_AC3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EAC3)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_E_AC3_JOC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EAC3_JOC)
+        },
+        {
+            AUDIO_FORMAT_DTS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS)
+        },
+        {
+            AUDIO_FORMAT_DTS_HD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_HD)
+        },
+        // In the future, we would like to represent encapsulated bitstreams as
+        // nested AudioFormatDescriptions. The legacy 'AUDIO_FORMAT_IEC61937' type doesn't
+        // specify the format of the encapsulated bitstream.
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_IEC61937,
+            make_AudioFormatDescription(media::PcmType::INT_16_BIT, "audio/x-iec61937")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_DOLBY_TRUEHD, make_AudioFormatDescription("audio/vnd.dolby.truehd")
+        },
+        {
+            AUDIO_FORMAT_EVRC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EVRC)
+        },
+        {
+            AUDIO_FORMAT_EVRCB, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EVRCB)
+        },
+        {
+            AUDIO_FORMAT_EVRCWB, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EVRCWB)
+        },
+        {
+            AUDIO_FORMAT_EVRCNW, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EVRCNW)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADIF, make_AudioFormatDescription("audio/aac.adif")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_WMA, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_WMA)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_WMA_PRO, make_AudioFormatDescription("audio/x-ms-wma.pro")
+        },
+        {
+            AUDIO_FORMAT_AMR_WB_PLUS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AMR_WB_PLUS)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MP2, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II)
+        },
+        {
+            AUDIO_FORMAT_QCELP, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_QCELP)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_DSD, make_AudioFormatDescription("audio/vnd.sony.dsd")
+        },
+        {
+            AUDIO_FORMAT_FLAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_FLAC)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_ALAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_ALAC)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_APE, make_AudioFormatDescription("audio/x-ape")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_MAIN, make_AudioFormatDescription("audio/aac-adts.main")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_LC, make_AudioFormatDescription("audio/aac-adts.lc")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_SSR, make_AudioFormatDescription("audio/aac-adts.ssr")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_LTP, make_AudioFormatDescription("audio/aac-adts.ltp")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_HE_V1, make_AudioFormatDescription("audio/aac-adts.he.v1")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_SCALABLE, make_AudioFormatDescription("audio/aac-adts.scalable")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_ERLC, make_AudioFormatDescription("audio/aac-adts.erlc")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_LD, make_AudioFormatDescription("audio/aac-adts.ld")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_HE_V2, make_AudioFormatDescription("audio/aac-adts.he.v2")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_ELD, make_AudioFormatDescription("audio/aac-adts.eld")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_ADTS_XHE, make_AudioFormatDescription("audio/aac-adts.xhe")
+        },
+        {
+            // Note: not in the IANA registry. "vnd.octel.sbc" is not BT SBC.
+            AUDIO_FORMAT_SBC, make_AudioFormatDescription("audio/x-sbc")
+        },
+        {
+            AUDIO_FORMAT_APTX, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_APTX)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_APTX_HD, make_AudioFormatDescription("audio/vnd.qcom.aptx.hd")
+        },
+        {
+            // Note: not in the IANA registry. Matches MediaDefs.cpp.
+            AUDIO_FORMAT_AC4, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AC4)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_LDAC, make_AudioFormatDescription("audio/vnd.sony.ldac")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MAT, make_AudioFormatDescription("audio/vnd.dolby.mat")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MAT_1_0, make_AudioFormatDescription("audio/vnd.dolby.mat.1.0")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MAT_2_0, make_AudioFormatDescription("audio/vnd.dolby.mat.2.0")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MAT_2_1, make_AudioFormatDescription("audio/vnd.dolby.mat.2.1")
+        },
+        {
+            AUDIO_FORMAT_AAC_LATM, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC)
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_LATM_LC, make_AudioFormatDescription("audio/mp4a-latm.lc")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_LATM_HE_V1, make_AudioFormatDescription("audio/mp4a-latm.he.v1")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_AAC_LATM_HE_V2, make_AudioFormatDescription("audio/mp4a-latm.he.v2")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_CELT, make_AudioFormatDescription("audio/x-celt")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_APTX_ADAPTIVE, make_AudioFormatDescription("audio/vnd.qcom.aptx.adaptive")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_LHDC, make_AudioFormatDescription("audio/vnd.savitech.lhdc")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_LHDC_LL, make_AudioFormatDescription("audio/vnd.savitech.lhdc.ll")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_APTX_TWSP, make_AudioFormatDescription("audio/vnd.qcom.aptx.twsp")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_LC3, make_AudioFormatDescription("audio/x-lc3")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MPEGH, make_AudioFormatDescription("audio/x-mpegh")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MPEGH_BL_L3, make_AudioFormatDescription("audio/x-mpegh.bl.l3")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MPEGH_BL_L4, make_AudioFormatDescription("audio/x-mpegh.bl.l4")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MPEGH_LC_L3, make_AudioFormatDescription("audio/x-mpegh.lc.l3")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_MPEGH_LC_L4, make_AudioFormatDescription("audio/x-mpegh.lc.l4")
+        },
+        {
+            // Note: not in the IANA registry.
+            AUDIO_FORMAT_IEC60958,
+            make_AudioFormatDescription(media::PcmType::INT_24_BIT, "audio/x-iec60958")
+        },
+        {
+            AUDIO_FORMAT_DTS_UHD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_UHD)
+        },
+        {
+            AUDIO_FORMAT_DRA, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DRA)
+        },
+    }};
+    return pairs;
+}
+
+template<typename S, typename T>
+std::unordered_map<S, T> make_DirectMap(const std::vector<std::pair<S, T>>& v) {
+    std::unordered_map<S, T> result(v.begin(), v.end());
+    LOG_ALWAYS_FATAL_IF(result.size() != v.size(), "Duplicate key elements detected");
+    return result;
+}
+
+template<typename S, typename T>
+std::unordered_map<T, S> make_ReverseMap(const std::vector<std::pair<S, T>>& v) {
+    std::unordered_map<T, S> result;
+    std::transform(v.begin(), v.end(), std::inserter(result, result.begin()),
+            [](const std::pair<S, T>& p) {
+                return std::make_pair(p.second, p.first);
+            });
+    LOG_ALWAYS_FATAL_IF(result.size() != v.size(), "Duplicate key elements detected");
+    return result;
+}
+
+}  // namespace
+
+ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devices_t(
+        const media::AudioDeviceDescription& aidl) {
+    static const std::unordered_map<media::AudioDeviceDescription, audio_devices_t> m =
+            make_ReverseMap(getAudioDevicePairs());
+    if (auto it = m.find(aidl); it != m.end()) {
+        return it->second;
+    } else {
+        ALOGE("%s: no legacy audio_devices_t found for %s", __func__, aidl.toString().c_str());
+        return unexpected(BAD_VALUE);
+    }
+}
+
+ConversionResult<media::AudioDeviceDescription> legacy2aidl_audio_devices_t_AudioDeviceDescription(
+        audio_devices_t legacy) {
+    static const std::unordered_map<audio_devices_t, media::AudioDeviceDescription> m =
+            make_DirectMap(getAudioDevicePairs());
+    if (auto it = m.find(legacy); it != m.end()) {
+        return it->second;
+    } else {
+        ALOGE("%s: no AudioDeviceDescription found for legacy audio_devices_t value 0x%x",
+                __func__, legacy);
+        return unexpected(BAD_VALUE);
+    }
+}
+
+ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format_t(
+        const media::AudioFormatDescription& aidl) {
+    static const std::unordered_map<media::AudioFormatDescription, audio_format_t> m =
+            make_ReverseMap(getAudioFormatPairs());
+    if (auto it = m.find(aidl); it != m.end()) {
+        return it->second;
+    } else {
+        ALOGE("%s: no legacy audio_format_t found for %s", __func__, aidl.toString().c_str());
+        return unexpected(BAD_VALUE);
+    }
+}
+
+ConversionResult<media::AudioFormatDescription> legacy2aidl_audio_format_t_AudioFormatDescription(
+        audio_format_t legacy) {
+    static const std::unordered_map<audio_format_t, media::AudioFormatDescription> m =
+            make_DirectMap(getAudioFormatPairs());
+    if (auto it = m.find(legacy); it != m.end()) {
+        return it->second;
+    } else {
+        ALOGE("%s: no AudioFormatDescription found for legacy audio_format_t value 0x%x",
+                __func__, legacy);
+        return unexpected(BAD_VALUE);
+    }
 }
 
 ConversionResult<audio_gain_mode_t> aidl2legacy_AudioGainMode_audio_gain_mode_t(media::AudioGainMode aidl) {
