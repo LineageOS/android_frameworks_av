@@ -22,6 +22,7 @@
 #include "PlaybackSession.h"
 #include "Parameters.h"
 #include "rtp/RTPSender.h"
+#include <media/stagefright/FoundationUtils.h>
 
 #include <binder/IServiceManager.h>
 #include <gui/IGraphicBufferProducer.h>
@@ -1734,4 +1735,3 @@ status_t WifiDisplaySource::makeHDCP() {
 }
 
 }  // namespace android
-

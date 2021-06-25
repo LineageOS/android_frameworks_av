@@ -28,7 +28,8 @@
 #include <media/stagefright/MediaErrors.h>
 #include <media/stagefright/Utils.h>
 
-#include "include/avc_utils.h"
+#include <media/stagefright/foundation/avc_utils.h>
+#include <media/stagefright/foundation/ByteUtils.h>
 
 namespace android {
 
@@ -805,4 +806,3 @@ void RTPSender::notifyNetworkStall(size_t numBytesQueued) {
 }
 
 }  // namespace android
-

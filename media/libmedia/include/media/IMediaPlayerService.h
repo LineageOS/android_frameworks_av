@@ -34,6 +34,7 @@ namespace android {
 
 struct IHDCP;
 class IMediaPlayer;
+struct IHDCP;
 class IMediaCodecList;
 struct IMediaHTTPService;
 class IMediaRecorder;
