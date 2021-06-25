@@ -19,6 +19,7 @@
 
 #include <functional>
 
+#include <android/media/AudioDeviceDescription.h>
 #include <android/media/AudioFormatDescription.h>
 #include <binder/Parcelable.h>
 #include <system/audio.h>
@@ -36,9 +37,18 @@ static size_t hash_combine(size_t seed, size_t v) {
 
 namespace std {
 
-// Note: when extending AudioFormatDescription we need to account for the
+// Note: when extending Audio{Device|Format}Description we need to account for the
 // possibility of comparison between different versions of it, e.g. a HAL
 // may be using a previous version of the AIDL interface.
+template<> struct hash<android::media::AudioDeviceDescription>
+{
+    std::size_t operator()(const android::media::AudioDeviceDescription& add) const noexcept {
+        return hash_combine(
+                std::hash<android::media::AudioDeviceType>{}(add.type),
+                std::hash<std::string>{}(add.connection));
+    }
+};
+
 template<> struct hash<android::media::AudioFormatDescription>
 {
     std::size_t operator()(const android::media::AudioFormatDescription& afd) const noexcept {
