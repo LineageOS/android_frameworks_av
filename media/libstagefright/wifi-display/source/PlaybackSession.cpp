@@ -1,5 +1,5 @@
 /*
- * Copyright 2012, The Android Open Source Project
+ * Copyright 2012-2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@
 #include "Converter.h"
 #include "MediaPuller.h"
 #include "RepeaterSource.h"
-#include "include/avc_utils.h"
+#include <media/stagefright/foundation/avc_utils.h>
 #include "WifiDisplaySource.h"
 
 #include <binder/IServiceManager.h>
@@ -43,6 +43,7 @@
 #include <media/stagefright/NuMediaExtractor.h>
 #include <media/stagefright/SurfaceMediaSource.h>
 #include <media/stagefright/Utils.h>
+#include <media/IOMX.h>
 
 #include <OMX_IVCommon.h>
 
@@ -747,7 +748,7 @@ void WifiDisplaySource::PlaybackSession::onSinkFeedback(const sp<AMessage> &msg)
 
 status_t WifiDisplaySource::PlaybackSession::setupMediaPacketizer(
         bool enableAudio, bool enableVideo) {
-    mExtractor = new NuMediaExtractor;
+    mExtractor = new NuMediaExtractor(NuMediaExtractor::EntryPoint::OTHER);
 
     status_t err = mExtractor->setDataSource(
             NULL /* httpService */, mMediaPath.c_str());
@@ -1069,8 +1070,11 @@ status_t WifiDisplaySource::PlaybackSession::addVideoSource(
 }
 
 status_t WifiDisplaySource::PlaybackSession::addAudioSource(bool usePCMAudio) {
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    attr.source = AUDIO_SOURCE_REMOTE_SUBMIX;
+
     sp<AudioSource> audioSource = new AudioSource(
-            AUDIO_SOURCE_REMOTE_SUBMIX,
+            &attr,
             mOpPackageName,
             48000 /* sampleRate */,
             2 /* channelCount */);

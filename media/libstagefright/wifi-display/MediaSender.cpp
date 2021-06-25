@@ -1,5 +1,5 @@
 /*
- * Copyright 2013, The Android Open Source Project
+ * Copyright 2013-2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -23,10 +23,10 @@
 #include "rtp/RTPSender.h"
 #include "source/TSPacketizer.h"
 
-#include "include/avc_utils.h"
+#include <media/stagefright/foundation/avc_utils.h>
 
 #include <media/IHDCP.h>
-#include <media/stagefright/MediaBuffer.h>
+#include <media/stagefright/MediaBufferBase.h>
 #include <media/stagefright/foundation/ABuffer.h>
 #include <media/stagefright/foundation/ADebug.h>
 #include <media/stagefright/foundation/AMessage.h>
@@ -400,7 +400,7 @@ status_t MediaSender::packetizeAccessUnit(
     bool manuallyPrependSPSPPS =
         !info.mIsAudio
         && (info.mFlags & FLAG_MANUALLY_PREPEND_SPS_PPS)
-        && IsIDR(accessUnit);
+        && IsIDR(accessUnit->data(), accessUnit->size());
 
     if (mHDCP != NULL && !info.mIsAudio) {
         isHDCPEncrypted = true;

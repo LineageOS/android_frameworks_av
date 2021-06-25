@@ -63,7 +63,7 @@ cc_library_shared {
         "frameworks/av/media/libstagefright/rtsp",
         "frameworks/av/media/libstagefright/webm",
         "frameworks/av/media/libstagefright/wifi-display",
-],
+    ],
 
     local_include_dirs: ["include"],
 

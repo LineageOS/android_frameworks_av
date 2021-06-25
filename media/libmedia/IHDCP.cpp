@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2012-2021 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ struct BpHDCPObserver : public BpInterface<IHDCPObserver> {
     }
 };
 
-IMPLEMENT_META_INTERFACE(HDCPObserver, "android.hardware.IHDCPObserver");
+DO_NOT_DIRECTLY_USE_ME_IMPLEMENT_META_INTERFACE(HDCPObserver, "android.hardware.IHDCPObserver");
 
 struct BpHDCP : public BpInterface<IHDCP> {
     explicit BpHDCP(const sp<IBinder> &impl)
@@ -166,7 +166,7 @@ struct BpHDCP : public BpInterface<IHDCP> {
     }
 };
 
-IMPLEMENT_META_INTERFACE(HDCP, "android.hardware.IHDCP");
+DO_NOT_DIRECTLY_USE_ME_IMPLEMENT_META_INTERFACE(HDCP, "android.hardware.IHDCP");
 
 status_t BnHDCPObserver::onTransact(
         uint32_t code, const Parcel &data, Parcel *reply, uint32_t flags) {

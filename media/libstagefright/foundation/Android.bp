@@ -55,9 +55,11 @@ cc_defaults {
         "ABuffer.cpp",
         "ADebug.cpp",
         "AHandler.cpp",
+        "AHierarchicalStateMachine.cpp",
         "ALooper.cpp",
         "ALooperRoster.cpp",
         "AMessage.cpp",
+        "ANetworkSession.cpp",
         "AString.cpp",
         "AStringUtils.cpp",
         "AudioPresentationInfo.cpp",
@@ -72,6 +74,7 @@ cc_defaults {
         "MetaData.cpp",
         "MetaDataBase.cpp",
         "OpusHeader.cpp",
+        "ParsedMessage.cpp",
         "avc_utils.cpp",
         "base64.cpp",
         "hexdump.cpp",
@@ -103,6 +106,9 @@ cc_library {
     name: "libstagefright_foundation",
     defaults: ["libstagefright_foundation_defaults"],
     min_sdk_version: "29",
+    header_abi_checker: {
+        enabled: false,
+    },
 }
 
 cc_library_static {
