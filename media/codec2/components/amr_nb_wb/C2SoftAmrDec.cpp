@@ -361,7 +361,13 @@ void C2SoftAmrDec::process(
 
     work->worklets.front()->output.flags = work->input.flags;
     work->worklets.front()->output.buffers.clear();
-    work->worklets.front()->output.buffers.push_back(createLinearBuffer(block));
+    // we filled the output buffer to (intptr_t)output - (intptr_t)wView.data()
+    // use calOutSize as that contains the expected number of samples
+    ALOGD_IF(calOutSize != ((intptr_t)output - (intptr_t)wView.data()),
+            "Expected %zu output bytes, but filled %lld",
+             calOutSize, (long long)((intptr_t)output - (intptr_t)wView.data()));
+    work->worklets.front()->output.buffers.push_back(
+            createLinearBuffer(block, 0, calOutSize));
     work->worklets.front()->output.ordinal = work->input.ordinal;
     if (eos) {
         mSignalledOutputEos = true;
