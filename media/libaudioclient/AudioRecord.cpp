@@ -668,6 +668,8 @@ status_t AudioRecord::getTimestamp(ExtendedTimestamp *timestamp)
 // ---- Explicit Routing ---------------------------------------------------
 status_t AudioRecord::setInputDevice(audio_port_handle_t deviceId) {
     AutoMutex lock(mLock);
+    ALOGV("%s(%d): deviceId=%d mSelectedDeviceId=%d",
+            __func__, mPortId, deviceId, mSelectedDeviceId);
     if (mSelectedDeviceId != deviceId) {
         mSelectedDeviceId = deviceId;
         if (mStatus == NO_ERROR) {

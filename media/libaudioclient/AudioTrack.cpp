@@ -1555,6 +1555,8 @@ audio_io_handle_t AudioTrack::getOutput() const
 
 status_t AudioTrack::setOutputDevice(audio_port_handle_t deviceId) {
     AutoMutex lock(mLock);
+    ALOGV("%s(%d): deviceId=%d mSelectedDeviceId=%d",
+            __func__, mPortId, deviceId, mSelectedDeviceId);
     if (mSelectedDeviceId != deviceId) {
         mSelectedDeviceId = deviceId;
         if (mStatus == NO_ERROR) {
