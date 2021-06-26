@@ -67,7 +67,17 @@ extern const char *MEDIA_MIMETYPE_AUDIO_ALAC;
 extern const char *MEDIA_MIMETYPE_AUDIO_WMA;
 extern const char *MEDIA_MIMETYPE_AUDIO_MS_ADPCM;
 extern const char *MEDIA_MIMETYPE_AUDIO_DVI_IMA_ADPCM;
-
+extern const char *MEDIA_MIMETYPE_AUDIO_DTS;
+extern const char *MEDIA_MIMETYPE_AUDIO_DTS_HD;
+extern const char *MEDIA_MIMETYPE_AUDIO_DTS_UHD;
+extern const char *MEDIA_MIMETYPE_AUDIO_EVRC;
+extern const char *MEDIA_MIMETYPE_AUDIO_EVRCB;
+extern const char *MEDIA_MIMETYPE_AUDIO_EVRCWB;
+extern const char *MEDIA_MIMETYPE_AUDIO_EVRCNW;
+extern const char *MEDIA_MIMETYPE_AUDIO_AMR_WB_PLUS;
+extern const char *MEDIA_MIMETYPE_AUDIO_APTX;
+extern const char *MEDIA_MIMETYPE_AUDIO_DRA;
+extern const char *MEDIA_MIMETYPE_AUDIO_AAC_FORMAT;
 
 extern const char *MEDIA_MIMETYPE_CONTAINER_MPEG4;
 extern const char *MEDIA_MIMETYPE_CONTAINER_WAV;

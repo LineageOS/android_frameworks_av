@@ -2123,8 +2123,9 @@ status_t AudioPolicyManager::getInputForAttr(const audio_attributes_t *attr,
                                              audio_port_handle_t *portId)
 {
     ALOGV("%s() source %d, sampling rate %d, format %#x, channel mask %#x, session %d, "
-          "flags %#x attributes=%s", __func__, attr->source, config->sample_rate,
-          config->format, config->channel_mask, session, flags, toString(*attr).c_str());
+          "flags %#x attributes=%s requested device ID %d",
+          __func__, attr->source, config->sample_rate, config->format, config->channel_mask,
+          session, flags, toString(*attr).c_str(), *selectedDeviceId);
 
     status_t status = NO_ERROR;
     audio_source_t halInputSource;
