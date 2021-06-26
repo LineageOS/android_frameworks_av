@@ -635,7 +635,8 @@ void C2SoftVpxEnc::process(
             }
             work->worklets.front()->output.flags = (C2FrameData::flags_t)flags;
             work->worklets.front()->output.buffers.clear();
-            std::shared_ptr<C2Buffer> buffer = createLinearBuffer(block);
+            std::shared_ptr<C2Buffer> buffer =
+                createLinearBuffer(block, 0, encoded_packet->data.frame.sz);
             if (encoded_packet->data.frame.flags & VPX_FRAME_IS_KEY) {
                 buffer->setInfo(std::make_shared<C2StreamPictureTypeMaskInfo::output>(
                         0u /* stream id */, C2Config::SYNC_FRAME));

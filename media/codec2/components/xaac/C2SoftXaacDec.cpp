@@ -361,9 +361,8 @@ void C2SoftXaacDec::finishWork(const std::unique_ptr<C2Work>& work,
     C2WriteView wView = block->map().get();
     int16_t* outBuffer = reinterpret_cast<int16_t*>(wView.data());
     memcpy(outBuffer, mOutputDrainBuffer, mOutputDrainBufferWritePos);
-    mOutputDrainBufferWritePos = 0;
 
-    auto fillWork = [buffer = createLinearBuffer(block)](
+    auto fillWork = [buffer = createLinearBuffer(block, 0, mOutputDrainBufferWritePos)](
         const std::unique_ptr<C2Work>& work) {
         uint32_t flags = 0;
         if (work->input.flags & C2FrameData::FLAG_END_OF_STREAM) {
@@ -376,6 +375,9 @@ void C2SoftXaacDec::finishWork(const std::unique_ptr<C2Work>& work,
         work->worklets.front()->output.ordinal = work->input.ordinal;
         work->workletsProcessed = 1u;
     };
+
+    mOutputDrainBufferWritePos = 0;
+
     if (work && work->input.ordinal.frameIndex == c2_cntr64_t(mCurFrameIndex)) {
         fillWork(work);
     } else {
