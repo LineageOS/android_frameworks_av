@@ -444,9 +444,6 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
     std::shared_ptr<C2StreamBitrateModeTuning::output> getBitrateMode_l() const { return mBitrateMode; }
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> getRequestSync_l() const { return mRequestSync; }
     std::shared_ptr<C2StreamTemporalLayeringTuning::output> getTemporalLayers_l() const { return mLayering; }
-    std::shared_ptr<C2StreamColorAspectsInfo::output> getCodedColorAspects_l() const {
-        return mCodedColorAspects;
-    }
     uint32_t getSyncFramePeriod() const {
         if (mSyncFramePeriod->value < 0 || mSyncFramePeriod->value == INT64_MAX) {
             return 0;
