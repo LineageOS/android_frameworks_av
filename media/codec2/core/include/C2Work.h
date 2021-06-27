@@ -145,10 +145,35 @@ struct C2FrameData {
          */
         FLAG_INCOMPLETE = (1 << 3),
         /**
+         * This frame has been corrected due to a bitstream error. This is a hint, and in most cases
+         * can be ignored. This flag can be set by components on their output to signal the clients
+         * that errors may be present but the frame should be used nonetheless. It can also be set
+         * by clients to signal that the input frame has been corrected, but nonetheless should be
+         * processed.
+         */
+        FLAG_CORRECTED = (1 << 4),
+        /**
+         * This frame is corrupt due to a bitstream error. This is similar to FLAG_CORRECTED,
+         * with the exception that this is a hint that downstream components should not process this
+         * frame.
+         * <p>
+         * If set on the input by the client, the input is likely non-processable and should be
+         * handled similarly to uncorrectable bitstream error detected. For components that operat
+         * on whole access units, this flag can be propagated to the output. Other components should
+         * aim to detect access unit boundaries to determine if any part of the input frame can be
+         * processed.
+         * <p>
+         * If set by the component, this signals to the client that the output is non-usable -
+         * including possibly the metadata that may also be non-usable; -- however, the component
+         * will try to recover on successive input frames.
+         */
+        FLAG_CORRUPT = (1 << 5),
+
+        /**
          * This frame contains only codec-specific configuration data, and no actual access unit.
          *
-         * \deprecated pass codec configuration with using the \todo codec-specific configuration
-         * info together with the access unit.
+         * \deprecated pass codec configuration with using the C2InitData info parameter together
+         *             with the access unit.
          */
         FLAG_CODEC_CONFIG  = (1u << 31),
     };
