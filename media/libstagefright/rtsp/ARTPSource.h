@@ -58,6 +58,7 @@ struct ARTPSource : public RefBase {
     };
 
     void processRTPPacket(const sp<ABuffer> &buffer);
+    void processRTPPacket();
     void timeReset();
     void timeUpdate(uint32_t rtpTime, uint64_t ntpTime);
     void byeReceived();
@@ -79,6 +80,8 @@ struct ARTPSource : public RefBase {
     void setStaticJitterTimeMs(const uint32_t jbTimeMs);
     void putBaseJitterData(uint32_t timeStamp, int64_t arrivalTime);
     void putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime);
+    void setJbTimer(const sp<AMessage> timer);
+    void setJbAlarmTime(int64_t nowTimeUs, int64_t alarmAfterUs);
 
     bool isNeedToEarlyNotify();
     void notifyPktInfo(int32_t bitrate, int64_t nowUs, bool isRegular);
@@ -112,6 +115,7 @@ private:
 
     int32_t mStaticJbTimeMs;
     sp<JitterCalc> mJitterCalc;
+    sp<AMessage> mJbTimer;
 
     typedef struct infoNACK {
         uint16_t seqNum;
@@ -130,6 +134,7 @@ private:
 
     bool mIsFirstRtpRtcpGap;
     double mAvgRtpRtcpGapMs;
+    int64_t mLastJbAlarmTimeUs;
 
     bool mIssueFIRRequests;
     bool mIssueFIRByAssembler;

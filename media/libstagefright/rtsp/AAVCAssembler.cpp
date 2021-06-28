@@ -195,6 +195,10 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addNALUnit(
 
     if (!isExpired) {
         ALOGV("buffering in jitter buffer.");
+        // set an alarm for jitter buffer time expiration.
+        // adding 1ms because jitter buffer time is keep changing.
+        int64_t expTimeUs = (RtpToMs(std::abs(diffTimeRtp), clockRate) + 1) * 1000;
+        source->setJbAlarmTime(nowTimeUs, expTimeUs);
         return NOT_ENOUGH_DATA;
     }
 

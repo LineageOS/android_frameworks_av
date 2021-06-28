@@ -109,6 +109,7 @@ ARTPSource::ARTPSource(
     int32_t clockRate, numChannels;
     ASessionDescription::ParseFormatDesc(desc.c_str(), &clockRate, &numChannels);
     mClockRate = clockRate;
+    mLastJbAlarmTimeUs = 0;
     mJitterCalc = new JitterCalc(mClockRate);
 }
 
@@ -118,6 +119,12 @@ static uint32_t AbsDiff(uint32_t seq1, uint32_t seq2) {
 
 void ARTPSource::processRTPPacket(const sp<ABuffer> &buffer) {
     if (mAssembler != NULL && queuePacket(buffer)) {
+        mAssembler->onPacketReceived(this);
+    }
+}
+
+void ARTPSource::processRTPPacket() {
+    if (mAssembler != NULL && !mQueue.empty()) {
         mAssembler->onPacketReceived(this);
     }
 }
@@ -611,6 +618,35 @@ void ARTPSource::putBaseJitterData(uint32_t timeStamp, int64_t arrivalTime) {
 
 void ARTPSource::putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime) {
     mJitterCalc->putInterArrivalData(timeStamp, arrivalTime);
+}
+
+void ARTPSource::setJbTimer(const sp<AMessage> timer) {
+    mJbTimer = timer;
+}
+
+void ARTPSource::setJbAlarmTime(int64_t nowTimeUs, int64_t alarmAfterUs) {
+    if (mJbTimer == NULL) {
+        return;
+    }
+    int64_t alarmTimeUs = nowTimeUs + alarmAfterUs;
+    bool alarm = false;
+    if (mLastJbAlarmTimeUs <= nowTimeUs) {
+        // no more alarm in pending.
+        mLastJbAlarmTimeUs = nowTimeUs + alarmAfterUs;
+        alarm = true;
+    } else if (mLastJbAlarmTimeUs > alarmTimeUs + 5000L) {
+        // bring an alarm forward more than 5ms.
+        mLastJbAlarmTimeUs = alarmTimeUs;
+        alarm = true;
+    } else {
+        // would not set alarm if it is close with before one.
+    }
+
+    if (alarm) {
+        sp<AMessage> notify = mJbTimer->dup();
+        notify->setObject("source", this);
+        notify->post(alarmAfterUs);
+    }
 }
 
 bool ARTPSource::isNeedToEarlyNotify() {
