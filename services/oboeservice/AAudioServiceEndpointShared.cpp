@@ -78,7 +78,7 @@ aaudio_result_t AAudioServiceEndpointShared::open(const aaudio::AAudioStreamRequ
     result = mStreamInternal->open(builder);
 
     setSampleRate(mStreamInternal->getSampleRate());
-    setSamplesPerFrame(mStreamInternal->getSamplesPerFrame());
+    setChannelMask(mStreamInternal->getChannelMask());
     setDeviceId(mStreamInternal->getDeviceId());
     setSessionId(mStreamInternal->getSessionId());
     setFormat(AUDIO_FORMAT_PCM_FLOAT); // force for mixer

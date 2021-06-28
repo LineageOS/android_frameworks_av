@@ -76,6 +76,7 @@ aaudio_result_t AudioStream::open(const AudioStreamBuilder& builder)
     // Copy parameters from the Builder because the Builder may be deleted after this call.
     // TODO AudioStream should be a subclass of AudioStreamParameters
     mSamplesPerFrame = builder.getSamplesPerFrame();
+    mChannelMask = builder.getChannelMask();
     mSampleRate = builder.getSampleRate();
     mDeviceId = builder.getDeviceId();
     mFormat = builder.getFormat();
