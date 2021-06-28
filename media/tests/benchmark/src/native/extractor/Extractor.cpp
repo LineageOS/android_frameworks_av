@@ -124,9 +124,7 @@ void Extractor::deInitExtractor() {
 
     int64_t sTime = mStats->getCurTime();
     if (mExtractor) {
-        // TODO: (b/140128505) Multiple calls result in DoS.
-        // Uncomment call to AMediaExtractor_delete() once this is resolved
-        // AMediaExtractor_delete(mExtractor);
+        AMediaExtractor_delete(mExtractor);
         mExtractor = nullptr;
     }
     int64_t eTime = mStats->getCurTime();

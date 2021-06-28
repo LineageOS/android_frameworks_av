@@ -19,6 +19,8 @@
 
 #include <gtest/gtest.h>
 
+#include <android/binder_process.h>
+
 #include "BenchmarkTestEnvironment.h"
 #include "Extractor.h"
 
@@ -73,6 +75,7 @@ INSTANTIATE_TEST_SUITE_P(ExtractorTestAll, ExtractorTest,
                                                      0)));
 
 int main(int argc, char **argv) {
+    ABinderProcess_startThreadPool();
     gEnv = new BenchmarkTestEnvironment();
     ::testing::AddGlobalTestEnvironment(gEnv);
     ::testing::InitGoogleTest(&argc, argv);
