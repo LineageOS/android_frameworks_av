@@ -909,6 +909,8 @@ void CCodecConfig::initializeStandardParams() {
             }
         }));
 
+    add(ConfigMapper("android._encoding-quality-level", C2_PARAMKEY_ENCODING_QUALITY_LEVEL, "value")
+        .limitTo(D::ENCODER & (D::CONFIG | D::PARAM)));
     add(ConfigMapper(KEY_QUALITY, C2_PARAMKEY_QUALITY, "value")
         .limitTo(D::ENCODER & (D::CONFIG | D::PARAM)));
     add(ConfigMapper(KEY_FLAC_COMPRESSION_LEVEL, C2_PARAMKEY_COMPLEXITY, "value")
