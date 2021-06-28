@@ -237,6 +237,12 @@ aaudio_result_t AAudioServiceEndpointMMAP::openWithFormat(audio_format_t audioFo
         result = AAUDIO_ERROR_INTERNAL;
         goto error;
     }
+    // Call to HAL to make sure the transport FD was able to be closed by binder.
+    // This is a tricky workaround for a problem in Binder.
+    // TODO:[b/192048842] When that problem is fixed we may be able to remove or change this code.
+    struct audio_mmap_position position;
+    mMmapStream->getMmapPosition(&position);
+
     mFramesPerBurst = mMmapBufferinfo.burst_size_frames;
     setFormat(config.format);
     setSampleRate(config.sample_rate);
