@@ -18,9 +18,7 @@
 #define LOG_TAG "ARTPConnection"
 #include <utils/Log.h>
 
-#include "ARTPAssembler.h"
 #include "ARTPConnection.h"
-
 #include "ARTPSource.h"
 #include "ASessionDescription.h"
 
@@ -306,6 +304,12 @@ void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatAlarmStream:
+        {
+            onAlarmStream(msg);
+            break;
+        }
+
         case kWhatInjectPacket:
         {
             onInjectPacket(msg);
@@ -568,6 +572,13 @@ void ARTPConnection::onPollStreams() {
 
     if (!mStreams.empty()) {
         postPollEvent();
+    }
+}
+
+void ARTPConnection::onAlarmStream(const sp<AMessage> msg) {
+    sp<ARTPSource> source = nullptr;
+    if (msg->findObject("source", (sp<android::RefBase>*)&source)) {
+        source->processRTPPacket();
     }
 }
 
@@ -1099,6 +1110,8 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
 
         source->setSelfID(mSelfID);
         source->setStaticJitterTimeMs(mStaticJitterTimeMs);
+        sp<AMessage> timer = new AMessage(kWhatAlarmStream, this);
+        source->setJbTimer(timer);
         info->mSources.add(srcId, source);
     } else {
         source = info->mSources.valueAt(index);
