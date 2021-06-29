@@ -98,6 +98,35 @@ bootclasspath_fragment {
     name: "com.android.media-bootclasspath-fragment",
     contents: ["updatable-media"],
     apex_available: ["com.android.media"],
+
+    api: {
+        stub_libs: [
+            // Stubs for the APIs provided by updatable-media. This has to be
+            // specified explicitly because updatable-media is not a
+            // java_sdk_library.
+            "framework-media",
+        ],
+    },
+
+    // The bootclasspath_fragments that provide APIs on which this depends.
+    fragments: [
+        {
+            apex: "com.android.art",
+            module: "art-bootclasspath-fragment",
+        },
+    ],
+
+    // Additional stubs libraries that this fragment's contents use which are
+    // not provided by another bootclasspath_fragment.
+    additional_stubs: [
+        "android-non-updatable",
+    ],
+
+    // Additional hidden API flag files to override the defaults. This must only be
+    // modified by the Soong or platform compat team.
+    hidden_api: {
+        max_target_o_low_priority: ["hiddenapi/hiddenapi-max-target-o-low-priority.txt"],
+    },
 }
 
 // Encapsulate the contributions made by the com.android.media to the systemserverclasspath.
