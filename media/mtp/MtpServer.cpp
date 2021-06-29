@@ -794,18 +794,28 @@ MtpResponseCode MtpServer::doGetObject() {
     struct stat sstat;
     uint64_t finalsize;
     bool transcode = android::base::GetBoolProperty("sys.fuse.transcode_mtp", false);
+    bool filePathAccess = true;
     ALOGD("Mtp transcode = %d", transcode);
-    mfr.fd = mDatabase->openFilePath(filePath, transcode);
-    // Doing this here because we want to update fileLength only for this case and leave the
-    // regular path as unchanged as possible.
-    if (mfr.fd >= 0) {
+
+    // For performance reasons, only attempt a ContentResolver open when transcode is required.
+    // This is fine as long as we don't transcode by default on the device. If we suddenly
+    // transcode by default, we'll need to ensure that MTP doesn't transcode by default and we
+    // might need to make a binder call to avoid transcoding or come up with a better strategy.
+    if (transcode) {
+        mfr.fd = mDatabase->openFilePath(filePath, true);
         fstat(mfr.fd, &sstat);
         finalsize = sstat.st_size;
         fileLength = finalsize;
-    } else {
-        ALOGW("Mtp open via IMtpDatabase failed for %s. Falling back to the original",
-                filePath);
+        if (mfr.fd < 0) {
+            ALOGW("Mtp open via IMtpDatabase failed for %s. Falling back to the original",
+                  filePath);
+            filePathAccess = true;
+        } else {
+            filePathAccess = false;
+        }
+    }
 
+    if (filePathAccess) {
         mfr.fd = open(filePath, O_RDONLY);
         if (mfr.fd < 0) {
             return MTP_RESPONSE_GENERAL_ERROR;
