@@ -651,8 +651,14 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     }
   }
 
-  CHECK(buffer->image_format == libgav1::kImageFormatYuv420 ||
-        buffer->image_format == libgav1::kImageFormatMonochrome400);
+  if (!(buffer->image_format == libgav1::kImageFormatYuv420 ||
+        buffer->image_format == libgav1::kImageFormatMonochrome400)) {
+    ALOGE("image_format %d not supported", buffer->image_format);
+    mSignalledError = true;
+    work->workletsProcessed = 1u;
+    work->result = C2_CORRUPTED;
+    return false;
+  }
   const bool isMonochrome =
       buffer->image_format == libgav1::kImageFormatMonochrome400;
 
