@@ -51,8 +51,8 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
         DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
             .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
             .withFields({
-                C2F(mSize, width).inRange(2, 2048, 2),
-                C2F(mSize, height).inRange(2, 2048, 2),
+                C2F(mSize, width).inRange(2, 4096, 2),
+                C2F(mSize, height).inRange(2, 4096, 2),
             })
             .withSetter(SizeSetter)
             .build());
