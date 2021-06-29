@@ -1,0 +1,15 @@
+#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:5
+#EXT-X-KEY:METHOD=SAMPLE-AES,URI="data:text/plain;charset=utf-8,a4cd9995a1aa91e1",IV=0X99b74007b6254e4bd1c6e03631cad15b
+#EXT-X-DISCONTINUITY-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXT-X-DISCONTINUITY
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence0.ts
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXT-X-DISCONTINUITY
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence2.ts
+#EXT-X-ENDLIST

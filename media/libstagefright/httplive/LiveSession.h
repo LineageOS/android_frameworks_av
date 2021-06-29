@@ -24,7 +24,7 @@
 
 #include <utils/String8.h>
 
-#include "mpeg2ts/ATSParser.h"
+#include <ATSParser.h>
 
 namespace android {
 
