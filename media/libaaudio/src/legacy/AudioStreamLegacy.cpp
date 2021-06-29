@@ -94,10 +94,15 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
             AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
             if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
                 ALOGW("processCallbackCommon() data, stream disconnected");
+                // This will kill the stream and prevent it from being restarted.
+                // That is OK because the stream is disconnected.
                 audioBuffer->size = SIZE_STOP_CALLBACKS;
             } else if (!mCallbackEnabled.load()) {
-                ALOGW("processCallbackCommon() no data because callback disabled");
-                audioBuffer->size = SIZE_STOP_CALLBACKS;
+                ALOGW("processCallbackCommon() no data because callback disabled, set size=0");
+                // Do NOT use SIZE_STOP_CALLBACKS here because that will kill the stream and
+                // prevent it from being restarted. This can occur because of a race condition
+                // caused by Legacy callbacks running after the track is "stopped".
+                audioBuffer->size = 0;
             } else {
                 if (audioBuffer->frameCount == 0) {
                     ALOGW("processCallbackCommon() data, frameCount is zero");
