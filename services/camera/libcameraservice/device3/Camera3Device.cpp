@@ -779,16 +779,21 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     }
 
     lines = String8("    In-flight requests:\n");
-    if (mInFlightMap.size() == 0) {
-        lines.append("      None\n");
-    } else {
-        for (size_t i = 0; i < mInFlightMap.size(); i++) {
-            InFlightRequest r = mInFlightMap.valueAt(i);
-            lines.appendFormat("      Frame %d |  Timestamp: %" PRId64 ", metadata"
-                    " arrived: %s, buffers left: %d\n", mInFlightMap.keyAt(i),
-                    r.shutterTimestamp, r.haveResultMetadata ? "true" : "false",
-                    r.numBuffersLeft);
+    if (mInFlightLock.try_lock()) {
+        if (mInFlightMap.size() == 0) {
+            lines.append("      None\n");
+        } else {
+            for (size_t i = 0; i < mInFlightMap.size(); i++) {
+                InFlightRequest r = mInFlightMap.valueAt(i);
+                lines.appendFormat("      Frame %d |  Timestamp: %" PRId64 ", metadata"
+                        " arrived: %s, buffers left: %d\n", mInFlightMap.keyAt(i),
+                        r.shutterTimestamp, r.haveResultMetadata ? "true" : "false",
+                        r.numBuffersLeft);
+            }
         }
+        mInFlightLock.unlock();
+    } else {
+        lines.append("      Failed to acquire In-flight lock!\n");
     }
     write(fd, lines.string(), lines.size());
 
