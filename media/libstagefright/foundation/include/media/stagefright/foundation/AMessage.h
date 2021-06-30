@@ -24,6 +24,8 @@
 #include <utils/KeyedVector.h>
 #include <utils/RefBase.h>
 
+#include <vector>
+
 namespace android {
 
 struct ABuffer;
@@ -95,6 +97,7 @@ struct AMessage : public RefBase {
 
     void setTarget(const sp<const AHandler> &handler);
 
+    // removes all items
     void clear();
 
     void setInt32(const char *name, int32_t value);
@@ -302,16 +305,39 @@ private:
         size_t      mNameLength;
         Type mType;
         void setName(const char *name, size_t len);
+        Item() : mName(nullptr), mNameLength(0), mType(kTypeInt32) { }
+        Item(const char *name, size_t length);
     };
 
     enum {
-        kMaxNumItems = 64
+        kMaxNumItems = 256
     };
-    Item mItems[kMaxNumItems];
-    size_t mNumItems;
+    std::vector<Item> mItems;
 
+    /**
+     * Allocates an item with the given key |name|. If the key already exists, the corresponding
+     * item value is freed. Otherwise a new item is added.
+     *
+     * This method currently asserts if the number of elements would exceed the max number of
+     * elements allowed (kMaxNumItems). This is a security precaution to avoid arbitrarily large
+     * AMessage structures.
+     *
+     * @todo(b/192153245) Either revisit this security precaution, or change the behavior to
+     *      silently ignore keys added after the max number of elements are reached.
+     *
+     * @note All previously returned Item* pointers are deemed invalid after this call. (E.g. from
+     *       allocateItem or findItem)
+     *
+     * @param name the key for the requested item.
+     *
+     * @return Item* a pointer to the item.
+     */
     Item *allocateItem(const char *name);
+
+    /** Frees the value for the item. */
     void freeItemValue(Item *item);
+
+    /** Finds an item with given key |name| and |type|. Returns nullptr if item is not found. */
     const Item *findItem(const char *name, Type type) const;
 
     void setObjectInternal(

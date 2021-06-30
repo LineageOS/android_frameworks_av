@@ -626,6 +626,14 @@ private:
             }
             LOG(VERBOSE) << "work #" << workCount << ": flags=" << work->input.flags
                     << " timestamp=" << work->input.ordinal.timestamp.peek();;
+
+            std::vector<C2Param *> configUpdate;
+            for (const std::unique_ptr<C2Param> &param : work->input.configUpdate) {
+                configUpdate.push_back(param.get());
+            }
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            mIntf->config_vb(configUpdate, C2_MAY_BLOCK, &failures);
+
             std::shared_ptr<C2StreamHdrStaticInfo::input> hdrStaticInfo =
                 mIntf->getHdrStaticMetadata();
             uint32_t dataspace = mIntf->getDataSpace();
