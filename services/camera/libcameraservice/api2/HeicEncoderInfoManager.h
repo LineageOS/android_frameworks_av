@@ -38,6 +38,7 @@ public:
     bool isSizeSupported(int32_t width, int32_t height,
             bool* useHeic, bool* useGrid, int64_t* stall, AString* hevcName) const;
 
+    // kGridWidth and kGridHeight should be 2^n
     static const auto kGridWidth = 512;
     static const auto kGridHeight = 512;
 private:
