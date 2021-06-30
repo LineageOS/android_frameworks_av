@@ -199,7 +199,7 @@ void C2SoftG711Dec::process(
 
     work->worklets.front()->output.flags = work->input.flags;
     work->worklets.front()->output.buffers.clear();
-    work->worklets.front()->output.buffers.push_back(createLinearBuffer(block));
+    work->worklets.front()->output.buffers.push_back(createLinearBuffer(block, 0, outSize));
     work->worklets.front()->output.ordinal = work->input.ordinal;
 
     if (eos) {
