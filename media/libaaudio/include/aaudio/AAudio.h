@@ -82,7 +82,9 @@ enum {
 
     /**
      * This format uses 24-bit samples packed into 3 bytes.
-     * The bytes are in the native endian order.
+     * The bytes are in little-endian order, so the least significant byte
+     * comes first in the byte array.
+     *
      * The maximum range of the data is -8388608 (0x800000)
      * to 8388607 (0x7FFFFF).
      *
