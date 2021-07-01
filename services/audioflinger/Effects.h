@@ -259,7 +259,7 @@ public:
     bool             isHapticGenerator() const;
 
     status_t         setHapticIntensity(int id, int intensity);
-    status_t         setVibratorInfo(const media::AudioVibratorInfo* vibratorInfo);
+    status_t         setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo);
 
     void             dump(int fd, const Vector<String16>& args);
 
