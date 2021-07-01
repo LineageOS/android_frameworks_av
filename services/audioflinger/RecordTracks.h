@@ -21,42 +21,6 @@
     #error This header file should only be included from AudioFlinger.h
 #endif
 
-// Checks and monitors app ops for audio record
-class OpRecordAudioMonitor : public RefBase {
-public:
-    ~OpRecordAudioMonitor() override;
-    bool hasOp() const;
-    int32_t getOp() const { return mAppOp; }
-
-    static sp<OpRecordAudioMonitor> createIfNeeded(const AttributionSourceState& attributionSource,
-            const audio_attributes_t& attr);
-
-private:
-    OpRecordAudioMonitor(const AttributionSourceState& attributionSource, int32_t appOp);
-
-    void onFirstRef() override;
-
-    AppOpsManager mAppOpsManager;
-
-    class RecordAudioOpCallback : public BnAppOpsCallback {
-    public:
-        explicit RecordAudioOpCallback(const wp<OpRecordAudioMonitor>& monitor);
-        void opChanged(int32_t op, const String16& packageName) override;
-
-    private:
-        const wp<OpRecordAudioMonitor> mMonitor;
-    };
-
-    sp<RecordAudioOpCallback> mOpCallback;
-    // called by RecordAudioOpCallback when the app op for this OpRecordAudioMonitor is updated
-    // in AppOp callback and in onFirstRef()
-    void checkOp();
-
-    std::atomic_bool mHasOp;
-    const AttributionSourceState mAttributionSource;
-    const int32_t mAppOp;
-};
-
 // record track
 class RecordTrack : public TrackBase {
 public:
@@ -107,7 +71,7 @@ public:
                                 { return (mFlags & AUDIO_INPUT_FLAG_DIRECT) != 0; }
 
             void        setSilenced(bool silenced) { if (!isPatchTrack()) mSilenced = silenced; }
-            bool        isSilenced() const;
+            bool        isSilenced() const { return mSilenced; }
 
             status_t    getActiveMicrophones(std::vector<media::MicrophoneInfo>* activeMicrophones);
 
@@ -154,8 +118,6 @@ private:
 
             bool                               mSilenced;
 
-            // used to enforce the audio record app op corresponding to this track's audio source
-            sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
             std::string                        mSharedAudioPackageName = {};
             int32_t                            mStartFrames = -1;
 };
