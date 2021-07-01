@@ -94,7 +94,7 @@ bool hasHalService(const std::string& package, const std::string& version,
 }  // namespace
 
 void* createPreferredImpl(const std::string& package, const std::string& interface) {
-    for (auto version = detail::sAudioHALVersions; version != nullptr; ++version) {
+    for (auto version = detail::sAudioHALVersions; *version != nullptr; ++version) {
         void* rawInterface = nullptr;
         if (hasHalService(package, *version, interface)
                 && createHalService(*version, interface, &rawInterface)) {
