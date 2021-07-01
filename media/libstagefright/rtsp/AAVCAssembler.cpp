@@ -44,6 +44,7 @@ AAVCAssembler::AAVCAssembler(const sp<AMessage> &notify)
       mNextExpectedSeqNo(0),
       mAccessUnitDamaged(false),
       mFirstIFrameProvided(false),
+      mLastCvo(-1),
       mLastIFrameProvidedAtMs(0),
       mLastRtpTimeJitterDataUs(0),
       mWidth(0),
@@ -544,6 +545,9 @@ ARTPAssembler::AssemblyStatus AAVCAssembler::addFragmentedNALUnit(
 
     if (cvo >= 0) {
         unit->meta()->setInt32("cvo", cvo);
+        mLastCvo = cvo;
+    } else if (mLastCvo >= 0) {
+        unit->meta()->setInt32("cvo", mLastCvo);
     }
     if (source != nullptr) {
         unit->meta()->setObject("source", source);
