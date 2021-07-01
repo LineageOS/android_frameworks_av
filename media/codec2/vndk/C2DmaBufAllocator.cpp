@@ -111,8 +111,27 @@ class C2DmaBufAllocation : public C2LinearAllocation {
     virtual bool equals(const std::shared_ptr<C2LinearAllocation>& other) const override;
 
     // internal methods
-    C2DmaBufAllocation(BufferAllocator& alloc, size_t size, C2String heap_name, unsigned flags,
-                       C2Allocator::id_t id);
+
+    /**
+      * Constructs an allocation via a new allocation.
+      *
+      * @param alloc     allocator
+      * @param allocSize size used for the allocator
+      * @param capacity  capacity advertised to the client
+      * @param heap_name name of the dmabuf heap (device)
+      * @param flags     flags
+      * @param id        allocator id
+      */
+    C2DmaBufAllocation(BufferAllocator& alloc, size_t allocSize, size_t capacity,
+                       C2String heap_name, unsigned flags, C2Allocator::id_t id);
+
+    /**
+      * Constructs an allocation by wrapping an existing allocation.
+      *
+      * @param size    capacity advertised to the client
+      * @param shareFd dmabuf fd of the wrapped allocation
+      * @param id      allocator id
+      */
     C2DmaBufAllocation(size_t size, int shareFd, C2Allocator::id_t id);
 
     c2_status_t status() const;
@@ -246,19 +265,19 @@ C2DmaBufAllocation::~C2DmaBufAllocation() {
     }
 }
 
-C2DmaBufAllocation::C2DmaBufAllocation(BufferAllocator& alloc, size_t size, C2String heap_name,
-                                       unsigned flags, C2Allocator::id_t id)
-    : C2LinearAllocation(size), mHandle(-1, 0) {
+C2DmaBufAllocation::C2DmaBufAllocation(BufferAllocator& alloc, size_t allocSize, size_t capacity,
+                                       C2String heap_name, unsigned flags, C2Allocator::id_t id)
+    : C2LinearAllocation(capacity), mHandle(-1, 0) {
     int bufferFd = -1;
     int ret = 0;
 
-    bufferFd = alloc.Alloc(heap_name, size, flags);
+    bufferFd = alloc.Alloc(heap_name, allocSize, flags);
     if (bufferFd < 0) {
         ret = bufferFd;
     }
 
     // this may be a non-working handle if bufferFd is negative
-    mHandle = C2HandleBuf(bufferFd, size);
+    mHandle = C2HandleBuf(bufferFd, capacity);
     mId = id;
     mInit = c2_status_t(c2_map_errno<ENOMEM, EACCES, EINVAL>(ret));
 }
@@ -381,7 +400,7 @@ c2_status_t C2DmaBufAllocator::newLinearAllocation(
     size_t allocSize = (size_t)capacity + sPadding;
     // TODO: should we align allocation size to mBlockSize to reflect the true allocation size?
     std::shared_ptr<C2DmaBufAllocation> alloc = std::make_shared<C2DmaBufAllocation>(
-            mBufferAllocator, allocSize, heap_name, flags, getId());
+            mBufferAllocator, allocSize, allocSize - sPadding, heap_name, flags, getId());
     ret = alloc->status();
     if (ret == C2_OK) {
         *allocation = alloc;

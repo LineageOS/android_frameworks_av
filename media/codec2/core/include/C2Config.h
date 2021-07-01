@@ -574,7 +574,6 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_MPEGH_HIGH,                         ///< MPEG-H High
     PROFILE_MPEGH_LC,                           ///< MPEG-H Low-complexity
     PROFILE_MPEGH_BASELINE,                     ///< MPEG-H Baseline
-
 };
 
 enum C2Config::level_t : uint32_t {

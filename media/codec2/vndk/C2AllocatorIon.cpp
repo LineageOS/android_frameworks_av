@@ -417,15 +417,16 @@ C2AllocationIon::Impl *C2AllocationIon::Impl::Alloc(int ionFd, size_t size, size
                 buffer = -1;
             }
         }
-        return new Impl(ionFd, allocSize, bufferFd, buffer, id, ret);
-
+        // the padding is not usable so deduct it from the advertised capacity
+        return new Impl(ionFd, allocSize - sPadding, bufferFd, buffer, id, ret);
     } else {
         ret = ion_alloc_fd(ionFd, allocSize, align, heapMask, flags, &bufferFd);
         ALOGV("ion_alloc_fd(ionFd = %d, size = %zu, align = %zu, prot = %d, flags = %d) "
               "returned (%d) ; bufferFd = %d",
               ionFd, allocSize, align, heapMask, flags, ret, bufferFd);
 
-        return new ImplV2(ionFd, allocSize, bufferFd, id, ret);
+        // the padding is not usable so deduct it from the advertised capacity
+        return new ImplV2(ionFd, allocSize - sPadding, bufferFd, id, ret);
     }
 }
 
