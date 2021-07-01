@@ -92,6 +92,7 @@ ALookup<C2Config::profile_t, int32_t> sAvcProfiles = {
 
 ALookup<C2Config::bitrate_mode_t, int32_t> sBitrateModes = {
     { C2Config::BITRATE_CONST,      BITRATE_MODE_CBR },
+    { C2Config::BITRATE_CONST_SKIP_ALLOWED, BITRATE_MODE_CBR_FD },
     { C2Config::BITRATE_VARIABLE,   BITRATE_MODE_VBR },
     { C2Config::BITRATE_IGNORE,     BITRATE_MODE_CQ },
 };
