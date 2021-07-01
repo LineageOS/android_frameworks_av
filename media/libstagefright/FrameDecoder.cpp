@@ -741,7 +741,7 @@ status_t VideoFrameDecoder::captureSurface() {
 
 ////////////////////////////////////////////////////////////////////////
 
-ImageDecoder::ImageDecoder(
+MediaImageDecoder::MediaImageDecoder(
         const AString &componentName,
         const sp<MetaData> &trackMeta,
         const sp<IMediaSource> &source)
@@ -757,7 +757,7 @@ ImageDecoder::ImageDecoder(
       mTargetTiles(0) {
 }
 
-sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
+sp<AMessage> MediaImageDecoder::onGetFormatAndSeekOptions(
         int64_t frameTimeUs, int /*seekMode*/,
         MediaSource::ReadOptions *options, sp<Surface> * /*window*/) {
     sp<MetaData> overrideMeta;
@@ -833,7 +833,7 @@ sp<AMessage> ImageDecoder::onGetFormatAndSeekOptions(
     return videoFormat;
 }
 
-status_t ImageDecoder::onExtractRect(FrameRect *rect) {
+status_t MediaImageDecoder::onExtractRect(FrameRect *rect) {
     // TODO:
     // This callback is for verifying whether we can decode the rect,
     // and if so, set up the internal variables for decoding.
@@ -872,7 +872,7 @@ status_t ImageDecoder::onExtractRect(FrameRect *rect) {
     return OK;
 }
 
-status_t ImageDecoder::onOutputReceived(
+status_t MediaImageDecoder::onOutputReceived(
         const sp<MediaCodecBuffer> &videoFrameBuffer,
         const sp<AMessage> &outputFormat, int64_t /*timeUs*/, bool *done) {
     if (outputFormat == NULL) {
