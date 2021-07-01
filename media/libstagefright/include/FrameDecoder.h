@@ -146,8 +146,8 @@ private:
     status_t captureSurface();
 };
 
-struct ImageDecoder : public FrameDecoder {
-    ImageDecoder(
+struct MediaImageDecoder : public FrameDecoder {
+   MediaImageDecoder(
             const AString &componentName,
             const sp<MetaData> &trackMeta,
             const sp<IMediaSource> &source);
