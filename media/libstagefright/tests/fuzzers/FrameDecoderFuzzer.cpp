@@ -42,7 +42,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (isVideoDecoder) {
         decoder = new VideoFrameDecoder(componentName, trackMeta, source);
     } else {
-        decoder = new ImageDecoder(componentName, trackMeta, source);
+        decoder = new MediaImageDecoder(componentName, trackMeta, source);
     }
 
     while (fdp.remaining_bytes()) {
@@ -80,4 +80,3 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
 }
 
 }  // namespace android
-
