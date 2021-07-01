@@ -63,12 +63,35 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
         return 0;
     }
 
+    // only proceed if we're in the handheld category.
+    // We embed this information within the codec record when we build up features
+    // and pass them in from MediaCodec; it's the easiest place to store it
+    //
+    // TODO: make a #define for ' _vq_eligible.device' here and in MediaCodec.cpp
+    //
+    int32_t isVQEligible = 0;
+    (void) codec->getFeatureValue("_vq_eligible.device", &isVQEligible);
+    ALOGD("minquality:  are we eligible: %d", isVQEligible);
+    if (!isVQEligible) {
+        ALOGD("minquality: not an eligible device class");
+        return 0;
+    }
+
     if (codec->supportedMinimumQuality() > 0) {
         // allow the codec provided minimum quality behavior to work at it
         ALOGD("minquality: codec claims to implement minquality=%d",
               codec->supportedMinimumQuality());
+
+        // tell the underlying codec to do its thing; we won't try to second guess.
+        // default to 1, aka S_HANDHELD;
+        int32_t qualityTarget = 1;
+        (void) codec->getFeatureValue("_quality.target", &qualityTarget);
+        AMediaFormat_setInt32(inFormat, "android._encoding-quality-level", qualityTarget);
         return 0;
     }
+
+    // let the codec know that we'll be enforcing the minimum quality standards
+    AMediaFormat_setInt32(inFormat, "android._encoding-quality-level", 0);
 
     //
     // consider any and all tools available
