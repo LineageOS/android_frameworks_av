@@ -557,12 +557,14 @@ inline static const char *asString_DolbyVisionLevel(int32_t i, const char *def =
 }
 
 constexpr int32_t BITRATE_MODE_CBR = 2;
+constexpr int32_t BITRATE_MODE_CBR_FD = 3;
 constexpr int32_t BITRATE_MODE_CQ = 0;
 constexpr int32_t BITRATE_MODE_VBR = 1;
 
 inline static const char *asString_BitrateMode(int32_t i, const char *def = "??") {
     switch (i) {
         case BITRATE_MODE_CBR:  return "CBR";
+        case BITRATE_MODE_CBR_FD: return "CBR_FD";
         case BITRATE_MODE_CQ:   return "CQ";
         case BITRATE_MODE_VBR:  return "VBR";
         default:                return def;
