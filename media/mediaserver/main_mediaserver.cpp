@@ -18,7 +18,6 @@
 #define LOG_TAG "mediaserver"
 //#define LOG_NDEBUG 0
 
-#include <android-base/properties.h>
 #include <binder/IPCThreadState.h>
 #include <binder/ProcessState.h>
 #include <binder/IServiceManager.h>
@@ -43,12 +42,6 @@ int main(int argc __unused, char **argv __unused)
     ResourceManagerService::instantiate();
     registerExtensions();
     ::android::hardware::configureRpcThreadpool(16, false);
-
-    if (!android::base::GetBoolProperty("ro.config.low_ram", false)) {
-        // Start the media.transcoding service if the device is not low ram
-        // device.
-        android::base::SetProperty("ctl.start", "media.transcoding");
-    }
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
     ::android::hardware::joinRpcThreadpool();
