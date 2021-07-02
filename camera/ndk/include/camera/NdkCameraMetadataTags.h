@@ -1988,6 +1988,16 @@ typedef enum acamera_metadata_tag {
      * ACAMERA_CONTROL_ZOOM_RATIO is not 1.0, and ACAMERA_SCALER_CROP_REGION is set to be
      * windowboxing, the camera framework will override the ACAMERA_SCALER_CROP_REGION to be
      * the active array.</p>
+     * <p>In the capture request, if the application sets ACAMERA_CONTROL_ZOOM_RATIO to a
+     * value != 1.0, the ACAMERA_CONTROL_ZOOM_RATIO tag in the capture result reflects the
+     * effective zoom ratio achieved by the camera device, and the ACAMERA_SCALER_CROP_REGION
+     * adjusts for additional crops that are not zoom related. Otherwise, if the application
+     * sets ACAMERA_CONTROL_ZOOM_RATIO to 1.0, or does not set it at all, the
+     * ACAMERA_CONTROL_ZOOM_RATIO tag in the result metadata will also be 1.0.</p>
+     * <p>When the application requests a physical stream for a logical multi-camera, the
+     * ACAMERA_CONTROL_ZOOM_RATIO in the physical camera result metadata will be 1.0, and
+     * the ACAMERA_SCALER_CROP_REGION tag reflects the amount of zoom and crop done by the
+     * physical camera device.</p>
      *
      * @see ACAMERA_CONTROL_AE_REGIONS
      * @see ACAMERA_CONTROL_ZOOM_RATIO
