@@ -307,8 +307,16 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
 
     sp<MetaData> meta = mImpl->getMetaData();
 
+    if (meta == nullptr) {
+        //extractor did not publish file metadata
+        return -EINVAL;
+    }
+
     const char *mime;
-    CHECK(meta->findCString(kKeyMIMEType, &mime));
+    if (!meta->findCString(kKeyMIMEType, &mime)) {
+        // no mime type maps to invalid
+        return -EINVAL;
+    }
     *format = new AMessage();
     (*format)->setString("mime", mime);
 
@@ -353,6 +361,11 @@ status_t NuMediaExtractor::getExifOffsetSize(off64_t *offset, size_t *size) cons
     }
 
     sp<MetaData> meta = mImpl->getMetaData();
+
+    if (meta == nullptr) {
+        //extractor did not publish file metadata
+        return -EINVAL;
+    }
 
     int64_t exifOffset, exifSize;
     if (meta->findInt64(kKeyExifOffset, &exifOffset)
