@@ -248,6 +248,7 @@ struct Parameters {
         bool useFlexibleYuv;
         Size maxJpegSize;
         Size maxZslSize;
+        Size usedZslSize;
         bool supportsPreferredConfigs;
     } fastInfo;
 
@@ -425,6 +426,11 @@ private:
     // Helper function to get minimum frame duration for a jpeg size
     // return -1 if input jpeg size cannot be found in supported size list
     int64_t getJpegStreamMinFrameDurationNs(Parameters::Size size);
+
+    // Helper function to get minimum frame duration for a
+    // IMPLEMENTATION_DEFINED stream of size 'size'
+    // return -1 if input size cannot be found in supported size list
+    int64_t getZslStreamMinFrameDurationNs(Parameters::Size size);
 
     // Helper function to get minimum frame duration for a size/format combination
     // return -1 if input size/format combination cannot be found.
