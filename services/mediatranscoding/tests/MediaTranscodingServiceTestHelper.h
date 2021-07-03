@@ -481,7 +481,7 @@ public:
         // Need thread pool to receive callbacks, otherwise oneway callbacks are
         // silently ignored.
         ABinderProcess_startThreadPool();
-        ::ndk::SpAIBinder binder(AServiceManager_getService("media.transcoding"));
+        ::ndk::SpAIBinder binder(AServiceManager_waitForService("media.transcoding"));
         mService = IMediaTranscodingService::fromBinder(binder);
         if (mService == nullptr) {
             ALOGE("Failed to connect to the media.trascoding service.");
