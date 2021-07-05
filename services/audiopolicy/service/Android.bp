@@ -16,6 +16,7 @@ cc_library_shared {
         "AudioPolicyInterfaceImpl.cpp",
         "AudioPolicyService.cpp",
         "CaptureStateNotifier.cpp",
+        "Spatializer.cpp",
     ],
 
     include_dirs: [
@@ -27,6 +28,7 @@ cc_library_shared {
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
+        "libaudiohal",
         "libaudiopolicy",
         "libaudiopolicymanagerdefault",
         "libaudioutils",
@@ -40,6 +42,7 @@ cc_library_shared {
         "libmediautils",
         "libpermission",
         "libsensorprivacy",
+        "libshmemcompat",
         "libutils",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
@@ -55,6 +58,7 @@ cc_library_shared {
     ],
 
     header_libs: [
+        "libaudiohal_headers",
         "libaudiopolicycommon",
         "libaudiopolicyengine_interface_headers",
         "libaudiopolicymanager_interface_headers",
