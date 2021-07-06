@@ -334,6 +334,12 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
     int bytesCount = nWidth * nHeight * 3 >> 1;
     int32_t timestampIncr = ENCODER_TIMESTAMP_INCREMENT;
     c2_status_t err = C2_OK;
+
+    // Query component's memory usage flags
+    std::vector<std::unique_ptr<C2Param>> params;
+    C2StreamUsageTuning::input compUsage(0u, 0u);
+    component->query({&compUsage}, {}, C2_DONT_BLOCK, &params);
+
     while (1) {
         if (nFrames == 0) break;
         uint32_t flags = 0;
@@ -384,7 +390,8 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         }
         std::shared_ptr<C2GraphicBlock> block;
         err = graphicPool->fetchGraphicBlock(nWidth, nHeight, HAL_PIXEL_FORMAT_YV12,
-                                             {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE},
+                                             {C2MemoryUsage::CPU_READ | compUsage.value,
+                                                 C2MemoryUsage::CPU_WRITE | compUsage.value},
                                              &block);
         if (err != C2_OK) {
             fprintf(stderr, "fetchGraphicBlock failed : %d\n", err);
