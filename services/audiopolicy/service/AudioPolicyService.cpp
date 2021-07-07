@@ -1442,8 +1442,8 @@ AudioPolicyService::OpRecordAudioMonitor::createIfNeeded(
             const AttributionSourceState& attributionSource, const audio_attributes_t& attr,
             wp<AudioCommandThread> commandThread)
 {
-    if (isServiceUid(attributionSource.uid)) {
-        ALOGV("not silencing record for service %s",
+    if (isAudioServerOrRootUid(attributionSource.uid)) {
+        ALOGV("not silencing record for audio or root source %s",
                 attributionSource.toString().c_str());
         return nullptr;
     }
