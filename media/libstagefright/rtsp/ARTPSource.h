@@ -31,7 +31,7 @@
 
 namespace android {
 
-const uint32_t kStaticJitterTimeMs = 50;   // 50ms
+const uint32_t kStaticJitterTimeMs = 100;   // 100ms
 
 struct ABuffer;
 struct AMessage;
