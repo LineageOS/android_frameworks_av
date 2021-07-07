@@ -1105,6 +1105,7 @@ sp<ARTPSource> ARTPConnection::findSource(StreamInfo *info, uint32_t srcId) {
                 srcId, info->mSessionDesc, info->mIndex, info->mNotifyMsg);
 
         if (mFlags & kViLTEConnection) {
+            setStaticJitterTimeMs(50);
             source->setPeriodicFIR(false);
         }
 
