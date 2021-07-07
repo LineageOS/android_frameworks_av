@@ -1126,7 +1126,9 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                     void *data;
                     size_t size;
 
-                    if (AMediaFormat_getBuffer(mLastTrack->meta, AMEDIAFORMAT_KEY_CSD_2, &data, &size)) {
+                    if (AMediaFormat_getBuffer(mLastTrack->meta, AMEDIAFORMAT_KEY_CSD_2,
+                                               &data, &size)
+                        && size >= 5) {
                         const uint8_t *ptr = (const uint8_t *)data;
                         const uint8_t profile = ptr[2] >> 1;
                         const uint8_t bl_compatibility_id = (ptr[4]) >> 4;
@@ -1163,8 +1165,12 @@ status_t MPEG4Extractor::parseChunk(off64_t *offset, int depth) {
                             mLastTrack->next = track_b;
                             track_b->next = NULL;
 
-                            auto id = track_b->meta->mFormat->findEntryByName(AMEDIAFORMAT_KEY_CSD_2);
-                            track_b->meta->mFormat->removeEntryAt(id);
+                            // we want to remove the csd-2 key from the metadata, but
+                            // don't have an AMediaFormat_* function to do so. Settle
+                            // for replacing this csd-2 with an empty csd-2.
+                            uint8_t emptybuffer[8] = {};
+                            AMediaFormat_setBuffer(track_b->meta, AMEDIAFORMAT_KEY_CSD_2,
+                                                   emptybuffer, 0);
 
                             if (4 == profile || 7 == profile || 8 == profile ) {
                                 AMediaFormat_setString(track_b->meta,
