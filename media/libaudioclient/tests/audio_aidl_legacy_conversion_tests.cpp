@@ -24,12 +24,26 @@ using namespace android::aidl_utils;
 
 namespace {
 
-size_t hash(const media::AudioDeviceDescription& add) {
-    return std::hash<media::AudioDeviceDescription>{}(add);
+template<typename T> size_t hash(const T& t) {
+    return std::hash<T>{}(t);
 }
 
-size_t hash(const media::AudioFormatDescription& afd) {
-    return std::hash<media::AudioFormatDescription>{}(afd);
+media::AudioChannelLayout make_ACL_None() {
+    return media::AudioChannelLayout{};
+}
+
+media::AudioChannelLayout make_ACL_Invalid() {
+    return media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::invalid>(0);
+}
+
+media::AudioChannelLayout make_ACL_Stereo() {
+    return media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::layoutMask>(
+            media::AudioChannelLayout::LAYOUT_STEREO);
+}
+
+media::AudioChannelLayout make_ACL_ChannelIndex2() {
+    return media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::indexMask>(
+            media::AudioChannelLayout::INDEX_MASK_2);
 }
 
 media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType type,
@@ -135,6 +149,11 @@ class HashIdentityTest : public ::testing::Test {
     }
 };
 
+TEST_F(HashIdentityTest, AudioChannelLayoutHashIdentity) {
+    verifyHashIdentity<media::AudioChannelLayout>({
+            make_ACL_None, make_ACL_Invalid, make_ACL_Stereo, make_ACL_ChannelIndex2});
+}
+
 TEST_F(HashIdentityTest, AudioDeviceDescriptionHashIdentity) {
     verifyHashIdentity<media::AudioDeviceDescription>({
             make_ADD_None, make_ADD_DefaultIn, make_ADD_DefaultOut, make_ADD_WiredHeadset,
@@ -146,6 +165,25 @@ TEST_F(HashIdentityTest, AudioFormatDescriptionHashIdentity) {
             make_AFD_Default, make_AFD_Invalid, make_AFD_Pcm16Bit, make_AFD_Bitstream,
             make_AFD_Encap, make_AFD_Encap_with_Enc});
 }
+
+using ChannelLayoutParam = std::tuple<media::AudioChannelLayout, bool /*isOutput*/>;
+class AudioChannelLayoutRoundTripTest :
+        public testing::TestWithParam<ChannelLayoutParam> {};
+TEST_P(AudioChannelLayoutRoundTripTest, Aidl2Legacy2Aidl) {
+    const auto initial = std::get<0>(GetParam());
+    const bool isOutput = std::get<1>(GetParam());
+    auto conv = aidl2legacy_AudioChannelLayout_audio_channel_mask_t(initial, isOutput);
+    ASSERT_TRUE(conv.ok());
+    auto convBack = legacy2aidl_audio_channel_mask_t_AudioChannelLayout(conv.value(), isOutput);
+    ASSERT_TRUE(convBack.ok());
+    EXPECT_EQ(initial, convBack.value());
+}
+INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip,
+        AudioChannelLayoutRoundTripTest,
+        testing::Combine(
+                testing::Values(media::AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
+                        make_ACL_ChannelIndex2()),
+                testing::Values(true, false)));
 
 class AudioDeviceDescriptionRoundTripTest :
         public testing::TestWithParam<media::AudioDeviceDescription> {};
