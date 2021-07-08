@@ -32,7 +32,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "StringUtils.h"
+#include "ValidateId.h"
 #include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
@@ -143,8 +143,7 @@ bool statsd_audiorecord(const std::shared_ptr<const mediametrics::Item>& item,
     // log_session_id (string)
     std::string logSessionId;
     (void)item->getString("android.media.audiorecord.logSessionId", &logSessionId);
-    const auto log_session_id =
-            mediametrics::stringutils::sanitizeLogSessionId(logSessionId);
+    const auto log_session_id = mediametrics::ValidateId::get()->validateId(logSessionId);
 
     android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
     int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIORECORD_REPORTED,
