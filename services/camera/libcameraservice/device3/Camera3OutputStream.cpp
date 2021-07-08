@@ -654,7 +654,8 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
          * Then there is circular locking dependency.
          */
         sp<Surface> consumer = mConsumer;
-        size_t remainingBuffers = camera_stream::max_buffers - mHandoutTotalBufferCount;
+        size_t remainingBuffers = (mState == STATE_PREPARING ? mTotalBufferCount :
+                                   camera_stream::max_buffers) - mHandoutTotalBufferCount;
         mLock.unlock();
         std::unique_lock<std::mutex> batchLock(mBatchLock);
 
