@@ -118,7 +118,7 @@ public:
     binder::Status getStrategyForStream(media::AudioStreamType stream,
                                         int32_t* _aidl_return) override;
     binder::Status getDevicesForStream(media::AudioStreamType stream,
-                                       int32_t* _aidl_return) override;
+                                       std::vector<int32_t>* _aidl_return) override;
     binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
                                            std::vector<media::AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
