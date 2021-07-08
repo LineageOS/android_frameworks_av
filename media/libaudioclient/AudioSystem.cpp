@@ -846,7 +846,8 @@ status_t AudioSystem::setDeviceConnectionState(audio_devices_t device,
     }
 
     media::AudioDevice deviceAidl;
-    deviceAidl.type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_devices_t_int32_t(device));
+    deviceAidl.type = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     deviceAidl.address = address;
 
     return statusTFromBinderStatus(
@@ -865,7 +866,8 @@ audio_policy_dev_state_t AudioSystem::getDeviceConnectionState(audio_devices_t d
 
     auto result = [&]() -> ConversionResult<audio_policy_dev_state_t> {
         media::AudioDevice deviceAidl;
-        deviceAidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(device));
+        deviceAidl.type = VALUE_OR_RETURN(
+                legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
         deviceAidl.address = device_address;
 
         media::AudioPolicyDeviceState result;
@@ -895,7 +897,8 @@ status_t AudioSystem::handleDeviceConfigChange(audio_devices_t device,
     }
 
     media::AudioDevice deviceAidl;
-    deviceAidl.type = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_devices_t_int32_t(device));
+    deviceAidl.type = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     deviceAidl.address = address;
 
     return statusTFromBinderStatus(
@@ -1165,7 +1168,8 @@ status_t AudioSystem::setStreamVolumeIndex(audio_stream_type_t stream,
     media::AudioStreamType streamAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
     int32_t indexAidl = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(index));
-    int32_t deviceAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_devices_t_int32_t(device));
+    media::AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     return statusTFromBinderStatus(
             aps->setStreamVolumeIndex(streamAidl, deviceAidl, indexAidl));
 }
@@ -1178,7 +1182,8 @@ status_t AudioSystem::getStreamVolumeIndex(audio_stream_type_t stream,
 
     media::AudioStreamType streamAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
-    int32_t deviceAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_devices_t_int32_t(device));
+    media::AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     int32_t indexAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getStreamVolumeIndex(streamAidl, deviceAidl, &indexAidl)));
@@ -1197,7 +1202,8 @@ status_t AudioSystem::setVolumeIndexForAttributes(const audio_attributes_t& attr
     media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
     int32_t indexAidl = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(index));
-    int32_t deviceAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_devices_t_int32_t(device));
+    media::AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     return statusTFromBinderStatus(
             aps->setVolumeIndexForAttributes(attrAidl, deviceAidl, indexAidl));
 }
@@ -1210,7 +1216,8 @@ status_t AudioSystem::getVolumeIndexForAttributes(const audio_attributes_t& attr
 
     media::AudioAttributesInternal attrAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
-    int32_t deviceAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_devices_t_int32_t(device));
+    media::AudioDeviceDescription deviceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
     int32_t indexAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getVolumeIndexForAttributes(attrAidl, deviceAidl, &indexAidl)));
@@ -1266,10 +1273,11 @@ DeviceTypeSet AudioSystem::getDevicesForStream(audio_stream_type_t stream) {
     auto result = [&]() -> ConversionResult<DeviceTypeSet> {
         media::AudioStreamType streamAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
-        std::vector<int32_t> resultAidl;
+        std::vector<media::AudioDeviceDescription> resultAidl;
         RETURN_IF_ERROR(statusTFromBinderStatus(
                 aps->getDevicesForStream(streamAidl, &resultAidl)));
-        return convertContainer<DeviceTypeSet>(resultAidl, aidl2legacy_int32_t_audio_devices_t);
+        return convertContainer<DeviceTypeSet>(resultAidl,
+                aidl2legacy_AudioDeviceDescription_audio_devices_t);
     }();
     return result.value_or(DeviceTypeSet{});
 }
@@ -1690,7 +1698,8 @@ status_t AudioSystem::acquireSoundTriggerSession(audio_session_t* session,
             statusTFromBinderStatus(aps->acquireSoundTriggerSession(&retAidl)));
     *session = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_session_t(retAidl.session));
     *ioHandle = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_io_handle_t(retAidl.ioHandle));
-    *device = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_devices_t(retAidl.device));
+    *device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceDescription_audio_devices_t(retAidl.device));
     return OK;
 }
 
@@ -1830,7 +1839,8 @@ AudioSystem::getStreamVolumeDB(audio_stream_type_t stream, int index, audio_devi
         media::AudioStreamType streamAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_stream_type_t_AudioStreamType(stream));
         int32_t indexAidl = VALUE_OR_RETURN(convertIntegral<int32_t>(index));
-        int32_t deviceAidl = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(device));
+        media::AudioDeviceDescription deviceAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_devices_t_AudioDeviceDescription(device));
         float retAidl;
         RETURN_IF_ERROR(statusTFromBinderStatus(
                 aps->getStreamVolumeDB(streamAidl, indexAidl, deviceAidl, &retAidl)));

@@ -1254,16 +1254,6 @@ ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_
             enumToMask_index<int32_t, media::AudioGainMode>);
 }
 
-ConversionResult<audio_devices_t> aidl2legacy_int32_t_audio_devices_t(int32_t aidl) {
-    // TODO(ytai): bitfield?
-    return convertReinterpret<audio_devices_t>(aidl);
-}
-
-ConversionResult<int32_t> legacy2aidl_audio_devices_t_int32_t(audio_devices_t legacy) {
-    // TODO(ytai): bitfield?
-    return convertReinterpret<int32_t>(legacy);
-}
-
 ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_config(
         const media::AudioGainConfig& aidl, media::AudioPortRole role, media::AudioPortType type) {
     audio_gain_config legacy;
@@ -1527,7 +1517,7 @@ aidl2legacy_AudioPortConfigDeviceExt_audio_port_config_device_ext(
         const media::AudioPortConfigDeviceExt& aidl) {
     audio_port_config_device_ext legacy;
     legacy.hw_module = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_module_handle_t(aidl.hwModule));
-    legacy.type = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.type));
+    legacy.type = VALUE_OR_RETURN(aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
     RETURN_IF_ERROR(aidl2legacy_string(aidl.address, legacy.address, AUDIO_DEVICE_MAX_ADDRESS_LEN));
     return legacy;
 }
@@ -1537,7 +1527,7 @@ legacy2aidl_audio_port_config_device_ext_AudioPortConfigDeviceExt(
         const audio_port_config_device_ext& legacy) {
     media::AudioPortConfigDeviceExt aidl;
     aidl.hwModule = VALUE_OR_RETURN(legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.type));
+    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.type));
     aidl.address = VALUE_OR_RETURN(
             legacy2aidl_string(legacy.address, AUDIO_DEVICE_MAX_ADDRESS_LEN));
     return aidl;
@@ -2592,7 +2582,8 @@ ConversionResult<audio_port_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(const media::AudioPortDeviceExt& aidl) {
     audio_port_device_ext legacy;
     legacy.hw_module = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_module_handle_t(aidl.hwModule));
-    legacy.type = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.device.type));
+    legacy.type = VALUE_OR_RETURN(
+            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.device.type));
     RETURN_IF_ERROR(
             aidl2legacy_string(aidl.device.address, legacy.address, sizeof(legacy.address)));
     legacy.encapsulation_modes = VALUE_OR_RETURN(
@@ -2606,7 +2597,8 @@ ConversionResult<media::AudioPortDeviceExt>
 legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(const audio_port_device_ext& legacy) {
     media::AudioPortDeviceExt aidl;
     aidl.hwModule = VALUE_OR_RETURN(legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl.device.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.type));
+    aidl.device.type = VALUE_OR_RETURN(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.type));
     aidl.device.address = VALUE_OR_RETURN(
             legacy2aidl_string(legacy.address, sizeof(legacy.address)));
     aidl.encapsulationModes = VALUE_OR_RETURN(

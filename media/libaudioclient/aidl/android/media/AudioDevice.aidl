@@ -16,11 +16,12 @@
 
 package android.media;
 
+import android.media.AudioDeviceDescription;
+
 /**
  * {@hide}
  */
 parcelable AudioDevice {
-    /** Interpreted as audio_devices_t. */
-    int type;
+    AudioDeviceDescription type;
     @utf8InCpp String address;
 }

@@ -16,6 +16,8 @@
 
 package android.media;
 
+import android.media.AudioDeviceDescription;
+
 /**
  * {@hide}
  */
@@ -26,11 +28,9 @@ parcelable AudioPortConfigDeviceExt {
      */
     int hwModule;
     /**
-     * Device type (e.g AUDIO_DEVICE_OUT_SPEAKER).
-     * Interpreted as audio_devices_t.
-     * TODO: Convert to a standalone AIDL representation.
+     * Device type.
      */
-    int type;
+    AudioDeviceDescription type;
     /** Device address. "" if N/A. */
     @utf8InCpp String address;
 }
