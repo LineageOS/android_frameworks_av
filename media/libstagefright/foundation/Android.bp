@@ -85,6 +85,7 @@ cc_defaults {
         "AudioPresentationInfo.cpp",
         "ByteUtils.cpp",
         "ColorUtils.cpp",
+        "ColorUtils_fill.cpp",
         "FoundationUtils.cpp",
         "MediaBuffer.cpp",
         "MediaBufferBase.cpp",
@@ -148,3 +149,66 @@ cc_library_static {
         "-DNO_IMEMORY",
     ],
 }
+
+// this gets linked into extractors in media mainline module
+// so must be ndk api 29 so that it runs on >=Q
+cc_library_static {
+    name: "libstagefright_foundation_colorutils_ndk",
+    host_supported: true,
+    vendor_available: true,
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
+
+    shared_libs: [
+        "liblog",
+        "libutils",             // for sp<>
+        // actually invokes this, but called from folks who already load it
+        // "libmediandk",
+    ],
+
+    header_libs: [
+        // this is only needed for the vendor variant that removes libbinder, but vendor
+        // target below does not allow adding header_libs.
+        "libbinder_headers",
+        "libstagefright_foundation_headers",
+        "media_ndk_headers",
+        "media_plugin_headers",
+    ],
+
+    local_include_dirs: [
+        "include/media/stagefright/foundation",
+    ],
+
+    cflags: [
+        "-Werror",
+        "-Wall",
+    ],
+
+    srcs: [
+        "ColorUtils_ndk.cpp",
+        "ColorUtils_fill.cpp",
+    ],
+
+    clang: true,
+
+    sanitize: {
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+        ],
+        cfi: true,
+    },
+
+    min_sdk_version: "29",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
+
+}
+
