@@ -40,6 +40,7 @@ cc_test {
     ],
 
     static_libs: [
+        "libstagefright_foundation_colorutils_ndk",
         "libstagefright_foundation",
     ],
 

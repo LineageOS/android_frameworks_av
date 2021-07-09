@@ -427,8 +427,7 @@ public:
      * less than or equal to the getBufferCapacityInFrames().
      * It may also be adjusted slightly for internal reasons.
      *
-     * Return the final size or a negative error if the track is unitialized
-     * or does not support variable sizes.
+     * Return the final size or a negative value (NO_INIT) if the track is uninitialized.
      */
             ssize_t     setBufferSizeInFrames(size_t size);
 
