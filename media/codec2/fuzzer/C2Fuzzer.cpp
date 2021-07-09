@@ -194,12 +194,12 @@ bool Codec2Fuzzer::initDecoder() {
   }
 
   std::vector<C2Param*> configParams;
+  C2StreamPictureSizeInfo::input inputSize(0u, kWidthOfVideo, kHeightOfVideo);
+  C2StreamSampleRateInfo::output sampleRateInfo(0u, kSamplingRateOfAudio);
+  C2StreamChannelCountInfo::output channelCountInfo(0u, kChannelsOfAudio);
   if (domain.value == DOMAIN_VIDEO) {
-    C2StreamPictureSizeInfo::input inputSize(0u, kWidthOfVideo, kHeightOfVideo);
     configParams.push_back(&inputSize);
   } else if (domain.value == DOMAIN_AUDIO) {
-    C2StreamSampleRateInfo::output sampleRateInfo(0u, kSamplingRateOfAudio);
-    C2StreamChannelCountInfo::output channelCountInfo(0u, kChannelsOfAudio);
     configParams.push_back(&sampleRateInfo);
     configParams.push_back(&channelCountInfo);
   }
