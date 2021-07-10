@@ -39,6 +39,7 @@ cc_defaults {
 
     static_libs: [
         "liblog",
+        "libstagefright_foundation_colorutils_ndk",
         "libstagefright_foundation",
         "libmediandk_format",
         "libmedia_ndkformatpriv",
