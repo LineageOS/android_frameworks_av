@@ -48,6 +48,7 @@ class MediaMetricsServiceFuzzer {
     void invokeAudioAnalytics(const uint8_t *data, size_t size);
     void invokeTimedAction(const uint8_t *data, size_t size);
     void process(const uint8_t *data, size_t size);
+    std::atomic_int mValue = 0;
 };
 
 void MediaMetricsServiceFuzzer::invokeStartsWith(const uint8_t *data, size_t size) {
@@ -342,11 +343,10 @@ void MediaMetricsServiceFuzzer::invokeAudioAnalytics(const uint8_t *data, size_t
 void MediaMetricsServiceFuzzer::invokeTimedAction(const uint8_t *data, size_t size) {
     FuzzedDataProvider fdp = FuzzedDataProvider(data, size);
     android::mediametrics::TimedAction timedAction;
-    std::atomic_int value = 0;
 
     while (fdp.remaining_bytes()) {
         timedAction.postIn(std::chrono::seconds(fdp.ConsumeIntegral<int32_t>()),
-                           [&value] { ++value; });
+                           [this] { ++mValue; });
         timedAction.size();
     }
 }
