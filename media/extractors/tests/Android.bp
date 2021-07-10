@@ -51,6 +51,7 @@ cc_test {
         "libstagefright_esds",
         "libstagefright_mpeg2support",
         "libstagefright_mpeg2extractor",
+        "libstagefright_foundation_colorutils_ndk",
         "libstagefright_foundation",
         "libstagefright_metadatautils",
 

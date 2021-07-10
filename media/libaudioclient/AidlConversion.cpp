@@ -412,10 +412,119 @@ ConversionResult<media::AudioFormatSys> legacy2aidl_audio_format_t_AudioFormat(
 namespace {
 
 namespace detail {
+using AudioChannelPair = std::pair<audio_channel_mask_t, media::AudioChannelLayout>;
+using AudioChannelPairs = std::vector<AudioChannelPair>;
 using AudioDevicePair = std::pair<audio_devices_t, media::AudioDeviceDescription>;
 using AudioDevicePairs = std::vector<AudioDevicePair>;
 using AudioFormatPair = std::pair<audio_format_t, media::AudioFormatDescription>;
 using AudioFormatPairs = std::vector<AudioFormatPair>;
+}
+
+const detail::AudioChannelPairs& getIndexAudioChannelPairs() {
+    static const detail::AudioChannelPairs pairs = {
+#define DEFINE_INDEX_MASK(n)                                                                \
+            {                                                                               \
+                AUDIO_CHANNEL_INDEX_MASK_##n,                                               \
+                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::indexMask>( \
+                        media::AudioChannelLayout::INDEX_MASK_##n)                          \
+            }
+
+            DEFINE_INDEX_MASK(1),
+            DEFINE_INDEX_MASK(2),
+            DEFINE_INDEX_MASK(3),
+            DEFINE_INDEX_MASK(4),
+            DEFINE_INDEX_MASK(5),
+            DEFINE_INDEX_MASK(6),
+            DEFINE_INDEX_MASK(7),
+            DEFINE_INDEX_MASK(8),
+            DEFINE_INDEX_MASK(9),
+            DEFINE_INDEX_MASK(10),
+            DEFINE_INDEX_MASK(11),
+            DEFINE_INDEX_MASK(12),
+            DEFINE_INDEX_MASK(13),
+            DEFINE_INDEX_MASK(14),
+            DEFINE_INDEX_MASK(15),
+            DEFINE_INDEX_MASK(16),
+            DEFINE_INDEX_MASK(17),
+            DEFINE_INDEX_MASK(18),
+            DEFINE_INDEX_MASK(19),
+            DEFINE_INDEX_MASK(20),
+            DEFINE_INDEX_MASK(21),
+            DEFINE_INDEX_MASK(22),
+            DEFINE_INDEX_MASK(23),
+            DEFINE_INDEX_MASK(24)
+#undef DEFINE_INDEX_MASK
+    };
+    return pairs;
+}
+
+const detail::AudioChannelPairs& getInAudioChannelPairs() {
+    static const detail::AudioChannelPairs pairs = {
+#define DEFINE_INPUT_LAYOUT(n)                                                               \
+            {                                                                                \
+                AUDIO_CHANNEL_IN_##n,                                                        \
+                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::layoutMask>( \
+                        media::AudioChannelLayout::LAYOUT_##n)                               \
+            }
+
+        DEFINE_INPUT_LAYOUT(MONO),
+        DEFINE_INPUT_LAYOUT(STEREO),
+        DEFINE_INPUT_LAYOUT(FRONT_BACK),
+        // AUDIO_CHANNEL_IN_6 not supported
+        DEFINE_INPUT_LAYOUT(2POINT0POINT2),
+        DEFINE_INPUT_LAYOUT(2POINT1POINT2),
+        DEFINE_INPUT_LAYOUT(3POINT0POINT2),
+        DEFINE_INPUT_LAYOUT(3POINT1POINT2),
+        DEFINE_INPUT_LAYOUT(5POINT1),
+        DEFINE_INPUT_LAYOUT(VOICE_UPLINK_MONO),
+        DEFINE_INPUT_LAYOUT(VOICE_DNLINK_MONO),
+        DEFINE_INPUT_LAYOUT(VOICE_CALL_MONO)
+#undef DEFINE_INPUT_LAYOUT
+    };
+    return pairs;
+}
+
+const detail::AudioChannelPairs& getOutAudioChannelPairs() {
+    static const detail::AudioChannelPairs pairs = {
+#define DEFINE_OUTPUT_LAYOUT(n)                                                              \
+            {                                                                                \
+                AUDIO_CHANNEL_OUT_##n,                                                       \
+                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::layoutMask>( \
+                        media::AudioChannelLayout::LAYOUT_##n)                               \
+            }
+
+        DEFINE_OUTPUT_LAYOUT(MONO),
+        DEFINE_OUTPUT_LAYOUT(STEREO),
+        DEFINE_OUTPUT_LAYOUT(2POINT1),
+        DEFINE_OUTPUT_LAYOUT(TRI),
+        DEFINE_OUTPUT_LAYOUT(TRI_BACK),
+        DEFINE_OUTPUT_LAYOUT(3POINT1),
+        DEFINE_OUTPUT_LAYOUT(2POINT0POINT2),
+        DEFINE_OUTPUT_LAYOUT(2POINT1POINT2),
+        DEFINE_OUTPUT_LAYOUT(3POINT0POINT2),
+        DEFINE_OUTPUT_LAYOUT(3POINT1POINT2),
+        DEFINE_OUTPUT_LAYOUT(QUAD),
+        DEFINE_OUTPUT_LAYOUT(QUAD_SIDE),
+        DEFINE_OUTPUT_LAYOUT(SURROUND),
+        DEFINE_OUTPUT_LAYOUT(PENTA),
+        DEFINE_OUTPUT_LAYOUT(5POINT1),
+        DEFINE_OUTPUT_LAYOUT(5POINT1_SIDE),
+        DEFINE_OUTPUT_LAYOUT(5POINT1POINT2),
+        DEFINE_OUTPUT_LAYOUT(5POINT1POINT4),
+        DEFINE_OUTPUT_LAYOUT(6POINT1),
+        DEFINE_OUTPUT_LAYOUT(7POINT1),
+        DEFINE_OUTPUT_LAYOUT(7POINT1POINT2),
+        DEFINE_OUTPUT_LAYOUT(7POINT1POINT4),
+        DEFINE_OUTPUT_LAYOUT(13POINT_360RA),
+        DEFINE_OUTPUT_LAYOUT(22POINT2),
+        DEFINE_OUTPUT_LAYOUT(MONO_HAPTIC_A),
+        DEFINE_OUTPUT_LAYOUT(STEREO_HAPTIC_A),
+        DEFINE_OUTPUT_LAYOUT(HAPTIC_AB),
+        DEFINE_OUTPUT_LAYOUT(MONO_HAPTIC_AB),
+        DEFINE_OUTPUT_LAYOUT(STEREO_HAPTIC_AB)
+#undef DEFINE_OUTPUT_LAYOUT
+    };
+    return pairs;
 }
 
 media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType type,
@@ -982,6 +1091,76 @@ std::unordered_map<T, S> make_ReverseMap(const std::vector<std::pair<S, T>>& v) 
 }
 
 }  // namespace
+
+ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
+        const media::AudioChannelLayout& aidl, bool isOutput) {
+    using ReverseMap = std::unordered_map<media::AudioChannelLayout, audio_channel_mask_t>;
+    using Tag = media::AudioChannelLayout::Tag;
+    static const ReverseMap mIdx = make_ReverseMap(getIndexAudioChannelPairs());
+    static const ReverseMap mIn = make_ReverseMap(getInAudioChannelPairs());
+    static const ReverseMap mOut = make_ReverseMap(getOutAudioChannelPairs());
+
+    auto convert = [](const media::AudioChannelLayout& aidl, const ReverseMap& m,
+            const char* func, const char* type) -> ConversionResult<audio_channel_mask_t> {
+        if (auto it = m.find(aidl); it != m.end()) {
+            return it->second;
+        } else {
+            ALOGE("%s: no legacy %s audio_channel_mask_t found for %s", func, type,
+                    aidl.toString().c_str());
+            return unexpected(BAD_VALUE);
+        }
+    };
+
+    switch (aidl.getTag()) {
+        case Tag::none:
+            return AUDIO_CHANNEL_NONE;
+        case Tag::invalid:
+            return AUDIO_CHANNEL_INVALID;
+        case Tag::indexMask:
+            return convert(aidl, mIdx, __func__, "index");
+        case Tag::layoutMask:
+            return convert(aidl, isOutput ? mOut : mIn, __func__, isOutput ? "output" : "input");
+    }
+    ALOGE("%s: unexpected tag value %d", __func__, aidl.getTag());
+    return unexpected(BAD_VALUE);
+}
+
+ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+        audio_channel_mask_t legacy, bool isOutput) {
+    using DirectMap = std::unordered_map<audio_channel_mask_t, media::AudioChannelLayout>;
+    using Tag = media::AudioChannelLayout::Tag;
+    static const DirectMap mIdx = make_DirectMap(getIndexAudioChannelPairs());
+    static const DirectMap mIn = make_DirectMap(getInAudioChannelPairs());
+    static const DirectMap mOut = make_DirectMap(getOutAudioChannelPairs());
+
+    auto convert = [](const audio_channel_mask_t legacy, const DirectMap& m,
+            const char* func, const char* type) -> ConversionResult<media::AudioChannelLayout> {
+        if (auto it = m.find(legacy); it != m.end()) {
+            return it->second;
+        } else {
+            ALOGE("%s: no AudioChannelLayout found for legacy %s audio_channel_mask_t value 0x%x",
+                    func, type, legacy);
+            return unexpected(BAD_VALUE);
+        }
+    };
+
+    if (legacy == AUDIO_CHANNEL_NONE) {
+        return media::AudioChannelLayout{};
+    } else if (legacy == AUDIO_CHANNEL_INVALID) {
+        return media::AudioChannelLayout::make<Tag::invalid>(0);
+    }
+
+    const audio_channel_representation_t repr = audio_channel_mask_get_representation(legacy);
+    if (repr == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
+        return convert(legacy, mIdx, __func__, "index");
+    } else if (repr == AUDIO_CHANNEL_REPRESENTATION_POSITION) {
+        return convert(legacy, isOutput ? mOut : mIn, __func__, isOutput ? "output" : "input");
+    }
+
+    ALOGE("%s: unknown representation %d in audio_channel_mask_t value 0x%x",
+            __func__, repr, legacy);
+    return unexpected(BAD_VALUE);
+}
 
 ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devices_t(
         const media::AudioDeviceDescription& aidl) {
