@@ -67,7 +67,8 @@ bool hasSuffix(const std::string& s, const char* suffix) {
             s.compare(s.size() - suffixLen, suffixLen, suffix) == 0;
 }
 
-void addSupportedProfileLevels(
+// returns true if component advertised supported profile level(s)
+bool addSupportedProfileLevels(
         std::shared_ptr<Codec2Client::Interface> intf,
         MediaCodecInfo::CapabilitiesWriter *caps,
         const Traits& trait, const std::string &mediaType) {
@@ -87,12 +88,12 @@ void addSupportedProfileLevels(
     c2_status_t err = intf->querySupportedValues(profileQuery, C2_DONT_BLOCK);
     ALOGV("query supported profiles -> %s | %s", asString(err), asString(profileQuery[0].status));
     if (err != C2_OK || profileQuery[0].status != C2_OK) {
-        return;
+        return false;
     }
 
     // we only handle enumerated values
     if (profileQuery[0].values.type != C2FieldSupportedValues::VALUES) {
-        return;
+        return false;
     }
 
     // determine if codec supports HDR
@@ -124,6 +125,8 @@ void addSupportedProfileLevels(
     // For VP9/AV1, the static info is always propagated by framework.
     supportsHdr |= (mediaType == MIMETYPE_VIDEO_VP9);
     supportsHdr |= (mediaType == MIMETYPE_VIDEO_AV1);
+
+    bool added = false;
 
     for (C2Value::Primitive profile : profileQuery[0].values.values) {
         pl.profile = (C2Config::profile_t)profile.ref<uint32_t>();
@@ -165,6 +168,7 @@ void addSupportedProfileLevels(
         } else if (!mapper) {
             caps->addProfileLevel(pl.profile, pl.level);
         }
+        added = true;
 
         // for H.263 also advertise the second highest level if the
         // codec supports level 45, as level 45 only covers level 10
@@ -188,6 +192,7 @@ void addSupportedProfileLevels(
             }
         }
     }
+    return added;
 }
 
 void addSupportedColorFormats(
@@ -604,7 +609,15 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
                     }
                 }
 
-                addSupportedProfileLevels(intf, caps.get(), trait, mediaType);
+                if (!addSupportedProfileLevels(intf, caps.get(), trait, mediaType)) {
+                    // TODO(b/193279646) This will get fixed in C2InterfaceHelper
+                    // Some components may not advertise supported values if they use a const
+                    // param for profile/level (they support only one profile). For now cover
+                    // only VP8 here until it is fixed.
+                    if (mediaType == MIMETYPE_VIDEO_VP8) {
+                        caps->addProfileLevel(VP8ProfileMain, VP8Level_Version0);
+                    }
+                }
                 addSupportedColorFormats(intf, caps.get(), trait, mediaType);
             }
         }
