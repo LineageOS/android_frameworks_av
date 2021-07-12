@@ -178,6 +178,10 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
          * Notify MediaCodec that output buffers are changed.
          */
         virtual void onOutputBuffersChanged() = 0;
+        /**
+         * Notify MediaCodec that the first tunnel frame is ready.
+         */
+        virtual void onFirstTunnelFrameReady() = 0;
     };
 
     /**
