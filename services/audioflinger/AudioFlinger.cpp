@@ -2569,7 +2569,14 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             return thread;
         } else {
             sp<PlaybackThread> thread;
-            if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
+            //TODO: b/193496180 use virtualizer stage flag at audio HAL when available
+            if (flags == (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST
+                                                    | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
+                thread = new VirtualizerStageThread(this, outputStream, *output,
+                                                    mSystemReady, mixerConfig);
+                ALOGD("openOutput_l() created virtualizer output: ID %d thread %p",
+                      *output, thread.get());
+            } else if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                 thread = new OffloadThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
                       *output, thread.get());
@@ -3806,7 +3813,8 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
                 io = mPlaybackThreads.keyAt(0);
             }
             ALOGV("createEffect() got io %d for effect %s", io, descOut.name);
-        } else if (checkPlaybackThread_l(io) != nullptr) {
+        } else if (checkPlaybackThread_l(io) != nullptr
+                        && sessionId != AUDIO_SESSION_OUTPUT_STAGE) {
             // allow only one effect chain per sessionId on mPlaybackThreads.
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
                 const audio_io_handle_t checkIo = mPlaybackThreads.keyAt(i);
