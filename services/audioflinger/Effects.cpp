@@ -242,6 +242,12 @@ status_t AudioFlinger::EffectBase::updatePolicyState()
 
     {
         Mutex::Autolock _l(mLock);
+
+        if ((isInternal_l() && !mPolicyRegistered)
+                || !getCallback()->isAudioPolicyReady()) {
+            return NO_ERROR;
+        }
+
         // register effect when first handle is attached and unregister when last handle is removed
         if (mPolicyRegistered != mHandles.size() > 0) {
             doRegister = true;
@@ -2048,11 +2054,11 @@ AudioFlinger::EffectChain::EffectChain(const wp<ThreadBase>& thread,
       mNewLeftVolume(UINT_MAX), mNewRightVolume(UINT_MAX),
       mEffectCallback(new EffectCallback(wp<EffectChain>(this), thread))
 {
-    mStrategy = AudioSystem::getStrategyForStream(AUDIO_STREAM_MUSIC);
     sp<ThreadBase> p = thread.promote();
     if (p == nullptr) {
         return;
     }
+    mStrategy = p->getStrategyForStream(AUDIO_STREAM_MUSIC);
     mMaxTailBuffers = ((kProcessTailDurationMs * p->sampleRate()) / 1000) /
                                     p->frameCount();
 }
