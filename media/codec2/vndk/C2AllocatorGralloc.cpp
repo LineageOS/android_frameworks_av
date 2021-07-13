@@ -750,6 +750,16 @@ c2_status_t C2AllocationGralloc::map(
 
             // We really don't know what this is; lock the buffer and pass it through ---
             // the client may know how to interpret it.
+
+            // unlock previous allocation if it was successful
+            if (err == OK) {
+                err = GraphicBufferMapper::get().unlock(mBuffer);
+                if (err) {
+                    ALOGE("failed transaction: unlock");
+                    return C2_CORRUPTED;
+                }
+            }
+
             void *pointer = nullptr;
             err = GraphicBufferMapper::get().lock(
                     const_cast<native_handle_t *>(mBuffer), grallocUsage, rect, &pointer);
