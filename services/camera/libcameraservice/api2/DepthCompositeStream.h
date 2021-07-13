@@ -132,7 +132,12 @@ private:
     sp<Surface>          mDepthSurface, mBlobSurface, mOutputSurface;
     sp<ProducerListener> mProducerListener;
 
-    ssize_t              mMaxJpegSize;
+    ssize_t              mMaxJpegBufferSize;
+    ssize_t              mUHRMaxJpegBufferSize;
+
+    camera3::Size        mDefaultMaxJpegSize;
+    camera3::Size        mUHRMaxJpegSize;
+
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizes;
     std::vector<std::tuple<size_t, size_t>> mSupportedDepthSizesMaximumResolution;
     std::vector<float>   mIntrinsicCalibration, mLensDistortion;
