@@ -434,6 +434,12 @@ void AudioMixer::setParameter(int name, int target, int param, void *value)
                 track->mHapticIntensity = hapticIntensity;
             }
             } break;
+        case HAPTIC_MAX_AMPLITUDE: {
+            const float hapticMaxAmplitude = *reinterpret_cast<float*>(value);
+            if (track->mHapticMaxAmplitude != hapticMaxAmplitude) {
+                track->mHapticMaxAmplitude = hapticMaxAmplitude;
+            }
+            } break;
         default:
             LOG_ALWAYS_FATAL("setParameter track: bad param %d", param);
         }
@@ -553,6 +559,7 @@ status_t AudioMixer::postCreateTrack(TrackBase *track)
     // haptic
     t->mHapticPlaybackEnabled = false;
     t->mHapticIntensity = os::HapticScale::NONE;
+    t->mHapticMaxAmplitude = NAN;
     t->mMixerHapticChannelMask = AUDIO_CHANNEL_NONE;
     t->mMixerHapticChannelCount = 0;
     t->mAdjustInChannelCount = t->channelCount + t->mHapticChannelCount;
@@ -602,7 +609,8 @@ void AudioMixer::postProcess()
                 switch (t->mMixerFormat) {
                 // Mixer format should be AUDIO_FORMAT_PCM_FLOAT.
                 case AUDIO_FORMAT_PCM_FLOAT: {
-                    os::scaleHapticData((float*) buffer, sampleCount, t->mHapticIntensity);
+                    os::scaleHapticData((float*) buffer, sampleCount, t->mHapticIntensity,
+                                        t->mHapticMaxAmplitude);
                 } break;
                 default:
                     LOG_ALWAYS_FATAL("bad mMixerFormat: %#x", t->mMixerFormat);

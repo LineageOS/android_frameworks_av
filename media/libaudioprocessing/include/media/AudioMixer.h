@@ -50,6 +50,7 @@ public:
         // for haptic
         HAPTIC_ENABLED  = 0x4007, // Set haptic data from this track should be played or not.
         HAPTIC_INTENSITY = 0x4008, // Set the intensity to play haptic data.
+        HAPTIC_MAX_AMPLITUDE = 0x4009, // Set the max amplitude allowed for haptic data.
         // for target TIMESTRETCH
         PLAYBACK_RATE   = 0x4300, // Configure timestretch on this track name;
                                   // parameter 'value' is a pointer to the new playback rate.
@@ -145,6 +146,7 @@ private:
         // Haptic
         bool                 mHapticPlaybackEnabled;
         os::HapticScale      mHapticIntensity;
+        float                mHapticMaxAmplitude;
         audio_channel_mask_t mHapticChannelMask;
         uint32_t             mHapticChannelCount;
         audio_channel_mask_t mMixerHapticChannelMask;

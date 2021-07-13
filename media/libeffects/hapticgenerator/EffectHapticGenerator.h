@@ -51,6 +51,7 @@ struct HapticGeneratorParam {
     // A map from track id to haptic intensity.
     std::map<int, os::HapticScale> id2Intensity;
     os::HapticScale maxHapticIntensity; // max intensity will be used to scale haptic data.
+    float maxHapticAmplitude; // max amplitude will be used to limit haptic data absolute values.
 
     float resonantFrequency;
     float bpfQ;
