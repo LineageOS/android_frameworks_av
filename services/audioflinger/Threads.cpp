@@ -1477,11 +1477,11 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         if (effect->isHapticGenerator()) {
             // TODO(b/184194057): Use the vibrator information from the vibrator that will be used
             // for the HapticGenerator.
-            const media::AudioVibratorInfo* defaultVibratorInfo =
-                    mAudioFlinger->getDefaultVibratorInfo_l();
-            if (defaultVibratorInfo != nullptr) {
+            const std::optional<media::AudioVibratorInfo> defaultVibratorInfo =
+                    std::move(mAudioFlinger->getDefaultVibratorInfo_l());
+            if (defaultVibratorInfo) {
                 // Only set the vibrator info when it is a valid one.
-                effect->setVibratorInfo(defaultVibratorInfo);
+                effect->setVibratorInfo(*defaultVibratorInfo);
             }
         }
         // create effect handle and connect it to effect module
@@ -2613,8 +2613,19 @@ status_t AudioFlinger::PlaybackThread::addTrack_l(const sp<Track>& track)
             mLock.unlock();
             const int intensity = AudioFlinger::onExternalVibrationStart(
                     track->getExternalVibration());
+            std::optional<media::AudioVibratorInfo> vibratorInfo;
+            {
+                // TODO(b/184194780): Use the vibrator information from the vibrator that will be
+                // used to play this track.
+                Mutex::Autolock _l(mAudioFlinger->mLock);
+                vibratorInfo = std::move(mAudioFlinger->getDefaultVibratorInfo_l());
+            }
             mLock.lock();
             track->setHapticIntensity(static_cast<os::HapticScale>(intensity));
+            if (vibratorInfo) {
+                track->setHapticMaxAmplitude(vibratorInfo->maxAmplitude);
+            }
+
             // Haptic playback should be enabled by vibrator service.
             if (track->getHapticPlaybackEnabled()) {
                 // Disable haptic playback of all active track to ensure only
@@ -4566,6 +4577,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
         fastTrack->mFormat = mFormat; // mPipeSink format for audio to FastMixer
         fastTrack->mHapticPlaybackEnabled = mHapticChannelMask != AUDIO_CHANNEL_NONE;
         fastTrack->mHapticIntensity = os::HapticScale::NONE;
+        fastTrack->mHapticMaxAmplitude = NAN;
         fastTrack->mGeneration++;
         state->mFastTracksGen++;
         state->mTrackMask = 1;
@@ -5103,6 +5115,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                     fastTrack->mFormat = track->mFormat;
                     fastTrack->mHapticPlaybackEnabled = track->getHapticPlaybackEnabled();
                     fastTrack->mHapticIntensity = track->getHapticIntensity();
+                    fastTrack->mHapticMaxAmplitude = track->getHapticMaxAmplitude();
                     fastTrack->mGeneration++;
                     state->mTrackMask |= 1 << j;
                     didModify = true;
@@ -5425,6 +5438,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 trackId,
                 AudioMixer::TRACK,
                 AudioMixer::HAPTIC_INTENSITY, (void *)(uintptr_t)track->getHapticIntensity());
+            mAudioMixer->setParameter(
+                trackId,
+                AudioMixer::TRACK,
+                AudioMixer::HAPTIC_MAX_AMPLITUDE, (void *)(&(track->mHapticMaxAmplitude)));
 
             // reset retry count
             track->mRetryCount = kMaxTrackRetries;
