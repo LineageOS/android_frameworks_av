@@ -290,8 +290,11 @@ public:
                 // dynamic externally-visible
                 uint32_t    sampleRate() const { return mSampleRate; }
                 audio_channel_mask_t channelMask() const { return mChannelMask; }
+    virtual     audio_channel_mask_t mixerChannelMask() const { return mChannelMask; }
+
                 audio_format_t format() const { return mHALFormat; }
                 uint32_t channelCount() const { return mChannelCount; }
+
                 // Called by AudioFlinger::frameCount(audio_io_handle_t output) and effects,
                 // and returns the [normal mix] buffer's frame count.
     virtual     size_t      frameCount() const = 0;
@@ -826,7 +829,8 @@ public:
     static const nsecs_t kMaxNextBufferDelayNs = 100000000;
 
     PlaybackThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-                   audio_io_handle_t id, type_t type, bool systemReady);
+                   audio_io_handle_t id, type_t type, bool systemReady,
+                   audio_config_base_t *mixerConfig = nullptr);
     virtual             ~PlaybackThread();
 
     // Thread virtuals
@@ -975,6 +979,10 @@ public:
 
     virtual     size_t      frameCount() const { return mNormalFrameCount; }
 
+                audio_channel_mask_t mixerChannelMask() const override {
+                    return mMixerChannelMask;
+                }
+
                 status_t    getTimestamp_l(AudioTimestamp& timestamp);
 
                 void        addPatchTrack(const sp<PatchTrack>& track);
@@ -1103,6 +1111,9 @@ protected:
     // haptic playback.
     audio_channel_mask_t            mHapticChannelMask = AUDIO_CHANNEL_NONE;
     uint32_t                        mHapticChannelCount = 0;
+
+    audio_channel_mask_t            mMixerChannelMask = AUDIO_CHANNEL_NONE;
+
 private:
     // mMasterMute is in both PlaybackThread and in AudioFlinger.  When a
     // PlaybackThread needs to find out if master-muted, it checks it's local
@@ -1324,7 +1335,8 @@ public:
                 AudioStreamOut* output,
                 audio_io_handle_t id,
                 bool systemReady,
-                type_t type = MIXER);
+                type_t type = MIXER,
+                audio_config_base_t *mixerConfig = nullptr);
     virtual             ~MixerThread();
 
     // Thread virtuals

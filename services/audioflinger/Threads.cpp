@@ -1904,7 +1904,8 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
                                              AudioStreamOut* output,
                                              audio_io_handle_t id,
                                              type_t type,
-                                             bool systemReady)
+                                             bool systemReady,
+                                             audio_config_base_t *mixerConfig)
     :   ThreadBase(audioFlinger, id, type, systemReady, true /* isOut */),
         mNormalFrameCount(0), mSinkBuffer(NULL),
         mMixerBufferEnabled(AudioFlinger::kEnableExtendedPrecision),
@@ -1962,6 +1963,10 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
         }
         mIsMsdDevice = strcmp(
                 mOutput->audioHwDev->moduleName(), AUDIO_HARDWARE_MODULE_ID_MSD) == 0;
+    }
+
+    if (mixerConfig != nullptr && mixerConfig->channel_mask != AUDIO_CHANNEL_NONE) {
+        mMixerChannelMask = mixerConfig->channel_mask;
     }
 
     readOutputParameters_l();
@@ -2092,6 +2097,8 @@ void AudioFlinger::PlaybackThread::dumpInternals_l(int fd, const Vector<String16
 {
     dprintf(fd, "  Master volume: %f\n", mMasterVolume);
     dprintf(fd, "  Master mute: %s\n", mMasterMute ? "on" : "off");
+    dprintf(fd, "  Mixer channel Mask: %#x (%s)\n",
+            mMixerChannelMask, channelMaskToString(mMixerChannelMask, true /* output */).c_str());
     if (mHapticChannelMask != AUDIO_CHANNEL_NONE) {
         dprintf(fd, "  Haptic channel mask: %#x (%s)\n", mHapticChannelMask,
                 channelMaskToString(mHapticChannelMask, true /* output */).c_str());
@@ -2838,8 +2845,15 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
         LOG_ALWAYS_FATAL("HAL channel mask %#x not supported for mixed output",
                 mChannelMask);
     }
+
+    if (mMixerChannelMask == AUDIO_CHANNEL_NONE) {
+        mMixerChannelMask = mChannelMask;
+    }
+
     mChannelCount = audio_channel_count_from_out_mask(mChannelMask);
     mBalance.setChannelMask(mChannelMask);
+
+    uint32_t mixerChannelCount = audio_channel_count_from_out_mask(mMixerChannelMask);
 
     // Get actual HAL format.
     status_t result = mOutput->stream->getAudioProperties(nullptr, nullptr, &mHALFormat);
@@ -2960,7 +2974,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     mMixerBuffer = NULL;
     if (mMixerBufferEnabled) {
         mMixerBufferFormat = AUDIO_FORMAT_PCM_FLOAT; // no longer valid: AUDIO_FORMAT_PCM_16_BIT.
-        mMixerBufferSize = mNormalFrameCount * mChannelCount
+        mMixerBufferSize = mNormalFrameCount * mixerChannelCount
                 * audio_bytes_per_sample(mMixerBufferFormat);
         (void)posix_memalign(&mMixerBuffer, 32, mMixerBufferSize);
     }
@@ -2968,7 +2982,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     mEffectBuffer = NULL;
     if (mEffectBufferEnabled) {
         mEffectBufferFormat = EFFECT_BUFFER_FORMAT;
-        mEffectBufferSize = mNormalFrameCount * mChannelCount
+        mEffectBufferSize = mNormalFrameCount * mixerChannelCount
                 * audio_bytes_per_sample(mEffectBufferFormat);
         (void)posix_memalign(&mEffectBuffer, 32, mEffectBufferSize);
     }
@@ -2977,6 +2991,7 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     mChannelMask = static_cast<audio_channel_mask_t>(mChannelMask & ~mHapticChannelMask);
     mHapticChannelCount = audio_channel_count_from_out_mask(mHapticChannelMask);
     mChannelCount -= mHapticChannelCount;
+    mMixerChannelMask = static_cast<audio_channel_mask_t>(mMixerChannelMask & ~mHapticChannelMask);
 
     // force reconfiguration of effect chains and engines to take new buffer size and audio
     // parameters into account
@@ -3367,7 +3382,8 @@ status_t AudioFlinger::PlaybackThread::addEffectChain_l(const sp<EffectChain>& c
         // Only one effect chain can be present in direct output thread and it uses
         // the sink buffer as input
         if (mType != DIRECT) {
-            size_t numSamples = mNormalFrameCount * (mChannelCount + mHapticChannelCount);
+            size_t numSamples = mNormalFrameCount
+                    * (audio_channel_count_from_out_mask(mMixerChannelMask) + mHapticChannelCount);
             status_t result = mAudioFlinger->mEffectsFactoryHal->allocateBuffer(
                     numSamples * sizeof(effect_buffer_t),
                     &halInBuffer);
@@ -3776,6 +3792,8 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             if (mMixerBufferValid) {
                 void *buffer = mEffectBufferValid ? mEffectBuffer : mSinkBuffer;
                 audio_format_t format = mEffectBufferValid ? mEffectBufferFormat : mFormat;
+                uint32_t channelCount = mEffectBufferValid ?
+                            audio_channel_count_from_out_mask(mMixerChannelMask) : mChannelCount;
 
                 // mono blend occurs for mixer threads only (not direct or offloaded)
                 // and is handled here if we're going directly to the sink.
@@ -3793,7 +3811,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 }
 
                 memcpy_by_audio_format(buffer, format, mMixerBuffer, mMixerBufferFormat,
-                        mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+                        mNormalFrameCount * (channelCount + mHapticChannelCount));
 
                 // If we're going directly to the sink and there are haptic channels,
                 // we should adjust channels as the sample data is partially interleaved
@@ -4467,8 +4485,8 @@ void AudioFlinger::PlaybackThread::toAudioPortConfig(struct audio_port_config *c
 // ----------------------------------------------------------------------------
 
 AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, AudioStreamOut* output,
-        audio_io_handle_t id, bool systemReady, type_t type)
-    :   PlaybackThread(audioFlinger, output, id, type, systemReady),
+        audio_io_handle_t id, bool systemReady, type_t type, audio_config_base_t *mixerConfig)
+    :   PlaybackThread(audioFlinger, output, id, type, systemReady, mixerConfig),
         // mAudioMixer below
         // mFastMixer below
         mFastMixerFutex(0),
@@ -5377,7 +5395,7 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 trackId,
                 AudioMixer::TRACK,
                 AudioMixer::MIXER_CHANNEL_MASK,
-                (void *)(uintptr_t)(mChannelMask | mHapticChannelMask));
+                (void *)(uintptr_t)(mMixerChannelMask | mHapticChannelMask));
             // limit track sample rate to 2 x output sample rate, which changes at re-configuration
             uint32_t maxSampleRate = mSampleRate * AUDIO_RESAMPLER_DOWN_RATIO_MAX;
             uint32_t reqSampleRate = proxy->getSampleRate();

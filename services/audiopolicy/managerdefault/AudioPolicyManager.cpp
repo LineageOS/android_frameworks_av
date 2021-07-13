@@ -1265,7 +1265,8 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
     // all MSD patches to prioritize this request over any active output on MSD.
     releaseMsdOutputPatches(devices);
 
-    status_t status = outputDesc->open(config, devices, stream, flags, output);
+    status_t status =
+            outputDesc->open(config, nullptr /* mixerConfig */, devices, stream, flags, output);
 
     // only accept an output with the requested parameters
     if (status != NO_ERROR ||
@@ -4990,7 +4991,8 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
             sp<SwAudioOutputDescriptor> outputDesc = new SwAudioOutputDescriptor(outProfile,
                                                                                  mpClientInterface);
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = outputDesc->open(nullptr, DeviceVector(supportedDevice),
+            status_t status = outputDesc->open(nullptr /* halConfig */, nullptr /* mixerConfig */,
+                                               DeviceVector(supportedDevice),
                                                AUDIO_STREAM_DEFAULT,
                                                AUDIO_OUTPUT_FLAG_NONE, &output);
             if (status != NO_ERROR) {
@@ -6996,7 +6998,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
     }
     sp<SwAudioOutputDescriptor> desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    status_t status = desc->open(nullptr, devices,
+    status_t status = desc->open(nullptr /* halConfig */, nullptr /* mixerConfig */, devices,
             AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
     if (status != NO_ERROR) {
         return nullptr;
@@ -7026,7 +7028,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
         config.offload_info.channel_mask = config.channel_mask;
         config.offload_info.format = config.format;
 
-        status = desc->open(&config, devices,
+        status = desc->open(&config, nullptr /* mixerConfig */, devices,
                             AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
         if (status != NO_ERROR) {
             return nullptr;

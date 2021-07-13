@@ -738,7 +738,8 @@ using effect_buffer_t = int16_t;
                                            const String8& outputDeviceAddress);
               sp<ThreadBase> openOutput_l(audio_module_handle_t module,
                                           audio_io_handle_t *output,
-                                          audio_config_t *config,
+                                          audio_config_t *halConfig,
+                                          audio_config_base_t *mixerConfig,
                                           audio_devices_t deviceType,
                                           const String8& address,
                                           audio_output_flags_t flags);
