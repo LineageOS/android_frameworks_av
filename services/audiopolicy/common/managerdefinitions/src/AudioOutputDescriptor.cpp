@@ -545,6 +545,12 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
 
     mFlags = (audio_output_flags_t)(mFlags | flags);
 
+    //TODO: b/193496180 use virtualizer stage flag at audio HAL when available
+    audio_output_flags_t halFlags = mFlags;
+    if ((mFlags & AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) != 0) {
+        halFlags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER);
+    }
+
     ALOGV("opening output for device %s profile %p name %s",
           mDevices.toString().c_str(), mProfile.get(), mProfile->getName().c_str());
 
@@ -554,7 +560,7 @@ status_t SwAudioOutputDescriptor::open(const audio_config_t *halConfig,
                                                    &lMixerConfig,
                                                    device,
                                                    &mLatency,
-                                                   mFlags);
+                                                   halFlags);
 
     if (status == NO_ERROR) {
         LOG_ALWAYS_FATAL_IF(*output == AUDIO_IO_HANDLE_NONE,
