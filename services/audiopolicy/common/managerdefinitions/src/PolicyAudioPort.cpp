@@ -30,9 +30,9 @@ namespace android {
 // --- PolicyAudioPort class implementation
 void PolicyAudioPort::attach(const sp<HwModule>& module)
 {
+    mModule = module;
     ALOGV("%s: attaching module %s to port %s",
             __FUNCTION__, getModuleName(), asAudioPort()->getName().c_str());
-    mModule = module;
 }
 
 void PolicyAudioPort::detach()
