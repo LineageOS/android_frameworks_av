@@ -480,6 +480,12 @@ status_t AudioSystem::systemReady() {
     return af->systemReady();
 }
 
+status_t AudioSystem::audioPolicyReady() {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == 0) return NO_INIT;
+    return af->audioPolicyReady();
+}
+
 status_t AudioSystem::getFrameCountHAL(audio_io_handle_t ioHandle,
                                        size_t* frameCount) {
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
