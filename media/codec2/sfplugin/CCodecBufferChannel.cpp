@@ -1341,6 +1341,15 @@ status_t CCodecBufferChannel::start(
                     outputSurface,
                     outputGeneration,
                     maxDequeueCount);
+        } else {
+            // configure CPU read consumer usage
+            C2StreamUsageTuning::output outputUsage{0u, C2MemoryUsage::CPU_READ};
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            err = mComponent->config({ &outputUsage }, C2_MAY_BLOCK, &failures);
+            // do not print error message for now as most components may not yet
+            // support this setting
+            ALOGD_IF(err != C2_BAD_INDEX, "[%s] Configured output usage [%#llx]",
+                  mName, (long long)outputUsage.value);
         }
 
         if (oStreamFormat.value == C2BufferData::LINEAR) {
