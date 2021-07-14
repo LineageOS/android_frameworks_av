@@ -643,8 +643,11 @@ AAUDIO_API void AAudioStreamBuilder_setDeviceId(AAudioStreamBuilder* builder,
  * This is usually {@code Context#getPackageName()}.
  *
  * The default, if you do not call this function, is a random package in the calling uid.
- * The vast majority of apps have only one package per calling UID. If the package
- * name does not match the calling UID, then requests will be rejected.
+ * The vast majority of apps have only one package per calling UID.
+ * If an invalid package name is set, input streams may not be given permission to
+ * record when started.
+ *
+ * The package name is usually the applicationId in your app's build.gradle file.
  *
  * Available since API level 31.
  *
