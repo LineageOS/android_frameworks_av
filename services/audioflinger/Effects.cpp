@@ -1600,7 +1600,7 @@ status_t AudioFlinger::EffectModule::setHapticIntensity(int id, int intensity)
     return status;
 }
 
-status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorInfo* vibratorInfo)
+status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorInfo& vibratorInfo)
 {
     if (mStatus != NO_ERROR) {
         return mStatus;
@@ -1610,15 +1610,17 @@ status_t AudioFlinger::EffectModule::setVibratorInfo(const media::AudioVibratorI
         return INVALID_OPERATION;
     }
 
+    const size_t paramCount = 3;
     std::vector<uint8_t> request(
-            sizeof(effect_param_t) + sizeof(int32_t) + 2 * sizeof(float));
+            sizeof(effect_param_t) + sizeof(int32_t) + paramCount * sizeof(float));
     effect_param_t *param = (effect_param_t*) request.data();
     param->psize = sizeof(int32_t);
-    param->vsize = 2 * sizeof(float);
+    param->vsize = paramCount * sizeof(float);
     *(int32_t*)param->data = HG_PARAM_VIBRATOR_INFO;
     float* vibratorInfoPtr = reinterpret_cast<float*>(param->data + sizeof(int32_t));
-    vibratorInfoPtr[0] = vibratorInfo->resonantFrequency;
-    vibratorInfoPtr[1] = vibratorInfo->qFactor;
+    vibratorInfoPtr[0] = vibratorInfo.resonantFrequency;
+    vibratorInfoPtr[1] = vibratorInfo.qFactor;
+    vibratorInfoPtr[2] = vibratorInfo.maxAmplitude;
     std::vector<uint8_t> response;
     status_t status = command(EFFECT_CMD_SET_PARAM, request, sizeof(int32_t), &response);
     if (status == NO_ERROR) {

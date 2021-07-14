@@ -309,7 +309,7 @@ public:
     void updateDownStreamPatches_l(const struct audio_patch *patch,
                                    const std::set<audio_io_handle_t> streams);
 
-    const media::AudioVibratorInfo* getDefaultVibratorInfo_l();
+    std::optional<media::AudioVibratorInfo> getDefaultVibratorInfo_l();
 
 private:
     // FIXME The 400 is temporarily too high until a leak of writers in media.log is fixed.
