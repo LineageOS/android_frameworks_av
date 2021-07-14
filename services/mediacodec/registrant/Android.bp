@@ -7,7 +7,7 @@ package {
     default_applicable_licenses: ["frameworks_av_services_mediacodec_license"],
 }
 
-cc_library_shared {
+cc_library {
     name: "libmedia_codecserviceregistrant",
     vendor_available: true,
     srcs: [

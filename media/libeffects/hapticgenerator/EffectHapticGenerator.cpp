@@ -302,15 +302,17 @@ int HapticGenerator_SetParameter(struct HapticGeneratorContext *context,
         break;
     }
     case HG_PARAM_VIBRATOR_INFO: {
-        if (value == nullptr || size != 2 * sizeof(float)) {
+        if (value == nullptr || size != 3 * sizeof(float)) {
             return -EINVAL;
         }
         const float resonantFrequency = *(float*) value;
         const float qFactor = *((float *) value + 1);
+        const float maxAmplitude = *((float *) value + 2);
         context->param.resonantFrequency =
                 isnan(resonantFrequency) ? DEFAULT_RESONANT_FREQUENCY : resonantFrequency;
         context->param.bsfZeroQ = isnan(qFactor) ? DEFAULT_BSF_POLE_Q : qFactor;
         context->param.bsfPoleQ = context->param.bsfZeroQ / 2.0f;
+        context->param.maxHapticAmplitude = maxAmplitude;
 
         if (context->processorsRecord.bpf != nullptr) {
             context->processorsRecord.bpf->setCoefficients(
@@ -463,7 +465,8 @@ int32_t HapticGenerator_Process(effect_handle_t self,
     float* hapticOutBuffer = HapticGenerator_runProcessingChain(
             context->processingChain, context->inputBuffer.data(),
             context->outputBuffer.data(), inBuffer->frameCount);
-    os::scaleHapticData(hapticOutBuffer, hapticSampleCount, context->param.maxHapticIntensity);
+    os::scaleHapticData(hapticOutBuffer, hapticSampleCount, context->param.maxHapticIntensity,
+                        context->param.maxHapticAmplitude);
 
     // For haptic data, the haptic playback thread will copy the data from effect input buffer,
     // which contains haptic data at the end of the buffer, directly to sink buffer.
