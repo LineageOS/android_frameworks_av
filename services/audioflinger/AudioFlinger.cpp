@@ -336,11 +336,11 @@ status_t AudioFlinger::updateSecondaryOutputs(
 }
 
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
-const media::AudioVibratorInfo* AudioFlinger::getDefaultVibratorInfo_l() {
+std::optional<media::AudioVibratorInfo> AudioFlinger::getDefaultVibratorInfo_l() {
     if (mAudioVibratorInfos.empty()) {
-        return nullptr;
+        return {};
     }
-    return &mAudioVibratorInfos.front();
+    return mAudioVibratorInfos.front();
 }
 
 AudioFlinger::~AudioFlinger()
