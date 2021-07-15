@@ -1092,7 +1092,7 @@ void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
     time_t now = time(0);
     tm *localTime = localtime(&now);
     snprintf(imageFileName, sizeof(imageFileName), "IMG_%4d%02d%02d_%02d%02d%02d_%" PRId64 ".%s",
-            1900 + localTime->tm_year, localTime->tm_mon, localTime->tm_mday,
+            1900 + localTime->tm_year, localTime->tm_mon + 1, localTime->tm_mday,
             localTime->tm_hour, localTime->tm_min, localTime->tm_sec,
             timestamp, fileExtension.c_str());
 
