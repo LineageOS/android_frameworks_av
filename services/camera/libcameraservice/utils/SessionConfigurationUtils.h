@@ -71,6 +71,12 @@ struct StreamConfigurationPair {
 
 class SessionConfigurationUtils {
 public:
+    static camera3::Size getMaxJpegResolution(const CameraMetadata &metadata,
+            bool ultraHighResolution);
+
+    static size_t getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
+            camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize);
+
     static int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
     // Find the closest dimensions for a given format in available stream configurations with

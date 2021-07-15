@@ -776,12 +776,6 @@ class Camera3Device :
     bool               tryLockSpinRightRound(Mutex& lock);
 
     /**
-     * Helper function to get the largest Jpeg resolution (in area)
-     * Return Size(0, 0) if static metatdata is invalid
-     */
-    camera3::Size getMaxJpegResolution() const;
-
-    /**
      * Helper function to get the offset between MONOTONIC and BOOTTIME
      * timestamp.
      */
