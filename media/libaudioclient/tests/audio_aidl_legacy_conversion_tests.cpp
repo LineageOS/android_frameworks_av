@@ -46,6 +46,11 @@ media::AudioChannelLayout make_ACL_ChannelIndex2() {
             media::AudioChannelLayout::INDEX_MASK_2);
 }
 
+media::AudioChannelLayout make_ACL_VoiceCall() {
+    return media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::voiceMask>(
+            media::AudioChannelLayout::VOICE_CALL_MONO);
+}
+
 media::AudioDeviceDescription make_AudioDeviceDescription(media::AudioDeviceType type,
         const std::string& connection = "") {
     media::AudioDeviceDescription result;
@@ -151,7 +156,8 @@ class HashIdentityTest : public ::testing::Test {
 
 TEST_F(HashIdentityTest, AudioChannelLayoutHashIdentity) {
     verifyHashIdentity<media::AudioChannelLayout>({
-            make_ACL_None, make_ACL_Invalid, make_ACL_Stereo, make_ACL_ChannelIndex2});
+            make_ACL_None, make_ACL_Invalid, make_ACL_Stereo, make_ACL_ChannelIndex2,
+            make_ACL_VoiceCall});
 }
 
 TEST_F(HashIdentityTest, AudioDeviceDescriptionHashIdentity) {
@@ -184,6 +190,10 @@ INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip,
                 testing::Values(media::AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
                         make_ACL_ChannelIndex2()),
                 testing::Values(true, false)));
+INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip,
+        AudioChannelLayoutRoundTripTest,
+        // In legacy constants the voice call is only defined for input.
+        testing::Combine(testing::Values(make_ACL_VoiceCall()), testing::Values(false)));
 
 class AudioDeviceDescriptionRoundTripTest :
         public testing::TestWithParam<media::AudioDeviceDescription> {};
