@@ -21,6 +21,7 @@
 #include <codec2/hidl/client.h>
 #include <C2Debug.h>
 #include <C2BufferPriv.h>
+#include <C2Config.h> // for C2StreamUsageTuning
 #include <C2PlatformSupport.h>
 
 #include <android/hardware/media/bufferpool/2.0/IClientManager.h>
@@ -41,7 +42,10 @@
 #include <cutils/native_handle.h>
 #include <gui/bufferqueue/2.0/B2HGraphicBufferProducer.h>
 #include <gui/bufferqueue/2.0/H2BGraphicBufferProducer.h>
+#include <hardware/gralloc.h> // for GRALLOC_USAGE_*
 #include <hidl/HidlSupport.h>
+#include <system/window.h> // for NATIVE_WINDOW_QUERY_*
+#include <media/stagefright/foundation/ADebug.h> // for asString(status_t)
 
 
 #include <deque>
@@ -80,6 +84,10 @@ namespace /* unnamed */ {
 
 // c2_status_t value that corresponds to hwbinder transaction failure.
 constexpr c2_status_t C2_TRANSACTION_FAILED = C2_CORRUPTED;
+
+// By default prepare buffer to be displayed on any of the common surfaces
+constexpr uint64_t kDefaultConsumerUsage =
+    (GRALLOC_USAGE_HW_TEXTURE | GRALLOC_USAGE_HW_COMPOSER);
 
 // Searches for a name in GetServiceNames() and returns the index found. If the
 // name is not found, the returned index will be equal to
@@ -1507,8 +1515,43 @@ c2_status_t Codec2Client::Component::setOutputSurface(
         mOutputBufferQueue->configure(surface, generation, bqId, maxDequeueCount, mBase1_2 ?
                                       &syncObj : nullptr);
     }
-    ALOGD("surface generation remote change %u HAL ver: %s",
-          generation, syncObj ? "1.2" : "1.0");
+
+    // set consumer bits
+    // TODO: should this get incorporated into setOutputSurface method so that consumer bits
+    // can be set atomically?
+    uint64_t consumerUsage = kDefaultConsumerUsage;
+    {
+        if (surface) {
+            int usage = 0;
+            status_t err = surface->query(NATIVE_WINDOW_CONSUMER_USAGE_BITS, &usage);
+            if (err != NO_ERROR) {
+                ALOGD("setOutputSurface -- failed to get consumer usage bits (%d/%s). ignoring",
+                        err, asString(err));
+            } else {
+                // Note: we are adding the default usage because components must support
+                // producing output frames that can be displayed an all output surfaces.
+
+                // TODO: do not set usage for tunneled scenario. It is unclear if consumer usage
+                // is meaningful in a tunneled scenario; on one hand output buffers exist, but
+                // they do not exist inside of C2 scope. Any buffer usage shall be communicated
+                // through the sideband channel.
+
+                // do an unsigned conversion as bit-31 may be 1
+                consumerUsage = (uint32_t)usage | kDefaultConsumerUsage;
+            }
+        }
+
+        C2StreamUsageTuning::output outputUsage{
+                0u, C2AndroidMemoryUsage::FromGrallocUsage(consumerUsage).expected};
+        std::vector<std::unique_ptr<C2SettingResult>> failures;
+        c2_status_t err = config({&outputUsage}, C2_MAY_BLOCK, &failures);
+        if (err != C2_OK) {
+            ALOGD("setOutputSurface -- failed to set consumer usage (%d/%s)",
+                    err, asString(err));
+        }
+    }
+    ALOGD("setOutputSurface -- generation=%u consumer usage=%#llx%s",
+            generation, (long long)consumerUsage, syncObj ? " sync" : "");
 
     Return<Status> transStatus = syncObj ?
             mBase1_2->setOutputSurfaceWithSyncObj(
@@ -1517,6 +1560,7 @@ c2_status_t Codec2Client::Component::setOutputSurface(
             mBase1_0->setOutputSurface(
                     static_cast<uint64_t>(blockPoolId),
                     bqId == 0 ? nullHgbp : igbp);
+
     if (!transStatus.isOk()) {
         LOG(ERROR) << "setOutputSurface -- transaction failed.";
         return C2_TRANSACTION_FAILED;
@@ -1694,4 +1738,3 @@ c2_status_t Codec2Client::InputSurfaceConnection::disconnect() {
 }
 
 }  // namespace android
-

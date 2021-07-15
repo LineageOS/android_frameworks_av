@@ -2531,12 +2531,14 @@ status_t AudioPolicyManager::stopInput(audio_port_handle_t portId)
         ALOGW("%s input %d client %d already stopped", __FUNCTION__, input, client->portId());
         return INVALID_OPERATION;
     }
-
+    auto old_source = inputDesc->source();
     inputDesc->setClientActive(client, false);
 
     inputDesc->stop();
     if (inputDesc->isActive()) {
-        setInputDevice(input, getNewInputDevice(inputDesc), false /* force */);
+        auto current_source = inputDesc->source();
+        setInputDevice(input, getNewInputDevice(inputDesc),
+                old_source != current_source /* force */);
     } else {
         sp<AudioPolicyMix> policyMix = inputDesc->mPolicyMix.promote();
         // if input maps to a dynamic policy with an activity listener, notify of state change
