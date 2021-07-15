@@ -24,6 +24,7 @@ import android.media.AudioAttributesInternal;
 import android.media.AudioConfig;
 import android.media.AudioConfigBase;
 import android.media.AudioDevice;
+import android.media.AudioDeviceDescription;
 import android.media.AudioMix;
 import android.media.AudioMode;
 import android.media.AudioOffloadInfo;
@@ -113,18 +114,18 @@ interface IAudioPolicyService {
                           int indexMax);
 
     void setStreamVolumeIndex(AudioStreamType stream,
-                              int /* audio_devices_t */ device,
+                              in AudioDeviceDescription device,
                               int index);
 
     int getStreamVolumeIndex(AudioStreamType stream,
-                             int /* audio_devices_t */ device);
+                             in AudioDeviceDescription device);
 
     void setVolumeIndexForAttributes(in AudioAttributesInternal attr,
-                                     int /* audio_devices_t */ device,
+                                     in AudioDeviceDescription device,
                                      int index);
 
     int getVolumeIndexForAttributes(in AudioAttributesInternal attr,
-                                    int /* audio_devices_t */ device);
+                                    in AudioDeviceDescription device);
 
     int getMaxVolumeIndexForAttributes(in AudioAttributesInternal attr);
 
@@ -132,7 +133,7 @@ interface IAudioPolicyService {
 
     int /* product_strategy_t */ getStrategyForStream(AudioStreamType stream);
 
-    int /* bitmask of audio_devices_t */ getDevicesForStream(AudioStreamType stream);
+    AudioDeviceDescription[] getDevicesForStream(AudioStreamType stream);
 
     AudioDevice[] getDevicesForAttributes(in AudioAttributesEx attr);
 
@@ -267,7 +268,7 @@ interface IAudioPolicyService {
 
     boolean getMasterMono();
 
-    float getStreamVolumeDB(AudioStreamType stream, int index, int /* audio_devices_t */ device);
+    float getStreamVolumeDB(AudioStreamType stream, int index, in AudioDeviceDescription device);
 
     /**
      * Populates supported surround formats and their enabled state in formats and formatsEnabled.

@@ -18,6 +18,7 @@
 #define ANDROID_AUDIOPOLICY_INTERFACE_H
 
 #include <media/AudioCommonTypes.h>
+#include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
@@ -198,7 +199,7 @@ public:
     virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) = 0;
 
     // return the enabled output devices for the given stream type
-    virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream) = 0;
+    virtual DeviceTypeSet getDevicesForStream(audio_stream_type_t stream) = 0;
 
     // retrieves the list of enabled output devices for the given audio attributes
     virtual status_t getDevicesForAttributes(const audio_attributes_t &attr,
