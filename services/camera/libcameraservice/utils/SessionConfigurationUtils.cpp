@@ -36,6 +36,48 @@ int32_t SessionConfigurationUtils::PERF_CLASS_LEVEL =
 
 bool SessionConfigurationUtils::IS_PERF_CLASS = (PERF_CLASS_LEVEL == SDK_VERSION_S);
 
+camera3::Size SessionConfigurationUtils::getMaxJpegResolution(const CameraMetadata &metadata,
+        bool ultraHighResolution) {
+    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
+    const int STREAM_CONFIGURATION_SIZE = 4;
+    const int STREAM_FORMAT_OFFSET = 0;
+    const int STREAM_WIDTH_OFFSET = 1;
+    const int STREAM_HEIGHT_OFFSET = 2;
+    const int STREAM_IS_INPUT_OFFSET = 3;
+
+    int32_t scalerSizesTag = ultraHighResolution ?
+            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION :
+                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS;
+    camera_metadata_ro_entry_t availableStreamConfigs =
+            metadata.find(scalerSizesTag);
+    if (availableStreamConfigs.count == 0 ||
+            availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
+        return camera3::Size(0, 0);
+    }
+
+    // Get max jpeg size (area-wise).
+    for (size_t i= 0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
+        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
+        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
+        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
+        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
+        if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
+                && format == HAL_PIXEL_FORMAT_BLOB &&
+                (width * height > maxJpegWidth * maxJpegHeight)) {
+            maxJpegWidth = width;
+            maxJpegHeight = height;
+        }
+    }
+
+    return camera3::Size(maxJpegWidth, maxJpegHeight);
+}
+
+size_t SessionConfigurationUtils::getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
+        camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize) {
+    return (uhrMaxJpegSize.width * uhrMaxJpegSize.height) /
+            (defaultMaxJpegSize.width * defaultMaxJpegSize.height) * defaultMaxJpegBufferSize;
+}
+
 void StreamConfiguration::getStreamConfigurations(
         const CameraMetadata &staticInfo, int configuration,
         std::unordered_map<int, std::vector<StreamConfiguration>> *scm) {

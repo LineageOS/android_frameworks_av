@@ -499,42 +499,6 @@ bool Camera3Device::tryLockSpinRightRound(Mutex& lock) {
     return gotLock;
 }
 
-camera3::Size Camera3Device::getMaxJpegResolution() const {
-    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
-    const int STREAM_CONFIGURATION_SIZE = 4;
-    const int STREAM_FORMAT_OFFSET = 0;
-    const int STREAM_WIDTH_OFFSET = 1;
-    const int STREAM_HEIGHT_OFFSET = 2;
-    const int STREAM_IS_INPUT_OFFSET = 3;
-    bool isHighResolutionSensor =
-            camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mDeviceInfo);
-    int32_t scalerSizesTag = isHighResolutionSensor ?
-            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION :
-                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS;
-    camera_metadata_ro_entry_t availableStreamConfigs =
-            mDeviceInfo.find(scalerSizesTag);
-    if (availableStreamConfigs.count == 0 ||
-            availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
-        return camera3::Size(0, 0);
-    }
-
-    // Get max jpeg size (area-wise).
-    for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
-        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
-        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
-        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
-        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
-        if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
-                && format == HAL_PIXEL_FORMAT_BLOB &&
-                (width * height > maxJpegWidth * maxJpegHeight)) {
-            maxJpegWidth = width;
-            maxJpegHeight = height;
-        }
-    }
-
-    return camera3::Size(maxJpegWidth, maxJpegHeight);
-}
-
 nsecs_t Camera3Device::getMonoToBoottimeOffset() {
     // try three times to get the clock offset, choose the one
     // with the minimum gap in measurements.
@@ -625,12 +589,25 @@ uint64_t Camera3Device::mapProducerToFrameworkUsage(
 }
 
 ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const {
-    // Get max jpeg size (area-wise).
-    camera3::Size maxJpegResolution = getMaxJpegResolution();
-    if (maxJpegResolution.width == 0) {
+    // Get max jpeg size (area-wise) for default sensor pixel mode
+    camera3::Size maxDefaultJpegResolution =
+            SessionConfigurationUtils::getMaxJpegResolution(mDeviceInfo,
+                    /*isUltraHighResolutionSensor*/false);
+    // Get max jpeg size (area-wise) for max resolution sensor pixel mode / 0 if
+    // not ultra high res sensor
+    camera3::Size uhrMaxJpegResolution =
+            SessionConfigurationUtils::getMaxJpegResolution(mDeviceInfo,
+                    /*isUltraHighResolution*/true);
+    if (maxDefaultJpegResolution.width == 0) {
         ALOGE("%s: Camera %s: Can't find valid available jpeg sizes in static metadata!",
                 __FUNCTION__, mId.string());
         return BAD_VALUE;
+    }
+    bool useMaxSensorPixelModeThreshold = false;
+    if (uhrMaxJpegResolution.width != 0 &&
+            width * height > maxDefaultJpegResolution.width * maxDefaultJpegResolution.height) {
+        // Use the ultra high res max jpeg size and max jpeg buffer size
+        useMaxSensorPixelModeThreshold = true;
     }
 
     // Get max jpeg buffer size
@@ -642,11 +619,19 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
         return BAD_VALUE;
     }
     maxJpegBufferSize = jpegBufMaxSize.data.i32[0];
+
+    camera3::Size chosenMaxJpegResolution = maxDefaultJpegResolution;
+    if (useMaxSensorPixelModeThreshold) {
+        maxJpegBufferSize =
+                SessionConfigurationUtils::getUHRMaxJpegBufferSize(uhrMaxJpegResolution,
+                        maxDefaultJpegResolution, maxJpegBufferSize);
+        chosenMaxJpegResolution = uhrMaxJpegResolution;
+    }
     assert(kMinJpegBufferSize < maxJpegBufferSize);
 
     // Calculate final jpeg buffer size for the given resolution.
     float scaleFactor = ((float) (width * height)) /
-            (maxJpegResolution.width * maxJpegResolution.height);
+            (chosenMaxJpegResolution.width * chosenMaxJpegResolution.height);
     ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
             kMinJpegBufferSize;
     if (jpegBufferSize > maxJpegBufferSize) {
@@ -654,7 +639,6 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
                   __FUNCTION__, maxJpegBufferSize);
         jpegBufferSize = maxJpegBufferSize;
     }
-
     return jpegBufferSize;
 }
 
