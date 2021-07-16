@@ -49,6 +49,8 @@ struct ARTPSource : public RefBase {
         RTCP_FIRST_PACKET = 101,
         RTP_QUALITY = 102,
         RTP_QUALITY_EMC = 103,
+        RTCP_SR = 200,
+        RTCP_RR = 201,
         RTCP_TSFB = 205,
         RTCP_PSFB = 206,
         RTP_CVO = 300,
@@ -79,13 +81,12 @@ struct ARTPSource : public RefBase {
     void putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTime);
 
     bool isNeedToEarlyNotify();
-    void notifyPktInfo(int32_t bitrate, bool isRegular);
+    void notifyPktInfo(int32_t bitrate, int64_t nowUs, bool isRegular);
     // FIR needs to be sent by missing packet or broken video image.
     void onIssueFIRByAssembler();
 
     void noticeAbandonBuffer(int cnt=1);
 
-    int32_t mFirstSeqNumber;
     uint32_t mFirstRtpTime;
     int64_t mFirstSysTime;
     int32_t mClockRate;
@@ -104,6 +105,8 @@ private:
     uint32_t mPrevExpectedForRR;
     int32_t mPrevNumBuffersReceivedForRR;
 
+    uint32_t mLatestRtpTime;
+
     List<sp<ABuffer> > mQueue;
     sp<ARTPAssembler> mAssembler;
 
@@ -121,8 +124,12 @@ private:
     std::map<uint16_t, infoNACK> mNACKMap;
     int getSeqNumToNACK(List<int>& list, int size);
 
-    uint64_t mLastNTPTime;
-    int64_t mLastNTPTimeUpdateUs;
+    uint32_t mLastSrRtpTime;
+    uint64_t mLastSrNtpTime;
+    int64_t mLastSrUpdateTimeUs;
+
+    bool mIsFirstRtpRtcpGap;
+    double mAvgRtpRtcpGapMs;
 
     bool mIssueFIRRequests;
     bool mIssueFIRByAssembler;
@@ -131,6 +138,7 @@ private:
 
     sp<AMessage> mNotify;
 
+    void calcTimeGapRtpRtcp(const sp<ABuffer> &buffer);
     bool queuePacket(const sp<ABuffer> &buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(ARTPSource);
