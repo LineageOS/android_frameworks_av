@@ -327,16 +327,17 @@ static void SpsPpsParser(MediaBufferBase *buffer,
 
     while (buffer->range_length() > 0) {
         const uint8_t *NALPtr = (const uint8_t *)buffer->data() + buffer->range_offset();
+        uint8_t nalType = (*NALPtr) & H264_NALU_MASK;
 
         MediaBufferBase **targetPtr = NULL;
-        if ((*NALPtr & H264_NALU_MASK) == H264_NALU_SPS) {
+        if (nalType == H264_NALU_SPS) {
             targetPtr = spsBuffer;
-        } else if ((*NALPtr & H264_NALU_MASK) == H264_NALU_PPS) {
+        } else if (nalType == H264_NALU_PPS) {
             targetPtr = ppsBuffer;
         } else {
             return;
         }
-        ALOGV("SPS(7) or PPS(8) found. Type %d", *NALPtr & H264_NALU_MASK);
+        ALOGV("SPS(7) or PPS(8) found. Type %d", nalType);
 
         uint32_t bufferSize = buffer->range_length();
         MediaBufferBase *&target = *targetPtr;
@@ -417,18 +418,18 @@ static void VpsSpsPpsParser(MediaBufferBase *buffer,
             }
         }
 
+        uint32_t targetSize;
         if (target != NULL) {
             target->release();
         }
-        uint32_t targetSize;
         // note that targetSize is never 0 as the first byte is never part
         // of a start prefix
         if (isBoundFound) {
             targetSize = i - SPCSize + 1;
-            target = MediaBufferBase::Create(j);
+            target = MediaBufferBase::Create(targetSize);
             memcpy(target->data(),
                    (const uint8_t *)buffer->data() + buffer->range_offset(),
-                   j);
+                   targetSize);
             buffer->set_range(buffer->range_offset() + targetSize + SPCSize,
                               buffer->range_length() - targetSize - SPCSize);
         } else {
