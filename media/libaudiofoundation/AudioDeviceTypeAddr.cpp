@@ -158,14 +158,15 @@ std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& devic
 
 ConversionResult<AudioDeviceTypeAddr>
 aidl2legacy_AudioDeviceTypeAddress(const media::AudioDevice& aidl) {
-    audio_devices_t type = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.type));
+    audio_devices_t type = VALUE_OR_RETURN(
+            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
     return AudioDeviceTypeAddr(type, aidl.address);
 }
 
 ConversionResult<media::AudioDevice>
 legacy2aidl_AudioDeviceTypeAddress(const AudioDeviceTypeAddr& legacy) {
     media::AudioDevice aidl;
-    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.mType));
+    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.mType));
     aidl.address = legacy.getAddress();
     return aidl;
 }

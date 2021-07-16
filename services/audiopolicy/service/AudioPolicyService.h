@@ -103,22 +103,27 @@ public:
     binder::Status releaseInput(int32_t portId) override;
     binder::Status initStreamVolume(media::AudioStreamType stream, int32_t indexMin,
                                     int32_t indexMax) override;
-    binder::Status setStreamVolumeIndex(media::AudioStreamType stream, int32_t device,
+    binder::Status setStreamVolumeIndex(media::AudioStreamType stream,
+                                        const media::AudioDeviceDescription& device,
                                         int32_t index) override;
-    binder::Status getStreamVolumeIndex(media::AudioStreamType stream, int32_t device,
+    binder::Status getStreamVolumeIndex(media::AudioStreamType stream,
+                                        const media::AudioDeviceDescription& device,
                                         int32_t* _aidl_return) override;
     binder::Status setVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
-                                               int32_t device, int32_t index) override;
+                                               const media::AudioDeviceDescription& device,
+                                               int32_t index) override;
     binder::Status getVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
-                                               int32_t device, int32_t* _aidl_return) override;
+                                               const media::AudioDeviceDescription& device,
+                                               int32_t* _aidl_return) override;
     binder::Status getMaxVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
                                                   int32_t* _aidl_return) override;
     binder::Status getMinVolumeIndexForAttributes(const media::AudioAttributesInternal& attr,
                                                   int32_t* _aidl_return) override;
     binder::Status getStrategyForStream(media::AudioStreamType stream,
                                         int32_t* _aidl_return) override;
-    binder::Status getDevicesForStream(media::AudioStreamType stream,
-                                       int32_t* _aidl_return) override;
+    binder::Status getDevicesForStream(
+            media::AudioStreamType stream,
+            std::vector<media::AudioDeviceDescription>* _aidl_return) override;
     binder::Status getDevicesForAttributes(const media::AudioAttributesEx& attr,
                                            std::vector<media::AudioDevice>* _aidl_return) override;
     binder::Status getOutputForEffect(const media::EffectDescriptor& desc,
@@ -187,7 +192,8 @@ public:
     binder::Status stopAudioSource(int32_t portId) override;
     binder::Status setMasterMono(bool mono) override;
     binder::Status getMasterMono(bool* _aidl_return) override;
-    binder::Status getStreamVolumeDB(media::AudioStreamType stream, int32_t index, int32_t device,
+    binder::Status getStreamVolumeDB(media::AudioStreamType stream, int32_t index,
+                                     const media::AudioDeviceDescription& device,
                                      float* _aidl_return) override;
     binder::Status getSurroundFormats(media::Int* count,
                                       std::vector<media::AudioFormatSys>* formats,

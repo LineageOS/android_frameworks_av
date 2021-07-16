@@ -475,10 +475,7 @@ const detail::AudioChannelPairs& getInAudioChannelPairs() {
         DEFINE_INPUT_LAYOUT(2POINT1POINT2),
         DEFINE_INPUT_LAYOUT(3POINT0POINT2),
         DEFINE_INPUT_LAYOUT(3POINT1POINT2),
-        DEFINE_INPUT_LAYOUT(5POINT1),
-        DEFINE_INPUT_LAYOUT(VOICE_UPLINK_MONO),
-        DEFINE_INPUT_LAYOUT(VOICE_DNLINK_MONO),
-        DEFINE_INPUT_LAYOUT(VOICE_CALL_MONO)
+        DEFINE_INPUT_LAYOUT(5POINT1)
 #undef DEFINE_INPUT_LAYOUT
     };
     return pairs;
@@ -523,6 +520,22 @@ const detail::AudioChannelPairs& getOutAudioChannelPairs() {
         DEFINE_OUTPUT_LAYOUT(MONO_HAPTIC_AB),
         DEFINE_OUTPUT_LAYOUT(STEREO_HAPTIC_AB)
 #undef DEFINE_OUTPUT_LAYOUT
+    };
+    return pairs;
+}
+
+const detail::AudioChannelPairs& getVoiceAudioChannelPairs() {
+    static const detail::AudioChannelPairs pairs = {
+#define DEFINE_VOICE_LAYOUT(n)                                                               \
+            {                                                                                \
+                AUDIO_CHANNEL_IN_VOICE_##n,                                                  \
+                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::voiceMask>(  \
+                        media::AudioChannelLayout::VOICE_##n)                                \
+            }
+        DEFINE_VOICE_LAYOUT(UPLINK_MONO),
+        DEFINE_VOICE_LAYOUT(DNLINK_MONO),
+        DEFINE_VOICE_LAYOUT(CALL_MONO)
+#undef DEFINE_VOICE_LAYOUT
     };
     return pairs;
 }
@@ -1080,6 +1093,17 @@ std::unordered_map<S, T> make_DirectMap(const std::vector<std::pair<S, T>>& v) {
 }
 
 template<typename S, typename T>
+std::unordered_map<S, T> make_DirectMap(
+        const std::vector<std::pair<S, T>>& v1, const std::vector<std::pair<S, T>>& v2) {
+    std::unordered_map<S, T> result(v1.begin(), v1.end());
+    LOG_ALWAYS_FATAL_IF(result.size() != v1.size(), "Duplicate key elements detected in v1");
+    result.insert(v2.begin(), v2.end());
+    LOG_ALWAYS_FATAL_IF(result.size() != v1.size() + v2.size(),
+            "Duplicate key elements detected in v1+v2");
+    return result;
+}
+
+template<typename S, typename T>
 std::unordered_map<T, S> make_ReverseMap(const std::vector<std::pair<S, T>>& v) {
     std::unordered_map<T, S> result;
     std::transform(v.begin(), v.end(), std::inserter(result, result.begin()),
@@ -1099,6 +1123,7 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
     static const ReverseMap mIdx = make_ReverseMap(getIndexAudioChannelPairs());
     static const ReverseMap mIn = make_ReverseMap(getInAudioChannelPairs());
     static const ReverseMap mOut = make_ReverseMap(getOutAudioChannelPairs());
+    static const ReverseMap mVoice = make_ReverseMap(getVoiceAudioChannelPairs());
 
     auto convert = [](const media::AudioChannelLayout& aidl, const ReverseMap& m,
             const char* func, const char* type) -> ConversionResult<audio_channel_mask_t> {
@@ -1120,6 +1145,8 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
             return convert(aidl, mIdx, __func__, "index");
         case Tag::layoutMask:
             return convert(aidl, isOutput ? mOut : mIn, __func__, isOutput ? "output" : "input");
+        case Tag::voiceMask:
+            return convert(aidl, mVoice, __func__, "voice");
     }
     ALOGE("%s: unexpected tag value %d", __func__, aidl.getTag());
     return unexpected(BAD_VALUE);
@@ -1130,7 +1157,8 @@ ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_Aud
     using DirectMap = std::unordered_map<audio_channel_mask_t, media::AudioChannelLayout>;
     using Tag = media::AudioChannelLayout::Tag;
     static const DirectMap mIdx = make_DirectMap(getIndexAudioChannelPairs());
-    static const DirectMap mIn = make_DirectMap(getInAudioChannelPairs());
+    static const DirectMap mInAndVoice = make_DirectMap(
+            getInAudioChannelPairs(), getVoiceAudioChannelPairs());
     static const DirectMap mOut = make_DirectMap(getOutAudioChannelPairs());
 
     auto convert = [](const audio_channel_mask_t legacy, const DirectMap& m,
@@ -1154,7 +1182,8 @@ ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_Aud
     if (repr == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
         return convert(legacy, mIdx, __func__, "index");
     } else if (repr == AUDIO_CHANNEL_REPRESENTATION_POSITION) {
-        return convert(legacy, isOutput ? mOut : mIn, __func__, isOutput ? "output" : "input");
+        return convert(legacy, isOutput ? mOut : mInAndVoice, __func__,
+                isOutput ? "output" : "input / voice");
     }
 
     ALOGE("%s: unknown representation %d in audio_channel_mask_t value 0x%x",
@@ -1252,16 +1281,6 @@ ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_
             indexToEnum_bitmask<audio_gain_mode_t>,
             // AudioGainMode is index-based.
             enumToMask_index<int32_t, media::AudioGainMode>);
-}
-
-ConversionResult<audio_devices_t> aidl2legacy_int32_t_audio_devices_t(int32_t aidl) {
-    // TODO(ytai): bitfield?
-    return convertReinterpret<audio_devices_t>(aidl);
-}
-
-ConversionResult<int32_t> legacy2aidl_audio_devices_t_int32_t(audio_devices_t legacy) {
-    // TODO(ytai): bitfield?
-    return convertReinterpret<int32_t>(legacy);
 }
 
 ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_config(
@@ -1527,7 +1546,7 @@ aidl2legacy_AudioPortConfigDeviceExt_audio_port_config_device_ext(
         const media::AudioPortConfigDeviceExt& aidl) {
     audio_port_config_device_ext legacy;
     legacy.hw_module = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_module_handle_t(aidl.hwModule));
-    legacy.type = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.type));
+    legacy.type = VALUE_OR_RETURN(aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.type));
     RETURN_IF_ERROR(aidl2legacy_string(aidl.address, legacy.address, AUDIO_DEVICE_MAX_ADDRESS_LEN));
     return legacy;
 }
@@ -1537,7 +1556,7 @@ legacy2aidl_audio_port_config_device_ext_AudioPortConfigDeviceExt(
         const audio_port_config_device_ext& legacy) {
     media::AudioPortConfigDeviceExt aidl;
     aidl.hwModule = VALUE_OR_RETURN(legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.type));
+    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.type));
     aidl.address = VALUE_OR_RETURN(
             legacy2aidl_string(legacy.address, AUDIO_DEVICE_MAX_ADDRESS_LEN));
     return aidl;
@@ -2592,7 +2611,8 @@ ConversionResult<audio_port_device_ext>
 aidl2legacy_AudioPortDeviceExt_audio_port_device_ext(const media::AudioPortDeviceExt& aidl) {
     audio_port_device_ext legacy;
     legacy.hw_module = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_module_handle_t(aidl.hwModule));
-    legacy.type = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.device.type));
+    legacy.type = VALUE_OR_RETURN(
+            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.device.type));
     RETURN_IF_ERROR(
             aidl2legacy_string(aidl.device.address, legacy.address, sizeof(legacy.address)));
     legacy.encapsulation_modes = VALUE_OR_RETURN(
@@ -2606,7 +2626,8 @@ ConversionResult<media::AudioPortDeviceExt>
 legacy2aidl_audio_port_device_ext_AudioPortDeviceExt(const audio_port_device_ext& legacy) {
     media::AudioPortDeviceExt aidl;
     aidl.hwModule = VALUE_OR_RETURN(legacy2aidl_audio_module_handle_t_int32_t(legacy.hw_module));
-    aidl.device.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.type));
+    aidl.device.type = VALUE_OR_RETURN(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.type));
     aidl.device.address = VALUE_OR_RETURN(
             legacy2aidl_string(legacy.address, sizeof(legacy.address)));
     aidl.encapsulationModes = VALUE_OR_RETURN(

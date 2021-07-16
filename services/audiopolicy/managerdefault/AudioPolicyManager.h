@@ -193,7 +193,7 @@ public:
         }
 
         // return the enabled output devices for the given stream type
-        virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream);
+        virtual DeviceTypeSet getDevicesForStream(audio_stream_type_t stream);
 
         virtual status_t getDevicesForAttributes(
                 const audio_attributes_t &attributes,
