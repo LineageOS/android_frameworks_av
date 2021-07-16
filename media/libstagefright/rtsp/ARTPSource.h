@@ -56,6 +56,7 @@ struct ARTPSource : public RefBase {
     };
 
     void processRTPPacket(const sp<ABuffer> &buffer);
+    void timeReset();
     void timeUpdate(uint32_t rtpTime, uint64_t ntpTime);
     void byeReceived();
 
