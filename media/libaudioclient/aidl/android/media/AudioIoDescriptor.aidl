@@ -17,7 +17,7 @@
 package android.media;
 
 import android.media.AudioChannelMask;
-import android.media.AudioFormatSys;
+import android.media.AudioFormatDescription;
 import android.media.AudioPatch;
 
 /**
@@ -28,7 +28,7 @@ parcelable AudioIoDescriptor {
     int ioHandle;
     AudioPatch patch;
     int samplingRate;
-    AudioFormatSys format;
+    AudioFormatDescription format;
     AudioChannelMask channelMask;
     long frameCount;
     long frameCountHAL;

@@ -136,11 +136,6 @@ ConversionResult<audio_port_type_t> aidl2legacy_AudioPortType_audio_port_type_t(
 ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortType(
         audio_port_type_t legacy);
 
-ConversionResult<audio_format_t> aidl2legacy_AudioFormat_audio_format_t(
-        media::AudioFormatSys aidl);
-ConversionResult<media::AudioFormatSys> legacy2aidl_audio_format_t_AudioFormat(
-        audio_format_t legacy);
-
 ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
         const media::AudioChannelLayout& aidl, bool isOutput);
 ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChannelLayout(

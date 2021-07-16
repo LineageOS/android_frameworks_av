@@ -562,7 +562,7 @@ public:
     Status createRecord(const media::CreateRecordRequest& request,
                         media::CreateRecordResponse* _aidl_return) override;
     Status sampleRate(int32_t ioHandle, int32_t* _aidl_return) override;
-    Status format(int32_t output, media::AudioFormatSys* _aidl_return) override;
+    Status format(int32_t output, media::AudioFormatDescription* _aidl_return) override;
     Status frameCount(int32_t ioHandle, int64_t* _aidl_return) override;
     Status latency(int32_t output, int32_t* _aidl_return) override;
     Status setMasterVolume(float value) override;
@@ -584,7 +584,7 @@ public:
     Status
     getParameters(int32_t ioHandle, const std::string& keys, std::string* _aidl_return) override;
     Status registerClient(const sp<media::IAudioFlingerClient>& client) override;
-    Status getInputBufferSize(int32_t sampleRate, media::AudioFormatSys format,
+    Status getInputBufferSize(int32_t sampleRate, const media::AudioFormatDescription& format,
                               media::AudioChannelMask channelMask, int64_t* _aidl_return) override;
     Status openOutput(const media::OpenOutputRequest& request,
                       media::OpenOutputResponse* _aidl_return) override;
