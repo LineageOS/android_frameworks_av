@@ -2810,7 +2810,9 @@ status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
 {
     Mutex::Autolock _l(mLock);
 
-    if (request.device.type == AUDIO_DEVICE_NONE) {
+    AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioDeviceTypeAddress(request.device));
+    if (device.mType == AUDIO_DEVICE_NONE) {
         return BAD_VALUE;
     }
 
@@ -2818,8 +2820,6 @@ status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
             aidl2legacy_int32_t_audio_io_handle_t(request.input));
     audio_config_t config = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioConfig_audio_config_t(request.config));
-    AudioDeviceTypeAddr device = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioDeviceTypeAddress(request.device));
 
     sp<ThreadBase> thread = openInput_l(
             VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_module_handle_t(request.module)),

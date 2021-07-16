@@ -5919,13 +5919,13 @@ bool AudioPolicyManager::streamsMatchForvolume(audio_stream_type_t stream1,
     return (stream1 == stream2);
 }
 
-audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stream) {
+DeviceTypeSet AudioPolicyManager::getDevicesForStream(audio_stream_type_t stream) {
     // By checking the range of stream before calling getStrategy, we avoid
     // getOutputDevicesForStream's behavior for invalid streams.
     // engine's getOutputDevicesForStream would fallback on its default behavior (most probably
     // device for music stream), but we want to return the empty set.
     if (stream < AUDIO_STREAM_MIN || stream >= AUDIO_STREAM_PUBLIC_CNT) {
-        return AUDIO_DEVICE_NONE;
+        return DeviceTypeSet{};
     }
     DeviceVector activeDevices;
     DeviceVector devices;
@@ -5956,8 +5956,7 @@ audio_devices_t AudioPolicyManager::getDevicesForStream(audio_stream_type_t stre
         devices.merge(mAvailableOutputDevices.getDevicesFromType(AUDIO_DEVICE_OUT_SPEAKER));
         devices.remove(speakerSafeDevices);
     }
-    // FIXME: use DeviceTypeSet when Java layer is ready for it.
-    return deviceTypesToBitMask(devices.types());
+    return devices.types();
 }
 
 status_t AudioPolicyManager::getDevicesForAttributes(

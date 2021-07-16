@@ -235,7 +235,8 @@ aidl2legacy_AudioMix(const media::AudioMix& aidl) {
     legacy.mFormat = VALUE_OR_RETURN(aidl2legacy_AudioConfig_audio_config_t(aidl.format));
     legacy.mRouteFlags = VALUE_OR_RETURN(
             aidl2legacy_AudioMixRouteFlag_uint32_t_mask(aidl.routeFlags));
-    legacy.mDeviceType = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.device.type));
+    legacy.mDeviceType = VALUE_OR_RETURN(
+            aidl2legacy_AudioDeviceDescription_audio_devices_t(aidl.device.type));
     legacy.mDeviceAddress = VALUE_OR_RETURN(aidl2legacy_string_view_String8(aidl.device.address));
     legacy.mCbFlags = VALUE_OR_RETURN(aidl2legacy_AudioMixCallbackFlag_uint32_t_mask(aidl.cbFlags));
     legacy.mAllowPrivilegedMediaPlaybackCapture = aidl.allowPrivilegedMediaPlaybackCapture;
@@ -254,7 +255,8 @@ legacy2aidl_AudioMix(const AudioMix& legacy) {
     aidl.format = VALUE_OR_RETURN(legacy2aidl_audio_config_t_AudioConfig(legacy.mFormat));
     aidl.routeFlags = VALUE_OR_RETURN(
             legacy2aidl_uint32_t_AudioMixRouteFlag_mask(legacy.mRouteFlags));
-    aidl.device.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.mDeviceType));
+    aidl.device.type = VALUE_OR_RETURN(
+            legacy2aidl_audio_devices_t_AudioDeviceDescription(legacy.mDeviceType));
     aidl.device.address = VALUE_OR_RETURN(legacy2aidl_String8_string(legacy.mDeviceAddress));
     aidl.cbFlags = VALUE_OR_RETURN(legacy2aidl_uint32_t_AudioMixCallbackFlag_mask(legacy.mCbFlags));
     aidl.allowPrivilegedMediaPlaybackCapture = legacy.mAllowPrivilegedMediaPlaybackCapture;

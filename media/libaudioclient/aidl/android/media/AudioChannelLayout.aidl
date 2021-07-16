@@ -33,6 +33,10 @@ package android.media;
  * number of channels in the audio frame. A channel mask per se only defines the
  * presence or absence of a channel, not the order. Please see 'INTERLEAVE_*'
  * constants for the platform convention of order.
+ *
+ * The structure also defines a "voice mask" which is a special case of
+ * layout mask, intended for processing voice audio from telecommunication
+ * use cases.
  */
 union AudioChannelLayout {
     /**
@@ -59,6 +63,12 @@ union AudioChannelLayout {
      * must have at least one bit set.
      */
     int layoutMask;
+    /**
+     * This variant is used for processing of voice audio input and output.
+     * It is recommended to use one of 'VOICE_*' values. The 'voiceMask' field
+     * must have at least one bit set.
+     */
+    int voiceMask;
 
     /**
      * 'INDEX_MASK_' constants define how many channels are used.
@@ -183,12 +193,6 @@ union AudioChannelLayout {
             LAYOUT_STEREO | LAYOUT_HAPTIC_AB;
     const int LAYOUT_FRONT_BACK =
             CHANNEL_FRONT_CENTER | CHANNEL_BACK_CENTER;
-    const int LAYOUT_VOICE_UPLINK_MONO =
-            LAYOUT_MONO | CHANNEL_VOICE_UPLINK;
-    const int LAYOUT_VOICE_DNLINK_MONO =
-            LAYOUT_MONO | CHANNEL_VOICE_DNLINK;
-    const int LAYOUT_VOICE_CALL_MONO =
-            CHANNEL_VOICE_UPLINK | CHANNEL_VOICE_DNLINK;
 
     /**
      * Expresses the convention when stereo audio samples are stored interleaved
@@ -204,8 +208,10 @@ union AudioChannelLayout {
     const int INTERLEAVE_RIGHT = 1;
 
     /**
-     * 'CHANNEL_*' constants are used to build 'LAYOUT_*' masks.
-     * Each constant must have exactly one bit set.
+     * 'CHANNEL_*' constants are used to build 'LAYOUT_*' masks. Each constant
+     * must have exactly one bit set. The values do not match
+     * 'android.media.AudioFormat.CHANNEL_OUT_*' constants from the SDK
+     * for better efficiency in masks processing.
      */
     const int CHANNEL_FRONT_LEFT = 1 << 0;
     const int CHANNEL_FRONT_RIGHT = 1 << 1;
@@ -233,8 +239,30 @@ union AudioChannelLayout {
     const int CHANNEL_LOW_FREQUENCY_2 = 1 << 23;
     const int CHANNEL_FRONT_WIDE_LEFT = 1 << 24;
     const int CHANNEL_FRONT_WIDE_RIGHT = 1 << 25;
-    const int CHANNEL_VOICE_UPLINK = 1 << 26;
-    const int CHANNEL_VOICE_DNLINK = 1 << 27;
-    const int CHANNEL_HAPTIC_B = 1 << 28;  // B then A to match legacy const.
-    const int CHANNEL_HAPTIC_A = 1 << 29;
+    /**
+     * Haptic channels are not part of multichannel standards, however they
+     * enhance user experience when playing so they are packed together with the
+     * channels of the program. To avoid collision with positional channels the
+     * values for haptic channels start at the MSB of an integer (after the sign
+     * bit) and move down to LSB.
+     */
+    const int CHANNEL_HAPTIC_B = 1 << 29;
+    const int CHANNEL_HAPTIC_A = 1 << 30;
+
+    /**
+     * 'VOICE_*' constants define layouts for voice audio. The order of the
+     * channels in the frame is assumed to be from the LSB to MSB for all the
+     * bits set to '1'.
+     */
+    const int VOICE_UPLINK_MONO = CHANNEL_VOICE_UPLINK;
+    const int VOICE_DNLINK_MONO = CHANNEL_VOICE_DNLINK;
+    const int VOICE_CALL_MONO = CHANNEL_VOICE_UPLINK | CHANNEL_VOICE_DNLINK;
+
+    /**
+     * 'CHANNEL_VOICE_*' constants are used to build 'VOICE_*' masks. Each
+     * constant must have exactly one bit set. Use the same values as
+     * 'android.media.AudioFormat.CHANNEL_IN_VOICE_*' constants from the SDK.
+     */
+    const int CHANNEL_VOICE_UPLINK = 0x4000;
+    const int CHANNEL_VOICE_DNLINK = 0x8000;
 }

@@ -164,9 +164,6 @@ legacy2aidl_audio_gain_mode_t_AudioGainMode(audio_gain_mode_t legacy);
 ConversionResult<audio_gain_mode_t> aidl2legacy_int32_t_audio_gain_mode_t_mask(int32_t aidl);
 ConversionResult<int32_t> legacy2aidl_audio_gain_mode_t_int32_t_mask(audio_gain_mode_t legacy);
 
-ConversionResult<audio_devices_t> aidl2legacy_int32_t_audio_devices_t(int32_t aidl);
-ConversionResult<int32_t> legacy2aidl_audio_devices_t_int32_t(audio_devices_t legacy);
-
 ConversionResult<audio_gain_config> aidl2legacy_AudioGainConfig_audio_gain_config(
         const media::AudioGainConfig& aidl, media::AudioPortRole role, media::AudioPortType type);
 ConversionResult<media::AudioGainConfig> legacy2aidl_audio_gain_config_AudioGainConfig(

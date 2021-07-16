@@ -24,6 +24,7 @@
 #include <android/media/BnAudioPolicyServiceClient.h>
 #include <android/content/AttributionSourceState.h>
 #include <media/AidlConversionUtil.h>
+#include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
 #include <media/AudioProductStrategy.h>
@@ -318,7 +319,7 @@ public:
     static status_t getMinVolumeIndexForAttributes(const audio_attributes_t &attr, int &index);
 
     static product_strategy_t getStrategyForStream(audio_stream_type_t stream);
-    static audio_devices_t getDevicesForStream(audio_stream_type_t stream);
+    static DeviceTypeSet getDevicesForStream(audio_stream_type_t stream);
     static status_t getDevicesForAttributes(const AudioAttributes &aa,
                                             AudioDeviceTypeAddrVector *devices);
 
