@@ -47,6 +47,8 @@ ARTPSource::ARTPSource(
     : mFirstRtpTime(0),
       mFirstSysTime(0),
       mClockRate(0),
+      mSysAnchorTime(0),
+      mLastSysAnchorTimeUpdatedUs(0),
       mFirstSsrc(0),
       mHighestNackNumber(0),
       mID(id),
@@ -64,6 +66,7 @@ ARTPSource::ARTPSource(
       mLastSrUpdateTimeUs(0),
       mIsFirstRtpRtcpGap(true),
       mAvgRtpRtcpGapMs(0),
+      mAvgUnderlineDelayMs(0),
       mIssueFIRRequests(false),
       mIssueFIRByAssembler(false),
       mLastFIRRequestUs(-1),
@@ -147,6 +150,8 @@ void ARTPSource::timeUpdate(uint32_t rtpTime, uint64_t ntpTime) {
 void ARTPSource::timeReset() {
     mFirstRtpTime = 0;
     mFirstSysTime = 0;
+    mSysAnchorTime = 0;
+    mLastSysAnchorTimeUpdatedUs = 0;
     mFirstSsrc = 0;
     mHighestNackNumber = 0;
     mHighestSeqNumber = 0;
@@ -162,16 +167,17 @@ void ARTPSource::timeReset() {
     mLastSrUpdateTimeUs = 0;
     mIsFirstRtpRtcpGap = true;
     mAvgRtpRtcpGapMs = 0;
+    mAvgUnderlineDelayMs = 0;
     mIssueFIRByAssembler = false;
     mLastFIRRequestUs = -1;
 }
 
-void ARTPSource::calcTimeGapRtpRtcp(const sp<ABuffer> &buffer) {
+void ARTPSource::calcTimeGapRtpRtcp(const sp<ABuffer> &buffer, int64_t nowUs) {
     if (mLastSrUpdateTimeUs == 0) {
         return;
     }
 
-    int64_t elapsedMs = (ALooper::GetNowUs() - mLastSrUpdateTimeUs) / 1000;
+    int64_t elapsedMs = (nowUs - mLastSrUpdateTimeUs) / 1000;
     int64_t elapsedRtpTime = (elapsedMs * (mClockRate / 1000));
     uint32_t rtpTime;
     CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
@@ -201,17 +207,51 @@ void ARTPSource::calcTimeGapRtpRtcp(const sp<ABuffer> &buffer) {
     }
 }
 
-bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
-    calcTimeGapRtpRtcp(buffer);
-    uint32_t seqNum = (uint32_t)buffer->int32Data();
+void ARTPSource::calcUnderlineDelay(const sp<ABuffer> &buffer, int64_t nowUs) {
+    int64_t elapsedMs = (nowUs - mSysAnchorTime) / 1000;
+    int64_t elapsedRtpTime = (elapsedMs * (mClockRate / 1000));
+    int64_t expectedRtpTime = mFirstRtpTime + elapsedRtpTime;
 
+    int32_t rtpTime;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+    int32_t delayMs = (expectedRtpTime - rtpTime) / (mClockRate / 1000);
+
+    mAvgUnderlineDelayMs = ((mAvgUnderlineDelayMs * 15) + delayMs) / 16;
+}
+
+void ARTPSource::adjustAnchorTimeIfRequired(int64_t nowUs) {
+    if (nowUs - mLastSysAnchorTimeUpdatedUs < 1000000L) {
+        return;
+    }
+
+    if (mAvgUnderlineDelayMs < -30) {
+        // adjust underline delay a quarter of desired delay like step by step.
+        mSysAnchorTime += (int64_t)(mAvgUnderlineDelayMs * 1000 / 4);
+        ALOGD("anchor time updated: original(%lld), anchor(%lld), diffMs(%lld)",
+                (long long)mFirstSysTime, (long long)mSysAnchorTime,
+                (long long)(mFirstSysTime - mSysAnchorTime) / 1000);
+
+        mAvgUnderlineDelayMs = 0;
+        mLastSysAnchorTimeUpdatedUs = nowUs;
+
+        // reset a jitter stastics since an anchor time adjusted.
+        mJitterCalc->init(mFirstRtpTime, mSysAnchorTime, 0, mStaticJbTimeMs * 1000);
+    }
+}
+
+bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
+    int64_t nowUs = ALooper::GetNowUs();
+    uint32_t seqNum = (uint32_t)buffer->int32Data();
     int32_t ssrc = 0, rtpTime = 0;
+
     buffer->meta()->findInt32("ssrc", &ssrc);
     CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
     mLatestRtpTime = rtpTime;
 
     if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
-        mFirstSysTime = ALooper::GetNowUs();
+        mFirstSysTime = nowUs;
+        mSysAnchorTime = nowUs;
+        mLastSysAnchorTimeUpdatedUs = nowUs;
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
         mFirstRtpTime = rtpTime;
@@ -232,6 +272,10 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
         ALOGW("Discarding a buffer due to unexpected ssrc");
         return false;
     }
+
+    calcTimeGapRtpRtcp(buffer, nowUs);
+    calcUnderlineDelay(buffer, nowUs);
+    adjustAnchorTimeIfRequired(nowUs);
 
     // Only the lower 16-bit of the sequence numbers are transmitted,
     // derive the high-order bits by choosing the candidate closest

@@ -94,6 +94,9 @@ struct ARTPSource : public RefBase {
     int64_t mFirstSysTime;
     int32_t mClockRate;
 
+    int64_t mSysAnchorTime;
+    int64_t mLastSysAnchorTimeUpdatedUs;
+
     int32_t mFirstSsrc;
     int32_t mHighestNackNumber;
 
@@ -134,6 +137,7 @@ private:
 
     bool mIsFirstRtpRtcpGap;
     double mAvgRtpRtcpGapMs;
+    double mAvgUnderlineDelayMs;
     int64_t mLastJbAlarmTimeUs;
 
     bool mIssueFIRRequests;
@@ -143,7 +147,10 @@ private:
 
     sp<AMessage> mNotify;
 
-    void calcTimeGapRtpRtcp(const sp<ABuffer> &buffer);
+    void calcTimeGapRtpRtcp(const sp<ABuffer> &buffer, int64_t nowUs);
+    void calcUnderlineDelay(const sp<ABuffer> &buffer, int64_t nowUs);
+    void adjustAnchorTimeIfRequired(int64_t nowUs);
+
     bool queuePacket(const sp<ABuffer> &buffer);
 
     DISALLOW_EVIL_CONSTRUCTORS(ARTPSource);
