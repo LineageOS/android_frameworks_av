@@ -145,15 +145,17 @@ void NuPlayer::RTSPSource::stop() {
         return;
     }
 
-    // Close socket before posting message to RTSPSource message handler.
-    if (mHandler != NULL) {
-        close(mHandler->getARTSPConnection()->getSocket());
-    }
-
     sp<AMessage> msg = new AMessage(kWhatDisconnect, this);
 
     sp<AMessage> dummy;
     msg->postAndAwaitResponse(&dummy);
+
+    // Close socket after posting message to RTSPSource message handler.
+    if (mHandler != NULL && mHandler->getARTSPConnection()->getSocket() >= 0) {
+        ALOGD("closing rtsp socket if not closed yet.");
+        close(mHandler->getARTSPConnection()->getSocket());
+    }
+
 }
 
 status_t NuPlayer::RTSPSource::feedMoreTSData() {
