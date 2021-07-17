@@ -42,6 +42,11 @@ namespace android {
 #define DEFAULT_B_FRAMES     0
 #define DEFAULT_RC_LOOKAHEAD 0
 
+#define HEVC_QP_MIN 1
+#define HEVC_QP_MAX 51
+
+constexpr int32_t kDefaultInitQP = 32;
+
 struct C2SoftHevcEnc : public SimpleC2Component {
     class IntfImpl;
 
@@ -90,6 +95,7 @@ struct C2SoftHevcEnc : public SimpleC2Component {
     std::shared_ptr<C2StreamGopTuning::output> mGop;
     std::shared_ptr<C2StreamRequestSyncFrameTuning::output> mRequestSync;
     std::shared_ptr<C2StreamColorAspectsInfo::output> mColorAspects;
+    std::shared_ptr<C2StreamPictureQuantizationTuning::output> mQpBounds;
 #ifdef FILE_DUMP_ENABLE
     char mInFile[200];
     char mOutFile[200];

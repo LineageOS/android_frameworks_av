@@ -594,4 +594,15 @@ sp<MetaData> APacketSource::getFormat() {
     return mFormat;
 }
 
+bool APacketSource::isVideo() {
+    bool isVideo = false;
+
+    const char *mime;
+    if (mFormat->findCString(kKeyMIMEType, &mime)) {
+        isVideo = !strncasecmp(mime, "video/", 6);
+    }
+
+    return isVideo;
+}
+
 }  // namespace android
