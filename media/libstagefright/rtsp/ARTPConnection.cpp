@@ -104,6 +104,11 @@ void ARTPConnection::addStream(
     msg->post();
 }
 
+void ARTPConnection::seekStream() {
+    sp<AMessage> msg = new AMessage(kWhatSeekStream, this);
+    msg->post();
+}
+
 void ARTPConnection::removeStream(int rtpSocket, int rtcpSocket) {
     sp<AMessage> msg = new AMessage(kWhatRemoveStream, this);
     msg->setInt32("rtp-socket", rtpSocket);
@@ -283,6 +288,12 @@ void ARTPConnection::onMessageReceived(const sp<AMessage> &msg) {
             break;
         }
 
+        case kWhatSeekStream:
+        {
+            onSeekStream(msg);
+            break;
+        }
+
         case kWhatRemoveStream:
         {
             onRemoveStream(msg);
@@ -350,6 +361,18 @@ void ARTPConnection::onAddStream(const sp<AMessage> &msg) {
 
     if (!injected) {
         postPollEvent();
+    }
+}
+
+void ARTPConnection::onSeekStream(const sp<AMessage> &msg) {
+    (void)msg; // unused param as of now.
+    List<StreamInfo>::iterator it = mStreams.begin();
+    while (it != mStreams.end()) {
+        for (size_t i = 0; i < it->mSources.size(); ++i) {
+            sp<ARTPSource> source = it->mSources.valueAt(i);
+            source->timeReset();
+        }
+        ++it;
     }
 }
 

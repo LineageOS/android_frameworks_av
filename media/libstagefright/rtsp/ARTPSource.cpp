@@ -130,6 +130,24 @@ void ARTPSource::timeUpdate(uint32_t rtpTime, uint64_t ntpTime) {
     notify->post();
 }
 
+void ARTPSource::timeReset() {
+    mFirstRtpTime = 0;
+    mFirstSysTime = 0;
+    mFirstSsrc = 0;
+    mHighestNackNumber = 0;
+    mHighestSeqNumber = 0;
+    mPrevExpected = 0;
+    mBaseSeqNumber = 0;
+    mNumBuffersReceived = 0;
+    mPrevNumBuffersReceived = 0;
+    mPrevExpectedForRR = 0;
+    mPrevNumBuffersReceivedForRR = 0;
+    mLastNTPTime = 0;
+    mLastNTPTimeUpdateUs = 0;
+    mIssueFIRByAssembler = false;
+    mLastFIRRequestUs = -1;
+}
+
 bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
     uint32_t seqNum = (uint32_t)buffer->int32Data();
 
@@ -147,6 +165,11 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
         ALOGD("first-rtp arrived: first-rtp-time=%u, sys-time=%lld, seq-num=%u, ssrc=%d",
                 mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber, mFirstSsrc);
         mJitterCalc->init(mFirstRtpTime, mFirstSysTime, 0, mStaticJbTimeMs * 1000);
+        if (mQueue.size() > 0) {
+            ALOGD("clearing buffers which belonged to previous timeline"
+                    " since a base timeline has been changed.");
+            mQueue.clear();
+        }
         mQueue.push_back(buffer);
         return true;
     }
