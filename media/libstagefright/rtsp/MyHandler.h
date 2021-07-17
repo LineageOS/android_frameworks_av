@@ -74,7 +74,8 @@ static int64_t kPauseDelayUs = 3000000ll;
 
 // The allowed maximum number of stale access units at the beginning of
 // a new sequence.
-static int32_t kMaxAllowedStaleAccessUnits = 20;
+static int32_t kMaxAllowedStaleAudioAccessUnits = 20;
+static int32_t kMaxAllowedStaleVideoAccessUnits = 400;
 
 static int64_t kTearDownTimeoutUs = 3000000ll;
 
@@ -106,6 +107,10 @@ static bool GetAttribute(const char *s, const char *key, AString *value) {
 
         s = colonPos + 1;
     }
+}
+
+static int32_t GetMaxAllowedStaleCount(bool isVideo) {
+    return isVideo ? kMaxAllowedStaleVideoAccessUnits : kMaxAllowedStaleAudioAccessUnits;
 }
 
 struct MyHandler : public AHandler {
@@ -1330,6 +1335,8 @@ struct MyHandler : public AHandler {
 
                         ALOGV("rtp-info: %s", response->mHeaders.valueAt(i).c_str());
 
+                        mRTPConn->seekStream();
+
                         ALOGI("seek completed.");
                     }
                 }
@@ -1514,7 +1521,7 @@ struct MyHandler : public AHandler {
             TrackInfo *info = &mTracks.editItemAt(trackIndex);
             info->mFirstSeqNumInSegment = seq;
             info->mNewSegment = true;
-            info->mAllowedStaleAccessUnits = kMaxAllowedStaleAccessUnits;
+            info->mAllowedStaleAccessUnits = GetMaxAllowedStaleCount(info->mIsVideo);
 
             CHECK(GetAttribute((*it).c_str(), "rtptime", &val));
 
@@ -1556,6 +1563,7 @@ private:
         int mRTPSocket;
         int mRTCPSocket;
         bool mUsingInterleavedTCP;
+        bool mIsVideo;
         uint32_t mFirstSeqNumInSegment;
         bool mNewSegment;
         int32_t mAllowedStaleAccessUnits;
@@ -1640,9 +1648,10 @@ private:
         info->mURL = trackURL;
         info->mPacketSource = source;
         info->mUsingInterleavedTCP = false;
+        info->mIsVideo = source->isVideo();
         info->mFirstSeqNumInSegment = 0;
         info->mNewSegment = true;
-        info->mAllowedStaleAccessUnits = kMaxAllowedStaleAccessUnits;
+        info->mAllowedStaleAccessUnits = GetMaxAllowedStaleCount(info->mIsVideo);
         info->mRTPSocket = -1;
         info->mRTCPSocket = -1;
         info->mRTPAnchor = 0;
@@ -1838,11 +1847,12 @@ private:
                 // by ARTPSource. Only the low 16 bits of seq in RTP-Info of reply of
                 // RTSP "PLAY" command should be used to detect the first RTP packet
                 // after seeking.
+                int32_t maxAllowedStaleAccessUnits = GetMaxAllowedStaleCount(track->mIsVideo);
                 if (mSeekable) {
                     if (track->mAllowedStaleAccessUnits > 0) {
                         uint32_t seqNum16 = seqNum & 0xffff;
                         uint32_t firstSeqNumInSegment16 = track->mFirstSeqNumInSegment & 0xffff;
-                        if (seqNum16 > firstSeqNumInSegment16 + kMaxAllowedStaleAccessUnits
+                        if (seqNum16 > firstSeqNumInSegment16 + maxAllowedStaleAccessUnits
                                 || seqNum16 < firstSeqNumInSegment16) {
                             // Not the first rtp packet of the stream after seeking, discarding.
                             track->mAllowedStaleAccessUnits--;
@@ -1857,7 +1867,7 @@ private:
                         mNumAccessUnitsReceived = 0;
                         ALOGW_IF(track->mAllowedStaleAccessUnits == 0,
                              "Still no first rtp packet after %d stale ones",
-                             kMaxAllowedStaleAccessUnits);
+                             maxAllowedStaleAccessUnits);
                         track->mAllowedStaleAccessUnits = -1;
                         return UNKNOWN_ERROR;
                     }
