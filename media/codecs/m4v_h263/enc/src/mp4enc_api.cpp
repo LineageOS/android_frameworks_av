@@ -501,13 +501,16 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
     /* check frame rate */
     for (i = 0; i < encParams->nLayers; i++)
     {
+        if (encOption->encFrameRate[i] <= 0. || encOption->encFrameRate[i] > 120)
+        {
+            goto CLEAN_UP;
+        }
         encParams->LayerFrameRate[i] = encOption->encFrameRate[i];
     }
 
     if (encParams->nLayers > 1)
     {
-        if (encOption->encFrameRate[0] == encOption->encFrameRate[1] ||
-                encOption->encFrameRate[0] == 0. || encOption->encFrameRate[1] == 0.) /* 7/31/03 */
+        if (encOption->encFrameRate[0] == encOption->encFrameRate[1])
             goto CLEAN_UP;
     }
     /* set max frame rate */
