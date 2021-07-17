@@ -312,15 +312,14 @@ class Camera3OutputStream :
     bool mDropBuffers;
 
 
-    // Protecting batch states below, must be acquired after mLock
-    std::mutex mBatchLock;
 
     // The batch size for buffer operation
-    size_t mBatchSize = 1;
+    std::atomic_size_t mBatchSize = 1;
 
+    // Protecting batch states below, must be acquired after mLock
+    std::mutex mBatchLock;
     // Prefetched buffers (ready to be handed to client)
     std::vector<Surface::BatchBuffer> mBatchedBuffers;
-
     // ---- End of mBatchLock protected scope ----
 
     /**
