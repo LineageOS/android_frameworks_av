@@ -148,7 +148,7 @@ ARTPAssembler::AssemblyStatus AHEVCAssembler::addNALUnit(
     }
     source->putInterArrivalJitterData(rtpTime, nowTimeUs);
 
-    const int64_t startTimeMs = source->mFirstSysTime / 1000;
+    const int64_t startTimeMs = source->mSysAnchorTime / 1000;
     const int64_t nowTimeMs = nowTimeUs / 1000;
     const int32_t staticJitterTimeMs = source->getStaticJitterTimeMs();
     const int32_t baseJitterTimeMs = source->getBaseJitterTimeMs();
