@@ -158,7 +158,7 @@ public:
                 ++it) {
             if (ll <= 0) break;
             if (prefix != nullptr && !startsWith(it->first, prefix)) break;
-            auto [s, l] = dumpMapTimeItem(it->second, ll - 1, sinceNs, prefix);
+            std::tie(s, l) = dumpMapTimeItem(it->second, ll - 1, sinceNs, prefix);
             if (l == 0) continue; // don't show empty groups (due to sinceNs).
             ss << " " << it->first << "\n" << s;
             ll -= l + 1;
