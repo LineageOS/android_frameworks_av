@@ -28,6 +28,7 @@
 #include "AudioTypes.h"           // string to int conversions
 #include "MediaMetricsService.h"  // package info
 #include "StringUtils.h"
+#include "ValidateId.h"
 
 #define PROP_AUDIO_ANALYTICS_CLOUD_ENABLED "persist.audio.analytics.cloud.enabled"
 
@@ -562,7 +563,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
         const auto flagsForStats = types::lookup<types::INPUT_FLAG, short_enum_type_t>(flags);
         const auto sourceForStats = types::lookup<types::SOURCE_TYPE, short_enum_type_t>(source);
         // Android S
-        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
+        const auto logSessionIdForStats = ValidateId::get()->validateId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
@@ -717,7 +718,7 @@ void AudioAnalytics::DeviceUse::endAudioIntervalGroup(
                  types::lookup<types::TRACK_TRAITS, short_enum_type_t>(traits);
         const auto usageForStats = types::lookup<types::USAGE, short_enum_type_t>(usage);
         // Android S
-        const auto logSessionIdForStats = stringutils::sanitizeLogSessionId(logSessionId);
+        const auto logSessionIdForStats = ValidateId::get()->validateId(logSessionId);
 
         LOG(LOG_LEVEL) << "key:" << key
               << " id:" << id
