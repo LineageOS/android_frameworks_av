@@ -945,9 +945,10 @@ private:
     void updateCameraNumAndIds();
 
     /**
-     * Filter camera characteristics for S Performance class primary cameras
+     * Filter camera characteristics for S Performance class primary cameras.
+     * mServiceLock should be locked.
      */
-    void filterSPerfClassCharacteristics();
+    void filterSPerfClassCharacteristicsLocked();
 
     // File descriptor to temp file used for caching previous open
     // session dumpsys info.
