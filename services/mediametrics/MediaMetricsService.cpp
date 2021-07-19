@@ -19,6 +19,7 @@
 #include <utils/Log.h>
 
 #include "MediaMetricsService.h"
+#include "ValidateId.h"
 #include "iface_statsd.h"
 
 #include <pwd.h> //getpwuid
@@ -204,6 +205,15 @@ status_t MediaMetricsService::submitInternal(mediametrics::Item *item, bool rele
     // now attach either the item or its dup to a const shared pointer
     std::shared_ptr<const mediametrics::Item> sitem(release ? item : item->dup());
 
+    // register log session ids with singleton.
+    if (startsWith(item->getKey(), "metrics.manager")) {
+        std::string logSessionId;
+        if (item->get("logSessionId", &logSessionId)
+                && mediametrics::stringutils::isLogSessionId(logSessionId.c_str())) {
+            mediametrics::ValidateId::get()->registerId(logSessionId);
+        }
+    }
+
     (void)mAudioAnalytics.submit(sitem, isTrusted);
 
     (void)dump2Statsd(sitem, mStatsdLog);  // failure should be logged in function.
@@ -308,6 +318,9 @@ status_t MediaMetricsService::dump(int fd, const Vector<String16>& args)
             if (lines == linesToDump) {
                 result << "-- some lines may be truncated --\n";
             }
+
+            result << "LogSessionId:\n"
+                   << mediametrics::ValidateId::get()->dump();
 
             // Dump the statsd atoms we sent out.
             result << "Statsd atoms:\n"
