@@ -338,7 +338,8 @@ status_t AudioPortConfig::writeToParcel(Parcel *parcel) const {
 
 status_t AudioPortConfig::writeToParcelable(media::AudioPortConfig* parcelable) const {
     parcelable->sampleRate = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mSamplingRate));
-    parcelable->format = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_format_t_AudioFormat(mFormat));
+    parcelable->format = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_format_t_AudioFormatDescription(mFormat));
     parcelable->channelMask = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_channel_mask_t_AudioChannelMask(mChannelMask));
     parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
@@ -362,7 +363,8 @@ status_t AudioPortConfig::readFromParcel(const Parcel *parcel) {
 
 status_t AudioPortConfig::readFromParcelable(const media::AudioPortConfig& parcelable) {
     mSamplingRate = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.sampleRate));
-    mFormat = VALUE_OR_RETURN_STATUS(aidl2legacy_AudioFormat_audio_format_t(parcelable.format));
+    mFormat = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioFormatDescription_audio_format_t(parcelable.format));
     mChannelMask = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioChannelMask_audio_channel_mask_t(parcelable.channelMask));
     mId = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_port_handle_t(parcelable.id));
