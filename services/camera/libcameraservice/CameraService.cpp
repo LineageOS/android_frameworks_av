@@ -237,10 +237,16 @@ status_t CameraService::enumerateProviders() {
         }
     }
 
-    //Derive primary rear/front cameras, and filter their charactierstics.
-    //This needs to be done after all cameras are enumerated and camera ids are sorted.
+    // Derive primary rear/front cameras, and filter their charactierstics.
+    // This needs to be done after all cameras are enumerated and camera ids are sorted.
     if (SessionConfigurationUtils::IS_PERF_CLASS) {
-        filterSPerfClassCharacteristics();
+        // Assume internal cameras are advertised from the same
+        // provider. If multiple providers are registered at different time,
+        // and each provider contains multiple internal color cameras, the current
+        // logic may filter the characteristics of more than one front/rear color
+        // cameras.
+        Mutex::Autolock l(mServiceLock);
+        filterSPerfClassCharacteristicsLocked();
     }
 
     return OK;
@@ -313,7 +319,7 @@ void CameraService::updateCameraNumAndIds() {
     filterAPI1SystemCameraLocked(mNormalDeviceIds);
 }
 
-void CameraService::filterSPerfClassCharacteristics() {
+void CameraService::filterSPerfClassCharacteristicsLocked() {
     // To claim to be S Performance primary cameras, the cameras must be
     // backward compatible. So performance class primary camera Ids must be API1
     // compatible.
