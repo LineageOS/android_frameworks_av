@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.AudioStreamType;
 import android.media.IAudioTrack;
 
 /**
@@ -34,6 +35,7 @@ parcelable CreateTrackResponse {
     int selectedDeviceId;
     int sessionId;
     int sampleRate;
+    AudioStreamType streamType;
     long afFrameCount;
     int afSampleRate;
     int afLatencyMs;
