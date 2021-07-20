@@ -16,14 +16,14 @@
 
 package aaudio;
 
-import android.media.AudioFormatSys;
+import android.media.AudioFormatDescription;
 
 parcelable StreamParameters {
     int                                       samplesPerFrame;  //      = AAUDIO_UNSPECIFIED;
     int                                       sampleRate;  //           = AAUDIO_UNSPECIFIED;
     int                                       deviceId;  //             = AAUDIO_UNSPECIFIED;
     int /* aaudio_sharing_mode_t */           sharingMode;  //          = AAUDIO_SHARING_MODE_SHARED;
-    AudioFormatSys                            audioFormat;  //          = AUDIO_FORMAT_DEFAULT;
+    AudioFormatDescription                    audioFormat;  //          = AUDIO_FORMAT_DEFAULT;
     int /* aaudio_direction_t */              direction;  //            = AAUDIO_DIRECTION_OUTPUT;
     int /* aaudio_usage_t */                  usage;  //                = AAUDIO_UNSPECIFIED;
     int /* aaudio_content_type_t */           contentType;  //          = AAUDIO_UNSPECIFIED;

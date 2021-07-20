@@ -42,7 +42,7 @@ import android.media.IAudioTrack;
 import android.media.MicrophoneInfoData;
 import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
-import android.media.AudioFormatSys;
+import android.media.AudioFormatDescription;
 
 /**
  * {@hide}
@@ -63,7 +63,7 @@ interface IAudioFlingerService {
      */
     int sampleRate(int /* audio_io_handle_t */ ioHandle);
 
-    AudioFormatSys format(int /* audio_io_handle_t */ output);
+    AudioFormatDescription format(int /* audio_io_handle_t */ output);
 
     long frameCount(int /* audio_io_handle_t */ ioHandle);
 
@@ -116,7 +116,7 @@ interface IAudioFlingerService {
     // Retrieve the audio recording buffer size in bytes.
     // FIXME This API assumes a route, and so should be deprecated.
     long getInputBufferSize(int sampleRate,
-                            AudioFormatSys format,
+                            in AudioFormatDescription format,
                             AudioChannelMask channelMask);
 
     OpenOutputResponse openOutput(in OpenOutputRequest request);

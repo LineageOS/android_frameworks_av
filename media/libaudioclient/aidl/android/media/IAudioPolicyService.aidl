@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioFormatSys;
+import android.media.AudioFormatDescription;
 import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
@@ -63,13 +63,13 @@ interface IAudioPolicyService {
     void setDeviceConnectionState(in AudioDevice device,
                                   in AudioPolicyDeviceState state,
                                   @utf8InCpp String deviceName,
-                                  in AudioFormatSys encodedFormat);
+                                  in AudioFormatDescription encodedFormat);
 
     AudioPolicyDeviceState getDeviceConnectionState(in AudioDevice device);
 
     void handleDeviceConfigChange(in AudioDevice device,
                                   @utf8InCpp String deviceName,
-                                  in AudioFormatSys encodedFormat);
+                                  in AudioFormatDescription encodedFormat);
 
     void setPhoneState(AudioMode state, int /* uid_t */ uid);
 
@@ -279,7 +279,7 @@ interface IAudioPolicyService {
      * number of elements without actually retrieving them.
      */
     void getSurroundFormats(inout Int count,
-                            out AudioFormatSys[] formats,
+                            out AudioFormatDescription[] formats,
                             out boolean[] formatsEnabled);
 
     /**
@@ -291,11 +291,11 @@ interface IAudioPolicyService {
      * number of elements without actually retrieving them.
      */
     void getReportedSurroundFormats(inout Int count,
-                                    out AudioFormatSys[] formats);
+                                    out AudioFormatDescription[] formats);
 
-    AudioFormatSys[] getHwOffloadEncodingFormatsSupportedForA2DP();
+    AudioFormatDescription[] getHwOffloadEncodingFormatsSupportedForA2DP();
 
-    void setSurroundFormatEnabled(AudioFormatSys audioFormat, boolean enabled);
+    void setSurroundFormatEnabled(in AudioFormatDescription audioFormat, boolean enabled);
 
     void setAssistantUid(int /* uid_t */ uid);
 
