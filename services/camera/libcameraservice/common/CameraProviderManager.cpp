@@ -476,15 +476,16 @@ hardware::Return<void> CameraProviderManager::onRegistration(
         const hardware::hidl_string& /*fqName*/,
         const hardware::hidl_string& name,
         bool preexisting) {
+    status_t res = OK;
     std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
     {
         std::lock_guard<std::mutex> lock(mInterfaceMutex);
 
-        addProviderLocked(name, preexisting);
+        res = addProviderLocked(name, preexisting);
     }
 
     sp<StatusListener> listener = getStatusListener();
-    if (nullptr != listener.get()) {
+    if (nullptr != listener.get() && res == OK) {
         listener->onNewProviderRegistered();
     }
 
