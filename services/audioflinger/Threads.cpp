@@ -8220,6 +8220,7 @@ status_t AudioFlinger::RecordThread::shareAudioHistory(
 status_t AudioFlinger::RecordThread::shareAudioHistory_l(
         const std::string& sharedAudioPackageName, audio_session_t sharedSessionId,
         int64_t sharedAudioStartMs) {
+
     if ((hasAudioSession_l(sharedSessionId) & ThreadBase::TRACK_SESSION) == 0) {
         return BAD_VALUE;
     }
@@ -8234,23 +8235,32 @@ status_t AudioFlinger::RecordThread::shareAudioHistory_l(
     // after one wraparound
     // We assume recent wraparounds on mRsmpInRear only given it is unlikely that the requesting
     // app waits several hours after the start time was computed.
-    const int64_t sharedAudioStartFrames = sharedAudioStartMs * mSampleRate / 1000;
+    int64_t sharedAudioStartFrames = sharedAudioStartMs * mSampleRate / 1000;
     const int32_t sharedOffset = audio_utils::safe_sub_overflow(mRsmpInRear,
           (int32_t)sharedAudioStartFrames);
-    if (sharedOffset < 0
-          || sharedOffset > mRsmpInFrames) {
-      return BAD_VALUE;
+    // Bring the start frame position within the input buffer to match the documented
+    // "best effort" behavior of the API.
+    if (sharedOffset < 0) {
+        sharedAudioStartFrames = mRsmpInRear;
+    } else if (sharedOffset > mRsmpInFrames) {
+        sharedAudioStartFrames =
+                audio_utils::safe_sub_overflow(mRsmpInRear, (int32_t)mRsmpInFrames);
     }
 
     mSharedAudioPackageName = sharedAudioPackageName;
     if (mSharedAudioPackageName.empty()) {
-        mSharedAudioSessionId = AUDIO_SESSION_NONE;
-        mSharedAudioStartFrames = -1;
+        resetAudioHistory_l();
     } else {
         mSharedAudioSessionId = sharedSessionId;
         mSharedAudioStartFrames = (int32_t)sharedAudioStartFrames;
     }
     return NO_ERROR;
+}
+
+void AudioFlinger::RecordThread::resetAudioHistory_l() {
+    mSharedAudioSessionId = AUDIO_SESSION_NONE;
+    mSharedAudioStartFrames = -1;
+    mSharedAudioPackageName = "";
 }
 
 void AudioFlinger::RecordThread::updateMetadata_l()
@@ -8862,22 +8872,21 @@ void AudioFlinger::RecordThread::updateOutDevices(const DeviceDescriptorBaseVect
 int32_t AudioFlinger::RecordThread::getOldestFront_l()
 {
     if (mTracks.size() == 0) {
-        return 0;
+        return mRsmpInRear;
     }
     int32_t oldestFront = mRsmpInRear;
     int32_t maxFilled = 0;
     for (size_t i = 0; i < mTracks.size(); i++) {
         int32_t front = mTracks[i]->mResamplerBufferProvider->getFront();
         int32_t filled;
-        if (front <= mRsmpInRear) {
-            filled = mRsmpInRear - front;
-        } else {
-            filled = (int32_t)((int64_t)mRsmpInRear + UINT32_MAX + 1 - front);
-        }
+        (void)__builtin_sub_overflow(mRsmpInRear, front, &filled);
         if (filled > maxFilled) {
             oldestFront = front;
             maxFilled = filled;
         }
+    }
+    if (maxFilled > mRsmpInFrames) {
+        (void)__builtin_sub_overflow(mRsmpInRear, mRsmpInFrames, &oldestFront);
     }
     return oldestFront;
 }
@@ -8928,7 +8937,7 @@ void AudioFlinger::RecordThread::resizeInputBuffer_l(int32_t maxSharedAudioHisto
                 "resizeInputBuffer_l() called with shared history and unallocated buffer");
         size_t rsmpInFrames = (size_t)maxSharedAudioHistoryMs * mSampleRate / 1000;
         // never reduce resampler input buffer size
-        if (rsmpInFrames < mRsmpInFrames) {
+        if (rsmpInFrames <= mRsmpInFrames) {
             return;
         }
         mRsmpInFrames = rsmpInFrames;
