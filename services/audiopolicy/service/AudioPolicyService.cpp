@@ -127,6 +127,7 @@ void AudioPolicyService::onFirstRef()
         loadAudioPolicyManager();
         mAudioPolicyManager = mCreateAudioPolicyManager(mAudioPolicyClient);
     }
+
     // load audio processing modules
     sp<AudioPolicyEffects> audioPolicyEffects = new AudioPolicyEffects();
     sp<UidPolicy> uidPolicy = new UidPolicy(this);
@@ -139,6 +140,8 @@ void AudioPolicyService::onFirstRef()
     }
     uidPolicy->registerSelf();
     sensorPrivacyPolicy->registerSelf();
+
+    AudioSystem::audioPolicyReady();
 }
 
 void AudioPolicyService::unloadAudioPolicyManager()

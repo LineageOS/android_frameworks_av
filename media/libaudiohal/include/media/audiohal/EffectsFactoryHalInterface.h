@@ -37,6 +37,9 @@ class EffectsFactoryHalInterface : public RefBase
     virtual status_t getDescriptor(const effect_uuid_t *pEffectUuid,
             effect_descriptor_t *pDescriptor) = 0;
 
+    virtual status_t getDescriptors(const effect_uuid_t *pEffectType,
+                                    std::vector<effect_descriptor_t> *descriptors) = 0;
+
     // Creates an effect engine of the specified type.
     // To release the effect engine, it is necessary to release references
     // to the returned effect object.
