@@ -452,8 +452,8 @@ aaudio_result_t AudioStream::createThread_l(int64_t periodNanoseconds,
                                             void* threadArg)
 {
     if (mHasThread) {
-        ALOGE("%s() - mHasThread already true", __func__);
-        return AAUDIO_ERROR_INVALID_STATE;
+        ALOGD("%s() - previous thread was not joined, join now to be safe", __func__);
+        joinThread_l(nullptr);
     }
     if (threadProc == nullptr) {
         return AAUDIO_ERROR_NULL;
@@ -462,6 +462,7 @@ aaudio_result_t AudioStream::createThread_l(int64_t periodNanoseconds,
     mThreadProc = threadProc;
     mThreadArg = threadArg;
     setPeriodNanoseconds(periodNanoseconds);
+    mHasThread = true;
     // Prevent this object from getting deleted before the thread has a chance to create
     // its strong pointer. Assume the thread will call decStrong().
     this->incStrong(nullptr);
@@ -470,6 +471,7 @@ aaudio_result_t AudioStream::createThread_l(int64_t periodNanoseconds,
         android::status_t status = -errno;
         ALOGE("%s() - pthread_create() failed, %d", __func__, status);
         this->decStrong(nullptr); // Because the thread won't do it.
+        mHasThread = false;
         return AAudioConvert_androidToAAudioResult(status);
     } else {
         // TODO Use AAudioThread or maybe AndroidThread
@@ -484,7 +486,6 @@ aaudio_result_t AudioStream::createThread_l(int64_t periodNanoseconds,
         err = pthread_setname_np(mThread, name);
         ALOGW_IF((err != 0), "Could not set name of AAudio thread. err = %d", err);
 
-        mHasThread = true;
         return AAUDIO_OK;
     }
 }
@@ -498,7 +499,7 @@ aaudio_result_t AudioStream::joinThread(void** returnArg) {
 // This must be called under mStreamLock.
 aaudio_result_t AudioStream::joinThread_l(void** returnArg) {
     if (!mHasThread) {
-        ALOGD("joinThread() - but has no thread");
+        ALOGD("joinThread() - but has no thread or already join()ed");
         return AAUDIO_ERROR_INVALID_STATE;
     }
     aaudio_result_t result = AAUDIO_OK;
@@ -515,8 +516,7 @@ aaudio_result_t AudioStream::joinThread_l(void** returnArg) {
             result = AAudioConvert_androidToAAudioResult(-err);
         } else {
             ALOGD("%s() pthread_join succeeded", __func__);
-            // This must be set false so that the callback thread can be created
-            // when the stream is restarted.
+            // Prevent joining a second time, which has undefined behavior.
             mHasThread = false;
         }
     } else {
