@@ -16,6 +16,7 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "C2SoftMp3Dec"
+#include <inttypes.h>
 #include <log/log.h>
 
 #include <numeric>
@@ -485,10 +486,10 @@ void C2SoftMP3::process(
         }
     }
 
-    uint64_t outTimeStamp = mProcessedSamples * 1000000ll / samplingRate;
+    int64_t outTimeStamp = mProcessedSamples * 1000000ll / samplingRate;
     mProcessedSamples += ((outSize - outOffset) / (numChannels * sizeof(int16_t)));
-    ALOGV("out buffer attr. offset %d size %d timestamp %u", outOffset, outSize - outOffset,
-          (uint32_t)(mAnchorTimeStamp + outTimeStamp));
+    ALOGV("out buffer attr. offset %d size %d timestamp %" PRId64 " ", outOffset,
+          outSize - outOffset, mAnchorTimeStamp + outTimeStamp);
     decodedSizes.clear();
     work->worklets.front()->output.flags = work->input.flags;
     work->worklets.front()->output.buffers.clear();
