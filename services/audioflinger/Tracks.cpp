@@ -2458,7 +2458,7 @@ void AudioFlinger::RecordThread::RecordTrack::destroy()
             RecordThread *recordThread = (RecordThread *) thread.get();
             priorState = mState;
             if (!mSharedAudioPackageName.empty()) {
-                recordThread->shareAudioHistory_l("");
+                recordThread->resetAudioHistory_l();
             }
             recordThread->destroyTrack_l(this); // move mState to STOPPED, terminate
         }

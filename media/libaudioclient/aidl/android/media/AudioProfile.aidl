@@ -18,7 +18,7 @@ package android.media;
 
 import android.media.AudioChannelMask;
 import android.media.AudioEncapsulationType;
-import android.media.AudioFormatSys;
+import android.media.AudioFormatDescription;
 
 /**
  * {@hide}
@@ -26,7 +26,7 @@ import android.media.AudioFormatSys;
 parcelable AudioProfile {
     @utf8InCpp String name;
     /** The format for an audio profile should only be set when initialized. */
-    AudioFormatSys format;
+    AudioFormatDescription format;
     AudioChannelMask[] channelMasks;
     int[] samplingRates;
     boolean isDynamicFormat;

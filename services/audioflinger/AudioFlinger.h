@@ -269,6 +269,9 @@ public:
 
     /* Indicate JAVA services are ready (scheduling, power management ...) */
     virtual status_t systemReady();
+    virtual status_t audioPolicyReady() { mAudioPolicyReady.store(true); return NO_ERROR; }
+            bool isAudioPolicyReady() const { return mAudioPolicyReady.load(); }
+
 
     virtual status_t getMicrophones(std::vector<media::MicrophoneInfo> *microphones);
 
@@ -986,6 +989,7 @@ private:
     DeviceEffectManager mDeviceEffectManager;
 
     bool       mSystemReady;
+    std::atomic_bool mAudioPolicyReady{};
 
     mediautils::UidInfo mUidInfo;
 

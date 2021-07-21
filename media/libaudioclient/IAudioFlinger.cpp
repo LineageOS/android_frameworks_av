@@ -238,9 +238,9 @@ uint32_t AudioFlingerClientAdapter::sampleRate(audio_io_handle_t ioHandle) const
 audio_format_t AudioFlingerClientAdapter::format(audio_io_handle_t output) const {
     auto result = [&]() -> ConversionResult<audio_format_t> {
         int32_t outputAidl = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(output));
-        media::AudioFormatSys aidlRet;
+        media::AudioFormatDescription aidlRet;
         RETURN_IF_ERROR(statusTFromBinderStatus(mDelegate->format(outputAidl, &aidlRet)));
-        return aidl2legacy_AudioFormat_audio_format_t(aidlRet);
+        return aidl2legacy_AudioFormatDescription_audio_format_t(aidlRet);
     }();
     return result.value_or(AUDIO_FORMAT_INVALID);
 }
@@ -406,8 +406,8 @@ size_t AudioFlingerClientAdapter::getInputBufferSize(uint32_t sampleRate, audio_
                                                      audio_channel_mask_t channelMask) const {
     auto result = [&]() -> ConversionResult<size_t> {
         int32_t sampleRateAidl = VALUE_OR_RETURN(convertIntegral<int32_t>(sampleRate));
-        media::AudioFormatSys formatAidl = VALUE_OR_RETURN(
-                legacy2aidl_audio_format_t_AudioFormat(format));
+        media::AudioFormatDescription formatAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_format_t_AudioFormatDescription(format));
         media::AudioChannelMask channelMaskAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_channel_mask_t_AudioChannelMask(channelMask));
         int64_t aidlRet;
@@ -707,6 +707,10 @@ status_t AudioFlingerClientAdapter::systemReady() {
     return statusTFromBinderStatus(mDelegate->systemReady());
 }
 
+status_t AudioFlingerClientAdapter::audioPolicyReady() {
+    return statusTFromBinderStatus(mDelegate->audioPolicyReady());
+}
+
 size_t AudioFlingerClientAdapter::frameCountHAL(audio_io_handle_t ioHandle) const {
     auto result = [&]() -> ConversionResult<size_t> {
         int32_t ioHandleAidl = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(ioHandle));
@@ -798,11 +802,11 @@ Status AudioFlingerServerAdapter::sampleRate(int32_t ioHandle, int32_t* _aidl_re
 }
 
 Status AudioFlingerServerAdapter::format(int32_t output,
-                                         media::AudioFormatSys* _aidl_return) {
+                                         media::AudioFormatDescription* _aidl_return) {
     audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(output));
     *_aidl_return = VALUE_OR_RETURN_BINDER(
-            legacy2aidl_audio_format_t_AudioFormat(mDelegate->format(outputLegacy)));
+            legacy2aidl_audio_format_t_AudioFormatDescription(mDelegate->format(outputLegacy)));
     return Status::ok();
 }
 
@@ -926,12 +930,12 @@ Status AudioFlingerServerAdapter::registerClient(const sp<media::IAudioFlingerCl
 }
 
 Status AudioFlingerServerAdapter::getInputBufferSize(int32_t sampleRate,
-                                                     media::AudioFormatSys format,
+                                                     const media::AudioFormatDescription& format,
                                                      media::AudioChannelMask channelMask,
                                                      int64_t* _aidl_return) {
     uint32_t sampleRateLegacy = VALUE_OR_RETURN_BINDER(convertIntegral<uint32_t>(sampleRate));
     audio_format_t formatLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_AudioFormat_audio_format_t(format));
+            aidl2legacy_AudioFormatDescription_audio_format_t(format));
     audio_channel_mask_t channelMaskLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_AudioChannelMask_audio_channel_mask_t(channelMask));
     size_t size = mDelegate->getInputBufferSize(sampleRateLegacy, formatLegacy, channelMaskLegacy);
@@ -1179,6 +1183,11 @@ Status AudioFlingerServerAdapter::getAudioHwSyncForSession(int32_t sessionId,
 
 Status AudioFlingerServerAdapter::systemReady() {
     return Status::fromStatusT(mDelegate->systemReady());
+}
+
+Status AudioFlingerServerAdapter::audioPolicyReady() {
+    mDelegate->audioPolicyReady();
+    return Status::ok();
 }
 
 Status AudioFlingerServerAdapter::frameCountHAL(int32_t ioHandle, int64_t* _aidl_return) {

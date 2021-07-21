@@ -1888,6 +1888,14 @@ void AudioFlinger::ThreadBase::sendStatistics(bool force)
     item->selfrecord();
 }
 
+product_strategy_t AudioFlinger::ThreadBase::getStrategyForStream(audio_stream_type_t stream) const
+{
+    if (!mAudioFlinger->isAudioPolicyReady()) {
+        return PRODUCT_STRATEGY_NONE;
+    }
+    return AudioSystem::getStrategyForStream(stream);
+}
+
 // ----------------------------------------------------------------------------
 //      Playback
 // ----------------------------------------------------------------------------
@@ -2397,11 +2405,11 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         // all tracks in same audio session must share the same routing strategy otherwise
         // conflicts will happen when tracks are moved from one output to another by audio policy
         // manager
-        product_strategy_t strategy = AudioSystem::getStrategyForStream(streamType);
+        product_strategy_t strategy = getStrategyForStream(streamType);
         for (size_t i = 0; i < mTracks.size(); ++i) {
             sp<Track> t = mTracks[i];
             if (t != 0 && t->isExternalTrack()) {
-                product_strategy_t actual = AudioSystem::getStrategyForStream(t->streamType());
+                product_strategy_t actual = getStrategyForStream(t->streamType());
                 if (sessionId == t->sessionId() && strategy != actual) {
                     ALOGE("createTrack_l() mismatched strategy; expected %u but found %u",
                             strategy, actual);
@@ -2445,7 +2453,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
         if (chain != 0) {
             ALOGV("createTrack_l() setting main buffer %p", chain->inBuffer());
             track->setMainBuffer(chain->inBuffer());
-            chain->setStrategy(AudioSystem::getStrategyForStream(track->streamType()));
+            chain->setStrategy(getStrategyForStream(track->streamType()));
             chain->incTrackCnt();
         }
 
@@ -3062,15 +3070,15 @@ product_strategy_t AudioFlinger::PlaybackThread::getStrategyForSession_l(audio_s
     // session AUDIO_SESSION_OUTPUT_MIX is placed in same strategy as MUSIC stream so that
     // it is moved to correct output by audio policy manager when A2DP is connected or disconnected
     if (sessionId == AUDIO_SESSION_OUTPUT_MIX) {
-        return AudioSystem::getStrategyForStream(AUDIO_STREAM_MUSIC);
+        return getStrategyForStream(AUDIO_STREAM_MUSIC);
     }
     for (size_t i = 0; i < mTracks.size(); i++) {
         sp<Track> track = mTracks[i];
         if (sessionId == track->sessionId() && !track->isInvalid()) {
-            return AudioSystem::getStrategyForStream(track->streamType());
+            return getStrategyForStream(track->streamType());
         }
     }
-    return AudioSystem::getStrategyForStream(AUDIO_STREAM_MUSIC);
+    return getStrategyForStream(AUDIO_STREAM_MUSIC);
 }
 
 
@@ -8237,6 +8245,7 @@ status_t AudioFlinger::RecordThread::shareAudioHistory(
 status_t AudioFlinger::RecordThread::shareAudioHistory_l(
         const std::string& sharedAudioPackageName, audio_session_t sharedSessionId,
         int64_t sharedAudioStartMs) {
+
     if ((hasAudioSession_l(sharedSessionId) & ThreadBase::TRACK_SESSION) == 0) {
         return BAD_VALUE;
     }
@@ -8251,23 +8260,32 @@ status_t AudioFlinger::RecordThread::shareAudioHistory_l(
     // after one wraparound
     // We assume recent wraparounds on mRsmpInRear only given it is unlikely that the requesting
     // app waits several hours after the start time was computed.
-    const int64_t sharedAudioStartFrames = sharedAudioStartMs * mSampleRate / 1000;
+    int64_t sharedAudioStartFrames = sharedAudioStartMs * mSampleRate / 1000;
     const int32_t sharedOffset = audio_utils::safe_sub_overflow(mRsmpInRear,
           (int32_t)sharedAudioStartFrames);
-    if (sharedOffset < 0
-          || sharedOffset > mRsmpInFrames) {
-      return BAD_VALUE;
+    // Bring the start frame position within the input buffer to match the documented
+    // "best effort" behavior of the API.
+    if (sharedOffset < 0) {
+        sharedAudioStartFrames = mRsmpInRear;
+    } else if (sharedOffset > mRsmpInFrames) {
+        sharedAudioStartFrames =
+                audio_utils::safe_sub_overflow(mRsmpInRear, (int32_t)mRsmpInFrames);
     }
 
     mSharedAudioPackageName = sharedAudioPackageName;
     if (mSharedAudioPackageName.empty()) {
-        mSharedAudioSessionId = AUDIO_SESSION_NONE;
-        mSharedAudioStartFrames = -1;
+        resetAudioHistory_l();
     } else {
         mSharedAudioSessionId = sharedSessionId;
         mSharedAudioStartFrames = (int32_t)sharedAudioStartFrames;
     }
     return NO_ERROR;
+}
+
+void AudioFlinger::RecordThread::resetAudioHistory_l() {
+    mSharedAudioSessionId = AUDIO_SESSION_NONE;
+    mSharedAudioStartFrames = -1;
+    mSharedAudioPackageName = "";
 }
 
 void AudioFlinger::RecordThread::updateMetadata_l()
@@ -8879,22 +8897,21 @@ void AudioFlinger::RecordThread::updateOutDevices(const DeviceDescriptorBaseVect
 int32_t AudioFlinger::RecordThread::getOldestFront_l()
 {
     if (mTracks.size() == 0) {
-        return 0;
+        return mRsmpInRear;
     }
     int32_t oldestFront = mRsmpInRear;
     int32_t maxFilled = 0;
     for (size_t i = 0; i < mTracks.size(); i++) {
         int32_t front = mTracks[i]->mResamplerBufferProvider->getFront();
         int32_t filled;
-        if (front <= mRsmpInRear) {
-            filled = mRsmpInRear - front;
-        } else {
-            filled = (int32_t)((int64_t)mRsmpInRear + UINT32_MAX + 1 - front);
-        }
+        (void)__builtin_sub_overflow(mRsmpInRear, front, &filled);
         if (filled > maxFilled) {
             oldestFront = front;
             maxFilled = filled;
         }
+    }
+    if (maxFilled > mRsmpInFrames) {
+        (void)__builtin_sub_overflow(mRsmpInRear, mRsmpInFrames, &oldestFront);
     }
     return oldestFront;
 }
@@ -8945,7 +8962,7 @@ void AudioFlinger::RecordThread::resizeInputBuffer_l(int32_t maxSharedAudioHisto
                 "resizeInputBuffer_l() called with shared history and unallocated buffer");
         size_t rsmpInFrames = (size_t)maxSharedAudioHistoryMs * mSampleRate / 1000;
         // never reduce resampler input buffer size
-        if (rsmpInFrames < mRsmpInFrames) {
+        if (rsmpInFrames <= mRsmpInFrames) {
             return;
         }
         mRsmpInFrames = rsmpInFrames;
@@ -9286,7 +9303,7 @@ status_t AudioFlinger::MmapThread::start(const AudioClient& client,
     mActiveTracks.add(track);
     sp<EffectChain> chain = getEffectChain_l(mSessionId);
     if (chain != 0) {
-        chain->setStrategy(AudioSystem::getStrategyForStream(streamType()));
+        chain->setStrategy(getStrategyForStream(streamType()));
         chain->incTrackCnt();
         chain->incActiveTrackCnt();
     }

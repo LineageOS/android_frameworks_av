@@ -64,6 +64,8 @@ public:
     virtual void resetVolume() = 0;
 
     virtual wp<EffectChain> chain() const = 0;
+
+    virtual bool isAudioPolicyReady() const = 0;
 };
 
 // EffectBase(EffectModule) and EffectChain classes both have their own mutex to protect
@@ -163,6 +165,16 @@ public:
     virtual          sp<DeviceEffectProxy> asDeviceEffectProxy() { return nullptr; }
 
     void             dump(int fd, const Vector<String16>& args);
+
+protected:
+    bool             isInternal_l() const {
+                         for (auto handle : mHandles) {
+                            if (handle->client() != nullptr) {
+                                return false;
+                            }
+                         }
+                         return true;
+                     }
 
 private:
     friend class AudioFlinger;      // for mHandles
@@ -341,6 +353,8 @@ public:
                                     int32_t* _aidl_return) override;
     android::binder::Status disconnect() override;
     android::binder::Status getCblk(media::SharedFileRegion* _aidl_return) override;
+
+    sp<Client> client() const { return mClient; }
 
 private:
     void disconnect(bool unpinIfLast);
@@ -566,6 +580,10 @@ private:
 
         wp<EffectChain> chain() const override { return mChain; }
 
+        bool isAudioPolicyReady() const override {
+            return mAudioFlinger.isAudioPolicyReady();
+        }
+
         wp<ThreadBase> thread() const { return mThread.load(); }
 
         void setThread(const wp<ThreadBase>& thread) {
@@ -715,6 +733,10 @@ private:
         void onEffectDisable(const sp<EffectBase>& effect __unused) override {}
 
         wp<EffectChain> chain() const override { return nullptr; }
+
+        bool isAudioPolicyReady() const override {
+            return mManagerCallback->isAudioPolicyReady();
+        }
 
         int newEffectId();
 

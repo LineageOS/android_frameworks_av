@@ -23,7 +23,7 @@ import android.media.AudioPortConfigExt;
 import android.media.AudioPortConfigType;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
-import android.media.AudioFormatSys;
+import android.media.AudioFormatDescription;
 
 /**
  * {@hide}
@@ -49,7 +49,7 @@ parcelable AudioPortConfig {
     /**
      * Format, if applicable.
      */
-    AudioFormatSys format;
+    AudioFormatDescription format;
     /** Gain to apply, if applicable. */
     AudioGainConfig gain;
     /** Framework only: HW_AV_SYNC, DIRECT, ... */

@@ -318,7 +318,6 @@ aidl_interface {
         "aidl/android/media/AudioEncapsulationType.aidl",
         "aidl/android/media/AudioFormatDescription.aidl",
         "aidl/android/media/AudioFormatType.aidl",
-        "aidl/android/media/AudioFormatSys.aidl",
         "aidl/android/media/AudioFlag.aidl",
         "aidl/android/media/AudioGain.aidl",
         "aidl/android/media/AudioGainConfig.aidl",

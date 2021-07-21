@@ -157,9 +157,13 @@ public:
 
     virtual aaudio_result_t setBufferSize(int32_t requestedFrames) = 0;
 
-    virtual aaudio_result_t createThread_l(int64_t periodNanoseconds,
-                                           aaudio_audio_thread_proc_t threadProc,
-                                           void *threadArg);
+    aaudio_result_t createThread(int64_t periodNanoseconds,
+                                 aaudio_audio_thread_proc_t threadProc,
+                                 void *threadArg)
+                                 EXCLUDES(mStreamLock) {
+        std::lock_guard<std::mutex> lock(mStreamLock);
+        return createThread_l(periodNanoseconds, threadProc, threadArg);
+    }
 
     aaudio_result_t joinThread(void **returnArg);
 
@@ -535,6 +539,11 @@ protected:
         mSessionId = sessionId;
     }
 
+    aaudio_result_t createThread_l(int64_t periodNanoseconds,
+                                           aaudio_audio_thread_proc_t threadProc,
+                                           void *threadArg)
+                                           REQUIRES(mStreamLock);
+
     aaudio_result_t joinThread_l(void **returnArg) REQUIRES(mStreamLock);
 
     std::atomic<bool>    mCallbackEnabled{false};
@@ -658,6 +667,7 @@ private:
     std::atomic<pid_t>          mErrorCallbackThread{CALLBACK_THREAD_NONE};
 
     // background thread ----------------------------------
+    // Use mHasThread to prevent joining twice, which has undefined behavior.
     bool                        mHasThread GUARDED_BY(mStreamLock) = false;
     pthread_t                   mThread  GUARDED_BY(mStreamLock) = {};
 
