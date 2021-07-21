@@ -675,7 +675,7 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
         sp<AudioRecordClient> client = new AudioRecordClient(attr, input, session, portId,
                                                              selectedDeviceId, adjAttributionSource,
                                                              canCaptureOutput, canCaptureHotword,
-                                                             mAudioCommandThread);
+                                                             mOutputCommandThread);
         mAudioRecordClients.add(portId, client);
     }
 
