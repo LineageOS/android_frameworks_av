@@ -142,7 +142,8 @@ status_t AudioGain::writeToParcelable(media::AudioGain* parcelable) const {
     parcelable->mode = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
     parcelable->channelMask = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_channel_mask_t_AudioChannelMask(mGain.channel_mask));
+            legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+                    mGain.channel_mask, mUseInChannelMask));
     parcelable->minValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_value));
     parcelable->maxValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.max_value));
     parcelable->defaultValue = VALUE_OR_RETURN_STATUS(
@@ -166,7 +167,8 @@ status_t AudioGain::readFromParcelable(const media::AudioGain& parcelable) {
     mGain.mode = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.mode));
     mGain.channel_mask = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioChannelMask_audio_channel_mask_t(parcelable.channelMask));
+            aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
+                    parcelable.channelMask, parcelable.useInChannelMask));
     mGain.min_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.minValue));
     mGain.max_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.maxValue));
     mGain.default_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.defaultValue));

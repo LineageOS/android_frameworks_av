@@ -11,10 +11,17 @@ cc_test {
     name: "audiofoundation_parcelable_test",
 
     shared_libs: [
-        "libaudiofoundation",
+        "libbase",
         "libbinder",
         "liblog",
         "libutils",
+    ],
+
+    static_libs: [
+        "audioclient-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+        "libaudiofoundation",
+        "libstagefright_foundation",
     ],
 
     header_libs: [
