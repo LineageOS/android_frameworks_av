@@ -1266,6 +1266,13 @@ sp<AMessage> CCodecConfig::getFormatForDomain(
         if (it == mVendorParams.end()) {
             continue;
         }
+        if (!input && key.find("vendor.qti-ext-vpp") == 0) {
+            // these vendor params are only used for configuration, no need to be
+            // saved in mOutputFormat. the mOutputFormat(AMessage) has max size
+            // limitation of 64, saving too many items will trigger assertion fail
+            ALOGV("Skip %s", key.c_str());
+            continue;
+        }
         C2Param::Index index = it->second->index();
         if (mSubscribedIndices.count(index) == 0) {
             continue;
