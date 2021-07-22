@@ -110,6 +110,7 @@ public:
 
         /* output */
         uint32_t sampleRate;
+        audio_stream_type_t streamType;
         size_t   afFrameCount;
         uint32_t afSampleRate;
         uint32_t afLatencyMs;
