@@ -164,11 +164,11 @@ aaudio_result_t AAudioServiceStreamShared::open(const aaudio::AAudioStreamReques
         goto error;
     }
 
-    setSamplesPerFrame(configurationInput.getSamplesPerFrame());
-    if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
-        setSamplesPerFrame(endpoint->getSamplesPerFrame());
+    setChannelMask(configurationInput.getChannelMask());
+    if (getChannelMask() == AAUDIO_UNSPECIFIED) {
+        setChannelMask(endpoint->getChannelMask());
     } else if (getSamplesPerFrame() != endpoint->getSamplesPerFrame()) {
-        ALOGD("%s() mSamplesPerFrame = %d, need %d",
+        ALOGD("%s() mSamplesPerFrame = %#x, need %#x",
               __func__, getSamplesPerFrame(), endpoint->getSamplesPerFrame());
         result = AAUDIO_ERROR_OUT_OF_RANGE;
         goto error;

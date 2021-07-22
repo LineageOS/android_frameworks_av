@@ -65,11 +65,8 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     const audio_session_t sessionId = AAudioConvert_aaudioToAndroidSessionId(requestedSessionId);
 
     // TODO Support UNSPECIFIED in AudioRecord. For now, use stereo if unspecified.
-    int32_t samplesPerFrame = (getSamplesPerFrame() == AAUDIO_UNSPECIFIED)
-                              ? 2 : getSamplesPerFrame();
-    audio_channel_mask_t channelMask = samplesPerFrame <= 2 ?
-                               audio_channel_in_mask_from_count(samplesPerFrame) :
-                               audio_channel_mask_for_index_assignment_from_count(samplesPerFrame);
+    audio_channel_mask_t channelMask =
+            AAudio_getChannelMaskForOpen(getChannelMask(), getSamplesPerFrame(), true /*isInput*/);
 
     size_t frameCount = (builder.getBufferCapacity() == AAUDIO_UNSPECIFIED) ? 0
                         : builder.getBufferCapacity();
@@ -115,7 +112,7 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
     constexpr int32_t kMostLikelySampleRateForFast = 48000;
     if (getFormat() == AUDIO_FORMAT_PCM_FLOAT
             && perfMode == AAUDIO_PERFORMANCE_MODE_LOW_LATENCY
-            && (samplesPerFrame <= 2) // FAST only for mono and stereo
+            && (audio_channel_count_from_in_mask(channelMask) <= 2) // FAST only for mono and stereo
             && (getSampleRate() == kMostLikelySampleRateForFast
                 || getSampleRate() == AAUDIO_UNSPECIFIED)) {
         setDeviceFormat(AUDIO_FORMAT_PCM_16_BIT);
@@ -228,7 +225,9 @@ aaudio_result_t AudioStreamRecord::open(const AudioStreamBuilder& builder)
             .set(AMEDIAMETRICS_PROP_ENCODINGCLIENT, toString(requestedFormat).c_str()).record();
 
     // Get the actual values from the AudioRecord.
-    setSamplesPerFrame(mAudioRecord->channelCount());
+    setChannelMask(AAudioConvert_androidToAAudioChannelMask(
+            mAudioRecord->channelMask(), true /*isInput*/,
+            AAudio_isChannelIndexMask(getChannelMask())));
     setSampleRate(mAudioRecord->getSampleRate());
     setBufferCapacity(getBufferCapacityFromDevice());
     setFramesPerBurst(getFramesPerBurstFromDevice());
