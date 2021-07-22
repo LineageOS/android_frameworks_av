@@ -5849,12 +5849,11 @@ DeviceVector AudioPolicyManager::getNewOutputDevices(const sp<SwAudioOutputDescr
         // With low-latency playing on speaker, music on WFD, when the first low-latency
         // output is stopped, getNewOutputDevices checks for a product strategy
         // from the list, as STRATEGY_SONIFICATION comes prior to STRATEGY_MEDIA.
-        // If an ALARM, RING or ENFORCED_AUDIBLE stream is supported by the product strategy,
+        // If an ALARM or ENFORCED_AUDIBLE stream is supported by the product strategy,
         // devices are returned for STRATEGY_SONIFICATION without checking whether the
         // stream is associated to the output descriptor.
         if (doGetOutputDevicesForVoice() || outputDesc->isStrategyActive(productStrategy) ||
                ((hasStreamActive(AUDIO_STREAM_ALARM) ||
-                hasStreamActive(AUDIO_STREAM_RING) ||
                 hasStreamActive(AUDIO_STREAM_ENFORCED_AUDIBLE)) &&
                 mOutputs.isStrategyActiveOnSameModule(productStrategy, outputDesc))) {
             // Retrieval of devices for voice DL is done on primary output profile, cannot
