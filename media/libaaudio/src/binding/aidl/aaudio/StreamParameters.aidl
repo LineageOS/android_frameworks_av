@@ -19,7 +19,7 @@ package aaudio;
 import android.media.audio.common.AudioFormat;
 
 parcelable StreamParameters {
-    int                                       samplesPerFrame;  //      = AAUDIO_UNSPECIFIED;
+    int                                       channelMask;  //          = AAUDIO_UNSPECIFIED;
     int                                       sampleRate;  //           = AAUDIO_UNSPECIFIED;
     int                                       deviceId;  //             = AAUDIO_UNSPECIFIED;
     int /* aaudio_sharing_mode_t */           sharingMode;  //          = AAUDIO_SHARING_MODE_SHARED;

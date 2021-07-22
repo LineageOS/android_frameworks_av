@@ -123,9 +123,9 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     request.getConfiguration().setDeviceId(getDeviceId());
     request.getConfiguration().setSampleRate(getSampleRate());
-    request.getConfiguration().setSamplesPerFrame(getSamplesPerFrame());
     request.getConfiguration().setDirection(getDirection());
     request.getConfiguration().setSharingMode(getSharingMode());
+    request.getConfiguration().setChannelMask(getChannelMask());
 
     request.getConfiguration().setUsage(getUsage());
     request.getConfiguration().setContentType(getContentType());
@@ -138,7 +138,8 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
     if (mServiceStreamHandle < 0
-            && request.getConfiguration().getSamplesPerFrame() == 1 // mono?
+            && (request.getConfiguration().getSamplesPerFrame() == 1
+                    || request.getConfiguration().getChannelMask() == AAUDIO_CHANNEL_MONO)
             && getDirection() == AAUDIO_DIRECTION_OUTPUT
             && !isInService()) {
         // if that failed then try switching from mono to stereo if OUTPUT.
@@ -146,7 +147,7 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         // that writes to a stereo MMAP stream.
         ALOGD("%s() - openStream() returned %d, try switching from MONO to STEREO",
               __func__, mServiceStreamHandle);
-        request.getConfiguration().setSamplesPerFrame(2); // stereo
+        request.getConfiguration().setChannelMask(AAUDIO_CHANNEL_STEREO);
         mServiceStreamHandle = mServiceInterface.openStream(request, configurationOutput);
     }
     if (mServiceStreamHandle < 0) {
@@ -171,9 +172,10 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
         goto error;
     }
     // Save results of the open.
-    if (getSamplesPerFrame() == AAUDIO_UNSPECIFIED) {
-        setSamplesPerFrame(configurationOutput.getSamplesPerFrame());
+    if (getChannelMask() == AAUDIO_UNSPECIFIED) {
+        setChannelMask(configurationOutput.getChannelMask());
     }
+
     mDeviceChannelCount = configurationOutput.getSamplesPerFrame();
 
     setSampleRate(configurationOutput.getSampleRate());
