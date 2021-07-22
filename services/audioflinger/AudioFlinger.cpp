@@ -947,6 +947,7 @@ status_t AudioFlinger::createTrack(const media::CreateTrackRequest& _input,
         output.frameCount = input.frameCount;
         output.notificationFrameCount = input.notificationFrameCount;
         output.flags = input.flags;
+        output.streamType = streamType;
 
         track = thread->createTrack_l(client, streamType, localAttr, &output.sampleRate,
                                       input.config.format, input.config.channel_mask,

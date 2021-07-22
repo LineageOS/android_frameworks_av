@@ -1164,8 +1164,9 @@ public:
 
     // constant after constructor or set()
     audio_format_t          mFormat;                // as requested by client, not forced to 16-bit
-    audio_stream_type_t     mStreamType;            // mStreamType == AUDIO_STREAM_DEFAULT implies
-                                                    // this AudioTrack has valid attributes
+    // mOriginalStreamType == AUDIO_STREAM_DEFAULT implies this AudioTrack has valid attributes
+    audio_stream_type_t     mOriginalStreamType = AUDIO_STREAM_DEFAULT;
+    audio_stream_type_t     mStreamType = AUDIO_STREAM_DEFAULT;
     uint32_t                mChannelCount;
     audio_channel_mask_t    mChannelMask;
     sp<IMemory>             mSharedBuffer;
