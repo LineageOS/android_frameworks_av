@@ -63,7 +63,7 @@ private:
     bool mSignalledError;
     bool mSignalledOutputEos;
     bool mGaplessBytes;
-    uint64_t mAnchorTimeStamp;
+    int64_t mAnchorTimeStamp;
     uint64_t mProcessedSamples;
 
     status_t initDecoder();
