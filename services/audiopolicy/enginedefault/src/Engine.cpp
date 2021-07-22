@@ -393,12 +393,14 @@ DeviceVector Engine::getDevicesForStrategyInt(legacy_strategy strategy,
                 || outputs.isActiveLocally(
                     toVolumeSource(AUDIO_STREAM_ACCESSIBILITY),
                     SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY);
-        // - for STRATEGY_SONIFICATION:
+
+        bool ringActiveLocally = outputs.isActiveLocally(toVolumeSource(AUDIO_STREAM_RING), 0);
+        // - for STRATEGY_SONIFICATION and ringtone active:
         // if SPEAKER was selected, and SPEAKER_SAFE is available, use SPEAKER_SAFE instead
         // - for STRATEGY_SONIFICATION_RESPECTFUL:
         // if no media is playing on the device, check for mandatory use of "safe" speaker
         // when media would have played on speaker, and the safe speaker path is available
-        if (strategy == STRATEGY_SONIFICATION
+        if (strategy == STRATEGY_SONIFICATION || ringActiveLocally
             || (strategy == STRATEGY_SONIFICATION_RESPECTFUL && !mediaActiveLocally)) {
             devices.replaceDevicesByType(
                     AUDIO_DEVICE_OUT_SPEAKER,
