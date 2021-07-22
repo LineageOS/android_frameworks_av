@@ -101,6 +101,8 @@ IAudioFlinger::CreateTrackOutput::toAidl() const {
             legacy2aidl_audio_port_handle_t_int32_t(selectedDeviceId));
     aidl.sessionId = VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(sessionId));
     aidl.sampleRate = VALUE_OR_RETURN(convertIntegral<int32_t>(sampleRate));
+    aidl.streamType =  VALUE_OR_RETURN(
+            legacy2aidl_audio_stream_type_t_AudioStreamType(streamType));
     aidl.afFrameCount = VALUE_OR_RETURN(convertIntegral<int64_t>(afFrameCount));
     aidl.afSampleRate = VALUE_OR_RETURN(convertIntegral<int32_t>(afSampleRate));
     aidl.afLatencyMs = VALUE_OR_RETURN(convertIntegral<int32_t>(afLatencyMs));
@@ -122,6 +124,8 @@ IAudioFlinger::CreateTrackOutput::fromAidl(
             aidl2legacy_int32_t_audio_port_handle_t(aidl.selectedDeviceId));
     legacy.sessionId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_session_t(aidl.sessionId));
     legacy.sampleRate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.sampleRate));
+    legacy.streamType = VALUE_OR_RETURN(
+            aidl2legacy_AudioStreamType_audio_stream_type_t(aidl.streamType));
     legacy.afFrameCount = VALUE_OR_RETURN(convertIntegral<size_t>(aidl.afFrameCount));
     legacy.afSampleRate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afSampleRate));
     legacy.afLatencyMs = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afLatencyMs));

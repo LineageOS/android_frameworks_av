@@ -472,7 +472,7 @@ status_t AudioTrack::set(
             status = BAD_VALUE;
             goto exit;
         }
-        mStreamType = streamType;
+        mOriginalStreamType = streamType;
 
     } else {
         // stream type shouldn't be looked at, this track has audio attributes
@@ -481,7 +481,7 @@ status_t AudioTrack::set(
                 " usage=%d content=%d flags=0x%x tags=[%s]",
                 __func__,
                  mAttributes.usage, mAttributes.content_type, mAttributes.flags, mAttributes.tags);
-        mStreamType = AUDIO_STREAM_DEFAULT;
+        mOriginalStreamType = AUDIO_STREAM_DEFAULT;
         audio_flags_to_audio_output_flags(mAttributes.flags, &flags);
     }
 
@@ -1603,9 +1603,6 @@ status_t AudioTrack::attachAuxEffect(int effectId)
 
 audio_stream_type_t AudioTrack::streamType() const
 {
-    if (mStreamType == AUDIO_STREAM_DEFAULT) {
-        return AudioSystem::attributesToStreamType(mAttributes);
-    }
     return mStreamType;
 }
 
@@ -1686,8 +1683,9 @@ status_t AudioTrack::createTrack_l()
     }
 
     IAudioFlinger::CreateTrackInput input;
-    if (mStreamType != AUDIO_STREAM_DEFAULT) {
-        input.attr = AudioSystem::streamTypeToAttributes(mStreamType);
+    if (mOriginalStreamType != AUDIO_STREAM_DEFAULT) {
+        // Legacy: This is based on original parameters even if the track is recreated.
+        input.attr = AudioSystem::streamTypeToAttributes(mOriginalStreamType);
     } else {
         input.attr = mAttributes;
     }
@@ -1743,6 +1741,7 @@ status_t AudioTrack::createTrack_l()
     mNotificationFramesAct = (uint32_t)output.notificationFrameCount;
     mRoutedDeviceId = output.selectedDeviceId;
     mSessionId = output.sessionId;
+    mStreamType = output.streamType;
 
     mSampleRate = output.sampleRate;
     if (mOriginalSampleRate == 0) {
@@ -3282,8 +3281,6 @@ status_t AudioTrack::dump(int fd, const Vector<String16>& args __unused) const
     result.appendFormat("  id(%d) status(%d), state(%d), session Id(%d), flags(%#x)\n",
                         mPortId, mStatus, mState, mSessionId, mFlags);
     result.appendFormat("  stream type(%d), left - right volume(%f, %f)\n",
-                        (mStreamType == AUDIO_STREAM_DEFAULT) ?
-                            AudioSystem::attributesToStreamType(mAttributes) :
                             mStreamType,
                         mVolume[AUDIO_INTERLEAVE_LEFT], mVolume[AUDIO_INTERLEAVE_RIGHT]);
     result.appendFormat("  format(%#x), channel mask(%#x), channel count(%u)\n",
