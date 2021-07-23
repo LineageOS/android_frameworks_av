@@ -34,6 +34,7 @@
 
 #include <system/audio.h>
 #include <android/media/GetInputForAttrResponse.h>
+#include <media/AudioParameter.h>
 
 #define VALUE_OR_RETURN_BINDER_STATUS(x) \
     ({ auto _tmp = (x); \
@@ -89,6 +90,9 @@ void AudioSystem::setAudioFlingerBinder(const sp<IBinder>& audioFlinger) {
     }
     gAudioFlingerBinder = audioFlinger;
 }
+
+static const char* keySetFmPreStop = "AudioFmPreStop";
+static String8 keyFmPreStop =String8(keySetFmPreStop);
 
 // establish binder interface to AudioFlinger service
 const sp<IAudioFlinger> AudioSystem::get_audio_flinger() {
@@ -244,6 +248,17 @@ status_t AudioSystem::setMode(audio_mode_t mode) {
 }
 
 status_t AudioSystem::setParameters(audio_io_handle_t ioHandle, const String8& keyValuePairs) {
+    ALOGD("+setParameters(): %s ", keyValuePairs.string());
+    int value = 0;
+    String8 value_str;
+    AudioParameter param = AudioParameter(keyValuePairs);
+    if (param.getInt(keyFmPreStop, value) == NO_ERROR) {
+        const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+        if (aps != 0) {
+            aps->setPolicyManagerParameters (3 /* POLICY_SET_FM_PRESTOP */, value);
+        }
+    }
+
     const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
     if (af == 0) return PERMISSION_DENIED;
     return af->setParameters(ioHandle, keyValuePairs);
