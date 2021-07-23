@@ -264,6 +264,7 @@ public:
             size_t      frameCount() const  { return mFrameCount; }
             size_t      frameSize() const   { return mFrameSize; }
             audio_source_t inputSource() const  { return mAttributes.source; }
+            audio_channel_mask_t channelMask() const { return mChannelMask; }
 
     /*
      * Return the period of the notification callback in frames.

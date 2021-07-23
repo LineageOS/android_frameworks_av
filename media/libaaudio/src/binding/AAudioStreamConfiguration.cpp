@@ -30,7 +30,7 @@ using namespace aaudio;
 using android::media::audio::common::AudioFormat;
 
 AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& parcelable) {
-    setSamplesPerFrame(parcelable.samplesPerFrame);
+    setChannelMask(parcelable.channelMask);
     setSampleRate(parcelable.sampleRate);
     setDeviceId(parcelable.deviceId);
     static_assert(sizeof(aaudio_sharing_mode_t) == sizeof(parcelable.sharingMode));
@@ -63,7 +63,7 @@ AAudioStreamConfiguration::operator=(const StreamParameters& parcelable) {
 
 StreamParameters AAudioStreamConfiguration::parcelable() const {
     StreamParameters result;
-    result.samplesPerFrame = getSamplesPerFrame();
+    result.channelMask = getChannelMask();
     result.sampleRate = getSampleRate();
     result.deviceId = getDeviceId();
     static_assert(sizeof(aaudio_sharing_mode_t) == sizeof(result.sharingMode));

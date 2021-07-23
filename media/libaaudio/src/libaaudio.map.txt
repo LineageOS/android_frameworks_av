@@ -25,6 +25,7 @@ LIBAAUDIO {
     AAudioStreamBuilder_setPrivacySensitive;   # introduced=30
     AAudioStreamBuilder_setPackageName;   # introduced=31
     AAudioStreamBuilder_setAttributionTag;   # introduced=31
+    AAudioStreamBuilder_setChannelMask;    # introduced=32
     AAudioStreamBuilder_openStream;
     AAudioStreamBuilder_delete;
     AAudioStream_close;
@@ -61,6 +62,7 @@ LIBAAUDIO {
     AAudioStream_isMMapUsed;
     AAudioStream_isPrivacySensitive;   # introduced=30
     AAudioStream_release;        # introduced=30
+    AAudioStream_getChannelMask;  # introduced=32
   local:
     *;
 };

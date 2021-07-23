@@ -59,6 +59,7 @@ std::string AAudioServiceEndpoint::dump() const NO_THREAD_SAFETY_ANALYSIS {
     result << "    Device Id:            " << getDeviceId() << "\n";
     result << "    Sample Rate:          " << getSampleRate() << "\n";
     result << "    Channel Count:        " << getSamplesPerFrame() << "\n";
+    result << "    Channel Mask:         0x" << std::hex << getChannelMask() << std::dec << "\n";
     result << "    Format:               " << getFormat() << "\n";
     result << "    Frames Per Burst:     " << mFramesPerBurst << "\n";
     result << "    Usage:                " << getUsage() << "\n";
@@ -162,6 +163,10 @@ bool AAudioServiceEndpoint::matches(const AAudioStreamConfiguration& configurati
     }
     if (configuration.getSamplesPerFrame() != AAUDIO_UNSPECIFIED &&
         configuration.getSamplesPerFrame() != getSamplesPerFrame()) {
+        return false;
+    }
+    if (configuration.getChannelMask() != AAUDIO_UNSPECIFIED &&
+        configuration.getChannelMask() != getChannelMask()) {
         return false;
     }
     return true;
