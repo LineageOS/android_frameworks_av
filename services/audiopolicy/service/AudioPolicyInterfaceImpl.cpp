@@ -1382,6 +1382,15 @@ status_t AudioPolicyService::getMasterMono(bool *mono)
     return mAudioPolicyManager->getMasterMono(mono);
 }
 
+status_t AudioPolicyService::setPolicyManagerParameters(int key, int value)
+{
+    if (mAudioPolicyManager == NULL) {
+        return NO_INIT;
+    }
+    Mutex::Autolock _l(mLock);
+    return mAudioPolicyManager->setPolicyManagerParameters(key, value);
+}
+
 
 float AudioPolicyService::getStreamVolumeDB(
             audio_stream_type_t stream, int index, audio_devices_t device)

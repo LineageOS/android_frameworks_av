@@ -6793,4 +6793,28 @@ bool AudioPolicyManager::isFMDirectActive(void)
     return false;
 }
 
+status_t AudioPolicyManager::setPolicyManagerParameters(int key, int value)
+{
+    audio_devices_t curDevice = Volume::getDeviceForVolume(mPrimaryOutput->devices().types());
+    ALOGV("setPolicyManagerCustomParameters key = %d value = %d curDevice = 0x%x", key, value, curDevice);
+    switch(key) {
+        case 3 /* POLICY_SET_FM_PRESTOP */: {
+            for (size_t i = 0; i < mOutputs.size(); i++) {
+                sp<AudioOutputDescriptor> desc = mOutputs.valueAt(i);
+                if (desc->sharesHwModuleWith(mPrimaryOutput) && !desc->isDuplicated()) {
+                    if (value) {
+                        ALOGD("mute for FM app with Handle %d", mOutputs.keyAt(i));
+                        setVolumeSourceMute(toVolumeSource(AUDIO_STREAM_MUSIC), true, desc);
+                    } else {
+                        ALOGD("unmute for FM app with Handle %d", mOutputs.keyAt(i));
+                        setVolumeSourceMute(toVolumeSource(AUDIO_STREAM_MUSIC), false, desc);
+                    }
+                }
+            }
+            break;
+        }
+    }
+    return NO_ERROR;
+}
+
 } // namespace android

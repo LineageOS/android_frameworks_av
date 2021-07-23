@@ -330,6 +330,7 @@ public:
                                     audio_session_t sessionId,
                                     bool suspended);
 
+            virtual status_t setPolicyManagerParameters(int key, int value);
             void onOutputSessionEffectsUpdate(sp<AudioSessionInfo>& info, bool added);
             void doOnOutputSessionEffectsUpdate(sp<AudioSessionInfo>& info, bool added);
 

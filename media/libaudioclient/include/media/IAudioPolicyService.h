@@ -156,6 +156,8 @@ public:
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes) = 0;
 
+    virtual status_t setPolicyManagerParameters(int key, int value) = 0;
+
     /* List available audio ports and their attributes */
     virtual status_t listAudioPorts(audio_port_role_t role,
                                     audio_port_type_t type,
