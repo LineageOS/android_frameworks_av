@@ -692,14 +692,8 @@ protected:
 
         audio_io_handle_t selectOutputForMusicEffects();
 
-        virtual status_t addAudioPatch(audio_patch_handle_t handle, const sp<AudioPatch>& patch)
-        {
-            return mAudioPatches.addAudioPatch(handle, patch);
-        }
-        virtual status_t removeAudioPatch(audio_patch_handle_t handle)
-        {
-            return mAudioPatches.removeAudioPatch(handle);
-        }
+        virtual status_t addAudioPatch(audio_patch_handle_t handle, const sp<AudioPatch>& patch);
+        virtual status_t removeAudioPatch(audio_patch_handle_t handle);
 
         bool isPrimaryModule(const sp<HwModule> &module) const
         {
@@ -888,6 +882,10 @@ protected:
         PatchBuilder buildMsdPatch(bool msdIsSource, const sp<DeviceDescriptor> &device) const;
         status_t setMsdOutputPatches(const DeviceVector *outputDevices = nullptr);
         void releaseMsdOutputPatches(const DeviceVector& devices);
+        audio_port_handle_t mFmPortId;
+        bool mFMDirectAudioPatchEnable;
+        bool mSkipFMVolControl;
+        virtual status_t setPolicyManagerParameters(int key, int value);
 private:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
@@ -1039,6 +1037,9 @@ private:
         sp<SwAudioOutputDescriptor> openOutputWithProfileAndDevice(const sp<IOProfile>& profile,
                                                                    const DeviceVector& devices);
 
+        bool isFMDirectMode(const sp<AudioPatch>& patch);
+        bool isFMActive(void);
+        bool isFMDirectActive(void);
 };
 
 };

@@ -2122,6 +2122,23 @@ void AudioPolicyService::AudioCommandThread::insertCommand_l(sp<AudioCommand>& c
         } else if (command2->mCommand != command->mCommand) continue;
 
         switch (command->mCommand) {
+        case SET_AUDIOPORT_CONFIG: {
+            SetAudioPortConfigData *data = (SetAudioPortConfigData *)command->mParam.get();
+            SetAudioPortConfigData *data2 = (SetAudioPortConfigData *)command2->mParam.get();
+            //if (data->mConfig.id != data2->mConfig.id) break; Port Device should be independent to volume controller
+            if (data->mConfig.role != data2->mConfig.role) break;
+            if (data->mConfig.type != data2->mConfig.type) break;
+            if (data->mConfig.config_mask != data2->mConfig.config_mask) break;
+            if (data->mConfig.sample_rate != data2->mConfig.sample_rate) break;
+            if (data->mConfig.format != data2->mConfig.format) break;
+            //if (data->mConfig.ext.device.type != data2->mConfig.ext.device.type) break;
+            ALOGV("Filtering out SET_AUDIOPORT_CONFIG command");
+            removedCommands.add(command2);
+            command->mTime = command2->mTime;
+            // force delayMs to non 0 so that code below does not request to wait for
+            // command status as the command is now delayed
+            delayMs = 1;
+        } break;
         case SET_PARAMETERS: {
             ParametersData *data = (ParametersData *)command->mParam.get();
             ParametersData *data2 = (ParametersData *)command2->mParam.get();

@@ -271,6 +271,8 @@ public:
     virtual status_t setMasterMono(bool mono) = 0;
     virtual status_t getMasterMono(bool *mono) = 0;
 
+    virtual status_t setPolicyManagerParameters(int key, int value) = 0;
+
     virtual float    getStreamVolumeDB(
                 audio_stream_type_t stream, int index, audio_devices_t device) = 0;
 
