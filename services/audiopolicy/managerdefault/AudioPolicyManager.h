@@ -757,6 +757,7 @@ protected:
         audio_port_handle_t mFmPortId;
         bool mFMDirectAudioPatchEnable;
         bool mSkipFMVolControl;
+        virtual status_t setPolicyManagerParameters(int key, int value);
 protected:
         // Add or remove AC3 DTS encodings based on user preferences.
         void modifySurroundFormats(const sp<DeviceDescriptor>& devDesc, FormatVector *formatsPtr);

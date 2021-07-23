@@ -106,6 +106,7 @@ enum {
     MOVE_EFFECTS_TO_IO,
     SET_RTT_ENABLED,
     LIST_AUDIO_SESSIONS,
+    SET_POLICYMANAGER_PARAMETERS,
 };
 
 #define MAX_ITEMS_PER_LIST 1024
@@ -625,6 +626,15 @@ public:
         data.writeInt32(flags);
         remote()->transact(SET_ALLOWED_CAPTURE_POLICY, data, &reply);
         return reply.readInt32();
+    }
+    
+    virtual status_t setPolicyManagerParameters(int key, int value) {
+        Parcel data, reply;
+        data.writeInterfaceToken(IAudioPolicyService::getInterfaceDescriptor());
+        data.writeInt32(key);
+        data.writeInt32(value);
+        remote()->transact(SET_POLICYMANAGER_PARAMETERS, data, &reply);
+        return static_cast <status_t> (reply.readInt32());
     }
 
     virtual bool isOffloadSupported(const audio_offload_info_t& info)
@@ -1829,6 +1839,14 @@ status_t BnAudioPolicyService::onTransact(
             }
             delete[] descriptors;
             return status;
+        }
+            
+        case SET_POLICYMANAGER_PARAMETERS: {
+            CHECK_INTERFACE(IAudioPolicyService, data, reply);
+            int key = data.readInt32();
+            int value = data.readInt32();
+            reply->writeInt32(setPolicyManagerParameters(key, value));
+            return NO_ERROR;
         }
 
         case IS_OFFLOAD_SUPPORTED: {
