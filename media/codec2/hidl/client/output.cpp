@@ -181,7 +181,7 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
                                   int maxDequeueBufferCount,
                                   std::shared_ptr<V1_2::SurfaceSyncObj> *syncObj) {
     uint64_t consumerUsage = 0;
-    if (igbp->getConsumerUsage(&consumerUsage) != OK) {
+    if (igbp && igbp->getConsumerUsage(&consumerUsage) != OK) {
         ALOGW("failed to get consumer usage");
     }
 
@@ -254,6 +254,9 @@ bool OutputBufferQueue::configure(const sp<IGraphicBufferProducer>& igbp,
         mBqId = bqId;
         mOwner = std::make_shared<int>(0);
         mMaxDequeueBufferCount = maxDequeueBufferCount;
+        if (igbp == nullptr) {
+            return false;
+        }
         for (int i = 0; i < BufferQueueDefs::NUM_BUFFER_SLOTS; ++i) {
             if (mBqId == 0 || !mBuffers[i]) {
                 continue;
