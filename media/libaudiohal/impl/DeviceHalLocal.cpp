@@ -233,7 +233,7 @@ status_t DeviceHalLocal::removeDeviceEffect(
     return INVALID_OPERATION;
 }
 
-status_t DeviceHalLocal::dump(int fd) {
+status_t DeviceHalLocal::dump(int fd, const Vector<String16>& /* args */) {
     return mDev->dump(mDev, fd);
 }
 
