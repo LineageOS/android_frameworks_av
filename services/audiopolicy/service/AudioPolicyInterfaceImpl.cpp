@@ -1801,6 +1801,15 @@ Status AudioPolicyService::getMasterMono(bool* _aidl_return)
     return binderStatusFromStatusT(mAudioPolicyManager->getMasterMono(_aidl_return));
 }
 
+Status AudioPolicyService::setPolicyManagerParameters(int key, int value)
+{
+    if (mAudioPolicyManager == NULL) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    Mutex::Autolock _l(mLock);
+    return binderStatusFromStatusT(mAudioPolicyManager->setPolicyManagerParameters(key, value));
+}
+
 
 Status AudioPolicyService::getStreamVolumeDB(media::AudioStreamType streamAidl, int32_t indexAidl,
                                              int32_t deviceAidl, float* _aidl_return) {
