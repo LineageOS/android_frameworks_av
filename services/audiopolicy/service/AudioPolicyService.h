@@ -317,6 +317,8 @@ public:
                             audio_session_t sessionId,
                             bool suspended);
 
+    virtual binder::Status setPolicyManagerParameters(int key, int value);
+
 private:
                         AudioPolicyService() ANDROID_API;
     virtual             ~AudioPolicyService();

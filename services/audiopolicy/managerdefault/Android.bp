@@ -50,5 +50,4 @@ cc_library_shared {
         "-Wall",
         "-Werror",
     ],
-
 }
