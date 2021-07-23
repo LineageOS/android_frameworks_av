@@ -634,14 +634,8 @@ protected:
 
         audio_io_handle_t selectOutputForMusicEffects();
 
-        virtual status_t addAudioPatch(audio_patch_handle_t handle, const sp<AudioPatch>& patch)
-        {
-            return mAudioPatches.addAudioPatch(handle, patch);
-        }
-        virtual status_t removeAudioPatch(audio_patch_handle_t handle)
-        {
-            return mAudioPatches.removeAudioPatch(handle);
-        }
+        virtual status_t addAudioPatch(audio_patch_handle_t handle, const sp<AudioPatch>& patch);
+        virtual status_t removeAudioPatch(audio_patch_handle_t handle);
 
         bool isPrimaryModule(const sp<HwModule> &module) const
         {
@@ -787,6 +781,10 @@ protected:
         std::unordered_set<audio_format_t> mManualSurroundFormats;
 
         std::unordered_map<uid_t, audio_flags_mask_t> mAllowedCapturePolicies;
+
+        audio_port_handle_t mFmPortId;
+        bool mFMDirectAudioPatchEnable;
+        bool mSkipFMVolControl;
 protected:
         void onNewAudioModulesAvailableInt(DeviceVector *newDevices);
 
@@ -942,6 +940,9 @@ protected:
                 std::function<bool(audio_devices_t)> predicate,
                 const char* context);
 
+        bool isFMDirectMode(const sp<AudioPatch>& patch);
+        bool isFMActive(void);
+        bool isFMDirectActive(void);
 };
 
 };

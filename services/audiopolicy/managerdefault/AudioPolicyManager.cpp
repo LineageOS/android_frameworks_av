@@ -278,6 +278,9 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                         && (!device_distinguishes_on_address(device->type())
                                 // always force when disconnecting (a non-duplicated device)
                                 || (state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE));
+                if (desc == mPrimaryOutput && force)
+                    newDevices = desc->supportedDevices().filter(newDevices);
+
                 setOutputDevices(desc, newDevices, force, 0);
             }
         }
@@ -4494,6 +4497,9 @@ AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterfa
     mMasterMono(false),
     mMusicEffectOutput(AUDIO_IO_HANDLE_NONE)
 {
+    mFMDirectAudioPatchEnable = false;
+    mSkipFMVolControl = false;
+    mFmPortId = 0;
 }
 
 AudioPolicyManager::AudioPolicyManager(AudioPolicyClientInterface *clientInterface)
@@ -5323,9 +5329,20 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
             if (desc == nullptr) continue;
 
             if (desc->isStrategyActive(psId)) {
+                bool FMcaseBetweenSPKHP = false;
+                oldDevices.remove(oldDevices.getDevicesFromTypes({AUDIO_DEVICE_OUT_SPEAKER, AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADPHONE}));
+                newDevices.remove(newDevices.getDevicesFromTypes({AUDIO_DEVICE_OUT_SPEAKER, AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADPHONE}));
+
+                if (followsSameRouting(attr, attributes_initializer(AUDIO_USAGE_MEDIA)) && isFMActive()) {
+                    if (oldDevices.isEmpty() && newDevices.isEmpty()) {
+                        FMcaseBetweenSPKHP = true;
+                    }
+                }
+                mSkipFMVolControl = FMcaseBetweenSPKHP;
                 setStrategyMute(psId, true, desc);
                 setStrategyMute(psId, false, desc, maxLatency * LATENCY_MUTE_FACTOR,
                                 newDevices.types());
+                mSkipFMVolControl = false;
             }
             sp<SourceClientDescriptor> source = getSourceForAttributesOnOutput(srcOut, attr);
             if (source != 0){
@@ -5334,6 +5351,21 @@ void AudioPolicyManager::checkOutputForAttributes(const audio_attributes_t &attr
         }
 
         // Move effects associated to this stream from previous output to new output
+        if (followsSameRouting(attr, attributes_initializer(AUDIO_USAGE_MEDIA))) {
+            DeviceVector oriOldDevices = oldDevices;
+            DeviceVector oriNewDevices = newDevices;
+            oldDevices.remove(oldDevices.getDevicesFromTypes({AUDIO_DEVICE_OUT_SPEAKER, AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADPHONE}));
+            newDevices.remove(newDevices.getDevicesFromTypes({AUDIO_DEVICE_OUT_SPEAKER, AUDIO_DEVICE_OUT_WIRED_HEADSET, AUDIO_DEVICE_OUT_WIRED_HEADPHONE}));
+            // ALPS03221274, when playback FM, route to Headset from BT. there is a missing sound of track from BT track Headset.
+            // And then it will mute and the unmute when entering direct mode
+            // If input device is disconnected first, FM active information will disappear, so remove FMActive
+            if (!oldDevices.isEmpty() && newDevices.isEmpty()) {
+                ALOGV("FM mute in-direct primary first, oldDevices %s -> newDevices %s", dumpDeviceTypes(oriOldDevices.types()).c_str(), dumpDeviceTypes(oriNewDevices.types()).c_str());
+                product_strategy_t strategy = mEngine->getProductStrategyForAttributes(attr);
+                setStrategyMute(strategy, true, mPrimaryOutput);
+                setStrategyMute(strategy, false, mPrimaryOutput, MUTE_TIME_MS, newDevices.types());
+            }
+        }
         if (followsSameRouting(attr, attributes_initializer(AUDIO_USAGE_MEDIA))) {
             selectOutputForMusicEffects();
         }
@@ -5737,6 +5769,14 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
         for (const auto &activeVs : outputDesc->getActiveVolumeSources()) {
             // make sure that we do not start the temporary mute period too early in case of
             // delayed device change
+            uint32_t muteDurationMs = outputDesc->latency() * 4;
+            uint32_t extendDurationMs = MUTE_TIME_MS / 2;
+            if (activeVs == toVolumeSource(AUDIO_STREAM_MUSIC)
+                && isFMActive() && muteDurationMs < extendDurationMs) {
+                tempMuteDurationMs = extendDurationMs;
+            } else {
+                tempMuteDurationMs = muteDurationMs;
+            }
             setVolumeSourceMute(activeVs, true, outputDesc, delayMs);
             setVolumeSourceMute(activeVs, false, outputDesc, delayMs + tempMuteDurationMs,
                                 devices.types());
@@ -5747,6 +5787,13 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
     if (muteWaitMs > delayMs) {
         muteWaitMs -= delayMs;
         usleep(muteWaitMs * 1000);
+        if (outputDesc == mPrimaryOutput && isFMDirectActive()) {
+#define WAIT_HW_GAIN_MUTE_TIME (430)
+            if (muteWaitMs < WAIT_HW_GAIN_MUTE_TIME) {
+                usleep((WAIT_HW_GAIN_MUTE_TIME - muteWaitMs) * 1000);
+                muteWaitMs = WAIT_HW_GAIN_MUTE_TIME;
+            }
+        }
         return muteWaitMs;
     }
     return 0;
@@ -5773,6 +5820,13 @@ uint32_t AudioPolicyManager::setOutputDevices(const sp<SwAudioOutputDescriptor>&
     // filter devices according to output selected
     DeviceVector filteredDevices = outputDesc->filterSupportedDevices(devices);
     DeviceVector prevDevices = outputDesc->devices();
+    
+    if (!devices.isEmpty() && (filteredDevices.isEmpty())) {
+        if (force && outputDesc == mPrimaryOutput && isFMActive()) {
+            nextAudioPortGeneration();
+            mpClientInterface->onAudioPatchListUpdate();
+        }
+    }
 
     ALOGV("setOutputDevices() prevDevice %s", prevDevices.toString().c_str());
 
@@ -6154,6 +6208,49 @@ status_t AudioPolicyManager::checkAndSetVolume(IVolumeCurves &curves,
     }
     outputDesc->setVolume(
             volumeDb, volumeSource, curves.getStreamTypes(), deviceTypes, delayMs, force);
+    
+    if (!mSkipFMVolControl && volumeSource == toVolumeSource(AUDIO_STREAM_MUSIC)
+            && outputDesc == mPrimaryOutput && (deviceTypes.count(AUDIO_DEVICE_OUT_WIRED_HEADSET) + deviceTypes.count(AUDIO_DEVICE_OUT_WIRED_HEADPHONE) + deviceTypes.count(AUDIO_DEVICE_OUT_SPEAKER) > 0)) {
+        for (ssize_t i = 0; i < (ssize_t)mAudioPatches.size(); i++) {
+            ALOGV("%s size %zu/%zu", __FUNCTION__, i, mAudioPatches.size());
+            sp<AudioPatch> patchDesc = mAudioPatches.valueAt(i);
+            if (isFMDirectMode(patchDesc)) {
+                ALOGV("%s, Do modify audiopatch volume",__FUNCTION__);
+                struct audio_port_config *config;
+                sp<AudioPortConfig> audioPortConfig;
+                sp<DeviceDescriptor>  deviceDesc;
+                config = &(patchDesc->mPatch.sinks[0]);
+                bool bOrignalDeviceRemoved = false;
+                if (config->role == AUDIO_PORT_ROLE_SINK) {
+                    deviceDesc = mAvailableOutputDevices.getDeviceFromId(config->id);
+                } else {
+                    ALOGV("1st deviceDesc NULL");
+                    break;
+                }
+                if (deviceDesc == NULL) {
+                    bOrignalDeviceRemoved = true; // Headset is removed
+                    ALOGV("bOrignalDeviceRemoved Device %s replace %x", dumpDeviceTypes(deviceTypes).c_str(), config->ext.device.type);
+                    deviceDesc = mAvailableOutputDevices.getDevice(deviceTypesToBitMask(deviceTypes), String8(""), AUDIO_FORMAT_DEFAULT);
+                    if (deviceDesc == NULL) {
+                        ALOGV("2nd deviceDesc NULL");
+                        break;
+                    }
+                }
+                audioPortConfig = deviceDesc;
+                struct audio_port_config newConfig;
+                audioPortConfig->toAudioPortConfig(&newConfig, config);
+                if (bOrignalDeviceRemoved == true)
+                    newConfig.ext.device.type = config->ext.device.type;
+                newConfig.config_mask = AUDIO_PORT_CONFIG_GAIN | newConfig.config_mask;
+                newConfig.gain.mode = AUDIO_GAIN_MODE_JOINT | newConfig.gain.mode;
+                newConfig.gain.values[0] = index;   // pass volume index directly
+                if ((!(isSingleDeviceType(deviceTypes, newConfig.ext.device.type)) || bOrignalDeviceRemoved) && index != 0) // For switch and pop between hp and speaker
+                    newConfig.ext.device.type = deviceTypesToBitMask(deviceTypes); // Device change, Don't un-mute, wait next createAudioPatch
+                    ALOGD("%s newConfig.ext.device.type = %d", __FUNCTION__, newConfig.ext.device.type);
+                    mpClientInterface->setAudioPortConfig(&newConfig, delayMs);
+                }
+        }
+    }
 
     if (isVoiceVolSrc || isBtScoVolSrc) {
         float voiceVolume;
@@ -6547,6 +6644,153 @@ status_t AudioPolicyManager::installPatch(const char *caller,
     }
     if (patchDescPtr) *patchDescPtr = patchDesc;
     return status;
+}
+
+status_t AudioPolicyManager::addAudioPatch(audio_patch_handle_t handle, const sp<AudioPatch>& patch)
+{
+    bool bFMeable = false;
+    sp<SwAudioOutputDescriptor> outputDesc = mPrimaryOutput;
+    //TODO: Add flag filter here
+    ssize_t index = mAudioPatches.indexOfKey(handle);
+
+    if (index >= 0) {
+        ALOGW("addAudioPatch() patch %d already in", handle);
+        return ALREADY_EXISTS;
+    }
+    if (isFMDirectMode(patch)) {
+        if (outputDesc != NULL) {
+            ALOGV("audiopatch Music+");
+            // creat a client for FM direct Mode>>
+            audio_config_base_t clientConfig = {.sample_rate = 48000,
+                .format = AUDIO_FORMAT_PCM,
+                .channel_mask = AUDIO_CHANNEL_OUT_STEREO };
+            mFmPortId = PolicyAudioPort::getNextUniqueId();
+            audio_attributes_t resultAttr = {.usage = AUDIO_USAGE_MEDIA,
+                .content_type = AUDIO_CONTENT_TYPE_MUSIC};
+
+            sp<TrackClientDescriptor> FmClientDesc =
+                    new TrackClientDescriptor(mFmPortId, -1, (audio_session_t) 0, resultAttr, clientConfig,
+                                                  AUDIO_PORT_HANDLE_NONE, AUDIO_STREAM_MUSIC,
+                                                  mEngine->getProductStrategyForAttributes(resultAttr),
+                                                  toVolumeSource(AUDIO_STREAM_MUSIC),
+                                                  (audio_output_flags_t)AUDIO_FLAG_NONE, false,
+                                                  {}, outputDesc->mPolicyMix);
+            if (FmClientDesc == NULL) {
+                ALOGD("FmClientDesc = NULL");
+                return INVALID_OPERATION;
+            }
+            outputDesc->addClient(FmClientDesc);
+            status_t status = outputDesc->start();
+            if (status != NO_ERROR) {
+                return status;
+            }
+            outputDesc->setClientActive(FmClientDesc, true);
+            mFmPortId = FmClientDesc->portId();
+            ALOGV("FmClientDesc->portId() %d active %d volume source %d, stream %d, curActiveCount %d", FmClientDesc->portId(),
+                    FmClientDesc->active(), FmClientDesc->volumeSource(), FmClientDesc->stream(), outputDesc->mProfile->curActiveCount);
+            // creat a client for FM direct Mode>>
+            bFMeable = true;
+            mFMDirectAudioPatchEnable = true;
+            DeviceVector currentDevice = getNewOutputDevices(outputDesc, false /*fromCache*/);
+            audio_devices_t patchDevice = patch->mPatch.sinks[0].ext.device.type;
+            if (patch->mPatch.num_sinks == 2) { // force flag is from ALPS03443673
+                patchDevice = patchDevice | patch->mPatch.sinks[1].ext.device.type;
+            }
+            // It will auto correct the right routing device ALPS02988442. Alarm stop before 80002000->0x0a
+            setOutputDevices(outputDesc, currentDevice, !currentDevice.containsDeviceWithType(patchDevice));
+        }
+    }
+    //TODO: End flag filter here
+    status_t status = mAudioPatches.addAudioPatch(handle, patch);
+
+    //TODO: Add flag filter here
+    if (bFMeable && status == NO_ERROR) {
+        sp<TrackClientDescriptor> FmClientDesc = outputDesc->getClient(mFmPortId);
+        if (FmClientDesc != NULL) {
+            ALOGV("mFmPortId %d volumeSource %d", mFmPortId, FmClientDesc->volumeSource());
+            // Change to 500 ms from 2 * Latency in order to covers FM dirty signal
+            DeviceVector device = getNewOutputDevices(outputDesc, false /*fromCache*/);
+            auto &curves = getVolumeCurves(FmClientDesc->volumeSource());
+                checkAndSetVolume(curves, FmClientDesc->volumeSource(),
+                curves.getVolumeIndex(device.types()), outputDesc, device.types(), 500, true);
+            applyStreamVolumes(outputDesc, device.types(), 500, true);
+        } else {
+            ALOGW("no FM client, mFmPortId %d", mFmPortId);
+        }
+    }
+    //TODO: Add flag filter here
+    return status;
+
+}
+
+status_t AudioPolicyManager::removeAudioPatch(audio_patch_handle_t handle)
+{
+    //TODO: Add flag filter here
+    ssize_t index = mAudioPatches.indexOfKey(handle);
+    if (index < 0) {
+    ALOGW("removeAudioPatch() patch %d not in", handle);
+        return ALREADY_EXISTS;
+    }
+    sp<SwAudioOutputDescriptor> outputDesc = mPrimaryOutput;
+    const sp<AudioPatch> patch = mAudioPatches.valueAt(index);
+    sp<TrackClientDescriptor> client = outputDesc->getClient(mFmPortId);
+    if (isFMDirectMode(patch)) {
+        if (outputDesc != NULL) {
+            if (client != NULL) {
+                ALOGV("audiopatch Music-");
+                // need to remove client here
+                // decrement usage count of this stream on the output
+                outputDesc->setClientActive(client, false);
+                outputDesc->removeClient(mFmPortId);
+                outputDesc->stop();
+                mFmPortId = 0;
+                mFMDirectAudioPatchEnable = false;
+                ALOGV("%s outputDesc->mProfile->curActiveCount %d", __FUNCTION__, outputDesc->mProfile->curActiveCount);
+                DeviceVector newDevice = getNewOutputDevices(outputDesc, false /*fromCache*/);
+                setOutputDevices(outputDesc, newDevice, false, outputDesc->latency()*2);
+            }
+        }
+    }
+    //TODO: End flag filter here
+    return mAudioPatches.removeAudioPatch(handle);
+}
+
+bool AudioPolicyManager::isFMDirectMode(const sp<AudioPatch>& patch)
+{
+    if (patch->mPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE &&
+        patch->mPatch.sinks[0].type == AUDIO_PORT_TYPE_DEVICE &&
+        (patch->mPatch.sources[0].ext.device.type == AUDIO_DEVICE_IN_FM_TUNER)) {
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool AudioPolicyManager::isFMActive(void)
+{
+    for (ssize_t i = 0; i < (ssize_t)mAudioPatches.size(); i++) {
+        ALOGVV("%s size %zu/ %zu", __FUNCTION__, i, mAudioPatches.size());
+        sp<AudioPatch> patchDesc = mAudioPatches.valueAt(i);
+        if (isFMDirectMode(patchDesc)||
+            (patchDesc->mPatch.sources[0].type == AUDIO_PORT_TYPE_DEVICE
+            &&patchDesc->mPatch.sources[0].ext.device.type == AUDIO_DEVICE_IN_FM_TUNER)) {
+            ALOGV("FM Active");
+            return true;
+        }
+    }
+    return false;
+}
+            
+bool AudioPolicyManager::isFMDirectActive(void)
+{
+    for (ssize_t i = 0; i < (ssize_t)mAudioPatches.size(); i++) {
+        sp<AudioPatch> patchDesc = mAudioPatches.valueAt(i);
+        if (isFMDirectMode(patchDesc)) {
+            ALOGV("FM Direct Active");
+            return true;
+        }
+    }
+    return false;
 }
 
 } // namespace android
