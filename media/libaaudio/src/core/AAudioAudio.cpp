@@ -128,7 +128,8 @@ AAUDIO_API void AAudioStreamBuilder_setSamplesPerFrame(AAudioStreamBuilder* buil
                                                        int32_t samplesPerFrame)
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
-    streamBuilder->setSamplesPerFrame(samplesPerFrame);
+    const aaudio_channel_mask_t channelMask = AAudioConvert_channelCountToMask(samplesPerFrame);
+    streamBuilder->setChannelMask(channelMask);
 }
 
 AAUDIO_API void AAudioStreamBuilder_setDirection(AAudioStreamBuilder* builder,
@@ -221,6 +222,13 @@ AAUDIO_API void AAudioStreamBuilder_setFramesPerDataCallback(AAudioStreamBuilder
 {
     AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
     streamBuilder->setFramesPerDataCallback(frames);
+}
+
+AAUDIO_API void AAudioStreamBuilder_setChannelMask(AAudioStreamBuilder* builder,
+                                                   aaudio_channel_mask_t channelMask)
+{
+    AudioStreamBuilder *streamBuilder = convertAAudioBuilderToStreamBuilder(builder);
+    streamBuilder->setChannelMask(channelMask);
 }
 
 AAUDIO_API aaudio_result_t  AAudioStreamBuilder_openStream(AAudioStreamBuilder* builder,
@@ -561,4 +569,12 @@ AAUDIO_API bool AAudioStream_isPrivacySensitive(AAudioStream* stream)
 {
     AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
     return audioStream->isPrivacySensitive();
+}
+
+AAUDIO_API aaudio_channel_mask_t AAudioStream_getChannelMask(AAudioStream* stream)
+{
+    AudioStream *audioStream = convertAAudioStreamToAudioStream(stream);
+    const aaudio_channel_mask_t channelMask = audioStream->getChannelMask();
+    // Do not return channel index masks as they are not public.
+    return AAudio_isChannelIndexMask(channelMask) ? AAUDIO_UNSPECIFIED : channelMask;
 }

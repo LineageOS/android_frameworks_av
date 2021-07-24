@@ -119,7 +119,7 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
-    virtual status_t dump(int fd);
+    status_t dump(int fd, const Vector<String16>& args) override;
 
   private:
     friend class DevicesFactoryHalHidl;

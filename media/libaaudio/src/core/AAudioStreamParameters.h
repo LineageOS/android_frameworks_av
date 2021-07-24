@@ -49,13 +49,6 @@ public:
         return mSamplesPerFrame;
     }
 
-    /**
-     * This is also known as channelCount.
-     */
-    void setSamplesPerFrame(int32_t samplesPerFrame) {
-        mSamplesPerFrame = samplesPerFrame;
-    }
-
     audio_format_t getFormat() const {
         return mAudioFormat;
     }
@@ -153,6 +146,15 @@ public:
         mAttributionTag = attributionTag;
     }
 
+    aaudio_channel_mask_t getChannelMask() const {
+        return mChannelMask;
+    }
+
+    void setChannelMask(aaudio_channel_mask_t channelMask) {
+        mChannelMask = channelMask;
+        mSamplesPerFrame = AAudioConvert_channelMaskToCount(channelMask);
+    }
+
     /**
      * @return bytes per frame of getFormat()
      */
@@ -171,6 +173,8 @@ public:
     void dump() const;
 
 private:
+    bool validateChannelMask() const;
+
     int32_t                         mSamplesPerFrame      = AAUDIO_UNSPECIFIED;
     int32_t                         mSampleRate           = AAUDIO_UNSPECIFIED;
     int32_t                         mDeviceId             = AAUDIO_UNSPECIFIED;
@@ -186,6 +190,7 @@ private:
     bool                            mIsPrivacySensitive   = false;
     std::optional<std::string>      mOpPackageName        = {};
     std::optional<std::string>      mAttributionTag       = {};
+    aaudio_channel_mask_t           mChannelMask          = AAUDIO_UNSPECIFIED;
 };
 
 } /* namespace aaudio */
