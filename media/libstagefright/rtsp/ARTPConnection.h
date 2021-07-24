@@ -73,6 +73,7 @@ private:
         kWhatRemoveStream,
         kWhatPollStreams,
         kWhatInjectPacket,
+        kWhatAlarmStream,
     };
 
     static const int64_t kSelectTimeoutUs;
@@ -98,6 +99,7 @@ private:
     void onSeekStream(const sp<AMessage> &msg);
     void onRemoveStream(const sp<AMessage> &msg);
     void onPollStreams();
+    void onAlarmStream(const sp<AMessage> msg);
     void onInjectPacket(const sp<AMessage> &msg);
     void onSendReceiverReports();
     void checkRxBitrate(int64_t nowUs);
