@@ -22,6 +22,7 @@
 
 #include <utils/List.h>
 #include <utils/RefBase.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -47,6 +48,7 @@ private:
     uint32_t mNextExpectedSeqNo;
     bool mAccessUnitDamaged;
     bool mFirstIFrameProvided;
+    int32_t mLastCvo;
     uint64_t mLastIFrameProvidedAtMs;
     int64_t mLastRtpTimeJitterDataUs;
     int32_t mWidth;
@@ -64,9 +66,7 @@ private:
 
     void submitAccessUnit();
 
-    int32_t pickProperSeq(const Queue *q, uint32_t first, int64_t play, int64_t jit);
-    bool recycleUnit(uint32_t start, uint32_t end, uint32_t connected,
-            size_t avail, float goodRatio);
+    int32_t pickStartSeq(const Queue *q, uint32_t first, int64_t play, int64_t jit);
     int32_t deleteUnitUnderSeq(Queue *q, uint32_t seq);
 
     DISALLOW_EVIL_CONSTRUCTORS(AAVCAssembler);
