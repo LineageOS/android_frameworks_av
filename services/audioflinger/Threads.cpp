@@ -2088,7 +2088,7 @@ void AudioFlinger::PlaybackThread::dumpTracks_l(int fd, const Vector<String16>& 
     write(fd, result.string(), result.size());
 }
 
-void AudioFlinger::PlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args __unused)
+void AudioFlinger::PlaybackThread::dumpInternals_l(int fd, const Vector<String16>& args)
 {
     dprintf(fd, "  Master volume: %f\n", mMasterVolume);
     dprintf(fd, "  Master mute: %s\n", mMasterMute ? "on" : "off");
@@ -2117,7 +2117,7 @@ void AudioFlinger::PlaybackThread::dumpInternals_l(int fd, const Vector<String16
     }
     if (output != nullptr) {
         dprintf(fd, "  Hal stream dump:\n");
-        (void)output->stream->dump(fd);
+        (void)output->stream->dump(fd, args);
     }
 }
 

@@ -120,7 +120,7 @@ class DeviceHalInterface : public RefBase
     virtual status_t removeDeviceEffect(
             audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
 
-    virtual status_t dump(int fd) = 0;
+    virtual status_t dump(int fd, const Vector<String16>& args) = 0;
 
   protected:
     // Subclasses can not be constructed directly by clients.
