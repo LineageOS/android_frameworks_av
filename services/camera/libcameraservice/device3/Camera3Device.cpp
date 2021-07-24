@@ -2823,17 +2823,28 @@ status_t Camera3Device::configureStreamsLocked(int operatingMode,
         mRequestBufferSM.onStreamsConfigured();
     }
 
+    // First call injectCamera() and then run configureStreamsLocked() case:
     // Since the streams configuration of the injection camera is based on the internal camera, we
-    // must wait until the internal camera configure streams before calling injectCamera() to
+    // must wait until the internal camera configure streams before running the injection job to
     // configure the injection streams.
     if (mInjectionMethods->isInjecting()) {
-        ALOGV("%s: Injection camera %s: Start to configure streams.",
+        ALOGD("%s: Injection camera %s: Start to configure streams.",
               __FUNCTION__, mInjectionMethods->getInjectedCamId().string());
         res = mInjectionMethods->injectCamera(config, bufferSizes);
         if (res != OK) {
             ALOGE("Can't finish inject camera process!");
             return res;
         }
+    } else {
+        // First run configureStreamsLocked() and then call injectCamera() case:
+        // If the stream configuration has been completed and camera deive is active, but the
+        // injection camera has not been injected yet, we need to store the stream configuration of
+        // the internal camera (because the stream configuration of the injection camera is based
+        // on the internal camera). When injecting occurs later, this configuration can be used by
+        // the injection camera.
+        ALOGV("%s: The stream configuration is complete and the camera device is active, but the"
+              " injection camera has not been injected yet.", __FUNCTION__);
+        mInjectionMethods->storeInjectionConfig(config, bufferSizes);
     }
 
     return OK;
@@ -6544,6 +6555,13 @@ status_t Camera3Device::injectCamera(const String8& injectedCamId,
     ALOGI("%s Injection camera: injectedCamId = %s", __FUNCTION__, injectedCamId.string());
     ATRACE_CALL();
     Mutex::Autolock il(mInterfaceLock);
+    // When the camera device is active, injectCamera() and stopInjection() will call
+    // internalPauseAndWaitLocked() and internalResumeLocked(), and then they will call
+    // mStatusChanged.waitRelative(mLock, timeout) of waitUntilStateThenRelock(). But
+    // mStatusChanged.waitRelative(mLock, timeout)'s parameter: mutex "mLock" must be in the locked
+    // state, so we need to add "Mutex::Autolock l(mLock)" to lock the "mLock" before calling
+    // waitUntilStateThenRelock().
+    Mutex::Autolock l(mLock);
 
     status_t res = NO_ERROR;
     if (mInjectionMethods->isInjecting()) {
@@ -6566,16 +6584,25 @@ status_t Camera3Device::injectCamera(const String8& injectedCamId,
         return res;
     }
 
-    camera3::camera_stream_configuration injectionConfig;
-    std::vector<uint32_t> injectionBufferSizes;
-    mInjectionMethods->getInjectionConfig(&injectionConfig, &injectionBufferSizes);
     // When the second display of android is cast to the remote device, and the opened camera is
     // also cast to the second display, in this case, because the camera has configured the streams
     // at this time, we can directly call injectCamera() to replace the internal camera with
     // injection camera.
-    if (mOperatingMode >= 0 && injectionConfig.num_streams > 0
-                && injectionBufferSizes.size() > 0) {
-        ALOGV("%s: The opened camera is directly cast to the remote device.", __FUNCTION__);
+    if (mInjectionMethods->isStreamConfigCompleteButNotInjected()) {
+        ALOGD("%s: The opened camera is directly cast to the remote device.", __FUNCTION__);
+
+        camera3::camera_stream_configuration injectionConfig;
+        std::vector<uint32_t> injectionBufferSizes;
+        mInjectionMethods->getInjectionConfig(&injectionConfig, &injectionBufferSizes);
+        if (mOperatingMode < 0 || injectionConfig.num_streams <= 0
+                    || injectionBufferSizes.size() <= 0) {
+            ALOGE("Failed to inject camera due to abandoned configuration! "
+                    "mOperatingMode: %d injectionConfig.num_streams: %d "
+                    "injectionBufferSizes.size(): %zu", mOperatingMode,
+                    injectionConfig.num_streams, injectionBufferSizes.size());
+            return DEAD_OBJECT;
+        }
+
         res = mInjectionMethods->injectCamera(
                 injectionConfig, injectionBufferSizes);
         if (res != OK) {
@@ -6590,6 +6617,7 @@ status_t Camera3Device::injectCamera(const String8& injectedCamId,
 status_t Camera3Device::stopInjection() {
     ALOGI("%s: Injection camera: stopInjection", __FUNCTION__);
     Mutex::Autolock il(mInterfaceLock);
+    Mutex::Autolock l(mLock);
     return mInjectionMethods->stopInjection();
 }
 

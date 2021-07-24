@@ -1361,17 +1361,26 @@ class Camera3Device :
         // when device is IDLE and request thread is paused.
         status_t injectCamera(
                 camera3::camera_stream_configuration& injectionConfig,
-                std::vector<uint32_t>& injectionBufferSizes);
+                const std::vector<uint32_t>& injectionBufferSizes);
 
         // Stop the injection camera and switch back to backup hal interface.
         status_t stopInjection();
 
         bool isInjecting();
 
+        bool isStreamConfigCompleteButNotInjected();
+
         const String8& getInjectedCamId() const;
 
         void getInjectionConfig(/*out*/ camera3::camera_stream_configuration* injectionConfig,
                 /*out*/ std::vector<uint32_t>* injectionBufferSizes);
+
+        // When the streaming configuration is completed and the camera device is active, but the
+        // injection camera has not yet been injected, the streaming configuration of the internal
+        // camera will be stored first.
+        void storeInjectionConfig(
+                const camera3::camera_stream_configuration& injectionConfig,
+                const std::vector<uint32_t>& injectionBufferSizes);
 
       private:
         // Configure the streams of injection camera, it need wait until the
@@ -1379,7 +1388,7 @@ class Camera3Device :
         // proceeding.
         status_t injectionConfigureStreams(
                 camera3::camera_stream_configuration& injectionConfig,
-                std::vector<uint32_t>& injectionBufferSizes);
+                const std::vector<uint32_t>& injectionBufferSizes);
 
         // Disconnect the injection camera and delete the hal interface.
         void injectionDisconnectImpl();
@@ -1396,6 +1405,17 @@ class Camera3Device :
 
         // Generated injection camera hal interface.
         sp<HalInterface> mInjectedCamHalInterface;
+
+        // Backup of the original camera hal result FMQ.
+        std::unique_ptr<ResultMetadataQueue> mBackupResultMetadataQueue;
+
+        // FMQ writes the result for the injection camera. Must be guarded by
+        // mProcessCaptureResultLock.
+        std::unique_ptr<ResultMetadataQueue> mInjectionResultMetadataQueue;
+
+        // The flag indicates that the stream configuration is complete, the camera device is
+        // active, but the injection camera has not yet been injected.
+        bool mIsStreamConfigCompleteButNotInjected = false;
 
         // Copy the configuration of the internal camera.
         camera3::camera_stream_configuration mInjectionConfig;
