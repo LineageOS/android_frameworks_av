@@ -395,23 +395,13 @@ void NuPlayer::RTPSource::onMessageReceived(const sp<AMessage> &msg) {
                 CHECK(msg->findInt64("ntp-time", (int64_t *)&ntpTime));
 
                 onTimeUpdate(trackIndex, rtpTime, ntpTime);
-                break;
-            }
-
-            int32_t firstRTCP;
-            if (msg->findInt32("first-rtcp", &firstRTCP)) {
-                // There won't be an access unit here, it's just a notification
-                // that the data communication worked since we got the first
-                // rtcp packet.
-                ALOGV("first-rtcp");
-                break;
             }
 
             int32_t IMSRxNotice;
             if (msg->findInt32("rtcp-event", &IMSRxNotice)) {
-                int32_t payloadType, feedbackType;
+                int32_t payloadType = 0, feedbackType = 0;
                 CHECK(msg->findInt32("payload-type", &payloadType));
-                CHECK(msg->findInt32("feedback-type", &feedbackType));
+                msg->findInt32("feedback-type", &feedbackType);
 
                 sp<AMessage> notify = dupNotify();
                 notify->setInt32("what", kWhatIMSRxNotice);
