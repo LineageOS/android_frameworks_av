@@ -2856,10 +2856,43 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
 
     CHECK(msg->findInt32("payload-type", &payloadType));
 
+    int32_t rtpSeq = 0, rtpTime = 0;
+    int64_t ntpTime = 0, recvTimeUs = 0;
+
     Parcel in;
     in.writeInt32(payloadType);
 
     switch (payloadType) {
+        case ARTPSource::RTP_FIRST_PACKET:
+        {
+            CHECK(msg->findInt32("rtp-time", &rtpTime));
+            CHECK(msg->findInt32("rtp-seq-num", &rtpSeq));
+            CHECK(msg->findInt64("recv-time-us", &recvTimeUs));
+            in.writeInt32(rtpTime);
+            in.writeInt32(rtpSeq);
+            in.writeInt32(recvTimeUs >> 32);
+            in.writeInt32(recvTimeUs & 0xFFFFFFFF);
+            break;
+        }
+        case ARTPSource::RTCP_FIRST_PACKET:
+        {
+            CHECK(msg->findInt64("recv-time-us", &recvTimeUs));
+            in.writeInt32(recvTimeUs >> 32);
+            in.writeInt32(recvTimeUs & 0xFFFFFFFF);
+            break;
+        }
+        case ARTPSource::RTCP_SR:
+        {
+            CHECK(msg->findInt32("rtp-time", &rtpTime));
+            CHECK(msg->findInt64("ntp-time", &ntpTime));
+            CHECK(msg->findInt64("recv-time-us", &recvTimeUs));
+            in.writeInt32(rtpTime);
+            in.writeInt32(ntpTime >> 32);
+            in.writeInt32(ntpTime & 0xFFFFFFFF);
+            in.writeInt32(recvTimeUs >> 32);
+            in.writeInt32(recvTimeUs & 0xFFFFFFFF);
+            break;
+        }
         case ARTPSource::RTCP_TSFB:   // RTCP TSFB
         case ARTPSource::RTCP_PSFB:   // RTCP PSFB
         case ARTPSource::RTP_AUTODOWN:
@@ -2882,6 +2915,8 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
             int32_t feedbackType, bitrate;
             int32_t highestSeqNum, baseSeqNum, prevExpected;
             int32_t numBufRecv, prevNumBufRecv;
+            int32_t latestRtpTime, jbTimeMs, rtpRtcpSrTimeGapMs;
+            int64_t recvTimeUs;
             CHECK(msg->findInt32("feedback-type", &feedbackType));
             CHECK(msg->findInt32("bit-rate", &bitrate));
             CHECK(msg->findInt32("highest-seq-num", &highestSeqNum));
@@ -2889,6 +2924,10 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
             CHECK(msg->findInt32("prev-expected", &prevExpected));
             CHECK(msg->findInt32("num-buf-recv", &numBufRecv));
             CHECK(msg->findInt32("prev-num-buf-recv", &prevNumBufRecv));
+            CHECK(msg->findInt32("latest-rtp-time", &latestRtpTime));
+            CHECK(msg->findInt64("recv-time-us", &recvTimeUs));
+            CHECK(msg->findInt32("rtp-jitter-time-ms", &jbTimeMs));
+            CHECK(msg->findInt32("rtp-rtcpsr-time-gap-ms", &rtpRtcpSrTimeGapMs));
             in.writeInt32(feedbackType);
             in.writeInt32(bitrate);
             in.writeInt32(highestSeqNum);
@@ -2896,6 +2935,11 @@ void NuPlayer::sendIMSRxNotice(const sp<AMessage> &msg) {
             in.writeInt32(prevExpected);
             in.writeInt32(numBufRecv);
             in.writeInt32(prevNumBufRecv);
+            in.writeInt32(latestRtpTime);
+            in.writeInt32(recvTimeUs >> 32);
+            in.writeInt32(recvTimeUs & 0xFFFFFFFF);
+            in.writeInt32(jbTimeMs);
+            in.writeInt32(rtpRtcpSrTimeGapMs);
             break;
         }
         case ARTPSource::RTP_CVO:
