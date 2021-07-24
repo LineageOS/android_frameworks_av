@@ -252,9 +252,7 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
      *         INVALID_OPERATION if already released;
      *         ERROR_UNSUPPORTED if not supported.
      */
-    virtual status_t querySupportedParameters([[maybe_unused]] std::vector<std::string> *names) {
-        return ERROR_UNSUPPORTED;
-    }
+    virtual status_t querySupportedParameters(std::vector<std::string> *names);
     /**
      * Fill |desc| with description of the parameter with |name|.
      *
@@ -267,10 +265,8 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
      *         ERROR_UNSUPPORTED if not supported.
      */
     virtual status_t describeParameter(
-            [[maybe_unused]] const std::string &name,
-            [[maybe_unused]] CodecParameterDescriptor *desc) {
-        return ERROR_UNSUPPORTED;
-    }
+            const std::string &name,
+            CodecParameterDescriptor *desc);
     /**
      * Subscribe to parameters in |names| and get output format change event
      * when they change.
@@ -281,10 +277,7 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
      *         INVALID_OPERATION if already released;
      *         ERROR_UNSUPPORTED if not supported.
      */
-    virtual status_t subscribeToParameters(
-            [[maybe_unused]] const std::vector<std::string> &names) {
-        return ERROR_UNSUPPORTED;
-    }
+    virtual status_t subscribeToParameters(const std::vector<std::string> &names);
     /**
      * Unsubscribe from parameters in |names| and no longer get
      * output format change event when they change.
@@ -295,10 +288,7 @@ struct CodecBase : public AHandler, /* static */ ColorUtils {
      *         INVALID_OPERATION if already released;
      *         ERROR_UNSUPPORTED if not supported.
      */
-    virtual status_t unsubscribeFromParameters(
-            [[maybe_unused]] const std::vector<std::string> &names) {
-        return ERROR_UNSUPPORTED;
-    }
+    virtual status_t unsubscribeFromParameters(const std::vector<std::string> &names);
 
     typedef CodecBase *(*CreateCodecFunc)(void);
     typedef PersistentSurface *(*CreateInputSurfaceFunc)(void);
