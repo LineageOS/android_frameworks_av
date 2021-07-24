@@ -204,8 +204,6 @@ void ARTPWriter::initState() {
     mRTPTimeBase = 0;
     mNumRTPSent = 0;
     mNumRTPOctetsSent = 0;
-    mLastRTPTime = 0;
-    mLastNTPTime = 0;
 
     mOpponentID = 0;
     mBitrate = 192000;
@@ -216,6 +214,7 @@ void ARTPWriter::initState() {
     mRTPSockNetwork = 0;
 
     mMode = INVALID;
+    mClockRate = 16000;
 }
 
 status_t ARTPWriter::addSource(const sp<MediaSource> &source) {
@@ -265,15 +264,28 @@ status_t ARTPWriter::start(MetaData * params) {
         updateSocketNetwork(sockNetwork);
 
     if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_AVC)) {
+        // rfc6184: RTP Payload Format for H.264 Video
+        // The clock rate in the "a=rtpmap" line MUST be 90000.
         mMode = H264;
+        mClockRate = 90000;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_HEVC)) {
+        // rfc7798: RTP Payload Format for High Efficiency Video Coding (HEVC)
+        // The clock rate in the "a=rtpmap" line MUST be 90000.
         mMode = H265;
+        mClockRate = 90000;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_VIDEO_H263)) {
         mMode = H263;
+        // rfc4629: RTP Payload Format for ITU-T Rec. H.263 Video
+        // The clock rate in the "a=rtpmap" line MUST be 90000.
+        mClockRate = 90000;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_NB)) {
         mMode = AMR_NB;
+        // rfc4867: RTP Payload Format ... (AMR) and (AMR-WB)
+        // The RTP clock rate in "a=rtpmap" MUST be 8000 for AMR and 16000 for AMR-WB
+        mClockRate = 8000;
     } else if (!strcasecmp(mime, MEDIA_MIMETYPE_AUDIO_AMR_WB)) {
         mMode = AMR_WB;
+        mClockRate = 16000;
     } else {
         TRESPASS();
     }
@@ -646,19 +658,27 @@ void ARTPWriter::addSR(const sp<ABuffer> &buffer) {
     data[6] = (mSourceID >> 8) & 0xff;
     data[7] = mSourceID & 0xff;
 
-    data[8] = mLastNTPTime >> (64 - 8);
-    data[9] = (mLastNTPTime >> (64 - 16)) & 0xff;
-    data[10] = (mLastNTPTime >> (64 - 24)) & 0xff;
-    data[11] = (mLastNTPTime >> 32) & 0xff;
-    data[12] = (mLastNTPTime >> 24) & 0xff;
-    data[13] = (mLastNTPTime >> 16) & 0xff;
-    data[14] = (mLastNTPTime >> 8) & 0xff;
-    data[15] = mLastNTPTime & 0xff;
+    uint64_t ntpTime = GetNowNTP();
+    data[8] = ntpTime >> (64 - 8);
+    data[9] = (ntpTime >> (64 - 16)) & 0xff;
+    data[10] = (ntpTime >> (64 - 24)) & 0xff;
+    data[11] = (ntpTime >> 32) & 0xff;
+    data[12] = (ntpTime >> 24) & 0xff;
+    data[13] = (ntpTime >> 16) & 0xff;
+    data[14] = (ntpTime >> 8) & 0xff;
+    data[15] = ntpTime & 0xff;
 
-    data[16] = (mLastRTPTime >> 24) & 0xff;
-    data[17] = (mLastRTPTime >> 16) & 0xff;
-    data[18] = (mLastRTPTime >> 8) & 0xff;
-    data[19] = mLastRTPTime & 0xff;
+    // A current rtpTime can be calculated from ALooper::GetNowUs().
+    // This is expecting a timestamp of raw frame from a media source is
+    // on the same time context across components in android media framework
+    // which can be queried by ALooper::GetNowUs().
+    // In other words, ALooper::GetNowUs() is on the same timeline as the time
+    // of kKeyTime in a MediaBufferBase
+    uint32_t rtpTime = getRtpTime(ALooper::GetNowUs());
+    data[16] = (rtpTime >> 24) & 0xff;
+    data[17] = (rtpTime >> 16) & 0xff;
+    data[18] = (rtpTime >> 8) & 0xff;
+    data[19] = rtpTime & 0xff;
 
     data[20] = mNumRTPSent >> 24;
     data[21] = (mNumRTPSent >> 16) & 0xff;
@@ -778,6 +798,13 @@ uint64_t ARTPWriter::GetNowNTP() {
     uint64_t lo = ((1LL << 32) * (nowUs % 1000000LL)) / 1000000LL;
 
     return (hi << 32) | lo;
+}
+
+uint32_t ARTPWriter::getRtpTime(int64_t timeUs) {
+    int32_t clockPerMs = mClockRate / 1000;
+    int64_t rtpTime = mRTPTimeBase + (timeUs * clockPerMs / 1000LL);
+
+    return (uint32_t)rtpTime;
 }
 
 void ARTPWriter::dumpSessionDesc() {
@@ -981,7 +1008,7 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
 
     sendVPSSPSPPSIfIFrame(mediaBuf, timeUs);
 
-    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100ll);
+    uint32_t rtpTime = getRtpTime(timeUs);
 
     CHECK(mediaBuf->range_length() > 0);
     const uint8_t *mediaData =
@@ -1156,9 +1183,6 @@ void ARTPWriter::sendHEVCData(MediaBufferBase *mediaBuf) {
             offset += size;
         }
     }
-
-    mLastRTPTime = rtpTime;
-    mLastNTPTime = GetNowNTP();
 }
 
 void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
@@ -1170,7 +1194,7 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
 
     sendSPSPPSIfIFrame(mediaBuf, timeUs);
 
-    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100LL);
+    uint32_t rtpTime = getRtpTime(timeUs);
 
     CHECK(mediaBuf->range_length() > 0);
     const uint8_t *mediaData =
@@ -1343,9 +1367,6 @@ void ARTPWriter::sendAVCData(MediaBufferBase *mediaBuf) {
             offset += size;
         }
     }
-
-    mLastRTPTime = rtpTime;
-    mLastNTPTime = GetNowNTP();
 }
 
 void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
@@ -1354,7 +1375,7 @@ void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
     int64_t timeUs;
     CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
 
-    uint32_t rtpTime = mRTPTimeBase + (timeUs * 9 / 100LL);
+    uint32_t rtpTime = getRtpTime(timeUs);
 
     const uint8_t *mediaData =
         (const uint8_t *)mediaBuf->data() + mediaBuf->range_offset();
@@ -1405,9 +1426,6 @@ void ARTPWriter::sendH263Data(MediaBufferBase *mediaBuf) {
         ++mNumRTPSent;
         mNumRTPOctetsSent += buffer->size() - 12;
     }
-
-    mLastRTPTime = rtpTime;
-    mLastNTPTime = GetNowNTP();
 }
 
 void ARTPWriter::updateCVODegrees(int32_t cvoDegrees) {
@@ -1490,7 +1508,7 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
 
     int64_t timeUs;
     CHECK(mediaBuf->meta_data().findInt64(kKeyTime, &timeUs));
-    uint32_t rtpTime = mRTPTimeBase + (timeUs / (isWide ? 250 : 125));
+    uint32_t rtpTime = getRtpTime(timeUs);
 
     // hexdump(mediaData, mediaLength);
 
@@ -1564,9 +1582,6 @@ void ARTPWriter::sendAMRData(MediaBufferBase *mediaBuf) {
     ++mSeqNo;
     ++mNumRTPSent;
     mNumRTPOctetsSent += buffer->size() - 12;
-
-    mLastRTPTime = rtpTime;
-    mLastNTPTime = GetNowNTP();
 }
 
 void ARTPWriter::makeSocketPairAndBind(String8& localIp, int localPort,

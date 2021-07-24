@@ -108,14 +108,13 @@ private:
     MediaBufferBase *mSPSBuf;
     MediaBufferBase *mPPSBuf;
 
+    uint32_t mClockRate;
     uint32_t mSourceID;
     uint32_t mPayloadType;
     uint32_t mSeqNo;
     uint32_t mRTPTimeBase;
     uint32_t mNumRTPSent;
     uint32_t mNumRTPOctetsSent;
-    uint32_t mLastRTPTime;
-    uint64_t mLastNTPTime;
 
     uint32_t mOpponentID;
     uint32_t mBitrate;
@@ -136,6 +135,7 @@ private:
     } mMode;
 
     static uint64_t GetNowNTP();
+    uint32_t getRtpTime(int64_t timeUs);
 
     void initState();
     void onRead(const sp<AMessage> &msg);
