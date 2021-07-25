@@ -40,4 +40,31 @@ void BufferChannelBase::IMemoryToSharedBuffer(
     buf->size = size;
 }
 
+status_t CodecBase::querySupportedParameters(std::vector<std::string> *names) {
+    if (names == nullptr) {
+        return BAD_VALUE;
+    }
+    names->clear();
+    return OK;
+}
+
+status_t CodecBase::describeParameter(const std::string &, CodecParameterDescriptor *) {
+    return ERROR_UNSUPPORTED;
+}
+
+status_t CodecBase::subscribeToParameters(const std::vector<std::string> &names) {
+    if (names.empty()) {
+        return OK;
+    }
+    return ERROR_UNSUPPORTED;
+}
+
+status_t CodecBase::unsubscribeFromParameters(const std::vector<std::string> &names) {
+    if (names.empty()) {
+        return OK;
+    }
+    return ERROR_UNSUPPORTED;
+}
+
+
 } // namespace android

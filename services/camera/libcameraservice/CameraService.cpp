@@ -3854,7 +3854,6 @@ void CameraService::InjectionStatusListener::removeListener() {
 
 void CameraService::InjectionStatusListener::notifyInjectionError(
         String8 injectedCamId, status_t err) {
-    Mutex::Autolock lock(mListenerLock);
     if (mCameraInjectionCallback == nullptr) {
         ALOGW("InjectionStatusListener: mCameraInjectionCallback == nullptr");
         return;
@@ -3901,16 +3900,15 @@ void CameraService::InjectionStatusListener::notifyInjectionError(
 
 void CameraService::InjectionStatusListener::binderDied(
         const wp<IBinder>& /*who*/) {
-    Mutex::Autolock lock(mListenerLock);
     ALOGV("InjectionStatusListener: ICameraInjectionCallback has died");
     auto parent = mParent.promote();
     if (parent != nullptr) {
-        parent->clearInjectionParameters();
         auto clientDescriptor = parent->mActiveClientManager.get(parent->mInjectionInternalCamId);
         if (clientDescriptor != nullptr) {
             BasicClient* baseClientPtr = clientDescriptor->getValue().get();
             baseClientPtr->stopInjection();
         }
+        parent->clearInjectionParameters();
     }
 }
 
@@ -3928,7 +3926,6 @@ binder::Status CameraService::CameraInjectionSession::stopInjection() {
     }
 
     status_t res = NO_ERROR;
-    parent->clearInjectionParameters();
     auto clientDescriptor = parent->mActiveClientManager.get(parent->mInjectionInternalCamId);
     if (clientDescriptor != nullptr) {
         BasicClient* baseClientPtr = clientDescriptor->getValue().get();
@@ -3940,6 +3937,7 @@ binder::Status CameraService::CameraInjectionSession::stopInjection() {
                 "Camera session encountered error");
         }
     }
+    parent->clearInjectionParameters();
     return binder::Status::ok();
 }
 
