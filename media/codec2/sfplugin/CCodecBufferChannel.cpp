@@ -1887,7 +1887,7 @@ bool CCodecBufferChannel::handleWork(
         drop = true;
     }
 
-    if (notifyClient && !buffer && !flags && !(drop && outputFormat)) {
+    if (notifyClient && !buffer && !flags && !drop) {
         ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
         notifyClient = false;
@@ -1914,7 +1914,7 @@ bool CCodecBufferChannel::handleWork(
             return false;
         }
         output->buffers->pushToStash(
-                drop ? nullptr : buffer,
+                buffer,
                 notifyClient,
                 timestamp.peek(),
                 flags,
