@@ -2505,7 +2505,8 @@ void AudioFlinger::setAudioHwSyncForSession_l(PlaybackThread *thread, audio_sess
 
 sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t module,
                                                         audio_io_handle_t *output,
-                                                        audio_config_t *config,
+                                                        audio_config_t *halConfig,
+                                                        audio_config_base_t *mixerConfig __unused,
                                                         audio_devices_t deviceType,
                                                         const String8& address,
                                                         audio_output_flags_t flags)
@@ -2533,16 +2534,16 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
         // Check only for Normal Mixing mode
         if (kEnableExtendedPrecision) {
             // Specify format (uncomment one below to choose)
-            //config->format = AUDIO_FORMAT_PCM_FLOAT;
-            //config->format = AUDIO_FORMAT_PCM_24_BIT_PACKED;
-            //config->format = AUDIO_FORMAT_PCM_32_BIT;
-            //config->format = AUDIO_FORMAT_PCM_8_24_BIT;
-            // ALOGV("openOutput_l() upgrading format to %#08x", config->format);
+            //halConfig->format = AUDIO_FORMAT_PCM_FLOAT;
+            //halConfig->format = AUDIO_FORMAT_PCM_24_BIT_PACKED;
+            //halConfig->format = AUDIO_FORMAT_PCM_32_BIT;
+            //halConfig->format = AUDIO_FORMAT_PCM_8_24_BIT;
+            // ALOGV("openOutput_l() upgrading format to %#08x", halConfig->format);
         }
         if (kEnableExtendedChannels) {
             // Specify channel mask (uncomment one below to choose)
-            //config->channel_mask = audio_channel_out_mask_from_count(4);  // for USB 4ch
-            //config->channel_mask = audio_channel_mask_from_representation_and_bits(
+            //halConfig->channel_mask = audio_channel_out_mask_from_count(4);  // for USB 4ch
+            //halConfig->channel_mask = audio_channel_mask_from_representation_and_bits(
             //        AUDIO_CHANNEL_REPRESENTATION_INDEX, (1 << 4) - 1);  // another 4ch example
         }
     }
@@ -2553,7 +2554,7 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             *output,
             deviceType,
             flags,
-            config,
+            halConfig,
             address.string());
 
     mHardwareStatus = AUDIO_HW_IDLE;
@@ -2568,13 +2569,20 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             return thread;
         } else {
             sp<PlaybackThread> thread;
-            if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
+            //TODO: b/193496180 use virtualizer stage flag at audio HAL when available
+            if (flags == (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST
+                                                    | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
+                thread = new VirtualizerStageThread(this, outputStream, *output,
+                                                    mSystemReady, mixerConfig);
+                ALOGD("openOutput_l() created virtualizer output: ID %d thread %p",
+                      *output, thread.get());
+            } else if (flags & AUDIO_OUTPUT_FLAG_COMPRESS_OFFLOAD) {
                 thread = new OffloadThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created offload output: ID %d thread %p",
                       *output, thread.get());
             } else if ((flags & AUDIO_OUTPUT_FLAG_DIRECT)
-                    || !isValidPcmSinkFormat(config->format)
-                    || !isValidPcmSinkChannelMask(config->channel_mask)) {
+                    || !isValidPcmSinkFormat(halConfig->format)
+                    || !isValidPcmSinkChannelMask(halConfig->channel_mask)) {
                 thread = new DirectOutputThread(this, outputStream, *output, mSystemReady);
                 ALOGV("openOutput_l() created direct output: ID %d thread %p",
                       *output, thread.get());
@@ -2601,8 +2609,10 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
 {
     audio_module_handle_t module = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_module_handle_t(request.module));
-    audio_config_t config = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioConfig_audio_config_t(request.config));
+    audio_config_t halConfig = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioConfig_audio_config_t(request.halConfig));
+    audio_config_base_t mixerConfig = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_AudioConfigBase_audio_config_base_t(request.mixerConfig));
     sp<DeviceDescriptorBase> device = VALUE_OR_RETURN_STATUS(
             aidl2legacy_DeviceDescriptorBase(request.device));
     audio_output_flags_t flags = VALUE_OR_RETURN_STATUS(
@@ -2615,9 +2625,9 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
               "Channels %#x, flags %#x",
               this, module,
               device->toString().c_str(),
-              config.sample_rate,
-              config.format,
-              config.channel_mask,
+              halConfig.sample_rate,
+              halConfig.format,
+              halConfig.channel_mask,
               flags);
 
     audio_devices_t deviceType = device->type();
@@ -2629,7 +2639,8 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
 
     Mutex::Autolock _l(mLock);
 
-    sp<ThreadBase> thread = openOutput_l(module, &output, &config, deviceType, address, flags);
+    sp<ThreadBase> thread = openOutput_l(module, &output, &halConfig,
+            &mixerConfig, deviceType, address, flags);
     if (thread != 0) {
         if ((flags & AUDIO_OUTPUT_FLAG_MMAP_NOIRQ) == 0) {
             PlaybackThread *playbackThread = (PlaybackThread *)thread.get();
@@ -2654,7 +2665,8 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
             mmapThread->ioConfigChanged(AUDIO_OUTPUT_OPENED);
         }
         response->output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
-        response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+        response->config =
+                VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(halConfig));
         response->latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(latencyMs));
         response->flags = VALUE_OR_RETURN_STATUS(
                 legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
@@ -3801,7 +3813,8 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
                 io = mPlaybackThreads.keyAt(0);
             }
             ALOGV("createEffect() got io %d for effect %s", io, descOut.name);
-        } else if (checkPlaybackThread_l(io) != nullptr) {
+        } else if (checkPlaybackThread_l(io) != nullptr
+                        && sessionId != AUDIO_SESSION_OUTPUT_STAGE) {
             // allow only one effect chain per sessionId on mPlaybackThreads.
             for (size_t i = 0; i < mPlaybackThreads.size(); i++) {
                 const audio_io_handle_t checkIo = mPlaybackThreads.keyAt(i);
