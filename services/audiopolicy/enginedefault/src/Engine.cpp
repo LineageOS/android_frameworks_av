@@ -479,7 +479,7 @@ sp<DeviceDescriptor> Engine::getDeviceForInputSource(audio_source_t inputSource)
         switch (commDeviceType) {
         case AUDIO_DEVICE_OUT_BLE_HEADSET:
             device = availableDevices.getDevice(
-                    AUDIO_DEVICE_IN_BLUETOOTH_SCO_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
+                    AUDIO_DEVICE_IN_BLE_HEADSET, String8(""), AUDIO_FORMAT_DEFAULT);
             break;
         case AUDIO_DEVICE_OUT_SPEAKER:
             device = availableDevices.getFirstExistingDevice({
