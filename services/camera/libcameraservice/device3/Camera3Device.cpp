@@ -2450,9 +2450,9 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
 
         auto testPatternDataEntry =
                 newRequest->mSettingsList.begin()->metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
-        if (testPatternDataEntry.count > 0) {
-            memcpy(newRequest->mOriginalTestPatternData, testPatternModeEntry.data.i32,
-                    sizeof(newRequest->mOriginalTestPatternData));
+        if (testPatternDataEntry.count >= 4) {
+            memcpy(newRequest->mOriginalTestPatternData, testPatternDataEntry.data.i32,
+                    sizeof(CaptureRequest::mOriginalTestPatternData));
         } else {
             newRequest->mOriginalTestPatternData[0] = 0;
             newRequest->mOriginalTestPatternData[1] = 0;
@@ -5829,6 +5829,13 @@ bool Camera3Device::RequestThread::overrideTestPattern(
         const sp<CaptureRequest> &request) {
     ATRACE_CALL();
 
+    {
+        sp<Camera3Device> parent = mParent.promote();
+        if (parent != nullptr) {
+            if (!parent->supportsCameraMute()) return false;
+        }
+    }
+
     Mutex::Autolock l(mTriggerMutex);
 
     bool changed = false;
@@ -5864,16 +5871,16 @@ bool Camera3Device::RequestThread::overrideTestPattern(
     }
 
     auto testPatternColor = metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
-    if (testPatternColor.count > 0) {
+    if (testPatternColor.count >= 4) {
         for (size_t i = 0; i < 4; i++) {
-            if (testPatternColor.data.i32[i] != (int32_t)testPatternData[i]) {
+            if (testPatternColor.data.i32[i] != testPatternData[i]) {
                 testPatternColor.data.i32[i] = testPatternData[i];
                 changed = true;
             }
         }
     } else {
         metadata.update(ANDROID_SENSOR_TEST_PATTERN_DATA,
-                (int32_t*)testPatternData, 4);
+                testPatternData, 4);
         changed = true;
     }
 
