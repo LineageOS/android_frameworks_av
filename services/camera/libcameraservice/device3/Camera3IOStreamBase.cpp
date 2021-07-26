@@ -82,7 +82,7 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
             camera_stream::width, camera_stream::height,
             camera_stream::format, camera_stream::data_space);
     lines.appendFormat("      Max size: %zu\n", mMaxSize);
-    lines.appendFormat("      Combined usage: %" PRIu64 ", max HAL buffers: %d\n",
+    lines.appendFormat("      Combined usage: 0x%" PRIx64 ", max HAL buffers: %d\n",
             mUsage | consumerUsage, camera_stream::max_buffers);
     if (strlen(camera_stream::physical_camera_id) > 0) {
         lines.appendFormat("      Physical camera id: %s\n", camera_stream::physical_camera_id);
