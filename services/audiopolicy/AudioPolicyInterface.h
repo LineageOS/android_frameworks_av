@@ -359,7 +359,8 @@ public:
     // The audio policy manager can check if the proposed parameters are suitable or not and act accordingly.
     virtual status_t openOutput(audio_module_handle_t module,
                                 audio_io_handle_t *output,
-                                audio_config_t *config,
+                                audio_config_t *halConfig,
+                                audio_config_base_t *mixerConfig,
                                 const sp<DeviceDescriptorBase>& device,
                                 uint32_t *latencyMs,
                                 audio_output_flags_t flags) = 0;
