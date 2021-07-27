@@ -1873,13 +1873,13 @@ void AudioFlinger::removeNotificationClient(pid_t pid)
     }
 }
 
-void AudioFlinger::ioConfigChanged(audio_io_config_event event,
+void AudioFlinger::ioConfigChanged(audio_io_config_event_t event,
                                    const sp<AudioIoDescriptor>& ioDesc,
                                    pid_t pid) {
     media::AudioIoDescriptor descAidl = VALUE_OR_FATAL(
             legacy2aidl_AudioIoDescriptor_AudioIoDescriptor(ioDesc));
     media::AudioIoConfigEvent eventAidl = VALUE_OR_FATAL(
-            legacy2aidl_audio_io_config_event_AudioIoConfigEvent(event));
+            legacy2aidl_audio_io_config_event_t_AudioIoConfigEvent(event));
 
     Mutex::Autolock _l(mClientLock);
     size_t size = mNotificationClients.size();
@@ -2752,9 +2752,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
             mMmapThreads.removeItem(output);
             ALOGD("closing mmapThread %p", mmapThread.get());
         }
-        const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
-        ioDesc->mIoHandle = output;
-        ioConfigChanged(AUDIO_OUTPUT_CLOSED, ioDesc);
+        ioConfigChanged(AUDIO_OUTPUT_CLOSED, sp<AudioIoDescriptor>::make(output));
         mPatchPanel.notifyStreamClosed(output);
     }
     // The thread entity (active unit of execution) is no longer running here,
@@ -3012,9 +3010,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
             dumpToThreadLog_l(mmapThread);
             mMmapThreads.removeItem(input);
         }
-        const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
-        ioDesc->mIoHandle = input;
-        ioConfigChanged(AUDIO_INPUT_CLOSED, ioDesc);
+        ioConfigChanged(AUDIO_INPUT_CLOSED, sp<AudioIoDescriptor>::make(input));
     }
     // FIXME: calling thread->exit() without mLock held should not be needed anymore now that
     // we have a different lock for notification client

@@ -336,7 +336,7 @@ status_t AudioSystem::getSamplingRate(audio_io_handle_t ioHandle,
     if (desc == 0) {
         *samplingRate = af->sampleRate(ioHandle);
     } else {
-        *samplingRate = desc->mSamplingRate;
+        *samplingRate = desc->getSamplingRate();
     }
     if (*samplingRate == 0) {
         ALOGE("AudioSystem::getSamplingRate failed for ioHandle %d", ioHandle);
@@ -371,7 +371,7 @@ status_t AudioSystem::getFrameCount(audio_io_handle_t ioHandle,
     if (desc == 0) {
         *frameCount = af->frameCount(ioHandle);
     } else {
-        *frameCount = desc->mFrameCount;
+        *frameCount = desc->getFrameCount();
     }
     if (*frameCount == 0) {
         ALOGE("AudioSystem::getFrameCount failed for ioHandle %d", ioHandle);
@@ -406,7 +406,7 @@ status_t AudioSystem::getLatency(audio_io_handle_t output,
     if (outputDesc == 0) {
         *latency = af->latency(output);
     } else {
-        *latency = outputDesc->mLatency;
+        *latency = outputDesc->getLatency();
     }
 
     ALOGV("getLatency() output %d, latency %d", output, *latency);
@@ -494,7 +494,7 @@ status_t AudioSystem::getFrameCountHAL(audio_io_handle_t ioHandle,
     if (desc == 0) {
         *frameCount = af->frameCountHAL(ioHandle);
     } else {
-        *frameCount = desc->mFrameCountHAL;
+        *frameCount = desc->getFrameCountHAL();
     }
     if (*frameCount == 0) {
         ALOGE("AudioSystem::getFrameCountHAL failed for ioHandle %d", ioHandle);
@@ -535,15 +535,15 @@ void AudioSystem::AudioFlingerClient::binderDied(const wp<IBinder>& who __unused
 Status AudioSystem::AudioFlingerClient::ioConfigChanged(
         media::AudioIoConfigEvent _event,
         const media::AudioIoDescriptor& _ioDesc) {
-    audio_io_config_event event = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioIoConfigEvent_audio_io_config_event(_event));
+    audio_io_config_event_t event = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioIoConfigEvent_audio_io_config_event_t(_event));
     sp<AudioIoDescriptor> ioDesc(
             VALUE_OR_RETURN_BINDER_STATUS(
                     aidl2legacy_AudioIoDescriptor_AudioIoDescriptor(_ioDesc)));
 
     ALOGV("ioConfigChanged() event %d", event);
 
-    if (ioDesc->mIoHandle == AUDIO_IO_HANDLE_NONE) return Status::ok();
+    if (ioDesc->getIoHandle() == AUDIO_IO_HANDLE_NONE) return Status::ok();
 
     audio_port_handle_t deviceId = AUDIO_PORT_HANDLE_NONE;
     std::vector<sp<AudioDeviceCallback>> callbacksToCall;
@@ -556,93 +556,88 @@ Status AudioSystem::AudioFlingerClient::ioConfigChanged(
             case AUDIO_OUTPUT_REGISTERED:
             case AUDIO_INPUT_OPENED:
             case AUDIO_INPUT_REGISTERED: {
-                sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->mIoHandle);
+                sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->getIoHandle());
                 if (oldDesc == 0) {
-                    mIoDescriptors.add(ioDesc->mIoHandle, ioDesc);
+                    mIoDescriptors.add(ioDesc->getIoHandle(), ioDesc);
                 } else {
                     deviceId = oldDesc->getDeviceId();
-                    mIoDescriptors.replaceValueFor(ioDesc->mIoHandle, ioDesc);
+                    mIoDescriptors.replaceValueFor(ioDesc->getIoHandle(), ioDesc);
                 }
 
                 if (ioDesc->getDeviceId() != AUDIO_PORT_HANDLE_NONE) {
                     deviceId = ioDesc->getDeviceId();
                     if (event == AUDIO_OUTPUT_OPENED || event == AUDIO_INPUT_OPENED) {
-                        auto it = mAudioDeviceCallbacks.find(ioDesc->mIoHandle);
+                        auto it = mAudioDeviceCallbacks.find(ioDesc->getIoHandle());
                         if (it != mAudioDeviceCallbacks.end()) {
                             callbacks = it->second;
                         }
                     }
                 }
-                ALOGV("ioConfigChanged() new %s %s %d samplingRate %u, format %#x channel mask %#x "
-                      "frameCount %zu deviceId %d",
+                ALOGV("ioConfigChanged() new %s %s %s",
                       event == AUDIO_OUTPUT_OPENED || event == AUDIO_OUTPUT_REGISTERED ?
                       "output" : "input",
                       event == AUDIO_OUTPUT_OPENED || event == AUDIO_INPUT_OPENED ?
                       "opened" : "registered",
-                      ioDesc->mIoHandle, ioDesc->mSamplingRate, ioDesc->mFormat,
-                      ioDesc->mChannelMask,
-                      ioDesc->mFrameCount, ioDesc->getDeviceId());
+                      ioDesc->toDebugString().c_str());
             }
                 break;
             case AUDIO_OUTPUT_CLOSED:
             case AUDIO_INPUT_CLOSED: {
-                if (getIoDescriptor_l(ioDesc->mIoHandle) == 0) {
+                if (getIoDescriptor_l(ioDesc->getIoHandle()) == 0) {
                     ALOGW("ioConfigChanged() closing unknown %s %d",
-                          event == AUDIO_OUTPUT_CLOSED ? "output" : "input", ioDesc->mIoHandle);
+                          event == AUDIO_OUTPUT_CLOSED ? "output" : "input", ioDesc->getIoHandle());
                     break;
                 }
                 ALOGV("ioConfigChanged() %s %d closed",
-                      event == AUDIO_OUTPUT_CLOSED ? "output" : "input", ioDesc->mIoHandle);
+                      event == AUDIO_OUTPUT_CLOSED ? "output" : "input", ioDesc->getIoHandle());
 
-                mIoDescriptors.removeItem(ioDesc->mIoHandle);
-                mAudioDeviceCallbacks.erase(ioDesc->mIoHandle);
+                mIoDescriptors.removeItem(ioDesc->getIoHandle());
+                mAudioDeviceCallbacks.erase(ioDesc->getIoHandle());
             }
                 break;
 
             case AUDIO_OUTPUT_CONFIG_CHANGED:
             case AUDIO_INPUT_CONFIG_CHANGED: {
-                sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->mIoHandle);
+                sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->getIoHandle());
                 if (oldDesc == 0) {
                     ALOGW("ioConfigChanged() modifying unknown %s! %d",
                           event == AUDIO_OUTPUT_CONFIG_CHANGED ? "output" : "input",
-                          ioDesc->mIoHandle);
+                          ioDesc->getIoHandle());
                     break;
                 }
 
                 deviceId = oldDesc->getDeviceId();
-                mIoDescriptors.replaceValueFor(ioDesc->mIoHandle, ioDesc);
+                mIoDescriptors.replaceValueFor(ioDesc->getIoHandle(), ioDesc);
 
                 if (deviceId != ioDesc->getDeviceId()) {
                     deviceId = ioDesc->getDeviceId();
-                    auto it = mAudioDeviceCallbacks.find(ioDesc->mIoHandle);
+                    auto it = mAudioDeviceCallbacks.find(ioDesc->getIoHandle());
                     if (it != mAudioDeviceCallbacks.end()) {
                         callbacks = it->second;
                     }
                 }
-                ALOGV("ioConfigChanged() new config for %s %d samplingRate %u, format %#x "
-                      "channel mask %#x frameCount %zu frameCountHAL %zu deviceId %d",
+                ALOGV("ioConfigChanged() new config for %s %s",
                       event == AUDIO_OUTPUT_CONFIG_CHANGED ? "output" : "input",
-                      ioDesc->mIoHandle, ioDesc->mSamplingRate, ioDesc->mFormat,
-                      ioDesc->mChannelMask, ioDesc->mFrameCount, ioDesc->mFrameCountHAL,
-                      ioDesc->getDeviceId());
+                      ioDesc->toDebugString().c_str());
 
             }
                 break;
             case AUDIO_CLIENT_STARTED: {
-                sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->mIoHandle);
+                sp<AudioIoDescriptor> oldDesc = getIoDescriptor_l(ioDesc->getIoHandle());
                 if (oldDesc == 0) {
-                    ALOGW("ioConfigChanged() start client on unknown io! %d", ioDesc->mIoHandle);
+                    ALOGW("ioConfigChanged() start client on unknown io! %d",
+                            ioDesc->getIoHandle());
                     break;
                 }
                 ALOGV("ioConfigChanged() AUDIO_CLIENT_STARTED  io %d port %d num callbacks %zu",
-                      ioDesc->mIoHandle, ioDesc->mPortId, mAudioDeviceCallbacks.size());
-                oldDesc->mPatch = ioDesc->mPatch;
-                auto it = mAudioDeviceCallbacks.find(ioDesc->mIoHandle);
+                      ioDesc->getIoHandle(), ioDesc->getPortId(), mAudioDeviceCallbacks.size());
+                oldDesc->setPatch(ioDesc->getPatch());
+                auto it = mAudioDeviceCallbacks.find(ioDesc->getIoHandle());
                 if (it != mAudioDeviceCallbacks.end()) {
                     auto cbks = it->second;
-                    auto it2 = cbks.find(ioDesc->mPortId);
+                    auto it2 = cbks.find(ioDesc->getPortId());
                     if (it2 != cbks.end()) {
-                        callbacks.emplace(ioDesc->mPortId, it2->second);
+                        callbacks.emplace(ioDesc->getPortId(), it2->second);
                         deviceId = oldDesc->getDeviceId();
                     }
                 }
@@ -661,8 +656,8 @@ Status AudioSystem::AudioFlingerClient::ioConfigChanged(
     // Callbacks must be called without mLock held. May lead to dead lock if calling for
     // example getRoutedDevice that updates the device and tries to acquire mLock.
     for (auto cb  : callbacksToCall) {
-        // If callbacksToCall is not empty, it implies ioDesc->mIoHandle and deviceId are valid
-        cb->onAudioDeviceUpdate(ioDesc->mIoHandle, deviceId);
+        // If callbacksToCall is not empty, it implies ioDesc->getIoHandle() and deviceId are valid
+        cb->onAudioDeviceUpdate(ioDesc->getIoHandle(), deviceId);
     }
 
     return Status::ok();

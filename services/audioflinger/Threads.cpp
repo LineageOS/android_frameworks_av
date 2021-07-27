@@ -626,7 +626,7 @@ status_t AudioFlinger::ThreadBase::sendConfigEvent_l(sp<ConfigEvent>& event)
     return status;
 }
 
-void AudioFlinger::ThreadBase::sendIoConfigEvent(audio_io_config_event event, pid_t pid,
+void AudioFlinger::ThreadBase::sendIoConfigEvent(audio_io_config_event_t event, pid_t pid,
                                                  audio_port_handle_t portId)
 {
     Mutex::Autolock _l(mLock);
@@ -634,7 +634,7 @@ void AudioFlinger::ThreadBase::sendIoConfigEvent(audio_io_config_event event, pi
 }
 
 // sendIoConfigEvent_l() must be called with ThreadBase::mLock held
-void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event event, pid_t pid,
+void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event_t event, pid_t pid,
                                                    audio_port_handle_t portId)
 {
     // The audio statistics history is exponentially weighted to forget events
@@ -2772,36 +2772,26 @@ status_t AudioFlinger::DirectOutputThread::selectPresentation(int presentationId
     return mOutput->stream->selectPresentation(presentationId, programId);
 }
 
-void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event event, pid_t pid,
+void AudioFlinger::PlaybackThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
                                                    audio_port_handle_t portId) {
-    sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
     ALOGV("PlaybackThread::ioConfigChanged, thread %p, event %d", this, event);
-
-    desc->mIoHandle = mId;
-    struct audio_patch patch = mPatch;
-    if (isMsdDevice()) {
-        patch = mDownStreamPatch;
-    }
-
+    sp<AudioIoDescriptor> desc;
+    const struct audio_patch patch = isMsdDevice() ? mDownStreamPatch : mPatch;
     switch (event) {
     case AUDIO_OUTPUT_OPENED:
     case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
-        desc->mPatch = patch;
-        desc->mChannelMask = mChannelMask;
-        desc->mSamplingRate = mSampleRate;
-        desc->mFormat = mFormat;
-        desc->mFrameCount = mNormalFrameCount; // FIXME see
-                                             // AudioFlinger::frameCount(audio_io_handle_t)
-        desc->mFrameCountHAL = mFrameCount;
-        desc->mLatency = latency_l();
+        desc = sp<AudioIoDescriptor>::make(mId, patch, false /*isInput*/,
+                mSampleRate, mFormat, mChannelMask,
+                // FIXME AudioFlinger::frameCount(audio_io_handle_t) instead of mNormalFrameCount?
+                mNormalFrameCount, mFrameCount, latency_l());
         break;
     case AUDIO_CLIENT_STARTED:
-        desc->mPatch = patch;
-        desc->mPortId = portId;
+        desc = sp<AudioIoDescriptor>::make(mId, patch, portId);
         break;
     case AUDIO_OUTPUT_CLOSED:
     default:
+        desc = sp<AudioIoDescriptor>::make(mId);
         break;
     }
     mAudioFlinger->ioConfigChanged(event, desc, pid);
@@ -8784,30 +8774,22 @@ String8 AudioFlinger::RecordThread::getParameters(const String8& keys)
     return String8();
 }
 
-void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event event, pid_t pid,
+void AudioFlinger::RecordThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
                                                  audio_port_handle_t portId) {
-    sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
-
-    desc->mIoHandle = mId;
-
+    sp<AudioIoDescriptor> desc;
     switch (event) {
     case AUDIO_INPUT_OPENED:
     case AUDIO_INPUT_REGISTERED:
     case AUDIO_INPUT_CONFIG_CHANGED:
-        desc->mPatch = mPatch;
-        desc->mChannelMask = mChannelMask;
-        desc->mSamplingRate = mSampleRate;
-        desc->mFormat = mFormat;
-        desc->mFrameCount = mFrameCount;
-        desc->mFrameCountHAL = mFrameCount;
-        desc->mLatency = 0;
+        desc = sp<AudioIoDescriptor>::make(mId, mPatch, true /*isInput*/,
+                mSampleRate, mFormat, mChannelMask, mFrameCount, mFrameCount);
         break;
     case AUDIO_CLIENT_STARTED:
-        desc->mPatch = mPatch;
-        desc->mPortId = portId;
+        desc = sp<AudioIoDescriptor>::make(mId, mPatch, portId);
         break;
     case AUDIO_INPUT_CLOSED:
     default:
+        desc = sp<AudioIoDescriptor>::make(mId);
         break;
     }
     mAudioFlinger->ioConfigChanged(event, desc, pid);
@@ -9650,31 +9632,26 @@ String8 AudioFlinger::MmapThread::getParameters(const String8& keys)
     return String8();
 }
 
-void AudioFlinger::MmapThread::ioConfigChanged(audio_io_config_event event, pid_t pid,
+void AudioFlinger::MmapThread::ioConfigChanged(audio_io_config_event_t event, pid_t pid,
                                                audio_port_handle_t portId __unused) {
-    sp<AudioIoDescriptor> desc = new AudioIoDescriptor();
-
-    desc->mIoHandle = mId;
-
+    sp<AudioIoDescriptor> desc;
+    bool isInput = false;
     switch (event) {
     case AUDIO_INPUT_OPENED:
     case AUDIO_INPUT_REGISTERED:
     case AUDIO_INPUT_CONFIG_CHANGED:
+        isInput = true;
+        FALLTHROUGH_INTENDED;
     case AUDIO_OUTPUT_OPENED:
     case AUDIO_OUTPUT_REGISTERED:
     case AUDIO_OUTPUT_CONFIG_CHANGED:
-        desc->mPatch = mPatch;
-        desc->mChannelMask = mChannelMask;
-        desc->mSamplingRate = mSampleRate;
-        desc->mFormat = mFormat;
-        desc->mFrameCount = mFrameCount;
-        desc->mFrameCountHAL = mFrameCount;
-        desc->mLatency = 0;
+        desc = sp<AudioIoDescriptor>::make(mId, mPatch, isInput,
+                mSampleRate, mFormat, mChannelMask, mFrameCount, mFrameCount);
         break;
-
     case AUDIO_INPUT_CLOSED:
     case AUDIO_OUTPUT_CLOSED:
     default:
+        desc = sp<AudioIoDescriptor>::make(mId);
         break;
     }
     mAudioFlinger->ioConfigChanged(event, desc, pid);

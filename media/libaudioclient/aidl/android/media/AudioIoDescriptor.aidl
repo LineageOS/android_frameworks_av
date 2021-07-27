@@ -27,6 +27,7 @@ parcelable AudioIoDescriptor {
     /** Interpreted as audio_io_handle_t. */
     int ioHandle;
     AudioPatch patch;
+    boolean isInput;
     int samplingRate;
     AudioFormatDescription format;
     AudioChannelMask channelMask;

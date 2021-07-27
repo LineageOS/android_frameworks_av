@@ -121,10 +121,10 @@ aidl2legacy_optional_string_view_optional_String16(std::optional<std::string_vie
 ConversionResult<std::optional<std::string_view>>
 legacy2aidl_optional_String16_optional_string(std::optional<String16> legacy);
 
-ConversionResult<audio_io_config_event> aidl2legacy_AudioIoConfigEvent_audio_io_config_event(
+ConversionResult<audio_io_config_event_t> aidl2legacy_AudioIoConfigEvent_audio_io_config_event_t(
         media::AudioIoConfigEvent aidl);
-ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_AudioIoConfigEvent(
-        audio_io_config_event legacy);
+ConversionResult<media::AudioIoConfigEvent> legacy2aidl_audio_io_config_event_t_AudioIoConfigEvent(
+        audio_io_config_event_t legacy);
 
 ConversionResult<audio_port_role_t> aidl2legacy_AudioPortRole_audio_port_role_t(
         media::AudioPortRole aidl);
