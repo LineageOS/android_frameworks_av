@@ -881,9 +881,9 @@ status_t AudioFlinger::EffectModule::configure()
     // similar to output EFFECT_FLAG_TYPE_INSERT/REPLACE,
     // in which case input channel masks should be used here.
     callback = getCallback();
-    channelMask = callback->channelMask();
+    channelMask = callback->inChannelMask(mId);
     mConfig.inputCfg.channels = channelMask;
-    mConfig.outputCfg.channels = channelMask;
+    mConfig.outputCfg.channels = callback->outChannelMask();
 
     if ((mDescriptor.flags & EFFECT_FLAG_TYPE_MASK) == EFFECT_FLAG_TYPE_AUXILIARY) {
         if (mConfig.inputCfg.channels != AUDIO_CHANNEL_OUT_MONO) {
@@ -2133,8 +2133,8 @@ void AudioFlinger::EffectChain::clearInputBuffer_l()
     if (mInBuffer == NULL) {
         return;
     }
-    const size_t frameSize =
-            audio_bytes_per_sample(EFFECT_BUFFER_FORMAT) * mEffectCallback->channelCount();
+    const size_t frameSize = audio_bytes_per_sample(EFFECT_BUFFER_FORMAT)
+            * mEffectCallback->inChannelCount(mEffects[0]->id());
 
     memset(mInBuffer->audioBuffer()->raw, 0, mEffectCallback->frameCount() * frameSize);
     mInBuffer->commit();
@@ -2244,6 +2244,9 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
                 numSamples * sizeof(int32_t), &halBuffer);
 #endif
         if (result != OK) return result;
+
+        effect->configure();
+
         effect->setInBuffer(halBuffer);
         // auxiliary effects output samples to chain input buffer for further processing
         // by insert effects
@@ -2311,6 +2314,10 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
             }
         }
 
+        mEffects.insertAt(effect, idx_insert);
+
+        effect->configure();
+
         // always read samples from chain input buffer
         effect->setInBuffer(mInBuffer);
 
@@ -2318,14 +2325,13 @@ status_t AudioFlinger::EffectChain::addEffect_ll(const sp<EffectModule>& effect)
         // output buffer, otherwise to chain input buffer
         if (idx_insert == size) {
             if (idx_insert != 0) {
-                mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
                 mEffects[idx_insert-1]->configure();
+                mEffects[idx_insert-1]->setOutBuffer(mInBuffer);
             }
             effect->setOutBuffer(mOutBuffer);
         } else {
             effect->setOutBuffer(mInBuffer);
         }
-        mEffects.insertAt(effect, idx_insert);
 
         ALOGV("addEffect_l() effect %p, added in chain %p at rank %zu", effect.get(), this,
                 idx_insert);
@@ -2358,14 +2364,21 @@ size_t AudioFlinger::EffectChain::removeEffect_l(const sp<EffectModule>& effect,
 
             if (type != EFFECT_FLAG_TYPE_AUXILIARY) {
                 if (i == size - 1 && i != 0) {
-                    mEffects[i - 1]->setOutBuffer(mOutBuffer);
                     mEffects[i - 1]->configure();
+                    mEffects[i - 1]->setOutBuffer(mOutBuffer);
                 }
             }
             mEffects.removeAt(i);
+
+            // make sure the input buffer configuration for the new first effect in the chain
+            // is updated if needed (can switch from HAL channel mask to mixer channel mask)
+            if (i == 0 && size > 1) {
+                mEffects[0]->configure();
+                mEffects[0]->setInBuffer(mInBuffer);
+            }
+
             ALOGV("removeEffect_l() effect %p, removed from chain %p at rank %zu", effect.get(),
                     this, i);
-
             break;
         }
     }
@@ -2940,7 +2953,43 @@ uint32_t AudioFlinger::EffectChain::EffectCallback::sampleRate() const {
     return t->sampleRate();
 }
 
-audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::channelMask() const {
+audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::inChannelMask(int id) const {
+    sp<ThreadBase> t = thread().promote();
+    if (t == nullptr) {
+        return AUDIO_CHANNEL_NONE;
+    }
+    sp<EffectChain> c = chain().promote();
+    if (c == nullptr) {
+        return AUDIO_CHANNEL_NONE;
+    }
+
+    if (c->sessionId() != AUDIO_SESSION_OUTPUT_STAGE
+            || c->isFirstEffect(id)) {
+        return t->mixerChannelMask();
+    } else {
+        return t->channelMask();
+    }
+}
+
+uint32_t AudioFlinger::EffectChain::EffectCallback::inChannelCount(int id) const {
+    sp<ThreadBase> t = thread().promote();
+    if (t == nullptr) {
+        return 0;
+    }
+    sp<EffectChain> c = chain().promote();
+    if (c == nullptr) {
+        return 0;
+    }
+
+    if (c->sessionId() != AUDIO_SESSION_OUTPUT_STAGE
+            || c->isFirstEffect(id)) {
+        return audio_channel_count_from_out_mask(t->mixerChannelMask());
+    } else {
+        return t->channelCount();
+    }
+}
+
+audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::outChannelMask() const {
     sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return AUDIO_CHANNEL_NONE;
@@ -2948,7 +2997,7 @@ audio_channel_mask_t AudioFlinger::EffectChain::EffectCallback::channelMask() co
     return t->channelMask();
 }
 
-uint32_t AudioFlinger::EffectChain::EffectCallback::channelCount() const {
+uint32_t AudioFlinger::EffectChain::EffectCallback::outChannelCount() const {
     sp<ThreadBase> t = thread().promote();
     if (t == nullptr) {
         return 0;
@@ -3372,7 +3421,8 @@ uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::sampleRate() const {
     return proxy->sampleRate();
 }
 
-audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelMask() const {
+audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::inChannelMask(
+        int id __unused) const {
     sp<DeviceEffectProxy> proxy = mProxy.promote();
     if (proxy == nullptr) {
         return AUDIO_CHANNEL_OUT_STEREO;
@@ -3380,7 +3430,23 @@ audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelMask
     return proxy->channelMask();
 }
 
-uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::channelCount() const {
+uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::inChannelCount(int id __unused) const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return 2;
+    }
+    return proxy->channelCount();
+}
+
+audio_channel_mask_t AudioFlinger::DeviceEffectProxy::ProxyCallback::outChannelMask() const {
+    sp<DeviceEffectProxy> proxy = mProxy.promote();
+    if (proxy == nullptr) {
+        return AUDIO_CHANNEL_OUT_STEREO;
+    }
+    return proxy->channelMask();
+}
+
+uint32_t AudioFlinger::DeviceEffectProxy::ProxyCallback::outChannelCount() const {
     sp<DeviceEffectProxy> proxy = mProxy.promote();
     if (proxy == nullptr) {
         return 2;

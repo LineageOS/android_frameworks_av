@@ -246,9 +246,11 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                     sp<SwAudioOutputDescriptor> desc = mOutputs.valueFor(output);
                     // close unused outputs after device disconnection or direct outputs that have
                     // been opened by checkOutputsForDevice() to query dynamic parameters
-                    if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE) ||
-                            (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
-                                (desc->mDirectOpenCount == 0))) {
+                    if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE)
+                            || (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
+                                (desc->mDirectOpenCount == 0))
+                            || (((desc->mFlags & AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) != 0) &&
+                                (desc != mVirtualizerStageOutput))) {
                         clearAudioSourcesForOutput(output);
                         closeOutput(output);
                     }
@@ -925,6 +927,36 @@ sp<IOProfile> AudioPolicyManager::getProfileForOutput(
     return profile;
 }
 
+sp<IOProfile> AudioPolicyManager::getVirtualizerStageOutputProfile(
+        const audio_config_t *config __unused, const AudioDeviceTypeAddrVector &devices,
+        bool forOpening) const
+{
+    for (const auto& hwModule : mHwModules) {
+        for (const auto& curProfile : hwModule->getOutputProfiles()) {
+            if (curProfile->getFlags() != AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) {
+                continue;
+            }
+            // reject profiles not corresponding to a device currently available
+            DeviceVector supportedDevices = curProfile->getSupportedDevices();
+            if (!mAvailableOutputDevices.containsAtLeastOne(supportedDevices)) {
+                continue;
+            }
+            if (!devices.empty()) {
+                if (supportedDevices.getDevicesFromDeviceTypeAddrVec(devices).size()
+                        != devices.size()) {
+                    continue;
+                }
+            }
+            if (forOpening && !curProfile->canOpenNewIo()) {
+                continue;
+            }
+            ALOGV("%s found profile %s", __func__, curProfile->getName().c_str());
+            return curProfile;
+        }
+    }
+    return nullptr;
+}
+
 audio_io_handle_t AudioPolicyManager::getOutput(audio_stream_type_t stream)
 {
     DeviceVector devices = mEngine->getOutputDevicesForStream(stream, false /*fromCache*/);
@@ -1094,7 +1126,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
 
     *output = AUDIO_IO_HANDLE_NONE;
     if (!msdDevices.isEmpty()) {
-        *output = getOutputForDevices(msdDevices, session, *stream, config, flags);
+        *output = getOutputForDevices(msdDevices, session, resultAttr, config, flags);
         if (*output != AUDIO_IO_HANDLE_NONE && setMsdOutputPatches(&outputDevices) == NO_ERROR) {
             ALOGV("%s() Using MSD devices %s instead of devices %s",
                   __func__, msdDevices.toString().c_str(), outputDevices.toString().c_str());
@@ -1103,7 +1135,7 @@ status_t AudioPolicyManager::getOutputForAttrInt(
         }
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
-        *output = getOutputForDevices(outputDevices, session, *stream, config,
+        *output = getOutputForDevices(outputDevices, session, resultAttr, config,
                 flags, resultAttr->flags & AUDIO_FLAG_MUTE_HAPTIC);
     }
     if (*output == AUDIO_IO_HANDLE_NONE) {
@@ -1265,7 +1297,8 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
     // all MSD patches to prioritize this request over any active output on MSD.
     releaseMsdOutputPatches(devices);
 
-    status_t status = outputDesc->open(config, devices, stream, flags, output);
+    status_t status =
+            outputDesc->open(config, nullptr /* mixerConfig */, devices, stream, flags, output);
 
     // only accept an output with the requested parameters
     if (status != NO_ERROR ||
@@ -1300,7 +1333,7 @@ status_t AudioPolicyManager::openDirectOutput(audio_stream_type_t stream,
 audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         const DeviceVector &devices,
         audio_session_t session,
-        audio_stream_type_t stream,
+        const audio_attributes_t *attr,
         const audio_config_t *config,
         audio_output_flags_t *flags,
         bool forceMutingHaptic)
@@ -1322,6 +1355,9 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
     if ((*flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) != 0) {
         *flags = (audio_output_flags_t)(*flags | AUDIO_OUTPUT_FLAG_DIRECT);
     }
+
+    audio_stream_type_t stream = mEngine->getStreamTypeForAttributes(*attr);
+
     // only allow deep buffering for music stream type
     if (stream != AUDIO_STREAM_MUSIC) {
         *flags = (audio_output_flags_t)(*flags &~AUDIO_OUTPUT_FLAG_DEEP_BUFFER);
@@ -1339,6 +1375,11 @@ audio_io_handle_t AudioPolicyManager::getOutputForDevices(
         *flags = (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_VOIP_RX |
                                        AUDIO_OUTPUT_FLAG_DIRECT);
         ALOGV("Set VoIP and Direct output flags for PCM format");
+    }
+
+    if (mVirtualizerStageOutput != nullptr
+            && canBeVirtualized(attr, config, devices.toTypeAddrVector())) {
+        return mVirtualizerStageOutput->mIoHandle;
     }
 
     audio_config_t directConfig = *config;
@@ -4802,6 +4843,136 @@ sp<SourceClientDescriptor> AudioPolicyManager::getSourceForAttributesOnOutput(
     return source;
 }
 
+bool AudioPolicyManager::canBeVirtualized(const audio_attributes_t *attr,
+                                      const audio_config_t *config,
+                                      const AudioDeviceTypeAddrVector &devices)  const
+{
+    // The caller can have the audio attributes criteria ignored by either passing a null ptr or
+    // the AUDIO_ATTRIBUTES_INITIALIZER value.
+    // If attributes are specified, current policy is to only allow virtualization for media
+    // and game usages.
+    if (attr != nullptr && *attr != AUDIO_ATTRIBUTES_INITIALIZER &&
+            attr->usage != AUDIO_USAGE_MEDIA && attr->usage != AUDIO_USAGE_GAME) {
+        return false;
+    }
+
+    // The caller can have the devices criteria ignored by passing and empty vector, and
+    // getVirtualizerStageOutputProfile() will ignore the devices when looking for a match.
+    // Otherwise an output profile supporting a virtualizer stage effect that can be routed
+    // to the specified devices must exist.
+    sp<IOProfile> profile =
+            getVirtualizerStageOutputProfile(config, devices, false /*forOpening*/);
+    if (profile == nullptr) {
+        return false;
+    }
+
+    // The caller can have the audio config criteria ignored by either passing a null ptr or
+    // the AUDIO_CONFIG_INITIALIZER value.
+    // If an audio config is specified, current policy is to only allow virtualization for
+    // 5.1, 7.1and 7.1.4 audio.
+    // If the virtualizer stage output is already opened, only channel masks included in the
+    // virtualizer stage output mixer channel mask are allowed.
+    if (config != nullptr && *config != AUDIO_CONFIG_INITIALIZER) {
+        if (config->channel_mask != AUDIO_CHANNEL_OUT_5POINT1
+                && config->channel_mask != AUDIO_CHANNEL_OUT_7POINT1
+                && config->channel_mask != AUDIO_CHANNEL_OUT_7POINT1POINT4) {
+            return false;
+        }
+        if (mVirtualizerStageOutput != nullptr) {
+            if ((config->channel_mask & mVirtualizerStageOutput->mMixerChannelMask)
+                    != config->channel_mask) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+void AudioPolicyManager::checkVirtualizerClientRoutes() {
+    std::set<audio_stream_type_t> streamsToInvalidate;
+    for (size_t i = 0; i < mOutputs.size(); i++) {
+        const sp<SwAudioOutputDescriptor>& outputDescriptor = mOutputs[i];
+        for (const sp<TrackClientDescriptor>& client : outputDescriptor->getClientIterable()) {
+            audio_attributes_t attr = client->attributes();
+            DeviceVector devices = mEngine->getOutputDevicesForAttributes(attr, nullptr, false);
+            AudioDeviceTypeAddrVector devicesTypeAddress = devices.toTypeAddrVector();
+            audio_config_base_t clientConfig = client->config();
+            audio_config_t config = audio_config_initializer(&clientConfig);
+            if (canBeVirtualized(&attr, &config, devicesTypeAddress)) {
+                streamsToInvalidate.insert(client->stream());
+            }
+        }
+    }
+
+    for (audio_stream_type_t stream : streamsToInvalidate) {
+        mpClientInterface->invalidateStream(stream);
+    }
+}
+
+status_t AudioPolicyManager::getVirtualizerStageOutput(const audio_config_base_t *mixerConfig,
+                                                        const audio_attributes_t *attr,
+                                                        audio_io_handle_t *output) {
+    *output = AUDIO_IO_HANDLE_NONE;
+
+    if (mVirtualizerStageOutput != nullptr) {
+        return INVALID_OPERATION;
+    }
+
+    DeviceVector devices = mEngine->getOutputDevicesForAttributes(*attr, nullptr, false);
+    AudioDeviceTypeAddrVector devicesTypeAddress = devices.toTypeAddrVector();
+    audio_config_t *configPtr = nullptr;
+    audio_config_t config;
+    if (mixerConfig != nullptr) {
+        config = audio_config_initializer(mixerConfig);
+        configPtr = &config;
+    }
+    if (!canBeVirtualized(attr, configPtr, devicesTypeAddress)) {
+        return BAD_VALUE;
+    }
+
+    sp<IOProfile> profile =
+            getVirtualizerStageOutputProfile(configPtr, devicesTypeAddress, true /*forOpening*/);
+    if (profile == nullptr) {
+        return BAD_VALUE;
+    }
+
+    mVirtualizerStageOutput = new SwAudioOutputDescriptor(profile, mpClientInterface);
+    status_t status = mVirtualizerStageOutput->open(nullptr, mixerConfig, devices,
+                                                    mEngine->getStreamTypeForAttributes(*attr),
+                                                    AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE, output);
+    if (status != NO_ERROR) {
+        ALOGV("%s failed opening output: status %d, output %d", __func__, status, *output);
+        if (*output != AUDIO_IO_HANDLE_NONE) {
+            mVirtualizerStageOutput->close();
+        }
+        mVirtualizerStageOutput.clear();
+        *output = AUDIO_IO_HANDLE_NONE;
+        return status;
+    }
+
+    checkVirtualizerClientRoutes();
+
+    addOutput(*output, mVirtualizerStageOutput);
+    mPreviousOutputs = mOutputs;
+    mpClientInterface->onAudioPortListUpdate();
+
+    ALOGV("%s returns new virtualizer stage output %d", __func__, *output);
+    return NO_ERROR;
+}
+
+status_t AudioPolicyManager::releaseVirtualizerStageOutput(audio_io_handle_t output) {
+    if (mVirtualizerStageOutput == nullptr) {
+        return INVALID_OPERATION;
+    }
+    if (mVirtualizerStageOutput->mIoHandle != output) {
+        return BAD_VALUE;
+    }
+    closeOutput(output);
+    mVirtualizerStageOutput.clear();
+    return NO_ERROR;
+}
+
 // ----------------------------------------------------------------------------
 // AudioPolicyManager
 // ----------------------------------------------------------------------------
@@ -4851,6 +5022,8 @@ void AudioPolicyManager::loadConfig() {
         ALOGE("could not load audio policy configuration file, setting defaults");
         getConfig().setDefault();
     }
+    //TODO: b/193496180 use virtualizer stage flag at audio HAL when available
+    getConfig().convertVirtualizerStageFlag();
 }
 
 status_t AudioPolicyManager::initialize() {
@@ -4990,7 +5163,8 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
             sp<SwAudioOutputDescriptor> outputDesc = new SwAudioOutputDescriptor(outProfile,
                                                                                  mpClientInterface);
             audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            status_t status = outputDesc->open(nullptr, DeviceVector(supportedDevice),
+            status_t status = outputDesc->open(nullptr /* halConfig */, nullptr /* mixerConfig */,
+                                               DeviceVector(supportedDevice),
                                                AUDIO_STREAM_DEFAULT,
                                                AUDIO_OUTPUT_FLAG_NONE, &output);
             if (status != NO_ERROR) {
@@ -5012,7 +5186,8 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                     outProfile->getFlags() & AUDIO_OUTPUT_FLAG_PRIMARY) {
                 mPrimaryOutput = outputDesc;
             }
-            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0) {
+            if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0
+                || (outProfile->getFlags() & AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) != 0 ) {
                 outputDesc->close();
             } else {
                 addOutput(output, outputDesc);
@@ -6995,7 +7170,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
     }
     sp<SwAudioOutputDescriptor> desc = new SwAudioOutputDescriptor(profile, mpClientInterface);
     audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-    status_t status = desc->open(nullptr, devices,
+    status_t status = desc->open(nullptr /* halConfig */, nullptr /* mixerConfig */, devices,
             AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
     if (status != NO_ERROR) {
         return nullptr;
@@ -7025,7 +7200,7 @@ sp<SwAudioOutputDescriptor> AudioPolicyManager::openOutputWithProfileAndDevice(
         config.offload_info.channel_mask = config.channel_mask;
         config.offload_info.format = config.format;
 
-        status = desc->open(&config, devices,
+        status = desc->open(&config, nullptr /* mixerConfig */, devices,
                             AUDIO_STREAM_DEFAULT, AUDIO_OUTPUT_FLAG_NONE, &output);
         if (status != NO_ERROR) {
             return nullptr;
