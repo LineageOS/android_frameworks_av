@@ -16,6 +16,8 @@
 
 package android.media.tv.tuner;
 
+import android.hardware.tv.tuner.DemuxFilterType;
+import android.hardware.tv.tuner.DvrType;
 import android.media.tv.tuner.ITunerDvr;
 import android.media.tv.tuner.ITunerDvrCallback;
 import android.media.tv.tuner.ITunerFilter;
@@ -43,8 +45,8 @@ interface ITunerDemux {
     /**
      * Open a new filter in the demux
      */
-    ITunerFilter openFilter(
-        in int mainType, in int subtype, in int bufferSize, in ITunerFilterCallback cb);
+    ITunerFilter openFilter(in DemuxFilterType type, in int bufferSize,
+        in ITunerFilterCallback cb);
 
     /**
      * Open time filter of the demux.
@@ -64,7 +66,7 @@ interface ITunerDemux {
     /**
      * Open a DVR (Digital Video Record) instance in the demux.
      */
-    ITunerDvr openDvr(in int dvbType, in int bufferSize, in ITunerDvrCallback cb);
+    ITunerDvr openDvr(in DvrType dvbType, in int bufferSize, in ITunerDvrCallback cb);
 
     /**
      * Connect Conditional Access Modules (CAM) through Common Interface (CI).

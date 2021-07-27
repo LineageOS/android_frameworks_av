@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2020, The Android Open Source Project
+ * Copyright (c) 2021, The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,16 +16,12 @@
 
 package android.media.tv.tuner;
 
-import android.hardware.common.fmq.MQDescriptor;
-import android.hardware.common.fmq.SynchronizedReadWrite;
-import android.hardware.common.fmq.UnsynchronizedWrite;
+import android.hardware.tv.tuner.DemuxCapabilities;
+import android.hardware.tv.tuner.FrontendInfo;
 import android.media.tv.tuner.ITunerDemux;
 import android.media.tv.tuner.ITunerDescrambler;
 import android.media.tv.tuner.ITunerFrontend;
 import android.media.tv.tuner.ITunerLnb;
-import android.media.tv.tuner.TunerDemuxCapabilities;
-import android.media.tv.tuner.TunerFrontendDtmbCapabilities;
-import android.media.tv.tuner.TunerFrontendInfo;
 
 /**
  * TunerService interface handles tuner related operations.
@@ -33,8 +29,8 @@ import android.media.tv.tuner.TunerFrontendInfo;
  * {@hide}
  */
 //@VintfStability
+@SuppressWarnings(value={"out-array"})
 interface ITunerService {
-
     /**
      * Gets frontend IDs.
      */
@@ -46,12 +42,7 @@ interface ITunerService {
      * @param frontendId the ID of the frontend.
      * @return the information of the frontend.
      */
-    TunerFrontendInfo getFrontendInfo(in int frontendId);
-
-    /**
-     * Get Dtmb Frontend Capabilities.
-     */
-    TunerFrontendDtmbCapabilities getFrontendDtmbCapabilities(in int id);
+    FrontendInfo getFrontendInfo(in int frontendId);
 
     /**
      * Open a Tuner Frontend interface.
@@ -87,7 +78,7 @@ interface ITunerService {
      *
      * @return the demux’s capabilities.
      */
-    TunerDemuxCapabilities getDemuxCaps();
+    DemuxCapabilities getDemuxCaps();
 
     /* Open a new interface of ITunerDescrambler given a descramblerHandle.
      *
