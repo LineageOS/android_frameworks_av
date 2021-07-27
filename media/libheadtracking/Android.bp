@@ -22,6 +22,35 @@ cc_library {
     ],
 }
 
+cc_library {
+    name: "libheadtracking-binding",
+    srcs: [
+      "SensorPoseProvider.cpp",
+    ],
+    shared_libs: [
+        "libheadtracking",
+        "libandroid",
+        "liblog",
+        "libsensor",
+    ],
+    export_shared_lib_headers: [
+        "libheadtracking",
+    ],
+}
+
+cc_binary {
+    name: "SensorPoseProvider-example",
+    srcs: [
+        "SensorPoseProvider-example.cpp",
+    ],
+    shared_libs: [
+        "libandroid",
+        "libheadtracking",
+        "libheadtracking-binding",
+        "libsensor",
+    ],
+}
+
 cc_test_host {
     name: "libheadtracking-test",
     srcs: [
