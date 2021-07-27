@@ -34,8 +34,10 @@ public:
     virtual bool isOffloadOrDirect() const = 0;
     virtual bool isOffloadOrMmap() const = 0;
     virtual uint32_t sampleRate() const = 0;
-    virtual audio_channel_mask_t channelMask() const = 0;
-    virtual uint32_t channelCount() const = 0;
+    virtual audio_channel_mask_t inChannelMask(int id) const = 0;
+    virtual uint32_t inChannelCount(int id) const = 0;
+    virtual audio_channel_mask_t outChannelMask() const = 0;
+    virtual uint32_t outChannelCount() const = 0;
     virtual audio_channel_mask_t hapticChannelMask() const = 0;
     virtual size_t frameCount() const = 0;
 
@@ -525,6 +527,8 @@ public:
     sp<EffectCallbackInterface> effectCallback() const { return mEffectCallback; }
     wp<ThreadBase> thread() const { return mEffectCallback->thread(); }
 
+    bool isFirstEffect(int id) const { return !mEffects.isEmpty() && id == mEffects[0]->id(); }
+
     void dump(int fd, const Vector<String16>& args);
 
 private:
@@ -558,8 +562,10 @@ private:
         bool isOffloadOrMmap() const override;
 
         uint32_t sampleRate() const override;
-        audio_channel_mask_t channelMask() const override;
-        uint32_t channelCount() const override;
+        audio_channel_mask_t inChannelMask(int id) const override;
+        uint32_t inChannelCount(int id) const override;
+        audio_channel_mask_t outChannelMask() const override;
+        uint32_t outChannelCount() const override;
         audio_channel_mask_t hapticChannelMask() const override;
         size_t frameCount() const override;
         uint32_t latency() const override;
@@ -712,8 +718,10 @@ private:
         bool isOffloadOrMmap() const override { return false; }
 
         uint32_t sampleRate() const override;
-        audio_channel_mask_t channelMask() const override;
-        uint32_t channelCount() const override;
+        audio_channel_mask_t inChannelMask(int id) const override;
+        uint32_t inChannelCount(int id) const override;
+        audio_channel_mask_t outChannelMask() const override;
+        uint32_t outChannelCount() const override;
         audio_channel_mask_t hapticChannelMask() const override { return AUDIO_CHANNEL_NONE; }
         size_t frameCount() const override  { return 0; }
         uint32_t latency() const override  { return 0; }
