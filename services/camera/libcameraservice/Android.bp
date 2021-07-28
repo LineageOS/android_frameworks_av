@@ -83,6 +83,7 @@ cc_library_shared {
         "device3/Camera3OutputStreamInterface.cpp",
         "device3/Camera3OutputUtils.cpp",
         "device3/Camera3DeviceInjectionMethods.cpp",
+        "device3/UHRCropAndMeteringRegionMapper.cpp",
         "gui/RingBufferConsumer.cpp",
         "hidl/AidlCameraDeviceCallbacks.cpp",
         "hidl/AidlCameraServiceListener.cpp",

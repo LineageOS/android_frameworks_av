@@ -129,20 +129,6 @@ status_t ZoomRatioMapper::overrideZoomRatioTags(
     return OK;
 }
 
-static bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo,
-        int32_t arrayTag, int32_t *width, int32_t *height) {
-    if (width == nullptr || height == nullptr) {
-        ALOGE("%s: width / height nullptr", __FUNCTION__);
-        return false;
-    }
-    camera_metadata_ro_entry_t entry;
-    entry = deviceInfo->find(arrayTag);
-    if (entry.count != 4) return false;
-    *width = entry.data.i32[2];
-    *height = entry.data.i32[3];
-    return true;
-}
-
 ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
         bool supportNativeZoomRatio, bool usePrecorrectArray) {
     initRemappedKeys();
@@ -156,13 +142,13 @@ ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
     int32_t activeMaximumResolutionW = 0;
     int32_t activeMaximumResolutionH = 0;
 
-    if (!getArrayWidthAndHeight(deviceInfo, ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE,
-            &arrayW, &arrayH)) {
+    if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
+            ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE, &arrayW, &arrayH)) {
         ALOGE("%s: Couldn't get pre correction active array size", __FUNCTION__);
         return;
     }
-     if (!getArrayWidthAndHeight(deviceInfo, ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE,
-            &activeW, &activeH)) {
+     if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
+            ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE, &activeW, &activeH)) {
         ALOGE("%s: Couldn't get active array size", __FUNCTION__);
         return;
     }
@@ -170,14 +156,14 @@ ZoomRatioMapper::ZoomRatioMapper(const CameraMetadata* deviceInfo,
     bool isUltraHighResolutionSensor =
             camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(*deviceInfo);
     if (isUltraHighResolutionSensor) {
-        if (!getArrayWidthAndHeight(deviceInfo,
+        if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
                 ANDROID_SENSOR_INFO_PRE_CORRECTION_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION,
                 &arrayMaximumResolutionW, &arrayMaximumResolutionH)) {
             ALOGE("%s: Couldn't get maximum resolution pre correction active array size",
                     __FUNCTION__);
             return;
         }
-         if (!getArrayWidthAndHeight(deviceInfo,
+         if (!SessionConfigurationUtils::getArrayWidthAndHeight(deviceInfo,
                 ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE_MAXIMUM_RESOLUTION,
                 &activeMaximumResolutionW, &activeMaximumResolutionH)) {
             ALOGE("%s: Couldn't get maximum resolution pre correction active array size",
