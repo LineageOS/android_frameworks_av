@@ -2777,7 +2777,7 @@ aidl2legacy_AudioGain_audio_gain(const media::AudioGain& aidl) {
     audio_gain legacy;
     legacy.mode = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_gain_mode_t_mask(aidl.mode));
     legacy.channel_mask = VALUE_OR_RETURN(aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-                    aidl.channelMask, aidl.useInChannelMask));
+                    aidl.channelMask, aidl.isInput));
     legacy.min_value = VALUE_OR_RETURN(convertIntegral<int>(aidl.minValue));
     legacy.max_value = VALUE_OR_RETURN(convertIntegral<int>(aidl.maxValue));
     legacy.default_value = VALUE_OR_RETURN(convertIntegral<int>(aidl.defaultValue));
@@ -2791,7 +2791,7 @@ ConversionResult<media::AudioGain>
 legacy2aidl_audio_gain_AudioGain(const audio_gain& legacy, bool isInput) {
     media::AudioGain aidl;
     aidl.mode = VALUE_OR_RETURN(legacy2aidl_audio_gain_mode_t_int32_t_mask(legacy.mode));
-    aidl.useInChannelMask = isInput;
+    aidl.isInput = isInput;
     aidl.channelMask = VALUE_OR_RETURN(
             legacy2aidl_audio_channel_mask_t_AudioChannelLayout(legacy.channel_mask, isInput));
     aidl.minValue = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.min_value));
