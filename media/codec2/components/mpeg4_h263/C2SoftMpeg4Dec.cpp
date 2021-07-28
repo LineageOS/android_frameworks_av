@@ -243,11 +243,13 @@ c2_status_t C2SoftMpeg4Dec::onInit() {
 }
 
 c2_status_t C2SoftMpeg4Dec::onStop() {
-    if (mInitialized) {
-        if (mDecHandle) {
+    if (mDecHandle) {
+        if (mInitialized) {
             PVCleanUpVideoDecoder(mDecHandle);
+            mInitialized = false;
         }
-        mInitialized = false;
+        delete mDecHandle;
+        mDecHandle = nullptr;
     }
     for (int32_t i = 0; i < kNumOutputBuffers; ++i) {
         if (mOutputBuffer[i]) {
@@ -269,22 +271,9 @@ void C2SoftMpeg4Dec::onReset() {
 }
 
 void C2SoftMpeg4Dec::onRelease() {
-    if (mInitialized) {
-        if (mDecHandle) {
-            PVCleanUpVideoDecoder(mDecHandle);
-            delete mDecHandle;
-            mDecHandle = nullptr;
-        }
-        mInitialized = false;
-    }
+    (void)onStop();
     if (mOutBlock) {
         mOutBlock.reset();
-    }
-    for (int32_t i = 0; i < kNumOutputBuffers; ++i) {
-        if (mOutputBuffer[i]) {
-            free(mOutputBuffer[i]);
-            mOutputBuffer[i] = nullptr;
-        }
     }
 }
 
