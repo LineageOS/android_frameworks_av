@@ -304,7 +304,6 @@ aidl_interface {
     srcs: [
         "aidl/android/media/AudioAttributesInternal.aidl",
         "aidl/android/media/AudioChannelLayout.aidl",
-        "aidl/android/media/AudioChannelMask.aidl",
         "aidl/android/media/AudioClient.aidl",
         "aidl/android/media/AudioConfig.aidl",
         "aidl/android/media/AudioConfigBase.aidl",

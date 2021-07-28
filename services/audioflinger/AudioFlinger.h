@@ -750,7 +750,7 @@ using effect_buffer_t = int16_t;
               // no range check, AudioFlinger::mLock held
               bool streamMute_l(audio_stream_type_t stream) const
                                 { return mStreamTypes[stream].mute; }
-              void ioConfigChanged(audio_io_config_event event,
+              void ioConfigChanged(audio_io_config_event_t event,
                                    const sp<AudioIoDescriptor>& ioDesc,
                                    pid_t pid = 0);
 

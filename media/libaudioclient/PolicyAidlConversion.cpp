@@ -232,7 +232,10 @@ aidl2legacy_AudioMix(const media::AudioMix& aidl) {
                                  std::back_inserter(legacy.mCriteria),
                                  aidl2legacy_AudioMixMatchCriterion));
     legacy.mMixType = VALUE_OR_RETURN(aidl2legacy_AudioMixType_uint32_t(aidl.mixType));
-    legacy.mFormat = VALUE_OR_RETURN(aidl2legacy_AudioConfig_audio_config_t(aidl.format));
+    // See 'convertAudioMixToNative' in 'android_media_AudioSystem.cpp' -- only
+    // an output mask is expected here.
+    legacy.mFormat = VALUE_OR_RETURN(aidl2legacy_AudioConfig_audio_config_t(
+                    aidl.format, false /*isInput*/));
     legacy.mRouteFlags = VALUE_OR_RETURN(
             aidl2legacy_AudioMixRouteFlag_uint32_t_mask(aidl.routeFlags));
     legacy.mDeviceType = VALUE_OR_RETURN(
@@ -252,7 +255,10 @@ legacy2aidl_AudioMix(const AudioMix& legacy) {
                     legacy.mCriteria,
                     legacy2aidl_AudioMixMatchCriterion));
     aidl.mixType = VALUE_OR_RETURN(legacy2aidl_uint32_t_AudioMixType(legacy.mMixType));
-    aidl.format = VALUE_OR_RETURN(legacy2aidl_audio_config_t_AudioConfig(legacy.mFormat));
+    // See 'convertAudioMixToNative' in 'android_media_AudioSystem.cpp' -- only
+    // an output mask is expected here.
+    aidl.format = VALUE_OR_RETURN(legacy2aidl_audio_config_t_AudioConfig(
+                    legacy.mFormat, false /*isInput*/));
     aidl.routeFlags = VALUE_OR_RETURN(
             legacy2aidl_uint32_t_AudioMixRouteFlag_mask(legacy.mRouteFlags));
     aidl.device.type = VALUE_OR_RETURN(
