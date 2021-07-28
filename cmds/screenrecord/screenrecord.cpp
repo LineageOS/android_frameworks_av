@@ -701,7 +701,7 @@ static status_t recordScreen(const char* fileName) {
         printf("Display is %dx%d @%.2ffps (orientation=%s), layerStack=%u\n",
                 layerStackSpaceRect.getWidth(), layerStackSpaceRect.getHeight(),
                 displayMode.refreshRate, toCString(displayState.orientation),
-                displayState.layerStack);
+                displayState.layerStack.id);
         fflush(stdout);
     }
 
