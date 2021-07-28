@@ -53,7 +53,7 @@ public:
 
 AudioGains getAudioGainsForTest() {
     AudioGains audioGains;
-    sp<AudioGain> audioGain = new AudioGain(0 /*index*/, false /*useInChannelMask*/);
+    sp<AudioGain> audioGain = new AudioGain(0 /*index*/, false /*isInput*/);
     audioGain->setMode(AUDIO_GAIN_MODE_JOINT);
     audioGain->setChannelMask(AUDIO_CHANNEL_OUT_STEREO);
     audioGain->setMinValueInMb(-3200);
