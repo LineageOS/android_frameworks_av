@@ -154,17 +154,20 @@ AudioProfile& AudioProfile::operator=(const AudioProfile& other) {
     return *this;
 }
 
+status_t AudioProfile::writeToParcel(Parcel *parcel) const {
+    media::AudioProfile parcelable = VALUE_OR_RETURN_STATUS(toParcelable());
+    return parcelable.writeToParcel(parcel);
+ }
+
 ConversionResult<media::AudioProfile>
-AudioProfile::toParcelable(bool isInput) const {
+AudioProfile::toParcelable() const {
     media::AudioProfile parcelable;
     parcelable.name = mName;
     parcelable.format = VALUE_OR_RETURN(legacy2aidl_audio_format_t_AudioFormatDescription(mFormat));
     parcelable.channelMasks = VALUE_OR_RETURN(
-            convertContainer<std::vector<media::AudioChannelLayout>>(
+            convertContainer<std::vector<media::AudioChannelMask>>(
                     mChannelMasks,
-                    [isInput](audio_channel_mask_t m) {
-                        return legacy2aidl_audio_channel_mask_t_AudioChannelLayout(m, isInput);
-                    }));
+                    legacy2aidl_audio_channel_mask_t_AudioChannelMask));
     parcelable.samplingRates = VALUE_OR_RETURN(
             convertContainer<std::vector<int32_t>>(mSamplingRates,
                                                    convertIntegral<int32_t, uint32_t>));
@@ -176,17 +179,24 @@ AudioProfile::toParcelable(bool isInput) const {
     return parcelable;
 }
 
+status_t AudioProfile::readFromParcel(const Parcel *parcel) {
+    media::AudioProfile parcelable;
+    if (status_t status = parcelable.readFromParcel(parcel); status != OK) {
+        return status;
+    }
+    *this = *VALUE_OR_RETURN_STATUS(fromParcelable(parcelable));
+    return OK;
+}
+
 ConversionResult<sp<AudioProfile>>
-AudioProfile::fromParcelable(const media::AudioProfile& parcelable, bool isInput) {
+AudioProfile::fromParcelable(const media::AudioProfile& parcelable) {
     sp<AudioProfile> legacy = new AudioProfile();
     legacy->mName = parcelable.name;
     legacy->mFormat = VALUE_OR_RETURN(
             aidl2legacy_AudioFormatDescription_audio_format_t(parcelable.format));
     legacy->mChannelMasks = VALUE_OR_RETURN(
             convertContainer<ChannelMaskSet>(parcelable.channelMasks,
-                    [isInput](const media::AudioChannelLayout& l) {
-                        return aidl2legacy_AudioChannelLayout_audio_channel_mask_t(l, isInput);
-                    }));
+                                             aidl2legacy_AudioChannelMask_audio_channel_mask_t));
     legacy->mSamplingRates = VALUE_OR_RETURN(
             convertContainer<SampleRateSet>(parcelable.samplingRates,
                                             convertIntegral<uint32_t, int32_t>));
@@ -200,13 +210,13 @@ AudioProfile::fromParcelable(const media::AudioProfile& parcelable, bool isInput
 }
 
 ConversionResult<sp<AudioProfile>>
-aidl2legacy_AudioProfile(const media::AudioProfile& aidl, bool isInput) {
-    return AudioProfile::fromParcelable(aidl, isInput);
+aidl2legacy_AudioProfile(const media::AudioProfile& aidl) {
+    return AudioProfile::fromParcelable(aidl);
 }
 
 ConversionResult<media::AudioProfile>
-legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy, bool isInput) {
-    return legacy->toParcelable(isInput);
+legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy) {
+    return legacy->toParcelable();
 }
 
 ssize_t AudioProfileVector::add(const sp<AudioProfile> &profile)
@@ -320,6 +330,33 @@ void AudioProfileVector::dump(std::string *dst, int spaces) const
     }
 }
 
+status_t AudioProfileVector::writeToParcel(Parcel *parcel) const
+{
+    status_t status = NO_ERROR;
+    if ((status = parcel->writeVectorSize(*this)) != NO_ERROR) return status;
+    for (const auto &audioProfile : *this) {
+        if ((status = parcel->writeParcelable(*audioProfile)) != NO_ERROR) {
+            break;
+        }
+    }
+    return status;
+}
+
+status_t AudioProfileVector::readFromParcel(const Parcel *parcel)
+{
+    status_t status = NO_ERROR;
+    this->clear();
+    if ((status = parcel->resizeOutVector(this)) != NO_ERROR) return status;
+    for (size_t i = 0; i < this->size(); ++i) {
+        this->at(i) = new AudioProfile(AUDIO_FORMAT_DEFAULT, AUDIO_CHANNEL_NONE, 0 /*sampleRate*/);
+        if ((status = parcel->readParcelable(this->at(i).get())) != NO_ERROR) {
+            this->clear();
+            break;
+        }
+    }
+    return status;
+}
+
 bool AudioProfileVector::equals(const AudioProfileVector& other) const
 {
     return std::equal(begin(), end(), other.begin(), other.end(),
@@ -329,19 +366,13 @@ bool AudioProfileVector::equals(const AudioProfileVector& other) const
 }
 
 ConversionResult<AudioProfileVector>
-aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl, bool isInput) {
-    return convertContainer<AudioProfileVector>(aidl,
-            [isInput](const media::AudioProfile& p) {
-                return aidl2legacy_AudioProfile(p, isInput);
-            });
+aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl) {
+    return convertContainer<AudioProfileVector>(aidl, aidl2legacy_AudioProfile);
 }
 
 ConversionResult<std::vector<media::AudioProfile>>
-legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy, bool isInput) {
-    return convertContainer<std::vector<media::AudioProfile>>(legacy,
-            [isInput](const sp<AudioProfile>& p) {
-                return legacy2aidl_AudioProfile(p, isInput);
-            });
+legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy) {
+    return convertContainer<std::vector<media::AudioProfile>>(legacy, legacy2aidl_AudioProfile);
 }
 
 AudioProfileVector intersectAudioProfiles(const AudioProfileVector& profiles1,
