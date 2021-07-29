@@ -613,8 +613,10 @@ void CameraService::onTorchStatusChangedLocked(const String8& cameraId,
     broadcastTorchModeStatus(cameraId, newStatus, systemCameraKind);
 }
 
-static bool hasPermissionsForSystemCamera(int callingPid, int callingUid) {
-    return checkPermission(sSystemCameraPermission, callingPid, callingUid) &&
+static bool hasPermissionsForSystemCamera(int callingPid, int callingUid,
+        bool logPermissionFailure = false) {
+    return checkPermission(sSystemCameraPermission, callingPid, callingUid,
+            logPermissionFailure) &&
             checkPermission(sCameraPermission, callingPid, callingUid);
 }
 
@@ -693,8 +695,8 @@ std::string CameraService::cameraIdIntToStrLocked(int cameraIdInt) {
     const std::vector<std::string> *deviceIds = &mNormalDeviceIdsWithoutSystemCamera;
     auto callingPid = CameraThreadState::getCallingPid();
     auto callingUid = CameraThreadState::getCallingUid();
-    if (checkPermission(sSystemCameraPermission, callingPid, callingUid) ||
-            getpid() == callingPid) {
+    if (checkPermission(sSystemCameraPermission, callingPid, callingUid,
+            /*logPermissionFailure*/false) || getpid() == callingPid) {
         deviceIds = &mNormalDeviceIds;
     }
     if (cameraIdInt < 0 || cameraIdInt >= static_cast<int>(deviceIds->size())) {
@@ -1597,7 +1599,7 @@ bool CameraService::shouldRejectSystemCameraConnection(const String8& cameraId) 
     //     same behavior for system camera devices.
     if (getCurrentServingCall() != BinderCallType::HWBINDER &&
             systemCameraKind == SystemCameraKind::SYSTEM_ONLY_CAMERA &&
-            !hasPermissionsForSystemCamera(cPid, cUid)) {
+            !hasPermissionsForSystemCamera(cPid, cUid, /*logPermissionFailure*/true)) {
         ALOGW("Rejecting access to system only camera %s, inadequete permissions",
                 cameraId.c_str());
         return true;
@@ -2336,7 +2338,7 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
     auto clientUid = CameraThreadState::getCallingUid();
     auto clientPid = CameraThreadState::getCallingPid();
     bool openCloseCallbackAllowed = checkPermission(sCameraOpenCloseListenerPermission,
-            clientPid, clientUid);
+            clientPid, clientUid, /*logPermissionFailure*/false);
 
     Mutex::Autolock lock(mServiceLock);
 
