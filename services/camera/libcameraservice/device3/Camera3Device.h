@@ -1430,6 +1430,9 @@ class Camera3Device :
         // Copy the configuration of the internal camera.
         camera3::camera_stream_configuration mInjectionConfig;
 
+        // Copy the streams of the internal camera.
+        Vector<camera3::camera_stream_t*> mInjectionStreams;
+
         // Copy the bufferSizes of the output streams of the internal camera.
         std::vector<uint32_t> mInjectionBufferSizes;
 

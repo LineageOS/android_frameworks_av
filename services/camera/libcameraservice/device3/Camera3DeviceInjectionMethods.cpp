@@ -193,11 +193,6 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectCamera(
 
 status_t Camera3Device::Camera3DeviceInjectionMethods::stopInjection() {
     status_t res = NO_ERROR;
-    mIsStreamConfigCompleteButNotInjected = false;
-    if (mInjectionConfig.streams != nullptr) {
-        delete [] mInjectionConfig.streams;
-        mInjectionConfig.streams = nullptr;
-    }
 
     sp<Camera3Device> parent = mParent.promote();
     if (parent == nullptr) {
@@ -269,16 +264,12 @@ void Camera3Device::Camera3DeviceInjectionMethods::storeInjectionConfig(
         const camera3::camera_stream_configuration& injectionConfig,
         const std::vector<uint32_t>& injectionBufferSizes) {
     mIsStreamConfigCompleteButNotInjected = true;
-    if (mInjectionConfig.streams != nullptr) {
-        delete [] mInjectionConfig.streams;
-        mInjectionConfig.streams = nullptr;
-    }
     mInjectionConfig = injectionConfig;
-    mInjectionConfig.streams =
-        (android::camera3::camera_stream_t **) new camera_stream_t*[injectionConfig.num_streams];
+    mInjectionStreams.clear();
     for (size_t i = 0; i < injectionConfig.num_streams; i++) {
-        mInjectionConfig.streams[i] = injectionConfig.streams[i];
+        mInjectionStreams.push_back(injectionConfig.streams[i]);
     }
+    mInjectionConfig.streams = mInjectionStreams.editArray();
     mInjectionBufferSizes = injectionBufferSizes;
 }
 
@@ -359,6 +350,9 @@ status_t Camera3Device::Camera3DeviceInjectionMethods::injectionConfigureStreams
 void Camera3Device::Camera3DeviceInjectionMethods::injectionDisconnectImpl() {
     ATRACE_CALL();
     ALOGI("%s: Injection camera disconnect", __FUNCTION__);
+    mIsStreamConfigCompleteButNotInjected = false;
+    mInjectionStreams.clear();
+    mInjectionConfig.streams = nullptr;
 
     mBackupHalInterface = nullptr;
     HalInterface* interface = nullptr;
