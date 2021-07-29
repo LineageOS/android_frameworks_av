@@ -1873,13 +1873,13 @@ void AudioFlinger::removeNotificationClient(pid_t pid)
     }
 }
 
-void AudioFlinger::ioConfigChanged(audio_io_config_event event,
+void AudioFlinger::ioConfigChanged(audio_io_config_event_t event,
                                    const sp<AudioIoDescriptor>& ioDesc,
                                    pid_t pid) {
+    media::AudioIoConfigEvent eventAidl = VALUE_OR_FATAL(
+            legacy2aidl_audio_io_config_event_t_AudioIoConfigEvent(event));
     media::AudioIoDescriptor descAidl = VALUE_OR_FATAL(
             legacy2aidl_AudioIoDescriptor_AudioIoDescriptor(ioDesc));
-    media::AudioIoConfigEvent eventAidl = VALUE_OR_FATAL(
-            legacy2aidl_audio_io_config_event_AudioIoConfigEvent(event));
 
     Mutex::Autolock _l(mClientLock);
     size_t size = mNotificationClients.size();
@@ -2610,9 +2610,9 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
     audio_module_handle_t module = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_module_handle_t(request.module));
     audio_config_t halConfig = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioConfig_audio_config_t(request.halConfig));
+            aidl2legacy_AudioConfig_audio_config_t(request.halConfig, false /*isInput*/));
     audio_config_base_t mixerConfig = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioConfigBase_audio_config_base_t(request.mixerConfig));
+            aidl2legacy_AudioConfigBase_audio_config_base_t(request.mixerConfig, false/*isInput*/));
     sp<DeviceDescriptorBase> device = VALUE_OR_RETURN_STATUS(
             aidl2legacy_DeviceDescriptorBase(request.device));
     audio_output_flags_t flags = VALUE_OR_RETURN_STATUS(
@@ -2665,8 +2665,8 @@ status_t AudioFlinger::openOutput(const media::OpenOutputRequest& request,
             mmapThread->ioConfigChanged(AUDIO_OUTPUT_OPENED);
         }
         response->output = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(output));
-        response->config =
-                VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(halConfig));
+        response->config = VALUE_OR_RETURN_STATUS(
+                legacy2aidl_audio_config_t_AudioConfig(halConfig, false /*isInput*/));
         response->latencyMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(latencyMs));
         response->flags = VALUE_OR_RETURN_STATUS(
                 legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
@@ -2752,9 +2752,7 @@ status_t AudioFlinger::closeOutput_nonvirtual(audio_io_handle_t output)
             mMmapThreads.removeItem(output);
             ALOGD("closing mmapThread %p", mmapThread.get());
         }
-        const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
-        ioDesc->mIoHandle = output;
-        ioConfigChanged(AUDIO_OUTPUT_CLOSED, ioDesc);
+        ioConfigChanged(AUDIO_OUTPUT_CLOSED, sp<AudioIoDescriptor>::make(output));
         mPatchPanel.notifyStreamClosed(output);
     }
     // The thread entity (active unit of execution) is no longer running here,
@@ -2836,7 +2834,7 @@ status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
     audio_io_handle_t input = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_io_handle_t(request.input));
     audio_config_t config = VALUE_OR_RETURN_STATUS(
-            aidl2legacy_AudioConfig_audio_config_t(request.config));
+            aidl2legacy_AudioConfig_audio_config_t(request.config, true /*isInput*/));
 
     sp<ThreadBase> thread = openInput_l(
             VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_module_handle_t(request.module)),
@@ -2850,7 +2848,8 @@ status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
             String8{});
 
     response->input = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_io_handle_t_int32_t(input));
-    response->config = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_config_t_AudioConfig(config));
+    response->config = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_config_t_AudioConfig(config, true /*isInput*/));
     response->device = request.device;
 
     if (thread != 0) {
@@ -3012,9 +3011,7 @@ status_t AudioFlinger::closeInput_nonvirtual(audio_io_handle_t input)
             dumpToThreadLog_l(mmapThread);
             mMmapThreads.removeItem(input);
         }
-        const sp<AudioIoDescriptor> ioDesc = new AudioIoDescriptor();
-        ioDesc->mIoHandle = input;
-        ioConfigChanged(AUDIO_INPUT_CLOSED, ioDesc);
+        ioConfigChanged(AUDIO_INPUT_CLOSED, sp<AudioIoDescriptor>::make(input));
     }
     // FIXME: calling thread->exit() without mLock held should not be needed anymore now that
     // we have a different lock for notification client
