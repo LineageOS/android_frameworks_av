@@ -16,18 +16,18 @@
 
 package android.media;
 
-import android.media.AudioChannelLayout;
+import android.media.AudioChannelMask;
 
 /**
  * {@hide}
  */
 parcelable AudioGain {
     int index;
-    boolean isInput;
+    boolean useInChannelMask;
     boolean useForVolume;
     /** Bitmask, indexed by AudioGainMode. */
     int mode;
-    AudioChannelLayout channelMask;
+    AudioChannelMask channelMask;
     int minValue;
     int maxValue;
     int defaultValue;

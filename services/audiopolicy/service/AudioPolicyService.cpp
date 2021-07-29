@@ -446,15 +446,13 @@ void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
             media::RecordClientInfo clientInfoAidl = VALUE_OR_RETURN_STATUS(
                     legacy2aidl_record_client_info_t_RecordClientInfo(*clientInfo));
             media::AudioConfigBase clientConfigAidl = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_audio_config_base_t_AudioConfigBase(
-                            *clientConfig, true /*isInput*/));
+                    legacy2aidl_audio_config_base_t_AudioConfigBase(*clientConfig));
             std::vector<media::EffectDescriptor> clientEffectsAidl = VALUE_OR_RETURN_STATUS(
                     convertContainer<std::vector<media::EffectDescriptor>>(
                             clientEffects,
                             legacy2aidl_effect_descriptor_t_EffectDescriptor));
             media::AudioConfigBase deviceConfigAidl = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_audio_config_base_t_AudioConfigBase(
-                            *deviceConfig, true /*isInput*/));
+                    legacy2aidl_audio_config_base_t_AudioConfigBase(*deviceConfig));
             std::vector<media::EffectDescriptor> effectsAidl = VALUE_OR_RETURN_STATUS(
                     convertContainer<std::vector<media::EffectDescriptor>>(
                             effects,

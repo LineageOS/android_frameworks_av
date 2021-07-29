@@ -31,7 +31,7 @@ namespace android {
 class AudioGain: public RefBase, public Parcelable
 {
 public:
-    AudioGain(int index, bool isInput);
+    AudioGain(int index, bool useInChannelMask);
     virtual ~AudioGain() {}
 
     void setMode(audio_gain_mode_t mode) { mGain.mode = mode; }
@@ -80,7 +80,7 @@ public:
 private:
     int               mIndex;
     struct audio_gain mGain;
-    bool              mIsInput;
+    bool              mUseInChannelMask;
     bool              mUseForVolume = false;
 };
 

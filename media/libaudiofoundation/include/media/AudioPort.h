@@ -130,7 +130,7 @@ private:
 };
 
 
-class AudioPortConfig : public virtual RefBase
+class AudioPortConfig : public virtual RefBase, public virtual Parcelable
 {
 public:
     virtual ~AudioPortConfig() = default;
@@ -152,8 +152,10 @@ public:
 
     bool equals(const sp<AudioPortConfig>& other) const;
 
-    status_t writeToParcelable(media::AudioPortConfig* parcelable, bool isInput) const;
-    status_t readFromParcelable(const media::AudioPortConfig& parcelable, bool isInput);
+    status_t writeToParcel(Parcel* parcel) const override;
+    status_t readFromParcel(const Parcel* parcel) override;
+    status_t writeToParcelable(media::AudioPortConfig* parcelable) const;
+    status_t readFromParcelable(const media::AudioPortConfig& parcelable);
 
 protected:
     unsigned int mSamplingRate = 0u;
