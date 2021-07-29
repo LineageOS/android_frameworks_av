@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioChannelMask;
+import android.media.AudioChannelLayout;
 
 /**
  * {@hide}
@@ -31,7 +31,7 @@ parcelable AudioGainConfig {
     /**
      * Channels which gain value follows. N/A in joint mode.
      */
-    AudioChannelMask channelMask;
+    AudioChannelLayout channelMask;
 
     /**
      * Gain values in millibels.

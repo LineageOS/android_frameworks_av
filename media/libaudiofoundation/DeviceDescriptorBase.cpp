@@ -166,7 +166,7 @@ status_t DeviceDescriptorBase::writeToParcel(Parcel *parcel) const
 
 status_t DeviceDescriptorBase::writeToParcelable(media::AudioPort* parcelable) const {
     AudioPort::writeToParcelable(parcelable);
-    AudioPortConfig::writeToParcelable(&parcelable->activeConfig);
+    AudioPortConfig::writeToParcelable(&parcelable->activeConfig, useInputChannelMask());
     parcelable->id = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_port_handle_t_int32_t(mId));
 
     media::AudioPortDeviceExt ext;
@@ -190,7 +190,7 @@ status_t DeviceDescriptorBase::readFromParcelable(const media::AudioPort& parcel
         return BAD_VALUE;
     }
     status_t status = AudioPort::readFromParcelable(parcelable)
-                      ?: AudioPortConfig::readFromParcelable(parcelable.activeConfig);
+            ?: AudioPortConfig::readFromParcelable(parcelable.activeConfig, useInputChannelMask());
     if (status != OK) {
         return status;
     }
