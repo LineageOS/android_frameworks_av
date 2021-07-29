@@ -34,10 +34,10 @@
 
 namespace android {
 
-AudioGain::AudioGain(int index, bool isInput)
+AudioGain::AudioGain(int index, bool useInChannelMask)
 {
     mIndex = index;
-    mIsInput = isInput;
+    mUseInChannelMask = useInChannelMask;
     memset(&mGain, 0, sizeof(struct audio_gain));
 }
 
@@ -49,9 +49,12 @@ void AudioGain::getDefaultConfig(struct audio_gain_config *config)
     if ((mGain.mode & AUDIO_GAIN_MODE_JOINT) == AUDIO_GAIN_MODE_JOINT) {
         config->values[0] = mGain.default_value;
     } else {
-        const uint32_t numValues = mIsInput ?
-                audio_channel_count_from_in_mask(mGain.channel_mask) :
-                audio_channel_count_from_out_mask(mGain.channel_mask);
+        uint32_t numValues;
+        if (mUseInChannelMask) {
+            numValues = audio_channel_count_from_in_mask(mGain.channel_mask);
+        } else {
+            numValues = audio_channel_count_from_out_mask(mGain.channel_mask);
+        }
         for (size_t i = 0; i < numValues; i++) {
             config->values[i] = mGain.default_value;
         }
@@ -75,9 +78,12 @@ status_t AudioGain::checkConfig(const struct audio_gain_config *config)
         if ((config->channel_mask & ~mGain.channel_mask) != 0) {
             return BAD_VALUE;
         }
-        const uint32_t numValues = mIsInput ?
-                audio_channel_count_from_in_mask(config->channel_mask) :
-                audio_channel_count_from_out_mask(config->channel_mask);
+        uint32_t numValues;
+        if (mUseInChannelMask) {
+            numValues = audio_channel_count_from_in_mask(config->channel_mask);
+        } else {
+            numValues = audio_channel_count_from_out_mask(config->channel_mask);
+        }
         for (size_t i = 0; i < numValues; i++) {
             if ((config->values[i] < mGain.min_value) ||
                     (config->values[i] > mGain.max_value)) {
@@ -110,7 +116,7 @@ void AudioGain::dump(std::string *dst, int spaces, int index) const
 bool AudioGain::equals(const sp<AudioGain>& other) const
 {
     return other != nullptr &&
-           mIsInput == other->mIsInput &&
+           mUseInChannelMask == other->mUseInChannelMask &&
            mUseForVolume == other->mUseForVolume &&
            // Compare audio gain
            mGain.mode == other->mGain.mode &&
@@ -131,13 +137,13 @@ status_t AudioGain::writeToParcel(android::Parcel *parcel) const {
 
 status_t AudioGain::writeToParcelable(media::AudioGain* parcelable) const {
     parcelable->index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mIndex));
-    parcelable->isInput = mIsInput;
+    parcelable->useInChannelMask = mUseInChannelMask;
     parcelable->useForVolume = mUseForVolume;
     parcelable->mode = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
     parcelable->channelMask = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
-                    mGain.channel_mask, mIsInput));
+                    mGain.channel_mask, mUseInChannelMask));
     parcelable->minValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_value));
     parcelable->maxValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.max_value));
     parcelable->defaultValue = VALUE_OR_RETURN_STATUS(
@@ -156,13 +162,13 @@ status_t AudioGain::readFromParcel(const android::Parcel *parcel) {
 
 status_t AudioGain::readFromParcelable(const media::AudioGain& parcelable) {
     mIndex = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.index));
-    mIsInput = parcelable.isInput;
+    mUseInChannelMask = parcelable.useInChannelMask;
     mUseForVolume = parcelable.useForVolume;
     mGain.mode = VALUE_OR_RETURN_STATUS(
             aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.mode));
     mGain.channel_mask = VALUE_OR_RETURN_STATUS(
             aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-                    parcelable.channelMask, parcelable.isInput));
+                    parcelable.channelMask, parcelable.useInChannelMask));
     mGain.min_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.minValue));
     mGain.max_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.maxValue));
     mGain.default_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.defaultValue));
