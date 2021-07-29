@@ -55,9 +55,7 @@ using binder::Status;
 ConversionResult<media::CreateTrackRequest> IAudioFlinger::CreateTrackInput::toAidl() const {
     media::CreateTrackRequest aidl;
     aidl.attr = VALUE_OR_RETURN(legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
-    // Do not be mislead by 'Input'--this is an input to 'createTrack', which creates output tracks.
-    aidl.config = VALUE_OR_RETURN(legacy2aidl_audio_config_t_AudioConfig(
-                    config, false /*isInput*/));
+    aidl.config = VALUE_OR_RETURN(legacy2aidl_audio_config_t_AudioConfig(config));
     aidl.clientInfo = VALUE_OR_RETURN(legacy2aidl_AudioClient_AudioClient(clientInfo));
     aidl.sharedBuffer = VALUE_OR_RETURN(legacy2aidl_NullableIMemory_SharedFileRegion(sharedBuffer));
     aidl.notificationsPerBuffer = VALUE_OR_RETURN(convertIntegral<int32_t>(notificationsPerBuffer));
@@ -76,9 +74,7 @@ ConversionResult<IAudioFlinger::CreateTrackInput>
 IAudioFlinger::CreateTrackInput::fromAidl(const media::CreateTrackRequest& aidl) {
     IAudioFlinger::CreateTrackInput legacy;
     legacy.attr = VALUE_OR_RETURN(aidl2legacy_AudioAttributesInternal_audio_attributes_t(aidl.attr));
-    // Do not be mislead by 'Input'--this is an input to 'createTrack', which creates output tracks.
-    legacy.config = VALUE_OR_RETURN(
-            aidl2legacy_AudioConfig_audio_config_t(aidl.config, false /*isInput*/));
+    legacy.config = VALUE_OR_RETURN(aidl2legacy_AudioConfig_audio_config_t(aidl.config));
     legacy.clientInfo = VALUE_OR_RETURN(aidl2legacy_AudioClient_AudioClient(aidl.clientInfo));
     legacy.sharedBuffer = VALUE_OR_RETURN(aidl2legacy_NullableSharedFileRegion_IMemory(aidl.sharedBuffer));
     legacy.notificationsPerBuffer = VALUE_OR_RETURN(
@@ -143,8 +139,7 @@ ConversionResult<media::CreateRecordRequest>
 IAudioFlinger::CreateRecordInput::toAidl() const {
     media::CreateRecordRequest aidl;
     aidl.attr = VALUE_OR_RETURN(legacy2aidl_audio_attributes_t_AudioAttributesInternal(attr));
-    aidl.config = VALUE_OR_RETURN(
-            legacy2aidl_audio_config_base_t_AudioConfigBase(config, true /*isInput*/));
+    aidl.config = VALUE_OR_RETURN(legacy2aidl_audio_config_base_t_AudioConfigBase(config));
     aidl.clientInfo = VALUE_OR_RETURN(legacy2aidl_AudioClient_AudioClient(clientInfo));
     aidl.riid = VALUE_OR_RETURN(legacy2aidl_audio_unique_id_t_int32_t(riid));
     aidl.maxSharedAudioHistoryMs = VALUE_OR_RETURN(
@@ -164,8 +159,7 @@ IAudioFlinger::CreateRecordInput::fromAidl(
     IAudioFlinger::CreateRecordInput legacy;
     legacy.attr = VALUE_OR_RETURN(
             aidl2legacy_AudioAttributesInternal_audio_attributes_t(aidl.attr));
-    legacy.config = VALUE_OR_RETURN(
-            aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.config, true /*isInput*/));
+    legacy.config = VALUE_OR_RETURN(aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.config));
     legacy.clientInfo = VALUE_OR_RETURN(aidl2legacy_AudioClient_AudioClient(aidl.clientInfo));
     legacy.riid = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_unique_id_t(aidl.riid));
     legacy.maxSharedAudioHistoryMs = VALUE_OR_RETURN(
@@ -418,8 +412,8 @@ size_t AudioFlingerClientAdapter::getInputBufferSize(uint32_t sampleRate, audio_
         int32_t sampleRateAidl = VALUE_OR_RETURN(convertIntegral<int32_t>(sampleRate));
         media::AudioFormatDescription formatAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_format_t_AudioFormatDescription(format));
-        media::AudioChannelLayout channelMaskAidl = VALUE_OR_RETURN(
-                legacy2aidl_audio_channel_mask_t_AudioChannelLayout(channelMask, true /*isInput*/));
+        media::AudioChannelMask channelMaskAidl = VALUE_OR_RETURN(
+                legacy2aidl_audio_channel_mask_t_AudioChannelMask(channelMask));
         int64_t aidlRet;
         RETURN_IF_ERROR(statusTFromBinderStatus(
                 mDelegate->getInputBufferSize(sampleRateAidl, formatAidl, channelMaskAidl,
@@ -945,13 +939,13 @@ Status AudioFlingerServerAdapter::registerClient(const sp<media::IAudioFlingerCl
 
 Status AudioFlingerServerAdapter::getInputBufferSize(int32_t sampleRate,
                                                      const media::AudioFormatDescription& format,
-                                                     const media::AudioChannelLayout& channelMask,
+                                                     media::AudioChannelMask channelMask,
                                                      int64_t* _aidl_return) {
     uint32_t sampleRateLegacy = VALUE_OR_RETURN_BINDER(convertIntegral<uint32_t>(sampleRate));
     audio_format_t formatLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_AudioFormatDescription_audio_format_t(format));
     audio_channel_mask_t channelMaskLegacy = VALUE_OR_RETURN_BINDER(
-            aidl2legacy_AudioChannelLayout_audio_channel_mask_t(channelMask, true /*isInput*/));
+            aidl2legacy_AudioChannelMask_audio_channel_mask_t(channelMask));
     size_t size = mDelegate->getInputBufferSize(sampleRateLegacy, formatLegacy, channelMaskLegacy);
     *_aidl_return = VALUE_OR_RETURN_BINDER(convertIntegral<int64_t>(size));
     return Status::ok();

@@ -592,8 +592,7 @@ public:
     getParameters(int32_t ioHandle, const std::string& keys, std::string* _aidl_return) override;
     Status registerClient(const sp<media::IAudioFlingerClient>& client) override;
     Status getInputBufferSize(int32_t sampleRate, const media::AudioFormatDescription& format,
-                              const media::AudioChannelLayout& channelMask,
-                              int64_t* _aidl_return) override;
+                              media::AudioChannelMask channelMask, int64_t* _aidl_return) override;
     Status openOutput(const media::OpenOutputRequest& request,
                       media::OpenOutputResponse* _aidl_return) override;
     Status openDuplicateOutput(int32_t output1, int32_t output2, int32_t* _aidl_return) override;
