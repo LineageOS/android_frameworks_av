@@ -171,6 +171,13 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
             mZoomRatioMappers[physicalId] = ZoomRatioMapper(
                     &mPhysicalDeviceInfoMap[physicalId],
                     mSupportNativeZoomRatio, usePrecorrectArray);
+
+            if (SessionConfigurationUtils::isUltraHighResolutionSensor(
+                    mPhysicalDeviceInfoMap[physicalId])) {
+                mUHRCropAndMeteringRegionMappers[physicalId] =
+                        UHRCropAndMeteringRegionMapper(mPhysicalDeviceInfoMap[physicalId],
+                                usePrecorrectArray);
+            }
         }
     }
 
@@ -347,6 +354,11 @@ status_t Camera3Device::initializeCommonLocked() {
 
     mZoomRatioMappers[mId.c_str()] = ZoomRatioMapper(&mDeviceInfo,
             mSupportNativeZoomRatio, usePrecorrectArray);
+
+    if (SessionConfigurationUtils::isUltraHighResolutionSensor(mDeviceInfo)) {
+        mUHRCropAndMeteringRegionMappers[mId.c_str()] =
+                UHRCropAndMeteringRegionMapper(mDeviceInfo, usePrecorrectArray);
+    }
 
     if (RotateAndCropMapper::isNeeded(&mDeviceInfo)) {
         mRotateAndCropMappers.emplace(mId.c_str(), &mDeviceInfo);
@@ -4815,10 +4827,31 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             {
-                // Correct metadata regions for distortion correction if enabled
                 sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
                     List<PhysicalCameraSettings>::iterator it;
+                    for (it = captureRequest->mSettingsList.begin();
+                            it != captureRequest->mSettingsList.end(); it++) {
+                        if (parent->mUHRCropAndMeteringRegionMappers.find(it->cameraId) ==
+                                parent->mUHRCropAndMeteringRegionMappers.end()) {
+                            continue;
+                        }
+
+                        if (!captureRequest->mUHRCropAndMeteringRegionsUpdated) {
+                            res = parent->mUHRCropAndMeteringRegionMappers[it->cameraId].
+                                    updateCaptureRequest(&(it->metadata));
+                            if (res != OK) {
+                                SET_ERR("RequestThread: Unable to correct capture requests "
+                                        "for scaler crop region and metering regions for request "
+                                        "%d: %s (%d)", halRequest->frame_number, strerror(-res),
+                                        res);
+                                return INVALID_OPERATION;
+                            }
+                            captureRequest->mUHRCropAndMeteringRegionsUpdated = true;
+                        }
+                    }
+
+                    // Correct metadata regions for distortion correction if enabled
                     for (it = captureRequest->mSettingsList.begin();
                             it != captureRequest->mSettingsList.end(); it++) {
                         if (parent->mDistortionMappers.find(it->cameraId) ==
