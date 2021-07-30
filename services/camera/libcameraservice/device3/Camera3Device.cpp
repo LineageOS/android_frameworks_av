@@ -306,9 +306,25 @@ status_t Camera3Device::initializeCommonLocked() {
         sessionParamKeys.insertArrayAt(sessionKeysEntry.data.i32, 0, sessionKeysEntry.count);
     }
 
+    camera_metadata_entry_t availableTestPatternModes = mDeviceInfo.find(
+            ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES);
+    for (size_t i = 0; i < availableTestPatternModes.count; i++) {
+        if (availableTestPatternModes.data.i32[i] ==
+                ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
+            mSupportCameraMute = true;
+            mSupportTestPatternSolidColor = true;
+            break;
+        } else if (availableTestPatternModes.data.i32[i] ==
+                ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK) {
+            mSupportCameraMute = true;
+            mSupportTestPatternSolidColor = false;
+        }
+    }
+
     /** Start up request queue thread */
     mRequestThread = new RequestThread(
-            this, mStatusTracker, mInterface, sessionParamKeys, mUseHalBufManager);
+            this, mStatusTracker, mInterface, sessionParamKeys,
+            mUseHalBufManager, mSupportCameraMute);
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -362,21 +378,6 @@ status_t Camera3Device::initializeCommonLocked() {
 
     if (RotateAndCropMapper::isNeeded(&mDeviceInfo)) {
         mRotateAndCropMappers.emplace(mId.c_str(), &mDeviceInfo);
-    }
-
-    camera_metadata_entry_t availableTestPatternModes = mDeviceInfo.find(
-            ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES);
-    for (size_t i = 0; i < availableTestPatternModes.count; i++) {
-        if (availableTestPatternModes.data.i32[i] ==
-                ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
-            mSupportCameraMute = true;
-            mSupportTestPatternSolidColor = true;
-            break;
-        } else if (availableTestPatternModes.data.i32[i] ==
-                ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK) {
-            mSupportCameraMute = true;
-            mSupportTestPatternSolidColor = false;
-        }
     }
 
     mInjectionMethods = new Camera3DeviceInjectionMethods(this);
@@ -4155,7 +4156,8 @@ void Camera3Device::HalInterface::onStreamReConfigured(int streamId) {
 Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<StatusTracker> statusTracker,
         sp<HalInterface> interface, const Vector<int32_t>& sessionParamKeys,
-        bool useHalBufManager) :
+        bool useHalBufManager,
+        bool supportCameraMute) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),
@@ -4181,7 +4183,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mRequestLatency(kRequestLatencyBinSize),
         mSessionParamKeys(sessionParamKeys),
         mLatestSessionParams(sessionParamKeys.size()),
-        mUseHalBufManager(useHalBufManager) {
+        mUseHalBufManager(useHalBufManager),
+        mSupportCameraMute(supportCameraMute){
     mStatusId = statusTracker->addComponent("RequestThread");
 }
 
@@ -5862,12 +5865,7 @@ bool Camera3Device::RequestThread::overrideTestPattern(
         const sp<CaptureRequest> &request) {
     ATRACE_CALL();
 
-    {
-        sp<Camera3Device> parent = mParent.promote();
-        if (parent != nullptr) {
-            if (!parent->supportsCameraMute()) return false;
-        }
-    }
+    if (!mSupportCameraMute) return false;
 
     Mutex::Autolock l(mTriggerMutex);
 
