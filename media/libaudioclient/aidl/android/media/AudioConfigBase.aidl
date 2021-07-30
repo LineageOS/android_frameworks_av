@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioChannelMask;
+import android.media.AudioChannelLayout;
 import android.media.AudioFormatDescription;
 
 /**
@@ -24,6 +24,6 @@ import android.media.AudioFormatDescription;
  */
 parcelable AudioConfigBase {
     int sampleRate;
-    AudioChannelMask channelMask;
+    AudioChannelLayout channelMask;
     AudioFormatDescription format;
 }

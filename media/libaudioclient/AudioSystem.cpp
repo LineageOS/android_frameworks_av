@@ -1003,7 +1003,7 @@ status_t AudioSystem::getOutputForAttr(audio_attributes_t* attr,
             legacy2aidl_audio_attributes_t_AudioAttributesInternal(*attr));
     int32_t sessionAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(session));
     media::AudioConfig configAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_config_t_AudioConfig(*config));
+            legacy2aidl_audio_config_t_AudioConfig(*config, false /*isInput*/));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_output_flags_t_int32_t_mask(flags));
     int32_t selectedDeviceIdAidl = VALUE_OR_RETURN_STATUS(
@@ -1097,7 +1097,7 @@ status_t AudioSystem::getInputForAttr(const audio_attributes_t* attr,
     int32_t riidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_unique_id_t_int32_t(riid));
     int32_t sessionAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_session_t_int32_t(session));
     media::AudioConfigBase configAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_config_base_t_AudioConfigBase(*config));
+            legacy2aidl_audio_config_base_t_AudioConfigBase(*config, true /*isInput*/));
     int32_t flagsAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
     int32_t selectedDeviceIdAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_port_handle_t_int32_t(*selectedDeviceId));
@@ -2431,13 +2431,13 @@ Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
         record_client_info_t clientInfoLegacy = VALUE_OR_RETURN_BINDER_STATUS(
                 aidl2legacy_RecordClientInfo_record_client_info_t(clientInfo));
         audio_config_base_t clientConfigLegacy = VALUE_OR_RETURN_BINDER_STATUS(
-                aidl2legacy_AudioConfigBase_audio_config_base_t(clientConfig));
+                aidl2legacy_AudioConfigBase_audio_config_base_t(clientConfig, true /*isInput*/));
         std::vector<effect_descriptor_t> clientEffectsLegacy = VALUE_OR_RETURN_BINDER_STATUS(
                 convertContainer<std::vector<effect_descriptor_t>>(
                         clientEffects,
                         aidl2legacy_EffectDescriptor_effect_descriptor_t));
         audio_config_base_t deviceConfigLegacy = VALUE_OR_RETURN_BINDER_STATUS(
-                aidl2legacy_AudioConfigBase_audio_config_base_t(deviceConfig));
+                aidl2legacy_AudioConfigBase_audio_config_base_t(deviceConfig, true /*isInput*/));
         std::vector<effect_descriptor_t> effectsLegacy = VALUE_OR_RETURN_BINDER_STATUS(
                 convertContainer<std::vector<effect_descriptor_t>>(
                         effects,

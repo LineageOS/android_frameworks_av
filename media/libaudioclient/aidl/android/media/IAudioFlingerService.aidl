@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioChannelMask;
+import android.media.AudioChannelLayout;
 import android.media.AudioMode;
 import android.media.AudioPatch;
 import android.media.AudioPort;
@@ -117,7 +117,7 @@ interface IAudioFlingerService {
     // FIXME This API assumes a route, and so should be deprecated.
     long getInputBufferSize(int sampleRate,
                             in AudioFormatDescription format,
-                            AudioChannelMask channelMask);
+                            in AudioChannelLayout channelMask);
 
     OpenOutputResponse openOutput(in OpenOutputRequest request);
     int /* audio_io_handle_t */ openDuplicateOutput(int /* audio_io_handle_t */ output1,
