@@ -23,7 +23,7 @@ import android.media.AudioChannelLayout;
  */
 parcelable AudioGain {
     int index;
-    boolean useInChannelMask;
+    boolean isInput;
     boolean useForVolume;
     /** Bitmask, indexed by AudioGainMode. */
     int mode;
