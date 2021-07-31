@@ -813,7 +813,8 @@ class Camera3Device :
                 sp<camera3::StatusTracker> statusTracker,
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
-                bool useHalBufManager);
+                bool useHalBufManager,
+                bool supportCameraMute);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -1086,6 +1087,7 @@ class Camera3Device :
         std::map<int32_t, std::set<String8>> mGroupIdPhysicalCameraMap;
 
         const bool         mUseHalBufManager;
+        const bool         mSupportCameraMute;
     };
     sp<RequestThread> mRequestThread;
 
