@@ -43,6 +43,7 @@ public:
     TunerDemux(sp<IDemux> demux, int demuxId);
     virtual ~TunerDemux();
     Status setFrontendDataSource(const shared_ptr<ITunerFrontend>& frontend) override;
+    Status setFrontendDataSourceById(int frontendId) override;
     Status openFilter(
         int mainType, int subtype, int bufferSize, const shared_ptr<ITunerFilterCallback>& cb,
         shared_ptr<ITunerFilter>* _aidl_return) override;
