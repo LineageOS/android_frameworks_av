@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioChannelLayout;
+import android.media.AudioChannelMask;
 import android.media.AudioGainConfig;
 import android.media.AudioIoFlags;
 import android.media.AudioPortConfigExt;
@@ -45,7 +45,7 @@ parcelable AudioPortConfig {
     /**
      * Channel mask, if applicable.
      */
-    AudioChannelLayout channelMask;
+    AudioChannelMask channelMask;
     /**
      * Format, if applicable.
      */
