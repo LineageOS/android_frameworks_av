@@ -15,6 +15,7 @@
  */
 
 //#define LOG_NDEBUG 0
+#include "include/HeifDecoderAPI.h"
 #define LOG_TAG "HeifDecoderImpl"
 
 #include "HeifDecoderImpl.h"
@@ -464,7 +465,7 @@ bool HeifDecoderImpl::getEncodedColor(HeifEncodedColor* /*outColor*/) const {
 }
 
 bool HeifDecoderImpl::setOutputColor(HeifColorFormat heifColor) {
-    if (heifColor == mOutputColor) {
+    if (heifColor == (HeifColorFormat)mOutputColor) {
         return true;
     }
 
