@@ -80,3 +80,46 @@ cc_fuzz {
         "libdrmframework",
     ],
 }
+
+cc_fuzz {
+    name: "mediaplayer_fuzzer",
+    srcs: [
+        "mediaplayer_fuzzer.cpp",
+    ],
+    defaults: [
+        "libmediaplayerserviceFuzzer_defaults",
+    ],
+    static_libs: [
+        "libplayerservice_datasource",
+        "libstagefright_nuplayer",
+        "libstagefright_rtsp",
+        "libstagefright_timedtext",
+    ],
+    shared_libs: [
+        "android.hardware.media.c2@1.0",
+        "android.hardware.media.omx@1.0",
+        "av-types-aidl-cpp",
+        "libaudioclient_aidl_conversion",
+        "libbase",
+        "libactivitymanager_aidl",
+        "libandroid_net",
+        "libaudioclient",
+        "libcamera_client",
+        "libcodec2_client",
+        "libcrypto",
+        "libdatasource",
+        "libdrmframework",
+        "libgui",
+        "libhidlbase",
+        "liblog",
+        "libmedia_codeclist",
+        "libmedia_omx",
+        "libmediadrm",
+        "libmediametrics",
+        "libmediautils",
+        "libmemunreachable",
+        "libnetd_client",
+        "libpowermanager",
+        "libstagefright_httplive",
+    ],
+}
