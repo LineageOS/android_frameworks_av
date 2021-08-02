@@ -53,7 +53,7 @@ public:
 
 AudioGains getAudioGainsForTest() {
     AudioGains audioGains;
-    sp<AudioGain> audioGain = new AudioGain(0 /*index*/, false /*useInChannelMask*/);
+    sp<AudioGain> audioGain = new AudioGain(0 /*index*/, false /*isInput*/);
     audioGain->setMode(AUDIO_GAIN_MODE_JOINT);
     audioGain->setChannelMask(AUDIO_CHANNEL_OUT_STEREO);
     audioGain->setMinValueInMb(-3200);
@@ -86,17 +86,6 @@ TEST(AudioFoundationParcelableTest, ParcelingAudioGain) {
     ASSERT_TRUE(audioGainsFromParcel.equals(audioGains));
 }
 
-TEST(AudioFoundationParcelableTest, ParcelingAudioProfileVector) {
-    Parcel data;
-    AudioProfileVector audioProfiles = getAudioProfileVectorForTest();
-
-    ASSERT_EQ(data.writeParcelable(audioProfiles), NO_ERROR);
-    data.setDataPosition(0);
-    AudioProfileVector audioProfilesFromParcel;
-    ASSERT_EQ(data.readParcelable(&audioProfilesFromParcel), NO_ERROR);
-    ASSERT_TRUE(audioProfilesFromParcel.equals(audioProfiles));
-}
-
 TEST(AudioFoundationParcelableTest, ParcelingAudioPort) {
     Parcel data;
     sp<AudioPort> audioPort = new AudioPort(
@@ -116,11 +105,15 @@ TEST(AudioFoundationParcelableTest, ParcelingAudioPortConfig) {
     Parcel data;
     sp<AudioPortConfig> audioPortConfig = new AudioPortConfigTestStub();
     audioPortConfig->applyAudioPortConfig(&TEST_AUDIO_PORT_CONFIG);
-
-    ASSERT_EQ(data.writeParcelable(*audioPortConfig), NO_ERROR);
+    media::AudioPortConfig parcelable{};
+    ASSERT_EQ(NO_ERROR, audioPortConfig->writeToParcelable(&parcelable, false /*isInput*/));
+    ASSERT_EQ(NO_ERROR, data.writeParcelable(parcelable));
     data.setDataPosition(0);
+    media::AudioPortConfig parcelableFromParcel{};
+    ASSERT_EQ(NO_ERROR, data.readParcelable(&parcelableFromParcel));
     sp<AudioPortConfig> audioPortConfigFromParcel = new AudioPortConfigTestStub();
-    ASSERT_EQ(data.readParcelable(audioPortConfigFromParcel.get()), NO_ERROR);
+    ASSERT_EQ(NO_ERROR, audioPortConfigFromParcel->readFromParcelable(
+                    parcelableFromParcel, false /*isInput*/));
     ASSERT_TRUE(audioPortConfigFromParcel->equals(audioPortConfig));
 }
 
