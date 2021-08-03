@@ -85,11 +85,17 @@ struct CameraStatus : public android::Parcelable {
      */
     std::vector<String8> unavailablePhysicalIds;
 
+    /**
+     * Client package name if camera is open, otherwise not applicable
+     */
+    String8 clientPackage;
+
     virtual status_t writeToParcel(android::Parcel* parcel) const;
     virtual status_t readFromParcel(const android::Parcel* parcel);
 
-    CameraStatus(String8 id, int32_t s, const std::vector<String8>& unavailSubIds) :
-            cameraId(id), status(s), unavailablePhysicalIds(unavailSubIds) {}
+    CameraStatus(String8 id, int32_t s, const std::vector<String8>& unavailSubIds,
+            const String8& clientPkg) : cameraId(id), status(s),
+            unavailablePhysicalIds(unavailSubIds), clientPackage(clientPkg) {}
     CameraStatus() : status(ICameraServiceListener::STATUS_PRESENT) {}
 };
 
