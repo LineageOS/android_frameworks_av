@@ -292,7 +292,7 @@ Status AudioPolicyService::getOutputForAttr(const media::AudioAttributesInternal
             aidl2legacy_int32_t_audio_session_t(sessionAidl));
     audio_stream_type_t stream = AUDIO_STREAM_DEFAULT;
     audio_config_t config = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioConfig_audio_config_t(configAidl));
+            aidl2legacy_AudioConfig_audio_config_t(configAidl, false /*isInput*/));
     audio_output_flags_t flags = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_output_flags_t_mask(flagsAidl));
     audio_port_handle_t selectedDeviceId = VALUE_OR_RETURN_BINDER_STATUS(
@@ -523,7 +523,7 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
     audio_session_t session = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_session_t(sessionAidl));
     audio_config_base_t config = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl));
+            aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl, true /*isInput*/));
     audio_input_flags_t flags = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_int32_t_audio_input_flags_t_mask(flagsAidl));
     audio_port_handle_t selectedDeviceId = VALUE_OR_RETURN_BINDER_STATUS(
@@ -1433,7 +1433,7 @@ Status AudioPolicyService::isDirectOutputSupported(
         const media::AudioAttributesInternal& attributesAidl,
         bool* _aidl_return) {
     audio_config_base_t config = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl));
+            aidl2legacy_AudioConfigBase_audio_config_base_t(configAidl, false /*isInput*/));
     audio_attributes_t attributes = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioAttributesInternal_audio_attributes_t(attributesAidl));
     RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(
