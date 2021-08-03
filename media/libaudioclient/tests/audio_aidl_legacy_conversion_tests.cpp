@@ -172,15 +172,15 @@ TEST_F(HashIdentityTest, AudioFormatDescriptionHashIdentity) {
             make_AFD_Encap, make_AFD_Encap_with_Enc});
 }
 
-using ChannelLayoutParam = std::tuple<media::AudioChannelLayout, bool /*isOutput*/>;
+using ChannelLayoutParam = std::tuple<media::AudioChannelLayout, bool /*isInput*/>;
 class AudioChannelLayoutRoundTripTest :
         public testing::TestWithParam<ChannelLayoutParam> {};
 TEST_P(AudioChannelLayoutRoundTripTest, Aidl2Legacy2Aidl) {
     const auto initial = std::get<0>(GetParam());
-    const bool isOutput = std::get<1>(GetParam());
-    auto conv = aidl2legacy_AudioChannelLayout_audio_channel_mask_t(initial, isOutput);
+    const bool isInput = std::get<1>(GetParam());
+    auto conv = aidl2legacy_AudioChannelLayout_audio_channel_mask_t(initial, isInput);
     ASSERT_TRUE(conv.ok());
-    auto convBack = legacy2aidl_audio_channel_mask_t_AudioChannelLayout(conv.value(), isOutput);
+    auto convBack = legacy2aidl_audio_channel_mask_t_AudioChannelLayout(conv.value(), isInput);
     ASSERT_TRUE(convBack.ok());
     EXPECT_EQ(initial, convBack.value());
 }
@@ -189,11 +189,11 @@ INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip,
         testing::Combine(
                 testing::Values(media::AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
                         make_ACL_ChannelIndex2()),
-                testing::Values(true, false)));
+                testing::Values(false, true)));
 INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip,
         AudioChannelLayoutRoundTripTest,
         // In legacy constants the voice call is only defined for input.
-        testing::Combine(testing::Values(make_ACL_VoiceCall()), testing::Values(false)));
+        testing::Combine(testing::Values(make_ACL_VoiceCall()), testing::Values(true)));
 
 class AudioDeviceDescriptionRoundTripTest :
         public testing::TestWithParam<media::AudioDeviceDescription> {};

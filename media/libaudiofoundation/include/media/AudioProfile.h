@@ -29,7 +29,7 @@
 
 namespace android {
 
-class AudioProfile final : public RefBase, public Parcelable
+class AudioProfile final : public RefBase
 {
 public:
     static sp<AudioProfile> createFullDynamic(audio_format_t dynamicFormat = AUDIO_FORMAT_DEFAULT);
@@ -81,11 +81,9 @@ public:
 
     bool equals(const sp<AudioProfile>& other) const;
 
-    status_t writeToParcel(Parcel* parcel) const override;
-    status_t readFromParcel(const Parcel* parcel) override;
-
-    ConversionResult<media::AudioProfile> toParcelable() const;
-    static ConversionResult<sp<AudioProfile>> fromParcelable(const media::AudioProfile& parcelable);
+    ConversionResult<media::AudioProfile> toParcelable(bool isInput) const;
+    static ConversionResult<sp<AudioProfile>> fromParcelable(
+            const media::AudioProfile& parcelable, bool isInput);
 
 private:
 
@@ -106,11 +104,11 @@ private:
 
 // Conversion routines, according to AidlConversion.h conventions.
 ConversionResult<sp<AudioProfile>>
-aidl2legacy_AudioProfile(const media::AudioProfile& aidl);
+aidl2legacy_AudioProfile(const media::AudioProfile& aidl, bool isInput);
 ConversionResult<media::AudioProfile>
-legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy);
+legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy, bool isInput);
 
-class AudioProfileVector : public std::vector<sp<AudioProfile>>, public Parcelable
+class AudioProfileVector : public std::vector<sp<AudioProfile>>
 {
 public:
     virtual ~AudioProfileVector() = default;
@@ -136,18 +134,15 @@ public:
     virtual void dump(std::string *dst, int spaces) const;
 
     bool equals(const AudioProfileVector& other) const;
-
-    status_t writeToParcel(Parcel* parcel) const override;
-    status_t readFromParcel(const Parcel* parcel) override;
 };
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);
 
 // Conversion routines, according to AidlConversion.h conventions.
 ConversionResult<AudioProfileVector>
-aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl);
+aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl, bool isInput);
 ConversionResult<std::vector<media::AudioProfile>>
-legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy);
+legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy, bool isInput);
 
 AudioProfileVector intersectAudioProfiles(const AudioProfileVector& profiles1,
                                           const AudioProfileVector& profiles2);
