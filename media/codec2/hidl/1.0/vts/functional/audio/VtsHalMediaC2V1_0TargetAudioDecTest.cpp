@@ -46,8 +46,8 @@ std::vector<CompToFiles> gCompToFiles = {
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz.info"},
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac",
          "bbb_aac_stereo_128kbps_48000hz_multi_frame.info"},
-        {"audio/mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
-        {"audio/mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3",
+        {"mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
+        {"mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3",
          "bbb_mp3_stereo_192kbps_48000hz_multi_frame.info"},
         {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb", "sine_amrnb_1ch_12kbps_8000hz.info"},
         {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb",
@@ -303,7 +303,7 @@ bool Codec2AudioDecHidlTestBase::getFileNames(size_t streamIndex) {
     int streamCount = 0;
 
     for (size_t i = 0; i < gCompToFiles.size(); ++i) {
-        if (mMime.find(gCompToFiles[i].mime) != std::string::npos) {
+        if (!mMime.compare("audio/" + gCompToFiles[i].mime)) {
             if (streamCount == streamIndex) {
                 mInputFile = sResourceDir + gCompToFiles[i].inputFile;
                 mInfoFile = sResourceDir + gCompToFiles[i].infoFile;
