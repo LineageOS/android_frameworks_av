@@ -71,13 +71,15 @@ std::vector<CompToFiles> gCompToFiles = {
         {"3gpp", "bbb_h263_352x288_300kbps_12fps.h263", "bbb_h263_352x288_300kbps_12fps.info", ""},
         {"mp4v-es", "bbb_mpeg4_352x288_512kbps_30fps.m4v", "bbb_mpeg4_352x288_512kbps_30fps.info",
          ""},
-        {"vp8", "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info", ""},
-        {"vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
+        {"x-vnd.on2.vp8", "bbb_vp8_176x144_240kbps_60fps.vp8", "bbb_vp8_176x144_240kbps_60fps.info",
+         ""},
+        {"x-vnd.on2.vp8", "bbb_vp8_640x360_2mbps_30fps.vp8", "bbb_vp8_640x360_2mbps_30fps.info",
          "bbb_vp8_640x360_2mbps_30fps_chksm.md5"},
-        {"vp9", "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info", ""},
-        {"vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9", "bbb_vp9_640x360_1600kbps_30fps.info",
-         "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
-        {"vp9", "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
+        {"x-vnd.on2.vp9", "bbb_vp9_176x144_285kbps_60fps.vp9", "bbb_vp9_176x144_285kbps_60fps.info",
+         ""},
+        {"x-vnd.on2.vp9", "bbb_vp9_640x360_1600kbps_30fps.vp9",
+         "bbb_vp9_640x360_1600kbps_30fps.info", "bbb_vp9_640x360_1600kbps_30fps_chksm.md5"},
+        {"x-vnd.on2.vp9", "bbb_vp9_704x480_280kbps_24fps_altref_2.vp9",
          "bbb_vp9_704x480_280kbps_24fps_altref_2.info", ""},
         {"av01", "bbb_av1_640_360.av1", "bbb_av1_640_360.info", "bbb_av1_640_360_chksum.md5"},
         {"av01", "bbb_av1_176_144.av1", "bbb_av1_176_144.info", "bbb_av1_176_144_chksm.md5"},
@@ -386,7 +388,7 @@ bool Codec2VideoDecHidlTestBase::getFileNames(size_t streamIndex) {
     int streamCount = 0;
 
     for (size_t i = 0; i < gCompToFiles.size(); ++i) {
-        if (mMime.find(gCompToFiles[i].mime) != std::string::npos) {
+        if (!mMime.compare("video/" + gCompToFiles[i].mime)) {
             if (streamCount == streamIndex) {
                 mInputFile = sResourceDir + gCompToFiles[i].inputFile;
                 mInfoFile = sResourceDir + gCompToFiles[i].infoFile;
