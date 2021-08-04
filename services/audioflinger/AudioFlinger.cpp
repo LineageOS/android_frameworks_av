@@ -976,8 +976,9 @@ sp<IAudioTrack> AudioFlinger::createTrack(const CreateTrackInput& input,
                 }
             }
         }
-
-        setAudioHwSyncForSession_l(thread, sessionId);
+        if ((output.flags & AUDIO_OUTPUT_FLAG_HW_AV_SYNC) == AUDIO_OUTPUT_FLAG_HW_AV_SYNC) {
+            setAudioHwSyncForSession_l(thread, sessionId);
+        }
     }
 
     if (lStatus != NO_ERROR) {
