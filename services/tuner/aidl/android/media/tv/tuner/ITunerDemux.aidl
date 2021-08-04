@@ -36,6 +36,11 @@ interface ITunerDemux {
     void setFrontendDataSource(in ITunerFrontend frontend);
 
     /**
+     * Set a frontend resource by ID as data input of the demux
+     */
+    void setFrontendDataSourceById(in int frontendId);
+
+    /**
      * Open a new filter in the demux
      */
     ITunerFilter openFilter(
