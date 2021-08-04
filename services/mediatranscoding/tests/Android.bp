@@ -34,8 +34,8 @@ cc_defaults {
     ],
 
     static_libs: [
-        "mediatranscoding_aidl_interface-ndk_platform",
-        "resourcemanager_aidl_interface-ndk_platform",
+        "mediatranscoding_aidl_interface-ndk",
+        "resourcemanager_aidl_interface-ndk",
         "libmediatranscodingservice",
     ],
 
