@@ -378,12 +378,12 @@ cc_library {
     ],
 
     static_libs: [
-        "resourcemanager_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk",
         "framework-permission-aidl-cpp",
     ],
 
     export_static_lib_headers: [
-        "resourcemanager_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk",
         "framework-permission-aidl-cpp",
     ],
 
