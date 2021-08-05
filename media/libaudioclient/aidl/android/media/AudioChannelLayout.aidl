@@ -52,9 +52,12 @@ union AudioChannelLayout {
      */
     int invalid = 0;
     /**
-     * This variant is used for representing indexed masks. The value
-     * must be one of the 'INDEX_MASK_*' constants. The 'indexMask' field
-     * must have at least one bit set.
+     * This variant is used for representing indexed masks. The mask indicates
+     * what channels are used. For example, the mask that specifies to use only
+     * channels 1 and 3 when interacting with a multi-channel device is defined
+     * as a combination of the 1st and the 3rd bits and thus is equal to 5. See
+     * also the 'INDEX_MASK_*' constants. The 'indexMask' field must have at
+     * least one bit set.
      */
     int indexMask;
     /**
@@ -71,7 +74,10 @@ union AudioChannelLayout {
     int voiceMask;
 
     /**
-     * 'INDEX_MASK_' constants define how many channels are used.
+     * 'INDEX_MASK_*' constants define how many channels are used.
+     * The mask constants below are 'canonical' masks. Each 'INDEX_MASK_N'
+     * constant declares that all N channels are used and arranges
+     * them starting from the LSB.
      */
     const int INDEX_MASK_1 = (1 << 1) - 1;
     const int INDEX_MASK_2 = (1 << 2) - 1;

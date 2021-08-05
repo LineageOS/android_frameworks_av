@@ -46,6 +46,11 @@ media::AudioChannelLayout make_ACL_ChannelIndex2() {
             media::AudioChannelLayout::INDEX_MASK_2);
 }
 
+media::AudioChannelLayout make_ACL_ChannelIndexArbitrary() {
+    // Use channels 1 and 3.
+    return media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::indexMask>(5);
+}
+
 media::AudioChannelLayout make_ACL_VoiceCall() {
     return media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::voiceMask>(
             media::AudioChannelLayout::VOICE_CALL_MONO);
@@ -157,7 +162,7 @@ class HashIdentityTest : public ::testing::Test {
 TEST_F(HashIdentityTest, AudioChannelLayoutHashIdentity) {
     verifyHashIdentity<media::AudioChannelLayout>({
             make_ACL_None, make_ACL_Invalid, make_ACL_Stereo, make_ACL_ChannelIndex2,
-            make_ACL_VoiceCall});
+            make_ACL_ChannelIndexArbitrary, make_ACL_VoiceCall});
 }
 
 TEST_F(HashIdentityTest, AudioDeviceDescriptionHashIdentity) {
@@ -188,7 +193,7 @@ INSTANTIATE_TEST_SUITE_P(AudioChannelLayoutRoundTrip,
         AudioChannelLayoutRoundTripTest,
         testing::Combine(
                 testing::Values(media::AudioChannelLayout{}, make_ACL_Invalid(), make_ACL_Stereo(),
-                        make_ACL_ChannelIndex2()),
+                        make_ACL_ChannelIndex2(), make_ACL_ChannelIndexArbitrary()),
                 testing::Values(false, true)));
 INSTANTIATE_TEST_SUITE_P(AudioChannelVoiceRoundTrip,
         AudioChannelLayoutRoundTripTest,

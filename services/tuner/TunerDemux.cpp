@@ -56,6 +56,19 @@ Status TunerDemux::setFrontendDataSource(const std::shared_ptr<ITunerFrontend>& 
     return Status::ok();
 }
 
+Status TunerDemux::setFrontendDataSourceById(int frontendId) {
+    if (mDemux == nullptr) {
+        ALOGE("IDemux is not initialized");
+        return Status::fromServiceSpecificError(static_cast<int32_t>(Result::UNAVAILABLE));
+    }
+
+    Result res = mDemux->setFrontendDataSource(frontendId);
+    if (res != Result::SUCCESS) {
+        return ::ndk::ScopedAStatus::fromServiceSpecificError(static_cast<int32_t>(res));
+    }
+    return Status::ok();
+}
+
 Status TunerDemux::openFilter(
         int type, int subType, int bufferSize, const std::shared_ptr<ITunerFilterCallback>& cb,
         std::shared_ptr<ITunerFilter>* _aidl_return) {
