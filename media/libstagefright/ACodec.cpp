@@ -3270,10 +3270,12 @@ status_t ACodec::configureTunneledVideoPlayback(
     if (err != OK) {
         ALOGE("native_window_set_sideband_stream(%p) failed! (err %d).",
                 sidebandHandle, err);
-        return err;
     }
 
-    return OK;
+    native_handle_close(sidebandHandle);
+    native_handle_delete(sidebandHandle);
+
+    return err;
 }
 
 status_t ACodec::setVideoPortFormatType(
