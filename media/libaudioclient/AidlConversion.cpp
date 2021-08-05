@@ -396,44 +396,6 @@ using AudioFormatPair = std::pair<audio_format_t, media::AudioFormatDescription>
 using AudioFormatPairs = std::vector<AudioFormatPair>;
 }
 
-const detail::AudioChannelPairs& getIndexAudioChannelPairs() {
-    static const detail::AudioChannelPairs pairs = {
-#define DEFINE_INDEX_MASK(n)                                                                \
-            {                                                                               \
-                AUDIO_CHANNEL_INDEX_MASK_##n,                                               \
-                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::indexMask>( \
-                        media::AudioChannelLayout::INDEX_MASK_##n)                          \
-            }
-
-            DEFINE_INDEX_MASK(1),
-            DEFINE_INDEX_MASK(2),
-            DEFINE_INDEX_MASK(3),
-            DEFINE_INDEX_MASK(4),
-            DEFINE_INDEX_MASK(5),
-            DEFINE_INDEX_MASK(6),
-            DEFINE_INDEX_MASK(7),
-            DEFINE_INDEX_MASK(8),
-            DEFINE_INDEX_MASK(9),
-            DEFINE_INDEX_MASK(10),
-            DEFINE_INDEX_MASK(11),
-            DEFINE_INDEX_MASK(12),
-            DEFINE_INDEX_MASK(13),
-            DEFINE_INDEX_MASK(14),
-            DEFINE_INDEX_MASK(15),
-            DEFINE_INDEX_MASK(16),
-            DEFINE_INDEX_MASK(17),
-            DEFINE_INDEX_MASK(18),
-            DEFINE_INDEX_MASK(19),
-            DEFINE_INDEX_MASK(20),
-            DEFINE_INDEX_MASK(21),
-            DEFINE_INDEX_MASK(22),
-            DEFINE_INDEX_MASK(23),
-            DEFINE_INDEX_MASK(24)
-#undef DEFINE_INDEX_MASK
-    };
-    return pairs;
-}
-
 const detail::AudioChannelPairs& getInAudioChannelPairs() {
     static const detail::AudioChannelPairs pairs = {
 #define DEFINE_INPUT_LAYOUT(n)                                                               \
@@ -1096,7 +1058,6 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
         const media::AudioChannelLayout& aidl, bool isInput) {
     using ReverseMap = std::unordered_map<media::AudioChannelLayout, audio_channel_mask_t>;
     using Tag = media::AudioChannelLayout::Tag;
-    static const ReverseMap mIdx = make_ReverseMap(getIndexAudioChannelPairs());
     static const ReverseMap mIn = make_ReverseMap(getInAudioChannelPairs());
     static const ReverseMap mOut = make_ReverseMap(getOutAudioChannelPairs());
     static const ReverseMap mVoice = make_ReverseMap(getVoiceAudioChannelPairs());
@@ -1117,8 +1078,19 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
             return AUDIO_CHANNEL_NONE;
         case Tag::invalid:
             return AUDIO_CHANNEL_INVALID;
-        case Tag::indexMask:
-            return convert(aidl, mIdx, __func__, "index");
+        case Tag::indexMask: {
+            // Index masks do not have pre-defined values.
+            const int bits = aidl.get<Tag::indexMask>();
+            if (__builtin_popcount(bits) != 0 &&
+                    __builtin_popcount(bits) <= AUDIO_CHANNEL_COUNT_MAX) {
+                return audio_channel_mask_from_representation_and_bits(
+                        AUDIO_CHANNEL_REPRESENTATION_INDEX, bits);
+            } else {
+                ALOGE("%s: invalid indexMask value 0x%x in %s",
+                        __func__, bits, aidl.toString().c_str());
+                return unexpected(BAD_VALUE);
+            }
+        }
         case Tag::layoutMask:
             return convert(aidl, isInput ? mIn : mOut, __func__, isInput ? "input" : "output");
         case Tag::voiceMask:
@@ -1132,7 +1104,6 @@ ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_Aud
         audio_channel_mask_t legacy, bool isInput) {
     using DirectMap = std::unordered_map<audio_channel_mask_t, media::AudioChannelLayout>;
     using Tag = media::AudioChannelLayout::Tag;
-    static const DirectMap mIdx = make_DirectMap(getIndexAudioChannelPairs());
     static const DirectMap mInAndVoice = make_DirectMap(
             getInAudioChannelPairs(), getVoiceAudioChannelPairs());
     static const DirectMap mOut = make_DirectMap(getOutAudioChannelPairs());
@@ -1156,7 +1127,14 @@ ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_Aud
 
     const audio_channel_representation_t repr = audio_channel_mask_get_representation(legacy);
     if (repr == AUDIO_CHANNEL_REPRESENTATION_INDEX) {
-        return convert(legacy, mIdx, __func__, "index");
+        if (audio_channel_mask_is_valid(legacy)) {
+            const int indexMask = VALUE_OR_RETURN(
+                    convertIntegral<int>(audio_channel_mask_get_bits(legacy)));
+            return media::AudioChannelLayout::make<Tag::indexMask>(indexMask);
+        } else {
+            ALOGE("%s: legacy audio_channel_mask_t value 0x%x is invalid", __func__, legacy);
+            return unexpected(BAD_VALUE);
+        }
     } else if (repr == AUDIO_CHANNEL_REPRESENTATION_POSITION) {
         return convert(legacy, isInput ? mInAndVoice : mOut, __func__,
                 isInput ? "input / voice" : "output");

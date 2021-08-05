@@ -43,10 +43,10 @@ interface ITunerService {
     /**
      * Retrieve the frontend's information.
      *
-     * @param frontendHandle the handle of the frontend granted by TRM.
+     * @param frontendId the ID of the frontend.
      * @return the information of the frontend.
      */
-    TunerFrontendInfo getFrontendInfo(in int frontendHandle);
+    TunerFrontendInfo getFrontendInfo(in int frontendId);
 
     /**
      * Get Dtmb Frontend Capabilities.
