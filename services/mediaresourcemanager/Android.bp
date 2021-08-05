@@ -90,7 +90,7 @@ cc_library {
     ],
 
     static_libs: [
-        "resourceobserver_aidl_interface-V1-ndk_platform",
+        "resourceobserver_aidl_interface-V1-ndk",
     ],
 
     include_dirs: ["frameworks/av/include"],
