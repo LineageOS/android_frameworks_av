@@ -106,8 +106,8 @@ cc_library {
     export_include_dirs: ["include"],
 
     static_libs: [
-        "mediatranscoding_aidl_interface-ndk_platform",
-        "resourceobserver_aidl_interface-V1-ndk_platform",
+        "mediatranscoding_aidl_interface-ndk",
+        "resourceobserver_aidl_interface-V1-ndk",
         "libstatslog_media",
     ],
 

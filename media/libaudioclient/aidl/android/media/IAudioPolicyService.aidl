@@ -299,6 +299,8 @@ interface IAudioPolicyService {
 
     void setAssistantUid(int /* uid_t */ uid);
 
+    void setHotwordDetectionServiceUid(int /* uid_t */ uid);
+
     void setA11yServicesUids(in int[] /* uid_t[] */ uids);
 
     void setCurrentImeUid(int /* uid_t */ uid);
