@@ -1572,25 +1572,8 @@ status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &s
 
     // configure dataspace
     static_assert(sizeof(int32_t) == sizeof(android_dataspace), "dataspace size mismatch");
-
-    // The output format contains app-configured color aspects, and the input format
-    // has the default color aspects. Use the default for the unspecified params.
-    ColorAspects inputColorAspects, outputColorAspects;
-    getColorAspectsFromFormat(config->mOutputFormat, outputColorAspects);
-    getColorAspectsFromFormat(config->mInputFormat, inputColorAspects);
-    if (outputColorAspects.mRange == ColorAspects::RangeUnspecified) {
-        outputColorAspects.mRange = inputColorAspects.mRange;
-    }
-    if (outputColorAspects.mPrimaries == ColorAspects::PrimariesUnspecified) {
-        outputColorAspects.mPrimaries = inputColorAspects.mPrimaries;
-    }
-    if (outputColorAspects.mTransfer == ColorAspects::TransferUnspecified) {
-        outputColorAspects.mTransfer = inputColorAspects.mTransfer;
-    }
-    if (outputColorAspects.mMatrixCoeffs == ColorAspects::MatrixUnspecified) {
-        outputColorAspects.mMatrixCoeffs = inputColorAspects.mMatrixCoeffs;
-    }
-    android_dataspace dataSpace = getDataSpaceForColorAspects(outputColorAspects, false);
+    android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
+    (void)config->mInputFormat->findInt32("android._dataspace", (int32_t*)&dataSpace);
     surface->setDataSpace(dataSpace);
 
     status_t err = mChannel->setInputSurface(surface);
