@@ -199,6 +199,7 @@ public:
     binder::Status setSurroundFormatEnabled(media::audio::common::AudioFormat audioFormat,
                                             bool enabled) override;
     binder::Status setAssistantUid(int32_t uid) override;
+    binder::Status setHotwordDetectionServiceUid(int32_t uid) override;
     binder::Status setA11yServicesUids(const std::vector<int32_t>& uids) override;
     binder::Status setCurrentImeUid(int32_t uid) override;
     binder::Status isHapticPlaybackSupported(bool* _aidl_return) override;
@@ -376,7 +377,8 @@ private:
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
                 : mService(service), mObserverRegistered(false),
-                  mAssistantUid(0), mCurrentImeUid(0), mRttEnabled(false) {}
+                  mAssistantUid(0), mHotwordDetectionServiceUid(0), mCurrentImeUid(0),
+                  mRttEnabled(false) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -386,8 +388,13 @@ private:
 
         bool isUidActive(uid_t uid);
         int getUidState(uid_t uid);
-        void setAssistantUid(uid_t uid) { mAssistantUid = uid; }
-        bool isAssistantUid(uid_t uid) { return uid == mAssistantUid; }
+        void setAssistantUid(uid_t uid) { mAssistantUid = uid; };
+        void setHotwordDetectionServiceUid(uid_t uid) { mHotwordDetectionServiceUid = uid; }
+        bool isAssistantUid(uid_t uid) const {
+            // The HotwordDetectionService is part of the Assistant package but runs with a separate
+            // (isolated) uid, so we check for either uid here.
+            return uid == mAssistantUid || uid == mHotwordDetectionServiceUid;
+        }
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
@@ -423,6 +430,7 @@ private:
         std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         uid_t mAssistantUid = -1;
+        uid_t mHotwordDetectionServiceUid = -1;
         std::vector<uid_t> mA11yUids;
         uid_t mCurrentImeUid = -1;
         bool mRttEnabled = false;
