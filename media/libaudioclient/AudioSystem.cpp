@@ -1922,6 +1922,14 @@ status_t AudioSystem::setAssistantUid(uid_t uid) {
     return statusTFromBinderStatus(aps->setAssistantUid(uidAidl));
 }
 
+status_t AudioSystem::setHotwordDetectionServiceUid(uid_t uid) {
+    const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
+    if (aps == 0) return PERMISSION_DENIED;
+
+    int32_t uidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_uid_t_int32_t(uid));
+    return statusTFromBinderStatus(aps->setHotwordDetectionServiceUid(uidAidl));
+}
+
 status_t AudioSystem::setA11yServicesUids(const std::vector<uid_t>& uids) {
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;

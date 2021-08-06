@@ -1916,6 +1916,14 @@ Status AudioPolicyService::setAssistantUid(int32_t uidAidl)
     return Status::ok();
 }
 
+Status AudioPolicyService::setHotwordDetectionServiceUid(int32_t uidAidl)
+{
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setHotwordDetectionServiceUid(uid);
+    return Status::ok();
+}
+
 Status AudioPolicyService::setA11yServicesUids(const std::vector<int32_t>& uidsAidl)
 {
     size_t size = uidsAidl.size();
