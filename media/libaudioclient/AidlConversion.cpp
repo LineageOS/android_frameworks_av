@@ -724,7 +724,6 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_PCM_24_BIT_PACKED, make_AudioFormatDescription(media::PcmType::INT_24_BIT)
         },
         {
-            // See the comment in MediaDefs.h.
             AUDIO_FORMAT_MP3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEG)
         },
         {
@@ -734,52 +733,41 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_AMR_WB, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AMR_WB)
         },
         {
-            // Note: in MediaDefs.cpp MEDIA_MIMETYPE_AUDIO_AAC = "audio/mp4a-latm".
-            AUDIO_FORMAT_AAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_FORMAT)
+            AUDIO_FORMAT_AAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_MP4)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_MAIN, make_AudioFormatDescription("audio/aac.main")
+            AUDIO_FORMAT_AAC_MAIN, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_MAIN)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_LC, make_AudioFormatDescription("audio/aac.lc")
+            AUDIO_FORMAT_AAC_LC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_LC)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_SSR, make_AudioFormatDescription("audio/aac.ssr")
+            AUDIO_FORMAT_AAC_SSR, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_SSR)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_LTP, make_AudioFormatDescription("audio/aac.ltp")
+            AUDIO_FORMAT_AAC_LTP, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_LTP)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_HE_V1, make_AudioFormatDescription("audio/aac.he.v1")
+            AUDIO_FORMAT_AAC_HE_V1, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_HE_V1)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_SCALABLE, make_AudioFormatDescription("audio/aac.scalable")
+            AUDIO_FORMAT_AAC_SCALABLE,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_SCALABLE)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ERLC, make_AudioFormatDescription("audio/aac.erlc")
+            AUDIO_FORMAT_AAC_ERLC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ERLC)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_LD, make_AudioFormatDescription("audio/aac.ld")
+            AUDIO_FORMAT_AAC_LD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_LD)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_HE_V2, make_AudioFormatDescription("audio/aac.he.v2")
+            AUDIO_FORMAT_AAC_HE_V2, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_HE_V2)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ELD, make_AudioFormatDescription("audio/aac.eld")
+            AUDIO_FORMAT_AAC_ELD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ELD)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_XHE, make_AudioFormatDescription("audio/aac.xhe")
+            AUDIO_FORMAT_AAC_XHE, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_XHE)
         },
         // AUDIO_FORMAT_HE_AAC_V1 and HE_AAC_V2 are removed since they were deprecated long time
         // ago.
@@ -796,7 +784,6 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_E_AC3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EAC3)
         },
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_E_AC3_JOC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EAC3_JOC)
         },
         {
@@ -809,13 +796,12 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
         // nested AudioFormatDescriptions. The legacy 'AUDIO_FORMAT_IEC61937' type doesn't
         // specify the format of the encapsulated bitstream.
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_IEC61937,
-            make_AudioFormatDescription(media::PcmType::INT_16_BIT, "audio/x-iec61937")
+            make_AudioFormatDescription(media::PcmType::INT_16_BIT, MEDIA_MIMETYPE_AUDIO_IEC61937)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_DOLBY_TRUEHD, make_AudioFormatDescription("audio/vnd.dolby.truehd")
+            AUDIO_FORMAT_DOLBY_TRUEHD,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DOLBY_TRUEHD)
         },
         {
             AUDIO_FORMAT_EVRC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EVRC)
@@ -830,11 +816,9 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_EVRCNW, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_EVRCNW)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADIF, make_AudioFormatDescription("audio/aac.adif")
+            AUDIO_FORMAT_AAC_ADIF, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADIF)
         },
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_WMA, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_WMA)
         },
         {
@@ -845,7 +829,6 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_AMR_WB_PLUS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AMR_WB_PLUS)
         },
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_MP2, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEG_LAYER_II)
         },
         {
@@ -859,7 +842,6 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_FLAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_FLAC)
         },
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_ALAC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_ALAC)
         },
         {
@@ -867,52 +849,49 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_APE, make_AudioFormatDescription("audio/x-ape")
         },
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_AAC_ADTS, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_MAIN, make_AudioFormatDescription("audio/aac-adts.main")
+            AUDIO_FORMAT_AAC_ADTS_MAIN,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_MAIN)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_LC, make_AudioFormatDescription("audio/aac-adts.lc")
+            AUDIO_FORMAT_AAC_ADTS_LC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LC)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_SSR, make_AudioFormatDescription("audio/aac-adts.ssr")
+            AUDIO_FORMAT_AAC_ADTS_SSR,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_SSR)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_LTP, make_AudioFormatDescription("audio/aac-adts.ltp")
+            AUDIO_FORMAT_AAC_ADTS_LTP,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LTP)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_HE_V1, make_AudioFormatDescription("audio/aac-adts.he.v1")
+            AUDIO_FORMAT_AAC_ADTS_HE_V1,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_HE_V1)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_SCALABLE, make_AudioFormatDescription("audio/aac-adts.scalable")
+            AUDIO_FORMAT_AAC_ADTS_SCALABLE,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_SCALABLE)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_ERLC, make_AudioFormatDescription("audio/aac-adts.erlc")
+            AUDIO_FORMAT_AAC_ADTS_ERLC,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_ERLC)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_LD, make_AudioFormatDescription("audio/aac-adts.ld")
+            AUDIO_FORMAT_AAC_ADTS_LD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_LD)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_HE_V2, make_AudioFormatDescription("audio/aac-adts.he.v2")
+            AUDIO_FORMAT_AAC_ADTS_HE_V2,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_HE_V2)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_ELD, make_AudioFormatDescription("audio/aac-adts.eld")
+            AUDIO_FORMAT_AAC_ADTS_ELD,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_ELD)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_ADTS_XHE, make_AudioFormatDescription("audio/aac-adts.xhe")
+            AUDIO_FORMAT_AAC_ADTS_XHE,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_ADTS_XHE)
         },
         {
             // Note: not in the IANA registry. "vnd.octel.sbc" is not BT SBC.
@@ -926,7 +905,6 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_APTX_HD, make_AudioFormatDescription("audio/vnd.qcom.aptx.hd")
         },
         {
-            // Note: not in the IANA registry. Matches MediaDefs.cpp.
             AUDIO_FORMAT_AC4, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AC4)
         },
         {
@@ -934,35 +912,36 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_LDAC, make_AudioFormatDescription("audio/vnd.sony.ldac")
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_MAT, make_AudioFormatDescription("audio/vnd.dolby.mat")
+            AUDIO_FORMAT_MAT, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DOLBY_MAT)
         },
         {
             // Note: not in the IANA registry.
-            AUDIO_FORMAT_MAT_1_0, make_AudioFormatDescription("audio/vnd.dolby.mat.1.0")
+            AUDIO_FORMAT_MAT_1_0,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DOLBY_MAT + std::string(".1.0"))
         },
         {
             // Note: not in the IANA registry.
-            AUDIO_FORMAT_MAT_2_0, make_AudioFormatDescription("audio/vnd.dolby.mat.2.0")
+            AUDIO_FORMAT_MAT_2_0,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DOLBY_MAT + std::string(".2.0"))
         },
         {
             // Note: not in the IANA registry.
-            AUDIO_FORMAT_MAT_2_1, make_AudioFormatDescription("audio/vnd.dolby.mat.2.1")
+            AUDIO_FORMAT_MAT_2_1,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DOLBY_MAT + std::string(".2.1"))
         },
         {
             AUDIO_FORMAT_AAC_LATM, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_LATM_LC, make_AudioFormatDescription("audio/mp4a-latm.lc")
+            AUDIO_FORMAT_AAC_LATM_LC, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_LATM_LC)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_LATM_HE_V1, make_AudioFormatDescription("audio/mp4a-latm.he.v1")
+            AUDIO_FORMAT_AAC_LATM_HE_V1,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_LATM_HE_V1)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_AAC_LATM_HE_V2, make_AudioFormatDescription("audio/mp4a-latm.he.v2")
+            AUDIO_FORMAT_AAC_LATM_HE_V2,
+            make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_AAC_LATM_HE_V2)
         },
         {
             // Note: not in the IANA registry.
@@ -989,29 +968,23 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
             AUDIO_FORMAT_LC3, make_AudioFormatDescription("audio/x-lc3")
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_MPEGH, make_AudioFormatDescription("audio/x-mpegh")
+            AUDIO_FORMAT_MPEGH, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEGH_MHM1)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_MPEGH_BL_L3, make_AudioFormatDescription("audio/x-mpegh.bl.l3")
+            AUDIO_FORMAT_MPEGH_BL_L3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L3)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_MPEGH_BL_L4, make_AudioFormatDescription("audio/x-mpegh.bl.l4")
+            AUDIO_FORMAT_MPEGH_BL_L4, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEGH_BL_L4)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_MPEGH_LC_L3, make_AudioFormatDescription("audio/x-mpegh.lc.l3")
+            AUDIO_FORMAT_MPEGH_LC_L3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L3)
         },
         {
-            // Note: not in the IANA registry.
-            AUDIO_FORMAT_MPEGH_LC_L4, make_AudioFormatDescription("audio/x-mpegh.lc.l4")
+            AUDIO_FORMAT_MPEGH_LC_L4, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEGH_LC_L4)
         },
         {
-            // Note: not in the IANA registry.
             AUDIO_FORMAT_IEC60958,
-            make_AudioFormatDescription(media::PcmType::INT_24_BIT, "audio/x-iec60958")
+            make_AudioFormatDescription(media::PcmType::INT_24_BIT, MEDIA_MIMETYPE_AUDIO_IEC60958)
         },
         {
             AUDIO_FORMAT_DTS_UHD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_UHD)
