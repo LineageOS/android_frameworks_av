@@ -289,6 +289,9 @@ public:
 
         bool tryWrapping = !copy;
 
+        // Temporarily disable wrapping
+        tryWrapping = false;
+
         switch (layout.type) {
             case C2PlanarLayout::TYPE_YUV: {
                 mediaImage->mType = MediaImage2::MEDIA_IMAGE_TYPE_YUV;
