@@ -30,7 +30,7 @@ cc_test {
     ],
 
     static_libs: [
-        "resourcemanager_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk",
     ],
 
     include_dirs: [

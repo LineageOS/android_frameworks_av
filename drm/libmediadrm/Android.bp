@@ -65,7 +65,7 @@ cc_library {
     ],
 
     static_libs: [
-        "resourcemanager_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk",
     ],
 
     export_shared_lib_headers: [
