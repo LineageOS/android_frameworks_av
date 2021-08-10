@@ -24,6 +24,7 @@
 #include <audio_utils/clock.h>    // clock conversions
 #include <cutils/properties.h>
 #include <statslog.h>             // statsd
+#include <system/audio.h>
 
 #include "AudioTypes.h"           // string to int conversions
 #include "MediaMetricsService.h"  // package info
@@ -957,6 +958,25 @@ void AudioAnalytics::AAudioStreamInfo::endAAudioStream(
     int32_t channelCount = -1;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
             key, AMEDIAMETRICS_PROP_CHANNELCOUNT, &channelCount);
+    if (channelCount == -1) {
+        // Try to get channel count from channel mask. From the legacy path,
+        // only channel mask are logged.
+        int32_t channelMask = 0;
+        mAudioAnalytics.mAnalyticsState->timeMachine().get(
+                key, AMEDIAMETRICS_PROP_CHANNELMASK, &channelMask);
+        if (channelMask != 0) {
+            switch (direction) {
+                case 1: // Output, keep sync with AudioTypes#getAAudioDirection()
+                    channelCount = audio_channel_count_from_out_mask(channelMask);
+                    break;
+                case 2: // Input, keep sync with AudioTypes#getAAudioDirection()
+                    channelCount = audio_channel_count_from_in_mask(channelMask);
+                    break;
+                default:
+                    ALOGW("Invalid direction %d", direction);
+            }
+        }
+    }
 
     int64_t totalFramesTransferred = -1;
     mAudioAnalytics.mAnalyticsState->timeMachine().get(
