@@ -644,6 +644,7 @@ void AudioFlinger::ThreadBase::sendIoConfigEvent_l(audio_io_config_event_t event
     mIoJitterMs.reset();
     mLatencyMs.reset();
     mProcessTimeMs.reset();
+    mMonopipePipeDepthStats.reset();
     mTimestampVerifier.discontinuity(mTimestampVerifier.DISCONTINUITY_MODE_CONTINUOUS);
 
     sp<ConfigEvent> configEvent = (ConfigEvent *)new IoConfigEvent(event, pid, portId);
@@ -987,6 +988,12 @@ void AudioFlinger::ThreadBase::dumpBase_l(int fd, const Vector<String16>& args _
         dprintf(fd, "  Threadloop %s latency stats: %s\n",
                 isOutput() ? "write" : "read",
                 mLatencyMs.toString().c_str());
+    }
+
+    if (mMonopipePipeDepthStats.getN() > 0) {
+        dprintf(fd, "  Monopipe %s pipe depth stats: %s\n",
+            isOutput() ? "write" : "read",
+            mMonopipePipeDepthStats.toString().c_str());
     }
 }
 
@@ -1916,6 +1923,12 @@ void AudioFlinger::ThreadBase::sendStatistics(bool force)
     if (mLatencyMs.getN() > 0) {
         item->setDouble(MM_PREFIX "latencyMs.mean", mLatencyMs.getMean());
         item->setDouble(MM_PREFIX "latencyMs.std", mLatencyMs.getStdDev());
+    }
+    if (mMonopipePipeDepthStats.getN() > 0) {
+        item->setDouble(MM_PREFIX "monopipePipeDepthStats.mean",
+                        mMonopipePipeDepthStats.getMean());
+        item->setDouble(MM_PREFIX "monopipePipeDepthStats.std",
+                        mMonopipePipeDepthStats.getStdDev());
     }
 
     item->selfrecord();
@@ -3972,6 +3985,18 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                                 Mutex::Autolock _l(mLock);
                                 mIoJitterMs.add(jitterMs);
                                 mProcessTimeMs.add(processMs);
+
+                                if (mPipeSink.get() != nullptr) {
+                                    // Using the Monopipe availableToWrite, we estimate the current
+                                    // buffer size.
+                                    MonoPipe* monoPipe = static_cast<MonoPipe*>(mPipeSink.get());
+                                    const ssize_t
+                                            availableToWrite = mPipeSink->availableToWrite();
+                                    const size_t pipeFrames = monoPipe->maxFrames();
+                                    const size_t
+                                            remainingFrames = pipeFrames - max(availableToWrite, 0);
+                                    mMonopipePipeDepthStats.add(remainingFrames);
+                                }
                             }
 
                             // write blocked detection
@@ -7588,6 +7613,7 @@ reacquire_wakelock:
 
             const ssize_t availableToRead = mPipeSource->availableToRead();
             if (availableToRead >= 0) {
+                mMonopipePipeDepthStats.add(availableToRead);
                 // PipeSource is the primary clock.  It is up to the AudioRecord client to keep up.
                 LOG_ALWAYS_FATAL_IF((size_t)availableToRead > mPipeFramesP2,
                         "more frames to read than fifo size, %zd > %zu",
