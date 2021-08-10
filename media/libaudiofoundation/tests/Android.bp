@@ -18,6 +18,7 @@ cc_test {
     ],
 
     static_libs: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",

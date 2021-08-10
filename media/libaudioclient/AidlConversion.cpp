@@ -34,6 +34,10 @@
 namespace android {
 
 using base::unexpected;
+using media::audio::common::AudioChannelLayout;
+using media::audio::common::AudioFormatDescription;
+using media::audio::common::AudioFormatType;
+using media::audio::common::PcmType;
 
 namespace {
 
@@ -388,21 +392,21 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
 namespace {
 
 namespace detail {
-using AudioChannelPair = std::pair<audio_channel_mask_t, media::AudioChannelLayout>;
+using AudioChannelPair = std::pair<audio_channel_mask_t, AudioChannelLayout>;
 using AudioChannelPairs = std::vector<AudioChannelPair>;
 using AudioDevicePair = std::pair<audio_devices_t, media::AudioDeviceDescription>;
 using AudioDevicePairs = std::vector<AudioDevicePair>;
-using AudioFormatPair = std::pair<audio_format_t, media::AudioFormatDescription>;
+using AudioFormatPair = std::pair<audio_format_t, AudioFormatDescription>;
 using AudioFormatPairs = std::vector<AudioFormatPair>;
 }
 
 const detail::AudioChannelPairs& getInAudioChannelPairs() {
     static const detail::AudioChannelPairs pairs = {
-#define DEFINE_INPUT_LAYOUT(n)                                                               \
-            {                                                                                \
-                AUDIO_CHANNEL_IN_##n,                                                        \
-                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::layoutMask>( \
-                        media::AudioChannelLayout::LAYOUT_##n)                               \
+#define DEFINE_INPUT_LAYOUT(n)                                                 \
+            {                                                                  \
+                AUDIO_CHANNEL_IN_##n,                                          \
+                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>( \
+                        AudioChannelLayout::LAYOUT_##n)                        \
             }
 
         DEFINE_INPUT_LAYOUT(MONO),
@@ -421,11 +425,11 @@ const detail::AudioChannelPairs& getInAudioChannelPairs() {
 
 const detail::AudioChannelPairs& getOutAudioChannelPairs() {
     static const detail::AudioChannelPairs pairs = {
-#define DEFINE_OUTPUT_LAYOUT(n)                                                              \
-            {                                                                                \
-                AUDIO_CHANNEL_OUT_##n,                                                       \
-                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::layoutMask>( \
-                        media::AudioChannelLayout::LAYOUT_##n)                               \
+#define DEFINE_OUTPUT_LAYOUT(n)                                                \
+            {                                                                  \
+                AUDIO_CHANNEL_OUT_##n,                                         \
+                AudioChannelLayout::make<AudioChannelLayout::Tag::layoutMask>( \
+                        AudioChannelLayout::LAYOUT_##n)                        \
             }
 
         DEFINE_OUTPUT_LAYOUT(MONO),
@@ -464,11 +468,11 @@ const detail::AudioChannelPairs& getOutAudioChannelPairs() {
 
 const detail::AudioChannelPairs& getVoiceAudioChannelPairs() {
     static const detail::AudioChannelPairs pairs = {
-#define DEFINE_VOICE_LAYOUT(n)                                                               \
-            {                                                                                \
-                AUDIO_CHANNEL_IN_VOICE_##n,                                                  \
-                media::AudioChannelLayout::make<media::AudioChannelLayout::Tag::voiceMask>(  \
-                        media::AudioChannelLayout::VOICE_##n)                                \
+#define DEFINE_VOICE_LAYOUT(n)                                                 \
+            {                                                                  \
+                AUDIO_CHANNEL_IN_VOICE_##n,                                    \
+                AudioChannelLayout::make<AudioChannelLayout::Tag::voiceMask>(  \
+                        AudioChannelLayout::VOICE_##n)                         \
             }
         DEFINE_VOICE_LAYOUT(UPLINK_MONO),
         DEFINE_VOICE_LAYOUT(DNLINK_MONO),
@@ -671,25 +675,25 @@ const detail::AudioDevicePairs& getAudioDevicePairs() {
     return pairs;
 }
 
-media::AudioFormatDescription make_AudioFormatDescription(media::AudioFormatType type) {
-    media::AudioFormatDescription result;
+AudioFormatDescription make_AudioFormatDescription(AudioFormatType type) {
+    AudioFormatDescription result;
     result.type = type;
     return result;
 }
 
-media::AudioFormatDescription make_AudioFormatDescription(media::PcmType pcm) {
-    auto result = make_AudioFormatDescription(media::AudioFormatType::PCM);
+AudioFormatDescription make_AudioFormatDescription(PcmType pcm) {
+    auto result = make_AudioFormatDescription(AudioFormatType::PCM);
     result.pcm = pcm;
     return result;
 }
 
-media::AudioFormatDescription make_AudioFormatDescription(const std::string& encoding) {
-    media::AudioFormatDescription result;
+AudioFormatDescription make_AudioFormatDescription(const std::string& encoding) {
+    AudioFormatDescription result;
     result.encoding = encoding;
     return result;
 }
 
-media::AudioFormatDescription make_AudioFormatDescription(media::PcmType transport,
+AudioFormatDescription make_AudioFormatDescription(PcmType transport,
         const std::string& encoding) {
     auto result = make_AudioFormatDescription(encoding);
     result.pcm = transport;
@@ -700,28 +704,28 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
     static const detail::AudioFormatPairs pairs = {{
         {
             AUDIO_FORMAT_INVALID,
-            make_AudioFormatDescription(media::AudioFormatType::SYS_RESERVED_INVALID)
+            make_AudioFormatDescription(AudioFormatType::SYS_RESERVED_INVALID)
         },
         {
-            AUDIO_FORMAT_DEFAULT, media::AudioFormatDescription{}
+            AUDIO_FORMAT_DEFAULT, AudioFormatDescription{}
         },
         {
-            AUDIO_FORMAT_PCM_16_BIT, make_AudioFormatDescription(media::PcmType::INT_16_BIT)
+            AUDIO_FORMAT_PCM_16_BIT, make_AudioFormatDescription(PcmType::INT_16_BIT)
         },
         {
-            AUDIO_FORMAT_PCM_8_BIT, make_AudioFormatDescription(media::PcmType::UINT_8_BIT)
+            AUDIO_FORMAT_PCM_8_BIT, make_AudioFormatDescription(PcmType::UINT_8_BIT)
         },
         {
-            AUDIO_FORMAT_PCM_32_BIT, make_AudioFormatDescription(media::PcmType::INT_32_BIT)
+            AUDIO_FORMAT_PCM_32_BIT, make_AudioFormatDescription(PcmType::INT_32_BIT)
         },
         {
-            AUDIO_FORMAT_PCM_8_24_BIT, make_AudioFormatDescription(media::PcmType::FIXED_Q_8_24)
+            AUDIO_FORMAT_PCM_8_24_BIT, make_AudioFormatDescription(PcmType::FIXED_Q_8_24)
         },
         {
-            AUDIO_FORMAT_PCM_FLOAT, make_AudioFormatDescription(media::PcmType::FLOAT_32_BIT)
+            AUDIO_FORMAT_PCM_FLOAT, make_AudioFormatDescription(PcmType::FLOAT_32_BIT)
         },
         {
-            AUDIO_FORMAT_PCM_24_BIT_PACKED, make_AudioFormatDescription(media::PcmType::INT_24_BIT)
+            AUDIO_FORMAT_PCM_24_BIT_PACKED, make_AudioFormatDescription(PcmType::INT_24_BIT)
         },
         {
             AUDIO_FORMAT_MP3, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_MPEG)
@@ -797,7 +801,7 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
         // specify the format of the encapsulated bitstream.
         {
             AUDIO_FORMAT_IEC61937,
-            make_AudioFormatDescription(media::PcmType::INT_16_BIT, MEDIA_MIMETYPE_AUDIO_IEC61937)
+            make_AudioFormatDescription(PcmType::INT_16_BIT, MEDIA_MIMETYPE_AUDIO_IEC61937)
         },
         {
             AUDIO_FORMAT_DOLBY_TRUEHD,
@@ -984,7 +988,7 @@ const detail::AudioFormatPairs& getAudioFormatPairs() {
         },
         {
             AUDIO_FORMAT_IEC60958,
-            make_AudioFormatDescription(media::PcmType::INT_24_BIT, MEDIA_MIMETYPE_AUDIO_IEC60958)
+            make_AudioFormatDescription(PcmType::INT_24_BIT, MEDIA_MIMETYPE_AUDIO_IEC60958)
         },
         {
             AUDIO_FORMAT_DTS_UHD, make_AudioFormatDescription(MEDIA_MIMETYPE_AUDIO_DTS_UHD)
@@ -1028,14 +1032,14 @@ std::unordered_map<T, S> make_ReverseMap(const std::vector<std::pair<S, T>>& v) 
 }  // namespace
 
 ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-        const media::AudioChannelLayout& aidl, bool isInput) {
-    using ReverseMap = std::unordered_map<media::AudioChannelLayout, audio_channel_mask_t>;
-    using Tag = media::AudioChannelLayout::Tag;
+        const AudioChannelLayout& aidl, bool isInput) {
+    using ReverseMap = std::unordered_map<AudioChannelLayout, audio_channel_mask_t>;
+    using Tag = AudioChannelLayout::Tag;
     static const ReverseMap mIn = make_ReverseMap(getInAudioChannelPairs());
     static const ReverseMap mOut = make_ReverseMap(getOutAudioChannelPairs());
     static const ReverseMap mVoice = make_ReverseMap(getVoiceAudioChannelPairs());
 
-    auto convert = [](const media::AudioChannelLayout& aidl, const ReverseMap& m,
+    auto convert = [](const AudioChannelLayout& aidl, const ReverseMap& m,
             const char* func, const char* type) -> ConversionResult<audio_channel_mask_t> {
         if (auto it = m.find(aidl); it != m.end()) {
             return it->second;
@@ -1073,16 +1077,16 @@ ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_chan
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
+ConversionResult<AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
         audio_channel_mask_t legacy, bool isInput) {
-    using DirectMap = std::unordered_map<audio_channel_mask_t, media::AudioChannelLayout>;
-    using Tag = media::AudioChannelLayout::Tag;
+    using DirectMap = std::unordered_map<audio_channel_mask_t, AudioChannelLayout>;
+    using Tag = AudioChannelLayout::Tag;
     static const DirectMap mInAndVoice = make_DirectMap(
             getInAudioChannelPairs(), getVoiceAudioChannelPairs());
     static const DirectMap mOut = make_DirectMap(getOutAudioChannelPairs());
 
     auto convert = [](const audio_channel_mask_t legacy, const DirectMap& m,
-            const char* func, const char* type) -> ConversionResult<media::AudioChannelLayout> {
+            const char* func, const char* type) -> ConversionResult<AudioChannelLayout> {
         if (auto it = m.find(legacy); it != m.end()) {
             return it->second;
         } else {
@@ -1093,9 +1097,9 @@ ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_Aud
     };
 
     if (legacy == AUDIO_CHANNEL_NONE) {
-        return media::AudioChannelLayout{};
+        return AudioChannelLayout{};
     } else if (legacy == AUDIO_CHANNEL_INVALID) {
-        return media::AudioChannelLayout::make<Tag::invalid>(0);
+        return AudioChannelLayout::make<Tag::invalid>(0);
     }
 
     const audio_channel_representation_t repr = audio_channel_mask_get_representation(legacy);
@@ -1103,7 +1107,7 @@ ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_Aud
         if (audio_channel_mask_is_valid(legacy)) {
             const int indexMask = VALUE_OR_RETURN(
                     convertIntegral<int>(audio_channel_mask_get_bits(legacy)));
-            return media::AudioChannelLayout::make<Tag::indexMask>(indexMask);
+            return AudioChannelLayout::make<Tag::indexMask>(indexMask);
         } else {
             ALOGE("%s: legacy audio_channel_mask_t value 0x%x is invalid", __func__, legacy);
             return unexpected(BAD_VALUE);
@@ -1144,8 +1148,8 @@ ConversionResult<media::AudioDeviceDescription> legacy2aidl_audio_devices_t_Audi
 }
 
 ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format_t(
-        const media::AudioFormatDescription& aidl) {
-    static const std::unordered_map<media::AudioFormatDescription, audio_format_t> m =
+        const AudioFormatDescription& aidl) {
+    static const std::unordered_map<AudioFormatDescription, audio_format_t> m =
             make_ReverseMap(getAudioFormatPairs());
     if (auto it = m.find(aidl); it != m.end()) {
         return it->second;
@@ -1155,9 +1159,9 @@ ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format
     }
 }
 
-ConversionResult<media::AudioFormatDescription> legacy2aidl_audio_format_t_AudioFormatDescription(
+ConversionResult<AudioFormatDescription> legacy2aidl_audio_format_t_AudioFormatDescription(
         audio_format_t legacy) {
-    static const std::unordered_map<audio_format_t, media::AudioFormatDescription> m =
+    static const std::unordered_map<audio_format_t, AudioFormatDescription> m =
             make_DirectMap(getAudioFormatPairs());
     if (auto it = m.find(legacy); it != m.end()) {
         return it->second;
@@ -2684,7 +2688,7 @@ aidl2legacy_AudioProfile_audio_profile(const media::AudioProfile& aidl, bool isI
     }
     RETURN_IF_ERROR(
             convertRange(aidl.channelMasks.begin(), aidl.channelMasks.end(), legacy.channel_masks,
-                    [isInput](const media::AudioChannelLayout& l) {
+                    [isInput](const AudioChannelLayout& l) {
                         return aidl2legacy_AudioChannelLayout_audio_channel_mask_t(l, isInput);
                     }));
     legacy.num_channel_masks = aidl.channelMasks.size();

@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioChannelLayout;
+import android.media.audio.common.AudioChannelLayout;
 
 /**
  * {@hide}

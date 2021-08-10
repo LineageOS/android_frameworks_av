@@ -16,7 +16,6 @@
 
 package android.media;
 
-import android.media.AudioFormatDescription;
 import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
@@ -53,6 +52,7 @@ import android.media.ICaptureStateListener;
 import android.media.INativeSpatializerCallback;
 import android.media.Int;
 import android.media.SoundTriggerSession;
+import android.media.audio.common.AudioFormatDescription;
 
 /**
  * IAudioPolicyService interface (see AudioPolicyInterface for method descriptions).
