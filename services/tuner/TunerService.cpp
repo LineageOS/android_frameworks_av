@@ -24,30 +24,20 @@
 #include <aidl/android/hardware/tv/tuner/IFrontend.h>
 #include <aidl/android/hardware/tv/tuner/ILnb.h>
 #include <aidl/android/hardware/tv/tuner/Result.h>
-#include <aidl/android/media/tv/tunerresourcemanager/TunerFrontendInfo.h>
 #include <android/binder_manager.h>
-#include <android/content/pm/IPackageManagerNative.h>
-#include <binder/IServiceManager.h>
 #include <utils/Log.h>
 
 #include "TunerDemux.h"
 #include "TunerDescrambler.h"
 #include "TunerFrontend.h"
+#include "TunerHelper.h"
 #include "TunerLnb.h"
 
 using ::aidl::android::hardware::tv::tuner::IDemux;
 using ::aidl::android::hardware::tv::tuner::IDescrambler;
 using ::aidl::android::hardware::tv::tuner::IFrontend;
 using ::aidl::android::hardware::tv::tuner::Result;
-using ::aidl::android::media::tv::tunerresourcemanager::TunerFrontendInfo;
-using ::android::defaultServiceManager;
-using ::android::IBinder;
-using ::android::interface_cast;
-using ::android::IServiceManager;
 using ::android::sp;
-using ::android::String16;
-using ::android::binder::Status;
-using ::android::content::pm::IPackageManagerNative;
 
 namespace aidl {
 namespace android {
@@ -56,34 +46,11 @@ namespace tv {
 namespace tuner {
 
 TunerService::TunerService() {
-    sp<IServiceManager> serviceMgr = defaultServiceManager();
-    sp<IPackageManagerNative> packageMgr;
-    if (serviceMgr.get() == nullptr) {
-        ALOGE("%s: Cannot find service manager", __func__);
-        return;
-    } else {
-        sp<IBinder> binder = serviceMgr->waitForService(String16("package_native"));
-        packageMgr = interface_cast<IPackageManagerNative>(binder);
-    }
-
-    if (packageMgr != nullptr) {
-        bool hasFeature = false;
-        Status status = packageMgr->hasSystemFeature(FEATURE_TUNER, 0, &hasFeature);
-        if (!status.isOk()) {
-            ALOGE("%s: hasSystemFeature failed: %s", __func__, status.exceptionMessage().c_str());
-            return;
-        }
-        if (!hasFeature) {
-            ALOGD("Current device does not support tuner feaure.");
-            return;
-        }
-    } else {
-        ALOGD("%s: Cannot find package manager.", __func__);
+    if (!TunerHelper::checkTunerFeature()) {
+        ALOGD("Device doesn't have tuner hardware.");
         return;
     }
 
-    ::ndk::SpAIBinder binder(AServiceManager_waitForService("tv_tuner_resource_mgr"));
-    mTunerResourceManager = ITunerResourceManager::fromBinder(binder);
     updateTunerResources();
 }
 
@@ -174,7 +141,7 @@ bool TunerService::hasITuner() {
                 static_cast<int32_t>(Result::UNAVAILABLE));
     }
 
-    int id = getResourceIdFromHandle(frontendHandle, FRONTEND);
+    int id = TunerHelper::getResourceIdFromHandle(frontendHandle, FRONTEND);
     shared_ptr<IFrontend> frontend;
     auto status = mTuner->openFrontendById(id, &frontend);
     if (status.isOk()) {
@@ -192,7 +159,7 @@ bool TunerService::hasITuner() {
     }
 
     shared_ptr<ILnb> lnb;
-    int id = getResourceIdFromHandle(lnbHandle, LNB);
+    int id = TunerHelper::getResourceIdFromHandle(lnbHandle, LNB);
     auto status = mTuner->openLnbById(id, &lnb);
     if (status.isOk()) {
         *_aidl_return = ::ndk::SharedRefBase::make<TunerLnb>(lnb, id);
@@ -228,7 +195,7 @@ bool TunerService::hasITuner() {
     }
 
     shared_ptr<IDescrambler> descrambler;
-    // int id = getResourceIdFromHandle(descramblerHandle, DESCRAMBLER);
+    // int id = TunerHelper::getResourceIdFromHandle(descramblerHandle, DESCRAMBLER);
     auto status = mTuner->openDescrambler(&descrambler);
     if (status.isOk()) {
         *_aidl_return = ::ndk::SharedRefBase::make<TunerDescrambler>(descrambler);
@@ -237,31 +204,29 @@ bool TunerService::hasITuner() {
     return status;
 }
 
-void TunerService::updateTunerResources() {
-    if (!hasITuner() || mTunerResourceManager == nullptr) {
-        ALOGE("Failed to updateTunerResources");
-        return;
-    }
-
-    updateFrontendResources();
-    updateLnbResources();
-    // TODO: update Demux, Descrambler.
-}
-
 ::ndk::ScopedAStatus TunerService::getTunerHalVersion(int* _aidl_return) {
     hasITuner();
     *_aidl_return = mTunerVersion;
     return ::ndk::ScopedAStatus::ok();
 }
 
-void TunerService::updateFrontendResources() {
-    vector<int32_t> ids;
-    auto status = mTuner->getFrontendIds(&ids);
-    if (!status.isOk()) {
+void TunerService::updateTunerResources() {
+    if (!hasITuner()) {
+        ALOGE("Failed to updateTunerResources");
         return;
     }
 
+    TunerHelper::updateTunerResources(getTRMFrontendInfos(), getTRMLnbHandles());
+}
+
+vector<TunerFrontendInfo> TunerService::getTRMFrontendInfos() {
     vector<TunerFrontendInfo> infos;
+    vector<int32_t> ids;
+    auto status = mTuner->getFrontendIds(&ids);
+    if (!status.isOk()) {
+        return infos;
+    }
+
     for (int i = 0; i < ids.size(); i++) {
         FrontendInfo frontendInfo;
         auto res = mTuner->getFrontendInfo(ids[i], &frontendInfo);
@@ -269,31 +234,24 @@ void TunerService::updateFrontendResources() {
             continue;
         }
         TunerFrontendInfo tunerFrontendInfo{
-                .handle = getResourceHandleFromId((int)ids[i], FRONTEND),
+                .handle = TunerHelper::getResourceHandleFromId((int)ids[i], FRONTEND),
                 .type = static_cast<int>(frontendInfo.type),
                 .exclusiveGroupId = frontendInfo.exclusiveGroupId,
         };
         infos.push_back(tunerFrontendInfo);
     }
-    mTunerResourceManager->setFrontendInfoList(infos);
+
+    return infos;
 }
 
-void TunerService::updateLnbResources() {
-    vector<int32_t> handles = getLnbHandles();
-    if (handles.size() == 0) {
-        return;
-    }
-    mTunerResourceManager->setLnbInfoList(handles);
-}
-
-vector<int32_t> TunerService::getLnbHandles() {
+vector<int32_t> TunerService::getTRMLnbHandles() {
     vector<int32_t> lnbHandles;
     if (mTuner != nullptr) {
         vector<int32_t> lnbIds;
         auto res = mTuner->getLnbIds(&lnbIds);
         if (res.isOk()) {
             for (int i = 0; i < lnbIds.size(); i++) {
-                lnbHandles.push_back(getResourceHandleFromId(lnbIds[i], LNB));
+                lnbHandles.push_back(TunerHelper::getResourceHandleFromId(lnbIds[i], LNB));
             }
         }
     }
