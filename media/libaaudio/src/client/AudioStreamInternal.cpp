@@ -155,8 +155,11 @@ aaudio_result_t AudioStreamInternal::open(const AudioStreamBuilder &builder) {
 
     // This must match the key generated in oboeservice/AAudioServiceStreamBase.cpp
     // so the client can have permission to log.
-    mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM)
-            + std::to_string(mServiceStreamHandle);
+    if (!mInService) {
+        // No need to log if it is from service side.
+        mMetricsId = std::string(AMEDIAMETRICS_KEY_PREFIX_AUDIO_STREAM)
+                     + std::to_string(mServiceStreamHandle);
+    }
 
     android::mediametrics::LogItem(mMetricsId)
             .set(AMEDIAMETRICS_PROP_PERFORMANCEMODE,
