@@ -368,7 +368,7 @@ void sendCaptureResult(
     }
     states.tagMonitor.monitorMetadata(TagMonitor::RESULT,
             frameNumber, sensorTimestamp, captureResult.mMetadata,
-            monitoredPhysicalMetadata);
+            monitoredPhysicalMetadata, std::set<int32_t>());
 
     insertResultLocked(states, &captureResult, frameNumber);
 }
