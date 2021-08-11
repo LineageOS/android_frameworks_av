@@ -89,13 +89,13 @@ cc_library {
         "liblog",
         "libmedia",
         "libutils",
-        "tv_tuner_aidl_interface-ndk_platform",
-        "tv_tuner_resource_manager_aidl_interface-ndk_platform",
+        "tv_tuner_aidl_interface-ndk",
+        "tv_tuner_resource_manager_aidl_interface-ndk",
         "tv_tuner_resource_manager_aidl_interface-cpp",
     ],
 
     static_libs: [
-        "android.hardware.common.fmq-V1-ndk_platform",
+        "android.hardware.common.fmq-V1-ndk",
         "libaidlcommonsupport",
     ],
 
@@ -128,12 +128,12 @@ cc_binary {
         "liblog",
         "libtunerservice",
         "libutils",
-        "tv_tuner_resource_manager_aidl_interface-ndk_platform",
+        "tv_tuner_resource_manager_aidl_interface-ndk",
         "tv_tuner_resource_manager_aidl_interface-cpp",
     ],
 
     static_libs: [
-        "tv_tuner_aidl_interface-ndk_platform",
+        "tv_tuner_aidl_interface-ndk",
     ],
 
     init_rc: ["mediatuner.rc"],
