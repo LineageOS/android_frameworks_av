@@ -56,7 +56,7 @@ cc_test {
     test_suites: ["device-tests"],
     static_libs: [
         "libresourcemanagerservice",
-        "resourceobserver_aidl_interface-V1-ndk_platform",
+        "resourceobserver_aidl_interface-V1-ndk",
     ],
     shared_libs: [
         "libbinder",
