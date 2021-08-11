@@ -383,6 +383,9 @@ struct EffectClient : public android::media::BnEffectClient {
                                    const std::vector<uint8_t> &replyData __unused) override {
         return binder::Status::ok();
     }
+    binder::Status framesProcessed(int32_t frames __unused) override {
+        return binder::Status::ok();
+    }
 };
 
 status_t AudioFlingerFuzzer::invokeAudioEffect() {
@@ -424,6 +427,7 @@ status_t AudioFlingerFuzzer::invokeAudioEffect() {
     request.attributionSource.packageName = opPackageName;
     request.attributionSource.pid = VALUE_OR_RETURN_STATUS(legacy2aidl_pid_t_int32_t(getpid()));
     request.probe = false;
+    request.notifyFramesProcessed = false;
 
     media::CreateEffectResponse response{};
     status_t status = af->createEffect(request, &response);

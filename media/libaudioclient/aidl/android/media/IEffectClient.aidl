@@ -43,4 +43,10 @@ interface IEffectClient {
      * TODO(ytai): replace opaque byte arrays with strongly typed parameters.
      */
     oneway void commandExecuted(int cmdCode, in byte[] cmdData, in byte[] replyData);
+
+    /**
+     * Called whenever audio frames have been processed by the effect engine.
+     * @param frames number of frames processed.
+     */
+    oneway void framesProcessed(int frames);
 }

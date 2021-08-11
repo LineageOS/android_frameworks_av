@@ -37,4 +37,6 @@ parcelable CreateEffectRequest {
     AudioDevice device;
     AttributionSourceState attributionSource;
     boolean probe;
+    /** true if a callback must be sent each time audio frames are processed */
+    boolean notifyFramesProcessed;
 }
