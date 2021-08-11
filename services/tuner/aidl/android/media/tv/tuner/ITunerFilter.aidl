@@ -19,8 +19,9 @@ package android.media.tv.tuner;
 import android.hardware.common.fmq.MQDescriptor;
 import android.hardware.common.fmq.SynchronizedReadWrite;
 import android.hardware.common.NativeHandle;
-import android.media.tv.tuner.TunerFilterConfiguration;
-import android.media.tv.tuner.TunerFilterSharedHandleInfo;
+import android.hardware.tv.tuner.DemuxFilterSettings;
+import android.hardware.tv.tuner.AvStreamType;
+import android.hardware.tv.tuner.DemuxFilterMonitorEventType;
 
 /**
  * Tuner Filter interface handles tuner related operations.
@@ -46,12 +47,12 @@ interface ITunerFilter {
     /**
      * Configure the filter.
      */
-    void configure(in TunerFilterConfiguration config);
+    void configure(in DemuxFilterSettings settings);
 
     /**
      * Configure the monitor event of the Filter.
      */
-    void configureMonitorEvent(in int monitorEventType);
+    void configureMonitorEvent(in int monitorEventTypes);
 
     /**
      * Configure the context id of the IP Filter.
@@ -61,12 +62,12 @@ interface ITunerFilter {
     /**
      * Configure the stream type of the media Filter.
      */
-    void configureAvStreamType(in int avStreamType);
+    void configureAvStreamType(in AvStreamType avStreamType);
 
     /**
      * Get the a/v shared memory handle
      */
-    TunerFilterSharedHandleInfo getAvSharedHandleInfo();
+    long getAvSharedHandle(out NativeHandle avMemory);
 
     /**
      * Release the handle reported by the HAL for AV memory.
