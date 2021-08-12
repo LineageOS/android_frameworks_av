@@ -684,6 +684,7 @@ protected:
                 audio_utils::Statistics<double> mIoJitterMs{0.995 /* alpha */};
                 audio_utils::Statistics<double> mProcessTimeMs{0.995 /* alpha */};
                 audio_utils::Statistics<double> mLatencyMs{0.995 /* alpha */};
+                audio_utils::Statistics<double> mMonopipePipeDepthStats{0.999 /* alpha */};
 
                 // Save the last count when we delivered statistics to mediametrics.
                 int64_t                 mLastRecordedTimestampVerifierN = 0;
