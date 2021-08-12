@@ -2262,8 +2262,6 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                             const C2ConstGraphicBlock &block = blocks[0];
                             updates.emplace_back(new C2StreamCropRectInfo::output(
                                     stream, block.crop()));
-                            updates.emplace_back(new C2StreamPictureSizeInfo::output(
-                                    stream, block.crop().width, block.crop().height));
                         }
                         ++stream;
                     }
