@@ -88,8 +88,7 @@ c2_status_t FrameReassembler::process(
         const sp<MediaCodecBuffer> &buffer,
         std::list<std::unique_ptr<C2Work>> *items) {
     int64_t timeUs;
-    if (buffer->size() == 0u
-            || !buffer->meta()->findInt64("timeUs", &timeUs)) {
+    if (!buffer->meta()->findInt64("timeUs", &timeUs)) {
         return C2_BAD_VALUE;
     }
 
