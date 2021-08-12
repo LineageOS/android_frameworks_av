@@ -178,6 +178,8 @@ c2_status_t C2AllocatorBlob::newLinearAllocation(
         return C2_CORRUPTED;
     }
 
+    // Note: the BLOB allocator does not support padding as this functionality is expected
+    // to be provided by the gralloc implementation.
     std::shared_ptr<C2GraphicAllocation> graphicAllocation;
     c2_status_t status = mC2AllocatorGralloc->newGraphicAllocation(
             capacity, kLinearBufferHeight, kLinearBufferFormat, usage, &graphicAllocation);

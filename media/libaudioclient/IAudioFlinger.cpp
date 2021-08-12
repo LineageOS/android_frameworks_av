@@ -101,6 +101,8 @@ IAudioFlinger::CreateTrackOutput::toAidl() const {
             legacy2aidl_audio_port_handle_t_int32_t(selectedDeviceId));
     aidl.sessionId = VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(sessionId));
     aidl.sampleRate = VALUE_OR_RETURN(convertIntegral<int32_t>(sampleRate));
+    aidl.streamType =  VALUE_OR_RETURN(
+            legacy2aidl_audio_stream_type_t_AudioStreamType(streamType));
     aidl.afFrameCount = VALUE_OR_RETURN(convertIntegral<int64_t>(afFrameCount));
     aidl.afSampleRate = VALUE_OR_RETURN(convertIntegral<int32_t>(afSampleRate));
     aidl.afLatencyMs = VALUE_OR_RETURN(convertIntegral<int32_t>(afLatencyMs));
@@ -122,6 +124,8 @@ IAudioFlinger::CreateTrackOutput::fromAidl(
             aidl2legacy_int32_t_audio_port_handle_t(aidl.selectedDeviceId));
     legacy.sessionId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_session_t(aidl.sessionId));
     legacy.sampleRate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.sampleRate));
+    legacy.streamType = VALUE_OR_RETURN(
+            aidl2legacy_AudioStreamType_audio_stream_type_t(aidl.streamType));
     legacy.afFrameCount = VALUE_OR_RETURN(convertIntegral<size_t>(aidl.afFrameCount));
     legacy.afSampleRate = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afSampleRate));
     legacy.afLatencyMs = VALUE_OR_RETURN(convertIntegral<uint32_t>(aidl.afLatencyMs));
@@ -661,7 +665,11 @@ status_t AudioFlingerClientAdapter::getAudioPort(struct audio_port_v7* port) {
 status_t AudioFlingerClientAdapter::createAudioPatch(const struct audio_patch* patch,
                                                      audio_patch_handle_t* handle) {
     media::AudioPatch patchAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_AudioPatch(*patch));
-    int32_t aidlRet;
+    int32_t aidlRet = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_handle_t_int32_t(
+                    AUDIO_PATCH_HANDLE_NONE));
+    if (handle != nullptr) {
+        aidlRet = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_patch_handle_t_int32_t(*handle));
+    }
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             mDelegate->createAudioPatch(patchAidl, &aidlRet)));
     if (handle != nullptr) {
@@ -1136,7 +1144,8 @@ Status AudioFlingerServerAdapter::getAudioPort(const media::AudioPort& port,
 Status AudioFlingerServerAdapter::createAudioPatch(const media::AudioPatch& patch,
                                                    int32_t* _aidl_return) {
     audio_patch patchLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioPatch_audio_patch(patch));
-    audio_patch_handle_t handleLegacy;
+    audio_patch_handle_t handleLegacy = VALUE_OR_RETURN_BINDER(
+            aidl2legacy_int32_t_audio_patch_handle_t(*_aidl_return));
     RETURN_BINDER_IF_ERROR(mDelegate->createAudioPatch(&patchLegacy, &handleLegacy));
     *_aidl_return = VALUE_OR_RETURN_BINDER(legacy2aidl_audio_patch_handle_t_int32_t(handleLegacy));
     return Status::ok();

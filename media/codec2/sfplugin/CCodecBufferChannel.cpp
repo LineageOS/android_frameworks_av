@@ -1341,6 +1341,15 @@ status_t CCodecBufferChannel::start(
                     outputSurface,
                     outputGeneration,
                     maxDequeueCount);
+        } else {
+            // configure CPU read consumer usage
+            C2StreamUsageTuning::output outputUsage{0u, C2MemoryUsage::CPU_READ};
+            std::vector<std::unique_ptr<C2SettingResult>> failures;
+            err = mComponent->config({ &outputUsage }, C2_MAY_BLOCK, &failures);
+            // do not print error message for now as most components may not yet
+            // support this setting
+            ALOGD_IF(err != C2_BAD_INDEX, "[%s] Configured output usage [%#llx]",
+                  mName, (long long)outputUsage.value);
         }
 
         if (oStreamFormat.value == C2BufferData::LINEAR) {
@@ -1872,13 +1881,7 @@ bool CCodecBufferChannel::handleWork(
         }
     }
 
-    bool drop = false;
-    if (worklet->output.flags & C2FrameData::FLAG_DROP_FRAME) {
-        ALOGV("[%s] onWorkDone: drop buffer but keep metadata", mName);
-        drop = true;
-    }
-
-    if (notifyClient && !buffer && !flags && !(drop && outputFormat)) {
+    if (notifyClient && !buffer && !flags) {
         ALOGV("[%s] onWorkDone: Not reporting output buffer (%lld)",
               mName, work->input.ordinal.frameIndex.peekull());
         notifyClient = false;
@@ -1905,7 +1908,7 @@ bool CCodecBufferChannel::handleWork(
             return false;
         }
         output->buffers->pushToStash(
-                drop ? nullptr : buffer,
+                buffer,
                 notifyClient,
                 timestamp.peek(),
                 flags,

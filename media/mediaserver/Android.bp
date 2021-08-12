@@ -35,7 +35,6 @@ cc_binary {
         "android.hardware.media.omx@1.0",
         "libandroidicu",
         "libfmq",
-        "libbase",
         "libbinder",
         "libhidlbase",
         "liblog",
@@ -53,9 +52,12 @@ cc_binary {
         "frameworks/av/services/mediaresourcemanager",
     ],
 
-    // mediaserver has only been verified on 32-bit, see b/126502613
-    // use "prefer32" to *only* enable 64-bit builds on 64-bit-only lunch
-    // targets, which allows them to reach 'boot_complete'.
+    // By default mediaserver runs in 32-bit to save memory, except
+    // on 64-bit-only lunch targets.
+    // ****************************************************************
+    // TO ENABLE 64-BIT MEDIASERVER ON MIXED 32/64-BIT DEVICES, COMMENT
+    // OUT THE FOLLOWING LINE:
+    // ****************************************************************
     compile_multilib: "prefer32",
 
     init_rc: ["mediaserver.rc"],

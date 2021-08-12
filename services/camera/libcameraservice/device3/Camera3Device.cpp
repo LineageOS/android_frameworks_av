@@ -171,6 +171,13 @@ status_t Camera3Device::initialize(sp<CameraProviderManager> manager, const Stri
             mZoomRatioMappers[physicalId] = ZoomRatioMapper(
                     &mPhysicalDeviceInfoMap[physicalId],
                     mSupportNativeZoomRatio, usePrecorrectArray);
+
+            if (SessionConfigurationUtils::isUltraHighResolutionSensor(
+                    mPhysicalDeviceInfoMap[physicalId])) {
+                mUHRCropAndMeteringRegionMappers[physicalId] =
+                        UHRCropAndMeteringRegionMapper(mPhysicalDeviceInfoMap[physicalId],
+                                usePrecorrectArray);
+            }
         }
     }
 
@@ -299,9 +306,25 @@ status_t Camera3Device::initializeCommonLocked() {
         sessionParamKeys.insertArrayAt(sessionKeysEntry.data.i32, 0, sessionKeysEntry.count);
     }
 
+    camera_metadata_entry_t availableTestPatternModes = mDeviceInfo.find(
+            ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES);
+    for (size_t i = 0; i < availableTestPatternModes.count; i++) {
+        if (availableTestPatternModes.data.i32[i] ==
+                ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
+            mSupportCameraMute = true;
+            mSupportTestPatternSolidColor = true;
+            break;
+        } else if (availableTestPatternModes.data.i32[i] ==
+                ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK) {
+            mSupportCameraMute = true;
+            mSupportTestPatternSolidColor = false;
+        }
+    }
+
     /** Start up request queue thread */
     mRequestThread = new RequestThread(
-            this, mStatusTracker, mInterface, sessionParamKeys, mUseHalBufManager);
+            this, mStatusTracker, mInterface, sessionParamKeys,
+            mUseHalBufManager, mSupportCameraMute);
     res = mRequestThread->run(String8::format("C3Dev-%s-ReqQueue", mId.string()).string());
     if (res != OK) {
         SET_ERR_L("Unable to start request queue thread: %s (%d)",
@@ -348,23 +371,13 @@ status_t Camera3Device::initializeCommonLocked() {
     mZoomRatioMappers[mId.c_str()] = ZoomRatioMapper(&mDeviceInfo,
             mSupportNativeZoomRatio, usePrecorrectArray);
 
-    if (RotateAndCropMapper::isNeeded(&mDeviceInfo)) {
-        mRotateAndCropMappers.emplace(mId.c_str(), &mDeviceInfo);
+    if (SessionConfigurationUtils::isUltraHighResolutionSensor(mDeviceInfo)) {
+        mUHRCropAndMeteringRegionMappers[mId.c_str()] =
+                UHRCropAndMeteringRegionMapper(mDeviceInfo, usePrecorrectArray);
     }
 
-    camera_metadata_entry_t availableTestPatternModes = mDeviceInfo.find(
-            ANDROID_SENSOR_AVAILABLE_TEST_PATTERN_MODES);
-    for (size_t i = 0; i < availableTestPatternModes.count; i++) {
-        if (availableTestPatternModes.data.i32[i] ==
-                ANDROID_SENSOR_TEST_PATTERN_MODE_SOLID_COLOR) {
-            mSupportCameraMute = true;
-            mSupportTestPatternSolidColor = true;
-            break;
-        } else if (availableTestPatternModes.data.i32[i] ==
-                ANDROID_SENSOR_TEST_PATTERN_MODE_BLACK) {
-            mSupportCameraMute = true;
-            mSupportTestPatternSolidColor = false;
-        }
+    if (RotateAndCropMapper::isNeeded(&mDeviceInfo)) {
+        mRotateAndCropMappers.emplace(mId.c_str(), &mDeviceInfo);
     }
 
     mInjectionMethods = new Camera3DeviceInjectionMethods(this);
@@ -499,42 +512,6 @@ bool Camera3Device::tryLockSpinRightRound(Mutex& lock) {
     return gotLock;
 }
 
-camera3::Size Camera3Device::getMaxJpegResolution() const {
-    int32_t maxJpegWidth = 0, maxJpegHeight = 0;
-    const int STREAM_CONFIGURATION_SIZE = 4;
-    const int STREAM_FORMAT_OFFSET = 0;
-    const int STREAM_WIDTH_OFFSET = 1;
-    const int STREAM_HEIGHT_OFFSET = 2;
-    const int STREAM_IS_INPUT_OFFSET = 3;
-    bool isHighResolutionSensor =
-            camera3::SessionConfigurationUtils::isUltraHighResolutionSensor(mDeviceInfo);
-    int32_t scalerSizesTag = isHighResolutionSensor ?
-            ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_MAXIMUM_RESOLUTION :
-                    ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS;
-    camera_metadata_ro_entry_t availableStreamConfigs =
-            mDeviceInfo.find(scalerSizesTag);
-    if (availableStreamConfigs.count == 0 ||
-            availableStreamConfigs.count % STREAM_CONFIGURATION_SIZE != 0) {
-        return camera3::Size(0, 0);
-    }
-
-    // Get max jpeg size (area-wise).
-    for (size_t i=0; i < availableStreamConfigs.count; i+= STREAM_CONFIGURATION_SIZE) {
-        int32_t format = availableStreamConfigs.data.i32[i + STREAM_FORMAT_OFFSET];
-        int32_t width = availableStreamConfigs.data.i32[i + STREAM_WIDTH_OFFSET];
-        int32_t height = availableStreamConfigs.data.i32[i + STREAM_HEIGHT_OFFSET];
-        int32_t isInput = availableStreamConfigs.data.i32[i + STREAM_IS_INPUT_OFFSET];
-        if (isInput == ANDROID_SCALER_AVAILABLE_STREAM_CONFIGURATIONS_OUTPUT
-                && format == HAL_PIXEL_FORMAT_BLOB &&
-                (width * height > maxJpegWidth * maxJpegHeight)) {
-            maxJpegWidth = width;
-            maxJpegHeight = height;
-        }
-    }
-
-    return camera3::Size(maxJpegWidth, maxJpegHeight);
-}
-
 nsecs_t Camera3Device::getMonoToBoottimeOffset() {
     // try three times to get the clock offset, choose the one
     // with the minimum gap in measurements.
@@ -625,12 +602,25 @@ uint64_t Camera3Device::mapProducerToFrameworkUsage(
 }
 
 ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const {
-    // Get max jpeg size (area-wise).
-    camera3::Size maxJpegResolution = getMaxJpegResolution();
-    if (maxJpegResolution.width == 0) {
+    // Get max jpeg size (area-wise) for default sensor pixel mode
+    camera3::Size maxDefaultJpegResolution =
+            SessionConfigurationUtils::getMaxJpegResolution(mDeviceInfo,
+                    /*isUltraHighResolutionSensor*/false);
+    // Get max jpeg size (area-wise) for max resolution sensor pixel mode / 0 if
+    // not ultra high res sensor
+    camera3::Size uhrMaxJpegResolution =
+            SessionConfigurationUtils::getMaxJpegResolution(mDeviceInfo,
+                    /*isUltraHighResolution*/true);
+    if (maxDefaultJpegResolution.width == 0) {
         ALOGE("%s: Camera %s: Can't find valid available jpeg sizes in static metadata!",
                 __FUNCTION__, mId.string());
         return BAD_VALUE;
+    }
+    bool useMaxSensorPixelModeThreshold = false;
+    if (uhrMaxJpegResolution.width != 0 &&
+            width * height > maxDefaultJpegResolution.width * maxDefaultJpegResolution.height) {
+        // Use the ultra high res max jpeg size and max jpeg buffer size
+        useMaxSensorPixelModeThreshold = true;
     }
 
     // Get max jpeg buffer size
@@ -642,11 +632,19 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
         return BAD_VALUE;
     }
     maxJpegBufferSize = jpegBufMaxSize.data.i32[0];
+
+    camera3::Size chosenMaxJpegResolution = maxDefaultJpegResolution;
+    if (useMaxSensorPixelModeThreshold) {
+        maxJpegBufferSize =
+                SessionConfigurationUtils::getUHRMaxJpegBufferSize(uhrMaxJpegResolution,
+                        maxDefaultJpegResolution, maxJpegBufferSize);
+        chosenMaxJpegResolution = uhrMaxJpegResolution;
+    }
     assert(kMinJpegBufferSize < maxJpegBufferSize);
 
     // Calculate final jpeg buffer size for the given resolution.
     float scaleFactor = ((float) (width * height)) /
-            (maxJpegResolution.width * maxJpegResolution.height);
+            (chosenMaxJpegResolution.width * chosenMaxJpegResolution.height);
     ssize_t jpegBufferSize = scaleFactor * (maxJpegBufferSize - kMinJpegBufferSize) +
             kMinJpegBufferSize;
     if (jpegBufferSize > maxJpegBufferSize) {
@@ -654,7 +652,6 @@ ssize_t Camera3Device::getJpegBufferSize(uint32_t width, uint32_t height) const 
                   __FUNCTION__, maxJpegBufferSize);
         jpegBufferSize = maxJpegBufferSize;
     }
-
     return jpegBufferSize;
 }
 
@@ -779,16 +776,21 @@ status_t Camera3Device::dump(int fd, const Vector<String16> &args) {
     }
 
     lines = String8("    In-flight requests:\n");
-    if (mInFlightMap.size() == 0) {
-        lines.append("      None\n");
-    } else {
-        for (size_t i = 0; i < mInFlightMap.size(); i++) {
-            InFlightRequest r = mInFlightMap.valueAt(i);
-            lines.appendFormat("      Frame %d |  Timestamp: %" PRId64 ", metadata"
-                    " arrived: %s, buffers left: %d\n", mInFlightMap.keyAt(i),
-                    r.shutterTimestamp, r.haveResultMetadata ? "true" : "false",
-                    r.numBuffersLeft);
+    if (mInFlightLock.try_lock()) {
+        if (mInFlightMap.size() == 0) {
+            lines.append("      None\n");
+        } else {
+            for (size_t i = 0; i < mInFlightMap.size(); i++) {
+                InFlightRequest r = mInFlightMap.valueAt(i);
+                lines.appendFormat("      Frame %d |  Timestamp: %" PRId64 ", metadata"
+                        " arrived: %s, buffers left: %d\n", mInFlightMap.keyAt(i),
+                        r.shutterTimestamp, r.haveResultMetadata ? "true" : "false",
+                        r.numBuffersLeft);
+            }
         }
+        mInFlightLock.unlock();
+    } else {
+        lines.append("      Failed to acquire In-flight lock!\n");
     }
     write(fd, lines.string(), lines.size());
 
@@ -2461,9 +2463,9 @@ sp<Camera3Device::CaptureRequest> Camera3Device::createCaptureRequest(
 
         auto testPatternDataEntry =
                 newRequest->mSettingsList.begin()->metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
-        if (testPatternDataEntry.count > 0) {
-            memcpy(newRequest->mOriginalTestPatternData, testPatternModeEntry.data.i32,
-                    sizeof(newRequest->mOriginalTestPatternData));
+        if (testPatternDataEntry.count >= 4) {
+            memcpy(newRequest->mOriginalTestPatternData, testPatternDataEntry.data.i32,
+                    sizeof(CaptureRequest::mOriginalTestPatternData));
         } else {
             newRequest->mOriginalTestPatternData[0] = 0;
             newRequest->mOriginalTestPatternData[1] = 0;
@@ -4154,7 +4156,8 @@ void Camera3Device::HalInterface::onStreamReConfigured(int streamId) {
 Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         sp<StatusTracker> statusTracker,
         sp<HalInterface> interface, const Vector<int32_t>& sessionParamKeys,
-        bool useHalBufManager) :
+        bool useHalBufManager,
+        bool supportCameraMute) :
         Thread(/*canCallJava*/false),
         mParent(parent),
         mStatusTracker(statusTracker),
@@ -4180,7 +4183,8 @@ Camera3Device::RequestThread::RequestThread(wp<Camera3Device> parent,
         mRequestLatency(kRequestLatencyBinSize),
         mSessionParamKeys(sessionParamKeys),
         mLatestSessionParams(sessionParamKeys.size()),
-        mUseHalBufManager(useHalBufManager) {
+        mUseHalBufManager(useHalBufManager),
+        mSupportCameraMute(supportCameraMute){
     mStatusId = statusTracker->addComponent("RequestThread");
 }
 
@@ -4826,10 +4830,31 @@ status_t Camera3Device::RequestThread::prepareHalRequests() {
             }
 
             {
-                // Correct metadata regions for distortion correction if enabled
                 sp<Camera3Device> parent = mParent.promote();
                 if (parent != nullptr) {
                     List<PhysicalCameraSettings>::iterator it;
+                    for (it = captureRequest->mSettingsList.begin();
+                            it != captureRequest->mSettingsList.end(); it++) {
+                        if (parent->mUHRCropAndMeteringRegionMappers.find(it->cameraId) ==
+                                parent->mUHRCropAndMeteringRegionMappers.end()) {
+                            continue;
+                        }
+
+                        if (!captureRequest->mUHRCropAndMeteringRegionsUpdated) {
+                            res = parent->mUHRCropAndMeteringRegionMappers[it->cameraId].
+                                    updateCaptureRequest(&(it->metadata));
+                            if (res != OK) {
+                                SET_ERR("RequestThread: Unable to correct capture requests "
+                                        "for scaler crop region and metering regions for request "
+                                        "%d: %s (%d)", halRequest->frame_number, strerror(-res),
+                                        res);
+                                return INVALID_OPERATION;
+                            }
+                            captureRequest->mUHRCropAndMeteringRegionsUpdated = true;
+                        }
+                    }
+
+                    // Correct metadata regions for distortion correction if enabled
                     for (it = captureRequest->mSettingsList.begin();
                             it != captureRequest->mSettingsList.end(); it++) {
                         if (parent->mDistortionMappers.find(it->cameraId) ==
@@ -5840,6 +5865,8 @@ bool Camera3Device::RequestThread::overrideTestPattern(
         const sp<CaptureRequest> &request) {
     ATRACE_CALL();
 
+    if (!mSupportCameraMute) return false;
+
     Mutex::Autolock l(mTriggerMutex);
 
     bool changed = false;
@@ -5875,16 +5902,16 @@ bool Camera3Device::RequestThread::overrideTestPattern(
     }
 
     auto testPatternColor = metadata.find(ANDROID_SENSOR_TEST_PATTERN_DATA);
-    if (testPatternColor.count > 0) {
+    if (testPatternColor.count >= 4) {
         for (size_t i = 0; i < 4; i++) {
-            if (testPatternColor.data.i32[i] != (int32_t)testPatternData[i]) {
+            if (testPatternColor.data.i32[i] != testPatternData[i]) {
                 testPatternColor.data.i32[i] = testPatternData[i];
                 changed = true;
             }
         }
     } else {
         metadata.update(ANDROID_SENSOR_TEST_PATTERN_DATA,
-                (int32_t*)testPatternData, 4);
+                testPatternData, 4);
         changed = true;
     }
 

@@ -654,19 +654,20 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
          * Then there is circular locking dependency.
          */
         sp<Surface> consumer = mConsumer;
-        size_t remainingBuffers = camera_stream::max_buffers - mHandoutTotalBufferCount;
+        size_t remainingBuffers = (mState == STATE_PREPARING ? mTotalBufferCount :
+                                   camera_stream::max_buffers) - mHandoutTotalBufferCount;
         mLock.unlock();
-        std::unique_lock<std::mutex> batchLock(mBatchLock);
 
         nsecs_t dequeueStart = systemTime(SYSTEM_TIME_MONOTONIC);
 
-        if (mBatchSize == 1) {
+        size_t batchSize = mBatchSize.load();
+        if (batchSize == 1) {
             sp<ANativeWindow> anw = consumer;
             res = anw->dequeueBuffer(anw.get(), anb, fenceFd);
         } else {
+            std::unique_lock<std::mutex> batchLock(mBatchLock);
             res = OK;
             if (mBatchedBuffers.size() == 0) {
-                size_t batchSize = mBatchSize;
                 if (remainingBuffers == 0) {
                     ALOGE("%s: cannot get buffer while all buffers are handed out", __FUNCTION__);
                     return INVALID_OPERATION;
@@ -674,13 +675,17 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
                 if (batchSize > remainingBuffers) {
                     batchSize = remainingBuffers;
                 }
+                batchLock.unlock();
                 // Refill batched buffers
-                mBatchedBuffers.resize(batchSize);
-                res = consumer->dequeueBuffers(&mBatchedBuffers);
+                std::vector<Surface::BatchBuffer> batchedBuffers;
+                batchedBuffers.resize(batchSize);
+                res = consumer->dequeueBuffers(&batchedBuffers);
+                batchLock.lock();
                 if (res != OK) {
                     ALOGE("%s: batch dequeueBuffers call failed! %s (%d)",
                             __FUNCTION__, strerror(-res), res);
-                    mBatchedBuffers.clear();
+                } else {
+                    mBatchedBuffers = std::move(batchedBuffers);
                 }
             }
 
@@ -691,7 +696,6 @@ status_t Camera3OutputStream::getBufferLockedCommon(ANativeWindowBuffer** anb, i
                 mBatchedBuffers.pop_back();
             }
         }
-        batchLock.unlock();
 
         nsecs_t dequeueEnd = systemTime(SYSTEM_TIME_MONOTONIC);
         mDequeueBufferLatency.add(dequeueStart, dequeueEnd);
@@ -1091,7 +1095,7 @@ void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
     time_t now = time(0);
     tm *localTime = localtime(&now);
     snprintf(imageFileName, sizeof(imageFileName), "IMG_%4d%02d%02d_%02d%02d%02d_%" PRId64 ".%s",
-            1900 + localTime->tm_year, localTime->tm_mon, localTime->tm_mday,
+            1900 + localTime->tm_year, localTime->tm_mon + 1, localTime->tm_mday,
             localTime->tm_hour, localTime->tm_min, localTime->tm_sec,
             timestamp, fileExtension.c_str());
 
@@ -1128,7 +1132,6 @@ void Camera3OutputStream::dumpImageToDisk(nsecs_t timestamp,
 
 status_t Camera3OutputStream::setBatchSize(size_t batchSize) {
     Mutex::Autolock l(mLock);
-    std::lock_guard<std::mutex> lock(mBatchLock);
     if (batchSize == 0) {
         ALOGE("%s: invalid batch size 0", __FUNCTION__);
         return BAD_VALUE;
@@ -1144,31 +1147,36 @@ status_t Camera3OutputStream::setBatchSize(size_t batchSize) {
         return INVALID_OPERATION;
     }
 
-    if (batchSize != mBatchSize) {
-        if (mBatchedBuffers.size() != 0) {
-            ALOGE("%s: change batch size from %zu to %zu dynamically is not supported",
-                    __FUNCTION__, mBatchSize, batchSize);
-            return INVALID_OPERATION;
-        }
-
-        if (camera_stream::max_buffers < batchSize) {
-            ALOGW("%s: batch size is capped by max_buffers %d", __FUNCTION__,
-                    camera_stream::max_buffers);
-            batchSize = camera_stream::max_buffers;
-        }
-        mBatchSize = batchSize;
+    if (camera_stream::max_buffers < batchSize) {
+        ALOGW("%s: batch size is capped by max_buffers %d", __FUNCTION__,
+                camera_stream::max_buffers);
+        batchSize = camera_stream::max_buffers;
     }
+
+    size_t defaultBatchSize = 1;
+    if (!mBatchSize.compare_exchange_strong(defaultBatchSize, batchSize)) {
+        ALOGE("%s: change batch size from %zu to %zu dynamically is not supported",
+                __FUNCTION__, defaultBatchSize, batchSize);
+        return INVALID_OPERATION;
+    }
+
     return OK;
 }
 
 void Camera3OutputStream::returnPrefetchedBuffersLocked() {
-    std::lock_guard<std::mutex> batchLock(mBatchLock);
-    if (mBatchedBuffers.size() != 0) {
-        ALOGW("%s: %zu extra prefetched buffers detected. Returning",
-                __FUNCTION__, mBatchedBuffers.size());
+    std::vector<Surface::BatchBuffer> batchedBuffers;
 
-        mConsumer->cancelBuffers(mBatchedBuffers);
-        mBatchedBuffers.clear();
+    {
+        std::lock_guard<std::mutex> batchLock(mBatchLock);
+        if (mBatchedBuffers.size() != 0) {
+            ALOGW("%s: %zu extra prefetched buffers detected. Returning",
+                   __FUNCTION__, mBatchedBuffers.size());
+            batchedBuffers = std::move(mBatchedBuffers);
+        }
+    }
+
+    if (batchedBuffers.size() > 0) {
+        mConsumer->cancelBuffers(batchedBuffers);
     }
 }
 

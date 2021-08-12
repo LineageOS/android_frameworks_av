@@ -33,6 +33,8 @@ struct APacketSource : public RefBase {
 
     virtual sp<MetaData> getFormat();
 
+    bool isVideo();
+
 protected:
     virtual ~APacketSource();
 

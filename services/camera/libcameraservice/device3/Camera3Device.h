@@ -50,6 +50,7 @@
 #include "device3/DistortionMapper.h"
 #include "device3/ZoomRatioMapper.h"
 #include "device3/RotateAndCropMapper.h"
+#include "device3/UHRCropAndMeteringRegionMapper.h"
 #include "device3/InFlightRequest.h"
 #include "device3/Camera3OutputInterface.h"
 #include "device3/Camera3OfflineSession.h"
@@ -589,6 +590,9 @@ class Camera3Device :
         bool                                mRotationAndCropUpdated = false;
         // Whether this capture request's zoom ratio update has been done.
         bool                                mZoomRatioUpdated = false;
+        // Whether this max resolution capture request's  crop / metering region update has been
+        // done.
+        bool                                mUHRCropAndMeteringRegionsUpdated = false;
     };
     typedef List<sp<CaptureRequest> > RequestList;
 
@@ -776,12 +780,6 @@ class Camera3Device :
     bool               tryLockSpinRightRound(Mutex& lock);
 
     /**
-     * Helper function to get the largest Jpeg resolution (in area)
-     * Return Size(0, 0) if static metatdata is invalid
-     */
-    camera3::Size getMaxJpegResolution() const;
-
-    /**
      * Helper function to get the offset between MONOTONIC and BOOTTIME
      * timestamp.
      */
@@ -815,7 +813,8 @@ class Camera3Device :
                 sp<camera3::StatusTracker> statusTracker,
                 sp<HalInterface> interface,
                 const Vector<int32_t>& sessionParamKeys,
-                bool useHalBufManager);
+                bool useHalBufManager,
+                bool supportCameraMute);
         ~RequestThread();
 
         void     setNotificationListener(wp<NotificationListener> listener);
@@ -1088,6 +1087,7 @@ class Camera3Device :
         std::map<int32_t, std::set<String8>> mGroupIdPhysicalCameraMap;
 
         const bool         mUseHalBufManager;
+        const bool         mSupportCameraMute;
     };
     sp<RequestThread> mRequestThread;
 
@@ -1228,6 +1228,12 @@ class Camera3Device :
      * Zoom ratio mapper support
      */
     std::unordered_map<std::string, camera3::ZoomRatioMapper> mZoomRatioMappers;
+
+    /**
+     * UHR request crop / metering region mapper support
+     */
+    std::unordered_map<std::string, camera3::UHRCropAndMeteringRegionMapper>
+            mUHRCropAndMeteringRegionMappers;
 
     /**
      * RotateAndCrop mapper support

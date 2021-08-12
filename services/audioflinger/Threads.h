@@ -1789,6 +1789,7 @@ public:
             status_t    shareAudioHistory_l(const std::string& sharedAudioPackageName,
                                           audio_session_t sharedSessionId = AUDIO_SESSION_NONE,
                                           int64_t sharedAudioStartMs = -1);
+            void        resetAudioHistory_l();
 
     virtual bool        isStreamInitialized() {
                             return !(mInput == nullptr || mInput->stream == nullptr);

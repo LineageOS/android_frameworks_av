@@ -237,10 +237,16 @@ status_t CameraService::enumerateProviders() {
         }
     }
 
-    //Derive primary rear/front cameras, and filter their charactierstics.
-    //This needs to be done after all cameras are enumerated and camera ids are sorted.
+    // Derive primary rear/front cameras, and filter their charactierstics.
+    // This needs to be done after all cameras are enumerated and camera ids are sorted.
     if (SessionConfigurationUtils::IS_PERF_CLASS) {
-        filterSPerfClassCharacteristics();
+        // Assume internal cameras are advertised from the same
+        // provider. If multiple providers are registered at different time,
+        // and each provider contains multiple internal color cameras, the current
+        // logic may filter the characteristics of more than one front/rear color
+        // cameras.
+        Mutex::Autolock l(mServiceLock);
+        filterSPerfClassCharacteristicsLocked();
     }
 
     return OK;
@@ -313,7 +319,7 @@ void CameraService::updateCameraNumAndIds() {
     filterAPI1SystemCameraLocked(mNormalDeviceIds);
 }
 
-void CameraService::filterSPerfClassCharacteristics() {
+void CameraService::filterSPerfClassCharacteristicsLocked() {
     // To claim to be S Performance primary cameras, the cameras must be
     // backward compatible. So performance class primary camera Ids must be API1
     // compatible.
@@ -1834,10 +1840,31 @@ Status CameraService::connectHelper(const sp<CALLBACK>& cameraCb, const String8&
         }
 
         // Set camera muting behavior
+        bool isCameraPrivacyEnabled =
+                mSensorPrivacyPolicy->isCameraPrivacyEnabled(multiuser_get_user_id(clientUid));
         if (client->supportsCameraMute()) {
-            bool isCameraPrivacyEnabled =
-                    mSensorPrivacyPolicy->isCameraPrivacyEnabled(multiuser_get_user_id(clientUid));
-            client->setCameraMute(mOverrideCameraMuteMode || isCameraPrivacyEnabled);
+            client->setCameraMute(
+                    mOverrideCameraMuteMode || isCameraPrivacyEnabled);
+        } else if (isCameraPrivacyEnabled) {
+            // no camera mute supported, but privacy is on! => disconnect
+            ALOGI("Camera mute not supported for package: %s, camera id: %s",
+                    String8(client->getPackageName()).string(), cameraId.string());
+            // Do not hold mServiceLock while disconnecting clients, but
+            // retain the condition blocking other clients from connecting
+            // in mServiceLockWrapper if held.
+            mServiceLock.unlock();
+            // Clear caller identity temporarily so client disconnect PID
+            // checks work correctly
+            int64_t token = CameraThreadState::clearCallingIdentity();
+            // Note AppOp to trigger the "Unblock" dialog
+            client->noteAppOp();
+            client->disconnect();
+            CameraThreadState::restoreCallingIdentity(token);
+            // Reacquire mServiceLock
+            mServiceLock.lock();
+
+            return STATUS_ERROR_FMT(ERROR_DISABLED,
+                    "Camera \"%s\" disabled due to camera mute", cameraId.string());
         }
 
         if (shimUpdateOnly) {
@@ -3195,6 +3222,27 @@ status_t CameraService::BasicClient::startCameraStreamingOps() {
     return OK;
 }
 
+status_t CameraService::BasicClient::noteAppOp() {
+    ATRACE_CALL();
+
+    ALOGV("%s: Start camera noteAppOp, package name = %s, client UID = %d",
+            __FUNCTION__, String8(mClientPackageName).string(), mClientUid);
+
+    // noteAppOp is only used for when camera mute is not supported, in order
+    // to trigger the sensor privacy "Unblock" dialog
+    if (mAppOpsManager != nullptr) {
+        int32_t mode = mAppOpsManager->noteOp(AppOpsManager::OP_CAMERA, mClientUid,
+                mClientPackageName, mClientFeatureId,
+                String16("start camera ") + String16(mCameraIdStr));
+        status_t res = handleAppOpMode(mode);
+        if (res != OK) {
+            return res;
+        }
+    }
+
+    return OK;
+}
+
 status_t CameraService::BasicClient::finishCameraStreamingOps() {
     ATRACE_CALL();
 
@@ -3287,10 +3335,13 @@ void CameraService::BasicClient::opChanged(int32_t op, const String16&) {
         // If the calling Uid is trusted (a native service), or the client Uid is active (WAR for
         // b/175320666), the AppOpsManager could return MODE_IGNORED. Do not treat such cases as
         // error.
-        if (!mUidIsTrusted && isUidActive && isCameraPrivacyEnabled) {
-            setCameraMute(true);
-        } else if (!mUidIsTrusted && !isUidActive) {
-            block();
+        if (!mUidIsTrusted) {
+            if (isUidActive && isCameraPrivacyEnabled && supportsCameraMute()) {
+                setCameraMute(true);
+            } else if (!isUidActive
+                || (isCameraPrivacyEnabled && !supportsCameraMute())) {
+                block();
+            }
         }
     } else if (res == AppOpsManager::MODE_ALLOWED) {
         setCameraMute(sCameraService->mOverrideCameraMuteMode);

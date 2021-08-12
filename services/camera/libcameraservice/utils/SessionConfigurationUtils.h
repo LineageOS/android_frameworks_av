@@ -71,6 +71,12 @@ struct StreamConfigurationPair {
 
 class SessionConfigurationUtils {
 public:
+    static camera3::Size getMaxJpegResolution(const CameraMetadata &metadata,
+            bool ultraHighResolution);
+
+    static size_t getUHRMaxJpegBufferSize(camera3::Size uhrMaxJpegSize,
+            camera3::Size defaultMaxJpegSize, size_t defaultMaxJpegBufferSize);
+
     static int64_t euclidDistSquare(int32_t x0, int32_t y0, int32_t x1, int32_t y1);
 
     // Find the closest dimensions for a given format in available stream configurations with
@@ -78,6 +84,9 @@ public:
     static bool roundBufferDimensionNearest(int32_t width, int32_t height, int32_t format,
             android_dataspace dataSpace, const CameraMetadata& info, bool maxResolution,
             /*out*/int32_t* outWidth, /*out*/int32_t* outHeight);
+
+    static bool getArrayWidthAndHeight(const CameraMetadata *deviceInfo, int32_t arrayTag,
+            int32_t *width, int32_t *height);
 
     //check if format is not custom format
     static bool isPublicFormat(int32_t format);

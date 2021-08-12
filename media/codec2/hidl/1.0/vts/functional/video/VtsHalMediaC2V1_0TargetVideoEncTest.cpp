@@ -95,9 +95,10 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
         mMinWidth = INT32_MAX;
         mMinHeight = INT32_MAX;
 
-        ASSERT_EQ(getMaxMinResolutionSupported(mComponent), C2_OK);
+        ASSERT_EQ(getMaxMinResolutionSupported(), C2_OK);
         mWidth = std::max(std::min(mWidth, mMaxWidth), mMinWidth);
         mHeight = std::max(std::min(mHeight, mMaxHeight), mMinHeight);
+        ALOGV("mWidth %d mHeight %d", mWidth, mHeight);
 
         C2SecureModeTuning secureModeTuning{};
         mComponent->query({&secureModeTuning}, {}, C2_MAY_BLOCK, nullptr);
@@ -106,6 +107,7 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
             mDisableTest = true;
         }
 
+        getFile();
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
     }
 
@@ -119,10 +121,9 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
 
     // Get the test parameters from GetParam call.
     virtual void getParams() {}
-
+    void getFile();
     bool setupConfigParam(int32_t nWidth, int32_t nHeight, int32_t nBFrame = 0);
-    c2_status_t getMaxMinResolutionSupported(
-            const std::shared_ptr<android::Codec2Client::Component>& component);
+    c2_status_t getMaxMinResolutionSupported();
 
     // callback function to process onWorkDone received by Listener
     void handleWorkDone(std::list<std::unique_ptr<C2Work>>& workItems) {
@@ -215,6 +216,8 @@ class Codec2VideoEncHidlTestBase : public ::testing::Test {
     std::shared_ptr<android::Codec2Client::Listener> mListener;
     std::shared_ptr<android::Codec2Client::Component> mComponent;
 
+    std::string mInputFile;
+
   protected:
     static void description(const std::string& description) {
         RecordProperty("description", description);
@@ -284,9 +287,8 @@ bool Codec2VideoEncHidlTestBase::setupConfigParam(int32_t nWidth, int32_t nHeigh
     return true;
 }
 
-// LookUpTable of clips for component testing
-void GetURLForComponent(char* URL) {
-    strcat(URL, "bbb_352x288_420p_30fps_32frames.yuv");
+void Codec2VideoEncHidlTestBase::getFile() {
+    mInputFile = sResourceDir + "bbb_352x288_420p_30fps_32frames.yuv";
 }
 
 void fillByteBuffer(char* inputBuffer, char* mInputData, uint32_t nWidth, int32_t nHeight) {
@@ -332,6 +334,12 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
     int bytesCount = nWidth * nHeight * 3 >> 1;
     int32_t timestampIncr = ENCODER_TIMESTAMP_INCREMENT;
     c2_status_t err = C2_OK;
+
+    // Query component's memory usage flags
+    std::vector<std::unique_ptr<C2Param>> params;
+    C2StreamUsageTuning::input compUsage(0u, 0u);
+    component->query({&compUsage}, {}, C2_DONT_BLOCK, &params);
+
     while (1) {
         if (nFrames == 0) break;
         uint32_t flags = 0;
@@ -382,7 +390,8 @@ void encodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& comp
         }
         std::shared_ptr<C2GraphicBlock> block;
         err = graphicPool->fetchGraphicBlock(nWidth, nHeight, HAL_PIXEL_FORMAT_YV12,
-                                             {C2MemoryUsage::CPU_READ, C2MemoryUsage::CPU_WRITE},
+                                             {C2MemoryUsage::CPU_READ | compUsage.value,
+                                                 C2MemoryUsage::CPU_WRITE | compUsage.value},
                                              &block);
         if (err != C2_OK) {
             fprintf(stderr, "fetchGraphicBlock failed : %d\n", err);
@@ -439,8 +448,7 @@ class Codec2VideoEncEncodeTest : public Codec2VideoEncHidlTestBase,
     }
 };
 
-c2_status_t Codec2VideoEncHidlTestBase::getMaxMinResolutionSupported(
-        const std::shared_ptr<android::Codec2Client::Component>& component) {
+c2_status_t Codec2VideoEncHidlTestBase::getMaxMinResolutionSupported() {
     std::unique_ptr<C2StreamPictureSizeInfo::input> param =
             std::make_unique<C2StreamPictureSizeInfo::input>();
     std::vector<C2FieldSupportedValuesQuery> validValueInfos = {
@@ -448,7 +456,7 @@ c2_status_t Codec2VideoEncHidlTestBase::getMaxMinResolutionSupported(
                     C2ParamField(param.get(), &C2StreamPictureSizeInfo::width)),
             C2FieldSupportedValuesQuery::Current(
                     C2ParamField(param.get(), &C2StreamPictureSizeInfo::height))};
-    c2_status_t c2err = component->querySupportedValues(validValueInfos, C2_MAY_BLOCK);
+    c2_status_t c2err = mComponent->querySupportedValues(validValueInfos, C2_MAY_BLOCK);
     if (c2err != C2_OK || validValueInfos.size() != 2u) {
         ALOGE("querySupportedValues_vb failed for pictureSize");
         return c2err;
@@ -491,19 +499,14 @@ TEST_P(Codec2VideoEncEncodeTest, EncodeTest) {
     description("Encodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512];
     bool signalEOS = std::get<3>(GetParam());
     // Send an empty frame to receive CSD data from encoder.
     bool sendEmptyFirstFrame = std::get<3>(GetParam());
     mConfigBPictures = std::get<4>(GetParam());
 
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
-
     std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
-    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
-    ALOGV("mURL : %s", mURL);
+    eleStream.open(mInputFile, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mInputFile << " file not found";
 
     mTimestampUs = 0;
     mTimestampDevTest = true;
@@ -640,11 +643,6 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     description("Test Request for flush");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512];
-
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
-
     if (!setupConfigParam(mWidth, mHeight)) {
         ASSERT_TRUE(false) << "Failed while configuring height and width for " << mComponentName;
     }
@@ -655,9 +653,9 @@ TEST_P(Codec2VideoEncHidlTest, FlushTest) {
     std::ifstream eleStream;
     uint32_t numFramesFlushed = 10;
     uint32_t numFrames = ENC_NUM_FRAMES;
-    eleStream.open(mURL, std::ifstream::binary);
+    eleStream.open(mInputFile, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
-    ALOGV("mURL : %s", mURL);
+
     // flush
     std::list<std::unique_ptr<C2Work>> flushedWork;
     c2_status_t err = mComponent->flush(C2Component::FLUSH_COMPONENT, &flushedWork);
@@ -820,15 +818,9 @@ TEST_P(Codec2VideoEncHidlTest, AdaptiveBitrateTest) {
     description("Encodes input file for different bitrates");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512];
-
-    strcpy(mURL, sResourceDir.c_str());
-    GetURLForComponent(mURL);
-
     std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
-    ASSERT_EQ(eleStream.is_open(), true) << mURL << " file not found";
-    ALOGV("mURL : %s", mURL);
+    eleStream.open(mInputFile, std::ifstream::binary);
+    ASSERT_EQ(eleStream.is_open(), true) << mInputFile << " file not found";
 
     mFlushedIndices.clear();
 

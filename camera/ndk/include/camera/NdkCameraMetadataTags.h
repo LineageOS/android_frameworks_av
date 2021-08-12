@@ -1988,6 +1988,16 @@ typedef enum acamera_metadata_tag {
      * ACAMERA_CONTROL_ZOOM_RATIO is not 1.0, and ACAMERA_SCALER_CROP_REGION is set to be
      * windowboxing, the camera framework will override the ACAMERA_SCALER_CROP_REGION to be
      * the active array.</p>
+     * <p>In the capture request, if the application sets ACAMERA_CONTROL_ZOOM_RATIO to a
+     * value != 1.0, the ACAMERA_CONTROL_ZOOM_RATIO tag in the capture result reflects the
+     * effective zoom ratio achieved by the camera device, and the ACAMERA_SCALER_CROP_REGION
+     * adjusts for additional crops that are not zoom related. Otherwise, if the application
+     * sets ACAMERA_CONTROL_ZOOM_RATIO to 1.0, or does not set it at all, the
+     * ACAMERA_CONTROL_ZOOM_RATIO tag in the result metadata will also be 1.0.</p>
+     * <p>When the application requests a physical stream for a logical multi-camera, the
+     * ACAMERA_CONTROL_ZOOM_RATIO in the physical camera result metadata will be 1.0, and
+     * the ACAMERA_SCALER_CROP_REGION tag reflects the amount of zoom and crop done by the
+     * physical camera device.</p>
      *
      * @see ACAMERA_CONTROL_AE_REGIONS
      * @see ACAMERA_CONTROL_ZOOM_RATIO
@@ -8898,13 +8908,27 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * camera's crop region is set to maximum size, the FOV of the physical streams for the
      * ultrawide lens will be the same as the logical stream, by making the crop region
      * smaller than its active array size to compensate for the smaller focal length.</p>
-     * <p>Even if the underlying physical cameras have different RAW characteristics (such as
-     * size or CFA pattern), a logical camera can still advertise RAW capability. In this
-     * case, when the application configures a RAW stream, the camera device will make sure
-     * the active physical camera will remain active to ensure consistent RAW output
-     * behavior, and not switch to other physical cameras.</p>
+     * <p>There are two ways for the application to capture RAW images from a logical camera
+     * with RAW capability:</p>
+     * <ul>
+     * <li>Because the underlying physical cameras may have different RAW capabilities (such
+     * as resolution or CFA pattern), to maintain backward compatibility, when a RAW stream
+     * is configured, the camera device makes sure the default active physical camera remains
+     * active and does not switch to other physical cameras. (One exception is that, if the
+     * logical camera consists of identical image sensors and advertises multiple focalLength
+     * due to different lenses, the camera device may generate RAW images from different
+     * physical cameras based on the focalLength being set by the application.) This
+     * backward-compatible approach usually results in loss of optical zoom, to telephoto
+     * lens or to ultrawide lens.</li>
+     * <li>Alternatively, to take advantage of the full zoomRatio range of the logical camera,
+     * the application should use <a href="https://developer.android.com/reference/android/hardware/camera2/MultiResolutionImageReader.html">MultiResolutionImageReader</a>
+     * to capture RAW images from the currently active physical camera. Because different
+     * physical camera may have different RAW characteristics, the application needs to use
+     * the characteristics and result metadata of the active physical camera for the
+     * relevant RAW metadata.</li>
+     * </ul>
      * <p>The capture request and result metadata tags required for backward compatible camera
-     * functionalities will be solely based on the logical camera capabiltity. On the other
+     * functionalities will be solely based on the logical camera capability. On the other
      * hand, the use of manual capture controls (sensor or post-processing) with a
      * logical camera may result in unexpected behavior when the HAL decides to switch
      * between physical cameras with different characteristics under the hood. For example,

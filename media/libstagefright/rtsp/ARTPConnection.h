@@ -40,7 +40,7 @@ struct ARTPConnection : public AHandler {
             const sp<ASessionDescription> &sessionDesc, size_t index,
             const sp<AMessage> &notify,
             bool injected);
-
+    void seekStream();
     void removeStream(int rtpSocket, int rtcpSocket);
 
     void injectPacket(int index, const sp<ABuffer> &buffer);
@@ -69,9 +69,11 @@ protected:
 private:
     enum {
         kWhatAddStream,
+        kWhatSeekStream,
         kWhatRemoveStream,
         kWhatPollStreams,
         kWhatInjectPacket,
+        kWhatAlarmStream,
     };
 
     static const int64_t kSelectTimeoutUs;
@@ -94,8 +96,10 @@ private:
     int32_t mCumulativeBytes;
 
     void onAddStream(const sp<AMessage> &msg);
+    void onSeekStream(const sp<AMessage> &msg);
     void onRemoveStream(const sp<AMessage> &msg);
     void onPollStreams();
+    void onAlarmStream(const sp<AMessage> msg);
     void onInjectPacket(const sp<AMessage> &msg);
     void onSendReceiverReports();
     void checkRxBitrate(int64_t nowUs);

@@ -36,18 +36,18 @@ static std::vector<DecodeTestParameters> gDecodeTestParameters;
 using CsdFlushTestParameters = std::tuple<std::string, std::string, bool>;
 static std::vector<CsdFlushTestParameters> gCsdFlushTestParameters;
 
-struct CompToURL {
+struct CompToFiles {
     std::string mime;
-    std::string mURL;
-    std::string info;
+    std::string inputFile;
+    std::string infoFile;
 };
 
-std::vector<CompToURL> gCompToURL = {
+std::vector<CompToFiles> gCompToFiles = {
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac", "bbb_aac_stereo_128kbps_48000hz.info"},
         {"mp4a-latm", "bbb_aac_stereo_128kbps_48000hz.aac",
          "bbb_aac_stereo_128kbps_48000hz_multi_frame.info"},
-        {"audio/mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
-        {"audio/mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3",
+        {"mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3", "bbb_mp3_stereo_192kbps_48000hz.info"},
+        {"mpeg", "bbb_mp3_stereo_192kbps_48000hz.mp3",
          "bbb_mp3_stereo_192kbps_48000hz_multi_frame.info"},
         {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb", "sine_amrnb_1ch_12kbps_8000hz.info"},
         {"3gpp", "sine_amrnb_1ch_12kbps_8000hz.amrnb",
@@ -110,6 +110,15 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
         mTimestampUs = 0u;
         mWorkResult = C2_OK;
         mTimestampDevTest = false;
+
+        bool valid = getFileNames(mStreamIndex);
+        if (!valid) {
+            GTEST_SKIP() << "No test file for  mime " << mMime << " index: " << mStreamIndex;
+        }
+        ALOGV("mStreamIndex : %zu", mStreamIndex);
+        ALOGV("mInputFile : %s", mInputFile.c_str());
+        ALOGV("mInfoFile : %s", mInfoFile.c_str());
+
         if (mDisableTest) std::cout << "[   WARN   ] Test Disabled \n";
     }
 
@@ -126,7 +135,7 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
 
     virtual void validateTimestampList(int32_t* bitStreamInfo);
 
-    void GetURLForComponent(char* mURL, char* info, size_t streamIndex = 0);
+    bool getFileNames(size_t streamIndex = 0);
 
     struct outputMetaData {
         uint64_t timestampUs;
@@ -193,6 +202,10 @@ class Codec2AudioDecHidlTestBase : public ::testing::Test {
     std::shared_ptr<android::Codec2Client::Listener> mListener;
     std::shared_ptr<android::Codec2Client::Component> mComponent;
 
+    std::string mInputFile;
+    std::string mInfoFile;
+    size_t mStreamIndex = 0;
+
   protected:
     static void description(const std::string& description) {
         RecordProperty("description", description);
@@ -204,6 +217,7 @@ class Codec2AudioDecHidlTest : public Codec2AudioDecHidlTestBase,
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
+        mStreamIndex = 0;
     }
 };
 
@@ -285,18 +299,20 @@ void getInputChannelInfo(const std::shared_ptr<android::Codec2Client::Component>
 }
 
 // LookUpTable of clips and metadata for component testing
-void Codec2AudioDecHidlTestBase::GetURLForComponent(char* mURL, char* info, size_t streamIndex) {
+bool Codec2AudioDecHidlTestBase::getFileNames(size_t streamIndex) {
     int streamCount = 0;
-    for (size_t i = 0; i < gCompToURL.size(); ++i) {
-        if (mMime.find(gCompToURL[i].mime) != std::string::npos) {
+
+    for (size_t i = 0; i < gCompToFiles.size(); ++i) {
+        if (!mMime.compare("audio/" + gCompToFiles[i].mime)) {
             if (streamCount == streamIndex) {
-                strcat(mURL, gCompToURL[i].mURL.c_str());
-                strcat(info, gCompToURL[i].info.c_str());
-                return;
+                mInputFile = sResourceDir + gCompToFiles[i].inputFile;
+                mInfoFile = sResourceDir + gCompToFiles[i].infoFile;
+                return true;
             }
             streamCount++;
         }
     }
+    return false;
 }
 
 void decodeNFrames(const std::shared_ptr<android::Codec2Client::Component>& component,
@@ -429,6 +445,7 @@ class Codec2AudioDecDecodeTest : public Codec2AudioDecHidlTestBase,
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
+        mStreamIndex = std::get<2>(GetParam());
     }
 };
 
@@ -436,22 +453,12 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
     description("Decodes input file");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    uint32_t streamIndex = std::get<2>(GetParam());
     bool signalEOS = std::get<3>(GetParam());
     mTimestampDevTest = true;
-    char mURL[512], info[512];
     android::Vector<FrameInfo> Info;
 
-    strcpy(mURL, sResourceDir.c_str());
-    strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mURL, info, streamIndex);
-    if (!strcmp(mURL, sResourceDir.c_str())) {
-        ALOGV("EMPTY INPUT sResourceDir.c_str() %s mURL  %s ", sResourceDir.c_str(), mURL);
-        return;
-    }
-
-    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
-    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
+    int32_t numCsds = populateInfoVector(mInfoFile, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << mInfoFile;
 
     // Reset total no of frames received
     mFramesReceived = 0;
@@ -468,9 +475,8 @@ TEST_P(Codec2AudioDecDecodeTest, DecodeTest) {
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
-    ALOGV("mURL : %s", mURL);
     std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
+    eleStream.open(mInputFile, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mLinearPool, eleStream, &Info, 0,
@@ -507,15 +513,10 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
     description("Test Request for thumbnail");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512], info[512];
     android::Vector<FrameInfo> Info;
 
-    strcpy(mURL, sResourceDir.c_str());
-    strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mURL, info);
-
-    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
-    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
+    int32_t numCsds = populateInfoVector(mInfoFile, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << mInfoFile;
 
     int32_t bitStreamInfo[2] = {0};
     if (mMime.find("raw") != std::string::npos) {
@@ -529,7 +530,6 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
-    ALOGV("mURL : %s", mURL);
 
     // request EOS for thumbnail
     // signal EOS flag with last frame
@@ -542,7 +542,7 @@ TEST_P(Codec2AudioDecHidlTest, ThumbnailTest) {
 
     } while (!(flags & SYNC_FRAME));
     std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
+    eleStream.open(mInputFile, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mLinearPool, eleStream, &Info, 0,
@@ -599,15 +599,10 @@ TEST_P(Codec2AudioDecHidlTest, EOSTest) {
 TEST_P(Codec2AudioDecHidlTest, FlushTest) {
     description("Tests Flush calls");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
-    char mURL[512], info[512];
     android::Vector<FrameInfo> Info;
 
-    strcpy(mURL, sResourceDir.c_str());
-    strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mURL, info);
-
-    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
-    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << info;
+    int32_t numCsds = populateInfoVector(mInfoFile, &Info, mTimestampDevTest, &mTimestampUslist);
+    ASSERT_GE(numCsds, 0) << "Error in parsing input info file: " << mInfoFile;
 
     int32_t bitStreamInfo[2] = {0};
     if (mMime.find("raw") != std::string::npos) {
@@ -629,9 +624,8 @@ TEST_P(Codec2AudioDecHidlTest, FlushTest) {
             verifyFlushOutput(flushedWork, mWorkQueue, mFlushedIndices, mQueueLock));
     ASSERT_EQ(mWorkQueue.size(), MAX_INPUT_BUFFERS);
 
-    ALOGV("mURL : %s", mURL);
     std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
+    eleStream.open(mInputFile, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     // Decode 30 frames and flush.
     uint32_t numFramesFlushed = FLUSH_INTERVAL;
@@ -684,15 +678,10 @@ TEST_P(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
     description("Decode with multiple empty input frames");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512], info[512];
     std::ifstream eleStream, eleInfo;
 
-    strcpy(mURL, sResourceDir.c_str());
-    strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mURL, info);
-
-    eleInfo.open(info);
-    ASSERT_EQ(eleInfo.is_open(), true) << mURL << " - file not found";
+    eleInfo.open(mInfoFile);
+    ASSERT_EQ(eleInfo.is_open(), true) << mInputFile << " - file not found";
     android::Vector<FrameInfo> Info;
     int bytesCount = 0;
     uint32_t frameId = 0;
@@ -730,8 +719,7 @@ TEST_P(Codec2AudioDecHidlTest, DecodeTestEmptyBuffersInserted) {
         return;
     }
     ASSERT_EQ(mComponent->start(), C2_OK);
-    ALOGV("mURL : %s", mURL);
-    eleStream.open(mURL, std::ifstream::binary);
+    eleStream.open(mInputFile, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
     ASSERT_NO_FATAL_FAILURE(decodeNFrames(mComponent, mQueueLock, mQueueCondition, mWorkQueue,
                                           mFlushedIndices, mLinearPool, eleStream, &Info, 0,
@@ -759,6 +747,7 @@ class Codec2AudioDecCsdInputTests : public Codec2AudioDecHidlTestBase,
     void getParams() {
         mInstanceName = std::get<0>(GetParam());
         mComponentName = std::get<1>(GetParam());
+        mStreamIndex = 0;
     }
 };
 
@@ -768,19 +757,9 @@ TEST_P(Codec2AudioDecCsdInputTests, CSDFlushTest) {
     description("Tests codecs for flush at different states");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
 
-    char mURL[512], info[512];
     android::Vector<FrameInfo> Info;
 
-    strcpy(mURL, sResourceDir.c_str());
-    strcpy(info, sResourceDir.c_str());
-    GetURLForComponent(mURL, info);
-    if (!strcmp(mURL, sResourceDir.c_str())) {
-        ALOGV("EMPTY INPUT sResourceDir.c_str() %s mURL  %s ", sResourceDir.c_str(), mURL);
-        return;
-    }
-    ALOGV("mURL : %s", mURL);
-
-    int32_t numCsds = populateInfoVector(info, &Info, mTimestampDevTest, &mTimestampUslist);
+    int32_t numCsds = populateInfoVector(mInfoFile, &Info, mTimestampDevTest, &mTimestampUslist);
     ASSERT_GE(numCsds, 0) << "Error in parsing input info file";
 
     int32_t bitStreamInfo[2] = {0};
@@ -797,7 +776,7 @@ TEST_P(Codec2AudioDecCsdInputTests, CSDFlushTest) {
 
     ASSERT_EQ(mComponent->start(), C2_OK);
     std::ifstream eleStream;
-    eleStream.open(mURL, std::ifstream::binary);
+    eleStream.open(mInputFile, std::ifstream::binary);
     ASSERT_EQ(eleStream.is_open(), true);
 
     bool signalEOS = false;

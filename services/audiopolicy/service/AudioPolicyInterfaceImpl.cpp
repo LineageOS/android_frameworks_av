@@ -674,7 +674,8 @@ Status AudioPolicyService::getInputForAttr(const media::AudioAttributesInternal&
 
         sp<AudioRecordClient> client = new AudioRecordClient(attr, input, session, portId,
                                                              selectedDeviceId, adjAttributionSource,
-                                                             canCaptureOutput, canCaptureHotword);
+                                                             canCaptureOutput, canCaptureHotword,
+                                                             mOutputCommandThread);
         mAudioRecordClients.add(portId, client);
     }
 
@@ -1912,6 +1913,14 @@ Status AudioPolicyService::setAssistantUid(int32_t uidAidl)
     uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
     Mutex::Autolock _l(mLock);
     mUidPolicy->setAssistantUid(uid);
+    return Status::ok();
+}
+
+Status AudioPolicyService::setHotwordDetectionServiceUid(int32_t uidAidl)
+{
+    uid_t uid = VALUE_OR_RETURN_BINDER_STATUS(aidl2legacy_int32_t_uid_t(uidAidl));
+    Mutex::Autolock _l(mLock);
+    mUidPolicy->setHotwordDetectionServiceUid(uid);
     return Status::ok();
 }
 

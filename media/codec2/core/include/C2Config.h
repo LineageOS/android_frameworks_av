@@ -574,7 +574,6 @@ enum C2Config::profile_t : uint32_t {
     PROFILE_MPEGH_HIGH,                         ///< MPEG-H High
     PROFILE_MPEGH_LC,                           ///< MPEG-H Low-complexity
     PROFILE_MPEGH_BASELINE,                     ///< MPEG-H Baseline
-
 };
 
 enum C2Config::level_t : uint32_t {
@@ -2393,22 +2392,24 @@ typedef C2StreamParam<C2Info, C2EasyBoolValue, kParamIndexTunnelStartRender>
         C2StreamTunnelStartRender;
 constexpr char C2_PARAMKEY_TUNNEL_START_RENDER[] = "output.tunnel-start-render";
 
-C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
-    NONE,
-    S_HANDHELD,
-    S_HANDHELD_PC
-);
-
-namespace android {
-
 /**
  * Encoding quality level signaling.
+ *
+ * Signal the 'minimum encoding quality' introduced in Android 12/S. It indicates
+ * whether the underlying codec is expected to take extra steps to ensure quality meets the
+ * appropriate minimum. A value of NONE indicates that the codec is not to apply
+ * any minimum quality bar requirements. Other values indicate that the codec is to apply
+ * a minimum quality bar, with the exact quality bar being decided by the parameter value.
  */
 typedef C2GlobalParam<C2Setting,
         C2SimpleValueStruct<C2EasyEnum<C2PlatformConfig::encoding_quality_level_t>>,
         kParamIndexEncodingQualityLevel> C2EncodingQualityLevel;
+constexpr char C2_PARAMKEY_ENCODING_QUALITY_LEVEL[] = "algo.encoding-quality-level";
 
-}
+C2ENUM(C2PlatformConfig::encoding_quality_level_t, uint32_t,
+    NONE = 0,
+    S_HANDHELD = 1              // corresponds to VMAF=70
+);
 
 /// @}
 

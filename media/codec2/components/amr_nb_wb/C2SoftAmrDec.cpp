@@ -143,7 +143,7 @@ c2_status_t C2SoftAmrDec::onStop() {
     if (!mIsWide) {
         Speech_Decode_Frame_reset(mAmrHandle);
     } else {
-        pvDecoder_AmrWb_Reset(mAmrHandle, 0 /* reset_all */);
+        pvDecoder_AmrWb_Reset(mAmrHandle, 1 /* reset_all */);
     }
     mSignalledError = false;
     mSignalledOutputEos = false;
@@ -361,7 +361,13 @@ void C2SoftAmrDec::process(
 
     work->worklets.front()->output.flags = work->input.flags;
     work->worklets.front()->output.buffers.clear();
-    work->worklets.front()->output.buffers.push_back(createLinearBuffer(block));
+    // we filled the output buffer to (intptr_t)output - (intptr_t)wView.data()
+    // use calOutSize as that contains the expected number of samples
+    ALOGD_IF(calOutSize != ((intptr_t)output - (intptr_t)wView.data()),
+            "Expected %zu output bytes, but filled %lld",
+             calOutSize, (long long)((intptr_t)output - (intptr_t)wView.data()));
+    work->worklets.front()->output.buffers.push_back(
+            createLinearBuffer(block, 0, calOutSize));
     work->worklets.front()->output.ordinal = work->input.ordinal;
     if (eos) {
         mSignalledOutputEos = true;

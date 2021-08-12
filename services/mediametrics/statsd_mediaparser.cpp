@@ -31,6 +31,7 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
+#include "StringUtils.h"
 #include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
 #include "iface_statsd.h"
 
@@ -80,6 +81,7 @@ bool statsd_mediaparser(const std::shared_ptr<const mediametrics::Item>& item,
 
     std::string logSessionId;
     item->getString("android.media.mediaparser.logSessionId", &logSessionId);
+    logSessionId = mediametrics::stringutils::sanitizeLogSessionId(logSessionId);
 
     int result = android::util::stats_write(android::util::MEDIAMETRICS_MEDIAPARSER_REPORTED,
                                timestamp_nanos,

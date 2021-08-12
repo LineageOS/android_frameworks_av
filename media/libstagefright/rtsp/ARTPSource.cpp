@@ -44,10 +44,11 @@ ARTPSource::ARTPSource(
         uint32_t id,
         const sp<ASessionDescription> &sessionDesc, size_t index,
         const sp<AMessage> &notify)
-    : mFirstSeqNumber(0),
-      mFirstRtpTime(0),
+    : mFirstRtpTime(0),
       mFirstSysTime(0),
       mClockRate(0),
+      mSysAnchorTime(0),
+      mLastSysAnchorTimeUpdatedUs(0),
       mFirstSsrc(0),
       mHighestNackNumber(0),
       mID(id),
@@ -58,9 +59,14 @@ ARTPSource::ARTPSource(
       mPrevNumBuffersReceived(0),
       mPrevExpectedForRR(0),
       mPrevNumBuffersReceivedForRR(0),
+      mLatestRtpTime(0),
       mStaticJbTimeMs(kStaticJitterTimeMs),
-      mLastNTPTime(0),
-      mLastNTPTimeUpdateUs(0),
+      mLastSrRtpTime(0),
+      mLastSrNtpTime(0),
+      mLastSrUpdateTimeUs(0),
+      mIsFirstRtpRtcpGap(true),
+      mAvgRtpRtcpGapMs(0),
+      mAvgUnderlineDelayMs(0),
       mIssueFIRRequests(false),
       mIssueFIRByAssembler(false),
       mLastFIRRequestUs(-1),
@@ -106,6 +112,7 @@ ARTPSource::ARTPSource(
     int32_t clockRate, numChannels;
     ASessionDescription::ParseFormatDesc(desc.c_str(), &clockRate, &numChannels);
     mClockRate = clockRate;
+    mLastJbAlarmTimeUs = 0;
     mJitterCalc = new JitterCalc(mClockRate);
 }
 
@@ -119,34 +126,144 @@ void ARTPSource::processRTPPacket(const sp<ABuffer> &buffer) {
     }
 }
 
+void ARTPSource::processRTPPacket() {
+    if (mAssembler != NULL && !mQueue.empty()) {
+        mAssembler->onPacketReceived(this);
+    }
+}
+
 void ARTPSource::timeUpdate(uint32_t rtpTime, uint64_t ntpTime) {
-    mLastNTPTime = ntpTime;
-    mLastNTPTimeUpdateUs = ALooper::GetNowUs();
+    mLastSrRtpTime = rtpTime;
+    mLastSrNtpTime = ntpTime;
+    mLastSrUpdateTimeUs = ALooper::GetNowUs();
 
     sp<AMessage> notify = mNotify->dup();
     notify->setInt32("time-update", true);
     notify->setInt32("rtp-time", rtpTime);
     notify->setInt64("ntp-time", ntpTime);
+    notify->setInt32("rtcp-event", 1);
+    notify->setInt32("payload-type", RTCP_SR);
+    notify->setInt64("recv-time-us", mLastSrUpdateTimeUs);
     notify->post();
 }
 
-bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
-    uint32_t seqNum = (uint32_t)buffer->int32Data();
+void ARTPSource::timeReset() {
+    mFirstRtpTime = 0;
+    mFirstSysTime = 0;
+    mSysAnchorTime = 0;
+    mLastSysAnchorTimeUpdatedUs = 0;
+    mFirstSsrc = 0;
+    mHighestNackNumber = 0;
+    mHighestSeqNumber = 0;
+    mPrevExpected = 0;
+    mBaseSeqNumber = 0;
+    mNumBuffersReceived = 0;
+    mPrevNumBuffersReceived = 0;
+    mPrevExpectedForRR = 0;
+    mPrevNumBuffersReceivedForRR = 0;
+    mLatestRtpTime = 0;
+    mLastSrRtpTime = 0;
+    mLastSrNtpTime = 0;
+    mLastSrUpdateTimeUs = 0;
+    mIsFirstRtpRtcpGap = true;
+    mAvgRtpRtcpGapMs = 0;
+    mAvgUnderlineDelayMs = 0;
+    mIssueFIRByAssembler = false;
+    mLastFIRRequestUs = -1;
+}
 
-    int32_t ssrc = 0;
+void ARTPSource::calcTimeGapRtpRtcp(const sp<ABuffer> &buffer, int64_t nowUs) {
+    if (mLastSrUpdateTimeUs == 0) {
+        return;
+    }
+
+    int64_t elapsedMs = (nowUs - mLastSrUpdateTimeUs) / 1000;
+    int64_t elapsedRtpTime = (elapsedMs * (mClockRate / 1000));
+    uint32_t rtpTime;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+
+    int64_t anchorRtpTime = mLastSrRtpTime + elapsedRtpTime;
+    int64_t rtpTimeGap = anchorRtpTime - rtpTime;
+    // rtpTime can not be faster than it's anchor time.
+    // because rtpTime(of rtp packet) represents it's a frame captured time and
+    // anchorRtpTime(of rtcp:sr packet) represents it's a rtp packetized time.
+    if (rtpTimeGap < 0 || rtpTimeGap > (mClockRate * 60)) {
+        // ignore invalid delay gap such as negative delay or later than 1 min.
+        return;
+    }
+
+    int64_t rtpTimeGapMs = (rtpTimeGap * 1000 / mClockRate);
+    if (mIsFirstRtpRtcpGap) {
+        mIsFirstRtpRtcpGap = false;
+        mAvgRtpRtcpGapMs = rtpTimeGapMs;
+    } else {
+        // This is measuring avg rtp timestamp distance between rtp and rtcp:sr packet.
+        // Rtp timestamp of rtp packet represents it's raw frame captured time.
+        // Rtp timestamp of rtcp:sr packet represents it's packetization time.
+        // So that, this value is showing how much time delayed to be a rtp packet
+        // from a raw frame captured time.
+        // This value maybe referred to know a/v sync and sender's own delay of this media stream.
+        mAvgRtpRtcpGapMs = ((mAvgRtpRtcpGapMs * 15) + rtpTimeGapMs) / 16;
+    }
+}
+
+void ARTPSource::calcUnderlineDelay(const sp<ABuffer> &buffer, int64_t nowUs) {
+    int64_t elapsedMs = (nowUs - mSysAnchorTime) / 1000;
+    int64_t elapsedRtpTime = (elapsedMs * (mClockRate / 1000));
+    int64_t expectedRtpTime = mFirstRtpTime + elapsedRtpTime;
+
+    int32_t rtpTime;
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+    int32_t delayMs = (expectedRtpTime - rtpTime) / (mClockRate / 1000);
+
+    mAvgUnderlineDelayMs = ((mAvgUnderlineDelayMs * 15) + delayMs) / 16;
+}
+
+void ARTPSource::adjustAnchorTimeIfRequired(int64_t nowUs) {
+    if (nowUs - mLastSysAnchorTimeUpdatedUs < 1000000L) {
+        return;
+    }
+
+    if (mAvgUnderlineDelayMs < -30) {
+        // adjust underline delay a quarter of desired delay like step by step.
+        mSysAnchorTime += (int64_t)(mAvgUnderlineDelayMs * 1000 / 4);
+        ALOGD("anchor time updated: original(%lld), anchor(%lld), diffMs(%lld)",
+                (long long)mFirstSysTime, (long long)mSysAnchorTime,
+                (long long)(mFirstSysTime - mSysAnchorTime) / 1000);
+
+        mAvgUnderlineDelayMs = 0;
+        mLastSysAnchorTimeUpdatedUs = nowUs;
+
+        // reset a jitter stastics since an anchor time adjusted.
+        mJitterCalc->init(mFirstRtpTime, mSysAnchorTime, 0, mStaticJbTimeMs * 1000);
+    }
+}
+
+bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
+    int64_t nowUs = ALooper::GetNowUs();
+    uint32_t seqNum = (uint32_t)buffer->int32Data();
+    int32_t ssrc = 0, rtpTime = 0;
+
     buffer->meta()->findInt32("ssrc", &ssrc);
+    CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&rtpTime));
+    mLatestRtpTime = rtpTime;
 
     if (mNumBuffersReceived++ == 0 && mFirstSysTime == 0) {
-        uint32_t firstRtpTime;
-        CHECK(buffer->meta()->findInt32("rtp-time", (int32_t *)&firstRtpTime));
-        mFirstSysTime = ALooper::GetNowUs();
+        mFirstSysTime = nowUs;
+        mSysAnchorTime = nowUs;
+        mLastSysAnchorTimeUpdatedUs = nowUs;
         mHighestSeqNumber = seqNum;
         mBaseSeqNumber = seqNum;
-        mFirstRtpTime = firstRtpTime;
+        mFirstRtpTime = rtpTime;
         mFirstSsrc = ssrc;
         ALOGD("first-rtp arrived: first-rtp-time=%u, sys-time=%lld, seq-num=%u, ssrc=%d",
                 mFirstRtpTime, (long long)mFirstSysTime, mHighestSeqNumber, mFirstSsrc);
         mJitterCalc->init(mFirstRtpTime, mFirstSysTime, 0, mStaticJbTimeMs * 1000);
+        if (mQueue.size() > 0) {
+            ALOGD("clearing buffers which belonged to previous timeline"
+                    " since a base timeline has been changed.");
+            mQueue.clear();
+        }
         mQueue.push_back(buffer);
         return true;
     }
@@ -155,6 +272,10 @@ bool ARTPSource::queuePacket(const sp<ABuffer> &buffer) {
         ALOGW("Discarding a buffer due to unexpected ssrc");
         return false;
     }
+
+    calcTimeGapRtpRtcp(buffer, nowUs);
+    calcUnderlineDelay(buffer, nowUs);
+    adjustAnchorTimeIfRequired(nowUs);
 
     // Only the lower 16-bit of the sequence numbers are transmitted,
     // derive the high-order bits by choosing the candidate closest
@@ -340,11 +461,11 @@ void ARTPSource::addReceiverReport(const sp<ABuffer> &buffer) {
 
     uint32_t LSR = 0;
     uint32_t DLSR = 0;
-    if (mLastNTPTime != 0) {
-        LSR = (mLastNTPTime >> 16) & 0xffffffff;
+    if (mLastSrNtpTime != 0) {
+        LSR = (mLastSrNtpTime >> 16) & 0xffffffff;
 
         DLSR = (uint32_t)
-            ((ALooper::GetNowUs() - mLastNTPTimeUpdateUs) * 65536.0 / 1E6);
+            ((ALooper::GetNowUs() - mLastSrUpdateTimeUs) * 65536.0 / 1E6);
     }
 
     data[24] = LSR >> 24;
@@ -543,6 +664,35 @@ void ARTPSource::putInterArrivalJitterData(uint32_t timeStamp, int64_t arrivalTi
     mJitterCalc->putInterArrivalData(timeStamp, arrivalTime);
 }
 
+void ARTPSource::setJbTimer(const sp<AMessage> timer) {
+    mJbTimer = timer;
+}
+
+void ARTPSource::setJbAlarmTime(int64_t nowTimeUs, int64_t alarmAfterUs) {
+    if (mJbTimer == NULL) {
+        return;
+    }
+    int64_t alarmTimeUs = nowTimeUs + alarmAfterUs;
+    bool alarm = false;
+    if (mLastJbAlarmTimeUs <= nowTimeUs) {
+        // no more alarm in pending.
+        mLastJbAlarmTimeUs = nowTimeUs + alarmAfterUs;
+        alarm = true;
+    } else if (mLastJbAlarmTimeUs > alarmTimeUs + 5000L) {
+        // bring an alarm forward more than 5ms.
+        mLastJbAlarmTimeUs = alarmTimeUs;
+        alarm = true;
+    } else {
+        // would not set alarm if it is close with before one.
+    }
+
+    if (alarm) {
+        sp<AMessage> notify = mJbTimer->dup();
+        notify->setObject("source", this);
+        notify->post(alarmAfterUs);
+    }
+}
+
 bool ARTPSource::isNeedToEarlyNotify() {
     uint32_t expected = mHighestSeqNumber - mBaseSeqNumber + 1;
     int32_t intervalExpectedInNow = expected - mPrevExpected;
@@ -553,7 +703,7 @@ bool ARTPSource::isNeedToEarlyNotify() {
     return false;
 }
 
-void ARTPSource::notifyPktInfo(int32_t bitrate, bool isRegular) {
+void ARTPSource::notifyPktInfo(int32_t bitrate, int64_t nowUs, bool isRegular) {
     int32_t payloadType = isRegular ? RTP_QUALITY : RTP_QUALITY_EMC;
 
     sp<AMessage> notify = mNotify->dup();
@@ -567,6 +717,11 @@ void ARTPSource::notifyPktInfo(int32_t bitrate, bool isRegular) {
     notify->setInt32("prev-expected", mPrevExpected);
     notify->setInt32("num-buf-recv", mNumBuffersReceived);
     notify->setInt32("prev-num-buf-recv", mPrevNumBuffersReceived);
+    notify->setInt32("latest-rtp-time", mLatestRtpTime);
+    notify->setInt64("recv-time-us", nowUs);
+    notify->setInt32("rtp-jitter-time-ms",
+            std::max(getBaseJitterTimeMs(), getStaticJitterTimeMs()));
+    notify->setInt32("rtp-rtcpsr-time-gap-ms", (int32_t)mAvgRtpRtcpGapMs);
     notify->post();
 
     if (isRegular) {

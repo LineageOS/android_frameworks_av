@@ -26,6 +26,11 @@
 #include <media/stagefright/foundation/MediaDefs.h>
 
 namespace android {
+namespace {
+
+constexpr uint8_t NEUTRAL_UV_VALUE = 128;
+
+}  // namespace
 
 // codecname set and passed in as a compile flag from Android.bp
 constexpr char COMPONENT_NAME[] = CODECNAME;
@@ -51,8 +56,8 @@ class C2SoftGav1Dec::IntfImpl : public SimpleInterface<void>::BaseParams {
         DefineParam(mSize, C2_PARAMKEY_PICTURE_SIZE)
             .withDefault(new C2StreamPictureSizeInfo::output(0u, 320, 240))
             .withFields({
-                C2F(mSize, width).inRange(2, 2048, 2),
-                C2F(mSize, height).inRange(2, 2048, 2),
+                C2F(mSize, width).inRange(2, 4096, 2),
+                C2F(mSize, height).inRange(2, 4096, 2),
             })
             .withSetter(SizeSetter)
             .build());
@@ -464,12 +469,24 @@ static void copyOutputBufferToYV12Frame(uint8_t *dstY, uint8_t *dstU, uint8_t *d
                                         const uint8_t *srcY, const uint8_t *srcU, const uint8_t *srcV,
                                         size_t srcYStride, size_t srcUStride, size_t srcVStride,
                                         size_t dstYStride, size_t dstUVStride,
-                                        uint32_t width, uint32_t height) {
+                                        uint32_t width, uint32_t height,
+                                        bool isMonochrome) {
 
   for (size_t i = 0; i < height; ++i) {
     memcpy(dstY, srcY, width);
     srcY += srcYStride;
     dstY += dstYStride;
+  }
+
+  if (isMonochrome) {
+    // Fill with neutral U/V values.
+    for (size_t i = 0; i < height / 2; ++i) {
+      memset(dstV, NEUTRAL_UV_VALUE, width / 2);
+      memset(dstU, NEUTRAL_UV_VALUE, width / 2);
+      dstV += dstUVStride;
+      dstU += dstUVStride;
+    }
+    return;
   }
 
   for (size_t i = 0; i < height / 2; ++i) {
@@ -557,7 +574,7 @@ static void convertYUV420Planar16ToYUV420Planar(
     const uint16_t *srcY, const uint16_t *srcU, const uint16_t *srcV,
     size_t srcYStride, size_t srcUStride, size_t srcVStride,
     size_t dstYStride, size_t dstUVStride,
-    size_t width, size_t height) {
+    size_t width, size_t height, bool isMonochrome) {
 
   for (size_t y = 0; y < height; ++y) {
     for (size_t x = 0; x < width; ++x) {
@@ -566,6 +583,17 @@ static void convertYUV420Planar16ToYUV420Planar(
 
     srcY += srcYStride;
     dstY += dstYStride;
+  }
+
+  if (isMonochrome) {
+    // Fill with neutral U/V values.
+    for (size_t y = 0; y < (height + 1) / 2; ++y) {
+      memset(dstV, NEUTRAL_UV_VALUE, (width + 1) / 2);
+      memset(dstU, NEUTRAL_UV_VALUE, (width + 1) / 2);
+      dstV += dstUVStride;
+      dstU += dstUVStride;
+    }
+    return;
   }
 
   for (size_t y = 0; y < (height + 1) / 2; ++y) {
@@ -623,8 +651,16 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     }
   }
 
-  // TODO(vigneshv): Add support for monochrome videos since AV1 supports it.
-  CHECK(buffer->image_format == libgav1::kImageFormatYuv420);
+  if (!(buffer->image_format == libgav1::kImageFormatYuv420 ||
+        buffer->image_format == libgav1::kImageFormatMonochrome400)) {
+    ALOGE("image_format %d not supported", buffer->image_format);
+    mSignalledError = true;
+    work->workletsProcessed = 1u;
+    work->result = C2_CORRUPTED;
+    return false;
+  }
+  const bool isMonochrome =
+      buffer->image_format == libgav1::kImageFormatMonochrome400;
 
   std::shared_ptr<C2GraphicBlock> block;
   uint32_t format = HAL_PIXEL_FORMAT_YV12;
@@ -636,6 +672,13 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
     if (defaultColorAspects->primaries == C2Color::PRIMARIES_BT2020 &&
         defaultColorAspects->matrix == C2Color::MATRIX_BT2020 &&
         defaultColorAspects->transfer == C2Color::TRANSFER_ST2084) {
+      if (buffer->image_format != libgav1::kImageFormatYuv420) {
+        ALOGE("Only YUV420 output is supported when targeting RGBA_1010102");
+        mSignalledError = true;
+        work->result = C2_OMITTED;
+        work->workletsProcessed = 1u;
+        return false;
+      }
       format = HAL_PIXEL_FORMAT_RGBA_1010102;
     }
   }
@@ -682,21 +725,18 @@ bool C2SoftGav1Dec::outputBuffer(const std::shared_ptr<C2BlockPool> &pool,
           (uint32_t *)dstY, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
           srcVStride / 2, dstYStride / sizeof(uint32_t), mWidth, mHeight);
     } else {
-      convertYUV420Planar16ToYUV420Planar(dstY, dstU, dstV,
-                                          srcY, srcU, srcV,
-                                          srcYStride / 2, srcUStride / 2, srcVStride / 2,
-                                          dstYStride, dstUVStride,
-                                          mWidth, mHeight);
+      convertYUV420Planar16ToYUV420Planar(
+          dstY, dstU, dstV, srcY, srcU, srcV, srcYStride / 2, srcUStride / 2,
+          srcVStride / 2, dstYStride, dstUVStride, mWidth, mHeight,
+          isMonochrome);
     }
   } else {
     const uint8_t *srcY = (const uint8_t *)buffer->plane[0];
     const uint8_t *srcU = (const uint8_t *)buffer->plane[1];
     const uint8_t *srcV = (const uint8_t *)buffer->plane[2];
-    copyOutputBufferToYV12Frame(dstY, dstU, dstV,
-                                srcY, srcU, srcV,
-                                srcYStride, srcUStride, srcVStride,
-                                dstYStride, dstUVStride,
-                                mWidth, mHeight);
+    copyOutputBufferToYV12Frame(
+        dstY, dstU, dstV, srcY, srcU, srcV, srcYStride, srcUStride, srcVStride,
+        dstYStride, dstUVStride, mWidth, mHeight, isMonochrome);
   }
   finishWork(buffer->user_private_data, work, std::move(block));
   block = nullptr;

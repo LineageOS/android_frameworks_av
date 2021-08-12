@@ -63,12 +63,61 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
         return 0;
     }
 
-    if (codec->supportedMinimumQuality() > 0) {
-        // allow the codec provided minimum quality behavior to work at it
-        ALOGD("minquality: codec claims to implement minquality=%d",
-              codec->supportedMinimumQuality());
+    // only proceed if we're in the handheld category.
+    // We embed this information within the codec record when we build up features
+    // and pass them in from MediaCodec; it's the easiest place to store it
+    //
+    // TODO: make a #define for ' _vq_eligible.device' here and in MediaCodec.cpp
+    //
+    int32_t isVQEligible = 0;
+    (void) codec->getFeatureValue("_vq_eligible.device", &isVQEligible);
+    if (!isVQEligible) {
+        ALOGD("minquality: not an eligible device class");
         return 0;
     }
+
+    // look at resolution to determine if we want any shaping/modification at all.
+    //
+    // we currently only shape (or ask the underlying codec to shape) for
+    // resolution range  320x240 < target <= 1920x1080
+    // NB: the < vs <=, that is deliberate.
+    //
+
+    int32_t width = 0;
+    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_WIDTH, &width);
+    int32_t height = 0;
+    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_HEIGHT, &height);
+    int64_t pixels = ((int64_t)width) * height;
+
+    bool eligibleSize = true;
+    if (pixels <= 320 * 240) {
+        eligibleSize = false;
+    } else if (pixels > 1920 * 1088) {
+        eligibleSize = false;
+    }
+
+    if (!eligibleSize) {
+        // we won't shape, and ask that the codec not shape
+        ALOGD("minquality: %dx%d outside of shaping range", width, height);
+        AMediaFormat_setInt32(inFormat, "android._encoding-quality-level", 0);
+        return 0;
+    }
+
+    if (codec->supportedMinimumQuality() > 0) {
+        // have the codec-provided minimum quality behavior to work at it
+        ALOGD("minquality: codec claims to implement minquality=%d",
+              codec->supportedMinimumQuality());
+
+        // tell the underlying codec to do its thing; we won't try to second guess.
+        // default to 1, aka S_HANDHELD;
+        int32_t qualityTarget = 1;
+        (void) codec->getFeatureValue("_quality.target", &qualityTarget);
+        AMediaFormat_setInt32(inFormat, "android._encoding-quality-level", qualityTarget);
+        return 0;
+    }
+
+    // let the codec know that we'll be enforcing the minimum quality standards
+    AMediaFormat_setInt32(inFormat, "android._encoding-quality-level", 0);
 
     //
     // consider any and all tools available
@@ -84,11 +133,8 @@ int VQApply(CodecProperties *codec, vqOps_t *info, AMediaFormat* inFormat, int f
     bitrateConfigured = bitrateConfiguredTmp;
     bitrateChosen = bitrateConfigured;
 
-    int32_t width = 0;
-    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_WIDTH, &width);
-    int32_t height = 0;
-    (void) AMediaFormat_getInt32(inFormat, AMEDIAFORMAT_KEY_HEIGHT, &height);
-    int64_t pixels = ((int64_t)width) * height;
+    // width, height, and pixels are calculated above
+
     double minimumBpp = codec->getBpp(width, height);
 
     int64_t bitrateFloor = pixels * minimumBpp;

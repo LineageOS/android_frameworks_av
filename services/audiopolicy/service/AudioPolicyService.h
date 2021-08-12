@@ -27,6 +27,7 @@
 #include <utils/Vector.h>
 #include <utils/SortedVector.h>
 #include <binder/ActivityManager.h>
+#include <binder/AppOpsManager.h>
 #include <binder/BinderService.h>
 #include <binder/IUidObserver.h>
 #include <system/audio.h>
@@ -198,6 +199,7 @@ public:
     binder::Status setSurroundFormatEnabled(media::audio::common::AudioFormat audioFormat,
                                             bool enabled) override;
     binder::Status setAssistantUid(int32_t uid) override;
+    binder::Status setHotwordDetectionServiceUid(int32_t uid) override;
     binder::Status setA11yServicesUids(const std::vector<int32_t>& uids) override;
     binder::Status setCurrentImeUid(int32_t uid) override;
     binder::Status isHapticPlaybackSupported(bool* _aidl_return) override;
@@ -358,6 +360,13 @@ private:
 
     static bool isVirtualSource(audio_source_t source);
 
+    /** returns true if the audio source must be silenced when the corresponding app op is denied.
+     *          false if the audio source does not actually capture from the microphone while still
+     *          being mapped to app op OP_RECORD_AUDIO and not a specialized op tracked separately.
+     *          See getOpForSource().
+     */
+    static bool isAppOpSource(audio_source_t source);
+
     // If recording we need to make sure the UID is allowed to do that. If the UID is idle
     // then it cannot record and gets buffers with zeros - silence. As soon as the UID
     // transitions to an active state we will start reporting buffers with data. This approach
@@ -368,7 +377,8 @@ private:
     public:
         explicit UidPolicy(wp<AudioPolicyService> service)
                 : mService(service), mObserverRegistered(false),
-                  mAssistantUid(0), mCurrentImeUid(0), mRttEnabled(false) {}
+                  mAssistantUid(0), mHotwordDetectionServiceUid(0), mCurrentImeUid(0),
+                  mRttEnabled(false) {}
 
         void registerSelf();
         void unregisterSelf();
@@ -378,8 +388,13 @@ private:
 
         bool isUidActive(uid_t uid);
         int getUidState(uid_t uid);
-        void setAssistantUid(uid_t uid) { mAssistantUid = uid; }
-        bool isAssistantUid(uid_t uid) { return uid == mAssistantUid; }
+        void setAssistantUid(uid_t uid) { mAssistantUid = uid; };
+        void setHotwordDetectionServiceUid(uid_t uid) { mHotwordDetectionServiceUid = uid; }
+        bool isAssistantUid(uid_t uid) const {
+            // The HotwordDetectionService is part of the Assistant package but runs with a separate
+            // (isolated) uid, so we check for either uid here.
+            return uid == mAssistantUid || uid == mHotwordDetectionServiceUid;
+        }
         void setA11yUids(const std::vector<uid_t>& uids) { mA11yUids.clear(); mA11yUids = uids; }
         bool isA11yUid(uid_t uid);
         bool isA11yOnTop();
@@ -415,6 +430,7 @@ private:
         std::unordered_map<uid_t, std::pair<bool, int>> mOverrideUids;
         std::unordered_map<uid_t, std::pair<bool, int>> mCachedUids;
         uid_t mAssistantUid = -1;
+        uid_t mHotwordDetectionServiceUid = -1;
         std::vector<uid_t> mA11yUids;
         uid_t mCurrentImeUid = -1;
         bool mRttEnabled = false;
@@ -467,6 +483,7 @@ private:
             SET_EFFECT_SUSPENDED,
             AUDIO_MODULES_UPDATE,
             ROUTING_UPDATED,
+            UPDATE_UID_STATES
         };
 
         AudioCommandThread (String8 name, const wp<AudioPolicyService>& service);
@@ -514,6 +531,7 @@ private:
                                                           bool suspended);
                     void        audioModulesUpdateCommand();
                     void        routingChangedCommand();
+                    void        updateUidStatesCommand();
                     void        insertCommand_l(AudioCommand *command, int delayMs = 0);
     private:
         class AudioCommandData;
@@ -814,6 +832,47 @@ private:
               bool active;                   // Playback/Capture is active or inactive
     };
 
+    // Checks and monitors app ops for AudioRecordClient
+    class OpRecordAudioMonitor : public RefBase {
+    public:
+        ~OpRecordAudioMonitor() override;
+        bool hasOp() const;
+        int32_t getOp() const { return mAppOp; }
+
+        static sp<OpRecordAudioMonitor> createIfNeeded(
+                const AttributionSourceState& attributionSource,
+                const audio_attributes_t& attr, wp<AudioCommandThread> commandThread);
+
+    private:
+        OpRecordAudioMonitor(const AttributionSourceState& attributionSource, int32_t appOp,
+                wp<AudioCommandThread> commandThread);
+
+        void onFirstRef() override;
+
+        AppOpsManager mAppOpsManager;
+
+        class RecordAudioOpCallback : public BnAppOpsCallback {
+        public:
+            explicit RecordAudioOpCallback(const wp<OpRecordAudioMonitor>& monitor);
+            void opChanged(int32_t op, const String16& packageName) override;
+
+        private:
+            const wp<OpRecordAudioMonitor> mMonitor;
+        };
+
+        sp<RecordAudioOpCallback> mOpCallback;
+        // called by RecordAudioOpCallback when the app op for this OpRecordAudioMonitor is updated
+        // in AppOp callback and in onFirstRef()
+        // updateUidStates is true when the silenced state of active AudioRecordClients must be
+        // re-evaluated
+        void checkOp(bool updateUidStates = false);
+
+        std::atomic_bool mHasOp;
+        const AttributionSourceState mAttributionSource;
+        const int32_t mAppOp;
+        wp<AudioCommandThread> mCommandThread;
+    };
+
     // --- AudioRecordClient ---
     // Information about each registered AudioRecord client
     // (between calls to getInputForAttr() and releaseInput())
@@ -824,19 +883,31 @@ private:
                           const audio_session_t session, audio_port_handle_t portId,
                           const audio_port_handle_t deviceId,
                           const AttributionSourceState& attributionSource,
-                          bool canCaptureOutput, bool canCaptureHotword) :
+                          bool canCaptureOutput, bool canCaptureHotword,
+                          wp<AudioCommandThread> commandThread) :
                     AudioClient(attributes, io, attributionSource,
                         session, portId, deviceId), attributionSource(attributionSource),
                         startTimeNs(0), canCaptureOutput(canCaptureOutput),
-                        canCaptureHotword(canCaptureHotword), silenced(false) {}
+                        canCaptureHotword(canCaptureHotword), silenced(false),
+                        mOpRecordAudioMonitor(
+                                OpRecordAudioMonitor::createIfNeeded(attributionSource,
+                                attributes, commandThread)) {}
                 ~AudioRecordClient() override = default;
+
+        bool hasOp() const {
+            return mOpRecordAudioMonitor ? mOpRecordAudioMonitor->hasOp() : true;
+        }
 
         const AttributionSourceState attributionSource; // attribution source of client
         nsecs_t startTimeNs;
         const bool canCaptureOutput;
         const bool canCaptureHotword;
         bool silenced;
+
+    private:
+        sp<OpRecordAudioMonitor>           mOpRecordAudioMonitor;
     };
+
 
     // --- AudioPlaybackClient ---
     // Information about each registered AudioTrack client

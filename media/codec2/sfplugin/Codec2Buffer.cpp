@@ -491,7 +491,7 @@ public:
                         * align(mHeight, 64) / plane.rowSampling;
             }
 
-            if ((maxPtr - minPtr + 1) <= planeSize) {
+            if (minPtr == mView.data()[0] && (maxPtr - minPtr + 1) <= planeSize) {
                 // FIXME: this is risky as reading/writing data out of bound results
                 //        in an undefined behavior, but gralloc does assume a
                 //        contiguous mapping
@@ -679,17 +679,20 @@ GraphicMetadataBuffer::GraphicMetadataBuffer(
 std::shared_ptr<C2Buffer> GraphicMetadataBuffer::asC2Buffer() {
 #ifdef __LP64__
     static std::once_flag s_checkOnce;
-    static bool s_64bitonly {false};
+    static bool s_is64bitOk {true};
     std::call_once(s_checkOnce, [&](){
         const std::string abi32list =
         ::android::base::GetProperty("ro.product.cpu.abilist32", "");
-        if (abi32list.empty()) {
-            s_64bitonly = true;
+        if (!abi32list.empty()) {
+            int32_t inputSurfaceSetting =
+            ::android::base::GetIntProperty("debug.stagefright.c2inputsurface", int32_t(0));
+            s_is64bitOk = inputSurfaceSetting != 0;
         }
     });
 
-    if (!s_64bitonly) {
-        ALOGE("GraphicMetadataBuffer does not work in 32+64 system if compiled as 64-bit object");
+    if (!s_is64bitOk) {
+        ALOGE("GraphicMetadataBuffer does not work in 32+64 system if compiled as 64-bit object"\
+              "when debug.stagefright.c2inputsurface is set to 0");
         return nullptr;
     }
 #endif

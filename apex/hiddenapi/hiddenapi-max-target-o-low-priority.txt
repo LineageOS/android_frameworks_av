@@ -1,0 +1,6 @@
+Landroid/media/MediaSession2$ControllerInfo;-><init>(Landroid/content/Context;IILjava/lang/String;Landroid/os/IInterface;)V
+Landroid/media/MediaSession2$ControllerInfo;->getPackageName()Ljava/lang/String;
+Landroid/media/MediaSession2$ControllerInfo;->getProvider()Landroid/media/update/MediaSession2Provider$ControllerInfoProvider;
+Landroid/media/MediaSession2$ControllerInfo;->getUid()I
+Landroid/media/MediaSession2$ControllerInfo;->isTrusted()Z
+Landroid/media/MediaSession2$ControllerInfo;->mProvider:Landroid/media/update/MediaSession2Provider$ControllerInfoProvider;

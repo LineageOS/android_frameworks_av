@@ -371,6 +371,9 @@ public:
         virtual status_t                finishCameraOps();
         // Handle errors for start/checkOps
         virtual status_t                handleAppOpMode(int32_t mode);
+        // Just notify camera appops to trigger unblocking dialog if sensor
+        // privacy is enabled and camera mute is not supported
+        virtual status_t                noteAppOp();
 
         std::unique_ptr<AppOpsManager>  mAppOpsManager = nullptr;
 
@@ -945,9 +948,10 @@ private:
     void updateCameraNumAndIds();
 
     /**
-     * Filter camera characteristics for S Performance class primary cameras
+     * Filter camera characteristics for S Performance class primary cameras.
+     * mServiceLock should be locked.
      */
-    void filterSPerfClassCharacteristics();
+    void filterSPerfClassCharacteristicsLocked();
 
     // File descriptor to temp file used for caching previous open
     // session dumpsys info.
