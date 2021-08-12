@@ -52,7 +52,7 @@ cc_binary {
 
     // minijail is used to protect against unexpected system calls.
     shared_libs: [
-        "libavservices_minijail_vendor",
+        "libavservices_minijail",
         "libbinder",
     ],
     required: ["android.hardware.media.c2@1.2-default-seccomp_policy"],
