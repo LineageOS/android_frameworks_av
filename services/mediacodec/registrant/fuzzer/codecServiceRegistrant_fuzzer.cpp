@@ -132,7 +132,10 @@ void CodecServiceRegistrantFuzzer::invokeH2C2ComponentStore() {
   mH2C2->querySupportedValues_sm(query);
 
   mH2C2->getName();
-  mH2C2->getParamReflector();
+  shared_ptr<C2ParamReflector> paramReflector = mH2C2->getParamReflector();
+  if (paramReflector) {
+    paramReflector->describe(C2ComponentDomainSetting::CORE_INDEX);
+  }
   mH2C2->listComponents();
   shared_ptr<C2GraphicBuffer> src;
   shared_ptr<C2GraphicBuffer> dst;
