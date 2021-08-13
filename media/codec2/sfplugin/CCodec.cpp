@@ -1566,15 +1566,36 @@ status_t CCodec::setupInputSurface(const std::shared_ptr<InputSurfaceWrapper> &s
     // we are now using surface - apply default color aspects to input format - as well as
     // get dataspace
     bool inputFormatChanged = config->updateFormats(Config::IS_INPUT);
-    ALOGD("input format %s to %s",
-            inputFormatChanged ? "changed" : "unchanged",
-            config->mInputFormat->debugString().c_str());
 
     // configure dataspace
     static_assert(sizeof(int32_t) == sizeof(android_dataspace), "dataspace size mismatch");
-    android_dataspace dataSpace = HAL_DATASPACE_UNKNOWN;
-    (void)config->mInputFormat->findInt32("android._dataspace", (int32_t*)&dataSpace);
+
+    // The output format contains app-configured color aspects, and the input format
+    // has the default color aspects. Use the default for the unspecified params.
+    ColorAspects inputColorAspects, colorAspects;
+    getColorAspectsFromFormat(config->mOutputFormat, colorAspects);
+    getColorAspectsFromFormat(config->mInputFormat, inputColorAspects);
+    if (colorAspects.mRange == ColorAspects::RangeUnspecified) {
+        colorAspects.mRange = inputColorAspects.mRange;
+    }
+    if (colorAspects.mPrimaries == ColorAspects::PrimariesUnspecified) {
+        colorAspects.mPrimaries = inputColorAspects.mPrimaries;
+    }
+    if (colorAspects.mTransfer == ColorAspects::TransferUnspecified) {
+        colorAspects.mTransfer = inputColorAspects.mTransfer;
+    }
+    if (colorAspects.mMatrixCoeffs == ColorAspects::MatrixUnspecified) {
+        colorAspects.mMatrixCoeffs = inputColorAspects.mMatrixCoeffs;
+    }
+    android_dataspace dataSpace = getDataSpaceForColorAspects(
+            colorAspects, /* mayExtend = */ false);
     surface->setDataSpace(dataSpace);
+    setColorAspectsIntoFormat(colorAspects, config->mInputFormat, /* force = */ true);
+    config->mInputFormat->setInt32("android._dataspace", int32_t(dataSpace));
+
+    ALOGD("input format %s to %s",
+            inputFormatChanged ? "changed" : "unchanged",
+            config->mInputFormat->debugString().c_str());
 
     status_t err = mChannel->setInputSurface(surface);
     if (err != OK) {
@@ -2262,8 +2283,6 @@ void CCodec::onMessageReceived(const sp<AMessage> &msg) {
                             const C2ConstGraphicBlock &block = blocks[0];
                             updates.emplace_back(new C2StreamCropRectInfo::output(
                                     stream, block.crop()));
-                            updates.emplace_back(new C2StreamPictureSizeInfo::output(
-                                    stream, block.crop().width, block.crop().height));
                         }
                         ++stream;
                     }
