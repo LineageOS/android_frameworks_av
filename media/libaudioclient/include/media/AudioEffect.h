@@ -283,7 +283,8 @@ public:
         EVENT_CONTROL_STATUS_CHANGED = 0,
         EVENT_ENABLE_STATUS_CHANGED = 1,
         EVENT_PARAMETER_CHANGED = 2,
-        EVENT_ERROR = 3
+        EVENT_ERROR = 3,
+        EVENT_FRAMES_PROCESSED = 4,
     };
 
     /* Callback function notifying client application of a change in effect engine state or
@@ -389,7 +390,8 @@ public:
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
                             const AudioDeviceTypeAddr& device = {},
-                            bool probe = false);
+                            bool probe = false,
+                            bool notifyFramesProcessed = false);
     /*
      * Same as above but with type and uuid specified by character strings.
      */
@@ -401,7 +403,8 @@ public:
                             audio_session_t sessionId = AUDIO_SESSION_OUTPUT_MIX,
                             audio_io_handle_t io = AUDIO_IO_HANDLE_NONE,
                             const AudioDeviceTypeAddr& device = {},
-                            bool probe = false);
+                            bool probe = false,
+                            bool notifyFramesProcessed = false);
 
     /* Result of constructing the AudioEffect. This must be checked
      * before using any AudioEffect API.
@@ -552,6 +555,7 @@ protected:
      virtual void commandExecuted(int32_t cmdCode,
                                   const std::vector<uint8_t>& cmdData,
                                   const std::vector<uint8_t>& replyData);
+     virtual void framesProcessed(int32_t frames);
 
 private:
 
@@ -587,6 +591,14 @@ private:
             }
             return binder::Status::ok();
         }
+        binder::Status framesProcessed(int32_t frames) override {
+            sp<AudioEffect> effect = mEffect.promote();
+            if (effect != 0) {
+                effect->framesProcessed(frames);
+            }
+            return binder::Status::ok();
+        }
+
 
         // IBinder::DeathRecipient
         virtual void binderDied(const wp<IBinder>& /*who*/) {

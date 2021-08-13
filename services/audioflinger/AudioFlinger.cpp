@@ -3761,7 +3761,7 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             ALOGV("%s device type %#x address %s", __func__, device.mType, device.getAddress());
             handle = mDeviceEffectManager.createEffect_l(
                     &descOut, device, client, effectClient, mPatchPanel.patches_l(),
-                    &enabledOut, &lStatus, probe);
+                    &enabledOut, &lStatus, probe, request.notifyFramesProcessed);
             if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
                 // remove local strong reference to Client with mClientLock held
                 Mutex::Autolock _cl(mClientLock);
@@ -3881,7 +3881,8 @@ status_t AudioFlinger::createEffect(const media::CreateEffectRequest& request,
             }
         }
         handle = thread->createEffect_l(client, effectClient, priority, sessionId,
-                                        &descOut, &enabledOut, &lStatus, pinned, probe);
+                                        &descOut, &enabledOut, &lStatus, pinned, probe,
+                                        request.notifyFramesProcessed);
         if (lStatus != NO_ERROR && lStatus != ALREADY_EXISTS) {
             // remove local strong reference to Client with mClientLock held
             Mutex::Autolock _cl(mClientLock);
