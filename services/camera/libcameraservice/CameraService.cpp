@@ -2333,6 +2333,13 @@ Status CameraService::notifySystemEvent(int32_t eventId,
             doUserSwitch(/*newUserIds*/ args);
             break;
         }
+        case ICameraService::EVENT_USB_DEVICE_ATTACHED:
+        case ICameraService::EVENT_USB_DEVICE_DETACHED: {
+            // Notify CameraProviderManager for lazy HALs
+            mCameraProviderManager->notifyUsbDeviceEvent(eventId,
+                                                        std::to_string(args[0]));
+            break;
+        }
         case ICameraService::EVENT_NONE:
         default: {
             ALOGW("%s: Received invalid system event from system_server: %d", __FUNCTION__,

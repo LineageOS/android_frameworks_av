@@ -53,6 +53,7 @@ using hardware::camera::provider::V2_7::CameraIdAndStreamCombination;
 
 namespace {
 const bool kEnableLazyHal(property_get_bool("ro.camera.enableLazyHal", false));
+const std::string kExternalProviderName = "external/0";
 } // anonymous namespace
 
 const float CameraProviderManager::kDepthARTolerance = .1f;
@@ -392,6 +393,73 @@ status_t CameraProviderManager::setUpVendorTags() {
 
     VendorTagDescriptorCache::setAsGlobalVendorTagCache(tagCache);
 
+    return OK;
+}
+
+sp<CameraProviderManager::ProviderInfo> CameraProviderManager::startExternalLazyProvider() const {
+    std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
+    std::lock_guard<std::mutex> lock(mInterfaceMutex);
+
+    for (const auto& providerInfo : mProviders) {
+        if (providerInfo->isExternalLazyHAL()) {
+            const sp<provider::V2_4::ICameraProvider>
+                  interface = providerInfo->startProviderInterface();
+            if (interface == nullptr) {
+                return nullptr;
+            } else {
+                return providerInfo;
+            }
+        }
+    }
+    return nullptr;
+}
+
+status_t CameraProviderManager::notifyUsbDeviceEvent(int32_t eventId,
+                                                     const std::string& usbDeviceId) {
+    if (!kEnableLazyHal) {
+        return OK;
+    }
+
+    ALOGV("notifySystemEvent: %d usbDeviceId : %s", eventId, usbDeviceId.c_str());
+
+    if (eventId == android::hardware::ICameraService::EVENT_USB_DEVICE_ATTACHED) {
+        sp<ProviderInfo> externalProvider = startExternalLazyProvider();
+        if (externalProvider != nullptr) {
+            auto usbDevices = mExternalUsbDevicesForProvider.first;
+            usbDevices.push_back(usbDeviceId);
+            mExternalUsbDevicesForProvider = {usbDevices, externalProvider};
+        }
+    } else if (eventId
+          == android::hardware::ICameraService::EVENT_USB_DEVICE_DETACHED) {
+        usbDeviceDetached(usbDeviceId);
+    }
+
+    return OK;
+}
+
+status_t CameraProviderManager::usbDeviceDetached(const std::string &usbDeviceId) {
+    std::lock_guard<std::mutex> providerLock(mProviderLifecycleLock);
+    std::lock_guard<std::mutex> interfaceLock(mInterfaceMutex);
+
+    auto usbDevices = mExternalUsbDevicesForProvider.first;
+    auto foundId = std::find(usbDevices.begin(), usbDevices.end(), usbDeviceId);
+    if (foundId != usbDevices.end()) {
+        sp<ProviderInfo> providerInfo = mExternalUsbDevicesForProvider.second;
+        if (providerInfo == nullptr) {
+              ALOGE("%s No valid external provider for USB device: %s",
+                    __FUNCTION__,
+                    usbDeviceId.c_str());
+              mExternalUsbDevicesForProvider = {std::vector<std::string>(), nullptr};
+              return DEAD_OBJECT;
+        } else {
+            mInterfaceMutex.unlock();
+            providerInfo->removeAllDevices();
+            mInterfaceMutex.lock();
+            mExternalUsbDevicesForProvider = {std::vector<std::string>(), nullptr};
+        }
+    } else {
+        return DEAD_OBJECT;
+    }
     return OK;
 }
 
@@ -1314,9 +1382,10 @@ status_t CameraProviderManager::addProviderLocked(const std::string& newProvider
         if (providerInfo->mProviderName == newProvider) {
             ALOGW("%s: Camera provider HAL with name '%s' already registered",
                     __FUNCTION__, newProvider.c_str());
-            if (preexisting) {
+            // Do not add new instances for lazy HAL external provider
+            if (preexisting || providerInfo->isExternalLazyHAL()) {
                 return ALREADY_EXISTS;
-            } else{
+            } else {
                 ALOGW("%s: The new provider instance will get initialized immediately after the"
                         " currently present instance is removed!", __FUNCTION__);
                 providerPresent = true;
@@ -1606,36 +1675,56 @@ CameraProviderManager::ProviderInfo::startProviderInterface() {
 
     auto interface = mActiveInterface.promote();
     if (interface == nullptr) {
-        ALOGI("Camera HAL provider needs restart, calling getService(%s)", mProviderName.c_str());
-        interface = mManager->mServiceProxy->getService(mProviderName);
-        interface->setCallback(this);
-        hardware::Return<bool> linked = interface->linkToDeath(this, /*cookie*/ mId);
-        if (!linked.isOk()) {
-            ALOGE("%s: Transaction error in linking to camera provider '%s' death: %s",
-                    __FUNCTION__, mProviderName.c_str(), linked.description().c_str());
-            mManager->removeProvider(mProviderName);
-            return nullptr;
-        } else if (!linked) {
-            ALOGW("%s: Unable to link to provider '%s' death notifications",
+        // Try to get service without starting
+        interface = mManager->mServiceProxy->tryGetService(mProviderName);
+        if (interface == nullptr) {
+            ALOGV("Camera provider actually needs restart, calling getService(%s)",
+                  mProviderName.c_str());
+            interface = mManager->mServiceProxy->getService(mProviderName);
+
+            // Set all devices as ENUMERATING, provider should update status
+            // to PRESENT after initializing.
+            // This avoids failing getCameraDeviceInterface_V3_x before devices
+            // are ready.
+            for (auto& device : mDevices) {
+              device->mIsDeviceAvailable = false;
+            }
+
+            interface->setCallback(this);
+            hardware::Return<bool>
+                linked = interface->linkToDeath(this, /*cookie*/ mId);
+            if (!linked.isOk()) {
+              ALOGE(
+                  "%s: Transaction error in linking to camera provider '%s' death: %s",
+                  __FUNCTION__,
+                  mProviderName.c_str(),
+                  linked.description().c_str());
+              mManager->removeProvider(mProviderName);
+              return nullptr;
+            } else if (!linked) {
+              ALOGW("%s: Unable to link to provider '%s' death notifications",
                     __FUNCTION__, mProviderName.c_str());
-        }
-        // Send current device state
-        if (mMinorVersion >= 5) {
-            auto castResult = provider::V2_5::ICameraProvider::castFrom(interface);
-            if (castResult.isOk()) {
+            }
+            // Send current device state
+            if (mMinorVersion >= 5) {
+              auto castResult =
+                  provider::V2_5::ICameraProvider::castFrom(interface);
+              if (castResult.isOk()) {
                 sp<provider::V2_5::ICameraProvider> interface_2_5 = castResult;
                 if (interface_2_5 != nullptr) {
-                    ALOGV("%s: Initial device state for %s: 0x %" PRIx64,
-                            __FUNCTION__, mProviderName.c_str(), mDeviceState);
-                    interface_2_5->notifyDeviceStateChange(mDeviceState);
+                  ALOGV("%s: Initial device state for %s: 0x %" PRIx64,
+                        __FUNCTION__, mProviderName.c_str(), mDeviceState);
+                  interface_2_5->notifyDeviceStateChange(mDeviceState);
                 }
+              }
             }
         }
-
         mActiveInterface = interface;
     } else {
-        ALOGV("Camera provider (%s) already in use. Re-using instance.", mProviderName.c_str());
+        ALOGV("Camera provider (%s) already in use. Re-using instance.",
+              mProviderName.c_str());
     }
+
     return interface;
 }
 
@@ -1710,13 +1799,48 @@ void CameraProviderManager::ProviderInfo::removeDevice(std::string id) {
             mUniqueCameraIds.erase(id);
             if ((*it)->isAPI1Compatible()) {
                 mUniqueAPI1CompatibleCameraIds.erase(std::remove(
-                        mUniqueAPI1CompatibleCameraIds.begin(),
-                        mUniqueAPI1CompatibleCameraIds.end(), id));
+                    mUniqueAPI1CompatibleCameraIds.begin(),
+                    mUniqueAPI1CompatibleCameraIds.end(), id));
             }
+
+            // Remove reference to camera provider to avoid pointer leak when
+            // unplugging external camera while in use with lazy HALs
+            mManager->removeRef(DeviceMode::CAMERA, id);
+            mManager->removeRef(DeviceMode::TORCH, id);
+
             mDevices.erase(it);
             break;
         }
     }
+}
+
+void CameraProviderManager::ProviderInfo::removeAllDevices() {
+    std::lock_guard<std::mutex> lock(mLock);
+
+    auto itDevices = mDevices.begin();
+    while (itDevices != mDevices.end()) {
+        std::string id = (*itDevices)->mId;
+        std::string deviceName = (*itDevices)->mName;
+        removeDevice(id);
+        // device was removed, reset iterator
+        itDevices = mDevices.begin();
+
+        //notify CameraService of status change
+        sp<StatusListener> listener = mManager->getStatusListener();
+        if (listener != nullptr) {
+            mLock.unlock();
+            ALOGV("%s: notify device not_present: %s",
+                  __FUNCTION__,
+                  deviceName.c_str());
+            listener->onDeviceStatusChanged(String8(id.c_str()),
+                                            CameraDeviceStatus::NOT_PRESENT);
+            mLock.lock();
+        }
+    }
+}
+
+bool CameraProviderManager::ProviderInfo::isExternalLazyHAL() const {
+    return kEnableLazyHal && (mProviderName == kExternalProviderName);
 }
 
 status_t CameraProviderManager::ProviderInfo::dump(int fd, const Vector<String16>&) const {
@@ -1898,12 +2022,16 @@ status_t CameraProviderManager::ProviderInfo::cameraDeviceStatusChangeLocked(
     std::string cameraId;
     for (auto& deviceInfo : mDevices) {
         if (deviceInfo->mName == cameraDeviceName) {
+            Mutex::Autolock l(deviceInfo->mDeviceAvailableLock);
             ALOGI("Camera device %s status is now %s, was %s", cameraDeviceName.c_str(),
                     deviceStatusToString(newStatus), deviceStatusToString(deviceInfo->mStatus));
             deviceInfo->mStatus = newStatus;
             // TODO: Handle device removal (NOT_PRESENT)
             cameraId = deviceInfo->mId;
             known = true;
+            deviceInfo->mIsDeviceAvailable =
+                (newStatus == CameraDeviceStatus::PRESENT);
+            deviceInfo->mDeviceAvailableSignal.signal();
             break;
         }
     }
@@ -1917,6 +2045,11 @@ status_t CameraProviderManager::ProviderInfo::cameraDeviceStatusChangeLocked(
         addDevice(cameraDeviceName, newStatus, &cameraId);
     } else if (newStatus == CameraDeviceStatus::NOT_PRESENT) {
         removeDevice(cameraId);
+    } else if (isExternalLazyHAL()) {
+        // Do not notify CameraService for PRESENT->PRESENT (lazy HAL restart)
+        // because NOT_AVAILABLE is set on CameraService::connect and a PRESENT
+        // notif. would overwrite it
+        return BAD_VALUE;
     }
     if (reCacheConcurrentStreamingCameraIdsLocked() != OK) {
         ALOGE("%s: CameraProvider %s could not re-cache concurrent streaming camera id list ",
@@ -2297,11 +2430,27 @@ CameraProviderManager::ProviderInfo::DeviceInfo::~DeviceInfo() {}
 
 template<class InterfaceT>
 sp<InterfaceT> CameraProviderManager::ProviderInfo::DeviceInfo::startDeviceInterface() {
+    Mutex::Autolock l(mDeviceAvailableLock);
     sp<InterfaceT> device;
     ATRACE_CALL();
     if (mSavedInterface == nullptr) {
         sp<ProviderInfo> parentProvider = mParentProvider.promote();
         if (parentProvider != nullptr) {
+            // Wait for lazy HALs to confirm device availability
+            if (parentProvider->isExternalLazyHAL() && !mIsDeviceAvailable) {
+                ALOGV("%s: Wait for external device to become available %s",
+                      __FUNCTION__,
+                      mId.c_str());
+
+                auto res = mDeviceAvailableSignal.waitRelative(mDeviceAvailableLock,
+                                                         kDeviceAvailableTimeout);
+                if (res != OK) {
+                    ALOGE("%s: Failed waiting for device to become available",
+                          __FUNCTION__);
+                    return nullptr;
+                }
+            }
+
             device = parentProvider->startDeviceInterface<InterfaceT>(mName);
         }
     } else {

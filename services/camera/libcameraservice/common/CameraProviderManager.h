@@ -29,7 +29,9 @@
 #include <camera/CameraParameters2.h>
 #include <camera/CameraMetadata.h>
 #include <camera/CameraBase.h>
+#include <utils/Condition.h>
 #include <utils/Errors.h>
+#include <android/hardware/ICameraService.h>
 #include <android/hardware/camera/common/1.0/types.h>
 #include <android/hardware/camera/provider/2.5/ICameraProvider.h>
 #include <android/hardware/camera/provider/2.6/ICameraProviderCallback.h>
@@ -357,6 +359,8 @@ public:
 
     status_t filterSmallJpegSizes(const std::string& cameraId);
 
+    status_t notifyUsbDeviceEvent(int32_t eventId, const std::string &usbDeviceId);
+
     static const float kDepthARTolerance;
 private:
     // All private members, unless otherwise noted, expect mInterfaceMutex to be locked before use
@@ -487,6 +491,17 @@ private:
                                 &halCameraIdsAndStreamCombinations,
                 bool *isSupported);
 
+        /**
+         * Remove all devices associated with this provider and notify listeners
+         * with NOT_PRESENT state.
+         */
+        void removeAllDevices();
+
+        /**
+         * Provider is an external lazy HAL
+         */
+        bool isExternalLazyHAL() const;
+
         // Basic device information, common to all camera devices
         struct DeviceInfo {
             const std::string mName;  // Full instance name
@@ -509,6 +524,12 @@ private:
             int32_t mTorchStrengthLevel;
             int32_t mTorchMaximumStrengthLevel;
             int32_t mTorchDefaultStrengthLevel;
+
+            // Wait for lazy HALs to confirm device availability
+            static const nsecs_t kDeviceAvailableTimeout = 2000e6; // 2000 ms
+            Mutex     mDeviceAvailableLock;
+            Condition mDeviceAvailableSignal;
+            bool mIsDeviceAvailable = true;
 
             bool hasFlashUnit() const { return mHasFlashUnit; }
             bool supportNativeZoomRatio() const { return mSupportNativeZoomRatio; }
@@ -734,6 +755,12 @@ private:
             hardware::hidl_version minVersion = hardware::hidl_version{0,0},
             hardware::hidl_version maxVersion = hardware::hidl_version{1000,0}) const;
 
+    // Map external providers to USB devices in order to handle USB hotplug
+    // events for lazy HALs
+    std::pair<std::vector<std::string>, sp<ProviderInfo>>
+        mExternalUsbDevicesForProvider;
+    sp<ProviderInfo> startExternalLazyProvider() const;
+
     status_t addProviderLocked(const std::string& newProvider, bool preexisting = false);
 
     status_t tryToInitializeProviderLocked(const std::string& providerName,
@@ -781,6 +808,8 @@ private:
               hardware::hidl_vec<hardware::camera::provider::V2_7::CameraIdAndStreamCombination>
                       *halCameraIdsAndStreamCombinations,
               bool *earlyExit);
+
+    status_t usbDeviceDetached(const std::string &usbDeviceId);
 };
 
 } // namespace android
