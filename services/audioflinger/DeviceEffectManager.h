@@ -37,7 +37,8 @@ public:
                 const std::map<audio_patch_handle_t, PatchPanel::Patch>& patches,
                 int *enabled,
                 status_t *status,
-                bool probe);
+                bool probe,
+                bool notifyFramesProcessed);
     void createAudioPatch(audio_patch_handle_t handle, const PatchPanel::Patch& patch);
     void releaseAudioPatch(audio_patch_handle_t handle);
 
