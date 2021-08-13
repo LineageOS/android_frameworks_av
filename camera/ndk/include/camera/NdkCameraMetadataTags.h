@@ -9005,7 +9005,12 @@ typedef enum acamera_metadata_enum_acamera_request_available_capabilities {
      * <code>android.scaler.streamConfigurationMap</code> describes the streams supported in 'default'
      * mode.
      * The stream configurations supported in 'max resolution' mode are described by
-     * <code>android.scaler.streamConfigurationMapMaximumResolution</code>.</p>
+     * <code>android.scaler.streamConfigurationMapMaximumResolution</code>.
+     * The maximum resolution mode pixel array size of a camera device
+     * (<code>ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE</code>) with this capability,
+     * will be at least 24 megapixels.</p>
+     *
+     * @see ACAMERA_SENSOR_INFO_PIXEL_ARRAY_SIZE
      */
     ACAMERA_REQUEST_AVAILABLE_CAPABILITIES_ULTRA_HIGH_RESOLUTION_SENSOR
                                                                       = 16,
