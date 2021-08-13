@@ -341,7 +341,7 @@ public:
     EffectHandle(const sp<EffectBase>& effect,
             const sp<AudioFlinger::Client>& client,
             const sp<media::IEffectClient>& effectClient,
-            int32_t priority);
+            int32_t priority, bool notifyFramesProcessed);
     virtual ~EffectHandle();
     virtual status_t initCheck();
 
@@ -371,6 +371,8 @@ private:
                          const std::vector<uint8_t>& replyData);
     void setEnabled(bool enabled);
     bool enabled() const { return mEnabled; }
+
+    void framesProcessed(int32_t frames) const;
 
     // Getters
     wp<EffectBase> effect() const { return mEffect; }
@@ -405,6 +407,8 @@ private:
     bool mEnabled;                           // cached enable state: needed when the effect is
                                              // restored after being suspended
     bool mDisconnected;                      // Set to true by disconnect()
+    const bool mNotifyFramesProcessed;       // true if the client callback event
+                                             // EVENT_FRAMES_PROCESSED must be generated
 };
 
 // the EffectChain class represents a group of effects associated to one audio session.
@@ -667,11 +671,11 @@ class DeviceEffectProxy : public EffectBase {
 public:
         DeviceEffectProxy (const AudioDeviceTypeAddr& device,
                 const sp<DeviceEffectManagerCallback>& callback,
-                effect_descriptor_t *desc, int id)
+                effect_descriptor_t *desc, int id, bool notifyFramesProcessed)
             : EffectBase(callback, desc, id, AUDIO_SESSION_DEVICE, false),
                 mDevice(device), mManagerCallback(callback),
-                mMyCallback(new ProxyCallback(wp<DeviceEffectProxy>(this),
-                                              callback)) {}
+                mMyCallback(new ProxyCallback(wp<DeviceEffectProxy>(this), callback)),
+                mNotifyFramesProcessed(notifyFramesProcessed) {}
 
     status_t setEnabled(bool enabled, bool fromHandle) override;
     sp<DeviceEffectProxy> asDeviceEffectProxy() override { return this; }
@@ -764,4 +768,5 @@ private:
     std::map<audio_patch_handle_t, sp<EffectHandle>> mEffectHandles; // protected by mProxyLock
     sp<EffectModule> mHalEffect; // protected by mProxyLock
     struct audio_port_config mDevicePort = { .id = AUDIO_PORT_HANDLE_NONE };
+    const bool mNotifyFramesProcessed;
 };
