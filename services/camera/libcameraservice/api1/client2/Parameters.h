@@ -56,7 +56,7 @@ struct Parameters {
     int previewTransform; // set by CAMERA_CMD_SET_DISPLAY_ORIENTATION
 
     int pictureWidth, pictureHeight;
-    // Store the picture size before they are overriden by video snapshot
+    // Store the picture size before they are overridden by video snapshot
     int pictureWidthLastSet, pictureHeightLastSet;
     bool pictureSizeOverriden;
 
@@ -248,6 +248,7 @@ struct Parameters {
         bool useFlexibleYuv;
         Size maxJpegSize;
         Size maxZslSize;
+        Size usedZslSize;
         bool supportsPreferredConfigs;
     } fastInfo;
 
@@ -425,6 +426,11 @@ private:
     // Helper function to get minimum frame duration for a jpeg size
     // return -1 if input jpeg size cannot be found in supported size list
     int64_t getJpegStreamMinFrameDurationNs(Parameters::Size size);
+
+    // Helper function to get minimum frame duration for a
+    // IMPLEMENTATION_DEFINED stream of size 'size'
+    // return -1 if input size cannot be found in supported size list
+    int64_t getZslStreamMinFrameDurationNs(Parameters::Size size);
 
     // Helper function to get minimum frame duration for a size/format combination
     // return -1 if input size/format combination cannot be found.

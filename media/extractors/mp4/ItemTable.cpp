@@ -76,16 +76,19 @@ struct ImageItem {
     size_t size;
     sp<ABuffer> hvcc;
     sp<ABuffer> icc;
+    sp<ABuffer> av1c;
 
     Vector<uint32_t> thumbnails;
     Vector<uint32_t> dimgRefs;
-    Vector<uint32_t> cdscRefs;
+    Vector<uint32_t> exifRefs;
+    Vector<uint32_t> xmpRefs;
     size_t nextTileIndex;
 };
 
-struct ExifItem {
+struct ExternalMetaItem {
     off64_t offset;
     size_t size;
+    bool isExif;
 };
 
 /////////////////////////////////////////////////////////////////////
@@ -481,7 +484,7 @@ struct ItemReference : public Box, public RefBase {
 
     void apply(
             KeyedVector<uint32_t, ImageItem> &itemIdToItemMap,
-            KeyedVector<uint32_t, ExifItem> &itemIdToExifMap) const;
+            KeyedVector<uint32_t, ExternalMetaItem> &itemIdToMetaMap) const;
 
 private:
     uint32_t mItemId;
@@ -493,7 +496,7 @@ private:
 
 void ItemReference::apply(
         KeyedVector<uint32_t, ImageItem> &itemIdToItemMap,
-        KeyedVector<uint32_t, ExifItem> &itemIdToExifMap) const {
+        KeyedVector<uint32_t, ExternalMetaItem> &itemIdToMetaMap) const {
     ALOGV("attach reference type 0x%x to item id %d)", type(), mItemId);
 
     switch(type()) {
@@ -555,15 +558,15 @@ void ItemReference::apply(
         break;
     }
     case FOURCC("cdsc"): {
-        ssize_t itemIndex = itemIdToExifMap.indexOfKey(mItemId);
+        ssize_t metaIndex = itemIdToMetaMap.indexOfKey(mItemId);
 
-        // ignore non-exif block items
-        if (itemIndex < 0) {
+        // ignore non-meta items
+        if (metaIndex < 0) {
             return;
         }
 
         for (size_t i = 0; i < mRefs.size(); i++) {
-            itemIndex = itemIdToItemMap.indexOfKey(mRefs[i]);
+            ssize_t itemIndex = itemIdToItemMap.indexOfKey(mRefs[i]);
 
             // ignore non-image items
             if (itemIndex < 0) {
@@ -571,7 +574,11 @@ void ItemReference::apply(
             }
             ALOGV("Image item id %d uses metadata item id %d", mRefs[i], mItemId);
             ImageItem &image = itemIdToItemMap.editValueAt(itemIndex);
-            image.cdscRefs.push_back(mItemId);
+            if (itemIdToMetaMap[metaIndex].isExif) {
+                image.exifRefs.push_back(mItemId);
+            } else {
+                image.xmpRefs.push_back(mItemId);
+            }
         }
         break;
     }
@@ -760,6 +767,39 @@ status_t HvccBox::parse(off64_t offset, size_t size) {
     }
 
     ALOGV("property hvcC");
+
+    return OK;
+}
+
+struct Av1cBox : public Box, public ItemProperty {
+    Av1cBox(DataSourceHelper *source) :
+        Box(source, FOURCC("av1C")) {}
+
+    status_t parse(off64_t offset, size_t size) override;
+
+    void attachTo(ImageItem &image) const override {
+        image.av1c = mAv1c;
+    }
+
+private:
+    sp<ABuffer> mAv1c;
+};
+
+status_t Av1cBox::parse(off64_t offset, size_t size) {
+    ALOGV("%s: offset %lld, size %zu", __FUNCTION__, (long long)offset, size);
+
+    mAv1c = new ABuffer(size);
+
+    if (mAv1c->data() == NULL) {
+        ALOGE("b/28471206");
+        return NO_MEMORY;
+    }
+
+    if (source()->readAt(offset, mAv1c->data(), size) < (ssize_t)size) {
+        return ERROR_IO;
+    }
+
+    ALOGV("property av1C");
 
     return OK;
 }
@@ -957,6 +997,11 @@ status_t IpcoBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
             itemProperty = new ColrBox(source());
             break;
         }
+        case FOURCC("av1C"):
+        {
+            itemProperty = new Av1cBox(source());
+            break;
+        }
         default:
         {
             // push dummy to maintain correct item property index
@@ -1026,7 +1071,21 @@ status_t IprpBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
 struct ItemInfo {
     uint32_t itemId;
     uint32_t itemType;
+    String8 contentType;
     bool hidden;
+
+    bool isXmp() const {
+        return itemType == FOURCC("mime") && contentType == String8("application/rdf+xml");
+    }
+    bool isExif() const {
+        return itemType == FOURCC("Exif");
+    }
+    bool isGrid() const {
+        return itemType == FOURCC("grid");
+    }
+    bool isSample() const {
+        return itemType == FOURCC("av01") || itemType == FOURCC("hvc1");
+    }
 };
 
 struct InfeBox : public FullBox {
@@ -1116,6 +1175,7 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
             if (!parseNullTerminatedString(&offset, &size, &content_type)) {
                 return ERROR_MALFORMED;
             }
+            itemInfo->contentType = content_type;
 
             // content_encoding is optional; can be omitted if would be empty
             if (size > 0) {
@@ -1136,18 +1196,18 @@ status_t InfeBox::parse(off64_t offset, size_t size, ItemInfo *itemInfo) {
 
 struct IinfBox : public FullBox {
     IinfBox(DataSourceHelper *source, Vector<ItemInfo> *itemInfos) :
-        FullBox(source, FOURCC("iinf")), mItemInfos(itemInfos) {}
+        FullBox(source, FOURCC("iinf")), mItemInfos(itemInfos), mNeedIref(false) {}
 
     status_t parse(off64_t offset, size_t size);
 
-    bool hasFourCC(uint32_t type) { return mFourCCSeen.count(type) > 0; }
+    bool needIrefBox() { return mNeedIref; }
 
 protected:
     status_t onChunkData(uint32_t type, off64_t offset, size_t size) override;
 
 private:
     Vector<ItemInfo> *mItemInfos;
-    std::unordered_set<uint32_t> mFourCCSeen;
+    bool mNeedIref;
 };
 
 status_t IinfBox::parse(off64_t offset, size_t size) {
@@ -1194,7 +1254,7 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
     status_t err = infeBox.parse(offset, size, &itemInfo);
     if (err == OK) {
         mItemInfos->push_back(itemInfo);
-        mFourCCSeen.insert(itemInfo.itemType);
+        mNeedIref |= (itemInfo.isExif() || itemInfo.isXmp() || itemInfo.isGrid());
     }
     // InfeBox parse returns ERROR_UNSUPPORTED if the box if an unsupported
     // version. Ignore this error as it's not fatal.
@@ -1203,8 +1263,9 @@ status_t IinfBox::onChunkData(uint32_t type, off64_t offset, size_t size) {
 
 //////////////////////////////////////////////////////////////////
 
-ItemTable::ItemTable(DataSourceHelper *source)
+ItemTable::ItemTable(DataSourceHelper *source, bool isHeif)
     : mDataSource(source),
+      mIsHeif(isHeif),
       mPrimaryItemId(0),
       mIdatOffset(0),
       mIdatSize(0),
@@ -1283,7 +1344,7 @@ status_t ItemTable::parseIinfBox(off64_t offset, size_t size) {
         return err;
     }
 
-    if (iinfBox.hasFourCC(FOURCC("grid")) || iinfBox.hasFourCC(FOURCC("Exif"))) {
+    if (iinfBox.needIrefBox()) {
         mRequiredBoxes.insert('iref');
     }
 
@@ -1359,11 +1420,9 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
 
         // Only handle 3 types of items, all others are ignored:
         //   'grid': derived image from tiles
-        //   'hvc1': coded image (or tile)
-        //   'Exif': EXIF metadata
-        if (info.itemType != FOURCC("grid") &&
-            info.itemType != FOURCC("hvc1") &&
-            info.itemType != FOURCC("Exif")) {
+        //   'hvc1' or 'av01': coded image (or tile)
+        //   'Exif' or XMP: metadata
+        if (!info.isGrid() && !info.isSample() && !info.isExif() && !info.isXmp()) {
             continue;
         }
 
@@ -1386,15 +1445,18 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
             return ERROR_MALFORMED;
         }
 
-        if (info.itemType == FOURCC("Exif")) {
-            // Only add if the Exif data is non-empty. The first 4 bytes contain
+        if (info.isExif() || info.isXmp()) {
+            // Only add if the meta is non-empty. For Exif, the first 4 bytes contain
             // the offset to TIFF header, which the Exif parser doesn't use.
-            if (size > 4) {
-                ExifItem exifItem = {
+            ALOGV("adding meta to mItemIdToMetaMap: isExif %d, offset %lld, size %lld",
+                    info.isExif(), (long long)offset, (long long)size);
+            if ((info.isExif() && size > 4) || (info.isXmp() && size > 0)) {
+                ExternalMetaItem metaItem = {
+                        .isExif = info.isExif(),
                         .offset = offset,
                         .size = size,
                 };
-                mItemIdToExifMap.add(info.itemId, exifItem);
+                mItemIdToMetaMap.add(info.itemId, metaItem);
             }
             continue;
         }
@@ -1429,7 +1491,7 @@ status_t ItemTable::buildImageItemsIfPossible(uint32_t type) {
     }
 
     for (size_t i = 0; i < mItemReferences.size(); i++) {
-        mItemReferences[i]->apply(mItemIdToItemMap, mItemIdToExifMap);
+        mItemReferences[i]->apply(mItemIdToItemMap, mItemIdToMetaMap);
     }
 
     bool foundPrimary = false;
@@ -1509,7 +1571,9 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
     }
 
     AMediaFormat *meta = AMediaFormat_new();
-    AMediaFormat_setString(meta, AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC);
+    AMediaFormat_setString(
+        meta, AMEDIAFORMAT_KEY_MIME,
+        mIsHeif ? MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC : MEDIA_MIMETYPE_IMAGE_AVIF);
 
     if (image->itemId == mPrimaryItemId) {
         AMediaFormat_setInt32(meta, AMEDIAFORMAT_KEY_IS_DEFAULT, 1);
@@ -1539,15 +1603,24 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
         ssize_t thumbItemIndex = mItemIdToItemMap.indexOfKey(image->thumbnails[0]);
         if (thumbItemIndex >= 0) {
             const ImageItem &thumbnail = mItemIdToItemMap[thumbItemIndex];
-
-            if (thumbnail.hvcc != NULL) {
+            if (thumbnail.hvcc != NULL || thumbnail.av1c != NULL) {
                 AMediaFormat_setInt32(meta,
                         AMEDIAFORMAT_KEY_THUMBNAIL_WIDTH, thumbnail.width);
                 AMediaFormat_setInt32(meta,
                         AMEDIAFORMAT_KEY_THUMBNAIL_HEIGHT, thumbnail.height);
-                AMediaFormat_setBuffer(meta,
-                        AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC,
-                        thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                if (thumbnail.hvcc != NULL) {
+                    AMediaFormat_setBuffer(meta,
+                            AMEDIAFORMAT_KEY_THUMBNAIL_CSD_HEVC,
+                            thumbnail.hvcc->data(), thumbnail.hvcc->size());
+                } else {
+                    // We use a hard-coded string here instead of
+                    // AMEDIAFORMAT_KEY_THUMBNAIL_CSD_AV1C. The key is available only from SDK 31.
+                    // The mp4 extractor is part of mainline and builds against SDK 29 as of
+                    // writing. This hard-coded string can be replaced with the named constant once
+                    // the mp4 extractor is built against SDK >= 31.
+                    AMediaFormat_setBuffer(meta,
+                            "thumbnail-csd-av1c", thumbnail.av1c->data(), thumbnail.av1c->size());
+                }
                 ALOGV("image[%u]: thumbnail: size %dx%d, item index %zd",
                         imageIndex, thumbnail.width, thumbnail.height, thumbItemIndex);
             } else {
@@ -1574,12 +1647,21 @@ AMediaFormat *ItemTable::getImageMeta(const uint32_t imageIndex) {
                 AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, image->width * image->height * 3 / 2);
     }
 
-    if (image->hvcc == NULL) {
-        ALOGE("%s: hvcc is missing for image[%u]!", __FUNCTION__, imageIndex);
-        return NULL;
+    if (mIsHeif) {
+        if (image->hvcc == NULL) {
+            ALOGE("%s: hvcc is missing for image[%u]!", __FUNCTION__, imageIndex);
+            return NULL;
+        }
+        AMediaFormat_setBuffer(meta,
+                AMEDIAFORMAT_KEY_CSD_HEVC, image->hvcc->data(), image->hvcc->size());
+    } else {
+        if (image->av1c == NULL) {
+            ALOGE("%s: av1c is missing for image[%u]!", __FUNCTION__, imageIndex);
+            return NULL;
+        }
+        AMediaFormat_setBuffer(meta,
+                AMEDIAFORMAT_KEY_CSD_0, image->av1c->data(), image->av1c->size());
     }
-    AMediaFormat_setBuffer(meta,
-            AMEDIAFORMAT_KEY_CSD_HEVC, image->hvcc->data(), image->hvcc->size());
 
     if (image->icc != NULL) {
         AMediaFormat_setBuffer(meta,
@@ -1686,11 +1768,11 @@ status_t ItemTable::getExifOffsetAndSize(off64_t *offset, size_t *size) {
     }
 
     const ImageItem &image = mItemIdToItemMap[itemIndex];
-    if (image.cdscRefs.size() == 0) {
+    if (image.exifRefs.size() == 0) {
         return NAME_NOT_FOUND;
     }
 
-    ssize_t exifIndex = mItemIdToExifMap.indexOfKey(image.cdscRefs[0]);
+    ssize_t exifIndex = mItemIdToMetaMap.indexOfKey(image.exifRefs[0]);
     if (exifIndex < 0) {
         return NAME_NOT_FOUND;
     }
@@ -1698,7 +1780,7 @@ status_t ItemTable::getExifOffsetAndSize(off64_t *offset, size_t *size) {
     // skip the first 4-byte of the offset to TIFF header
     uint32_t tiffOffset;
     if (!mDataSource->readAt(
-            mItemIdToExifMap[exifIndex].offset, &tiffOffset, 4)) {
+            mItemIdToMetaMap[exifIndex].offset, &tiffOffset, 4)) {
         return ERROR_IO;
     }
 
@@ -1711,16 +1793,43 @@ status_t ItemTable::getExifOffsetAndSize(off64_t *offset, size_t *size) {
     // exif data. The size of the item should be > 4 for a non-empty exif (this
     // was already checked when the item was added). Also check that the tiff
     // header offset is valid.
-    if (mItemIdToExifMap[exifIndex].size <= 4 ||
-            tiffOffset > mItemIdToExifMap[exifIndex].size - 4) {
+    if (mItemIdToMetaMap[exifIndex].size <= 4 ||
+            tiffOffset > mItemIdToMetaMap[exifIndex].size - 4) {
         return ERROR_MALFORMED;
     }
 
     // Offset of 'Exif\0\0' relative to the beginning of 'Exif' item
     // (first 4-byte is the tiff header offset)
     uint32_t exifOffset = 4 + tiffOffset - 6;
-    *offset = mItemIdToExifMap[exifIndex].offset + exifOffset;
-    *size = mItemIdToExifMap[exifIndex].size - exifOffset;
+    *offset = mItemIdToMetaMap[exifIndex].offset + exifOffset;
+    *size = mItemIdToMetaMap[exifIndex].size - exifOffset;
+    return OK;
+}
+
+status_t ItemTable::getXmpOffsetAndSize(off64_t *offset, size_t *size) {
+    if (!mImageItemsValid) {
+        return INVALID_OPERATION;
+    }
+
+    ssize_t itemIndex = mItemIdToItemMap.indexOfKey(mPrimaryItemId);
+
+    // this should not happen, something's seriously wrong.
+    if (itemIndex < 0) {
+        return INVALID_OPERATION;
+    }
+
+    const ImageItem &image = mItemIdToItemMap[itemIndex];
+    if (image.xmpRefs.size() == 0) {
+        return NAME_NOT_FOUND;
+    }
+
+    ssize_t xmpIndex = mItemIdToMetaMap.indexOfKey(image.xmpRefs[0]);
+    if (xmpIndex < 0) {
+        return NAME_NOT_FOUND;
+    }
+
+    *offset = mItemIdToMetaMap[xmpIndex].offset;
+    *size = mItemIdToMetaMap[xmpIndex].size;
     return OK;
 }
 

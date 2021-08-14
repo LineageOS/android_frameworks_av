@@ -174,9 +174,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
         ALOGV("getting track %zu of %zu, meta=%s", i, n, meta->toString().c_str());
 
         const char *mime;
-        CHECK(meta->findCString(kKeyMIMEType, &mime));
-
-        if (!strncasecmp(mime, "image/", 6)) {
+        if (meta->findCString(kKeyMIMEType, &mime) && !strncasecmp(mime, "image/", 6)) {
             int32_t isPrimary;
             if ((index < 0 && meta->findInt32(
                     kKeyTrackIsDefault, &isPrimary) && isPrimary)
@@ -208,10 +206,17 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
     }
 
     const char *mime;
-    CHECK(trackMeta->findCString(kKeyMIMEType, &mime));
+    if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
+        ALOGE("image track has no mime type");
+        return NULL;
+    }
     ALOGV("extracting from %s track", mime);
     if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC)) {
         mime = MEDIA_MIMETYPE_VIDEO_HEVC;
+        trackMeta = new MetaData(*trackMeta);
+        trackMeta->setCString(kKeyMIMEType, mime);
+    } else if (!strcasecmp(mime, MEDIA_MIMETYPE_IMAGE_AVIF)) {
+        mime = MEDIA_MIMETYPE_VIDEO_AV1;
         trackMeta = new MetaData(*trackMeta);
         trackMeta->setCString(kKeyMIMEType, mime);
     }
@@ -228,7 +233,7 @@ sp<IMemory> StagefrightMetadataRetriever::getImageInternal(
 
     for (size_t i = 0; i < matchingCodecs.size(); ++i) {
         const AString &componentName = matchingCodecs[i];
-        sp<ImageDecoder> decoder = new ImageDecoder(componentName, trackMeta, source);
+        sp<MediaImageDecoder> decoder = new MediaImageDecoder(componentName, trackMeta, source);
         int64_t frameTimeUs = thumbnail ? -1 : 0;
         if (decoder->init(frameTimeUs, 0 /*option*/, colorFormat) == OK) {
             sp<IMemory> frame = decoder->extractFrame(rect);
@@ -299,9 +304,7 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
         }
 
         const char *mime;
-        CHECK(meta->findCString(kKeyMIMEType, &mime));
-
-        if (!strncasecmp(mime, "video/", 6)) {
+        if (meta->findCString(kKeyMIMEType, &mime) && !strncasecmp(mime, "video/", 6)) {
             break;
         }
     }
@@ -337,7 +340,10 @@ sp<IMemory> StagefrightMetadataRetriever::getFrameInternal(
     }
 
     const char *mime;
-    CHECK(trackMeta->findCString(kKeyMIMEType, &mime));
+    if (!trackMeta->findCString(kKeyMIMEType, &mime)) {
+        ALOGE("video track has no mime information.");
+        return NULL;
+    }
 
     bool preferhw = property_get_bool(
             "media.stagefright.thumbnail.prefer_hw_codecs", false);
@@ -523,6 +529,15 @@ void StagefrightMetadataRetriever::parseMetaData() {
         mMetaData.add(METADATA_KEY_EXIF_LENGTH, String8(tmp));
     }
 
+    int64_t xmpOffset, xmpSize;
+    if (meta->findInt64(kKeyXmpOffset, &xmpOffset)
+     && meta->findInt64(kKeyXmpSize, &xmpSize)) {
+        sprintf(tmp, "%lld", (long long)xmpOffset);
+        mMetaData.add(METADATA_KEY_XMP_OFFSET, String8(tmp));
+        sprintf(tmp, "%lld", (long long)xmpSize);
+        mMetaData.add(METADATA_KEY_XMP_LENGTH, String8(tmp));
+    }
+
     bool hasAudio = false;
     bool hasVideo = false;
     int32_t videoWidth = -1;
@@ -531,14 +546,14 @@ void StagefrightMetadataRetriever::parseMetaData() {
     int32_t audioBitrate = -1;
     int32_t rotationAngle = -1;
     int32_t imageCount = 0;
-    int32_t imagePrimary = 0;
+    int32_t imagePrimary = -1;
     int32_t imageWidth = -1;
     int32_t imageHeight = -1;
     int32_t imageRotation = -1;
 
     // The overall duration is the duration of the longest track.
     int64_t maxDurationUs = 0;
-    String8 timedTextLang;
+    String8 timedTextLang, videoMime;
     for (size_t i = 0; i < numTracks; ++i) {
         sp<MetaData> trackMeta = mExtractor->getTrackMetaData(i);
         if (!trackMeta) {
@@ -574,27 +589,32 @@ void StagefrightMetadataRetriever::parseMetaData() {
                     mMetaData.add(METADATA_KEY_SAMPLERATE, String8(tmp));
                 }
             } else if (!hasVideo && !strncasecmp("video/", mime, 6)) {
-                hasVideo = true;
-
-                CHECK(trackMeta->findInt32(kKeyWidth, &videoWidth));
-                CHECK(trackMeta->findInt32(kKeyHeight, &videoHeight));
                 if (!trackMeta->findInt32(kKeyRotation, &rotationAngle)) {
                     rotationAngle = 0;
                 }
                 if (!trackMeta->findInt32(kKeyFrameCount, &videoFrameCount)) {
                     videoFrameCount = 0;
                 }
-
-                parseColorAspects(trackMeta);
+                if (trackMeta->findInt32(kKeyWidth, &videoWidth)
+                    && trackMeta->findInt32(kKeyHeight, &videoHeight)) {
+                    hasVideo = true;
+                    videoMime = String8(mime);
+                    parseColorAspects(trackMeta);
+                } else {
+                    ALOGE("video track ignored for missing dimensions");
+                }
             } else if (!strncasecmp("image/", mime, 6)) {
                 int32_t isPrimary;
                 if (trackMeta->findInt32(
                         kKeyTrackIsDefault, &isPrimary) && isPrimary) {
-                    imagePrimary = imageCount;
-                    CHECK(trackMeta->findInt32(kKeyWidth, &imageWidth));
-                    CHECK(trackMeta->findInt32(kKeyHeight, &imageHeight));
                     if (!trackMeta->findInt32(kKeyRotation, &imageRotation)) {
                         imageRotation = 0;
+                    }
+                    if (trackMeta->findInt32(kKeyWidth, &imageWidth)
+                        && trackMeta->findInt32(kKeyHeight, &imageHeight)) {
+                        imagePrimary = imageCount;
+                    } else {
+                        ALOGE("primary image track ignored for missing dimensions");
                     }
                 }
                 imageCount++;
@@ -618,7 +638,8 @@ void StagefrightMetadataRetriever::parseMetaData() {
     }
 
     // The duration value is a string representing the duration in ms.
-    sprintf(tmp, "%" PRId64, (maxDurationUs + 500) / 1000);
+    sprintf(tmp, "%" PRId64,
+           (maxDurationUs > (INT64_MAX - 500) ? INT64_MAX : (maxDurationUs + 500)) / 1000);
     mMetaData.add(METADATA_KEY_DURATION, String8(tmp));
 
     if (hasAudio) {
@@ -628,14 +649,18 @@ void StagefrightMetadataRetriever::parseMetaData() {
     if (hasVideo) {
         mMetaData.add(METADATA_KEY_HAS_VIDEO, String8("yes"));
 
+        CHECK(videoWidth >= 0);
         sprintf(tmp, "%d", videoWidth);
         mMetaData.add(METADATA_KEY_VIDEO_WIDTH, String8(tmp));
 
+        CHECK(videoHeight >= 0);
         sprintf(tmp, "%d", videoHeight);
         mMetaData.add(METADATA_KEY_VIDEO_HEIGHT, String8(tmp));
 
         sprintf(tmp, "%d", rotationAngle);
         mMetaData.add(METADATA_KEY_VIDEO_ROTATION, String8(tmp));
+
+        mMetaData.add(METADATA_KEY_VIDEO_CODEC_MIME_TYPE, videoMime);
 
         if (videoFrameCount > 0) {
             sprintf(tmp, "%d", videoFrameCount);
@@ -643,7 +668,8 @@ void StagefrightMetadataRetriever::parseMetaData() {
         }
     }
 
-    if (imageCount > 0) {
+    // only if we have a primary image
+    if (imageCount > 0 && imagePrimary >= 0) {
         mMetaData.add(METADATA_KEY_HAS_IMAGE, String8("yes"));
 
         sprintf(tmp, "%d", imageCount);
@@ -652,9 +678,11 @@ void StagefrightMetadataRetriever::parseMetaData() {
         sprintf(tmp, "%d", imagePrimary);
         mMetaData.add(METADATA_KEY_IMAGE_PRIMARY, String8(tmp));
 
+        CHECK(imageWidth >= 0);
         sprintf(tmp, "%d", imageWidth);
         mMetaData.add(METADATA_KEY_IMAGE_WIDTH, String8(tmp));
 
+        CHECK(imageHeight >= 0);
         sprintf(tmp, "%d", imageHeight);
         mMetaData.add(METADATA_KEY_IMAGE_HEIGHT, String8(tmp));
 
@@ -682,10 +710,9 @@ void StagefrightMetadataRetriever::parseMetaData() {
                 !strcasecmp(fileMIME, "video/x-matroska")) {
             sp<MetaData> trackMeta = mExtractor->getTrackMetaData(0);
             const char *trackMIME;
-            if (trackMeta != nullptr) {
-                CHECK(trackMeta->findCString(kKeyMIMEType, &trackMIME));
-            }
-            if (!strncasecmp("audio/", trackMIME, 6)) {
+            if (trackMeta != nullptr
+                && trackMeta->findCString(kKeyMIMEType, &trackMIME)
+                && !strncasecmp("audio/", trackMIME, 6)) {
                 // The matroska file only contains a single audio track,
                 // rewrite its mime type.
                 mMetaData.add(

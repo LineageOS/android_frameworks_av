@@ -61,8 +61,10 @@ public:
     DeviceVector getOutputDevicesForStream(audio_stream_type_t stream,
                                            bool fromCache = false) const override;
 
-    sp<DeviceDescriptor> getInputDeviceForAttributes(
-            const audio_attributes_t &attr, sp<AudioPolicyMix> *mix = nullptr) const override;
+    sp<DeviceDescriptor> getInputDeviceForAttributes(const audio_attributes_t &attr,
+                                                     uid_t uid = 0,
+                                                     sp<AudioPolicyMix> *mix = nullptr)
+                                                     const override;
 
     void updateDeviceSelectionCache() override;
 

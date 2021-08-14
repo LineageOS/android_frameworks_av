@@ -90,6 +90,10 @@ public:
         }
     }
 
+    void setPriority(int priority) {
+        androidSetThreadPriority(getTid(), priority);
+    }
+
 protected:
     bool threadLoop() override {
         constexpr nsecs_t kIntervalNs = nsecs_t(10) * 1000 * 1000;  // 10ms
@@ -419,6 +423,8 @@ status_t C2OMXNode::emptyBuffer(
         if (err != OK) {
             (void)fd0.release();
             (void)fd1.release();
+            native_handle_close(handle);
+            native_handle_delete(handle);
             return UNKNOWN_ERROR;
         }
         block = _C2BlockFactory::CreateGraphicBlock(alloc);
@@ -525,6 +531,10 @@ void C2OMXNode::onInputBufferDone(c2_cntr64_t index) {
 
 android_dataspace C2OMXNode::getDataspace() {
     return *mDataspace.lock();
+}
+
+void C2OMXNode::setPriority(int priority) {
+    mQueueThread->setPriority(priority);
 }
 
 }  // namespace android

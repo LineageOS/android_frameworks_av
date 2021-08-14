@@ -106,6 +106,19 @@ TEST(RawGraphicOutputBuffersTest, ChangeNumSlots) {
     }
 }
 
+TEST(RawGraphicOutputBuffersTest, WrapNullBuffer) {
+    constexpr int32_t kWidth = 320;
+    constexpr int32_t kHeight = 240;
+
+    std::shared_ptr<RawGraphicOutputBuffers> buffers =
+        GetRawGraphicOutputBuffers(kWidth, kHeight);
+
+    sp<Codec2Buffer> buffer = buffers->wrap(nullptr);
+    ASSERT_EQ(nullptr, buffer->base());
+    ASSERT_EQ(0, buffer->size());
+    ASSERT_EQ(0, buffer->offset());
+}
+
 TEST(RawGraphicOutputBuffersTest, FlexYuvColorFormat) {
     constexpr int32_t kWidth = 320;
     constexpr int32_t kHeight = 240;

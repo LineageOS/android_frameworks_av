@@ -129,42 +129,51 @@ bool AudioGain::equals(const sp<AudioGain>& other) const
            mGain.max_ramp_ms == other->mGain.max_ramp_ms;
 }
 
-status_t AudioGain::writeToParcel(android::Parcel *parcel) const
-{
-    status_t status = NO_ERROR;
-    if ((status = parcel->writeInt32(mIndex)) != NO_ERROR) return status;
-    if ((status = parcel->writeBool(mUseInChannelMask)) != NO_ERROR) return status;
-    if ((status = parcel->writeBool(mUseForVolume)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.mode)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.channel_mask)) != NO_ERROR) return status;
-    if ((status = parcel->writeInt32(mGain.min_value)) != NO_ERROR) return status;
-    if ((status = parcel->writeInt32(mGain.max_value)) != NO_ERROR) return status;
-    if ((status = parcel->writeInt32(mGain.default_value)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.step_value)) != NO_ERROR) return status;
-    if ((status = parcel->writeUint32(mGain.min_ramp_ms)) != NO_ERROR) return status;
-    status = parcel->writeUint32(mGain.max_ramp_ms);
-    return status;
+status_t AudioGain::writeToParcel(android::Parcel *parcel) const {
+    media::AudioGain parcelable;
+    return writeToParcelable(&parcelable)
+        ?: parcelable.writeToParcel(parcel);
 }
 
-status_t AudioGain::readFromParcel(const android::Parcel *parcel)
-{
-    status_t status = NO_ERROR;
-    if ((status = parcel->readInt32(&mIndex)) != NO_ERROR) return status;
-    if ((status = parcel->readBool(&mUseInChannelMask)) != NO_ERROR) return status;
-    if ((status = parcel->readBool(&mUseForVolume)) != NO_ERROR) return status;
-    uint32_t rawGainMode;
-    if ((status = parcel->readUint32(&rawGainMode)) != NO_ERROR) return status;
-    mGain.mode = static_cast<audio_gain_mode_t>(rawGainMode);
-    uint32_t rawChannelMask;
-    if ((status = parcel->readUint32(&rawChannelMask)) != NO_ERROR) return status;
-    mGain.channel_mask = static_cast<audio_channel_mask_t>(rawChannelMask);
-    if ((status = parcel->readInt32(&mGain.min_value)) != NO_ERROR) return status;
-    if ((status = parcel->readInt32(&mGain.max_value)) != NO_ERROR) return status;
-    if ((status = parcel->readInt32(&mGain.default_value)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mGain.step_value)) != NO_ERROR) return status;
-    if ((status = parcel->readUint32(&mGain.min_ramp_ms)) != NO_ERROR) return status;
-    status = parcel->readUint32(&mGain.max_ramp_ms);
-    return status;
+status_t AudioGain::writeToParcelable(media::AudioGain* parcelable) const {
+    parcelable->index = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mIndex));
+    parcelable->useInChannelMask = mUseInChannelMask;
+    parcelable->useForVolume = mUseForVolume;
+    parcelable->mode = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_gain_mode_t_int32_t_mask(mGain.mode));
+    parcelable->channelMask = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_channel_mask_t_int32_t(mGain.channel_mask));
+    parcelable->minValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_value));
+    parcelable->maxValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.max_value));
+    parcelable->defaultValue = VALUE_OR_RETURN_STATUS(
+            convertIntegral<int32_t>(mGain.default_value));
+    parcelable->stepValue = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.step_value));
+    parcelable->minRampMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.min_ramp_ms));
+    parcelable->maxRampMs = VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(mGain.max_ramp_ms));
+    return OK;
+}
+
+status_t AudioGain::readFromParcel(const android::Parcel *parcel) {
+    media::AudioGain parcelable;
+    return parcelable.readFromParcel(parcel)
+        ?: readFromParcelable(parcelable);
+}
+
+status_t AudioGain::readFromParcelable(const media::AudioGain& parcelable) {
+    mIndex = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.index));
+    mUseInChannelMask = parcelable.useInChannelMask;
+    mUseForVolume = parcelable.useForVolume;
+    mGain.mode = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_gain_mode_t_mask(parcelable.mode));
+    mGain.channel_mask = VALUE_OR_RETURN_STATUS(
+            aidl2legacy_int32_t_audio_channel_mask_t(parcelable.channelMask));
+    mGain.min_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.minValue));
+    mGain.max_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.maxValue));
+    mGain.default_value = VALUE_OR_RETURN_STATUS(convertIntegral<int>(parcelable.defaultValue));
+    mGain.step_value = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.stepValue));
+    mGain.min_ramp_ms = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.minRampMs));
+    mGain.max_ramp_ms = VALUE_OR_RETURN_STATUS(convertIntegral<unsigned int>(parcelable.maxRampMs));
+    return OK;
 }
 
 bool AudioGains::equals(const AudioGains &other) const
@@ -198,6 +207,36 @@ status_t AudioGains::readFromParcel(const android::Parcel *parcel) {
         }
     }
     return status;
+}
+
+ConversionResult<sp<AudioGain>>
+aidl2legacy_AudioGain(const media::AudioGain& aidl) {
+    sp<AudioGain> legacy = new AudioGain(0, false);
+    status_t status = legacy->readFromParcelable(aidl);
+    if (status != OK) {
+        return base::unexpected(status);
+    }
+    return legacy;
+}
+
+ConversionResult<media::AudioGain>
+legacy2aidl_AudioGain(const sp<AudioGain>& legacy) {
+    media::AudioGain aidl;
+    status_t status = legacy->writeToParcelable(&aidl);
+    if (status != OK) {
+        return base::unexpected(status);
+    }
+    return aidl;
+}
+
+ConversionResult<AudioGains>
+aidl2legacy_AudioGains(const std::vector<media::AudioGain>& aidl) {
+    return convertContainer<AudioGains>(aidl, aidl2legacy_AudioGain);
+}
+
+ConversionResult<std::vector<media::AudioGain>>
+legacy2aidl_AudioGains(const AudioGains& legacy) {
+    return convertContainer<std::vector<media::AudioGain>>(legacy, legacy2aidl_AudioGain);
 }
 
 } // namespace android

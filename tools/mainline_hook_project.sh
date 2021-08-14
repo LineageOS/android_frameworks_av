@@ -16,7 +16,8 @@
 
 
 # tunables
-DEV_BRANCH=rvc-dev
+DEV_BRANCH=master
+MAINLINE_BRANCH=sc-mainline-prod
 
 ###
 RED=$(tput setaf 1)
@@ -25,41 +26,27 @@ NORMAL=$(tput sgr0)
 ## check the active branch:
 ## * b131183694 d198c6a [goog/master] Fix to handle missing checks on error returned
 ##
-current=`git branch -vv | grep -P "^\*[^\[]+\[goog/"|sed -e 's/^.*\[//' | sed -e 's/:.*$//'| sed -e 's/^goog\///'`
+current=`git branch -vv | grep -P "^\*[^\[]+\[goog/"|sed -e 's/^.*\[//' | sed -e 's/\].*$//'|sed -e 's/:.*$//'| sed -e 's/^goog\///'`
 if [ "${current}" = "" ] ; then
         current=unknown
 fi
 
-if [ "${current}" = "${DEV_BRANCH}" ] ; then
-    # Change appears to be in mainline dev branch
-    exit 0
+# simple reminder that it should also land in mainline branch
+#
+if [ "${current}" != "${MAINLINE_BRANCH}" ] ; then
+        # simple reminder to ensure it hits mainline
+        cat - <<EOF
+You are uploading repo  ${RED}${REPO_PATH}${NORMAL} to branch ${RED}${current}${NORMAL}.
+The mainline branch for ${RED}${REPO_PATH}${NORMAL} is branch ${RED}${MAINLINE_BRANCH}${NORMAL}.
+
+Ensure an appropriate cherry pick or equivalent lands in branch ${RED}${MAINLINE_BRANCH}${NORMAL}.
+Security bulletin timing or unreleased functionality may determine when that can be landed.
+
+EOF
 fi
 
-## warn the user that about not being on the typical/desired branch.
-
-cat - <<EOF
-
-You are uploading repo  ${RED}${REPO_PATH}${NORMAL} to branch ${RED}${current}${NORMAL}. 
-The source of truth for ${RED}${REPO_PATH}${NORMAL} is branch ${RED}${DEV_BRANCH}${NORMAL}. 
-
-Please upload this change to branch ${RED}${DEV_BRANCH}${NORMAL} unless one or more of
-the following apply:
-- this is a security bug prohibited from disclosure before the next dessert release.
-  (moderate security bugs fall into this category).
-- this is new functionality prohibitied from disclosure before the next dessert release.
-EOF
-
-
-##
-## TODO: prompt the user y/n to continue right now instead of re-invoking with no-verify
-## this has to get around how repo buffers stdout from this script such that the output
-## is not flushed before we try to read the input.
-## 
-
-cat - <<EOF
-If you are sure you want to proceed uploading to branch ${RED}${current}${NORMAL},
-re-run your repo upload command with the '--no-verify' option
-
-EOF
-exit 1
+# exit 0 is "all good, no output passed along to user"
+# exit 77 is "all ok, but output is passed along to the user"
+#
+exit 77
 

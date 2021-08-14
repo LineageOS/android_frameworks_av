@@ -25,6 +25,7 @@ apex_defaults {
     name: "com.android.media-defaults",
     updatable: true,
     bootclasspath_fragments: ["com.android.media-bootclasspath-fragment"],
+    systemserverclasspath_fragments: ["com.android.media-systemserverclasspath-fragment"],
     multilib: {
         first: {
             // Extractor process runs only with the primary ABI.
@@ -40,15 +41,25 @@ apex_defaults {
                 "libmpeg2extractor",
                 "liboggextractor",
                 "libwavextractor",
-                // JNI
-                "libmediaparser-jni"
+            ],
+            // Transcoding service only run with primary ABI.
+            binaries: [
+                "mediatranscoding",
             ],
         },
     },
+    // JNI
+    native_shared_libs: [
+        "libmediaparser-jni",
+        "libmediaformatshaper",
+    ],
+    compile_multilib: "both",
     prebuilts: [
-        "mediaextractor.policy",
         "code_coverage.policy",
+        "com.android.media-mediatranscoding.rc",
         "crash_dump.policy",
+        "mediaextractor.policy",
+        "media-linker-config",
     ],
     key: "com.android.media.key",
     certificate: ":com.android.media.certificate",
@@ -73,10 +84,7 @@ apex {
     name: "com.android.media",
     manifest: "manifest.json",
     defaults: ["com.android.media-defaults"],
-    prebuilts: [
-        "current_sdkinfo",
-        "media-linker-config",
-    ],
+    prebuilts: ["current_sdkinfo"],
 }
 
 linker_config {
@@ -121,6 +129,13 @@ bootclasspath_fragment {
     },
 }
 
+// Encapsulate the contributions made by the com.android.media to the systemserverclasspath.
+systemserverclasspath_fragment {
+    name: "com.android.media-systemserverclasspath-fragment",
+    contents: ["service-media-s"],
+    apex_available: ["com.android.media"],
+}
+
 filegroup {
     name: "com.android.media-androidManifest",
     srcs: ["AndroidManifest-media.xml"],
@@ -137,6 +152,12 @@ apex_defaults {
     binaries: [
         "mediaswcodec",
     ],
+    native_shared_libs: [
+        "libcodec2_hidl@1.0",
+        "libcodec2_hidl@1.1",
+        "libcodec2_hidl@1.2",
+        "libstagefright_foundation",
+    ],
     prebuilts: [
         "com.android.media.swcodec-mediaswcodec.rc",
         "com.android.media.swcodec-ld.config.txt",
@@ -145,7 +166,6 @@ apex_defaults {
         "crash_dump.policy",
         "mediaswcodec.xml",
     ],
-    use_vendor: true,
     key: "com.android.media.swcodec.key",
     certificate: ":com.android.media.swcodec.certificate",
 
@@ -163,6 +183,13 @@ apex_defaults {
     // Indicates that pre-installed version of this apex can be compressed.
     // Whether it actually will be compressed is controlled on per-device basis.
     compressible: true,
+}
+
+prebuilt_etc {
+    name: "com.android.media-mediatranscoding.rc",
+    src: "mediatranscoding.rc",
+    filename: "init.rc",
+    installable: false,
 }
 
 prebuilt_etc {

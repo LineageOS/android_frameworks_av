@@ -202,6 +202,19 @@ void EffectDescriptorCollection::moveEffects(const std::vector<int>& ids,
     }
 }
 
+audio_io_handle_t EffectDescriptorCollection::getIoForSession(audio_session_t sessionId,
+                                                              const effect_uuid_t *effectType)
+{
+    for (size_t i = 0; i < size(); ++i) {
+        sp<EffectDescriptor> effect = valueAt(i);
+        if (effect->mSession == sessionId && (effectType == nullptr ||
+                memcmp(&effect->mDesc.type, effectType, sizeof(effect_uuid_t)) == 0)) {
+            return effect->mIo;
+        }
+    }
+    return AUDIO_IO_HANDLE_NONE;
+}
+
 EffectDescriptorCollection EffectDescriptorCollection::getEffectsForIo(audio_io_handle_t io) const
 {
     EffectDescriptorCollection effects;

@@ -96,7 +96,7 @@ aaudio_handle_t AAudioStreamTracker::addStreamForHandle(sp<AAudioServiceStreamBa
     return handle;
 }
 
-std::string AAudioStreamTracker::dump() const {
+std::string AAudioStreamTracker::dump() const NO_THREAD_SAFETY_ANALYSIS {
     std::stringstream result;
     const bool isLocked = AAudio_tryUntilTrue(
             [this]()->bool { return mHandleLock.try_lock(); } /* f */,

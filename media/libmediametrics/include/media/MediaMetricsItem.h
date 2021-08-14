@@ -32,7 +32,8 @@
 
 namespace android {
 
-class IMediaMetricsService;
+namespace media { class IMediaMetricsService; }
+
 class Parcel;
 
 /*
@@ -239,7 +240,10 @@ class BaseItem {
 public:
     // are we collecting metrics data
     static bool isEnabled();
-    static sp<IMediaMetricsService> getService();
+    // returns the MediaMetrics service if active.
+    static sp<media::IMediaMetricsService> getService();
+    // submits a raw buffer directly to the MediaMetrics service - this is highly optimized.
+    static status_t submitBuffer(const char *buffer, size_t len);
 
 protected:
     static constexpr const char * const EnabledProperty = "media.metrics.enabled";
@@ -247,10 +251,9 @@ protected:
     static const int EnabledProperty_default = 1;
 
     // let's reuse a binder connection
-    static sp<IMediaMetricsService> sMediaMetricsService;
+    static sp<media::IMediaMetricsService> sMediaMetricsService;
 
     static void dropInstance();
-    static bool submitBuffer(const char *buffer, size_t len);
 
     template <typename T>
     struct is_item_type {
@@ -573,7 +576,7 @@ public:
 
     bool record() {
         return updateHeader()
-                && BaseItem::submitBuffer(getBuffer(), getLength());
+                && BaseItem::submitBuffer(getBuffer(), getLength()) == OK;
     }
 
     bool isValid () const {

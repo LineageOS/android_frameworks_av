@@ -25,6 +25,7 @@
 #define LOG_TAG "APM_Test"
 #include <Serializer.h>
 #include <android-base/file.h>
+#include <android/content/AttributionSourceState.h>
 #include <media/AudioPolicy.h>
 #include <media/PatchBuilder.h>
 #include <media/RecordingActivityTracker.h>
@@ -33,11 +34,13 @@
 
 #include "AudioPolicyInterface.h"
 #include "AudioPolicyManagerTestClient.h"
+#include "AudioPolicyManagerTestClientForHdmi.h"
 #include "AudioPolicyTestClient.h"
 #include "AudioPolicyTestManager.h"
 
 using namespace android;
 using testing::UnorderedElementsAre;
+using android::content::AttributionSourceState;
 
 TEST(AudioPolicyManagerTestInit, EngineFailure) {
     AudioPolicyTestClient client;
@@ -137,15 +140,16 @@ class AudioPolicyManagerTest : public testing::Test {
     // Tries to find a device port. If 'foundPort' isn't nullptr,
     // will generate a failure if the port hasn't been found.
     bool findDevicePort(audio_port_role_t role, audio_devices_t deviceType,
-            const std::string &address, audio_port *foundPort);
+            const std::string &address, audio_port_v7 *foundPort);
     static audio_port_handle_t getDeviceIdFromPatch(const struct audio_patch* patch);
+    virtual AudioPolicyManagerTestClient* getClient() { return new AudioPolicyManagerTestClient; }
 
     std::unique_ptr<AudioPolicyManagerTestClient> mClient;
     std::unique_ptr<AudioPolicyTestManager> mManager;
 };
 
 void AudioPolicyManagerTest::SetUp() {
-    mClient.reset(new AudioPolicyManagerTestClient);
+    mClient.reset(getClient());
     mManager.reset(new AudioPolicyTestManager(mClient.get()));
     SetUpManagerConfig();  // Subclasses may want to customize the config.
     ASSERT_EQ(NO_ERROR, mManager->initialize());
@@ -212,8 +216,12 @@ void AudioPolicyManagerTest::getOutputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::output_type_t outputType;
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource = AttributionSourceState();
+    attributionSource.uid = 0;
+    attributionSource.token = sp<BBinder>::make();
     ASSERT_EQ(OK, mManager->getOutputForAttr(
-                    &attr, output, AUDIO_SESSION_NONE, &stream, 0 /*uid*/, &config, &flags,
+                    &attr, output, AUDIO_SESSION_NONE, &stream, attributionSource, &config, &flags,
                     selectedDeviceId, portId, {}, &outputType));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
     ASSERT_NE(AUDIO_IO_HANDLE_NONE, *output);
@@ -237,14 +245,18 @@ void AudioPolicyManagerTest::getInputForAttr(
     if (!portId) portId = &localPortId;
     *portId = AUDIO_PORT_HANDLE_NONE;
     AudioPolicyInterface::input_type_t inputType;
+    // TODO b/182392769: use attribution source util
+    AttributionSourceState attributionSource = AttributionSourceState();
+    attributionSource.uid = 0;
+    attributionSource.token = sp<BBinder>::make();
     ASSERT_EQ(OK, mManager->getInputForAttr(
-            &attr, &input, riid, AUDIO_SESSION_NONE, 0 /*uid*/, &config, flags,
+            &attr, &input, riid, AUDIO_SESSION_NONE, attributionSource, &config, flags,
             selectedDeviceId, &inputType, portId));
     ASSERT_NE(AUDIO_PORT_HANDLE_NONE, *portId);
 }
 
 bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
-        audio_devices_t deviceType, const std::string &address, audio_port *foundPort) {
+        audio_devices_t deviceType, const std::string &address, audio_port_v7 *foundPort) {
     uint32_t numPorts = 0;
     uint32_t generation1;
     status_t ret;
@@ -254,7 +266,7 @@ bool AudioPolicyManagerTest::findDevicePort(audio_port_role_t role,
     if (HasFailure()) return false;
 
     uint32_t generation2;
-    struct audio_port ports[numPorts];
+    struct audio_port_v7 ports[numPorts];
     ret = mManager->listAudioPorts(role, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation2);
     EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
     EXPECT_EQ(generation1, generation2) << "Generations changed during ports retrieval";
@@ -790,6 +802,188 @@ TEST_F(AudioPolicyManagerTestDynamicPolicy, UnregisterPolicyMixes) {
     ASSERT_EQ(INVALID_OPERATION, ret);
 }
 
+class AudioPolicyManagerTestForHdmi
+        : public AudioPolicyManagerTestWithConfigurationFile {
+protected:
+    void SetUp() override;
+    std::string getConfigFile() override { return sTvConfig; }
+    std::map<audio_format_t, bool> getSurroundFormatsHelper();
+    std::vector<audio_format_t> getReportedSurroundFormatsHelper();
+    std::unordered_set<audio_format_t> getFormatsFromPorts();
+    AudioPolicyManagerTestClient* getClient() override {
+        return new AudioPolicyManagerTestClientForHdmi;
+    }
+    void TearDown() override;
+
+    static const std::string sTvConfig;
+
+};
+
+const std::string AudioPolicyManagerTestForHdmi::sTvConfig =
+        AudioPolicyManagerTestForHdmi::sExecutableDir +
+        "test_settop_box_surround_configuration.xml";
+
+void AudioPolicyManagerTestForHdmi::SetUp() {
+    AudioPolicyManagerTest::SetUp();
+    mClient->addSupportedFormat(AUDIO_FORMAT_E_AC3);
+    mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT);
+}
+
+void AudioPolicyManagerTestForHdmi::TearDown() {
+    mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_HDMI, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "" /*address*/, "" /*name*/, AUDIO_FORMAT_DEFAULT);
+    AudioPolicyManagerTest::TearDown();
+}
+
+std::map<audio_format_t, bool>
+        AudioPolicyManagerTestForHdmi::getSurroundFormatsHelper() {
+    unsigned int numSurroundFormats = 0;
+    std::map<audio_format_t, bool> surroundFormatsMap;
+    status_t ret = mManager->getSurroundFormats(
+            &numSurroundFormats, nullptr /* surroundFormats */,
+            nullptr /* surroundFormatsEnabled */);
+    EXPECT_EQ(NO_ERROR, ret);
+    if (ret != NO_ERROR) {
+        return surroundFormatsMap;
+    }
+    audio_format_t surroundFormats[numSurroundFormats];
+    memset(surroundFormats, 0, sizeof(audio_format_t) * numSurroundFormats);
+    bool surroundFormatsEnabled[numSurroundFormats];
+    memset(surroundFormatsEnabled, 0, sizeof(bool) * numSurroundFormats);
+    ret = mManager->getSurroundFormats(
+            &numSurroundFormats, surroundFormats, surroundFormatsEnabled);
+    EXPECT_EQ(NO_ERROR, ret);
+    if (ret != NO_ERROR) {
+        return surroundFormatsMap;
+    }
+    for (int i = 0; i< numSurroundFormats; i++) {
+        surroundFormatsMap[surroundFormats[i]] = surroundFormatsEnabled[i];
+    }
+    return surroundFormatsMap;
+}
+
+std::vector<audio_format_t> AudioPolicyManagerTestForHdmi::getReportedSurroundFormatsHelper() {
+    unsigned int numSurroundFormats = 0;
+    std::vector<audio_format_t>  surroundFormatsVector;
+    status_t ret = mManager->getReportedSurroundFormats(
+            &numSurroundFormats, nullptr /* surroundFormats */);
+    EXPECT_EQ(NO_ERROR, ret);
+    if (ret != NO_ERROR) {
+        return surroundFormatsVector;
+    }
+    audio_format_t surroundFormats[numSurroundFormats];
+    memset(surroundFormats, 0, sizeof(audio_format_t) * numSurroundFormats);
+    ret = mManager->getReportedSurroundFormats(&numSurroundFormats, surroundFormats);
+    EXPECT_EQ(NO_ERROR, ret);
+    if (ret != NO_ERROR) {
+        return surroundFormatsVector;
+    }
+    for (const auto &surroundFormat : surroundFormats) {
+        surroundFormatsVector.push_back(surroundFormat);
+    }
+    return surroundFormatsVector;
+}
+
+std::unordered_set<audio_format_t>
+        AudioPolicyManagerTestForHdmi::getFormatsFromPorts() {
+    uint32_t numPorts = 0;
+    uint32_t generation1;
+    status_t ret;
+    std::unordered_set<audio_format_t> formats;
+    ret = mManager->listAudioPorts(
+            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, nullptr, &generation1);
+    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
+    if (ret != NO_ERROR) {
+        return formats;
+    }
+    struct audio_port_v7 ports[numPorts];
+    ret = mManager->listAudioPorts(
+            AUDIO_PORT_ROLE_SINK, AUDIO_PORT_TYPE_DEVICE, &numPorts, ports, &generation1);
+    EXPECT_EQ(NO_ERROR, ret) << "mManager->listAudioPorts returned error";
+    if (ret != NO_ERROR) {
+        return formats;
+    }
+    for (const auto &port : ports) {
+        for (size_t i = 0; i < port.num_audio_profiles; ++i) {
+            formats.insert(port.audio_profiles[i].format);
+        }
+    }
+    return formats;
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi, GetSurroundFormatsReturnsSupportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
+    auto surroundFormats = getSurroundFormatsHelper();
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        GetSurroundFormatsReturnsManipulatedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
+
+    status_t ret =
+            mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    auto surroundFormats = getSurroundFormatsHelper();
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_FALSE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+
+    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    surroundFormats = getSurroundFormatsHelper();
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_TRUE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+
+    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    surroundFormats = getSurroundFormatsHelper();
+    ASSERT_EQ(1, surroundFormats.count(AUDIO_FORMAT_E_AC3));
+    ASSERT_FALSE(surroundFormats[AUDIO_FORMAT_E_AC3]);
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        ListAudioPortsReturnManipulatedHdmiFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
+
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/));
+    auto formats = getFormatsFromPorts();
+    ASSERT_EQ(0, formats.count(AUDIO_FORMAT_E_AC3));
+
+    ASSERT_EQ(NO_ERROR, mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/));
+    formats = getFormatsFromPorts();
+    ASSERT_EQ(1, formats.count(AUDIO_FORMAT_E_AC3));
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        GetReportedSurroundFormatsReturnsHdmiReportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_ALWAYS);
+    auto surroundFormats = getReportedSurroundFormatsHelper();
+    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), AUDIO_FORMAT_E_AC3));
+}
+
+TEST_F(AudioPolicyManagerTestForHdmi,
+        GetReportedSurroundFormatsReturnsNonManipulatedHdmiReportedFormats) {
+    mManager->setForceUse(
+            AUDIO_POLICY_FORCE_FOR_ENCODED_SURROUND, AUDIO_POLICY_FORCE_ENCODED_SURROUND_MANUAL);
+
+    status_t ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, false /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    auto surroundFormats = getReportedSurroundFormatsHelper();
+    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), AUDIO_FORMAT_E_AC3));
+
+    ret = mManager->setSurroundFormatEnabled(AUDIO_FORMAT_E_AC3, true /*enabled*/);
+    ASSERT_EQ(NO_ERROR, ret);
+    surroundFormats = getReportedSurroundFormatsHelper();
+    ASSERT_EQ(1, std::count(surroundFormats.begin(), surroundFormats.end(), AUDIO_FORMAT_E_AC3));
+}
+
 class AudioPolicyManagerTestDPNoRemoteSubmixModule : public AudioPolicyManagerTestDynamicPolicy {
 protected:
     std::string getConfigFile() override { return sPrimaryOnlyConfig; }
@@ -836,7 +1030,7 @@ protected:
             {AUDIO_USAGE_ALARM, AUDIO_SOURCE_DEFAULT, RULE_MATCH_ATTRIBUTE_USAGE}
     };
 
-    struct audio_port mInjectionPort;
+    struct audio_port_v7 mInjectionPort;
     audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
 };
 
@@ -853,7 +1047,7 @@ void AudioPolicyManagerTestDPPlaybackReRouting::SetUp() {
             AUDIO_DEVICE_OUT_REMOTE_SUBMIX, mMixAddress, audioConfig, mUsageRules);
     ASSERT_EQ(NO_ERROR, ret);
 
-    struct audio_port extractionPort;
+    struct audio_port_v7 extractionPort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX,
                     mMixAddress, &extractionPort));
 
@@ -1022,7 +1216,7 @@ protected:
         {AUDIO_USAGE_UNKNOWN, AUDIO_SOURCE_VOICE_COMMUNICATION, RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET}
     };
 
-    struct audio_port mExtractionPort;
+    struct audio_port_v7 mExtractionPort;
     audio_port_handle_t mPortId = AUDIO_PORT_HANDLE_NONE;
 };
 
@@ -1039,7 +1233,7 @@ void AudioPolicyManagerTestDPMixRecordInjection::SetUp() {
             AUDIO_DEVICE_IN_REMOTE_SUBMIX, mMixAddress, audioConfig, mSourceRules);
     ASSERT_EQ(NO_ERROR, ret);
 
-    struct audio_port injectionPort;
+    struct audio_port_v7 injectionPort;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SINK, AUDIO_DEVICE_OUT_REMOTE_SUBMIX,
                     mMixAddress, &injectionPort));
 
@@ -1145,6 +1339,34 @@ TEST_F(AudioPolicyManagerTestDeviceConnection, Dump) {
     dumpToLog();
 }
 
+TEST_F(AudioPolicyManagerTestDeviceConnection, RoutingUpdate) {
+    mClient->resetRoutingUpdatedCounter();
+    // Connecting a valid output device with valid parameters should trigger a routing update
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
+            "a", "b", AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(1, mClient->getRoutingUpdatedCounter());
+
+    // Disconnecting a connected device should succeed and trigger a routing update
+    ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "a", "b", AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(2, mClient->getRoutingUpdatedCounter());
+
+    // Disconnecting a disconnected device should fail and not trigger a routing update
+    ASSERT_EQ(INVALID_OPERATION, mManager->setDeviceConnectionState(
+            AUDIO_DEVICE_OUT_BLUETOOTH_SCO, AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE,
+            "a", "b",  AUDIO_FORMAT_DEFAULT));
+    ASSERT_EQ(2, mClient->getRoutingUpdatedCounter());
+
+    // Changing force use should trigger an update
+    auto config = mManager->getForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA);
+    auto newConfig = config == AUDIO_POLICY_FORCE_BT_A2DP ?
+            AUDIO_POLICY_FORCE_NONE : AUDIO_POLICY_FORCE_BT_A2DP;
+    mManager->setForceUse(AUDIO_POLICY_FORCE_FOR_MEDIA, newConfig);
+    ASSERT_EQ(3, mClient->getRoutingUpdatedCounter());
+}
+
 TEST_P(AudioPolicyManagerTestDeviceConnection, SetDeviceConnectionState) {
     const audio_devices_t type = std::get<0>(GetParam());
     const std::string name = std::get<1>(GetParam());
@@ -1190,7 +1412,7 @@ TEST_P(AudioPolicyManagerTestDeviceConnection, ExplicitlyRoutingAfterConnection)
             type, AUDIO_POLICY_DEVICE_STATE_AVAILABLE,
             address.c_str(), name.c_str(), AUDIO_FORMAT_DEFAULT));
 
-    audio_port devicePort;
+    audio_port_v7 devicePort;
     const audio_port_role_t role = audio_is_output_device(type)
             ? AUDIO_PORT_ROLE_SINK : AUDIO_PORT_ROLE_SOURCE;
     ASSERT_TRUE(findDevicePort(role, type, address, &devicePort));
@@ -1251,7 +1473,7 @@ void AudioPolicyManagerTVTest::testHDMIPortSelection(
             flags, &output, &portId);
     sp<SwAudioOutputDescriptor> outDesc = mManager->getOutputs().valueFor(output);
     ASSERT_NE(nullptr, outDesc.get());
-    audio_port port = {};
+    audio_port_v7 port = {};
     outDesc->toAudioPort(&port);
     mManager->releaseOutput(portId);
     ASSERT_EQ(NO_ERROR, mManager->setDeviceConnectionState(
@@ -1333,7 +1555,7 @@ TEST_F(AudioPolicyManagerDynamicHwModulesTest, ListAddedAudioPorts) {
             findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", nullptr));
     mClient->swapAllowedModuleNames({"primary", "r_submix"});
     mManager->onNewAudioModulesAvailable();
-    struct audio_port port;
+    struct audio_port_v7 port;
     ASSERT_TRUE(findDevicePort(AUDIO_PORT_ROLE_SOURCE, AUDIO_DEVICE_IN_REMOTE_SUBMIX, "0", &port));
 }
 

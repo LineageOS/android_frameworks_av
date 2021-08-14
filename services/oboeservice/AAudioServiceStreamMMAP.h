@@ -19,6 +19,7 @@
 
 #include <atomic>
 
+#include <android-base/thread_annotations.h>
 #include <android-base/unique_fd.h>
 #include <media/audiohal/StreamHalInterface.h>
 #include <media/MmapStreamCallback.h>
@@ -34,9 +35,7 @@
 #include "TimestampScheduler.h"
 #include "utility/MonotonicCounter.h"
 
-
 namespace aaudio {
-
 
 /**
  * These corresponds to an EXCLUSIVE mode MMAP client stream.
@@ -68,13 +67,14 @@ protected:
      * This is not guaranteed to be synchronous but it currently is.
      * An AAUDIO_SERVICE_EVENT_PAUSED will be sent to the client when complete.
     */
-    aaudio_result_t pause_l() override;
+    aaudio_result_t pause_l() REQUIRES(mLock) override;
 
-    aaudio_result_t stop_l() override;
+    aaudio_result_t stop_l() REQUIRES(mLock) override;
 
     aaudio_result_t getAudioDataDescription(AudioEndpointParcelable &parcelable) override;
 
-    aaudio_result_t getFreeRunningPosition(int64_t *positionFrames, int64_t *timeNanos) override;
+    aaudio_result_t getFreeRunningPosition(int64_t *positionFrames,
+            int64_t *timeNanos) EXCLUDES(mLock) override;
 
     aaudio_result_t getHardwareTimestamp(int64_t *positionFrames, int64_t *timeNanos) override;
 

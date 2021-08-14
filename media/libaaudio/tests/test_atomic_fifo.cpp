@@ -26,6 +26,7 @@ using android::fifo_frames_t;
 using android::fifo_counter_t;
 using android::FifoController;
 using android::FifoBuffer;
+using android::FifoBufferIndirect;
 using android::WrappingBuffer;
 
 TEST(test_fifo_controller, fifo_indices) {
@@ -325,7 +326,7 @@ public:
         verifyStorageIntegrity();
     }
 
-    FifoBuffer     mFifoBuffer;
+    FifoBufferIndirect     mFifoBuffer;
     fifo_frames_t  mNextWriteIndex = 0;
     fifo_frames_t  mNextVerifyIndex = 0;
     fifo_frames_t  mThreshold;

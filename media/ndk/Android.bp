@@ -149,7 +149,10 @@ cc_library_shared {
 
     export_header_lib_headers: ["jni_headers"],
 
-    export_include_dirs: ["include"],
+    export_include_dirs: [
+        "include",
+        "include_platform",
+    ],
 
     export_shared_lib_headers: [
         "libgui",
@@ -207,6 +210,7 @@ cc_library {
 
 cc_test {
     name: "AImageReaderWindowHandleTest",
+    test_suites: ["device-tests"],
     srcs: ["tests/AImageReaderWindowHandleTest.cpp"],
     shared_libs: [
         "libbinder",
@@ -266,5 +270,9 @@ cc_library_static {
         },
     },
 
-    apex_available: ["com.android.media"],
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media",
+        "com.android.media.swcodec",
+    ],
 }

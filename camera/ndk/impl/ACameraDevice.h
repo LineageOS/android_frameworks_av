@@ -167,7 +167,7 @@ class CameraDevice final : public RefBase {
     void notifySessionEndOfLifeLocked(ACameraCaptureSession* session);
 
     camera_status_t configureStreamsLocked(const ACaptureSessionOutputContainer* outputs,
-           const ACaptureRequest* sessionParameters);
+           const ACaptureRequest* sessionParameters, nsecs_t startTimeNs);
 
     // Input message will be posted and cleared after this returns
     void postSessionMsgAndCleanup(sp<AMessage>& msg);

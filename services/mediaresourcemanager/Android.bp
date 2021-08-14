@@ -7,11 +7,73 @@ package {
     default_applicable_licenses: ["frameworks_av_license"],
 }
 
+filegroup {
+    name: "resourcemanager_aidl",
+    srcs: [
+        "aidl/android/media/IResourceManagerClient.aidl",
+        "aidl/android/media/IResourceManagerService.aidl",
+        "aidl/android/media/MediaResourceType.aidl",
+        "aidl/android/media/MediaResourceSubType.aidl",
+        "aidl/android/media/MediaResourceParcel.aidl",
+        "aidl/android/media/MediaResourcePolicyParcel.aidl",
+    ],
+    path: "aidl",
+}
+
+filegroup {
+    name: "resourceobserver_aidl",
+    srcs: [
+        "aidl/android/media/IResourceObserver.aidl",
+        "aidl/android/media/IResourceObserverService.aidl",
+        "aidl/android/media/MediaObservableEvent.aidl",
+        "aidl/android/media/MediaObservableFilter.aidl",
+        "aidl/android/media/MediaObservableType.aidl",
+        "aidl/android/media/MediaObservableParcel.aidl",
+    ],
+    path: "aidl",
+}
+
+aidl_interface {
+    name: "resourcemanager_aidl_interface",
+    unstable: true,
+    local_include_dir: "aidl",
+    srcs: [
+        ":resourcemanager_aidl",
+    ],
+}
+
+aidl_interface {
+    name: "resourceobserver_aidl_interface",
+    local_include_dir: "aidl",
+    srcs: [
+        ":resourceobserver_aidl",
+    ],
+    backend: {
+        java: {
+            enabled: false,
+        },
+        cpp: {
+            enabled: false,
+        },
+        ndk: {
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+                "test_com.android.media",
+            ],
+            min_sdk_version: "29",
+            enabled: true,
+        },
+    },
+    versions: ["1"],
+}
+
 cc_library {
     name: "libresourcemanagerservice",
 
     srcs: [
         "ResourceManagerService.cpp",
+        "ResourceObserverService.cpp",
         "ServiceLog.cpp",
 
         // TODO: convert to AIDL?
@@ -25,6 +87,10 @@ cc_library {
         "libbinder_ndk",
         "libutils",
         "liblog",
+    ],
+
+    static_libs: [
+        "resourceobserver_aidl_interface-V1-ndk",
     ],
 
     include_dirs: ["frameworks/av/include"],

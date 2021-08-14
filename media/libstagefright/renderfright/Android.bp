@@ -1,0 +1,119 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_media_libstagefright_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_media_libstagefright_license"],
+}
+
+cc_defaults {
+    name: "renderfright_defaults",
+    cflags: [
+        "-DLOG_TAG=\"renderfright\"",
+        "-Wall",
+        "-Werror",
+        "-Wthread-safety",
+        "-Wunused",
+        "-Wunreachable-code",
+    ],
+}
+
+cc_defaults {
+    name: "librenderfright_defaults",
+    defaults: ["renderfright_defaults"],
+    cflags: [
+        "-DGL_GLEXT_PROTOTYPES",
+        "-DEGL_EGLEXT_PROTOTYPES",
+    ],
+    shared_libs: [
+        "libbase",
+        "libcutils",
+        "libEGL",
+        "libGLESv1_CM",
+        "libGLESv2",
+        "liblog",
+        "libnativewindow",
+        "libprocessgroup",
+        "libsync",
+        "libui",
+        "libutils",
+    ],
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+}
+
+filegroup {
+    name: "librenderfright_sources",
+    srcs: [
+        "Description.cpp",
+        "Mesh.cpp",
+        "RenderEngine.cpp",
+        "Texture.cpp",
+    ],
+}
+
+filegroup {
+    name: "librenderfright_gl_sources",
+    srcs: [
+        "gl/GLESRenderEngine.cpp",
+        "gl/GLExtensions.cpp",
+        "gl/GLFramebuffer.cpp",
+        "gl/GLImage.cpp",
+        "gl/GLShadowTexture.cpp",
+        "gl/GLShadowVertexGenerator.cpp",
+        "gl/GLSkiaShadowPort.cpp",
+        "gl/GLVertexBuffer.cpp",
+        "gl/ImageManager.cpp",
+        "gl/Program.cpp",
+        "gl/ProgramCache.cpp",
+        "gl/filters/BlurFilter.cpp",
+        "gl/filters/GenericProgram.cpp",
+    ],
+}
+
+filegroup {
+    name: "librenderfright_threaded_sources",
+    srcs: [
+        "threaded/RenderEngineThreaded.cpp",
+    ],
+}
+
+cc_library_static {
+    name: "librenderfright",
+    defaults: ["librenderfright_defaults"],
+    vendor_available: true,
+    vndk: {
+        enabled: true,
+    },
+    double_loadable: true,
+    clang: true,
+    cflags: [
+        "-fvisibility=hidden",
+        "-Werror=format",
+    ],
+    srcs: [
+        ":librenderfright_sources",
+        ":librenderfright_gl_sources",
+        ":librenderfright_threaded_sources",
+    ],
+    lto: {
+        thin: true,
+    },
+}
+
+cc_library_static {
+    name: "librenderfright_mocks",
+    defaults: ["librenderfright_defaults"],
+    srcs: [
+        "mock/Framebuffer.cpp",
+        "mock/Image.cpp",
+        "mock/RenderEngine.cpp",
+    ],
+    static_libs: [
+        "libgtest",
+        "libgmock",
+    ],
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+}

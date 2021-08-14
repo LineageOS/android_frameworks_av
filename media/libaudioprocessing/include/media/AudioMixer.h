@@ -22,10 +22,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
-#include <android/os/IExternalVibratorService.h>
 #include <media/AudioMixerBase.h>
 #include <media/BufferProviders.h>
 #include <utils/threads.h>
+#include <vibrator/ExternalVibrationUtils.h>
 
 // FIXME This is actually unity gain, which might not be max in future, expressed in U.12
 #define MAX_GAIN_INT AudioMixerBase::UNITY_GAIN_INT
@@ -54,32 +54,6 @@ public:
         PLAYBACK_RATE   = 0x4300, // Configure timestretch on this track name;
                                   // parameter 'value' is a pointer to the new playback rate.
     };
-
-    typedef enum { // Haptic intensity, should keep consistent with VibratorService
-        HAPTIC_SCALE_MUTE = os::IExternalVibratorService::SCALE_MUTE,
-        HAPTIC_SCALE_VERY_LOW = os::IExternalVibratorService::SCALE_VERY_LOW,
-        HAPTIC_SCALE_LOW = os::IExternalVibratorService::SCALE_LOW,
-        HAPTIC_SCALE_NONE = os::IExternalVibratorService::SCALE_NONE,
-        HAPTIC_SCALE_HIGH = os::IExternalVibratorService::SCALE_HIGH,
-        HAPTIC_SCALE_VERY_HIGH = os::IExternalVibratorService::SCALE_VERY_HIGH,
-    } haptic_intensity_t;
-    static constexpr float HAPTIC_SCALE_VERY_LOW_RATIO = 2.0f / 3.0f;
-    static constexpr float HAPTIC_SCALE_LOW_RATIO = 3.0f / 4.0f;
-    static const constexpr float HAPTIC_MAX_AMPLITUDE_FLOAT = 1.0f;
-
-    static inline bool isValidHapticIntensity(haptic_intensity_t hapticIntensity) {
-        switch (hapticIntensity) {
-        case HAPTIC_SCALE_MUTE:
-        case HAPTIC_SCALE_VERY_LOW:
-        case HAPTIC_SCALE_LOW:
-        case HAPTIC_SCALE_NONE:
-        case HAPTIC_SCALE_HIGH:
-        case HAPTIC_SCALE_VERY_HIGH:
-            return true;
-        default:
-            return false;
-        }
-    }
 
     AudioMixer(size_t frameCount, uint32_t sampleRate)
             : AudioMixerBase(frameCount, sampleRate) {
@@ -170,7 +144,7 @@ private:
 
         // Haptic
         bool                 mHapticPlaybackEnabled;
-        haptic_intensity_t   mHapticIntensity;
+        os::HapticScale      mHapticIntensity;
         audio_channel_mask_t mHapticChannelMask;
         uint32_t             mHapticChannelCount;
         audio_channel_mask_t mMixerHapticChannelMask;
@@ -180,38 +154,6 @@ private:
         uint32_t             mAdjustNonDestructiveInChannelCount;
         uint32_t             mAdjustNonDestructiveOutChannelCount;
         bool                 mKeepContractedChannels;
-
-        float getHapticScaleGamma() const {
-        // Need to keep consistent with the value in VibratorService.
-        switch (mHapticIntensity) {
-        case HAPTIC_SCALE_VERY_LOW:
-            return 2.0f;
-        case HAPTIC_SCALE_LOW:
-            return 1.5f;
-        case HAPTIC_SCALE_HIGH:
-            return 0.5f;
-        case HAPTIC_SCALE_VERY_HIGH:
-            return 0.25f;
-        default:
-            return 1.0f;
-        }
-        }
-
-        float getHapticMaxAmplitudeRatio() const {
-        // Need to keep consistent with the value in VibratorService.
-        switch (mHapticIntensity) {
-        case HAPTIC_SCALE_VERY_LOW:
-            return HAPTIC_SCALE_VERY_LOW_RATIO;
-        case HAPTIC_SCALE_LOW:
-            return HAPTIC_SCALE_LOW_RATIO;
-        case HAPTIC_SCALE_NONE:
-        case HAPTIC_SCALE_HIGH:
-        case HAPTIC_SCALE_VERY_HIGH:
-            return 1.0f;
-        default:
-            return 0.0f;
-        }
-        }
     };
 
     inline std::shared_ptr<Track> getTrack(int name) {

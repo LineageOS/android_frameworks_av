@@ -1576,7 +1576,7 @@ void RasterIntraUpdate(UChar *intraArray, UChar *Mode, Int totalMB, Int numRefre
 
     /* find the last refresh MB */
     indx = 0;
-    while (intraArray[indx] == 1 && indx < totalMB)
+    while (indx < totalMB && intraArray[indx] == 1)
         indx++;
 
     /* add more  */

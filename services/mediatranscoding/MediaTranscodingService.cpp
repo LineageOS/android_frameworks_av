@@ -16,12 +16,24 @@
 
 //#define LOG_NDEBUG 0
 #define LOG_TAG "MediaTranscodingService"
-#include <MediaTranscodingService.h>
+#include "MediaTranscodingService.h"
+
 #include <android/binder_manager.h>
 #include <android/binder_process.h>
-#include <private/android_filesystem_config.h>
+#include <android/permission_manager.h>
+#include <cutils/properties.h>
+#include <media/TranscoderWrapper.h>
+#include <media/TranscodingClientManager.h>
+#include <media/TranscodingDefs.h>
+#include <media/TranscodingLogger.h>
+#include <media/TranscodingResourcePolicy.h>
+#include <media/TranscodingSessionController.h>
+#include <media/TranscodingThermalPolicy.h>
+#include <media/TranscodingUidPolicy.h>
 #include <utils/Log.h>
 #include <utils/Vector.h>
+
+#include "SimulatedTranscoder.h"
 
 namespace android {
 
@@ -31,23 +43,53 @@ namespace android {
             errorCode,                                \
             String8::format("%s:%d: " errorString, __FUNCTION__, __LINE__, ##__VA_ARGS__))
 
-// Can MediaTranscoding service trust the caller based on the calling UID?
-// TODO(hkuang): Add MediaProvider's UID.
-static bool isTrustedCallingUid(uid_t uid) {
-    switch (uid) {
-    case AID_ROOT:  // root user
-    case AID_SYSTEM:
-    case AID_SHELL:
-    case AID_MEDIA:  // mediaserver
-        return true;
-    default:
-        return false;
-    }
-}
+static constexpr int64_t kTranscoderHeartBeatIntervalUs = 1000000LL;
 
 MediaTranscodingService::MediaTranscodingService()
-      : mTranscodingClientManager(TranscodingClientManager::getInstance()) {
+      : mUidPolicy(new TranscodingUidPolicy()),
+        mResourcePolicy(new TranscodingResourcePolicy()),
+        mThermalPolicy(new TranscodingThermalPolicy()),
+        mLogger(new TranscodingLogger()) {
     ALOGV("MediaTranscodingService is created");
+    bool simulated = property_get_bool("debug.transcoding.simulated_transcoder", false);
+    if (simulated) {
+        // Overrid default config params with shorter values for testing.
+        TranscodingSessionController::ControllerConfig config = {
+                .pacerBurstThresholdMs = 500,
+                .pacerBurstCountQuota = 10,
+                .pacerBurstTimeQuotaSeconds = 3,
+        };
+        mSessionController.reset(new TranscodingSessionController(
+                [](const std::shared_ptr<TranscoderCallbackInterface>& cb)
+                        -> std::shared_ptr<TranscoderInterface> {
+                    return std::make_shared<SimulatedTranscoder>(cb);
+                },
+                mUidPolicy, mResourcePolicy, mThermalPolicy, &config));
+    } else {
+        int32_t overrideBurstCountQuota =
+                property_get_int32("persist.transcoding.burst_count_quota", -1);
+        int32_t pacerBurstTimeQuotaSeconds =
+                property_get_int32("persist.transcoding.burst_time_quota_seconds", -1);
+        // Override default config params with properties if present.
+        TranscodingSessionController::ControllerConfig config;
+        if (overrideBurstCountQuota > 0) {
+            config.pacerBurstCountQuota = overrideBurstCountQuota;
+        }
+        if (pacerBurstTimeQuotaSeconds > 0) {
+            config.pacerBurstTimeQuotaSeconds = pacerBurstTimeQuotaSeconds;
+        }
+        mSessionController.reset(new TranscodingSessionController(
+                [logger = mLogger](const std::shared_ptr<TranscoderCallbackInterface>& cb)
+                        -> std::shared_ptr<TranscoderInterface> {
+                    return std::make_shared<TranscoderWrapper>(cb, logger,
+                                                               kTranscoderHeartBeatIntervalUs);
+                },
+                mUidPolicy, mResourcePolicy, mThermalPolicy, &config));
+    }
+    mClientManager.reset(new TranscodingClientManager(mSessionController));
+    mUidPolicy->setCallback(mSessionController);
+    mResourcePolicy->setCallback(mSessionController);
+    mThermalPolicy->setCallback(mSessionController);
 }
 
 MediaTranscodingService::~MediaTranscodingService() {
@@ -56,6 +98,23 @@ MediaTranscodingService::~MediaTranscodingService() {
 
 binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uint32_t /*numArgs*/) {
     String8 result;
+
+    uid_t callingUid = AIBinder_getCallingUid();
+    pid_t callingPid = AIBinder_getCallingPid();
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+        int32_t permissionResult;
+        if (APermissionManager_checkPermission("android.permission.DUMP", callingPid, callingUid,
+                                               &permissionResult) != PERMISSION_MANAGER_STATUS_OK ||
+            permissionResult != PERMISSION_MANAGER_PERMISSION_GRANTED) {
+            result.format(
+                    "Permission Denial: "
+                    "can't dump MediaTranscodingService from pid=%d, uid=%d\n",
+                    AIBinder_getCallingPid(), AIBinder_getCallingUid());
+            write(fd, result.string(), result.size());
+            return PERMISSION_DENIED;
+        }
+    }
+
     const size_t SIZE = 256;
     char buffer[SIZE];
 
@@ -64,7 +123,8 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
     write(fd, result.string(), result.size());
 
     Vector<String16> args;
-    mTranscodingClientManager.dumpAllClients(fd, args);
+    mClientManager->dumpAllClients(fd, args);
+    mSessionController->dumpAllSessions(fd, args);
     return OK;
 }
 
@@ -72,126 +132,39 @@ binder_status_t MediaTranscodingService::dump(int fd, const char** /*args*/, uin
 void MediaTranscodingService::instantiate() {
     std::shared_ptr<MediaTranscodingService> service =
             ::ndk::SharedRefBase::make<MediaTranscodingService>();
-    binder_status_t status =
-            AServiceManager_addService(service->asBinder().get(), getServiceName());
-    if (status != STATUS_OK) {
-        return;
+    if (__builtin_available(android __TRANSCODING_MIN_API__, *)) {
+        // Once service is started, we want it to stay even is client side perished.
+        AServiceManager_forceLazyServicesPersist(true /*persist*/);
+        (void)AServiceManager_registerLazyService(service->asBinder().get(), getServiceName());
     }
 }
 
 Status MediaTranscodingService::registerClient(
-        const std::shared_ptr<ITranscodingServiceClient>& in_client,
-        const std::string& in_opPackageName, int32_t in_clientUid, int32_t in_clientPid,
-        int32_t* _aidl_return) {
-    if (in_client == nullptr) {
-        ALOGE("Client can not be null");
-        *_aidl_return = kInvalidJobId;
-        return Status::fromServiceSpecificError(ERROR_ILLEGAL_ARGUMENT);
-    }
-
-    int32_t callingPid = AIBinder_getCallingPid();
-    int32_t callingUid = AIBinder_getCallingUid();
-
-    // Check if we can trust clientUid. Only privilege caller could forward the uid on app client's behalf.
-    if (in_clientUid == USE_CALLING_UID) {
-        in_clientUid = callingUid;
-    } else if (!isTrustedCallingUid(callingUid)) {
-        ALOGE("MediaTranscodingService::registerClient failed (calling PID %d, calling UID %d) "
-              "rejected "
-              "(don't trust clientUid %d)",
-              in_clientPid, in_clientUid, in_clientUid);
-        return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                                "Untrusted caller (calling PID %d, UID %d) trying to "
-                                "register client",
-                                in_clientPid, in_clientUid);
-    }
-
-    // Check if we can trust clientPid. Only privilege caller could forward the pid on app client's behalf.
-    if (in_clientPid == USE_CALLING_PID) {
-        in_clientPid = callingPid;
-    } else if (!isTrustedCallingUid(callingUid)) {
-        ALOGE("MediaTranscodingService::registerClient client failed (calling PID %d, calling UID "
-              "%d) rejected "
-              "(don't trust clientPid %d)",
-              in_clientPid, in_clientUid, in_clientPid);
-        return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                                "Untrusted caller (calling PID %d, UID %d) trying to "
-                                "register client",
-                                in_clientPid, in_clientUid);
-    }
-
-    // We know the clientId must be equal to its pid as we assigned client's pid as its clientId.
-    int32_t clientId = in_clientPid;
-
-    // Checks if the client already registers.
-    if (mTranscodingClientManager.isClientIdRegistered(clientId)) {
-        return Status::fromServiceSpecificError(ERROR_ALREADY_EXISTS);
+        const std::shared_ptr<ITranscodingClientCallback>& in_callback,
+        const std::string& in_clientName, const std::string& in_opPackageName,
+        std::shared_ptr<ITranscodingClient>* _aidl_return) {
+    if (in_callback == nullptr) {
+        *_aidl_return = nullptr;
+        return STATUS_ERROR_FMT(ERROR_ILLEGAL_ARGUMENT, "Client callback cannot be null!");
     }
 
     // Creates the client and uses its process id as client id.
-    std::unique_ptr<TranscodingClientManager::ClientInfo> newClient =
-            std::make_unique<TranscodingClientManager::ClientInfo>(
-                    in_client, clientId, in_clientPid, in_clientUid, in_opPackageName);
-    status_t err = mTranscodingClientManager.addClient(std::move(newClient));
+    std::shared_ptr<ITranscodingClient> newClient;
+
+    status_t err =
+            mClientManager->addClient(in_callback, in_clientName, in_opPackageName, &newClient);
     if (err != OK) {
-        *_aidl_return = kInvalidClientId;
+        *_aidl_return = nullptr;
         return STATUS_ERROR_FMT(err, "Failed to add client to TranscodingClientManager");
     }
 
-    ALOGD("Assign client: %s pid: %d, uid: %d with id: %d", in_opPackageName.c_str(), in_clientPid,
-          in_clientUid, clientId);
-
-    *_aidl_return = clientId;
-    return Status::ok();
-}
-
-Status MediaTranscodingService::unregisterClient(int32_t clientId, bool* _aidl_return) {
-    ALOGD("unregisterClient id: %d", clientId);
-    int32_t callingUid = AIBinder_getCallingUid();
-    int32_t callingPid = AIBinder_getCallingPid();
-
-    // Only the client with clientId or the trusted caller could unregister the client.
-    if (callingPid != clientId) {
-        if (!isTrustedCallingUid(callingUid)) {
-            ALOGE("Untrusted caller (calling PID %d, UID %d) trying to "
-                  "unregister client with id: %d",
-                  callingUid, callingPid, clientId);
-            *_aidl_return = true;
-            return STATUS_ERROR_FMT(ERROR_PERMISSION_DENIED,
-                                    "Untrusted caller (calling PID %d, UID %d) trying to "
-                                    "unregister client with id: %d",
-                                    callingUid, callingPid, clientId);
-        }
-    }
-
-    *_aidl_return = (mTranscodingClientManager.removeClient(clientId) == OK);
+    *_aidl_return = newClient;
     return Status::ok();
 }
 
 Status MediaTranscodingService::getNumOfClients(int32_t* _aidl_return) {
     ALOGD("MediaTranscodingService::getNumOfClients");
-    *_aidl_return = mTranscodingClientManager.getNumOfClients();
-    return Status::ok();
-}
-
-Status MediaTranscodingService::submitRequest(int32_t /*clientId*/,
-                                              const TranscodingRequestParcel& /*request*/,
-                                              TranscodingJobParcel* /*job*/,
-                                              int32_t* /*_aidl_return*/) {
-    // TODO(hkuang): Add implementation.
-    return Status::ok();
-}
-
-Status MediaTranscodingService::cancelJob(int32_t /*in_clientId*/, int32_t /*in_jobId*/,
-                                          bool* /*_aidl_return*/) {
-    // TODO(hkuang): Add implementation.
-    return Status::ok();
-}
-
-Status MediaTranscodingService::getJobWithId(int32_t /*in_jobId*/,
-                                             TranscodingJobParcel* /*out_job*/,
-                                             bool* /*_aidl_return*/) {
-    // TODO(hkuang): Add implementation.
+    *_aidl_return = mClientManager->getNumOfClients();
     return Status::ok();
 }
 

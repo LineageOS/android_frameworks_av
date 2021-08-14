@@ -11,6 +11,10 @@ cc_test {
     name: "mediametrics_tests",
     test_suites: ["device-tests"],
 
+    // not all shared libraries are populated in the 2nd architecture in
+    // particular, libmediametricsservice we use to have a tame copy of the service
+    compile_multilib: "first",
+
     cflags: [
         "-Wall",
         "-Werror",
@@ -28,6 +32,7 @@ cc_test {
         "libmediametricsservice",
         "libmediautils",
         "libutils",
+        "mediametricsservice-aidl-cpp",
     ],
 
     header_libs: [

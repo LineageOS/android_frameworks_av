@@ -467,14 +467,16 @@ void ARTPConnection::onPollStreams() {
 
             if (err == -ECONNRESET) {
                 // socket failure, this stream is dead, Jim.
-                sp<AMessage> notify = it->mNotifyMsg->dup();
-                notify->setInt32("rtcp-event", 1);
-                notify->setInt32("payload-type", 400);
-                notify->setInt32("feedback-type", 1);
-                notify->setInt32("sender", it->mSources.valueAt(0)->getSelfID());
-                notify->post();
+                for (size_t i = 0; i < it->mSources.size(); ++i) {
+                    sp<AMessage> notify = it->mNotifyMsg->dup();
+                    notify->setInt32("rtcp-event", 1);
+                    notify->setInt32("payload-type", 400);
+                    notify->setInt32("feedback-type", 1);
+                    notify->setInt32("sender", it->mSources.valueAt(i)->getSelfID());
+                    notify->post();
 
-                ALOGW("failed to receive RTP/RTCP datagram.");
+                    ALOGW("failed to receive RTP/RTCP datagram.");
+                }
                 it = mStreams.erase(it);
                 continue;
             }

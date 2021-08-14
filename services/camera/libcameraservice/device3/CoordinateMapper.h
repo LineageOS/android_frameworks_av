@@ -18,16 +18,23 @@
 #define ANDROID_SERVERS_COORDINATEMAPPER_H
 
 #include <array>
+#include <set>
 
 namespace android {
 
 namespace camera3 {
 
 class CoordinateMapper {
-    // Right now only stores metadata tags containing 2D coordinates
-    // to be corrected.
+public:
+    // The result metadata tags that are to be re-mapped
+    const std::set<uint32_t>& getRemappedKeys() const {
+        return mRemappedKeys;
+    }
+
+    virtual ~CoordinateMapper() = default;
+
 protected:
-    // Metadata key lists to correct
+    // Metadata tags containing 2D coordinates to be corrected.
 
     // Both capture request and result
     static const std::array<uint32_t, 3> kMeteringRegionsToCorrect;
@@ -37,6 +44,10 @@ protected:
 
     // Only for capture results; don't clamp
     static const std::array<uint32_t, 2> kResultPointsToCorrectNoClamp;
+
+    virtual void initRemappedKeys() = 0;
+    std::set<uint32_t> mRemappedKeys;
+
 }; // class CoordinateMapper
 
 } // namespace camera3

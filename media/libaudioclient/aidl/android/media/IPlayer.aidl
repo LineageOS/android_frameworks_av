@@ -16,11 +16,11 @@
 
 package android.media;
 
-import android.media.VolumeShaper.Configuration;
-import android.media.VolumeShaper.Operation;
+import android.media.VolumeShaperConfiguration;
+import android.media.VolumeShaperOperation;
 
 /**
- * @hide
+ * {@hide}
  */
 interface IPlayer {
     oneway void start();
@@ -29,6 +29,6 @@ interface IPlayer {
     oneway void setVolume(float vol);
     oneway void setPan(float pan);
     oneway void setStartDelayMs(int delayMs);
-    oneway void applyVolumeShaper(in Configuration configuration,
-                                  in Operation operation);
+    oneway void applyVolumeShaper(in VolumeShaperConfiguration configuration,
+                                  in VolumeShaperOperation operation);
 }

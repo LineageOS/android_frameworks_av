@@ -15,12 +15,13 @@
  */
 
 #include <media/AudioDeviceTypeAddr.h>
-
 #include <arpa/inet.h>
 #include <iostream>
 #include <regex>
 #include <set>
 #include <sstream>
+
+#include <media/AidlConversion.h>
 
 namespace android {
 
@@ -153,6 +154,20 @@ std::string dumpAudioDeviceTypeAddrVector(const AudioDeviceTypeAddrVector& devic
         stream << it->toString(includeSensitiveInfo);
     }
     return stream.str();
+}
+
+ConversionResult<AudioDeviceTypeAddr>
+aidl2legacy_AudioDeviceTypeAddress(const media::AudioDevice& aidl) {
+    audio_devices_t type = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_devices_t(aidl.type));
+    return AudioDeviceTypeAddr(type, aidl.address);
+}
+
+ConversionResult<media::AudioDevice>
+legacy2aidl_AudioDeviceTypeAddress(const AudioDeviceTypeAddr& legacy) {
+    media::AudioDevice aidl;
+    aidl.type = VALUE_OR_RETURN(legacy2aidl_audio_devices_t_int32_t(legacy.mType));
+    aidl.address = legacy.getAddress();
+    return aidl;
 }
 
 } // namespace android

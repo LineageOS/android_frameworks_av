@@ -33,25 +33,21 @@ using android::WrappingBuffer;
 using android::FifoBuffer;
 using android::fifo_frames_t;
 
-AAudioMixer::~AAudioMixer() {
-    delete[] mOutputBuffer;
-}
-
 void AAudioMixer::allocate(int32_t samplesPerFrame, int32_t framesPerBurst) {
     mSamplesPerFrame = samplesPerFrame;
     mFramesPerBurst = framesPerBurst;
     int32_t samplesPerBuffer = samplesPerFrame * framesPerBurst;
-    mOutputBuffer = new float[samplesPerBuffer];
+    mOutputBuffer = std::make_unique<float[]>(samplesPerBuffer);
     mBufferSizeInBytes = samplesPerBuffer * sizeof(float);
 }
 
 void AAudioMixer::clear() {
-    memset(mOutputBuffer, 0, mBufferSizeInBytes);
+    memset(mOutputBuffer.get(), 0, mBufferSizeInBytes);
 }
 
-int32_t AAudioMixer::mix(int streamIndex, FifoBuffer *fifo, bool allowUnderflow) {
+int32_t AAudioMixer::mix(int streamIndex, std::shared_ptr<FifoBuffer> fifo, bool allowUnderflow) {
     WrappingBuffer wrappingBuffer;
-    float *destination = mOutputBuffer;
+    float *destination = mOutputBuffer.get();
 
 #if AAUDIO_MIXER_ATRACE_ENABLED
     ATRACE_BEGIN("aaMix");
@@ -117,5 +113,5 @@ void AAudioMixer::mixPart(float *destination, float *source, int32_t numFrames) 
 }
 
 float *AAudioMixer::getOutputBuffer() {
-    return mOutputBuffer;
+    return mOutputBuffer.get();
 }

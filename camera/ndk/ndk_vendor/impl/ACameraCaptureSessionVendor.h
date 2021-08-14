@@ -18,7 +18,7 @@
 #include "utils.h"
 
 struct ACaptureSessionOutput {
-    explicit ACaptureSessionOutput(native_handle_t* window, bool isShared = false,
+    explicit ACaptureSessionOutput(const native_handle_t* window, bool isShared = false,
             const char* physicalCameraId = "") :
             mWindow(window), mIsShared(isShared), mPhysicalCameraId(physicalCameraId) {};
 

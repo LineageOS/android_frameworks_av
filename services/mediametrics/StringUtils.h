@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <iomanip>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -67,5 +69,102 @@ std::vector<std::pair<std::string, std::string>> getDeviceAddressPairs(const std
  * Replaces targetChars with replaceChar in string, returns number of chars replaced.
  */
 size_t replace(std::string &str, const char *targetChars, const char replaceChar);
+
+// RFC 1421, 2045, 2152, 4648(4), 4880
+inline constexpr char Base64Table[] =
+    // 0000000000111111111122222222223333333333444444444455555555556666
+    // 0123456789012345678901234567890123456789012345678901234567890123
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+// RFC 4648(5) URL-safe Base64 encoding
+inline constexpr char Base64UrlTable[] =
+    // 0000000000111111111122222222223333333333444444444455555555556666
+    // 0123456789012345678901234567890123456789012345678901234567890123
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+
+// An constexpr struct that transposes/inverts a string conversion table.
+struct Transpose {
+    // constexpr bug, returning char still means -1 == 0xff, so we use unsigned char.
+    using base_char_t = unsigned char;
+    static inline constexpr base_char_t INVALID_CHAR = 0xff;
+
+    template <size_t N>
+    explicit constexpr Transpose(const char(&string)[N]) {
+        for (auto& e : mMap) {
+            e = INVALID_CHAR;
+        }
+        for (size_t i = 0; string[i] != 0; ++i) {
+            mMap[static_cast<size_t>(string[i]) & 0xff] = i;
+        }
+    }
+
+    constexpr base_char_t operator[] (size_t n) const {
+        return n < sizeof(mMap) ? mMap[n] : INVALID_CHAR;
+    }
+
+    constexpr const auto& get() const {
+        return mMap;
+    }
+
+private:
+    base_char_t mMap[256];  // construct an inverse character mapping.
+};
+
+// This table is used to convert an input char to a 6 bit (0 - 63) value.
+// If the input char is not in the Base64Url charset, Transpose::INVALID_CHAR is returned.
+inline constexpr Transpose InverseBase64UrlTable(Base64UrlTable);
+
+// Returns true if s consists of only valid Base64Url characters (no padding chars allowed).
+inline constexpr bool isBase64Url(const char *s) {
+    for (; *s != 0; ++s) {
+        if (InverseBase64UrlTable[(unsigned char)*s] == Transpose::INVALID_CHAR) return false;
+    }
+    return true;
+}
+
+// Returns true if s is a valid log session id: exactly 16 Base64Url characters.
+//
+// logSessionIds are a web-safe Base64Url RFC 4648(5) encoded string of 16 characters
+// (representing 96 unique bits 16 * 6).
+//
+// The string version is considered the reference representation.  However, for ease of
+// manipulation and comparison, it may be converted to an int128.
+//
+// For int128 conversion, some common interpretations exist - for example
+// (1) the 16 Base64 chars can be converted 6 bits per char to a 96 bit value
+// (with the most significant 32 bits as zero) as there are only 12 unique bytes worth of data
+// or (2) the 16 Base64 chars can be used to directly fill the 128 bits of int128 assuming
+// the 16 chars are 16 bytes, filling the layout of the int128 variable.
+// Endianness of the data may follow whatever is convenient in the interpretation as long
+// as it is applied to each such conversion of string to int128 identically.
+//
+inline constexpr bool isLogSessionId(const char *s) {
+    return std::char_traits<std::decay_t<decltype(*s)>>::length(s) == 16 && isBase64Url(s);
+}
+
+// Returns either the original string or an empty string if isLogSessionId check fails.
+inline std::string sanitizeLogSessionId(const std::string& string) {
+    if (isLogSessionId(string.c_str())) return string;
+    return {}; // if not a logSessionId, return an empty string.
+}
+
+inline std::string bytesToString(const std::vector<uint8_t>& bytes, size_t maxSize = SIZE_MAX) {
+    if (bytes.size() == 0) {
+        return "{}";
+    }
+    std::stringstream ss;
+    ss << "{";
+    ss << std::hex << std::setfill('0');
+    maxSize = std::min(maxSize, bytes.size());
+    for (size_t i = 0; i < maxSize; ++i) {
+        ss << " " << std::setw(2) << (int)bytes[i];
+    }
+    if (maxSize != bytes.size()) {
+        ss << " ... }";
+    } else {
+        ss << " }";
+    }
+    return ss.str();
+}
 
 } // namespace android::mediametrics::stringutils

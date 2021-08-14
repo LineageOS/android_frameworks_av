@@ -18,6 +18,7 @@
 
 #include <vector>
 
+#include <android/media/AudioPort.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include <media/AudioContainers.h>
@@ -54,6 +55,7 @@ public:
 
     // AudioPort
     virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
     status_t setEncapsulationModes(uint32_t encapsulationModes);
     status_t setEncapsulationMetadataTypes(uint32_t encapsulationMetadataTypes);
@@ -75,10 +77,25 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    status_t writeToParcelable(media::AudioPort* parcelable) const;
+    status_t readFromParcelable(const media::AudioPort& parcelable);
+
 protected:
     AudioDeviceTypeAddr mDeviceTypeAddr;
     uint32_t mEncapsulationModes = 0;
     uint32_t mEncapsulationMetadataTypes = 0;
+private:
+    template <typename T, std::enable_if_t<std::is_same<T, struct audio_port>::value
+                                        || std::is_same<T, struct audio_port_v7>::value, int> = 0>
+    void toAudioPortInternal(T* port) const {
+        AudioPort::toAudioPort(port);
+        toAudioPortConfig(&port->active_config);
+        port->id = mId;
+        port->ext.device.type = mDeviceTypeAddr.mType;
+        port->ext.device.encapsulation_modes = mEncapsulationModes;
+        port->ext.device.encapsulation_metadata_types = mEncapsulationMetadataTypes;
+        (void)audio_utils_strlcpy_zerofill(port->ext.device.address, mDeviceTypeAddr.getAddress());
+    }
 };
 
 using DeviceDescriptorBaseVector = std::vector<sp<DeviceDescriptorBase>>;
@@ -93,5 +110,11 @@ std::string toString(const DeviceDescriptorBaseVector& devices);
  * Return a set of device types and addresses from collection of DeviceDescriptorBase.
  */
 AudioDeviceTypeAddrVector deviceTypeAddrsFromDescriptors(const DeviceDescriptorBaseVector& devices);
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<sp<DeviceDescriptorBase>>
+aidl2legacy_DeviceDescriptorBase(const media::AudioPort& aidl);
+ConversionResult<media::AudioPort>
+legacy2aidl_DeviceDescriptorBase(const sp<DeviceDescriptorBase>& legacy);
 
 } // namespace android

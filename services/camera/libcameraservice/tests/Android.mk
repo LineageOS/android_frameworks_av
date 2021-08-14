@@ -33,9 +33,11 @@ LOCAL_SHARED_LIBRARIES := \
     android.hardware.camera.provider@2.4 \
     android.hardware.camera.provider@2.5 \
     android.hardware.camera.provider@2.6 \
+    android.hardware.camera.provider@2.7 \
     android.hardware.camera.device@1.0 \
     android.hardware.camera.device@3.2 \
     android.hardware.camera.device@3.4 \
+    android.hardware.camera.device@3.7 \
     android.hidl.token@1.0-utils
 
 LOCAL_STATIC_LIBRARIES := \

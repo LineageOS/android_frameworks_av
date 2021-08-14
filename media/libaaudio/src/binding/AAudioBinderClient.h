@@ -21,12 +21,15 @@
 #include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
-#include "AAudioServiceDefinitions.h"
+#include <binder/IInterface.h>
+
+#include "aaudio/BnAAudioClient.h"
+#include "aaudio/IAAudioService.h"
 #include "AAudioServiceInterface.h"
+#include "binding/AAudioBinderAdapter.h"
 #include "binding/AAudioStreamRequest.h"
-#include "binding/AAudioStreamConfiguration.h"
 #include "binding/AudioEndpointParcelable.h"
-#include "binding/IAAudioService.h"
+#include "core/AAudioStreamParameters.h"
 
 /**
  * Implements the AAudioServiceInterface by talking to the service through Binder.
@@ -44,11 +47,7 @@ public:
 
     virtual ~AAudioBinderClient();
 
-    const android::sp<android::IAAudioService> getAAudioService();
-
-    void dropAAudioService();
-
-    void registerClient(const android::sp<android::IAAudioClient>& client __unused) override {}
+    void registerClient(const android::sp<IAAudioClient>& client __unused) override {}
 
     /**
      * @param request info needed to create the stream
@@ -64,7 +63,7 @@ public:
     * used to communicate with the underlying HAL or Service.
     */
     aaudio_result_t getStreamDescription(aaudio_handle_t streamHandle,
-                                                 AudioEndpointParcelable &parcelable) override;
+                                         AudioEndpointParcelable &endpointOut) override;
 
     /**
      * Start the flow of data.
@@ -115,8 +114,7 @@ public:
         ALOGW("onStreamChange called!");
     }
 
-    class AAudioClient : public android::IBinder::DeathRecipient , public android::BnAAudioClient
-    {
+    class AAudioClient : public android::IBinder::DeathRecipient, public BnAAudioClient {
     public:
         AAudioClient(android::wp<AAudioBinderClient> aaudioBinderClient)
                 : mBinderClient(aaudioBinderClient) {
@@ -132,21 +130,66 @@ public:
         }
 
         // implement BnAAudioClient
-        void onStreamChange(aaudio_handle_t handle, int32_t opcode, int32_t value) {
+        android::binder::Status onStreamChange(int32_t handle, int32_t opcode, int32_t value) {
+            static_assert(std::is_same_v<aaudio_handle_t, int32_t>);
             android::sp<AAudioBinderClient> client = mBinderClient.promote();
             if (client.get() != nullptr) {
                 client->onStreamChange(handle, opcode, value);
             }
+            return android::binder::Status::ok();
         }
     private:
         android::wp<AAudioBinderClient> mBinderClient;
     };
 
-private:
+    // This adapter is used to convert the binder interface (delegate) to the AudioServiceInterface
+    // conventions (translating between data types and respective parcelables, translating error
+    // codes and calling conventions).
+    // The adapter also owns the underlying service object and is responsible to unlink its death
+    // listener when destroyed.
+    class Adapter : public AAudioBinderAdapter {
+    public:
+        Adapter(const android::sp<IAAudioService>& delegate,
+                const android::sp<AAudioClient>& aaudioClient)
+                : AAudioBinderAdapter(delegate.get()),
+                  mDelegate(delegate),
+                  mAAudioClient(aaudioClient) {}
 
-    android::Mutex                  mServiceLock;
-    android::sp<android::IAAudioService>  mAAudioService;
-    android::sp<AAudioClient>       mAAudioClient;
+        virtual ~Adapter() {
+            if (mDelegate != nullptr) {
+                android::IInterface::asBinder(mDelegate)->unlinkToDeath(mAAudioClient);
+            }
+        }
+
+        // This should never be called (call is rejected at the AudioBinderClient level).
+        aaudio_result_t startClient(aaudio_handle_t streamHandle __unused,
+                                    const android::AudioClient& client __unused,
+                                    const audio_attributes_t* attr __unused,
+                                    audio_port_handle_t* clientHandle __unused) override {
+            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
+
+        // This should never be called (call is rejected at the AudioBinderClient level).
+        aaudio_result_t stopClient(aaudio_handle_t streamHandle __unused,
+                                   audio_port_handle_t clientHandle __unused) override {
+            LOG_ALWAYS_FATAL("Shouldn't get here");
+            return AAUDIO_ERROR_UNAVAILABLE;
+        }
+
+    private:
+        android::sp<IAAudioService> mDelegate;
+        android::sp<AAudioClient> mAAudioClient;
+    };
+
+private:
+    android::Mutex                          mServiceLock;
+    std::shared_ptr<AAudioServiceInterface> mAdapter;
+    android::sp<AAudioClient>               mAAudioClient;
+
+    std::shared_ptr<AAudioServiceInterface> getAAudioService();
+
+    void dropAAudioService();
 
 };
 

@@ -30,6 +30,26 @@
 
 using namespace android;
 
+// Formats not listed in the public API, but still available to AImageReader
+enum AIMAGE_PRIVATE_FORMATS {
+    /**
+     * Unprocessed implementation-dependent raw
+     * depth measurements, opaque with 16 bit
+     * samples.
+     *
+     */
+
+    AIMAGE_FORMAT_RAW_DEPTH = 0x1002,
+
+    /**
+     * Device specific 10 bits depth RAW image format.
+     *
+     * <p>Unprocessed implementation-dependent raw depth measurements, opaque with 10 bit samples
+     * and device specific bit layout.</p>
+     */
+    AIMAGE_FORMAT_RAW_DEPTH10 = 0x1003,
+};
+
 // TODO: this only supports ImageReader
 struct AImage {
     AImage(AImageReader* reader, int32_t format, uint64_t usage, BufferItem* buffer,

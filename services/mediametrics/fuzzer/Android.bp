@@ -50,8 +50,12 @@ cc_fuzz {
         "libmemunreachable",
         "libprotobuf-cpp-lite",
         "libstagefright",
+        "libstagefright_foundation",
         "libstatslog",
+        "libstatspull",
+        "libstatssocket",
         "libutils",
+        "mediametricsservice-aidl-cpp",
     ],
 
     include_dirs: [

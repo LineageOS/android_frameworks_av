@@ -29,7 +29,6 @@
 #define MAX_NUM_CHANNELS 8
 
 struct downmix_cntxt_s {
-  effect_descriptor_t desc;
   effect_handle_t handle;
   effect_config_t config;
 
@@ -87,13 +86,12 @@ int32_t DownmixDefaultConfig(effect_config_t *pConfig) {
 }
 
 int32_t DownmixConfiureAndEnable(downmix_cntxt_s *pDescriptor) {
-  effect_handle_t *effectHandle = &pDescriptor->handle;
-  downmix_module_t *downmixEffectHandle = (downmix_module_t *)*effectHandle;
-  const struct effect_interface_s *Downmix_api = downmixEffectHandle->itfe;
+  effect_handle_t effectHandle = pDescriptor->handle;
+  const struct effect_interface_s *Downmix_api = *effectHandle;
   int32_t err = 0;
   uint32_t replySize = (uint32_t)sizeof(err);
 
-  err = (Downmix_api->command)(*effectHandle, EFFECT_CMD_SET_CONFIG,
+  err = (Downmix_api->command)(effectHandle, EFFECT_CMD_SET_CONFIG,
                                sizeof(effect_config_t), &(pDescriptor->config),
                                &replySize, &err);
   if (err != 0) {
@@ -101,7 +99,7 @@ int32_t DownmixConfiureAndEnable(downmix_cntxt_s *pDescriptor) {
     return err;
   }
 
-  err = ((Downmix_api->command))(*effectHandle, EFFECT_CMD_ENABLE, 0, nullptr,
+  err = ((Downmix_api->command))(effectHandle, EFFECT_CMD_ENABLE, 0, nullptr,
                                  &replySize, &err);
   if (err != 0) {
     ALOGE("Downmix command to enable effect returned an error %d", err);
@@ -112,9 +110,8 @@ int32_t DownmixConfiureAndEnable(downmix_cntxt_s *pDescriptor) {
 
 int32_t DownmixExecute(downmix_cntxt_s *pDescriptor, FILE *finp,
                        FILE *fout) {
-  effect_handle_t *effectHandle = &pDescriptor->handle;
-  downmix_module_t *downmixEffectHandle = (downmix_module_t *)*effectHandle;
-  const struct effect_interface_s *Downmix_api = downmixEffectHandle->itfe;
+  effect_handle_t effectHandle = pDescriptor->handle;
+  const struct effect_interface_s *Downmix_api = *effectHandle;
 
   const int numFileChannels = pDescriptor->numFileChannels;
   const int numProcessChannels = pDescriptor->numProcessChannels;
@@ -150,7 +147,7 @@ int32_t DownmixExecute(downmix_cntxt_s *pDescriptor, FILE *finp,
     memcpy_to_float_from_i16(inFloat.data(), inS16.data(),
                              FRAME_LENGTH * numProcessChannels);
 
-    const int32_t err = (Downmix_api->process)(*effectHandle, pinbuf, poutbuf);
+    const int32_t err = (Downmix_api->process)(effectHandle, pinbuf, poutbuf);
     if (err != 0) {
       ALOGE("DownmixProcess returned an error %d", err);
       return -1;

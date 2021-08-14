@@ -44,7 +44,13 @@ cc_library_static {
         ],
         cfi: true,
     },
-    apex_available: ["com.android.media.swcodec"],
+
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.media.swcodec",
+        "test_com.android.media.swcodec",
+    ],
+
     min_sdk_version: "29",
 
     target: {

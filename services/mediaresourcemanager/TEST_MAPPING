@@ -5,6 +5,9 @@
     },
     {
        "name": "ServiceLog_test"
+    },
+    {
+       "name": "ResourceObserverService_test"
     }
   ]
 }

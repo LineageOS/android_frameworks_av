@@ -735,14 +735,19 @@ static std::vector<std::pair<const char *, uint32_t>> floatMappings {
     }
 };
 
-static std::vector<std::pair<const char *, uint32_t>> int64Mappings {
+static std::vector<std::pair<const char*, uint32_t>> int64Mappings {
     {
-        { "exif-offset", kKeyExifOffset },
-        { "exif-size", kKeyExifSize },
-        { "target-time", kKeyTargetTime },
-        { "thumbnail-time", kKeyThumbnailTime },
-        { "timeUs", kKeyTime },
-        { "durationUs", kKeyDuration },
+        { "exif-offset", kKeyExifOffset},
+        { "exif-size", kKeyExifSize},
+        { "xmp-offset", kKeyXmpOffset},
+        { "xmp-size", kKeyXmpSize},
+        { "target-time", kKeyTargetTime},
+        { "thumbnail-time", kKeyThumbnailTime},
+        { "timeUs", kKeyTime},
+        { "durationUs", kKeyDuration},
+        { "sample-file-offset", kKeySampleFileOffset},
+        { "last-sample-index-in-chunk", kKeyLastSampleIndexInChunk},
+        { "sample-time-before-append", kKeySampleTimeBeforeAppend},
     }
 };
 
@@ -779,6 +784,8 @@ static std::vector<std::pair<const char *, uint32_t>> bufferMappings {
         { "sei", kKeySEI },
         { "text-format-data", kKeyTextFormatData },
         { "thumbnail-csd-hevc", kKeyThumbnailHVCC },
+        { "slow-motion-markers", kKeySlowMotionMarkers },
+        { "thumbnail-csd-av1c", kKeyThumbnailAV1C },
     }
 };
 
@@ -1700,7 +1707,7 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
     if (msg->findString("mime", &mime)) {
         meta->setCString(kKeyMIMEType, mime.c_str());
     } else {
-        ALOGE("did not find mime type");
+        ALOGV("did not find mime type");
         return BAD_VALUE;
     }
 
@@ -1729,6 +1736,12 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         meta->setInt32(kKeyIsSyncFrame, 1);
     }
 
+    // Mode for media transcoding.
+    int32_t isBackgroundMode;
+    if (msg->findInt32("android._background-mode", &isBackgroundMode) && isBackgroundMode != 0) {
+        meta->setInt32(isBackgroundMode, 1);
+    }
+
     int32_t avgBitrate = 0;
     int32_t maxBitrate;
     if (msg->findInt32("bitrate", &avgBitrate) && avgBitrate > 0) {
@@ -1750,7 +1763,7 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             meta->setInt32(kKeyWidth, width);
             meta->setInt32(kKeyHeight, height);
         } else {
-            ALOGE("did not find width and/or height");
+            ALOGV("did not find width and/or height");
             return BAD_VALUE;
         }
 
@@ -1839,7 +1852,7 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
         int32_t numChannels, sampleRate;
         if (!msg->findInt32("channel-count", &numChannels) ||
                 !msg->findInt32("sample-rate", &sampleRate)) {
-            ALOGE("did not find channel-count and/or sample-rate");
+            ALOGV("did not find channel-count and/or sample-rate");
             return BAD_VALUE;
         }
         meta->setInt32(kKeyChannelCount, numChannels);
@@ -1950,7 +1963,8 @@ status_t convertMessageToMetaData(const sp<AMessage> &msg, sp<MetaData> &meta) {
             std::vector<uint8_t> hvcc(csd0size + 1024);
             size_t outsize = reassembleHVCC(csd0, hvcc.data(), hvcc.size(), 4);
             meta->setData(kKeyHVCC, kTypeHVCC, hvcc.data(), outsize);
-        } else if (mime == MEDIA_MIMETYPE_VIDEO_AV1) {
+        } else if (mime == MEDIA_MIMETYPE_VIDEO_AV1 ||
+                   mime == MEDIA_MIMETYPE_IMAGE_AVIF) {
             meta->setData(kKeyAV1C, 0, csd0->data(), csd0->size());
         } else if (mime == MEDIA_MIMETYPE_VIDEO_DOLBY_VISION) {
             if (msg->findBuffer("csd-2", &csd2)) {
@@ -2210,7 +2224,7 @@ status_t getAudioOffloadInfo(const sp<MetaData>& meta, bool hasVideo,
     }
     info->duration_us = duration;
 
-    int32_t brate = -1;
+    int32_t brate = 0;
     if (!meta->findInt32(kKeyBitRate, &brate)) {
         ALOGV("track of type '%s' does not publish bitrate", mime);
     }
@@ -2235,7 +2249,7 @@ bool canOffloadStream(const sp<MetaData>& meta, bool hasVideo,
 #ifdef DISABLE_AUDIO_SYSTEM_OFFLOAD
     return false;
 #else
-    return AudioSystem::isOffloadSupported(info);
+    return AudioSystem::getOffloadSupport(info) != AUDIO_OFFLOAD_NOT_SUPPORTED;
 #endif
 }
 

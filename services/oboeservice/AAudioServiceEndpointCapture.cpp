@@ -35,22 +35,17 @@
 using namespace android;  // TODO just import names needed
 using namespace aaudio;   // TODO just import names needed
 
-AAudioServiceEndpointCapture::AAudioServiceEndpointCapture(AAudioService &audioService)
-    : AAudioServiceEndpointShared(
-            (AudioStreamInternal *)(new AudioStreamInternalCapture(audioService, true))) {
-}
-
-AAudioServiceEndpointCapture::~AAudioServiceEndpointCapture() {
-    delete[] mDistributionBuffer;
+AAudioServiceEndpointCapture::AAudioServiceEndpointCapture(AAudioService& audioService)
+        : AAudioServiceEndpointShared(
+                new AudioStreamInternalCapture(audioService.asAAudioServiceInterface(), true)) {
 }
 
 aaudio_result_t AAudioServiceEndpointCapture::open(const aaudio::AAudioStreamRequest &request) {
     aaudio_result_t result = AAudioServiceEndpointShared::open(request);
     if (result == AAUDIO_OK) {
-        delete[] mDistributionBuffer;
         int distributionBufferSizeBytes = getStreamInternal()->getFramesPerBurst()
                                           * getStreamInternal()->getBytesPerFrame();
-        mDistributionBuffer = new uint8_t[distributionBufferSizeBytes];
+        mDistributionBuffer = std::make_unique<uint8_t[]>(distributionBufferSizeBytes);
     }
     return result;
 }
@@ -67,7 +62,8 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
         int64_t mmapFramesRead = getStreamInternal()->getFramesRead();
 
         // Read audio data from stream using a blocking read.
-        result = getStreamInternal()->read(mDistributionBuffer, getFramesPerBurst(), timeoutNanos);
+        result = getStreamInternal()->read(mDistributionBuffer.get(),
+                getFramesPerBurst(), timeoutNanos);
         if (result == AAUDIO_ERROR_DISCONNECTED) {
             ALOGD("%s() read() returned AAUDIO_ERROR_DISCONNECTED", __func__);
             // We do not need the returned vector.
@@ -81,48 +77,14 @@ void *AAudioServiceEndpointCapture::callbackLoop() {
 
         // Distribute data to each active stream.
         { // brackets are for lock_guard
-
             std::lock_guard <std::mutex> lock(mLockStreams);
             for (const auto& clientStream : mRegisteredStreams) {
                 if (clientStream->isRunning() && !clientStream->isSuspended()) {
-                    int64_t clientFramesWritten = 0;
-
                     sp<AAudioServiceStreamShared> streamShared =
                             static_cast<AAudioServiceStreamShared *>(clientStream.get());
-
-                    {
-                        // Lock the AudioFifo to protect against close.
-                        std::lock_guard <std::mutex> lock(streamShared->getAudioDataQueueLock());
-
-                        FifoBuffer *fifo = streamShared->getAudioDataFifoBuffer_l();
-                        if (fifo != nullptr) {
-
-                            // Determine offset between framePosition in client's stream
-                            // vs the underlying MMAP stream.
-                            clientFramesWritten = fifo->getWriteCounter();
-                            // There are two indices that refer to the same frame.
-                            int64_t positionOffset = mmapFramesRead - clientFramesWritten;
-                            streamShared->setTimestampPositionOffset(positionOffset);
-
-                            // Is the buffer too full to write a burst?
-                            if (fifo->getEmptyFramesAvailable() <
-                                    getFramesPerBurst()) {
-                                streamShared->incrementXRunCount();
-                            } else {
-                                fifo->write(mDistributionBuffer, getFramesPerBurst());
-                            }
-                            clientFramesWritten = fifo->getWriteCounter();
-                        }
-                    }
-
-                    if (clientFramesWritten > 0) {
-                        // This timestamp represents the completion of data being written into the
-                        // client buffer. It is sent to the client and used in the timing model
-                        // to decide when data will be available to read.
-                        Timestamp timestamp(clientFramesWritten, AudioClock::getNanoseconds());
-                        streamShared->markTransferTime(timestamp);
-                    }
-
+                    streamShared->writeDataIfRoom(mmapFramesRead,
+                                                  mDistributionBuffer.get(),
+                                                  getFramesPerBurst());
                 }
             }
         }

@@ -50,7 +50,7 @@ static constexpr int kTestImageHeight = 480;
 static constexpr int kTestImageFormat = AIMAGE_FORMAT_YUV_420_888;
 
 using android::hardware::camera::common::V1_0::helper::VendorTagDescriptorCache;
-using ConfiguredWindows = std::set<native_handle_t *>;
+using ConfiguredWindows = std::set<const native_handle_t *>;
 
 class CameraHelper {
    public:
@@ -60,11 +60,11 @@ class CameraHelper {
 
     struct PhysicalImgReaderInfo {
         const char* physicalCameraId;
-        native_handle_t* anw;
+        const native_handle_t* anw;
     };
 
     // Retaining the error code in case the caller needs to analyze it.
-    std::variant<int, ConfiguredWindows> initCamera(native_handle_t* imgReaderAnw,
+    std::variant<int, ConfiguredWindows> initCamera(const native_handle_t* imgReaderAnw,
             const std::vector<PhysicalImgReaderInfo>& physicalImgReaders,
             bool usePhysicalSettings) {
         ConfiguredWindows configuredWindows;
@@ -257,7 +257,7 @@ class CameraHelper {
     ACameraDevice_StateCallbacks mDeviceCb{this, nullptr, nullptr};
     ACameraCaptureSession_stateCallbacks mSessionCb{ this, nullptr, nullptr, nullptr};
 
-    native_handle_t* mImgReaderAnw = nullptr;  // not owned by us.
+    const native_handle_t* mImgReaderAnw = nullptr;  // not owned by us.
 
     // Camera device
     ACameraDevice* mDevice = nullptr;
@@ -396,7 +396,7 @@ class ImageReaderTestCase {
         return 0;
     }
 
-    native_handle_t* getNativeWindow() { return mImgReaderAnw; }
+    const native_handle_t* getNativeWindow() { return mImgReaderAnw; }
 
     int getAcquiredImageCount() {
         std::lock_guard<std::mutex> lock(mMutex);

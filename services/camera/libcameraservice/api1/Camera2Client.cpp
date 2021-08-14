@@ -34,6 +34,7 @@
 #include "api1/client2/CallbackProcessor.h"
 #include "api1/client2/ZslProcessor.h"
 #include "utils/CameraThreadState.h"
+#include "utils/CameraServiceProxyWrapper.h"
 
 #define ALOG1(...) ALOGD_IF(gLogLevel >= 1, __VA_ARGS__);
 #define ALOG2(...) ALOGD_IF(gLogLevel >= 2, __VA_ARGS__);
@@ -54,12 +55,14 @@ Camera2Client::Camera2Client(const sp<CameraService>& cameraService,
         const String8& cameraDeviceId,
         int api1CameraId,
         int cameraFacing,
+        int sensorOrientation,
         int clientPid,
         uid_t clientUid,
-        int servicePid):
+        int servicePid,
+        bool overrideForPerfClass):
         Camera2ClientBase(cameraService, cameraClient, clientPackageName, clientFeatureId,
-                cameraDeviceId, api1CameraId, cameraFacing,
-                clientPid, clientUid, servicePid),
+                cameraDeviceId, api1CameraId, cameraFacing, sensorOrientation,
+                clientPid, clientUid, servicePid, overrideForPerfClass),
         mParameters(api1CameraId, cameraFacing)
 {
     ATRACE_CALL();
@@ -75,7 +78,8 @@ status_t Camera2Client::initialize(sp<CameraProviderManager> manager, const Stri
 bool Camera2Client::isZslEnabledInStillTemplate() {
     bool zslEnabled = false;
     CameraMetadata stillTemplate;
-    status_t res = mDevice->createDefaultRequest(CAMERA2_TEMPLATE_STILL_CAPTURE, &stillTemplate);
+    status_t res = mDevice->createDefaultRequest(
+            camera_request_template_t::CAMERA_TEMPLATE_STILL_CAPTURE, &stillTemplate);
     if (res == OK) {
         camera_metadata_entry_t enableZsl = stillTemplate.find(ANDROID_CONTROL_ENABLE_ZSL);
         if (enableZsl.count == 1) {
@@ -396,6 +400,7 @@ status_t Camera2Client::dumpClient(int fd, const Vector<String16>& args) {
 
 binder::Status Camera2Client::disconnect() {
     ATRACE_CALL();
+    nsecs_t startTime = systemTime();
     Mutex::Autolock icl(mBinderSerializationLock);
 
     binder::Status res = binder::Status::ok();
@@ -456,6 +461,9 @@ binder::Status Camera2Client::disconnect() {
     mDevice->disconnect();
 
     CameraService::Client::disconnect();
+
+    int32_t closeLatencyMs = ns2ms(systemTime() - startTime);
+    CameraServiceProxyWrapper::logClose(mCameraIdStr, closeLatencyMs);
 
     return res;
 }
@@ -929,6 +937,7 @@ status_t Camera2Client::startPreviewL(Parameters &params, bool restart) {
         return res;
     }
 
+    mCallbackProcessor->unpauseCallback();
     params.state = Parameters::PREVIEW;
     return OK;
 }
@@ -963,6 +972,7 @@ void Camera2Client::stopPreviewL() {
             FALLTHROUGH_INTENDED;
         case Parameters::RECORD:
         case Parameters::PREVIEW:
+            mCallbackProcessor->pauseCallback();
             syncWithDevice();
             // Due to flush a camera device sync is not a sufficient
             // guarantee that the current client parameters are
@@ -2288,6 +2298,14 @@ status_t Camera2Client::setRotateAndCropOverride(uint8_t rotateAndCrop) {
 
     return mDevice->setRotateAndCropAutoBehavior(
         static_cast<camera_metadata_enum_android_scaler_rotate_and_crop_t>(rotateAndCrop));
+}
+
+bool Camera2Client::supportsCameraMute() {
+    return mDevice->supportsCameraMute();
+}
+
+status_t Camera2Client::setCameraMute(bool enabled) {
+    return mDevice->setCameraMute(enabled);
 }
 
 status_t Camera2Client::waitUntilCurrentRequestIdLocked() {

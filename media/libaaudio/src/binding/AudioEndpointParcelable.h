@@ -20,16 +20,13 @@
 #include <stdint.h>
 
 //#include <sys/mman.h>
+#include <aaudio/Endpoint.h>
 #include <android-base/unique_fd.h>
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
 
 #include "binding/AAudioServiceDefinitions.h"
 #include "binding/RingBufferParcelable.h"
 
 using android::status_t;
-using android::Parcel;
-using android::Parcelable;
 
 namespace aaudio {
 
@@ -39,10 +36,15 @@ namespace aaudio {
  * It contains no addresses, just sizes, offsets and file descriptors for
  * shared memory that can be passed through Binder.
  */
-class AudioEndpointParcelable : public Parcelable {
+class AudioEndpointParcelable {
 public:
-    AudioEndpointParcelable();
-    virtual ~AudioEndpointParcelable();
+    AudioEndpointParcelable() = default;
+
+    // Ctor/assignment from a parcelable representation.
+    // Since the parcelable object owns unique FDs (for shared memory blocks), move semantics are
+    // provided to avoid the need to dupe.
+    AudioEndpointParcelable(Endpoint&& parcelable);
+    AudioEndpointParcelable& operator=(Endpoint&& parcelable);
 
     /**
      * Add the file descriptor to the table.
@@ -50,15 +52,16 @@ public:
      */
     int32_t addFileDescriptor(const android::base::unique_fd& fd, int32_t sizeInBytes);
 
-    virtual status_t writeToParcel(Parcel* parcel) const override;
-
-    virtual status_t readFromParcel(const Parcel* parcel) override;
-
     aaudio_result_t resolve(EndpointDescriptor *descriptor);
 
     aaudio_result_t close();
 
     void dump();
+
+    // Extract a parcelable representation of this object.
+    // Since our shared memory objects own a unique FD, move semantics are provided to avoid the
+    // need to dupe.
+    Endpoint parcelable()&&;
 
 public: // TODO add getters
     // Set capacityInFrames to zero if Queue is unused.

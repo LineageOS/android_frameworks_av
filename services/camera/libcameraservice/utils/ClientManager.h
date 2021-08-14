@@ -31,6 +31,31 @@
 namespace android {
 namespace resource_policy {
 
+// Values from frameworks/base/services/core/java/com/android/server/am/ProcessList.java
+const int32_t INVALID_ADJ = -10000;
+const int32_t UNKNOWN_ADJ = 1001;
+const int32_t CACHED_APP_MAX_ADJ = 999;
+const int32_t CACHED_APP_MIN_ADJ = 900;
+const int32_t CACHED_APP_LMK_FIRST_ADJ = 950;
+const int32_t CACHED_APP_IMPORTANCE_LEVELS = 5;
+const int32_t SERVICE_B_ADJ = 800;
+const int32_t PREVIOUS_APP_ADJ = 700;
+const int32_t HOME_APP_ADJ = 600;
+const int32_t SERVICE_ADJ = 500;
+const int32_t HEAVY_WEIGHT_APP_ADJ = 400;
+const int32_t BACKUP_APP_ADJ = 300;
+const int32_t PERCEPTIBLE_LOW_APP_ADJ = 250;
+const int32_t PERCEPTIBLE_MEDIUM_APP_ADJ = 225;
+const int32_t PERCEPTIBLE_APP_ADJ = 200;
+const int32_t VISIBLE_APP_ADJ = 100;
+const int32_t VISIBLE_APP_LAYER_MAX = PERCEPTIBLE_APP_ADJ - VISIBLE_APP_ADJ - 1;
+const int32_t PERCEPTIBLE_RECENT_FOREGROUND_APP_ADJ = 50;
+const int32_t FOREGROUND_APP_ADJ = 0;
+const int32_t PERSISTENT_SERVICE_ADJ = -700;
+const int32_t PERSISTENT_PROC_ADJ = -800;
+const int32_t SYSTEM_ADJ = -900;
+const int32_t NATIVE_ADJ = -1000;
+
 class ClientPriority {
 public:
     /**
@@ -39,18 +64,26 @@ public:
      * case where the construction is offloaded to another thread which isn't a
      * hwbinder thread.
      */
-    ClientPriority(int32_t score, int32_t state, bool isVendorClient) :
-            mScore(score), mState(state), mIsVendorClient(isVendorClient) { }
+    ClientPriority(int32_t score, int32_t state, bool isVendorClient, int32_t scoreOffset = 0) :
+            mIsVendorClient(isVendorClient), mScoreOffset(scoreOffset) {
+        setScore(score);
+        setState(state);
+    }
 
     int32_t getScore() const { return mScore; }
     int32_t getState() const { return mState; }
+    int32_t isVendorClient() const { return mIsVendorClient; }
 
     void setScore(int32_t score) {
         // For vendor clients, the score is set once and for all during
         // construction. Otherwise, it can get reset each time cameraserver
         // queries ActivityManagerService for oom_adj scores / states .
-        if (!mIsVendorClient) {
-            mScore = score;
+        // For clients where the score offset is set by the app, add it to the
+        // score provided by ActivityManagerService.
+        if (score == INVALID_ADJ) {
+            mScore = UNKNOWN_ADJ;
+        } else {
+            mScore = mScoreOffset + score;
         }
     }
 
@@ -60,9 +93,7 @@ public:
       // queries ActivityManagerService for oom_adj scores / states
       // (ActivityManagerService returns a vendor process' state as
       // PROCESS_STATE_NONEXISTENT.
-      if (!mIsVendorClient) {
-          mState = state;
-      }
+      mState = state;
     }
 
     bool operator==(const ClientPriority& rhs) const {
@@ -93,6 +124,7 @@ private:
         int32_t mScore;
         int32_t mState;
         bool mIsVendorClient = false;
+        int32_t mScoreOffset = 0;
 };
 
 // --------------------------------------------------------------------------------
@@ -110,9 +142,10 @@ class ClientDescriptor final {
 public:
     ClientDescriptor(const KEY& key, const VALUE& value, int32_t cost,
             const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
-            bool isVendorClient);
+            bool isVendorClient, int32_t oomScoreOffset);
     ClientDescriptor(KEY&& key, VALUE&& value, int32_t cost, std::set<KEY>&& conflictingKeys,
-            int32_t score, int32_t ownerId, int32_t state, bool isVendorClient);
+            int32_t score, int32_t ownerId, int32_t state, bool isVendorClient,
+            int32_t oomScoreOffset);
 
     ~ClientDescriptor();
 
@@ -177,18 +210,18 @@ bool operator < (const ClientDescriptor<K, V>& a, const ClientDescriptor<K, V>& 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::ClientDescriptor(const KEY& key, const VALUE& value, int32_t cost,
         const std::set<KEY>& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
-        bool isVendorClient) :
+        bool isVendorClient, int32_t scoreOffset) :
         mKey{key}, mValue{value}, mCost{cost}, mConflicting{conflictingKeys},
-        mPriority(score, state, isVendorClient),
+        mPriority(score, state, isVendorClient, scoreOffset),
         mOwnerId{ownerId} {}
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::ClientDescriptor(KEY&& key, VALUE&& value, int32_t cost,
         std::set<KEY>&& conflictingKeys, int32_t score, int32_t ownerId, int32_t state,
-        bool isVendorClient) :
+        bool isVendorClient, int32_t scoreOffset) :
         mKey{std::forward<KEY>(key)}, mValue{std::forward<VALUE>(value)}, mCost{cost},
         mConflicting{std::forward<std::set<KEY>>(conflictingKeys)},
-        mPriority(score, state, isVendorClient), mOwnerId{ownerId} {}
+        mPriority(score, state, isVendorClient, scoreOffset), mOwnerId{ownerId} {}
 
 template<class KEY, class VALUE>
 ClientDescriptor<KEY, VALUE>::~ClientDescriptor() {}
@@ -239,6 +272,9 @@ void ClientDescriptor<KEY, VALUE>::setPriority(const ClientPriority& priority) {
     // off in the incoming priority argument since an AIDL thread might have
     // called getCurrentServingCall() == BinderCallType::HWBINDER after refreshing
     // priorities for old clients through ProcessInfoService::getProcessStatesScoresFromPids().
+    if (mPriority.isVendorClient()) {
+        return;
+    }
     mPriority.setScore(priority.getScore());
     mPriority.setState(priority.getState());
 }

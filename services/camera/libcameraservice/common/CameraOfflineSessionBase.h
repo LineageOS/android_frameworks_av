@@ -17,11 +17,14 @@
 #ifndef ANDROID_SERVERS_CAMERA_CAMERAOFFLINESESSIONBASE_H
 #define ANDROID_SERVERS_CAMERA_CAMERAOFFLINESESSIONBASE_H
 
+#include <vector>
+
 #include <utils/RefBase.h>
 #include <utils/String8.h>
 #include <utils/Timers.h>
 
 #include "camera/CaptureResult.h"
+#include "camera/CameraSessionStats.h"
 #include "FrameProducer.h"
 
 namespace android {
@@ -37,9 +40,11 @@ class NotificationListener : public virtual RefBase {
     // Required for API 1 and 2
     virtual void notifyError(int32_t errorCode,
                              const CaptureResultExtras &resultExtras) = 0;
+    virtual status_t notifyActive() = 0; // May return an error since it checks appops
+    virtual void notifyIdle(int64_t requestCount, int64_t resultError, bool deviceError,
+            const std::vector<hardware::CameraStreamStats>& streamStats) = 0;
 
     // Required only for API2
-    virtual void notifyIdle() = 0;
     virtual void notifyShutter(const CaptureResultExtras &resultExtras,
             nsecs_t timestamp) = 0;
     virtual void notifyPrepared(int streamId) = 0;

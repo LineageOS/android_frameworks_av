@@ -93,7 +93,7 @@ cc_library_shared {
     ],
     cflags: [
         "-fvisibility=hidden",
-        "-DEXPORT=__attribute__ ((visibility (\"default\")))",
+        "-DEXPORT=__attribute__((visibility(\"default\")))",
         "-Wall",
         "-Wextra",
         "-Werror",
@@ -152,9 +152,11 @@ cc_library_shared {
         "libcamera_metadata",
         "libmediandk",
         "android.frameworks.cameraservice.device@2.0",
+        "android.frameworks.cameraservice.device@2.1",
         "android.frameworks.cameraservice.common@2.0",
         "android.frameworks.cameraservice.service@2.0",
         "android.frameworks.cameraservice.service@2.1",
+        "android.frameworks.cameraservice.service@2.2",
     ],
     static_libs: [
         "android.hardware.camera.common@1.0-helper",

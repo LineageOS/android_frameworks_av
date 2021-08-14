@@ -20,6 +20,8 @@
 #include <map>
 #include <mutex>
 #include <sys/types.h>
+
+#include <android-base/thread_annotations.h>
 #include <utils/Singleton.h>
 
 #include "binding/AAudioServiceMessage.h"
@@ -70,10 +72,12 @@ private:
                                               const aaudio::AAudioStreamRequest &request);
 
     android::sp<AAudioServiceEndpoint> findExclusiveEndpoint_l(
-            const AAudioStreamConfiguration& configuration);
+            const AAudioStreamConfiguration& configuration)
+            REQUIRES(mExclusiveLock);
 
     android::sp<AAudioServiceEndpointShared> findSharedEndpoint_l(
-            const AAudioStreamConfiguration& configuration);
+            const AAudioStreamConfiguration& configuration)
+            REQUIRES(mSharedLock);
 
     void closeExclusiveEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
     void closeSharedEndpoint(android::sp<AAudioServiceEndpoint> serviceEndpoint);
@@ -83,23 +87,25 @@ private:
     // Lock mSharedLock before mExclusiveLock.
     // it is OK to only lock mExclusiveLock.
     mutable std::mutex                                     mSharedLock;
-    std::vector<android::sp<AAudioServiceEndpointShared>>  mSharedStreams;
+    std::vector<android::sp<AAudioServiceEndpointShared>>  mSharedStreams
+            GUARDED_BY(mSharedLock);
 
     mutable std::mutex                                     mExclusiveLock;
-    std::vector<android::sp<AAudioServiceEndpointMMAP>>    mExclusiveStreams;
+    std::vector<android::sp<AAudioServiceEndpointMMAP>>    mExclusiveStreams
+            GUARDED_BY(mExclusiveLock);
 
-    // Modified under a lock.
-    int32_t mExclusiveSearchCount = 0; // number of times we SEARCHED for an exclusive endpoint
-    int32_t mExclusiveFoundCount  = 0; // number of times we FOUND an exclusive endpoint
-    int32_t mExclusiveOpenCount   = 0; // number of times we OPENED an exclusive endpoint
-    int32_t mExclusiveCloseCount  = 0; // number of times we CLOSED an exclusive endpoint
-    int32_t mExclusiveStolenCount = 0; // number of times we STOLE an exclusive endpoint
+    // Counts related to an exclusive endpoint.
+    int32_t mExclusiveSearchCount GUARDED_BY(mExclusiveLock) = 0; // # SEARCHED
+    int32_t mExclusiveFoundCount  GUARDED_BY(mExclusiveLock) = 0; // # FOUND
+    int32_t mExclusiveOpenCount   GUARDED_BY(mExclusiveLock) = 0; // # OPENED
+    int32_t mExclusiveCloseCount  GUARDED_BY(mExclusiveLock) = 0; // # CLOSED
+    int32_t mExclusiveStolenCount GUARDED_BY(mExclusiveLock) = 0; // # STOLEN
 
     // Same as above but for SHARED endpoints.
-    int32_t mSharedSearchCount    = 0;
-    int32_t mSharedFoundCount     = 0;
-    int32_t mSharedOpenCount      = 0;
-    int32_t mSharedCloseCount     = 0;
+    int32_t mSharedSearchCount    GUARDED_BY(mSharedLock) = 0;
+    int32_t mSharedFoundCount     GUARDED_BY(mSharedLock) = 0;
+    int32_t mSharedOpenCount      GUARDED_BY(mSharedLock) = 0;
+    int32_t mSharedCloseCount     GUARDED_BY(mSharedLock) = 0;
 
     // For easily disabling the stealing of exclusive streams.
     static constexpr bool kStealingEnabled = true;

@@ -321,7 +321,9 @@ void MediaMetricsServiceFuzzer::invokeAnalyticsAction(const uint8_t *data, size_
 
 void MediaMetricsServiceFuzzer::invokeAudioAnalytics(const uint8_t *data, size_t size) {
     FuzzedDataProvider fdp = FuzzedDataProvider(data, size);
-    android::mediametrics::AudioAnalytics audioAnalytics;
+    std::shared_ptr<android::mediametrics::StatsdLog> statsdLog =
+            std::make_shared<android::mediametrics::StatsdLog>(10);
+    android::mediametrics::AudioAnalytics audioAnalytics{statsdLog};
 
     while (fdp.remaining_bytes()) {
         auto item = std::make_shared<mediametrics::Item>(fdp.ConsumeRandomLengthString().c_str());

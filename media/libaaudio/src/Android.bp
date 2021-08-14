@@ -30,6 +30,7 @@ cc_library {
     ],
 
     cflags: [
+        "-Wthread-safety",
         "-Wno-unused-parameter",
         "-Wall",
         "-Werror",
@@ -51,6 +52,7 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "libpermission",
     ],
 
     sanitize: {
@@ -84,6 +86,10 @@ cc_library {
     ],
     export_header_lib_headers: ["libaaudio_headers"],
 
+    export_shared_lib_headers: [
+        "framework-permission-aidl-cpp",
+    ],
+
     shared_libs: [
         "libaudioclient",
         "libaudioutils",
@@ -94,6 +100,9 @@ cc_library {
         "libcutils",
         "libutils",
         "libbinder",
+        "framework-permission-aidl-cpp",
+        "aaudio-aidl-cpp",
+        "libaudioclient_aidl_conversion",
     ],
 
     cflags: [
@@ -123,11 +132,10 @@ cc_library {
         "client/AudioStreamInternalPlay.cpp",
         "client/IsochronousClockModel.cpp",
         "binding/AudioEndpointParcelable.cpp",
+        "binding/AAudioBinderAdapter.cpp",
         "binding/AAudioBinderClient.cpp",
         "binding/AAudioStreamRequest.cpp",
         "binding/AAudioStreamConfiguration.cpp",
-        "binding/IAAudioClient.cpp",
-        "binding/IAAudioService.cpp",
         "binding/RingBufferParcelable.cpp",
         "binding/SharedMemoryParcelable.cpp",
         "binding/SharedRegionParcelable.cpp",
@@ -138,12 +146,45 @@ cc_library {
         "flowgraph/SinkFloat.cpp",
         "flowgraph/SinkI16.cpp",
         "flowgraph/SinkI24.cpp",
+        "flowgraph/SinkI32.cpp",
         "flowgraph/SourceFloat.cpp",
         "flowgraph/SourceI16.cpp",
         "flowgraph/SourceI24.cpp",
+        "flowgraph/SourceI32.cpp",
     ],
     sanitize: {
         integer_overflow: true,
         misc_undefined: ["bounds"],
+    },
+}
+
+aidl_interface {
+    name: "aaudio-aidl",
+    unstable: true,
+    local_include_dir: "binding/aidl",
+    srcs: [
+        "binding/aidl/aaudio/Endpoint.aidl",
+        "binding/aidl/aaudio/RingBuffer.aidl",
+        "binding/aidl/aaudio/SharedRegion.aidl",
+        "binding/aidl/aaudio/StreamParameters.aidl",
+        "binding/aidl/aaudio/StreamRequest.aidl",
+        "binding/aidl/aaudio/IAAudioClient.aidl",
+        "binding/aidl/aaudio/IAAudioService.aidl",
+    ],
+    imports: [
+        "audio_common-aidl",
+        "shared-file-region-aidl",
+        "framework-permission-aidl"
+    ],
+    backend:
+    {
+        cpp: {
+            enabled: true,
+        },
+        java: {
+            // TODO: need to have audio_common-aidl available in Java to enable
+            //       this.
+            enabled: false,
+        },
     },
 }

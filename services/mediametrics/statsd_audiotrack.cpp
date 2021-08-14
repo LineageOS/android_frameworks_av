@@ -32,77 +32,78 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "StringUtils.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
 
-bool statsd_audiotrack(const mediametrics::Item *item)
+bool statsd_audiotrack(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::AudioTrackData metrics_proto;
+    ::android::stats::mediametrics_message::AudioTrackData metrics_proto;
 
     // flesh out the protobuf we'll hand off with our data
     //
 
     // static constexpr char kAudioTrackStreamType[] = "android.media.audiotrack.streamtype";
     // optional string streamType;
-    std::string streamtype;
-    if (item->getString("android.media.audiotrack.streamtype", &streamtype)) {
-        metrics_proto.set_stream_type(std::move(streamtype));
+    std::string stream_type;
+    if (item->getString("android.media.audiotrack.streamtype", &stream_type)) {
+        metrics_proto.set_stream_type(stream_type);
     }
 
     // static constexpr char kAudioTrackContentType[] = "android.media.audiotrack.type";
     // optional string contentType;
-    std::string contenttype;
-    if (item->getString("android.media.audiotrack.type", &contenttype)) {
-        metrics_proto.set_content_type(std::move(contenttype));
+    std::string content_type;
+    if (item->getString("android.media.audiotrack.type", &content_type)) {
+        metrics_proto.set_content_type(content_type);
     }
 
     // static constexpr char kAudioTrackUsage[] = "android.media.audiotrack.usage";
     // optional string trackUsage;
-    std::string trackusage;
-    if (item->getString("android.media.audiotrack.usage", &trackusage)) {
-        metrics_proto.set_track_usage(std::move(trackusage));
+    std::string track_usage;
+    if (item->getString("android.media.audiotrack.usage", &track_usage)) {
+        metrics_proto.set_track_usage(track_usage);
     }
 
     // static constexpr char kAudioTrackSampleRate[] = "android.media.audiotrack.samplerate";
     // optional int32 samplerate;
-    int32_t samplerate = -1;
-    if (item->getInt32("android.media.audiotrack.samplerate", &samplerate)) {
-        metrics_proto.set_sample_rate(samplerate);
+    int32_t sample_rate = -1;
+    if (item->getInt32("android.media.audiotrack.samplerate", &sample_rate)) {
+        metrics_proto.set_sample_rate(sample_rate);
     }
 
     // static constexpr char kAudioTrackChannelMask[] = "android.media.audiotrack.channelmask";
     // optional int64 channelMask;
-    int64_t channelMask = -1;
-    if (item->getInt64("android.media.audiotrack.channelmask", &channelMask)) {
-        metrics_proto.set_channel_mask(channelMask);
+    int64_t channel_mask = -1;
+    if (item->getInt64("android.media.audiotrack.channelmask", &channel_mask)) {
+        metrics_proto.set_channel_mask(channel_mask);
     }
 
     // NB: These are not yet exposed as public Java API constants.
     // static constexpr char kAudioTrackUnderrunFrames[] = "android.media.audiotrack.underrunframes";
     // optional int32 underrunframes;
-    int32_t underrunframes = -1;
-    if (item->getInt32("android.media.audiotrack.underrunframes", &underrunframes)) {
-        metrics_proto.set_underrun_frames(underrunframes);
+    int32_t underrun_frames = -1;
+    if (item->getInt32("android.media.audiotrack.underrunframes", &underrun_frames)) {
+        metrics_proto.set_underrun_frames(underrun_frames);
     }
 
     // static constexpr char kAudioTrackStartupGlitch[] = "android.media.audiotrack.glitch.startup";
     // optional int32 startupglitch;
-    int32_t startupglitch = -1;
-    if (item->getInt32("android.media.audiotrack.glitch.startup", &startupglitch)) {
-        metrics_proto.set_startup_glitch(startupglitch);
+    int32_t startup_glitch = -1;
+    if (item->getInt32("android.media.audiotrack.glitch.startup", &startup_glitch)) {
+        metrics_proto.set_startup_glitch(startup_glitch);
     }
 
     // portId (int32)
@@ -113,7 +114,7 @@ bool statsd_audiotrack(const mediametrics::Item *item)
     // encoding (string)
     std::string encoding;
     if (item->getString("android.media.audiotrack.encoding", &encoding)) {
-        metrics_proto.set_encoding(std::move(encoding));
+        metrics_proto.set_encoding(encoding);
     }
     // frameCount (int32)
     int32_t frame_count = -1;
@@ -123,7 +124,7 @@ bool statsd_audiotrack(const mediametrics::Item *item)
     // attributes (string)
     std::string attributes;
     if (item->getString("android.media.audiotrack.attributes", &attributes)) {
-        metrics_proto.set_attributes(std::move(attributes));
+        metrics_proto.set_attributes(attributes);
     }
 
     std::string serialized;
@@ -132,17 +133,44 @@ bool statsd_audiotrack(const mediametrics::Item *item)
         return false;
     }
 
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-        (void)android::util::stats_write(android::util::MEDIAMETRICS_AUDIOTRACK_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
+    // Android S
+    // log_session_id (string)
+    std::string logSessionId;
+    (void)item->getString("android.media.audiotrack.logSessionId", &logSessionId);
+    const auto log_session_id =
+            mediametrics::stringutils::sanitizeLogSessionId(logSessionId);
 
-    } else {
-        ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
-    }
+    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_AUDIOTRACK_REPORTED,
+                               timestamp_nanos, package_name.c_str(), package_version_code,
+                               media_apex_version,
+                               bf_serialized,
+                               log_session_id.c_str());
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_audiotrack_reported:"
+            << android::util::MEDIAMETRICS_AUDIOTRACK_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
 
+            << " stream_type:" << stream_type
+            << " content_type:" << content_type
+            << " track_usage:" << track_usage
+            << " sample_rate:" << sample_rate
+            << " channel_mask:" << channel_mask
+            << " underrun_frames:" << underrun_frames
+            << " startup_glitch:" << startup_glitch
+            << " port_id:" << port_id
+            << " encoding:" << encoding
+            << " frame_count:" << frame_count
+
+            << " attributes:" << attributes
+
+            << " log_session_id:" << log_session_id
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_AUDIOTRACK_REPORTED, log.str());
     return true;
 }
 

@@ -189,6 +189,11 @@ status_t NuMediaExtractor::setDataSource(const sp<DataSource> &source) {
     return err;
 }
 
+const char* NuMediaExtractor::getName() const {
+    Mutex::Autolock autoLock(mLock);
+    return mImpl == nullptr ? nullptr : mImpl->name().string();
+}
+
 static String8 arrayToString(const std::vector<uint8_t> &array) {
     String8 result;
     for (size_t i = 0; i < array.size(); i++) {
@@ -302,8 +307,16 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
 
     sp<MetaData> meta = mImpl->getMetaData();
 
+    if (meta == nullptr) {
+        //extractor did not publish file metadata
+        return -EINVAL;
+    }
+
     const char *mime;
-    CHECK(meta->findCString(kKeyMIMEType, &mime));
+    if (!meta->findCString(kKeyMIMEType, &mime)) {
+        // no mime type maps to invalid
+        return -EINVAL;
+    }
     *format = new AMessage();
     (*format)->setString("mime", mime);
 
@@ -314,6 +327,27 @@ status_t NuMediaExtractor::getFileFormat(sp<AMessage> *format) const {
         sp<ABuffer> buf = new ABuffer(psshsize);
         memcpy(buf->data(), pssh, psshsize);
         (*format)->setBuffer("pssh", buf);
+    }
+
+    // Copy over the slow-motion related metadata
+    const void *slomoMarkers;
+    size_t slomoMarkersSize;
+    if (meta->findData(kKeySlowMotionMarkers, &type, &slomoMarkers, &slomoMarkersSize)
+            && slomoMarkersSize > 0) {
+        sp<ABuffer> buf = new ABuffer(slomoMarkersSize);
+        memcpy(buf->data(), slomoMarkers, slomoMarkersSize);
+        (*format)->setBuffer("slow-motion-markers", buf);
+    }
+
+    int32_t temporalLayerCount;
+    if (meta->findInt32(kKeyTemporalLayerCount, &temporalLayerCount)
+            && temporalLayerCount > 0) {
+        (*format)->setInt32("temporal-layer-count", temporalLayerCount);
+    }
+
+    float captureFps;
+    if (meta->findFloat(kKeyCaptureFramerate, &captureFps) && captureFps > 0.0f) {
+        (*format)->setFloat("capture-rate", captureFps);
     }
 
     return OK;
@@ -327,6 +361,11 @@ status_t NuMediaExtractor::getExifOffsetSize(off64_t *offset, size_t *size) cons
     }
 
     sp<MetaData> meta = mImpl->getMetaData();
+
+    if (meta == nullptr) {
+        //extractor did not publish file metadata
+        return -EINVAL;
+    }
 
     int64_t exifOffset, exifSize;
     if (meta->findInt64(kKeyExifOffset, &exifOffset)
@@ -857,6 +896,17 @@ status_t NuMediaExtractor::getAudioPresentations(
     }
     ALOGV("Source does not contain any audio presentation");
     return ERROR_UNSUPPORTED;
+}
+
+status_t NuMediaExtractor::setLogSessionId(const String8& logSessionId) {
+    if (mImpl == nullptr) {
+        return ERROR_UNSUPPORTED;
+    }
+    status_t status = mImpl->setLogSessionId(logSessionId);
+    if (status != OK) {
+        ALOGW("Failed to set log session id: %d.", status);
+    }
+    return status;
 }
 
 }  // namespace android

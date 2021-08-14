@@ -40,6 +40,10 @@
 namespace android {
 namespace camera2 {
 
+using android::camera3::CAMERA_STREAM_ROTATION_0;
+using android::camera3::CAMERA_TEMPLATE_PREVIEW;
+using android::camera3::CAMERA_TEMPLATE_ZERO_SHUTTER_LAG;
+
 StreamingProcessor::StreamingProcessor(sp<Camera2Client> client):
         mClient(client),
         mDevice(client->getCameraDevice()),
@@ -113,12 +117,12 @@ status_t StreamingProcessor::updatePreviewRequest(const Parameters &params) {
             return INVALID_OPERATION;
         }
 
-        // Use CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG for ZSL streaming case.
+        // Use CAMERA_TEMPLATE_ZERO_SHUTTER_LAG for ZSL streaming case.
         if (params.useZeroShutterLag() && !params.recordingHint) {
             res = device->createDefaultRequest(
-                    CAMERA3_TEMPLATE_ZERO_SHUTTER_LAG, &mPreviewRequest);
+                    CAMERA_TEMPLATE_ZERO_SHUTTER_LAG, &mPreviewRequest);
         } else {
-            res = device->createDefaultRequest(CAMERA3_TEMPLATE_PREVIEW,
+            res = device->createDefaultRequest(CAMERA_TEMPLATE_PREVIEW,
                     &mPreviewRequest);
         }
 
@@ -194,7 +198,8 @@ status_t StreamingProcessor::updatePreviewStream(const Parameters &params) {
         res = device->createStream(mPreviewWindow,
                 params.previewWidth, params.previewHeight,
                 CAMERA2_HAL_PIXEL_FORMAT_OPAQUE, HAL_DATASPACE_UNKNOWN,
-                CAMERA3_STREAM_ROTATION_0, &mPreviewStreamId, String8());
+                CAMERA_STREAM_ROTATION_0, &mPreviewStreamId, String8(),
+                std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Unable to create preview stream: %s (%d)",
                     __FUNCTION__, mId, strerror(-res), res);
@@ -263,7 +268,7 @@ status_t StreamingProcessor::updateRecordingRequest(const Parameters &params) {
     }
 
     if (mRecordingRequest.entryCount() == 0) {
-        res = device->createDefaultRequest(CAMERA2_TEMPLATE_VIDEO_RECORD,
+        res = device->createDefaultRequest(camera_request_template_t::CAMERA_TEMPLATE_VIDEO_RECORD,
                 &mRecordingRequest);
         if (res != OK) {
             ALOGE("%s: Camera %d: Unable to create default recording request:"
@@ -379,8 +384,8 @@ status_t StreamingProcessor::updateRecordingStream(const Parameters &params) {
         res = device->createStream(mRecordingWindow,
                 params.videoWidth, params.videoHeight,
                 params.videoFormat, params.videoDataSpace,
-                CAMERA3_STREAM_ROTATION_0, &mRecordingStreamId,
-                String8());
+                CAMERA_STREAM_ROTATION_0, &mRecordingStreamId,
+                String8(), std::unordered_set<int32_t>{ANDROID_SENSOR_PIXEL_MODE_DEFAULT});
         if (res != OK) {
             ALOGE("%s: Camera %d: Can't create output stream for recording: "
                     "%s (%d)", __FUNCTION__, mId,

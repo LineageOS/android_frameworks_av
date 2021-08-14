@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include <android/media/AudioVolumeGroup.h>
+#include <media/AidlConversionUtil.h>
 #include <media/AudioProductStrategy.h>
 #include <system/audio.h>
 #include <system/audio_policy.h>
@@ -50,5 +52,11 @@ private:
 };
 
 using AudioVolumeGroupVector = std::vector<AudioVolumeGroup>;
+
+// AIDL conversion routines.
+ConversionResult<media::AudioVolumeGroup>
+legacy2aidl_AudioVolumeGroup(const AudioVolumeGroup& legacy);
+ConversionResult<AudioVolumeGroup>
+aidl2legacy_AudioVolumeGroup(const media::AudioVolumeGroup& aidl);
 
 } // namespace android

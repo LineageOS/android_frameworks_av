@@ -76,6 +76,7 @@ MediaMuxer::~MediaMuxer() {
     mFileMeta.clear();
     mWriter.clear();
     mTrackList.clear();
+    mFormatList.clear();
 }
 
 ssize_t MediaMuxer::addTrack(const sp<AMessage> &format) {
@@ -109,6 +110,8 @@ ssize_t MediaMuxer::addTrack(const sp<AMessage> &format) {
             ALOGW("addTrack() setCaptureRate failed :%d", result);
         }
     }
+
+    mFormatList.add(format);
     return mTrackList.add(newTrack);
 }
 
@@ -177,16 +180,23 @@ status_t MediaMuxer::stop() {
 
 status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
                                      int64_t timeUs, uint32_t flags) {
-    Mutex::Autolock autoLock(mMuxerLock);
-
     if (buffer.get() == NULL) {
         ALOGE("WriteSampleData() get an NULL buffer.");
         return -EINVAL;
     }
-
-    if (mState != STARTED) {
-        ALOGE("WriteSampleData() is called in invalid state %d", mState);
-        return INVALID_OPERATION;
+    {
+        /* As MediaMuxer's writeSampleData handles inputs from multiple tracks,
+         * limited the scope of mMuxerLock to this inner block so that the
+         * current track's buffer does not wait until the completion
+         * of processing of previous buffer of the same or another track.
+         * It's the responsibility of individual track - MediaAdapter object
+         * to gate its buffers.
+         */
+        Mutex::Autolock autoLock(mMuxerLock);
+        if (mState != STARTED) {
+            ALOGE("WriteSampleData() is called in invalid state %d", mState);
+            return INVALID_OPERATION;
+        }
     }
 
     if (trackIndex >= mTrackList.size()) {
@@ -217,9 +227,42 @@ status_t MediaMuxer::writeSampleData(const sp<ABuffer> &buffer, size_t trackInde
         ALOGV("BUFFER_FLAG_EOS");
     }
 
+    sp<AMessage> bufMeta = buffer->meta();
+    int64_t val64;
+    if (bufMeta->findInt64("sample-file-offset", &val64)) {
+        sampleMetaData.setInt64(kKeySampleFileOffset, val64);
+    }
+    if (bufMeta->findInt64(
+                "last-sample-index-in-chunk" /*AMEDIAFORMAT_KEY_LAST_SAMPLE_INDEX_IN_CHUNK*/,
+                &val64)) {
+        sampleMetaData.setInt64(kKeyLastSampleIndexInChunk, val64);
+    }
+
     sp<MediaAdapter> currentTrack = mTrackList[trackIndex];
     // This pushBuffer will wait until the mediaBuffer is consumed.
     return currentTrack->pushBuffer(mediaBuffer);
+}
+
+ssize_t MediaMuxer::getTrackCount() {
+    Mutex::Autolock autoLock(mMuxerLock);
+    if (mState != INITIALIZED && mState != STARTED) {
+        ALOGE("getTrackCount() must be called either in INITIALIZED or STARTED state");
+        return -1;
+    }
+    return mTrackList.size();
+}
+
+sp<AMessage> MediaMuxer::getTrackFormat([[maybe_unused]] size_t idx) {
+    Mutex::Autolock autoLock(mMuxerLock);
+    if (mState != INITIALIZED && mState != STARTED) {
+        ALOGE("getTrackFormat() must be called either in INITIALIZED or STARTED state");
+        return nullptr;
+    }
+    if (idx < 0 || idx >= mFormatList.size()) {
+        ALOGE("getTrackFormat() idx is out of range");
+        return nullptr;
+    }
+    return mFormatList[idx];
 }
 
 }  // namespace android

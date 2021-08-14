@@ -182,6 +182,7 @@ public:
      * Active ref count of the client will be incremented/decremented through setActive API
      */
     virtual void setClientActive(const sp<TrackClientDescriptor>& client, bool active);
+    bool isClientActive(const sp<TrackClientDescriptor>& client);
 
     bool isActive(uint32_t inPastMs) const;
     bool isActive(VolumeSource volumeSource = VOLUME_SOURCE_NONE,
@@ -260,7 +261,7 @@ public:
                            const struct audio_port_config *srcConfig = NULL) const;
     virtual sp<AudioPort> getAudioPort() const { return mPolicyAudioPort->asAudioPort(); }
 
-    virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
     audio_module_handle_t getModuleHandle() const;
 
@@ -337,6 +338,8 @@ public:
     bool sharesHwModuleWith(const sp<SwAudioOutputDescriptor>& outputDesc);
     virtual DeviceVector supportedDevices() const;
     virtual bool devicesSupportEncodedFormats(const DeviceTypeSet& deviceTypes);
+    virtual bool containsSingleDeviceSupportingEncodedFormats(
+            const sp<DeviceDescriptor>& device) const;
     virtual uint32_t latency();
     virtual bool isDuplicated() const { return (mOutput1 != NULL && mOutput2 != NULL); }
     virtual bool isFixedVolume(const DeviceTypeSet& deviceTypes);
@@ -357,7 +360,7 @@ public:
 
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
-    virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
         status_t open(const audio_config_t *config,
                       const DeviceVector &devices,
@@ -395,6 +398,14 @@ public:
     bool supportsAllDevices(const DeviceVector &devices) const;
 
     /**
+     * @brief supportsDevicesForPlayback
+     * @param devices to be checked against
+     * @return true if the devices is a supported combo for playback
+     *         false otherwise
+     */
+    bool supportsDevicesForPlayback(const DeviceVector &devices) const;
+
+    /**
      * @brief filterSupportedDevices takes a vector of devices and filters them according to the
      * device supported by this output (the profile from which this output derives from)
      * @param devices reference device vector to be filtered
@@ -411,6 +422,7 @@ public:
     sp<SwAudioOutputDescriptor> mOutput2;    // used by duplicated outputs: second output
     uint32_t mDirectOpenCount; // number of clients using this output (direct outputs only)
     audio_session_t mDirectClientSession; // session id of the direct output client
+    bool mPendingReopenToQueryProfiles = false;
 };
 
 // Audio output driven by an input device directly.
@@ -431,7 +443,7 @@ public:
 
     virtual void toAudioPortConfig(struct audio_port_config *dstConfig,
                            const struct audio_port_config *srcConfig = NULL) const;
-    virtual void toAudioPort(struct audio_port *port) const;
+    virtual void toAudioPort(struct audio_port_v7 *port) const;
 
     const sp<SourceClientDescriptor> mSource;
 
