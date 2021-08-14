@@ -648,6 +648,13 @@ bool AudioFlinger::EffectModule::updateState() {
             mState = IDLE;
         }
         break;
+    case ACTIVE:
+        for (size_t i = 0; i < mHandles.size(); i++) {
+            if (!mHandles[i]->disconnected()) {
+                mHandles[i]->framesProcessed(mConfig.inputCfg.buffer.frameCount);
+            }
+        }
+        break;
     default: //IDLE , ACTIVE, DESTROYED
         break;
     }
@@ -1716,10 +1723,11 @@ void AudioFlinger::EffectModule::dump(int fd, const Vector<String16>& args)
 AudioFlinger::EffectHandle::EffectHandle(const sp<EffectBase>& effect,
                                          const sp<AudioFlinger::Client>& client,
                                          const sp<media::IEffectClient>& effectClient,
-                                         int32_t priority)
+                                         int32_t priority, bool notifyFramesProcessed)
     : BnEffect(),
     mEffect(effect), mEffectClient(effectClient), mClient(client), mCblk(NULL),
-    mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false)
+    mPriority(priority), mHasControl(false), mEnabled(false), mDisconnected(false),
+    mNotifyFramesProcessed(notifyFramesProcessed)
 {
     ALOGV("constructor %p client %p", this, client.get());
 
@@ -2025,6 +2033,13 @@ void AudioFlinger::EffectHandle::setEnabled(bool enabled)
 {
     if (mEffectClient != 0) {
         mEffectClient->enableStatusChanged(enabled);
+    }
+}
+
+void AudioFlinger::EffectHandle::framesProcessed(int32_t frames) const
+{
+    if (mEffectClient != 0 && mNotifyFramesProcessed) {
+        mEffectClient->framesProcessed(frames);
     }
 }
 
@@ -3200,7 +3215,8 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         } else {
             mHalEffect->setDevices({mDevice});
         }
-        *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/);
+        *handle = new EffectHandle(mHalEffect, nullptr, nullptr, 0 /*priority*/,
+                                   mNotifyFramesProcessed);
         status = (*handle)->initCheck();
         if (status == OK) {
             status = mHalEffect->addHandle((*handle).get());
@@ -3226,7 +3242,8 @@ status_t AudioFlinger::DeviceEffectProxy::checkPort(const PatchPanel::Patch& pat
         int enabled;
         *handle = thread->createEffect_l(nullptr, nullptr, 0, AUDIO_SESSION_DEVICE,
                                          const_cast<effect_descriptor_t *>(&mDescriptor),
-                                         &enabled, &status, false, false /*probe*/);
+                                         &enabled, &status, false, false /*probe*/,
+                                         mNotifyFramesProcessed);
         ALOGV("%s thread->createEffect_l status %d", __func__, status);
     } else {
         status = BAD_VALUE;
