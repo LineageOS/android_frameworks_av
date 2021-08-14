@@ -408,7 +408,8 @@ public:
                                     int *enabled,
                                     status_t *status /*non-NULL*/,
                                     bool pinned,
-                                    bool probe);
+                                    bool probe,
+                                    bool notifyFramesProcessed);
 
                 // return values for hasAudioSession (bit field)
                 enum effect_state {

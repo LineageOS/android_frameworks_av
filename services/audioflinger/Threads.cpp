@@ -1456,7 +1456,8 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
         int *enabled,
         status_t *status,
         bool pinned,
-        bool probe)
+        bool probe,
+        bool notifyFramesProcessed)
 {
     sp<EffectModule> effect;
     sp<EffectHandle> handle;
@@ -1523,7 +1524,7 @@ sp<AudioFlinger::EffectHandle> AudioFlinger::ThreadBase::createEffect_l(
             }
         }
         // create effect handle and connect it to effect module
-        handle = new EffectHandle(effect, client, effectClient, priority);
+        handle = new EffectHandle(effect, client, effectClient, priority, notifyFramesProcessed);
         lStatus = handle->initCheck();
         if (lStatus == OK) {
             lStatus = effect->addHandle(handle.get());
@@ -2286,7 +2287,7 @@ sp<AudioFlinger::PlaybackThread::Track> AudioFlinger::PlaybackThread::createTrac
                  "AUDIO_OUTPUT_FLAG_FAST accepted: frameCount=%zu mFrameCount=%zu",
                  frameCount, mFrameCount);
       } else {
-        ALOGV("AUDIO_OUTPUT_FLAG_FAST denied: sharedBuffer=%p frameCount=%zu "
+        ALOGD("AUDIO_OUTPUT_FLAG_FAST denied: sharedBuffer=%p frameCount=%zu "
                 "mFrameCount=%zu format=%#x mFormat=%#x isLinear=%d channelMask=%#x "
                 "sampleRate=%u mSampleRate=%u "
                 "hasFastMixer=%d tid=%d fastTrackAvailMask=%#x",
@@ -7117,7 +7118,7 @@ void AudioFlinger::VirtualizerStageThread::checkOutputStageEffects()
 
         finalDownMixer = createEffect_l(nullptr /*client*/, nullptr /*effectClient*/,
                 0 /*priority*/, AUDIO_SESSION_OUTPUT_STAGE, &descriptors[0], nullptr /*enabled*/,
-                &status, false /*pinned*/, false /*probe*/);
+                &status, false /*pinned*/, false /*probe*/, false /*notifyFramesProcessed*/);
 
         if (finalDownMixer == nullptr || (status != NO_ERROR && status != ALREADY_EXISTS)) {
             ALOGW("%s error creating downmixer %d", __func__, status);
