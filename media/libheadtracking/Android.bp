@@ -1,0 +1,40 @@
+cc_library {
+    name: "libheadtracking",
+    host_supported: true,
+    srcs: [
+      "HeadTrackingProcessor.cpp",
+      "ModeSelector.cpp",
+      "Pose.cpp",
+      "PoseDriftCompensator.cpp",
+      "PoseRateLimiter.cpp",
+      "QuaternionUtil.cpp",
+      "ScreenHeadFusion.cpp",
+      "Twist.cpp",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    header_libs: [
+        "libeigen",
+    ],
+    export_header_lib_headers: [
+        "libeigen",
+    ],
+}
+
+cc_test_host {
+    name: "libheadtracking-test",
+    srcs: [
+        "HeadTrackingProcessor-test.cpp",
+        "ModeSelector-test.cpp",
+        "Pose-test.cpp",
+        "PoseDriftCompensator-test.cpp",
+        "PoseRateLimiter-test.cpp",
+        "QuaternionUtil-test.cpp",
+        "ScreenHeadFusion-test.cpp",
+        "Twist-test.cpp",
+    ],
+    shared_libs: [
+        "libheadtracking",
+    ],
+}
