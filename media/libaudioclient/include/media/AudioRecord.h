@@ -760,6 +760,13 @@ private:
     bool                    mTimestampRetrogradePositionReported = false; // reduce log spam
     bool                    mTimestampRetrogradeTimeReported = false;     // reduce log spam
 
+    // Format conversion. Maybe needed for adding fast tracks whose format is different from server.
+    audio_config_base_t     mServerConfig;
+    size_t                  mServerFrameSize;
+    size_t                  mServerSampleSize;
+    std::unique_ptr<uint8_t[]> mFormatConversionBufRaw;
+    Buffer                  mFormatConversionBuffer;
+
 private:
     class DeathNotifier : public IBinder::DeathRecipient {
     public:

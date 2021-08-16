@@ -166,6 +166,7 @@ public:
         sp<IMemory> buffers;
         audio_port_handle_t portId;
         sp<media::IAudioRecord> audioRecord;
+        audio_config_base_t serverConfig;
 
         ConversionResult<media::CreateRecordResponse> toAidl() const;
         static ConversionResult<CreateRecordOutput>
