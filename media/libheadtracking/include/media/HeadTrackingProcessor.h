@@ -97,7 +97,7 @@ class HeadTrackingProcessor {
 /**
  * Creates an instance featuring a default implementation of the HeadTrackingProcessor interface.
  */
-std::unique_ptr<HeadTrackingProcessor> createHeadTrackingProcess(
+std::unique_ptr<HeadTrackingProcessor> createHeadTrackingProcessor(
         const HeadTrackingProcessor::Options& options,
         HeadTrackingMode initialMode = HeadTrackingMode::STATIC);
 
