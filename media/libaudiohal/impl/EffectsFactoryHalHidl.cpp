@@ -149,6 +149,18 @@ status_t EffectsFactoryHalHidl::dumpEffects(int fd) {
     hidlHandle->data[0] = fd;
     Return<void> ret = mEffectsFactory->debug(hidlHandle, {} /* options */);
     native_handle_delete(hidlHandle);
+
+    // TODO(b/111997867, b/177271958)  Workaround - remove when fixed.
+    // A Binder transmitted fd may not close immediately due to a race condition b/111997867
+    // when the remote binder thread removes the last refcount to the fd blocks in the
+    // kernel for binder activity. We send a Binder ping() command to unblock the thread
+    // and complete the fd close / release.
+    //
+    // See DeviceHalHidl::dump(), EffectHalHidl::dump(), StreamHalHidl::dump(),
+    //     EffectsFactoryHalHidl::dumpEffects().
+
+    (void)mEffectsFactory->ping(); // synchronous Binder call
+
     return processReturn(__FUNCTION__, ret);
 }
 
