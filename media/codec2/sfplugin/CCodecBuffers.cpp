@@ -129,6 +129,7 @@ sp<Codec2Buffer> InputBuffers::cloneAndReleaseBuffer(const sp<MediaCodecBuffer> 
     if (!copy->copy(c2buffer)) {
         return nullptr;
     }
+    copy->meta()->extend(buffer->meta());
     return copy;
 }
 
