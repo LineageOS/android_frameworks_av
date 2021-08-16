@@ -53,7 +53,8 @@ public:
             C2Config::pcm_encoding_t encoding,
             size_t inputFrameSizeInBytes,
             size_t count,
-            size_t expectedOutputSize) {
+            size_t expectedOutputSize,
+            bool separateEos) {
         FrameReassembler frameReassembler;
         frameReassembler.init(
                 mPool,
@@ -67,7 +68,7 @@ public:
 
         size_t inputIndex = 0, outputIndex = 0;
         size_t expectCount = 0;
-        for (size_t i = 0; i < count; ++i) {
+        for (size_t i = 0; i < count + (separateEos ? 1 : 0); ++i) {
             sp<MediaCodecBuffer> buffer = new MediaCodecBuffer(
                     new AMessage, new ABuffer(inputFrameSizeInBytes));
             buffer->setRange(0, inputFrameSizeInBytes);
@@ -77,8 +78,12 @@ public:
             if (i == count - 1) {
                 buffer->meta()->setInt32("eos", 1);
             }
-            for (size_t j = 0; j < inputFrameSizeInBytes; ++j, ++inputIndex) {
-                buffer->base()[j] = (inputIndex & 0xFF);
+            if (i == count && separateEos) {
+                buffer->setRange(0, 0);
+            } else {
+                for (size_t j = 0; j < inputFrameSizeInBytes; ++j, ++inputIndex) {
+                    buffer->base()[j] = (inputIndex & 0xFF);
+                }
             }
             std::list<std::unique_ptr<C2Work>> items;
             ASSERT_EQ(C2_OK, frameReassembler.process(buffer, &items));
@@ -105,7 +110,8 @@ public:
                 ASSERT_EQ(encoderFrameSize * BytesPerSample(encoding), view.capacity());
                 for (size_t j = 0; j < view.capacity(); ++j, ++outputIndex) {
                     ASSERT_TRUE(outputIndex < inputIndex
-                             || inputIndex == inputFrameSizeInBytes * count);
+                             || inputIndex == inputFrameSizeInBytes * count)
+                        << "inputIndex = " << inputIndex << " outputIndex = " << outputIndex;
                     uint8_t expected = outputIndex < inputIndex ? (outputIndex & 0xFF) : 0;
                     if (expectCount < 10) {
                         ++expectCount;
@@ -137,204 +143,239 @@ const C2MemoryUsage FrameReassemblerTest::kUsage{C2MemoryUsage::CPU_READ, C2Memo
 // Push frames with exactly the same size as the encoder requested.
 TEST_F(FrameReassemblerTest, PushExactFrameSize) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            1024 /* input frame size in bytes = 1024 samples * 1 channel * 1 bytes/sample */,
-            10 /* count */,
-            10240 /* expected output size = 10 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            2048 /* input frame size in bytes = 1024 samples * 1 channel * 2 bytes/sample */,
-            10 /* count */,
-            20480 /* expected output size = 10 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            4096 /* input frame size in bytes = 1024 samples * 1 channel * 4 bytes/sample */,
-            10 /* count */,
-            40960 /* expected output size = 10 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                1024 /* input frame size in bytes = 1024 samples * 1 channel * 1 bytes/sample */,
+                10 /* count */,
+                10240 /* expected output size = 10 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                2048 /* input frame size in bytes = 1024 samples * 1 channel * 2 bytes/sample */,
+                10 /* count */,
+                20480 /* expected output size = 10 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                4096 /* input frame size in bytes = 1024 samples * 1 channel * 4 bytes/sample */,
+                10 /* count */,
+                40960 /* expected output size = 10 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 // Push frames with half the size that the encoder requested.
 TEST_F(FrameReassemblerTest, PushHalfFrameSize) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            512 /* input frame size in bytes = 512 samples * 1 channel * 1 bytes per sample */,
-            10 /* count */,
-            5120 /* expected output size = 5 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            1024 /* input frame size in bytes = 512 samples * 1 channel * 2 bytes per sample */,
-            10 /* count */,
-            10240 /* expected output size = 5 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            2048 /* input frame size in bytes = 512 samples * 1 channel * 4 bytes per sample */,
-            10 /* count */,
-            20480 /* expected output size = 5 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                512 /* input frame size in bytes = 512 samples * 1 channel * 1 bytes/sample */,
+                10 /* count */,
+                5120 /* expected output size = 5 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                1024 /* input frame size in bytes = 512 samples * 1 channel * 2 bytes/sample */,
+                10 /* count */,
+                10240 /* expected output size = 5 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                2048 /* input frame size in bytes = 512 samples * 1 channel * 4 bytes/sample */,
+                10 /* count */,
+                20480 /* expected output size = 5 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 // Push frames with twice the size that the encoder requested.
 TEST_F(FrameReassemblerTest, PushDoubleFrameSize) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            2048 /* input frame size in bytes = 2048 samples * 1 channel * 1 bytes per sample */,
-            10 /* count */,
-            20480 /* expected output size = 20 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            4096 /* input frame size in bytes = 2048 samples * 1 channel * 2 bytes per sample */,
-            10 /* count */,
-            40960 /* expected output size = 20 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            8192 /* input frame size in bytes = 2048 samples * 1 channel * 4 bytes per sample */,
-            10 /* count */,
-            81920 /* expected output size = 20 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                2048 /* input frame size in bytes = 2048 samples * 1 channel * 1 bytes/sample */,
+                10 /* count */,
+                20480 /* expected output size = 20 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                4096 /* input frame size in bytes = 2048 samples * 1 channel * 2 bytes/sample */,
+                10 /* count */,
+                40960 /* expected output size = 20 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                8192 /* input frame size in bytes = 2048 samples * 1 channel * 4 bytes/sample */,
+                10 /* count */,
+                81920 /* expected output size = 20 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 // Push frames with a little bit larger (+5 samples) than the requested size.
 TEST_F(FrameReassemblerTest, PushLittleLargerFrameSize) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            1029 /* input frame size in bytes = 1029 samples * 1 channel * 1 bytes per sample */,
-            10 /* count */,
-            11264 /* expected output size = 11 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            2058 /* input frame size in bytes = 1029 samples * 1 channel * 2 bytes per sample */,
-            10 /* count */,
-            22528 /* expected output size = 11 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            4116 /* input frame size in bytes = 1029 samples * 1 channel * 4 bytes per sample */,
-            10 /* count */,
-            45056 /* expected output size = 11 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                1029 /* input frame size in bytes = 1029 samples * 1 channel * 1 bytes/sample */,
+                10 /* count */,
+                11264 /* expected output size = 11 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                2058 /* input frame size in bytes = 1029 samples * 1 channel * 2 bytes/sample */,
+                10 /* count */,
+                22528 /* expected output size = 11 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                4116 /* input frame size in bytes = 1029 samples * 1 channel * 4 bytes/sample */,
+                10 /* count */,
+                45056 /* expected output size = 11 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 // Push frames with a little bit smaller (-5 samples) than the requested size.
 TEST_F(FrameReassemblerTest, PushLittleSmallerFrameSize) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            1019 /* input frame size in bytes = 1019 samples * 1 channel * 1 bytes per sample */,
-            10 /* count */,
-            10240 /* expected output size = 10 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            2038 /* input frame size in bytes = 1019 samples * 1 channel * 2 bytes per sample */,
-            10 /* count */,
-            20480 /* expected output size = 10 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            4076 /* input frame size in bytes = 1019 samples * 1 channel * 4 bytes per sample */,
-            10 /* count */,
-            40960 /* expected output size = 10 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                1019 /* input frame size in bytes = 1019 samples * 1 channel * 1 bytes/sample */,
+                10 /* count */,
+                10240 /* expected output size = 10 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                2038 /* input frame size in bytes = 1019 samples * 1 channel * 2 bytes/sample */,
+                10 /* count */,
+                20480 /* expected output size = 10 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                4076 /* input frame size in bytes = 1019 samples * 1 channel * 4 bytes/sample */,
+                10 /* count */,
+                40960 /* expected output size = 10 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 // Push single-byte frames
 TEST_F(FrameReassemblerTest, PushSingleByte) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            1 /* input frame size in bytes */,
-            100000 /* count */,
-            100352 /* expected output size = 98 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            1 /* input frame size in bytes */,
-            100000 /* count */,
-            100352 /* expected output size = 49 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            1 /* input frame size in bytes */,
-            100000 /* count */,
-            102400 /* expected output size = 25 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                1 /* input frame size in bytes */,
+                100000 /* count */,
+                100352 /* expected output size = 98 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                1 /* input frame size in bytes */,
+                100000 /* count */,
+                100352 /* expected output size = 49 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                1 /* input frame size in bytes */,
+                100000 /* count */,
+                102400 /* expected output size = 25 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 // Push one big chunk.
 TEST_F(FrameReassemblerTest, PushBigChunk) {
     ASSERT_EQ(OK, initStatus());
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_8,
-            100000 /* input frame size in bytes */,
-            1 /* count */,
-            100352 /* expected output size = 98 * 1024 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_16,
-            100000 /* input frame size in bytes */,
-            1 /* count */,
-            100352 /* expected output size = 49 * 2048 bytes/frame */);
-    testPushSameSize(
-            1024 /* frame size in samples */,
-            48000 /* sample rate */,
-            1 /* channel count */,
-            PCM_FLOAT,
-            100000 /* input frame size in bytes */,
-            1 /* count */,
-            102400 /* expected output size = 25 * 4096 bytes/frame */);
+    for (bool separateEos : {false, true}) {
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_8,
+                100000 /* input frame size in bytes */,
+                1 /* count */,
+                100352 /* expected output size = 98 * 1024 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_16,
+                100000 /* input frame size in bytes */,
+                1 /* count */,
+                100352 /* expected output size = 49 * 2048 bytes/frame */,
+                separateEos);
+        testPushSameSize(
+                1024 /* frame size in samples */,
+                48000 /* sample rate */,
+                1 /* channel count */,
+                PCM_FLOAT,
+                100000 /* input frame size in bytes */,
+                1 /* count */,
+                102400 /* expected output size = 25 * 4096 bytes/frame */,
+                separateEos);
+    }
 }
 
 } // namespace android
