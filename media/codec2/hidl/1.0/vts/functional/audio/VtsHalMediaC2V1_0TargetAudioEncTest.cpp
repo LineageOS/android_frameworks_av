@@ -301,13 +301,23 @@ c2_status_t Codec2AudioEncHidlTestBase::getSampleRate(int32_t* nSampleRate) {
 c2_status_t Codec2AudioEncHidlTestBase::getSamplesPerFrame(int32_t nChannels,
                                                            int32_t* samplesPerFrame) {
     std::vector<std::unique_ptr<C2Param>> queried;
-    c2_status_t c2err = mComponent->query({}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE},
+    c2_status_t c2err = mComponent->query({}, {C2StreamAudioFrameSizeInfo::input::PARAM_TYPE},
                                           C2_DONT_BLOCK, &queried);
-    if (c2err != C2_OK || queried.size() == 0) return c2err;
-
     size_t offset = sizeof(C2Param);
-    C2Param* param = queried[0].get();
-    uint32_t maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
+    uint32_t maxInputSize = 0;
+    if (c2err == C2_OK && queried.size()) {
+        C2Param* param = queried[0].get();
+        maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
+    }
+
+    if (0 == maxInputSize) {
+        c2err = mComponent->query({}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE}, C2_DONT_BLOCK,
+                                  &queried);
+        if (c2err != C2_OK || queried.size() == 0) return c2err;
+
+        C2Param* param = queried[0].get();
+        maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
+    }
     *samplesPerFrame = std::min((maxInputSize / (nChannels * 2)), kMaxSamplesPerFrame);
 
     return C2_OK;
