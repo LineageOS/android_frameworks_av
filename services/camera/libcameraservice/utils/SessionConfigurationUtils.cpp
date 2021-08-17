@@ -564,7 +564,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         const String8 &logicalCameraId, const CameraMetadata &deviceInfo,
         metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
         hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
-        bool overrideForPerfClass, bool *earlyExit) {
+        bool overrideForPerfClass, bool *earlyExit, bool isPriviledgedClient) {
 
     auto operatingMode = sessionConfiguration.getOperatingMode();
     binder::Status res = checkOperatingMode(operatingMode, deviceInfo, logicalCameraId);
@@ -674,7 +674,7 @@ SessionConfigurationUtils::convertToHALStreamCombination(
         for (auto& bufferProducer : bufferProducers) {
             sp<Surface> surface;
             res = createSurfaceFromGbp(streamInfo, isStreamInfoValid, surface, bufferProducer,
-                    logicalCameraId, metadataChosen, sensorPixelModesUsed);
+                    logicalCameraId, metadataChosen, sensorPixelModesUsed, isPriviledgedClient);
 
             if (!res.isOk())
                 return res;

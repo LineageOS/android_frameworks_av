@@ -124,7 +124,7 @@ public:
             const String8 &cameraId, const CameraMetadata &deviceInfo,
             metadataGetter getMetadata, const std::vector<std::string> &physicalCameraIds,
             hardware::camera::device::V3_7::StreamConfiguration &streamConfiguration,
-            bool overrideForPerfClass, bool *earlyExit);
+            bool overrideForPerfClass, bool *earlyExit, bool isPriviledgedClient = false);
 
     // Utility function to convert a V3_7::StreamConfiguration to
     // V3_4::StreamConfiguration. Return false if the original V3_7 configuration cannot
