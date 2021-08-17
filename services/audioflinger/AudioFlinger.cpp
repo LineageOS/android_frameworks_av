@@ -2569,10 +2569,10 @@ sp<AudioFlinger::ThreadBase> AudioFlinger::openOutput_l(audio_module_handle_t mo
             return thread;
         } else {
             sp<PlaybackThread> thread;
-            //TODO: b/193496180 use virtualizer stage flag at audio HAL when available
+            //TODO: b/193496180 use spatializer flag at audio HAL when available
             if (flags == (audio_output_flags_t)(AUDIO_OUTPUT_FLAG_FAST
                                                     | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
-                thread = new VirtualizerStageThread(this, outputStream, *output,
+                thread = new SpatializerThread(this, outputStream, *output,
                                                     mSystemReady, mixerConfig);
                 ALOGD("openOutput_l() created virtualizer output: ID %d thread %p",
                       *output, thread.get());
