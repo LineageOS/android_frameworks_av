@@ -6294,11 +6294,18 @@ uint32_t AudioPolicyManager::checkDeviceMuteStrategies(const sp<AudioOutputDescr
     // different per device volumes
     if (outputDesc->isActive() && (devices != prevDevices)) {
         uint32_t tempMuteWaitMs = outputDesc->latency() * 2;
-        // temporary mute duration is conservatively set to 4 times the reported latency
-        uint32_t tempMuteDurationMs = outputDesc->latency() * 4;
+
         if (muteWaitMs < tempMuteWaitMs) {
             muteWaitMs = tempMuteWaitMs;
         }
+
+        // If recommended duration is defined, replace temporary mute duration to avoid
+        // truncated notifications at beginning, which depends on duration of changing path in HAL.
+        // Otherwise, temporary mute duration is conservatively set to 4 times the reported latency.
+        uint32_t tempRecommendedMuteDuration = outputDesc->getRecommendedMuteDurationMs();
+        uint32_t tempMuteDurationMs = tempRecommendedMuteDuration > 0 ?
+                tempRecommendedMuteDuration : outputDesc->latency() * 4;
+
         for (const auto &activeVs : outputDesc->getActiveVolumeSources()) {
             // make sure that we do not start the temporary mute period too early in case of
             // delayed device change
