@@ -17,10 +17,10 @@
 #pragma once
 
 #include <android-base/thread_annotations.h>
-#include <audio_utils/SimpleLog.h>
 #include "AnalyticsActions.h"
 #include "AnalyticsState.h"
 #include "AudioPowerUsage.h"
+#include "StatsdLog.h"
 #include "TimedAction.h"
 #include "Wrap.h"
 
@@ -32,7 +32,7 @@ class AudioAnalytics
     friend AudioPowerUsage;
 
 public:
-    AudioAnalytics();
+    explicit AudioAnalytics(const std::shared_ptr<StatsdLog>& statsdLog);
     ~AudioAnalytics();
 
     /**
@@ -122,8 +122,7 @@ private:
     SharedPtrWrap<AnalyticsState> mPreviousAnalyticsState;
 
     TimedAction mTimedAction; // locked internally
-
-    SimpleLog mStatsdLog{16 /* log lines */}; // locked internally
+    const std::shared_ptr<StatsdLog> mStatsdLog; // locked internally, ok for multiple threads.
 
     // DeviceUse is a nested class which handles audio device usage accounting.
     // We define this class at the end to ensure prior variables all properly constructed.
@@ -189,7 +188,30 @@ private:
         int32_t mA2dpConnectionUnknowns GUARDED_BY(mLock) = 0;
     } mDeviceConnection{*this};
 
-    AudioPowerUsage mAudioPowerUsage{this};
+    // AAudioStreamInfo is a nested class which collect aaudio stream info from both client and
+    // server side.
+    class AAudioStreamInfo {
+    public:
+        // All the enum here must be kept the same as the ones defined in atoms.proto
+        enum CallerPath {
+            CALLER_PATH_UNKNOWN = 0,
+            CALLER_PATH_LEGACY = 1,
+            CALLER_PATH_MMAP = 2,
+        };
+
+        explicit AAudioStreamInfo(AudioAnalytics &audioAnalytics)
+            : mAudioAnalytics(audioAnalytics) {}
+
+        void endAAudioStream(
+                const std::shared_ptr<const android::mediametrics::Item> &item,
+                CallerPath path) const;
+
+    private:
+
+        AudioAnalytics &mAudioAnalytics;
+    } mAAudioStreamInfo{*this};
+
+    AudioPowerUsage mAudioPowerUsage;
 };
 
 } // namespace android::mediametrics

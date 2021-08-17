@@ -21,10 +21,11 @@
 #include <mutex>
 #include <set>
 
+#include <android-base/thread_annotations.h>
 #include <utils/Singleton.h>
 
 #include <aaudio/AAudio.h>
-#include "binding/IAAudioClient.h"
+#include <aaudio/IAAudioClient.h>
 #include "AAudioService.h"
 
 namespace aaudio {
@@ -46,7 +47,7 @@ public:
      */
     std::string dump() const;
 
-    aaudio_result_t registerClient(pid_t pid, const android::sp<android::IAAudioClient>& client);
+    aaudio_result_t registerClient(pid_t pid, const android::sp<IAAudioClient>& client);
 
     void unregisterClient(pid_t pid);
 
@@ -114,10 +115,12 @@ private:
     };
 
     // This must be called under mLock
-    android::sp<NotificationClient> getNotificationClient_l(pid_t pid);
+    android::sp<NotificationClient> getNotificationClient_l(pid_t pid)
+            REQUIRES(mLock);
 
     mutable std::mutex                               mLock;
-    std::map<pid_t, android::sp<NotificationClient>> mNotificationClients;
+    std::map<pid_t, android::sp<NotificationClient>> mNotificationClients
+            GUARDED_BY(mLock);
     android::AAudioService                          *mAAudioService = nullptr;
 };
 

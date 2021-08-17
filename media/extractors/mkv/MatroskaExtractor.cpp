@@ -1700,17 +1700,17 @@ status_t MatroskaExtractor::synthesizeMPEG2(TrackInfo *trackInfo, size_t index) 
         return ERROR_MALFORMED;
     }
 
-    size_t header_start = 0;
-    size_t header_lenth = 0;
+    long header_start = 0;
+    long header_length = 0;
     for (header_start = 0; header_start < frame.len - 4; header_start++) {
         if (ntohl(0x000001b3) == *(uint32_t*)((uint8_t*)tmpData.get() + header_start)) {
             break;
         }
     }
     bool isComplete_csd = false;
-    for (header_lenth = 0; header_lenth < frame.len - 4 - header_start; header_lenth++) {
+    for (header_length = 0; header_length < frame.len - 4 - header_start; header_length++) {
         if (ntohl(0x000001b8) == *(uint32_t*)((uint8_t*)tmpData.get()
-                                + header_start + header_lenth)) {
+                                + header_start + header_length)) {
             isComplete_csd = true;
             break;
         }
@@ -1720,7 +1720,7 @@ status_t MatroskaExtractor::synthesizeMPEG2(TrackInfo *trackInfo, size_t index) 
         return ERROR_MALFORMED;
     }
     addESDSFromCodecPrivate(trackInfo->mMeta, false,
-                              (uint8_t*)(tmpData.get()) + header_start, header_lenth);
+                            (uint8_t*)(tmpData.get()) + header_start, header_length);
 
     return OK;
 

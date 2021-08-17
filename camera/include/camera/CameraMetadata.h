@@ -242,6 +242,11 @@ class CameraMetadata: public Parcelable {
     static status_t getTagFromName(const char *name,
             const VendorTagDescriptor* vTags, uint32_t *tag);
 
+    /**
+     * Return the current vendor tag id associated with this metadata.
+     */
+    metadata_vendor_id_t getVendorId();
+
   private:
     camera_metadata_t *mBuffer;
     mutable bool       mLocked;

@@ -24,6 +24,15 @@
 #define ANDROID_IDRM_H_
 
 namespace android {
+namespace hardware {
+namespace drm {
+namespace V1_4 {
+struct LogMessage;
+}  // namespace V1_4
+}  // namespace drm
+}  // namespace hardware
+
+namespace drm = ::android::hardware::drm;
 
 struct AString;
 
@@ -144,6 +153,17 @@ struct IDrm : public virtual RefBase {
                              Vector<uint8_t> &signature) = 0;
 
     virtual status_t setListener(const sp<IDrmClient>& listener) = 0;
+
+    virtual status_t requiresSecureDecoder(const char *mime, bool *required) const = 0;
+
+    virtual status_t requiresSecureDecoder(const char *mime, DrmPlugin::SecurityLevel securityLevel,
+                                           bool *required) const = 0;
+
+    virtual status_t setPlaybackId(
+            Vector<uint8_t> const &sessionId,
+            const char *playbackId) = 0;
+
+    virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const = 0;
 
 protected:
     IDrm() {}

@@ -22,6 +22,8 @@
 #include <mutex>
 #include <vector>
 
+#include <android-base/thread_annotations.h>
+
 #include "client/AudioStreamInternal.h"
 #include "client/AudioStreamInternalPlay.h"
 #include "core/AAudioStreamParameters.h"
@@ -41,7 +43,7 @@ class AAudioServiceEndpoint
         , public AAudioStreamParameters {
 public:
 
-    virtual ~AAudioServiceEndpoint() = default;
+    virtual ~AAudioServiceEndpoint();
 
     virtual std::string dump() const;
 
@@ -141,7 +143,8 @@ protected:
     std::vector<android::sp<AAudioServiceStreamBase>> disconnectRegisteredStreams();
 
     mutable std::mutex       mLockStreams;
-    std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams;
+    std::vector<android::sp<AAudioServiceStreamBase>> mRegisteredStreams
+            GUARDED_BY(mLockStreams);
 
     SimpleDoubleBuffer<Timestamp>  mAtomicEndpointTimestamp;
 

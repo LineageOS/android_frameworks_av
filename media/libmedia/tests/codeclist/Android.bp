@@ -25,6 +25,7 @@ package {
 
 cc_test {
     name: "CodecListTest",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: [

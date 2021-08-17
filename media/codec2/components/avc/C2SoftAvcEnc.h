@@ -99,8 +99,10 @@ namespace android {
 #define STRLENGTH                   500
 #define DEFAULT_CONSTRAINED_INTRA   0
 
-/** limits as specified by h264 */
-#define CODEC_QP_MIN                0
+/** limits as specified by h264
+ *  (QP_MIN==4 is actually a limitation of this SW codec, not the H.264 standard)
+ **/
+#define CODEC_QP_MIN                4
 #define CODEC_QP_MAX                51
 
 

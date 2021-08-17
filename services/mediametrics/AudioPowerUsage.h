@@ -22,13 +22,15 @@
 #include <mutex>
 #include <thread>
 
+#include "StatsdLog.h"
+
 namespace android::mediametrics {
 
 class AudioAnalytics;
 
 class AudioPowerUsage {
 public:
-    explicit AudioPowerUsage(AudioAnalytics *audioAnalytics);
+    AudioPowerUsage(AudioAnalytics *audioAnalytics, const std::shared_ptr<StatsdLog>& statsdLog);
     ~AudioPowerUsage();
 
     void checkTrackRecord(const std::shared_ptr<const mediametrics::Item>& item, bool isTrack);
@@ -83,12 +85,13 @@ public:
 private:
     bool saveAsItem_l(int32_t device, int64_t duration, int32_t type, double average_vol)
          REQUIRES(mLock);
-    static void sendItem(const std::shared_ptr<const mediametrics::Item>& item);
+    void sendItem(const std::shared_ptr<const mediametrics::Item>& item) const;
     void collect();
     bool saveAsItems_l(int32_t device, int64_t duration, int32_t type, double average_vol)
          REQUIRES(mLock);
 
     AudioAnalytics * const mAudioAnalytics;
+    const std::shared_ptr<StatsdLog> mStatsdLog;  // mStatsdLog is internally locked
     const bool mDisabled;
     const int32_t mIntervalHours;
 

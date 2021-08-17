@@ -39,7 +39,11 @@ static const char *kKeyExtractor = "extractor";
 static const char *kExtractorFormat = "android.media.mediaextractor.fmt";
 static const char *kExtractorMime = "android.media.mediaextractor.mime";
 static const char *kExtractorTracks = "android.media.mediaextractor.ntrk";
+
+// The following are not available in frameworks/base/media/java/android/media/MediaExtractor.java
+// because they are not applicable or useful to that API.
 static const char *kExtractorEntryPoint = "android.media.mediaextractor.entry";
+static const char *kExtractorLogSessionId = "android.media.mediaextractor.logSessionId";
 
 static const char *kEntryPointSdk = "sdk";
 static const char *kEntryPointWithJvm = "ndk-with-jvm";
@@ -171,6 +175,11 @@ status_t RemoteMediaExtractor::setEntryPoint(EntryPoint entryPoint) {
             return BAD_VALUE;
     }
     mMetricsItem->setCString(kExtractorEntryPoint, entryPointString);
+    return OK;
+}
+
+status_t RemoteMediaExtractor::setLogSessionId(const String8& logSessionId) {
+    mMetricsItem->setCString(kExtractorLogSessionId, logSessionId.c_str());
     return OK;
 }
 

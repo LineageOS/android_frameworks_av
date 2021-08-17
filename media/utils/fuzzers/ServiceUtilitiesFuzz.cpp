@@ -17,12 +17,16 @@
 #include <fcntl.h>
 
 #include <functional>
+#include <type_traits>
 
+#include <android/content/AttributionSourceState.h>
 #include "fuzzer/FuzzedDataProvider.h"
 #include "mediautils/ServiceUtilities.h"
 
 static constexpr int kMaxOperations = 50;
 static constexpr int kMaxStringLen = 256;
+
+using android::content::AttributionSourceState;
 
 const std::vector<std::function<void(FuzzedDataProvider*, android::MediaPackageManager)>>
     operations = {
@@ -42,8 +46,19 @@ const std::vector<std::function<void(FuzzedDataProvider*, android::MediaPackageM
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     FuzzedDataProvider data_provider(data, size);
-    uid_t uid = data_provider.ConsumeIntegral<uid_t>();
-    pid_t pid = data_provider.ConsumeIntegral<pid_t>();
+    int32_t uid = data_provider.ConsumeIntegral<int32_t>();
+    int32_t pid = data_provider.ConsumeIntegral<int32_t>();
+    audio_source_t source = static_cast<audio_source_t>(data_provider
+        .ConsumeIntegral<std::underlying_type_t<audio_source_t>>());
+
+    std::string packageNameStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
+    std::string msgStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
+    android::String16 msgStr16(packageNameStr.c_str());
+    AttributionSourceState attributionSource;
+    attributionSource.packageName = packageNameStr;
+    attributionSource.uid = uid;
+    attributionSource.pid = pid;
+    attributionSource.token = android::sp<android::BBinder>::make();
 
     // There is not state here, and order is not significant,
     // so we can simply call all of the target functions
@@ -51,16 +66,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     android::isAudioServerUid(uid);
     android::isAudioServerOrSystemServerUid(uid);
     android::isAudioServerOrMediaServerUid(uid);
-    std::string packageNameStr = data_provider.ConsumeRandomLengthString(kMaxStringLen);
-    android::String16 opPackageName(packageNameStr.c_str());
-    android::recordingAllowed(opPackageName, pid, uid);
-    android::startRecording(opPackageName, pid, uid, false);
-    android::finishRecording(opPackageName, uid, false);
-    android::captureAudioOutputAllowed(pid, uid);
-    android::captureMediaOutputAllowed(pid, uid);
-    android::captureHotwordAllowed(opPackageName, pid, uid);
-    android::modifyPhoneStateAllowed(uid, pid);
-    android::bypassInterruptionPolicyAllowed(uid, pid);
+    android::recordingAllowed(attributionSource);
+    android::startRecording(attributionSource, msgStr16, source);
+    android::finishRecording(attributionSource, source);
+    android::captureAudioOutputAllowed(attributionSource);
+    android::captureMediaOutputAllowed(attributionSource);
+    android::captureHotwordAllowed(attributionSource);
+    android::modifyPhoneStateAllowed(attributionSource);
+    android::bypassInterruptionPolicyAllowed(attributionSource);
     android::settingsAllowed();
     android::modifyAudioRoutingAllowed();
     android::modifyDefaultAudioEffectsAllowed();

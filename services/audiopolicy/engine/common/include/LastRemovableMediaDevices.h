@@ -36,6 +36,8 @@ public:
     void setRemovableMediaDevices(sp<DeviceDescriptor> desc, audio_policy_dev_state_t state);
     std::vector<audio_devices_t> getLastRemovableMediaDevices(
             device_out_group_t group = GROUP_NONE) const;
+    sp<DeviceDescriptor> getLastRemovableMediaDevice(
+            const DeviceVector& excludedDevices, device_out_group_t group = GROUP_NONE) const;
 
 private:
     struct DeviceGroupDescriptor {

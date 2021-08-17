@@ -33,6 +33,7 @@
 #include <binder/IPCThreadState.h>
 #include <binder/IServiceManager.h>
 
+#include <media/AidlConversion.h>
 #include <media/IMediaPlayerService.h>
 #include <media/MediaMetricsItem.h>
 #include <media/stagefright/foundation/ABuffer.h>
@@ -78,6 +79,7 @@ static const char *kKeyRecorder = "recorder";
 // NB: these are matched with public Java API constants defined
 // in frameworks/base/media/java/android/media/MediaRecorder.java
 // These must be kept synchronized with the constants there.
+static const char *kRecorderLogSessionId = "android.media.mediarecorder.log-session-id";
 static const char *kRecorderAudioBitrate = "android.media.mediarecorder.audio-bitrate";
 static const char *kRecorderAudioChannels = "android.media.mediarecorder.audio-channels";
 static const char *kRecorderAudioSampleRate = "android.media.mediarecorder.audio-samplerate";
@@ -114,8 +116,8 @@ static void addBatteryData(uint32_t params) {
 }
 
 
-StagefrightRecorder::StagefrightRecorder(const String16 &opPackageName)
-    : MediaRecorderBase(opPackageName),
+StagefrightRecorder::StagefrightRecorder(const AttributionSourceState& client)
+    : MediaRecorderBase(client),
       mWriter(NULL),
       mOutputFd(-1),
       mAudioSource((audio_source_t)AUDIO_SOURCE_CNT), // initialize with invalid value
@@ -157,7 +159,9 @@ void StagefrightRecorder::updateMetrics() {
 
     // we run as part of the media player service; what we really want to
     // know is the app which requested the recording.
-    mMetricsItem->setUid(mClientUid);
+    mMetricsItem->setUid(VALUE_OR_FATAL(aidl2legacy_int32_t_uid_t(mAttributionSource.uid)));
+
+    mMetricsItem->setCString(kRecorderLogSessionId, mLogSessionId.c_str());
 
     // populate the values from the raw fields.
 
@@ -913,6 +917,14 @@ status_t StagefrightRecorder::requestIDRFrame() {
     return ret;
 }
 
+status_t StagefrightRecorder::setLogSessionId(const String8 &log_session_id) {
+    ALOGV("setLogSessionId: %s", log_session_id.string());
+
+    // TODO: validity check that log_session_id is a 32-byte hex digit.
+    mLogSessionId.setTo(log_session_id.string());
+    return OK;
+}
+
 status_t StagefrightRecorder::setParameter(
         const String8 &key, const String8 &value) {
     ALOGV("setParameter: key (%s) => value (%s)", key.string(), value.string());
@@ -1081,6 +1093,8 @@ status_t StagefrightRecorder::setParameter(
         if (safe_strtoi64(value.string(), &networkHandle)) {
             return setSocketNetwork(networkHandle);
         }
+    } else if (key == "log-session-id") {
+        return setLogSessionId(value);
     } else {
         ALOGE("setParameter: failed to find key %s", key.string());
     }
@@ -1129,7 +1143,9 @@ status_t StagefrightRecorder::setListener(const sp<IMediaRecorderClient> &listen
 }
 
 status_t StagefrightRecorder::setClientName(const String16& clientName) {
-    mClientName = clientName;
+
+    mAttributionSource.packageName = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_String16_string(clientName));
 
     return OK;
 }
@@ -1140,10 +1156,6 @@ status_t StagefrightRecorder::prepareInternal() {
         ALOGE("Output file descriptor is invalid");
         return INVALID_OPERATION;
     }
-
-    // Get UID and PID here for permission checking
-    mClientUid = IPCThreadState::self()->getCallingUid();
-    mClientPid = IPCThreadState::self()->getCallingPid();
 
     status_t status = OK;
 
@@ -1344,12 +1356,10 @@ sp<MediaCodecSource> StagefrightRecorder::createAudioSource() {
     sp<AudioSource> audioSource =
         new AudioSource(
                 &attr,
-                mOpPackageName,
+                mAttributionSource,
                 sourceSampleRate,
                 mAudioChannels,
                 mSampleRate,
-                mClientUid,
-                mClientPid,
                 mSelectedDeviceId,
                 mSelectedMicDirection,
                 mSelectedMicFieldDimension);
@@ -1871,6 +1881,10 @@ status_t StagefrightRecorder::setupCameraSource(
     Size videoSize;
     videoSize.width = mVideoWidth;
     videoSize.height = mVideoHeight;
+    uid_t uid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_uid_t(mAttributionSource.uid));
+    pid_t pid = VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_pid_t(mAttributionSource.pid));
+    String16 clientName = VALUE_OR_RETURN_STATUS(
+        aidl2legacy_string_view_String16(mAttributionSource.packageName.value_or("")));
     if (mCaptureFpsEnable) {
         if (!(mCaptureFps > 0.)) {
             ALOGE("Invalid mCaptureFps value: %lf", mCaptureFps);
@@ -1878,13 +1892,13 @@ status_t StagefrightRecorder::setupCameraSource(
         }
 
         mCameraSourceTimeLapse = CameraSourceTimeLapse::CreateFromCamera(
-                mCamera, mCameraProxy, mCameraId, mClientName, mClientUid, mClientPid,
+                mCamera, mCameraProxy, mCameraId, clientName, uid, pid,
                 videoSize, mFrameRate, mPreviewSurface,
                 std::llround(1e6 / mCaptureFps));
         *cameraSource = mCameraSourceTimeLapse;
     } else {
         *cameraSource = CameraSource::CreateFromCamera(
-                mCamera, mCameraProxy, mCameraId, mClientName, mClientUid, mClientPid,
+                mCamera, mCameraProxy, mCameraId, clientName, uid, pid,
                 videoSize, mFrameRate,
                 mPreviewSurface);
     }

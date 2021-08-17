@@ -706,7 +706,7 @@ status_t CaptureSequencer::updateCaptureRequest(const Parameters &params,
 
     if (mCaptureRequest.entryCount() == 0) {
         res = client->getCameraDevice()->createDefaultRequest(
-                CAMERA2_TEMPLATE_STILL_CAPTURE,
+                camera_request_template_t::CAMERA_TEMPLATE_STILL_CAPTURE,
                 &mCaptureRequest);
         if (res != OK) {
             ALOGE("%s: Camera %d: Unable to create default still image request:"

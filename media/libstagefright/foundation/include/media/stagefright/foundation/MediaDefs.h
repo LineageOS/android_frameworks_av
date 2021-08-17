@@ -22,6 +22,7 @@ namespace android {
 
 extern const char *MEDIA_MIMETYPE_IMAGE_JPEG;
 extern const char *MEDIA_MIMETYPE_IMAGE_ANDROID_HEIC;
+extern const char *MEDIA_MIMETYPE_IMAGE_AVIF;
 
 extern const char *MEDIA_MIMETYPE_VIDEO_VP8;
 extern const char *MEDIA_MIMETYPE_VIDEO_VP9;

@@ -19,7 +19,7 @@
 //#define LOG_NDEBUG 0
 #define LOG_TAG "NdkMediaCodec"
 
-#include <media/NdkMediaCodec.h>
+#include <media/NdkMediaCodecPlatform.h>
 #include <media/NdkMediaError.h>
 #include <media/NdkMediaFormatPriv.h>
 #include "NdkMediaCryptoPriv.h"
@@ -45,6 +45,10 @@ static media_status_t translate_error(status_t err) {
         return AMEDIA_OK;
     } else if (err == -EAGAIN) {
         return (media_status_t) AMEDIACODEC_INFO_TRY_AGAIN_LATER;
+    } else if (err == NO_MEMORY) {
+        return AMEDIACODEC_ERROR_INSUFFICIENT_RESOURCE;
+    } else if (err == DEAD_OBJECT) {
+        return AMEDIACODEC_ERROR_RECLAIMED;
     }
     ALOGE("sf error code: %d", err);
     return AMEDIA_ERROR_UNKNOWN;
@@ -255,7 +259,7 @@ void CodecHandler::onMessageReceived(const sp<AMessage> &msg) {
                          break;
                      }
                      msg->findString("detail", &detail);
-                     ALOGE("Decoder reported error(0x%x), actionCode(%d), detail(%s)",
+                     ALOGE("Codec reported error(0x%x), actionCode(%d), detail(%s)",
                            err, actionCode, detail.c_str());
 
                      Mutex::Autolock _l(mCodec->mAsyncCallbackLock);
@@ -308,7 +312,11 @@ static void requestActivityNotification(AMediaCodec *codec) {
 
 extern "C" {
 
-static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool encoder) {
+static AMediaCodec * createAMediaCodec(const char *name,
+                                       bool name_is_type,
+                                       bool encoder,
+                                       pid_t pid = android::MediaCodec::kNoPid,
+                                       uid_t uid = android::MediaCodec::kNoUid) {
     AMediaCodec *mData = new AMediaCodec();
     mData->mLooper = new ALooper;
     mData->mLooper->setName("NDK MediaCodec_looper");
@@ -322,9 +330,20 @@ static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool
         return NULL;
     }
     if (name_is_type) {
-        mData->mCodec = android::MediaCodec::CreateByType(mData->mLooper, name, encoder);
+        mData->mCodec = android::MediaCodec::CreateByType(
+                mData->mLooper,
+                name,
+                encoder,
+                nullptr /* err */,
+                pid,
+                uid);
     } else {
-        mData->mCodec = android::MediaCodec::CreateByComponentName(mData->mLooper, name);
+        mData->mCodec = android::MediaCodec::CreateByComponentName(
+                mData->mLooper,
+                name,
+                nullptr /* err */,
+                pid,
+                uid);
     }
     if (mData->mCodec == NULL) {  // failed to create codec
         AMediaCodec_delete(mData);
@@ -344,17 +363,38 @@ static AMediaCodec * createAMediaCodec(const char *name, bool name_is_type, bool
 
 EXPORT
 AMediaCodec* AMediaCodec_createCodecByName(const char *name) {
-    return createAMediaCodec(name, false, false);
+    return createAMediaCodec(name, false /* name_is_type */, false /* encoder */);
 }
 
 EXPORT
 AMediaCodec* AMediaCodec_createDecoderByType(const char *mime_type) {
-    return createAMediaCodec(mime_type, true, false);
+    return createAMediaCodec(mime_type, true /* name_is_type */, false /* encoder */);
 }
 
 EXPORT
 AMediaCodec* AMediaCodec_createEncoderByType(const char *name) {
-    return createAMediaCodec(name, true, true);
+    return createAMediaCodec(name, true /* name_is_type */, true /* encoder */);
+}
+
+EXPORT
+AMediaCodec* AMediaCodec_createCodecByNameForClient(const char *name,
+                                                    pid_t pid,
+                                                    uid_t uid) {
+    return createAMediaCodec(name, false /* name_is_type */, false /* encoder */, pid, uid);
+}
+
+EXPORT
+AMediaCodec* AMediaCodec_createDecoderByTypeForClient(const char *mime_type,
+                                                      pid_t pid,
+                                                      uid_t uid) {
+    return createAMediaCodec(mime_type, true /* name_is_type */, false /* encoder */, pid, uid);
+}
+
+EXPORT
+AMediaCodec* AMediaCodec_createEncoderByTypeForClient(const char *name,
+                                                      pid_t pid,
+                                                      uid_t uid) {
+    return createAMediaCodec(name, true /* name_is_type */, true /* encoder */, pid, uid);
 }
 
 EXPORT
@@ -913,6 +953,14 @@ media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo* ci
     memcpy(dst, ci->encryptedbytes, sizeof(size_t) * ci->numsubsamples);
     return AMEDIA_OK;
 }
+
+EXPORT const char* AMEDIACODEC_KEY_HDR10_PLUS_INFO = AMEDIAFORMAT_KEY_HDR10_PLUS_INFO;
+EXPORT const char* AMEDIACODEC_KEY_LOW_LATENCY = AMEDIAFORMAT_KEY_LOW_LATENCY;
+EXPORT const char* AMEDIACODEC_KEY_OFFSET_TIME = "time-offset-us";
+EXPORT const char* AMEDIACODEC_KEY_REQUEST_SYNC_FRAME = "request-sync";
+EXPORT const char* AMEDIACODEC_KEY_SUSPEND = "drop-input-frames";
+EXPORT const char* AMEDIACODEC_KEY_SUSPEND_TIME = "drop-start-time-us";
+EXPORT const char* AMEDIACODEC_KEY_VIDEO_BITRATE = "video-bitrate";
 
 } // extern "C"
 

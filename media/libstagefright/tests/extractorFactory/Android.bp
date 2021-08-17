@@ -28,6 +28,7 @@ package {
 cc_test {
     name: "ExtractorFactoryTest",
     gtest: true,
+    test_suites: ["device-tests"],
 
     srcs: [
         "ExtractorFactoryTest.cpp",

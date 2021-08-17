@@ -31,8 +31,9 @@
 #include <utils/SortedVector.h>
 #include <utils/threads.h>
 
+#include <android/media/BnMediaMetricsService.h> // for direct Binder access
+#include <android/media/IMediaMetricsService.h>
 #include <binder/IServiceManager.h>
-#include <media/IMediaMetricsService.h>
 #include <media/MediaMetricsItem.h>
 #include <private/android_filesystem_config.h>
 
@@ -278,17 +279,19 @@ std::string mediametrics::Item::toString() const {
 // calls the appropriate daemon
 bool mediametrics::Item::selfrecord() {
     ALOGD_IF(DEBUG_API, "%s: delivering %s", __func__, this->toString().c_str());
-    sp<IMediaMetricsService> svc = getService();
-    if (svc != NULL) {
-        status_t status = svc->submit(this);
-        if (status != NO_ERROR) {
-            ALOGW("%s: failed to record: %s", __func__, this->toString().c_str());
-            return false;
-        }
-        return true;
-    } else {
+
+    char *str;
+    size_t size;
+    status_t status = writeToByteString(&str, &size);
+    if (status == NO_ERROR) {
+        status = submitBuffer(str, size);
+        free(str);
+    }
+    if (status != NO_ERROR) {
+        ALOGW("%s: failed to record: %s", __func__, this->toString().c_str());
         return false;
     }
+    return true;
 }
 
 //static
@@ -305,6 +308,17 @@ bool BaseItem::isEnabled() {
     switch (uid) {
     case AID_RADIO:     // telephony subsystem, RIL
         return false;
+    default:
+        // Some isolated processes can access the audio system; see
+        // AudioSystem::setAudioFlingerBinder (currently only the HotwordDetectionService). Instead
+        // of also allowing access to the MediaMetrics service, it's simpler to just disable it for
+        // now.
+        // TODO(b/190151205): Either allow the HotwordDetectionService to access MediaMetrics or
+        // make this disabling specific to that process.
+        if (uid >= AID_ISOLATED_START && uid <= AID_ISOLATED_END) {
+            return false;
+        }
+        break;
     }
 
     int enabled = property_get_int32(Item::EnabledProperty, -1);
@@ -327,7 +341,7 @@ class MediaMetricsDeathNotifier : public IBinder::DeathRecipient {
 
 static sp<MediaMetricsDeathNotifier> sNotifier;
 // static
-sp<IMediaMetricsService> BaseItem::sMediaMetricsService;
+sp<media::IMediaMetricsService> BaseItem::sMediaMetricsService;
 static std::mutex sServiceMutex;
 static int sRemainingBindAttempts = SVC_TRIES;
 
@@ -339,29 +353,67 @@ void BaseItem::dropInstance() {
 }
 
 // static
-bool BaseItem::submitBuffer(const char *buffer, size_t size) {
-/*
-    mediametrics::Item item;
-    status_t status = item.readFromByteString(buffer, size);
-    ALOGD("%s: status:%d, size:%zu, item:%s", __func__, status, size, item.toString().c_str());
-    return item.selfrecord();
-    */
-
+status_t BaseItem::submitBuffer(const char *buffer, size_t size) {
     ALOGD_IF(DEBUG_API, "%s: delivering %zu bytes", __func__, size);
-    sp<IMediaMetricsService> svc = getService();
-    if (svc != nullptr) {
-        const status_t status = svc->submitBuffer(buffer, size);
-        if (status != NO_ERROR) {
-            ALOGW("%s: failed(%d) to record: %zu bytes", __func__, status, size);
-            return false;
-        }
-        return true;
+
+    // Validate size
+    if (size > std::numeric_limits<int32_t>::max()) return BAD_VALUE;
+
+    // Do we have the service available?
+    sp<media::IMediaMetricsService> svc = getService();
+    if (svc == nullptr)  return NO_INIT;
+
+    ::android::status_t status = NO_ERROR;
+    if constexpr (/* DISABLES CODE */ (false)) {
+        // THIS PATH IS FOR REFERENCE ONLY.
+        // It is compiled so that any changes to IMediaMetricsService::submitBuffer()
+        // will lead here.  If this code is changed, the else branch must
+        // be changed as well.
+        //
+        // Use the AIDL calling interface - this is a bit slower as a byte vector must be
+        // constructed. As the call is one-way, the only a transaction error occurs.
+        status = svc->submitBuffer({buffer, buffer + size}).transactionError();
+    } else {
+        // Use the Binder calling interface - this direct implementation avoids
+        // malloc/copy/free for the vector and reduces the overhead for logging.
+        // We based this off of the AIDL generated file:
+        // out/soong/.intermediates/frameworks/av/media/libmediametrics/mediametricsservice-aidl-unstable-cpp-source/gen/android/media/IMediaMetricsService.cpp
+        // TODO: Create an AIDL C++ back end optimized form of vector writing.
+        ::android::Parcel _aidl_data;
+        ::android::Parcel _aidl_reply; // we don't care about this as it is one-way.
+
+        status = _aidl_data.writeInterfaceToken(svc->getInterfaceDescriptor());
+        if (status != ::android::OK) goto _aidl_error;
+
+        status = _aidl_data.writeInt32(static_cast<int32_t>(size));
+        if (status != ::android::OK) goto _aidl_error;
+
+        status = _aidl_data.write(buffer, static_cast<int32_t>(size));
+        if (status != ::android::OK) goto _aidl_error;
+
+        status = ::android::IInterface::asBinder(svc)->transact(
+                ::android::media::BnMediaMetricsService::TRANSACTION_submitBuffer,
+                _aidl_data, &_aidl_reply, ::android::IBinder::FLAG_ONEWAY);
+
+        // AIDL permits setting a default implementation for additional functionality.
+        // See go/aog/713984. This is not used here.
+        // if (status == ::android::UNKNOWN_TRANSACTION
+        //         && ::android::media::IMediaMetricsService::getDefaultImpl()) {
+        //     status = ::android::media::IMediaMetricsService::getDefaultImpl()
+        //             ->submitBuffer(immutableByteVectorFromBuffer(buffer, size))
+        //             .transactionError();
+        // }
     }
-    return false;
+
+    if (status == NO_ERROR) return NO_ERROR;
+
+    _aidl_error:
+    ALOGW("%s: failed(%d) to record: %zu bytes", __func__, status, size);
+    return status;
 }
 
 //static
-sp<IMediaMetricsService> BaseItem::getService() {
+sp<media::IMediaMetricsService> BaseItem::getService() {
     static const char *servicename = "media.metrics";
     static const bool enabled = isEnabled(); // singleton initialized
 
@@ -379,7 +431,7 @@ sp<IMediaMetricsService> BaseItem::getService() {
         if (sm != nullptr) {
             sp<IBinder> binder = sm->getService(String16(servicename));
             if (binder != nullptr) {
-                sMediaMetricsService = interface_cast<IMediaMetricsService>(binder);
+                sMediaMetricsService = interface_cast<media::IMediaMetricsService>(binder);
                 sNotifier = new MediaMetricsDeathNotifier();
                 binder->linkToDeath(sNotifier);
             } else {

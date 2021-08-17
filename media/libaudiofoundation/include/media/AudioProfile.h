@@ -19,8 +19,10 @@
 #include <string>
 #include <vector>
 
+#include <android/media/AudioProfile.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
+#include <media/AidlConversion.h>
 #include <media/AudioContainers.h>
 #include <system/audio.h>
 #include <utils/RefBase.h>
@@ -36,6 +38,10 @@ public:
     AudioProfile(audio_format_t format,
                  const ChannelMaskSet &channelMasks,
                  const SampleRateSet &samplingRateCollection);
+    AudioProfile(audio_format_t format,
+                 const ChannelMaskSet &channelMasks,
+                 const SampleRateSet &samplingRateCollection,
+                 audio_encapsulation_type_t encapsulationType);
 
     audio_format_t getFormat() const { return mFormat; }
     const ChannelMaskSet &getChannels() const { return mChannelMasks; }
@@ -66,6 +72,11 @@ public:
 
     bool isDynamic() { return mIsDynamicFormat || mIsDynamicChannels || mIsDynamicRate; }
 
+    audio_encapsulation_type_t getEncapsulationType() const { return mEncapsulationType; }
+    void setEncapsulationType(audio_encapsulation_type_t encapsulationType) {
+        mEncapsulationType = encapsulationType;
+    }
+
     void dump(std::string *dst, int spaces) const;
 
     bool equals(const sp<AudioProfile>& other) const;
@@ -73,7 +84,11 @@ public:
     status_t writeToParcel(Parcel* parcel) const override;
     status_t readFromParcel(const Parcel* parcel) override;
 
+    ConversionResult<media::AudioProfile> toParcelable() const;
+    static ConversionResult<sp<AudioProfile>> fromParcelable(const media::AudioProfile& parcelable);
+
 private:
+
     std::string  mName;
     audio_format_t mFormat; // The format for an audio profile should only be set when initialized.
     ChannelMaskSet mChannelMasks;
@@ -82,7 +97,18 @@ private:
     bool mIsDynamicFormat = false;
     bool mIsDynamicChannels = false;
     bool mIsDynamicRate = false;
+
+    audio_encapsulation_type_t mEncapsulationType = AUDIO_ENCAPSULATION_TYPE_NONE;
+
+    AudioProfile() = default;
+    AudioProfile& operator=(const AudioProfile& other);
 };
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<sp<AudioProfile>>
+aidl2legacy_AudioProfile(const media::AudioProfile& aidl);
+ConversionResult<media::AudioProfile>
+legacy2aidl_AudioProfile(const sp<AudioProfile>& legacy);
 
 class AudioProfileVector : public std::vector<sp<AudioProfile>>, public Parcelable
 {
@@ -105,6 +131,8 @@ public:
     bool hasDynamicProfile() const;
     bool hasDynamicRateFor(audio_format_t format) const;
 
+    bool contains(const sp<AudioProfile>& profile) const;
+
     virtual void dump(std::string *dst, int spaces) const;
 
     bool equals(const AudioProfileVector& other) const;
@@ -114,5 +142,14 @@ public:
 };
 
 bool operator == (const AudioProfile &left, const AudioProfile &right);
+
+// Conversion routines, according to AidlConversion.h conventions.
+ConversionResult<AudioProfileVector>
+aidl2legacy_AudioProfileVector(const std::vector<media::AudioProfile>& aidl);
+ConversionResult<std::vector<media::AudioProfile>>
+legacy2aidl_AudioProfileVector(const AudioProfileVector& legacy);
+
+AudioProfileVector intersectAudioProfiles(const AudioProfileVector& profiles1,
+                                          const AudioProfileVector& profiles2);
 
 } // namespace android

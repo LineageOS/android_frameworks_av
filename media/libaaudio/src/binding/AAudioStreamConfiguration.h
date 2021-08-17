@@ -20,24 +20,24 @@
 #include <stdint.h>
 
 #include <aaudio/AAudio.h>
+#include <aaudio/StreamParameters.h>
 #include <binder/Parcel.h>
 #include <binder/Parcelable.h>
 #include "core/AAudioStreamParameters.h"
 
-using android::status_t;
-using android::Parcel;
-using android::Parcelable;
-
 namespace aaudio {
 
-class AAudioStreamConfiguration : public AAudioStreamParameters, public Parcelable {
+// This is a holder for AAudioStreamParameters, which allows conversion to/from it parcelable
+// representation, StreamParameters.
+class AAudioStreamConfiguration : public AAudioStreamParameters {
 public:
-    AAudioStreamConfiguration();
-    virtual ~AAudioStreamConfiguration();
+    AAudioStreamConfiguration() = default;
 
-    virtual status_t writeToParcel(Parcel* parcel) const override;
+    explicit AAudioStreamConfiguration(const StreamParameters& parcelable);
 
-    virtual status_t readFromParcel(const Parcel* parcel) override;
+    AAudioStreamConfiguration& operator=(const StreamParameters& parcelable);
+
+    StreamParameters parcelable() const;
 };
 
 } /* namespace aaudio */

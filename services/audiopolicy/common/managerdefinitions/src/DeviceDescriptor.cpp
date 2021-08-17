@@ -162,8 +162,12 @@ void DeviceDescriptor::toAudioPortConfig(struct audio_port_config *dstConfig,
 void DeviceDescriptor::toAudioPort(struct audio_port *port) const
 {
     ALOGV("DeviceDescriptor::toAudioPort() handle %d type %08x", mId, mDeviceTypeAddr.mType);
-    DeviceDescriptorBase::toAudioPort(port);
-    port->ext.device.hw_module = getModuleHandle();
+    toAudioPortInternal(port);
+}
+
+void DeviceDescriptor::toAudioPort(struct audio_port_v7 *port) const {
+    ALOGV("DeviceDescriptor::toAudioPort() v7 handle %d type %08x", mId, mDeviceTypeAddr.mType);
+    toAudioPortInternal(port);
 }
 
 void DeviceDescriptor::importAudioPortAndPickAudioProfile(
@@ -220,6 +224,18 @@ void DeviceVector::refreshTypes()
     ALOGV("DeviceVector::refreshTypes() mDeviceTypes %s", dumpDeviceTypes(mDeviceTypes).c_str());
 }
 
+void DeviceVector::refreshAudioProfiles() {
+    if (empty()) {
+        mSupportedProfiles.clear();
+        return;
+    }
+    mSupportedProfiles = itemAt(0)->getAudioProfiles();
+    for (size_t i = 1; i < size(); ++i) {
+        mSupportedProfiles = intersectAudioProfiles(
+                mSupportedProfiles, itemAt(i)->getAudioProfiles());
+    }
+}
+
 ssize_t DeviceVector::indexOf(const sp<DeviceDescriptor>& item) const
 {
     for (size_t i = 0; i < size(); i++) {
@@ -234,29 +250,50 @@ void DeviceVector::add(const DeviceVector &devices)
 {
     bool added = false;
     for (const auto& device : devices) {
+        ALOG_ASSERT(device != nullptr, "Null pointer found when adding DeviceVector");
         if (indexOf(device) < 0 && SortedVector::add(device) >= 0) {
             added = true;
         }
     }
     if (added) {
         refreshTypes();
+        refreshAudioProfiles();
     }
 }
 
 ssize_t DeviceVector::add(const sp<DeviceDescriptor>& item)
 {
+    ALOG_ASSERT(item != nullptr, "Adding null pointer to DeviceVector");
     ssize_t ret = indexOf(item);
 
     if (ret < 0) {
         ret = SortedVector::add(item);
         if (ret >= 0) {
             refreshTypes();
+            refreshAudioProfiles();
         }
     } else {
         ALOGW("DeviceVector::add device %08x already in", item->type());
         ret = -1;
     }
     return ret;
+}
+
+int DeviceVector::do_compare(const void* lhs, const void* rhs) const {
+    const auto ldevice = *reinterpret_cast<const sp<DeviceDescriptor>*>(lhs);
+    const auto rdevice = *reinterpret_cast<const sp<DeviceDescriptor>*>(rhs);
+    int ret = 0;
+
+    // sort by type.
+    ret = compare_type(ldevice->type(), rdevice->type());
+    if (ret != 0)
+        return ret;
+    // for same type higher priority for latest device.
+    ret = compare_type(rdevice->getId(), ldevice->getId());
+    if (ret != 0)
+        return ret;
+    // fallback to default sort using pointer address
+    return SortedVector::do_compare(lhs, rhs);
 }
 
 ssize_t DeviceVector::remove(const sp<DeviceDescriptor>& item)
@@ -269,6 +306,7 @@ ssize_t DeviceVector::remove(const sp<DeviceDescriptor>& item)
         ret = SortedVector::removeAt(ret);
         if (ret >= 0) {
             refreshTypes();
+            refreshAudioProfiles();
         }
     }
     return ret;

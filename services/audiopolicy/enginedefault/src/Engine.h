@@ -62,8 +62,10 @@ private:
     DeviceVector getOutputDevicesForStream(audio_stream_type_t stream,
                                            bool fromCache = false) const override;
 
-    sp<DeviceDescriptor> getInputDeviceForAttributes(
-            const audio_attributes_t &attr, sp<AudioPolicyMix> *mix = nullptr) const override;
+    sp<DeviceDescriptor> getInputDeviceForAttributes(const audio_attributes_t &attr,
+                                                     uid_t uid = 0,
+                                                     sp<AudioPolicyMix> *mix = nullptr)
+                                                     const override;
 
     void updateDeviceSelectionCache() override;
 
@@ -74,9 +76,15 @@ private:
 
     status_t setDefaultDevice(audio_devices_t device);
 
+    void filterOutputDevicesForStrategy(legacy_strategy strategy,
+                                            DeviceVector& availableOutputDevices,
+                                            const SwAudioOutputCollection &outputs) const;
+
+    product_strategy_t remapStrategyFromContext(product_strategy_t strategy,
+                                            const SwAudioOutputCollection &outputs) const;
+
     DeviceVector getDevicesForStrategyInt(legacy_strategy strategy,
                                           DeviceVector availableOutputDevices,
-                                          DeviceVector availableInputDevices,
                                           const SwAudioOutputCollection &outputs) const;
 
     DeviceVector getDevicesForProductStrategy(product_strategy_t strategy) const;

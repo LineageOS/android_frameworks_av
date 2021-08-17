@@ -50,6 +50,15 @@ static std::vector<T> Intersection(const std::set<T>& a, const std::set<T>& b) {
     return intersection;
 }
 
+template<typename T>
+static std::set<T> SetIntersection(const std::set<T>& a, const std::set<T> b) {
+    std::set<T> intersection;
+    std::set_intersection(a.begin(), a.end(),
+                          b.begin(), b.end(),
+                          std::inserter(intersection, intersection.begin()));
+    return intersection;
+}
+
 static inline ChannelMaskSet asInMask(const ChannelMaskSet& channelMasks) {
     ChannelMaskSet inMaskSet;
     for (const auto &channel : channelMasks) {

@@ -181,7 +181,8 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
         }
 
         CameraMetadata metadata;
-        rc = mCameraService->getCameraCharacteristics(cameraIdStr, &metadata);
+        rc = mCameraService->getCameraCharacteristics(cameraIdStr,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &metadata);
         if (!rc.isOk()) {
             // The test is relevant only for cameras with Hal 3.x
             // support.
@@ -207,7 +208,8 @@ TEST_F(CameraZSLTests, TestAllPictureSizes) {
 
         rc = mCameraService->connect(this, cameraId,
                 String16("ZSLTest"), hardware::ICameraService::USE_CALLING_UID,
-                hardware::ICameraService::USE_CALLING_PID, &cameraDevice);
+                hardware::ICameraService::USE_CALLING_PID,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &cameraDevice);
         EXPECT_TRUE(rc.isOk());
 
         CameraParameters params(cameraDevice->getParameters());

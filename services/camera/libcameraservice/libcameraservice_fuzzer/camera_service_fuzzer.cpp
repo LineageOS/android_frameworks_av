@@ -18,8 +18,18 @@
  * Originally developed and contributed by Ittiam Systems Pvt. Ltd, Bangalore
  */
 
+#define LOG_TAG "CameraServiceFuzzer"
+//#define LOG_NDEBUG 0
+
 #include <CameraService.h>
+#include <device3/Camera3StreamInterface.h>
+#include <android/hardware/BnCameraServiceListener.h>
+#include <android/hardware/camera2/BnCameraDeviceCallbacks.h>
 #include <android/hardware/ICameraServiceListener.h>
+#include <android/hardware/camera2/ICameraDeviceUser.h>
+#include <camera/camera2/OutputConfiguration.h>
+#include <gui/BufferItemConsumer.h>
+#include <gui/IGraphicBufferProducer.h>
 #include <gui/Surface.h>
 #include <gui/SurfaceComposerClient.h>
 #include <private/android_filesystem_config.h>
@@ -30,6 +40,7 @@ using namespace hardware;
 using namespace std;
 
 const int32_t kPreviewThreshold = 8;
+const int32_t kNumRequestsTested = 8;
 const nsecs_t kPreviewTimeout = 5000000000;  // .5 [s.]
 const nsecs_t kEventTimeout = 10000000000;   // 1 [s.]
 const size_t kMaxNumLines = USHRT_MAX;
@@ -39,6 +50,23 @@ const int32_t kCamType[] = {hardware::ICameraService::CAMERA_TYPE_BACKWARD_COMPA
                             hardware::ICameraService::CAMERA_TYPE_ALL};
 const int kCameraApiVersion[] = {android::CameraService::API_VERSION_1,
                                  android::CameraService::API_VERSION_2};
+const uint8_t kSensorPixelModes[] = {ANDROID_SENSOR_PIXEL_MODE_DEFAULT,
+        ANDROID_SENSOR_PIXEL_MODE_MAXIMUM_RESOLUTION};
+const int32_t kRequestTemplates[] = {
+    hardware::camera2::ICameraDeviceUser::TEMPLATE_PREVIEW,
+    hardware::camera2::ICameraDeviceUser::TEMPLATE_STILL_CAPTURE,
+    hardware::camera2::ICameraDeviceUser::TEMPLATE_RECORD,
+    hardware::camera2::ICameraDeviceUser::TEMPLATE_VIDEO_SNAPSHOT,
+    hardware::camera2::ICameraDeviceUser::TEMPLATE_MANUAL,
+    hardware::camera2::ICameraDeviceUser::TEMPLATE_ZERO_SHUTTER_LAG
+};
+
+const int32_t kRotations[] = {
+    camera3::CAMERA_STREAM_ROTATION_0,
+    camera3::CAMERA_STREAM_ROTATION_90,
+    camera3::CAMERA_STREAM_ROTATION_270
+};
+
 const int kLayerMetadata[] = {
     0x00100000 /*GRALLOC_USAGE_RENDERSCRIPT*/, 0x00000003 /*GRALLOC_USAGE_SW_READ_OFTEN*/,
     0x00000100 /*GRALLOC_USAGE_HW_TEXTURE*/,   0x00000800 /*GRALLOC_USAGE_HW_COMPOSER*/,
@@ -69,15 +97,15 @@ const size_t kNumShellCmd = size(kShellCmd);
 
 class CameraFuzzer : public ::android::hardware::BnCameraClient {
    public:
-    CameraFuzzer() = default;
+    CameraFuzzer(sp<CameraService> cs, std::shared_ptr<FuzzedDataProvider> fp) :
+          mCameraService(cs), mFuzzedDataProvider(fp) {};
     ~CameraFuzzer() { deInit(); }
-    bool init();
-    void process(const uint8_t *data, size_t size);
+    void process();
     void deInit();
 
    private:
-    FuzzedDataProvider *mFuzzedDataProvider = nullptr;
     sp<CameraService> mCameraService = nullptr;
+    std::shared_ptr<FuzzedDataProvider> mFuzzedDataProvider = nullptr;
     sp<SurfaceComposerClient> mComposerClient = nullptr;
     int32_t mNumCameras = 0;
     size_t mPreviewBufferCount = 0;
@@ -167,19 +195,7 @@ status_t CameraFuzzer::waitForEvent(Mutex &mutex, Condition &condition, bool &fl
     return rc;
 }
 
-bool CameraFuzzer::init() {
-    setuid(AID_MEDIA);
-    mCameraService = new CameraService();
-    if (mCameraService) {
-        return true;
-    }
-    return false;
-}
-
 void CameraFuzzer::deInit() {
-    if (mCameraService) {
-        mCameraService = nullptr;
-    }
     if (mComposerClient) {
         mComposerClient->dispose();
     }
@@ -216,7 +232,8 @@ void CameraFuzzer::getCameraInformation(int32_t cameraId) {
     mCameraService->getCameraInfo(cameraId, &cameraInfo);
 
     CameraMetadata metadata;
-    mCameraService->getCameraCharacteristics(cameraIdStr, &metadata);
+    mCameraService->getCameraCharacteristics(cameraIdStr,
+            /*targetSdkVersion*/__ANDROID_API_FUTURE__, &metadata);
 }
 
 void CameraFuzzer::invokeCameraSound() {
@@ -298,12 +315,12 @@ void CameraFuzzer::invokeCameraAPIs() {
     for (int32_t cameraId = 0; cameraId < mNumCameras; ++cameraId) {
         getCameraInformation(cameraId);
 
-        const String16 opPackageName("com.fuzzer.poc");
         ::android::binder::Status rc;
         sp<ICamera> cameraDevice;
 
-        rc = mCameraService->connect(this, cameraId, opPackageName, AID_MEDIA, AID_ROOT,
-                                     &cameraDevice);
+        rc = mCameraService->connect(this, cameraId, String16(),
+                android::CameraService::USE_CALLING_UID, android::CameraService::USE_CALLING_PID,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &cameraDevice);
         if (!rc.isOk()) {
             // camera not connected
             return;
@@ -405,8 +422,7 @@ void CameraFuzzer::invokeCameraAPIs() {
     }
 }
 
-void CameraFuzzer::process(const uint8_t *data, size_t size) {
-    mFuzzedDataProvider = new FuzzedDataProvider(data, size);
+void CameraFuzzer::process() {
     getNumCameras();
     invokeCameraSound();
     if (mNumCameras > 0) {
@@ -415,19 +431,170 @@ void CameraFuzzer::process(const uint8_t *data, size_t size) {
     invokeDump();
     invokeShellCommand();
     invokeNotifyCalls();
-    delete mFuzzedDataProvider;
+}
+
+class TestCameraServiceListener : public hardware::BnCameraServiceListener {
+public:
+    virtual ~TestCameraServiceListener() {};
+
+    virtual binder::Status onStatusChanged(int32_t , const String16&) {
+        return binder::Status::ok();
+    };
+
+    virtual binder::Status onPhysicalCameraStatusChanged(int32_t /*status*/,
+            const String16& /*cameraId*/, const String16& /*physicalCameraId*/) {
+        // No op
+        return binder::Status::ok();
+    };
+
+    virtual binder::Status onTorchStatusChanged(int32_t /*status*/, const String16& /*cameraId*/) {
+        return binder::Status::ok();
+    };
+
+    virtual binder::Status onCameraAccessPrioritiesChanged() {
+        // No op
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onCameraOpened(const String16& /*cameraId*/,
+            const String16& /*clientPackageName*/) {
+        // No op
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onCameraClosed(const String16& /*cameraId*/) {
+        // No op
+        return binder::Status::ok();
+    }
+};
+
+class TestCameraDeviceCallbacks : public hardware::camera2::BnCameraDeviceCallbacks {
+public:
+    TestCameraDeviceCallbacks() {}
+
+    virtual ~TestCameraDeviceCallbacks() {}
+
+    virtual binder::Status onDeviceError(int /*errorCode*/,
+            const CaptureResultExtras& /*resultExtras*/) {
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onDeviceIdle() {
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onCaptureStarted(const CaptureResultExtras& /*resultExtras*/,
+            int64_t /*timestamp*/) {
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onResultReceived(const CameraMetadata& /*metadata*/,
+            const CaptureResultExtras& /*resultExtras*/,
+            const std::vector<PhysicalCaptureResultInfo>& /*physicalResultInfos*/) {
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onPrepared(int /*streamId*/) {
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onRepeatingRequestError(
+            int64_t /*lastFrameNumber*/, int32_t /*stoppedSequenceId*/) {
+        return binder::Status::ok();
+    }
+
+    virtual binder::Status onRequestQueueEmpty() {
+        return binder::Status::ok();
+    }
+};
+
+class Camera2Fuzzer {
+   public:
+    Camera2Fuzzer(sp<CameraService> cs, std::shared_ptr<FuzzedDataProvider> fp) :
+          mCameraService(cs), mFuzzedDataProvider(fp) { };
+    ~Camera2Fuzzer() {}
+    void process();
+   private:
+    sp<CameraService> mCameraService = nullptr;
+    std::shared_ptr<FuzzedDataProvider> mFuzzedDataProvider = nullptr;
+};
+
+void Camera2Fuzzer::process() {
+    sp<TestCameraServiceListener> listener = new TestCameraServiceListener();
+    std::vector<hardware::CameraStatus> statuses;
+    mCameraService->addListenerTest(listener, &statuses);
+    for (auto s : statuses) {
+        sp<TestCameraDeviceCallbacks> callbacks(new TestCameraDeviceCallbacks());
+        sp<hardware::camera2::ICameraDeviceUser> device;
+        mCameraService->connectDevice(callbacks, String16(s.cameraId), String16(), {},
+                android::CameraService::USE_CALLING_UID, 0/*oomScoreDiff*/,
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &device);
+        if (device == nullptr) {
+            continue;
+        }
+        device->beginConfigure();
+        sp<IGraphicBufferProducer> gbProducer;
+        sp<IGraphicBufferConsumer> gbConsumer;
+        BufferQueue::createBufferQueue(&gbProducer, &gbConsumer);
+        sp<BufferItemConsumer> opaqueConsumer = new BufferItemConsumer(gbConsumer,
+                GRALLOC_USAGE_SW_READ_NEVER, /*maxImages*/8, /*controlledByApp*/true);
+        opaqueConsumer->setName(String8("Roger"));
+
+        // Set to VGA dimension for default, as that is guaranteed to be present
+        gbConsumer->setDefaultBufferSize(640, 480);
+        gbConsumer->setDefaultBufferFormat(HAL_PIXEL_FORMAT_IMPLEMENTATION_DEFINED);
+
+        sp<Surface> surface(new Surface(gbProducer, /*controlledByApp*/false));
+
+        String16 noPhysicalId;
+        size_t rotations = sizeof(kRotations) / sizeof(int32_t) - 1;
+        OutputConfiguration output(gbProducer,
+                kRotations[mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(0, rotations)],
+                noPhysicalId);
+        int streamId;
+        device->createStream(output, &streamId);
+        CameraMetadata sessionParams;
+        std::vector<int> offlineStreamIds;
+        device->endConfigure(/*isConstrainedHighSpeed*/ mFuzzedDataProvider->ConsumeBool(),
+                sessionParams, ns2ms(systemTime()), &offlineStreamIds);
+
+        CameraMetadata requestTemplate;
+        size_t requestTemplatesSize =  sizeof(kRequestTemplates) /sizeof(int32_t)  - 1;
+        device->createDefaultRequest(kRequestTemplates[
+                mFuzzedDataProvider->ConsumeIntegralInRange<size_t>(0, requestTemplatesSize)],
+                /*out*/&requestTemplate);
+        hardware::camera2::CaptureRequest request;
+        request.mSurfaceList.add(surface);
+        request.mIsReprocess = false;
+        hardware::camera2::utils::SubmitInfo info;
+        for (int i = 0; i < kNumRequestsTested; i++) {
+            uint8_t sensorPixelMode =
+                    kSensorPixelModes[mFuzzedDataProvider->ConsumeBool() ? 1 : 0];
+            requestTemplate.update(ANDROID_SENSOR_PIXEL_MODE, &sensorPixelMode, 1);
+            request.mPhysicalCameraSettings.clear();
+            request.mPhysicalCameraSettings.push_back({s.cameraId.string(), requestTemplate});
+            device->submitRequest(request, /*streaming*/false, /*out*/&info);
+            ALOGV("%s : camera id %s submit request id %d",__FUNCTION__, s.cameraId.string(),
+                    info.mRequestId);
+        }
+        device->disconnect();
+    }
 }
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
     if (size < 1) {
         return 0;
     }
-    sp<CameraFuzzer> camerafuzzer = new CameraFuzzer();
+    setuid(AID_CAMERASERVER);
+    std::shared_ptr<FuzzedDataProvider> fp = std::make_shared<FuzzedDataProvider>(data, size);
+    sp<CameraService> cs = new CameraService();
+    cs->clearCachedVariables();
+    sp<CameraFuzzer> camerafuzzer = new CameraFuzzer(cs, fp);
     if (!camerafuzzer) {
         return 0;
     }
-    if (camerafuzzer->init()) {
-        camerafuzzer->process(data, size);
-    }
+    camerafuzzer->process();
+    Camera2Fuzzer camera2fuzzer(cs, fp);
+    camera2fuzzer.process();
     return 0;
 }

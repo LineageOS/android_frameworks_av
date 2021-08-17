@@ -16,6 +16,18 @@ cc_defaults {
 }
 
 cc_test {
+    name: "audio_aidl_status_tests",
+    defaults: ["libaudioclient_tests_defaults"],
+    srcs: ["audio_aidl_status_tests.cpp"],
+    shared_libs: [
+        "libaudioclient_aidl_conversion",
+        "libbinder",
+        "libcutils",
+        "libutils",
+    ],
+}
+
+cc_test {
     name: "test_create_audiotrack",
     defaults: ["libaudioclient_tests_defaults"],
     srcs: ["test_create_audiotrack.cpp",
@@ -25,6 +37,7 @@ cc_test {
         "libmediametrics_headers",
     ],
     shared_libs: [
+        "framework-permission-aidl-cpp",
         "libaudioclient",
         "libbinder",
         "libcutils",
@@ -47,6 +60,7 @@ cc_test {
         "libbinder",
         "libcutils",
         "libutils",
+        "framework-permission-aidl-cpp",
     ],
     data: ["record_test_input_*.txt"],
 }

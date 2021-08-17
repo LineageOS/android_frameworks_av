@@ -32,11 +32,12 @@ namespace camera3 {
 class Camera3IOStreamBase :
         public Camera3Stream {
   protected:
-    Camera3IOStreamBase(int id, camera3_stream_type_t type,
+    Camera3IOStreamBase(int id, camera_stream_type_t type,
             uint32_t width, uint32_t height, size_t maxSize, int format,
-            android_dataspace dataSpace, camera3_stream_rotation_t rotation,
+            android_dataspace dataSpace, camera_stream_rotation_t rotation,
             const String8& physicalCameraId,
-            int setId = CAMERA3_STREAM_SET_ID_INVALID);
+            const std::unordered_set<int32_t> &sensorPixelModesUsed,
+            int setId = CAMERA3_STREAM_SET_ID_INVALID, bool isMultiResolution = false);
 
   public:
 
@@ -48,6 +49,7 @@ class Camera3IOStreamBase :
 
     virtual void     dump(int fd, const Vector<String16> &args) const;
 
+    int              getMaxTotalBuffers() const { return mTotalBufferCount; }
   protected:
     size_t            mTotalBufferCount;
     // sum of input and output buffers that are currently acquired by HAL
@@ -63,13 +65,13 @@ class Camera3IOStreamBase :
     sp<Fence>         mCombinedFence;
 
     status_t         returnAnyBufferLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>& surface_ids = std::vector<size_t>());
 
     virtual status_t returnBufferCheckedLocked(
-            const camera3_stream_buffer &buffer,
+            const camera_stream_buffer &buffer,
             nsecs_t timestamp,
             bool output,
             const std::vector<size_t>& surface_ids,
@@ -99,11 +101,11 @@ class Camera3IOStreamBase :
 
     // Hand out the buffer to a native location,
     //   incrementing the internal refcount and dequeued buffer count
-    void handoutBufferLocked(camera3_stream_buffer &buffer,
+    void handoutBufferLocked(camera_stream_buffer &buffer,
                              buffer_handle_t *handle,
                              int acquire_fence,
                              int release_fence,
-                             camera3_buffer_status_t status,
+                             camera_buffer_status_t status,
                              bool output);
 
 }; // class Camera3IOStreamBase

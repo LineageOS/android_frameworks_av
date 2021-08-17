@@ -22,7 +22,12 @@
 #include <utils/Vector.h>
 #include <utils/threads.h>
 
+#include <map>
+#include <mutex>
+#include <vector>
+
 #include "media/stagefright/foundation/ABase.h"
+#include "MediaMuxerBase.h"
 
 namespace android {
 
@@ -33,6 +38,7 @@ class MediaBuffer;
 struct MediaSource;
 class MetaData;
 struct MediaWriter;
+struct NuMediaExtractor;
 
 // MediaMuxer is used to mux multiple tracks into a video. Currently, we only
 // support a mp4 file as the output.
@@ -40,19 +46,8 @@ struct MediaWriter;
 // Constructor -> addTrack+ -> start -> writeSampleData+ -> stop
 // If muxing operation need to be cancelled, the app is responsible for
 // deleting the output file after stop.
-struct MediaMuxer : public RefBase {
+struct MediaMuxer : public MediaMuxerBase {
 public:
-    // Please update media/java/android/media/MediaMuxer.java if the
-    // OutputFormat is updated.
-    enum OutputFormat {
-        OUTPUT_FORMAT_MPEG_4      = 0,
-        OUTPUT_FORMAT_WEBM        = 1,
-        OUTPUT_FORMAT_THREE_GPP   = 2,
-        OUTPUT_FORMAT_HEIF        = 3,
-        OUTPUT_FORMAT_OGG         = 4,
-        OUTPUT_FORMAT_LIST_END // must be last - used to validate format type
-    };
-
     // Construct the muxer with the file descriptor. Note that the MediaMuxer
     // will close this file at stop().
     MediaMuxer(int fd, OutputFormat format);
@@ -117,10 +112,25 @@ public:
     status_t writeSampleData(const sp<ABuffer> &buffer, size_t trackIndex,
                              int64_t timeUs, uint32_t flags) ;
 
+    /**
+     * Gets the number of tracks added successfully.  Should be called in
+     * INITIALIZED(after constructor) or STARTED(after start()) state.
+     * @return the number of tracks or -1 in wrong state.
+     */
+    ssize_t getTrackCount();
+
+    /**
+     * Gets the format of the track by their index.
+     * @param idx : index of the track whose format is wanted.
+     * @return smart pointer to AMessage containing the format details.
+     */
+    sp<AMessage> getTrackFormat(size_t idx);
+
 private:
     const OutputFormat mFormat;
     sp<MediaWriter> mWriter;
     Vector< sp<MediaAdapter> > mTrackList;  // Each track has its MediaAdapter.
+    Vector< sp<AMessage> > mFormatList; // Format of each track.
     sp<MetaData> mFileMeta;  // Metadata for the whole file.
     Mutex mMuxerLock;
 

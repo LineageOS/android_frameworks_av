@@ -19,6 +19,7 @@
 
 #define ATRACE_TAG ATRACE_TAG_AUDIO
 
+#include <media/MediaMetricsItem.h>
 #include <utils/Trace.h>
 
 #include "client/AudioStreamInternalPlay.h"
@@ -32,6 +33,7 @@
 #define LOG_TAG (mInService ? "AudioStreamInternalPlay_Service" \
                             : "AudioStreamInternalPlay_Client")
 
+using android::status_t;
 using android::WrappingBuffer;
 
 using namespace aaudio;
@@ -55,7 +57,7 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
                              getDeviceChannelCount());
 
         if (result != AAUDIO_OK) {
-            releaseCloseFinal();
+            safeReleaseClose();
         }
         // Sample rate is constrained to common values by now and should not overflow.
         int32_t numFrames = kRampMSec * getSampleRate() / AAUDIO_MILLIS_PER_SECOND;
@@ -65,9 +67,9 @@ aaudio_result_t AudioStreamInternalPlay::open(const AudioStreamBuilder &builder)
 }
 
 // This must be called under mStreamLock.
-aaudio_result_t AudioStreamInternalPlay::requestPause()
+aaudio_result_t AudioStreamInternalPlay::requestPause_l()
 {
-    aaudio_result_t result = stopCallback();
+    aaudio_result_t result = stopCallback_l();
     if (result != AAUDIO_OK) {
         return result;
     }
@@ -82,7 +84,7 @@ aaudio_result_t AudioStreamInternalPlay::requestPause()
     return mServiceInterface.pauseStream(mServiceStreamHandle);
 }
 
-aaudio_result_t AudioStreamInternalPlay::requestFlush() {
+aaudio_result_t AudioStreamInternalPlay::requestFlush_l() {
     if (mServiceStreamHandle == AAUDIO_HANDLE_INVALID) {
         ALOGW("%s() mServiceStreamHandle invalid", __func__);
         return AAUDIO_ERROR_INVALID_STATE;
@@ -92,8 +94,13 @@ aaudio_result_t AudioStreamInternalPlay::requestFlush() {
     return mServiceInterface.flushStream(mServiceStreamHandle);
 }
 
-void AudioStreamInternalPlay::advanceClientToMatchServerPosition() {
-    int64_t readCounter = mAudioEndpoint->getDataReadCounter();
+void AudioStreamInternalPlay::prepareBuffersForStart() {
+    // Prevent stale data from being played.
+    mAudioEndpoint->eraseDataMemory();
+}
+
+void AudioStreamInternalPlay::advanceClientToMatchServerPosition(int32_t serverMargin) {
+    int64_t readCounter = mAudioEndpoint->getDataReadCounter() + serverMargin;
     int64_t writeCounter = mAudioEndpoint->getDataWriteCounter();
 
     // Bump offset so caller does not see the retrograde motion in getFramesRead().
@@ -151,7 +158,9 @@ aaudio_result_t AudioStreamInternalPlay::processDataNow(void *buffer, int32_t nu
     if (mNeedCatchUp.isRequested()) {
         // Catch an MMAP pointer that is already advancing.
         // This will avoid initial underruns caused by a slow cold start.
-        advanceClientToMatchServerPosition();
+        // We add a one burst margin in case the DSP advances before we can write the data.
+        // This can help prevent the beginning of the stream from being skipped.
+        advanceClientToMatchServerPosition(getFramesPerBurst());
         mNeedCatchUp.acknowledge();
     }
 
@@ -293,7 +302,7 @@ void *AudioStreamInternalPlay::callbackLoop() {
             }
         } else if (callbackResult == AAUDIO_CALLBACK_RESULT_STOP) {
             ALOGD("%s(): callback returned AAUDIO_CALLBACK_RESULT_STOP", __func__);
-            result = systemStopFromCallback();
+            result = systemStopInternal();
             break;
         }
     }

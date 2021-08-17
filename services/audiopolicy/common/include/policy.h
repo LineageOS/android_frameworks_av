@@ -42,7 +42,7 @@ static const uint32_t SONIFICATION_RESPECTFUL_AFTER_MUSIC_DELAY = 5000;
 
 // For mixed output and inputs, the policy will use max mixer channel count.
 // Do not limit channel count otherwise
-#define MAX_MIXER_CHANNEL_COUNT FCC_8
+#define MAX_MIXER_CHANNEL_COUNT FCC_LIMIT
 
 /**
  * Alias to AUDIO_DEVICE_OUT_DEFAULT defined for clarification when this value is used by volume
@@ -226,6 +226,8 @@ static inline audio_devices_t apm_extract_one_audio_device(
             return AUDIO_DEVICE_OUT_SPEAKER_SAFE;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_ARC) != 0) {
             return AUDIO_DEVICE_OUT_HDMI_ARC;
+        } else if (deviceTypes.count(AUDIO_DEVICE_OUT_HDMI_EARC) != 0) {
+            return AUDIO_DEVICE_OUT_HDMI_EARC;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_AUX_LINE) != 0) {
             return AUDIO_DEVICE_OUT_AUX_LINE;
         } else if (deviceTypes.count(AUDIO_DEVICE_OUT_SPDIF) != 0) {

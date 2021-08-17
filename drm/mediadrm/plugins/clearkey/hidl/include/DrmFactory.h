@@ -17,15 +17,15 @@
 #ifndef CLEARKEY_DRM_FACTORY_H_
 #define CLEARKEY_DRM_FACTORY_H_
 
-#include <android/hardware/drm/1.2/IDrmPlugin.h>
-#include <android/hardware/drm/1.3/IDrmFactory.h>
+#include <android/hardware/drm/1.4/IDrmPlugin.h>
+#include <android/hardware/drm/1.4/IDrmFactory.h>
 
 #include "ClearKeyTypes.h"
 
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_3 {
+namespace V1_4 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_1::SecurityLevel;
@@ -63,7 +63,7 @@ private:
 };
 
 } // namespace clearkey
-} // namespace V1_3
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

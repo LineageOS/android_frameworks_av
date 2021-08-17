@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include <AudioPolicyManagerObserver.h>
 #include <media/AudioProductStrategy.h>
 #include <media/AudioVolumeGroup.h>
@@ -35,7 +37,7 @@ using DeviceStrategyMap = std::map<product_strategy_t, DeviceVector>;
 using StrategyVector = std::vector<product_strategy_t>;
 using VolumeGroupVector = std::vector<volume_group_t>;
 using CapturePresetDevicesRoleMap =
-        std::map<audio_source_t, std::map<device_role_t, AudioDeviceTypeAddrVector>>;
+        std::map<std::pair<audio_source_t, device_role_t>, AudioDeviceTypeAddrVector>;
 
 /**
  * This interface is dedicated to the policy manager that a Policy Engine shall implement.
@@ -110,11 +112,12 @@ public:
      * Get the strategy selected for a given audio attributes.
      *
      * @param[in] audio attributes to get the selected @product_strategy_t followed by.
-     *
+     * @param fallbackOnDefault if true, will return the fallback strategy if the attributes
+     * are not explicitly assigned to a given strategy.
      * @return @product_strategy_t to be followed.
      */
     virtual product_strategy_t getProductStrategyForAttributes(
-            const audio_attributes_t &attr) const = 0;
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const = 0;
 
     /**
      * @brief getOutputDevicesForAttributes retrieves the devices to be used for given
@@ -170,8 +173,10 @@ public:
      * @param[out] mix to be used if a mix has been installed for the given audio attributes.
      * @return selected input device for the audio attributes, may be null if error.
      */
-    virtual sp<DeviceDescriptor> getInputDeviceForAttributes(
-            const audio_attributes_t &attr, sp<AudioPolicyMix> *mix = nullptr) const = 0;
+    virtual sp<DeviceDescriptor> getInputDeviceForAttributes(const audio_attributes_t &attr,
+                                                             uid_t uid = 0,
+                                                             sp<AudioPolicyMix> *mix = nullptr)
+                                                             const = 0;
 
     /**
      * Get the legacy stream type for a given audio attributes.
@@ -271,19 +276,25 @@ public:
      * @brief getVolumeGroupForAttributes gets the appropriate volume group to be used for a given
      * Audio Attributes.
      * @param attr to be considered
+     * @param fallbackOnDefault if true, will return the fallback volume group if the attributes
+     * are not associated to any volume group.
      * @return volume group associated to the given audio attributes, default group if none
      * applicable, VOLUME_GROUP_NONE if no default group defined.
      */
-    virtual volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const = 0;
+    virtual volume_group_t getVolumeGroupForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const = 0;
 
     /**
      * @brief getVolumeGroupForStreamType gets the appropriate volume group to be used for a given
      * legacy stream type
      * @param stream type to be considered
+     * @param fallbackOnDefault if true, will return the fallback volume group if the stream type
+     * is not associated to any volume group.
      * @return volume group associated to the given stream type, default group if none applicable,
      * VOLUME_GROUP_NONE if no default group defined.
      */
-    virtual volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const = 0;
+    virtual volume_group_t getVolumeGroupForStreamType(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const = 0;
 
     /**
      * @brief listAudioVolumeGroups introspection API to get the Audio Volume Groups, aka
@@ -403,6 +414,12 @@ public:
     virtual status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
             device_role_t role, AudioDeviceTypeAddrVector &devices) const = 0;
 
+    /**
+     * @brief getActiveMediaDevices returns which devices will most likely to be used for media
+     * @param availableDevices all available devices
+     * @return collection of active devices
+     */
+    virtual DeviceVector getActiveMediaDevices(const DeviceVector& availableDevices) const = 0;
 
     virtual void dump(String8 *dst) const = 0;
 

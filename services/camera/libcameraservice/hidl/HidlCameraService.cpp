@@ -38,7 +38,7 @@ using hardware::cameraservice::utils::conversion::B2HStatus;
 using hardware::Void;
 
 using device::V2_0::implementation::H2BCameraDeviceCallbacks;
-using device::V2_0::implementation::HidlCameraDeviceUser;
+using device::V2_1::implementation::HidlCameraDeviceUser;
 using service::V2_0::implementation::H2BCameraServiceListener;
 using HCameraMetadataType = frameworks::cameraservice::common::V2_0::CameraMetadataType;
 using HVendorTag = frameworks::cameraservice::common::V2_0::VendorTag;
@@ -59,7 +59,8 @@ HidlCameraService::getCameraCharacteristics(const hidl_string& cameraId,
     android::CameraMetadata cameraMetadata;
     HStatus status = HStatus::NO_ERROR;
     binder::Status serviceRet =
-        mAidlICameraService->getCameraCharacteristics(String16(cameraId.c_str()), &cameraMetadata);
+        mAidlICameraService->getCameraCharacteristics(String16(cameraId.c_str()),
+                /*targetSdkVersion*/__ANDROID_API_FUTURE__, &cameraMetadata);
     HCameraMetadata hidlMetadata;
     if (!serviceRet.isOk()) {
         switch(serviceRet.serviceSpecificErrorCode()) {
@@ -104,7 +105,8 @@ Return<void> HidlCameraService::connectDevice(const sp<HCameraDeviceCallback>& h
     sp<hardware::camera2::ICameraDeviceCallbacks> callbacks = hybridCallbacks;
     binder::Status serviceRet = mAidlICameraService->connectDevice(
             callbacks, String16(cameraId.c_str()), String16(""), {},
-            hardware::ICameraService::USE_CALLING_UID, /*out*/&deviceRemote);
+            hardware::ICameraService::USE_CALLING_UID, 0/*oomScoreOffset*/,
+            /*targetSdkVersion*/__ANDROID_API_FUTURE__, /*out*/&deviceRemote);
     HStatus status = HStatus::NO_ERROR;
     if (!serviceRet.isOk()) {
         ALOGE("%s: Unable to connect to camera device", __FUNCTION__);

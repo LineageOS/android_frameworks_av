@@ -98,6 +98,11 @@ struct C2OMXNode : public BnOMXNode {
      */
     android_dataspace getDataspace();
 
+    /**
+     * Sets priority of the queue thread.
+     */
+    void setPriority(int priority);
+
 private:
     std::weak_ptr<Codec2Client::Component> mComp;
     sp<IOMXBufferSource> mBufferSource;

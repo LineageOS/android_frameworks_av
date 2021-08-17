@@ -32,11 +32,13 @@ namespace camera3 {
  * Utilities to transform between unrotated and rotated-and-cropped coordinate systems
  * for cameras that support SCALER_ROTATE_AND_CROP controls in AUTO mode.
  */
-class RotateAndCropMapper : private CoordinateMapper {
+class RotateAndCropMapper : public CoordinateMapper {
   public:
     static bool isNeeded(const CameraMetadata* deviceInfo);
 
     RotateAndCropMapper(const CameraMetadata* deviceInfo);
+
+    void initRemappedKeys() override;
 
     /**
      * Adjust capture request assuming rotate and crop AUTO is enabled

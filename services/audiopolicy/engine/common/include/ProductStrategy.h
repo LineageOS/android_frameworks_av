@@ -18,20 +18,20 @@
 
 #include "VolumeGroup.h"
 
-#include <system/audio.h>
-#include <utils/RefBase.h>
-#include <HandleGenerator.h>
-#include <string>
-#include <vector>
 #include <map>
-#include <utils/Errors.h>
-#include <utils/String8.h>
+#include <string>
+#include <utility>
+#include <vector>
+
+#include <HandleGenerator.h>
 #include <media/AudioAttributes.h>
 #include <media/AudioContainers.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioPolicy.h>
-
-#include <vector>
+#include <system/audio.h>
+#include <utils/Errors.h>
+#include <utils/RefBase.h>
+#include <utils/String8.h>
 
 namespace android {
 
@@ -129,7 +129,8 @@ public:
      * @param attr
      * @return applicable product strategy for the given attribute, default if none applicable.
      */
-    product_strategy_t getProductStrategyForAttributes(const audio_attributes_t &attr) const;
+    product_strategy_t getProductStrategyForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const;
 
     product_strategy_t getProductStrategyForStream(audio_stream_type_t stream) const;
 
@@ -153,9 +154,11 @@ public:
 
     std::string getDeviceAddressForProductStrategy(product_strategy_t strategy) const;
 
-    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const;
+    volume_group_t getVolumeGroupForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const;
 
-    volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const;
+    volume_group_t getVolumeGroupForStreamType(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const;
 
     volume_group_t getDefaultVolumeGroup() const;
 
@@ -167,11 +170,12 @@ private:
     product_strategy_t mDefaultStrategy = PRODUCT_STRATEGY_NONE;
 };
 
-class ProductStrategyPreferredRoutingMap : public std::map<product_strategy_t,
-                                                           AudioDeviceTypeAddrVector>
-{
-public:
-    void dump(String8 *dst, int spaces = 0) const;
-};
+using ProductStrategyDevicesRoleMap =
+        std::map<std::pair<product_strategy_t, device_role_t>, AudioDeviceTypeAddrVector>;
+
+void dumpProductStrategyDevicesRoleMap(
+        const ProductStrategyDevicesRoleMap& productStrategyDeviceRoleMap,
+        String8 *dst,
+        int spaces);
 
 } // namespace android

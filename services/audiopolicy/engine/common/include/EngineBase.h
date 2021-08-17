@@ -53,7 +53,7 @@ public:
                                                audio_policy_dev_state_t /*state*/) override;
 
     product_strategy_t getProductStrategyForAttributes(
-            const audio_attributes_t &attr) const override;
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const override;
 
     audio_stream_type_t getStreamTypeForAttributes(const audio_attributes_t &attr) const override;
 
@@ -79,9 +79,11 @@ public:
 
     VolumeGroupVector getVolumeGroups() const override;
 
-    volume_group_t getVolumeGroupForAttributes(const audio_attributes_t &attr) const override;
+    volume_group_t getVolumeGroupForAttributes(
+            const audio_attributes_t &attr, bool fallbackOnDefault = true) const override;
 
-    volume_group_t getVolumeGroupForStreamType(audio_stream_type_t stream) const override;
+    volume_group_t getVolumeGroupForStreamType(
+            audio_stream_type_t stream, bool fallbackOnDefault = true) const override;
 
     status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) const override;
 
@@ -151,12 +153,30 @@ public:
     status_t getDevicesForRoleAndCapturePreset(audio_source_t audioSource,
             device_role_t role, AudioDeviceTypeAddrVector &devices) const override;
 
+    DeviceVector getActiveMediaDevices(const DeviceVector& availableDevices) const override;
+
 private:
+    /**
+     * Get media devices as the given role
+     *
+     * @param role the audio devices role
+     * @param availableDevices all available devices
+     * @param devices the DeviceVector to store devices as the given role
+     * @return NO_ERROR if all devices associated to the given role are present in available devices
+     *         NAME_NO_FOUND if there is no strategy for media or there are no devices associate to
+     *         the given role
+     *         NOT_ENOUGH_DATA if not all devices as given role are present in available devices
+     */
+    status_t getMediaDevicesForRole(device_role_t role, const DeviceVector& availableDevices,
+            DeviceVector& devices) const;
+
+    void dumpCapturePresetDevicesRoleMap(String8 *dst, int spaces) const;
+
     AudioPolicyManagerObserver *mApmObserver = nullptr;
 
     ProductStrategyMap mProductStrategies;
-    ProductStrategyPreferredRoutingMap mProductStrategyPreferredDevices;
-    CapturePresetDevicesRoleMap mCapturePresetDevicesRole;
+    ProductStrategyDevicesRoleMap mProductStrategyDeviceRoleMap;
+    CapturePresetDevicesRoleMap mCapturePresetDevicesRoleMap;
     VolumeGroupMap mVolumeGroups;
     LastRemovableMediaDevices mLastRemovableMediaDevices;
     audio_mode_t mPhoneState = AUDIO_MODE_NORMAL;  /**< current phone state. */

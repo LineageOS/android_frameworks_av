@@ -41,7 +41,7 @@ AAudioClientTracker::AAudioClientTracker()
         : Singleton<AAudioClientTracker>() {
 }
 
-std::string AAudioClientTracker::dump() const {
+std::string AAudioClientTracker::dump() const NO_THREAD_SAFETY_ANALYSIS {
     std::stringstream result;
     const bool isLocked = AAudio_tryUntilTrue(
             [this]()->bool { return mLock.try_lock(); } /* f */,
@@ -198,7 +198,7 @@ void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who 
         for (const auto& serviceStream : streamsToClose) {
             aaudio_handle_t handle = serviceStream->getHandle();
             ALOGW("binderDied() close abandoned stream 0x%08X\n", handle);
-            aaudioService->closeStream(handle);
+            aaudioService->asAAudioServiceInterface().closeStream(handle);
         }
         // mStreams should be empty now
     }
@@ -207,7 +207,7 @@ void AAudioClientTracker::NotificationClient::binderDied(const wp<IBinder>& who 
 }
 
 
-std::string AAudioClientTracker::NotificationClient::dump() const {
+std::string AAudioClientTracker::NotificationClient::dump() const NO_THREAD_SAFETY_ANALYSIS {
     std::stringstream result;
     const bool isLocked = AAudio_tryUntilTrue(
             [this]()->bool { return mLock.try_lock(); } /* f */,

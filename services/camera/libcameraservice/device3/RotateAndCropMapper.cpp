@@ -27,6 +27,18 @@ namespace android {
 
 namespace camera3 {
 
+void RotateAndCropMapper::initRemappedKeys() {
+    mRemappedKeys.insert(
+            kMeteringRegionsToCorrect.begin(),
+            kMeteringRegionsToCorrect.end());
+    mRemappedKeys.insert(
+            kResultPointsToCorrectNoClamp.begin(),
+            kResultPointsToCorrectNoClamp.end());
+
+    mRemappedKeys.insert(ANDROID_SCALER_ROTATE_AND_CROP);
+    mRemappedKeys.insert(ANDROID_SCALER_CROP_REGION);
+}
+
 bool RotateAndCropMapper::isNeeded(const CameraMetadata* deviceInfo) {
     auto entry = deviceInfo->find(ANDROID_SCALER_AVAILABLE_ROTATE_AND_CROP_MODES);
     for (size_t i = 0; i < entry.count; i++) {
@@ -36,6 +48,8 @@ bool RotateAndCropMapper::isNeeded(const CameraMetadata* deviceInfo) {
 }
 
 RotateAndCropMapper::RotateAndCropMapper(const CameraMetadata* deviceInfo) {
+    initRemappedKeys();
+
     auto entry = deviceInfo->find(ANDROID_SENSOR_INFO_ACTIVE_ARRAY_SIZE);
     if (entry.count != 4) return;
 

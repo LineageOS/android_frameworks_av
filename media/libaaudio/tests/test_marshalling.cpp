@@ -33,6 +33,29 @@ using android::base::unique_fd;
 using namespace android;
 using namespace aaudio;
 
+template<typename T>
+T copy(const T& object) {
+    return T(object);
+}
+
+template<>
+SharedMemoryParcelable copy<SharedMemoryParcelable>(const SharedMemoryParcelable& object) {
+    return object.dup();
+}
+
+template<typename T>
+void writeToParcel(const T& object, Parcel* parcel) {
+    copy(object).parcelable().writeToParcel(parcel);
+}
+
+template<typename T>
+T readFromParcel(const Parcel& parcel) {
+    using ParcelType = std::decay_t<decltype(std::declval<T>().parcelable())>;
+    ParcelType parcelable;
+    parcelable.readFromParcel(&parcel);
+    return T(std::move(parcelable));
+}
+
 // Test adding one value.
 TEST(test_marshalling, aaudio_one_read_write) {
     Parcel parcel;
@@ -48,7 +71,6 @@ TEST(test_marshalling, aaudio_one_read_write) {
 // Test SharedMemoryParcel.
 TEST(test_marshalling, aaudio_shared_memory) {
     SharedMemoryParcelable sharedMemoryA;
-    SharedMemoryParcelable sharedMemoryB;
     const size_t memSizeBytes = 840;
     unique_fd fd(ashmem_create_region("TestMarshalling", memSizeBytes));
     ASSERT_LE(0, fd);
@@ -63,10 +85,10 @@ TEST(test_marshalling, aaudio_shared_memory) {
 
     Parcel parcel;
     size_t pos = parcel.dataPosition();
-    sharedMemoryA.writeToParcel(&parcel);
+    writeToParcel(sharedMemoryA, &parcel);
 
     parcel.setDataPosition(pos);
-    sharedMemoryB.readFromParcel(&parcel);
+    SharedMemoryParcelable sharedMemoryB = readFromParcel<SharedMemoryParcelable>(parcel);
     EXPECT_EQ(sharedMemoryA.getSizeInBytes(), sharedMemoryB.getSizeInBytes());
 
     // should see same value at two different addresses
@@ -81,7 +103,6 @@ TEST(test_marshalling, aaudio_shared_memory) {
 TEST(test_marshalling, aaudio_shared_region) {
     SharedMemoryParcelable sharedMemories[2];
     SharedRegionParcelable sharedRegionA;
-    SharedRegionParcelable sharedRegionB;
     const size_t memSizeBytes = 840;
     unique_fd fd(ashmem_create_region("TestMarshalling", memSizeBytes));
     ASSERT_LE(0, fd);
@@ -97,10 +118,10 @@ TEST(test_marshalling, aaudio_shared_region) {
 
     Parcel parcel;
     size_t pos = parcel.dataPosition();
-    sharedRegionA.writeToParcel(&parcel);
+    writeToParcel(sharedRegionA, &parcel);
 
     parcel.setDataPosition(pos);
-    sharedRegionB.readFromParcel(&parcel);
+    SharedRegionParcelable sharedRegionB = readFromParcel<SharedRegionParcelable>(parcel);
 
     // should see same value
     void *region2;
@@ -113,7 +134,6 @@ TEST(test_marshalling, aaudio_shared_region) {
 TEST(test_marshalling, aaudio_ring_buffer_parcelable) {
     SharedMemoryParcelable sharedMemories[2];
     RingBufferParcelable ringBufferA;
-    RingBufferParcelable ringBufferB;
 
     const size_t bytesPerFrame = 8;
     const size_t framesPerBurst = 32;
@@ -147,11 +167,11 @@ TEST(test_marshalling, aaudio_ring_buffer_parcelable) {
     // write A to parcel
     Parcel parcel;
     size_t pos = parcel.dataPosition();
-    ringBufferA.writeToParcel(&parcel);
+    writeToParcel(ringBufferA, &parcel);
 
     // read B from parcel
     parcel.setDataPosition(pos);
-    ringBufferB.readFromParcel(&parcel);
+    RingBufferParcelable ringBufferB = readFromParcel<RingBufferParcelable>(parcel);
 
     RingBufferDescriptor descriptorB;
     EXPECT_EQ(AAUDIO_OK, ringBufferB.resolve(sharedMemories, &descriptorB));

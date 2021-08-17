@@ -31,13 +31,13 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_3 {
+namespace V1_4 {
 namespace clearkey {
 
 using ::android::hardware::drm::V1_0::Status;
 using ::android::hardware::drm::V1_1::SecurityLevel;
-using ::android::hardware::drm::V1_2::clearkey::DrmPlugin;
-using ::android::hardware::drm::V1_2::clearkey::SessionLibrary;
+using ::android::hardware::drm::V1_4::clearkey::DrmPlugin;
+using ::android::hardware::drm::V1_4::clearkey::SessionLibrary;
 using ::android::hardware::Void;
 
 Return<bool> DrmFactory::isCryptoSchemeSupported(
@@ -105,7 +105,7 @@ Return<void> DrmFactory::debug(const hidl_handle& fd, const hidl_vec<hidl_string
 }
 
 } // namespace clearkey
-} // namespace V1_3
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

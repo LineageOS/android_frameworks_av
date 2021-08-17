@@ -46,7 +46,7 @@ public:
 
     // Returns INVALID_OPERATION if there is no source or track.
     virtual status_t start(MetaData *param = NULL);
-    virtual status_t stop() { return reset(); }
+    virtual status_t stop();
     virtual status_t pause();
     virtual bool reachedEOS();
     virtual status_t dump(int fd, const Vector<String16>& args);
@@ -97,6 +97,7 @@ private:
     sp<MetaData> mStartMeta;
     status_t mInitCheck;
     bool mIsRealTimeRecording;
+    bool mIsBackgroundMode;
     bool mUse4ByteNalLength;
     bool mIsFileSizeLimitExplicitlyRequested;
     bool mPaused;
@@ -106,6 +107,7 @@ private:
     off64_t mOffset;
     off64_t mPreAllocateFileEndOffset;  //End of file offset during preallocation.
     off64_t mMdatOffset;
+    off64_t mMaxOffsetAppend; // File offset written upto while appending.
     off64_t mMdatEndOffset;  // End offset of mdat atom.
     uint8_t *mInMemoryCache;
     off64_t mInMemoryCacheOffset;
@@ -126,6 +128,7 @@ private:
     bool mWriteSeekErr;
     bool mFallocateErr;
     bool mPreAllocationEnabled;
+    status_t mResetStatus;
     // Queue to hold top long write durations
     std::priority_queue<std::chrono::microseconds, std::vector<std::chrono::microseconds>,
                         std::greater<std::chrono::microseconds>> mWriteDurationPQ;
@@ -135,7 +138,9 @@ private:
     sp<AHandlerReflector<MPEG4Writer> > mReflector;
 
     Mutex mLock;
+    // Serialize reset calls from client of MPEG4Writer and MP4WtrCtrlHlpLooper.
     std::mutex mResetMutex;
+    // Serialize preallocation calls from different track threads.
     std::mutex mFallocMutex;
     bool mPreAllocFirstTime; // Pre-allocate space for file and track headers only once per file.
     uint64_t mPrevAllTracksTotalMetaDataSizeEstimate;
@@ -271,6 +276,10 @@ private:
     // By default, real time recording is on.
     bool isRealTimeRecording() const;
 
+    // Return whether the writer is used in background mode for media
+    // transcoding.
+    bool isBackgroundMode() const;
+
     void lock();
     void unlock();
 
@@ -304,7 +313,7 @@ private:
     void writeGeoDataBox();
     void writeLatitude(int degreex10000);
     void writeLongitude(int degreex10000);
-    void finishCurrentSession();
+    status_t finishCurrentSession();
 
     void addDeviceMeta();
     void writeHdlr(const char *handlerType);
@@ -337,7 +346,7 @@ private:
     void sendSessionSummary();
     status_t release();
     status_t switchFd();
-    status_t reset(bool stopSource = true);
+    status_t reset(bool stopSource = true, bool waitForAnyPreviousCallToComplete = true);
 
     static uint32_t getMpeg4Time();
 

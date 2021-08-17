@@ -29,13 +29,15 @@ namespace android {
 
 namespace camera3 {
 
-Camera3IOStreamBase::Camera3IOStreamBase(int id, camera3_stream_type_t type,
+Camera3IOStreamBase::Camera3IOStreamBase(int id, camera_stream_type_t type,
         uint32_t width, uint32_t height, size_t maxSize, int format,
-        android_dataspace dataSpace, camera3_stream_rotation_t rotation,
-        const String8& physicalCameraId, int setId) :
+        android_dataspace dataSpace, camera_stream_rotation_t rotation,
+        const String8& physicalCameraId,
+        const std::unordered_set<int32_t> &sensorPixelModesUsed,
+        int setId, bool isMultiResolution) :
         Camera3Stream(id, type,
                 width, height, maxSize, format, dataSpace, rotation,
-                physicalCameraId, setId),
+                physicalCameraId, sensorPixelModesUsed, setId, isMultiResolution),
         mTotalBufferCount(0),
         mHandoutTotalBufferCount(0),
         mHandoutOutputBufferCount(0),
@@ -77,13 +79,13 @@ void Camera3IOStreamBase::dump(int fd, const Vector<String16> &args) const {
 
     lines.appendFormat("      State: %d\n", mState);
     lines.appendFormat("      Dims: %d x %d, format 0x%x, dataspace 0x%x\n",
-            camera3_stream::width, camera3_stream::height,
-            camera3_stream::format, camera3_stream::data_space);
+            camera_stream::width, camera_stream::height,
+            camera_stream::format, camera_stream::data_space);
     lines.appendFormat("      Max size: %zu\n", mMaxSize);
     lines.appendFormat("      Combined usage: %" PRIu64 ", max HAL buffers: %d\n",
-            mUsage | consumerUsage, camera3_stream::max_buffers);
-    if (strlen(camera3_stream::physical_camera_id) > 0) {
-        lines.appendFormat("      Physical camera id: %s\n", camera3_stream::physical_camera_id);
+            mUsage | consumerUsage, camera_stream::max_buffers);
+    if (strlen(camera_stream::physical_camera_id) > 0) {
+        lines.appendFormat("      Physical camera id: %s\n", camera_stream::physical_camera_id);
     }
     lines.appendFormat("      Frames produced: %d, last timestamp: %" PRId64 " ns\n",
             mFrameCount, mLastTimestamp);
@@ -150,11 +152,11 @@ status_t Camera3IOStreamBase::disconnectLocked() {
    return OK;
 }
 
-void Camera3IOStreamBase::handoutBufferLocked(camera3_stream_buffer &buffer,
+void Camera3IOStreamBase::handoutBufferLocked(camera_stream_buffer &buffer,
                                               buffer_handle_t *handle,
                                               int acquireFence,
                                               int releaseFence,
-                                              camera3_buffer_status_t status,
+                                              camera_buffer_status_t status,
                                               bool output) {
     /**
      * Note that all fences are now owned by HAL.
@@ -220,7 +222,7 @@ status_t Camera3IOStreamBase::returnBufferPreconditionCheckLocked() const {
 }
 
 status_t Camera3IOStreamBase::returnAnyBufferLocked(
-        const camera3_stream_buffer &buffer,
+        const camera_stream_buffer &buffer,
         nsecs_t timestamp,
         bool output,
         const std::vector<size_t>& surface_ids) {

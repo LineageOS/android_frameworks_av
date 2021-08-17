@@ -73,9 +73,10 @@ TEST_P(Codec2MasterHalTest, ListComponents) {
             ASSERT_NE(listener, nullptr);
 
             // Create component from all known services
-            component =
-                    mClient->CreateComponentByName(listTraits[i].name.c_str(), listener, &mClient);
-            ASSERT_NE(component, nullptr)
+            const c2_status_t status =
+                    android::Codec2Client::CreateComponentByName(
+                            listTraits[i].name.c_str(), listener, &component, &mClient);
+            ASSERT_EQ(status, C2_OK)
                     << "Create component failed for " << listTraits[i].name.c_str();
         }
     }

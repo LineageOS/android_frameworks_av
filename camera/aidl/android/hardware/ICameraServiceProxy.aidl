@@ -16,10 +16,10 @@
 
 package android.hardware;
 
+import android.hardware.CameraSessionStats;
+
 /**
  * Binder interface for the camera service proxy running in system_server.
- *
- * Keep in sync with frameworks/av/include/camera/ICameraServiceProxy.h
  *
  * @hide
  */
@@ -30,30 +30,15 @@ interface ICameraServiceProxy
      */
     oneway void pingForUserUpdate();
 
-    /**
-     * Values for notifyCameraState newCameraState
-     */
-    const int CAMERA_STATE_OPEN = 0;
-    const int CAMERA_STATE_ACTIVE = 1;
-    const int CAMERA_STATE_IDLE = 2;
-    const int CAMERA_STATE_CLOSED = 3;
-
-    /**
-     * Values for notifyCameraState facing
-     */
-    const int CAMERA_FACING_BACK = 0;
-    const int CAMERA_FACING_FRONT = 1;
-    const int CAMERA_FACING_EXTERNAL = 2;
-
-    /**
-     * Values for notifyCameraState api level
-     */
-     const int CAMERA_API_LEVEL_1 = 1;
-     const int CAMERA_API_LEVEL_2 = 2;
 
     /**
      * Update the status of a camera device.
      */
-    oneway void notifyCameraState(String cameraId, int facing, int newCameraState,
-            String clientName, int apiLevel);
+    oneway void notifyCameraState(in CameraSessionStats cameraSessionStats);
+
+    /**
+     * Reports whether the top activity needs a rotate and crop override.
+     */
+    boolean isRotateAndCropOverrideNeeded(String packageName, int sensorOrientation,
+            int lensFacing);
 }

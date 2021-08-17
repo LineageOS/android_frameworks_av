@@ -17,7 +17,7 @@
 #ifndef CLEARKEY_CRYPTO_PLUGIN_H_
 #define CLEARKEY_CRYPTO_PLUGIN_H_
 
-#include <android/hardware/drm/1.2/ICryptoPlugin.h>
+#include <android/hardware/drm/1.4/ICryptoPlugin.h>
 #include <android/hidl/memory/1.0/IMemory.h>
 
 #include <mutex>
@@ -34,7 +34,7 @@ namespace {
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 namespace drm = ::android::hardware::drm;
@@ -56,7 +56,7 @@ using ::android::sp;
 
 typedef drm::V1_2::Status Status_V1_2;
 
-struct CryptoPlugin : public drm::V1_2::ICryptoPlugin {
+struct CryptoPlugin : public drm::V1_4::ICryptoPlugin {
     explicit CryptoPlugin(const hidl_vec<uint8_t>& sessionId) {
         mInitStatus = setMediaDrmSession(sessionId);
     }
@@ -104,6 +104,8 @@ struct CryptoPlugin : public drm::V1_2::ICryptoPlugin {
 
     Return<Status> getInitStatus() const { return mInitStatus; }
 
+    Return<void> getLogMessages(
+            getLogMessages_cb _hidl_cb);
 private:
     CLEARKEY_DISALLOW_COPY_AND_ASSIGN(CryptoPlugin);
 
@@ -114,7 +116,7 @@ private:
 };
 
 } // namespace clearkey
-} // namespace V1_2
+} // namespace V1_4
 } // namespace drm
 } // namespace hardware
 } // namespace android

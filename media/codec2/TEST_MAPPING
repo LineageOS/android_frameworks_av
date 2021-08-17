@@ -1,5 +1,12 @@
 {
   "presubmit": [
+    // TODO failing 4 of 13
+    // { "name": "codec2_core_param_test"},
+    // TODO(b/155516524)
+    // { "name": "codec2_vndk_interface_test"},
+    { "name": "codec2_vndk_test"}
+  ],
+  "presubmit-large": [
     {
       "name": "CtsMediaTestCases",
       "options": [

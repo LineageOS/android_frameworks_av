@@ -31,40 +31,37 @@
 #include "FifoBuffer.h"
 
 using android::FifoBuffer;
+using android::FifoBufferAllocated;
+using android::FifoBufferIndirect;
 using android::fifo_frames_t;
 
-FifoBuffer::FifoBuffer(int32_t bytesPerFrame, fifo_frames_t capacityInFrames)
-        : mBytesPerFrame(bytesPerFrame)
+FifoBuffer::FifoBuffer(int32_t bytesPerFrame)
+        : mBytesPerFrame(bytesPerFrame) {}
+
+FifoBufferAllocated::FifoBufferAllocated(int32_t bytesPerFrame, fifo_frames_t capacityInFrames)
+        : FifoBuffer(bytesPerFrame)
 {
     mFifo = std::make_unique<FifoController>(capacityInFrames, capacityInFrames);
     // allocate buffer
     int32_t bytesPerBuffer = bytesPerFrame * capacityInFrames;
-    mStorage = new uint8_t[bytesPerBuffer];
-    mStorageOwned = true;
+    mInternalStorage = std::make_unique<uint8_t[]>(bytesPerBuffer);
     ALOGV("%s() capacityInFrames = %d, bytesPerFrame = %d",
           __func__, capacityInFrames, bytesPerFrame);
 }
 
-FifoBuffer::FifoBuffer( int32_t   bytesPerFrame,
+FifoBufferIndirect::FifoBufferIndirect( int32_t   bytesPerFrame,
                         fifo_frames_t   capacityInFrames,
-                        fifo_counter_t *  readIndexAddress,
-                        fifo_counter_t *  writeIndexAddress,
+                        fifo_counter_t *readIndexAddress,
+                        fifo_counter_t *writeIndexAddress,
                         void *  dataStorageAddress
                         )
-        : mBytesPerFrame(bytesPerFrame)
-        , mStorage(static_cast<uint8_t *>(dataStorageAddress))
+        : FifoBuffer(bytesPerFrame)
+        , mExternalStorage(static_cast<uint8_t *>(dataStorageAddress))
 {
     mFifo = std::make_unique<FifoControllerIndirect>(capacityInFrames,
                                        capacityInFrames,
                                        readIndexAddress,
                                        writeIndexAddress);
-    mStorageOwned = false;
-}
-
-FifoBuffer::~FifoBuffer() {
-    if (mStorageOwned) {
-        delete[] mStorage;
-    }
 }
 
 int32_t FifoBuffer::convertFramesToBytes(fifo_frames_t frames) {
@@ -76,15 +73,16 @@ void FifoBuffer::fillWrappingBuffer(WrappingBuffer *wrappingBuffer,
                                     int32_t startIndex) {
     wrappingBuffer->data[1] = nullptr;
     wrappingBuffer->numFrames[1] = 0;
+    uint8_t *storage = getStorage();
     if (framesAvailable > 0) {
         fifo_frames_t capacity = mFifo->getCapacity();
-        uint8_t *source = &mStorage[convertFramesToBytes(startIndex)];
+        uint8_t *source = &storage[convertFramesToBytes(startIndex)];
         // Does the available data cross the end of the FIFO?
         if ((startIndex + framesAvailable) > capacity) {
             wrappingBuffer->data[0] = source;
             fifo_frames_t firstFrames = capacity - startIndex;
             wrappingBuffer->numFrames[0] = firstFrames;
-            wrappingBuffer->data[1] = &mStorage[0];
+            wrappingBuffer->data[1] = &storage[0];
             wrappingBuffer->numFrames[1] = framesAvailable - firstFrames;
         } else {
             wrappingBuffer->data[0] = source;
@@ -191,6 +189,6 @@ fifo_frames_t FifoBuffer::getBufferCapacityInFrames() {
 void FifoBuffer::eraseMemory() {
     int32_t numBytes = convertFramesToBytes(getBufferCapacityInFrames());
     if (numBytes > 0) {
-        memset(mStorage, 0, (size_t) numBytes);
+        memset(getStorage(), 0, (size_t) numBytes);
     }
 }

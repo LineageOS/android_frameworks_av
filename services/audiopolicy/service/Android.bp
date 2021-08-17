@@ -1,0 +1,76 @@
+package {
+    // See: http://go/android-license-faq
+    // A large-scale-change added 'default_applicable_licenses' to import
+    // all of the 'license_kinds' from "frameworks_av_license"
+    // to get the below license kinds:
+    //   SPDX-license-identifier-Apache-2.0
+    default_applicable_licenses: ["frameworks_av_license"],
+}
+
+cc_library_shared {
+    name: "libaudiopolicyservice",
+
+    srcs: [
+        "AudioPolicyClientImpl.cpp",
+        "AudioPolicyEffects.cpp",
+        "AudioPolicyInterfaceImpl.cpp",
+        "AudioPolicyService.cpp",
+        "CaptureStateNotifier.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/services/audioflinger"
+    ],
+
+    shared_libs: [
+        "libactivitymanager_aidl",
+        "libaudioclient",
+        "libaudioclient_aidl_conversion",
+        "libaudiofoundation",
+        "libaudiopolicy",
+        "libaudiopolicymanagerdefault",
+        "libaudioutils",
+        "libbinder",
+        "libcutils",
+        "libeffectsconfig",
+        "libhardware_legacy",
+        "liblog",
+        "libmedia_helper",
+        "libmediametrics",
+        "libmediautils",
+        "libpermission",
+        "libsensorprivacy",
+        "libutils",
+        "audioclient-types-aidl-cpp",
+        "audioflinger-aidl-cpp",
+        "audiopolicy-aidl-cpp",
+        "audiopolicy-types-aidl-cpp",
+        "capture_state_listener-aidl-cpp",
+        "framework-permission-aidl-cpp",
+    ],
+
+    static_libs: [
+        "libaudiopolicycomponents",
+        "framework-permission-aidl-cpp",
+    ],
+
+    header_libs: [
+        "libaudiopolicycommon",
+        "libaudiopolicyengine_interface_headers",
+        "libaudiopolicymanager_interface_headers",
+        "libaudioutils_headers",
+    ],
+
+    cflags: [
+        "-fvisibility=hidden",
+        "-Werror",
+        "-Wall",
+        "-Wthread-safety",
+    ],
+
+    export_shared_lib_headers: [
+        "libactivitymanager_aidl",
+        "libsensorprivacy",
+        "framework-permission-aidl-cpp",
+    ],
+}

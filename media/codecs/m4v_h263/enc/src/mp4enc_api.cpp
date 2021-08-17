@@ -491,6 +491,9 @@ OSCL_EXPORT_REF Bool    PVInitVideoEncoder(VideoEncControls *encoderControl, Vid
     }
     for (i = 0; i < encParams->nLayers; i++)
     {
+        if (encOption->encHeight[i] == 0 || encOption->encWidth[i] == 0 ||
+                encOption->encHeight[i] % 16 != 0 || encOption->encWidth[i] % 16 != 0)
+            goto CLEAN_UP;
         encParams->LayerHeight[i] = encOption->encHeight[i];
         encParams->LayerWidth[i] = encOption->encWidth[i];
     }

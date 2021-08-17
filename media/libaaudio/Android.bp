@@ -41,4 +41,6 @@ ndk_library {
 cc_library_headers {
     name: "libaaudio_headers",
     export_include_dirs: ["include"],
+    export_shared_lib_headers: ["aaudio-aidl-cpp"],
+    shared_libs: ["aaudio-aidl-cpp"],
 }

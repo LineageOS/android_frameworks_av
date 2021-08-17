@@ -36,8 +36,6 @@ cc_binary {
         "libmedia_headers",
     ],
 
-    init_rc: ["mediaswcodec.rc"],
-
     cflags: [
         "-Werror",
         "-Wall",

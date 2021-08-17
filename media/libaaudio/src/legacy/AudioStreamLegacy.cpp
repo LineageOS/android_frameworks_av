@@ -94,10 +94,15 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
             AudioTrack::Buffer *audioBuffer = static_cast<AudioTrack::Buffer *>(info);
             if (getState() == AAUDIO_STREAM_STATE_DISCONNECTED) {
                 ALOGW("processCallbackCommon() data, stream disconnected");
+                // This will kill the stream and prevent it from being restarted.
+                // That is OK because the stream is disconnected.
                 audioBuffer->size = SIZE_STOP_CALLBACKS;
             } else if (!mCallbackEnabled.load()) {
-                ALOGW("processCallbackCommon() no data because callback disabled");
-                audioBuffer->size = SIZE_STOP_CALLBACKS;
+                ALOGW("processCallbackCommon() no data because callback disabled, set size=0");
+                // Do NOT use SIZE_STOP_CALLBACKS here because that will kill the stream and
+                // prevent it from being restarted. This can occur because of a race condition
+                // caused by Legacy callbacks running after the track is "stopped".
+                audioBuffer->size = 0;
             } else {
                 if (audioBuffer->frameCount == 0) {
                     ALOGW("processCallbackCommon() data, frameCount is zero");
@@ -124,7 +129,7 @@ void AudioStreamLegacy::processCallbackCommon(aaudio_callback_operation_t opcode
                               __func__, callbackResult);
                     }
                     audioBuffer->size = 0;
-                    systemStopFromCallback();
+                    systemStopInternal();
                     // Disable the callback just in case the system keeps trying to call us.
                     mCallbackEnabled.store(false);
                 }
@@ -226,7 +231,7 @@ void AudioStreamLegacy::onAudioDeviceUpdate(audio_io_handle_t /* audioIo */,
             ALOGD("%s() request DISCONNECT in data callback, device %d => %d",
                   __func__, (int) getDeviceId(), (int) deviceId);
             // If the stream is stopped before the data callback has a chance to handle the
-            // request then the requestStop() and requestPause() methods will handle it after
+            // request then the requestStop_l() and requestPause() methods will handle it after
             // the callback has stopped.
             mRequestDisconnect.request();
         } else {

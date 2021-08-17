@@ -110,6 +110,7 @@ cc_library_shared {
         "//apex_available:platform",
     ],
     vendor_available: false,
+    min_sdk_version: "29",
     static_libs: [
         "libgui_bufferqueue_static",
     ],

@@ -22,6 +22,7 @@
 
 #include <media/AudioSystem.h>
 #include <media/IMediaRecorder.h>
+#include <android/content/AttributionSourceState.h>
 
 #include <vector>
 
@@ -93,14 +94,13 @@ private:
 
                            MediaRecorderClient(
                                    const sp<MediaPlayerService>& service,
-                                                               pid_t pid,
-                                                               const String16& opPackageName);
+                                   const content::AttributionSourceState& attributionSource);
     virtual                ~MediaRecorderClient();
 
     std::vector<DeathNotifier> mDeathNotifiers;
     sp<AudioDeviceUpdatedNotifier> mAudioDeviceUpdatedNotifier;
 
-    pid_t                  mPid;
+    content::AttributionSourceState mAttributionSource;
     mutable Mutex          mLock;
     MediaRecorderBase      *mRecorder;
     sp<MediaPlayerService> mMediaPlayerService;

@@ -268,6 +268,9 @@ MediaTrackHelper *MPEG2TSExtractor::getTrack(size_t index) {
 media_status_t MPEG2TSExtractor::getTrackMetaData(
         AMediaFormat *meta,
         size_t index, uint32_t /* flags */) {
+    if (meta == nullptr) {
+        return AMEDIA_ERROR_INVALID_PARAMETER;
+    }
     sp<MetaData> implMeta = index < mSourceImpls.size()
         ? mSourceImpls.editItemAt(index)->getFormat() : NULL;
     if (implMeta == NULL) {

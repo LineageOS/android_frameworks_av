@@ -43,6 +43,7 @@ public:
     virtual status_t setMediaCas(const HInterfaceToken &casToken);
     virtual String8 name();
     virtual status_t setEntryPoint(EntryPoint entryPoint);
+    virtual status_t setLogSessionId(const String8& logSessionId);
 
 private:
     MediaExtractor *mExtractor;

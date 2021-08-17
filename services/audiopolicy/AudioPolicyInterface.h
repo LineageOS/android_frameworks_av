@@ -17,13 +17,17 @@
 #ifndef ANDROID_AUDIOPOLICY_INTERFACE_H
 #define ANDROID_AUDIOPOLICY_INTERFACE_H
 
+#include <media/AudioCommonTypes.h>
 #include <media/AudioDeviceTypeAddr.h>
 #include <media/AudioSystem.h>
 #include <media/AudioPolicy.h>
 #include <media/DeviceDescriptorBase.h>
+#include <android/content/AttributionSourceState.h>
 #include <utils/String8.h>
 
 namespace android {
+
+using content::AttributionSourceState;
 
 // ----------------------------------------------------------------------------
 
@@ -122,7 +126,7 @@ public:
                                         audio_io_handle_t *output,
                                         audio_session_t session,
                                         audio_stream_type_t *stream,
-                                        uid_t uid,
+                                        const AttributionSourceState& attributionSouce,
                                         const audio_config_t *config,
                                         audio_output_flags_t *flags,
                                         audio_port_handle_t *selectedDeviceId,
@@ -133,15 +137,15 @@ public:
     virtual status_t startOutput(audio_port_handle_t portId) = 0;
     // indicates to the audio policy manager that the output stops being used by corresponding stream.
     virtual status_t stopOutput(audio_port_handle_t portId) = 0;
-    // releases the output.
-    virtual void releaseOutput(audio_port_handle_t portId) = 0;
+    // releases the output, return true if the output descriptor is reopened.
+    virtual bool releaseOutput(audio_port_handle_t portId) = 0;
 
     // request an input appropriate for record from the supplied device with supplied parameters.
     virtual status_t getInputForAttr(const audio_attributes_t *attr,
                                      audio_io_handle_t *input,
                                      audio_unique_id_t riid,
                                      audio_session_t session,
-                                     uid_t uid,
+                                     const AttributionSourceState& attributionSouce,
                                      const audio_config_base_t *config,
                                      audio_input_flags_t flags,
                                      audio_port_handle_t *selectedDeviceId,
@@ -191,7 +195,7 @@ public:
                                                     int &index) = 0;
 
     // return the strategy corresponding to a given stream type
-    virtual uint32_t getStrategyForStream(audio_stream_type_t stream) = 0;
+    virtual product_strategy_t getStrategyForStream(audio_stream_type_t stream) = 0;
 
     // return the enabled output devices for the given stream type
     virtual audio_devices_t getDevicesForStream(audio_stream_type_t stream) = 0;
@@ -204,7 +208,7 @@ public:
     virtual audio_io_handle_t getOutputForEffect(const effect_descriptor_t *desc) = 0;
     virtual status_t registerEffect(const effect_descriptor_t *desc,
                                     audio_io_handle_t io,
-                                    uint32_t strategy,
+                                    product_strategy_t strategy,
                                     int session,
                                     int id) = 0;
     virtual status_t unregisterEffect(int id) = 0;
@@ -220,16 +224,16 @@ public:
     virtual status_t    dump(int fd) = 0;
 
     virtual status_t setAllowedCapturePolicy(uid_t uid, audio_flags_mask_t flags) = 0;
-    virtual bool isOffloadSupported(const audio_offload_info_t& offloadInfo) = 0;
+    virtual audio_offload_mode_t getOffloadSupport(const audio_offload_info_t& offloadInfo) = 0;
     virtual bool isDirectOutputSupported(const audio_config_base_t& config,
                                          const audio_attributes_t& attributes) = 0;
 
     virtual status_t listAudioPorts(audio_port_role_t role,
                                     audio_port_type_t type,
                                     unsigned int *num_ports,
-                                    struct audio_port *ports,
+                                    struct audio_port_v7 *ports,
                                     unsigned int *generation) = 0;
-    virtual status_t getAudioPort(struct audio_port *port) = 0;
+    virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
     virtual status_t createAudioPatch(const struct audio_patch *patch,
                                        audio_patch_handle_t *handle,
                                        uid_t uid) = 0;
@@ -272,8 +276,11 @@ public:
 
     virtual status_t getSurroundFormats(unsigned int *numSurroundFormats,
                                         audio_format_t *surroundFormats,
-                                        bool *surroundFormatsEnabled,
-                                        bool reported) = 0;
+                                        bool *surroundFormatsEnabled) = 0;
+
+    virtual status_t getReportedSurroundFormats(unsigned int *numSurroundFormats,
+                                                audio_format_t *surroundFormats) = 0;
+
     virtual status_t setSurroundFormatEnabled(audio_format_t audioFormat, bool enabled) = 0;
 
     virtual bool     isHapticPlaybackSupported() = 0;
@@ -285,13 +292,14 @@ public:
 
     virtual status_t listAudioProductStrategies(AudioProductStrategyVector &strategies) = 0;
 
-    virtual status_t getProductStrategyFromAudioAttributes(const AudioAttributes &aa,
-                                                           product_strategy_t &productStrategy) = 0;
+    virtual status_t getProductStrategyFromAudioAttributes(
+            const AudioAttributes &aa, product_strategy_t &productStrategy,
+            bool fallbackOnDefault) = 0;
 
     virtual status_t listAudioVolumeGroups(AudioVolumeGroupVector &groups) = 0;
 
-    virtual status_t getVolumeGroupFromAudioAttributes(const AudioAttributes &aa,
-                                                       volume_group_t &volumeGroup) = 0;
+    virtual status_t getVolumeGroupFromAudioAttributes(
+            const AudioAttributes &aa, volume_group_t &volumeGroup, bool fallbackOnDefault) = 0;
 
     virtual bool     isCallScreenModeSupported() = 0;
 
@@ -439,16 +447,25 @@ public:
                                                 audio_patch_handle_t patchHandle,
                                                 audio_source_t source) = 0;
 
+    virtual void onRoutingUpdated() = 0;
+
     // Used to notify the sound trigger module that an audio capture is about to
     // take place. This should typically result in any active recognition
     // sessions to be preempted on modules that do not support sound trigger
     // recognition concurrently with audio capture.
     virtual void setSoundTriggerCaptureState(bool active) = 0;
+
+    virtual status_t getAudioPort(struct audio_port_v7 *port) = 0;
+
+    virtual status_t updateSecondaryOutputs(
+            const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
 };
 
-extern "C" AudioPolicyInterface* createAudioPolicyManager(AudioPolicyClientInterface *clientInterface);
-extern "C" void destroyAudioPolicyManager(AudioPolicyInterface *interface);
-
+    // These are the signatures of createAudioPolicyManager/destroyAudioPolicyManager
+    // methods respectively, expected by AudioPolicyService, needs to be exposed by
+    // libaudiopolicymanagercustom.
+    using CreateAudioPolicyManagerInstance = AudioPolicyInterface* (*)(AudioPolicyClientInterface*);
+    using DestroyAudioPolicyManagerInstance = void (*)(AudioPolicyInterface*);
 
 } // namespace android
 

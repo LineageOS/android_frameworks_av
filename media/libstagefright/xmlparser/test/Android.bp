@@ -25,6 +25,7 @@ package {
 
 cc_test {
     name: "XMLParserTest",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: [

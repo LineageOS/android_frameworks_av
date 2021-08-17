@@ -545,64 +545,76 @@ void AudioResamplerDyn<TC, TI, TO>::setSampleRate(int32_t inSampleRate)
     // Note: A stride of 2 is achieved with non-SIMD processing.
     int stride = ((c.mHalfNumCoefs & 7) == 0) ? 16 : 2;
     LOG_ALWAYS_FATAL_IF(stride < 16, "Resampler stride must be 16 or more");
-    LOG_ALWAYS_FATAL_IF(mChannelCount < 1 || mChannelCount > 8,
-            "Resampler channels(%d) must be between 1 to 8", mChannelCount);
+    LOG_ALWAYS_FATAL_IF(mChannelCount < 1 || mChannelCount > FCC_LIMIT,
+            "Resampler channels(%d) must be between 1 to %d", mChannelCount, FCC_LIMIT);
     // stride 16 (falls back to stride 2 for machines that do not support NEON)
+
+
+// For now use a #define as a compiler generated function table requires renaming.
+#pragma push_macro("AUDIORESAMPLERDYN_CASE")
+#undef AUDIORESAMPLERDYN_CASE
+#define AUDIORESAMPLERDYN_CASE(CHANNEL, LOCKED) \
+    case CHANNEL: if constexpr (CHANNEL <= FCC_LIMIT) {\
+        mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<CHANNEL, LOCKED, 16>; \
+    } break
+
     if (locked) {
         switch (mChannelCount) {
-        case 1:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<1, true, 16>;
-            break;
-        case 2:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<2, true, 16>;
-            break;
-        case 3:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<3, true, 16>;
-            break;
-        case 4:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<4, true, 16>;
-            break;
-        case 5:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<5, true, 16>;
-            break;
-        case 6:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<6, true, 16>;
-            break;
-        case 7:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<7, true, 16>;
-            break;
-        case 8:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<8, true, 16>;
-            break;
+        AUDIORESAMPLERDYN_CASE(1, true);
+        AUDIORESAMPLERDYN_CASE(2, true);
+        AUDIORESAMPLERDYN_CASE(3, true);
+        AUDIORESAMPLERDYN_CASE(4, true);
+        AUDIORESAMPLERDYN_CASE(5, true);
+        AUDIORESAMPLERDYN_CASE(6, true);
+        AUDIORESAMPLERDYN_CASE(7, true);
+        AUDIORESAMPLERDYN_CASE(8, true);
+        AUDIORESAMPLERDYN_CASE(9, true);
+        AUDIORESAMPLERDYN_CASE(10, true);
+        AUDIORESAMPLERDYN_CASE(11, true);
+        AUDIORESAMPLERDYN_CASE(12, true);
+        AUDIORESAMPLERDYN_CASE(13, true);
+        AUDIORESAMPLERDYN_CASE(14, true);
+        AUDIORESAMPLERDYN_CASE(15, true);
+        AUDIORESAMPLERDYN_CASE(16, true);
+        AUDIORESAMPLERDYN_CASE(17, true);
+        AUDIORESAMPLERDYN_CASE(18, true);
+        AUDIORESAMPLERDYN_CASE(19, true);
+        AUDIORESAMPLERDYN_CASE(20, true);
+        AUDIORESAMPLERDYN_CASE(21, true);
+        AUDIORESAMPLERDYN_CASE(22, true);
+        AUDIORESAMPLERDYN_CASE(23, true);
+        AUDIORESAMPLERDYN_CASE(24, true);
         }
     } else {
         switch (mChannelCount) {
-        case 1:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<1, false, 16>;
-            break;
-        case 2:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<2, false, 16>;
-            break;
-        case 3:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<3, false, 16>;
-            break;
-        case 4:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<4, false, 16>;
-            break;
-        case 5:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<5, false, 16>;
-            break;
-        case 6:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<6, false, 16>;
-            break;
-        case 7:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<7, false, 16>;
-            break;
-        case 8:
-            mResampleFunc = &AudioResamplerDyn<TC, TI, TO>::resample<8, false, 16>;
-            break;
+        AUDIORESAMPLERDYN_CASE(1, false);
+        AUDIORESAMPLERDYN_CASE(2, false);
+        AUDIORESAMPLERDYN_CASE(3, false);
+        AUDIORESAMPLERDYN_CASE(4, false);
+        AUDIORESAMPLERDYN_CASE(5, false);
+        AUDIORESAMPLERDYN_CASE(6, false);
+        AUDIORESAMPLERDYN_CASE(7, false);
+        AUDIORESAMPLERDYN_CASE(8, false);
+        AUDIORESAMPLERDYN_CASE(9, false);
+        AUDIORESAMPLERDYN_CASE(10, false);
+        AUDIORESAMPLERDYN_CASE(11, false);
+        AUDIORESAMPLERDYN_CASE(12, false);
+        AUDIORESAMPLERDYN_CASE(13, false);
+        AUDIORESAMPLERDYN_CASE(14, false);
+        AUDIORESAMPLERDYN_CASE(15, false);
+        AUDIORESAMPLERDYN_CASE(16, false);
+        AUDIORESAMPLERDYN_CASE(17, false);
+        AUDIORESAMPLERDYN_CASE(18, false);
+        AUDIORESAMPLERDYN_CASE(19, false);
+        AUDIORESAMPLERDYN_CASE(20, false);
+        AUDIORESAMPLERDYN_CASE(21, false);
+        AUDIORESAMPLERDYN_CASE(22, false);
+        AUDIORESAMPLERDYN_CASE(23, false);
+        AUDIORESAMPLERDYN_CASE(24, false);
         }
     }
+#pragma pop_macro("AUDIORESAMPLERDYN_CASE")
+
 #ifdef DEBUG_RESAMPLER
     printf("channels:%d  %s  stride:%d  %s  coef:%d  shift:%d\n",
             mChannelCount, locked ? "locked" : "interpolated",

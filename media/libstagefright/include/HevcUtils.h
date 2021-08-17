@@ -30,6 +30,10 @@
 namespace android {
 
 enum {
+    kHevcNalUnitTypeCodedSliceIdr = 19,
+    kHevcNalUnitTypeCodedSliceIdrNoLP = 20,
+    kHevcNalUnitTypeCodedSliceCra = 21,
+
     kHevcNalUnitTypeVps = 32,
     kHevcNalUnitTypeSps = 33,
     kHevcNalUnitTypePps = 34,
@@ -94,6 +98,7 @@ public:
             const sp<ABuffer> &SpsBuffer, int32_t *width, int32_t *height);
 
     Info getInfo() const { return mInfo; }
+    static bool IsHevcIDR(const uint8_t *data, size_t size);
 
 private:
     status_t parseVps(const uint8_t* data, size_t size);

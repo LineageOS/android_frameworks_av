@@ -25,7 +25,6 @@
 #include "client/AudioStreamInternal.h"
 
 using android::sp;
-using android::IAAudioService;
 
 namespace aaudio {
 
@@ -36,9 +35,9 @@ public:
 
     aaudio_result_t open(const AudioStreamBuilder &builder) override;
 
-    aaudio_result_t requestPause() override;
+    aaudio_result_t requestPause_l() override;
 
-    aaudio_result_t requestFlush() override;
+    aaudio_result_t requestFlush_l() override;
 
     bool isFlushSupported() const override {
         // Only implement FLUSH for OUTPUT streams.
@@ -65,7 +64,9 @@ public:
 
 protected:
 
-    void advanceClientToMatchServerPosition() override;
+    void prepareBuffersForStart() override;
+
+    void advanceClientToMatchServerPosition(int32_t serverMargin = 0) override;
 
     void onFlushFromServer() override;
 

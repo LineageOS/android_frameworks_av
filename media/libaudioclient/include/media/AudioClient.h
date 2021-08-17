@@ -18,38 +18,18 @@
 #ifndef ANDROID_AUDIO_CLIENT_H
 #define ANDROID_AUDIO_CLIENT_H
 
-#include <binder/Parcel.h>
-#include <binder/Parcelable.h>
-#include <system/audio.h>
-#include <utils/String16.h>
+#include <sys/types.h>
+#include <android/content/AttributionSourceState.h>
 
 namespace android {
 
-class AudioClient : public Parcelable {
+class AudioClient {
  public:
     AudioClient() :
-        clientUid(-1), clientPid(-1), clientTid(-1), packageName("") {}
+        clientTid(-1) {}
 
-    uid_t clientUid;
-    pid_t clientPid;
     pid_t clientTid;
-    String16 packageName;
-
-    status_t readFromParcel(const Parcel *parcel) override {
-        clientUid = parcel->readInt32();
-        clientPid = parcel->readInt32();
-        clientTid = parcel->readInt32();
-        packageName = parcel->readString16();
-        return NO_ERROR;
-    }
-
-    status_t writeToParcel(Parcel *parcel) const override {
-        parcel->writeInt32(clientUid);
-        parcel->writeInt32(clientPid);
-        parcel->writeInt32(clientTid);
-        parcel->writeString16(packageName);
-        return NO_ERROR;
-    }
+    android::content::AttributionSourceState attributionSource;
 };
 
 }; // namespace android

@@ -27,6 +27,7 @@ package {
 
 cc_test {
     name: "AmrwbEncoderTest",
+    test_suites: ["device-tests"],
     gtest: true,
 
     srcs: [

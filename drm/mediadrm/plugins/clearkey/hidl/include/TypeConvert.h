@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 
-#ifndef CLEARKEY_ANDROID_HARDWARE_DRM_V1_1_TYPECONVERT
-#define CLEARKEY_ANDROID_HARDWARE_DRM_V1_1_TYPECONVERT
+#ifndef CLEARKEY_ANDROID_HARDWARE_DRM_V1_4_TYPECONVERT
+#define CLEARKEY_ANDROID_HARDWARE_DRM_V1_4_TYPECONVERT
 
 #include <vector>
 
@@ -24,7 +24,7 @@
 namespace android {
 namespace hardware {
 namespace drm {
-namespace V1_2 {
+namespace V1_4 {
 namespace clearkey {
 
 using ::android::hardware::hidl_array;
@@ -80,9 +80,9 @@ inline Status toStatus_1_0(Status_V1_2 status) {
 }
 
 }  // namespace clearkey
-}  // namespace V1_2
+}  // namespace V1_4
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android
 
-#endif // CLEARKEY_ANDROID_HARDWARE_DRM_V1_1_TYPECONVERT
+#endif // CLEARKEY_ANDROID_HARDWARE_DRM_V1_4_TYPECONVERT

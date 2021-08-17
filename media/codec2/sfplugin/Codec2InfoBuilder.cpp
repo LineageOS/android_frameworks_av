@@ -343,6 +343,59 @@ status_t Codec2InfoBuilder::buildMediaCodecList(MediaCodecListWriter* writer) {
     // parse default XML files
     parser.parseXmlFilesInSearchDirs();
 
+    // The mainline modules for media may optionally include some codec shaping information.
+    // Based on vendor partition SDK, and the brand/product/device information
+    // (expect to be empty in almost always)
+    //
+    {
+        // get build info so we know what file to search
+        // ro.vendor.build.fingerprint
+        std::string fingerprint = base::GetProperty("ro.vendor.build.fingerprint",
+                                               "brand/product/device:");
+        ALOGV("property_get for ro.vendor.build.fingerprint == '%s'", fingerprint.c_str());
+
+        // ro.vendor.build.version.sdk
+        std::string sdk = base::GetProperty("ro.vendor.build.version.sdk", "0");
+        ALOGV("property_get for ro.vendor.build.version.sdk == '%s'", sdk.c_str());
+
+        std::string brand;
+        std::string product;
+        std::string device;
+        size_t pos1;
+        pos1 = fingerprint.find('/');
+        if (pos1 != std::string::npos) {
+            brand = fingerprint.substr(0, pos1);
+            size_t pos2 = fingerprint.find('/', pos1+1);
+            if (pos2 != std::string::npos) {
+                product = fingerprint.substr(pos1+1, pos2 - pos1 - 1);
+                size_t pos3 = fingerprint.find('/', pos2+1);
+                if (pos3 != std::string::npos) {
+                    device = fingerprint.substr(pos2+1, pos3 - pos2 - 1);
+                    size_t pos4 = device.find(':');
+                    if (pos4 != std::string::npos) {
+                        device.resize(pos4);
+                    }
+                }
+            }
+        }
+
+        ALOGV("parsed: sdk '%s' brand '%s' product '%s' device '%s'",
+            sdk.c_str(), brand.c_str(), product.c_str(), device.c_str());
+
+        std::string base = "/apex/com.android.media/etc/formatshaper";
+
+        // looking in these directories within the apex
+        const std::vector<std::string> modulePathnames = {
+            base + "/" + sdk + "/" + brand + "/" + product + "/" + device,
+            base + "/" + sdk + "/" + brand + "/" + product,
+            base + "/" + sdk + "/" + brand,
+            base + "/" + sdk,
+            base
+        };
+
+        parser.parseXmlFilesInSearchDirs( { "media_codecs_shaping.xml" }, modulePathnames);
+    }
+
     if (parser.getParsingStatus() != OK) {
         ALOGD("XML parser no good");
         return OK;

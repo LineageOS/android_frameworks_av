@@ -39,6 +39,7 @@ cc_defaults {
 
     static_libs: [
         "liblog",
+        "libstagefright_foundation_colorutils_ndk",
         "libstagefright_foundation",
         "libmediandk_format",
         "libmedia_ndkformatpriv",
@@ -318,4 +319,28 @@ cc_fuzz {
     ],
 
     dictionary: "flac_extractor_fuzzer.dict",
+}
+
+cc_fuzz {
+    name: "midi_extractor_fuzzer",
+    defaults: ["extractor-fuzzer-defaults"],
+
+    srcs: [
+        "midi_extractor_fuzzer.cpp",
+    ],
+
+    include_dirs: [
+        "frameworks/av/media/extractors/midi",
+    ],
+
+    static_libs: [
+        "libsonivox",
+        "libmedia_midiiowrapper",
+        "libmidiextractor",
+        "libwatchdog",
+    ],
+
+    dictionary: "midi_extractor_fuzzer.dict",
+
+    host_supported: true,
 }

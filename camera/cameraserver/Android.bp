@@ -42,11 +42,12 @@ cc_binary {
         "android.hardware.camera.provider@2.4",
         "android.hardware.camera.provider@2.5",
         "android.hardware.camera.provider@2.6",
+        "android.hardware.camera.provider@2.7",
         "android.hardware.camera.device@1.0",
         "android.hardware.camera.device@3.2",
         "android.hardware.camera.device@3.4",
     ],
-    compile_multilib: "prefer32",
+    compile_multilib: "first",
     cflags: [
         "-Wall",
         "-Wextra",
@@ -57,6 +58,6 @@ cc_binary {
     init_rc: ["cameraserver.rc"],
 
     vintf_fragments: [
-        "manifest_android.frameworks.cameraservice.service@2.1.xml",
+        "manifest_android.frameworks.cameraservice.service@2.2.xml",
     ],
 }

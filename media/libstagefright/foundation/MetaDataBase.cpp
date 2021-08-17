@@ -28,7 +28,7 @@
 #include <media/stagefright/foundation/hexdump.h>
 #include <media/stagefright/MetaDataBase.h>
 
-#ifndef __ANDROID_VNDK__
+#if !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 #include <binder/Parcel.h>
 #endif
 
@@ -452,7 +452,7 @@ void MetaDataBase::dumpToLog() const {
     }
 }
 
-#ifndef __ANDROID_VNDK__
+#if !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 status_t MetaDataBase::writeToParcel(Parcel &parcel) {
     status_t ret;
     size_t numItems = mInternalData->mItems.size();
@@ -532,7 +532,7 @@ status_t MetaDataBase::updateFromParcel(const Parcel &parcel) {
     ALOGW("no metadata in parcel");
     return UNKNOWN_ERROR;
 }
-#endif
+#endif // !defined(__ANDROID_VNDK__) && !defined(__ANDROID_APEX__)
 
 }  // namespace android
 

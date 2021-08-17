@@ -561,6 +561,8 @@ status_t FLACParser::init()
         AMediaFormat_setString(mFileMetadata,
                 AMEDIAFORMAT_KEY_MIME, MEDIA_MIMETYPE_AUDIO_FLAC);
     }
+    mMaxBufferSize = getMaxBlockSize() * getChannels() * getOutputSampleSize();
+    AMediaFormat_setInt32(mTrackMetadata, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, mMaxBufferSize);
     return OK;
 }
 
@@ -568,8 +570,6 @@ void FLACParser::allocateBuffers(MediaBufferGroupHelper *group)
 {
     CHECK(mGroup == NULL);
     mGroup = group;
-    mMaxBufferSize = getMaxBlockSize() * getChannels() * getOutputSampleSize();
-    AMediaFormat_setInt32(mTrackMetadata, AMEDIAFORMAT_KEY_MAX_INPUT_SIZE, mMaxBufferSize);
     mGroup->add_buffer(mMaxBufferSize);
 }
 

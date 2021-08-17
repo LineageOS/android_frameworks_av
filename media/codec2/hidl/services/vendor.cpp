@@ -15,11 +15,11 @@
  */
 
 //#define LOG_NDEBUG 0
-#define LOG_TAG "android.hardware.media.c2@1.1-service"
+#define LOG_TAG "android.hardware.media.c2@1.2-service"
 
 #include <android-base/logging.h>
 #include <binder/ProcessState.h>
-#include <codec2/hidl/1.1/ComponentStore.h>
+#include <codec2/hidl/1.2/ComponentStore.h>
 #include <hidl/HidlTransportSupport.h>
 #include <minijail.h>
 
@@ -31,13 +31,13 @@
 // "android.hardware.media.c2@1.1-default-seccomp_policy" in Android.bp.
 static constexpr char kBaseSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/"
-        "android.hardware.media.c2@1.1-default-seccomp-policy";
+        "android.hardware.media.c2@1.2-default-seccomp-policy";
 
 // Additional seccomp permissions can be added in this file.
 // This file does not exist by default.
 static constexpr char kExtSeccompPolicyPath[] =
         "/vendor/etc/seccomp_policy/"
-        "android.hardware.media.c2@1.1-extended-seccomp-policy";
+        "android.hardware.media.c2@1.2-extended-seccomp-policy";
 
 class StoreImpl : public C2ComponentStore {
 public:
@@ -164,7 +164,7 @@ private:
 
 int main(int /* argc */, char** /* argv */) {
     using namespace ::android;
-    LOG(DEBUG) << "android.hardware.media.c2@1.1-service starting...";
+    LOG(DEBUG) << "android.hardware.media.c2@1.2-service starting...";
 
     // Set up minijail to limit system calls.
     signal(SIGPIPE, SIG_IGN);
@@ -180,7 +180,7 @@ int main(int /* argc */, char** /* argv */) {
 
     // Create IComponentStore service.
     {
-        using namespace ::android::hardware::media::c2::V1_1;
+        using namespace ::android::hardware::media::c2::V1_2;
         sp<IComponentStore> store;
 
         // TODO: Replace this with

@@ -32,59 +32,62 @@
 #include <statslog.h>
 
 #include "MediaMetricsService.h"
-#include "frameworks/proto_logging/stats/enums/stats/mediametrics/mediametrics.pb.h"
+#include "StringUtils.h"
+#include "frameworks/proto_logging/stats/message/mediametrics_message.pb.h"
 #include "iface_statsd.h"
 
 namespace android {
 
-bool statsd_extractor(const mediametrics::Item *item)
+bool statsd_extractor(const std::shared_ptr<const mediametrics::Item>& item,
+        const std::shared_ptr<mediametrics::StatsdLog>& statsdLog)
 {
     if (item == nullptr) return false;
 
     // these go into the statsd wrapper
-    const nsecs_t timestamp = MediaMetricsService::roundTime(item->getTimestamp());
-    std::string pkgName = item->getPkgName();
-    int64_t pkgVersionCode = item->getPkgVersionCode();
-    int64_t mediaApexVersion = 0;
-
+    const nsecs_t timestamp_nanos = MediaMetricsService::roundTime(item->getTimestamp());
+    const std::string package_name = item->getPkgName();
+    const int64_t package_version_code = item->getPkgVersionCode();
+    const int64_t media_apex_version = 0;
 
     // the rest into our own proto
     //
-    ::android::stats::mediametrics::ExtractorData metrics_proto;
+    ::android::stats::mediametrics_message::ExtractorData metrics_proto;
 
-    // flesh out the protobuf we'll hand off with our data
-    //
-
-    // android.media.mediaextractor.fmt         string
-    std::string fmt;
-    if (item->getString("android.media.mediaextractor.fmt", &fmt)) {
-        metrics_proto.set_format(std::move(fmt));
+    std::string format;
+    if (item->getString("android.media.mediaextractor.fmt", &format)) {
+        metrics_proto.set_format(format);
     }
-    // android.media.mediaextractor.mime        string
+
     std::string mime;
     if (item->getString("android.media.mediaextractor.mime", &mime)) {
-        metrics_proto.set_mime(std::move(mime));
-    }
-    // android.media.mediaextractor.ntrk        int32
-    int32_t ntrk = -1;
-    if (item->getInt32("android.media.mediaextractor.ntrk", &ntrk)) {
-        metrics_proto.set_tracks(ntrk);
+        metrics_proto.set_mime(mime);
     }
 
-    // android.media.mediaextractor.entry       string
+    int32_t tracks = -1;
+    if (item->getInt32("android.media.mediaextractor.ntrk", &tracks)) {
+        metrics_proto.set_tracks(tracks);
+    }
+
     std::string entry_point_string;
+    stats::mediametrics_message::ExtractorData::EntryPoint entry_point =
+            stats::mediametrics_message::ExtractorData_EntryPoint_OTHER;
     if (item->getString("android.media.mediaextractor.entry", &entry_point_string)) {
-      stats::mediametrics::ExtractorData::EntryPoint entry_point;
       if (entry_point_string == "sdk") {
-        entry_point = stats::mediametrics::ExtractorData_EntryPoint_SDK;
+        entry_point = stats::mediametrics_message::ExtractorData_EntryPoint_SDK;
       } else if (entry_point_string == "ndk-with-jvm") {
-        entry_point = stats::mediametrics::ExtractorData_EntryPoint_NDK_WITH_JVM;
+        entry_point = stats::mediametrics_message::ExtractorData_EntryPoint_NDK_WITH_JVM;
       } else if (entry_point_string == "ndk-no-jvm") {
-        entry_point = stats::mediametrics::ExtractorData_EntryPoint_NDK_NO_JVM;
+        entry_point = stats::mediametrics_message::ExtractorData_EntryPoint_NDK_NO_JVM;
       } else {
-        entry_point = stats::mediametrics::ExtractorData_EntryPoint_OTHER;
+        entry_point = stats::mediametrics_message::ExtractorData_EntryPoint_OTHER;
       }
       metrics_proto.set_entry_point(entry_point);
+    }
+
+    std::string log_session_id;
+    if (item->getString("android.media.mediaextractor.logSessionId", &log_session_id)) {
+        log_session_id = mediametrics::stringutils::sanitizeLogSessionId(log_session_id);
+        metrics_proto.set_log_session_id(log_session_id);
     }
 
     std::string serialized;
@@ -93,17 +96,27 @@ bool statsd_extractor(const mediametrics::Item *item)
         return false;
     }
 
-    if (enabled_statsd) {
-        android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
-        (void)android::util::stats_write(android::util::MEDIAMETRICS_EXTRACTOR_REPORTED,
-                                   timestamp, pkgName.c_str(), pkgVersionCode,
-                                   mediaApexVersion,
-                                   bf_serialized);
+    android::util::BytesField bf_serialized( serialized.c_str(), serialized.size());
+    int result = android::util::stats_write(android::util::MEDIAMETRICS_EXTRACTOR_REPORTED,
+        timestamp_nanos, package_name.c_str(), package_version_code,
+        media_apex_version,
+        bf_serialized);
+    std::stringstream log;
+    log << "result:" << result << " {"
+            << " mediametrics_extractor_reported:"
+            << android::util::MEDIAMETRICS_EXTRACTOR_REPORTED
+            << " timestamp_nanos:" << timestamp_nanos
+            << " package_name:" << package_name
+            << " package_version_code:" << package_version_code
+            << " media_apex_version:" << media_apex_version
 
-    } else {
-        ALOGV("NOT sending: private data (len=%zu)", strlen(serialized.c_str()));
-    }
-
+            << " format:" << format
+            << " mime:" << mime
+            << " tracks:" << tracks
+            << " entry_point:" << entry_point_string << "(" << entry_point << ")"
+            << " log_session_id:" << log_session_id
+            << " }";
+    statsdLog->log(android::util::MEDIAMETRICS_EXTRACTOR_REPORTED, log.str());
     return true;
 }
 

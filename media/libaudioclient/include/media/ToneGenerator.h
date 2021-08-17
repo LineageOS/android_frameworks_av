@@ -17,6 +17,8 @@
 #ifndef ANDROID_TONEGENERATOR_H_
 #define ANDROID_TONEGENERATOR_H_
 
+#include <string>
+
 #include <media/AudioSystem.h>
 #include <media/AudioTrack.h>
 #include <utils/Compat.h>
@@ -152,7 +154,8 @@ public:
         NUM_SUP_TONES = LAST_SUP_TONE-FIRST_SUP_TONE+1
     };
 
-    ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava = false);
+    ToneGenerator(audio_stream_type_t streamType, float volume, bool threadCanCallJava = false,
+            std::string opPackageName = {});
     ~ToneGenerator();
 
     bool startTone(tone_type toneType, int durationMs = -1);
@@ -193,6 +196,7 @@ private:
         TONE_JAPAN_DIAL,            // Dial tone: 400Hz, continuous
         TONE_JAPAN_BUSY,            // Busy tone: 400Hz, 500ms ON, 500ms OFF...
         TONE_JAPAN_RADIO_ACK,       // Radio path acknowlegment: 400Hz, 1s ON, 2s OFF...
+        TONE_JAPAN_RINGTONE,        // Ring Tone: 400 Hz repeated in a 1 s on, 2 s off pattern.
         // GB Supervisory tones
         TONE_GB_BUSY,               // Busy tone: 400 Hz, 375ms ON, 375ms OFF...
         TONE_GB_CONGESTION,         // Congestion Tone: 400 Hz, 400ms ON, 350ms OFF, 225ms ON, 525ms OFF...
@@ -343,6 +347,8 @@ private:
     };
 
     KeyedVector<uint16_t, WaveGenerator *> mWaveGens;  // list of active wave generators.
+
+    std::string mOpPackageName;
 };
 
 }

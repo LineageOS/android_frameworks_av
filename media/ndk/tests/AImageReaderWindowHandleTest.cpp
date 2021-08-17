@@ -17,10 +17,10 @@
 #include <gtest/gtest.h>
 #include <media/NdkImageReader.h>
 #include <media/NdkImage.h>
-#include <private/media/NdkImage.h>
 #include <mediautils/AImageReaderUtils.h>
 #include <gui/IGraphicBufferProducer.h>
 #include <gui/bufferqueue/1.0/H2BGraphicBufferProducer.h>
+#include <NdkImagePriv.h>
 #include <NdkImageReaderPriv.h>
 #include <vndk/hardware_buffer.h>
 #include <memory>

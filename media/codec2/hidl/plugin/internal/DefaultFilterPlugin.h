@@ -35,6 +35,9 @@ public:
     std::shared_ptr<C2ComponentStore> getStore() override { return mStore; }
     bool describe(C2String name, FilterWrapper::Descriptor *desc) override;
     bool isFilteringEnabled(const std::shared_ptr<C2ComponentInterface> &intf) override;
+    c2_status_t queryParamsForPreviousComponent(
+            const std::shared_ptr<C2ComponentInterface> &intf,
+            std::vector<std::unique_ptr<C2Param>> *params) override;
 
 private:
     status_t mInit;

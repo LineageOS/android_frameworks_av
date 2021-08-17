@@ -41,13 +41,14 @@ cc_library {
         "libprocessinfoservice_aidl",
     ],
     shared_libs: [
+        "libaudioclient_aidl_conversion",
         "libaudioutils", // for clock.h
         "libbinder",
         "libcutils",
         "liblog",
-        "libpermission",
         "libutils",
         "libhidlbase",
+        "libpermission",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
     ],
@@ -68,10 +69,21 @@ cc_library {
         "libmedia_headers",
     ],
 
+    export_shared_lib_headers: [
+        "libpermission",
+    ],
+
     include_dirs: [
         // For DEBUGGER_SIGNAL
         "system/core/debuggerd/include",
     ],
     local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+}
+
+cc_library_headers {
+    name: "libmediautils_headers",
+    vendor_available: true,  // required for platform/hardware/interfaces
+
     export_include_dirs: ["include"],
 }

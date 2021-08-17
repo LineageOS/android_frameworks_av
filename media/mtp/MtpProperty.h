@@ -91,6 +91,7 @@ public:
 
     void                setDefaultValue(const uint16_t* string);
     void                setCurrentValue(const uint16_t* string);
+    void                setCurrentValue(const char* string);
     void                setCurrentValue(MtpDataPacket& packet);
     const MtpPropertyValue& getCurrentValue() { return mCurrentValue; }
 

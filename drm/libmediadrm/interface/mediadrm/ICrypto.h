@@ -32,6 +32,10 @@ namespace V1_0 {
 struct SharedBuffer;
 struct DestinationBuffer;
 }  // namespace V1_0
+
+namespace V1_4 {
+struct LogMessage;
+}  // namespace V1_4
 }  // namespace drm
 }  // namespace hardware
 }  // namespace android
@@ -82,6 +86,8 @@ struct ICrypto : public RefBase {
      */
     virtual int32_t setHeap(const sp<hardware::HidlMemory>& heap) = 0;
     virtual void unsetHeap(int32_t seqNum) = 0;
+
+    virtual status_t getLogMessages(Vector<drm::V1_4::LogMessage> &logs) const = 0;
 
 protected:
     ICrypto() {}

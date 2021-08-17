@@ -255,6 +255,17 @@ public:
 
     audio_channel_mask_t channelMask() const { return mChannelMask; }
 
+    /** @return true if the track has changed (metadata or volume) since
+     *          the last time this function was called,
+     *          true if this function was never called since the track creation,
+     *          false otherwise.
+     *  Thread safe.
+     */
+    bool readAndClearHasChanged() { return !mChangeNotified.test_and_set(); }
+
+    /** Set that a metadata has changed and needs to be notified to backend. Thread safe. */
+    void setMetadataHasChanged() { mChangeNotified.clear(); }
+
 protected:
     DISALLOW_COPY_AND_ASSIGN(TrackBase);
 
@@ -391,6 +402,9 @@ protected:
     std::atomic<FrameTime> mKernelFrameTime{};     // last frame time on kernel side.
     const pid_t         mCreatorPid;  // can be different from mclient->pid() for instance
                                       // when created by NuPlayer on behalf of a client
+
+    // If the last track change was notified to the client with readAndClearHasChanged
+    std::atomic_flag    mChangeNotified = ATOMIC_FLAG_INIT;
 };
 
 // PatchProxyBufferProvider interface is implemented by PatchTrack and PatchRecord.

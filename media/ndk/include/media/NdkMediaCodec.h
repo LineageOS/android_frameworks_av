@@ -570,6 +570,14 @@ media_status_t AMediaCodecCryptoInfo_getClearBytes(AMediaCodecCryptoInfo*, size_
  */
 media_status_t AMediaCodecCryptoInfo_getEncryptedBytes(AMediaCodecCryptoInfo*, size_t *dst) __INTRODUCED_IN(21);
 
+extern const char* AMEDIACODEC_KEY_HDR10_PLUS_INFO __INTRODUCED_IN(31);
+extern const char* AMEDIACODEC_KEY_LOW_LATENCY __INTRODUCED_IN(31);
+extern const char* AMEDIACODEC_KEY_OFFSET_TIME __INTRODUCED_IN(31);
+extern const char* AMEDIACODEC_KEY_REQUEST_SYNC_FRAME __INTRODUCED_IN(31);
+extern const char* AMEDIACODEC_KEY_SUSPEND __INTRODUCED_IN(31);
+extern const char* AMEDIACODEC_KEY_SUSPEND_TIME __INTRODUCED_IN(31);
+extern const char* AMEDIACODEC_KEY_VIDEO_BITRATE __INTRODUCED_IN(31);
+
 __END_DECLS
 
 #endif //_NDK_MEDIA_CODEC_H
