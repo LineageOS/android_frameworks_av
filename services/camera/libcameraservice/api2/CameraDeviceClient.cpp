@@ -654,7 +654,7 @@ binder::Status CameraDeviceClient::isSessionConfigurationSupported(
     mProviderManager->isLogicalCamera(mCameraIdStr.string(), &physicalCameraIds);
     res = SessionConfigurationUtils::convertToHALStreamCombination(sessionConfiguration,
             mCameraIdStr, mDevice->info(), getMetadata, physicalCameraIds, streamConfiguration,
-            mOverrideForPerfClass, &earlyExit);
+            mOverrideForPerfClass, &earlyExit, mPrivilegedClient);
     if (!res.isOk()) {
         return res;
     }
