@@ -129,7 +129,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
 }  // namespace
 
-std::unique_ptr<HeadTrackingProcessor> createHeadTrackingProcess(
+std::unique_ptr<HeadTrackingProcessor> createHeadTrackingProcessor(
         const HeadTrackingProcessor::Options& options, HeadTrackingMode initialMode) {
     return std::make_unique<HeadTrackingProcessorImpl>(options, initialMode);
 }
