@@ -33,7 +33,7 @@ TEST(HeadTrackingProcessor, Initial) {
     for (auto mode : {HeadTrackingMode::STATIC, HeadTrackingMode::WORLD_RELATIVE,
                       HeadTrackingMode::SCREEN_RELATIVE}) {
         std::unique_ptr<HeadTrackingProcessor> processor =
-                createHeadTrackingProcess(Options{}, mode);
+                createHeadTrackingProcessor(Options{}, mode);
         processor->calculate(0);
         EXPECT_EQ(processor->getActualMode(), HeadTrackingMode::STATIC);
         EXPECT_EQ(processor->getHeadToStagePose(), Pose3f());
@@ -47,7 +47,7 @@ TEST(HeadTrackingProcessor, BasicComposition) {
     const float physicalToLogical = M_PI_2;
 
     std::unique_ptr<HeadTrackingProcessor> processor =
-            createHeadTrackingProcess(Options{}, HeadTrackingMode::SCREEN_RELATIVE);
+            createHeadTrackingProcessor(Options{}, HeadTrackingMode::SCREEN_RELATIVE);
     processor->setWorldToHeadPose(0, worldToHead, Twist3f());
     processor->setWorldToScreenPose(0, worldToScreen);
     processor->setScreenToStagePose(screenToStage);
@@ -74,7 +74,7 @@ TEST(HeadTrackingProcessor, Prediction) {
     const Twist3f headTwist{{4, 5, 6}, quaternionToRotationVector(Quaternionf::UnitRandom()) / 10};
     const Pose3f worldToScreen{{4, 5, 6}, Quaternionf::UnitRandom()};
 
-    std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcess(
+    std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcessor(
             Options{.predictionDuration = 2.f}, HeadTrackingMode::WORLD_RELATIVE);
     processor->setWorldToHeadPose(0, worldToHead, headTwist);
     processor->setWorldToScreenPose(0, worldToScreen);
@@ -97,7 +97,7 @@ TEST(HeadTrackingProcessor, Prediction) {
 TEST(HeadTrackingProcessor, SmoothModeSwitch) {
     const Pose3f targetHeadToWorld = Pose3f({4, 0, 0}, rotateZ(M_PI / 2));
 
-    std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcess(
+    std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcessor(
             Options{.maxTranslationalVelocity = 1}, HeadTrackingMode::STATIC);
 
     processor->calculate(0);
