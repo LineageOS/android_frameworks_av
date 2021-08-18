@@ -1658,14 +1658,14 @@ public:
     }
 };
 
-class VirtualizerStageThread : public MixerThread {
+class SpatializerThread : public MixerThread {
 public:
-    VirtualizerStageThread(const sp<AudioFlinger>& audioFlinger,
+    SpatializerThread(const sp<AudioFlinger>& audioFlinger,
                            AudioStreamOut* output,
                            audio_io_handle_t id,
                            bool systemReady,
                            audio_config_base_t *mixerConfig);
-            ~VirtualizerStageThread() override {}
+            ~SpatializerThread() override {}
 
             bool hasFastMixer() const override { return false; }
 
