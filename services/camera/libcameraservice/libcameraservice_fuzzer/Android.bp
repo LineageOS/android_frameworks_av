@@ -65,5 +65,10 @@ cc_fuzz {
             "android-media-fuzzing-reports@google.com",
         ],
         componentid: 155276,
+        libfuzzer_options: [
+            //based on b/187360866
+            "timeout=770",
+        ],
+
     },
 }
