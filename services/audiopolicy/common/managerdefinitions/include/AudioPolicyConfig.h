@@ -210,7 +210,7 @@ public:
             for (const auto& curProfile : hwModule->getOutputProfiles()) {
                 if (curProfile->getFlags()
                         == (AUDIO_OUTPUT_FLAG_FAST | AUDIO_OUTPUT_FLAG_DEEP_BUFFER)) {
-                    curProfile->setFlags(AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE);
+                    curProfile->setFlags(AUDIO_OUTPUT_FLAG_SPATIALIZER);
                 }
             }
         }
