@@ -7064,7 +7064,7 @@ void AudioFlinger::DuplicatingThread::cacheParameters_l()
 
 // ----------------------------------------------------------------------------
 
-AudioFlinger::VirtualizerStageThread::VirtualizerStageThread(const sp<AudioFlinger>& audioFlinger,
+AudioFlinger::SpatializerThread::SpatializerThread(const sp<AudioFlinger>& audioFlinger,
                                                              AudioStreamOut* output,
                                                              audio_io_handle_t id,
                                                              bool systemReady,
@@ -7073,7 +7073,7 @@ AudioFlinger::VirtualizerStageThread::VirtualizerStageThread(const sp<AudioFling
 {
 }
 
-void AudioFlinger::VirtualizerStageThread::checkOutputStageEffects()
+void AudioFlinger::SpatializerThread::checkOutputStageEffects()
 {
     bool hasVirtualizer = false;
     bool hasDownMixer = false;

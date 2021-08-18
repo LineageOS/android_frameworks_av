@@ -356,15 +356,15 @@ public:
                     BAD_VALUE : NO_ERROR;
         }
 
-        virtual bool canBeVirtualized(const audio_attributes_t *attr,
+        virtual bool canBeSpatialized(const audio_attributes_t *attr,
                                       const audio_config_t *config,
                                       const AudioDeviceTypeAddrVector &devices) const;
 
-        virtual status_t getVirtualizerStageOutput(const audio_config_base_t *config,
+        virtual status_t getSpatializerOutput(const audio_config_base_t *config,
                                                 const audio_attributes_t *attr,
                                                 audio_io_handle_t *output);
 
-        virtual status_t releaseVirtualizerStageOutput(audio_io_handle_t output);
+        virtual status_t releaseSpatializerOutput(audio_io_handle_t output);
 
         bool isCallScreenModeSupported() override;
 
@@ -807,7 +807,7 @@ protected:
         sp<SwAudioOutputDescriptor> mPrimaryOutput;     // primary output descriptor
         // list of descriptors for outputs currently opened
 
-        sp<SwAudioOutputDescriptor> mVirtualizerStageOutput;
+        sp<SwAudioOutputDescriptor> mSpatializerOutput;
 
         SwAudioOutputCollection mOutputs;
         // copy of mOutputs before setDeviceConnectionState() opens new outputs
@@ -961,7 +961,7 @@ private:
                 const DeviceVector &devices,
                 audio_io_handle_t *output);
 
-        sp<IOProfile> getVirtualizerStageOutputProfile(const audio_config_t *config,
+        sp<IOProfile> getSpatializerOutputProfile(const audio_config_t *config,
                                                        const AudioDeviceTypeAddrVector &devices,
                                                        bool forOpening) const;
 
