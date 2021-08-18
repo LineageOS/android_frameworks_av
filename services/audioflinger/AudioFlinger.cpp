@@ -2143,6 +2143,20 @@ status_t AudioFlinger::createRecord(const media::CreateRecordRequest& _input,
             goto Exit;
         }
 
+        if (recordTrack->isFastTrack()) {
+            output.serverConfig = {
+                    thread->sampleRate(),
+                    thread->channelMask(),
+                    thread->format()
+            };
+        } else {
+            output.serverConfig = {
+                    recordTrack->sampleRate(),
+                    recordTrack->channelMask(),
+                    recordTrack->format()
+            };
+        }
+
         // Check if one effect chain was awaiting for an AudioRecord to be created on this
         // session and move it to this thread.
         sp<EffectChain> chain = getOrphanEffectChain_l(sessionId);

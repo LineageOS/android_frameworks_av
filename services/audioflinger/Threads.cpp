@@ -8038,6 +8038,7 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
       if (
             // we formerly checked for a callback handler (non-0 tid),
             // but that is no longer required for TRANSFER_OBTAIN mode
+            // No need to match hardware format, format conversion will be done in client side.
             //
             // Frame count is not specified (0), or is less than or equal the pipe depth.
             // It is OK to provide a higher capacity than requested.
@@ -8045,8 +8046,6 @@ sp<AudioFlinger::RecordThread::RecordTrack> AudioFlinger::RecordThread::createRe
             (frameCount <= mPipeFramesP2) &&
             // PCM data
             audio_is_linear_pcm(format) &&
-            // hardware format
-            (format == mFormat) &&
             // hardware channel mask
             (channelMask == mChannelMask) &&
             // hardware sample rate

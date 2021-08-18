@@ -195,6 +195,8 @@ IAudioFlinger::CreateRecordOutput::toAidl() const {
     aidl.buffers = VALUE_OR_RETURN(legacy2aidl_NullableIMemory_SharedFileRegion(buffers));
     aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(portId));
     aidl.audioRecord = audioRecord;
+    aidl.serverConfig = VALUE_OR_RETURN(
+            legacy2aidl_audio_config_base_t_AudioConfigBase(serverConfig, true /*isInput*/));
     return aidl;
 }
 
@@ -215,6 +217,8 @@ IAudioFlinger::CreateRecordOutput::fromAidl(
     legacy.buffers = VALUE_OR_RETURN(aidl2legacy_NullableSharedFileRegion_IMemory(aidl.buffers));
     legacy.portId = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
     legacy.audioRecord = aidl.audioRecord;
+    legacy.serverConfig = VALUE_OR_RETURN(
+            aidl2legacy_AudioConfigBase_audio_config_base_t(aidl.serverConfig, true /*isInput*/));
     return legacy;
 }
 
