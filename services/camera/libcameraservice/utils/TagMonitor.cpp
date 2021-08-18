@@ -24,6 +24,7 @@
 #include <utils/Log.h>
 #include <camera/VendorTagDescriptor.h>
 #include <camera_metadata_hidden.h>
+#include <device3/Camera3Stream.h>
 
 namespace android {
 
@@ -119,7 +120,8 @@ void TagMonitor::disableMonitoring() {
 void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_t timestamp,
         const CameraMetadata& metadata,
         const std::unordered_map<std::string, CameraMetadata>& physicalMetadata,
-        const std::set<int32_t> &outputStreamIds, int32_t inputStreamId) {
+        const camera3::camera_stream_buffer_t *outputBuffers, uint32_t numOutputBuffers,
+        int32_t inputStreamId) {
     if (!mMonitoringEnabled) return;
 
     std::lock_guard<std::mutex> lock(mMonitorMutex);
@@ -127,7 +129,12 @@ void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_
     if (timestamp == 0) {
         timestamp = systemTime(SYSTEM_TIME_BOOTTIME);
     }
-
+    std::unordered_set<int32_t> outputStreamIds;
+    for (size_t i = 0; i < numOutputBuffers; i++) {
+        const camera3::camera_stream_buffer_t *src = outputBuffers + i;
+        int32_t streamId = camera3::Camera3Stream::cast(src->stream)->getId();
+        outputStreamIds.emplace(streamId);
+    }
     std::string emptyId;
     for (auto tag : mMonitoredTagList) {
         monitorSingleMetadata(source, frameNumber, timestamp, emptyId, tag, metadata,
@@ -142,7 +149,7 @@ void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_
 
 void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, nsecs_t timestamp,
         const std::string& cameraId, uint32_t tag, const CameraMetadata& metadata,
-        const std::set<int32_t> &outputStreamIds, int32_t inputStreamId) {
+        const std::unordered_set<int32_t> &outputStreamIds, int32_t inputStreamId) {
 
     CameraMetadata &lastValues = (source == REQUEST) ?
             (cameraId.empty() ? mLastMonitoredRequestValues :
@@ -186,7 +193,8 @@ void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, 
         // Also monitor when the stream ids change, this helps visually see what
         // monitored metadata values are for capture requests with different
         // stream ids.
-        if (inputStreamId != mLastInputStreamId || outputStreamIds != mLastStreamIds) {
+        if (source == REQUEST &&
+                (inputStreamId != mLastInputStreamId || outputStreamIds != mLastStreamIds)) {
             mLastInputStreamId = inputStreamId;
             mLastStreamIds = outputStreamIds;
             isDifferent = true;
@@ -261,7 +269,7 @@ void TagMonitor::dumpMonitoredMetadata(int fd) {
 #define CAMERA_METADATA_ENUM_STRING_MAX_SIZE 29
 
 void TagMonitor::printData(int fd, const uint8_t *data_ptr, uint32_t tag,
-        int type, int count, int indentation, const std::set<int32_t> &outputStreamIds,
+        int type, int count, int indentation, const std::unordered_set<int32_t> &outputStreamIds,
         int32_t inputStreamId) {
     static int values_per_line[NUM_TYPES] = {
         [TYPE_BYTE]     = 16,
@@ -353,7 +361,8 @@ void TagMonitor::printData(int fd, const uint8_t *data_ptr, uint32_t tag,
 
 template<typename T>
 TagMonitor::MonitorEvent::MonitorEvent(eventSource src, uint32_t frameNumber, nsecs_t timestamp,
-        const T &value, const std::string& cameraId, const std::set<int32_t> &outputStreamIds,
+        const T &value, const std::string& cameraId,
+        const std::unordered_set<int32_t> &outputStreamIds,
         int32_t inputStreamId) :
         source(src),
         frameNumber(frameNumber),

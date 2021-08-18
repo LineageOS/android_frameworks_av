@@ -3084,10 +3084,11 @@ CameraMetadata Camera3Device::getLatestRequestLocked() {
 void Camera3Device::monitorMetadata(TagMonitor::eventSource source,
         int64_t frameNumber, nsecs_t timestamp, const CameraMetadata& metadata,
         const std::unordered_map<std::string, CameraMetadata>& physicalMetadata,
-        const std::set<int32_t> &outputStreamIds, int32_t inputStreamId) {
+        const camera_stream_buffer_t *outputBuffers, uint32_t numOutputBuffers,
+        int32_t inputStreamId) {
 
     mTagMonitor.monitorMetadata(source, frameNumber, timestamp, metadata,
-            physicalMetadata, outputStreamIds, inputStreamId);
+            physicalMetadata, outputBuffers, numOutputBuffers, inputStreamId);
 }
 
 /**
@@ -4590,12 +4591,6 @@ void Camera3Device::RequestThread::updateNextRequest(NextRequest& nextRequest) {
 
         sp<Camera3Device> parent = mParent.promote();
         if (parent != NULL) {
-            std::set<int32_t> outputStreamIds;
-            for (size_t i = 0; i < halRequest.num_output_buffers; i++) {
-                const camera_stream_buffer_t *src = halRequest.output_buffers + i;
-                int32_t streamId = Camera3Stream::cast(src->stream)->getId();
-                outputStreamIds.emplace(streamId);
-            }
             int32_t inputStreamId = -1;
             if (halRequest.input_buffer != nullptr) {
               inputStreamId = Camera3Stream::cast(halRequest.input_buffer->stream)->getId();
@@ -4603,7 +4598,8 @@ void Camera3Device::RequestThread::updateNextRequest(NextRequest& nextRequest) {
 
             parent->monitorMetadata(TagMonitor::REQUEST,
                     halRequest.frame_number,
-                    0, mLatestRequest, mLatestPhysicalRequest, outputStreamIds, inputStreamId);
+                    0, mLatestRequest, mLatestPhysicalRequest, halRequest.output_buffers,
+                    halRequest.num_output_buffers, inputStreamId);
         }
     }
 
