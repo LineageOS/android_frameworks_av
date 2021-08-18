@@ -112,11 +112,14 @@ void TagMonitor::disableMonitoring() {
     mLastMonitoredResultValues.clear();
     mLastMonitoredPhysicalRequestKeys.clear();
     mLastMonitoredPhysicalResultKeys.clear();
+    mLastStreamIds.clear();
+    mLastInputStreamId = -1;
 }
 
 void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_t timestamp,
         const CameraMetadata& metadata,
-        const std::unordered_map<std::string, CameraMetadata>& physicalMetadata) {
+        const std::unordered_map<std::string, CameraMetadata>& physicalMetadata,
+        const std::set<int32_t> &outputStreamIds, int32_t inputStreamId) {
     if (!mMonitoringEnabled) return;
 
     std::lock_guard<std::mutex> lock(mMonitorMutex);
@@ -127,16 +130,19 @@ void TagMonitor::monitorMetadata(eventSource source, int64_t frameNumber, nsecs_
 
     std::string emptyId;
     for (auto tag : mMonitoredTagList) {
-        monitorSingleMetadata(source, frameNumber, timestamp, emptyId, tag, metadata);
+        monitorSingleMetadata(source, frameNumber, timestamp, emptyId, tag, metadata,
+                outputStreamIds, inputStreamId);
 
         for (auto& m : physicalMetadata) {
-            monitorSingleMetadata(source, frameNumber, timestamp, m.first, tag, m.second);
+            monitorSingleMetadata(source, frameNumber, timestamp, m.first, tag, m.second,
+                    outputStreamIds, inputStreamId);
         }
     }
 }
 
 void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, nsecs_t timestamp,
-        const std::string& cameraId, uint32_t tag, const CameraMetadata& metadata) {
+        const std::string& cameraId, uint32_t tag, const CameraMetadata& metadata,
+        const std::set<int32_t> &outputStreamIds, int32_t inputStreamId) {
 
     CameraMetadata &lastValues = (source == REQUEST) ?
             (cameraId.empty() ? mLastMonitoredRequestValues :
@@ -177,13 +183,21 @@ void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, 
             // No last entry, so always consider to be different
             isDifferent = true;
         }
-
+        // Also monitor when the stream ids change, this helps visually see what
+        // monitored metadata values are for capture requests with different
+        // stream ids.
+        if (inputStreamId != mLastInputStreamId || outputStreamIds != mLastStreamIds) {
+            mLastInputStreamId = inputStreamId;
+            mLastStreamIds = outputStreamIds;
+            isDifferent = true;
+        }
         if (isDifferent) {
             ALOGV("%s: Tag %s changed", __FUNCTION__,
                   get_local_camera_metadata_tag_name_vendor_id(
                           tag, mVendorTagId));
             lastValues.update(entry);
-            mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId);
+            mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId,
+                    outputStreamIds, inputStreamId);
         }
     } else if (lastEntry.count > 0) {
         // Value has been removed
@@ -195,7 +209,10 @@ void TagMonitor::monitorSingleMetadata(eventSource source, int64_t frameNumber, 
         entry.type = get_local_camera_metadata_tag_type_vendor_id(tag,
                 mVendorTagId);
         entry.count = 0;
-        mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId);
+        mLastInputStreamId = inputStreamId;
+        mLastStreamIds = outputStreamIds;
+        mMonitoringEvents.emplace(source, frameNumber, timestamp, entry, cameraId, outputStreamIds,
+                inputStreamId);
     }
 }
 
@@ -232,7 +249,7 @@ void TagMonitor::dumpMonitoredMetadata(int fd) {
             } else {
                 printData(fd, event.newData.data(), event.tag,
                         event.type, event.newData.size() / camera_metadata_type_size[event.type],
-                        indentation + 18);
+                        indentation + 18, event.outputStreamIds, event.inputStreamId);
             }
         }
     }
@@ -244,7 +261,8 @@ void TagMonitor::dumpMonitoredMetadata(int fd) {
 #define CAMERA_METADATA_ENUM_STRING_MAX_SIZE 29
 
 void TagMonitor::printData(int fd, const uint8_t *data_ptr, uint32_t tag,
-        int type, int count, int indentation) {
+        int type, int count, int indentation, const std::set<int32_t> &outputStreamIds,
+        int32_t inputStreamId) {
     static int values_per_line[NUM_TYPES] = {
         [TYPE_BYTE]     = 16,
         [TYPE_INT32]    = 8,
@@ -319,20 +337,31 @@ void TagMonitor::printData(int fd, const uint8_t *data_ptr, uint32_t tag,
                     dprintf(fd, "??? ");
             }
         }
-        dprintf(fd, "]\n");
+        dprintf(fd, "] ");
+        if (outputStreamIds.size() > 0) {
+            dprintf(fd, "output stream ids: ");
+            for (const auto &id : outputStreamIds) {
+                dprintf(fd, " %d ", id);
+            }
+        }
+        if (inputStreamId != -1) {
+            dprintf(fd, "input stream id: %d", inputStreamId);
+        }
+        dprintf(fd, "\n");
     }
 }
 
 template<typename T>
 TagMonitor::MonitorEvent::MonitorEvent(eventSource src, uint32_t frameNumber, nsecs_t timestamp,
-        const T &value, const std::string& cameraId) :
+        const T &value, const std::string& cameraId, const std::set<int32_t> &outputStreamIds,
+        int32_t inputStreamId) :
         source(src),
         frameNumber(frameNumber),
         timestamp(timestamp),
         tag(value.tag),
         type(value.type),
         newData(value.data.u8, value.data.u8 + camera_metadata_type_size[value.type] * value.count),
-        cameraId(cameraId) {
+        cameraId(cameraId), outputStreamIds(outputStreamIds), inputStreamId(inputStreamId) {
 }
 
 TagMonitor::MonitorEvent::~MonitorEvent() {
