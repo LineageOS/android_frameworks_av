@@ -22,6 +22,7 @@
 #include <android-base/macros.h>
 #include <sys/resource.h>
 
+#include <audio_utils/format.h>
 #include <audiomanager/AudioManager.h>
 #include <audiomanager/IAudioManager.h>
 #include <binder/Binder.h>
@@ -858,6 +859,10 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
     mRoutedDeviceId = output.selectedDeviceId;
     mSessionId = output.sessionId;
     mSampleRate = output.sampleRate;
+    mServerConfig = output.serverConfig;
+    mServerFrameSize = audio_bytes_per_frame(
+            audio_channel_count_from_in_mask(mServerConfig.channel_mask), mServerConfig.format);
+    mServerSampleSize = audio_bytes_per_sample(mServerConfig.format);
 
     if (output.cblk == 0) {
         ALOGE("%s(%d): Could not get control block", __func__, mPortId);
@@ -921,6 +926,10 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
                 mNotificationFramesReq, output.notificationFrameCount, output.frameCount);
     }
     mNotificationFramesAct = (uint32_t)output.notificationFrameCount;
+    if (mServerConfig.format != mFormat && mCbf != nullptr) {
+        mFormatConversionBufRaw = std::make_unique<uint8_t[]>(mNotificationFramesAct * mFrameSize);
+        mFormatConversionBuffer.raw = mFormatConversionBufRaw.get();
+    }
 
     //mInput != input includes the case where mInput == AUDIO_IO_HANDLE_NONE for first creation
     if (mDeviceCallback != 0) {
@@ -947,7 +956,7 @@ status_t AudioRecord::createRecord_l(const Modulo<uint32_t> &epoch)
     }
 
     // update proxy
-    mProxy = new AudioRecordClientProxy(cblk, buffers, mFrameCount, mFrameSize);
+    mProxy = new AudioRecordClientProxy(cblk, buffers, mFrameCount, mServerFrameSize);
     mProxy->setEpoch(epoch);
     mProxy->setMinimum(mNotificationFramesAct);
 
@@ -1077,7 +1086,7 @@ status_t AudioRecord::obtainBuffer(Buffer* audioBuffer, const struct timespec *r
     } while ((status == DEAD_OBJECT) && (tryCounter-- > 0));
 
     audioBuffer->frameCount = buffer.mFrameCount;
-    audioBuffer->size = buffer.mFrameCount * mFrameSize;
+    audioBuffer->size = buffer.mFrameCount * mServerFrameSize;
     audioBuffer->raw = buffer.mRaw;
     audioBuffer->sequence = oldSequence;
     if (nonContig != NULL) {
@@ -1090,7 +1099,7 @@ void AudioRecord::releaseBuffer(const Buffer* audioBuffer)
 {
     // FIXME add error checking on mode, by adding an internal version
 
-    size_t stepCount = audioBuffer->size / mFrameSize;
+    size_t stepCount = audioBuffer->frameCount;
     if (stepCount == 0) {
         return;
     }
@@ -1152,8 +1161,9 @@ ssize_t AudioRecord::read(void* buffer, size_t userSize, bool blocking)
             return ssize_t(err);
         }
 
-        size_t bytesRead = audioBuffer.size;
-        memcpy(buffer, audioBuffer.i8, bytesRead);
+        size_t bytesRead = audioBuffer.frameCount * mFrameSize;
+        memcpy_by_audio_format(buffer, mFormat, audioBuffer.raw, mServerConfig.format,
+                               audioBuffer.size / mServerSampleSize);
         buffer = ((char *) buffer) + bytesRead;
         userSize -= bytesRead;
         read += bytesRead;
@@ -1350,9 +1360,19 @@ nsecs_t AudioRecord::processAudioBuffer()
             }
         }
 
-        size_t reqSize = audioBuffer.size;
-        mCbf(EVENT_MORE_DATA, mUserData, &audioBuffer);
-        size_t readSize = audioBuffer.size;
+        Buffer* buffer = &audioBuffer;
+        if (mServerConfig.format != mFormat) {
+            buffer = &mFormatConversionBuffer;
+            buffer->frameCount = audioBuffer.frameCount;
+            buffer->size = buffer->frameCount * mFrameSize;
+            buffer->sequence = audioBuffer.sequence;
+            memcpy_by_audio_format(buffer->raw, mFormat, audioBuffer.raw,
+                                   mServerConfig.format, audioBuffer.size / mServerSampleSize);
+        }
+
+        size_t reqSize = buffer->size;
+        mCbf(EVENT_MORE_DATA, mUserData, buffer);
+        size_t readSize = buffer->size;
 
         // Validate on returned size
         if (ssize_t(readSize) < 0 || readSize > reqSize) {
