@@ -16,6 +16,7 @@
 
 package android.media;
 
+import android.media.AudioConfigBase;
 import android.media.IAudioRecord;
 import android.media.SharedFileRegion;
 
@@ -43,4 +44,5 @@ parcelable CreateRecordResponse {
     int portId;
     /** The newly created record. */
     @nullable IAudioRecord audioRecord;
+    AudioConfigBase serverConfig;
 }
