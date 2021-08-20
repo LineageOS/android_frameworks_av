@@ -29,10 +29,8 @@ using Eigen::Vector3f;
 PoseDriftCompensator::PoseDriftCompensator(const Options& options) : mOptions(options) {}
 
 void PoseDriftCompensator::setInput(int64_t timestamp, const Pose3f& input) {
-    if (!mTimestamp.has_value()) {
-        // First input sample sets the output directly.
-        mOutput = input;
-    } else {
+    if (mTimestamp.has_value()) {
+        // Avoid computation upon first input (only sets the initial state).
         Pose3f prevInputToInput = mPrevInput.inverse() * input;
         mOutput = scale(mOutput, timestamp - mTimestamp.value()) * prevInputToInput;
     }
@@ -41,6 +39,7 @@ void PoseDriftCompensator::setInput(int64_t timestamp, const Pose3f& input) {
 }
 
 void PoseDriftCompensator::recenter() {
+    mTimestamp.reset();
     mOutput = Pose3f();
 }
 
