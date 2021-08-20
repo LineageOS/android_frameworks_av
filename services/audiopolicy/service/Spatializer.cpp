@@ -67,7 +67,7 @@ sp<Spatializer> Spatializer::create(SpatializerPolicyCallback *callback) {
 
     std::vector<effect_descriptor_t> descriptors;
     status_t status =
-            effectsFactoryHal->getDescriptors(FX_IID_VIRTUALIZER_STAGE, &descriptors);
+            effectsFactoryHal->getDescriptors(FX_IID_SPATIALIZER, &descriptors);
     if (status != NO_ERROR) {
         ALOGW("%s failed to get spatializer descriptor, error %d", __func__, status);
         return spatializer;
