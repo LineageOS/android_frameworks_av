@@ -16,9 +16,24 @@
 
 #include "media/Pose.h"
 #include "media/Twist.h"
+#include "QuaternionUtil.h"
 
 namespace android {
 namespace media {
+
+using Eigen::Vector3f;
+
+std::optional<Pose3f> Pose3f::fromVector(const std::vector<float>& vec) {
+    if (vec.size() != 6) {
+        return std::nullopt;
+    }
+    return Pose3f({vec[0], vec[1], vec[2]}, rotationVectorToQuaternion({vec[3], vec[4], vec[5]}));
+}
+
+std::vector<float> Pose3f::toVector() const {
+    Eigen::Vector3f rot = quaternionToRotationVector(mRotation);
+    return {mTranslation[0], mTranslation[1], mTranslation[2], rot[0], rot[1], rot[2]};
+}
 
 std::tuple<Pose3f, bool> moveWithRateLimit(const Pose3f& from, const Pose3f& to, float t,
                                            float maxTranslationalVelocity,

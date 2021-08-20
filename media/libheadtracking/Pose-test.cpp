@@ -110,6 +110,29 @@ TEST(Pose, MoveWithRateLimit_RotationLimit) {
     EXPECT_TRUE(std::get<1>(result));
 }
 
+TEST(Pose, FloatVectorRoundTrip1) {
+    // Rotation vector magnitude must be less than Pi.
+    std::vector<float> vec = { 1, 2, 3, 0.4, 0.5, 0.6};
+    std::optional<Pose3f> pose = Pose3f::fromVector(vec);
+    ASSERT_TRUE(pose.has_value());
+    std::vector<float> reconstructed = pose->toVector();
+    EXPECT_EQ(vec, reconstructed);
+}
+
+TEST(Pose, FloatVectorRoundTrip2) {
+    Pose3f pose({1, 2, 3}, Quaternionf::UnitRandom());
+    std::vector<float> vec = pose.toVector();
+    std::optional<Pose3f> reconstructed = Pose3f::fromVector(vec);
+    ASSERT_TRUE(reconstructed.has_value());
+    EXPECT_EQ(pose, reconstructed.value());
+}
+
+TEST(Pose, FloatVectorInvalid) {
+    EXPECT_FALSE(Pose3f::fromVector({}).has_value());
+    EXPECT_FALSE(Pose3f::fromVector({1, 2, 3, 4, 5}).has_value());
+    EXPECT_FALSE(Pose3f::fromVector({1, 2, 3, 4, 5, 6, 7}).has_value());
+}
+
 }  // namespace
 }  // namespace media
 }  // namespace android
