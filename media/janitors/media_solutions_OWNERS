@@ -1,0 +1,10 @@
+# Bug component: 1344
+# go/android-fwk-media-solutions for info on areas of ownership.
+
+# Main owners:
+aquilescanta@google.com
+krocard@google.com
+
+# In case of emergency:
+andrewlewis@google.com #{LAST_RESORT_SUGGESTION}
+olly@google.com #{LAST_RESORT_SUGGESTION}
