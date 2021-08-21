@@ -20,7 +20,9 @@
 #include <utils/Log.h>
 
 #include "TunerService.h"
+#include "hidl/TunerHidlService.h"
 
+using ::aidl::android::media::tv::tuner::TunerHidlService;
 using ::aidl::android::media::tv::tuner::TunerService;
 
 using namespace android;
@@ -31,8 +33,12 @@ int main() {
     sp<ProcessState> proc(ProcessState::self());
     sp<IServiceManager> sm = defaultServiceManager();
 
-    binder_status_t status = TunerService::instantiate();
-    CHECK(status == STATUS_OK);
+    // Check legacy HIDL HAL first. If it's not existed, use AIDL HAL.
+    binder_status_t status = TunerHidlService::instantiate();
+    if (status != STATUS_OK) {
+        status = TunerService::instantiate();
+        CHECK(status == STATUS_OK);
+    }
 
     ProcessState::self()->startThreadPool();
     IPCThreadState::self()->joinThreadPool();
