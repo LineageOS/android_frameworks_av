@@ -32,7 +32,7 @@ public:
         OFFLOAD,            // Thread class is OffloadThread
         MMAP_PLAYBACK,      // Thread class for MMAP playback stream
         MMAP_CAPTURE,       // Thread class for MMAP capture stream
-        VIRTUALIZER_STAGE,  //
+        SPATIALIZER,  //
         // If you add any values here, also update ThreadBase::threadTypeToString()
     };
 
@@ -1051,7 +1051,7 @@ public:
                 PlaybackThread::Track* getTrackById_l(audio_port_handle_t trackId);
 
                 bool hasMixer() const {
-                    return mType == MIXER || mType == DUPLICATING || mType == VIRTUALIZER_STAGE;
+                    return mType == MIXER || mType == DUPLICATING || mType == SPATIALIZER;
                 }
 protected:
     // updated by readOutputParameters_l()

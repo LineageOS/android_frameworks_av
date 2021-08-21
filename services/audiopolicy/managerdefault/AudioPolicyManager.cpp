@@ -249,7 +249,7 @@ status_t AudioPolicyManager::setDeviceConnectionStateInt(const sp<DeviceDescript
                     if ((state == AUDIO_POLICY_DEVICE_STATE_UNAVAILABLE)
                             || (((desc->mFlags & AUDIO_OUTPUT_FLAG_DIRECT) != 0) &&
                                 (desc->mDirectOpenCount == 0))
-                            || (((desc->mFlags & AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) != 0) &&
+                            || (((desc->mFlags & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0) &&
                                 (desc != mSpatializerOutput))) {
                         clearAudioSourcesForOutput(output);
                         closeOutput(output);
@@ -933,7 +933,7 @@ sp<IOProfile> AudioPolicyManager::getSpatializerOutputProfile(
 {
     for (const auto& hwModule : mHwModules) {
         for (const auto& curProfile : hwModule->getOutputProfiles()) {
-            if (curProfile->getFlags() != AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) {
+            if (curProfile->getFlags() != AUDIO_OUTPUT_FLAG_SPATIALIZER) {
                 continue;
             }
             // reject profiles not corresponding to a device currently available
@@ -4940,7 +4940,7 @@ status_t AudioPolicyManager::getSpatializerOutput(const audio_config_base_t *mix
     mSpatializerOutput = new SwAudioOutputDescriptor(profile, mpClientInterface);
     status_t status = mSpatializerOutput->open(nullptr, mixerConfig, devices,
                                                     mEngine->getStreamTypeForAttributes(*attr),
-                                                    AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE, output);
+                                                    AUDIO_OUTPUT_FLAG_SPATIALIZER, output);
     if (status != NO_ERROR) {
         ALOGV("%s failed opening output: status %d, output %d", __func__, status, *output);
         if (*output != AUDIO_IO_HANDLE_NONE) {
@@ -5187,7 +5187,7 @@ void AudioPolicyManager::onNewAudioModulesAvailableInt(DeviceVector *newDevices)
                 mPrimaryOutput = outputDesc;
             }
             if ((outProfile->getFlags() & AUDIO_OUTPUT_FLAG_DIRECT) != 0
-                || (outProfile->getFlags() & AUDIO_OUTPUT_FLAG_VIRTUALIZER_STAGE) != 0 ) {
+                || (outProfile->getFlags() & AUDIO_OUTPUT_FLAG_SPATIALIZER) != 0 ) {
                 outputDesc->close();
             } else {
                 addOutput(output, outputDesc);

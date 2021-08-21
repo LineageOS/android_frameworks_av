@@ -388,7 +388,9 @@ aidl_interface {
         "aidl/android/media/AudioProductStrategy.aidl",
         "aidl/android/media/AudioVolumeGroup.aidl",
         "aidl/android/media/DeviceRole.aidl",
+        "aidl/android/media/HeadTrackingMode.aidl",
         "aidl/android/media/SoundTriggerSession.aidl",
+        "aidl/android/media/SpatializationLevel.aidl",
     ],
     imports: [
         "audio_common-aidl",
@@ -459,10 +461,13 @@ aidl_interface {
     srcs: [
         "aidl/android/media/GetInputForAttrResponse.aidl",
         "aidl/android/media/GetOutputForAttrResponse.aidl",
+        "aidl/android/media/GetSpatializerResponse.aidl",
         "aidl/android/media/Int.aidl",
         "aidl/android/media/RecordClientInfo.aidl",
         "aidl/android/media/IAudioPolicyService.aidl",
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
+        "aidl/android/media/INativeSpatializerCallback.aidl",
+        "aidl/android/media/ISpatializer.aidl",
     ],
     imports: [
         "audio_common-aidl",

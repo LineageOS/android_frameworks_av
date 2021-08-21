@@ -2205,4 +2205,41 @@ Status AudioPolicyService::getDevicesForRoleAndCapturePreset(
     return Status::ok();
 }
 
+Status AudioPolicyService::getSpatializer(
+        const sp<media::INativeSpatializerCallback>& callback,
+        media::GetSpatializerResponse* _aidl_return) {
+    _aidl_return->spatializer = nullptr;
+    LOG_ALWAYS_FATAL_IF(callback == nullptr);
+    RETURN_IF_BINDER_ERROR(binderStatusFromStatusT(mSpatializer->registerCallback(callback)));
+    _aidl_return->spatializer = mSpatializer;
+    return Status::ok();
+}
+
+Status AudioPolicyService::canBeSpatialized(
+        const std::optional<media::AudioAttributesInternal>& attrAidl,
+        const std::optional<media::AudioConfig>& configAidl,
+        const std::vector<media::AudioDevice>& devicesAidl,
+        bool* _aidl_return) {
+    if (mAudioPolicyManager == nullptr) {
+        return binderStatusFromStatusT(NO_INIT);
+    }
+    audio_attributes_t attr = AUDIO_ATTRIBUTES_INITIALIZER;
+    if (attrAidl.has_value()) {
+        attr = VALUE_OR_RETURN_BINDER_STATUS(
+            aidl2legacy_AudioAttributesInternal_audio_attributes_t(attrAidl.value()));
+    }
+    audio_config_t config = AUDIO_CONFIG_INITIALIZER;
+    if (configAidl.has_value()) {
+        config = VALUE_OR_RETURN_BINDER_STATUS(
+                                    aidl2legacy_AudioConfig_audio_config_t(configAidl.value()));
+    }
+    AudioDeviceTypeAddrVector devices = VALUE_OR_RETURN_BINDER_STATUS(
+            convertContainer<AudioDeviceTypeAddrVector>(devicesAidl,
+                                                        aidl2legacy_AudioDeviceTypeAddress));
+
+    Mutex::Autolock _l(mLock);
+    *_aidl_return = mAudioPolicyManager->canBeSpatialized(&attr, &config, devices);
+    return Status::ok();
+}
+
 } // namespace android

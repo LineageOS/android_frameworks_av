@@ -53,7 +53,7 @@
 #include <system/audio_effects/effect_aec.h>
 #include <system/audio_effects/effect_downmix.h>
 #include <system/audio_effects/effect_ns.h>
-#include <system/audio_effects/effect_virtualizer_stage.h>
+#include <system/audio_effects/effect_spatializer.h>
 #include <system/audio.h>
 
 // NBAIO implementations
@@ -509,8 +509,8 @@ const char *AudioFlinger::ThreadBase::threadTypeToString(AudioFlinger::ThreadBas
         return "MMAP_PLAYBACK";
     case MMAP_CAPTURE:
         return "MMAP_CAPTURE";
-    case VIRTUALIZER_STAGE:
-        return "VIRTUALIZER_STAGE";
+    case SPATIALIZER:
+        return "SPATIALIZER";
     default:
         return "unknown";
     }
@@ -1030,8 +1030,8 @@ String16 AudioFlinger::ThreadBase::getWakeLockTag()
         return String16("MmapPlayback");
     case MMAP_CAPTURE:
         return String16("MmapCapture");
-    case VIRTUALIZER_STAGE:
-        return String16("AudioVirt");
+    case SPATIALIZER:
+        return String16("AudioSpatial");
     default:
         ALOG_ASSERT(false);
         return String16("AudioUnknown");
@@ -1425,9 +1425,9 @@ status_t AudioFlinger::PlaybackThread::checkEffectCompatibility_l(
             return BAD_VALUE;
         }
         break;
-    case VIRTUALIZER_STAGE:
+    case SPATIALIZER:
         if (!audio_is_global_session(sessionId)) {
-            ALOGW("checkEffectCompatibility_l(): non global effect %s on VIRTUALIZER_STAGE"
+            ALOGW("checkEffectCompatibility_l(): non global effect %s on SPATIALIZER"
                     " thread %s", desc->name, mThreadName);
             return BAD_VALUE;
         }
@@ -1942,12 +1942,12 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
                                              audio_config_base_t *mixerConfig)
     :   ThreadBase(audioFlinger, id, type, systemReady, true /* isOut */),
         mNormalFrameCount(0), mSinkBuffer(NULL),
-        mMixerBufferEnabled(AudioFlinger::kEnableExtendedPrecision || type == VIRTUALIZER_STAGE),
+        mMixerBufferEnabled(AudioFlinger::kEnableExtendedPrecision || type == SPATIALIZER),
         mMixerBuffer(NULL),
         mMixerBufferSize(0),
         mMixerBufferFormat(AUDIO_FORMAT_INVALID),
         mMixerBufferValid(false),
-        mEffectBufferEnabled(AudioFlinger::kEnableExtendedPrecision || type == VIRTUALIZER_STAGE),
+        mEffectBufferEnabled(AudioFlinger::kEnableExtendedPrecision || type == SPATIALIZER),
         mEffectBuffer(NULL),
         mEffectBufferSize(0),
         mEffectBufferFormat(AUDIO_FORMAT_INVALID),
@@ -2005,7 +2005,7 @@ AudioFlinger::PlaybackThread::PlaybackThread(const sp<AudioFlinger>& audioFlinge
 
     readOutputParameters_l();
 
-    if (mType != VIRTUALIZER_STAGE
+    if (mType != SPATIALIZER
             && mMixerChannelMask != mChannelMask) {
         LOG_ALWAYS_FATAL("HAL channel mask %#x does not match mixer channel mask %#x",
                 mChannelMask, mMixerChannelMask);
@@ -7069,7 +7069,7 @@ AudioFlinger::SpatializerThread::SpatializerThread(const sp<AudioFlinger>& audio
                                                              audio_io_handle_t id,
                                                              bool systemReady,
                                                              audio_config_base_t *mixerConfig)
-    : MixerThread(audioFlinger, output, id, systemReady, VIRTUALIZER_STAGE, mixerConfig)
+    : MixerThread(audioFlinger, output, id, systemReady, SPATIALIZER, mixerConfig)
 {
 }
 
@@ -7082,7 +7082,7 @@ void AudioFlinger::SpatializerThread::checkOutputStageEffects()
         Mutex::Autolock _l(mLock);
         sp<EffectChain> chain = getEffectChain_l(AUDIO_SESSION_OUTPUT_STAGE);
         if (chain != 0) {
-            hasVirtualizer = chain->getEffectFromType_l(FX_IID_VIRTUALIZER_STAGE) != nullptr;
+            hasVirtualizer = chain->getEffectFromType_l(FX_IID_SPATIALIZER) != nullptr;
             hasDownMixer = chain->getEffectFromType_l(EFFECT_UIID_DOWNMIX) != nullptr;
         }
 
