@@ -23,7 +23,7 @@
 #include <android/media/SpatializationLevel.h>
 
 #include <media/AudioEffect.h>
-#include <system/audio_effects/effect_virtualizer_stage.h>
+#include <system/audio_effects/effect_spatializer.h>
 
 
 namespace android {

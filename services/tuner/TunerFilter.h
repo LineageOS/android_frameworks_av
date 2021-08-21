@@ -88,9 +88,6 @@ public:
     };
 
 private:
-    bool isAudioFilter();
-    bool isVideoFilter();
-
     shared_ptr<IFilter> mFilter;
     int32_t mId;
     int64_t mId64Bit;

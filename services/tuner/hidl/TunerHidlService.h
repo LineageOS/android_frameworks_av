@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-#ifndef ANDROID_MEDIA_TUNERSERVICE_H
-#define ANDROID_MEDIA_TUNERSERVICE_H
+#ifndef ANDROID_MEDIA_TUNERHIDLSERVICE_H
+#define ANDROID_MEDIA_TUNERHIDLSERVICE_H
 
 #include <aidl/android/hardware/tv/tuner/DemuxFilterEvent.h>
 #include <aidl/android/hardware/tv/tuner/DemuxFilterStatus.h>
-#include <aidl/android/hardware/tv/tuner/ITuner.h>
 #include <aidl/android/media/tv/tuner/BnTunerService.h>
 #include <aidl/android/media/tv/tunerresourcemanager/TunerFrontendInfo.h>
+#include <android/hardware/tv/tuner/1.1/ITuner.h>
 
 #include "TunerHelper.h"
 
@@ -29,14 +29,26 @@ using ::aidl::android::hardware::tv::tuner::DemuxCapabilities;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterEvent;
 using ::aidl::android::hardware::tv::tuner::DemuxFilterStatus;
 using ::aidl::android::hardware::tv::tuner::FrontendInfo;
-using ::aidl::android::hardware::tv::tuner::ITuner;
-using ::aidl::android::media::tv::tuner::BnTunerService;
 using ::aidl::android::media::tv::tuner::ITunerDemux;
+using ::aidl::android::media::tv::tuner::ITunerDescrambler;
 using ::aidl::android::media::tv::tuner::ITunerFrontend;
 using ::aidl::android::media::tv::tuner::ITunerLnb;
 using ::aidl::android::media::tv::tunerresourcemanager::TunerFrontendInfo;
+using ::android::sp;
+using ::android::hardware::hidl_vec;
+using ::android::hardware::Return;
+using ::android::hardware::Void;
+using ::std::shared_ptr;
+using ::std::vector;
 
-using namespace std;
+using HidlFrontendDtmbCapabilities = ::android::hardware::tv::tuner::V1_1::FrontendDtmbCapabilities;
+using HidlDemuxFilterEvent = ::android::hardware::tv::tuner::V1_0::DemuxFilterEvent;
+using HidlDemuxFilterStatus = ::android::hardware::tv::tuner::V1_0::DemuxFilterStatus;
+using HidlDemuxCapabilities = ::android::hardware::tv::tuner::V1_0::DemuxCapabilities;
+using HidlFrontendInfo = ::android::hardware::tv::tuner::V1_0::FrontendInfo;
+using HidlITuner = ::android::hardware::tv::tuner::V1_0::ITuner;
+using HidlResult = ::android::hardware::tv::tuner::V1_0::Result;
+using HidlFrontendId = ::android::hardware::tv::tuner::V1_0::FrontendId;
 
 namespace aidl {
 namespace android {
@@ -44,12 +56,12 @@ namespace media {
 namespace tv {
 namespace tuner {
 
-class TunerService : public BnTunerService {
+class TunerHidlService : public BnTunerService {
 public:
-    static char const *getServiceName() { return "media.tuner"; }
+    static char const* getServiceName() { return "media.tuner"; }
     static binder_status_t instantiate();
-    TunerService();
-    virtual ~TunerService();
+    TunerHidlService();
+    virtual ~TunerHidlService();
 
     ::ndk::ScopedAStatus getFrontendIds(vector<int32_t>* out_ids) override;
     ::ndk::ScopedAStatus getFrontendInfo(int32_t in_frontendHandle,
@@ -58,7 +70,7 @@ public:
                                       shared_ptr<ITunerFrontend>* _aidl_return) override;
     ::ndk::ScopedAStatus openLnb(int32_t in_lnbHandle,
                                  shared_ptr<ITunerLnb>* _aidl_return) override;
-    ::ndk::ScopedAStatus openLnbByName(const string& in_lnbName,
+    ::ndk::ScopedAStatus openLnbByName(const std::string& in_lnbName,
                                        shared_ptr<ITunerLnb>* _aidl_return) override;
     ::ndk::ScopedAStatus openDemux(int32_t in_demuxHandle,
                                    shared_ptr<ITunerDemux>* _aidl_return) override;
@@ -69,11 +81,18 @@ public:
 
 private:
     bool hasITuner();
+    bool hasITuner_1_1();
     void updateTunerResources();
     vector<TunerFrontendInfo> getTRMFrontendInfos();
     vector<int32_t> getTRMLnbHandles();
+    HidlResult getHidlFrontendIds(hidl_vec<HidlFrontendId>& ids);
+    HidlResult getHidlFrontendInfo(const int id, HidlFrontendInfo& info);
+    DemuxCapabilities getAidlDemuxCaps(const HidlDemuxCapabilities& caps);
+    FrontendInfo getAidlFrontendInfo(const HidlFrontendInfo& halInfo,
+                                     const HidlFrontendDtmbCapabilities& dtmbCaps);
 
-    shared_ptr<ITuner> mTuner;
+    sp<HidlITuner> mTuner;
+    sp<::android::hardware::tv::tuner::V1_1::ITuner> mTuner_1_1;
     int mTunerVersion = TUNER_HAL_VERSION_UNKNOWN;
 };
 
@@ -83,4 +102,4 @@ private:
 }  // namespace android
 }  // namespace aidl
 
-#endif // ANDROID_MEDIA_TUNERSERVICE_H
+#endif  // ANDROID_MEDIA_TUNERHIDLSERVICE_H
