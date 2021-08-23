@@ -402,9 +402,9 @@ aidl_interface {
         "aidl/android/media/AudioProductStrategy.aidl",
         "aidl/android/media/AudioVolumeGroup.aidl",
         "aidl/android/media/DeviceRole.aidl",
-        "aidl/android/media/HeadTrackingMode.aidl",
         "aidl/android/media/SoundTriggerSession.aidl",
         "aidl/android/media/SpatializationLevel.aidl",
+        "aidl/android/media/SpatializerHeadTrackingMode.aidl",
     ],
     imports: [
         "audioclient-types-aidl",

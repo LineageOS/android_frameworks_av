@@ -40,8 +40,8 @@ using aidl_utils::statusTFromBinderStatus;
 using aidl_utils::binderStatusFromStatusT;
 using android::content::AttributionSourceState;
 using binder::Status;
-using media::HeadTrackingMode;
 using media::SpatializationLevel;
+using media::SpatializerHeadTrackingMode;
 
 #define VALUE_OR_RETURN_BINDER_STATUS(x) \
     ({ auto _tmp = (x); \
@@ -177,7 +177,7 @@ Status Spatializer::getLevel(media::SpatializationLevel *level) {
 }
 
 Status Spatializer::getSupportedHeadTrackingModes(
-        std::vector<media::HeadTrackingMode>* modes) {
+        std::vector<media::SpatializerHeadTrackingMode>* modes) {
     ALOGV("%s", __func__);
     if (modes == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
@@ -186,14 +186,14 @@ Status Spatializer::getSupportedHeadTrackingModes(
     // - The engine capabilities
     // - If a head tracking sensor is registered and linked to a connected audio device
     // - if we have indications on the screen orientation
-    modes->push_back(HeadTrackingMode::RELATIVE_WORLD);
+    modes->push_back(SpatializerHeadTrackingMode::RELATIVE_WORLD);
     return Status::ok();
 }
 
-Status Spatializer::setDesiredHeadTrackingMode(media::HeadTrackingMode mode) {
+Status Spatializer::setDesiredHeadTrackingMode(media::SpatializerHeadTrackingMode mode) {
     ALOGV("%s level %d", __func__, (int)mode);
-    if (mode != HeadTrackingMode::DISABLED
-            && mode != HeadTrackingMode::RELATIVE_WORLD) {
+    if (mode != SpatializerHeadTrackingMode::DISABLED
+            && mode != SpatializerHeadTrackingMode::RELATIVE_WORLD) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
     {
@@ -203,7 +203,7 @@ Status Spatializer::setDesiredHeadTrackingMode(media::HeadTrackingMode mode) {
     return Status::ok();
 }
 
-Status Spatializer::getActualHeadTrackingMode(media::HeadTrackingMode *mode) {
+Status Spatializer::getActualHeadTrackingMode(media::SpatializerHeadTrackingMode *mode) {
     if (mode == nullptr) {
         return binderStatusFromStatusT(BAD_VALUE);
     }
@@ -213,7 +213,7 @@ Status Spatializer::getActualHeadTrackingMode(media::HeadTrackingMode *mode) {
     return Status::ok();
 }
 
-Status Spatializer::recenterHeadtracker() {
+Status Spatializer::recenterHeadTracker() {
     return Status::ok();
 }
 
@@ -259,10 +259,9 @@ status_t Spatializer::attachOutput(audio_io_handle_t output) {
     // create FX instance on output
     AttributionSourceState attributionSource = AttributionSourceState();
     mEngine = new AudioEffect(attributionSource);
-    mEngine->set(nullptr, &mEngineDescriptor.uuid, 0,
-                 Spatializer::engineCallback /* cbf */, this /* user */,
-                 AUDIO_SESSION_OUTPUT_STAGE, output,
-                 {} /* device */, false /* probe */, true /* notifyFramesProcessed */);
+    mEngine->set(nullptr, &mEngineDescriptor.uuid, 0, Spatializer::engineCallback /* cbf */,
+                 this /* user */, AUDIO_SESSION_OUTPUT_STAGE, output, {} /* device */,
+                 false /* probe */, true /* notifyFramesProcessed */);
     status_t status = mEngine->initCheck();
     ALOGV("%s mEngine create status %d", __func__, (int)status);
     if (status != NO_ERROR) {

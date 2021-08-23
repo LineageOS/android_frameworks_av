@@ -16,8 +16,8 @@
 
 package android.media;
 
-import android.media.HeadTrackingMode;
 import android.media.SpatializationLevel;
+import android.media.SpatializerHeadTrackingMode;
 
 /**
  * The ISpatializer interface is used to control the native audio service implementation
@@ -47,22 +47,23 @@ interface ISpatializer {
     /** Gets the selected spatialization level (see SpatializationLevel.aidl) */
     SpatializationLevel getLevel();
 
-    /** Reports the list of supported head tracking modes (see HeadTrackingMode.aidl). The list can
-     * be empty if the spatializer implementation does not support head tracking or if no
-     * head tracking device is connected.
+    /** Reports the list of supported head tracking modes (see SpatializerHeadTrackingMode.aidl).
+     * The list can be empty if the spatializer implementation does not support head tracking or if
+     * no head tracking device is connected.
      */
-    HeadTrackingMode[] getSupportedHeadTrackingModes();
+    SpatializerHeadTrackingMode[] getSupportedHeadTrackingModes();
 
-    /** Selects the desired head tracking mode (see HeadTrackingMode.aidl) */
-    void setDesiredHeadTrackingMode(HeadTrackingMode mode);
+    /** Selects the desired head tracking mode (see SpatializerHeadTrackingMode.aidl) */
+    void setDesiredHeadTrackingMode(SpatializerHeadTrackingMode mode);
 
     /** Gets the actual head tracking mode. Can be different from the desired mode if conditions to
      * enable the desired mode are not met (e.g if the head tracking device was removed)
      */
-    HeadTrackingMode getActualHeadTrackingMode();
+    SpatializerHeadTrackingMode getActualHeadTrackingMode();
 
     /** Reset the head tracking algorithm to consider current head pose as neutral */
-    void recenterHeadtracker();
+    void recenterHeadTracker();
+
     /** Set the screen to stage transform to use by the head tracking algorithm */
     void setGlobalTransform(in float[] screenToStage);
 }
