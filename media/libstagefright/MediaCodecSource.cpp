@@ -943,9 +943,16 @@ void MediaCodecSource::onMessageReceived(const sp<AMessage> &msg) {
 
             sp<MediaCodecBuffer> outbuf;
             status_t err = mEncoder->getOutputBuffer(index, &outbuf);
-            if (err != OK || outbuf == NULL || outbuf->data() == NULL
-                || outbuf->size() == 0) {
+            if (err != OK || outbuf == NULL || outbuf->data() == NULL) {
                 signalEOS();
+                break;
+            } else if (outbuf->size() == 0) {
+                // Zero length CSD buffers are not treated as an error
+                if (flags & MediaCodec::BUFFER_FLAG_CODECCONFIG) {
+                    mEncoder->releaseOutputBuffer(index);
+                } else {
+                    signalEOS();
+                }
                 break;
             }
 
