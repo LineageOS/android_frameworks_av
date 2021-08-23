@@ -48,6 +48,11 @@ TEST(HeadTrackingProcessor, BasicComposition) {
 
     std::unique_ptr<HeadTrackingProcessor> processor =
             createHeadTrackingProcessor(Options{}, HeadTrackingMode::SCREEN_RELATIVE);
+
+    // Establish a baseline for the drift compensators.
+    processor->setWorldToHeadPose(0, Pose3f(), Twist3f());
+    processor->setWorldToScreenPose(0, Pose3f());
+
     processor->setWorldToHeadPose(0, worldToHead, Twist3f());
     processor->setWorldToScreenPose(0, worldToScreen);
     processor->setScreenToStagePose(screenToStage);
@@ -76,6 +81,11 @@ TEST(HeadTrackingProcessor, Prediction) {
 
     std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcessor(
             Options{.predictionDuration = 2.f}, HeadTrackingMode::WORLD_RELATIVE);
+
+    // Establish a baseline for the drift compensators.
+    processor->setWorldToHeadPose(0, Pose3f(), Twist3f());
+    processor->setWorldToScreenPose(0, Pose3f());
+
     processor->setWorldToHeadPose(0, worldToHead, headTwist);
     processor->setWorldToScreenPose(0, worldToScreen);
     processor->calculate(0);
@@ -99,6 +109,10 @@ TEST(HeadTrackingProcessor, SmoothModeSwitch) {
 
     std::unique_ptr<HeadTrackingProcessor> processor = createHeadTrackingProcessor(
             Options{.maxTranslationalVelocity = 1}, HeadTrackingMode::STATIC);
+
+    // Establish a baseline for the drift compensators.
+    processor->setWorldToHeadPose(0, Pose3f(), Twist3f());
+    processor->setWorldToScreenPose(0, Pose3f());
 
     processor->calculate(0);
 
