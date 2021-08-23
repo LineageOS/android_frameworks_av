@@ -15,6 +15,8 @@
  */
 #pragma once
 
+#include <optional>
+#include <vector>
 #include <Eigen/Geometry>
 
 namespace android {
@@ -44,6 +46,22 @@ class Pose3f {
     Pose3f() : Pose3f(Eigen::Vector3f::Zero(), Eigen::Quaternionf::Identity()) {}
 
     Pose3f(const Pose3f& other) { *this = other; }
+
+    /**
+     * Create instance from a vector-of-floats representation.
+     * The vector is expected to have exactly 6 elements, where the first three are a translation
+     * vector and the last three are a rotation vector.
+     *
+     * Returns nullopt if the input vector is illegal.
+     */
+    static std::optional<Pose3f> fromVector(const std::vector<float>& vec);
+
+    /**
+     * Convert instance to a vector-of-floats representation.
+     * The vector will have exactly 6 elements, where the first three are a translation vector and
+     * the last three are a rotation vector.
+     */
+    std::vector<float> toVector() const;
 
     Pose3f& operator=(const Pose3f& other) {
         mTranslation = other.mTranslation;
