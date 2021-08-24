@@ -1,0 +1,14 @@
+#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:5
+#EXT-X-KEY:METHOD=NONE
+#EXT-X-DISCONTINUITY-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence0.ts
+#EXT-X-DISCONTINUITY
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence2.ts
+#EXT-X-ENDLIST

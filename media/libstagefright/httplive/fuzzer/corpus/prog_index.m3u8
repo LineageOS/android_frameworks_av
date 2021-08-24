@@ -1,0 +1,17 @@
+#EXTM3U
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="eng",NAME="English",AUTOSELECT=YES,DEFAULT=YES,URI="corpus/index1.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="fre",NAME="Français",AUTOSELECT=YES,DEFAULT=NO,URI="corpus/index1.m3u8"
+#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",LANGUAGE="sp",NAME="Espanol",AUTOSELECT=YES,DEFAULT=NO,URI="corpus/index1.m3u8"
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:5
+#EXT-X-KEY:METHOD=NONE
+#EXT-X-DISCONTINUITY-SEQUENCE:0
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXT-X-DISCONTINUITY
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXT-X-ENDLIST
