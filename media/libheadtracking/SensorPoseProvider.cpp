@@ -144,6 +144,9 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     bool waitInitFinished() { return mInitPromise.get_future().get(); }
 
     void threadFunc(const char* packageName) {
+        // Obtain looper.
+        mLooper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
+
         // The number 19 is arbitrary, only useful if using multiple objects on the same looper.
         constexpr int kIdent = 19;
 
@@ -154,9 +157,6 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
             initFinished(false);
             return;
         }
-
-        // Obtain looper.
-        mLooper = ALooper_prepare(ALOOPER_PREPARE_ALLOW_NON_CALLBACKS);
 
         // Create event queue.
         ASensorEventQueue* queue =
