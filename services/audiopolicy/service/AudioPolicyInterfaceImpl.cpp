@@ -121,11 +121,14 @@ Status AudioPolicyService::setDeviceConnectionState(
     ALOGV("setDeviceConnectionState()");
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
-    return binderStatusFromStatusT(
-            mAudioPolicyManager->setDeviceConnectionState(device, state,
+    status_t status = mAudioPolicyManager->setDeviceConnectionState(device, state,
                                                           deviceAidl.address.c_str(),
                                                           deviceNameAidl.c_str(),
-                                                          encodedFormat));
+                                                          encodedFormat);
+    if (status == NO_ERROR) {
+        onCheckSpatializer_l();
+    }
+    return binderStatusFromStatusT(status);
 }
 
 Status AudioPolicyService::getDeviceConnectionState(const media::AudioDevice& deviceAidl,
@@ -165,9 +168,13 @@ Status AudioPolicyService::handleDeviceConfigChange(
     ALOGV("handleDeviceConfigChange()");
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
-    return binderStatusFromStatusT(
-            mAudioPolicyManager->handleDeviceConfigChange(device, deviceAidl.address.c_str(),
-                                                          deviceNameAidl.c_str(), encodedFormat));
+    status_t status =  mAudioPolicyManager->handleDeviceConfigChange(
+            device, deviceAidl.address.c_str(), deviceNameAidl.c_str(), encodedFormat);
+
+    if (status == NO_ERROR) {
+       onCheckSpatializer_l();
+    }
+    return binderStatusFromStatusT(status);
 }
 
 Status AudioPolicyService::setPhoneState(media::AudioMode stateAidl, int32_t uidAidl)
@@ -234,6 +241,7 @@ Status AudioPolicyService::setForceUse(media::AudioPolicyForceUse usageAidl,
     Mutex::Autolock _l(mLock);
     AutoCallerClear acc;
     mAudioPolicyManager->setForceUse(usage, config);
+    onCheckSpatializer_l();
     return Status::ok();
 }
 
@@ -2062,8 +2070,11 @@ Status AudioPolicyService::setDevicesRoleForStrategy(
         return binderStatusFromStatusT(NO_INIT);
     }
     Mutex::Autolock _l(mLock);
-    return binderStatusFromStatusT(
-            mAudioPolicyManager->setDevicesRoleForStrategy(strategy, role, devices));
+    status_t status = mAudioPolicyManager->setDevicesRoleForStrategy(strategy, role, devices);
+    if (status == NO_ERROR) {
+       onCheckSpatializer_l();
+    }
+    return binderStatusFromStatusT(status);
 }
 
 Status AudioPolicyService::removeDevicesRoleForStrategy(int32_t strategyAidl,
@@ -2076,8 +2087,11 @@ Status AudioPolicyService::removeDevicesRoleForStrategy(int32_t strategyAidl,
         return binderStatusFromStatusT(NO_INIT);
     }
     Mutex::Autolock _l(mLock);
-    return binderStatusFromStatusT(
-            mAudioPolicyManager->removeDevicesRoleForStrategy(strategy, role));
+    status_t status = mAudioPolicyManager->removeDevicesRoleForStrategy(strategy, role);
+    if (status == NO_ERROR) {
+       onCheckSpatializer_l();
+    }
+    return binderStatusFromStatusT(status);
 }
 
 Status AudioPolicyService::getDevicesForRoleAndStrategy(
