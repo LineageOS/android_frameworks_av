@@ -1,0 +1,55 @@
+/*
+ * Copyright (C) 2021 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at:
+ *
+ * http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+cc_fuzz {
+    name: "httplive_fuzzer",
+    srcs: [
+        "httplive_fuzzer.cpp",
+    ],
+    static_libs: [
+        "libstagefright_httplive",
+        "libstagefright_id3",
+        "libstagefright_metadatautils",
+        "libstagefright_mpeg2support",
+        "liblog",
+        "libcutils",
+        "libdatasource",
+        "libmedia",
+        "libstagefright",
+        "libutils",
+    ],
+    header_libs: [
+        "libbase_headers",
+        "libstagefright_foundation_headers",
+        "libstagefright_headers",
+        "libstagefright_httplive_headers",
+    ],
+    shared_libs: [
+        "libcrypto",
+        "libstagefright_foundation",
+        "libhidlbase",
+        "libhidlmemory",
+        "android.hidl.allocator@1.0",
+    ],
+    corpus: ["corpus/*"],
+    dictionary: "httplive_fuzzer.dict",
+    fuzz_config: {
+        cc: [
+            "android-media-fuzzing-reports@google.com",
+        ],
+        componentid: 155276,
+    },
+}

@@ -1,0 +1,12 @@
+#EXTM3U
+#EXT-X-VERSION:4
+#EXT-X-TARGETDURATION:5
+#EXT-X-KEY:METHOD=AES-128,URI="data:text/plain;charset=utf-8,a4cd9995a1aa91e1",IV=0x30303030303030303030303030303030
+#EXT-X-PLAYLIST-TYPE:VOD
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence2.ts
+#EXTINF:5,
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence3.ts
+#EXT-X-ENDLIST
