@@ -283,8 +283,6 @@ TunerHidlFilter::~TunerHidlFilter() {
         if (res == HidlResult::SUCCESS) {
             *out_avMemory = dupToAidl(avMemory);
             *_aidl_return = static_cast<int64_t>(avMemSize);
-        } else {
-            _aidl_return = nullptr;
         }
     });
 

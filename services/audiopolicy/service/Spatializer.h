@@ -19,7 +19,7 @@
 
 #include <android/media/BnEffect.h>
 #include <android/media/BnSpatializer.h>
-#include <android/media/HeadTrackingMode.h>
+#include <android/media/SpatializerHeadTrackingMode.h>
 #include <android/media/SpatializationLevel.h>
 
 #include <media/AudioEffect.h>
@@ -93,10 +93,12 @@ public:
     binder::Status setLevel(media::SpatializationLevel level) override;
     binder::Status getLevel(media::SpatializationLevel *level) override;
     binder::Status getSupportedHeadTrackingModes(
-            std::vector<media::HeadTrackingMode>* modes) override;
-    binder::Status setDesiredHeadTrackingMode(media::HeadTrackingMode mode) override;
-    binder::Status getActualHeadTrackingMode(media::HeadTrackingMode *mode) override;
-    binder::Status recenterHeadtracker() override;
+            std::vector<media::SpatializerHeadTrackingMode>* modes) override;
+    binder::Status setDesiredHeadTrackingMode(
+            media::SpatializerHeadTrackingMode mode) override;
+    binder::Status getActualHeadTrackingMode(
+            media::SpatializerHeadTrackingMode* mode) override;
+    binder::Status recenterHeadTracker() override;
     binder::Status setGlobalTransform(const std::vector<float>& screenToStage) override;
 
     /** IBinder::DeathRecipient. Listen to the death of the INativeSpatializerCallback. */
@@ -190,8 +192,8 @@ private:
     /** Requested spatialization level */
     media::SpatializationLevel mLevel GUARDED_BY(mLock) = media::SpatializationLevel::NONE;
     /** Requested head tracking mode */
-    media::HeadTrackingMode mHeadTrackingMode GUARDED_BY(mLock)
-            = media::HeadTrackingMode::DISABLED;
+    media::SpatializerHeadTrackingMode mHeadTrackingMode GUARDED_BY(mLock)
+            = media::SpatializerHeadTrackingMode::DISABLED;
     /** Configured screen to stage transform */
     std::vector<float> mScreenToStageTransform GUARDED_BY(mLock);
 

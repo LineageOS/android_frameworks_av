@@ -1250,7 +1250,8 @@ class Camera3Device :
     void monitorMetadata(TagMonitor::eventSource source, int64_t frameNumber,
             nsecs_t timestamp, const CameraMetadata& metadata,
             const std::unordered_map<std::string, CameraMetadata>& physicalMetadata,
-            const std::set<int32_t> &outputStreamIds, int32_t inputStreamId);
+            const camera_stream_buffer_t *outputBuffers, uint32_t numOutputBuffers,
+            int32_t inputStreamId);
 
     metadata_vendor_id_t mVendorTagId;
 
