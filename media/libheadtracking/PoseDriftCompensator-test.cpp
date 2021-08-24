@@ -39,17 +39,22 @@ TEST(PoseDriftCompensator, NoDrift) {
     Pose3f pose2({4, 5, 6}, Quaternionf::UnitRandom());
     PoseDriftCompensator comp(Options{});
 
+    // First pose sets the baseline.
     comp.setInput(1000, pose1);
-    EXPECT_EQ(comp.getOutput(), pose1);
+    EXPECT_EQ(comp.getOutput(), Pose3f());
 
     comp.setInput(2000, pose2);
-    EXPECT_EQ(comp.getOutput(), pose2);
+    EXPECT_EQ(comp.getOutput(), pose1.inverse() * pose2);
 
+    // Recentering resets the baseline.
     comp.recenter();
     EXPECT_EQ(comp.getOutput(), Pose3f());
 
     comp.setInput(3000, pose1);
-    EXPECT_EQ(comp.getOutput(), pose2.inverse() * pose1);
+    EXPECT_EQ(comp.getOutput(), Pose3f());
+
+    comp.setInput(4000, pose2);
+    EXPECT_EQ(comp.getOutput(), pose1.inverse() * pose2);
 }
 
 TEST(PoseDriftCompensator, NoDriftZeroTime) {
@@ -58,16 +63,19 @@ TEST(PoseDriftCompensator, NoDriftZeroTime) {
     PoseDriftCompensator comp(Options{});
 
     comp.setInput(1000, pose1);
-    EXPECT_EQ(comp.getOutput(), pose1);
+    EXPECT_EQ(comp.getOutput(), Pose3f());
 
     comp.setInput(1000, pose2);
-    EXPECT_EQ(comp.getOutput(), pose2);
+    EXPECT_EQ(comp.getOutput(), pose1.inverse() * pose2);
 
     comp.recenter();
     EXPECT_EQ(comp.getOutput(), Pose3f());
 
     comp.setInput(1000, pose1);
-    EXPECT_EQ(comp.getOutput(), pose2.inverse() * pose1);
+    EXPECT_EQ(comp.getOutput(), Pose3f());
+
+    comp.setInput(1000, pose2);
+    EXPECT_EQ(comp.getOutput(), pose1.inverse() * pose2);
 }
 
 TEST(PoseDriftCompensator, Asymptotic) {
@@ -92,22 +100,28 @@ TEST(PoseDriftCompensator, Fast) {
             Options{.translationalDriftTimeConstant = 1e7, .rotationalDriftTimeConstant = 1e7});
 
     comp.setInput(0, pose1);
-    EXPECT_EQ(comp.getOutput(), pose1);
+    EXPECT_EQ(comp.getOutput(), Pose3f());
 
     comp.setInput(1, pose2);
-    EXPECT_EQ(comp.getOutput(), pose2);
+    EXPECT_EQ(comp.getOutput(), pose1.inverse() * pose2);
 
     comp.recenter();
     EXPECT_EQ(comp.getOutput(), Pose3f());
 
     comp.setInput(2, pose1);
-    EXPECT_EQ(comp.getOutput(), pose2.inverse() * pose1);
+    EXPECT_EQ(comp.getOutput(), Pose3f());
+
+    comp.setInput(3, pose2);
+    EXPECT_EQ(comp.getOutput(), pose1.inverse() * pose2);
 }
 
 TEST(PoseDriftCompensator, Drift) {
     Pose3f pose1({1, 2, 3}, rotateZ(-M_PI * 3 / 4));
     PoseDriftCompensator comp(
             Options{.translationalDriftTimeConstant = 500, .rotationalDriftTimeConstant = 1000});
+
+    // Establish a baseline.
+    comp.setInput(1000, Pose3f());
 
     // Initial pose is used as is.
     comp.setInput(1000, pose1);

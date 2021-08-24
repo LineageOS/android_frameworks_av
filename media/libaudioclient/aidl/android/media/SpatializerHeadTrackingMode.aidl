@@ -18,12 +18,12 @@ package android.media;
 
 
 /**
- * The head tracking mode supported by the spatializer stage effect implementation.
+ * The head tracking mode supported by the spatializer effect implementation.
  * Used by methods of the ISpatializer interface.
  * {@hide}
  */
 @Backing(type="byte")
-enum HeadTrackingMode {
+enum SpatializerHeadTrackingMode {
     /** Head tracking is active in a mode not listed below (forward compatibility) */
     OTHER = 0,
     /** Head tracking is disabled */

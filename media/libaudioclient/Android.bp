@@ -25,11 +25,13 @@ cc_library_headers {
     static_libs: [
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
+        "spatializer-aidl-cpp",
         "av-types-aidl-cpp",
     ],
     export_static_lib_headers: [
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
+        "spatializer-aidl-cpp",
         "av-types-aidl-cpp",
     ],
     target: {
@@ -112,6 +114,7 @@ cc_library {
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
+        "spatializer-aidl-cpp",
         "audiopolicy-types-aidl-cpp",
         "av-types-aidl-cpp",
         "capture_state_listener-aidl-cpp",
@@ -137,6 +140,7 @@ cc_library {
     export_shared_lib_headers: [
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
+        "spatializer-aidl-cpp",
         "framework-permission-aidl-cpp",
         "libbinder",
     ],
@@ -388,9 +392,9 @@ aidl_interface {
         "aidl/android/media/AudioProductStrategy.aidl",
         "aidl/android/media/AudioVolumeGroup.aidl",
         "aidl/android/media/DeviceRole.aidl",
-        "aidl/android/media/HeadTrackingMode.aidl",
         "aidl/android/media/SoundTriggerSession.aidl",
         "aidl/android/media/SpatializationLevel.aidl",
+        "aidl/android/media/SpatializerHeadTrackingMode.aidl",
     ],
     imports: [
         "audio_common-aidl",
@@ -466,8 +470,6 @@ aidl_interface {
         "aidl/android/media/RecordClientInfo.aidl",
         "aidl/android/media/IAudioPolicyService.aidl",
         "aidl/android/media/IAudioPolicyServiceClient.aidl",
-        "aidl/android/media/INativeSpatializerCallback.aidl",
-        "aidl/android/media/ISpatializer.aidl",
     ],
     imports: [
         "audio_common-aidl",
@@ -475,6 +477,33 @@ aidl_interface {
         "audiopolicy-types-aidl",
         "capture_state_listener-aidl",
         "framework-permission-aidl",
+        "spatializer-aidl",
+    ],
+
+    double_loadable: true,
+    backend: {
+        cpp: {
+            min_sdk_version: "29",
+            apex_available: [
+                "//apex_available:platform",
+                "com.android.media",
+            ],
+        },
+    },
+}
+
+aidl_interface {
+    name: "spatializer-aidl",
+    unstable: true,
+    local_include_dir: "aidl",
+    host_supported: true,
+    vendor_available: true,
+    srcs: [
+        "aidl/android/media/INativeSpatializerCallback.aidl",
+        "aidl/android/media/ISpatializer.aidl",
+    ],
+    imports: [
+        "audiopolicy-types-aidl",
     ],
 
     double_loadable: true,
