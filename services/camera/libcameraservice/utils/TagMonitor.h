@@ -20,7 +20,6 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
-#include <set>
 #include <unordered_map>
 
 #include <utils/RefBase.h>
@@ -31,6 +30,7 @@
 #include <system/camera_metadata.h>
 #include <system/camera_vendor_tags.h>
 #include <camera/CameraMetadata.h>
+#include <device3/InFlightRequest.h>
 
 namespace android {
 
@@ -68,7 +68,8 @@ class TagMonitor {
     void monitorMetadata(eventSource source, int64_t frameNumber,
             nsecs_t timestamp, const CameraMetadata& metadata,
             const std::unordered_map<std::string, CameraMetadata>& physicalMetadata,
-            const std::set<int32_t> &outputStreamIds, int32_t inputStreamId = -1);
+            const camera3::camera_stream_buffer_t *outputBuffers = nullptr,
+            uint32_t numOutputBuffers = 0, int32_t inputStreamId = -1);
 
     // Dump current event log to the provided fd
     void dumpMonitoredMetadata(int fd);
@@ -76,12 +77,12 @@ class TagMonitor {
   private:
 
     static void printData(int fd, const uint8_t *data_ptr, uint32_t tag,
-            int type, int count, int indentation, const std::set<int32_t> &outputStreamIds,
-            int32_t inputStreamId);
+            int type, int count, int indentation,
+            const std::unordered_set<int32_t> &outputStreamIds, int32_t inputStreamId);
 
     void monitorSingleMetadata(TagMonitor::eventSource source, int64_t frameNumber,
             nsecs_t timestamp, const std::string& cameraId, uint32_t tag,
-            const CameraMetadata& metadata, const std::set<int32_t> &outputStreamIds,
+            const CameraMetadata& metadata, const std::unordered_set<int32_t> &outputStreamIds,
             int32_t inputStreamId);
 
     std::atomic<bool> mMonitoringEnabled;
@@ -98,7 +99,7 @@ class TagMonitor {
     std::unordered_map<std::string, CameraMetadata> mLastMonitoredPhysicalResultKeys;
 
     int32_t mLastInputStreamId = -1;
-    std::set<int32_t> mLastStreamIds;
+    std::unordered_set<int32_t> mLastStreamIds;
 
     /**
      * A monitoring event
@@ -109,7 +110,7 @@ class TagMonitor {
         template<typename T>
         MonitorEvent(eventSource src, uint32_t frameNumber, nsecs_t timestamp,
                 const T &newValue, const std::string& cameraId,
-                const std::set<int32_t> &outputStreamIds, int32_t inputStreamId);
+                const std::unordered_set<int32_t> &outputStreamIds, int32_t inputStreamId);
         ~MonitorEvent();
 
         eventSource source;
@@ -119,7 +120,7 @@ class TagMonitor {
         uint8_t type;
         std::vector<uint8_t> newData;
         std::string cameraId;
-        std::set<int32_t> outputStreamIds;
+        std::unordered_set<int32_t> outputStreamIds;
         int32_t inputStreamId = 1;
     };
 

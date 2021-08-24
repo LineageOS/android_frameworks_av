@@ -1797,7 +1797,7 @@ status_t AudioTrack::createTrack_l()
                 mAwaitBoost = true;
             }
         } else {
-            ALOGD("%s(%d): AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu",
+            ALOGV("%s(%d): AUDIO_OUTPUT_FLAG_FAST denied by server; frameCount %zu -> %zu",
                   __func__, mPortId, mReqFrameCount, mFrameCount);
         }
     }
