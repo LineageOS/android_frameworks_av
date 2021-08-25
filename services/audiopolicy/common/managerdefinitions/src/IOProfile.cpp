@@ -137,6 +137,7 @@ void IOProfile::dump(String8 *dst) const
              maxOpenCount, curOpenCount);
     dst->appendFormat("    - maxActiveCount: %u - curActiveCount: %u\n",
              maxActiveCount, curActiveCount);
+    dst->appendFormat("    - recommendedMuteDurationMs: %u ms\n", recommendedMuteDurationMs);
 }
 
 void IOProfile::log()
