@@ -30,6 +30,8 @@ namespace android {
 
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
+using media::audio::common::AudioChannelLayout;
+using media::audio::common::AudioFormatDescription;
 
 #define MAX_ITEMS_PER_LIST 1024
 
@@ -252,7 +254,7 @@ uint32_t AudioFlingerClientAdapter::sampleRate(audio_io_handle_t ioHandle) const
 audio_format_t AudioFlingerClientAdapter::format(audio_io_handle_t output) const {
     auto result = [&]() -> ConversionResult<audio_format_t> {
         int32_t outputAidl = VALUE_OR_RETURN(legacy2aidl_audio_io_handle_t_int32_t(output));
-        media::AudioFormatDescription aidlRet;
+        AudioFormatDescription aidlRet;
         RETURN_IF_ERROR(statusTFromBinderStatus(mDelegate->format(outputAidl, &aidlRet)));
         return aidl2legacy_AudioFormatDescription_audio_format_t(aidlRet);
     }();
@@ -420,9 +422,9 @@ size_t AudioFlingerClientAdapter::getInputBufferSize(uint32_t sampleRate, audio_
                                                      audio_channel_mask_t channelMask) const {
     auto result = [&]() -> ConversionResult<size_t> {
         int32_t sampleRateAidl = VALUE_OR_RETURN(convertIntegral<int32_t>(sampleRate));
-        media::AudioFormatDescription formatAidl = VALUE_OR_RETURN(
+        AudioFormatDescription formatAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_format_t_AudioFormatDescription(format));
-        media::AudioChannelLayout channelMaskAidl = VALUE_OR_RETURN(
+        AudioChannelLayout channelMaskAidl = VALUE_OR_RETURN(
                 legacy2aidl_audio_channel_mask_t_AudioChannelLayout(channelMask, true /*isInput*/));
         int64_t aidlRet;
         RETURN_IF_ERROR(statusTFromBinderStatus(
@@ -820,7 +822,7 @@ Status AudioFlingerServerAdapter::sampleRate(int32_t ioHandle, int32_t* _aidl_re
 }
 
 Status AudioFlingerServerAdapter::format(int32_t output,
-                                         media::AudioFormatDescription* _aidl_return) {
+                                         AudioFormatDescription* _aidl_return) {
     audio_io_handle_t outputLegacy = VALUE_OR_RETURN_BINDER(
             aidl2legacy_int32_t_audio_io_handle_t(output));
     *_aidl_return = VALUE_OR_RETURN_BINDER(
@@ -948,8 +950,8 @@ Status AudioFlingerServerAdapter::registerClient(const sp<media::IAudioFlingerCl
 }
 
 Status AudioFlingerServerAdapter::getInputBufferSize(int32_t sampleRate,
-                                                     const media::AudioFormatDescription& format,
-                                                     const media::AudioChannelLayout& channelMask,
+                                                     const AudioFormatDescription& format,
+                                                     const AudioChannelLayout& channelMask,
                                                      int64_t* _aidl_return) {
     uint32_t sampleRateLegacy = VALUE_OR_RETURN_BINDER(convertIntegral<uint32_t>(sampleRate));
     audio_format_t formatLegacy = VALUE_OR_RETURN_BINDER(

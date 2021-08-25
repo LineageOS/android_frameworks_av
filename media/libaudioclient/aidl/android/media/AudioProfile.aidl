@@ -16,9 +16,9 @@
 
 package android.media;
 
-import android.media.AudioChannelLayout;
 import android.media.AudioEncapsulationType;
-import android.media.AudioFormatDescription;
+import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioChannelLayout;
 
 /**
  * {@hide}
