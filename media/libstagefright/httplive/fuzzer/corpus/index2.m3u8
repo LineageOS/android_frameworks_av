@@ -1,0 +1,6 @@
+#EXTM3U
+#EXT-X-INDEPENDENT-SEGMENTS
+#EXT-X-STREAM-INF:CLOSED-CAPTIONS=NONE,BANDWIDTH=165340,RESOLUTION=256x144,CODECS="mp4a.40.5,avc1.42c00b"
+https://non.existentsite.com/test-doesnt-dereference-these-paths/prog_index.m3u8
+#EXT-X-STREAM-INF:CLOSED-CAPTIONS=NONE,BANDWIDTH=344388,RESOLUTION=426x240,CODECS="mp4a.40.5,avc1.4d4015"
+https://non.existentsite.com/test-doesnt-dereference-these-paths/prog_index1.m3u8
