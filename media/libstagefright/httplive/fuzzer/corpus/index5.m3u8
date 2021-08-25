@@ -1,0 +1,14 @@
+#EXTM3U
+#EXT-X-TARGETDURATION:11
+#EXT-X-KEY:METHOD=NONE
+#EXT-X-MEDIA-SEQUENCE:0
+#EXT-X-VERSION:4
+#EXTINF:10.0,
+#EXT-X-BYTERANGE:10@0
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXTINF:10.0,
+#EXT-X-BYTERANGE:20@10
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
+#EXTINF:10.0,
+#EXT-X-BYTERANGE:80
+https://non.existentsite.com/test-doesnt-dereference-these-paths/fileSequence1.ts
