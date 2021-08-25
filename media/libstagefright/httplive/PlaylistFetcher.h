@@ -21,7 +21,7 @@
 #include <media/stagefright/foundation/AHandler.h>
 #include <openssl/aes.h>
 
-#include "mpeg2ts/ATSParser.h"
+#include <ATSParser.h>
 #include "LiveSession.h"
 
 namespace android {
