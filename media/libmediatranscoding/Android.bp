@@ -58,7 +58,7 @@ cc_library_shared {
     export_include_dirs: ["include"],
 
     static_libs: [
-        "mediatranscoding_aidl_interface-ndk_platform",
+        "mediatranscoding_aidl_interface-ndk",
     ],
 
     cflags: [

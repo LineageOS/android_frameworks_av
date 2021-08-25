@@ -35,7 +35,7 @@ cc_fuzz {
     static_libs: [
         "libmediadrm",
         "liblog",
-        "resourcemanager_aidl_interface-ndk_platform",
+        "resourcemanager_aidl_interface-ndk",
     ],
     header_libs: [
         "libmedia_headers",
