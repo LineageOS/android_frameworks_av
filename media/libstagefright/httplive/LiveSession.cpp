@@ -23,7 +23,7 @@
 #include "M3UParser.h"
 #include "PlaylistFetcher.h"
 
-#include "mpeg2ts/AnotherPacketSource.h"
+#include <AnotherPacketSource.h>
 
 #include <cutils/properties.h>
 #include <media/MediaHTTPService.h>
