@@ -670,6 +670,15 @@ status_t SwAudioOutputDescriptor::openDuplicating(const sp<SwAudioOutputDescript
     return NO_ERROR;
 }
 
+uint32_t SwAudioOutputDescriptor::getRecommendedMuteDurationMs() const
+{
+    if (isDuplicated()) {
+        return std::max(mOutput1->getRecommendedMuteDurationMs(),
+                mOutput2->getRecommendedMuteDurationMs());
+    }
+    return mProfile->recommendedMuteDurationMs;
+}
+
 // HwAudioOutputDescriptor implementation
 HwAudioOutputDescriptor::HwAudioOutputDescriptor(const sp<SourceClientDescriptor>& source,
                                                  AudioPolicyClientInterface *clientInterface)

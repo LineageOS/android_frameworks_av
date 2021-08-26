@@ -168,6 +168,7 @@ cc_library {
         "libbinder",
         "framework-permission-aidl-cpp",
         "aaudio-aidl-cpp",
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
@@ -246,6 +247,7 @@ aidl_interface {
         "binding/aidl/aaudio/IAAudioService.aidl",
     ],
     imports: [
+        "android.media.audio.common.types",
         "audioclient-types-aidl",
         "shared-file-region-aidl",
         "framework-permission-aidl",

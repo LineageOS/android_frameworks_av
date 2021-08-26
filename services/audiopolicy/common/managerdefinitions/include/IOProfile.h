@@ -207,6 +207,8 @@ public:
     // Number of streams currently active for this profile. This is not the number of active clients
     // (AudioTrack or AudioRecord) but the number of active HAL streams.
     uint32_t     curActiveCount;
+    // Mute duration while changing device on this output profile.
+    uint32_t     recommendedMuteDurationMs = 0;
 
 private:
     DeviceVector mSupportedDevices; // supported devices: this input/output can be routed from/to

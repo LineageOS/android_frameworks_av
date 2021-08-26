@@ -29,7 +29,7 @@
 
 using namespace aaudio;
 
-using android::media::AudioFormatDescription;
+using android::media::audio::common::AudioFormatDescription;
 
 AAudioStreamConfiguration::AAudioStreamConfiguration(const StreamParameters& parcelable) {
     setChannelMask(parcelable.channelMask);
@@ -76,7 +76,8 @@ StreamParameters AAudioStreamConfiguration::parcelable() const {
         result.audioFormat = convAudioFormat.value();
     } else {
         result.audioFormat = AudioFormatDescription{};
-        result.audioFormat.type = android::media::AudioFormatType::SYS_RESERVED_INVALID;
+        result.audioFormat.type =
+                android::media::audio::common::AudioFormatType::SYS_RESERVED_INVALID;
     }
     static_assert(sizeof(aaudio_direction_t) == sizeof(result.direction));
     result.direction = getDirection();

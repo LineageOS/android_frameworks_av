@@ -307,6 +307,8 @@ public:
     DeviceVector mDevices; /**< current devices this output is routed to */
     wp<AudioPolicyMix> mPolicyMix;  // non NULL when used by a dynamic policy
 
+    virtual uint32_t getRecommendedMuteDurationMs() const { return 0; }
+
 protected:
     const sp<PolicyAudioPort> mPolicyAudioPort;
     AudioPolicyClientInterface * const mClientInterface;
@@ -414,6 +416,8 @@ public:
      * depending on the device type)
      */
     DeviceVector filterSupportedDevices(const DeviceVector &devices) const;
+
+    uint32_t getRecommendedMuteDurationMs() const override;
 
     const sp<IOProfile> mProfile;          // I/O profile this output derives from
     audio_io_handle_t mIoHandle;           // output handle

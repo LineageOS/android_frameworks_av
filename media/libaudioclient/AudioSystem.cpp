@@ -51,8 +51,9 @@
 namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
+using content::AttributionSourceState;
 using media::IAudioPolicyService;
-using android::content::AttributionSourceState;
+using media::audio::common::AudioFormatDescription;
 
 // client singleton for AudioFlinger binder interface
 Mutex AudioSystem::gLock;
@@ -1877,7 +1878,7 @@ status_t AudioSystem::getSurroundFormats(unsigned int* numSurroundFormats,
     media::Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
-    std::vector<media::AudioFormatDescription> surroundFormatsAidl;
+    std::vector<AudioFormatDescription> surroundFormatsAidl;
     std::vector<bool> surroundFormatsEnabledAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl,
@@ -1904,7 +1905,7 @@ status_t AudioSystem::getReportedSurroundFormats(unsigned int* numSurroundFormat
     media::Int numSurroundFormatsAidl;
     numSurroundFormatsAidl.value =
             VALUE_OR_RETURN_STATUS(convertIntegral<int32_t>(*numSurroundFormats));
-    std::vector<media::AudioFormatDescription> surroundFormatsAidl;
+    std::vector<AudioFormatDescription> surroundFormatsAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getReportedSurroundFormats(&numSurroundFormatsAidl, &surroundFormatsAidl)));
 
@@ -1920,7 +1921,7 @@ status_t AudioSystem::setSurroundFormatEnabled(audio_format_t audioFormat, bool 
     const sp<IAudioPolicyService>& aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    media::AudioFormatDescription audioFormatAidl = VALUE_OR_RETURN_STATUS(
+    AudioFormatDescription audioFormatAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_format_t_AudioFormatDescription(audioFormat));
     return statusTFromBinderStatus(
             aps->setSurroundFormatEnabled(audioFormatAidl, enabled));
@@ -1982,7 +1983,7 @@ status_t AudioSystem::getHwOffloadEncodingFormatsSupportedForA2DP(
             & aps = AudioSystem::get_audio_policy_service();
     if (aps == 0) return PERMISSION_DENIED;
 
-    std::vector<media::AudioFormatDescription> formatsAidl;
+    std::vector<AudioFormatDescription> formatsAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->getHwOffloadEncodingFormatsSupportedForA2DP(&formatsAidl)));
     *formats = VALUE_OR_RETURN_STATUS(

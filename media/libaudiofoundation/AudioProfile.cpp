@@ -27,6 +27,8 @@
 
 namespace android {
 
+using media::audio::common::AudioChannelLayout;
+
 bool operator == (const AudioProfile &left, const AudioProfile &right)
 {
     return (left.getFormat() == right.getFormat()) &&
@@ -160,7 +162,7 @@ AudioProfile::toParcelable(bool isInput) const {
     parcelable.name = mName;
     parcelable.format = VALUE_OR_RETURN(legacy2aidl_audio_format_t_AudioFormatDescription(mFormat));
     parcelable.channelMasks = VALUE_OR_RETURN(
-            convertContainer<std::vector<media::AudioChannelLayout>>(
+            convertContainer<std::vector<AudioChannelLayout>>(
                     mChannelMasks,
                     [isInput](audio_channel_mask_t m) {
                         return legacy2aidl_audio_channel_mask_t_AudioChannelLayout(m, isInput);
@@ -184,7 +186,7 @@ AudioProfile::fromParcelable(const media::AudioProfile& parcelable, bool isInput
             aidl2legacy_AudioFormatDescription_audio_format_t(parcelable.format));
     legacy->mChannelMasks = VALUE_OR_RETURN(
             convertContainer<ChannelMaskSet>(parcelable.channelMasks,
-                    [isInput](const media::AudioChannelLayout& l) {
+                    [isInput](const AudioChannelLayout& l) {
                         return aidl2legacy_AudioChannelLayout_audio_channel_mask_t(l, isInput);
                     }));
     legacy->mSamplingRates = VALUE_OR_RETURN(

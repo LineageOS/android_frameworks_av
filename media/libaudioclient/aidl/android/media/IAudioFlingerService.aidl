@@ -16,7 +16,6 @@
 
 package android.media;
 
-import android.media.AudioChannelLayout;
 import android.media.AudioMode;
 import android.media.AudioPatch;
 import android.media.AudioPort;
@@ -42,7 +41,8 @@ import android.media.IAudioTrack;
 import android.media.MicrophoneInfoData;
 import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
-import android.media.AudioFormatDescription;
+import android.media.audio.common.AudioChannelLayout;
+import android.media.audio.common.AudioFormatDescription;
 
 /**
  * {@hide}

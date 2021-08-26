@@ -24,9 +24,11 @@ cc_library_headers {
         "libmedia_helper_headers",
     ],
     static_libs: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
     ],
     export_static_lib_headers: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
     ],
     host_supported: true,
@@ -52,6 +54,7 @@ cc_library {
     ],
 
     shared_libs: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
         "libaudioutils",
@@ -63,6 +66,7 @@ cc_library {
     ],
 
     export_shared_lib_headers: [
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "libaudioclient_aidl_conversion",
     ],
