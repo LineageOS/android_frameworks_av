@@ -47,6 +47,7 @@ cc_library_shared {
         "audiopolicy-types-aidl-cpp",
         "capture_state_listener-aidl-cpp",
         "framework-permission-aidl-cpp",
+        "packagemanager_aidl-cpp",
     ],
 
     static_libs: [
