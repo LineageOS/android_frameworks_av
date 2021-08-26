@@ -51,6 +51,7 @@ cc_library {
         "libpermission",
         "android.hardware.graphics.bufferqueue@1.0",
         "android.hidl.token@1.0-utils",
+        "packagemanager_aidl-cpp",
     ],
     export_static_lib_headers: [
         "libbatterystats_aidl",
@@ -71,6 +72,7 @@ cc_library {
 
     export_shared_lib_headers: [
         "libpermission",
+        "packagemanager_aidl-cpp",
     ],
 
     include_dirs: [
