@@ -81,6 +81,7 @@ cc_library_shared {
         "libmedia_helper",
         "libshmemcompat",
         "libvibrator",
+        "packagemanager_aidl-cpp",
     ],
 
     static_libs: [
@@ -97,6 +98,7 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libpermission",
+        "packagemanager_aidl-cpp",
     ],
 
     cflags: [
