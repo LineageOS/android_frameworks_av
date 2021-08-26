@@ -20,7 +20,6 @@ import android.media.AudioMode;
 import android.media.AudioPatch;
 import android.media.AudioPort;
 import android.media.AudioPortConfig;
-import android.media.AudioStreamType;
 import android.media.AudioUniqueIdUse;
 import android.media.AudioUuid;
 import android.media.AudioVibratorInfo;
@@ -43,6 +42,7 @@ import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
 import android.media.audio.common.AudioChannelLayout;
 import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioStreamType;
 
 /**
  * {@hide}

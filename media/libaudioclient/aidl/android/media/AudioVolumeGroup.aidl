@@ -17,7 +17,7 @@
 package android.media;
 
 import android.media.AudioAttributesInternal;
-import android.media.AudioStreamType;
+import android.media.audio.common.AudioStreamType;
 
 /**
  * {@hide}

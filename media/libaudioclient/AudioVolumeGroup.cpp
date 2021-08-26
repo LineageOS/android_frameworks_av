@@ -31,6 +31,8 @@
 
 namespace android {
 
+using media::audio::common::AudioStreamType;
+
 status_t AudioVolumeGroup::readFromParcel(const Parcel *parcel)
 {
     media::AudioVolumeGroup aidl;
@@ -55,7 +57,7 @@ legacy2aidl_AudioVolumeGroup(const AudioVolumeGroup& legacy) {
                     legacy.getAudioAttributes(),
                     legacy2aidl_audio_attributes_t_AudioAttributesInternal));
     aidl.streams = VALUE_OR_RETURN(
-            convertContainer<std::vector<media::AudioStreamType>>(legacy.getStreamTypes(),
+            convertContainer<std::vector<AudioStreamType>>(legacy.getStreamTypes(),
             legacy2aidl_audio_stream_type_t_AudioStreamType));
     return aidl;
 }
