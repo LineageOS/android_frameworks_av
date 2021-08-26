@@ -16,14 +16,14 @@
 
 package android.media;
 
-import android.media.AudioChannelLayout;
 import android.media.AudioGainConfig;
 import android.media.AudioIoFlags;
 import android.media.AudioPortConfigExt;
 import android.media.AudioPortConfigType;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
-import android.media.AudioFormatDescription;
+import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioChannelLayout;
 
 /**
  * {@hide}

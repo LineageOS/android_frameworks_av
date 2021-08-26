@@ -22,7 +22,6 @@
 #include <system/audio.h>
 
 #include <android/media/AudioAttributesInternal.h>
-#include <android/media/AudioChannelLayout.h>
 #include <android/media/AudioClient.h>
 #include <android/media/AudioConfig.h>
 #include <android/media/AudioConfigBase.h>
@@ -32,7 +31,6 @@
 #include <android/media/AudioEncapsulationMetadataType.h>
 #include <android/media/AudioEncapsulationType.h>
 #include <android/media/AudioFlag.h>
-#include <android/media/AudioFormatDescription.h>
 #include <android/media/AudioGain.h>
 #include <android/media/AudioGainMode.h>
 #include <android/media/AudioInputFlags.h>
@@ -54,6 +52,8 @@
 #include <android/media/EffectDescriptor.h>
 #include <android/media/ExtraAudioDescriptor.h>
 #include <android/media/TrackSecondaryOutputInfo.h>
+#include <android/media/audio/common/AudioChannelLayout.h>
+#include <android/media/audio/common/AudioFormatDescription.h>
 
 #include <android/media/SharedFileRegion.h>
 #include <binder/IMemory.h>
@@ -132,9 +132,9 @@ ConversionResult<media::AudioPortType> legacy2aidl_audio_port_type_t_AudioPortTy
         audio_port_type_t legacy);
 
 ConversionResult<audio_channel_mask_t> aidl2legacy_AudioChannelLayout_audio_channel_mask_t(
-        const media::AudioChannelLayout& aidl, bool isInput);
-ConversionResult<media::AudioChannelLayout> legacy2aidl_audio_channel_mask_t_AudioChannelLayout(
-        audio_channel_mask_t legacy, bool isInput);
+        const android::media::audio::common::AudioChannelLayout& aidl, bool isInput);
+ConversionResult<android::media::audio::common::AudioChannelLayout>
+legacy2aidl_audio_channel_mask_t_AudioChannelLayout(audio_channel_mask_t legacy, bool isInput);
 
 ConversionResult<audio_devices_t> aidl2legacy_AudioDeviceDescription_audio_devices_t(
         const media::AudioDeviceDescription& aidl);
@@ -142,9 +142,9 @@ ConversionResult<media::AudioDeviceDescription> legacy2aidl_audio_devices_t_Audi
         audio_devices_t legacy);
 
 ConversionResult<audio_format_t> aidl2legacy_AudioFormatDescription_audio_format_t(
-        const media::AudioFormatDescription& aidl);
-ConversionResult<media::AudioFormatDescription> legacy2aidl_audio_format_t_AudioFormatDescription(
-        audio_format_t legacy);
+        const media::audio::common::AudioFormatDescription& aidl);
+ConversionResult<media::audio::common::AudioFormatDescription>
+legacy2aidl_audio_format_t_AudioFormatDescription(audio_format_t legacy);
 
 ConversionResult<audio_gain_mode_t>
 aidl2legacy_AudioGainMode_audio_gain_mode_t(media::AudioGainMode aidl);

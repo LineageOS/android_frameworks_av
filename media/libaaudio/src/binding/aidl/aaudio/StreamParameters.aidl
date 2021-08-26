@@ -16,7 +16,7 @@
 
 package aaudio;
 
-import android.media.AudioFormatDescription;
+import android.media.audio.common.AudioFormatDescription;
 
 parcelable StreamParameters {
     int                                       channelMask;  //          = AAUDIO_UNSPECIFIED;

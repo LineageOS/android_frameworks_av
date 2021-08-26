@@ -123,6 +123,7 @@ struct MixPortTraits : public AndroidCollectionTraits<IOProfile, IOProfileCollec
         static constexpr const char *flags = "flags";
         static constexpr const char *maxOpenCount = "maxOpenCount";
         static constexpr const char *maxActiveCount = "maxActiveCount";
+        static constexpr const char *recommendedMuteDurationMs = "recommendedMuteDurationMs";
     };
 
     // Children: GainTraits
@@ -496,6 +497,13 @@ std::variant<status_t, MixPortTraits::Element> PolicySerializer::deserialize<Mix
     if (!maxActiveCount.empty()) {
         convertTo(maxActiveCount, mixPort->maxActiveCount);
     }
+
+    std::string recommendedmuteDurationMsLiteral =
+            getXmlAttribute(child, Attributes::recommendedMuteDurationMs);
+    if (!recommendedmuteDurationMsLiteral.empty()) {
+        convertTo(recommendedmuteDurationMsLiteral, mixPort->recommendedMuteDurationMs);
+    }
+
     // Deserialize children
     AudioGainTraits::Collection gains;
     status = deserializeCollection<AudioGainTraits>(child, &gains, NULL);

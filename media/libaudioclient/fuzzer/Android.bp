@@ -46,6 +46,7 @@ cc_fuzz {
     ],
     shared_libs: [
         "android.hardware.audio.common-util",
+        "android.media.audio.common.types-V1-cpp",
         "audioclient-types-aidl-cpp",
         "audioflinger-aidl-cpp",
         "audiopolicy-aidl-cpp",
