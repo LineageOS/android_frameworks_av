@@ -1336,7 +1336,7 @@ status_t CameraService::handleEvictionsLocked(const String8& cameraId, int clien
                 auto clientSp = current->getValue();
                 if (clientSp.get() != nullptr) { // should never be needed
                     if (!clientSp->canCastToApiClient(effectiveApiLevel)) {
-                        ALOGW("CameraService connect called from same client, but with a different"
+                        ALOGW("CameraService connect called with a different"
                                 " API level, evicting prior client...");
                     } else if (clientSp->getRemote() == remoteCallback) {
                         ALOGI("CameraService::connect X (PID %d) (second call from same"
