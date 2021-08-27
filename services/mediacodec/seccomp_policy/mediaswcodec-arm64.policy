@@ -79,4 +79,14 @@ getgid: 1
 getegid: 1
 getgroups: 1
 
+# Android profiler (heapprofd, traced_perf) additions, where not already
+# covered by the rest of the file, or by builtin minijail allow-listing of
+# logging-related syscalls.
+# TODO(b/197184220): this is a targeted addition for a specific investigation,
+# and addresses just the arm64 framework av service policies. In the future, we
+# should make this more general (e.g. a central file that can be @included in
+# other policy files).
+setsockopt: 1
+sendmsg: 1
+
 @include /apex/com.android.media.swcodec/etc/seccomp_policy/code_coverage.arm64.policy
