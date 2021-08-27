@@ -45,14 +45,11 @@ cc_test {
         "libdatasource",
         "libwatchdog",
 
-        "libstagefright",
         "libstagefright_id3",
         "libstagefright_flacdec",
         "libstagefright_esds",
         "libstagefright_mpeg2support",
-        "libstagefright_mpeg2extractor",
         "libstagefright_foundation_colorutils_ndk",
-        "libstagefright_foundation",
         "libstagefright_metadatautils",
 
         "libmedia_midiiowrapper",
@@ -74,6 +71,8 @@ cc_test {
         "libcutils",
         "libmediandk",
         "libmedia",
+        "libstagefright",
+        "libstagefright_foundation",
         "libcrypto",
         "libhidlmemory",
         "libhidlbase",
