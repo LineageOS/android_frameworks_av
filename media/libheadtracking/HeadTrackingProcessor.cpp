@@ -108,10 +108,22 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     HeadTrackingMode getActualMode() const override { return mModeSelector.getActualMode(); }
 
-    void recenter() override {
-        mHeadPoseDriftCompensator.recenter();
-        mScreenPoseDriftCompensator.recenter();
-        mRateLimiter.enable();
+    void recenter(bool recenterHead, bool recenterScreen) override {
+        if (recenterHead) {
+            mHeadPoseDriftCompensator.recenter();
+        }
+        if (recenterScreen) {
+            mScreenPoseDriftCompensator.recenter();
+        }
+
+        // If a sensor being recentered is included in the current mode, apply rate limiting to
+        // avoid discontinuities.
+        HeadTrackingMode mode = mModeSelector.getActualMode();
+        if ((recenterHead && (mode == HeadTrackingMode::WORLD_RELATIVE ||
+                              mode == HeadTrackingMode::SCREEN_RELATIVE)) ||
+            (recenterScreen && mode == HeadTrackingMode::SCREEN_RELATIVE)) {
+            mRateLimiter.enable();
+        }
     }
 
   private:

@@ -124,7 +124,7 @@ void SpatializerPoseController::setHeadSensor(const ASensor* sensor) {
     // Start new sensor, if valid.
     mHeadSensor = sensor != nullptr ? mPoseProvider->startSensor(sensor, mSensorPeriod)
                                     : SensorPoseProvider::INVALID_HANDLE;
-    mProcessor->recenter();
+    mProcessor->recenter(true, false);
 }
 
 void SpatializerPoseController::setScreenSensor(const ASensor* sensor) {
@@ -136,7 +136,7 @@ void SpatializerPoseController::setScreenSensor(const ASensor* sensor) {
     // Start new sensor, if valid.
     mScreenSensor = sensor != nullptr ? mPoseProvider->startSensor(sensor, mSensorPeriod)
                                       : SensorPoseProvider::INVALID_HANDLE;
-    mProcessor->recenter();
+    mProcessor->recenter(false, true);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
