@@ -81,6 +81,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
         mEos = false;
         mCsd = false;
         mFramesReceived = 0;
+        mEncoderFrameSize = 0;
         mWorkResult = C2_OK;
         mOutputSize = 0u;
         getInputMaxBufSize();
@@ -146,6 +147,7 @@ class Codec2AudioEncHidlTestBase : public ::testing::Test {
     uint32_t mFramesReceived;
     int32_t mInputMaxBufSize;
     uint64_t mOutputSize;
+    uint32_t mEncoderFrameSize;
     std::list<uint64_t> mFlushedIndices;
 
     C2BlockPool::local_id_t mBlockPoolId;
@@ -304,20 +306,21 @@ c2_status_t Codec2AudioEncHidlTestBase::getSamplesPerFrame(int32_t nChannels,
     c2_status_t c2err = mComponent->query({}, {C2StreamAudioFrameSizeInfo::input::PARAM_TYPE},
                                           C2_DONT_BLOCK, &queried);
     size_t offset = sizeof(C2Param);
-    uint32_t maxInputSize = 0;
     if (c2err == C2_OK && queried.size()) {
         C2Param* param = queried[0].get();
-        maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
+        mEncoderFrameSize = *(uint32_t*)((uint8_t*)param + offset);
+        if (mEncoderFrameSize) {
+            *samplesPerFrame = mEncoderFrameSize;
+            return C2_OK;
+        }
     }
 
-    if (0 == maxInputSize) {
-        c2err = mComponent->query({}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE}, C2_DONT_BLOCK,
-                                  &queried);
-        if (c2err != C2_OK || queried.size() == 0) return c2err;
+    c2err = mComponent->query({}, {C2StreamMaxBufferSizeInfo::input::PARAM_TYPE}, C2_DONT_BLOCK,
+                              &queried);
+    if (c2err != C2_OK || queried.size() == 0) return c2err;
 
-        C2Param* param = queried[0].get();
-        maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
-    }
+    C2Param* param = queried[0].get();
+    uint32_t maxInputSize = *(uint32_t*)((uint8_t*)param + offset);
     *samplesPerFrame = std::min((maxInputSize / (nChannels * 2)), kMaxSamplesPerFrame);
 
     return C2_OK;
@@ -450,10 +453,13 @@ TEST_P(Codec2AudioEncEncodeTest, EncodeTest) {
     ALOGV("EncodeTest");
     if (mDisableTest) GTEST_SKIP() << "Test is disabled";
     bool signalEOS = std::get<2>(GetParam());
-    // Ratio w.r.t to mInputMaxBufSize
-    int32_t inputMaxBufRatio = std::get<3>(GetParam());
-    mSamplesPerFrame = ((mInputMaxBufSize / inputMaxBufRatio) / (mNumChannels * 2));
-
+    // Set samples per frame based on inputMaxBufRatio if component does not
+    // advertise supported frame size
+    if (!mEncoderFrameSize) {
+        // Ratio w.r.t to mInputMaxBufSize
+        int32_t inputMaxBufRatio = std::get<3>(GetParam());
+        mSamplesPerFrame = ((mInputMaxBufSize / inputMaxBufRatio) / (mNumChannels * 2));
+    }
     ALOGV("signalEOS %d mInputMaxBufSize %d mSamplesPerFrame %d", signalEOS, mInputMaxBufSize,
           mSamplesPerFrame);
 
