@@ -17,6 +17,7 @@ cc_library_shared {
         "AudioPolicyService.cpp",
         "CaptureStateNotifier.cpp",
         "Spatializer.cpp",
+        "SpatializerPoseController.cpp",
     ],
 
     include_dirs: [
@@ -25,6 +26,7 @@ cc_library_shared {
 
     shared_libs: [
         "libactivitymanager_aidl",
+        "libandroid",
         "libaudioclient",
         "libaudioclient_aidl_conversion",
         "libaudiofoundation",
@@ -36,11 +38,14 @@ cc_library_shared {
         "libcutils",
         "libeffectsconfig",
         "libhardware_legacy",
+        "libheadtracking",
+        "libheadtracking-binding",
         "liblog",
         "libmedia_helper",
         "libmediametrics",
         "libmediautils",
         "libpermission",
+        "libsensor",
         "libsensorprivacy",
         "libshmemcompat",
         "libutils",
@@ -75,6 +80,8 @@ cc_library_shared {
 
     export_shared_lib_headers: [
         "libactivitymanager_aidl",
+        "libheadtracking",
+        "libheadtracking-binding",
         "libsensorprivacy",
         "framework-permission-aidl-cpp",
     ],
