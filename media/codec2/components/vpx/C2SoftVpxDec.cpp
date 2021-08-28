@@ -149,8 +149,16 @@ public:
 #else
         addParameter(
                 DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
-                .withConstValue(new C2StreamProfileLevelInfo::input(0u,
-                        C2Config::PROFILE_UNUSED, C2Config::LEVEL_UNUSED))
+                .withDefault(new C2StreamProfileLevelInfo::input(0u,
+                        C2Config::PROFILE_VP8_0, C2Config::LEVEL_UNUSED))
+                .withFields({
+                    C2F(mProfileLevel, profile).equalTo(
+                        PROFILE_VP8_0
+                    ),
+                    C2F(mProfileLevel, level).equalTo(
+                        LEVEL_UNUSED),
+                })
+                .withSetter(ProfileLevelSetter, mSize)
                 .build());
 #endif
 
