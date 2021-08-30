@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "824a75ec_c55967c3",
+        "filename": "media/libstagefright/wifi-display/source/WifiDisplaySource.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 25,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2021-08-30T19:50:53Z",
+      "side": 1,
+      "message": "weird placement.",
+      "range": {
+        "startLine": 25,
+        "startChar": 0,
+        "endLine": 25,
+        "endChar": 46
+      },
+      "revId": "0a43235c65c0313d950db103d787c17929c8101e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
