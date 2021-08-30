@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "40db5dbe_9b0796e5",
+        "filename": "media/libstagefright/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 208,
+      "author": {
+        "id": 25732
+      },
+      "writtenOn": "2021-08-30T20:00:58Z",
+      "side": 1,
+      "message": "I know it\u0027s a revert, but do we need to bring back the alphabetical typo?",
+      "range": {
+        "startLine": 208,
+        "startChar": 0,
+        "endLine": 208,
+        "endChar": 24
+      },
+      "revId": "a6f0ecab915020431335224b558e81135e7217bc",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
