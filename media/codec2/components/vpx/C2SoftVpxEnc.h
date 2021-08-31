@@ -324,21 +324,35 @@ class C2SoftVpxEnc::IntfImpl : public SimpleInterface<void>::BaseParams {
                 .withConstValue(new C2StreamIntraRefreshTuning::output(
                              0u, C2Config::INTRA_REFRESH_DISABLED, 0.))
                 .build());
-
+#ifdef VP9
         addParameter(
-        DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
-        .withDefault(new C2StreamProfileLevelInfo::output(
-                0u, PROFILE_VP9_0, LEVEL_VP9_4_1))
-        .withFields({
-            C2F(mProfileLevel, profile).equalTo(
-                PROFILE_VP9_0
-            ),
-            C2F(mProfileLevel, level).equalTo(
-                LEVEL_VP9_4_1),
-        })
-        .withSetter(ProfileLevelSetter)
-        .build());
-
+                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
+                .withDefault(new C2StreamProfileLevelInfo::output(
+                        0u, PROFILE_VP9_0, LEVEL_VP9_4_1))
+                .withFields({
+                    C2F(mProfileLevel, profile).equalTo(
+                        PROFILE_VP9_0
+                    ),
+                    C2F(mProfileLevel, level).equalTo(
+                        LEVEL_VP9_4_1),
+                })
+                .withSetter(ProfileLevelSetter)
+                .build());
+#else
+        addParameter(
+                DefineParam(mProfileLevel, C2_PARAMKEY_PROFILE_LEVEL)
+                .withDefault(new C2StreamProfileLevelInfo::output(
+                        0u, PROFILE_VP8_0, LEVEL_UNUSED))
+                .withFields({
+                    C2F(mProfileLevel, profile).equalTo(
+                        PROFILE_VP8_0
+                    ),
+                    C2F(mProfileLevel, level).equalTo(
+                        LEVEL_UNUSED),
+                })
+                .withSetter(ProfileLevelSetter)
+                .build());
+#endif
         addParameter(
                 DefineParam(mRequestSync, C2_PARAMKEY_REQUEST_SYNC_FRAME)
                 .withDefault(new C2StreamRequestSyncFrameTuning::output(0u, C2_FALSE))
