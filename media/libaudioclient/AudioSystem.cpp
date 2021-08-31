@@ -2353,6 +2353,16 @@ status_t AudioSystem::setVibratorInfos(
     return af->setVibratorInfos(vibratorInfos);
 }
 
+status_t AudioSystem::getMmapPolicyInfo(
+        media::AudioMMapPolicyType policyType,
+        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
+    const sp<IAudioFlinger>& af = AudioSystem::get_audio_flinger();
+    if (af == nullptr) {
+        return PERMISSION_DENIED;
+    }
+    return af->getMmapPolicyInfos(policyType, policyInfos);
+}
+
 // ---------------------------------------------------------------------------
 
 int AudioSystem::AudioPolicyServiceClient::addAudioPortCallback(
