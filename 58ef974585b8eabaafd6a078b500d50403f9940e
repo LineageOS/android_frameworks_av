@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "6615457b_1a170809",
+        "filename": "media/libmediaplayerservice/MediaPlayerService.cpp",
+        "patchSetId": 1
+      },
+      "lineNbr": 516,
+      "author": {
+        "id": 11883
+      },
+      "writtenOn": "2021-08-31T07:49:37Z",
+      "side": 1,
+      "message": "Comment removed by: Luca Stefani; Reason: I\u0027m wrong.",
+      "range": {
+        "startLine": 516,
+        "startChar": 0,
+        "endLine": 516,
+        "endChar": 70
+      },
+      "revId": "58ef974585b8eabaafd6a078b500d50403f9940e",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
