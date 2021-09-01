@@ -229,17 +229,13 @@ void HttpLiveFuzzer::invokeGetConfig() {
 
 void HttpLiveFuzzer::invokeConnectAsync() {
   string currentFileName = generateFileName();
-  size_t fileUrlLength =
-      strlen(currentFileName.c_str()) + strlen(kFileUrlPrefix);
-  char *url = new char[fileUrlLength + 1];
-  strcpy(url, kFileUrlPrefix);
-  strcat(url, currentFileName.c_str());
+  string url = kFileUrlPrefix + currentFileName;
   string str_1 = mFDP->ConsumeRandomLengthString(kRandomStringLength);
   string str_2 = mFDP->ConsumeRandomLengthString(kRandomStringLength);
 
   KeyedVector<String8, String8> headers;
   headers.add(String8(str_1.c_str()), String8(str_2.c_str()));
-  mLiveSession->connectAsync(url, &headers);
+  mLiveSession->connectAsync(url.c_str(), &headers);
 }
 
 void HttpLiveFuzzer::invokeLiveSession() {
