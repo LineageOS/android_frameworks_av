@@ -52,6 +52,7 @@ cc_library {
         "liblog",
         "libmedia",
         "libutils",
+        "packagemanager_aidl-cpp",
         "tv_tuner_aidl_interface-ndk",
         "tv_tuner_resource_manager_aidl_interface-ndk",
     ],
