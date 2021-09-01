@@ -18,7 +18,7 @@ package android.media;
 
 import android.media.AudioContentType;
 import android.media.AudioSourceType;
-import android.media.AudioUsage;
+import android.media.audio.common.AudioUsage;
 
 /**
  * The "Internal" suffix of this type name is to disambiguate it from the

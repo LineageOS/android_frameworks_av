@@ -20,13 +20,10 @@ import android.content.AttributionSourceState;
 
 import android.media.AudioAttributesEx;
 import android.media.AudioAttributesInternal;
-import android.media.AudioConfig;
-import android.media.AudioConfigBase;
 import android.media.AudioDevice;
 import android.media.AudioDeviceDescription;
 import android.media.AudioMix;
 import android.media.AudioMode;
-import android.media.AudioOffloadInfo;
 import android.media.AudioOffloadMode;
 import android.media.AudioPatch;
 import android.media.AudioPolicyDeviceState;
@@ -38,8 +35,6 @@ import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProductStrategy;
 import android.media.AudioSourceType;
-import android.media.AudioStreamType;
-import android.media.AudioUsage;
 import android.media.AudioUuid;
 import android.media.AudioVolumeGroup;
 import android.media.DeviceRole;
@@ -52,7 +47,12 @@ import android.media.ICaptureStateListener;
 import android.media.INativeSpatializerCallback;
 import android.media.Int;
 import android.media.SoundTriggerSession;
+import android.media.audio.common.AudioConfig;
+import android.media.audio.common.AudioConfigBase;
 import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioOffloadInfo;
+import android.media.audio.common.AudioStreamType;
+import android.media.audio.common.AudioUsage;
 
 /**
  * IAudioPolicyService interface (see AudioPolicyInterface for method descriptions).

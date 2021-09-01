@@ -689,9 +689,9 @@ private:
         binder::Status onRecordingConfigurationUpdate(
                 int32_t event,
                 const media::RecordClientInfo& clientInfo,
-                const media::AudioConfigBase& clientConfig,
+                const media::audio::common::AudioConfigBase& clientConfig,
                 const std::vector<media::EffectDescriptor>& clientEffects,
-                const media::AudioConfigBase& deviceConfig,
+                const media::audio::common::AudioConfigBase& deviceConfig,
                 const std::vector<media::EffectDescriptor>& effects,
                 int32_t patchHandle,
                 media::AudioSourceType source) override;
