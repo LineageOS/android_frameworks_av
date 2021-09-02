@@ -566,10 +566,12 @@ void AudioFlinger::dumpClients(int fd, const Vector<String16>& args __unused)
     String8 result;
 
     result.append("Clients:\n");
+    result.append("   pid    heap_size\n");
     for (size_t i = 0; i < mClients.size(); ++i) {
         sp<Client> client = mClients.valueAt(i).promote();
         if (client != 0) {
-            result.appendFormat("  pid: %d\n", client->pid());
+            result.appendFormat("%6d %12zu\n", client->pid(),
+                    client->heap()->getMemoryHeap()->getSize());
         }
     }
 

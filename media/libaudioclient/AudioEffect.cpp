@@ -666,7 +666,7 @@ status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
     media::AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
     std::string opPackageNameAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_String16_string(opPackageName));
-    media::AudioUsage usageAidl = VALUE_OR_RETURN_STATUS(
+    media::audio::common::AudioUsage usageAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_usage_t_AudioUsage(usage));
     int32_t retAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
