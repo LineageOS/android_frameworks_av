@@ -16,10 +16,10 @@
 
 package android.media;
 
-import android.media.AudioConfigBase;
 import android.media.AudioSourceType;
 import android.media.EffectDescriptor;
 import android.media.RecordClientInfo;
+import android.media.audio.common.AudioConfigBase;
 
 /**
  * {@hide}

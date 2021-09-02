@@ -172,11 +172,13 @@ cc_library {
         "libstatspull",
         "libstatssocket",
         "libutils",
+        "packagemanager_aidl-cpp",
     ],
 
     export_shared_lib_headers: [
         "libstatspull",
         "libstatssocket",
+        "packagemanager_aidl-cpp",
     ],
 
     static_libs: [

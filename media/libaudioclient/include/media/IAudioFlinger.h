@@ -580,11 +580,12 @@ public:
     Status masterMute(bool* _aidl_return) override;
     Status setMasterBalance(float balance) override;
     Status getMasterBalance(float* _aidl_return) override;
-    Status setStreamVolume(media::AudioStreamType stream, float value, int32_t output) override;
-    Status setStreamMute(media::AudioStreamType stream, bool muted) override;
-    Status
-    streamVolume(media::AudioStreamType stream, int32_t output, float* _aidl_return) override;
-    Status streamMute(media::AudioStreamType stream, bool* _aidl_return) override;
+    Status setStreamVolume(media::audio::common::AudioStreamType stream,
+                           float value, int32_t output) override;
+    Status setStreamMute(media::audio::common::AudioStreamType stream, bool muted) override;
+    Status streamVolume(media::audio::common::AudioStreamType stream,
+                        int32_t output, float* _aidl_return) override;
+    Status streamMute(media::audio::common::AudioStreamType stream, bool* _aidl_return) override;
     Status setMode(media::AudioMode mode) override;
     Status setMicMute(bool state) override;
     Status getMicMute(bool* _aidl_return) override;
@@ -606,7 +607,7 @@ public:
     Status openInput(const media::OpenInputRequest& request,
                      media::OpenInputResponse* _aidl_return) override;
     Status closeInput(int32_t input) override;
-    Status invalidateStream(media::AudioStreamType stream) override;
+    Status invalidateStream(media::audio::common::AudioStreamType stream) override;
     Status setVoiceVolume(float volume) override;
     Status getRenderPosition(int32_t output, media::RenderPosition* _aidl_return) override;
     Status getInputFramesLost(int32_t ioHandle, int32_t* _aidl_return) override;
