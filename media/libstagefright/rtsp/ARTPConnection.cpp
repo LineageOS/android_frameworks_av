@@ -508,8 +508,6 @@ void ARTPConnection::onPollStreams() {
                     if (n != (ssize_t)buffer->size()) {
                         ALOGW("failed to send RTCP TMMBR (%s).",
                                 n >= 0 ? "connection gone" : strerror(errno));
-
-                        it = mStreams.erase(it);
                         continue;
                     }
                 }
@@ -560,8 +558,6 @@ void ARTPConnection::onPollStreams() {
                 if (n != (ssize_t)buffer->size()) {
                     ALOGW("failed to send RTCP receiver report (%s).",
                             n >= 0 ? "connection gone" : strerror(errno));
-
-                    it = mStreams.erase(it);
                     continue;
                 }
 
@@ -621,7 +617,14 @@ status_t ARTPConnection::receive(StreamInfo *s, bool receiveRTP) {
     } while (nbytes < 0 && errno == EINTR);
 
     if (nbytes <= 0) {
-        return -ECONNRESET;
+        ALOGW("failed to recv rtp packet. cause=%s", strerror(errno));
+        // ECONNREFUSED may happen in next recvfrom() calling if one of
+        // outgoing packet can not be delivered to remote by using sendto()
+        if (errno == ECONNREFUSED) {
+            return -ECONNREFUSED;
+        } else {
+            return -ECONNRESET;
+        }
     }
 
     buffer->setRange(0, nbytes);
@@ -664,6 +667,10 @@ ssize_t ARTPConnection::send(const StreamInfo *info, const sp<ABuffer> buffer) {
                     info->mRTCPSocket, buffer->data(), buffer->size(), 0,
                     pRemoteRTCPAddr, sizeSockSt);
         } while (n < 0 && errno == EINTR);
+
+        if (n < 0) {
+            ALOGW("failed to send rtcp packet. cause=%s", strerror(errno));
+        }
 
         return n;
 }
