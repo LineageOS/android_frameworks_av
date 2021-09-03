@@ -25,8 +25,6 @@
 #include <android/media/AudioClient.h>
 #include <android/media/AudioDeviceDescription.h>
 #include <android/media/AudioDualMonoMode.h>
-#include <android/media/AudioEncapsulationMetadataType.h>
-#include <android/media/AudioEncapsulationType.h>
 #include <android/media/AudioFlag.h>
 #include <android/media/AudioGain.h>
 #include <android/media/AudioGainMode.h>
@@ -34,7 +32,6 @@
 #include <android/media/AudioIoConfigEvent.h>
 #include <android/media/AudioIoDescriptor.h>
 #include <android/media/AudioMixLatencyClass.h>
-#include <android/media/AudioMode.h>
 #include <android/media/AudioOutputFlags.h>
 #include <android/media/AudioPlaybackRate.h>
 #include <android/media/AudioPort.h>
@@ -52,10 +49,16 @@
 #include <android/media/audio/common/AudioChannelLayout.h>
 #include <android/media/audio/common/AudioConfig.h>
 #include <android/media/audio/common/AudioConfigBase.h>
-#include <android/media/audio/common/AudioOffloadInfo.h>
+#include <android/media/audio/common/AudioContentType.h>
+#include <android/media/audio/common/AudioEncapsulationMetadataType.h>
 #include <android/media/audio/common/AudioEncapsulationMode.h>
+#include <android/media/audio/common/AudioEncapsulationType.h>
 #include <android/media/audio/common/AudioFormatDescription.h>
+#include <android/media/audio/common/AudioMode.h>
+#include <android/media/audio/common/AudioOffloadInfo.h>
+#include <android/media/audio/common/AudioSource.h>
 #include <android/media/audio/common/AudioUsage.h>
+#include <android/media/audio/common/AudioUuid.h>
 
 #include <android/media/SharedFileRegion.h>
 #include <binder/IMemory.h>
@@ -198,9 +201,10 @@ ConversionResult<audio_stream_type_t> aidl2legacy_AudioStreamType_audio_stream_t
 ConversionResult<media::audio::common::AudioStreamType>
 legacy2aidl_audio_stream_type_t_AudioStreamType(audio_stream_type_t legacy);
 
-ConversionResult<audio_source_t> aidl2legacy_AudioSourceType_audio_source_t(
-        media::AudioSourceType aidl);
-ConversionResult<media::AudioSourceType> legacy2aidl_audio_source_t_AudioSourceType(
+ConversionResult<audio_source_t> aidl2legacy_AudioSource_audio_source_t(
+        media::audio::common::AudioSource aidl);
+ConversionResult<media::audio::common::AudioSource>
+        legacy2aidl_audio_source_t_AudioSource(
         audio_source_t legacy);
 
 ConversionResult<audio_session_t> aidl2legacy_int32_t_audio_session_t(int32_t aidl);
@@ -239,8 +243,9 @@ ConversionResult<media::AudioClient> legacy2aidl_AudioClient_AudioClient(
         const AudioClient& legacy);
 
 ConversionResult<audio_content_type_t>
-aidl2legacy_AudioContentType_audio_content_type_t(media::AudioContentType aidl);
-ConversionResult<media::AudioContentType>
+aidl2legacy_AudioContentType_audio_content_type_t(
+        media::audio::common::AudioContentType aidl);
+ConversionResult<media::audio::common::AudioContentType>
 legacy2aidl_audio_content_type_t_AudioContentType(audio_content_type_t legacy);
 
 ConversionResult<audio_usage_t>
@@ -302,8 +307,8 @@ ConversionResult<media::AudioTimestampInternal>
 legacy2aidl_AudioTimestamp_AudioTimestampInternal(const AudioTimestamp& legacy);
 
 ConversionResult<audio_uuid_t>
-aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl);
-ConversionResult<media::AudioUuid>
+aidl2legacy_AudioUuid_audio_uuid_t(const media::audio::common::AudioUuid& aidl);
+ConversionResult<media::audio::common::AudioUuid>
 legacy2aidl_audio_uuid_t_AudioUuid(const audio_uuid_t& legacy);
 
 ConversionResult<effect_descriptor_t>
@@ -313,8 +318,8 @@ legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& lega
 
 ConversionResult<audio_encapsulation_metadata_type_t>
 aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t(
-        media::AudioEncapsulationMetadataType aidl);
-ConversionResult<media::AudioEncapsulationMetadataType>
+        media::audio::common::AudioEncapsulationMetadataType aidl);
+ConversionResult<media::audio::common::AudioEncapsulationMetadataType>
 legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
         audio_encapsulation_metadata_type_t legacy);
 
@@ -367,8 +372,8 @@ ConversionResult<media::AudioPort>
 legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy);
 
 ConversionResult<audio_mode_t>
-aidl2legacy_AudioMode_audio_mode_t(media::AudioMode aidl);
-ConversionResult<media::AudioMode>
+aidl2legacy_AudioMode_audio_mode_t(media::audio::common::AudioMode aidl);
+ConversionResult<media::audio::common::AudioMode>
 legacy2aidl_audio_mode_t_AudioMode(audio_mode_t legacy);
 
 ConversionResult<audio_unique_id_use_t>
@@ -415,8 +420,8 @@ legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(
 
 ConversionResult<audio_encapsulation_type_t>
 aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(
-        const media::AudioEncapsulationType& aidl);
-ConversionResult<media::AudioEncapsulationType>
+        const media::audio::common::AudioEncapsulationType& aidl);
+ConversionResult<media::audio::common::AudioEncapsulationType>
 legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
         const audio_encapsulation_type_t & legacy);
 

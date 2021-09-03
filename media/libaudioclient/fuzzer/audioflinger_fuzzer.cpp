@@ -604,7 +604,7 @@ status_t AudioFlingerFuzzer::invokeAudioInputDevice() {
     request.config = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_config_t_AudioConfig(config, true /*isInput*/));
     request.device = VALUE_OR_RETURN_STATUS(legacy2aidl_AudioDeviceTypeAddress(deviceTypeAddr));
-    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSourceType(source));
+    request.source = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_source_t_AudioSource(source));
     request.flags = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_input_flags_t_int32_t_mask(flags));
 
     media::OpenInputResponse response{};

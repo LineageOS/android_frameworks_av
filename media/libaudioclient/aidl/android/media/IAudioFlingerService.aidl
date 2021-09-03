@@ -16,12 +16,10 @@
 
 package android.media;
 
-import android.media.AudioMode;
 import android.media.AudioPatch;
 import android.media.AudioPort;
 import android.media.AudioPortConfig;
 import android.media.AudioUniqueIdUse;
-import android.media.AudioUuid;
 import android.media.AudioVibratorInfo;
 import android.media.CreateEffectRequest;
 import android.media.CreateEffectResponse;
@@ -42,7 +40,9 @@ import android.media.RenderPosition;
 import android.media.TrackSecondaryOutputInfo;
 import android.media.audio.common.AudioChannelLayout;
 import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioMode;
 import android.media.audio.common.AudioStreamType;
+import android.media.audio.common.AudioUuid;
 
 /**
  * {@hide}

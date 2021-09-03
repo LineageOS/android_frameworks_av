@@ -23,7 +23,6 @@ import android.media.AudioAttributesInternal;
 import android.media.AudioDevice;
 import android.media.AudioDeviceDescription;
 import android.media.AudioMix;
-import android.media.AudioMode;
 import android.media.AudioOffloadMode;
 import android.media.AudioPatch;
 import android.media.AudioPolicyDeviceState;
@@ -34,8 +33,6 @@ import android.media.AudioPortConfig;
 import android.media.AudioPortRole;
 import android.media.AudioPortType;
 import android.media.AudioProductStrategy;
-import android.media.AudioSourceType;
-import android.media.AudioUuid;
 import android.media.AudioVolumeGroup;
 import android.media.DeviceRole;
 import android.media.EffectDescriptor;
@@ -50,9 +47,12 @@ import android.media.SoundTriggerSession;
 import android.media.audio.common.AudioConfig;
 import android.media.audio.common.AudioConfigBase;
 import android.media.audio.common.AudioFormatDescription;
+import android.media.audio.common.AudioMode;
 import android.media.audio.common.AudioOffloadInfo;
+import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
 import android.media.audio.common.AudioUsage;
+import android.media.audio.common.AudioUuid;
 
 /**
  * IAudioPolicyService interface (see AudioPolicyInterface for method descriptions).
@@ -157,7 +157,7 @@ interface IAudioPolicyService {
 
     boolean isStreamActiveRemotely(AudioStreamType stream, int inPastMs);
 
-    boolean isSourceActive(AudioSourceType source);
+    boolean isSourceActive(AudioSource source);
 
     /**
      * On input, count represents the maximum length of the returned array.
@@ -172,7 +172,7 @@ interface IAudioPolicyService {
                                                        @utf8InCpp String opPackageName,
                                                        in AudioUuid uuid,
                                                        int priority,
-                                                       AudioSourceType source);
+                                                       AudioSource source);
 
     int /* audio_unique_id_t */ addStreamDefaultEffect(in AudioUuid type,
                                                        @utf8InCpp String opPackageName,
@@ -331,22 +331,22 @@ interface IAudioPolicyService {
     AudioDevice[] getDevicesForRoleAndStrategy(int /* product_strategy_t */ strategy,
                                                DeviceRole role);
 
-    void setDevicesRoleForCapturePreset(AudioSourceType audioSource,
+    void setDevicesRoleForCapturePreset(AudioSource audioSource,
                                         DeviceRole role,
                                         in AudioDevice[] devices);
 
-    void addDevicesRoleForCapturePreset(AudioSourceType audioSource,
+    void addDevicesRoleForCapturePreset(AudioSource audioSource,
                                         DeviceRole role,
                                         in AudioDevice[] devices);
 
-    void removeDevicesRoleForCapturePreset(AudioSourceType audioSource,
+    void removeDevicesRoleForCapturePreset(AudioSource audioSource,
                                            DeviceRole role,
                                            in AudioDevice[] devices);
 
-    void clearDevicesRoleForCapturePreset(AudioSourceType audioSource,
+    void clearDevicesRoleForCapturePreset(AudioSource audioSource,
                                           DeviceRole role);
 
-    AudioDevice[] getDevicesForRoleAndCapturePreset(AudioSourceType audioSource,
+    AudioDevice[] getDevicesForRoleAndCapturePreset(AudioSource audioSource,
                                                     DeviceRole role);
 
     boolean registerSoundTriggerCaptureStateListener(ICaptureStateListener listener);

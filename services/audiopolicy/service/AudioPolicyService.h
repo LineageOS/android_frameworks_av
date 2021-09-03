@@ -52,8 +52,11 @@ using content::AttributionSourceState;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioFormatDescription;
+using media::audio::common::AudioMode;
+using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
+using media::audio::common::AudioUuid;
 
 // ----------------------------------------------------------------------------
 
@@ -86,7 +89,7 @@ public:
             const media::AudioDevice& device,
             const std::string& deviceName,
             const AudioFormatDescription& encodedFormat) override;
-    binder::Status setPhoneState(media::AudioMode state, int32_t uid) override;
+    binder::Status setPhoneState(AudioMode state, int32_t uid) override;
     binder::Status setForceUse(media::AudioPolicyForceUse usage,
                                media::AudioPolicyForcedConfig config) override;
     binder::Status getForceUse(media::AudioPolicyForceUse usage,
@@ -145,18 +148,18 @@ public:
                                   bool* _aidl_return) override;
     binder::Status isStreamActiveRemotely(AudioStreamType stream, int32_t inPastMs,
                                           bool* _aidl_return) override;
-    binder::Status isSourceActive(media::AudioSourceType source, bool* _aidl_return) override;
+    binder::Status isSourceActive(AudioSource source, bool* _aidl_return) override;
     binder::Status queryDefaultPreProcessing(
             int32_t audioSession, media::Int* count,
             std::vector<media::EffectDescriptor>* _aidl_return) override;
-    binder::Status addSourceDefaultEffect(const media::AudioUuid& type,
+    binder::Status addSourceDefaultEffect(const AudioUuid& type,
                                           const std::string& opPackageName,
-                                          const media::AudioUuid& uuid, int32_t priority,
-                                          media::AudioSourceType source,
+                                          const AudioUuid& uuid, int32_t priority,
+                                          AudioSource source,
                                           int32_t* _aidl_return) override;
-    binder::Status addStreamDefaultEffect(const media::AudioUuid& type,
+    binder::Status addStreamDefaultEffect(const AudioUuid& type,
                                           const std::string& opPackageName,
-                                          const media::AudioUuid& uuid, int32_t priority,
+                                          const AudioUuid& uuid, int32_t priority,
                                           AudioUsage usage, int32_t* _aidl_return) override;
     binder::Status removeSourceDefaultEffect(int32_t id) override;
     binder::Status removeStreamDefaultEffect(int32_t id) override;
@@ -184,7 +187,7 @@ public:
     binder::Status setAudioVolumeGroupCallbacksEnabled(bool enabled) override;
     binder::Status acquireSoundTriggerSession(media::SoundTriggerSession* _aidl_return) override;
     binder::Status releaseSoundTriggerSession(int32_t session) override;
-    binder::Status getPhoneState(media::AudioMode* _aidl_return) override;
+    binder::Status getPhoneState(AudioMode* _aidl_return) override;
     binder::Status registerPolicyMixes(const std::vector<media::AudioMix>& mixes,
                                        bool registration) override;
     binder::Status setUidDeviceAffinities(int32_t uid,
@@ -237,21 +240,21 @@ public:
             int32_t strategy, media::DeviceRole role,
             std::vector<media::AudioDevice>* _aidl_return) override;
     binder::Status setDevicesRoleForCapturePreset(
-            media::AudioSourceType audioSource,
+            AudioSource audioSource,
             media::DeviceRole role,
             const std::vector<media::AudioDevice>& devices) override;
     binder::Status addDevicesRoleForCapturePreset(
-            media::AudioSourceType audioSource,
+            AudioSource audioSource,
             media::DeviceRole role,
             const std::vector<media::AudioDevice>& devices) override;
     binder::Status removeDevicesRoleForCapturePreset(
-            media::AudioSourceType audioSource,
+            AudioSource audioSource,
             media::DeviceRole role,
             const std::vector<media::AudioDevice>& devices) override;
-    binder::Status clearDevicesRoleForCapturePreset(media::AudioSourceType audioSource,
+    binder::Status clearDevicesRoleForCapturePreset(AudioSource audioSource,
                                                     media::DeviceRole role) override;
     binder::Status getDevicesForRoleAndCapturePreset(
-            media::AudioSourceType audioSource,
+            AudioSource audioSource,
             media::DeviceRole role,
             std::vector<media::AudioDevice>* _aidl_return) override;
     binder::Status registerSoundTriggerCaptureStateListener(

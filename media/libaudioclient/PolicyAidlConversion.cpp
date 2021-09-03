@@ -152,7 +152,7 @@ aidl2legacy_AudioMixMatchCriterionValue(
 
         case media::AudioMixMatchCriterionValue::source:
             legacy.mSource = VALUE_OR_RETURN(
-                    aidl2legacy_AudioSourceType_audio_source_t(UNION_GET(aidl, source).value()));
+                    aidl2legacy_AudioSource_audio_source_t(UNION_GET(aidl, source).value()));
             *rule |= RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET;
             return legacy;
 
@@ -184,7 +184,7 @@ legacy2aidl_AudioMixMatchCriterionValue(
 
         case RULE_MATCH_ATTRIBUTE_CAPTURE_PRESET:
             UNION_SET(aidl, source,
-                      VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSourceType(legacy.mSource)));
+                      VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.mSource)));
             break;
 
         case RULE_MATCH_UID:

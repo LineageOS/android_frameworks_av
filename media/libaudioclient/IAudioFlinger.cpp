@@ -32,7 +32,9 @@ using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioFormatDescription;
+using media::audio::common::AudioMode;
 using media::audio::common::AudioStreamType;
+using media::audio::common::AudioUuid;
 
 #define MAX_ITEMS_PER_LIST 1024
 
@@ -363,7 +365,7 @@ bool AudioFlingerClientAdapter::streamMute(audio_stream_type_t stream) const {
 }
 
 status_t AudioFlingerClientAdapter::setMode(audio_mode_t mode) {
-    media::AudioMode modeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_mode_t_AudioMode(mode));
+    AudioMode modeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_mode_t_AudioMode(mode));
     return statusTFromBinderStatus(mDelegate->setMode(modeAidl));
 }
 
@@ -581,9 +583,9 @@ status_t AudioFlingerClientAdapter::getEffectDescriptor(const effect_uuid_t* pEf
                                                         const effect_uuid_t* pTypeUUID,
                                                         uint32_t preferredTypeFlag,
                                                         effect_descriptor_t* pDescriptor) const {
-    media::AudioUuid effectUuidAidl = VALUE_OR_RETURN_STATUS(
+    AudioUuid effectUuidAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_uuid_t_AudioUuid(*pEffectUUID));
-    media::AudioUuid typeUuidAidl = VALUE_OR_RETURN_STATUS(
+    AudioUuid typeUuidAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_audio_uuid_t_AudioUuid(*pTypeUUID));
     int32_t preferredTypeFlagAidl = VALUE_OR_RETURN_STATUS(
             convertReinterpret<int32_t>(preferredTypeFlag));
@@ -905,7 +907,7 @@ Status AudioFlingerServerAdapter::streamMute(AudioStreamType stream, bool* _aidl
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::setMode(media::AudioMode mode) {
+Status AudioFlingerServerAdapter::setMode(AudioMode mode) {
     audio_mode_t modeLegacy = VALUE_OR_RETURN_BINDER(aidl2legacy_AudioMode_audio_mode_t(mode));
     return Status::fromStatusT(mDelegate->setMode(modeLegacy));
 }
@@ -1084,8 +1086,8 @@ AudioFlingerServerAdapter::queryEffect(int32_t index, media::EffectDescriptor* _
     return Status::ok();
 }
 
-Status AudioFlingerServerAdapter::getEffectDescriptor(const media::AudioUuid& effectUUID,
-                                                      const media::AudioUuid& typeUUID,
+Status AudioFlingerServerAdapter::getEffectDescriptor(const AudioUuid& effectUUID,
+                                                      const AudioUuid& typeUUID,
                                                       int32_t preferredTypeFlag,
                                                       media::EffectDescriptor* _aidl_return) {
     effect_uuid_t effectUuidLegacy = VALUE_OR_RETURN_BINDER(
