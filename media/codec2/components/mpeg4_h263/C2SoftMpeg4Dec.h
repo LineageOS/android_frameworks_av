@@ -19,8 +19,8 @@
 
 #include <SimpleC2Component.h>
 
+#include <mp4dec_api.h>
 
-struct tagvideoDecControls;
 
 namespace android {
 
@@ -54,7 +54,7 @@ struct C2SoftMpeg4Dec : public SimpleC2Component {
     bool handleResChange(const std::unique_ptr<C2Work> &work);
 
     std::shared_ptr<IntfImpl> mIntf;
-    tagvideoDecControls *mDecHandle;
+    tagvideoDecControls mVideoDecControls;
     std::shared_ptr<C2GraphicBlock> mOutBlock;
     uint8_t *mOutputBuffer[kNumOutputBuffers];
     size_t  mOutputBufferSize;
