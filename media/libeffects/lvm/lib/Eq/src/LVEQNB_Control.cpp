@@ -313,9 +313,9 @@ LVEQNB_ReturnStatus_en LVEQNB_Control(LVEQNB_Handle_t hInstance, LVEQNB_Params_t
      */
     pInstance->eqBiquad.resize(pParams->NBands,
                                android::audio_utils::BiquadFilter<LVM_FLOAT>(pParams->NrChannels));
-    LVEQNB_ClearFilterHistory(pInstance);
 
     if (bChange || modeChange) {
+        LVEQNB_ClearFilterHistory(pInstance);
         /*
          * If the sample rate has changed clear the history
          */
