@@ -335,6 +335,29 @@ status_t AudioFlinger::updateSecondaryOutputs(
     return NO_ERROR;
 }
 
+status_t AudioFlinger::getMmapPolicyInfos(
+            media::AudioMMapPolicyType policyType,
+            std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
+    AutoMutex lock(mHardwareLock);
+    if (mPolicyInfos.find(policyType) != mPolicyInfos.end()) {
+        *policyInfos = mPolicyInfos[policyType];
+        return NO_ERROR;
+    }
+    for (size_t i = 0; i < mAudioHwDevs.size(); ++i) {
+        AudioHwDevice *dev = mAudioHwDevs.valueAt(i);
+        std::vector<media::AudioMMapPolicyInfo> infos;
+        status_t status = dev->getMmapPolicyInfos(policyType, &infos);
+        if (status != NO_ERROR) {
+            ALOGE("Failed to query mmap policy info of %d, error %d",
+                  mAudioHwDevs.keyAt(i), status);
+            continue;
+        }
+        policyInfos->insert(policyInfos->end(), infos.begin(), infos.end());
+    }
+    mPolicyInfos[policyType] = *policyInfos;
+    return NO_ERROR;
+}
+
 // getDefaultVibratorInfo_l must be called with AudioFlinger lock held.
 std::optional<media::AudioVibratorInfo> AudioFlinger::getDefaultVibratorInfo_l() {
     if (mAudioVibratorInfos.empty()) {

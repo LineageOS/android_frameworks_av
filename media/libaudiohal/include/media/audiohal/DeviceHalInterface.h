@@ -17,6 +17,8 @@
 #ifndef ANDROID_HARDWARE_DEVICE_HAL_INTERFACE_H
 #define ANDROID_HARDWARE_DEVICE_HAL_INTERFACE_H
 
+#include <android/media/AudioMMapPolicyInfo.h>
+#include <android/media/AudioMMapPolicyType.h>
 #include <media/audiohal/EffectHalInterface.h>
 #include <media/MicrophoneInfo.h>
 #include <system/audio.h>
@@ -119,6 +121,10 @@ class DeviceHalInterface : public RefBase
             audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
     virtual status_t removeDeviceEffect(
             audio_port_handle_t device, sp<EffectHalInterface> effect) = 0;
+
+    virtual status_t getMmapPolicyInfos(
+            media::AudioMMapPolicyType policyType,
+            std::vector<media::AudioMMapPolicyInfo> *policyInfos)  = 0;
 
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;
 

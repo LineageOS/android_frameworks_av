@@ -30,6 +30,7 @@ cc_library_shared {
     ],
 
     shared_libs: [
+        "audioclient-types-aidl-cpp",
         "libdl",
         "libhidlbase",
         "liblog",
