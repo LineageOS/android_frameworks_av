@@ -104,7 +104,6 @@ class Codec2Fuzzer {
     static constexpr size_t kMarkerSuffixSize = 3;
   };
 
-  BufferSource* mBufferSource;
   bool mEos = false;
   C2BlockPool::local_id_t mBlockPoolId;
 
