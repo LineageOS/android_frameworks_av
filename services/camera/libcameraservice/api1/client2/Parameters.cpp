@@ -864,7 +864,6 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
 
     if (fabs(maxDigitalZoom.data.f[0] - 1.f) > 0.00001f) {
         params.set(CameraParameters::KEY_ZOOM, zoom);
-        params.set(CameraParameters::KEY_MAX_ZOOM, NUM_ZOOM_STEPS - 1);
 
         {
             String8 zoomRatios;
@@ -872,18 +871,34 @@ status_t Parameters::initialize(CameraDeviceBase *device, int deviceVersion) {
             float zoomIncrement = (maxDigitalZoom.data.f[0] - zoom) /
                     (NUM_ZOOM_STEPS-1);
             bool addComma = false;
-            for (size_t i=0; i < NUM_ZOOM_STEPS; i++) {
+            int previousZoom = -1;
+            size_t zoomSteps = 0;
+            for (size_t i = 0; i < NUM_ZOOM_STEPS; i++) {
+                int currentZoom = static_cast<int>(zoom * 100);
+                if (previousZoom == currentZoom) {
+                    zoom += zoomIncrement;
+                    continue;
+                }
                 if (addComma) zoomRatios += ",";
                 addComma = true;
-                zoomRatios += String8::format("%d", static_cast<int>(zoom * 100));
+                zoomRatios += String8::format("%d", currentZoom);
                 zoom += zoomIncrement;
+                previousZoom = currentZoom;
+                zoomSteps++;
             }
-            params.set(CameraParameters::KEY_ZOOM_RATIOS, zoomRatios);
+
+            if (zoomSteps > 0) {
+                params.set(CameraParameters::KEY_ZOOM_RATIOS, zoomRatios);
+                params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
+                        CameraParameters::TRUE);
+                params.set(CameraParameters::KEY_MAX_ZOOM, zoomSteps - 1);
+                zoomAvailable = true;
+            } else {
+                params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
+                        CameraParameters::FALSE);
+            }
         }
 
-        params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
-                CameraParameters::TRUE);
-        zoomAvailable = true;
     } else {
         params.set(CameraParameters::KEY_ZOOM_SUPPORTED,
                 CameraParameters::FALSE);

@@ -228,7 +228,6 @@ C2SoftMpeg4Dec::C2SoftMpeg4Dec(
         const std::shared_ptr<IntfImpl> &intfImpl)
     : SimpleC2Component(std::make_shared<SimpleInterface<IntfImpl>>(name, id, intfImpl)),
       mIntf(intfImpl),
-      mDecHandle(nullptr),
       mOutputBuffer{},
       mInitialized(false) {
 }
@@ -243,13 +242,9 @@ c2_status_t C2SoftMpeg4Dec::onInit() {
 }
 
 c2_status_t C2SoftMpeg4Dec::onStop() {
-    if (mDecHandle) {
-        if (mInitialized) {
-            PVCleanUpVideoDecoder(mDecHandle);
-            mInitialized = false;
-        }
-        delete mDecHandle;
-        mDecHandle = nullptr;
+    if (mInitialized) {
+        PVCleanUpVideoDecoder(&mVideoDecControls);
+        mInitialized = false;
     }
     for (int32_t i = 0; i < kNumOutputBuffers; ++i) {
         if (mOutputBuffer[i]) {
@@ -279,7 +274,7 @@ void C2SoftMpeg4Dec::onRelease() {
 
 c2_status_t C2SoftMpeg4Dec::onFlush_sm() {
     if (mInitialized) {
-        if (PV_TRUE != PVResetVideoDecoder(mDecHandle)) {
+        if (PV_TRUE != PVResetVideoDecoder(&mVideoDecControls)) {
             return C2_CORRUPTED;
         }
     }
@@ -294,14 +289,8 @@ status_t C2SoftMpeg4Dec::initDecoder() {
 #else
     mIsMpeg4 = false;
 #endif
-    if (!mDecHandle) {
-        mDecHandle = new tagvideoDecControls;
-    }
-    if (!mDecHandle) {
-        ALOGE("mDecHandle is null");
-        return NO_MEMORY;
-    }
-    memset(mDecHandle, 0, sizeof(tagvideoDecControls));
+
+    memset(&mVideoDecControls, 0, sizeof(tagvideoDecControls));
 
     /* TODO: bring these values to 352 and 288. It cannot be done as of now
      * because, h263 doesn't seem to allow port reconfiguration. In OMX, the
@@ -357,10 +346,6 @@ void C2SoftMpeg4Dec::finishWork(uint64_t index, const std::unique_ptr<C2Work> &w
 }
 
 c2_status_t C2SoftMpeg4Dec::ensureDecoderState(const std::shared_ptr<C2BlockPool> &pool) {
-    if (!mDecHandle) {
-        ALOGE("not supposed to be here, invalid decoder context");
-        return C2_CORRUPTED;
-    }
 
     mOutputBufferSize = align(mIntf->getMaxWidth(), 16) * align(mIntf->getMaxHeight(), 16) * 3 / 2;
     for (int32_t i = 0; i < kNumOutputBuffers; ++i) {
@@ -391,10 +376,10 @@ c2_status_t C2SoftMpeg4Dec::ensureDecoderState(const std::shared_ptr<C2BlockPool
 
 bool C2SoftMpeg4Dec::handleResChange(const std::unique_ptr<C2Work> &work) {
     uint32_t disp_width, disp_height;
-    PVGetVideoDimensions(mDecHandle, (int32 *)&disp_width, (int32 *)&disp_height);
+    PVGetVideoDimensions(&mVideoDecControls, (int32 *)&disp_width, (int32 *)&disp_height);
 
     uint32_t buf_width, buf_height;
-    PVGetBufferDimensions(mDecHandle, (int32 *)&buf_width, (int32 *)&buf_height);
+    PVGetBufferDimensions(&mVideoDecControls, (int32 *)&buf_width, (int32 *)&buf_height);
 
     CHECK_LE(disp_width, buf_width);
     CHECK_LE(disp_height, buf_height);
@@ -415,13 +400,14 @@ bool C2SoftMpeg4Dec::handleResChange(const std::unique_ptr<C2Work> &work) {
         }
 
         if (!mIsMpeg4) {
-            PVCleanUpVideoDecoder(mDecHandle);
+            PVCleanUpVideoDecoder(&mVideoDecControls);
 
             uint8_t *vol_data[1]{};
             int32_t vol_size = 0;
 
             if (!PVInitVideoDecoder(
-                    mDecHandle, vol_data, &vol_size, 1, mIntf->getMaxWidth(), mIntf->getMaxHeight(), H263_MODE)) {
+                    &mVideoDecControls, vol_data, &vol_size, 1, mIntf->getMaxWidth(),
+                                                        mIntf->getMaxHeight(), H263_MODE)) {
                 ALOGE("Error in PVInitVideoDecoder H263_MODE while resChanged was set to true");
                 mSignalledError = true;
                 work->result = C2_CORRUPTED;
@@ -511,7 +497,7 @@ void C2SoftMpeg4Dec::process(
     uint32_t *start_code = (uint32_t *)bitstream;
     bool volHeader = *start_code == 0xB0010000;
     if (volHeader) {
-        PVCleanUpVideoDecoder(mDecHandle);
+        PVCleanUpVideoDecoder(&mVideoDecControls);
         mInitialized = false;
     }
 
@@ -526,7 +512,7 @@ void C2SoftMpeg4Dec::process(
         }
         MP4DecodingMode mode = (mIsMpeg4) ? MPEG4_MODE : H263_MODE;
         if (!PVInitVideoDecoder(
-                mDecHandle, vol_data, &vol_size, 1,
+                &mVideoDecControls, vol_data, &vol_size, 1,
                 mIntf->getMaxWidth(), mIntf->getMaxHeight(), mode)) {
             ALOGE("PVInitVideoDecoder failed. Unsupported content?");
             mSignalledError = true;
@@ -534,7 +520,7 @@ void C2SoftMpeg4Dec::process(
             return;
         }
         mInitialized = true;
-        MP4DecodingMode actualMode = PVGetDecBitstreamMode(mDecHandle);
+        MP4DecodingMode actualMode = PVGetDecBitstreamMode(&mVideoDecControls);
         if (mode != actualMode) {
             ALOGE("Decoded mode not same as actual mode of the decoder");
             mSignalledError = true;
@@ -542,7 +528,7 @@ void C2SoftMpeg4Dec::process(
             return;
         }
 
-        PVSetPostProcType(mDecHandle, 0);
+        PVSetPostProcType(&mVideoDecControls, 0);
         if (handleResChange(work)) {
             ALOGI("Setting width and height");
             C2StreamPictureSizeInfo::output size(0u, mWidth, mHeight);
@@ -579,7 +565,7 @@ void C2SoftMpeg4Dec::process(
             return;
         }
 
-        uint32_t yFrameSize = sizeof(uint8) * mDecHandle->size;
+        uint32_t yFrameSize = sizeof(uint8) * mVideoDecControls.size;
         if (mOutputBufferSize < yFrameSize * 3 / 2){
             ALOGE("Too small output buffer: %zu bytes", mOutputBufferSize);
             mSignalledError = true;
@@ -588,7 +574,7 @@ void C2SoftMpeg4Dec::process(
         }
 
         if (!mFramesConfigured) {
-            PVSetReferenceYUV(mDecHandle,mOutputBuffer[1]);
+            PVSetReferenceYUV(&mVideoDecControls,mOutputBuffer[1]);
             mFramesConfigured = true;
         }
 
@@ -599,7 +585,7 @@ void C2SoftMpeg4Dec::process(
         uint8_t *bitstreamTmp = bitstream;
         uint32_t timestamp = workIndex;
         if (PVDecodeVopHeader(
-                    mDecHandle, &bitstreamTmp, &timestamp, &tmpInSize,
+                    &mVideoDecControls, &bitstreamTmp, &timestamp, &tmpInSize,
                     &header_info, &useExtTimestamp,
                     mOutputBuffer[mNumSamplesOutput & 1]) != PV_TRUE) {
             ALOGE("failed to decode vop header.");
@@ -631,7 +617,7 @@ void C2SoftMpeg4Dec::process(
             continue;
         }
 
-        if (PVDecodeVopBody(mDecHandle, &tmpInSize) != PV_TRUE) {
+        if (PVDecodeVopBody(&mVideoDecControls, &tmpInSize) != PV_TRUE) {
             ALOGE("failed to decode video frame.");
             mSignalledError = true;
             work->result = C2_CORRUPTED;
