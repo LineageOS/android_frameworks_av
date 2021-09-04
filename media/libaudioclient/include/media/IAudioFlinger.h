@@ -37,8 +37,6 @@
 #include <string>
 #include <vector>
 
-#include <android/media/AudioMMapPolicyInfo.h>
-#include <android/media/AudioMMapPolicyType.h>
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerService.h>
 #include <android/media/BpAudioFlingerService.h>
@@ -350,10 +348,6 @@ public:
 
     virtual status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) = 0;
-
-    virtual status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) = 0;
 };
 
 /**
@@ -451,10 +445,6 @@ public:
     status_t updateSecondaryOutputs(
             const TrackSecondaryOutputsMap& trackSecondaryOutputs) override;
 
-    status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) override;
-
 private:
     const sp<media::IAudioFlingerService> mDelegate;
 };
@@ -539,7 +529,6 @@ public:
             SET_AUDIO_HAL_PIDS = media::BnAudioFlingerService::TRANSACTION_setAudioHalPids,
             SET_VIBRATOR_INFOS = media::BnAudioFlingerService::TRANSACTION_setVibratorInfos,
             UPDATE_SECONDARY_OUTPUTS = media::BnAudioFlingerService::TRANSACTION_updateSecondaryOutputs,
-            GET_MMAP_POLICY_INFOS = media::BnAudioFlingerService::TRANSACTION_getMmapPolicyInfos,
         };
 
         /**
@@ -652,9 +641,6 @@ public:
     Status setVibratorInfos(const std::vector<media::AudioVibratorInfo>& vibratorInfos) override;
     Status updateSecondaryOutputs(
             const std::vector<media::TrackSecondaryOutputInfo>& trackSecondaryOutputInfos) override;
-    Status getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *_aidl_return) override;
 
 private:
     const sp<AudioFlingerServerAdapter::Delegate> mDelegate;

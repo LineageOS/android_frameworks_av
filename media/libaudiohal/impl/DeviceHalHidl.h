@@ -119,10 +119,6 @@ class DeviceHalHidl : public DeviceHalInterface, public ConversionHelperHidl
     status_t addDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
     status_t removeDeviceEffect(audio_port_handle_t device, sp<EffectHalInterface> effect) override;
 
-    status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) override;
-
     status_t dump(int fd, const Vector<String16>& args) override;
 
   private:

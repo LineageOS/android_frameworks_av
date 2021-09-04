@@ -17,9 +17,6 @@
 
 #define LOG_TAG "IAudioFlinger"
 //#define LOG_NDEBUG 0
-
-#include <algorithm>
-
 #include <utils/Log.h>
 
 #include <stdint.h>
@@ -780,12 +777,6 @@ status_t AudioFlingerClientAdapter::updateSecondaryOutputs(
     return statusTFromBinderStatus(mDelegate->updateSecondaryOutputs(trackSecondaryOutputInfos));
 }
 
-status_t AudioFlingerClientAdapter::getMmapPolicyInfos(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
-    return statusTFromBinderStatus(mDelegate->getMmapPolicyInfos(policyType, policyInfos));
-}
-
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 // AudioFlingerServerAdapter
@@ -1256,12 +1247,6 @@ Status AudioFlingerServerAdapter::updateSecondaryOutputs(
                     trackSecondaryOutputInfos,
                     aidl2legacy_TrackSecondaryOutputInfo_TrackSecondaryOutputInfoPair));
     return Status::fromStatusT(mDelegate->updateSecondaryOutputs(trackSecondaryOutputs));
-}
-
-Status AudioFlingerServerAdapter::getMmapPolicyInfos(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *_aidl_return) {
-    return Status::fromStatusT(mDelegate->getMmapPolicyInfos(policyType, _aidl_return));
 }
 
 } // namespace android

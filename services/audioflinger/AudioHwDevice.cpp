@@ -102,11 +102,5 @@ status_t AudioHwDevice::getAudioPort(struct audio_port_v7 *port) const {
     return mHwDevice->getAudioPort(port);
 }
 
-status_t AudioHwDevice::getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) const {
-    return mHwDevice->getMmapPolicyInfos(policyType, policyInfos);
-}
-
 
 }; // namespace android

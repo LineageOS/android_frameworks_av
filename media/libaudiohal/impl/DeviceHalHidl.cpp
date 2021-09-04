@@ -20,7 +20,6 @@
 //#define LOG_NDEBUG 0
 
 #include <cutils/native_handle.h>
-#include <cutils/properties.h>
 #include <hwbinder/IPCThreadState.h>
 #include <media/AudioContainers.h>
 #include <utils/Log.h>
@@ -33,7 +32,6 @@
 #include "DeviceHalHidl.h"
 #include "EffectHalHidl.h"
 #include "ParameterUtils.h"
-#include "PropertyUtils.h"
 #include "StreamHalHidl.h"
 
 using ::android::hardware::audio::common::CPP_VERSION::implementation::HidlUtils;
@@ -458,14 +456,6 @@ status_t DeviceHalHidl::removeDeviceEffect(
     return INVALID_OPERATION;
 }
 #endif
-
-status_t DeviceHalHidl::getMmapPolicyInfos(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
-    // TODO: this is just for test, faking a data by querying the system property.
-    // When AIDL HAL is ready, this should query AIDL HAL when possible.
-    return utils::getMmapPolicyInfosFromSystemProperty(policyType, policyInfos);
-}
 
 status_t DeviceHalHidl::dump(int fd, const Vector<String16>& args) {
     if (mDevice == 0) return NO_INIT;

@@ -16,8 +16,6 @@
 
 package android.media;
 
-import android.media.AudioMMapPolicyInfo;
-import android.media.AudioMMapPolicyType;
 import android.media.AudioMode;
 import android.media.AudioPatch;
 import android.media.AudioPort;
@@ -219,6 +217,4 @@ interface IAudioFlingerService {
     // This usually happens when there is a dynamic policy registered.
     void updateSecondaryOutputs(
             in TrackSecondaryOutputInfo[] trackSecondaryOutputInfos);
-
-    AudioMMapPolicyInfo[] getMmapPolicyInfos(AudioMMapPolicyType policyType);
 }
