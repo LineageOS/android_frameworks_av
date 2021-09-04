@@ -248,7 +248,10 @@ public:
 
         // align width and height to support subsampling cleanly
         uint32_t stride = align(view.crop().width, 2) * divUp(layout.planes[0].allocatedDepth, 8u);
-        uint32_t vStride = align(view.crop().height, 2);
+
+        int32_t fmtHeight = mHeight;
+        format->findInt32(KEY_HEIGHT, &fmtHeight);
+        uint32_t vStride = align(fmtHeight, 2);
 
         bool tryWrapping = !copy;
 
