@@ -20,7 +20,6 @@
 #include <utils/Log.h>
 
 #include "DeviceHalLocal.h"
-#include "PropertyUtils.h"
 #include "StreamHalLocal.h"
 
 namespace android {
@@ -232,12 +231,6 @@ status_t DeviceHalLocal::addDeviceEffect(
 status_t DeviceHalLocal::removeDeviceEffect(
         audio_port_handle_t device __unused, sp<EffectHalInterface> effect __unused) {
     return INVALID_OPERATION;
-}
-
-status_t DeviceHalLocal::getMmapPolicyInfos(
-        media::AudioMMapPolicyType policyType,
-        std::vector<media::AudioMMapPolicyInfo> *policyInfos) {
-    return utils::getMmapPolicyInfosFromSystemProperty(policyType, policyInfos);
 }
 
 status_t DeviceHalLocal::dump(int fd, const Vector<String16>& /* args */) {

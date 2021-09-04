@@ -85,10 +85,6 @@ public:
 
     status_t getAudioPort(struct audio_port_v7 *port) const;
 
-    status_t getMmapPolicyInfos(
-            media::AudioMMapPolicyType policyType,
-            std::vector<media::AudioMMapPolicyInfo> *policyInfos) const;
-
 private:
     const audio_module_handle_t mHandle;
     const char * const          mModuleName;
