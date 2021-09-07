@@ -327,6 +327,7 @@ public:
      * by audio policy manager and attach/detach the spatializer effect accordingly.
      */
     void onCheckSpatializer() override;
+    void onCheckSpatializer_l();
     void doOnCheckSpatializer();
 
     void setEffectSuspended(int effectId,

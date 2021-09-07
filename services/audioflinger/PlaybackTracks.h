@@ -195,6 +195,10 @@ public:
 
     audio_output_flags_t getOutputFlags() const { return mFlags; }
     float getSpeed() const { return mSpeed; }
+
+    bool canBeSpatialized() const { return (mAttr.flags
+            & (AUDIO_FLAG_CONTENT_SPATIALIZED | AUDIO_FLAG_NEVER_SPATIALIZE)) == 0; }
+
 protected:
     // for numerous
     friend class PlaybackThread;
