@@ -962,8 +962,9 @@ private:
                 audio_io_handle_t *output);
 
         sp<IOProfile> getSpatializerOutputProfile(const audio_config_t *config,
-                                                       const AudioDeviceTypeAddrVector &devices,
-                                                       bool forOpening) const;
+                                                  const AudioDeviceTypeAddrVector &devices) const;
+
+        static bool isChannelMaskSpatialized(audio_channel_mask_t channels);
 
         void checkVirtualizerClientRoutes();
 
