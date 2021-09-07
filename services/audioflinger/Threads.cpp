@@ -2039,6 +2039,7 @@ AudioFlinger::PlaybackThread::~PlaybackThread()
     free(mSinkBuffer);
     free(mMixerBuffer);
     free(mEffectBuffer);
+    free(mEffectToSinkBuffer);
 }
 
 // Thread virtuals
@@ -3001,10 +3002,17 @@ void AudioFlinger::PlaybackThread::readOutputParameters_l()
     // Originally this was int16_t[] array, need to remove legacy implications.
     free(mSinkBuffer);
     mSinkBuffer = NULL;
+    free(mEffectToSinkBuffer);
+    mEffectToSinkBuffer = nullptr;
+
     // For sink buffer size, we use the frame size from the downstream sink to avoid problems
     // with non PCM formats for compressed music, e.g. AAC, and Offload threads.
     const size_t sinkBufferSize = mNormalFrameCount * mFrameSize;
     (void)posix_memalign(&mSinkBuffer, 32, sinkBufferSize);
+
+    if (mType == SPATIALIZER) {
+        (void)posix_memalign(&mEffectToSinkBuffer, 32, sinkBufferSize);
+    }
 
     // We resize the mMixerBuffer according to the requirements of the sink buffer which
     // drives the output.
@@ -3836,11 +3844,11 @@ bool AudioFlinger::PlaybackThread::threadLoop()
             //
             // mMixerBufferValid is only set true by MixerThread::prepareTracks_l().
             // TODO use mSleepTimeUs == 0 as an additional condition.
+            uint32_t mixerChannelCount = mEffectBufferValid ?
+                        audio_channel_count_from_out_mask(mMixerChannelMask) : mChannelCount;
             if (mMixerBufferValid) {
                 void *buffer = mEffectBufferValid ? mEffectBuffer : mSinkBuffer;
                 audio_format_t format = mEffectBufferValid ? mEffectBufferFormat : mFormat;
-                uint32_t channelCount = mEffectBufferValid ?
-                            audio_channel_count_from_out_mask(mMixerChannelMask) : mChannelCount;
 
                 // mono blend occurs for mixer threads only (not direct or offloaded)
                 // and is handled here if we're going directly to the sink.
@@ -3858,7 +3866,7 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 }
 
                 memcpy_by_audio_format(buffer, format, mMixerBuffer, mMixerBufferFormat,
-                        mNormalFrameCount * (channelCount + mHapticChannelCount));
+                        mNormalFrameCount * (mixerChannelCount + mHapticChannelCount));
 
                 // If we're going directly to the sink and there are haptic channels,
                 // we should adjust channels as the sample data is partially interleaved
@@ -3891,8 +3899,11 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                             && activeHapticSessionId == effectChains[i]->sessionId()) {
                         // Haptic data is active in this case, copy it directly from
                         // in buffer to out buffer.
+                        uint32_t channelCount =
+                                effectChains[i]->sessionId() == AUDIO_SESSION_OUTPUT_STAGE ?
+                                        mixerChannelCount : mChannelCount;
                         const size_t audioBufferSize = mNormalFrameCount
-                                * audio_bytes_per_frame(mChannelCount, EFFECT_BUFFER_FORMAT);
+                                * audio_bytes_per_frame(channelCount, EFFECT_BUFFER_FORMAT);
                         memcpy_by_audio_format(
                                 (uint8_t*)effectChains[i]->outBuffer() + audioBufferSize,
                                 EFFECT_BUFFER_FORMAT,
@@ -3932,8 +3943,23 @@ bool AudioFlinger::PlaybackThread::threadLoop()
                 mBalance.process((float *)mEffectBuffer, mNormalFrameCount);
             }
 
-            memcpy_by_audio_format(mSinkBuffer, mFormat, mEffectBuffer, mEffectBufferFormat,
-                    mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+            if (mType == SPATIALIZER) {
+                memcpy_by_audio_format(mEffectToSinkBuffer, mFormat, mEffectBuffer,
+                        mEffectBufferFormat,
+                        mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+                accumulate_by_audio_format(mSinkBuffer, mEffectToSinkBuffer, mFormat,
+                                           mNormalFrameCount * mChannelCount);
+                const size_t audioBufferSize = mNormalFrameCount
+                        * audio_bytes_per_frame(mChannelCount, mFormat);
+                memcpy_by_audio_format(
+                        (uint8_t*)mSinkBuffer + audioBufferSize,
+                        mFormat,
+                        (uint8_t*)mEffectToSinkBuffer + audioBufferSize,
+                        mFormat, mNormalFrameCount * mHapticChannelCount);
+            } else {
+                memcpy_by_audio_format(mSinkBuffer, mFormat, mEffectBuffer, mEffectBufferFormat,
+                        mNormalFrameCount * (mChannelCount + mHapticChannelCount));
+            }
             // The sample data is partially interleaved when haptic channels exist,
             // we need to adjust channels here.
             if (mHapticChannelCount > 0) {
@@ -4588,6 +4614,7 @@ AudioFlinger::MixerThread::MixerThread(const sp<AudioFlinger>& audioFlinger, Aud
                 && Intersection(outDeviceTypes(), getAudioDeviceOutAllA2dpSet()).empty();
         break;
     }
+    ALOG_ASSERT(initFastMixer && mType == SPATIALIZER);
     ALOGW_IF(initFastMixer == false && mFrameCount < mNormalFrameCount,
             "FastMixer is preferred for this sink as frameCount %zu is less than threshold %zu",
             mFrameCount, mNormalFrameCount);
@@ -4946,6 +4973,9 @@ void AudioFlinger::MixerThread::threadLoop_sleepTime()
         // before effects processing or output.
         if (mMixerBufferValid) {
             memset(mMixerBuffer, 0, mMixerBufferSize);
+            if (mType == SPATIALIZER) {
+                memset(mSinkBuffer, 0, mSinkBufferSize);
+            }
         } else {
             memset(mSinkBuffer, 0, mSinkBufferSize);
         }
@@ -5438,11 +5468,21 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
                 trackId,
                 AudioMixer::TRACK,
                 AudioMixer::CHANNEL_MASK, (void *)(uintptr_t)track->channelMask());
-            mAudioMixer->setParameter(
-                trackId,
-                AudioMixer::TRACK,
-                AudioMixer::MIXER_CHANNEL_MASK,
-                (void *)(uintptr_t)(mMixerChannelMask | mHapticChannelMask));
+
+            if (mType == SPATIALIZER && !track->canBeSpatialized()) {
+                mAudioMixer->setParameter(
+                    trackId,
+                    AudioMixer::TRACK,
+                    AudioMixer::MIXER_CHANNEL_MASK,
+                    (void *)(uintptr_t)(mChannelMask | mHapticChannelMask));
+            } else {
+                mAudioMixer->setParameter(
+                    trackId,
+                    AudioMixer::TRACK,
+                    AudioMixer::MIXER_CHANNEL_MASK,
+                    (void *)(uintptr_t)(mMixerChannelMask | mHapticChannelMask));
+            }
+
             // limit track sample rate to 2 x output sample rate, which changes at re-configuration
             uint32_t maxSampleRate = mSampleRate * AUDIO_RESAMPLER_DOWN_RATIO_MAX;
             uint32_t reqSampleRate = proxy->getSampleRate();
@@ -5479,16 +5519,27 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
             if (mMixerBufferEnabled
                     && (track->mainBuffer() == mSinkBuffer
                             || track->mainBuffer() == mMixerBuffer)) {
-                mAudioMixer->setParameter(
-                        trackId,
-                        AudioMixer::TRACK,
-                        AudioMixer::MIXER_FORMAT, (void *)mMixerBufferFormat);
-                mAudioMixer->setParameter(
-                        trackId,
-                        AudioMixer::TRACK,
-                        AudioMixer::MAIN_BUFFER, (void *)mMixerBuffer);
-                // TODO: override track->mainBuffer()?
-                mMixerBufferValid = true;
+                if (mType == SPATIALIZER && !track->canBeSpatialized()) {
+                    mAudioMixer->setParameter(
+                            trackId,
+                            AudioMixer::TRACK,
+                            AudioMixer::MIXER_FORMAT, (void *)mFormat);
+                    mAudioMixer->setParameter(
+                            trackId,
+                            AudioMixer::TRACK,
+                            AudioMixer::MAIN_BUFFER, (void *)mSinkBuffer);
+                } else {
+                    mAudioMixer->setParameter(
+                            trackId,
+                            AudioMixer::TRACK,
+                            AudioMixer::MIXER_FORMAT, (void *)mMixerBufferFormat);
+                    mAudioMixer->setParameter(
+                            trackId,
+                            AudioMixer::TRACK,
+                            AudioMixer::MAIN_BUFFER, (void *)mMixerBuffer);
+                    // TODO: override track->mainBuffer()?
+                    mMixerBufferValid = true;
+                }
             } else {
                 mAudioMixer->setParameter(
                         trackId,
@@ -5678,8 +5729,10 @@ AudioFlinger::PlaybackThread::mixer_state AudioFlinger::MixerThread::prepareTrac
     // sink or mix buffer must be cleared if all tracks are connected to an
     // effect chain as in this case the mixer will not write to the sink or mix buffer
     // and track effects will accumulate into it
-    if ((mBytesRemaining == 0) && ((mixedTracks != 0 && mixedTracks == tracksWithEffect) ||
-            (mixedTracks == 0 && fastTracks > 0))) {
+    // always clear sink buffer for spatializer output as the output of the spatializer
+    // effect will be accumulated into it
+    if ((mBytesRemaining == 0) && (((mixedTracks != 0 && mixedTracks == tracksWithEffect) ||
+            (mixedTracks == 0 && fastTracks > 0)) || (mType == SPATIALIZER))) {
         // FIXME as a performance optimization, should remember previous zero status
         if (mMixerBufferValid) {
             memset(mMixerBuffer, 0, mMixerBufferSize);
