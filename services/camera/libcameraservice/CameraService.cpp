@@ -2396,7 +2396,8 @@ Status CameraService::addListenerHelper(const sp<ICameraServiceListener>& listen
         Mutex::Autolock lock(mCameraStatesLock);
         for (auto& i : mCameraStates) {
             cameraStatuses->emplace_back(i.first,
-                    mapToInterface(i.second->getStatus()), i.second->getUnavailablePhysicalIds());
+                    mapToInterface(i.second->getStatus()), i.second->getUnavailablePhysicalIds(),
+                    openCloseCallbackAllowed ? i.second->getClientPackage() : String8::empty());
         }
     }
     // Remove the camera statuses that should be hidden from the client, we do
@@ -3766,6 +3767,16 @@ bool CameraService::CameraState::removeUnavailablePhysicalId(const String8& phys
     return count > 0;
 }
 
+void CameraService::CameraState::setClientPackage(const String8& clientPackage) {
+    Mutex::Autolock lock(mStatusLock);
+    mClientPackage = clientPackage;
+}
+
+String8 CameraService::CameraState::getClientPackage() const {
+    Mutex::Autolock lock(mStatusLock);
+    return mClientPackage;
+}
+
 // ----------------------------------------------------------------------------
 //                  ClientEventListener
 // ----------------------------------------------------------------------------
@@ -4329,6 +4340,18 @@ void CameraService::updateStatus(StatusInternal status, const String8& cameraId,
 
 void CameraService::updateOpenCloseStatus(const String8& cameraId, bool open,
         const String16& clientPackageName) {
+    auto state = getCameraState(cameraId);
+    if (state == nullptr) {
+        ALOGW("%s: Could not update the status for %s, no such device exists", __FUNCTION__,
+                cameraId.string());
+        return;
+    }
+    if (open) {
+        state->setClientPackage(String8(clientPackageName));
+    } else {
+        state->setClientPackage(String8::empty());
+    }
+
     Mutex::Autolock lock(mStatusListenerLock);
 
     for (const auto& it : mListenerList) {
