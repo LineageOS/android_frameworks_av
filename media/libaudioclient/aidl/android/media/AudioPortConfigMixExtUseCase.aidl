@@ -16,7 +16,7 @@
 
 package android.media;
 
-import android.media.AudioSourceType;
+import android.media.audio.common.AudioSource;
 import android.media.audio.common.AudioStreamType;
 
 /**
@@ -33,5 +33,5 @@ union AudioPortConfigMixExtUseCase {
     /** This to be set if the containing config has the AudioPortRole::SOURCE role. */
     AudioStreamType stream;
     /** This to be set if the containing config has the AudioPortRole::SINK role. */
-    AudioSourceType source;
+    AudioSource source;
 }

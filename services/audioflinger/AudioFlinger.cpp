@@ -2859,7 +2859,7 @@ status_t AudioFlinger::openInput(const media::OpenInputRequest& request,
             &config,
             device.mType,
             device.address().c_str(),
-            VALUE_OR_RETURN_STATUS(aidl2legacy_AudioSourceType_audio_source_t(request.source)),
+            VALUE_OR_RETURN_STATUS(aidl2legacy_AudioSource_audio_source_t(request.source)),
             VALUE_OR_RETURN_STATUS(aidl2legacy_int32_t_audio_input_flags_t_mask(request.flags)),
             AUDIO_DEVICE_NONE,
             String8{});

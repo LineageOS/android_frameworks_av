@@ -19,6 +19,9 @@
 
 #include <sys/types.h>
 
+#include <set>
+#include <vector>
+
 #include <android/media/AudioVibratorInfo.h>
 #include <android/media/BnAudioFlingerClient.h>
 #include <android/media/BnAudioPolicyServiceClient.h>
@@ -33,13 +36,11 @@
 #include <media/AudioVolumeGroup.h>
 #include <media/AudioIoDescriptor.h>
 #include <media/MicrophoneInfo.h>
-#include <set>
 #include <system/audio.h>
 #include <system/audio_effect.h>
 #include <system/audio_policy.h>
 #include <utils/Errors.h>
 #include <utils/Mutex.h>
-#include <vector>
 
 using android::content::AttributionSourceState;
 
@@ -694,7 +695,7 @@ private:
                 const media::audio::common::AudioConfigBase& deviceConfig,
                 const std::vector<media::EffectDescriptor>& effects,
                 int32_t patchHandle,
-                media::AudioSourceType source) override;
+                media::audio::common::AudioSource source) override;
         binder::Status onRoutingUpdated();
 
     private:

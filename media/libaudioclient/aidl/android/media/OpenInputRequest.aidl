@@ -17,8 +17,8 @@
 package android.media;
 
 import android.media.AudioDevice;
-import android.media.AudioSourceType;
 import android.media.audio.common.AudioConfig;
+import android.media.audio.common.AudioSource;
 
 /**
  * {@hide}
@@ -30,7 +30,7 @@ parcelable OpenInputRequest {
     int input;
     AudioConfig config;
     AudioDevice device;
-    AudioSourceType source;
+    AudioSource source;
     /** Bitmask, indexed by AudioInputFlag. */
     int flags;
 }

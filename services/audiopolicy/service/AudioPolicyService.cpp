@@ -521,8 +521,8 @@ void AudioPolicyService::NotificationClient::onRecordingConfigurationUpdate(
                             legacy2aidl_effect_descriptor_t_EffectDescriptor));
             int32_t patchHandleAidl = VALUE_OR_RETURN_STATUS(
                     legacy2aidl_audio_patch_handle_t_int32_t(patchHandle));
-            media::AudioSourceType sourceAidl = VALUE_OR_RETURN_STATUS(
-                    legacy2aidl_audio_source_t_AudioSourceType(source));
+            media::audio::common::AudioSource sourceAidl = VALUE_OR_RETURN_STATUS(
+                    legacy2aidl_audio_source_t_AudioSource(source));
             return aidl_utils::statusTFromBinderStatus(
                     mAudioPolicyServiceClient->onRecordingConfigurationUpdate(eventAidl,
                                                                               clientInfoAidl,

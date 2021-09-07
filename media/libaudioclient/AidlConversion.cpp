@@ -37,12 +37,18 @@ using base::unexpected;
 using media::audio::common::AudioChannelLayout;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
+using media::audio::common::AudioContentType;
+using media::audio::common::AudioEncapsulationMetadataType;
 using media::audio::common::AudioEncapsulationMode;
+using media::audio::common::AudioEncapsulationType;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioFormatType;
+using media::audio::common::AudioMode;
 using media::audio::common::AudioOffloadInfo;
+using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
+using media::audio::common::AudioUuid;
 using media::audio::common::PcmType;
 
 namespace {
@@ -1504,7 +1510,7 @@ ConversionResult<audio_stream_type_t> aidl2legacy_AudioStreamType_audio_stream_t
     switch (aidl) {
         case AudioStreamType::INVALID:
             break;  // return error
-        case AudioStreamType::DEFAULT:
+        case AudioStreamType::SYS_RESERVED_DEFAULT:
             return AUDIO_STREAM_DEFAULT;
         case AudioStreamType::VOICE_CALL:
             return AUDIO_STREAM_VOICE_CALL;
@@ -1544,7 +1550,7 @@ ConversionResult<AudioStreamType> legacy2aidl_audio_stream_type_t_AudioStreamTyp
         audio_stream_type_t legacy) {
     switch (legacy) {
         case AUDIO_STREAM_DEFAULT:
-            return AudioStreamType::DEFAULT;
+            return AudioStreamType::SYS_RESERVED_DEFAULT;
         case AUDIO_STREAM_VOICE_CALL:
             return AudioStreamType::VOICE_CALL;
         case AUDIO_STREAM_SYSTEM:
@@ -1579,77 +1585,76 @@ ConversionResult<AudioStreamType> legacy2aidl_audio_stream_type_t_AudioStreamTyp
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<audio_source_t> aidl2legacy_AudioSourceType_audio_source_t(
-        media::AudioSourceType aidl) {
+ConversionResult<audio_source_t> aidl2legacy_AudioSource_audio_source_t(
+        AudioSource aidl) {
     switch (aidl) {
-        case media::AudioSourceType::INVALID:
-            // This value does not have an enum
+        case AudioSource::SYS_RESERVED_INVALID:
             return AUDIO_SOURCE_INVALID;
-        case media::AudioSourceType::DEFAULT:
+        case AudioSource::DEFAULT:
             return AUDIO_SOURCE_DEFAULT;
-        case media::AudioSourceType::MIC:
+        case AudioSource::MIC:
             return AUDIO_SOURCE_MIC;
-        case media::AudioSourceType::VOICE_UPLINK:
+        case AudioSource::VOICE_UPLINK:
             return AUDIO_SOURCE_VOICE_UPLINK;
-        case media::AudioSourceType::VOICE_DOWNLINK:
+        case AudioSource::VOICE_DOWNLINK:
             return AUDIO_SOURCE_VOICE_DOWNLINK;
-        case media::AudioSourceType::VOICE_CALL:
+        case AudioSource::VOICE_CALL:
             return AUDIO_SOURCE_VOICE_CALL;
-        case media::AudioSourceType::CAMCORDER:
+        case AudioSource::CAMCORDER:
             return AUDIO_SOURCE_CAMCORDER;
-        case media::AudioSourceType::VOICE_RECOGNITION:
+        case AudioSource::VOICE_RECOGNITION:
             return AUDIO_SOURCE_VOICE_RECOGNITION;
-        case media::AudioSourceType::VOICE_COMMUNICATION:
+        case AudioSource::VOICE_COMMUNICATION:
             return AUDIO_SOURCE_VOICE_COMMUNICATION;
-        case media::AudioSourceType::REMOTE_SUBMIX:
+        case AudioSource::REMOTE_SUBMIX:
             return AUDIO_SOURCE_REMOTE_SUBMIX;
-        case media::AudioSourceType::UNPROCESSED:
+        case AudioSource::UNPROCESSED:
             return AUDIO_SOURCE_UNPROCESSED;
-        case media::AudioSourceType::VOICE_PERFORMANCE:
+        case AudioSource::VOICE_PERFORMANCE:
             return AUDIO_SOURCE_VOICE_PERFORMANCE;
-        case media::AudioSourceType::ECHO_REFERENCE:
+        case AudioSource::ECHO_REFERENCE:
             return AUDIO_SOURCE_ECHO_REFERENCE;
-        case media::AudioSourceType::FM_TUNER:
+        case AudioSource::FM_TUNER:
             return AUDIO_SOURCE_FM_TUNER;
-        case media::AudioSourceType::HOTWORD:
+        case AudioSource::HOTWORD:
             return AUDIO_SOURCE_HOTWORD;
     }
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<media::AudioSourceType> legacy2aidl_audio_source_t_AudioSourceType(
+ConversionResult<AudioSource> legacy2aidl_audio_source_t_AudioSource(
         audio_source_t legacy) {
     switch (legacy) {
         case AUDIO_SOURCE_INVALID:
-            return media::AudioSourceType::INVALID;
+            return AudioSource::SYS_RESERVED_INVALID;
         case AUDIO_SOURCE_DEFAULT:
-            return media::AudioSourceType::DEFAULT;
+            return AudioSource::DEFAULT;
         case AUDIO_SOURCE_MIC:
-            return media::AudioSourceType::MIC;
+            return AudioSource::MIC;
         case AUDIO_SOURCE_VOICE_UPLINK:
-            return media::AudioSourceType::VOICE_UPLINK;
+            return AudioSource::VOICE_UPLINK;
         case AUDIO_SOURCE_VOICE_DOWNLINK:
-            return media::AudioSourceType::VOICE_DOWNLINK;
+            return AudioSource::VOICE_DOWNLINK;
         case AUDIO_SOURCE_VOICE_CALL:
-            return media::AudioSourceType::VOICE_CALL;
+            return AudioSource::VOICE_CALL;
         case AUDIO_SOURCE_CAMCORDER:
-            return media::AudioSourceType::CAMCORDER;
+            return AudioSource::CAMCORDER;
         case AUDIO_SOURCE_VOICE_RECOGNITION:
-            return media::AudioSourceType::VOICE_RECOGNITION;
+            return AudioSource::VOICE_RECOGNITION;
         case AUDIO_SOURCE_VOICE_COMMUNICATION:
-            return media::AudioSourceType::VOICE_COMMUNICATION;
+            return AudioSource::VOICE_COMMUNICATION;
         case AUDIO_SOURCE_REMOTE_SUBMIX:
-            return media::AudioSourceType::REMOTE_SUBMIX;
+            return AudioSource::REMOTE_SUBMIX;
         case AUDIO_SOURCE_UNPROCESSED:
-            return media::AudioSourceType::UNPROCESSED;
+            return AudioSource::UNPROCESSED;
         case AUDIO_SOURCE_VOICE_PERFORMANCE:
-            return media::AudioSourceType::VOICE_PERFORMANCE;
+            return AudioSource::VOICE_PERFORMANCE;
         case AUDIO_SOURCE_ECHO_REFERENCE:
-            return media::AudioSourceType::ECHO_REFERENCE;
+            return AudioSource::ECHO_REFERENCE;
         case AUDIO_SOURCE_FM_TUNER:
-            return media::AudioSourceType::FM_TUNER;
+            return AudioSource::FM_TUNER;
         case AUDIO_SOURCE_HOTWORD:
-            return media::AudioSourceType::HOTWORD;
+            return AudioSource::HOTWORD;
     }
     return unexpected(BAD_VALUE);
 }
@@ -1683,7 +1688,7 @@ ConversionResult<audio_port_config_mix_ext_usecase> aidl2legacy_AudioPortConfigM
 
         case media::AudioPortRole::SINK:
             // This is not a bug. A SINK role corresponds to the source field.
-            legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSourceType_audio_source_t(
+            legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSource_audio_source_t(
                     VALUE_OR_RETURN(UNION_GET(aidl, source))));
             return legacy;
     }
@@ -1706,7 +1711,7 @@ ConversionResult<media::AudioPortConfigMixExtUseCase> legacy2aidl_AudioPortConfi
         case AUDIO_PORT_ROLE_SINK:
             // This is not a bug. A SINK role corresponds to the source field.
             UNION_SET(aidl, source,
-                      VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSourceType(legacy.source)));
+                      VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.source)));
             return aidl;
     }
     LOG_ALWAYS_FATAL("Shouldn't get here"); // with -Werror,-Wswitch may compile-time fail
@@ -1972,35 +1977,35 @@ ConversionResult<media::AudioClient> legacy2aidl_AudioClient_AudioClient(
 }
 
 ConversionResult<audio_content_type_t>
-aidl2legacy_AudioContentType_audio_content_type_t(media::AudioContentType aidl) {
+aidl2legacy_AudioContentType_audio_content_type_t(AudioContentType aidl) {
     switch (aidl) {
-        case media::AudioContentType::UNKNOWN:
+        case AudioContentType::UNKNOWN:
             return AUDIO_CONTENT_TYPE_UNKNOWN;
-        case media::AudioContentType::SPEECH:
+        case AudioContentType::SPEECH:
             return AUDIO_CONTENT_TYPE_SPEECH;
-        case media::AudioContentType::MUSIC:
+        case AudioContentType::MUSIC:
             return AUDIO_CONTENT_TYPE_MUSIC;
-        case media::AudioContentType::MOVIE:
+        case AudioContentType::MOVIE:
             return AUDIO_CONTENT_TYPE_MOVIE;
-        case media::AudioContentType::SONIFICATION:
+        case AudioContentType::SONIFICATION:
             return AUDIO_CONTENT_TYPE_SONIFICATION;
     }
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<media::AudioContentType>
+ConversionResult<AudioContentType>
 legacy2aidl_audio_content_type_t_AudioContentType(audio_content_type_t legacy) {
     switch (legacy) {
         case AUDIO_CONTENT_TYPE_UNKNOWN:
-            return media::AudioContentType::UNKNOWN;
+            return AudioContentType::UNKNOWN;
         case AUDIO_CONTENT_TYPE_SPEECH:
-            return media::AudioContentType::SPEECH;
+            return AudioContentType::SPEECH;
         case AUDIO_CONTENT_TYPE_MUSIC:
-            return media::AudioContentType::MUSIC;
+            return AudioContentType::MUSIC;
         case AUDIO_CONTENT_TYPE_MOVIE:
-            return media::AudioContentType::MOVIE;
+            return AudioContentType::MOVIE;
         case AUDIO_CONTENT_TYPE_SONIFICATION:
-            return media::AudioContentType::SONIFICATION;
+            return AudioContentType::SONIFICATION;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2210,7 +2215,7 @@ aidl2legacy_AudioAttributesInternal_audio_attributes_t(const media::AudioAttribu
     legacy.content_type = VALUE_OR_RETURN(
             aidl2legacy_AudioContentType_audio_content_type_t(aidl.contentType));
     legacy.usage = VALUE_OR_RETURN(aidl2legacy_AudioUsage_audio_usage_t(aidl.usage));
-    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSourceType_audio_source_t(aidl.source));
+    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSource_audio_source_t(aidl.source));
     legacy.flags = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_flags_mask_t_mask(aidl.flags));
     RETURN_IF_ERROR(aidl2legacy_string(aidl.tags, legacy.tags, sizeof(legacy.tags)));
     return legacy;
@@ -2222,7 +2227,7 @@ legacy2aidl_audio_attributes_t_AudioAttributesInternal(const audio_attributes_t&
     aidl.contentType = VALUE_OR_RETURN(
             legacy2aidl_audio_content_type_t_AudioContentType(legacy.content_type));
     aidl.usage = VALUE_OR_RETURN(legacy2aidl_audio_usage_t_AudioUsage(legacy.usage));
-    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSourceType(legacy.source));
+    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.source));
     aidl.flags = VALUE_OR_RETURN(legacy2aidl_audio_flags_mask_t_int32_t_mask(legacy.flags));
     aidl.tags = VALUE_OR_RETURN(legacy2aidl_string(legacy.tags, sizeof(legacy.tags)));
     return aidl;
@@ -2417,7 +2422,7 @@ legacy2aidl_AudioTimestamp_AudioTimestampInternal(const AudioTimestamp& legacy) 
 }
 
 ConversionResult<audio_uuid_t>
-aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl) {
+aidl2legacy_AudioUuid_audio_uuid_t(const AudioUuid& aidl) {
     audio_uuid_t legacy;
     legacy.timeLow = VALUE_OR_RETURN(convertReinterpret<uint32_t>(aidl.timeLow));
     legacy.timeMid = VALUE_OR_RETURN(convertIntegral<uint16_t>(aidl.timeMid));
@@ -2430,9 +2435,9 @@ aidl2legacy_AudioUuid_audio_uuid_t(const media::AudioUuid& aidl) {
     return legacy;
 }
 
-ConversionResult<media::AudioUuid>
+ConversionResult<AudioUuid>
 legacy2aidl_audio_uuid_t_AudioUuid(const audio_uuid_t& legacy) {
-    media::AudioUuid aidl;
+    AudioUuid aidl;
     aidl.timeLow = VALUE_OR_RETURN(convertReinterpret<int32_t>(legacy.timeLow));
     aidl.timeMid = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.timeMid));
     aidl.timeHiAndVersion = VALUE_OR_RETURN(convertIntegral<int32_t>(legacy.timeHiAndVersion));
@@ -2473,28 +2478,28 @@ legacy2aidl_effect_descriptor_t_EffectDescriptor(const effect_descriptor_t& lega
 
 ConversionResult<audio_encapsulation_metadata_type_t>
 aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t(
-        media::AudioEncapsulationMetadataType aidl) {
+        AudioEncapsulationMetadataType aidl) {
     switch (aidl) {
-        case media::AudioEncapsulationMetadataType::NONE:
+        case AudioEncapsulationMetadataType::NONE:
             return AUDIO_ENCAPSULATION_METADATA_TYPE_NONE;
-        case media::AudioEncapsulationMetadataType::FRAMEWORK_TUNER:
+        case AudioEncapsulationMetadataType::FRAMEWORK_TUNER:
             return AUDIO_ENCAPSULATION_METADATA_TYPE_FRAMEWORK_TUNER;
-        case media::AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR:
+        case AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR:
             return AUDIO_ENCAPSULATION_METADATA_TYPE_DVB_AD_DESCRIPTOR;
     }
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<media::AudioEncapsulationMetadataType>
+ConversionResult<AudioEncapsulationMetadataType>
 legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType(
         audio_encapsulation_metadata_type_t legacy) {
     switch (legacy) {
         case AUDIO_ENCAPSULATION_METADATA_TYPE_NONE:
-            return media::AudioEncapsulationMetadataType::NONE;
+            return AudioEncapsulationMetadataType::NONE;
         case AUDIO_ENCAPSULATION_METADATA_TYPE_FRAMEWORK_TUNER:
-            return media::AudioEncapsulationMetadataType::FRAMEWORK_TUNER;
+            return AudioEncapsulationMetadataType::FRAMEWORK_TUNER;
         case AUDIO_ENCAPSULATION_METADATA_TYPE_DVB_AD_DESCRIPTOR:
-            return media::AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR;
+            return AudioEncapsulationMetadataType::DVB_AD_DESCRIPTOR;
     }
     return unexpected(BAD_VALUE);
 }
@@ -2526,9 +2531,9 @@ aidl2legacy_AudioEncapsulationMetadataType_mask(int32_t aidl) {
     return convertBitmask<uint32_t,
             int32_t,
             audio_encapsulation_metadata_type_t,
-            media::AudioEncapsulationMetadataType>(
+            AudioEncapsulationMetadataType>(
             aidl, aidl2legacy_AudioEncapsulationMetadataType_audio_encapsulation_metadata_type_t,
-            indexToEnum_index<media::AudioEncapsulationMetadataType>,
+            indexToEnum_index<AudioEncapsulationMetadataType>,
             enumToMask_index<uint32_t, audio_encapsulation_metadata_type_t>);
 }
 
@@ -2536,11 +2541,11 @@ ConversionResult<int32_t>
 legacy2aidl_AudioEncapsulationMetadataType_mask(uint32_t legacy) {
     return convertBitmask<int32_t,
             uint32_t,
-            media::AudioEncapsulationMetadataType,
+            AudioEncapsulationMetadataType,
             audio_encapsulation_metadata_type_t>(
             legacy, legacy2aidl_audio_encapsulation_metadata_type_t_AudioEncapsulationMetadataType,
             indexToEnum_index<audio_encapsulation_metadata_type_t>,
-            enumToMask_index<int32_t, media::AudioEncapsulationMetadataType>);
+            enumToMask_index<int32_t, AudioEncapsulationMetadataType>);
 }
 
 ConversionResult<audio_mix_latency_class_t>
@@ -2859,43 +2864,43 @@ legacy2aidl_audio_port_v7_AudioPort(const audio_port_v7& legacy) {
 }
 
 ConversionResult<audio_mode_t>
-aidl2legacy_AudioMode_audio_mode_t(media::AudioMode aidl) {
+aidl2legacy_AudioMode_audio_mode_t(AudioMode aidl) {
     switch (aidl) {
-        case media::AudioMode::INVALID:
+        case AudioMode::SYS_RESERVED_INVALID:
             return AUDIO_MODE_INVALID;
-        case media::AudioMode::CURRENT:
+        case AudioMode::SYS_RESERVED_CURRENT:
             return AUDIO_MODE_CURRENT;
-        case media::AudioMode::NORMAL:
+        case AudioMode::NORMAL:
             return AUDIO_MODE_NORMAL;
-        case media::AudioMode::RINGTONE:
+        case AudioMode::RINGTONE:
             return AUDIO_MODE_RINGTONE;
-        case media::AudioMode::IN_CALL:
+        case AudioMode::IN_CALL:
             return AUDIO_MODE_IN_CALL;
-        case media::AudioMode::IN_COMMUNICATION:
+        case AudioMode::IN_COMMUNICATION:
             return AUDIO_MODE_IN_COMMUNICATION;
-        case media::AudioMode::CALL_SCREEN:
+        case AudioMode::CALL_SCREEN:
             return AUDIO_MODE_CALL_SCREEN;
     }
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<media::AudioMode>
+ConversionResult<AudioMode>
 legacy2aidl_audio_mode_t_AudioMode(audio_mode_t legacy) {
     switch (legacy) {
         case AUDIO_MODE_INVALID:
-            return media::AudioMode::INVALID;
+            return AudioMode::SYS_RESERVED_INVALID;
         case AUDIO_MODE_CURRENT:
-            return media::AudioMode::CURRENT;
+            return AudioMode::SYS_RESERVED_CURRENT;
         case AUDIO_MODE_NORMAL:
-            return media::AudioMode::NORMAL;
+            return AudioMode::NORMAL;
         case AUDIO_MODE_RINGTONE:
-            return media::AudioMode::RINGTONE;
+            return AudioMode::RINGTONE;
         case AUDIO_MODE_IN_CALL:
-            return media::AudioMode::IN_CALL;
+            return AudioMode::IN_CALL;
         case AUDIO_MODE_IN_COMMUNICATION:
-            return media::AudioMode::IN_COMMUNICATION;
+            return AudioMode::IN_COMMUNICATION;
         case AUDIO_MODE_CALL_SCREEN:
-            return media::AudioMode::CALL_SCREEN;
+            return AudioMode::CALL_SCREEN;
         case AUDIO_MODE_CNT:
             break;
     }
@@ -3102,24 +3107,24 @@ legacy2aidl_audio_extra_audio_descriptor_ExtraAudioDescriptor(
 
 ConversionResult<audio_encapsulation_type_t>
 aidl2legacy_AudioEncapsulationType_audio_encapsulation_type_t(
-        const media::AudioEncapsulationType& aidl) {
+        const AudioEncapsulationType& aidl) {
     switch (aidl) {
-        case media::AudioEncapsulationType::NONE:
+        case AudioEncapsulationType::NONE:
             return AUDIO_ENCAPSULATION_TYPE_NONE;
-        case media::AudioEncapsulationType::IEC61937:
+        case AudioEncapsulationType::IEC61937:
             return AUDIO_ENCAPSULATION_TYPE_IEC61937;
     }
     return unexpected(BAD_VALUE);
 }
 
-ConversionResult<media::AudioEncapsulationType>
+ConversionResult<AudioEncapsulationType>
 legacy2aidl_audio_encapsulation_type_t_AudioEncapsulationType(
         const audio_encapsulation_type_t & legacy) {
     switch (legacy) {
         case AUDIO_ENCAPSULATION_TYPE_NONE:
-            return media::AudioEncapsulationType::NONE;
+            return AudioEncapsulationType::NONE;
         case AUDIO_ENCAPSULATION_TYPE_IEC61937:
-            return media::AudioEncapsulationType::IEC61937;
+            return AudioEncapsulationType::IEC61937;
     }
     return unexpected(BAD_VALUE);
 }
