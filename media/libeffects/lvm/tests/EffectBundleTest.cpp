@@ -14,29 +14,39 @@
  * limitations under the License.
  */
 
+#include <system/audio_effects/effect_bassboost.h>
+#include <system/audio_effects/effect_equalizer.h>
+#include <system/audio_effects/effect_virtualizer.h>
 #include "EffectTestHelper.h"
-using namespace android;
 
-// Update isBassBoost, if the order of effects is updated
-constexpr effect_uuid_t kEffectUuids[] = {
+using namespace android;
+typedef enum {
+    EFFECT_BASS_BOOST,
+    EFFECT_EQUALIZER,
+    EFFECT_VIRTUALIZER,
+    EFFECT_VOLUME
+} effect_type_t;
+
+const std::map<effect_type_t, effect_uuid_t> kEffectUuids = {
         // NXP SW BassBoost
-        {0x8631f300, 0x72e2, 0x11df, 0xb57e, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
-        // NXP SW Virtualizer
-        {0x1d4033c0, 0x8557, 0x11df, 0x9f2d, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
+        {EFFECT_BASS_BOOST,
+         {0x8631f300, 0x72e2, 0x11df, 0xb57e, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}},
         // NXP SW Equalizer
-        {0xce772f20, 0x847d, 0x11df, 0xbb17, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
+        {EFFECT_EQUALIZER,
+         {0xce772f20, 0x847d, 0x11df, 0xbb17, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}},
+        // NXP SW Virtualizer
+        {EFFECT_VIRTUALIZER,
+         {0x1d4033c0, 0x8557, 0x11df, 0x9f2d, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}},
         // NXP SW Volume
-        {0x119341a0, 0x8469, 0x11df, 0x81f9, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}},
+        {EFFECT_VOLUME, {0x119341a0, 0x8469, 0x11df, 0x81f9, {0x00, 0x02, 0xa5, 0xd5, 0xc5, 0x1b}}},
 };
 
-static bool isBassBoost(const effect_uuid_t* uuid) {
-    // Update this, if the order of effects in kEffectUuids is updated
-    return uuid == &kEffectUuids[0];
-}
+const size_t kNumEffectUuids = std::size(kEffectUuids);
 
-constexpr size_t kNumEffectUuids = std::size(kEffectUuids);
+constexpr float kMinAmplitude = -1.0f;
+constexpr float kMaxAmplitude = 1.0f;
 
-typedef std::tuple<int, int, int, int, int> SingleEffectTestParam;
+using SingleEffectTestParam = std::tuple<int, int, int, int, int>;
 class SingleEffectTest : public ::testing::TestWithParam<SingleEffectTestParam> {
   public:
     SingleEffectTest()
@@ -46,7 +56,8 @@ class SingleEffectTest : public ::testing::TestWithParam<SingleEffectTestParam> 
           mFrameCount(EffectTestHelper::kFrameCounts[std::get<2>(GetParam())]),
           mLoopCount(EffectTestHelper::kLoopCounts[std::get<3>(GetParam())]),
           mTotalFrameCount(mFrameCount * mLoopCount),
-          mUuid(&kEffectUuids[std::get<4>(GetParam())]) {}
+          mEffectType((effect_type_t)std::get<4>(GetParam())),
+          mUuid(kEffectUuids.at(mEffectType)) {}
 
     const size_t mChMask;
     const size_t mChannelCount;
@@ -54,7 +65,8 @@ class SingleEffectTest : public ::testing::TestWithParam<SingleEffectTestParam> 
     const size_t mFrameCount;
     const size_t mLoopCount;
     const size_t mTotalFrameCount;
-    const effect_uuid_t* mUuid;
+    const effect_type_t mEffectType;
+    const effect_uuid_t mUuid;
 };
 
 // Tests applying a single effect
@@ -63,7 +75,7 @@ TEST_P(SingleEffectTest, SimpleProcess) {
                  << "chMask: " << mChMask << " sampleRate: " << mSampleRate
                  << " frameCount: " << mFrameCount << " loopCount: " << mLoopCount);
 
-    EffectTestHelper effect(mUuid, mChMask, mChMask, mSampleRate, mFrameCount, mLoopCount);
+    EffectTestHelper effect(&mUuid, mChMask, mChMask, mSampleRate, mFrameCount, mLoopCount);
 
     ASSERT_NO_FATAL_FAILURE(effect.createEffect());
     ASSERT_NO_FATAL_FAILURE(effect.setConfig());
@@ -72,7 +84,7 @@ TEST_P(SingleEffectTest, SimpleProcess) {
     std::vector<float> input(mTotalFrameCount * mChannelCount);
     std::vector<float> output(mTotalFrameCount * mChannelCount);
     std::minstd_rand gen(mChMask);
-    std::uniform_real_distribution<> dis(-1.0f, 1.0f);
+    std::uniform_real_distribution<> dis(kMinAmplitude, kMaxAmplitude);
     for (auto& in : input) {
         in = dis(gen);
     }
@@ -88,7 +100,7 @@ INSTANTIATE_TEST_SUITE_P(
                            ::testing::Range(0, (int)EffectTestHelper::kNumLoopCounts),
                            ::testing::Range(0, (int)kNumEffectUuids)));
 
-typedef std::tuple<int, int, int, int> SingleEffectComparisonTestParam;
+using SingleEffectComparisonTestParam = std::tuple<int, int, int, int>;
 class SingleEffectComparisonTest
     : public ::testing::TestWithParam<SingleEffectComparisonTestParam> {
   public:
@@ -97,13 +109,15 @@ class SingleEffectComparisonTest
           mFrameCount(EffectTestHelper::kFrameCounts[std::get<1>(GetParam())]),
           mLoopCount(EffectTestHelper::kLoopCounts[std::get<2>(GetParam())]),
           mTotalFrameCount(mFrameCount * mLoopCount),
-          mUuid(&kEffectUuids[std::get<3>(GetParam())]) {}
+          mEffectType((effect_type_t)std::get<3>(GetParam())),
+          mUuid(kEffectUuids.at(mEffectType)) {}
 
     const size_t mSampleRate;
     const size_t mFrameCount;
     const size_t mLoopCount;
     const size_t mTotalFrameCount;
-    const effect_uuid_t* mUuid;
+    const effect_type_t mEffectType;
+    const effect_uuid_t mUuid;
 };
 
 // Compares first two channels in multi-channel output to stereo output when same effect is applied
@@ -115,7 +129,7 @@ TEST_P(SingleEffectComparisonTest, SimpleProcess) {
     std::vector<float> monoInput(mTotalFrameCount);
 
     std::minstd_rand gen(mSampleRate);
-    std::uniform_real_distribution<> dis(-1.0f, 1.0f);
+    std::uniform_real_distribution<> dis(kMinAmplitude, kMaxAmplitude);
     for (auto& in : monoInput) {
         in = dis(gen);
     }
@@ -126,7 +140,7 @@ TEST_P(SingleEffectComparisonTest, SimpleProcess) {
                     mTotalFrameCount * sizeof(float) * FCC_1);
 
     // Apply effect on stereo channels
-    EffectTestHelper stereoEffect(mUuid, AUDIO_CHANNEL_OUT_STEREO, AUDIO_CHANNEL_OUT_STEREO,
+    EffectTestHelper stereoEffect(&mUuid, AUDIO_CHANNEL_OUT_STEREO, AUDIO_CHANNEL_OUT_STEREO,
                                   mSampleRate, mFrameCount, mLoopCount);
 
     ASSERT_NO_FATAL_FAILURE(stereoEffect.createEffect());
@@ -142,7 +156,7 @@ TEST_P(SingleEffectComparisonTest, SimpleProcess) {
 
     for (size_t chMask : EffectTestHelper::kChMasks) {
         size_t channelCount = audio_channel_count_from_out_mask(chMask);
-        EffectTestHelper testEffect(mUuid, chMask, chMask, mSampleRate, mFrameCount, mLoopCount);
+        EffectTestHelper testEffect(&mUuid, chMask, chMask, mSampleRate, mFrameCount, mLoopCount);
 
         ASSERT_NO_FATAL_FAILURE(testEffect.createEffect());
         ASSERT_NO_FATAL_FAILURE(testEffect.setConfig());
@@ -170,7 +184,7 @@ TEST_P(SingleEffectComparisonTest, SimpleProcess) {
         memcpy_to_i16_from_float(stereoTestI16.data(), stereoTestOutput.data(),
                                  mTotalFrameCount * FCC_2);
 
-        if (isBassBoost(mUuid)) {
+        if (EFFECT_BASS_BOOST == mEffectType) {
             // SNR must be above the threshold
             float snr = computeSnr<int16_t>(stereoRefI16.data(), stereoTestI16.data(),
                                             mTotalFrameCount * FCC_2);
@@ -189,6 +203,135 @@ INSTANTIATE_TEST_SUITE_P(
         ::testing::Combine(::testing::Range(0, (int)EffectTestHelper::kNumSampleRates),
                            ::testing::Range(0, (int)EffectTestHelper::kNumFrameCounts),
                            ::testing::Range(0, (int)EffectTestHelper::kNumLoopCounts),
+                           ::testing::Range(0, (int)kNumEffectUuids)));
+
+using SingleEffectDefaultSetParamTestParam = std::tuple<int, int, int>;
+class SingleEffectDefaultSetParamTest
+    : public ::testing::TestWithParam<SingleEffectDefaultSetParamTestParam> {
+  public:
+    SingleEffectDefaultSetParamTest()
+        : mChMask(EffectTestHelper::kChMasks[std::get<0>(GetParam())]),
+          mChannelCount(audio_channel_count_from_out_mask(mChMask)),
+          mSampleRate(16000),
+          mFrameCount(EffectTestHelper::kFrameCounts[std::get<1>(GetParam())]),
+          mLoopCount(1),
+          mTotalFrameCount(mFrameCount * mLoopCount),
+          mEffectType((effect_type_t)std::get<2>(GetParam())),
+          mUuid(kEffectUuids.at(mEffectType)) {}
+
+    const size_t mChMask;
+    const size_t mChannelCount;
+    const size_t mSampleRate;
+    const size_t mFrameCount;
+    const size_t mLoopCount;
+    const size_t mTotalFrameCount;
+    const effect_type_t mEffectType;
+    const effect_uuid_t mUuid;
+};
+
+// Tests verifying that redundant setParam calls do not alter output
+TEST_P(SingleEffectDefaultSetParamTest, SimpleProcess) {
+    SCOPED_TRACE(testing::Message()
+                 << "chMask: " << mChMask << " sampleRate: " << mSampleRate
+                 << " frameCount: " << mFrameCount << " loopCount: " << mLoopCount);
+    // effect.process() handles mTotalFrameCount * mChannelCount samples in each call.
+    // This test calls process() twice per effect, hence total samples when allocating
+    // input and output vectors is twice the number of samples processed in one call.
+    size_t totalNumSamples = 2 * mTotalFrameCount * mChannelCount;
+    // Initialize input buffer with deterministic pseudo-random values
+    std::vector<float> input(totalNumSamples);
+    std::minstd_rand gen(mChMask);
+    std::uniform_real_distribution<> dis(kMinAmplitude, kMaxAmplitude);
+    for (auto& in : input) {
+        in = dis(gen);
+    }
+
+    uint32_t key;
+    int32_t value1, value2;
+    switch (mEffectType) {
+        case EFFECT_BASS_BOOST:
+            key = BASSBOOST_PARAM_STRENGTH;
+            value1 = 1;
+            value2 = 14;
+            break;
+        case EFFECT_VIRTUALIZER:
+            key = VIRTUALIZER_PARAM_STRENGTH;
+            value1 = 0;
+            value2 = 100;
+            break;
+        case EFFECT_EQUALIZER:
+            key = EQ_PARAM_CUR_PRESET;
+            value1 = 0;
+            value2 = 1;
+            break;
+        case EFFECT_VOLUME:
+            key = 0 /* VOLUME_PARAM_LEVEL */;
+            value1 = 0;
+            value2 = -100;
+            break;
+        default:
+            FAIL() << "Unsupported effect type : " << mEffectType;
+    }
+
+    EffectTestHelper refEffect(&mUuid, mChMask, mChMask, mSampleRate, mFrameCount, mLoopCount);
+
+    ASSERT_NO_FATAL_FAILURE(refEffect.createEffect());
+    ASSERT_NO_FATAL_FAILURE(refEffect.setConfig());
+
+    if (EFFECT_BASS_BOOST == mEffectType) {
+        ASSERT_NO_FATAL_FAILURE(refEffect.setParam<int16_t>(key, value1));
+    } else {
+        ASSERT_NO_FATAL_FAILURE(refEffect.setParam<int32_t>(key, value1));
+    }
+    std::vector<float> refOutput(totalNumSamples);
+    float* pInput = input.data();
+    float* pOutput = refOutput.data();
+    ASSERT_NO_FATAL_FAILURE(refEffect.process(pInput, pOutput));
+
+    pInput += totalNumSamples / 2;
+    pOutput += totalNumSamples / 2;
+    ASSERT_NO_FATAL_FAILURE(refEffect.process(pInput, pOutput));
+    ASSERT_NO_FATAL_FAILURE(refEffect.releaseEffect());
+
+    EffectTestHelper testEffect(&mUuid, mChMask, mChMask, mSampleRate, mFrameCount, mLoopCount);
+
+    ASSERT_NO_FATAL_FAILURE(testEffect.createEffect());
+    ASSERT_NO_FATAL_FAILURE(testEffect.setConfig());
+
+    if (EFFECT_BASS_BOOST == mEffectType) {
+        ASSERT_NO_FATAL_FAILURE(testEffect.setParam<int16_t>(key, value1));
+    } else {
+        ASSERT_NO_FATAL_FAILURE(testEffect.setParam<int32_t>(key, value1));
+    }
+
+    std::vector<float> testOutput(totalNumSamples);
+    pInput = input.data();
+    pOutput = testOutput.data();
+    ASSERT_NO_FATAL_FAILURE(testEffect.process(pInput, pOutput));
+
+    // Call setParam once to change the parameters, and then call setParam again
+    // to restore the parameters to the initial state, making the first setParam
+    // call redundant
+    if (EFFECT_BASS_BOOST == mEffectType) {
+        ASSERT_NO_FATAL_FAILURE(testEffect.setParam<int16_t>(key, value2));
+        ASSERT_NO_FATAL_FAILURE(testEffect.setParam<int16_t>(key, value1));
+    } else {
+        ASSERT_NO_FATAL_FAILURE(testEffect.setParam<int32_t>(key, value2));
+        ASSERT_NO_FATAL_FAILURE(testEffect.setParam<int32_t>(key, value1));
+    }
+
+    pInput += totalNumSamples / 2;
+    pOutput += totalNumSamples / 2;
+    ASSERT_NO_FATAL_FAILURE(testEffect.process(pInput, pOutput));
+    ASSERT_NO_FATAL_FAILURE(testEffect.releaseEffect());
+    ASSERT_TRUE(areNearlySame(refOutput.data(), testOutput.data(), totalNumSamples))
+            << "Outputs do not match with default setParam calls";
+}
+
+INSTANTIATE_TEST_SUITE_P(
+        EffectBundleTestAll, SingleEffectDefaultSetParamTest,
+        ::testing::Combine(::testing::Range(0, (int)EffectTestHelper::kNumChMasks),
+                           ::testing::Range(0, (int)EffectTestHelper::kNumFrameCounts),
                            ::testing::Range(0, (int)kNumEffectUuids)));
 
 int main(int argc, char** argv) {
