@@ -366,41 +366,51 @@ void AudioPolicyService::doOnRoutingUpdated()
 void AudioPolicyService::onCheckSpatializer()
 {
     Mutex::Autolock _l(mLock);
-    mOutputCommandThread->checkSpatializerCommand();
+    onCheckSpatializer_l();
+}
+
+void AudioPolicyService::onCheckSpatializer_l()
+{
+    if (mSpatializer != nullptr) {
+        mOutputCommandThread->checkSpatializerCommand();
+    }
 }
 
 void AudioPolicyService::doOnCheckSpatializer()
 {
-    sp<Spatializer> spatializer;
-    {
-        Mutex::Autolock _l(mLock);
-        spatializer = mSpatializer;
+    Mutex::Autolock _l(mLock);
 
-        if (spatializer != nullptr) {
-            audio_io_handle_t output = AUDIO_IO_HANDLE_NONE;
-            if (spatializer->getLevel() != media::SpatializationLevel::NONE
-                && spatializer->getOutput() == AUDIO_IO_HANDLE_NONE) {
-                const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
-                audio_config_base_t config = spatializer->getAudioInConfig();
-                status_t status =
-                        mAudioPolicyManager->getSpatializerOutput(&config, &attr, &output);
-                if (status != NO_ERROR || output == AUDIO_IO_HANDLE_NONE) {
-                    return;
-                }
-                mLock.unlock();
-                status = spatializer->attachOutput(output);
+    if (mSpatializer != nullptr) {
+        if (mSpatializer->getLevel() != media::SpatializationLevel::NONE) {
+            audio_io_handle_t currentOutput = mSpatializer->getOutput();
+            audio_io_handle_t newOutput;
+            const audio_attributes_t attr = attributes_initializer(AUDIO_USAGE_MEDIA);
+            audio_config_base_t config = mSpatializer->getAudioInConfig();
+            status_t status =
+                    mAudioPolicyManager->getSpatializerOutput(&config, &attr, &newOutput);
+
+            if (status == NO_ERROR && currentOutput == newOutput) {
+                return;
+            }
+            mLock.unlock();
+            // It is OK to call detachOutput() is none is already attached.
+            mSpatializer->detachOutput();
+            if (status != NO_ERROR || newOutput == AUDIO_IO_HANDLE_NONE) {
                 mLock.lock();
-                if (status != NO_ERROR) {
-                    mAudioPolicyManager->releaseSpatializerOutput(output);
-                }
-            } else if (spatializer->getLevel() == media::SpatializationLevel::NONE
-                                   && spatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
-                mLock.unlock();
-                output = spatializer->detachOutput();
-                mLock.lock();
-                if (output != AUDIO_IO_HANDLE_NONE) {
-                    mAudioPolicyManager->releaseSpatializerOutput(output);
-                }
+                return;
+            }
+            status = mSpatializer->attachOutput(newOutput);
+            mLock.lock();
+            if (status != NO_ERROR) {
+                mAudioPolicyManager->releaseSpatializerOutput(newOutput);
+            }
+        } else if (mSpatializer->getLevel() == media::SpatializationLevel::NONE
+                               && mSpatializer->getOutput() != AUDIO_IO_HANDLE_NONE) {
+            mLock.unlock();
+            audio_io_handle_t output = mSpatializer->detachOutput();
+            mLock.lock();
+            if (output != AUDIO_IO_HANDLE_NONE) {
+                mAudioPolicyManager->releaseSpatializerOutput(output);
             }
         }
     }

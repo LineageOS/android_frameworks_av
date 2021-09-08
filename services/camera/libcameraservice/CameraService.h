@@ -635,6 +635,12 @@ private:
         bool removeUnavailablePhysicalId(const String8& physicalId);
 
         /**
+         * Set and get client package name.
+         */
+        void setClientPackage(const String8& clientPackage);
+        String8 getClientPackage() const;
+
+        /**
          * Return the unavailable physical ids for this device.
          *
          * This method acquires mStatusLock.
@@ -646,6 +652,7 @@ private:
         const int mCost;
         std::set<String8> mConflicting;
         std::set<String8> mUnavailablePhysicalIds;
+        String8 mClientPackage;
         mutable Mutex mStatusLock;
         CameraParameters mShimParams;
         const SystemCameraKind mSystemCameraKind;
