@@ -57,6 +57,7 @@ using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioFormatDescription;
 using media::audio::common::AudioOffloadInfo;
+using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
 
@@ -1405,8 +1406,8 @@ status_t AudioSystem::isSourceActive(audio_source_t stream, bool* state) {
     if (aps == 0) return PERMISSION_DENIED;
     if (state == NULL) return BAD_VALUE;
 
-    media::AudioSourceType streamAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(stream));
+    AudioSource streamAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(stream));
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->isSourceActive(streamAidl, state)));
     return OK;
@@ -1724,7 +1725,7 @@ audio_mode_t AudioSystem::getPhoneState() {
     if (aps == 0) return AUDIO_MODE_INVALID;
 
     auto result = [&]() -> ConversionResult<audio_mode_t> {
-        media::AudioMode retAidl;
+        media::audio::common::AudioMode retAidl;
         RETURN_IF_ERROR(statusTFromBinderStatus(aps->getPhoneState(&retAidl)));
         return aidl2legacy_AudioMode_audio_mode_t(retAidl);
     }();
@@ -2178,8 +2179,8 @@ status_t AudioSystem::setDevicesRoleForCapturePreset(audio_source_t audioSource,
         return PERMISSION_DENIED;
     }
 
-    media::AudioSourceType audioSourceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(audioSource));
+    AudioSource audioSourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(audioSource));
     media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
     std::vector<media::AudioDevice> devicesAidl = VALUE_OR_RETURN_STATUS(
             convertContainer<std::vector<media::AudioDevice>>(devices,
@@ -2195,8 +2196,8 @@ status_t AudioSystem::addDevicesRoleForCapturePreset(audio_source_t audioSource,
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    media::AudioSourceType audioSourceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(audioSource));
+    AudioSource audioSourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(audioSource));
     media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
     std::vector<media::AudioDevice> devicesAidl = VALUE_OR_RETURN_STATUS(
             convertContainer<std::vector<media::AudioDevice>>(devices,
@@ -2211,8 +2212,8 @@ status_t AudioSystem::removeDevicesRoleForCapturePreset(
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    media::AudioSourceType audioSourceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(audioSource));
+    AudioSource audioSourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(audioSource));
     media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
     std::vector<media::AudioDevice> devicesAidl = VALUE_OR_RETURN_STATUS(
             convertContainer<std::vector<media::AudioDevice>>(devices,
@@ -2227,8 +2228,8 @@ status_t AudioSystem::clearDevicesRoleForCapturePreset(audio_source_t audioSourc
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    media::AudioSourceType audioSourceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(audioSource));
+    AudioSource audioSourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(audioSource));
     media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
     return statusTFromBinderStatus(
             aps->clearDevicesRoleForCapturePreset(audioSourceAidl, roleAidl));
@@ -2241,8 +2242,8 @@ status_t AudioSystem::getDevicesForRoleAndCapturePreset(audio_source_t audioSour
     if (aps == 0) {
         return PERMISSION_DENIED;
     }
-    media::AudioSourceType audioSourceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(audioSource));
+    AudioSource audioSourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(audioSource));
     media::DeviceRole roleAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_device_role_t_DeviceRole(role));
     std::vector<media::AudioDevice> devicesAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
@@ -2474,7 +2475,7 @@ Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
         const AudioConfigBase& deviceConfig,
         const std::vector<media::EffectDescriptor>& effects,
         int32_t patchHandle,
-        media::AudioSourceType source) {
+        AudioSource source) {
     record_config_callback cb = NULL;
     {
         Mutex::Autolock _l(AudioSystem::gLock);
@@ -2500,7 +2501,7 @@ Status AudioSystem::AudioPolicyServiceClient::onRecordingConfigurationUpdate(
         audio_patch_handle_t patchHandleLegacy = VALUE_OR_RETURN_BINDER_STATUS(
                 aidl2legacy_int32_t_audio_patch_handle_t(patchHandle));
         audio_source_t sourceLegacy = VALUE_OR_RETURN_BINDER_STATUS(
-                aidl2legacy_AudioSourceType_audio_source_t(source));
+                aidl2legacy_AudioSource_audio_source_t(source));
         cb(eventLegacy, &clientInfoLegacy, &clientConfigLegacy, clientEffectsLegacy,
            &deviceConfigLegacy, effectsLegacy, patchHandleLegacy, sourceLegacy);
     }
@@ -2544,7 +2545,7 @@ aidl2legacy_RecordClientInfo_record_client_info_t(const media::RecordClientInfo&
     legacy.riid = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_unique_id_t(aidl.riid));
     legacy.uid = VALUE_OR_RETURN(aidl2legacy_int32_t_uid_t(aidl.uid));
     legacy.session = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_session_t(aidl.session));
-    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSourceType_audio_source_t(aidl.source));
+    legacy.source = VALUE_OR_RETURN(aidl2legacy_AudioSource_audio_source_t(aidl.source));
     legacy.port_id = VALUE_OR_RETURN(aidl2legacy_int32_t_audio_port_handle_t(aidl.portId));
     legacy.silenced = aidl.silenced;
     return legacy;
@@ -2556,7 +2557,7 @@ legacy2aidl_record_client_info_t_RecordClientInfo(const record_client_info_t& le
     aidl.riid = VALUE_OR_RETURN(legacy2aidl_audio_unique_id_t_int32_t(legacy.riid));
     aidl.uid = VALUE_OR_RETURN(legacy2aidl_uid_t_int32_t(legacy.uid));
     aidl.session = VALUE_OR_RETURN(legacy2aidl_audio_session_t_int32_t(legacy.session));
-    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSourceType(legacy.source));
+    aidl.source = VALUE_OR_RETURN(legacy2aidl_audio_source_t_AudioSource(legacy.source));
     aidl.portId = VALUE_OR_RETURN(legacy2aidl_audio_port_handle_t_int32_t(legacy.port_id));
     aidl.silenced = legacy.silenced;
     return aidl;

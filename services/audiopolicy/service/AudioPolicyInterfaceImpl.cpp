@@ -47,9 +47,12 @@ using content::AttributionSourceState;
 using media::audio::common::AudioConfig;
 using media::audio::common::AudioConfigBase;
 using media::audio::common::AudioFormatDescription;
+using media::audio::common::AudioMode;
 using media::audio::common::AudioOffloadInfo;
+using media::audio::common::AudioSource;
 using media::audio::common::AudioStreamType;
 using media::audio::common::AudioUsage;
+using media::audio::common::AudioUuid;
 
 const std::vector<audio_usage_t>& SYSTEM_USAGES = {
     AUDIO_USAGE_CALL_ASSISTANT,
@@ -183,7 +186,7 @@ Status AudioPolicyService::handleDeviceConfigChange(
     return binderStatusFromStatusT(status);
 }
 
-Status AudioPolicyService::setPhoneState(media::AudioMode stateAidl, int32_t uidAidl)
+Status AudioPolicyService::setPhoneState(AudioMode stateAidl, int32_t uidAidl)
 {
     audio_mode_t state = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioMode_audio_mode_t(stateAidl));
@@ -215,7 +218,7 @@ Status AudioPolicyService::setPhoneState(media::AudioMode stateAidl, int32_t uid
     return Status::ok();
 }
 
-Status AudioPolicyService::getPhoneState(media::AudioMode* _aidl_return) {
+Status AudioPolicyService::getPhoneState(AudioMode* _aidl_return) {
     Mutex::Autolock _l(mLock);
     *_aidl_return = VALUE_OR_RETURN_BINDER_STATUS(legacy2aidl_audio_mode_t_AudioMode(mPhoneState));
     return Status::ok();
@@ -1256,9 +1259,9 @@ Status AudioPolicyService::isStreamActiveRemotely(AudioStreamType streamAidl,
     return Status::ok();
 }
 
-Status AudioPolicyService::isSourceActive(media::AudioSourceType sourceAidl, bool* _aidl_return) {
+Status AudioPolicyService::isSourceActive(AudioSource sourceAidl, bool* _aidl_return) {
     audio_source_t source = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(sourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(sourceAidl));
     if (mAudioPolicyManager == NULL) {
         return binderStatusFromStatusT(NO_INIT);
     }
@@ -1310,11 +1313,11 @@ Status AudioPolicyService::queryDefaultPreProcessing(
     return Status::ok();
 }
 
-Status AudioPolicyService::addSourceDefaultEffect(const media::AudioUuid& typeAidl,
+Status AudioPolicyService::addSourceDefaultEffect(const AudioUuid& typeAidl,
                                                   const std::string& opPackageNameAidl,
-                                                  const media::AudioUuid& uuidAidl,
+                                                  const AudioUuid& uuidAidl,
                                                   int32_t priority,
-                                                  media::AudioSourceType sourceAidl,
+                                                  AudioSource sourceAidl,
                                                   int32_t* _aidl_return) {
     effect_uuid_t type = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioUuid_audio_uuid_t(typeAidl));
@@ -1323,7 +1326,7 @@ Status AudioPolicyService::addSourceDefaultEffect(const media::AudioUuid& typeAi
     effect_uuid_t uuid = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_AudioUuid_audio_uuid_t(uuidAidl));
     audio_source_t source = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(sourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(sourceAidl));
     audio_unique_id_t id;
 
     sp<AudioPolicyEffects>audioPolicyEffects;
@@ -1337,9 +1340,9 @@ Status AudioPolicyService::addSourceDefaultEffect(const media::AudioUuid& typeAi
     return Status::ok();
 }
 
-Status AudioPolicyService::addStreamDefaultEffect(const media::AudioUuid& typeAidl,
+Status AudioPolicyService::addStreamDefaultEffect(const AudioUuid& typeAidl,
                                                   const std::string& opPackageNameAidl,
-                                                  const media::AudioUuid& uuidAidl,
+                                                  const AudioUuid& uuidAidl,
                                                   int32_t priority, AudioUsage usageAidl,
                                                   int32_t* _aidl_return) {
     effect_uuid_t type = VALUE_OR_RETURN_BINDER_STATUS(
@@ -2138,11 +2141,11 @@ Status AudioPolicyService::registerSoundTriggerCaptureStateListener(
 }
 
 Status AudioPolicyService::setDevicesRoleForCapturePreset(
-        media::AudioSourceType audioSourceAidl,
+        AudioSource audioSourceAidl,
         media::DeviceRole roleAidl,
         const std::vector<media::AudioDevice>& devicesAidl) {
     audio_source_t audioSource = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(audioSourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(audioSourceAidl));
     device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_DeviceRole_device_role_t(roleAidl));
     AudioDeviceTypeAddrVector devices = VALUE_OR_RETURN_BINDER_STATUS(
@@ -2158,11 +2161,11 @@ Status AudioPolicyService::setDevicesRoleForCapturePreset(
 }
 
 Status AudioPolicyService::addDevicesRoleForCapturePreset(
-        media::AudioSourceType audioSourceAidl,
+        AudioSource audioSourceAidl,
         media::DeviceRole roleAidl,
         const std::vector<media::AudioDevice>& devicesAidl) {
     audio_source_t audioSource = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(audioSourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(audioSourceAidl));
     device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_DeviceRole_device_role_t(roleAidl));
     AudioDeviceTypeAddrVector devices = VALUE_OR_RETURN_BINDER_STATUS(
@@ -2178,11 +2181,11 @@ Status AudioPolicyService::addDevicesRoleForCapturePreset(
 }
 
 Status AudioPolicyService::removeDevicesRoleForCapturePreset(
-        media::AudioSourceType audioSourceAidl,
+        AudioSource audioSourceAidl,
         media::DeviceRole roleAidl,
         const std::vector<media::AudioDevice>& devicesAidl) {
     audio_source_t audioSource = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(audioSourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(audioSourceAidl));
     device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_DeviceRole_device_role_t(roleAidl));
     AudioDeviceTypeAddrVector devices = VALUE_OR_RETURN_BINDER_STATUS(
@@ -2197,10 +2200,10 @@ Status AudioPolicyService::removeDevicesRoleForCapturePreset(
             mAudioPolicyManager->removeDevicesRoleForCapturePreset(audioSource, role, devices));
 }
 
-Status AudioPolicyService::clearDevicesRoleForCapturePreset(media::AudioSourceType audioSourceAidl,
+Status AudioPolicyService::clearDevicesRoleForCapturePreset(AudioSource audioSourceAidl,
                                                             media::DeviceRole roleAidl) {
     audio_source_t audioSource = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(audioSourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(audioSourceAidl));
     device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_DeviceRole_device_role_t(roleAidl));
 
@@ -2213,11 +2216,11 @@ Status AudioPolicyService::clearDevicesRoleForCapturePreset(media::AudioSourceTy
 }
 
 Status AudioPolicyService::getDevicesForRoleAndCapturePreset(
-        media::AudioSourceType audioSourceAidl,
+        AudioSource audioSourceAidl,
         media::DeviceRole roleAidl,
         std::vector<media::AudioDevice>* _aidl_return) {
     audio_source_t audioSource = VALUE_OR_RETURN_BINDER_STATUS(
-            aidl2legacy_AudioSourceType_audio_source_t(audioSourceAidl));
+            aidl2legacy_AudioSource_audio_source_t(audioSourceAidl));
     device_role_t role = VALUE_OR_RETURN_BINDER_STATUS(
             aidl2legacy_DeviceRole_device_role_t(roleAidl));
     AudioDeviceTypeAddrVector devices;
