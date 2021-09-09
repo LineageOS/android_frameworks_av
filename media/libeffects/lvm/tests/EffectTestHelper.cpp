@@ -50,23 +50,6 @@ void EffectTestHelper::setConfig() {
     ASSERT_EQ(reply, 0) << "cmd_enable reply non zero " << reply;
 }
 
-void EffectTestHelper::setParam(uint32_t type, uint32_t value) {
-    int reply = 0;
-    uint32_t replySize = sizeof(reply);
-    uint32_t paramData[2] = {type, value};
-    auto effectParam = new effect_param_t[sizeof(effect_param_t) + sizeof(paramData)];
-    memcpy(&effectParam->data[0], &paramData[0], sizeof(paramData));
-    effectParam->psize = sizeof(paramData[0]);
-    effectParam->vsize = sizeof(paramData[1]);
-    int status = (*mEffectHandle)
-                         ->command(mEffectHandle, EFFECT_CMD_SET_PARAM,
-                                   sizeof(effect_param_t) + sizeof(paramData), effectParam,
-                                   &replySize, &reply);
-    delete[] effectParam;
-    ASSERT_EQ(status, 0) << "set_param returned an error " << status;
-    ASSERT_EQ(reply, 0) << "set_param reply non zero " << reply;
-}
-
 void EffectTestHelper::process(float* input, float* output) {
     audio_buffer_t inBuffer = {.frameCount = mFrameCount, .f32 = input};
     audio_buffer_t outBuffer = {.frameCount = mFrameCount, .f32 = output};
