@@ -61,31 +61,33 @@ static constexpr size_t kFrameCount = 1000;
 
 /*
 Pixel 4XL
+$ adb shell /data/benchmarktest/downmix_benchmark/vendor/downmix_benchmark
+
 --------------------------------------------------------
 Benchmark              Time             CPU   Iterations
 --------------------------------------------------------
-BM_Downmix/0        2845 ns         2839 ns       246585 AUDIO_CHANNEL_OUT_MONO
-BM_Downmix/1        2844 ns         2838 ns       246599
-BM_Downmix/2        3727 ns         3719 ns       188227 AUDIO_CHANNEL_OUT_STEREO
-BM_Downmix/3        4609 ns         4600 ns       152148 AUDIO_CHANNEL_OUT_2POINT1
-BM_Downmix/4        3727 ns         3719 ns       188228 AUDIO_CHANNEL_OUT_2POINT0POINT2
-BM_Downmix/5        1787 ns         1784 ns       392384 AUDIO_CHANNEL_OUT_QUAD
-BM_Downmix/6        1787 ns         1783 ns       392527 AUDIO_CHANNEL_OUT_QUAD_SIDE
-BM_Downmix/7        5493 ns         5481 ns       127740 AUDIO_CHANNEL_OUT_SURROUND
-BM_Downmix/8        4610 ns         4600 ns       152168 AUDIO_CHANNEL_OUT_2POINT1POINT2
-BM_Downmix/9        4610 ns         4600 ns       152162 AUDIO_CHANNEL_OUT_3POINT0POINT2
-BM_Downmix/10       6377 ns         6362 ns       110042 AUDIO_CHANNEL_OUT_PENTA
-BM_Downmix/11       5493 ns         5481 ns       127683 AUDIO_CHANNEL_OUT_3POINT1POINT2
-BM_Downmix/12       2758 ns         2752 ns       251488 AUDIO_CHANNEL_OUT_5POINT1
-BM_Downmix/13       2683 ns         2677 ns       261421 AUDIO_CHANNEL_OUT_5POINT1_SIDE
-BM_Downmix/14       8141 ns         8124 ns        86157 AUDIO_CHANNEL_OUT_6POINT1
-BM_Downmix/15       7265 ns         7249 ns        96554 AUDIO_CHANNEL_OUT_5POINT1POINT2
-BM_Downmix/16       3158 ns         3151 ns       222188 AUDIO_CHANNEL_OUT_7POINT1
-BM_Downmix/17       7291 ns         7276 ns        96226 AUDIO_CHANNEL_OUT_5POINT1POINT4
-BM_Downmix/18       9050 ns         9031 ns        77512 AUDIO_CHANNEL_OUT_7POINT1POINT2
-BM_Downmix/19       9056 ns         9036 ns        77467 AUDIO_CHANNEL_OUT_7POINT1POINT4
-BM_Downmix/20       6426 ns         6412 ns       109164 AUDIO_CHANNEL_OUT_13POINT_360RA
-BM_Downmix/21      11743 ns        11716 ns        59762 AUDIO_CHANNEL_OUT_22POINT2
+BM_Downmix/0        3638 ns         3624 ns       197517 AUDIO_CHANNEL_OUT_MONO
+BM_Downmix/1        4040 ns         4024 ns       178766
+BM_Downmix/2        4759 ns         4740 ns       134741 AUDIO_CHANNEL_OUT_STEREO
+BM_Downmix/3        6042 ns         6017 ns       129546 AUDIO_CHANNEL_OUT_2POINT1
+BM_Downmix/4        6897 ns         6868 ns        96316 AUDIO_CHANNEL_OUT_2POINT0POINT2
+BM_Downmix/5        2117 ns         2109 ns       331705 AUDIO_CHANNEL_OUT_QUAD
+BM_Downmix/6        2097 ns         2088 ns       335421 AUDIO_CHANNEL_OUT_QUAD_SIDE
+BM_Downmix/7        7291 ns         7263 ns        96256 AUDIO_CHANNEL_OUT_SURROUND
+BM_Downmix/8        8246 ns         8206 ns        84318 AUDIO_CHANNEL_OUT_2POINT1POINT2
+BM_Downmix/9        8341 ns         8303 ns        84298 AUDIO_CHANNEL_OUT_3POINT0POINT2
+BM_Downmix/10       7549 ns         7517 ns        84293 AUDIO_CHANNEL_OUT_PENTA
+BM_Downmix/11       9395 ns         9354 ns        75209 AUDIO_CHANNEL_OUT_3POINT1POINT2
+BM_Downmix/12       3267 ns         3253 ns       215596 AUDIO_CHANNEL_OUT_5POINT1
+BM_Downmix/13       3178 ns         3163 ns       220132 AUDIO_CHANNEL_OUT_5POINT1_SIDE
+BM_Downmix/14      10245 ns        10199 ns        67486 AUDIO_CHANNEL_OUT_6POINT1
+BM_Downmix/15      10975 ns        10929 ns        61359 AUDIO_CHANNEL_OUT_5POINT1POINT2
+BM_Downmix/16       3796 ns         3780 ns       184728 AUDIO_CHANNEL_OUT_7POINT1
+BM_Downmix/17      13562 ns        13503 ns        51823 AUDIO_CHANNEL_OUT_5POINT1POINT4
+BM_Downmix/18      13573 ns        13516 ns        51800 AUDIO_CHANNEL_OUT_7POINT1POINT2
+BM_Downmix/19      15502 ns        15435 ns        47147 AUDIO_CHANNEL_OUT_7POINT1POINT4
+BM_Downmix/20      16693 ns        16624 ns        42109 AUDIO_CHANNEL_OUT_13POINT_360RA
+BM_Downmix/21      28267 ns        28116 ns        24982 AUDIO_CHANNEL_OUT_22POINT2
 */
 
 static void BM_Downmix(benchmark::State& state) {
