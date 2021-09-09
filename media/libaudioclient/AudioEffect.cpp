@@ -42,6 +42,8 @@ namespace android {
 using aidl_utils::statusTFromBinderStatus;
 using binder::Status;
 using media::IAudioPolicyService;
+using media::audio::common::AudioSource;
+using media::audio::common::AudioUuid;
 
 namespace {
 
@@ -619,12 +621,12 @@ status_t AudioEffect::addSourceDefaultEffect(const char *typeStr,
         uuid = *EFFECT_UUID_NULL;
     }
 
-    media::AudioUuid typeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(type));
-    media::AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
+    AudioUuid typeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(type));
+    AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
     std::string opPackageNameAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_String16_string(opPackageName));
-    media::AudioSourceType sourceAidl = VALUE_OR_RETURN_STATUS(
-            legacy2aidl_audio_source_t_AudioSourceType(source));
+    AudioSource sourceAidl = VALUE_OR_RETURN_STATUS(
+            legacy2aidl_audio_source_t_AudioSource(source));
     int32_t retAidl;
     RETURN_STATUS_IF_ERROR(statusTFromBinderStatus(
             aps->addSourceDefaultEffect(typeAidl, opPackageNameAidl, uuidAidl, priority, sourceAidl,
@@ -662,8 +664,8 @@ status_t AudioEffect::addStreamDefaultEffect(const char *typeStr,
         uuid = *EFFECT_UUID_NULL;
     }
 
-    media::AudioUuid typeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(type));
-    media::AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
+    AudioUuid typeAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(type));
+    AudioUuid uuidAidl = VALUE_OR_RETURN_STATUS(legacy2aidl_audio_uuid_t_AudioUuid(uuid));
     std::string opPackageNameAidl = VALUE_OR_RETURN_STATUS(
             legacy2aidl_String16_string(opPackageName));
     media::audio::common::AudioUsage usageAidl = VALUE_OR_RETURN_STATUS(

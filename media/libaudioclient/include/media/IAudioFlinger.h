@@ -586,7 +586,7 @@ public:
     Status streamVolume(media::audio::common::AudioStreamType stream,
                         int32_t output, float* _aidl_return) override;
     Status streamMute(media::audio::common::AudioStreamType stream, bool* _aidl_return) override;
-    Status setMode(media::AudioMode mode) override;
+    Status setMode(media::audio::common::AudioMode mode) override;
     Status setMicMute(bool state) override;
     Status getMicMute(bool* _aidl_return) override;
     Status setRecordSilenced(int32_t portId, bool silenced) override;
@@ -616,7 +616,8 @@ public:
     Status releaseAudioSessionId(int32_t audioSession, int32_t pid) override;
     Status queryNumberEffects(int32_t* _aidl_return) override;
     Status queryEffect(int32_t index, media::EffectDescriptor* _aidl_return) override;
-    Status getEffectDescriptor(const media::AudioUuid& effectUUID, const media::AudioUuid& typeUUID,
+    Status getEffectDescriptor(const media::audio::common::AudioUuid& effectUUID,
+                               const media::audio::common::AudioUuid& typeUUID,
                                int32_t preferredTypeFlag,
                                media::EffectDescriptor* _aidl_return) override;
     Status createEffect(const media::CreateEffectRequest& request,

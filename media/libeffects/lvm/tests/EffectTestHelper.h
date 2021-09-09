@@ -50,6 +50,23 @@ static float computeSnr(const T* ref, const T* tst, size_t count) {
     return snr;
 }
 
+template <typename T>
+static float areNearlySame(const T* ref, const T* tst, size_t count) {
+    T delta;
+    if constexpr (std::is_floating_point_v<T>) {
+        delta = std::numeric_limits<T>::epsilon();
+    } else {
+        delta = 1;
+    }
+    for (size_t i = 0; i < count; ++i) {
+        const double diff(tst[i] - ref[i]);
+        if (abs(diff) > delta) {
+            return false;
+        }
+    }
+    return true;
+}
+
 class EffectTestHelper {
   public:
     EffectTestHelper(const effect_uuid_t* uuid, size_t inChMask, size_t outChMask,
@@ -65,7 +82,25 @@ class EffectTestHelper {
     void createEffect();
     void releaseEffect();
     void setConfig();
-    void setParam(uint32_t type, uint32_t val);
+    template <typename VALUE_DTYPE>
+    void setParam(uint32_t type, VALUE_DTYPE const value) {
+        int reply = 0;
+        uint32_t replySize = sizeof(reply);
+
+        uint8_t paramData[sizeof(effect_param_t) + sizeof(type) + sizeof(value)];
+        auto effectParam = (effect_param_t*)paramData;
+
+        memcpy(&effectParam->data[0], &type, sizeof(type));
+        memcpy(&effectParam->data[sizeof(type)], &value, sizeof(value));
+        effectParam->psize = sizeof(type);
+        effectParam->vsize = sizeof(value);
+        int status = (*mEffectHandle)
+                             ->command(mEffectHandle, EFFECT_CMD_SET_PARAM,
+                                       sizeof(effect_param_t) + sizeof(type) + sizeof(value),
+                                       effectParam, &replySize, &reply);
+        ASSERT_EQ(status, 0) << "set_param returned an error " << status;
+        ASSERT_EQ(reply, 0) << "set_param reply non zero " << reply;
+    };
     void process(float* input, float* output);
 
     // Corresponds to SNR for 1 bit difference between two int16_t signals
