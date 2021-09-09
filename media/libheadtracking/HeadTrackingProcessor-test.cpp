@@ -53,10 +53,10 @@ TEST(HeadTrackingProcessor, BasicComposition) {
     processor->setWorldToHeadPose(0, Pose3f(), Twist3f());
     processor->setWorldToScreenPose(0, Pose3f());
 
+    processor->setDisplayOrientation(physicalToLogical);
     processor->setWorldToHeadPose(0, worldToHead, Twist3f());
     processor->setWorldToScreenPose(0, worldToScreen);
     processor->setScreenToStagePose(screenToStage);
-    processor->setDisplayOrientation(physicalToLogical);
     processor->calculate(0);
     ASSERT_EQ(processor->getActualMode(), HeadTrackingMode::SCREEN_RELATIVE);
     EXPECT_EQ(processor->getHeadToStagePose(), worldToHead.inverse() * worldToScreen *
