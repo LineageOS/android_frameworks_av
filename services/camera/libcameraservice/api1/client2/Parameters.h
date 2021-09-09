@@ -205,7 +205,7 @@ struct Parameters {
     static const int MAX_INITIAL_PREVIEW_WIDTH = 1920;
     static const int MAX_INITIAL_PREVIEW_HEIGHT = 1080;
     // Aspect ratio tolerance
-    static const CONSTEXPR float ASPECT_RATIO_TOLERANCE = 0.001;
+    static const CONSTEXPR float ASPECT_RATIO_TOLERANCE = 0.01;
     // Threshold for slow jpeg mode
     static const int64_t kSlowJpegModeThreshold = 33400000LL; // 33.4 ms
     // Margin for checking FPS
