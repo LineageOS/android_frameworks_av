@@ -89,9 +89,9 @@ class HeadTrackingProcessor {
     virtual HeadTrackingMode getActualMode() const = 0;
 
     /**
-     * This causes the current poses for both the head and screen to be considered "center".
+     * This causes the current poses for both the head and/or screen to be considered "center".
      */
-    virtual void recenter() = 0;
+    virtual void recenter(bool recenterHead = true, bool recenterScreen = true) = 0;
 };
 
 /**

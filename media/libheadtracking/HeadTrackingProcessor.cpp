@@ -57,7 +57,14 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     }
 
     void setWorldToScreenPose(int64_t timestamp, const Pose3f& worldToScreen) override {
-        mScreenPoseDriftCompensator.setInput(timestamp, worldToScreen);
+        if (mPhysicalToLogicalAngle != mPendingPhysicalToLogicalAngle) {
+            // We're introducing an artificial discontinuity. Enable the rate limiter.
+            mRateLimiter.enable();
+            mPhysicalToLogicalAngle = mPendingPhysicalToLogicalAngle;
+        }
+
+        mScreenPoseDriftCompensator.setInput(
+                timestamp, worldToScreen * Pose3f(rotateY(-mPhysicalToLogicalAngle)));
         mWorldToScreenTimestamp = timestamp;
     }
 
@@ -66,10 +73,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
     }
 
     void setDisplayOrientation(float physicalToLogicalAngle) override {
-        if (mPhysicalToLogicalAngle != physicalToLogicalAngle) {
-            mRateLimiter.enable();
-        }
-        mPhysicalToLogicalAngle = physicalToLogicalAngle;
+        mPendingPhysicalToLogicalAngle = physicalToLogicalAngle;
     }
 
     void calculate(int64_t timestamp) override {
@@ -80,8 +84,7 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
         }
 
         if (mWorldToScreenTimestamp.has_value()) {
-            const Pose3f worldToLogicalScreen = mScreenPoseDriftCompensator.getOutput() *
-                                                Pose3f(rotateY(-mPhysicalToLogicalAngle));
+            const Pose3f worldToLogicalScreen = mScreenPoseDriftCompensator.getOutput();
             mScreenHeadFusion.setWorldToScreenPose(mWorldToScreenTimestamp.value(),
                                                    worldToLogicalScreen);
         }
@@ -108,15 +111,30 @@ class HeadTrackingProcessorImpl : public HeadTrackingProcessor {
 
     HeadTrackingMode getActualMode() const override { return mModeSelector.getActualMode(); }
 
-    void recenter() override {
-        mHeadPoseDriftCompensator.recenter();
-        mScreenPoseDriftCompensator.recenter();
-        mRateLimiter.enable();
+    void recenter(bool recenterHead, bool recenterScreen) override {
+        if (recenterHead) {
+            mHeadPoseDriftCompensator.recenter();
+        }
+        if (recenterScreen) {
+            mScreenPoseDriftCompensator.recenter();
+        }
+
+        // If a sensor being recentered is included in the current mode, apply rate limiting to
+        // avoid discontinuities.
+        HeadTrackingMode mode = mModeSelector.getActualMode();
+        if ((recenterHead && (mode == HeadTrackingMode::WORLD_RELATIVE ||
+                              mode == HeadTrackingMode::SCREEN_RELATIVE)) ||
+            (recenterScreen && mode == HeadTrackingMode::SCREEN_RELATIVE)) {
+            mRateLimiter.enable();
+        }
     }
 
   private:
     const Options mOptions;
     float mPhysicalToLogicalAngle = 0;
+    // We store the physical to logical angle as "pending" until the next world-to-screen sample it
+    // applies to arrives.
+    float mPendingPhysicalToLogicalAngle = 0;
     std::optional<int64_t> mWorldToHeadTimestamp;
     std::optional<int64_t> mWorldToScreenTimestamp;
     Pose3f mHeadToStagePose;
