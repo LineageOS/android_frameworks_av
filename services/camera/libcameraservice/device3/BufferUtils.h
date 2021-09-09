@@ -104,7 +104,7 @@ namespace camera3 {
 
         // Return the removed buffer ID if input cache is found.
         // Otherwise return BUFFER_ID_NO_BUFFER
-        uint64_t removeOneBufferCache(int streamId, const native_handle_t* handle);
+        uint64_t removeOneBufferCache(int streamId, const native_handle_t* handle) override;
 
         // Clear all caches for input stream, but do not remove the stream
         // Removed buffers' ID are returned
