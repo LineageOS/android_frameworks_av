@@ -4132,6 +4132,11 @@ std::pair<bool, uint64_t> Camera3Device::HalInterface::getBufferId(
     return mBufferRecords.getBufferId(buf, streamId);
 }
 
+uint64_t Camera3Device::HalInterface::removeOneBufferCache(int streamId,
+        const native_handle_t* handle) {
+    return mBufferRecords.removeOneBufferCache(streamId, handle);
+}
+
 void Camera3Device::HalInterface::onBufferFreed(
         int streamId, const native_handle_t* handle) {
     uint32_t bufferId = mBufferRecords.removeOneBufferCache(streamId, handle);
