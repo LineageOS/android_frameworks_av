@@ -137,7 +137,6 @@ cc_library {
         "libprocessgroup",
         "libshmemcompat",
         "libutils",
-        "libvibrator",
         "framework-permission-aidl-cpp",
     ],
     export_shared_lib_headers: [
