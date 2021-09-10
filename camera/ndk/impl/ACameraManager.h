@@ -139,6 +139,8 @@ class CameraManagerGlobal final : public RefBase {
             return !(*this == other);
         }
         bool operator < (const Callback& other) const {
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wordered-compare-function-pointers"
             if (*this == other) return false;
             if (mContext != other.mContext) return mContext < other.mContext;
             if (mPhysicalCamAvailable != other.mPhysicalCamAvailable) {
@@ -152,6 +154,7 @@ class CameraManagerGlobal final : public RefBase {
             }
             if (mAvailable != other.mAvailable) return mAvailable < other.mAvailable;
             return mUnavailable < other.mUnavailable;
+#pragma GCC diagnostic pop
         }
         bool operator > (const Callback& other) const {
             return (*this != other && !(*this < other));
