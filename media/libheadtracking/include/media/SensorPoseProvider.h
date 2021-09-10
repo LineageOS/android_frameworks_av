@@ -77,11 +77,13 @@ class SensorPoseProvider {
 
     /**
      * Start receiving pose updates from a given sensor.
+     * Attempting to start a sensor that has already been started results in undefined behavior.
      * @param sensor The sensor to subscribe to.
      * @param samplingPeriod Sampling interval, in microseconds. Actual rate might be slightly
      * different.
-     * @return A handle, which can be later used for stopSensor(). INVALID_HANDLE would be returned
-     * in case of error.
+     * @return The sensor handle, which can be later used for stopSensor(). INVALID_HANDLE would be
+     * returned in case of error. This is guaranteed to be the same handle as the one returned by
+     * ASensor_getHandle(sensor).
      */
     virtual int32_t startSensor(const ASensor* sensor,
                                 std::chrono::microseconds samplingPeriod) = 0;
