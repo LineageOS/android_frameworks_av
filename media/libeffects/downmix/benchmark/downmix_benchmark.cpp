@@ -64,28 +64,28 @@ Pixel 4XL
 --------------------------------------------------------
 Benchmark              Time             CPU   Iterations
 --------------------------------------------------------
-BM_Downmix/0        3553 ns         3545 ns       197503 AUDIO_CHANNEL_OUT_MONO
-BM_Downmix/1        2846 ns         2840 ns       202849
-BM_Downmix/2        4436 ns         4426 ns       158176 AUDIO_CHANNEL_OUT_STEREO
-BM_Downmix/3        5320 ns         5307 ns       131870 AUDIO_CHANNEL_OUT_2POINT1
-BM_Downmix/4        4437 ns         4426 ns       159523 AUDIO_CHANNEL_OUT_2POINT0POINT2
-BM_Downmix/5        2493 ns         2487 ns       281496 AUDIO_CHANNEL_OUT_QUAD
-BM_Downmix/6        2493 ns         2487 ns       281456 AUDIO_CHANNEL_OUT_QUAD_SIDE
-BM_Downmix/7        6204 ns         6188 ns       115044 AUDIO_CHANNEL_OUT_SURROUND
-BM_Downmix/8        5320 ns         5307 ns       100000 AUDIO_CHANNEL_OUT_2POINT1POINT2
-BM_Downmix/9        5320 ns         5307 ns       100000 AUDIO_CHANNEL_OUT_3POINT0POINT2
-BM_Downmix/10       7088 ns         7071 ns       108264 AUDIO_CHANNEL_OUT_PENTA
-BM_Downmix/11       6203 ns         6188 ns       117021 AUDIO_CHANNEL_OUT_3POINT1POINT2
-BM_Downmix/12       3105 ns         3097 ns       226182 AUDIO_CHANNEL_OUT_5POINT1
-BM_Downmix/13       3112 ns         3105 ns       225488 AUDIO_CHANNEL_OUT_5POINT1_SIDE
-BM_Downmix/14       8855 ns         8831 ns        79265 AUDIO_CHANNEL_OUT_6POINT1
-BM_Downmix/15       7971 ns         7951 ns        90918 AUDIO_CHANNEL_OUT_5POINT1POINT2
-BM_Downmix/16       3547 ns         3539 ns       197780 AUDIO_CHANNEL_OUT_7POINT1
-BM_Downmix/17       7972 ns         7953 ns        90101 AUDIO_CHANNEL_OUT_5POINT1POINT4
-BM_Downmix/18       9737 ns         9714 ns        72773 AUDIO_CHANNEL_OUT_7POINT1POINT2
-BM_Downmix/19       9745 ns         9721 ns        72015 AUDIO_CHANNEL_OUT_7POINT1POINT4
-BM_Downmix/20       7070 ns         7053 ns       109476 AUDIO_CHANNEL_OUT_13POINT_360RA
-BM_Downmix/21      12413 ns        12381 ns        57455 AUDIO_CHANNEL_OUT_22POINT2
+BM_Downmix/0        2845 ns         2839 ns       246585 AUDIO_CHANNEL_OUT_MONO
+BM_Downmix/1        2844 ns         2838 ns       246599
+BM_Downmix/2        3727 ns         3719 ns       188227 AUDIO_CHANNEL_OUT_STEREO
+BM_Downmix/3        4609 ns         4600 ns       152148 AUDIO_CHANNEL_OUT_2POINT1
+BM_Downmix/4        3727 ns         3719 ns       188228 AUDIO_CHANNEL_OUT_2POINT0POINT2
+BM_Downmix/5        1787 ns         1784 ns       392384 AUDIO_CHANNEL_OUT_QUAD
+BM_Downmix/6        1787 ns         1783 ns       392527 AUDIO_CHANNEL_OUT_QUAD_SIDE
+BM_Downmix/7        5493 ns         5481 ns       127740 AUDIO_CHANNEL_OUT_SURROUND
+BM_Downmix/8        4610 ns         4600 ns       152168 AUDIO_CHANNEL_OUT_2POINT1POINT2
+BM_Downmix/9        4610 ns         4600 ns       152162 AUDIO_CHANNEL_OUT_3POINT0POINT2
+BM_Downmix/10       6377 ns         6362 ns       110042 AUDIO_CHANNEL_OUT_PENTA
+BM_Downmix/11       5493 ns         5481 ns       127683 AUDIO_CHANNEL_OUT_3POINT1POINT2
+BM_Downmix/12       2758 ns         2752 ns       251488 AUDIO_CHANNEL_OUT_5POINT1
+BM_Downmix/13       2683 ns         2677 ns       261421 AUDIO_CHANNEL_OUT_5POINT1_SIDE
+BM_Downmix/14       8141 ns         8124 ns        86157 AUDIO_CHANNEL_OUT_6POINT1
+BM_Downmix/15       7265 ns         7249 ns        96554 AUDIO_CHANNEL_OUT_5POINT1POINT2
+BM_Downmix/16       3158 ns         3151 ns       222188 AUDIO_CHANNEL_OUT_7POINT1
+BM_Downmix/17       7291 ns         7276 ns        96226 AUDIO_CHANNEL_OUT_5POINT1POINT4
+BM_Downmix/18       9050 ns         9031 ns        77512 AUDIO_CHANNEL_OUT_7POINT1POINT2
+BM_Downmix/19       9056 ns         9036 ns        77467 AUDIO_CHANNEL_OUT_7POINT1POINT4
+BM_Downmix/20       6426 ns         6412 ns       109164 AUDIO_CHANNEL_OUT_13POINT_360RA
+BM_Downmix/21      11743 ns        11716 ns        59762 AUDIO_CHANNEL_OUT_22POINT2
 */
 
 static void BM_Downmix(benchmark::State& state) {

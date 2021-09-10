@@ -6477,6 +6477,7 @@ media_status_t MPEG4Source::read(
         } else {
           // We are trying to read a sample larger than the expected max sample size.
           // Fall through and let the failure be handled by the following if.
+          android_errorWriteLog(0x534e4554, "188893559");
         }
 
         if (num_bytes_read < (ssize_t)size) {
