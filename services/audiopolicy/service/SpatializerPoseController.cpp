@@ -117,26 +117,46 @@ SpatializerPoseController::~SpatializerPoseController() {
 
 void SpatializerPoseController::setHeadSensor(const ASensor* sensor) {
     std::lock_guard lock(mMutex);
-    // Stop current sensor, if valid.
-    if (mHeadSensor != SensorPoseProvider::INVALID_HANDLE) {
+    // Stop current sensor, if valid and different from the other sensor.
+    if (mHeadSensor != SensorPoseProvider::INVALID_HANDLE && mHeadSensor != mScreenSensor) {
         mPoseProvider->stopSensor(mHeadSensor);
     }
-    // Start new sensor, if valid.
-    mHeadSensor = sensor != nullptr ? mPoseProvider->startSensor(sensor, mSensorPeriod)
-                                    : SensorPoseProvider::INVALID_HANDLE;
-    mProcessor->recenter();
+
+    if (sensor != nullptr) {
+        if (ASensor_getHandle(sensor) != mScreenSensor) {
+            // Start new sensor.
+            mHeadSensor = mPoseProvider->startSensor(sensor, mSensorPeriod);
+        } else {
+            // Sensor is already enabled.
+            mHeadSensor = mScreenSensor;
+        }
+    } else {
+        mHeadSensor = SensorPoseProvider::INVALID_HANDLE;
+    }
+
+    mProcessor->recenter(true, false);
 }
 
 void SpatializerPoseController::setScreenSensor(const ASensor* sensor) {
     std::lock_guard lock(mMutex);
-    // Stop current sensor, if valid.
-    if (mScreenSensor != SensorPoseProvider::INVALID_HANDLE) {
+    // Stop current sensor, if valid and different from the other sensor.
+    if (mScreenSensor != SensorPoseProvider::INVALID_HANDLE && mScreenSensor != mHeadSensor) {
         mPoseProvider->stopSensor(mScreenSensor);
     }
-    // Start new sensor, if valid.
-    mScreenSensor = sensor != nullptr ? mPoseProvider->startSensor(sensor, mSensorPeriod)
-                                      : SensorPoseProvider::INVALID_HANDLE;
-    mProcessor->recenter();
+
+    if (sensor != nullptr) {
+        if (ASensor_getHandle(sensor) != mHeadSensor) {
+            // Start new sensor.
+            mScreenSensor = mPoseProvider->startSensor(sensor, mSensorPeriod);
+        } else {
+            // Sensor is already enabled.
+            mScreenSensor = mHeadSensor;
+        }
+    } else {
+        mScreenSensor = SensorPoseProvider::INVALID_HANDLE;
+    }
+
+    mProcessor->recenter(false, true);
 }
 
 void SpatializerPoseController::setDesiredMode(HeadTrackingMode mode) {
@@ -188,7 +208,8 @@ void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const 
     std::lock_guard lock(mMutex);
     if (sensor == mHeadSensor) {
         mProcessor->setWorldToHeadPose(timestamp, pose, twist.value_or(Twist3f()));
-    } else if (sensor == mScreenSensor) {
+    }
+    if (sensor == mScreenSensor) {
         mProcessor->setWorldToScreenPose(timestamp, pose);
     }
 }
