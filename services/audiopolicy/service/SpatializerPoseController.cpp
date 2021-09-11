@@ -15,7 +15,7 @@
  */
 #include "SpatializerPoseController.h"
 
-#define LOG_TAG "VirtualizerStageController"
+#define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
@@ -34,10 +34,10 @@ using namespace std::chrono_literals;
 namespace {
 
 // This is how fast, in m/s, we allow position to shift during rate-limiting.
-constexpr auto kMaxTranslationalVelocity = 2 ;
+constexpr auto kMaxTranslationalVelocity = 2;
 
 // This is how fast, in rad/s, we allow rotation angle to shift during rate-limiting.
-constexpr auto kMaxRotationalVelocity = 4 * M_PI ;
+constexpr auto kMaxRotationalVelocity = 4 * M_PI;
 
 // This should be set to the typical time scale that the translation sensors used drift in. This
 // means, loosely, for how long we can trust the reading to be "accurate enough". This would
@@ -73,8 +73,8 @@ constexpr auto kTicksPerSecond = Ticks::period::den;
 }  // namespace
 
 SpatializerPoseController::SpatializerPoseController(Listener* listener,
-                                                       std::chrono::microseconds sensorPeriod,
-                                                       std::chrono::microseconds maxUpdatePeriod)
+                                                     std::chrono::microseconds sensorPeriod,
+                                                     std::chrono::microseconds maxUpdatePeriod)
     : mListener(listener),
       mSensorPeriod(sensorPeriod),
       mPoseProvider(SensorPoseProvider::create("headtracker", this)),
@@ -88,6 +88,8 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
       })),
       mThread([this, maxUpdatePeriod] {
           while (true) {
+              Pose3f headToStage;
+              std::optional<HeadTrackingMode> modeIfChanged;
               {
                   std::unique_lock lock(mMutex);
                   mCondVar.wait_for(lock, maxUpdatePeriod,
@@ -96,7 +98,19 @@ SpatializerPoseController::SpatializerPoseController(Listener* listener,
                       ALOGV("Exiting thread");
                       return;
                   }
-                  calculate_l();
+
+                  // Calculate.
+                  std::tie(headToStage, modeIfChanged) = calculate_l();
+              }
+
+              // Invoke the callbacks outside the lock.
+              mListener->onHeadToStagePose(headToStage);
+              if (modeIfChanged) {
+                  mListener->onActualModeChange(modeIfChanged.value());
+              }
+
+              {
+                  std::lock_guard lock(mMutex);
                   if (!mCalculated) {
                       mCalculated = true;
                       mCondVar.notify_all();
@@ -185,17 +199,20 @@ void SpatializerPoseController::waitUntilCalculated() {
     mCondVar.wait(lock, [this] { return mCalculated; });
 }
 
-void SpatializerPoseController::calculate_l() {
+std::tuple<media::Pose3f, std::optional<media::HeadTrackingMode>>
+SpatializerPoseController::calculate_l() {
     Pose3f headToStage;
     HeadTrackingMode mode;
+    std::optional<media::HeadTrackingMode> modeIfChanged;
+
     mProcessor->calculate(elapsedRealtimeNano());
     headToStage = mProcessor->getHeadToStagePose();
     mode = mProcessor->getActualMode();
-    mListener->onHeadToStagePose(headToStage);
     if (!mActualMode.has_value() || mActualMode.value() != mode) {
         mActualMode = mode;
-        mListener->onActualModeChange(mode);
+        modeIfChanged = mode;
     }
+    return std::make_tuple(headToStage, modeIfChanged);
 }
 
 void SpatializerPoseController::recenter() {
@@ -204,7 +221,7 @@ void SpatializerPoseController::recenter() {
 }
 
 void SpatializerPoseController::onPose(int64_t timestamp, int32_t sensor, const Pose3f& pose,
-                                        const std::optional<Twist3f>& twist) {
+                                       const std::optional<Twist3f>& twist) {
     std::lock_guard lock(mMutex);
     if (sensor == mHeadSensor) {
         mProcessor->setWorldToHeadPose(timestamp, pose, twist.value_or(Twist3f()));

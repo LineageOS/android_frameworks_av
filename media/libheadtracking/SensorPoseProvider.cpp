@@ -101,6 +101,8 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
     }
 
     ~SensorPoseProviderImpl() override {
+        // Disable all active sensors.
+        mEnabledSensors.clear();
         ALooper_wake(mLooper);
         mThread.join();
     }
@@ -109,12 +111,12 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         int32_t handle = ASensor_getHandle(sensor);
 
         // Enable the sensor.
-        if (ASensorEventQueue_registerSensor(mQueue->get(), sensor, samplingPeriod.count(), 0)) {
+        if (ASensorEventQueue_registerSensor(mQueue, sensor, samplingPeriod.count(), 0)) {
             ALOGE("Failed to enable sensor");
             return INVALID_HANDLE;
         }
 
-        mEnabledSensors.emplace(handle, SensorEnableGuard(mQueue->get(), sensor));
+        mEnabledSensors.emplace(handle, SensorEnableGuard(mQueue, sensor));
         return handle;
     }
 
@@ -123,9 +125,10 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
   private:
     ALooper* mLooper;
     Listener* const mListener;
+
     std::thread mThread;
     std::map<int32_t, SensorEnableGuard> mEnabledSensors;
-    std::unique_ptr<EventQueueGuard> mQueue;
+    ASensorEventQueue* mQueue;
 
     // We must do some of the initialization operations on the worker thread, because the API relies
     // on the thread-local looper. In addition, as a matter of convenience, we store some of the
@@ -159,16 +162,15 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
         }
 
         // Create event queue.
-        ASensorEventQueue* queue =
-                ASensorManager_createEventQueue(sensor_manager, mLooper, kIdent, nullptr, nullptr);
+        mQueue = ASensorManager_createEventQueue(sensor_manager, mLooper, kIdent, nullptr, nullptr);
 
-        if (queue == nullptr) {
+        if (mQueue == nullptr) {
             ALOGE("Failed to create a sensor event queue");
             initFinished(false);
             return;
         }
 
-        mQueue.reset(new EventQueueGuard(sensor_manager, queue));
+        EventQueueGuard eventQueueGuard(sensor_manager, mQueue);
 
         initFinished(true);
 
@@ -190,7 +192,7 @@ class SensorPoseProviderImpl : public SensorPoseProvider {
 
             // Process an event.
             ASensorEvent event;
-            ssize_t size = ASensorEventQueue_getEvents(queue, &event, 1);
+            ssize_t size = ASensorEventQueue_getEvents(mQueue, &event, 1);
             if (size < 0 || size > 1) {
                 ALOGE("Unexpected return value from ASensorEventQueue_getEvents: %zd", size);
                 break;

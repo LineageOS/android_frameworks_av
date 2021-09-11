@@ -52,34 +52,63 @@ static constexpr audio_channel_mask_t kChannelPositionMasks[] = {
     AUDIO_CHANNEL_OUT_22POINT2,
 };
 
-static constexpr audio_channel_mask_t kConsideredChannels =
-    (audio_channel_mask_t)(AUDIO_CHANNEL_OUT_7POINT1 | AUDIO_CHANNEL_OUT_BACK_CENTER);
+constexpr float COEF_25 = 0.2508909536f;
+constexpr float COEF_35 = 0.3543928915f;
+constexpr float COEF_36 = 0.3552343859f;
+constexpr float COEF_61 = 0.6057043428f;
 
-constexpr inline float kScaleFromChannelIdx[] = {
+constexpr inline float kScaleFromChannelIdxLeft[] = {
     1.f,       // AUDIO_CHANNEL_OUT_FRONT_LEFT            = 0x1u,
-    1.f,       // AUDIO_CHANNEL_OUT_FRONT_RIGHT           = 0x2u,
+    0.f,       // AUDIO_CHANNEL_OUT_FRONT_RIGHT           = 0x2u,
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_FRONT_CENTER          = 0x4u,
     0.5f,      // AUDIO_CHANNEL_OUT_LOW_FREQUENCY         = 0x8u,
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_BACK_LEFT             = 0x10u,
-    M_SQRT1_2, // AUDIO_CHANNEL_OUT_BACK_RIGHT            = 0x20u,
-    0,         // AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER  = 0x40u,
-    0,         // AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER = 0x80u,
+    0.f,       // AUDIO_CHANNEL_OUT_BACK_RIGHT            = 0x20u,
+    COEF_61,   // AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER  = 0x40u,
+    COEF_25,   // AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER = 0x80u,
     0.5f,      // AUDIO_CHANNEL_OUT_BACK_CENTER           = 0x100u,
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_SIDE_LEFT             = 0x200u,
+    0.f,       // AUDIO_CHANNEL_OUT_SIDE_RIGHT            = 0x400u,
+    COEF_36,   // AUDIO_CHANNEL_OUT_TOP_CENTER            = 0x800u,
+    1.f,       // AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT        = 0x1000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER      = 0x2000u,
+    0.f,       // AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT       = 0x4000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_TOP_BACK_LEFT         = 0x8000u,
+    COEF_35,   // AUDIO_CHANNEL_OUT_TOP_BACK_CENTER       = 0x10000u,
+    0.f,       // AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT        = 0x20000u,
+    COEF_61,   // AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT         = 0x40000u,
+    0.f,       // AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT        = 0x80000u,
+    1.f,       // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_LEFT     = 0x100000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_CENTER   = 0x200000u,
+    0.f, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_RIGHT    = 0x400000u,
+    0.f, // AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2       = 0x800000u,
+};
+
+constexpr inline float kScaleFromChannelIdxRight[] = {
+    0.f,       // AUDIO_CHANNEL_OUT_FRONT_LEFT            = 0x1u,
+    1.f,       // AUDIO_CHANNEL_OUT_FRONT_RIGHT           = 0x2u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_FRONT_CENTER          = 0x4u,
+    0.5f,      // AUDIO_CHANNEL_OUT_LOW_FREQUENCY         = 0x8u,
+    0.f,       // AUDIO_CHANNEL_OUT_BACK_LEFT             = 0x10u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_BACK_RIGHT            = 0x20u,
+    COEF_25,   // AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER  = 0x40u,
+    COEF_61,   // AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER = 0x80u,
+    0.5f,      // AUDIO_CHANNEL_OUT_BACK_CENTER           = 0x100u,
+    0.f,       // AUDIO_CHANNEL_OUT_SIDE_LEFT             = 0x200u,
     M_SQRT1_2, // AUDIO_CHANNEL_OUT_SIDE_RIGHT            = 0x400u,
-    0, // AUDIO_CHANNEL_OUT_TOP_CENTER            = 0x800u,
-    0, // AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT        = 0x1000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER      = 0x2000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT       = 0x4000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_BACK_LEFT         = 0x8000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_BACK_CENTER       = 0x10000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT        = 0x20000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT         = 0x40000u,
-    0, // AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT        = 0x80000u,
-    0, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_LEFT     = 0x100000u,
-    0, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_CENTER   = 0x200000u,
-    0, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_RIGHT    = 0x400000u,
-    0, // AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2       = 0x800000u,
+    COEF_36,   // AUDIO_CHANNEL_OUT_TOP_CENTER            = 0x800u,
+    0.f,       // AUDIO_CHANNEL_OUT_TOP_FRONT_LEFT        = 0x1000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_TOP_FRONT_CENTER      = 0x2000u,
+    1.f,       // AUDIO_CHANNEL_OUT_TOP_FRONT_RIGHT       = 0x4000u,
+    0.f,       // AUDIO_CHANNEL_OUT_TOP_BACK_LEFT         = 0x8000u,
+    COEF_35,   // AUDIO_CHANNEL_OUT_TOP_BACK_CENTER       = 0x10000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_TOP_BACK_RIGHT        = 0x20000u,
+    0.f,       // AUDIO_CHANNEL_OUT_TOP_SIDE_LEFT         = 0x40000u,
+    COEF_61,   // AUDIO_CHANNEL_OUT_TOP_SIDE_RIGHT        = 0x80000u,
+    0.f,       // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_LEFT     = 0x100000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_CENTER   = 0x200000u,
+    1.f,       // AUDIO_CHANNEL_OUT_BOTTOM_FRONT_RIGHT    = 0x400000u,
+    M_SQRT1_2, // AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2       = 0x800000u,
 };
 
 // Downmix doesn't change with sample rate
@@ -155,30 +184,40 @@ public:
             savedPower[index][0] = power[0];
             savedPower[index][1] = power[1];
 
-            // Confirm exactly the mix amount prescribed by the existing downmix effect.
-            // For future changes to the downmix effect, the nearness needs to be relaxed
-            // to compare behavior S or earlier.
-            if ((channelBit & kConsideredChannels) == 0) {
-                // for channels not considered, expect 0 power for legacy downmix
-                EXPECT_EQ(0.f, power[0]);
-                EXPECT_EQ(0.f, power[1]);
-                continue;
-            }
-
             constexpr float POWER_TOLERANCE = 0.001;
-            const float expectedPower = kScaleFromChannelIdx[index] * kScaleFromChannelIdx[index];
+            const float expectedPower =
+                    kScaleFromChannelIdxLeft[index] * kScaleFromChannelIdxLeft[index]
+                    + kScaleFromChannelIdxRight[index] * kScaleFromChannelIdxRight[index];
+            EXPECT_NEAR(expectedPower, power[0] + power[1], POWER_TOLERANCE);
             switch (side) {
             case AUDIO_GEOMETRY_SIDE_LEFT:
-                EXPECT_EQ(0.f, power[1]); // always true
-                EXPECT_NEAR(expectedPower, power[0], POWER_TOLERANCE);
+                if (channelBit == AUDIO_CHANNEL_OUT_FRONT_LEFT_OF_CENTER) {
+                    break;
+                }
+                EXPECT_EQ(0.f, power[1]);
                 break;
             case AUDIO_GEOMETRY_SIDE_RIGHT:
-                EXPECT_EQ(0.f, power[0]); // always true
-                EXPECT_NEAR(expectedPower, power[1], POWER_TOLERANCE);
+                if (channelBit == AUDIO_CHANNEL_OUT_FRONT_RIGHT_OF_CENTER) {
+                    break;
+                }
+                EXPECT_EQ(0.f, power[0]);
                 break;
             case AUDIO_GEOMETRY_SIDE_CENTER:
-                EXPECT_NEAR_EPSILON(power[0], power[1]); // always true
-                EXPECT_NEAR(expectedPower, power[0], POWER_TOLERANCE);
+                if (channelBit == AUDIO_CHANNEL_OUT_LOW_FREQUENCY) {
+                    if (channelMask & AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2) {
+                        EXPECT_EQ(0.f, power[1]);
+                        break;
+                    } else {
+                        EXPECT_NEAR_EPSILON(power[0], power[1]); // always true
+                        EXPECT_NEAR(expectedPower, power[0] + power[1], POWER_TOLERANCE);
+                        break;
+                    }
+                } else if (channelBit == AUDIO_CHANNEL_OUT_LOW_FREQUENCY_2) {
+                    EXPECT_EQ(0.f, power[0]);
+                    EXPECT_NEAR(expectedPower, power[1], POWER_TOLERANCE);
+                    break;
+                }
+                EXPECT_NEAR_EPSILON(power[0], power[1]);
                 break;
             }
         }
