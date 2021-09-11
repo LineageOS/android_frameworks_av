@@ -38,15 +38,13 @@ namespace android {
  * - By setting a timeout in the ctor, a calculation will be triggered after the timeout elapsed
  *   from the last calculateAsync() call.
  *
- * This class is thread-safe. Callbacks are invoked with the lock held, so it is illegal to call
- * into this module from the callbacks.
+ * This class is thread-safe.
  */
 class SpatializerPoseController : private media::SensorPoseProvider::Listener {
   public:
     /**
      * Listener interface for getting pose and mode updates.
-     * Methods will always be invoked from a designated thread. Calling into the parent class from
-     * within the callbacks is disallowed (will result in a deadlock).
+     * Methods will always be invoked from a designated thread.
      */
     class Listener {
       public:
@@ -109,7 +107,7 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
 
     /**
      * Blocks until calculation and invocation of the respective callbacks has happened at least
-     * once.
+     * once. Do not call from within callbacks.
      */
     void waitUntilCalculated();
 
@@ -131,7 +129,11 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     void onPose(int64_t timestamp, int32_t sensor, const media::Pose3f& pose,
                 const std::optional<media::Twist3f>& twist) override;
 
-    void calculate_l();
+    /**
+     * Calculates the new outputs and updates internal state. Must be called with the lock held.
+     * Returns values that should be passed to the respective callbacks.
+     */
+    std::tuple<media::Pose3f, std::optional<media::HeadTrackingMode>> calculate_l();
 };
 
 }  // namespace android
