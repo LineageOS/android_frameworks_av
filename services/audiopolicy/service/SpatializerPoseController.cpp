@@ -15,7 +15,7 @@
  */
 #include "SpatializerPoseController.h"
 
-#define LOG_TAG "VirtualizerStageController"
+#define LOG_TAG "SpatializerPoseController"
 //#define LOG_NDEBUG 0
 #include <utils/Log.h>
 #include <utils/SystemClock.h>
