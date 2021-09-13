@@ -17,17 +17,29 @@
 package android.media;
 
 import android.media.SpatializationLevel;
+import android.media.SpatializerHeadTrackingMode;
 
 /**
  * The INativeSpatializerCallback interface is a callback associated to the
- * ISpatializer interface. The callback is used by the spatializer stage
- * implementation in native audio server to communicate stage changes to the
+ * ISpatializer interface. The callback is used by the spatializer
+ * implementation in native audio server to communicate state changes to the
  * client controlling the spatializer with the ISpatializer interface.
  * {@hide}
  */
-interface INativeSpatializerCallback {
-    /** Called when the spatialization level applied by the vitualizer stage changes
+oneway interface INativeSpatializerCallback {
+    /** Called when the spatialization level applied by the spatializer changes
      * (e.g. when the spatializer is enabled or disabled)
      */
-    oneway void onLevelChanged(SpatializationLevel level);
+    void onLevelChanged(SpatializationLevel level);
+
+    /** Called when the head tracking mode has changed
+     */
+    void onHeadTrackingModeChanged(SpatializerHeadTrackingMode mode);
+
+    /** Called when the head to stage pose hase been updated
+     * The head to stage pose is conveyed as a vector of 6 elements,
+     * where the first three are a translation vector and
+     * the last three are a rotation vector.
+     */
+    void onHeadToSoundStagePoseUpdated(in float[] headToStage);
 }
