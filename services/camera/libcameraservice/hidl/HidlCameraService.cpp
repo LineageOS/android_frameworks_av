@@ -279,6 +279,9 @@ Return<void> HidlCameraService::getCameraVendorTagSections(getCameraVendorTagSec
         size_t numSections = sectionNames->size();
         std::vector<std::vector<HVendorTag>> tagsBySection(numSections);
         int tagCount = desc->getTagCount();
+        if (tagCount <= 0) {
+            continue;
+        }
         std::vector<uint32_t> tags(tagCount);
         desc->getTagArray(tags.data());
         for (int i = 0; i < tagCount; i++) {
