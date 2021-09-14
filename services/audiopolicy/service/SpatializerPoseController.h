@@ -115,8 +115,9 @@ class SpatializerPoseController : private media::SensorPoseProvider::Listener {
     mutable std::mutex mMutex;
     Listener* const mListener;
     const std::chrono::microseconds mSensorPeriod;
-    std::unique_ptr<media::SensorPoseProvider> mPoseProvider;
+    // Order matters for the following two members to ensure correct destruction.
     std::unique_ptr<media::HeadTrackingProcessor> mProcessor;
+    std::unique_ptr<media::SensorPoseProvider> mPoseProvider;
     int32_t mHeadSensor = media::SensorPoseProvider::INVALID_HANDLE;
     int32_t mScreenSensor = media::SensorPoseProvider::INVALID_HANDLE;
     std::optional<media::HeadTrackingMode> mActualMode;
